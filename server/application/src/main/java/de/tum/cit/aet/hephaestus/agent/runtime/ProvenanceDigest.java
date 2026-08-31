@@ -76,8 +76,7 @@ public final class ProvenanceDigest {
     private static void updateSegment(MessageDigest digest, byte[] content, int from, int to) {
         int length = to - from;
         digest.update(
-            new byte[] { (byte) (length >>> 24), (byte) (length >>> 16), (byte) (length >>> 8), (byte) length }
-        );
+                new byte[] {(byte) (length >>> 24), (byte) (length >>> 16), (byte) (length >>> 8), (byte) length});
         digest.update(content, from, length);
     }
 

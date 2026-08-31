@@ -15,9 +15,7 @@ import tools.jackson.databind.JsonNode;
 public class SlackChannelDeletedMessageHandler extends SlackChannelLifecycleMessageHandler {
 
     public SlackChannelDeletedMessageHandler(
-        SlackChannelLifecycleService lifecycleService,
-        NatsMessageDeserializer deserializer
-    ) {
+            SlackChannelLifecycleService lifecycleService, NatsMessageDeserializer deserializer) {
         super("channel_deleted", lifecycleService, deserializer);
     }
 

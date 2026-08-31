@@ -1,21 +1,34 @@
 # Scripts
 
-Utility scripts for Hephaestus development. All TypeScript scripts run via `tsx` (no compilation needed).
+The Node.js version pinned in `package.json#devEngines.runtime` executes these TypeScript utilities
+using native type stripping.
 
-## Prerequisites
-
-Scripts use dependencies from the root `package.json`. Run `pnpm install` at the repo root first.
+Most scripts require `pnpm install` at the repository root. Jean setup performs that installation.
 
 ## Available Scripts
 
-### Database Utilities
+### Repository orchestration
 
-Database documentation commands use `db-utils.sh` and require Docker with the Compose plugin:
+Infrastructure tests use `node:test`; Vitest is reserved for the Vite-managed webapp and docs trees.
 
-```bash
-pnpm run db:generate-erd-docs                    # Generate Mermaid ERD diagram
-pnpm run db:draft-changelog                       # Generate Liquibase changelog diff
-```
+Substantive developer orchestration under `scripts/` uses typed Node.js entry points:
+
+| Command | Purpose |
+| --- | --- |
+| `pnpm run check:ports` | Validate configured local ports and report listeners. |
+| `pnpm run db:draft-changelog` | Rebuild a disposable database and generate a Liquibase diff. |
+| `pnpm run db:generate-erd-docs` | Apply migrations and regenerate the Mermaid ERD. |
+| `pnpm run e2e:setup -- <options>` | Configure a local E2E workspace against the selected SCM and model provider. Secrets are environment-only. |
+| `pnpm run jean:public-test -- <command>` | Manage the machine-local public test route. |
+
+The database commands require Docker with the Compose plugin.
+
+`jean:public-test` accepts `start`, `stop`, `status`, `smoke`, and `seed-status`. The route is
+internet-facing and requires Docker, the machine's Coolify network and Traefik configuration
+directory, and `server/.env`.
+
+Jean runs `node "$JEAN_ROOT_PATH/scripts/jean-setup.ts"` from a new worktree to copy machine-local
+configuration and install dependencies. It is not a general contributor command.
 
 **ERD generation environment variables:**
 
@@ -64,11 +77,13 @@ pnpm run nats:extract-examples -- --event push --event pull_request:opened
 | `--until <iso>`           | Only messages before this timestamp |
 | `--dry-run`               | Validate config without extracting  |
 
-## Dependencies
+## Retained shell boundaries
 
-Scripts depend on packages in root `package.json`:
+The retained shell files run where shell is already part of the runtime:
 
-- `tsx` - TypeScript execution
-- `commander` - CLI parsing
-- `pg` and `@types/pg` - PostgreSQL client with TypeScript types
-- `@nats-io/jetstream` and `@nats-io/transport-node` - NATS JetStream client
+- `.husky/_/husky.sh` is Husky's generated, minimal Git-hook bootstrap.
+- `docker/self-host/setup.sh` bootstraps an operator installation before the repository toolchain is available; its test
+  orchestration is typed TypeScript under `scripts/`.
+- `webapp/docker/entrypoint.sh` prepares assets in the final nginx image, which does not contain Node.
+
+No substantive shell script is permitted under `scripts/`.

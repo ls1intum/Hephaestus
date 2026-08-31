@@ -40,19 +40,14 @@ public class AccountBootstrapService {
     private final String configuredToken;
 
     public AccountBootstrapService(
-        AccountRepository accountRepository,
-        AuthEventLogger authEventLogger,
-        AuthProperties authProperties
-    ) {
+            AccountRepository accountRepository, AuthEventLogger authEventLogger, AuthProperties authProperties) {
         this.accountRepository = accountRepository;
         this.authEventLogger = authEventLogger;
         this.configuredToken = authProperties.bootstrapToken();
         if (enabled()) {
-            log.warn(
-                "auth.bootstrap: break-glass token endpoint POST /auth/bootstrap-admin is ENABLED " +
-                    "(hephaestus.auth.bootstrap-token set). It self-disables once an admin exists; " +
-                    "unset it after bootstrapping."
-            );
+            log.warn("auth.bootstrap: break-glass token endpoint POST /auth/bootstrap-admin is ENABLED "
+                    + "(hephaestus.auth.bootstrap-token set). It self-disables once an admin exists; "
+                    + "unset it after bootstrapping.");
         }
     }
 
@@ -81,16 +76,14 @@ public class AccountBootstrapService {
         if (promoted == 0) {
             // Either an APP_ADMIN already exists (self-disabled) or this account is already one.
             throw new ResponseStatusException(
-                HttpStatus.CONFLICT,
-                "bootstrap unavailable: an administrator already exists"
-            );
+                    HttpStatus.CONFLICT, "bootstrap unavailable: an administrator already exists");
         }
         authEventLogger
-            .event(AuthEvent.EventType.APP_ROLE_CHANGED, AuthEvent.Result.SUCCESS)
-            .account(accountId)
-            .actingAccount(accountId)
-            .details("{\"from\":\"USER\",\"to\":\"APP_ADMIN\",\"via\":\"bootstrap-token\"}")
-            .record();
+                .event(AuthEvent.EventType.APP_ROLE_CHANGED, AuthEvent.Result.SUCCESS)
+                .account(accountId)
+                .actingAccount(accountId)
+                .details("{\"from\":\"USER\",\"to\":\"APP_ADMIN\",\"via\":\"bootstrap-token\"}")
+                .record();
         log.warn("auth.bootstrap: accountId={} self-promoted to APP_ADMIN via break-glass token", accountId);
     }
 

@@ -9,37 +9,36 @@ import org.jspecify.annotations.Nullable;
  * {@link WorkspaceLlmConnection}, not here, so every field is safe to record verbatim.
  */
 record WorkspaceLlmModelSnapshot(
-    String slug,
-    String displayName,
-    String upstreamModelId,
-    @Nullable Integer contextWindow,
-    @Nullable Integer maxOutputTokens,
-    boolean supportsReasoning,
-    PricingMode pricingMode,
-    @Nullable BigDecimal per1mInputUsd,
-    @Nullable BigDecimal per1mOutputUsd,
-    @Nullable BigDecimal per1mCacheReadUsd,
-    @Nullable BigDecimal per1mCacheWriteUsd,
-    String currency,
-    @Nullable String priceNote,
-    boolean enabled
-) implements ConfigAuditSnapshot {
+        String slug,
+        String displayName,
+        String upstreamModelId,
+        @Nullable Integer contextWindow,
+        @Nullable Integer maxOutputTokens,
+        boolean supportsReasoning,
+        PricingMode pricingMode,
+        @Nullable BigDecimal per1mInputUsd,
+        @Nullable BigDecimal per1mOutputUsd,
+        @Nullable BigDecimal per1mCacheReadUsd,
+        @Nullable BigDecimal per1mCacheWriteUsd,
+        String currency,
+        @Nullable String priceNote,
+        boolean enabled)
+        implements ConfigAuditSnapshot {
     static WorkspaceLlmModelSnapshot of(WorkspaceLlmModel m) {
         return new WorkspaceLlmModelSnapshot(
-            m.getSlug(),
-            m.getDisplayName(),
-            m.getUpstreamModelId(),
-            m.getContextWindow(),
-            m.getMaxOutputTokens(),
-            m.isSupportsReasoning(),
-            m.getPricingMode(),
-            m.getPer1mInputUsd(),
-            m.getPer1mOutputUsd(),
-            m.getPer1mCacheReadUsd(),
-            m.getPer1mCacheWriteUsd(),
-            m.getCurrency(),
-            m.getPriceNote(),
-            m.isEnabled()
-        );
+                m.getSlug(),
+                m.getDisplayName(),
+                m.getUpstreamModelId(),
+                m.getContextWindow(),
+                m.getMaxOutputTokens(),
+                m.isSupportsReasoning(),
+                m.getPricingMode(),
+                m.getPer1mInputUsd(),
+                m.getPer1mOutputUsd(),
+                m.getPer1mCacheReadUsd(),
+                m.getPer1mCacheWriteUsd(),
+                m.getCurrency(),
+                m.getPriceNote(),
+                m.isEnabled());
     }
 }

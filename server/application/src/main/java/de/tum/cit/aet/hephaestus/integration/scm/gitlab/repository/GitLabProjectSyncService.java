@@ -47,13 +47,12 @@ public class GitLabProjectSyncService {
     private final IdentityProviderRepository gitProviderRepository;
 
     public GitLabProjectSyncService(
-        GitLabGraphQlClientProvider graphQlClientProvider,
-        GitLabGraphQlResponseHandler responseHandler,
-        GitLabProjectProcessor projectProcessor,
-        GitLabGroupProcessor groupProcessor,
-        GitLabProperties gitLabProperties,
-        IdentityProviderRepository gitProviderRepository
-    ) {
+            GitLabGraphQlClientProvider graphQlClientProvider,
+            GitLabGraphQlResponseHandler responseHandler,
+            GitLabProjectProcessor projectProcessor,
+            GitLabGroupProcessor groupProcessor,
+            GitLabProperties gitLabProperties,
+            IdentityProviderRepository gitProviderRepository) {
         this.graphQlClientProvider = graphQlClientProvider;
         this.responseHandler = responseHandler;
         this.projectProcessor = projectProcessor;
@@ -70,12 +69,9 @@ public class GitLabProjectSyncService {
      */
     private IdentityProvider resolveProvider() {
         return gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITLAB, gitLabProperties.defaultServerUrl())
-            .orElseThrow(() ->
-                new IllegalStateException(
-                    "IdentityProvider not found for type=GITLAB, serverUrl=" + gitLabProperties.defaultServerUrl()
-                )
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITLAB, gitLabProperties.defaultServerUrl())
+                .orElseThrow(() -> new IllegalStateException("IdentityProvider not found for type=GITLAB, serverUrl="
+                        + gitLabProperties.defaultServerUrl()));
     }
 
     /**
@@ -101,11 +97,10 @@ public class GitLabProjectSyncService {
             graphQlClientProvider.acquirePermission();
             HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
 
-            ClientGraphQlResponse response = client
-                .documentName(GET_PROJECT_DOCUMENT)
-                .variable("fullPath", projectFullPath)
-                .execute()
-                .block(gitLabProperties.graphqlTimeout());
+            ClientGraphQlResponse response = client.documentName(GET_PROJECT_DOCUMENT)
+                    .variable("fullPath", projectFullPath)
+                    .execute()
+                    .block(gitLabProperties.graphqlTimeout());
 
             var handleResult = responseHandler.handle(response, "project " + safeProjectPath, log);
             if (handleResult.action() != GitLabGraphQlResponseHandler.HandleResult.Action.CONTINUE) {
@@ -115,15 +110,13 @@ public class GitLabProjectSyncService {
 
             graphQlClientProvider.recordSuccess();
 
-            GitLabProjectResponse project = Objects.requireNonNull(response)
-                .field("project")
-                .toEntity(GitLabProjectResponse.class);
+            GitLabProjectResponse project =
+                    Objects.requireNonNull(response).field("project").toEntity(GitLabProjectResponse.class);
             if (project == null) {
                 log.warn(
-                    "Skipped project sync: reason=notFoundOnGitLab, scopeId={}, projectPath={}",
-                    scopeId,
-                    safeProjectPath
-                );
+                        "Skipped project sync: reason=notFoundOnGitLab, scopeId={}, projectPath={}",
+                        scopeId,
+                        safeProjectPath);
                 return Optional.empty();
             }
 
@@ -134,10 +127,9 @@ public class GitLabProjectSyncService {
                 organization = groupProcessor.process(groupData, providerId);
                 if (organization == null) {
                     log.warn(
-                        "Skipped project sync: reason=groupProcessingFailed, scopeId={}, projectPath={}",
-                        scopeId,
-                        safeProjectPath
-                    );
+                            "Skipped project sync: reason=groupProcessingFailed, scopeId={}, projectPath={}",
+                            scopeId,
+                            safeProjectPath);
                     return Optional.empty();
                 }
             }
@@ -145,11 +137,10 @@ public class GitLabProjectSyncService {
             Repository repository = projectProcessor.processGraphQlResponse(project, organization, provider);
             if (repository != null) {
                 log.info(
-                    "Synced project: scopeId={}, repoId={}, projectPath={}",
-                    scopeId,
-                    repository.getId(),
-                    safeProjectPath
-                );
+                        "Synced project: scopeId={}, repoId={}, projectPath={}",
+                        scopeId,
+                        repository.getId(),
+                        safeProjectPath);
             }
 
             return Optional.ofNullable(repository);

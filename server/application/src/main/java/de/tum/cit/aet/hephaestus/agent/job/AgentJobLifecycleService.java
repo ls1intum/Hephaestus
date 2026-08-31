@@ -9,6 +9,8 @@ import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.WorkerJobCancelDispatcher;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchRepository;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.Set;
@@ -35,16 +37,19 @@ public class AgentJobLifecycleService {
     private final Optional<WorkerJobCancelDispatcher> workerJobCancelDispatcher;
     private final LlmUsageRecorder usageRecorder;
     private final ObjectMapper objectMapper;
+    private final FeedbackDispatchRepository feedbackDispatchRepository;
+    private final AgentJobTelemetry jobTelemetry;
 
     public AgentJobLifecycleService(
-        AgentJobRepository agentJobRepository,
-        JobTypeHandlerRegistry handlerRegistry,
-        TransactionTemplate transactionTemplate,
-        @Nullable SandboxManager sandboxManager,
-        Optional<WorkerJobCancelDispatcher> workerJobCancelDispatcher,
-        LlmUsageRecorder usageRecorder,
-        ObjectMapper objectMapper
-    ) {
+            AgentJobRepository agentJobRepository,
+            JobTypeHandlerRegistry handlerRegistry,
+            TransactionTemplate transactionTemplate,
+            @Nullable SandboxManager sandboxManager,
+            Optional<WorkerJobCancelDispatcher> workerJobCancelDispatcher,
+            LlmUsageRecorder usageRecorder,
+            ObjectMapper objectMapper,
+            FeedbackDispatchRepository feedbackDispatchRepository,
+            AgentJobTelemetry jobTelemetry) {
         this.agentJobRepository = agentJobRepository;
         this.handlerRegistry = handlerRegistry;
         this.transactionTemplate = transactionTemplate;
@@ -52,6 +57,8 @@ public class AgentJobLifecycleService {
         this.workerJobCancelDispatcher = workerJobCancelDispatcher;
         this.usageRecorder = usageRecorder;
         this.objectMapper = objectMapper;
+        this.feedbackDispatchRepository = feedbackDispatchRepository;
+        this.jobTelemetry = jobTelemetry;
     }
 
     /**
@@ -63,39 +70,47 @@ public class AgentJobLifecycleService {
     public AgentJob retryDelivery(Long workspaceId, UUID jobId) {
         int updated = transactionTemplate.execute(status -> {
             requireJob(workspaceId, jobId);
-
-            return agentJobRepository.transitionDeliveryStatus(
-                jobId,
-                DeliveryStatus.PENDING,
-                Set.of(DeliveryStatus.FAILED)
-            );
+            int transitioned = agentJobRepository.transitionDeliveryStatus(
+                    jobId, DeliveryStatus.PENDING, Set.of(DeliveryStatus.FAILED));
+            if (transitioned == 1) {
+                feedbackDispatchRepository.resetFailedAutomaticPackage(jobId, workspaceId);
+            }
+            return transitioned;
         });
 
         if (updated == 0) {
             throw new AgentJobStateConflictException(
-                "Cannot retry delivery: job must be COMPLETED with delivery status FAILED"
-            );
+                    "Cannot retry delivery: job must be COMPLETED with delivery status FAILED");
         }
 
         // Reload after the CAS commit so the entity is not stale.
-        AgentJob job = transactionTemplate.execute(status ->
-            agentJobRepository
+        AgentJob job = transactionTemplate.execute(status -> agentJobRepository
                 .findById(jobId)
-                .orElseThrow(() -> new EntityNotFoundException("AgentJob", jobId.toString()))
-        );
+                .orElseThrow(() -> new EntityNotFoundException("AgentJob", jobId.toString())));
 
         // Delivery leaves the database (GitHub/GitLab), so it must not run inside a transaction.
         JobTypeHandler handler = handlerRegistry.getHandler(job.getJobType());
+        Instant deliveryStarted = Instant.now();
         try {
             handler.deliver(job);
-            transactionTemplate.executeWithoutResult(tx ->
-                agentJobRepository.updateDeliveryStatus(jobId, DeliveryStatus.DELIVERED, job.getDeliveryCommentId())
-            );
+            transactionTemplate.executeWithoutResult(tx -> agentJobRepository.updateDeliveryStatus(
+                    jobId, DeliveryStatus.DELIVERED, job.getDeliveryCommentId()));
             log.info("Delivery retry succeeded: jobId={}", jobId);
+            jobTelemetry.transition(
+                    job,
+                    "agent.job.delivery",
+                    AgentJobTelemetry.Phase.DELIVERY,
+                    AgentJobTelemetry.Outcome.DELIVERED,
+                    Duration.between(deliveryStarted, Instant.now()));
         } catch (Exception e) {
             transactionTemplate.executeWithoutResult(tx ->
-                agentJobRepository.updateDeliveryStatus(jobId, DeliveryStatus.FAILED, job.getDeliveryCommentId())
-            );
+                    agentJobRepository.updateDeliveryStatus(jobId, DeliveryStatus.FAILED, job.getDeliveryCommentId()));
+            jobTelemetry.transition(
+                    job,
+                    "agent.job.delivery",
+                    AgentJobTelemetry.Phase.DELIVERY,
+                    AgentJobTelemetry.Outcome.DELIVERY_FAILED,
+                    Duration.between(deliveryStarted, Instant.now()));
             log.warn("Delivery retry failed: jobId={}, error={}", jobId, e.getMessage(), e);
             throw new AgentJobStateConflictException("Delivery retry failed: " + e.getMessage(), e);
         }
@@ -138,18 +153,13 @@ public class AgentJobLifecycleService {
 
     private AgentJob requireJob(Long workspaceId, UUID jobId) {
         return agentJobRepository
-            .findByIdAndWorkspaceId(jobId, workspaceId)
-            .orElseThrow(() -> new EntityNotFoundException("AgentJob", jobId.toString()));
+                .findByIdAndWorkspaceId(jobId, workspaceId)
+                .orElseThrow(() -> new EntityNotFoundException("AgentJob", jobId.toString()));
     }
 
     private int casToCancelled(UUID jobId) {
         return agentJobRepository.transitionStatus(
-            jobId,
-            AgentJobStatus.CANCELLED,
-            Instant.now(),
-            null,
-            ACTIVE_STATUSES
-        );
+                jobId, AgentJobStatus.CANCELLED, Instant.now(), null, ACTIVE_STATUSES);
     }
 
     /** The status-transition CAS + races, run inside {@link #transactionTemplate}. */
@@ -168,8 +178,7 @@ public class AgentJobLifecycleService {
             AgentJob raced = requireJob(workspaceId, jobId);
             if (raced.getStatus().isTerminal()) {
                 throw new AgentJobStateConflictException(
-                    "Cannot cancel job " + jobId + " — executor already moved it to " + raced.getStatus()
-                );
+                        "Cannot cancel job " + jobId + " — executor already moved it to " + raced.getStatus());
             }
             // Back inside the CAS window, so a concurrent claim moved it there; retry once and then
             // report whatever state the loser observes rather than spinning against the executor.
@@ -177,8 +186,7 @@ public class AgentJobLifecycleService {
                 AgentJob racedAgain = requireJob(workspaceId, jobId);
                 if (racedAgain.getStatus() != AgentJobStatus.CANCELLED) {
                     throw new AgentJobStateConflictException(
-                        "Cannot cancel job " + jobId + " — executor moved it to " + racedAgain.getStatus()
-                    );
+                            "Cannot cancel job " + jobId + " — executor moved it to " + racedAgain.getStatus());
                 }
                 return new CancelOutcome(racedAgain, false);
             }
@@ -187,6 +195,7 @@ public class AgentJobLifecycleService {
         // Reload to read worker_id, which is only set at claim.
         AgentJob fresh = requireJob(workspaceId, jobId);
         recordUnverifiableUsageIfStarted(workspaceId, fresh);
+        jobTelemetry.terminal(fresh, AgentJobStatus.CANCELLED, AgentJobTelemetry.age(fresh));
         return new CancelOutcome(fresh, true);
     }
 
@@ -201,7 +210,7 @@ public class AgentJobLifecycleService {
         }
         ConfigSnapshot snap = ConfigSnapshot.fromJson(job.getConfigSnapshot(), objectMapper);
         LlmPriceSnapshot price =
-            snap.priceSnapshot() != null ? snap.priceSnapshot() : LlmPriceSnapshot.unpricedInstance();
+                snap.priceSnapshot() != null ? snap.priceSnapshot() : LlmPriceSnapshot.unpricedInstance();
         // A cancel from the API cannot see what the attempt consumed; the executor path that observes
         // the cancellation bills the proxy-attributed tokens. This row records that the spend is unknown.
         TerminalUsage.none().appendTo(usageRecorder, workspaceId, job, snap.upstreamModelId(), price);
@@ -231,49 +240,37 @@ public class AgentJobLifecycleService {
             existing = handler.findExistingDelivery(job);
         } catch (RuntimeException e) {
             log.debug(
-                "Existing-delivery dedup check failed (treated as unknown): jobId={}, error={}",
-                job.getId(),
-                e.getMessage()
-            );
+                    "Existing-delivery dedup check failed (treated as unknown): jobId={}, error={}",
+                    job.getId(),
+                    e.getMessage());
             existing = ExistingDeliveryLookup.unknown();
         }
 
         if (existing.kind() == ExistingDeliveryLookup.Kind.UNKNOWN) {
             log.debug(
-                "Existing-delivery dedup check was inconclusive — leaving PENDING rather than risking a " +
-                    "duplicate post: jobId={}",
-                job.getId()
-            );
+                    "Existing-delivery dedup check was inconclusive — leaving PENDING rather than risking a "
+                            + "duplicate post: jobId={}",
+                    job.getId());
             return false;
         }
 
-        if (existing.kind() == ExistingDeliveryLookup.Kind.FOUND) {
+        if (existing.kind() == ExistingDeliveryLookup.Kind.FOUND && !handler.reconcilesMoreThanOneProviderObject()) {
             String existingCommentId = existing.commentId();
-            boolean won = fencedDeliveryWrite(
-                job.getId(),
-                DeliveryStatus.DELIVERED,
-                existingCommentId,
-                claimedAttempts
-            );
+            boolean won =
+                    fencedDeliveryWrite(job.getId(), DeliveryStatus.DELIVERED, existingCommentId, claimedAttempts);
             if (won) {
                 log.info(
-                    "Delivery recovery found an already-posted comment (crash before recording) — not re-posting: jobId={}, commentId={}",
-                    job.getId(),
-                    existingCommentId
-                );
+                        "Delivery recovery found an already-posted comment (crash before recording) — not re-posting: jobId={}, commentId={}",
+                        job.getId(),
+                        existingCommentId);
             }
             return won;
         }
 
-        // ABSENT — confirmed safe to post.
         try {
             handler.deliver(job);
             boolean won = fencedDeliveryWrite(
-                job.getId(),
-                DeliveryStatus.DELIVERED,
-                job.getDeliveryCommentId(),
-                claimedAttempts
-            );
+                    job.getId(), DeliveryStatus.DELIVERED, job.getDeliveryCommentId(), claimedAttempts);
             if (won) {
                 log.info("Delivery recovery succeeded: jobId={}", job.getId());
             }
@@ -288,27 +285,15 @@ public class AgentJobLifecycleService {
 
     /** Logs rather than throws when the fence is lost: a superseded attempt is expected to no-op. */
     private boolean fencedDeliveryWrite(
-        UUID jobId,
-        DeliveryStatus newStatus,
-        @Nullable String commentId,
-        short claimedAttempts
-    ) {
-        Integer updated = transactionTemplate.execute(tx ->
-            agentJobRepository.transitionDeliveryStatusFenced(
-                jobId,
-                newStatus,
-                commentId,
-                Set.of(DeliveryStatus.PENDING),
-                claimedAttempts
-            )
-        );
+            UUID jobId, DeliveryStatus newStatus, @Nullable String commentId, short claimedAttempts) {
+        Integer updated = transactionTemplate.execute(tx -> agentJobRepository.transitionDeliveryStatusFenced(
+                jobId, newStatus, commentId, Set.of(DeliveryStatus.PENDING), claimedAttempts));
         boolean won = updated != null && updated > 0;
         if (!won) {
             log.info(
-                "Delivery-recovery terminal write superseded by a later attempt — leaving current state: jobId={}, attemptedStatus={}",
-                jobId,
-                newStatus
-            );
+                    "Delivery-recovery terminal write superseded by a later attempt — leaving current state: jobId={}, attemptedStatus={}",
+                    jobId,
+                    newStatus);
         }
         return won;
     }

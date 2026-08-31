@@ -108,19 +108,18 @@ public class GitHubIssueSyncService {
     private record IssueWithProjectItemCursor(Issue issue, String nodeId, String projectItemCursor) {}
 
     public GitHubIssueSyncService(
-        RepositoryRepository repositoryRepository,
-        GitHubGraphQlClientProvider graphQlClientProvider,
-        GitHubIssueProcessor issueProcessor,
-        GitHubIssueCommentProcessor commentProcessor,
-        GitHubIssueCommentSyncService commentSyncService,
-        GitHubProjectItemSyncService projectItemSyncService,
-        BackfillStateProvider backfillStateProvider,
-        TransactionTemplate transactionTemplate,
-        GitHubSyncProperties syncProperties,
-        SyncSchedulerProperties syncSchedulerProperties,
-        GitHubExceptionClassifier exceptionClassifier,
-        GitHubGraphQlSyncCoordinator graphQlSyncHelper
-    ) {
+            RepositoryRepository repositoryRepository,
+            GitHubGraphQlClientProvider graphQlClientProvider,
+            GitHubIssueProcessor issueProcessor,
+            GitHubIssueCommentProcessor commentProcessor,
+            GitHubIssueCommentSyncService commentSyncService,
+            GitHubProjectItemSyncService projectItemSyncService,
+            BackfillStateProvider backfillStateProvider,
+            TransactionTemplate transactionTemplate,
+            GitHubSyncProperties syncProperties,
+            SyncSchedulerProperties syncSchedulerProperties,
+            GitHubExceptionClassifier exceptionClassifier,
+            GitHubGraphQlSyncCoordinator graphQlSyncHelper) {
         this.repositoryRepository = repositoryRepository;
         this.graphQlClientProvider = graphQlClientProvider;
         this.issueProcessor = issueProcessor;
@@ -168,11 +167,7 @@ public class GitHubIssueSyncService {
      * @return sync result containing status and count of issues synced
      */
     public SyncResult syncForRepository(
-        Long scopeId,
-        Long repositoryId,
-        @Nullable Long syncTargetId,
-        @Nullable String initialCursor
-    ) {
+            Long scopeId, Long repositoryId, @Nullable Long syncTargetId, @Nullable String initialCursor) {
         return syncForRepository(scopeId, repositoryId, syncTargetId, initialCursor, null);
     }
 
@@ -201,18 +196,15 @@ public class GitHubIssueSyncService {
      * @return sync result containing status and count of issues synced
      */
     public SyncResult syncForRepository(
-        Long scopeId,
-        Long repositoryId,
-        @Nullable Long syncTargetId,
-        @Nullable String initialCursor,
-        @Nullable Instant lastSyncTimestamp
-    ) {
+            Long scopeId,
+            Long repositoryId,
+            @Nullable Long syncTargetId,
+            @Nullable String initialCursor,
+            @Nullable Instant lastSyncTimestamp) {
         // Fetch repository outside of transaction to avoid holding locks during API calls
-        Optional<Repository> repositoryResult = transactionTemplate.execute(status ->
-            repositoryRepository.findById(repositoryId)
-        );
-        @Nullable
-        Repository repository = repositoryResult == null ? null : repositoryResult.orElse(null);
+        Optional<Repository> repositoryResult =
+                transactionTemplate.execute(status -> repositoryRepository.findById(repositoryId));
+        @Nullable Repository repository = repositoryResult == null ? null : repositoryResult.orElse(null);
         if (repository == null) {
             log.debug("Skipped issue sync: reason=repositoryNotFound, repoId={}", repositoryId);
             return SyncResult.completed(0);
@@ -240,20 +232,18 @@ public class GitHubIssueSyncService {
                 Instant bufferedTimestamp = lastSyncTimestamp.minus(syncProperties.incrementalSyncBuffer());
                 sinceDateTime = bufferedTimestamp.atOffset(ZoneOffset.UTC);
                 log.info(
-                    "Starting incremental issue sync: repoName={}, since={}, buffer={}",
-                    safeNameWithOwner,
-                    sinceDateTime,
-                    syncProperties.incrementalSyncBuffer()
-                );
+                        "Starting incremental issue sync: repoName={}, since={}, buffer={}",
+                        safeNameWithOwner,
+                        sinceDateTime,
+                        syncProperties.incrementalSyncBuffer());
             } else {
                 // First sync - use configured timeframe as fallback to limit initial data fetch
                 sinceDateTime = OffsetDateTime.now(ZoneOffset.UTC).minusDays(syncSchedulerProperties.timeframeDays());
                 log.info(
-                    "Starting first issue sync with timeframe fallback: repoName={}, timeframeDays={}, since={}",
-                    safeNameWithOwner,
-                    syncSchedulerProperties.timeframeDays(),
-                    sinceDateTime
-                );
+                        "Starting first issue sync with timeframe fallback: repoName={}, timeframeDays={}, since={}",
+                        safeNameWithOwner,
+                        syncSchedulerProperties.timeframeDays(),
+                        sinceDateTime);
             }
             isIncrementalSync = true;
         }
@@ -267,17 +257,15 @@ public class GitHubIssueSyncService {
             int updatedCount = probeIssueCount(client, ownerAndName, sinceDateTime, timeout, safeNameWithOwner);
             if (updatedCount == 0) {
                 log.info(
-                    "Skipped issue sync: reason=noUpdatedIssues, repoName={}, since={}",
-                    safeNameWithOwner,
-                    sinceDateTime
-                );
+                        "Skipped issue sync: reason=noUpdatedIssues, repoName={}, since={}",
+                        safeNameWithOwner,
+                        sinceDateTime);
                 return SyncResult.completed(0);
             }
             log.info(
-                "Issue count probe found {} updated issues, proceeding with full sync: repoName={}",
-                updatedCount,
-                safeNameWithOwner
-            );
+                    "Issue count probe found {} updated issues, proceeding with full sync: repoName={}",
+                    updatedCount,
+                    safeNameWithOwner);
         }
 
         int totalIssuesSynced = 0;
@@ -300,20 +288,18 @@ public class GitHubIssueSyncService {
 
         if (initialCursor != null) {
             log.info(
-                "Resuming issue sync from checkpoint: repoName={}, cursor={}",
-                safeNameWithOwner,
-                initialCursor.substring(0, Math.min(20, initialCursor.length())) + "..."
-            );
+                    "Resuming issue sync from checkpoint: repoName={}, cursor={}",
+                    safeNameWithOwner,
+                    initialCursor.substring(0, Math.min(20, initialCursor.length())) + "...");
         }
 
         while (hasMore) {
             pageCount++;
             if (pageCount >= MAX_PAGINATION_PAGES) {
                 log.warn(
-                    "Reached maximum pagination limit for issue sync: repoName={}, limit={}",
-                    safeNameWithOwner,
-                    MAX_PAGINATION_PAGES
-                );
+                        "Reached maximum pagination limit for issue sync: repoName={}, limit={}",
+                        safeNameWithOwner,
+                        MAX_PAGINATION_PAGES);
                 break;
             }
 
@@ -327,70 +313,58 @@ public class GitHubIssueSyncService {
                 final OffsetDateTime sinceDt = sinceDateTime;
 
                 ClientGraphQlResponse response = Mono.defer(() -> {
-                    var requestBuilder = client
-                        .documentName(QUERY_DOCUMENT)
-                        .variable("owner", ownerAndName.owner())
-                        .variable("name", ownerAndName.name())
-                        .variable(
-                            "first",
-                            adaptPageSize(ISSUE_SYNC_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId))
-                        )
-                        .variable("after", currentCursor);
+                            var requestBuilder = client.documentName(QUERY_DOCUMENT)
+                                    .variable("owner", ownerAndName.owner())
+                                    .variable("name", ownerAndName.name())
+                                    .variable(
+                                            "first",
+                                            adaptPageSize(
+                                                    ISSUE_SYNC_PAGE_SIZE,
+                                                    graphQlClientProvider.getRateLimitRemaining(scopeId)))
+                                    .variable("after", currentCursor);
 
-                    // Add 'since' parameter for incremental sync (filters by updatedAt >= since)
-                    if (sinceDt != null) {
-                        requestBuilder = requestBuilder.variable("since", sinceDt.toString());
-                    }
+                            // Add 'since' parameter for incremental sync (filters by updatedAt >= since)
+                            if (sinceDt != null) {
+                                requestBuilder = requestBuilder.variable("since", sinceDt.toString());
+                            }
 
-                    return requestBuilder.execute();
-                })
-                    .retryWhen(
-                        Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
-                            .maxBackoff(TRANSPORT_MAX_BACKOFF)
-                            .jitter(JITTER_FACTOR)
-                            .filter(ScmTransportErrors::isTransportError)
-                            .doBeforeRetry(signal ->
-                                log.warn(
-                                    "Retrying issue sync after transport error: repoName={}, page={}, attempt={}, error={}",
-                                    safeNameWithOwner,
-                                    currentPage,
-                                    signal.totalRetries() + 1,
-                                    signal.failure().getMessage()
-                                )
-                            )
-                    )
-                    .block(timeout);
+                            return requestBuilder.execute();
+                        })
+                        .retryWhen(Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
+                                .maxBackoff(TRANSPORT_MAX_BACKOFF)
+                                .jitter(JITTER_FACTOR)
+                                .filter(ScmTransportErrors::isTransportError)
+                                .doBeforeRetry(signal -> log.warn(
+                                        "Retrying issue sync after transport error: repoName={}, page={}, attempt={}, error={}",
+                                        safeNameWithOwner,
+                                        currentPage,
+                                        signal.totalRetries() + 1,
+                                        signal.failure().getMessage())))
+                        .block(timeout);
 
                 if (response == null || !response.isValid()) {
                     ClassificationResult classification = graphQlSyncHelper.classifyGraphQlErrors(response);
                     if (classification != null) {
-                        if (
-                            graphQlSyncHelper.handleGraphQlClassification(
-                                new GraphQlClassificationContext(
-                                    classification,
-                                    retryAttempt,
-                                    MAX_RETRY_ATTEMPTS,
-                                    "issue sync",
-                                    "repoName",
-                                    safeNameWithOwner,
-                                    log
-                                )
-                            )
-                        ) {
+                        if (graphQlSyncHelper.handleGraphQlClassification(new GraphQlClassificationContext(
+                                classification,
+                                retryAttempt,
+                                MAX_RETRY_ATTEMPTS,
+                                "issue sync",
+                                "repoName",
+                                safeNameWithOwner,
+                                log))) {
                             retryAttempt++;
                             continue;
                         }
-                        abortReason =
-                            classification.category() == Category.RATE_LIMITED
+                        abortReason = classification.category() == Category.RATE_LIMITED
                                 ? SyncResult.Status.ABORTED_RATE_LIMIT
                                 : SyncResult.Status.ABORTED_ERROR;
                         break;
                     }
                     log.warn(
-                        "Received invalid GraphQL response: repoName={}, errors={}",
-                        safeNameWithOwner,
-                        response != null ? response.getErrors() : "null"
-                    );
+                            "Received invalid GraphQL response: repoName={}, errors={}",
+                            safeNameWithOwner,
+                            response != null ? response.getErrors() : "null");
                     abortReason = SyncResult.Status.ABORTED_ERROR;
                     break;
                 }
@@ -400,23 +374,19 @@ public class GitHubIssueSyncService {
 
                 // Check if we should pause due to rate limiting
                 if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
-                    if (
-                        !graphQlSyncHelper.waitForRateLimitIfNeeded(
-                            scopeId,
-                            "issue sync",
-                            "repoName",
-                            safeNameWithOwner,
-                            log
-                        )
-                    ) {
+                    if (!graphQlSyncHelper.waitForRateLimitIfNeeded(
+                            scopeId, "issue sync", "repoName", safeNameWithOwner, log)) {
                         abortReason = SyncResult.Status.ABORTED_RATE_LIMIT;
                         break;
                     }
                 }
 
-                GHIssueConnection connection = response.field("repository.issues").toEntity(GHIssueConnection.class);
+                GHIssueConnection connection =
+                        response.field("repository.issues").toEntity(GHIssueConnection.class);
 
-                if (connection == null || connection.getNodes() == null || connection.getNodes().isEmpty()) {
+                if (connection == null
+                        || connection.getNodes() == null
+                        || connection.getNodes().isEmpty()) {
                     break;
                 }
 
@@ -429,17 +399,15 @@ public class GitHubIssueSyncService {
                 // Process the page within its own transaction to keep transactions short
                 final Long repoId = repositoryId;
                 PageResult pageResult = transactionTemplate.execute(status -> {
-                    Repository repo = repositoryRepository.findByIdWithOrganization(repoId).orElse(null);
+                    Repository repo = repositoryRepository
+                            .findByIdWithOrganization(repoId)
+                            .orElse(null);
                     if (repo == null) {
                         return new PageResult(0, 0, 0);
                     }
                     ProcessingContext context = ProcessingContext.forSync(scopeId, repo);
                     return processIssuePage(
-                        connection,
-                        context,
-                        issuesNeedingCommentPagination,
-                        issuesNeedingProjectItemPagination
-                    );
+                            connection, context, issuesNeedingCommentPagination, issuesNeedingProjectItemPagination);
                 });
 
                 if (pageResult != null) {
@@ -472,11 +440,10 @@ public class GitHubIssueSyncService {
                         if (retryAttempt < MAX_RETRY_ATTEMPTS) {
                             retryAttempt++;
                             log.warn(
-                                "Retrying issue sync after transient error: repoName={}, attempt={}, error={}",
-                                safeNameWithOwner,
-                                retryAttempt,
-                                classification.message()
-                            );
+                                    "Retrying issue sync after transient error: repoName={}, attempt={}, error={}",
+                                    safeNameWithOwner,
+                                    retryAttempt,
+                                    classification.message());
                             try {
                                 ExponentialBackoff.sleep(retryAttempt);
                             } catch (InterruptedException ie) {
@@ -488,11 +455,10 @@ public class GitHubIssueSyncService {
                             continue; // Retry the same page
                         }
                         log.error(
-                            "Failed to sync issues after {} retries: repoName={}, error={}",
-                            MAX_RETRY_ATTEMPTS,
-                            safeNameWithOwner,
-                            classification.message()
-                        );
+                                "Failed to sync issues after {} retries: repoName={}, error={}",
+                                MAX_RETRY_ATTEMPTS,
+                                safeNameWithOwner,
+                                classification.message());
                         abortReason = SyncResult.Status.ABORTED_ERROR;
                         break;
                     }
@@ -501,74 +467,66 @@ public class GitHubIssueSyncService {
                         if (retryAttempt < MAX_RETRY_ATTEMPTS && classification.suggestedWait() != null) {
                             retryAttempt++;
                             long waitMs = Math.min(
-                                classification.suggestedWait().toMillis(),
-                                300_000 // Cap at 5 minutes
-                            );
+                                    classification.suggestedWait().toMillis(), 300_000 // Cap at 5 minutes
+                                    );
                             log.warn(
-                                "Rate limited during issue sync, waiting: repoName={}, waitMs={}, attempt={}",
-                                safeNameWithOwner,
-                                waitMs,
-                                retryAttempt
-                            );
+                                    "Rate limited during issue sync, waiting: repoName={}, waitMs={}, attempt={}",
+                                    safeNameWithOwner,
+                                    waitMs,
+                                    retryAttempt);
                             try {
                                 Thread.sleep(waitMs);
                             } catch (InterruptedException ie) {
                                 Thread.currentThread().interrupt();
                                 log.warn(
-                                    "Issue sync interrupted during rate limit wait: repoName={}",
-                                    safeNameWithOwner
-                                );
+                                        "Issue sync interrupted during rate limit wait: repoName={}",
+                                        safeNameWithOwner);
                                 abortReason = SyncResult.Status.ABORTED_RATE_LIMIT;
                                 break;
                             }
                             continue; // Retry the same page
                         }
                         log.error(
-                            "Aborting issue sync due to rate limiting: repoName={}, error={}",
-                            safeNameWithOwner,
-                            classification.message()
-                        );
+                                "Aborting issue sync due to rate limiting: repoName={}, error={}",
+                                safeNameWithOwner,
+                                classification.message());
                         abortReason = SyncResult.Status.ABORTED_RATE_LIMIT;
                         break;
                     }
                     case NOT_FOUND -> {
                         // Resource not found - skip and continue
                         log.warn(
-                            "Resource not found during issue sync, skipping: repoName={}, error={}",
-                            safeNameWithOwner,
-                            classification.message()
-                        );
+                                "Resource not found during issue sync, skipping: repoName={}, error={}",
+                                safeNameWithOwner,
+                                classification.message());
                         abortReason = SyncResult.Status.ABORTED_ERROR;
                         break;
                     }
                     case AUTH_ERROR -> {
                         // Authentication error - abort sync
                         log.error(
-                            "Aborting issue sync due to auth error: repoName={}, error={}",
-                            safeNameWithOwner,
-                            classification.message()
-                        );
+                                "Aborting issue sync due to auth error: repoName={}, error={}",
+                                safeNameWithOwner,
+                                classification.message());
                         abortReason = SyncResult.Status.ABORTED_ERROR;
                         break;
                     }
                     case CLIENT_ERROR -> {
                         // Client error - abort sync
                         log.error(
-                            "Aborting issue sync due to client error: repoName={}, error={}",
-                            safeNameWithOwner,
-                            classification.message()
-                        );
+                                "Aborting issue sync due to client error: repoName={}, error={}",
+                                safeNameWithOwner,
+                                classification.message());
                         abortReason = SyncResult.Status.ABORTED_ERROR;
                         break;
                     }
                     default -> {
                         // Unknown error - log and abort
                         log.error(
-                            "Aborting issue sync due to unknown error: repoName={}, error={}",
-                            safeNameWithOwner,
-                            classification.message(),
-                            e
-                        );
+                                "Aborting issue sync due to unknown error: repoName={}, error={}",
+                                safeNameWithOwner,
+                                classification.message(),
+                                e);
                         abortReason = SyncResult.Status.ABORTED_ERROR;
                         break;
                     }
@@ -583,28 +541,19 @@ public class GitHubIssueSyncService {
         if (reportedTotalCount >= 0 && !incrementalSync) {
             boolean stoppedEarly = abortReason != null || hasMore;
             GraphQlConnectionOverflowDetector.checkPaginated(
-                "issues",
-                issuesReceived,
-                reportedTotalCount,
-                stoppedEarly,
-                safeNameWithOwner
-            );
+                    "issues", issuesReceived, reportedTotalCount, stoppedEarly, safeNameWithOwner);
         }
 
         // Fetch remaining comments for issues with >10 comments (using cursor for efficient continuation)
         // Each call to syncRemainingComments handles its own transactions
         if (!issuesNeedingCommentPagination.isEmpty()) {
             log.debug(
-                "Starting additional comment fetch for issues with pagination: repoName={}, issueCount={}",
-                safeNameWithOwner,
-                issuesNeedingCommentPagination.size()
-            );
+                    "Starting additional comment fetch for issues with pagination: repoName={}, issueCount={}",
+                    safeNameWithOwner,
+                    issuesNeedingCommentPagination.size());
             for (IssueWithCommentCursor issueWithCursor : issuesNeedingCommentPagination) {
                 int additionalComments = commentSyncService.syncRemainingComments(
-                    scopeId,
-                    issueWithCursor.issue(),
-                    issueWithCursor.commentCursor()
-                );
+                        scopeId, issueWithCursor.issue(), issueWithCursor.commentCursor());
                 totalCommentsSynced += additionalComments;
             }
         }
@@ -613,19 +562,17 @@ public class GitHubIssueSyncService {
         // Each call to syncRemainingProjectItems handles its own transactions
         if (!issuesNeedingProjectItemPagination.isEmpty()) {
             log.debug(
-                "Starting additional project item fetch for issues with pagination: repoName={}, issueCount={}",
-                safeNameWithOwner,
-                issuesNeedingProjectItemPagination.size()
-            );
+                    "Starting additional project item fetch for issues with pagination: repoName={}, issueCount={}",
+                    safeNameWithOwner,
+                    issuesNeedingProjectItemPagination.size());
             for (IssueWithProjectItemCursor issueWithCursor : issuesNeedingProjectItemPagination) {
                 int additionalItems = projectItemSyncService.syncRemainingProjectItems(
-                    scopeId,
-                    issueWithCursor.nodeId(),
-                    false, // Not a pull request
-                    issueWithCursor.issue().requireRepository(),
-                    issueWithCursor.projectItemCursor(),
-                    issueWithCursor.issue().getId()
-                );
+                        scopeId,
+                        issueWithCursor.nodeId(),
+                        false, // Not a pull request
+                        issueWithCursor.issue().requireRepository(),
+                        issueWithCursor.projectItemCursor(),
+                        issueWithCursor.issue().getId());
                 totalProjectItemsSynced += additionalItems;
             }
         }
@@ -640,18 +587,17 @@ public class GitHubIssueSyncService {
         SyncResult.Status finalStatus = abortReason != null ? abortReason : SyncResult.Status.COMPLETED;
 
         log.info(
-            "Completed issue sync: repoName={}, issueCount={}, commentCount={}, projectItemCount={}, issuesWithCommentPagination={}, issuesWithProjectItemPagination={}, scopeId={}, resumed={}, incremental={}, status={}",
-            safeNameWithOwner,
-            totalIssuesSynced,
-            totalCommentsSynced,
-            totalProjectItemsSynced,
-            issuesNeedingCommentPagination.size(),
-            issuesNeedingProjectItemPagination.size(),
-            scopeId,
-            resuming,
-            incrementalSync,
-            finalStatus
-        );
+                "Completed issue sync: repoName={}, issueCount={}, commentCount={}, projectItemCount={}, issuesWithCommentPagination={}, issuesWithProjectItemPagination={}, scopeId={}, resumed={}, incremental={}, status={}",
+                safeNameWithOwner,
+                totalIssuesSynced,
+                totalCommentsSynced,
+                totalProjectItemsSynced,
+                issuesNeedingCommentPagination.size(),
+                issuesNeedingProjectItemPagination.size(),
+                scopeId,
+                resuming,
+                incrementalSync,
+                finalStatus);
         return new SyncResult(finalStatus, totalIssuesSynced);
     }
 
@@ -668,11 +614,10 @@ public class GitHubIssueSyncService {
      * - Project items (when issue is in more than 5 projects)
      */
     private PageResult processIssuePage(
-        GHIssueConnection connection,
-        ProcessingContext context,
-        List<IssueWithCommentCursor> issuesNeedingCommentPagination,
-        List<IssueWithProjectItemCursor> issuesNeedingProjectItemPagination
-    ) {
+            GHIssueConnection connection,
+            ProcessingContext context,
+            List<IssueWithCommentCursor> issuesNeedingCommentPagination,
+            List<IssueWithProjectItemCursor> issuesNeedingProjectItemPagination) {
         int issuesSynced = 0;
         int commentsSynced = 0;
         int projectItemsSynced = 0;
@@ -701,17 +646,13 @@ public class GitHubIssueSyncService {
             // Track issues that need additional comment pagination (with cursor for efficient continuation)
             if (embeddedComments.needsPagination()) {
                 issuesNeedingCommentPagination.add(
-                    new IssueWithCommentCursor(entity, Objects.requireNonNull(embeddedComments.endCursor()))
-                );
+                        new IssueWithCommentCursor(entity, Objects.requireNonNull(embeddedComments.endCursor())));
             }
 
             // Process embedded project items
             EmbeddedProjectItemsDTO embeddedProjectItems = issueWithComments.embeddedProjectItems();
-            projectItemsSynced += projectItemSyncService.processEmbeddedItems(
-                embeddedProjectItems,
-                context,
-                entity.getId()
-            );
+            projectItemsSynced +=
+                    projectItemSyncService.processEmbeddedItems(embeddedProjectItems, context, entity.getId());
 
             // Track issues that need additional project item pagination
             if (embeddedProjectItems.needsPagination()) {
@@ -720,13 +661,8 @@ public class GitHubIssueSyncService {
                     log.warn("Skipped project-item pagination: reason=missingIssueNodeId, issueId={}", entity.getId());
                     continue;
                 }
-                issuesNeedingProjectItemPagination.add(
-                    new IssueWithProjectItemCursor(
-                        entity,
-                        issueNodeId,
-                        Objects.requireNonNull(embeddedProjectItems.endCursor())
-                    )
-                );
+                issuesNeedingProjectItemPagination.add(new IssueWithProjectItemCursor(
+                        entity, issueNodeId, Objects.requireNonNull(embeddedProjectItems.endCursor())));
             }
         }
 
@@ -741,9 +677,8 @@ public class GitHubIssueSyncService {
      * to avoid Spring proxy issues with self-invocation.
      */
     private void persistCursorCheckpoint(Long syncTargetId, String cursor) {
-        TransactionTemplate requiresNewTemplate = new TransactionTemplate(
-            Objects.requireNonNull(transactionTemplate.getTransactionManager())
-        );
+        TransactionTemplate requiresNewTemplate =
+                new TransactionTemplate(Objects.requireNonNull(transactionTemplate.getTransactionManager()));
         requiresNewTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         requiresNewTemplate.executeWithoutResult(status -> {
             backfillStateProvider.updateSyncCursor(syncTargetId, SyncCursorKind.ISSUE, cursor);
@@ -759,9 +694,8 @@ public class GitHubIssueSyncService {
      * to avoid Spring proxy issues with self-invocation.
      */
     private void clearCursorCheckpoint(Long syncTargetId) {
-        TransactionTemplate requiresNewTemplate = new TransactionTemplate(
-            Objects.requireNonNull(transactionTemplate.getTransactionManager())
-        );
+        TransactionTemplate requiresNewTemplate =
+                new TransactionTemplate(Objects.requireNonNull(transactionTemplate.getTransactionManager()));
         requiresNewTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         requiresNewTemplate.executeWithoutResult(status -> {
             backfillStateProvider.updateSyncCursor(syncTargetId, SyncCursorKind.ISSUE, null);
@@ -786,51 +720,40 @@ public class GitHubIssueSyncService {
      * @return totalCount of matching issues, or -1 if the probe failed
      */
     private int probeIssueCount(
-        HttpGraphQlClient client,
-        RepositoryOwnerAndName ownerAndName,
-        OffsetDateTime sinceDateTime,
-        Duration timeout,
-        String safeNameWithOwner
-    ) {
+            HttpGraphQlClient client,
+            RepositoryOwnerAndName ownerAndName,
+            OffsetDateTime sinceDateTime,
+            Duration timeout,
+            String safeNameWithOwner) {
         try {
-            ClientGraphQlResponse response = Mono.defer(() ->
-                client
-                    .documentName("GetRepositoryIssueCount")
-                    .variable("owner", ownerAndName.owner())
-                    .variable("name", ownerAndName.name())
-                    .variable("since", sinceDateTime.toString())
-                    .execute()
-            )
-                .retryWhen(
-                    Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
-                        .maxBackoff(TRANSPORT_MAX_BACKOFF)
-                        .jitter(JITTER_FACTOR)
-                        .filter(ScmTransportErrors::isTransportError)
-                        .doBeforeRetry(signal ->
-                            log.warn(
-                                "Retrying after transport error: context=issueCountProbe, repoName={}, attempt={}, error={}",
-                                safeNameWithOwner,
-                                signal.totalRetries() + 1,
-                                signal.failure().getMessage()
-                            )
-                        )
-                )
-                .block(timeout);
+            ClientGraphQlResponse response = Mono.defer(() -> client.documentName("GetRepositoryIssueCount")
+                            .variable("owner", ownerAndName.owner())
+                            .variable("name", ownerAndName.name())
+                            .variable("since", sinceDateTime.toString())
+                            .execute())
+                    .retryWhen(Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
+                            .maxBackoff(TRANSPORT_MAX_BACKOFF)
+                            .jitter(JITTER_FACTOR)
+                            .filter(ScmTransportErrors::isTransportError)
+                            .doBeforeRetry(signal -> log.warn(
+                                    "Retrying after transport error: context=issueCountProbe, repoName={}, attempt={}, error={}",
+                                    safeNameWithOwner,
+                                    signal.totalRetries() + 1,
+                                    signal.failure().getMessage())))
+                    .block(timeout);
 
             if (response == null || !response.isValid()) {
                 log.warn(
-                    "Issue count probe returned invalid response, falling back to full sync: repoName={}",
-                    safeNameWithOwner
-                );
+                        "Issue count probe returned invalid response, falling back to full sync: repoName={}",
+                        safeNameWithOwner);
                 return -1;
             }
 
             Integer totalCount = response.field("repository.issues.totalCount").toEntity(Integer.class);
             if (totalCount == null) {
                 log.warn(
-                    "Issue count probe returned null totalCount, falling back to full sync: repoName={}",
-                    safeNameWithOwner
-                );
+                        "Issue count probe returned null totalCount, falling back to full sync: repoName={}",
+                        safeNameWithOwner);
                 return -1;
             }
 
@@ -838,10 +761,9 @@ public class GitHubIssueSyncService {
         } catch (Exception e) {
             // Fail-open: if the probe itself fails, proceed with the full sync
             log.warn(
-                "Issue count probe failed, falling back to full sync: repoName={}, error={}",
-                safeNameWithOwner,
-                e.getMessage()
-            );
+                    "Issue count probe failed, falling back to full sync: repoName={}, error={}",
+                    safeNameWithOwner,
+                    e.getMessage());
             return -1;
         }
     }

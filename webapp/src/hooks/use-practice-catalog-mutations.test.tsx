@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { assert, beforeEach, describe, expect, it, vi } from "vitest";
+
 import {
 	deleteGroupMutation,
 	deletePracticeMutation,
@@ -18,6 +19,7 @@ import {
 	mockPractice,
 	mockPractices,
 } from "@/components/admin/practices/story-mock-data";
+
 import { usePracticeCatalogMutations } from "./use-practice-catalog-mutations";
 
 vi.mock("@/api/@tanstack/react-query.gen", async (importOriginal) => {

@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { fn } from "storybook/test";
+import { expect, fn, userEvent } from "storybook/test";
+
 import type { TeamInfo } from "@/api/types.gen";
+
 import type { ExtendedUserTeams } from "./types";
 import { UsersTable } from "./UsersTable";
 
@@ -142,7 +144,27 @@ const meta: Meta<typeof UsersTable> = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Default: Story = {};
+export const Default: Story = {
+	play: async ({ args, canvas }) => {
+		// The sort lives in the URL, so a column is always sorted — and which one has to be legible
+		// to a screen reader, not only to whoever can see the arrow.
+		await expect(canvas.getByRole("columnheader", { name: "Name" })).toHaveAttribute(
+			"aria-sort",
+			"ascending",
+		);
+		await expect(canvas.getByRole("columnheader", { name: "Username" })).toHaveAttribute(
+			"aria-sort",
+			"none",
+		);
+
+		await userEvent.click(canvas.getByRole("button", { name: "Username" }));
+		await expect(args.onViewChange).toHaveBeenCalledWith({
+			sort: "username",
+			desc: false,
+			page: 0,
+		});
+	},
+};
 
 export const Loading: Story = {
 	args: {

@@ -56,13 +56,12 @@ public class GitHubPullRequestReviewCommentProcessor {
     private final ApplicationEventPublisher eventPublisher;
 
     public GitHubPullRequestReviewCommentProcessor(
-        PullRequestReviewCommentRepository commentRepository,
-        PullRequestRepository prRepository,
-        PullRequestReviewRepository reviewRepository,
-        PullRequestReviewThreadRepository threadRepository,
-        GitHubUserProcessor userProcessor,
-        ApplicationEventPublisher eventPublisher
-    ) {
+            PullRequestReviewCommentRepository commentRepository,
+            PullRequestRepository prRepository,
+            PullRequestReviewRepository reviewRepository,
+            PullRequestReviewThreadRepository threadRepository,
+            GitHubUserProcessor userProcessor,
+            ApplicationEventPublisher eventPublisher) {
         this.commentRepository = commentRepository;
         this.prRepository = prRepository;
         this.reviewRepository = reviewRepository;
@@ -86,11 +85,10 @@ public class GitHubPullRequestReviewCommentProcessor {
      */
     @Transactional
     public @Nullable PullRequestReviewComment processCreated(
-        GitHubPullRequestReviewCommentEventDTO.GitHubReviewCommentDTO dto,
-        long repositoryId,
-        int prNumber,
-        @NonNull ProcessingContext context
-    ) {
+            GitHubPullRequestReviewCommentEventDTO.GitHubReviewCommentDTO dto,
+            long repositoryId,
+            int prNumber,
+            @NonNull ProcessingContext context) {
         if (dto == null || dto.id() == null) {
             log.warn("Skipped review comment processing: reason=nullOrMissingId");
             return null;
@@ -101,14 +99,14 @@ public class GitHubPullRequestReviewCommentProcessor {
             return null;
         }
 
-        PullRequest pr = prRepository.findByRepositoryIdAndNumber(repositoryId, prNumber).orElse(null);
+        PullRequest pr =
+                prRepository.findByRepositoryIdAndNumber(repositoryId, prNumber).orElse(null);
         if (pr == null) {
             log.warn(
-                "Skipped comment creation: reason=prNotFound, repositoryId={}, prNumber={}, commentId={}",
-                repositoryId,
-                prNumber,
-                dto.id()
-            );
+                    "Skipped comment creation: reason=prNotFound, repositoryId={}, prNumber={}, commentId={}",
+                    repositoryId,
+                    prNumber,
+                    dto.id());
             return null;
         }
 
@@ -139,10 +137,9 @@ public class GitHubPullRequestReviewCommentProcessor {
      */
     @Transactional
     public @Nullable PullRequestReviewComment processCreatedWithParentCreation(
-        GitHubPullRequestReviewCommentEventDTO.GitHubReviewCommentDTO dto,
-        GitHubPullRequestDTO prDto,
-        ProcessingContext context
-    ) {
+            GitHubPullRequestReviewCommentEventDTO.GitHubReviewCommentDTO dto,
+            GitHubPullRequestDTO prDto,
+            ProcessingContext context) {
         if (dto == null || dto.id() == null) {
             log.warn("Skipped review comment processing: reason=nullOrMissingId");
             return null;
@@ -156,18 +153,18 @@ public class GitHubPullRequestReviewCommentProcessor {
         // Try to find existing parent entity using repository ID and PR number (not database ID)
         // This avoids inconsistencies between GraphQL and webhook database IDs
         PullRequest pr = prRepository
-            .findByRepositoryIdAndNumber(Objects.requireNonNull(context.repository()).getId(), prDto.number())
-            .orElse(null);
+                .findByRepositoryIdAndNumber(
+                        Objects.requireNonNull(context.repository()).getId(), prDto.number())
+                .orElse(null);
 
         // If parent doesn't exist, create a minimal entity from webhook data
         if (pr == null) {
             pr = createMinimalPullRequest(prDto, context);
             if (pr == null) {
                 log.warn(
-                    "Skipped review comment processing: reason=failedToCreateParent, prNumber={}, commentId={}",
-                    prDto.number(),
-                    dto.id()
-                );
+                        "Skipped review comment processing: reason=failedToCreateParent, prNumber={}, commentId={}",
+                        prDto.number(),
+                        dto.id());
                 return null;
             }
         }
@@ -179,89 +176,76 @@ public class GitHubPullRequestReviewCommentProcessor {
      * Internal method that processes a review comment given a resolved parent PR.
      */
     private PullRequestReviewComment processCreatedInternal(
-        GitHubPullRequestReviewCommentEventDTO.GitHubReviewCommentDTO dto,
-        PullRequest pr,
-        @NonNull ProcessingContext context
-    ) {
+            GitHubPullRequestReviewCommentEventDTO.GitHubReviewCommentDTO dto,
+            PullRequest pr,
+            @NonNull ProcessingContext context) {
         PullRequestReviewThread thread = resolveThread(dto, pr);
         PullRequestReviewComment comment = createComment(dto, pr, thread);
 
         PullRequestReviewComment saved = commentRepository.save(comment);
-        eventPublisher.publishEvent(
-            new ScmDomainEvent.ReviewCommentCreated(
-                ScmEventPayload.ReviewCommentData.from(saved),
-                pr.getId(),
-                EventContext.from(context)
-            )
-        );
+        eventPublisher.publishEvent(new ScmDomainEvent.ReviewCommentCreated(
+                ScmEventPayload.ReviewCommentData.from(saved), pr.getId(), EventContext.from(context)));
         log.debug("Created review comment: commentId={}, threadId={}", dto.id(), thread.getId());
         return saved;
     }
 
     @Transactional
     public @Nullable PullRequestReviewComment processEdited(
-        GitHubPullRequestReviewCommentEventDTO.GitHubReviewCommentDTO dto,
-        Long prId,
-        @NonNull ProcessingContext context
-    ) {
+            GitHubPullRequestReviewCommentEventDTO.GitHubReviewCommentDTO dto,
+            Long prId,
+            @NonNull ProcessingContext context) {
         return commentRepository
-            .findByNativeIdAndProviderId(dto.id(), Objects.requireNonNull(context.providerId()))
-            .map(comment -> {
-                comment.setBody(dto.body());
-                comment.setUpdatedAt(dto.updatedAt());
-                PullRequestReviewComment saved = commentRepository.save(comment);
-                eventPublisher.publishEvent(
-                    new ScmDomainEvent.ReviewCommentEdited(
-                        ScmEventPayload.ReviewCommentData.from(saved),
-                        prId,
-                        Set.of("body"),
-                        EventContext.from(context)
-                    )
-                );
-                log.debug("Updated review comment: commentId={}", dto.id());
-                return saved;
-            })
-            .orElseGet(() -> {
-                log.debug("Skipped comment edit: reason=commentNotFound, commentId={}", dto.id());
-                return null;
-            });
+                .findByNativeIdAndProviderId(dto.id(), Objects.requireNonNull(context.providerId()))
+                .map(comment -> {
+                    comment.setBody(dto.body());
+                    comment.setUpdatedAt(dto.updatedAt());
+                    PullRequestReviewComment saved = commentRepository.save(comment);
+                    eventPublisher.publishEvent(new ScmDomainEvent.ReviewCommentEdited(
+                            ScmEventPayload.ReviewCommentData.from(saved),
+                            prId,
+                            Set.of("body"),
+                            EventContext.from(context)));
+                    log.debug("Updated review comment: commentId={}", dto.id());
+                    return saved;
+                })
+                .orElseGet(() -> {
+                    log.debug("Skipped comment edit: reason=commentNotFound, commentId={}", dto.id());
+                    return null;
+                });
     }
 
     @Transactional
     public void processDeleted(Long commentId, Long prId, @NonNull ProcessingContext context) {
         commentRepository
-            .findByNativeIdAndProviderId(commentId, Objects.requireNonNull(context.providerId()))
-            .ifPresent(comment -> {
-                // CRITICAL: For bidirectional @OneToMany with orphanRemoval=true,
-                // we MUST remove the comment from the thread's collection BEFORE deleting.
-                // Otherwise, the thread's in-memory collection still references the deleted
-                // entity, causing TransientObjectException on flush.
-                PullRequestReviewThread thread = comment.getThread();
-                if (thread != null) {
-                    thread.getComments().remove(comment);
-                }
+                .findByNativeIdAndProviderId(commentId, Objects.requireNonNull(context.providerId()))
+                .ifPresent(comment -> {
+                    // CRITICAL: For bidirectional @OneToMany with orphanRemoval=true,
+                    // we MUST remove the comment from the thread's collection BEFORE deleting.
+                    // Otherwise, the thread's in-memory collection still references the deleted
+                    // entity, causing TransientObjectException on flush.
+                    PullRequestReviewThread thread = comment.getThread();
+                    if (thread != null) {
+                        thread.getComments().remove(comment);
+                    }
 
-                // Also clean up the inReplyTo relationship to avoid dangling references
-                comment.getReplies().forEach(reply -> reply.setInReplyTo(null));
+                    // Also clean up the inReplyTo relationship to avoid dangling references
+                    comment.getReplies().forEach(reply -> reply.setInReplyTo(null));
 
-                commentRepository.delete(comment);
-                log.debug(
-                    "Deleted review comment: commentId={}, threadId={}",
-                    commentId,
-                    thread != null ? thread.getId() : "null"
-                );
-            });
+                    commentRepository.delete(comment);
+                    log.debug(
+                            "Deleted review comment: commentId={}, threadId={}",
+                            commentId,
+                            thread != null ? thread.getId() : "null");
+                });
 
         eventPublisher.publishEvent(
-            new ScmDomainEvent.ReviewCommentDeleted(commentId, prId, EventContext.from(context))
-        );
+                new ScmDomainEvent.ReviewCommentDeleted(commentId, prId, EventContext.from(context)));
     }
 
     private PullRequestReviewComment createComment(
-        GitHubPullRequestReviewCommentEventDTO.GitHubReviewCommentDTO dto,
-        PullRequest pr,
-        PullRequestReviewThread thread
-    ) {
+            GitHubPullRequestReviewCommentEventDTO.GitHubReviewCommentDTO dto,
+            PullRequest pr,
+            PullRequestReviewThread thread) {
         PullRequestReviewComment comment = new PullRequestReviewComment();
         comment.setNativeId(dto.id());
         comment.setProvider(pr.requireRepository().getProvider());
@@ -288,8 +272,7 @@ public class GitHubPullRequestReviewCommentProcessor {
         // Set required fields with sensible defaults
         comment.setCommitId(dto.commitId() != null ? dto.commitId() : "");
         comment.setOriginalCommitId(
-            dto.originalCommitId() != null ? dto.originalCommitId() : dto.commitId() != null ? dto.commitId() : ""
-        );
+                dto.originalCommitId() != null ? dto.originalCommitId() : dto.commitId() != null ? dto.commitId() : "");
         comment.setAuthorAssociation(mapAuthorAssociation(dto.authorAssociation()));
         comment.setLine(dto.line() != null ? dto.line() : 0);
         comment.setOriginalLine(dto.originalLine() != null ? dto.originalLine() : comment.getLine());
@@ -308,19 +291,18 @@ public class GitHubPullRequestReviewCommentProcessor {
         // Link to review if present (reviewId is the provider's native ID, not the JPA PK)
         if (dto.reviewId() != null) {
             reviewRepository
-                .findByNativeIdAndProviderId(
-                    dto.reviewId(),
-                    Objects.requireNonNull(pr.requireRepository().getProvider().getId())
-                )
-                .ifPresent(comment::setReview);
+                    .findByNativeIdAndProviderId(
+                            dto.reviewId(),
+                            Objects.requireNonNull(
+                                    pr.requireRepository().getProvider().getId()))
+                    .ifPresent(comment::setReview);
         }
 
         // Link author if present - ensure user exists (create if needed)
         if (dto.author() != null) {
             User author = userProcessor.ensureExists(
-                dto.author(),
-                Objects.requireNonNull(pr.requireRepository().getProvider().getId())
-            );
+                    dto.author(),
+                    Objects.requireNonNull(pr.requireRepository().getProvider().getId()));
             if (author != null) {
                 comment.setAuthor(author);
             }
@@ -329,11 +311,11 @@ public class GitHubPullRequestReviewCommentProcessor {
         // Link to parent comment if this is a reply
         if (dto.inReplyToId() != null) {
             commentRepository
-                .findByNativeIdAndProviderId(
-                    dto.inReplyToId(),
-                    Objects.requireNonNull(pr.requireRepository().getProvider().getId())
-                )
-                .ifPresent(comment::setInReplyTo);
+                    .findByNativeIdAndProviderId(
+                            dto.inReplyToId(),
+                            Objects.requireNonNull(
+                                    pr.requireRepository().getProvider().getId()))
+                    .ifPresent(comment::setInReplyTo);
         }
 
         return comment;
@@ -351,17 +333,16 @@ public class GitHubPullRequestReviewCommentProcessor {
      * preserving the threading relationship.
      */
     private PullRequestReviewThread resolveThread(
-        GitHubPullRequestReviewCommentEventDTO.GitHubReviewCommentDTO dto,
-        PullRequest pr
-    ) {
+            GitHubPullRequestReviewCommentEventDTO.GitHubReviewCommentDTO dto, PullRequest pr) {
         // If this is a reply, use the parent comment's thread
         if (dto.inReplyToId() != null) {
             // First try to get the thread from the existing parent comment
-            Long providerId = Objects.requireNonNull(pr.requireRepository().getProvider().getId());
+            Long providerId =
+                    Objects.requireNonNull(pr.requireRepository().getProvider().getId());
             var parentThread = commentRepository
-                .findByNativeIdAndProviderId(dto.inReplyToId(), providerId)
-                .map(PullRequestReviewComment::getThread)
-                .orElse(null);
+                    .findByNativeIdAndProviderId(dto.inReplyToId(), providerId)
+                    .map(PullRequestReviewComment::getThread)
+                    .orElse(null);
 
             if (parentThread != null) {
                 return parentThread;
@@ -371,10 +352,9 @@ public class GitHubPullRequestReviewCommentProcessor {
             // Create/find a thread using the PARENT's ID so that when the parent
             // arrives later, it will find the same thread. This preserves threading.
             log.debug(
-                "Reply arrived before parent: commentId={}, inReplyToId={}, using parent's ID for thread",
-                dto.id(),
-                dto.inReplyToId()
-            );
+                    "Reply arrived before parent: commentId={}, inReplyToId={}, using parent's ID for thread",
+                    dto.id(),
+                    dto.inReplyToId());
             return findOrCreateThreadForParent(dto.inReplyToId(), dto, pr);
         }
 
@@ -388,27 +368,25 @@ public class GitHubPullRequestReviewCommentProcessor {
      * when the parent comment arrives later.
      */
     private PullRequestReviewThread findOrCreateThreadForParent(
-        Long parentCommentId,
-        GitHubPullRequestReviewCommentEventDTO.GitHubReviewCommentDTO dto,
-        PullRequest pr
-    ) {
-        Long providerId = Objects.requireNonNull(pr.requireRepository().getProvider().getId());
+            Long parentCommentId, GitHubPullRequestReviewCommentEventDTO.GitHubReviewCommentDTO dto, PullRequest pr) {
+        Long providerId =
+                Objects.requireNonNull(pr.requireRepository().getProvider().getId());
         return threadRepository
-            .findByNativeIdAndProviderId(parentCommentId, providerId)
-            .orElseGet(() -> {
-                PullRequestReviewThread thread = new PullRequestReviewThread();
-                thread.setNativeId(parentCommentId); // Use parent's ID, not this comment's ID
-                thread.setProvider(pr.requireRepository().getProvider());
-                thread.setPullRequest(pr);
-                thread.setPath(dto.path()); // Use reply's path as best guess
-                thread.setLine(dto.line());
-                thread.setStartLine(dto.startLine());
-                thread.setSide(mapSide(Objects.requireNonNullElse(dto.side(), "RIGHT")));
-                thread.setState(PullRequestReviewThread.State.UNRESOLVED);
-                thread.setCreatedAt(dto.createdAt());
-                thread.setUpdatedAt(dto.updatedAt());
-                return threadRepository.save(thread);
-            });
+                .findByNativeIdAndProviderId(parentCommentId, providerId)
+                .orElseGet(() -> {
+                    PullRequestReviewThread thread = new PullRequestReviewThread();
+                    thread.setNativeId(parentCommentId); // Use parent's ID, not this comment's ID
+                    thread.setProvider(pr.requireRepository().getProvider());
+                    thread.setPullRequest(pr);
+                    thread.setPath(dto.path()); // Use reply's path as best guess
+                    thread.setLine(dto.line());
+                    thread.setStartLine(dto.startLine());
+                    thread.setSide(mapSide(Objects.requireNonNullElse(dto.side(), "RIGHT")));
+                    thread.setState(PullRequestReviewThread.State.UNRESOLVED);
+                    thread.setCreatedAt(dto.createdAt());
+                    thread.setUpdatedAt(dto.updatedAt());
+                    return threadRepository.save(thread);
+                });
     }
 
     /**
@@ -416,26 +394,25 @@ public class GitHubPullRequestReviewCommentProcessor {
      * Uses the comment ID as the thread ID since GitHub doesn't provide explicit thread IDs in webhooks.
      */
     private PullRequestReviewThread createSyntheticThread(
-        GitHubPullRequestReviewCommentEventDTO.GitHubReviewCommentDTO dto,
-        PullRequest pr
-    ) {
-        Long providerId = Objects.requireNonNull(pr.requireRepository().getProvider().getId());
+            GitHubPullRequestReviewCommentEventDTO.GitHubReviewCommentDTO dto, PullRequest pr) {
+        Long providerId =
+                Objects.requireNonNull(pr.requireRepository().getProvider().getId());
         return threadRepository
-            .findByNativeIdAndProviderId(dto.id(), providerId)
-            .orElseGet(() -> {
-                PullRequestReviewThread thread = new PullRequestReviewThread();
-                thread.setNativeId(dto.id());
-                thread.setProvider(pr.requireRepository().getProvider());
-                thread.setPullRequest(pr);
-                thread.setPath(dto.path());
-                thread.setLine(dto.line());
-                thread.setStartLine(dto.startLine());
-                thread.setSide(mapSide(Objects.requireNonNullElse(dto.side(), "RIGHT")));
-                thread.setState(PullRequestReviewThread.State.UNRESOLVED);
-                thread.setCreatedAt(dto.createdAt());
-                thread.setUpdatedAt(dto.updatedAt());
-                return threadRepository.save(thread);
-            });
+                .findByNativeIdAndProviderId(dto.id(), providerId)
+                .orElseGet(() -> {
+                    PullRequestReviewThread thread = new PullRequestReviewThread();
+                    thread.setNativeId(dto.id());
+                    thread.setProvider(pr.requireRepository().getProvider());
+                    thread.setPullRequest(pr);
+                    thread.setPath(dto.path());
+                    thread.setLine(dto.line());
+                    thread.setStartLine(dto.startLine());
+                    thread.setSide(mapSide(Objects.requireNonNullElse(dto.side(), "RIGHT")));
+                    thread.setState(PullRequestReviewThread.State.UNRESOLVED);
+                    thread.setCreatedAt(dto.createdAt());
+                    thread.setUpdatedAt(dto.updatedAt());
+                    return threadRepository.save(thread);
+                });
     }
 
     /**
@@ -548,20 +525,18 @@ public class GitHubPullRequestReviewCommentProcessor {
         // Link author
         if (dto.author() != null) {
             User author = userProcessor.ensureExists(
-                dto.author(),
-                Objects.requireNonNull(repository.getProvider().getId())
-            );
+                    dto.author(),
+                    Objects.requireNonNull(repository.getProvider().getId()));
             pr.setAuthor(author);
         }
 
         PullRequest saved = prRepository.save(pr);
         log.info(
-            "Created stub PullRequest from review comment webhook (will be hydrated by PR webhook or sync): " +
-                "prId={}, prNumber={}, repoName={}",
-            saved.getId(),
-            saved.getNumber(),
-            repository.getNameWithOwner()
-        );
+                "Created stub PullRequest from review comment webhook (will be hydrated by PR webhook or sync): "
+                        + "prId={}, prNumber={}, repoName={}",
+                saved.getId(),
+                saved.getNumber(),
+                repository.getNameWithOwner());
         return saved;
     }
 
@@ -582,10 +557,8 @@ public class GitHubPullRequestReviewCommentProcessor {
      */
     private Issue.State convertState(String state) {
         if (state == null) {
-            log.warn(
-                "PR state is null when creating stub from review comment webhook, defaulting to OPEN. " +
-                    "This may indicate missing data in webhook payload."
-            );
+            log.warn("PR state is null when creating stub from review comment webhook, defaulting to OPEN. "
+                    + "This may indicate missing data in webhook payload.");
             return Issue.State.OPEN;
         }
         return switch (state.toUpperCase()) {
@@ -594,9 +567,8 @@ public class GitHubPullRequestReviewCommentProcessor {
             case "MERGED" -> Issue.State.MERGED;
             default -> {
                 log.warn(
-                    "Unknown PR state '{}' when creating stub from review comment webhook, defaulting to OPEN",
-                    state
-                );
+                        "Unknown PR state '{}' when creating stub from review comment webhook, defaulting to OPEN",
+                        state);
                 yield Issue.State.OPEN;
             }
         };

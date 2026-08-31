@@ -41,22 +41,22 @@ class GithubConnectionStrategyTest extends BaseUnitTest {
 
     private GithubConnectionStrategy strategy() {
         return new GithubConnectionStrategy(
-            "https://github.com/apps/heph/installations/new",
-            "123",
-            oauthStateService,
-            connectionService,
-            appTokenService,
-            contentEraser
-        );
+                "https://github.com/apps/heph/installations/new",
+                "123",
+                oauthStateService,
+                connectionService,
+                appTokenService,
+                contentEraser);
     }
 
     @Test
     void initiate_weavesInitiatingAdminActorRefIntoTheOAuthState() {
-        when(oauthStateService.issue(7L, IntegrationKind.GITHUB, "admin@example.com")).thenReturn("state-xyz");
+        when(oauthStateService.issue(7L, IntegrationKind.GITHUB, "admin@example.com"))
+                .thenReturn("state-xyz");
 
-        strategy().initiate(
-            new ConnectionStrategy.InitiateRequest(7L, IntegrationKind.GITHUB, Map.of(), "admin@example.com")
-        );
+        strategy()
+                .initiate(new ConnectionStrategy.InitiateRequest(
+                        7L, IntegrationKind.GITHUB, Map.of(), "admin@example.com"));
 
         verify(oauthStateService).issue(7L, IntegrationKind.GITHUB, "admin@example.com");
     }
@@ -116,7 +116,9 @@ class GithubConnectionStrategyTest extends BaseUnitTest {
         IntegrationRef ref = new IntegrationRef(IntegrationKind.GITHUB, 7L, "4242", 9L);
         when(connectionService.findReferenced(ref)).thenReturn(Optional.of(connection));
         when(connection.getConfig()).thenReturn(new ConnectionConfig.GitHubAppConfig(4242L, null, null, Set.of()));
-        doThrow(new RuntimeException("github unavailable")).when(appTokenService).deleteInstallation(4242L);
+        doThrow(new RuntimeException("github unavailable"))
+                .when(appTokenService)
+                .deleteInstallation(4242L);
 
         assertThatThrownBy(() -> strategy().revokeProvider(ref)).hasMessage("github unavailable");
 
@@ -128,7 +130,9 @@ class GithubConnectionStrategyTest extends BaseUnitTest {
         IntegrationRef ref = new IntegrationRef(IntegrationKind.GITHUB, 7L, "4242");
         when(connectionService.findReferenced(ref)).thenReturn(Optional.of(connection));
         when(connection.getConfig()).thenReturn(new ConnectionConfig.GitHubAppConfig(4242L, null, null, Set.of()));
-        doThrow(new RuntimeException("github unavailable")).when(appTokenService).deleteInstallation(4242L);
+        doThrow(new RuntimeException("github unavailable"))
+                .when(appTokenService)
+                .deleteInstallation(4242L);
 
         strategy().revoke(ref);
 

@@ -25,10 +25,9 @@ class TaskEnvelopeWriterTest extends BaseUnitTest {
 
     private TaskEnvelope sampleEnvelope() {
         return TaskEnvelope.of(
-            UUID.fromString("00000000-0000-0000-0000-00000000abcd"),
-            99L,
-            new Task.PracticeReview("Review this PR", 42, "owner/repo")
-        );
+                UUID.fromString("00000000-0000-0000-0000-00000000abcd"),
+                99L,
+                new Task.PracticeReview("Review this PR", 42, "owner/repo"));
     }
 
     @Test
@@ -78,9 +77,8 @@ class TaskEnvelopeWriterTest extends BaseUnitTest {
 
     @Test
     void rejectsBlankPrompt() {
-        assertThatThrownBy(() -> new Task.PracticeReview("", 42, "owner/repo")).isInstanceOf(
-            IllegalArgumentException.class
-        );
+        assertThatThrownBy(() -> new Task.PracticeReview("", 42, "owner/repo"))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
@@ -88,11 +86,11 @@ class TaskEnvelopeWriterTest extends BaseUnitTest {
         Task.PracticeReview task = new Task.PracticeReview("p", 1, "o/r");
         UUID jobId = UUID.randomUUID();
         assertThatThrownBy(() -> new TaskEnvelope(0, jobId, 1L, task))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("schemaVersion");
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("schemaVersion");
         assertThatThrownBy(() -> new TaskEnvelope(1, jobId, 0L, task))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("workspaceId");
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("workspaceId");
     }
 
     @Test

@@ -1,234 +1,203 @@
-/**
- * CSS files with the .module.css suffix will be treated as CSS modules
- * and scoped locally.
- */
-
 .heroSection {
-  padding: 4.5rem 0 4rem;
-  background: var(--ifm-background-color);
-  overflow: hidden;
+	padding: 3.5rem 0 2rem;
+	background: var(--ifm-background-color);
+	overflow: hidden;
 }
 
 .heroGrid {
-  display: grid;
-  grid-template-columns: minmax(0, 0.88fr) minmax(28rem, 1.12fr);
-  gap: clamp(2rem, 5vw, 5rem);
-  align-items: center;
+	display: grid;
+	grid-template-columns: minmax(0, 0.88fr) minmax(28rem, 1.12fr);
+	gap: clamp(2rem, 5vw, 5rem);
+	align-items: center;
 }
 
 .heroCopy {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 1.5rem;
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 1.5rem;
 }
 
 .heroKicker {
-  display: inline-flex;
-  padding: 0.42rem 0.8rem;
-  border: 1px solid color-mix(in srgb, var(--ifm-color-primary) 24%, transparent);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--ifm-color-primary) 7%, transparent);
-  color: var(--ifm-color-primary);
-  font-size: 0.82rem;
-  font-weight: 650;
+	composes: hephKicker from global;
+	display: inline-flex;
+	padding: 0.42rem 0.8rem;
+	border: 1px solid color-mix(in srgb, var(--ifm-color-primary) 24%, transparent);
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--ifm-color-primary) 7%, transparent);
 }
 
 .heroTitle {
-  font-size: clamp(2.6rem, 5vw, 4.2rem);
-  font-weight: 700;
-  letter-spacing: -0.045em;
-  line-height: 1.04;
-  margin: 0;
-}
-
-.heroHighlight {
-  position: relative;
-  display: inline-block;
-  white-space: nowrap;
-  isolation: isolate;
-}
-
-.heroHighlight::after {
-  content: '';
-  position: absolute;
-  z-index: -1;
-  left: -0.05em;
-  right: -0.06em;
-  bottom: 0.02em;
-  height: 0.27em;
-  background: color-mix(in srgb, var(--ifm-color-primary) 30%, transparent);
-  clip-path: polygon(
-    0 45%,
-    10% 31%,
-    25% 47%,
-    39% 20%,
-    55% 37%,
-    72% 14%,
-    87% 27%,
-    100% 8%,
-    98% 76%,
-    81% 68%,
-    64% 88%,
-    43% 70%,
-    26% 91%,
-    9% 73%,
-    0 83%
-  );
-  transform: rotate(-1.5deg);
+	font-size: clamp(2.4rem, 4vw, 3.4rem);
+	font-weight: 700;
+	letter-spacing: -0.04em;
+	line-height: 1.05;
+	margin: 0;
 }
 
 .heroSubtitle {
-  font-size: clamp(1.125rem, 2vw, 1.35rem);
-  line-height: 1.6;
-  max-width: 58ch;
-  margin: 0;
-  color: var(--ifm-color-emphasis-700);
+	font-size: clamp(1.125rem, 2vw, 1.35rem);
+	line-height: 1.6;
+	max-width: 58ch;
+	margin: 0;
+	color: var(--ifm-color-emphasis-700);
 }
 
 .heroActions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.75rem;
 }
 
 .heroVisual {
-  position: relative;
-  margin: -1.5rem -1rem;
+	position: relative;
+	margin: 0;
 }
 
 .heroVisual::before {
-  content: '';
-  position: absolute;
-  inset: 18% 10%;
-  z-index: 0;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--ifm-color-primary) 12%, transparent);
-  filter: blur(48px);
+	content: "";
+	position: absolute;
+	inset: 18% 10%;
+	z-index: 0;
+	border-radius: 50%;
+	background: color-mix(in srgb, var(--ifm-color-primary) 12%, transparent);
+	filter: blur(48px);
 }
 
 .heroVisual img {
-  position: relative;
-  z-index: 1;
-  display: block;
-  width: 100%;
-  height: auto;
-}
-
-.heroVisual p {
-  position: relative;
-  z-index: 1;
-  margin: -0.8rem 0 0;
-  text-align: center;
-  color: var(--ifm-color-emphasis-600);
-  font-size: 0.78rem;
-}
-
-.heroVisualDark {
-  display: none !important;
-}
-
-:global([data-theme='dark']) .heroVisualLight {
-  display: none;
-}
-
-:global([data-theme='dark']) .heroVisualDark {
-  display: block !important;
+	position: relative;
+	z-index: 1;
+	display: block;
+	width: 100%;
+	height: auto;
 }
 
 .quickstartSection {
-  padding: 4.5rem 0 5rem;
+	padding: 3.5rem 0 4rem;
 }
 
 .quickstartHeader {
-  text-align: center;
-  max-width: 48rem;
-  margin: 0 auto 3rem;
+	text-align: center;
+	max-width: 48rem;
+	margin: 0 auto 3rem;
 }
 
 .quickstartHeader h2 {
-  font-size: clamp(2rem, 3vw, 2.5rem);
-  margin-bottom: 1rem;
+	font-size: clamp(1.75rem, 3vw, 2.25rem);
+	text-wrap: balance;
+	margin-bottom: 1rem;
 }
 
 .quickstartHeader p {
-  color: var(--ifm-color-emphasis-700);
-  margin: 0;
+	color: var(--ifm-color-emphasis-700);
+	margin: 0;
 }
 
 .quickstartGrid {
-  display: grid;
-  gap: 1.5rem;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+	display: grid;
+	gap: 1.5rem;
+	grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
 }
 
 .quickstartCard {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  gap: 1.1rem;
-  padding: 1.85rem;
-  border: 1px solid var(--ifm-toc-border-color);
-  border-radius: 16px;
-  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
-  text-decoration: none;
-  color: inherit;
-  background: var(--ifm-card-background-color);
-  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+	composes: hephCard from global;
+	gap: 0.5rem;
+	transition:
+		border-color 0.2s ease,
+		transform 0.2s ease;
 }
 
 .quickstartCard:hover {
-  transform: translateY(-4px);
-  border-color: var(--ifm-color-primary);
-  box-shadow: 0 22px 44px rgba(45, 51, 73, 0.15);
+	transform: translateY(-2px);
+	border-color: color-mix(in oklab, var(--ifm-color-primary) 45%, var(--ifm-toc-border-color));
 }
 
-.quickstartCard h3 {
-  margin-bottom: 0.5rem;
+.quickstartAudience {
+	composes: hephKicker from global;
+	margin: 0;
 }
 
-.quickstartCard span {
-  font-size: 1.75rem;
-  align-self: flex-end;
-  color: var(--ifm-color-primary);
+.quickstartTitle {
+	margin: 0;
+	font-size: 1.35rem;
+}
+
+.quickstartTitle a {
+	color: inherit;
+	text-decoration: none;
+}
+
+.quickstartTitle a::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	border-radius: inherit;
+}
+
+.quickstartBody {
+	margin: 0;
+	color: var(--ifm-color-emphasis-700);
+}
+
+.quickstartLinks {
+	position: relative;
+	z-index: 1;
+	margin: 0.75rem 0 0;
+	padding: 0.9rem 0 0;
+	border-top: 1px solid var(--ifm-toc-border-color);
+	list-style: none;
+	display: flex;
+	flex-direction: column;
+	gap: 0.4rem;
+	font-size: 0.92rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.quickstartCard {
+		transition: none;
+	}
+
+	.quickstartCard:hover {
+		transform: none;
+	}
 }
 
 @media screen and (max-width: 996px) {
-  .heroSection {
-    padding: 3.5rem 0 3rem;
-  }
+	.heroSection {
+		padding: 3.5rem 0 3rem;
+	}
 
-  .heroGrid {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 2.25rem;
-  }
+	.heroGrid {
+		grid-template-columns: minmax(0, 1fr);
+		gap: 2.25rem;
+	}
 
-  .heroCopy {
-    align-items: center;
-    text-align: center;
-  }
+	.heroCopy {
+		align-items: center;
+		text-align: center;
+	}
 
-  .heroSubtitle {
-    max-width: 48rem;
-  }
+	.heroSubtitle {
+		max-width: 48rem;
+	}
 
-  .heroVisual {
-    width: min(100%, 46rem);
-    margin: -1rem auto;
-  }
+	.heroVisual {
+		width: min(100%, 46rem);
+		margin: -1rem auto;
+	}
 }
 
 @media screen and (max-width: 576px) {
-  .heroSection {
-    padding: 2.5rem 0 2.25rem;
-  }
+	.heroSection {
+		padding: 2.5rem 0 2.25rem;
+	}
 
-  .heroTitle {
-    font-size: clamp(2.35rem, 12vw, 3.25rem);
-  }
+	.heroTitle {
+		font-size: clamp(2.35rem, 12vw, 3.25rem);
+	}
 
-  .heroVisual {
-    width: calc(100% + 1.5rem);
-    margin: -1.4rem -0.75rem -0.75rem;
-  }
+	.heroVisual {
+		width: calc(100% + 1.5rem);
+		margin: -1.4rem -0.75rem -0.75rem;
+	}
 }

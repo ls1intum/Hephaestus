@@ -39,22 +39,18 @@ class AccountHardDeleteSweeperTest extends BaseUnitTest {
         Duration cooldown = Duration.ofHours(48);
         when(authProperties.deleteCooldown()).thenReturn(cooldown);
         when(accountRepository.findDeletingPastCooldown(eq(NOW.minus(cooldown)), any()))
-            .thenReturn(List.of(1L, 2L))
-            .thenReturn(List.of(2L));
+                .thenReturn(List.of(1L, 2L))
+                .thenReturn(List.of(2L));
         doAnswer(invocation -> {
-            if (invocation.<Long>getArgument(0) == 2L) {
-                throw new RuntimeException("purge failed");
-            }
-            return null;
-        })
-            .when(accountPurger)
-            .purge(anyLong());
-        AccountHardDeleteSweeper sweeper = new AccountHardDeleteSweeper(
-            accountRepository,
-            accountPurger,
-            authProperties,
-            clock
-        );
+                    if (invocation.<Long>getArgument(0) == 2L) {
+                        throw new RuntimeException("purge failed");
+                    }
+                    return null;
+                })
+                .when(accountPurger)
+                .purge(anyLong());
+        AccountHardDeleteSweeper sweeper =
+                new AccountHardDeleteSweeper(accountRepository, accountPurger, authProperties, clock);
 
         assertThat(sweeper.sweepNow()).isEqualTo(1);
         verify(accountPurger).purge(1L);

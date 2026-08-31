@@ -11,11 +11,10 @@ import org.jspecify.annotations.Nullable;
  * are {@code null} rather than failing the whole projection.
  */
 public record SlackThreadMessageRow(
-    String slackTs,
-    @Nullable String authorSlackUserId,
-    @Nullable Long authorMemberId,
-    @Nullable String authorLogin,
-    @Nullable String authorName,
-    @Nullable String text,
-    @Nullable Instant editedAt
-) {}
+        String slackTs,
+        @Nullable String authorSlackUserId,
+        @Nullable Long authorMemberId,
+        @Nullable String authorLogin,
+        @Nullable String authorName,
+        @Nullable String text,
+        @Nullable Instant editedAt) {}

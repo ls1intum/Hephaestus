@@ -1,6 +1,7 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
 import { describe, expect, it, vi } from "vitest";
+
 import {
 	computeUserLeagueStatsQueryKey,
 	getLeaderboardQueryKey,

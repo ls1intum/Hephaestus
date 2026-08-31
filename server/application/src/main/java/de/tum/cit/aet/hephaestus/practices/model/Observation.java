@@ -27,6 +27,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 import org.hibernate.type.SqlTypes;
+import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.JsonNode;
 
 /**
@@ -36,21 +37,24 @@ import tools.jackson.databind.JsonNode;
 @Entity
 @Immutable
 @Table(
-    name = "observation",
-    uniqueConstraints = { @UniqueConstraint(name = "uk_observation_occurrence", columnNames = { "occurrence_key" }) },
-    indexes = {
-        @Index(name = "idx_observation_practice_observed", columnList = "practice_id, observed_at DESC"),
-        @Index(name = "idx_observation_agent_job", columnList = "agent_job_id"),
-        @Index(name = "idx_observation_target", columnList = "artifact_kind, artifact_id"),
-        @Index(
-            name = "idx_observation_target_run",
-            columnList = "artifact_kind, artifact_id, agent_job_id, observed_at DESC"
-        ),
-        @Index(name = "idx_observation_correlation", columnList = "recurrence_key"),
-        // Observations are filed against the subject (about_user_id); index for subject dashboards.
-        @Index(name = "idx_observation_subject", columnList = "about_user_id"),
-    }
-)
+        name = "observation",
+        uniqueConstraints = {
+            @UniqueConstraint(
+                    name = "uk_observation_occurrence",
+                    columnNames = {"occurrence_key"})
+        },
+        indexes = {
+            @Index(name = "idx_observation_practice_observed", columnList = "practice_id, observed_at DESC"),
+            @Index(name = "idx_observation_agent_job", columnList = "agent_job_id"),
+            @Index(name = "idx_observation_workspace", columnList = "workspace_id"),
+            @Index(name = "idx_observation_target", columnList = "artifact_kind, artifact_id"),
+            @Index(
+                    name = "idx_observation_target_run",
+                    columnList = "artifact_kind, artifact_id, agent_job_id, observed_at DESC"),
+            @Index(name = "idx_observation_correlation", columnList = "recurrence_key"),
+            // Observations are filed against the subject (about_user_id); index for subject dashboards.
+            @Index(name = "idx_observation_subject", columnList = "about_user_id"),
+        })
 @Getter
 @Builder
 @NoArgsConstructor
@@ -75,6 +79,10 @@ public class Observation {
     @Column(name = "agent_job_id", nullable = false, columnDefinition = "UUID")
     private UUID agentJobId;
 
+    @NotNull
+    @Column(name = "workspace_id", nullable = false)
+    private Long workspaceId;
+
     /**
      * The practice measured. Deliberately not cascade-deleted: an observation is immutable and the
      * substrate for longitudinal research, so pruning a practice must not erase everyone's history
@@ -85,16 +93,10 @@ public class Observation {
     @JoinColumn(name = "practice_id", nullable = false, foreignKey = @ForeignKey(name = "fk_observation_practice"))
     private Practice practice;
 
-    /**
-     * The {@link PracticeRevision} (SCD-2 snapshot) the detector evaluated this observation against,
-     * pinning it to criteria as they were for reproducibility. NULL means the observation predates
-     * criteria versioning, not a missing reference — {@code ON DELETE SET NULL} lets the immutable
-     * observation outlive a pruned revision.
-     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "practice_revision_id", foreignKey = @ForeignKey(name = "fk_observation_revision"))
     @OnDelete(action = OnDeleteAction.SET_NULL)
-    private PracticeRevision practiceRevision;
+    private @Nullable PracticeRevision practiceRevision;
 
     @NotNull
     @Column(name = "artifact_kind", length = ArtifactKind.MAX_LENGTH, nullable = false)
@@ -204,21 +206,19 @@ public class Observation {
         }
         if (presence.carriesValence() != (assessment != null)) {
             throw new IllegalStateException(
-                "Observation coherence violation: assessment is required exactly for a presence that carries valence (presence=" +
-                    presence +
-                    ", assessment=" +
-                    assessment +
-                    ")"
-            );
+                    "Observation coherence violation: assessment is required exactly for a presence that carries valence (presence="
+                            + presence
+                            + ", assessment="
+                            + assessment
+                            + ")");
         }
         if (assessment != Assessment.BAD && severity != null) {
             throw new IllegalStateException(
-                "Observation coherence violation: severity must be null unless assessment is BAD (assessment=" +
-                    assessment +
-                    ", severity=" +
-                    severity +
-                    ")"
-            );
+                    "Observation coherence violation: severity must be null unless assessment is BAD (assessment="
+                            + assessment
+                            + ", severity="
+                            + severity
+                            + ")");
         }
     }
 }

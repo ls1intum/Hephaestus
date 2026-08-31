@@ -27,8 +27,7 @@ public class PracticePiAdapter {
     private final AgentImageProperties imageProperties;
 
     public PracticeSandboxSpec buildSandboxSpec(PracticeAgentRequest request) {
-        PiRuntimeFactory.PiPlan plan = runtimeFactory.build(
-            new PiPlanSpec(
+        PiRuntimeFactory.PiPlan plan = runtimeFactory.build(new PiPlanSpec(
                 request.apiProtocol(),
                 request.upstreamModelId(),
                 request.contextWindow(),
@@ -39,20 +38,17 @@ public class PracticePiAdapter {
                 request.timeoutSeconds(),
                 PROFILE,
                 Map.of(),
-                buildPrecomputeStep()
-            )
-        );
+                buildPrecomputeStep()));
         return new PracticeSandboxSpec(
-            imageProperties.reference(),
-            plan.command(),
-            plan.environment(),
-            plan.inputFiles(),
-            SandboxLayout.OUTPUT_PATH,
-            null,
-            plan.networkPolicy(),
-            Map.of(),
-            plan.promptDigest()
-        );
+                imageProperties.reference(),
+                plan.command(),
+                plan.environment(),
+                plan.inputFiles(),
+                SandboxLayout.OUTPUT_PATH,
+                null,
+                plan.networkPolicy(),
+                Map.of(),
+                plan.promptDigest());
     }
 
     /** Parse the sandbox result via the shared {@link PiResultParser}. */
@@ -60,59 +56,62 @@ public class PracticePiAdapter {
         return resultParser.parse(sandboxResult);
     }
 
-    /**
-     * Run precompute scripts via Bun before the agent. Failure is non-fatal. Paths reference the
-     * workspace ABI ({@link SandboxLayout#CONTEXT_PREFIX}).
-     *
-     * <p><b>Trust boundary:</b> the returned string is interpolated verbatim into the container's
-     * {@code sh -c} command line. Do not derive any part of this output from untrusted input.
-     */
+    /** Build the fixed, best-effort precompute shell fragment. */
     static String buildPrecomputeStep() {
         String root = SandboxLayout.WORKSPACE_ROOT;
         String contextTarget = root + "/" + SandboxLayout.CONTEXT_PREFIX;
         String precomputeIn = root + "/" + SandboxLayout.PRECOMPUTE_PREFIX + "practices";
+        String precomputeStage = root + "/work/precompute-stage";
         String precomputeOut = root + "/" + SandboxLayout.PRECOMPUTE_OUT_PREFIX.replaceFirst("/$", "");
-        return (
-            "(mkdir -p " +
-            precomputeOut +
-            "/practices" +
-            " && find " +
-            precomputeIn +
-            " -maxdepth 1 -type f -name '*.ts' -exec cp {} " +
-            precomputeOut +
-            "/practices/ \\;" +
-            " && ln -sf /opt/precompute/lib " +
-            precomputeOut +
-            "/lib" +
-            // diff.patch is the AGENT-facing view: every line carries a [L<n>] line-number annotation. The
-            // precompute diff parser expects a RAW unified diff, so strip the annotation into a clean copy the
-            // runner parses (the raw diff is the right input for static analysis; the annotation is the agent's).
-            " && sed 's/^\\[L[0-9]*\\] //' " +
-            contextTarget +
-            "diff.patch > " +
-            precomputeOut +
-            "/diff_clean.patch 2>/dev/null ; bun run /opt/precompute/runner.ts" +
-            " --repo " +
-            SandboxLayout.REPO_MOUNT +
-            " --diff " +
-            precomputeOut +
-            "/diff_clean.patch" +
-            " --metadata " +
-            contextTarget +
-            "metadata.json" +
-            // Give scripts the materialised context dir so they can read the SAME cross-artifact context the
-            // agent sees (project_inventory.json, linked_work_items.json, …) and point the LLM at neighbours.
-            " --context " +
-            contextTarget +
-            " --output " +
-            precomputeOut +
-            " > /tmp/precompute-runner.log 2>&1" +
-            " || { echo '[precompute] failed, continuing without hints'" +
-            " && cp /tmp/precompute-runner.log " +
-            precomputeOut +
-            "/precompute-runner.log 2>/dev/null" +
-            " ; tail -200 /tmp/precompute-runner.log 2>/dev/null" +
-            " ; true; }) && "
-        );
+        return ("(rm -rf " + precomputeStage
+                + " && mkdir -p "
+                + precomputeStage
+                + "/practices "
+                + precomputeOut
+                + " && find "
+                + precomputeIn
+                + " -maxdepth 1 -type f -name '*.ts' -exec cp {} "
+                + precomputeStage
+                + "/practices/ \\;"
+                + " && ln -sf /opt/precompute/lib "
+                + precomputeStage
+                + "/lib"
+                +
+                // Precompute consumes a raw diff; the staged agent view prefixes lines with [L<n>].
+                " && sed 's/^\\[L[0-9]*\\] //' "
+                + contextTarget
+                + "diff.patch > "
+                + precomputeOut
+                +
+                // env -i resolves node through the PATH it sets, so it must include /usr/local/bin,
+                // where the node:24-slim base installs the binary.
+                "/diff_clean.patch 2>/dev/null ; env -i HOME=/home/agent PATH=/usr/local/bin:/usr/bin:/bin TMPDIR=/tmp node"
+                + " --permission"
+                + " --allow-fs-read=/workspace"
+                + " --allow-fs-read=/opt/precompute"
+                + " '--allow-fs-write=/workspace/work/precompute-out*'"
+                + " --allow-child-process /opt/precompute/runner.ts"
+                + " --repo "
+                + SandboxLayout.REPO_MOUNT
+                + " --diff "
+                + precomputeOut
+                + "/diff_clean.patch"
+                + " --metadata "
+                + contextTarget
+                + "metadata.json"
+                + " --context "
+                + contextTarget
+                + " --practices "
+                + precomputeStage
+                + "/practices"
+                + " --output "
+                + precomputeOut
+                + " > /tmp/precompute-runner.log 2>&1"
+                + " || { echo '[precompute] failed, continuing without hints'"
+                + " && cp /tmp/precompute-runner.log "
+                + precomputeOut
+                + "/precompute-runner.log 2>/dev/null"
+                + " ; tail -200 /tmp/precompute-runner.log 2>/dev/null"
+                + " ; true; }) && ");
     }
 }

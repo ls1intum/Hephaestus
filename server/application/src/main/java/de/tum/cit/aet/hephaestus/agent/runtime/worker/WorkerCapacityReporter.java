@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.runtime.worker;
 
+import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PreDestroy;
@@ -30,22 +31,21 @@ public class WorkerCapacityReporter {
     private volatile @Nullable ScheduledFuture<?> task;
 
     public WorkerCapacityReporter(
-        WorkerCapacityState state,
-        WorkerControlClient client,
-        WorkerProperties properties,
-        ScheduledExecutorService workerScheduler,
-        MeterRegistry meterRegistry
-    ) {
+            WorkerCapacityState state,
+            WorkerControlClient client,
+            WorkerProperties properties,
+            ScheduledExecutorService workerScheduler,
+            MeterRegistry meterRegistry) {
         this.state = state;
         this.client = client;
         this.interval = properties.heartbeat().interval();
         this.scheduler = workerScheduler;
-        this.sent = Counter.builder("worker.heartbeats.sent")
-            .description("Worker → hub CapacityReport frames sent")
-            .register(meterRegistry);
-        this.failed = Counter.builder("worker.heartbeats.failed")
-            .description("Worker → hub CapacityReport sends that threw")
-            .register(meterRegistry);
+        this.sent = Counter.builder(AgentMetrics.WORKER_HEARTBEATS_SENT)
+                .description("Worker → hub CapacityReport frames sent")
+                .register(meterRegistry);
+        this.failed = Counter.builder(AgentMetrics.WORKER_HEARTBEATS_FAILED)
+                .description("Worker → hub CapacityReport sends that threw")
+                .register(meterRegistry);
     }
 
     @EventListener(ApplicationReadyEvent.class)

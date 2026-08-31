@@ -25,40 +25,30 @@ public interface OutlineCollectionRepository extends JpaRepository<OutlineCollec
     List<OutlineCollection> findByWorkspaceIdAndConnectionId(Long workspaceId, Long connectionId);
 
     Optional<OutlineCollection> findByWorkspaceIdAndConnectionIdAndCollectionId(
-        Long workspaceId,
-        Long connectionId,
-        String collectionId
-    );
+            Long workspaceId, Long connectionId, String collectionId);
 
     /**
      * The collections one sync pass walks: ENABLED rows for the workspace's install, stalest
      * first ({@code NULLS FIRST} puts never-synced collections at the front).
      */
-    @Query(
-        "SELECT c FROM OutlineCollection c WHERE c.workspaceId = :workspaceId AND c.connectionId = :connectionId " +
-            "AND c.state = :state ORDER BY c.documentsSyncedAt ASC NULLS FIRST, c.id ASC"
-    )
+    @Query("SELECT c FROM OutlineCollection c WHERE c.workspaceId = :workspaceId AND c.connectionId = :connectionId "
+            + "AND c.state = :state ORDER BY c.documentsSyncedAt ASC NULLS FIRST, c.id ASC")
     List<OutlineCollection> findForSync(
-        @Param("workspaceId") long workspaceId,
-        @Param("connectionId") long connectionId,
-        @Param("state") MirrorState state
-    );
+            @Param("workspaceId") long workspaceId,
+            @Param("connectionId") long connectionId,
+            @Param("state") MirrorState state);
 
     /** ENABLED rows still awaiting their first clean pass — the catch-up tick's per-workspace worklist. */
     List<OutlineCollection> findByWorkspaceIdAndStateAndSyncStatus(
-        Long workspaceId,
-        MirrorState state,
-        SyncStatus syncStatus
-    );
+            Long workspaceId, MirrorState state, SyncStatus syncStatus);
 
     /**
      * Workspaces with at least one ENABLED collection still PENDING — the catch-up tick's fan-out.
      * Native + unscoped: runs inside a {@code @WorkspaceAgnostic} scheduler before any tenant is bound.
      */
     @Query(
-        value = "SELECT DISTINCT workspace_id FROM outline_collection " +
-            "WHERE state = 'ENABLED' AND sync_status = 'PENDING'",
-        nativeQuery = true
-    )
+            value = "SELECT DISTINCT workspace_id FROM outline_collection "
+                    + "WHERE state = 'ENABLED' AND sync_status = 'PENDING'",
+            nativeQuery = true)
     List<Long> findDistinctWorkspaceIdsWithPendingSync();
 }

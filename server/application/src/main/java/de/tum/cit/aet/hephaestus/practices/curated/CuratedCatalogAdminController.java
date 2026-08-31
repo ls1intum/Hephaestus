@@ -66,20 +66,20 @@ public class CuratedCatalogAdminController {
 
     @GetMapping("/definition-options")
     @Operation(
-        summary = "Read practice definition options",
-        description = "Returns available review events, recommended requirements, and allowed evidence sources by work type",
-        operationId = "adminGetPracticeDefinitionOptions"
-    )
+            summary = "Read practice definition options",
+            description =
+                    "Returns available review events, recommended requirements, and allowed evidence sources by work type",
+            operationId = "adminGetPracticeDefinitionOptions")
     public ResponseEntity<PracticeDefinitionOptionsDTO> definitionOptions() {
         return ResponseEntity.ok(definitionOptionsService.options());
     }
 
     @GetMapping
     @Operation(
-        summary = "Read the instance catalog",
-        description = "Practice summaries, complete groups, ordering, and catalog state. Fetch a practice for its full definition.",
-        operationId = "adminGetCuratedCatalog"
-    )
+            summary = "Read the instance catalog",
+            description =
+                    "Practice summaries, complete groups, ordering, and catalog state. Fetch a practice for its full definition.",
+            operationId = "adminGetCuratedCatalog")
     public ResponseEntity<CuratedCatalogDTO> catalog() {
         EffectiveCatalog catalog = service.catalog();
         return catalogResponse(catalog);
@@ -88,10 +88,9 @@ public class CuratedCatalogAdminController {
     @GetMapping("/practices/{slug}")
     @Operation(summary = "Read a catalog practice", operationId = "adminGetCuratedPractice")
     @ApiResponse(
-        responseCode = "200",
-        description = "The practice",
-        content = @Content(schema = @Schema(implementation = CuratedPracticeDTO.class))
-    )
+            responseCode = "200",
+            description = "The practice",
+            content = @Content(schema = @Schema(implementation = CuratedPracticeDTO.class)))
     public ResponseEntity<CuratedPracticeDTO> getPractice(@PathVariable String slug) {
         return ok(service.practice(slug), CuratedPracticeDTO::from);
     }
@@ -99,19 +98,16 @@ public class CuratedCatalogAdminController {
     @PostMapping("/practices")
     @Operation(summary = "Add a practice to the catalog", operationId = "adminCreateCuratedPractice")
     @ApiResponse(
-        responseCode = "201",
-        description = "Practice added",
-        content = @Content(schema = @Schema(implementation = CuratedPracticeDTO.class))
-    )
+            responseCode = "201",
+            description = "Practice added",
+            content = @Content(schema = @Schema(implementation = CuratedPracticeDTO.class)))
     @ApiResponse(
-        responseCode = "409",
-        description = "Slug already exists",
-        content = @Content(schema = @Schema(implementation = ProblemDetail.class))
-    )
+            responseCode = "409",
+            description = "Slug already exists",
+            content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "CURATED_PRACTICE")
     public ResponseEntity<CuratedPracticeDTO> createPractice(
-        @Valid @RequestBody CreateCuratedPracticeRequestDTO request
-    ) {
+            @Valid @RequestBody CreateCuratedPracticeRequestDTO request) {
         var entry = service.createPractice(request.slug(), definition(request.definition()));
         return created(entry.slug(), entry.etag(), CuratedPracticeDTO.from(entry));
     }
@@ -119,130 +115,102 @@ public class CuratedCatalogAdminController {
     @PutMapping("/practices/{slug}")
     @Operation(summary = "Replace a practice definition", operationId = "adminUpdateCuratedPractice")
     @ApiResponse(
-        responseCode = "200",
-        description = "The practice",
-        content = @Content(schema = @Schema(implementation = CuratedPracticeDTO.class))
-    )
+            responseCode = "200",
+            description = "The practice",
+            content = @Content(schema = @Schema(implementation = CuratedPracticeDTO.class)))
     @ApiResponse(
-        responseCode = "412",
-        description = "The supplied ETag is stale",
-        content = @Content(schema = @Schema(implementation = ProblemDetail.class))
-    )
+            responseCode = "412",
+            description = "The supplied ETag is stale",
+            content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     @ApiResponse(
-        responseCode = "428",
-        description = "If-Match is required",
-        content = @Content(schema = @Schema(implementation = ProblemDetail.class))
-    )
+            responseCode = "428",
+            description = "If-Match is required",
+            content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "CURATED_PRACTICE")
     public ResponseEntity<CuratedPracticeDTO> updatePractice(
-        @PathVariable String slug,
-        @Parameter(required = true) @RequestHeader(
-            name = HttpHeaders.IF_MATCH,
-            required = false
-        ) @Nullable String ifMatch,
-        @Valid @RequestBody CuratedPracticeRequestDTO request
-    ) {
+            @PathVariable String slug,
+            @Parameter(required = true) @RequestHeader(name = HttpHeaders.IF_MATCH, required = false) @Nullable
+                    String ifMatch,
+            @Valid @RequestBody CuratedPracticeRequestDTO request) {
         return ok(service.writePractice(slug, precondition(ifMatch), definition(request)), CuratedPracticeDTO::from);
     }
 
     @PatchMapping("/practices/{slug}/status")
     @Operation(
-        summary = "Exclude a practice from new workspaces, or include it again",
-        operationId = "adminUpdateCuratedPracticeStatus"
-    )
+            summary = "Exclude a practice from new workspaces, or include it again",
+            operationId = "adminUpdateCuratedPracticeStatus")
     @ApiResponse(
-        responseCode = "200",
-        description = "The practice",
-        content = @Content(schema = @Schema(implementation = CuratedPracticeDTO.class))
-    )
+            responseCode = "200",
+            description = "The practice",
+            content = @Content(schema = @Schema(implementation = CuratedPracticeDTO.class)))
     @ApiResponse(
-        responseCode = "412",
-        description = "The supplied ETag is stale",
-        content = @Content(schema = @Schema(implementation = ProblemDetail.class))
-    )
+            responseCode = "412",
+            description = "The supplied ETag is stale",
+            content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     @ApiResponse(
-        responseCode = "428",
-        description = "If-Match is required",
-        content = @Content(schema = @Schema(implementation = ProblemDetail.class))
-    )
+            responseCode = "428",
+            description = "If-Match is required",
+            content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "CURATED_PRACTICE")
     public ResponseEntity<CuratedPracticeDTO> updatePracticeStatus(
-        @PathVariable String slug,
-        @Parameter(required = true) @RequestHeader(
-            name = HttpHeaders.IF_MATCH,
-            required = false
-        ) @Nullable String ifMatch,
-        @Valid @RequestBody UpdateCuratedStatusRequestDTO request
-    ) {
+            @PathVariable String slug,
+            @Parameter(required = true) @RequestHeader(name = HttpHeaders.IF_MATCH, required = false) @Nullable
+                    String ifMatch,
+            @Valid @RequestBody UpdateCuratedStatusRequestDTO request) {
         return ok(service.setPracticeStatus(slug, precondition(ifMatch), request.status()), CuratedPracticeDTO::from);
     }
 
     @DeleteMapping("/practices/{slug}/override")
     @Operation(
-        summary = "Use the Hephaestus definition of a practice",
-        description = "Discards the customization, so the practice follows the Hephaestus default again.",
-        operationId = "adminDeleteCuratedPracticeOverride"
-    )
+            summary = "Use the Hephaestus definition of a practice",
+            description = "Discards the customization, so the practice follows the Hephaestus default again.",
+            operationId = "adminDeleteCuratedPracticeOverride")
     @ApiResponse(
-        responseCode = "200",
-        description = "The practice",
-        content = @Content(schema = @Schema(implementation = CuratedPracticeDTO.class))
-    )
+            responseCode = "200",
+            description = "The practice",
+            content = @Content(schema = @Schema(implementation = CuratedPracticeDTO.class)))
     @ApiResponse(
-        responseCode = "409",
-        description = "Hephaestus ships no definition for this slug",
-        content = @Content(schema = @Schema(implementation = ProblemDetail.class))
-    )
+            responseCode = "409",
+            description = "Hephaestus ships no definition for this slug",
+            content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     @ApiResponse(
-        responseCode = "412",
-        description = "The supplied ETag is stale",
-        content = @Content(schema = @Schema(implementation = ProblemDetail.class))
-    )
+            responseCode = "412",
+            description = "The supplied ETag is stale",
+            content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     @ApiResponse(
-        responseCode = "428",
-        description = "If-Match is required",
-        content = @Content(schema = @Schema(implementation = ProblemDetail.class))
-    )
+            responseCode = "428",
+            description = "If-Match is required",
+            content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "CURATED_PRACTICE")
     public ResponseEntity<CuratedPracticeDTO> resetPractice(
-        @PathVariable String slug,
-        @Parameter(required = true) @RequestHeader(
-            name = HttpHeaders.IF_MATCH,
-            required = false
-        ) @Nullable String ifMatch
-    ) {
+            @PathVariable String slug,
+            @Parameter(required = true) @RequestHeader(name = HttpHeaders.IF_MATCH, required = false) @Nullable
+                    String ifMatch) {
         return ok(service.resetPractice(slug, precondition(ifMatch)), CuratedPracticeDTO::from);
     }
 
     @PutMapping("/practices/{slug}/override/acknowledgement")
     @Operation(
-        summary = "Keep the saved practice customization",
-        description = "Records that the Hephaestus update was reviewed and keeps the saved definition.",
-        operationId = "adminKeepCuratedPractice"
-    )
+            summary = "Keep the saved practice customization",
+            description = "Records that the Hephaestus update was reviewed and keeps the saved definition.",
+            operationId = "adminKeepCuratedPractice")
     @ApiResponse(
-        responseCode = "200",
-        description = "The practice",
-        content = @Content(schema = @Schema(implementation = CuratedPracticeDTO.class))
-    )
+            responseCode = "200",
+            description = "The practice",
+            content = @Content(schema = @Schema(implementation = CuratedPracticeDTO.class)))
     @ApiResponse(
-        responseCode = "412",
-        description = "The supplied ETag is stale",
-        content = @Content(schema = @Schema(implementation = ProblemDetail.class))
-    )
+            responseCode = "412",
+            description = "The supplied ETag is stale",
+            content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     @ApiResponse(
-        responseCode = "428",
-        description = "If-Match is required",
-        content = @Content(schema = @Schema(implementation = ProblemDetail.class))
-    )
+            responseCode = "428",
+            description = "If-Match is required",
+            content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "CURATED_PRACTICE")
     public ResponseEntity<CuratedPracticeDTO> keepPractice(
-        @PathVariable String slug,
-        @Parameter(required = true) @RequestHeader(
-            name = HttpHeaders.IF_MATCH,
-            required = false
-        ) @Nullable String ifMatch
-    ) {
+            @PathVariable String slug,
+            @Parameter(required = true) @RequestHeader(name = HttpHeaders.IF_MATCH, required = false) @Nullable
+                    String ifMatch) {
         return ok(service.keepPractice(slug, precondition(ifMatch)), CuratedPracticeDTO::from);
     }
 
@@ -250,40 +218,31 @@ public class CuratedCatalogAdminController {
     @Operation(summary = "Reorder practices within one catalog group", operationId = "adminReorderCuratedPractices")
     @AuditExempt(reason = "catalog order affects presentation, not review execution or delivery")
     public ResponseEntity<CuratedCatalogDTO> reorderPractices(
-        @Parameter(required = true) @RequestHeader(
-            name = HttpHeaders.IF_MATCH,
-            required = false
-        ) @Nullable String ifMatch,
-        @Valid @RequestBody ReorderPracticesRequestDTO request
-    ) {
+            @Parameter(required = true) @RequestHeader(name = HttpHeaders.IF_MATCH, required = false) @Nullable
+                    String ifMatch,
+            @Valid @RequestBody ReorderPracticesRequestDTO request) {
         return catalogResponse(
-            service.reorderPractices(precondition(ifMatch), request.groupSlug(), request.orderedSlugs())
-        );
+                service.reorderPractices(precondition(ifMatch), request.groupSlug(), request.orderedSlugs()));
     }
 
     @PatchMapping("/practices/{slug}/placement")
     @Operation(summary = "Move a practice to another catalog group", operationId = "adminPlaceCuratedPractice")
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "CURATED_PRACTICE")
     public ResponseEntity<CuratedCatalogDTO> placePractice(
-        @PathVariable String slug,
-        @Parameter(required = true) @RequestHeader(
-            name = HttpHeaders.IF_MATCH,
-            required = false
-        ) @Nullable String ifMatch,
-        @Valid @RequestBody PlacePracticeRequestDTO request
-    ) {
+            @PathVariable String slug,
+            @Parameter(required = true) @RequestHeader(name = HttpHeaders.IF_MATCH, required = false) @Nullable
+                    String ifMatch,
+            @Valid @RequestBody PlacePracticeRequestDTO request) {
         return catalogResponse(
-            service.placePractice(slug, precondition(ifMatch), request.groupSlug(), request.position())
-        );
+                service.placePractice(slug, precondition(ifMatch), request.groupSlug(), request.position()));
     }
 
     @GetMapping("/groups/{slug}")
     @Operation(summary = "Read a catalog group", operationId = "adminGetCuratedGroup")
     @ApiResponse(
-        responseCode = "200",
-        description = "The group",
-        content = @Content(schema = @Schema(implementation = CuratedGroupDTO.class))
-    )
+            responseCode = "200",
+            description = "The group",
+            content = @Content(schema = @Schema(implementation = CuratedGroupDTO.class)))
     public ResponseEntity<CuratedGroupDTO> getGroup(@PathVariable String slug) {
         return ok(service.group(slug), CuratedGroupDTO::from);
     }
@@ -291,15 +250,13 @@ public class CuratedCatalogAdminController {
     @PostMapping("/groups")
     @Operation(summary = "Add a group to the catalog", operationId = "adminCreateCuratedGroup")
     @ApiResponse(
-        responseCode = "201",
-        description = "Group added",
-        content = @Content(schema = @Schema(implementation = CuratedGroupDTO.class))
-    )
+            responseCode = "201",
+            description = "Group added",
+            content = @Content(schema = @Schema(implementation = CuratedGroupDTO.class)))
     @ApiResponse(
-        responseCode = "409",
-        description = "Slug already exists",
-        content = @Content(schema = @Schema(implementation = ProblemDetail.class))
-    )
+            responseCode = "409",
+            description = "Slug already exists",
+            content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "CURATED_PRACTICE_GROUP")
     public ResponseEntity<CuratedGroupDTO> createGroup(@Valid @RequestBody CreateCuratedGroupRequestDTO request) {
         var entry = service.createGroup(request.slug(), request.definition().definition());
@@ -309,123 +266,98 @@ public class CuratedCatalogAdminController {
     @PutMapping("/groups/{slug}")
     @Operation(summary = "Replace a group definition", operationId = "adminUpdateCuratedGroup")
     @ApiResponse(
-        responseCode = "200",
-        description = "The group",
-        content = @Content(schema = @Schema(implementation = CuratedGroupDTO.class))
-    )
+            responseCode = "200",
+            description = "The group",
+            content = @Content(schema = @Schema(implementation = CuratedGroupDTO.class)))
     @ApiResponse(
-        responseCode = "412",
-        description = "The supplied ETag is stale",
-        content = @Content(schema = @Schema(implementation = ProblemDetail.class))
-    )
+            responseCode = "412",
+            description = "The supplied ETag is stale",
+            content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     @ApiResponse(
-        responseCode = "428",
-        description = "If-Match is required",
-        content = @Content(schema = @Schema(implementation = ProblemDetail.class))
-    )
+            responseCode = "428",
+            description = "If-Match is required",
+            content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "CURATED_PRACTICE_GROUP")
     public ResponseEntity<CuratedGroupDTO> updateGroup(
-        @PathVariable String slug,
-        @Parameter(required = true) @RequestHeader(
-            name = HttpHeaders.IF_MATCH,
-            required = false
-        ) @Nullable String ifMatch,
-        @Valid @RequestBody CuratedGroupRequestDTO request
-    ) {
+            @PathVariable String slug,
+            @Parameter(required = true) @RequestHeader(name = HttpHeaders.IF_MATCH, required = false) @Nullable
+                    String ifMatch,
+            @Valid @RequestBody CuratedGroupRequestDTO request) {
         return ok(service.writeGroup(slug, precondition(ifMatch), request.definition()), CuratedGroupDTO::from);
     }
 
     @PatchMapping("/groups/{slug}/status")
     @Operation(
-        summary = "Exclude a group from new workspaces, or include it again",
-        description = "Excluding a group also excludes its practices from new workspaces; existing workspaces do not change.",
-        operationId = "adminUpdateCuratedGroupStatus"
-    )
+            summary = "Exclude a group from new workspaces, or include it again",
+            description =
+                    "Excluding a group also excludes its practices from new workspaces; existing workspaces do not change.",
+            operationId = "adminUpdateCuratedGroupStatus")
     @ApiResponse(
-        responseCode = "200",
-        description = "The updated catalog",
-        content = @Content(schema = @Schema(implementation = CuratedCatalogDTO.class))
-    )
+            responseCode = "200",
+            description = "The updated catalog",
+            content = @Content(schema = @Schema(implementation = CuratedCatalogDTO.class)))
     @ApiResponse(
-        responseCode = "412",
-        description = "The supplied ETag is stale",
-        content = @Content(schema = @Schema(implementation = ProblemDetail.class))
-    )
+            responseCode = "412",
+            description = "The supplied ETag is stale",
+            content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     @ApiResponse(
-        responseCode = "428",
-        description = "If-Match is required",
-        content = @Content(schema = @Schema(implementation = ProblemDetail.class))
-    )
+            responseCode = "428",
+            description = "If-Match is required",
+            content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "CURATED_PRACTICE_GROUP")
     public ResponseEntity<CuratedCatalogDTO> updateGroupStatus(
-        @PathVariable String slug,
-        @Parameter(required = true) @RequestHeader(
-            name = HttpHeaders.IF_MATCH,
-            required = false
-        ) @Nullable String ifMatch,
-        @Valid @RequestBody UpdateCuratedStatusRequestDTO request
-    ) {
+            @PathVariable String slug,
+            @Parameter(required = true) @RequestHeader(name = HttpHeaders.IF_MATCH, required = false) @Nullable
+                    String ifMatch,
+            @Valid @RequestBody UpdateCuratedStatusRequestDTO request) {
         return catalogResponse(service.setGroupStatus(slug, precondition(ifMatch), request.status()));
     }
 
     @DeleteMapping("/groups/{slug}/override")
     @Operation(summary = "Use the Hephaestus definition of a group", operationId = "adminDeleteCuratedGroupOverride")
     @ApiResponse(
-        responseCode = "200",
-        description = "The group",
-        content = @Content(schema = @Schema(implementation = CuratedGroupDTO.class))
-    )
+            responseCode = "200",
+            description = "The group",
+            content = @Content(schema = @Schema(implementation = CuratedGroupDTO.class)))
     @ApiResponse(
-        responseCode = "409",
-        description = "Hephaestus ships no definition for this slug",
-        content = @Content(schema = @Schema(implementation = ProblemDetail.class))
-    )
+            responseCode = "409",
+            description = "Hephaestus ships no definition for this slug",
+            content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     @ApiResponse(
-        responseCode = "412",
-        description = "The supplied ETag is stale",
-        content = @Content(schema = @Schema(implementation = ProblemDetail.class))
-    )
+            responseCode = "412",
+            description = "The supplied ETag is stale",
+            content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     @ApiResponse(
-        responseCode = "428",
-        description = "If-Match is required",
-        content = @Content(schema = @Schema(implementation = ProblemDetail.class))
-    )
+            responseCode = "428",
+            description = "If-Match is required",
+            content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "CURATED_PRACTICE_GROUP")
     public ResponseEntity<CuratedGroupDTO> resetGroup(
-        @PathVariable String slug,
-        @Parameter(required = true) @RequestHeader(
-            name = HttpHeaders.IF_MATCH,
-            required = false
-        ) @Nullable String ifMatch
-    ) {
+            @PathVariable String slug,
+            @Parameter(required = true) @RequestHeader(name = HttpHeaders.IF_MATCH, required = false) @Nullable
+                    String ifMatch) {
         return ok(service.resetGroup(slug, precondition(ifMatch)), CuratedGroupDTO::from);
     }
 
     @PutMapping("/groups/{slug}/override/acknowledgement")
     @Operation(summary = "Keep the saved group customization", operationId = "adminKeepCuratedGroup")
     @ApiResponse(
-        responseCode = "200",
-        description = "The group",
-        content = @Content(schema = @Schema(implementation = CuratedGroupDTO.class))
-    )
+            responseCode = "200",
+            description = "The group",
+            content = @Content(schema = @Schema(implementation = CuratedGroupDTO.class)))
     @ApiResponse(
-        responseCode = "412",
-        description = "The supplied ETag is stale",
-        content = @Content(schema = @Schema(implementation = ProblemDetail.class))
-    )
+            responseCode = "412",
+            description = "The supplied ETag is stale",
+            content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     @ApiResponse(
-        responseCode = "428",
-        description = "If-Match is required",
-        content = @Content(schema = @Schema(implementation = ProblemDetail.class))
-    )
+            responseCode = "428",
+            description = "If-Match is required",
+            content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "CURATED_PRACTICE_GROUP")
     public ResponseEntity<CuratedGroupDTO> keepGroup(
-        @PathVariable String slug,
-        @Parameter(required = true) @RequestHeader(
-            name = HttpHeaders.IF_MATCH,
-            required = false
-        ) @Nullable String ifMatch
-    ) {
+            @PathVariable String slug,
+            @Parameter(required = true) @RequestHeader(name = HttpHeaders.IF_MATCH, required = false) @Nullable
+                    String ifMatch) {
         return ok(service.keepGroup(slug, precondition(ifMatch)), CuratedGroupDTO::from);
     }
 
@@ -433,12 +365,9 @@ public class CuratedCatalogAdminController {
     @Operation(summary = "Reorder catalog groups", operationId = "adminReorderCuratedGroups")
     @AuditExempt(reason = "catalog order affects presentation, not review execution or delivery")
     public ResponseEntity<CuratedCatalogDTO> reorderGroups(
-        @Parameter(required = true) @RequestHeader(
-            name = HttpHeaders.IF_MATCH,
-            required = false
-        ) @Nullable String ifMatch,
-        @Valid @RequestBody ReorderPracticeGroupsRequestDTO request
-    ) {
+            @Parameter(required = true) @RequestHeader(name = HttpHeaders.IF_MATCH, required = false) @Nullable
+                    String ifMatch,
+            @Valid @RequestBody ReorderPracticeGroupsRequestDTO request) {
         return catalogResponse(service.reorderGroups(precondition(ifMatch), request.orderedSlugs()));
     }
 
@@ -446,17 +375,13 @@ public class CuratedCatalogAdminController {
     @Operation(summary = "Use the Hephaestus default order", operationId = "adminResetCuratedCatalogOrder")
     @AuditExempt(reason = "catalog order affects presentation, not review execution or delivery")
     public ResponseEntity<CuratedCatalogDTO> resetOrder(
-        @Parameter(required = true) @RequestHeader(
-            name = HttpHeaders.IF_MATCH,
-            required = false
-        ) @Nullable String ifMatch
-    ) {
+            @Parameter(required = true) @RequestHeader(name = HttpHeaders.IF_MATCH, required = false) @Nullable
+                    String ifMatch) {
         return catalogResponse(service.resetOrder(precondition(ifMatch)));
     }
 
     private PracticeDefinition definition(CuratedPracticeRequestDTO request) {
-        var evidence =
-            request.automatedReviewPolicy() == null
+        var evidence = request.automatedReviewPolicy() == null
                 ? evidenceDefaults.policyFor(PracticeBinding.artifactKindOf(request.bindings()))
                 : request.automatedReviewPolicy();
         return request.definition(evidence);
@@ -464,28 +389,26 @@ public class CuratedCatalogAdminController {
 
     private static ResponseEntity<CuratedCatalogDTO> catalogResponse(EffectiveCatalog catalog) {
         CuratedCatalogDTO body = new CuratedCatalogDTO(
-            catalog.etag(),
-            catalog.customOrder(),
-            CuratedCatalogSummaryDTO.from(catalog.summary()),
-            catalog.groups().stream().map(CuratedGroupDTO::from).toList(),
-            catalog
-                .practices()
-                .stream()
-                .map(entry -> CuratedPracticeSummaryDTO.from(entry, catalog.isEffectivelyOffered(entry)))
-                .toList()
-        );
+                catalog.etag(),
+                catalog.customOrder(),
+                CuratedCatalogSummaryDTO.from(catalog.summary()),
+                catalog.groups().stream().map(CuratedGroupDTO::from).toList(),
+                catalog.practices().stream()
+                        .map(entry -> CuratedPracticeSummaryDTO.from(entry, catalog.isEffectivelyOffered(entry)))
+                        .toList());
         return ResponseEntity.ok().eTag(etag(catalog.etag())).body(body);
     }
 
     private static <D extends CatalogDefinition, T> ResponseEntity<T> ok(
-        CatalogEntry<D> entry,
-        java.util.function.Function<CatalogEntry<D>, T> body
-    ) {
+            CatalogEntry<D> entry, java.util.function.Function<CatalogEntry<D>, T> body) {
         return ResponseEntity.ok().eTag(etag(entry.etag())).body(body.apply(entry));
     }
 
     private static <T> ResponseEntity<T> created(String slug, String tag, T body) {
-        URI location = ServletUriComponentsBuilder.fromCurrentRequest().path("/{slug}").buildAndExpand(slug).toUri();
+        URI location = ServletUriComponentsBuilder.fromCurrentRequest()
+                .path("/{slug}")
+                .buildAndExpand(slug)
+                .toUri();
         return ResponseEntity.created(location).eTag(etag(tag)).body(body);
     }
 

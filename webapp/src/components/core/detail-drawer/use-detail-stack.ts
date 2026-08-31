@@ -1,5 +1,7 @@
 import { useRouter } from "@tanstack/react-router";
+
 import { useSearchState } from "@/lib/search-params";
+
 import { type DetailStackEntry, encodeDetailStack } from "./detail-stack";
 
 export interface DetailStackControls {

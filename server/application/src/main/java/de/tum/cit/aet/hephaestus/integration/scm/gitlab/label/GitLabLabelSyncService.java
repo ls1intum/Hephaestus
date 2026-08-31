@@ -48,12 +48,11 @@ public class GitLabLabelSyncService {
     private final GitLabProperties gitLabProperties;
 
     public GitLabLabelSyncService(
-        GitLabGraphQlClientProvider graphQlClientProvider,
-        GitLabGraphQlResponseHandler responseHandler,
-        GitLabLabelProcessor labelProcessor,
-        LabelRepository labelRepository,
-        GitLabProperties gitLabProperties
-    ) {
+            GitLabGraphQlClientProvider graphQlClientProvider,
+            GitLabGraphQlResponseHandler responseHandler,
+            GitLabLabelProcessor labelProcessor,
+            LabelRepository labelRepository,
+            GitLabProperties gitLabProperties) {
         this.graphQlClientProvider = graphQlClientProvider;
         this.responseHandler = responseHandler;
         this.labelProcessor = labelProcessor;
@@ -105,13 +104,12 @@ public class GitLabLabelSyncService {
 
                 HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
 
-                ClientGraphQlResponse response = client
-                    .documentName(GET_PROJECT_LABELS_DOCUMENT)
-                    .variable("fullPath", projectPath)
-                    .variable("first", pageSize)
-                    .variable("after", cursor)
-                    .execute()
-                    .block(gitLabProperties.graphqlTimeout());
+                ClientGraphQlResponse response = client.documentName(GET_PROJECT_LABELS_DOCUMENT)
+                        .variable("fullPath", projectPath)
+                        .variable("first", pageSize)
+                        .variable("after", cursor)
+                        .execute()
+                        .block(gitLabProperties.graphqlTimeout());
 
                 var handleResult = responseHandler.handle(response, "labels for " + safeProjectPath, log);
                 if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.RETRY) {
@@ -125,10 +123,10 @@ public class GitLabLabelSyncService {
 
                 graphQlClientProvider.recordSuccess();
 
-                @SuppressWarnings({ "unchecked", "rawtypes" })
+                @SuppressWarnings({"unchecked", "rawtypes"})
                 List<Map<String, Object>> nodes = (List) Objects.requireNonNull(response)
-                    .field("project.labels.nodes")
-                    .toEntityList(Map.class);
+                        .field("project.labels.nodes")
+                        .toEntityList(Map.class);
 
                 if (nodes == null || nodes.isEmpty()) {
                     break;
@@ -149,8 +147,8 @@ public class GitLabLabelSyncService {
                 }
 
                 GitLabPageInfo pageInfo = Objects.requireNonNull(response)
-                    .field("project.labels.pageInfo")
-                    .toEntity(GitLabPageInfo.class);
+                        .field("project.labels.pageInfo")
+                        .toEntity(GitLabPageInfo.class);
                 cursor = pageInfo != null ? pageInfo.endCursor() : null;
                 page++;
 
@@ -172,29 +170,24 @@ public class GitLabLabelSyncService {
 
         // Remove stale labels only if sync completed fully
         if (syncComplete) {
-            int removedCount = removeStaleLabels(
-                repository.getId(),
-                syncedNames,
-                ProcessingContext.forSync(scopeId, repository)
-            );
+            int removedCount =
+                    removeStaleLabels(repository.getId(), syncedNames, ProcessingContext.forSync(scopeId, repository));
             if (removedCount > 0) {
                 log.info("Removed stale labels: removedCount={}, projectPath={}", removedCount, safeProjectPath);
             }
         } else {
             log.warn(
-                "Skipped stale label removal: reason=incompleteSync, projectPath={}, pagesProcessed={}",
-                safeProjectPath,
-                page
-            );
+                    "Skipped stale label removal: reason=incompleteSync, projectPath={}, pagesProcessed={}",
+                    safeProjectPath,
+                    page);
         }
 
         log.info(
-            "Completed label sync: projectPath={}, labelCount={}, complete={}, scopeId={}",
-            safeProjectPath,
-            totalSynced,
-            syncComplete,
-            scopeId
-        );
+                "Completed label sync: projectPath={}, labelCount={}, complete={}, scopeId={}",
+                safeProjectPath,
+                totalSynced,
+                syncComplete,
+                scopeId);
 
         if (rateLimitAborted) {
             return SyncResult.abortedRateLimit(totalSynced);
@@ -213,10 +206,9 @@ public class GitLabLabelSyncService {
                 labelProcessor.delete(existingLabel.getId(), context);
                 removedCount++;
                 log.debug(
-                    "Removed stale label: labelName={}, repoId={}",
-                    sanitizeForLog(existingLabel.getName()),
-                    repositoryId
-                );
+                        "Removed stale label: labelName={}, repoId={}",
+                        sanitizeForLog(existingLabel.getName()),
+                        repositoryId);
             }
         }
         return removedCount;

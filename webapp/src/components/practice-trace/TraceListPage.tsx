@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { RadarIcon } from "lucide-react";
+
 import type { ListTracedArtifactsResponse } from "@/api/types.gen";
 import { ReviewResultsSkeleton } from "@/components/admin/practice-reviews/ReviewResultsSkeleton";
 import { FilterToolbar } from "@/components/common/FilterToolbar";
@@ -16,9 +17,10 @@ import {
 } from "@/components/ui/empty";
 import { ItemGroup } from "@/components/ui/item";
 import { ARTIFACT_KIND_VALUES, artifactKindPluralLabel } from "@/lib/artifact-kinds";
+
+import type { TraceSearch } from "./trace-search";
 import { TracedArtifactRow } from "./TracedArtifactRow";
 import { TraceKindFilter } from "./TraceKindFilter";
-import type { TraceSearch } from "./trace-search";
 
 /**
  * Shared with the route that asks for the page, so the skeleton shows the number of rows that are

@@ -140,10 +140,9 @@ public class PullRequest extends Issue {
 
     @ManyToMany
     @JoinTable(
-        name = "pull_request_requested_reviewers",
-        joinColumns = @JoinColumn(name = "pull_request_id"),
-        inverseJoinColumns = @JoinColumn(name = "user_id")
-    )
+            name = "pull_request_requested_reviewers",
+            joinColumns = @JoinColumn(name = "pull_request_id"),
+            inverseJoinColumns = @JoinColumn(name = "user_id"))
     @BatchSize(size = 50)
     @ToString.Exclude
     private Set<User> requestedReviewers = new HashSet<>();

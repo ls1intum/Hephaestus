@@ -102,15 +102,15 @@ class PracticeGroupControllerIntegrationTest extends AbstractWorkspaceIntegratio
             persistGroup("beta", "Beta");
 
             webTestClient
-                .get()
-                .uri(BASE_URI, workspace.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$.length()")
-                .isEqualTo(2);
+                    .get()
+                    .uri(BASE_URI, workspace.getWorkspaceSlug())
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$.length()")
+                    .isEqualTo(2);
         }
 
         @Test
@@ -121,21 +121,26 @@ class PracticeGroupControllerIntegrationTest extends AbstractWorkspaceIntegratio
             persistGroup("member-visible", "Visible");
 
             webTestClient
-                .get()
-                .uri(BASE_URI, workspace.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$.length()")
-                .isEqualTo(1);
+                    .get()
+                    .uri(BASE_URI, workspace.getWorkspaceSlug())
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$.length()")
+                    .isEqualTo(1);
         }
 
         @Test
         @DisplayName("returns 401 when not logged in")
         void shouldReturnUnauthorized() {
-            webTestClient.get().uri(BASE_URI, workspace.getWorkspaceSlug()).exchange().expectStatus().isUnauthorized();
+            webTestClient
+                    .get()
+                    .uri(BASE_URI, workspace.getWorkspaceSlug())
+                    .exchange()
+                    .expectStatus()
+                    .isUnauthorized();
         }
     }
 
@@ -153,26 +158,26 @@ class PracticeGroupControllerIntegrationTest extends AbstractWorkspaceIntegratio
             persistGroup("member-get", "Member Get");
 
             webTestClient
-                .get()
-                .uri(BASE_URI + "/{groupSlug}", workspace.getWorkspaceSlug(), "member-get")
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$.slug")
-                .isEqualTo("member-get");
+                    .get()
+                    .uri(BASE_URI + "/{groupSlug}", workspace.getWorkspaceSlug(), "member-get")
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$.slug")
+                    .isEqualTo("member-get");
         }
 
         @Test
         @DisplayName("returns 401 when not logged in")
         void shouldReturnUnauthorized() {
             webTestClient
-                .get()
-                .uri(BASE_URI + "/{groupSlug}", workspace.getWorkspaceSlug(), "any-slug")
-                .exchange()
-                .expectStatus()
-                .isUnauthorized();
+                    .get()
+                    .uri(BASE_URI + "/{groupSlug}", workspace.getWorkspaceSlug(), "any-slug")
+                    .exchange()
+                    .expectStatus()
+                    .isUnauthorized();
         }
     }
 
@@ -189,16 +194,17 @@ class PracticeGroupControllerIntegrationTest extends AbstractWorkspaceIntegratio
             asMember();
 
             webTestClient
-                .post()
-                .uri(BASE_URI, workspace.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(validCreateRequest("forbidden-group"))
-                .exchange()
-                .expectStatus()
-                .isForbidden();
+                    .post()
+                    .uri(BASE_URI, workspace.getWorkspaceSlug())
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(validCreateRequest("forbidden-group"))
+                    .exchange()
+                    .expectStatus()
+                    .isForbidden();
 
-            assertThat(groupRepository.existsByWorkspaceIdAndSlug(workspace.getId(), "forbidden-group")).isFalse();
+            assertThat(groupRepository.existsByWorkspaceIdAndSlug(workspace.getId(), "forbidden-group"))
+                    .isFalse();
         }
 
         @Test
@@ -207,13 +213,13 @@ class PracticeGroupControllerIntegrationTest extends AbstractWorkspaceIntegratio
             // Anonymous POST → double-submit CSRF gate (ADR 0017) rejects 403 before auth (no
             // X-XSRF-TOKEN). The create stays blocked for anonymous callers.
             webTestClient
-                .post()
-                .uri(BASE_URI, workspace.getWorkspaceSlug())
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(validCreateRequest("anon-group"))
-                .exchange()
-                .expectStatus()
-                .isForbidden();
+                    .post()
+                    .uri(BASE_URI, workspace.getWorkspaceSlug())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(validCreateRequest("anon-group"))
+                    .exchange()
+                    .expectStatus()
+                    .isForbidden();
         }
     }
 
@@ -233,18 +239,18 @@ class PracticeGroupControllerIntegrationTest extends AbstractWorkspaceIntegratio
             var request = new UpdatePracticeGroupRequestDTO("Hacked Name", null, null, null, null, null);
 
             webTestClient
-                .patch()
-                .uri(BASE_URI + "/{groupSlug}", workspace.getWorkspaceSlug(), "forbidden-update")
-                .headers(TestAuthUtils.withCurrentUser())
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(request)
-                .exchange()
-                .expectStatus()
-                .isForbidden();
+                    .patch()
+                    .uri(BASE_URI + "/{groupSlug}", workspace.getWorkspaceSlug(), "forbidden-update")
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(request)
+                    .exchange()
+                    .expectStatus()
+                    .isForbidden();
 
             PracticeGroup persisted = groupRepository
-                .findByWorkspaceIdAndSlug(workspace.getId(), "forbidden-update")
-                .orElseThrow();
+                    .findByWorkspaceIdAndSlug(workspace.getId(), "forbidden-update")
+                    .orElseThrow();
             assertThat(persisted.getName()).isEqualTo("Original");
         }
 
@@ -256,14 +262,14 @@ class PracticeGroupControllerIntegrationTest extends AbstractWorkspaceIntegratio
             // Pass CSRF so the auth layer (not the CSRF filter) answers a cookie-style write → 401 (ADR 0017).
             String csrf = TestAuthUtils.fetchCsrfToken(webTestClient);
             webTestClient
-                .patch()
-                .uri(BASE_URI + "/{groupSlug}", workspace.getWorkspaceSlug(), "any-slug")
-                .headers(TestAuthUtils.withCsrf(csrf))
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(request)
-                .exchange()
-                .expectStatus()
-                .isUnauthorized();
+                    .patch()
+                    .uri(BASE_URI + "/{groupSlug}", workspace.getWorkspaceSlug(), "any-slug")
+                    .headers(TestAuthUtils.withCsrf(csrf))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(request)
+                    .exchange()
+                    .expectStatus()
+                    .isUnauthorized();
         }
     }
 
@@ -284,26 +290,30 @@ class PracticeGroupControllerIntegrationTest extends AbstractWorkspaceIntegratio
             var request = new ReorderPracticeGroupsRequestDTO(List.of("second", "first"));
 
             webTestClient
-                .patch()
-                .uri(BASE_URI + "/reorder", workspace.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(request)
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$[0].slug")
-                .isEqualTo("second")
-                .jsonPath("$[1].slug")
-                .isEqualTo("first");
+                    .patch()
+                    .uri(BASE_URI + "/reorder", workspace.getWorkspaceSlug())
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(request)
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$[0].slug")
+                    .isEqualTo("second")
+                    .jsonPath("$[1].slug")
+                    .isEqualTo("first");
 
-            assertThat(
-                groupRepository.findByWorkspaceIdAndSlug(workspace.getId(), "second").orElseThrow().getDisplayOrder()
-            ).isZero();
-            assertThat(
-                groupRepository.findByWorkspaceIdAndSlug(workspace.getId(), "first").orElseThrow().getDisplayOrder()
-            ).isEqualTo(1);
+            assertThat(groupRepository
+                            .findByWorkspaceIdAndSlug(workspace.getId(), "second")
+                            .orElseThrow()
+                            .getDisplayOrder())
+                    .isZero();
+            assertThat(groupRepository
+                            .findByWorkspaceIdAndSlug(workspace.getId(), "first")
+                            .orElseThrow()
+                            .getDisplayOrder())
+                    .isEqualTo(1);
         }
 
         @Test
@@ -317,14 +327,14 @@ class PracticeGroupControllerIntegrationTest extends AbstractWorkspaceIntegratio
             var request = new ReorderPracticeGroupsRequestDTO(List.of("second", "first"));
 
             webTestClient
-                .patch()
-                .uri(BASE_URI + "/reorder", workspace.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(request)
-                .exchange()
-                .expectStatus()
-                .isForbidden();
+                    .patch()
+                    .uri(BASE_URI + "/reorder", workspace.getWorkspaceSlug())
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(request)
+                    .exchange()
+                    .expectStatus()
+                    .isForbidden();
         }
 
         @Test
@@ -335,14 +345,14 @@ class PracticeGroupControllerIntegrationTest extends AbstractWorkspaceIntegratio
             // Pass CSRF so the auth layer (not the CSRF filter) answers a cookie-style write → 401 (ADR 0017).
             String csrf = TestAuthUtils.fetchCsrfToken(webTestClient);
             webTestClient
-                .patch()
-                .uri(BASE_URI + "/reorder", workspace.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCsrf(csrf))
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(request)
-                .exchange()
-                .expectStatus()
-                .isUnauthorized();
+                    .patch()
+                    .uri(BASE_URI + "/reorder", workspace.getWorkspaceSlug())
+                    .headers(TestAuthUtils.withCsrf(csrf))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(request)
+                    .exchange()
+                    .expectStatus()
+                    .isUnauthorized();
         }
     }
 
@@ -360,14 +370,14 @@ class PracticeGroupControllerIntegrationTest extends AbstractWorkspaceIntegratio
             persistGroup("dup", "Existing");
 
             webTestClient
-                .post()
-                .uri(BASE_URI, workspace.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(validCreateRequest("dup"))
-                .exchange()
-                .expectStatus()
-                .isEqualTo(409);
+                    .post()
+                    .uri(BASE_URI, workspace.getWorkspaceSlug())
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(validCreateRequest("dup"))
+                    .exchange()
+                    .expectStatus()
+                    .isEqualTo(409);
         }
 
         @Test
@@ -377,12 +387,12 @@ class PracticeGroupControllerIntegrationTest extends AbstractWorkspaceIntegratio
             ensureAdminMembership(workspace);
 
             webTestClient
-                .get()
-                .uri(BASE_URI + "/{groupSlug}", workspace.getWorkspaceSlug(), "does-not-exist")
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isNotFound();
+                    .get()
+                    .uri(BASE_URI + "/{groupSlug}", workspace.getWorkspaceSlug(), "does-not-exist")
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .exchange()
+                    .expectStatus()
+                    .isNotFound();
         }
 
         @Test
@@ -393,14 +403,14 @@ class PracticeGroupControllerIntegrationTest extends AbstractWorkspaceIntegratio
             var request = new UpdatePracticeGroupRequestDTO("New Name", null, null, null, null, null);
 
             webTestClient
-                .patch()
-                .uri(BASE_URI + "/{groupSlug}", workspace.getWorkspaceSlug(), "does-not-exist")
-                .headers(TestAuthUtils.withCurrentUser())
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(request)
-                .exchange()
-                .expectStatus()
-                .isNotFound();
+                    .patch()
+                    .uri(BASE_URI + "/{groupSlug}", workspace.getWorkspaceSlug(), "does-not-exist")
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(request)
+                    .exchange()
+                    .expectStatus()
+                    .isNotFound();
         }
 
         @Test
@@ -410,12 +420,12 @@ class PracticeGroupControllerIntegrationTest extends AbstractWorkspaceIntegratio
             ensureAdminMembership(workspace);
 
             webTestClient
-                .delete()
-                .uri(BASE_URI + "/{groupSlug}", workspace.getWorkspaceSlug(), "does-not-exist")
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isNotFound();
+                    .delete()
+                    .uri(BASE_URI + "/{groupSlug}", workspace.getWorkspaceSlug(), "does-not-exist")
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .exchange()
+                    .expectStatus()
+                    .isNotFound();
         }
 
         @Test
@@ -428,14 +438,14 @@ class PracticeGroupControllerIntegrationTest extends AbstractWorkspaceIntegratio
             var request = new ReorderPracticeGroupsRequestDTO(List.of("only", "only"));
 
             webTestClient
-                .patch()
-                .uri(BASE_URI + "/reorder", workspace.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(request)
-                .exchange()
-                .expectStatus()
-                .isBadRequest();
+                    .patch()
+                    .uri(BASE_URI + "/reorder", workspace.getWorkspaceSlug())
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(request)
+                    .exchange()
+                    .expectStatus()
+                    .isBadRequest();
         }
 
         @Test
@@ -448,14 +458,14 @@ class PracticeGroupControllerIntegrationTest extends AbstractWorkspaceIntegratio
             var request = new ReorderPracticeGroupsRequestDTO(List.of("known", "ghost"));
 
             webTestClient
-                .patch()
-                .uri(BASE_URI + "/reorder", workspace.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(request)
-                .exchange()
-                .expectStatus()
-                .isNotFound();
+                    .patch()
+                    .uri(BASE_URI + "/reorder", workspace.getWorkspaceSlug())
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(request)
+                    .exchange()
+                    .expectStatus()
+                    .isNotFound();
         }
 
         @Test
@@ -475,12 +485,12 @@ class PracticeGroupControllerIntegrationTest extends AbstractWorkspaceIntegratio
 
             // Reading it through THIS workspace's slug must 404 — it is scoped to the other workspace.
             webTestClient
-                .get()
-                .uri(BASE_URI + "/{groupSlug}", workspace.getWorkspaceSlug(), "foreign-group")
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isNotFound();
+                    .get()
+                    .uri(BASE_URI + "/{groupSlug}", workspace.getWorkspaceSlug(), "foreign-group")
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .exchange()
+                    .expectStatus()
+                    .isNotFound();
         }
     }
 
@@ -498,14 +508,15 @@ class PracticeGroupControllerIntegrationTest extends AbstractWorkspaceIntegratio
             persistGroup("forbidden-delete", "Keep Me");
 
             webTestClient
-                .delete()
-                .uri(BASE_URI + "/{groupSlug}", workspace.getWorkspaceSlug(), "forbidden-delete")
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isForbidden();
+                    .delete()
+                    .uri(BASE_URI + "/{groupSlug}", workspace.getWorkspaceSlug(), "forbidden-delete")
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .exchange()
+                    .expectStatus()
+                    .isForbidden();
 
-            assertThat(groupRepository.existsByWorkspaceIdAndSlug(workspace.getId(), "forbidden-delete")).isTrue();
+            assertThat(groupRepository.existsByWorkspaceIdAndSlug(workspace.getId(), "forbidden-delete"))
+                    .isTrue();
         }
 
         @Test
@@ -514,12 +525,12 @@ class PracticeGroupControllerIntegrationTest extends AbstractWorkspaceIntegratio
             // Pass CSRF so the auth layer (not the CSRF filter) answers a cookie-style write → 401 (ADR 0017).
             String csrf = TestAuthUtils.fetchCsrfToken(webTestClient);
             webTestClient
-                .delete()
-                .uri(BASE_URI + "/{groupSlug}", workspace.getWorkspaceSlug(), "any-slug")
-                .headers(TestAuthUtils.withCsrf(csrf))
-                .exchange()
-                .expectStatus()
-                .isUnauthorized();
+                    .delete()
+                    .uri(BASE_URI + "/{groupSlug}", workspace.getWorkspaceSlug(), "any-slug")
+                    .headers(TestAuthUtils.withCsrf(csrf))
+                    .exchange()
+                    .expectStatus()
+                    .isUnauthorized();
         }
     }
 
@@ -548,7 +559,10 @@ class PracticeGroupControllerIntegrationTest extends AbstractWorkspaceIntegratio
         }
 
         private @Nullable PracticeAutonomy storedTierOf(String slug) {
-            return groupRepository.findByWorkspaceIdAndSlug(workspace.getId(), slug).orElseThrow().getAutonomy();
+            return groupRepository
+                    .findByWorkspaceIdAndSlug(workspace.getId(), slug)
+                    .orElseThrow()
+                    .getAutonomy();
         }
 
         /**
@@ -559,20 +573,18 @@ class PracticeGroupControllerIntegrationTest extends AbstractWorkspaceIntegratio
          */
         private long auditedChangesTo(PracticeGroup group) {
             return configAuditEventRepository
-                .findForWorkspace(
-                    workspace.getId(),
-                    new ConfigAuditFilter(
-                        List.of(ConfigAuditEntityType.PRACTICE_GROUP),
-                        String.valueOf(group.getId()),
-                        null,
-                        null,
-                        null,
-                        null,
-                        null
-                    ),
-                    PageRequest.of(0, 50)
-                )
-                .getTotalElements();
+                    .findForWorkspace(
+                            workspace.getId(),
+                            new ConfigAuditFilter(
+                                    List.of(ConfigAuditEntityType.PRACTICE_GROUP),
+                                    String.valueOf(group.getId()),
+                                    null,
+                                    null,
+                                    null,
+                                    null,
+                                    null),
+                            PageRequest.of(0, 50))
+                    .getTotalElements();
         }
 
         /**
@@ -588,17 +600,17 @@ class PracticeGroupControllerIntegrationTest extends AbstractWorkspaceIntegratio
             persistGroupAt("decides", null);
 
             PracticeGroupDTO result = webTestClient
-                .patch()
-                .uri(BASE_URI + "/{groupSlug}/autonomy", workspace.getWorkspaceSlug(), "decides")
-                .headers(TestAuthUtils.withCurrentUser())
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new UpdatePracticeAutonomyRequestDTO(autonomy))
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody(PracticeGroupDTO.class)
-                .returnResult()
-                .getResponseBody();
+                    .patch()
+                    .uri(BASE_URI + "/{groupSlug}/autonomy", workspace.getWorkspaceSlug(), "decides")
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(new UpdatePracticeAutonomyRequestDTO(autonomy))
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody(PracticeGroupDTO.class)
+                    .returnResult()
+                    .getResponseBody();
 
             assertThat(result).isNotNull();
             assertThat(result.autonomy().effective()).isEqualTo(autonomy);
@@ -617,17 +629,17 @@ class PracticeGroupControllerIntegrationTest extends AbstractWorkspaceIntegratio
             persistGroupAt("clear-me", PracticeAutonomy.OFF);
 
             PracticeGroupDTO result = webTestClient
-                .patch()
-                .uri(BASE_URI + "/{groupSlug}/autonomy", workspace.getWorkspaceSlug(), "clear-me")
-                .headers(TestAuthUtils.withCurrentUser())
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue("{\"autonomy\": null}")
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody(PracticeGroupDTO.class)
-                .returnResult()
-                .getResponseBody();
+                    .patch()
+                    .uri(BASE_URI + "/{groupSlug}/autonomy", workspace.getWorkspaceSlug(), "clear-me")
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue("{\"autonomy\": null}")
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody(PracticeGroupDTO.class)
+                    .returnResult()
+                    .getResponseBody();
 
             assertThat(result).isNotNull();
             assertThat(result.autonomy().override()).isNull();
@@ -651,17 +663,17 @@ class PracticeGroupControllerIntegrationTest extends AbstractWorkspaceIntegratio
             persistGroupAt("absent-key", PracticeAutonomy.AUTOMATIC);
 
             PracticeGroupDTO result = webTestClient
-                .patch()
-                .uri(BASE_URI + "/{groupSlug}/autonomy", workspace.getWorkspaceSlug(), "absent-key")
-                .headers(TestAuthUtils.withCurrentUser())
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue("{}")
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody(PracticeGroupDTO.class)
-                .returnResult()
-                .getResponseBody();
+                    .patch()
+                    .uri(BASE_URI + "/{groupSlug}/autonomy", workspace.getWorkspaceSlug(), "absent-key")
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue("{}")
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody(PracticeGroupDTO.class)
+                    .returnResult()
+                    .getResponseBody();
 
             assertThat(result).isNotNull();
             assertThat(result.autonomy().override()).isNull();
@@ -684,17 +696,17 @@ class PracticeGroupControllerIntegrationTest extends AbstractWorkspaceIntegratio
             long auditedBefore = auditedChangesTo(group);
 
             PracticeGroupDTO result = webTestClient
-                .patch()
-                .uri(BASE_URI + "/{groupSlug}/autonomy", workspace.getWorkspaceSlug(), "unchanged")
-                .headers(TestAuthUtils.withCurrentUser())
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new UpdatePracticeAutonomyRequestDTO(PracticeAutonomy.HUMAN_APPROVAL))
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody(PracticeGroupDTO.class)
-                .returnResult()
-                .getResponseBody();
+                    .patch()
+                    .uri(BASE_URI + "/{groupSlug}/autonomy", workspace.getWorkspaceSlug(), "unchanged")
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(new UpdatePracticeAutonomyRequestDTO(PracticeAutonomy.HUMAN_APPROVAL))
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody(PracticeGroupDTO.class)
+                    .returnResult()
+                    .getResponseBody();
 
             assertThat(result).isNotNull();
             assertThat(result.autonomy().effective()).isEqualTo(PracticeAutonomy.HUMAN_APPROVAL);
@@ -713,14 +725,14 @@ class PracticeGroupControllerIntegrationTest extends AbstractWorkspaceIntegratio
             long auditedBefore = auditedChangesTo(group);
 
             webTestClient
-                .patch()
-                .uri(BASE_URI + "/{groupSlug}/autonomy", workspace.getWorkspaceSlug(), "changes")
-                .headers(TestAuthUtils.withCurrentUser())
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new UpdatePracticeAutonomyRequestDTO(PracticeAutonomy.OFF))
-                .exchange()
-                .expectStatus()
-                .isOk();
+                    .patch()
+                    .uri(BASE_URI + "/{groupSlug}/autonomy", workspace.getWorkspaceSlug(), "changes")
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(new UpdatePracticeAutonomyRequestDTO(PracticeAutonomy.OFF))
+                    .exchange()
+                    .expectStatus()
+                    .isOk();
 
             assertThat(auditedChangesTo(group)).isEqualTo(auditedBefore + 1);
         }
@@ -732,14 +744,14 @@ class PracticeGroupControllerIntegrationTest extends AbstractWorkspaceIntegratio
             ensureAdminMembership(workspace);
 
             webTestClient
-                .patch()
-                .uri(BASE_URI + "/{groupSlug}/autonomy", workspace.getWorkspaceSlug(), "no-such-group")
-                .headers(TestAuthUtils.withCurrentUser())
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new UpdatePracticeAutonomyRequestDTO(PracticeAutonomy.OFF))
-                .exchange()
-                .expectStatus()
-                .isNotFound();
+                    .patch()
+                    .uri(BASE_URI + "/{groupSlug}/autonomy", workspace.getWorkspaceSlug(), "no-such-group")
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(new UpdatePracticeAutonomyRequestDTO(PracticeAutonomy.OFF))
+                    .exchange()
+                    .expectStatus()
+                    .isNotFound();
         }
 
         @Test
@@ -750,14 +762,14 @@ class PracticeGroupControllerIntegrationTest extends AbstractWorkspaceIntegratio
             persistGroupAt("forbidden-autonomy", PracticeAutonomy.AUTOMATIC);
 
             webTestClient
-                .patch()
-                .uri(BASE_URI + "/{groupSlug}/autonomy", workspace.getWorkspaceSlug(), "forbidden-autonomy")
-                .headers(TestAuthUtils.withCurrentUser())
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new UpdatePracticeAutonomyRequestDTO(PracticeAutonomy.OFF))
-                .exchange()
-                .expectStatus()
-                .isForbidden();
+                    .patch()
+                    .uri(BASE_URI + "/{groupSlug}/autonomy", workspace.getWorkspaceSlug(), "forbidden-autonomy")
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(new UpdatePracticeAutonomyRequestDTO(PracticeAutonomy.OFF))
+                    .exchange()
+                    .expectStatus()
+                    .isForbidden();
 
             assertThat(storedTierOf("forbidden-autonomy")).isEqualTo(PracticeAutonomy.AUTOMATIC);
         }
@@ -767,14 +779,14 @@ class PracticeGroupControllerIntegrationTest extends AbstractWorkspaceIntegratio
         void shouldReturnUnauthorized() {
             String csrf = TestAuthUtils.fetchCsrfToken(webTestClient);
             webTestClient
-                .patch()
-                .uri(BASE_URI + "/{groupSlug}/autonomy", workspace.getWorkspaceSlug(), "any-slug")
-                .headers(TestAuthUtils.withCsrf(csrf))
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new UpdatePracticeAutonomyRequestDTO(PracticeAutonomy.OFF))
-                .exchange()
-                .expectStatus()
-                .isUnauthorized();
+                    .patch()
+                    .uri(BASE_URI + "/{groupSlug}/autonomy", workspace.getWorkspaceSlug(), "any-slug")
+                    .headers(TestAuthUtils.withCsrf(csrf))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(new UpdatePracticeAutonomyRequestDTO(PracticeAutonomy.OFF))
+                    .exchange()
+                    .expectStatus()
+                    .isUnauthorized();
         }
     }
 }

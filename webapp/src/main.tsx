@@ -1,30 +1,25 @@
 import * as Sentry from "@sentry/react";
 import { createRouter, RouterProvider } from "@tanstack/react-router";
-import { PostHogProvider } from "posthog-js/react";
+import { StrictMode, useEffect } from "react";
 import ReactDOM from "react-dom/client";
+
 import { client } from "@/api/client.gen";
-import * as TanstackQuery from "./integrations/tanstack-query/root-provider";
-import { routeTree } from "./routeTree.gen";
+import environment from "@/environment";
+import { RouteError } from "@/integrations/sentry/RouteError";
 
 import "./styles.css";
-import { StrictMode, useEffect } from "react";
 
-import environment from "@/environment";
 import { AuthProvider, applyStateChangingHeaders, useAuth } from "@/integrations/auth";
 import { handlePossibleSessionExpiry } from "@/integrations/auth/session-expiry";
 import { SessionKeepAlive } from "@/integrations/auth/use-session-keep-alive";
 import { useCookieConsent } from "@/integrations/consent";
 import { TanstackDevtools } from "@/integrations/devtools/TanstackDevtools";
-import { PostHogIdentity } from "@/integrations/posthog";
-import {
-	isPosthogEnabled,
-	posthogApiHost,
-	posthogProjectApiKey,
-} from "@/integrations/posthog/config";
 import { disableSentry, initSentry } from "@/integrations/sentry";
 import { ThemeProvider } from "@/integrations/theme";
 import { useImpersonationStore } from "@/stores/impersonation-store";
-import reportWebVitals from "./reportWebVitals";
+
+import * as TanstackQuery from "./integrations/tanstack-query/root-provider";
+import { routeTree } from "./routeTree.gen";
 
 // No default request timeout, deliberately: it would have to clear the slowest honest response (a
 // workspace purge is unbounded by design), and aborting a mutation does not abort the server — it
@@ -36,6 +31,18 @@ client.setConfig({
 	// cross-origin dev setup (SPA :4200 → server :8080).
 	credentials: "include",
 });
+
+// Register the web-app manifest from here rather than an inline <script> in index.html: the
+// deployed Content-Security-Policy is `script-src 'self'` (webapp/docker/security-headers.conf and
+// the Traefik edge middleware), which blocks inline scripts. Browsers process a manifest <link>
+// whenever it is added, so doing it from the bundle loses nothing.
+{
+	const manifestLink = document.createElement("link");
+	manifestLink.rel = "manifest";
+	manifestLink.href =
+		window.location.hostname === "localhost" ? "/manifest-dev.json" : "/manifest.json";
+	document.head.appendChild(manifestLink);
+}
 
 // Attach the CSRF double-submit header (X-XSRF-TOKEN from the __Host-XSRF-TOKEN cookie) on every
 // state-changing request, plus the impersonation write-allow header when write-mode is on. The pure
@@ -69,6 +76,7 @@ const router = createRouter({
 	scrollRestorationBehavior: "instant",
 	defaultStructuralSharing: true,
 	defaultPreloadStaleTime: 0,
+	defaultErrorComponent: RouteError,
 });
 
 // Register the router instance for type safety
@@ -83,23 +91,10 @@ function WrappedRouterProvider() {
 	return <RouterProvider router={router} context={{ ...TanstackQuery.getContext(), auth }} />;
 }
 
-/**
- * App root. Tracking integrations are consent-gated (ADR 0017 cookie consent):
- *  - Sentry initializes only once error-monitoring consent is granted (and a DSN is configured).
- *  - PostHog is only mounted (PostHogProvider) when analytics consent is granted AND PostHog is
- *    enabled via its env flag. The PostHogProvider already opts out of capturing by default and
- *    PostHogIdentity gates opt-in on the per-user research setting, so consent is an ADDITIONAL,
- *    ANDed gate. When consent is withdrawn the provider unmounts on the next decision.
- */
 function Root() {
 	const consent = useCookieConsent();
 	const errorMonitoring = consent?.errorMonitoring === true;
 
-	// Sentry follows the consent decision as an effect (never as a render side effect): init when
-	// error-monitoring consent is granted, tear down when it is withdrawn. Both calls are
-	// idempotent, so re-running on any consent change is safe. This mirrors PostHog's
-	// mount/unmount gating below — withdrawing consent must actually STOP capture, not just
-	// avoid the first init.
 	useEffect(() => {
 		if (errorMonitoring) {
 			initSentry();
@@ -108,12 +103,9 @@ function Root() {
 		}
 	}, [errorMonitoring]);
 
-	const analyticsEnabled = isPosthogEnabled && consent?.analytics === true;
-
-	const app = (
+	return (
 		<TanstackQuery.Provider>
 			<AuthProvider>
-				{analyticsEnabled ? <PostHogIdentity /> : null}
 				{/* Proactively rotates the access cookie before it expires (only while active), so an
 				    active user is never auto-logged-out and an idle session still times out. */}
 				<SessionKeepAlive />
@@ -124,33 +116,15 @@ function Root() {
 			</AuthProvider>
 		</TanstackQuery.Provider>
 	);
-
-	if (analyticsEnabled) {
-		return (
-			<PostHogProvider
-				apiKey={posthogProjectApiKey}
-				options={{
-					api_host: posthogApiHost || undefined,
-					cross_subdomain_cookie: false,
-					opt_out_capturing_by_default: true,
-				}}
-			>
-				{app}
-			</PostHogProvider>
-		);
-	}
-
-	return app;
 }
 
 const rootElement = document.getElementById("app");
 if (rootElement && !rootElement.innerHTML) {
 	const root = ReactDOM.createRoot(rootElement, {
 		onUncaughtError: Sentry.reactErrorHandler((error, errorInfo) => {
-			// oxlint-disable-next-line no-console -- Supplying `onUncaughtError` replaces React's own console report, so without this line an uncaught render error leaves nothing in the browser console for a developer with devtools open; the component stack is available nowhere else on the page.
+			// oxlint-disable-next-line no-console -- The custom handler replaces React's console report.
 			console.warn("Uncaught error", error, errorInfo.componentStack);
 		}),
-		onCaughtError: Sentry.reactErrorHandler(),
 		onRecoverableError: Sentry.reactErrorHandler(),
 	});
 	root.render(
@@ -159,8 +133,3 @@ if (rootElement && !rootElement.innerHTML) {
 		</StrictMode>,
 	);
 }
-
-// If you want to start measuring performance in your app, pass a function
-// to log results (for example: reportWebVitals(console.log))
-// or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
-reportWebVitals();

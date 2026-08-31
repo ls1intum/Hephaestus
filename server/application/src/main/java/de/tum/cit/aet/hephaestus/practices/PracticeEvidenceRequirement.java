@@ -10,15 +10,11 @@ import org.jspecify.annotations.NonNull;
 /** One source a practice reads, and how it relates to it. */
 @Schema(description = "A source a practice reads and the stance it takes towards it")
 public record PracticeEvidenceRequirement(
-    @NonNull
-    @NotNull
-    @Schema(description = "Stable source identifier from the selected source contract")
-    SourceKind sourceKind,
-    @NonNull
-    @NotNull
-    @Schema(description = "Whether an absent or degraded capture refuses the review")
-    EvidenceStance stance
-) {
+        @NonNull @NotNull @Schema(description = "Stable source identifier from the selected source contract")
+        SourceKind sourceKind,
+
+        @NonNull @NotNull @Schema(description = "Whether an absent or degraded capture refuses the review")
+        EvidenceStance stance) {
     public PracticeEvidenceRequirement {
         Objects.requireNonNull(sourceKind, "sourceKind");
         Objects.requireNonNull(stance, "stance");

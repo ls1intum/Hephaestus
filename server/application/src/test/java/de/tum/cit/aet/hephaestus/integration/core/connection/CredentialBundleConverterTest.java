@@ -12,6 +12,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.HashSet;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
@@ -20,18 +21,10 @@ class CredentialBundleConverterTest extends BaseUnitTest {
     private static final String KEY = "0123456789abcdef0123456789abcdef";
     private static final String OTHER_KEY = "ABCDEFabcdef0123ABCDEFabcdef0123";
 
-    private static final EncryptionContext CTX_A = new EncryptionContext(
-        42L,
-        IntegrationKind.GITHUB,
-        "installation-100",
-        "connection.credentials_encrypted"
-    );
-    private static final EncryptionContext CTX_B = new EncryptionContext(
-        42L,
-        IntegrationKind.GITHUB,
-        "installation-999",
-        "connection.credentials_encrypted"
-    );
+    private static final EncryptionContext CTX_A =
+            new EncryptionContext(42L, IntegrationKind.GITHUB, "installation-100", "connection.credentials_encrypted");
+    private static final EncryptionContext CTX_B =
+            new EncryptionContext(42L, IntegrationKind.GITHUB, "installation-999", "connection.credentials_encrypted");
 
     private static CredentialBundleConverter enabled() {
         return new CredentialBundleConverter(KEY, "dev");
@@ -71,10 +64,7 @@ class CredentialBundleConverterTest extends BaseUnitTest {
         void oauthSession_roundTrips() {
             CredentialBundleConverter c = enabled();
             OAuthSession withRefresh = new OAuthSession(
-                "ya29.access-token-here",
-                "refresh-token-xyz",
-                Instant.parse("2030-06-15T12:00:00Z")
-            );
+                    "ya29.access-token-here", "refresh-token-xyz", Instant.parse("2030-06-15T12:00:00Z"));
             OAuthSession withoutRefresh = new OAuthSession("opaque-access", null, null);
 
             assertThat(c.decrypt(c.encrypt(withRefresh, CTX_A), CTX_A)).isEqualTo(withRefresh);
@@ -104,14 +94,20 @@ class CredentialBundleConverterTest extends BaseUnitTest {
         }
 
         @Test
+        void ivIsUniqueAcrossOneThousandEncryptions() {
+            CredentialBundleConverter c = enabled();
+            var ciphertexts = new HashSet<String>();
+            for (int i = 0; i < 1_000; i++) {
+                ciphertexts.add(Arrays.toString(c.encrypt(new BearerToken("same-input", null), CTX_A)));
+            }
+            assertThat(ciphertexts).hasSize(1_000);
+        }
+
+        @Test
         void nullInstanceKey_roundTrips() {
             CredentialBundleConverter c = enabled();
-            EncryptionContext pending = new EncryptionContext(
-                42L,
-                IntegrationKind.GITHUB,
-                null,
-                "connection.credentials_encrypted"
-            );
+            EncryptionContext pending =
+                    new EncryptionContext(42L, IntegrationKind.GITHUB, null, "connection.credentials_encrypted");
             BearerToken bundle = new BearerToken("pending-token", null);
 
             byte[] blob = c.encrypt(bundle, pending);
@@ -123,10 +119,9 @@ class CredentialBundleConverterTest extends BaseUnitTest {
     class Format {
 
         @Test
-        void encryptedBlob_isV2Tagged_andHasAuthTag() {
+        void encryptedBlob_isV2TaggedAndHasAuthTag() {
             CredentialBundleConverter c = enabled();
             byte[] blob = c.encrypt(new BearerToken("x", null), CTX_A);
-            // 1-byte version + 12-byte IV + 16-byte GCM tag at minimum.
             assertThat(blob[0]).isEqualTo(CredentialBundleConverter.FORMAT_VERSION_V2);
             assertThat(blob.length).isGreaterThan(1 + 12 + 16);
         }
@@ -135,11 +130,11 @@ class CredentialBundleConverterTest extends BaseUnitTest {
         void unknownVersion_throwsUnsupported() {
             CredentialBundleConverter c = enabled();
             byte[] blob = new byte[1 + 12 + 17];
-            blob[0] = 0x03;
+            blob[0] = 0x04;
 
             assertThatThrownBy(() -> c.decrypt(blob, CTX_A))
-                .isInstanceOf(EncryptionException.class)
-                .hasMessageContaining("Unsupported");
+                    .isInstanceOf(EncryptionException.class)
+                    .hasMessageContaining("Unsupported");
         }
 
         @Test
@@ -149,8 +144,8 @@ class CredentialBundleConverterTest extends BaseUnitTest {
             v1Shaped[0] = 0x01;
 
             assertThatThrownBy(() -> c.decrypt(v1Shaped, CTX_A))
-                .isInstanceOf(EncryptionException.class)
-                .hasMessageContaining("Unsupported");
+                    .isInstanceOf(EncryptionException.class)
+                    .hasMessageContaining("Unsupported");
         }
     }
 
@@ -195,65 +190,54 @@ class CredentialBundleConverterTest extends BaseUnitTest {
 
             // wrong instanceKey
             assertThatThrownBy(() -> c.decrypt(blobForA, CTX_B))
-                .isInstanceOf(EncryptionException.class)
-                .hasRootCauseInstanceOf(javax.crypto.AEADBadTagException.class);
+                    .isInstanceOf(EncryptionException.class)
+                    .hasRootCauseInstanceOf(javax.crypto.AEADBadTagException.class);
             // wrong workspaceId
-            assertThatThrownBy(() ->
-                c.decrypt(blobForA, new EncryptionContext(99L, CTX_A.kind(), CTX_A.instanceKey(), CTX_A.columnFqn()))
-            ).isInstanceOf(EncryptionException.class);
+            assertThatThrownBy(() -> c.decrypt(
+                            blobForA, new EncryptionContext(99L, CTX_A.kind(), CTX_A.instanceKey(), CTX_A.columnFqn())))
+                    .isInstanceOf(EncryptionException.class);
             // wrong kind
-            assertThatThrownBy(() ->
-                c.decrypt(
-                    blobForA,
-                    new EncryptionContext(
-                        CTX_A.workspaceId(),
-                        IntegrationKind.GITLAB,
-                        CTX_A.instanceKey(),
-                        CTX_A.columnFqn()
-                    )
-                )
-            ).isInstanceOf(EncryptionException.class);
+            assertThatThrownBy(() -> c.decrypt(
+                            blobForA,
+                            new EncryptionContext(
+                                    CTX_A.workspaceId(),
+                                    IntegrationKind.GITLAB,
+                                    CTX_A.instanceKey(),
+                                    CTX_A.columnFqn())))
+                    .isInstanceOf(EncryptionException.class);
             // wrong columnFqn
-            assertThatThrownBy(() ->
-                c.decrypt(
-                    blobForA,
-                    new EncryptionContext(
-                        CTX_A.workspaceId(),
-                        CTX_A.kind(),
-                        CTX_A.instanceKey(),
-                        "connection.some_other_column"
-                    )
-                )
-            ).isInstanceOf(EncryptionException.class);
+            assertThatThrownBy(() -> c.decrypt(
+                            blobForA,
+                            new EncryptionContext(
+                                    CTX_A.workspaceId(),
+                                    CTX_A.kind(),
+                                    CTX_A.instanceKey(),
+                                    "connection.some_other_column")))
+                    .isInstanceOf(EncryptionException.class);
         }
     }
 
     @Nested
-    class AttributeConverterAPI {
+    class KeyRotation {
 
         @Test
-        void nullPassesThrough() {
-            CredentialBundleConverter c = enabled();
-            assertThat(c.convertToDatabaseColumn(null)).isNull();
-            assertThat(c.convertToEntityAttribute(null)).isNull();
+        void keyVersionColumnSelectsPriorAndActiveKeysDuringRotation() {
+            CredentialBundleConverter old = new CredentialBundleConverter(KEY, 7, null, null, "dev");
+            byte[] oldBlob = old.encrypt(new BearerToken("secret", null), CTX_A);
+            CredentialBundleConverter rotating = new CredentialBundleConverter(OTHER_KEY, 8, KEY, 7, "dev");
+
+            assertThat(rotating.decrypt(oldBlob, CTX_A, 7)).isEqualTo(new BearerToken("secret", null));
+            byte[] newBlob = rotating.encrypt(new BearerToken("new", null), CTX_A);
+            assertThat(rotating.decrypt(newBlob, CTX_A, 8)).isEqualTo(new BearerToken("new", null));
         }
 
         @Test
-        void contextLessWrite_throws() {
+        void unknownColumnKeyVersionFailsClosed() {
             CredentialBundleConverter c = enabled();
-            assertThatThrownBy(() -> c.convertToDatabaseColumn(new BearerToken("x", null)))
-                .isInstanceOf(EncryptionException.class)
-                .hasMessageContaining("requires per-row EncryptionContext");
-        }
-
-        @Test
-        void contextLessRead_rejectsV2Blobs() {
-            CredentialBundleConverter c = enabled();
-            byte[] v2Blob = c.encrypt(new BearerToken("s", null), CTX_A);
-
-            assertThatThrownBy(() -> c.convertToEntityAttribute(v2Blob))
-                .isInstanceOf(EncryptionException.class)
-                .hasMessageContaining("requires per-row EncryptionContext");
+            byte[] blob = c.encrypt(new BearerToken("secret", null), CTX_A);
+            assertThatThrownBy(() -> c.decrypt(blob, CTX_A, 99))
+                    .isInstanceOf(EncryptionException.class)
+                    .hasMessageContaining("No encryption key configured");
         }
     }
 
@@ -266,8 +250,8 @@ class CredentialBundleConverterTest extends BaseUnitTest {
             assertThat(disabled.isEnabled()).isFalse();
 
             assertThatThrownBy(() -> disabled.encrypt(new BearerToken("x", null), CTX_A))
-                .isInstanceOf(EncryptionException.class)
-                .hasMessageContaining("not enabled");
+                    .isInstanceOf(EncryptionException.class)
+                    .hasMessageContaining("disabled");
         }
 
         @Test
@@ -280,24 +264,17 @@ class CredentialBundleConverterTest extends BaseUnitTest {
         }
 
         @Test
-        void disabled_nullStillPassesThrough() {
-            CredentialBundleConverter disabled = new CredentialBundleConverter("", "dev");
-            assertThat(disabled.convertToDatabaseColumn(null)).isNull();
-            assertThat(disabled.convertToEntityAttribute(null)).isNull();
-        }
-
-        @Test
         void prodProfile_missingKey_failsFast() {
             assertThatThrownBy(() -> new CredentialBundleConverter("", "prod"))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("required in production");
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("required in production");
         }
 
         @Test
         void wrongLengthKey_failsFast() {
             assertThatThrownBy(() -> new CredentialBundleConverter("short", "dev"))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("exactly 32 characters");
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("exactly 32");
         }
     }
 }

@@ -41,9 +41,11 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "hephaestus.integration.gitlab")
 public record GitLabProperties(
-    @NotNull @DefaultValue("https://gitlab.com") String defaultServerUrl,
-    @NotNull @DurationUnit(SECONDS) @DefaultValue("30s") Duration graphqlTimeout,
-    @NotNull @DurationUnit(SECONDS) @DefaultValue("60s") Duration extendedGraphqlTimeout,
-    @NotNull @DurationUnit(MILLIS) @DefaultValue("200ms") Duration paginationThrottle,
-    @NotNull @DurationUnit(SECONDS) @DefaultValue("5m") Duration tokenValidationCacheDuration
-) {}
+        @NotNull @DefaultValue("https://gitlab.com") String defaultServerUrl,
+        @NotNull @DurationUnit(SECONDS) @DefaultValue("30s") Duration graphqlTimeout,
+        @NotNull @DurationUnit(SECONDS) @DefaultValue("60s") Duration extendedGraphqlTimeout,
+
+        @NotNull @DurationUnit(MILLIS) @DefaultValue("200ms")
+        Duration paginationThrottle,
+
+        @NotNull @DurationUnit(SECONDS) @DefaultValue("5m") Duration tokenValidationCacheDuration) {}

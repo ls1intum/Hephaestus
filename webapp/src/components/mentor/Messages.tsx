@@ -2,24 +2,15 @@ import type { UseChatHelpers } from "@ai-sdk/react";
 import { isStaticToolUIPart } from "ai";
 import { motion } from "motion/react";
 import type { RefObject } from "react";
+
 import type { ChatMessageVote } from "@/api/types.gen";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { ChatMessage, ChatTools } from "@/lib/types";
 import { cn } from "@/lib/utils";
+
 import { Greeting } from "./Greeting";
 import { PreviewMessage, ThinkingMessage } from "./Message";
-import type { PartRendererMap, ToolPartState } from "./renderers/types";
-
-/** Every tool state renders something, so a tool part in any of them counts as visible content. */
-const VISIBLE_TOOL_STATES: ToolPartState[] = [
-	"input-streaming",
-	"input-available",
-	"approval-requested",
-	"approval-responded",
-	"output-available",
-	"output-error",
-	"output-denied",
-];
+import type { PartRendererMap } from "./renderers/types";
 
 export interface MessagesProps {
 	messages: ChatMessage[];
@@ -62,7 +53,8 @@ export function Messages({
 		for (const p of parts) {
 			if (p.type === "text" && p.text.trim().length > 0) return true;
 			if (p.type === "file") return true;
-			if (isStaticToolUIPart<ChatTools>(p) && VISIBLE_TOOL_STATES.includes(p.state)) return true;
+			// Every state a tool part can be in renders something, so reaching one is visible content.
+			if (isStaticToolUIPart<ChatTools>(p)) return true;
 		}
 		return false;
 	};

@@ -53,37 +53,29 @@ class SlackIntegrationArchitectureTest extends HephaestusArchitectureTest {
     @DisplayName("every Slack REST controller is workspace-scoped or a hidden webhook receiver")
     void slackControllersAreWorkspaceScopedOrHiddenReceivers() {
         classes()
-            .that()
-            .resideInAPackage(SLACK)
-            .and()
-            .areAnnotatedWith("org.springframework.web.bind.annotation.RestController")
-            .and(
-                DescribedPredicate.describe("are not explicitly allowlisted user-scoped controllers", javaClass ->
-                    !USER_SCOPED_CONTROLLERS.contains(javaClass.getSimpleName())
-                )
-            )
-            .should(
-                new ArchCondition<>("be @WorkspaceScopedController or @Hidden") {
+                .that()
+                .resideInAPackage(SLACK)
+                .and()
+                .areAnnotatedWith("org.springframework.web.bind.annotation.RestController")
+                .and(DescribedPredicate.describe(
+                        "are not explicitly allowlisted user-scoped controllers",
+                        javaClass -> !USER_SCOPED_CONTROLLERS.contains(javaClass.getSimpleName())))
+                .should(new ArchCondition<>("be @WorkspaceScopedController or @Hidden") {
                     @Override
                     public void check(JavaClass javaClass, ConditionEvents events) {
                         boolean workspaceScoped = javaClass.isAnnotatedWith(
-                            "de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController"
-                        );
+                                "de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController");
                         boolean hiddenReceiver = javaClass.isAnnotatedWith("io.swagger.v3.oas.annotations.Hidden");
                         if (!workspaceScoped && !hiddenReceiver) {
-                            events.add(
-                                SimpleConditionEvent.violated(
+                            events.add(SimpleConditionEvent.violated(
                                     javaClass,
-                                    javaClass.getName() +
-                                        " is a Slack @RestController that is neither @WorkspaceScopedController nor" +
-                                        " an @Hidden webhook receiver"
-                                )
-                            );
+                                    javaClass.getName()
+                                            + " is a Slack @RestController that is neither @WorkspaceScopedController nor"
+                                            + " an @Hidden webhook receiver"));
                         }
                     }
-                }
-            )
-            .check(classes);
+                })
+                .check(classes);
     }
 
     @Test
@@ -93,34 +85,27 @@ class SlackIntegrationArchitectureTest extends HephaestusArchitectureTest {
         // AbstractIntegrationMessageHandler for the channel-message path, which additionally needs the shared
         // TransactionTemplate boundary around its DB-writing ingest.
         classes()
-            .that()
-            .resideInAPackage("de.tum.cit.aet.hephaestus.integration.slack.webhook..")
-            .and()
-            .haveSimpleNameEndingWith("MessageHandler")
-            .and()
-            .doNotHaveModifier(JavaModifier.ABSTRACT)
-            .should(
-                new ArchCondition<>("be assignable to a Slack/integration envelope-handler base") {
+                .that()
+                .resideInAPackage("de.tum.cit.aet.hephaestus.integration.slack.webhook..")
+                .and()
+                .haveSimpleNameEndingWith("MessageHandler")
+                .and()
+                .doNotHaveModifier(JavaModifier.ABSTRACT)
+                .should(new ArchCondition<>("be assignable to a Slack/integration envelope-handler base") {
                     @Override
                     public void check(JavaClass javaClass, ConditionEvents events) {
                         boolean slackBase = javaClass.isAssignableTo(
-                            "de.tum.cit.aet.hephaestus.integration.slack.webhook.AbstractSlackEnvelopeHandler"
-                        );
+                                "de.tum.cit.aet.hephaestus.integration.slack.webhook.AbstractSlackEnvelopeHandler");
                         boolean coreBase = javaClass.isAssignableTo(
-                            "de.tum.cit.aet.hephaestus.integration.core.handler.AbstractIntegrationMessageHandler"
-                        );
+                                "de.tum.cit.aet.hephaestus.integration.core.handler.AbstractIntegrationMessageHandler");
                         if (!slackBase && !coreBase) {
-                            events.add(
-                                SimpleConditionEvent.violated(
+                            events.add(SimpleConditionEvent.violated(
                                     javaClass,
-                                    javaClass.getName() + " is a Slack *MessageHandler outside both handler bases"
-                                )
-                            );
+                                    javaClass.getName() + " is a Slack *MessageHandler outside both handler bases"));
                         }
                     }
-                }
-            )
-            .check(classes);
+                })
+                .check(classes);
     }
 
     /**
@@ -128,27 +113,25 @@ class SlackIntegrationArchitectureTest extends HephaestusArchitectureTest {
      * a workspace. Their callers carry {@code @WorkspaceAgnostic}; everything else must take a workspace id.
      */
     private static final Set<String> UNSCOPED_ALLOWLIST = Set.of(
-        "SlackMessageRepository.findDistinctWorkspaceIds",
-        "SlackMonitoredChannelRepository.findDistinctWorkspaceIdsByConsentState",
-        // The agent-owned ConversationCandidateSource SPI's settled-thread scan is an inherently cross-workspace
-        // sweep (each returned candidate carries its own workspace_id); its caller chain
-        // (SlackConversationCandidateSource.settledCandidates → agent's ConversationThreadTriggerScheduler) is
-        // itself @WorkspaceAgnostic for exactly this reason, mirroring the two entries above.
-        "SlackThreadRepository.findSettledCandidateRows"
-    );
+            "SlackMessageRepository.findDistinctWorkspaceIds",
+            "SlackMonitoredChannelRepository.findDistinctWorkspaceIdsByConsentState",
+            // The agent-owned ConversationCandidateSource SPI's settled-thread scan is an inherently cross-workspace
+            // sweep (each returned candidate carries its own workspace_id); its caller chain
+            // (SlackConversationCandidateSource.settledCandidates → agent's ConversationThreadTriggerScheduler) is
+            // itself @WorkspaceAgnostic for exactly this reason, mirroring the two entries above.
+            "SlackThreadRepository.findSettledCandidateRows");
 
     @Test
     @DisplayName("Slack repository finders carry the workspace predicate in their signature")
     void slackRepositoryFindersAreWorkspaceScopedAtCompileTime() {
         classes()
-            .that()
-            .resideInAPackage("de.tum.cit.aet.hephaestus.integration.slack.domain..")
-            .and()
-            .areInterfaces()
-            .and()
-            .haveSimpleNameEndingWith("Repository")
-            .should(
-                new ArchCondition<>("declare only workspace-scoped finders (or allowlisted enumerators)") {
+                .that()
+                .resideInAPackage("de.tum.cit.aet.hephaestus.integration.slack.domain..")
+                .and()
+                .areInterfaces()
+                .and()
+                .haveSimpleNameEndingWith("Repository")
+                .should(new ArchCondition<>("declare only workspace-scoped finders (or allowlisted enumerators)") {
                     @Override
                     public void check(JavaClass javaClass, ConditionEvents events) {
                         for (JavaMethod method : javaClass.getMethods()) {
@@ -164,21 +147,16 @@ class SlackIntegrationArchitectureTest extends HephaestusArchitectureTest {
                             }
                             boolean scoped = nameCarriesWorkspaceParam(method);
                             if (!scoped) {
-                                events.add(
-                                    SimpleConditionEvent.violated(
+                                events.add(SimpleConditionEvent.violated(
                                         method,
-                                        javaClass.getSimpleName() +
-                                            "." +
-                                            name +
-                                            " has no workspaceId parameter and is not allowlisted"
-                                    )
-                                );
+                                        javaClass.getSimpleName() + "."
+                                                + name
+                                                + " has no workspaceId parameter and is not allowlisted"));
                             }
                         }
                     }
-                }
-            )
-            .check(classes);
+                })
+                .check(classes);
     }
 
     /**
@@ -192,22 +170,13 @@ class SlackIntegrationArchitectureTest extends HephaestusArchitectureTest {
         if (method.getName().contains("ByWorkspaceId")) {
             return true;
         }
-        return method
-            .getParameters()
-            .stream()
-            .anyMatch(p ->
-                p
-                    .getAnnotations()
-                    .stream()
-                    .anyMatch(
-                        a ->
-                            a.getRawType().getName().equals("org.springframework.data.repository.query.Param") &&
-                            a
-                                .get("value")
-                                .map(v -> "workspaceId".equals(v))
-                                .orElse(false)
-                    )
-            );
+        return method.getParameters().stream()
+                .anyMatch(p -> p.getAnnotations().stream()
+                        .anyMatch(
+                                a -> a.getRawType().getName().equals("org.springframework.data.repository.query.Param")
+                                        && a.get("value")
+                                                .map(v -> "workspaceId".equals(v))
+                                                .orElse(false)));
     }
 
     @Test
@@ -216,23 +185,18 @@ class SlackIntegrationArchitectureTest extends HephaestusArchitectureTest {
         // The rule above delegates to nameCarriesWorkspaceParam; if that helper rotted (e.g. the @Param annotation
         // lookup broke), every finder would count as unscoped — the allowlist and the rule's real violations would
         // be indistinguishable from noise. This pins both directions cheaply on the live class graph.
-        JavaClass repo = classes
-            .stream()
-            .filter(c -> c.getSimpleName().equals("SlackMonitoredChannelRepository"))
-            .findFirst()
-            .orElseThrow();
-        JavaMethod scopedDerived = repo
-            .getMethods()
-            .stream()
-            .filter(m -> m.getName().equals("findByWorkspaceIdAndSlackChannelId"))
-            .findFirst()
-            .orElseThrow();
-        JavaMethod unscopedEnumerator = repo
-            .getMethods()
-            .stream()
-            .filter(m -> m.getName().equals("findDistinctWorkspaceIdsByConsentState"))
-            .findFirst()
-            .orElseThrow();
+        JavaClass repo = classes.stream()
+                .filter(c -> c.getSimpleName().equals("SlackMonitoredChannelRepository"))
+                .findFirst()
+                .orElseThrow();
+        JavaMethod scopedDerived = repo.getMethods().stream()
+                .filter(m -> m.getName().equals("findByWorkspaceIdAndSlackChannelId"))
+                .findFirst()
+                .orElseThrow();
+        JavaMethod unscopedEnumerator = repo.getMethods().stream()
+                .filter(m -> m.getName().equals("findDistinctWorkspaceIdsByConsentState"))
+                .findFirst()
+                .orElseThrow();
         assertThat(nameCarriesWorkspaceParam(scopedDerived)).isTrue();
         // The enumerator is unscoped BY DESIGN — the helper must say so, forcing it through the explicit allowlist.
         assertThat(nameCarriesWorkspaceParam(unscopedEnumerator)).isFalse();
@@ -252,21 +216,17 @@ class SlackIntegrationArchitectureTest extends HephaestusArchitectureTest {
     @DisplayName("no Slack class outside the allowlist depends on raw JdbcTemplate — DB queries belong in repositories")
     void slackClassesDoNotUseRawJdbcTemplate() {
         ArchRule rule = noClasses()
-            .that()
-            .resideInAPackage(SLACK)
-            .and(
-                DescribedPredicate.describe("are not the allowlisted tenant-resolution exception", javaClass ->
-                    !JDBC_TEMPLATE_ALLOWLIST.contains(javaClass.getSimpleName())
-                )
-            )
-            .should()
-            .dependOnClassesThat()
-            .haveFullyQualifiedName("org.springframework.jdbc.core.JdbcTemplate")
-            .because(
-                "DB queries belong in Spring Data repositories (JPQL/native @Query), not raw JdbcTemplate SQL " +
-                    "hand-rolled inside a @Component — SlackWorkspaceResolver is the one documented exception " +
-                    "(tenant resolution before workspace scoping exists)"
-            );
+                .that()
+                .resideInAPackage(SLACK)
+                .and(DescribedPredicate.describe(
+                        "are not the allowlisted tenant-resolution exception",
+                        javaClass -> !JDBC_TEMPLATE_ALLOWLIST.contains(javaClass.getSimpleName())))
+                .should()
+                .dependOnClassesThat()
+                .haveFullyQualifiedName("org.springframework.jdbc.core.JdbcTemplate")
+                .because("DB queries belong in Spring Data repositories (JPQL/native @Query), not raw JdbcTemplate SQL "
+                        + "hand-rolled inside a @Component — SlackWorkspaceResolver is the one documented exception "
+                        + "(tenant resolution before workspace scoping exists)");
         rule.check(classes);
     }
 
@@ -292,85 +252,69 @@ class SlackIntegrationArchitectureTest extends HephaestusArchitectureTest {
     @DisplayName("*Service/*Repository/*Controller names keep their stereotype promise")
     void slackServiceNamesAreServices() {
         classes()
-            .that()
-            .resideInAPackage(SLACK)
-            .and()
-            .haveSimpleNameEndingWith("Service")
-            .and(
-                DescribedPredicate.describe("are not explicitly allowlisted pre-existing exceptions", javaClass ->
-                    !SERVICE_STEREOTYPE_ALLOWLIST.contains(javaClass.getSimpleName())
-                )
-            )
-            .should(
-                new ArchCondition<>("be annotated @Service (or be an interface)") {
+                .that()
+                .resideInAPackage(SLACK)
+                .and()
+                .haveSimpleNameEndingWith("Service")
+                .and(DescribedPredicate.describe(
+                        "are not explicitly allowlisted pre-existing exceptions",
+                        javaClass -> !SERVICE_STEREOTYPE_ALLOWLIST.contains(javaClass.getSimpleName())))
+                .should(new ArchCondition<>("be annotated @Service (or be an interface)") {
                     @Override
                     public void check(JavaClass javaClass, ConditionEvents events) {
                         boolean isService = javaClass.isAnnotatedWith("org.springframework.stereotype.Service");
                         if (!isService && !javaClass.isInterface()) {
-                            events.add(
-                                SimpleConditionEvent.violated(
+                            events.add(SimpleConditionEvent.violated(
                                     javaClass,
-                                    javaClass.getName() + " is named *Service but is not annotated @Service"
-                                )
-                            );
+                                    javaClass.getName() + " is named *Service but is not annotated @Service"));
                         }
                     }
-                }
-            )
-            .check(classes);
+                })
+                .check(classes);
 
         classes()
-            .that()
-            .resideInAPackage(SLACK)
-            .and()
-            .haveSimpleNameEndingWith("Repository")
-            .should(
-                new ArchCondition<>("be an interface extending org.springframework.data.repository.Repository") {
-                    @Override
-                    public void check(JavaClass javaClass, ConditionEvents events) {
-                        boolean isRepositoryInterface =
-                            javaClass.isInterface() &&
-                            javaClass.isAssignableTo("org.springframework.data.repository.Repository");
-                        if (!isRepositoryInterface) {
-                            events.add(
-                                SimpleConditionEvent.violated(
-                                    javaClass,
-                                    javaClass.getName() +
-                                        " is named *Repository but is not an interface extending Repository"
-                                )
-                            );
-                        }
-                    }
-                }
-            )
-            .check(classes);
+                .that()
+                .resideInAPackage(SLACK)
+                .and()
+                .haveSimpleNameEndingWith("Repository")
+                .should(
+                        new ArchCondition<>(
+                                "be an interface extending org.springframework.data.repository.Repository") {
+                            @Override
+                            public void check(JavaClass javaClass, ConditionEvents events) {
+                                boolean isRepositoryInterface = javaClass.isInterface()
+                                        && javaClass.isAssignableTo("org.springframework.data.repository.Repository");
+                                if (!isRepositoryInterface) {
+                                    events.add(
+                                            SimpleConditionEvent.violated(
+                                                    javaClass,
+                                                    javaClass.getName()
+                                                            + " is named *Repository but is not an interface extending Repository"));
+                                }
+                            }
+                        })
+                .check(classes);
 
         classes()
-            .that()
-            .resideInAPackage(SLACK)
-            .and()
-            .haveSimpleNameEndingWith("Controller")
-            .and()
-            // an abstract *Controller base (shared plumbing for concrete controllers) makes no runtime promise
-            .doNotHaveModifier(JavaModifier.ABSTRACT)
-            .should(
-                new ArchCondition<>("be @RestController, directly or via a meta-annotation") {
+                .that()
+                .resideInAPackage(SLACK)
+                .and()
+                .haveSimpleNameEndingWith("Controller")
+                .and()
+                // an abstract *Controller base (shared plumbing for concrete controllers) makes no runtime promise
+                .doNotHaveModifier(JavaModifier.ABSTRACT)
+                .should(new ArchCondition<>("be @RestController, directly or via a meta-annotation") {
                     @Override
                     public void check(JavaClass javaClass, ConditionEvents events) {
-                        boolean isRestController = javaClass.isMetaAnnotatedWith(
-                            "org.springframework.web.bind.annotation.RestController"
-                        );
+                        boolean isRestController =
+                                javaClass.isMetaAnnotatedWith("org.springframework.web.bind.annotation.RestController");
                         if (!isRestController) {
-                            events.add(
-                                SimpleConditionEvent.violated(
+                            events.add(SimpleConditionEvent.violated(
                                     javaClass,
-                                    javaClass.getName() + " is named *Controller but is not @RestController"
-                                )
-                            );
+                                    javaClass.getName() + " is named *Controller but is not @RestController"));
                         }
                     }
-                }
-            )
-            .check(classes);
+                })
+                .check(classes);
     }
 }

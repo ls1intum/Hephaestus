@@ -75,7 +75,8 @@ class OutlineRateLimitTrackerTest extends BaseUnitTest {
             assertThat(snapshot).isNotNull();
             assertThat(snapshot.throttledUntil()).isNotNull();
             // ceil(1.5) == 2 seconds from the observation
-            assertThat(snapshot.throttledUntil()).isBetween(before.plusSeconds(2), Instant.now().plusSeconds(2));
+            assertThat(snapshot.throttledUntil())
+                    .isBetween(before.plusSeconds(2), Instant.now().plusSeconds(2));
         }
 
         @Test

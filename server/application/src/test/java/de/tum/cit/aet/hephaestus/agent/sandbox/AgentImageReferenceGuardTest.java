@@ -21,44 +21,41 @@ class AgentImageReferenceGuardTest extends BaseUnitTest {
 
     @ParameterizedTest
     @ValueSource(
-        strings = {
-            "ghcr.io/ls1intum/hephaestus/agent-pi:0.73.2",
-            "ghcr.io/ls1intum/hephaestus/agent-pi:9a1f0c2e1b7d4a6f8c3e5b2d9a7f4c1e0b8d6a35",
-            // A registry port is not a tag; a reference carrying both must still read the tag.
-            "localhost:5000/agent-pi:0.73.2",
-            // The series rule reaches only version-shaped tags that stop short of a patch, so a
-            // pre-release, a four-part build number and a hand-built dev tag all still name a build.
-            "ghcr.io/ls1intum/hephaestus/agent-pi:0.74.0-rc.1",
-            "ghcr.io/ls1intum/hephaestus/agent-pi:1.2.3.4",
-            "ghcr.io/ls1intum/hephaestus/agent-pi:dev",
-        }
-    )
+            strings = {
+                "ghcr.io/ls1intum/hephaestus/agent-pi:0.73.2",
+                "ghcr.io/ls1intum/hephaestus/agent-pi:9a1f0c2e1b7d4a6f8c3e5b2d9a7f4c1e0b8d6a35",
+                // A registry port is not a tag; a reference carrying both must still read the tag.
+                "localhost:5000/agent-pi:0.73.2",
+                // The series rule reaches only version-shaped tags that stop short of a patch, so a
+                // pre-release, a four-part build number and a hand-built dev tag all still name a build.
+                "ghcr.io/ls1intum/hephaestus/agent-pi:0.74.0-rc.1",
+                "ghcr.io/ls1intum/hephaestus/agent-pi:1.2.3.4",
+                "ghcr.io/ls1intum/hephaestus/agent-pi:dev",
+            })
     void shouldAcceptAReferenceThatCanNameAMatchedBuild(String reference) {
         assertThatCode(() -> guardFor(reference)).doesNotThrowAnyException();
     }
 
     @Test
     void shouldAcceptADigestPin() {
-        assertThatCode(() ->
-            guardFor("ghcr.io/ls1intum/hephaestus/agent-pi@sha256:" + "a".repeat(64))
-        ).doesNotThrowAnyException();
+        assertThatCode(() -> guardFor("ghcr.io/ls1intum/hephaestus/agent-pi@sha256:" + "a".repeat(64)))
+                .doesNotThrowAnyException();
     }
 
     @ParameterizedTest
     @ValueSource(
-        strings = {
-            "ghcr.io/ls1intum/hephaestus/agent-pi:latest",
-            "ghcr.io/ls1intum/hephaestus/agent-pi:stable",
-            "ghcr.io/ls1intum/hephaestus/agent-pi:edge",
-            "ghcr.io/ls1intum/hephaestus/agent-pi:main",
-        }
-    )
+            strings = {
+                "ghcr.io/ls1intum/hephaestus/agent-pi:latest",
+                "ghcr.io/ls1intum/hephaestus/agent-pi:stable",
+                "ghcr.io/ls1intum/hephaestus/agent-pi:edge",
+                "ghcr.io/ls1intum/hephaestus/agent-pi:main",
+            })
     void shouldRefuseAReleaseChannelBecauseItNamesAnotherReleasesImage(String reference) {
         assertThatThrownBy(() -> guardFor(reference))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining(reference)
-            .hasMessageContaining("different commit")
-            .hasMessageContaining("docs/admin/agent-image-digests.md");
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining(reference)
+                .hasMessageContaining("different commit")
+                .hasMessageContaining("docs/admin/release-image-lock.md");
     }
 
     /**
@@ -68,31 +65,30 @@ class AgentImageReferenceGuardTest extends BaseUnitTest {
      */
     @ParameterizedTest
     @ValueSource(
-        strings = {
-            "ghcr.io/ls1intum/hephaestus/agent-pi:0.73",
-            "ghcr.io/ls1intum/hephaestus/agent-pi:0",
-            "ghcr.io/ls1intum/hephaestus/agent-pi:v1.2",
-            "localhost:5000/agent-pi:0.73",
-        }
-    )
+            strings = {
+                "ghcr.io/ls1intum/hephaestus/agent-pi:0.73",
+                "ghcr.io/ls1intum/hephaestus/agent-pi:0",
+                "ghcr.io/ls1intum/hephaestus/agent-pi:v1.2",
+                "localhost:5000/agent-pi:0.73",
+            })
     void shouldRefuseAVersionSeriesBecauseItMovesOnTheNextPatchRelease(String reference) {
         assertThatThrownBy(() -> guardFor(reference))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining(reference)
-            .hasMessageContaining("version series")
-            .hasMessageContaining("different commit")
-            .hasMessageContaining("docs/admin/agent-image-digests.md");
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining(reference)
+                .hasMessageContaining("version series")
+                .hasMessageContaining("different commit")
+                .hasMessageContaining("docs/admin/release-image-lock.md");
     }
 
     /** Docker resolves an untagged reference to the release channel, so this is the same defect. */
     @ParameterizedTest
-    @ValueSource(strings = { "ghcr.io/ls1intum/hephaestus/agent-pi", "localhost:5000/agent-pi" })
+    @ValueSource(strings = {"ghcr.io/ls1intum/hephaestus/agent-pi", "localhost:5000/agent-pi"})
     void shouldRefuseAReferenceThatNamesNoTag(String reference) {
         assertThatThrownBy(() -> guardFor(reference))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining(reference)
-            .hasMessageContaining("names no tag")
-            .hasMessageContaining("different commit");
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining(reference)
+                .hasMessageContaining("names no tag")
+                .hasMessageContaining("different commit");
     }
 
     /**
@@ -100,42 +96,42 @@ class AgentImageReferenceGuardTest extends BaseUnitTest {
      * to the empty string leaves the derivation with nothing to append.
      */
     @ParameterizedTest
-    @ValueSource(strings = { "ghcr.io/ls1intum/hephaestus/agent-pi:", "ghcr.io/ls1intum/hephaestus/agent-pi:-bad" })
+    @ValueSource(strings = {"ghcr.io/ls1intum/hephaestus/agent-pi:", "ghcr.io/ls1intum/hephaestus/agent-pi:-bad"})
     void shouldRefuseAReferenceWhoseTagIsNotUsable(String reference) {
         assertThatThrownBy(() -> guardFor(reference))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining(reference)
-            .hasMessageContaining("APP_VERSION")
-            .hasMessageContaining("docs/admin/agent-image-digests.md");
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining(reference)
+                .hasMessageContaining("APP_VERSION")
+                .hasMessageContaining("docs/admin/release-image-lock.md");
     }
 
     @ParameterizedTest
     @ValueSource(
-        strings = {
-            "ghcr.io/ls1intum/hephaestus/agent-pi@sha256:abc123", "ghcr.io/ls1intum/hephaestus/agent-pi@sha256:",
-        }
-    )
+            strings = {
+                "ghcr.io/ls1intum/hephaestus/agent-pi@sha256:abc123",
+                "ghcr.io/ls1intum/hephaestus/agent-pi@sha256:",
+            })
     void shouldRefuseAMalformedDigest(String reference) {
         assertThatThrownBy(() -> guardFor(reference))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining(reference)
-            .hasMessageContaining("64 lowercase hex");
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining(reference)
+                .hasMessageContaining("64 lowercase hex");
     }
 
     @ParameterizedTest
     @NullAndEmptySource
-    @ValueSource(strings = { "   " })
+    @ValueSource(strings = {"   "})
     void shouldRefuseAnUnresolvedReference(String reference) {
         assertThatThrownBy(() -> guardFor(reference))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("hephaestus.agent.image.reference");
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("hephaestus.agent.image.reference");
     }
 
     @Test
     void shouldAllowStartupWhenTheTagCameFromAnUnsetAppVersion() {
-        assertThatCode(() ->
-            guardFor("ghcr.io/ls1intum/hephaestus/agent-pi:" + AgentImageReferenceGuard.DEVELOPMENT_VERSION)
-        ).doesNotThrowAnyException();
+        assertThatCode(() -> guardFor(
+                        "ghcr.io/ls1intum/hephaestus/agent-pi:" + AgentImageReferenceGuard.DEVELOPMENT_VERSION))
+                .doesNotThrowAnyException();
     }
 
     /**
@@ -149,8 +145,8 @@ class AgentImageReferenceGuardTest extends BaseUnitTest {
         var scanner = new ClassPathScanningCandidateComponentProvider(true);
 
         assertThat(scanner.findCandidateComponents(AgentImageReferenceGuard.class.getPackageName()))
-            .as("AgentImageReferenceGuard is a component scan candidate")
-            .extracting(BeanDefinition::getBeanClassName)
-            .contains(AgentImageReferenceGuard.class.getName());
+                .as("AgentImageReferenceGuard is a component scan candidate")
+                .extracting(BeanDefinition::getBeanClassName)
+                .contains(AgentImageReferenceGuard.class.getName());
     }
 }

@@ -51,9 +51,8 @@ public class AchievementEventListener {
     public void onActivitySaved(ActivitySavedEvent event) {
         if (event.user().isEmpty()) {
             log.debug(
-                "Skipping achievement check for system event: eventType={} | Reason: event has no user",
-                event.eventType()
-            );
+                    "Skipping achievement check for system event: eventType={} | Reason: event has no user",
+                    event.eventType());
             return;
         }
 
@@ -68,20 +67,18 @@ public class AchievementEventListener {
 
             if (!unlocked.isEmpty()) {
                 log.info(
-                    "User {} unlocked {} achievement(s): {}",
-                    userId,
-                    unlocked.size(),
-                    unlocked.stream().map(AchievementDefinition::id).toList()
-                );
+                        "User {} unlocked {} achievement(s): {}",
+                        userId,
+                        unlocked.size(),
+                        unlocked.stream().map(AchievementDefinition::id).toList());
             }
         } catch (ObjectOptimisticLockingFailureException e) {
             // Residual contention past the advisory lock + retries; this increment is lost but
             // self-heals on the next event, so WARN without a stack trace (not an alert-worthy ERROR).
             log.warn(
-                "Achievement increment lost to lock contention: userId={}, eventType={}",
-                userId,
-                event.eventType()
-            );
+                    "Achievement increment lost to lock contention: userId={}, eventType={}",
+                    userId,
+                    event.eventType());
         } catch (Exception e) {
             // Unexpected — keep ERROR; achievements are non-critical so we don't rethrow.
             log.error("Failed to evaluate achievements: userId={}, eventType={}", userId, event.eventType(), e);

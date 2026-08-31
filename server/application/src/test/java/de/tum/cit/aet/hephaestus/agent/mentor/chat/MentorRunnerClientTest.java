@@ -27,7 +27,6 @@ import org.junit.jupiter.api.Test;
 import reactor.core.Disposable;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.node.JsonNodeFactory;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
@@ -51,16 +50,15 @@ class MentorRunnerClientTest extends BaseUnitTest {
         scheduler = Executors.newSingleThreadScheduledExecutor();
         threadId = UUID.randomUUID();
         client = new MentorRunnerClient(
-            sandbox,
-            mapper,
-            events::add,
-            req -> {
-                lastFetchContext.set(req);
-                return mapper.createObjectNode().put("ok", true);
-            },
-            scheduler,
-            threadId
-        );
+                sandbox,
+                mapper,
+                events::add,
+                req -> {
+                    lastFetchContext.set(req);
+                    return mapper.createObjectNode().put("ok", true);
+                },
+                scheduler,
+                threadId);
         client.start();
     }
 
@@ -99,23 +97,17 @@ class MentorRunnerClientTest extends BaseUnitTest {
         sandbox.pushFrame(error);
 
         assertThatThrownBy(() -> future.get(2, TimeUnit.SECONDS))
-            .isInstanceOf(ExecutionException.class)
-            .hasCauseInstanceOf(MentorRunnerException.class)
-            .hasMessageContaining("-32001");
+                .isInstanceOf(ExecutionException.class)
+                .hasCauseInstanceOf(MentorRunnerException.class)
+                .hasMessageContaining("-32001");
     }
 
     @Test
     void poisoningErrorCodes() {
-        MentorRunnerException pi = new MentorRunnerException(
-            MentorRunnerException.CODE_PI_ERROR,
-            "pi",
-            mapper.nullNode()
-        );
-        MentorRunnerException invalid = new MentorRunnerException(
-            MentorRunnerException.CODE_INVALID_STATE,
-            "bad",
-            mapper.nullNode()
-        );
+        MentorRunnerException pi =
+                new MentorRunnerException(MentorRunnerException.CODE_PI_ERROR, "pi", mapper.nullNode());
+        MentorRunnerException invalid =
+                new MentorRunnerException(MentorRunnerException.CODE_INVALID_STATE, "bad", mapper.nullNode());
         MentorRunnerException other = new MentorRunnerException(-32001, "in flight", mapper.nullNode());
 
         assertThat(pi.poisonsSandbox()).isTrue();
@@ -130,7 +122,8 @@ class MentorRunnerClientTest extends BaseUnitTest {
         notification.put("method", "event");
         ObjectNode params = notification.putObject("params");
         params.put("threadId", threadId.toString());
-        params.set("event", mapper.createObjectNode().put("type", "runner_ready").put("protocolVersion", 1));
+        params.set(
+                "event", mapper.createObjectNode().put("type", "runner_ready").put("protocolVersion", 1));
 
         sandbox.pushFrame(notification);
 

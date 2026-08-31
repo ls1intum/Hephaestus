@@ -36,16 +36,18 @@ import org.jspecify.annotations.Nullable;
  * may have two GitHub orgs as two Connection rows, distinct instance_key values.
  *
  * <p>Config is a sealed JSONB column. Credentials are an opaque AES-GCM-encrypted blob.
- * Audit lives in a separate append-only table.
  */
 @Entity
 @Table(
-    name = "connection",
-    uniqueConstraints = {
-        @UniqueConstraint(name = "uq_connection", columnNames = { "workspace_id", "kind", "instance_key" }),
-        @UniqueConstraint(name = "ux_connection_id_workspace", columnNames = { "id", "workspace_id" }),
-    }
-)
+        name = "connection",
+        uniqueConstraints = {
+            @UniqueConstraint(
+                    name = "uq_connection",
+                    columnNames = {"workspace_id", "kind", "instance_key"}),
+            @UniqueConstraint(
+                    name = "ux_connection_id_workspace",
+                    columnNames = {"id", "workspace_id"}),
+        })
 public class Connection {
 
     @Id
@@ -82,11 +84,15 @@ public class Connection {
     private ConnectionConfig config;
 
     @Column(name = "credentials_encrypted")
-    private byte@Nullable [] credentialsEncrypted;
+    private byte @Nullable [] credentialsEncrypted;
 
     @Column(name = "credentials_alg", length = 64)
     @Nullable
     private String credentialsAlg;
+
+    @Column(name = "credentials_key_version")
+    @Nullable
+    private Integer credentialsKeyVersion;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -104,11 +110,7 @@ public class Connection {
     protected Connection() {}
 
     public Connection(
-        Workspace workspace,
-        IntegrationKind kind,
-        @Nullable String instanceKey,
-        ConnectionConfig config
-    ) {
+            Workspace workspace, IntegrationKind kind, @Nullable String instanceKey, ConnectionConfig config) {
         this.workspace = workspace;
         this.kind = kind;
         this.instanceKey = instanceKey;
@@ -132,8 +134,7 @@ public class Connection {
         }
         if (!this.instanceKey.equals(instanceKey)) {
             throw new IllegalStateException(
-                "Cannot rebind Connection " + id + " from instance_key=" + this.instanceKey + " to " + instanceKey
-            );
+                    "Cannot rebind Connection " + id + " from instance_key=" + this.instanceKey + " to " + instanceKey);
         }
     }
 
@@ -176,13 +177,18 @@ public class Connection {
         return config;
     }
 
-    public byte@Nullable [] getCredentialsEncrypted() {
+    public byte @Nullable [] getCredentialsEncrypted() {
         return credentialsEncrypted;
     }
 
     @Nullable
     public String getCredentialsAlg() {
         return credentialsAlg;
+    }
+
+    @Nullable
+    public Integer getCredentialsKeyVersion() {
+        return credentialsKeyVersion;
     }
 
     public Instant getCreatedAt() {
@@ -213,7 +219,7 @@ public class Connection {
         this.config = config;
     }
 
-    public void setCredentialsEncrypted(byte@Nullable [] credentialsEncrypted) {
+    public void setCredentialsEncrypted(byte @Nullable [] credentialsEncrypted) {
         this.credentialsEncrypted = credentialsEncrypted;
     }
 
@@ -221,37 +227,25 @@ public class Connection {
         this.credentialsAlg = credentialsAlg;
     }
 
-    /**
-     * Encrypt {@code bundle} and stamp the algorithm tag. Passing {@code null} clears
-     * both columns; the surrounding transition's {@code stateReason} records why.
-     *
-     * <p>The encryption context — {@code (workspaceId, kind, instanceKey)} — is derived
-     * from {@code this} and bound into the AES-GCM AAD; a ciphertext written for one row
-     * cannot be substituted into another.
-     */
+    /** Encrypts or clears this connection's credentials. */
     public void setCredentials(@Nullable CredentialBundle bundle, CredentialBundleConverter converter) {
         if (bundle == null) {
             this.credentialsEncrypted = null;
             this.credentialsAlg = null;
+            this.credentialsKeyVersion = null;
             return;
         }
         this.credentialsEncrypted = converter.encrypt(bundle, encryptionContext());
         this.credentialsAlg = CredentialBundleConverter.ALGORITHM_TAG;
+        this.credentialsKeyVersion = converter.activeKeyVersion();
     }
 
-    /**
-     * Decrypt the credential blob if present. Empty when no blob is stored.
-     *
-     * <p>v2 (per-row AAD) only. Throws {@link
-     * de.tum.cit.aet.hephaestus.core.security.EncryptionException} on tamper,
-     * unsupported version, or context mismatch (the closure the AAD binding provides).
-     * Callers must treat that as an unrecoverable data error, not "no auth available".
-     */
+    /** Returns the decrypted credentials, if configured. */
     public Optional<CredentialBundle> credentials(CredentialBundleConverter converter) {
         if (credentialsEncrypted == null) {
             return Optional.empty();
         }
-        return Optional.of(converter.decrypt(credentialsEncrypted, encryptionContext()));
+        return Optional.of(converter.decrypt(credentialsEncrypted, encryptionContext(), credentialsKeyVersion));
     }
 
     private EncryptionContext encryptionContext() {
@@ -270,23 +264,21 @@ public class Connection {
         if (kind == null || config == null) {
             return;
         }
-        IntegrationKind expected = switch (config) {
-            case ConnectionConfig.GitHubAppConfig __ -> IntegrationKind.GITHUB;
-            case ConnectionConfig.GitHubPatConfig __ -> IntegrationKind.GITHUB;
-            case ConnectionConfig.GitLabConfig __ -> IntegrationKind.GITLAB;
-            case ConnectionConfig.SlackConfig __ -> IntegrationKind.SLACK;
-            case ConnectionConfig.OutlineConfig __ -> IntegrationKind.OUTLINE;
-        };
+        IntegrationKind expected =
+                switch (config) {
+                    case ConnectionConfig.GitHubAppConfig __ -> IntegrationKind.GITHUB;
+                    case ConnectionConfig.GitHubPatConfig __ -> IntegrationKind.GITHUB;
+                    case ConnectionConfig.GitLabConfig __ -> IntegrationKind.GITLAB;
+                    case ConnectionConfig.SlackConfig __ -> IntegrationKind.SLACK;
+                    case ConnectionConfig.OutlineConfig __ -> IntegrationKind.OUTLINE;
+                };
         if (kind != expected) {
-            throw new IllegalStateException(
-                "Connection kind=" +
-                    kind +
-                    " incompatible with config=" +
-                    config.getClass().getSimpleName() +
-                    " (expected " +
-                    expected +
-                    ")"
-            );
+            throw new IllegalStateException("Connection kind=" + kind
+                    + " incompatible with config="
+                    + config.getClass().getSimpleName()
+                    + " (expected "
+                    + expected
+                    + ")");
         }
     }
 }

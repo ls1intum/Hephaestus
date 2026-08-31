@@ -34,8 +34,8 @@ class RunnerProfileSidecarTest {
     @MethodSource("profiles")
     void shouldStageEverySidecarItsRunnerImports(PiRunnerProfile profile) throws IOException {
         assertThat(profile.sidecarScripts())
-            .as("sidecars staged beside %s", profile.runnerScript())
-            .containsAll(relativeImportsOf(profile.runnerScript()));
+                .as("sidecars staged beside %s", profile.runnerScript())
+                .containsAll(relativeImportsOf(profile.runnerScript()));
     }
 
     private static Set<String> relativeImportsOf(String script) throws IOException {

@@ -19,7 +19,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestR
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabEventType;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.issuecomment.dto.GitLabNoteEventDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.RecordingScmEventListener;
@@ -57,13 +56,13 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
     // Fixture values
     private static final String FIXTURE_NOTE_BODY = "I'll start working on this feature";
     private static final String FIXTURE_NOTE_UPDATED_BODY =
-        "Updated: I'll start working on this feature - high priority\\!";
+            "Updated: I'll start working on this feature - high priority\\!";
     private static final String FIXTURE_MR_NOTE_BODY =
-        "LGTM\\! Just a minor suggestion: consider adding error handling.";
+            "LGTM\\! Just a minor suggestion: consider adding error handling.";
     private static final String FIXTURE_MR_NOTE_UPDATED_BODY =
-        "Updated: Consider adding error handling here. Also add input validation.";
+            "Updated: Consider adding error handling here. Also add input validation.";
     private static final String FIXTURE_NOTE_URL =
-        "https://gitlab.lrz.de/hephaestustest/demo-repository/-/issues/5#note_4406174";
+            "https://gitlab.lrz.de/hephaestustest/demo-repository/-/issues/5#note_4406174";
     private static final String FIXTURE_AUTHOR_LOGIN = "ga84xah";
 
     // Repository/org setup
@@ -149,7 +148,8 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
                 assertThat(comment.getProvider().getType()).isEqualTo(IdentityProviderType.GITLAB);
             });
 
-            assertThat(eventListener.ofType(ScmDomainEvent.CommentCreated.class)).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.CommentCreated.class))
+                    .hasSize(1);
         }
 
         @Test
@@ -168,7 +168,8 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
                 assertThat(comment.getBody()).isEqualTo(FIXTURE_NOTE_UPDATED_BODY);
             });
 
-            assertThat(eventListener.ofType(ScmDomainEvent.CommentUpdated.class)).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.CommentUpdated.class))
+                    .hasSize(1);
         }
     }
 
@@ -192,7 +193,8 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
                 assertThat(comment.getIssue().getId()).isEqualTo(savedPr.getId());
             });
 
-            assertThat(eventListener.ofType(ScmDomainEvent.CommentCreated.class)).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.CommentCreated.class))
+                    .hasSize(1);
         }
 
         @Test
@@ -211,7 +213,8 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
                 assertThat(comment.getBody()).isEqualTo(FIXTURE_MR_NOTE_UPDATED_BODY);
             });
 
-            assertThat(eventListener.ofType(ScmDomainEvent.CommentUpdated.class)).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.CommentUpdated.class))
+                    .hasSize(1);
         }
     }
 
@@ -225,7 +228,8 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
             handler.handleEvent(loadPayload("note.system"));
 
             assertThat(commentRepository.count()).isZero();
-            assertThat(eventListener.ofType(ScmDomainEvent.CommentCreated.class)).isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.CommentCreated.class))
+                    .isEmpty();
         }
     }
 
@@ -239,7 +243,8 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
             handler.handleEvent(loadPayload("note.confidential.issue.create"));
 
             assertThat(commentRepository.count()).isZero();
-            assertThat(eventListener.ofType(ScmDomainEvent.CommentCreated.class)).isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.CommentCreated.class))
+                    .isEmpty();
         }
     }
 
@@ -282,8 +287,8 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
                 assertThat(commentRepository.count()).isEqualTo(1);
 
                 Issue stubIssue = issueRepository
-                    .findByRepositoryIdAndNumber(savedRepo.getId(), ISSUE_IID)
-                    .orElse(null);
+                        .findByRepositoryIdAndNumber(savedRepo.getId(), ISSUE_IID)
+                        .orElse(null);
                 assertThat(stubIssue).isNotNull();
                 assertThat(stubIssue.getNativeId()).isEqualTo(NATIVE_ISSUE_ID);
             });
@@ -294,7 +299,8 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
             handler.handleEvent(loadPayload("note.commit.create"));
 
             assertThat(commentRepository.count()).isZero();
-            assertThat(eventListener.ofType(ScmDomainEvent.CommentCreated.class)).isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.CommentCreated.class))
+                    .isEmpty();
         }
     }
 
@@ -308,10 +314,9 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     private void setupTestData() {
         savedProvider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.lrz.de")
-            .orElseGet(() ->
-                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITLAB, "https://gitlab.lrz.de"))
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.lrz.de")
+                .orElseGet(() -> gitProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITLAB, "https://gitlab.lrz.de")));
 
         Organization org = new Organization();
         org.setNativeId(1L);

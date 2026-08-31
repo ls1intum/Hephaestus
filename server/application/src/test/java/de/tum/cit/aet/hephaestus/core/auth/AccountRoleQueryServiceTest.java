@@ -35,11 +35,10 @@ class AccountRoleQueryServiceTest extends BaseUnitTest {
     }
 
     @ParameterizedTest
-    @ValueSource(booleans = { true, false })
+    @ValueSource(booleans = {true, false})
     void hasFeatureFlag_passesThroughRepositoryVerdict(boolean repositorySaysYes) {
-        when(
-            accountFeatureRepository.existsActiveFeatureForProviderSubject(PROVIDER_ID, SUBJECT, "AI_REVIEW")
-        ).thenReturn(repositorySaysYes);
+        when(accountFeatureRepository.existsActiveFeatureForProviderSubject(PROVIDER_ID, SUBJECT, "AI_REVIEW"))
+                .thenReturn(repositorySaysYes);
 
         assertThat(service.hasFeatureFlag(PROVIDER_ID, SUBJECT, "AI_REVIEW")).isEqualTo(repositorySaysYes);
     }
@@ -51,18 +50,14 @@ class AccountRoleQueryServiceTest extends BaseUnitTest {
         assertThat(service.hasFeatureFlag(PROVIDER_ID, SUBJECT, "  ")).isFalse();
         assertThat(service.hasFeatureFlag(PROVIDER_ID, "  ", "AI_REVIEW")).isFalse();
 
-        verify(accountFeatureRepository, never()).existsActiveFeatureForProviderSubject(
-            anyLong(),
-            anyString(),
-            anyString()
-        );
+        verify(accountFeatureRepository, never())
+                .existsActiveFeatureForProviderSubject(anyLong(), anyString(), anyString());
     }
 
     @Test
     void hasFeatureFlag_whenBackendThrows_failsClosed() {
-        when(
-            accountFeatureRepository.existsActiveFeatureForProviderSubject(PROVIDER_ID, SUBJECT, "AI_REVIEW")
-        ).thenThrow(new RuntimeException("db down"));
+        when(accountFeatureRepository.existsActiveFeatureForProviderSubject(PROVIDER_ID, SUBJECT, "AI_REVIEW"))
+                .thenThrow(new RuntimeException("db down"));
 
         assertThat(service.hasFeatureFlag(PROVIDER_ID, SUBJECT, "AI_REVIEW")).isFalse();
     }

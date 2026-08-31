@@ -30,13 +30,13 @@ class LlmProxyWebClientConfig {
     @Bean(destroyMethod = "dispose")
     ConnectionProvider llmProxyConnectionProvider() {
         return ConnectionProvider.builder("llm-proxy-pool")
-            .maxConnections(100)
-            .pendingAcquireMaxCount(200)
-            .maxIdleTime(Duration.ofSeconds(20))
-            .maxLifeTime(Duration.ofMinutes(3))
-            .pendingAcquireTimeout(Duration.ofSeconds(60))
-            .evictInBackground(Duration.ofSeconds(30))
-            .build();
+                .maxConnections(100)
+                .pendingAcquireMaxCount(200)
+                .maxIdleTime(Duration.ofSeconds(20))
+                .maxLifeTime(Duration.ofMinutes(3))
+                .pendingAcquireTimeout(Duration.ofSeconds(60))
+                .evictInBackground(Duration.ofSeconds(30))
+                .build();
     }
 
     @Bean(destroyMethod = "dispose")
@@ -47,29 +47,28 @@ class LlmProxyWebClientConfig {
 
     @Bean
     WebClient llmProxyWebClient(
-        ConnectionProvider llmProxyConnectionProvider,
-        LoopResources llmProxyLoopResources,
-        LlmProperties llmProperties
-    ) {
+            ConnectionProvider llmProxyConnectionProvider,
+            LoopResources llmProxyLoopResources,
+            LlmProperties llmProperties,
+            WebClient.Builder webClientBuilder) {
         boolean allowLoopback = llmProperties.egress().allowLoopback();
         HttpClient httpClient = HttpClient.create(llmProxyConnectionProvider)
-            .runOn(llmProxyLoopResources)
-            .responseTimeout(Duration.ofSeconds(300))
-            .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 10_000)
-            .resolver(WebClientConnectors.resolverGroup(allowLoopback))
-            .doOnConnected(conn ->
-                // No ReadTimeoutHandler — LLM SSE streams go silent during model thinking, so stream
-                // duration is bounded by ProxyStreamingUtils' own SSE timeout instead.
-                conn.addHandlerLast(new WriteTimeoutHandler(60))
-            );
+                .runOn(llmProxyLoopResources)
+                .responseTimeout(Duration.ofSeconds(300))
+                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 10_000)
+                .resolver(WebClientConnectors.resolverGroup(allowLoopback))
+                .doOnConnected(conn ->
+                        // No ReadTimeoutHandler — LLM SSE streams go silent during model thinking, so stream
+                        // duration is bounded by ProxyStreamingUtils' own SSE timeout instead.
+                        conn.addHandlerLast(new WriteTimeoutHandler(60)));
 
         ExchangeStrategies strategies = ExchangeStrategies.builder()
-            .codecs(cfg -> cfg.defaultCodecs().maxInMemorySize(1024 * 1024))
-            .build();
+                .codecs(cfg -> cfg.defaultCodecs().maxInMemorySize(1024 * 1024))
+                .build();
 
-        return WebClient.builder()
-            .clientConnector(new ReactorClientHttpConnector(httpClient))
-            .exchangeStrategies(strategies)
-            .build();
+        return webClientBuilder
+                .clientConnector(new ReactorClientHttpConnector(httpClient))
+                .exchangeStrategies(strategies)
+                .build();
     }
 }

@@ -417,7 +417,8 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
             Long scopeId = 1L;
 
             assertThat(tracker.getLimit(scopeId)).isEqualTo(5000); // assumption, pre-seed
-            tracker.updateFromRestRateLimit(scopeId, 12_500, 12_400, Instant.now().plusSeconds(3600), Instant.now());
+            tracker.updateFromRestRateLimit(
+                    scopeId, 12_500, 12_400, Instant.now().plusSeconds(3600), Instant.now());
 
             assertThat(tracker.getLimit(scopeId)).isEqualTo(12_500);
         }
@@ -429,7 +430,8 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
             tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(4200, 5000, 3, resetTime));
 
             // A probe that was in flight before the GraphQL response landed.
-            tracker.updateFromRestRateLimit(scopeId, 5000, 4999, resetTime.toInstant(), Instant.now().minusSeconds(30));
+            tracker.updateFromRestRateLimit(
+                    scopeId, 5000, 4999, resetTime.toInstant(), Instant.now().minusSeconds(30));
 
             assertNotNull(tracker.snapshot(scopeId));
             assertThat(required(tracker.snapshot(scopeId)).remaining()).isEqualTo(4200);
@@ -454,21 +456,31 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
             OffsetDateTime resetTime = OffsetDateTime.now(ZoneOffset.UTC).plusHours(1);
             tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(4500, 5000, 2, resetTime));
 
-            assertThat(
-                meterRegistry.find("github.graphql.ratelimit.points.remaining").tag("scope_id", "1").gauge()
-            ).isNotNull();
-            assertThat(
-                meterRegistry.find("github.graphql.ratelimit.points.limit").tag("scope_id", "1").gauge()
-            ).isNotNull();
-            assertThat(
-                meterRegistry.find("github.graphql.ratelimit.points.used").tag("scope_id", "1").gauge()
-            ).isNotNull();
-            assertThat(
-                meterRegistry.find("github.graphql.ratelimit.last_query_cost").tag("scope_id", "1").gauge()
-            ).isNotNull();
-            assertThat(
-                meterRegistry.find("github.graphql.ratelimit.seconds_until_reset").tag("scope_id", "1").gauge()
-            ).isNotNull();
+            assertThat(meterRegistry
+                            .find("github.graphql.ratelimit.points.remaining")
+                            .tag("scope_id", "1")
+                            .gauge())
+                    .isNotNull();
+            assertThat(meterRegistry
+                            .find("github.graphql.ratelimit.points.limit")
+                            .tag("scope_id", "1")
+                            .gauge())
+                    .isNotNull();
+            assertThat(meterRegistry
+                            .find("github.graphql.ratelimit.points.used")
+                            .tag("scope_id", "1")
+                            .gauge())
+                    .isNotNull();
+            assertThat(meterRegistry
+                            .find("github.graphql.ratelimit.last_query_cost")
+                            .tag("scope_id", "1")
+                            .gauge())
+                    .isNotNull();
+            assertThat(meterRegistry
+                            .find("github.graphql.ratelimit.seconds_until_reset")
+                            .tag("scope_id", "1")
+                            .gauge())
+                    .isNotNull();
         }
 
         /**
@@ -490,9 +502,9 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
             assertThatNoException().isThrownBy(() -> tracker.waitIfNeeded(scopeId));
 
             var remainingGauge = meterRegistry
-                .find("github.graphql.ratelimit.points.remaining")
-                .tag("scope_id", "1")
-                .gauge();
+                    .find("github.graphql.ratelimit.points.remaining")
+                    .tag("scope_id", "1")
+                    .gauge();
             assertNotNull(remainingGauge);
             assertThat(remainingGauge.value()).isEqualTo(7.0);
         }
@@ -504,12 +516,15 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
             tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(4500, 5000, 2, resetTime));
 
             var remainingGauge = meterRegistry
-                .find("github.graphql.ratelimit.points.remaining")
-                .tag("scope_id", "1")
-                .gauge();
+                    .find("github.graphql.ratelimit.points.remaining")
+                    .tag("scope_id", "1")
+                    .gauge();
             assertNotNull(remainingGauge);
             assertThat(remainingGauge.value()).isEqualTo(4500.0);
-            var limitGauge = meterRegistry.find("github.graphql.ratelimit.points.limit").tag("scope_id", "1").gauge();
+            var limitGauge = meterRegistry
+                    .find("github.graphql.ratelimit.points.limit")
+                    .tag("scope_id", "1")
+                    .gauge();
             assertNotNull(limitGauge);
             assertThat(limitGauge.value()).isEqualTo(5000.0);
         }
@@ -524,11 +539,7 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
      * arrive.
      */
     private ClientGraphQlResponse mockResponseWithRateLimit(
-        int remaining,
-        int limit,
-        int cost,
-        @Nullable OffsetDateTime resetAt
-    ) {
+            int remaining, int limit, int cost, @Nullable OffsetDateTime resetAt) {
         GHRateLimit rateLimit = new GHRateLimit();
         rateLimit.setCost(cost);
         rateLimit.setLimit(limit);

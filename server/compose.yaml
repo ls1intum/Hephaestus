@@ -1,6 +1,6 @@
-# Local development stack. From the repo root: `pnpm dev` runs `docker compose up -d --wait`
+# Local development stack. From the repo root: `pnpm run dev` runs `docker compose up -d --wait`
 # then starts the server + webapp. Postgres is a bind mount (./postgres-data), so
-# `docker compose down -v` won't clear it — use `pnpm dev:reset` to reset the DB.
+# `docker compose down -v` won't clear it — use `pnpm run dev:reset` to reset the DB.
 #
 # Authentication is Hephaestus-native (no Keycloak — ADR 0017). For local login, register a
 # GitHub OAuth app (callback http://localhost:8080/login/oauth2/code/github) and set
@@ -21,7 +21,7 @@ services:
     networks:
       - app-network
     volumes:
-      - ./postgres-data:/var/lib/postgresql/data
+      - ./postgres-data:/var/lib/postgresql
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U root -d hephaestus']
       interval: 5s
@@ -32,7 +32,7 @@ services:
   # Available for opt-in agent/webhook pipeline work (set the relevant hephaestus.*.nats.enabled
   # in application-local.yml). Idle otherwise — no Spring connection opens unless enabled.
   nats:
-    image: nats:alpine
+    image: nats:2.14.6-alpine@sha256:ad7a43eb7e3337c3c38ce5d784d1461791f95f730f252d2b25eee699752a0ca3
     command: ['-js', '-m', '8222']
     ports:
       - '${NATS_PORT:-4222}:4222'

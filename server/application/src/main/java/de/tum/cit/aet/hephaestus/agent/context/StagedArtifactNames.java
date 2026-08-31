@@ -41,7 +41,8 @@ public class StagedArtifactNames {
             if (reference.kind() == null || reference.id() == null) {
                 continue;
             }
-            wanted.computeIfAbsent(reference.kind(), kind -> new LinkedHashSet<>()).add(reference.id());
+            wanted.computeIfAbsent(reference.kind(), kind -> new LinkedHashSet<>())
+                    .add(reference.id());
         }
         Map<ArtifactKind, Map<Long, ArtifactIdentity>> byKind = new LinkedHashMap<>();
         wanted.forEach((kind, ids) -> byKind.put(kind, identities.resolve(workspaceId, kind, ids)));
@@ -49,7 +50,8 @@ public class StagedArtifactNames {
     }
 
     /** One entry's artifact, as the staging side holds it: the ledger coordinates, not a name. */
-    public record Reference(@Nullable ArtifactKind kind, @Nullable Long id) {}
+    public record Reference(
+            @Nullable ArtifactKind kind, @Nullable Long id) {}
 
     /** The names for one payload's worth of references, resolved together. */
     public static final class Resolved {

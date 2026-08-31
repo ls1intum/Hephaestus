@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * An instruction file that no agent loads fails in complete silence.
  *
@@ -28,9 +27,11 @@ import { lstat, readFile, readlink } from "node:fs/promises";
 import { resolve } from "node:path";
 import { basename, dirname, join, matchesGlob, normalize } from "node:path/posix";
 import { promisify } from "node:util";
+
 import { fromMarkdown } from "mdast-util-from-markdown";
 import { mdxFromMarkdown } from "mdast-util-mdx";
 import { mdxjs } from "micromark-extension-mdxjs";
+
 import { asRecord, asStringArray, parseJson } from "./lib/json.ts";
 
 /** Resolved from this file, so the gate answers the same whatever the working directory is. */

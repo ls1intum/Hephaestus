@@ -51,26 +51,21 @@ public class WorkspaceLlmModelService {
 
     private WorkspaceLlmModel load(WorkspaceContext workspaceContext, Long id) {
         return modelRepository
-            .findByIdAndWorkspaceIdWithConnection(id, workspaceContext.id())
-            .orElseThrow(() -> new EntityNotFoundException("WorkspaceLlmModel", id));
+                .findByIdAndWorkspaceIdWithConnection(id, workspaceContext.id())
+                .orElseThrow(() -> new EntityNotFoundException("WorkspaceLlmModel", id));
     }
 
     @Transactional
     public WorkspaceLlmModel create(
-        WorkspaceContext workspaceContext,
-        Long connectionId,
-        CreateWorkspaceLlmModelRequestDTO request
-    ) {
+            WorkspaceContext workspaceContext, Long connectionId, CreateWorkspaceLlmModelRequestDTO request) {
         requireByoEnabled();
         Long workspaceId = workspaceContext.id();
         WorkspaceLlmConnection connection = connectionRepository
-            .findByIdAndWorkspaceId(connectionId, workspaceId)
-            .orElseThrow(() -> new EntityNotFoundException("WorkspaceLlmConnection", connectionId));
+                .findByIdAndWorkspaceId(connectionId, workspaceId)
+                .orElseThrow(() -> new EntityNotFoundException("WorkspaceLlmConnection", connectionId));
         String slug = modelSlug(workspaceId, request.slug(), request.displayName());
-        if (
-            StringUtils.hasText(request.slug()) &&
-            modelRepository.findByWorkspaceIdAndSlug(workspaceId, slug).isPresent()
-        ) {
+        if (StringUtils.hasText(request.slug())
+                && modelRepository.findByWorkspaceIdAndSlug(workspaceId, slug).isPresent()) {
             throw new LlmModelSlugConflictException(connectionId, slug);
         }
         if (modelRepository.existsByConnectionIdAndUpstreamModelId(connectionId, request.upstreamModelId())) {
@@ -94,14 +89,13 @@ public class WorkspaceLlmModelService {
             model.setEnabled(request.enabled());
         }
         validateAndApplyPrice(
-            model,
-            pricingMode,
-            request.per1mInputUsd(),
-            request.per1mOutputUsd(),
-            request.per1mCacheReadUsd(),
-            request.per1mCacheWriteUsd(),
-            request.priceNote()
-        );
+                model,
+                pricingMode,
+                request.per1mInputUsd(),
+                request.per1mOutputUsd(),
+                request.per1mCacheReadUsd(),
+                request.per1mCacheWriteUsd(),
+                request.priceNote());
         if (model.isEnabled()) {
             requireActivatable(model);
         }
@@ -115,32 +109,29 @@ public class WorkspaceLlmModelService {
             }
             throw new LlmModelSlugConflictException(connectionId, slug, e);
         }
-        configAudit.record(
-            ConfigAuditEntry.created(
+        configAudit.record(ConfigAuditEntry.created(
                 ConfigAuditEntityType.WORKSPACE_LLM_MODEL,
                 saved.getId(),
                 workspaceId,
-                WorkspaceLlmModelSnapshot.of(saved)
-            )
-        );
+                WorkspaceLlmModelSnapshot.of(saved)));
         return saved;
     }
 
     private String modelSlug(Long workspaceId, @Nullable String requested, String displayName) {
-        return CatalogSlug.unique(requested, displayName, slug ->
-            modelRepository.findByWorkspaceIdAndSlug(workspaceId, slug).isPresent()
-        );
+        return CatalogSlug.unique(
+                requested,
+                displayName,
+                slug -> modelRepository
+                        .findByWorkspaceIdAndSlug(workspaceId, slug)
+                        .isPresent());
     }
 
     @Transactional
     public WorkspaceLlmModel update(
-        WorkspaceContext workspaceContext,
-        Long id,
-        UpdateWorkspaceLlmModelRequestDTO request
-    ) {
+            WorkspaceContext workspaceContext, Long id, UpdateWorkspaceLlmModelRequestDTO request) {
         WorkspaceLlmModel model = modelRepository
-            .findByIdAndWorkspaceIdForUpdate(id, workspaceContext.id())
-            .orElseThrow(() -> new EntityNotFoundException("WorkspaceLlmModel", id));
+                .findByIdAndWorkspaceIdForUpdate(id, workspaceContext.id())
+                .orElseThrow(() -> new EntityNotFoundException("WorkspaceLlmModel", id));
         WorkspaceLlmModelSnapshot before = WorkspaceLlmModelSnapshot.of(model);
 
         if (request.displayName() != null) {
@@ -160,29 +151,25 @@ public class WorkspaceLlmModelService {
         }
         if (request.pricingMode() != null) {
             validateAndApplyPrice(
-                model,
-                request.pricingMode(),
-                request.per1mInputUsd(),
-                request.per1mOutputUsd(),
-                request.per1mCacheReadUsd(),
-                request.per1mCacheWriteUsd(),
-                request.priceNote()
-            );
+                    model,
+                    request.pricingMode(),
+                    request.per1mInputUsd(),
+                    request.per1mOutputUsd(),
+                    request.per1mCacheReadUsd(),
+                    request.per1mCacheWriteUsd(),
+                    request.priceNote());
         }
         if (model.isEnabled()) {
             requireActivatable(model);
         }
 
         WorkspaceLlmModel saved = modelRepository.saveAndFlush(model);
-        configAudit.record(
-            ConfigAuditEntry.updated(
+        configAudit.record(ConfigAuditEntry.updated(
                 ConfigAuditEntityType.WORKSPACE_LLM_MODEL,
                 saved.getId(),
                 workspaceContext.id(),
                 before,
-                WorkspaceLlmModelSnapshot.of(saved)
-            )
-        );
+                WorkspaceLlmModelSnapshot.of(saved)));
         return saved;
     }
 
@@ -195,8 +182,7 @@ public class WorkspaceLlmModelService {
         WorkspaceLlmModelSnapshot before = WorkspaceLlmModelSnapshot.of(model);
         modelRepository.delete(model);
         configAudit.record(
-            ConfigAuditEntry.deleted(ConfigAuditEntityType.WORKSPACE_LLM_MODEL, id, workspaceContext.id(), before)
-        );
+                ConfigAuditEntry.deleted(ConfigAuditEntityType.WORKSPACE_LLM_MODEL, id, workspaceContext.id(), before));
     }
 
     /**
@@ -206,22 +192,19 @@ public class WorkspaceLlmModelService {
     @Transactional(readOnly = true)
     public List<AvailableLlmModelDTO> availableModels(WorkspaceContext workspaceContext) {
         List<LlmModel> instanceModels = instanceModelRepository.findVisibleEnabledModels(workspaceContext.id());
-        List<Long> instanceModelIds = instanceModels.stream().map(LlmModel::getId).toList();
+        List<Long> instanceModelIds =
+                instanceModels.stream().map(LlmModel::getId).toList();
         Map<Long, LlmModelPrice> currentPrices = instanceModelIds.isEmpty()
-            ? Map.of()
-            : instancePriceRepository
-                  .findByModelIdInAndEffectiveToIsNull(instanceModelIds)
-                  .stream()
-                  .collect(Collectors.toMap(price -> price.getModel().getId(), price -> price));
+                ? Map.of()
+                : instancePriceRepository.findByModelIdInAndEffectiveToIsNull(instanceModelIds).stream()
+                        .collect(Collectors.toMap(price -> price.getModel().getId(), price -> price));
 
-        List<WorkspaceLlmModel> workspaceModels = modelRepository.findEnabledWithEnabledConnection(
-            workspaceContext.id()
-        );
+        List<WorkspaceLlmModel> workspaceModels =
+                modelRepository.findEnabledWithEnabledConnection(workspaceContext.id());
 
         List<AvailableLlmModelDTO> result = new ArrayList<>(instanceModels.size() + workspaceModels.size());
-        instanceModels.forEach(model ->
-            result.add(AvailableLlmModelDTO.fromInstance(model, currentPrices.get(model.getId())))
-        );
+        instanceModels.forEach(
+                model -> result.add(AvailableLlmModelDTO.fromInstance(model, currentPrices.get(model.getId()))));
         workspaceModels.forEach(model -> result.add(AvailableLlmModelDTO.fromWorkspace(model)));
         return result;
     }
@@ -233,22 +216,15 @@ public class WorkspaceLlmModelService {
     }
 
     private static void validateAndApplyPrice(
-        WorkspaceLlmModel model,
-        PricingMode pricingMode,
-        @Nullable BigDecimal per1mInputUsd,
-        @Nullable BigDecimal per1mOutputUsd,
-        @Nullable BigDecimal per1mCacheReadUsd,
-        @Nullable BigDecimal per1mCacheWriteUsd,
-        @Nullable String priceNote
-    ) {
+            WorkspaceLlmModel model,
+            PricingMode pricingMode,
+            @Nullable BigDecimal per1mInputUsd,
+            @Nullable BigDecimal per1mOutputUsd,
+            @Nullable BigDecimal per1mCacheReadUsd,
+            @Nullable BigDecimal per1mCacheWriteUsd,
+            @Nullable String priceNote) {
         LlmPriceValidation.validate(
-            pricingMode,
-            per1mInputUsd,
-            per1mOutputUsd,
-            per1mCacheReadUsd,
-            per1mCacheWriteUsd,
-            priceNote
-        );
+                pricingMode, per1mInputUsd, per1mOutputUsd, per1mCacheReadUsd, per1mCacheWriteUsd, priceNote);
         model.setPricingMode(pricingMode);
         model.setPer1mInputUsd(per1mInputUsd);
         model.setPer1mOutputUsd(per1mOutputUsd);
@@ -260,8 +236,7 @@ public class WorkspaceLlmModelService {
     private static void requireActivatable(WorkspaceLlmModel model) {
         if (!model.getConnection().isEnabled() || model.getPricingMode() == PricingMode.UNPRICED) {
             throw new IllegalArgumentException(
-                "Activate the connection and configure a price before activating the model."
-            );
+                    "Activate the connection and configure a price before activating the model.");
         }
     }
 

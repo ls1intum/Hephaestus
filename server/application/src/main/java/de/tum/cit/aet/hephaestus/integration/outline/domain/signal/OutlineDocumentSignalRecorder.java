@@ -43,12 +43,11 @@ public class OutlineDocumentSignalRecorder {
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Optional<SignalKey> record(
-        long workspaceId,
-        @Nullable OutlineDocumentSnapshot document,
-        @Nullable String outlineEventName,
-        Instant occurredAt,
-        DiscoveredVia discoveredVia
-    ) {
+            long workspaceId,
+            @Nullable OutlineDocumentSnapshot document,
+            @Nullable String outlineEventName,
+            Instant occurredAt,
+            DiscoveredVia discoveredVia) {
         if (document == null || document.id() == null || document.isDeleted()) {
             return Optional.empty();
         }
@@ -57,20 +56,14 @@ public class OutlineDocumentSignalRecorder {
             return Optional.empty();
         }
         Optional<SignalKey> key = DocsSignals.documentKey(
-            workspaceId,
-            document.id(),
-            signal.get(),
-            document.contentHash(),
-            document.title()
-        );
+                workspaceId, document.id(), signal.get(), document.contentHash(), document.title());
         if (key.isEmpty()) {
             // An evicted body has no hash to key a content-shaped signal on, and a made-up one would break
             // dedup for every future occurrence.
             log.debug(
-                "Outline document signal has no revision, not recorded: documentId={}, signal={}",
-                document.id(),
-                signal.get()
-            );
+                    "Outline document signal has no revision, not recorded: documentId={}, signal={}",
+                    document.id(),
+                    signal.get());
             return Optional.empty();
         }
         boolean recorded = recorder.record(key.get(), occurredAt, discoveredVia);
@@ -78,12 +71,11 @@ public class OutlineDocumentSignalRecorder {
             return Optional.empty();
         }
         log.debug(
-            "Recorded document signal: workspaceId={}, documentId={}, signal={}, via={}",
-            workspaceId,
-            document.id(),
-            signal.get(),
-            discoveredVia
-        );
+                "Recorded document signal: workspaceId={}, documentId={}, signal={}, via={}",
+                workspaceId,
+                document.id(),
+                signal.get(),
+                discoveredVia);
         return key;
     }
 }

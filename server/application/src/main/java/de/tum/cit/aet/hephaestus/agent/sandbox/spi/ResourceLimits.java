@@ -15,7 +15,11 @@ import org.jspecify.annotations.Nullable;
  * @param pidsLimit maximum number of processes inside the container
  * @param maxRuntime hard deadline after which the container is killed
  */
-public record ResourceLimits(long memoryBytes, double cpus, int pidsLimit, @Nullable Duration maxRuntime) {
+public record ResourceLimits(
+        long memoryBytes,
+        double cpus,
+        int pidsLimit,
+        @Nullable Duration maxRuntime) {
     public static final long MAX_MEMORY_BYTES = 16L * 1024 * 1024 * 1024;
 
     public static final double MAX_CPUS = 8.0;
@@ -30,8 +34,7 @@ public record ResourceLimits(long memoryBytes, double cpus, int pidsLimit, @Null
         }
         if (memoryBytes > MAX_MEMORY_BYTES) {
             throw new IllegalArgumentException(
-                "memoryBytes exceeds maximum (" + MAX_MEMORY_BYTES + "), got: " + memoryBytes
-            );
+                    "memoryBytes exceeds maximum (" + MAX_MEMORY_BYTES + "), got: " + memoryBytes);
         }
         if (cpus <= 0) {
             throw new IllegalArgumentException("cpus must be positive, got: " + cpus);
@@ -60,10 +63,6 @@ public record ResourceLimits(long memoryBytes, double cpus, int pidsLimit, @Null
     }
 
     /** Sensible defaults: 4 GB RAM, 2 CPUs, 512 PIDs, 10 min timeout. */
-    public static final ResourceLimits DEFAULT = new ResourceLimits(
-        4L * 1024 * 1024 * 1024,
-        2.0,
-        512,
-        Duration.ofMinutes(10)
-    );
+    public static final ResourceLimits DEFAULT =
+            new ResourceLimits(4L * 1024 * 1024 * 1024, 2.0, 512, Duration.ofMinutes(10));
 }

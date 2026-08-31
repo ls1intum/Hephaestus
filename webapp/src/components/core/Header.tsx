@@ -1,9 +1,9 @@
 import { TagIcon } from "@primer/octicons-react";
 import { Link } from "@tanstack/react-router";
 import { Hammer, LogOut, Settings, User } from "lucide-react";
+
 import { SignInButtons } from "@/components/auth/SignInButtons";
 import { ModeToggle } from "@/components/core/ModeToggle";
-import { SurveyNotificationButton } from "@/components/surveys/survey-notification-button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -39,6 +39,7 @@ export interface HeaderProps {
 	username?: string;
 	avatarUrl?: string;
 	workspaceSlug?: string;
+	feedbackDialog?: React.ReactNode;
 	onLogin: (idpHint?: string) => void;
 	onLogout: () => void;
 }
@@ -53,6 +54,7 @@ export default function Header({
 	name,
 	username,
 	workspaceSlug,
+	feedbackDialog,
 	avatarUrl,
 	onLogin,
 	onLogout,
@@ -123,7 +125,7 @@ export default function Header({
 				</div>
 			</div>
 			<div className="flex gap-2 px-4">
-				<SurveyNotificationButton />
+				{isAuthenticated ? feedbackDialog : null}
 				<ModeToggle />
 				<div className="flex items-center gap-2">
 					{!isAuthenticated ? (

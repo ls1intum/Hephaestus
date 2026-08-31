@@ -7,43 +7,44 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
-/**
- * The AAD produced by {@link EncryptionContext#toAad()} is the entire substitution-resistance mechanism
- * for at-rest credential bundles: a ciphertext encrypted under context A must not decrypt under context
- * B. These tests pin the two properties that guarantee it — field injectivity and length-prefix framing
- * (so {@code (a, bc)} can never collide with {@code (ab, c)}) — plus the u16 overflow guard. A refactor
- * that dropped a length prefix would still pass every encrypt→decrypt round-trip test (writer + reader
- * stay in sync), which is exactly why this needs a direct assertion on the bytes.
- */
+/** Pins the persisted AAD wire format and field separation that round trips cannot detect. */
 class EncryptionContextTest extends BaseUnitTest {
 
     private static byte[] aad(
-        long ws,
-        IntegrationKind kind,
-        @org.jspecify.annotations.Nullable String instanceKey,
-        String column
-    ) {
+            long ws, IntegrationKind kind, @org.jspecify.annotations.Nullable String instanceKey, String column) {
         return new EncryptionContext(ws, kind, instanceKey, column).toAad();
+    }
+
+    @Test
+    void shouldUseVersionedLengthPrefixedFraming() {
+        byte[] actual = aad(1L, IntegrationKind.GITHUB, "a", "bc");
+
+        assertThat(HexFormat.of().formatHex(actual))
+                .isEqualTo("686570686165737475732d63726564656e7469616c2d62756e646c651f02"
+                        + "000131000647495448554200016100026263");
     }
 
     @Test
     void aadDiffersForEachDistinguishingField() {
         List<byte[]> aads = List.of(
-            aad(1L, IntegrationKind.GITHUB, "inst", "col"),
-            aad(2L, IntegrationKind.GITHUB, "inst", "col"), // workspaceId differs
-            aad(1L, IntegrationKind.GITLAB, "inst", "col"), // kind differs
-            aad(1L, IntegrationKind.GITHUB, "other", "col"), // instanceKey differs
-            aad(1L, IntegrationKind.GITHUB, "inst", "other") // columnFqn differs
-        );
+                aad(1L, IntegrationKind.GITHUB, "inst", "col"),
+                aad(2L, IntegrationKind.GITHUB, "inst", "col"), // workspaceId differs
+                aad(1L, IntegrationKind.GITLAB, "inst", "col"), // kind differs
+                aad(1L, IntegrationKind.GITHUB, "other", "col"), // instanceKey differs
+                aad(1L, IntegrationKind.GITHUB, "inst", "other") // columnFqn differs
+                );
         Set<String> distinct = new HashSet<>();
         for (byte[] a : aads) {
             distinct.add(Arrays.toString(a));
         }
-        assertThat(distinct).as("every distinguishing field must change the AAD").hasSize(aads.size());
+        assertThat(distinct)
+                .as("every distinguishing field must change the AAD")
+                .hasSize(aads.size());
     }
 
     @Test
@@ -55,27 +56,29 @@ class EncryptionContextTest extends BaseUnitTest {
     }
 
     @Test
-    void nullAndEmptyInstanceKeyAreCoercedToTheSameAad() {
-        // Documents the deliberate null→"" coercion: callers must therefore NEVER pass "" as a real
-        // instanceKey, or it would share AAD with a null-instanceKey (pending) row of the same column.
-        assertThat(aad(1L, IntegrationKind.GITHUB, null, "col")).isEqualTo(aad(1L, IntegrationKind.GITHUB, "", "col"));
-    }
-
-    @Test
-    void everyContextBeginsWithTheSameDomainSeparatorMarker() {
-        // Cross-purpose AAD separation: every context — regardless of its fields — leads with the same
-        // domain-separator marker, so a credential-bundle ciphertext can't be confused with another use
-        // of the same AES key. Asserting the marker (not the exact framing offsets) keeps this robust.
-        byte[] marker = "hephaestus-credential-bundle".getBytes(java.nio.charset.StandardCharsets.UTF_8);
-        assertThat(aad(1L, IntegrationKind.GITHUB, "inst", "col")).startsWith(marker);
-        assertThat(aad(999L, IntegrationKind.SLACK, "other-instance", "other.column")).startsWith(marker);
+    void rejectsBlankInstanceKey() {
+        assertThatThrownBy(() -> aad(1L, IntegrationKind.GITHUB, "", "col"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("instanceKey must not be blank");
     }
 
     @Test
     void rejectsFieldExceedingU16LengthLimit() {
         EncryptionContext oversized = new EncryptionContext(1L, IntegrationKind.GITHUB, "inst", "c".repeat(70_000));
         assertThatThrownBy(oversized::toAad)
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("u16 length limit");
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("u16 length limit");
+    }
+
+    @Test
+    void shouldAcceptMaximumU16FieldLength() {
+        String maximumColumn = "c".repeat(0xFFFF);
+        byte[] actual = aad(1L, IntegrationKind.GITHUB, "inst", maximumColumn);
+
+        int columnLengthOffset = actual.length - 0xFFFF - 2;
+        assertThat(actual[columnLengthOffset]).isEqualTo((byte) 0xFF);
+        assertThat(actual[columnLengthOffset + 1]).isEqualTo((byte) 0xFF);
+        assertThat(actual[columnLengthOffset + 2]).isEqualTo((byte) 'c');
+        assertThat(actual[actual.length - 1]).isEqualTo((byte) 'c');
     }
 }

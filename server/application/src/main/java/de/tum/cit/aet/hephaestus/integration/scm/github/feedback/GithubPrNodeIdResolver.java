@@ -40,23 +40,16 @@ class GithubPrNodeIdResolver {
     }
 
     private String resolveNodeId(
-        long scopeId,
-        String owner,
-        String name,
-        int number,
-        String documentName,
-        String idField,
-        String kind
-    ) {
+            long scopeId, String owner, String name, int number, String documentName, String idField, String kind) {
         String ref = owner + "/" + name + "#" + number;
         ClientGraphQlResponse response = gitHubProvider
-            .forScope(scopeId)
-            .documentName(documentName)
-            .variable("owner", owner)
-            .variable("name", name)
-            .variable("number", number)
-            .execute()
-            .block(GRAPHQL_TIMEOUT);
+                .forScope(scopeId)
+                .documentName(documentName)
+                .variable("owner", owner)
+                .variable("name", name)
+                .variable("number", number)
+                .execute()
+                .block(GRAPHQL_TIMEOUT);
 
         if (response == null) {
             throw new FeedbackDeliveryException("Null response resolving " + kind + " node ID: " + ref);
@@ -67,8 +60,7 @@ class GithubPrNodeIdResolver {
         if (nodeId == null) {
             List<?> errors = response.getErrors();
             throw new FeedbackDeliveryException(
-                kind + " not found via GraphQL: " + ref + (errors.isEmpty() ? "" : ", errors=" + errors)
-            );
+                    kind + " not found via GraphQL: " + ref + (errors.isEmpty() ? "" : ", errors=" + errors));
         }
         return nodeId;
     }

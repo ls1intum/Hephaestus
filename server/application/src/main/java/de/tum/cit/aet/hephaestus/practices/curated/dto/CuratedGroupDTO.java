@@ -8,21 +8,19 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 public record CuratedGroupDTO(
-    @NonNull String slug,
-    @NonNull Integer position,
-    @NonNull CuratedGroupRequestDTO definition,
-    @Nullable CuratedGroupRequestDTO shipped,
-    @NonNull CatalogEntryStatusDTO status
-) {
+        @NonNull String slug,
+        @NonNull Integer position,
+        @NonNull CuratedGroupRequestDTO definition,
+        @Nullable CuratedGroupRequestDTO shipped,
+        @NonNull CatalogEntryStatusDTO status) {
     public static CuratedGroupDTO from(CatalogEntry<GroupDefinition> entry) {
         return new CuratedGroupDTO(
-            entry.slug(),
-            entry.position(),
-            CuratedGroupRequestDTO.of(entry.effective()),
-            entry.changeKind() == CatalogChangeKind.NONE
-                ? null
-                : CuratedGroupRequestDTO.of(Objects.requireNonNull(entry.shipped())),
-            CatalogEntryStatusDTO.from(entry)
-        );
+                entry.slug(),
+                entry.position(),
+                CuratedGroupRequestDTO.of(entry.effective()),
+                entry.changeKind() == CatalogChangeKind.NONE
+                        ? null
+                        : CuratedGroupRequestDTO.of(Objects.requireNonNull(entry.shipped())),
+                CatalogEntryStatusDTO.from(entry));
     }
 }

@@ -30,10 +30,9 @@ public class GitLabWebhookContextResolver {
     private final ScopeIdResolver scopeIdResolver;
 
     GitLabWebhookContextResolver(
-        RepositoryRepository repositoryRepository,
-        RepositoryScopeFilter repositoryScopeFilter,
-        ScopeIdResolver scopeIdResolver
-    ) {
+            RepositoryRepository repositoryRepository,
+            RepositoryScopeFilter repositoryScopeFilter,
+            ScopeIdResolver scopeIdResolver) {
         this.repositoryRepository = repositoryRepository;
         this.repositoryScopeFilter = repositoryScopeFilter;
         this.scopeIdResolver = scopeIdResolver;
@@ -57,8 +56,8 @@ public class GitLabWebhookContextResolver {
         }
 
         Repository repository = repositoryRepository
-            .findByNameWithOwnerWithOrganization(pathWithNamespace)
-            .orElse(null);
+                .findByNameWithOwnerWithOrganization(pathWithNamespace)
+                .orElse(null);
 
         if (repository == null) {
             log.debug("Skipped {} event: reason=repositoryNotFound, repoName={}", eventLabel, safePath);
@@ -77,6 +76,8 @@ public class GitLabWebhookContextResolver {
                 return scopeId;
             }
         }
-        return scopeIdResolver.findScopeIdByRepositoryName(repository.getNameWithOwner()).orElse(null);
+        return scopeIdResolver
+                .findScopeIdByRepositoryName(repository.getNameWithOwner())
+                .orElse(null);
     }
 }

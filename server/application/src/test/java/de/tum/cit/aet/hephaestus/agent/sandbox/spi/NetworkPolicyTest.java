@@ -18,24 +18,25 @@ class NetworkPolicyTest extends BaseUnitTest {
     @Test
     void httpAndHttpsAreAccepted() {
         assertThat(new NetworkPolicy(true, "http://localhost:8080", "tok")).isNotNull();
-        assertThat(new NetworkPolicy(true, "https://proxy.example/internal", "tok")).isNotNull();
+        assertThat(new NetworkPolicy(true, "https://proxy.example/internal", "tok"))
+                .isNotNull();
     }
 
     @Test
     void relativeUrlRejected() {
         assertThatThrownBy(() -> new NetworkPolicy(true, "/internal/llm", null))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("must be absolute");
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("must be absolute");
     }
 
     @Test
     void nonHttpSchemeRejected() {
         assertThatThrownBy(() -> new NetworkPolicy(true, "ftp://x.example", null))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("http or https");
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("http or https");
         assertThatThrownBy(() -> new NetworkPolicy(true, "file:///etc/passwd", null))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("http or https");
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("http or https");
     }
 
     @Test

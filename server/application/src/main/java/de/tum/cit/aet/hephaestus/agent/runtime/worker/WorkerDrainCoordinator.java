@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.runtime.worker;
 
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobCancellationReason;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobExecutor;
+import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.CapacityReport;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.Heartbeat;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.WorkerControlFrame;
@@ -14,13 +15,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.availability.AvailabilityChangeEvent;
 import org.springframework.boot.availability.ReadinessState;
-import org.springframework.boot.web.server.context.WebServerGracefulShutdownLifecycle;
+import org.springframework.boot.web.server.context.WebServerApplicationContext;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.SmartLifecycle;
 
 /**
- * SIGTERM-driven graceful shutdown for the worker. Runs at
- * {@link WebServerGracefulShutdownLifecycle#SMART_LIFECYCLE_PHASE} {@code - 1024} (after HTTP
+ * Graceful shutdown for the worker. Runs at
+ * {@link WebServerApplicationContext#GRACEFUL_SHUTDOWN_PHASE} {@code - 1024} (after HTTP
  * server stop, before executor teardown). Liveness stays {@code CORRECT} — kubelet must
  * not kill the pod early; only readiness flips to {@code REFUSING_TRAFFIC}.
  *
@@ -32,7 +33,7 @@ public class WorkerDrainCoordinator implements SmartLifecycle {
 
     private static final Logger log = LoggerFactory.getLogger(WorkerDrainCoordinator.class);
 
-    static final int PHASE = WebServerGracefulShutdownLifecycle.SMART_LIFECYCLE_PHASE - 1024;
+    static final int PHASE = WebServerApplicationContext.GRACEFUL_SHUTDOWN_PHASE - 1024;
 
     private final WorkerControlClient client;
     private final WorkerCapacityState state;
@@ -43,21 +44,20 @@ public class WorkerDrainCoordinator implements SmartLifecycle {
     private final AtomicBoolean draining = new AtomicBoolean(false);
 
     public WorkerDrainCoordinator(
-        WorkerControlClient client,
-        WorkerCapacityState state,
-        WorkerProperties properties,
-        Optional<AgentJobExecutor> executor,
-        ApplicationEventPublisher events,
-        MeterRegistry meterRegistry
-    ) {
+            WorkerControlClient client,
+            WorkerCapacityState state,
+            WorkerProperties properties,
+            Optional<AgentJobExecutor> executor,
+            ApplicationEventPublisher events,
+            MeterRegistry meterRegistry) {
         this.client = client;
         this.state = state;
         this.properties = properties;
         this.executor = executor;
         this.events = events;
-        Gauge.builder("worker.drain.active", draining, b -> b.get() ? 1.0 : 0.0)
-            .description("1 while the worker is draining, 0 otherwise")
-            .register(meterRegistry);
+        Gauge.builder(AgentMetrics.WORKER_DRAIN_ACTIVE, draining, b -> b.get() ? 1.0 : 0.0)
+                .description("1 while the worker is draining, 0 otherwise")
+                .register(meterRegistry);
     }
 
     @Override
@@ -81,16 +81,8 @@ public class WorkerDrainCoordinator implements SmartLifecycle {
                 AvailabilityChangeEvent.publish(events, this, ReadinessState.REFUSING_TRAFFIC);
                 safeSend(new Heartbeat(true));
                 CapacityReport snap = state.snapshot();
-                safeSend(
-                    new CapacityReport(
-                        snap.reviewMax(),
-                        snap.mentorMax(),
-                        snap.inFlightReview(),
-                        snap.inFlightMentor(),
-                        0,
-                        0
-                    )
-                );
+                safeSend(new CapacityReport(
+                        snap.reviewMax(), snap.mentorMax(), snap.inFlightReview(), snap.inFlightMentor(), 0, 0));
 
                 executor.ifPresent(e -> drainExecutor(e, timeout));
                 log.info("Worker drain complete.");
@@ -121,10 +113,9 @@ public class WorkerDrainCoordinator implements SmartLifecycle {
             client.send(frame);
         } catch (Exception e) {
             log.warn(
-                "Drain-time send failed for {}: {}",
-                frame.getClass().getSimpleName(),
-                e.getClass().getSimpleName()
-            );
+                    "Drain-time send failed for {}: {}",
+                    frame.getClass().getSimpleName(),
+                    e.getClass().getSimpleName());
         }
     }
 

@@ -29,9 +29,7 @@ public class WebhookConfiguration {
 
     @Bean
     WebhookHealthIndicator webhookHealthIndicator(
-        @Qualifier("natsConnection") Connection connection,
-        JetStreamManagement jsm
-    ) {
+            @Qualifier("natsConnection") Connection connection, JetStreamManagement jsm) {
         return new WebhookHealthIndicator(connection, jsm);
     }
 }

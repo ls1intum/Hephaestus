@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "storybook/test";
+
 import { LandingPage } from "./LandingPage";
 
 const meta = {
@@ -7,27 +8,6 @@ const meta = {
 	tags: ["autodocs"],
 	parameters: {
 		layout: "fullscreen",
-		docs: {
-			description: {
-				component:
-					"The landing page explains practice feedback, conversations with Heph, and the role of workspace settings.",
-			},
-		},
-	},
-	argTypes: {
-		onSignIn: {
-			description: "Callback function triggered when the sign-in button is clicked",
-			action: "signed in",
-		},
-		onGoToDashboard: {
-			description:
-				"Callback function triggered when the 'Go to dashboard' button is clicked (for signed-in users)",
-			action: "go to dashboard",
-		},
-		isSignedIn: {
-			description: "Whether the user is currently signed in",
-			control: "boolean",
-		},
 	},
 	args: {
 		onSignIn: fn(),
@@ -48,4 +28,14 @@ export const SignedIn: Story = {
 	args: {
 		isSignedIn: true,
 	},
+};
+
+export const Mobile: Story = {
+	args: { isSignedIn: false },
+	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
+};
+
+export const DarkMode: Story = {
+	args: { isSignedIn: false },
+	globals: { theme: "dark" },
 };

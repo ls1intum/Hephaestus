@@ -1,8 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { Gauge } from "lucide-react";
+
 import type { InstanceSettings } from "@/api/types.gen";
 import { minutesBefore } from "@/components/common/story-clock";
 import { PageHeader } from "@/components/core/PageHeader";
+
 import { SilentModeBanner } from "./SilentModeBanner";
 
 const engaged: InstanceSettings = {

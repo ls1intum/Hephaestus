@@ -1,5 +1,6 @@
 import { Plus, Trash2 } from "lucide-react";
 import { useRef } from "react";
+
 import type { PracticeAutomatedReviewPolicy } from "@/api/types.gen";
 import { Button } from "@/components/ui/button";
 import {

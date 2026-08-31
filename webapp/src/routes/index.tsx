@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+
 import { StandardPageSurface } from "@/components/core/StandardPageSurface";
 import { LandingPage } from "@/components/info/landing/LandingPage";
 import { RedirectToWorkspace } from "@/components/workspace/RedirectToWorkspace";

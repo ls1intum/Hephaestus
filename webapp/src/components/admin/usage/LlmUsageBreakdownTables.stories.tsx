@@ -1,11 +1,13 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect } from "storybook/test";
+
 import type {
 	FxRateInfo,
 	LlmUsageByDay,
 	LlmUsageByJobType,
 	WorkspaceLlmUsageReport,
 } from "@/api/types.gen";
+
 import { LlmUsageByDayTable, LlmUsageByJobTypeTable } from "./LlmUsageBreakdownTables";
 
 const eur: FxRateInfo = {

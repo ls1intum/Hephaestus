@@ -59,43 +59,32 @@ public class WebhookIngestPipeline {
     private final ObjectMapper objectMapper;
 
     public WebhookIngestPipeline(
-        List<WebhookSignatureVerifier> verifiers,
-        List<SubjectKeyDeriver> derivers,
-        @Nullable JetStreamPublisher jetStreamPublisher,
-        ObjectMapper objectMapper
-    ) {
+            List<WebhookSignatureVerifier> verifiers,
+            List<SubjectKeyDeriver> derivers,
+            @Nullable JetStreamPublisher jetStreamPublisher,
+            ObjectMapper objectMapper) {
         this(verifiers, derivers, jetStreamPublisher, objectMapper, List.of());
     }
 
     @Autowired
     public WebhookIngestPipeline(
-        List<WebhookSignatureVerifier> verifiers,
-        List<SubjectKeyDeriver> derivers,
-        @Nullable JetStreamPublisher jetStreamPublisher,
-        ObjectMapper objectMapper,
-        List<WebhookPublishGate> publishGates
-    ) {
-        this.verifiersByKind = verifiers
-            .stream()
-            .collect(
-                Collectors.toUnmodifiableMap(WebhookSignatureVerifier::kind, Function.identity(), (a, b) -> {
+            List<WebhookSignatureVerifier> verifiers,
+            List<SubjectKeyDeriver> derivers,
+            @Nullable JetStreamPublisher jetStreamPublisher,
+            ObjectMapper objectMapper,
+            List<WebhookPublishGate> publishGates) {
+        this.verifiersByKind = verifiers.stream()
+                .collect(Collectors.toUnmodifiableMap(WebhookSignatureVerifier::kind, Function.identity(), (a, b) -> {
                     throw new IllegalStateException("Duplicate WebhookSignatureVerifier for kind=" + a.kind());
-                })
-            );
-        this.deriversByKind = derivers
-            .stream()
-            .collect(
-                Collectors.toUnmodifiableMap(SubjectKeyDeriver::kind, Function.identity(), (a, b) -> {
+                }));
+        this.deriversByKind = derivers.stream()
+                .collect(Collectors.toUnmodifiableMap(SubjectKeyDeriver::kind, Function.identity(), (a, b) -> {
                     throw new IllegalStateException("Duplicate SubjectKeyDeriver for kind=" + a.kind());
-                })
-            );
-        this.publishGatesByKind = publishGates
-            .stream()
-            .collect(
-                Collectors.toUnmodifiableMap(WebhookPublishGate::kind, Function.identity(), (a, b) -> {
+                }));
+        this.publishGatesByKind = publishGates.stream()
+                .collect(Collectors.toUnmodifiableMap(WebhookPublishGate::kind, Function.identity(), (a, b) -> {
                     throw new IllegalStateException("Duplicate WebhookPublishGate for kind=" + a.kind());
-                })
-            );
+                }));
         this.jetStreamPublisher = jetStreamPublisher;
         this.objectMapper = objectMapper;
     }
@@ -112,9 +101,8 @@ public class WebhookIngestPipeline {
         if (verifier == null) {
             // No verifier wired — kind is allow-listed but not yet implemented.
             log.warn("No WebhookSignatureVerifier registered for kind={}; rejecting", kind);
-            return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED).body(
-                Map.of("error", "no verifier wired for " + kind)
-            );
+            return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED)
+                    .body(Map.of("error", "no verifier wired for " + kind));
         }
 
         WebhookRequest request = new WebhookRequest(body, headers);
@@ -137,9 +125,8 @@ public class WebhookIngestPipeline {
                 log.warn("Webhook rejected for kind={}: {}", kind, i.reason());
                 yield ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "invalid"));
             }
-            case VerificationResult.MissingSignature ms -> ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
-                Map.of("error", "missing-signature")
-            );
+            case VerificationResult.MissingSignature ms ->
+                ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "missing-signature"));
         };
     }
 
@@ -156,9 +143,8 @@ public class WebhookIngestPipeline {
             // Kind has a verifier but no derivation — surface as NOT_IMPLEMENTED so the
             // operator notices the gap rather than silently dropping into a default subject.
             log.warn("WebhookIngestPipeline: no SubjectKeyDeriver wired for kind={}", kind);
-            return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED).body(
-                Map.of("error", "no subject deriver for " + kind)
-            );
+            return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED)
+                    .body(Map.of("error", "no subject deriver for " + kind));
         }
 
         JsonNode payload;
@@ -198,19 +184,17 @@ public class WebhookIngestPipeline {
             }
         } catch (JetStreamPublisher.PublishFailedException e) {
             log.error(
-                "WebhookIngestPipeline: publish failed for kind={} subject={}: {}",
-                kind,
-                sanitizeForLog(subject),
-                e.getMessage()
-            );
+                    "WebhookIngestPipeline: publish failed for kind={} subject={}: {}",
+                    kind,
+                    sanitizeForLog(subject),
+                    e.getMessage());
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of("error", "publish-failed"));
         }
         log.info(
-            "Published {} webhook to NATS: subject={} dedupId={}",
-            kind,
-            sanitizeForLog(subject),
-            sanitizeForLog(dedupId)
-        );
+                "Published {} webhook to NATS: subject={} dedupId={}",
+                kind,
+                sanitizeForLog(subject),
+                sanitizeForLog(dedupId));
         return ResponseEntity.accepted().body(Map.of("status", "ok"));
     }
 

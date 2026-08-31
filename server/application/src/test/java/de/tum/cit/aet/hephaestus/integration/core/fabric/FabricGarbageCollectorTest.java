@@ -85,7 +85,8 @@ class FabricGarbageCollectorTest extends BaseUnitTest {
     @Test
     void collect_skipsSweepWhenAnyManifestIsUnreadable() throws Exception {
         String orphan = cas.put("old-orphan".getBytes(StandardCharsets.UTF_8));
-        Files.setLastModifiedTime(cas.pathFor(orphan), FileTime.from(Instant.now().minus(Duration.ofDays(60))));
+        Files.setLastModifiedTime(
+                cas.pathFor(orphan), FileTime.from(Instant.now().minus(Duration.ofDays(60))));
         Path corrupt = layout.jobDir("corrupt");
         Files.createDirectories(corrupt);
         Files.write(corrupt.resolve("artifact-source-manifest.json"), "{".getBytes(StandardCharsets.UTF_8));
@@ -111,7 +112,8 @@ class FabricGarbageCollectorTest extends BaseUnitTest {
     void collect_keepsAnOldBlobReusedByAnInFlightCapture() throws Exception {
         byte[] content = "reused-content".getBytes(StandardCharsets.UTF_8);
         String reused = cas.put(content);
-        Files.setLastModifiedTime(cas.pathFor(reused), FileTime.from(Instant.now().minus(Duration.ofDays(60))));
+        Files.setLastModifiedTime(
+                cas.pathFor(reused), FileTime.from(Instant.now().minus(Duration.ofDays(60))));
 
         cas.put(content);
         gc.collect();
@@ -128,13 +130,21 @@ class FabricGarbageCollectorTest extends BaseUnitTest {
         writeJob("recent", keep);
         Path old = writeJob("old", expired);
         Files.setLastModifiedTime(old, FileTime.from(Instant.now().minus(Duration.ofDays(60))));
-        Files.setLastModifiedTime(cas.pathFor(expired), FileTime.from(Instant.now().minus(Duration.ofDays(60))));
-        Files.setLastModifiedTime(cas.pathFor(orphan), FileTime.from(Instant.now().minus(Duration.ofDays(60))));
+        Files.setLastModifiedTime(
+                cas.pathFor(expired), FileTime.from(Instant.now().minus(Duration.ofDays(60))));
+        Files.setLastModifiedTime(
+                cas.pathFor(orphan), FileTime.from(Instant.now().minus(Duration.ofDays(60))));
 
         gc.collect();
 
-        assertThat(cas.exists(keep)).as("blob referenced by a surviving job manifest is kept").isTrue();
-        assertThat(cas.exists(expired)).as("blob referenced only by a pruned (expired) job is swept").isFalse();
-        assertThat(cas.exists(orphan)).as("blob referenced by no manifest is swept").isFalse();
+        assertThat(cas.exists(keep))
+                .as("blob referenced by a surviving job manifest is kept")
+                .isTrue();
+        assertThat(cas.exists(expired))
+                .as("blob referenced only by a pruned (expired) job is swept")
+                .isFalse();
+        assertThat(cas.exists(orphan))
+                .as("blob referenced by no manifest is swept")
+                .isFalse();
     }
 }

@@ -1,7 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, userEvent } from "storybook/test";
+
 import type { ConnectionSyncStatus, SyncJob } from "@/api/types.gen";
 import { minutesBefore } from "@/components/common/story-clock";
+
 import { IntegrationOverviewCard } from "./IntegrationOverviewCard";
 
 const SYNC_INTERVAL_SECONDS = 3_600;

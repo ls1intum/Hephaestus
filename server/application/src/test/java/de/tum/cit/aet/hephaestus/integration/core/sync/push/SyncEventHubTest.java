@@ -56,9 +56,8 @@ class SyncEventHubTest extends BaseUnitTest {
 
         hub.publish(WORKSPACE_ID, new SyncEventHint("job", CONNECTION_ID));
 
-        await()
-            .atMost(Duration.ofSeconds(2))
-            .untilAsserted(() -> assertThat(emitter.dataFrames()).hasSize(1));
+        await().atMost(Duration.ofSeconds(2))
+                .untilAsserted(() -> assertThat(emitter.dataFrames()).hasSize(1));
         assertThat(emitter.eventNames()).containsExactly("sync");
         assertThat(emitter.dataFrames().get(0)).contains("\"scope\":\"job\"").contains("\"connectionId\":10");
     }
@@ -72,9 +71,8 @@ class SyncEventHubTest extends BaseUnitTest {
 
         hub.publish(WORKSPACE_ID, new SyncEventHint("job", CONNECTION_ID));
 
-        await()
-            .atMost(Duration.ofSeconds(2))
-            .untilAsserted(() -> assertThat(emitter.completed()).isTrue());
+        await().atMost(Duration.ofSeconds(2))
+                .untilAsserted(() -> assertThat(emitter.completed()).isTrue());
         assertThat(hub.subscriberCount(WORKSPACE_ID)).isZero();
         assertThat(counter("integration.sync.sse.events", "outcome", "error")).isEqualTo(1.0);
     }
@@ -101,9 +99,8 @@ class SyncEventHubTest extends BaseUnitTest {
         hub.publish(WORKSPACE_ID, new SyncEventHint("job", CONNECTION_ID));
         hub.publish(WORKSPACE_ID, new SyncEventHint("job", CONNECTION_ID));
 
-        await()
-            .atMost(Duration.ofSeconds(2))
-            .untilAsserted(() -> assertThat(emitter.dataFrames()).hasSize(1));
+        await().atMost(Duration.ofSeconds(2))
+                .untilAsserted(() -> assertThat(emitter.dataFrames()).hasSize(1));
         assertThat(emitter.dataFrames().get(0)).contains("\"scope\":\"job\"");
     }
 
@@ -116,12 +113,11 @@ class SyncEventHubTest extends BaseUnitTest {
         hub.publish(WORKSPACE_ID, new SyncEventHint("job", CONNECTION_ID));
         hub.publish(WORKSPACE_ID, new SyncEventHint("resources", CONNECTION_ID));
 
-        await()
-            .atMost(Duration.ofSeconds(2))
-            .untilAsserted(() -> assertThat(emitter.dataFrames()).hasSize(2));
+        await().atMost(Duration.ofSeconds(2))
+                .untilAsserted(() -> assertThat(emitter.dataFrames()).hasSize(2));
         assertThat(emitter.dataFrames())
-            .anySatisfy(frame -> assertThat(frame).contains("\"scope\":\"job\""))
-            .anySatisfy(frame -> assertThat(frame).contains("\"scope\":\"resources\""));
+                .anySatisfy(frame -> assertThat(frame).contains("\"scope\":\"job\""))
+                .anySatisfy(frame -> assertThat(frame).contains("\"scope\":\"resources\""));
     }
 
     @Test
@@ -134,12 +130,10 @@ class SyncEventHubTest extends BaseUnitTest {
 
         hub.sendHeartbeats();
 
-        await()
-            .atMost(Duration.ofSeconds(2))
-            .untilAsserted(() -> assertThat(first.comments()).contains("ping"));
-        await()
-            .atMost(Duration.ofSeconds(2))
-            .untilAsserted(() -> assertThat(second.comments()).contains("ping"));
+        await().atMost(Duration.ofSeconds(2))
+                .untilAsserted(() -> assertThat(first.comments()).contains("ping"));
+        await().atMost(Duration.ofSeconds(2))
+                .untilAsserted(() -> assertThat(second.comments()).contains("ping"));
     }
 
     @Test
@@ -150,9 +144,11 @@ class SyncEventHubTest extends BaseUnitTest {
 
         hub.shutdown();
 
-        assertThat(createdEmitters).allSatisfy(emitter -> assertThat(emitter.completed()).isTrue());
+        assertThat(createdEmitters)
+                .allSatisfy(emitter -> assertThat(emitter.completed()).isTrue());
         assertThat(hub.subscriberCount(WORKSPACE_ID)).isZero();
-        assertThat(meters.get("integration.sync.sse.subscribers").gauge().value()).isZero();
+        assertThat(meters.get("integration.sync.sse.subscribers").gauge().value())
+                .isZero();
     }
 
     @Test
@@ -173,13 +169,15 @@ class SyncEventHubTest extends BaseUnitTest {
             currentHub.subscribe(WORKSPACE_ID);
         }
 
-        assertThatThrownBy(() -> currentHub.subscribe(WORKSPACE_ID)).isInstanceOf(
-            org.springframework.web.server.ResponseStatusException.class
-        );
+        assertThatThrownBy(() -> currentHub.subscribe(WORKSPACE_ID))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
         assertThat(currentHub.subscriberCount(WORKSPACE_ID)).isEqualTo(20);
-        assertThat(counter("integration.sync.sse.subscriptions", "outcome", "accepted")).isEqualTo(20.0);
-        assertThat(counter("integration.sync.sse.subscriptions", "outcome", "rejected")).isEqualTo(1.0);
-        assertThat(meters.get("integration.sync.sse.subscribers").gauge().value()).isEqualTo(20.0);
+        assertThat(counter("integration.sync.sse.subscriptions", "outcome", "accepted"))
+                .isEqualTo(20.0);
+        assertThat(counter("integration.sync.sse.subscriptions", "outcome", "rejected"))
+                .isEqualTo(1.0);
+        assertThat(meters.get("integration.sync.sse.subscribers").gauge().value())
+                .isEqualTo(20.0);
     }
 
     @Test
@@ -190,15 +188,13 @@ class SyncEventHubTest extends BaseUnitTest {
         List<Future<?>> futures = new ArrayList<>();
         try (var executor = Executors.newFixedThreadPool(16)) {
             for (int i = 0; i < 100; i++) {
-                futures.add(
-                    executor.submit(() -> {
-                        try {
-                            currentHub.subscribe(WORKSPACE_ID);
-                        } catch (org.springframework.web.server.ResponseStatusException expected) {
-                            rejected.incrementAndGet();
-                        }
-                    })
-                );
+                futures.add(executor.submit(() -> {
+                    try {
+                        currentHub.subscribe(WORKSPACE_ID);
+                    } catch (org.springframework.web.server.ResponseStatusException expected) {
+                        rejected.incrementAndGet();
+                    }
+                }));
             }
             executor.shutdown();
             assertThat(executor.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
@@ -225,9 +221,8 @@ class SyncEventHubTest extends BaseUnitTest {
         }
         emitter.releaseHeartbeat();
 
-        await()
-            .atMost(Duration.ofSeconds(2))
-            .untilAsserted(() -> assertThat(emitter.comments()).contains("ping"));
+        await().atMost(Duration.ofSeconds(2))
+                .untilAsserted(() -> assertThat(emitter.comments()).contains("ping"));
         assertThat(emitter.comments().stream().filter("ping"::equals)).hasSize(1);
     }
 

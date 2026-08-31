@@ -1,9 +1,3 @@
-# Documentation Deployment Pipeline
-#
-# - PR with docs changes: build a /-rooted bundle, deploy preview to Surge.sh
-# - push to main with docs changes: build /Hephaestus/-rooted bundle, deploy to GitHub Pages
-# - PR close: cd-docs-teardown.yml removes the preview (path filters are unreliable on close)
-
 name: CD / Docs
 
 on:
@@ -23,24 +17,21 @@ concurrency:
   group: docs-deploy-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || github.ref }}
   cancel-in-progress: true
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-  pull-requests: write
-  statuses: write
+permissions: {}
 
 jobs:
-  # build-preview and build-production are split so each only spins up a runner
-  # for the event it serves; collapsing into a matrix would burn ~30s on the
-  # idle flavor for every trigger. The shared steps live in setup-pnpm-node.
   build-preview:
     name: Build (preview)
     if: github.event_name == 'pull_request'
+    timeout-minutes: 15
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: ./.github/actions/setup-pnpm-node
+      - uses: ./.github/actions/setup-node-pnpm
+        with:
+          install: "frozen"
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
@@ -50,7 +41,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-docusaurus-preview-${{ hashFiles('pnpm-lock.yaml') }}-
             ${{ runner.os }}-docusaurus-preview-
-      - run: pnpm install --frozen-lockfile
       - run: pnpm --filter docs run build
         env:
           DOCUSAURUS_BASE_URL: "/"
@@ -63,10 +53,15 @@ jobs:
   build-production:
     name: Build (production)
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    timeout-minutes: 15
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: ./.github/actions/setup-pnpm-node
+      - uses: ./.github/actions/setup-node-pnpm
+        with:
+          install: "frozen"
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
@@ -76,7 +71,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-docusaurus-production-${{ hashFiles('pnpm-lock.yaml') }}-
             ${{ runner.os }}-docusaurus-production-
-      - run: pnpm install --frozen-lockfile
       - run: pnpm --filter docs run build
         env:
           DOCUSAURUS_BASE_URL: "/Hephaestus/"
@@ -90,26 +84,28 @@ jobs:
     name: PR Preview
     needs: build-preview
     if: github.event_name == 'pull_request'
+    timeout-minutes: 10
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      statuses: write
     env:
       PREVIEW_URL: ls1intum-hephaestus-docs-pr-${{ github.event.number }}.surge.sh
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          # Need: composite action, Node version, lockfile (for actions/setup-node cache key).
-          sparse-checkout: |
-            .github/actions/setup-pnpm-node
-            .node-version
-            pnpm-lock.yaml
-          sparse-checkout-cone-mode: false
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: docs-build-preview
           path: docs-build
-      - uses: ./.github/actions/setup-pnpm-node
+      - uses: ./.github/actions/setup-node-pnpm
+        with:
+          install: "hardened"
       - name: Deploy to Surge.sh
-        run: pnpm dlx surge ./docs-build ${{ env.PREVIEW_URL }} --token ${{ secrets.SURGE_TOKEN }}
-      - uses: marocchino/sticky-pull-request-comment@773744901bac0e8cbb5a0dc842800d45e9b2b405 # v2
+        env:
+          SURGE_TOKEN: ${{ secrets.SURGE_TOKEN }}
+        run: ./node_modules/.bin/surge ./docs-build "$PREVIEW_URL" --token "$SURGE_TOKEN"
+      - uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
         with:
           header: docs-preview
           message: |
@@ -121,6 +117,8 @@ jobs:
 
             <sub>Preview for commit ${{ github.event.pull_request.head.sha }}. Updates automatically on new commits.</sub>
       - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          TARGET_URL: https://${{ env.PREVIEW_URL }}
         with:
           script: |
             const sha = context.payload.pull_request?.head?.sha || context.sha;
@@ -129,7 +127,7 @@ jobs:
               repo: context.repo.repo,
               sha: sha,
               state: 'success',
-              target_url: 'https://${{ env.PREVIEW_URL }}',
+              target_url: process.env.TARGET_URL,
               description: 'Click Details to view Docs Preview',
               context: 'Preview / Docs'
             });
@@ -138,7 +136,11 @@ jobs:
     name: GitHub Pages
     needs: build-production
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    timeout-minutes: 10
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      pages: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -147,8 +149,8 @@ jobs:
         with:
           name: docs-build-production
           path: docs-build
-      - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: docs-build
       - id: deployment
-        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0

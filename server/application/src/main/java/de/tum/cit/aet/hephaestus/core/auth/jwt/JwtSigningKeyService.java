@@ -76,10 +76,7 @@ public class JwtSigningKeyService implements JWKSource<SecurityContext> {
     private static final long CACHE_TTL_MILLIS = 60_000L;
 
     public JwtSigningKeyService(
-        JwtSigningKeyRepository repository,
-        Environment environment,
-        JwtSigningKeySealer sealer
-    ) {
+            JwtSigningKeyRepository repository, Environment environment, JwtSigningKeySealer sealer) {
         this.repository = repository;
         this.environment = environment;
         this.sealer = sealer;
@@ -110,9 +107,8 @@ public class JwtSigningKeyService implements JWKSource<SecurityContext> {
         if (isProd() && !sealer.isEnabled()) {
             // Belt-and-suspenders: the sealer ctor already fails fast in prod when the key is missing.
             throw new IllegalStateException(
-                "No JWT signing key present and sealing is disabled. Refusing to bootstrap an unsealed " +
-                    "signing key in prod; set hephaestus.security.encryption-key (ADR 0017)."
-            );
+                    "No JWT signing key present and sealing is disabled. Refusing to bootstrap an unsealed "
+                            + "signing key in prod; set hephaestus.security.encryption-key (ADR 0017).");
         }
         JwtSigningKey row = generateNewKeyRow();
         repository.save(row);
@@ -132,19 +128,14 @@ public class JwtSigningKeyService implements JWKSource<SecurityContext> {
     public void assertProdKeysSealed() {
         if (isProd() && hasUnsealedActiveKey()) {
             throw new IllegalStateException(
-                "Active JWT signing key is stored unsealed (encryption_key_id=" +
-                    UNSEALED_KEY_ID +
-                    "). Refusing to operate in prod — a DB read would let an attacker forge any token. " +
-                    "Rotate the legacy row out before deploying (ADR 0017 / auth-cutover runbook)."
-            );
+                    "Active JWT signing key is stored unsealed (encryption_key_id=" + UNSEALED_KEY_ID
+                            + "). Refusing to operate in prod — a DB read would let an attacker forge any token. "
+                            + "Rotate the legacy row out before deploying (ADR 0017 / auth-cutover runbook).");
         }
     }
 
     private boolean hasUnsealedActiveKey() {
-        return repository
-            .findActive()
-            .stream()
-            .anyMatch(k -> UNSEALED_KEY_ID.equals(k.getEncryptionKeyId()));
+        return repository.findActive().stream().anyMatch(k -> UNSEALED_KEY_ID.equals(k.getEncryptionKeyId()));
     }
 
     private boolean isProd() {
@@ -154,9 +145,9 @@ public class JwtSigningKeyService implements JWKSource<SecurityContext> {
     private JwtSigningKey generateNewKeyRow() {
         try {
             ECKey jwk = new ECKeyGenerator(Curve.P_256)
-                .keyUse(KeyUse.SIGNATURE)
-                .keyID(UUID.randomUUID().toString())
-                .generate();
+                    .keyUse(KeyUse.SIGNATURE)
+                    .keyID(UUID.randomUUID().toString())
+                    .generate();
             JwtSigningKey row = new JwtSigningKey();
             row.setKid(jwk.getKeyID());
             row.setAlgorithm("ES256");
@@ -183,7 +174,9 @@ public class JwtSigningKeyService implements JWKSource<SecurityContext> {
     /** Used by both {@code NimbusJwtEncoder} (signing) and {@code NimbusJwtDecoder} (verification). */
     @Override
     public List<JWK> get(JWKSelector selector, SecurityContext context) {
-        return loadJwkSet().getKeys().stream().filter(selector.getMatcher()::matches).toList();
+        return loadJwkSet().getKeys().stream()
+                .filter(selector.getMatcher()::matches)
+                .toList();
     }
 
     /**
@@ -225,40 +218,36 @@ public class JwtSigningKeyService implements JWKSource<SecurityContext> {
         // unsealed (forgeable) signing key in prod, even on the deferred first-issuance path.
         if (unsealed && isProd()) {
             throw new IllegalStateException(
-                "Refusing to use an unsealed JWT signing key (kid=" + row.getKid() + ") in prod."
-            );
+                    "Refusing to use an unsealed JWT signing key (kid=" + row.getKid() + ") in prod.");
         }
         try {
             byte[] publicDer = stripPem(row.getPublicKeyPem());
-            ECPublicKey publicKey = (ECPublicKey) KeyFactory.getInstance("EC").generatePublic(
-                new X509EncodedKeySpec(publicDer)
-            );
+            ECPublicKey publicKey =
+                    (ECPublicKey) KeyFactory.getInstance("EC").generatePublic(new X509EncodedKeySpec(publicDer));
             // Unseal the private bytes if this row was sealed at rest; legacy "v0-unsealed"
             // rows carry raw PKCS#8 DER and parse directly.
             byte[] privateDer = unsealed ? row.getPrivateKeyPem() : sealer.unseal(row.getPrivateKeyPem());
-            ECPrivateKey privateKey = (ECPrivateKey) KeyFactory.getInstance("EC").generatePrivate(
-                new PKCS8EncodedKeySpec(privateDer)
-            );
+            ECPrivateKey privateKey =
+                    (ECPrivateKey) KeyFactory.getInstance("EC").generatePrivate(new PKCS8EncodedKeySpec(privateDer));
             return new ECKey.Builder(Curve.P_256, publicKey)
-                .privateKey(privateKey)
-                .keyID(row.getKid())
-                .keyUse(KeyUse.SIGNATURE)
-                .build();
+                    .privateKey(privateKey)
+                    .keyID(row.getKid())
+                    .keyUse(KeyUse.SIGNATURE)
+                    .build();
         } catch (Exception e) {
             throw new IllegalStateException("failed to materialize JWK kid=" + row.getKid(), e);
         }
     }
 
     private static String toPem(String label, byte[] der) {
-        String b64 = Base64.getMimeEncoder(64, new byte[] { '\n' }).encodeToString(der);
+        String b64 = Base64.getMimeEncoder(64, new byte[] {'\n'}).encodeToString(der);
         return "-----BEGIN " + label + "-----\n" + b64 + "\n-----END " + label + "-----\n";
     }
 
     private static byte[] stripPem(String pem) {
-        String body = pem
-            .replaceAll("-----BEGIN [^-]+-----", "")
-            .replaceAll("-----END [^-]+-----", "")
-            .replaceAll("\\s+", "");
+        String body = pem.replaceAll("-----BEGIN [^-]+-----", "")
+                .replaceAll("-----END [^-]+-----", "")
+                .replaceAll("\\s+", "");
         return Base64.getDecoder().decode(body);
     }
 

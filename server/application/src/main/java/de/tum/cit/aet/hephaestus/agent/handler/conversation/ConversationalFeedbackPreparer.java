@@ -60,13 +60,12 @@ public class ConversationalFeedbackPreparer {
     private final OutboundEgressGuard egressGuard;
 
     public ConversationalFeedbackPreparer(
-        FeedbackRepository feedbackRepository,
-        FeedbackObservationRepository feedbackObservationRepository,
-        ObservationRepository observationRepository,
-        FeedbackSupersession supersession,
-        ApplicationEventPublisher eventPublisher,
-        OutboundEgressGuard egressGuard
-    ) {
+            FeedbackRepository feedbackRepository,
+            FeedbackObservationRepository feedbackObservationRepository,
+            ObservationRepository observationRepository,
+            FeedbackSupersession supersession,
+            ApplicationEventPublisher eventPublisher,
+            OutboundEgressGuard egressGuard) {
         this.feedbackRepository = feedbackRepository;
         this.feedbackObservationRepository = feedbackObservationRepository;
         this.observationRepository = observationRepository;
@@ -85,11 +84,7 @@ public class ConversationalFeedbackPreparer {
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public int prepare(
-        UUID agentJobId,
-        Long workspaceId,
-        List<Observation> admitted,
-        List<ComposedFeedbackUnit> composed
-    ) {
+            UUID agentJobId, Long workspaceId, List<Observation> admitted, List<ComposedFeedbackUnit> composed) {
         if (admitted.isEmpty()) {
             return 0;
         }
@@ -103,23 +98,20 @@ public class ConversationalFeedbackPreparer {
             // silence from infrastructure failure. The lane recovery marker is still written by the caller.
             return 0;
         }
-        List<Observation> ordered = admitted
-            .stream()
-            .sorted(Comparator.comparingLong(Observation::getAboutUserId).thenComparing(ObservationOrder.worstFirst()))
-            .collect(Collectors.toList());
+        List<Observation> ordered = admitted.stream()
+                .sorted(Comparator.comparingLong(Observation::getAboutUserId)
+                        .thenComparing(ObservationOrder.worstFirst()))
+                .collect(Collectors.toList());
 
         // Every admitted observation consumes a slot, so the band is not bounded by the per-recipient cap.
         // Overflowing it would collide with the next band and silently drop the very rows this records —
         // fail loud instead; a job with this many admitted loci is pathological.
         if (ordered.size() > FeedbackLedgerRecorder.UNIT_ORDINAL_BAND_WIDTH) {
-            throw new IllegalStateException(
-                "Conversational units exceed the ordinal band: jobId=" +
-                    agentJobId +
-                    ", admitted=" +
-                    ordered.size() +
-                    ", band=" +
-                    FeedbackLedgerRecorder.UNIT_ORDINAL_BAND_WIDTH
-            );
+            throw new IllegalStateException("Conversational units exceed the ordinal band: jobId=" + agentJobId
+                    + ", admitted="
+                    + ordered.size()
+                    + ", band="
+                    + FeedbackLedgerRecorder.UNIT_ORDINAL_BAND_WIDTH);
         }
 
         // Read once, from a projection, and needed on every path: the practice is both the join between what
@@ -127,7 +119,7 @@ public class ConversationalFeedbackPreparer {
         // observations arrive from whichever caller routed them and may be detached, so walking
         // o.practice.slug would make a row supersedable — or a composed message deliverable — depending on
         // whether that caller happened to hold a session.
-        Map<UUID, String> practiceSlugs = practiceSlugsOf(ordered);
+        Map<UUID, String> practiceSlugs = practiceSlugsOf(ordered, workspaceId);
         Map<Long, Integer> perRecipientCount = new HashMap<>();
         // Newly CREATED units only (re-run no-ops excluded) — feeds the per-recipient prepared event.
         Map<Long, Integer> newlyPreparedByRecipient = new HashMap<>();
@@ -155,10 +147,9 @@ public class ConversationalFeedbackPreparer {
                     // Both are the evidence's reason rather than ours, and a refusal that belongs to the
                     // evidence is not a withholding to explain — the reason itself stays on the job's output.
                     log.debug(
-                        "Conversational locus not raised, composer wrote nothing for it: jobId={}, practice={}",
-                        agentJobId,
-                        practiceSlug
-                    );
+                            "Conversational locus not raised, composer wrote nothing for it: jobId={}, practice={}",
+                            agentJobId,
+                            practiceSlug);
                     continue;
                 }
                 if (!raisedPractices.add(recipient + "|" + practiceSlug)) {
@@ -168,13 +159,12 @@ public class ConversationalFeedbackPreparer {
                 move = unit;
                 ComposedFeedbackUnit.ConversationBrief brief = Objects.requireNonNull(unit.notes());
                 body = ConversationBriefBody.render(
-                    Objects.requireNonNull(unit.title()),
-                    brief.situation(),
-                    brief.capability(),
-                    brief.evidenceSummary(),
-                    brief.inConversationSignal(),
-                    brief.alreadySaid()
-                );
+                        Objects.requireNonNull(unit.title()),
+                        brief.situation(),
+                        brief.capability(),
+                        brief.evidenceSummary(),
+                        brief.inConversationSignal(),
+                        brief.alreadySaid());
             }
 
             int count = perRecipientCount.getOrDefault(recipient, 0);
@@ -194,22 +184,19 @@ public class ConversationalFeedbackPreparer {
             // The habit this row continues. Scoped to the practice rather than to the locus, because the
             // mentor raises a habit and not a line; a capped row gets none, because it is never raised and
             // putting it at the head of the thread would leave the queued move behind it unreplaceable.
-            String threadKey =
-                overCap || practiceSlug == null
+            String threadKey = overCap || practiceSlug == null
                     ? null
                     : FeedbackThreadKey.forPractice(practiceSlug, recipient, FeedbackChannel.IN_CHAT);
             // The claim and the write below are one swap, and this method's REQUIRES_NEW transaction is what
             // makes them one: a retired move with no replacement leaves the mentor with nothing to raise
             // about a habit it was about to raise.
-            FeedbackSupersession.Outcome outcome =
-                threadKey != null && supersedes(move, threadKey)
+            FeedbackSupersession.Outcome outcome = threadKey != null && supersedes(move, threadKey)
                     ? supersession.supersede(workspaceId, recipient, FeedbackChannel.IN_CHAT, threadKey)
                     : FeedbackSupersession.Outcome.standalone();
             if (outcome.retiredSomething()) {
                 superseded++;
             }
-            Feedback unit = feedbackRepository.save(
-                Feedback.builder()
+            Feedback unit = feedbackRepository.save(Feedback.builder()
                     .agentJobId(agentJobId)
                     .workspaceId(workspaceId)
                     .artifactKind(observation.getArtifactKind())
@@ -232,14 +219,9 @@ public class ConversationalFeedbackPreparer {
                     // after the mentor had already raised its predecessor still continues that thread.
                     .replacesId(outcome.replacesId())
                     .createdAt(now)
-                    .build()
-            );
+                    .build());
             feedbackObservationRepository.insertIfAbsent(
-                unit.getId(),
-                observation.getId(),
-                EvidenceRole.PRIMARY.name(),
-                0
-            );
+                    unit.getId(), observation.getId(), EvidenceRole.PRIMARY.name(), 0);
             if (!overCap) {
                 newlyPreparedByRecipient.merge(recipient, 1, Integer::sum);
                 prepared++;
@@ -247,32 +229,25 @@ public class ConversationalFeedbackPreparer {
         }
         if (prepared > 0) {
             log.info(
-                "Conversational feedback prepared: jobId={}, units={}, superseded={}, composed={}",
-                agentJobId,
-                prepared,
-                superseded,
-                composition.spoke()
-            );
+                    "Conversational feedback prepared: jobId={}, units={}, superseded={}, composed={}",
+                    agentJobId,
+                    prepared,
+                    superseded,
+                    composition.spoke());
         }
         // A move about a practice this run measured nothing admissible for cannot be prepared: the queue is
         // read through the observations bound to a unit, so an evidence-free unit would be invisible to the
         // mentor and unexplainable afterwards.
-        composition
-            .raisableSlugs()
-            .stream()
-            .filter(slug -> !matchedUnits.contains(slug))
-            .forEach(slug ->
-                log.info(
-                    "Composed conversational move dropped, no admitted locus for its practice: jobId={}, practice={}",
-                    agentJobId,
-                    slug
-                )
-            );
+        composition.raisableSlugs().stream()
+                .filter(slug -> !matchedUnits.contains(slug))
+                .forEach(slug -> log.info(
+                        "Composed conversational move dropped, no admitted locus for its practice: jobId={}, practice={}",
+                        agentJobId,
+                        slug));
         // Published inside this REQUIRES_NEW transaction so AFTER_COMMIT listeners (the Slack nudge) fire
         // exactly when the units are durably visible — and not at all on a pure re-run.
         newlyPreparedByRecipient.forEach((recipient, count) ->
-            eventPublisher.publishEvent(new ConversationFeedbackPreparedEvent(workspaceId, recipient, count))
-        );
+                eventPublisher.publishEvent(new ConversationFeedbackPreparedEvent(workspaceId, recipient, count)));
         return prepared;
     }
 
@@ -287,13 +262,11 @@ public class ConversationalFeedbackPreparer {
         static Composition of(List<ComposedFeedbackUnit> composed) {
             Map<String, ComposedFeedbackUnit> raisable = new LinkedHashMap<>();
             for (ComposedFeedbackUnit unit : composed) {
-                if (
-                    unit.channel() == FeedbackChannel.IN_CHAT &&
-                    unit.action() != ComposedFeedbackUnit.Action.WITHHOLD &&
-                    unit.isComplete() &&
-                    unit.notes() != null &&
-                    unit.title() != null
-                ) {
+                if (unit.channel() == FeedbackChannel.IN_CHAT
+                        && unit.action() != ComposedFeedbackUnit.Action.WITHHOLD
+                        && unit.isComplete()
+                        && unit.notes() != null
+                        && unit.title() != null) {
                     // The parser already admits one unit per practice per channel; first wins either way.
                     raisable.putIfAbsent(normalizeSlug(unit.practiceSlug()), unit);
                 }
@@ -328,9 +301,8 @@ public class ConversationalFeedbackPreparer {
             return true;
         }
         log.warn(
-            "Conversational move named a supersession target on another habit's thread; written as new: practice={}",
-            move.practiceSlug()
-        );
+                "Conversational move named a supersession target on another habit's thread; written as new: practice={}",
+                move.practiceSlug());
         return false;
     }
 
@@ -340,13 +312,17 @@ public class ConversationalFeedbackPreparer {
      * and, because a habit thread is scoped to the practice, the same spelling is what the continuity key is
      * derived from, on this lane and on the in-app lane alike.
      */
-    private Map<UUID, String> practiceSlugsOf(List<Observation> observations) {
-        List<UUID> ids = observations.stream().map(Observation::getId).filter(Objects::nonNull).toList();
+    private Map<UUID, String> practiceSlugsOf(List<Observation> observations, Long workspaceId) {
+        List<UUID> ids = observations.stream()
+                .map(Observation::getId)
+                .filter(Objects::nonNull)
+                .toList();
         if (ids.isEmpty()) {
             return Map.of();
         }
         Map<UUID, String> slugs = new HashMap<>(ids.size());
-        for (ObservationRepository.ObservationPracticeSlug row : observationRepository.practiceSlugsFor(ids)) {
+        for (ObservationRepository.ObservationPracticeSlug row :
+                observationRepository.practiceSlugsFor(ids, workspaceId)) {
             String slug = row.getPracticeSlug();
             if (slug != null && !slug.isBlank()) {
                 slugs.put(row.getObservationId(), normalizeSlug(slug));

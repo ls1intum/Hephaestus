@@ -7,6 +7,7 @@ import {
 	IssueOpenedIcon,
 } from "@primer/octicons-react";
 import { MessageSquareReply } from "lucide-react";
+
 import {
 	getProviderTerms,
 	getPullRequestStateIcon,

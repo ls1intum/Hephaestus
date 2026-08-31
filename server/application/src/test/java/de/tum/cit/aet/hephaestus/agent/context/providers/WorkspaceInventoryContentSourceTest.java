@@ -56,18 +56,16 @@ class WorkspaceInventoryContentSourceTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         provider = new WorkspaceInventoryContentSource(
-            objectMapper,
-            issueRepository,
-            pullRequestRepository,
-            repositoryRepository
-        );
+                objectMapper, issueRepository, pullRequestRepository, repositoryRepository);
         lenient()
-            .when(issueRepository.findIssueInventoryByRepositoryId(eq(REPO_ID), any(Pageable.class)))
-            .thenReturn(List.of());
+                .when(issueRepository.findIssueInventoryByRepositoryId(eq(REPO_ID), any(Pageable.class)))
+                .thenReturn(List.of());
         lenient()
-            .when(pullRequestRepository.findPullRequestInventoryByRepositoryId(eq(REPO_ID), any(Pageable.class)))
-            .thenReturn(List.of());
-        lenient().when(repositoryRepository.findAllByWorkspaceMonitors(WORKSPACE_ID)).thenReturn(List.of());
+                .when(pullRequestRepository.findPullRequestInventoryByRepositoryId(eq(REPO_ID), any(Pageable.class)))
+                .thenReturn(List.of());
+        lenient()
+                .when(repositoryRepository.findAllByWorkspaceMonitors(WORKSPACE_ID))
+                .thenReturn(List.of());
     }
 
     // --- helpers ---
@@ -163,16 +161,13 @@ class WorkspaceInventoryContentSourceTest extends BaseUnitTest {
     void listsEveryIssueAndPullRequestExcludingTheFocalIssue() throws Exception {
         Issue withMilestone = issue(12, "Login fails on Safari", Issue.State.OPEN, "bob");
         withMilestone.setMilestone(milestone("Sprint 7"));
-        when(issueRepository.findIssueInventoryByRepositoryId(eq(REPO_ID), any(Pageable.class))).thenReturn(
-            List.of(
-                issue(99, "Focal issue under review", Issue.State.OPEN, "alice"),
-                withMilestone,
-                issue(7, "Old bug", Issue.State.CLOSED, null)
-            )
-        );
-        when(pullRequestRepository.findPullRequestInventoryByRepositoryId(eq(REPO_ID), any(Pageable.class))).thenReturn(
-            List.of(pr(70, "Fix login handler", Issue.State.MERGED, false))
-        );
+        when(issueRepository.findIssueInventoryByRepositoryId(eq(REPO_ID), any(Pageable.class)))
+                .thenReturn(List.of(
+                        issue(99, "Focal issue under review", Issue.State.OPEN, "alice"),
+                        withMilestone,
+                        issue(7, "Old bug", Issue.State.CLOSED, null)));
+        when(pullRequestRepository.findPullRequestInventoryByRepositoryId(eq(REPO_ID), any(Pageable.class)))
+                .thenReturn(List.of(pr(70, "Fix login handler", Issue.State.MERGED, false)));
 
         Map<String, byte[]> files = new LinkedHashMap<>();
         provider.contribute(issueRequest(99), files);
@@ -218,7 +213,8 @@ class WorkspaceInventoryContentSourceTest extends BaseUnitTest {
         for (int n = 2; n <= WorkspaceInventoryContentSource.MAX_PER_TYPE; n++) {
             fullPage.add(issue(n, "Issue " + n, Issue.State.OPEN, "bob"));
         }
-        when(issueRepository.findIssueInventoryByRepositoryId(eq(REPO_ID), any(Pageable.class))).thenReturn(fullPage);
+        when(issueRepository.findIssueInventoryByRepositoryId(eq(REPO_ID), any(Pageable.class)))
+                .thenReturn(fullPage);
 
         Map<String, byte[]> files = new LinkedHashMap<>();
         provider.contribute(issueRequest(1), files);
@@ -226,19 +222,16 @@ class WorkspaceInventoryContentSourceTest extends BaseUnitTest {
         JsonNode root = objectMapper.readTree(files.get(OUTPUT));
         assertThat(root.get("truncated").asBoolean()).isTrue();
         // Focal #1 is excluded from the emitted list, so the count is one below the cap even though the page was full.
-        assertThat(root.get("counts").get("issuesListed").asInt()).isEqualTo(
-            WorkspaceInventoryContentSource.MAX_PER_TYPE - 1
-        );
+        assertThat(root.get("counts").get("issuesListed").asInt())
+                .isEqualTo(WorkspaceInventoryContentSource.MAX_PER_TYPE - 1);
     }
 
     @Test
     void excludesTheFocalPullRequestInPrFlow() throws Exception {
-        when(pullRequestRepository.findPullRequestInventoryByRepositoryId(eq(REPO_ID), any(Pageable.class))).thenReturn(
-            List.of(
-                pr(42, "The PR under review", Issue.State.OPEN, false),
-                pr(41, "Another PR", Issue.State.OPEN, true)
-            )
-        );
+        when(pullRequestRepository.findPullRequestInventoryByRepositoryId(eq(REPO_ID), any(Pageable.class)))
+                .thenReturn(List.of(
+                        pr(42, "The PR under review", Issue.State.OPEN, false),
+                        pr(41, "Another PR", Issue.State.OPEN, true)));
 
         Map<String, byte[]> files = new LinkedHashMap<>();
         provider.contribute(prRequest(42), files);
@@ -263,9 +256,8 @@ class WorkspaceInventoryContentSourceTest extends BaseUnitTest {
 
     @Test
     void reportsEmptyWhenOnlyTheExcludedFocalArtifactExists() {
-        when(issueRepository.findIssueInventoryByRepositoryId(eq(REPO_ID), any(Pageable.class))).thenReturn(
-            List.of(issue(1, "Focal issue", Issue.State.OPEN, "alice"))
-        );
+        when(issueRepository.findIssueInventoryByRepositoryId(eq(REPO_ID), any(Pageable.class)))
+                .thenReturn(List.of(issue(1, "Focal issue", Issue.State.OPEN, "alice")));
 
         var captured = provider.capture(issueRequest(1), provider.sourceKinds());
 
@@ -281,19 +273,18 @@ class WorkspaceInventoryContentSourceTest extends BaseUnitTest {
         // An empty inventory reads as "this workspace tracks no work" — the inverse of the truth
         // when the job simply arrived without its focal repository.
         assertThatThrownBy(() -> provider.contribute(new ContextRequest.IssueReviewRequest(job), new LinkedHashMap<>()))
-            .isInstanceOf(EvidenceCollectionException.class)
-            .hasRootCauseMessage("Workspace-inventory collection has no repository_id");
+                .isInstanceOf(EvidenceCollectionException.class)
+                .hasRootCauseMessage("Workspace-inventory collection has no repository_id");
     }
 
     @Test
     void reportsRepositoryFailure() {
-        when(issueRepository.findIssueInventoryByRepositoryId(eq(REPO_ID), any(Pageable.class))).thenThrow(
-            new RuntimeException("db down")
-        );
+        when(issueRepository.findIssueInventoryByRepositoryId(eq(REPO_ID), any(Pageable.class)))
+                .thenThrow(new RuntimeException("db down"));
         Map<String, byte[]> files = new LinkedHashMap<>();
         assertThatThrownBy(() -> provider.contribute(issueRequest(1), files))
-            .isInstanceOf(EvidenceCollectionException.class)
-            .hasMessageContaining("Workspace-inventory collection failed");
+                .isInstanceOf(EvidenceCollectionException.class)
+                .hasMessageContaining("Workspace-inventory collection failed");
         assertThat(files).doesNotContainKey(OUTPUT);
     }
 
@@ -304,18 +295,14 @@ class WorkspaceInventoryContentSourceTest extends BaseUnitTest {
         Repository repoA = repository(1L, "acme/widgets");
         Repository repoB = repository(2L, "acme/gadgets");
         when(repositoryRepository.findAllByWorkspaceMonitors(WORKSPACE_ID)).thenReturn(List.of(repoA, repoB));
-        when(issueRepository.findIssueInventoryByRepositoryId(eq(1L), any(Pageable.class))).thenReturn(
-            List.of(issue(5, "Widget bug", Issue.State.OPEN, "alice"))
-        );
-        when(issueRepository.findIssueInventoryByRepositoryId(eq(2L), any(Pageable.class))).thenReturn(
-            List.of(issue(9, "Gadget bug", Issue.State.CLOSED, "bob"))
-        );
-        when(pullRequestRepository.findPullRequestInventoryByRepositoryId(eq(1L), any(Pageable.class))).thenReturn(
-            List.of(pr(11, "Fix widget", Issue.State.OPEN, false))
-        );
-        when(pullRequestRepository.findPullRequestInventoryByRepositoryId(eq(2L), any(Pageable.class))).thenReturn(
-            List.of()
-        );
+        when(issueRepository.findIssueInventoryByRepositoryId(eq(1L), any(Pageable.class)))
+                .thenReturn(List.of(issue(5, "Widget bug", Issue.State.OPEN, "alice")));
+        when(issueRepository.findIssueInventoryByRepositoryId(eq(2L), any(Pageable.class)))
+                .thenReturn(List.of(issue(9, "Gadget bug", Issue.State.CLOSED, "bob")));
+        when(pullRequestRepository.findPullRequestInventoryByRepositoryId(eq(1L), any(Pageable.class)))
+                .thenReturn(List.of(pr(11, "Fix widget", Issue.State.OPEN, false)));
+        when(pullRequestRepository.findPullRequestInventoryByRepositoryId(eq(2L), any(Pageable.class)))
+                .thenReturn(List.of());
 
         Map<String, byte[]> files = new LinkedHashMap<>();
         provider.contribute(conversationRequest(), files);
@@ -372,16 +359,16 @@ class WorkspaceInventoryContentSourceTest extends BaseUnitTest {
         for (int n = 1; n <= WorkspaceInventoryContentSource.MAX_PER_TYPE; n++) {
             fullPage.add(issue(n, "Issue " + n, Issue.State.OPEN, "bob"));
         }
-        when(issueRepository.findIssueInventoryByRepositoryId(eq(1L), any(Pageable.class))).thenReturn(fullPage);
+        when(issueRepository.findIssueInventoryByRepositoryId(eq(1L), any(Pageable.class)))
+                .thenReturn(fullPage);
 
         Map<String, byte[]> files = new LinkedHashMap<>();
         provider.contribute(conversationRequest(), files);
 
         JsonNode root = objectMapper.readTree(files.get(OUTPUT));
         assertThat(root.get("truncated").asBoolean()).isTrue();
-        assertThat(root.get("counts").get("issuesListed").asInt()).isEqualTo(
-            WorkspaceInventoryContentSource.MAX_PER_TYPE
-        );
+        assertThat(root.get("counts").get("issuesListed").asInt())
+                .isEqualTo(WorkspaceInventoryContentSource.MAX_PER_TYPE);
     }
 
     @Test
@@ -389,8 +376,8 @@ class WorkspaceInventoryContentSourceTest extends BaseUnitTest {
         when(repositoryRepository.findAllByWorkspaceMonitors(WORKSPACE_ID)).thenThrow(new RuntimeException("db down"));
         Map<String, byte[]> files = new LinkedHashMap<>();
         assertThatThrownBy(() -> provider.contribute(conversationRequest(), files))
-            .isInstanceOf(EvidenceCollectionException.class)
-            .hasMessageContaining("Workspace-inventory collection failed");
+                .isInstanceOf(EvidenceCollectionException.class)
+                .hasMessageContaining("Workspace-inventory collection failed");
         assertThat(files).doesNotContainKey(OUTPUT);
     }
 }

@@ -18,6 +18,9 @@ spring:
         virtual:
             enabled: true
 
+    reactor:
+        context-propagation: auto
+
     # Virtual threads are always daemons. With virtual threads enabled, both the request executor
     # and the @Scheduled TaskScheduler use them — so no non-daemon thread remains after main().
     # keep-alive registers one to hold the JVM open between cron firings.
@@ -32,7 +35,7 @@ spring:
             connection-timeout: 45000
             idle-timeout: 600000
             max-lifetime: 1800000
-            maximum-pool-size: 30
+            maximum-pool-size: ${HIKARI_MAXIMUM_POOL_SIZE:20}
             minimum-idle: 5
 
     jpa:
@@ -116,6 +119,10 @@ server:
 
 # Actuator on the management port; health probes for Kubernetes liveness/readiness.
 management:
+    tracing:
+        # Propagate trace context without sampling spans.
+        sampling:
+            probability: 0.0
     server:
         port: ${MANAGEMENT_PORT:8080}
     endpoints:
@@ -175,6 +182,8 @@ springdoc:
     writer-with-order-by-keys: true
 
 hephaestus:
+    database:
+        allow-insecure-remote: ${HEPHAESTUS_DATABASE_ALLOW_INSECURE_REMOTE:false}
     auth:
         issuer: ${HEPHAESTUS_AUTH_ISSUER:http://localhost:8080}
         audience: ${HEPHAESTUS_AUTH_AUDIENCE:hephaestus-spa}
@@ -246,6 +255,15 @@ hephaestus:
             export:
                 capacity: ${HEPHAESTUS_AUTH_RATE_LIMIT_EXPORT_CAPACITY:10}
                 period: ${HEPHAESTUS_AUTH_RATE_LIMIT_EXPORT_PERIOD:1h}
+            mentor-chat:
+                capacity: ${HEPHAESTUS_RATE_LIMIT_MENTOR_CHAT_CAPACITY:20}
+                period: ${HEPHAESTUS_RATE_LIMIT_MENTOR_CHAT_PERIOD:10m}
+            review-request:
+                capacity: ${HEPHAESTUS_RATE_LIMIT_REVIEW_REQUEST_CAPACITY:10}
+                period: ${HEPHAESTUS_RATE_LIMIT_REVIEW_REQUEST_PERIOD:1h}
+            sync-trigger:
+                capacity: ${HEPHAESTUS_RATE_LIMIT_SYNC_TRIGGER_CAPACITY:10}
+                period: ${HEPHAESTUS_RATE_LIMIT_SYNC_TRIGGER_PERIOD:1h}
 
     host-url: ${APPLICATION_HOST_URL:http://localhost:4200}
 
@@ -275,16 +293,14 @@ hephaestus:
     # ═══════════════════════════════════════════════════════════════════════════
     # TENANCY ENFORCEMENT (WorkspaceStatementInspector)
     # ═══════════════════════════════════════════════════════════════════════════
-    # SQL-layer enforcement that every query against a workspace-scoped table
-    # carries a workspace_id predicate. See core/tenancy/* and ADR 0004.
+    # SQL-shape defect detection for workspace-scoped tables. This complements, but does
+    # not replace, workspace authorization. See core/tenancy/* and ADR 0004.
     #
-    #   throw — TenancyViolationException on violations (fail loud; default in test)
-    #   log   — log + Micrometer counter, query passes (default outside test —
-    #           one calendar week of clean counter readings before flipping to throw
-    #           in prod)
-    #   off   — disable inspection (only for perf debugging)
+    #   throw — TenancyViolationException on violations (default)
+    #   log   — log + Micrometer counter, query passes (diagnostics only)
+    #   off   — disable inspection entirely (diagnostics only)
     tenancy:
-        enforcement: ${HEPHAESTUS_TENANCY_ENFORCEMENT:log}
+        enforcement: ${HEPHAESTUS_TENANCY_ENFORCEMENT:throw}
 
     # Provider-agnostic sync scheduler (SyncSchedulerProperties). The GitHub-specific sync
     # tuning (GraphQL timeouts, incremental buffer, backfill page size) lives under
@@ -327,6 +343,8 @@ hephaestus:
             enabled: false
             durable-consumer-name: ${NATS_DURABLE_CONSUMER_NAME:hephaestus}
             server: ""
+            username: ${NATS_USERNAME:}
+            password: ${NATS_PASSWORD:}
             consumer:
                 # Request timeout for JetStream API calls. Increase for workspaces with many
                 # repositories. The remaining consumer tuning (ack-wait, poison handling, …)
@@ -459,11 +477,6 @@ hephaestus:
         pending-lapse-after: ${SIGNAL_LEDGER_PENDING_LAPSE_AFTER:7d}
         sweep-batch-size: ${SIGNAL_LEDGER_SWEEP_BATCH_SIZE:200}
 
-    posthog:
-        enabled: ${POSTHOG_ENABLED:false}
-        api-host: ${POSTHOG_API_HOST:https://app.posthog.com}
-        project-id: ${POSTHOG_PROJECT_ID:}
-        personal-api-key: ${POSTHOG_PERSONAL_API_KEY:}
 
     sandbox:
         # The LLM proxy controller/security chain follows the worker/sandbox capability. It serves
@@ -497,14 +510,6 @@ hephaestus:
     # The queue IS the agent_job table — a QUEUED insert is the enqueue, and AgentJobExecutor polls
     # for QUEUED rows on a fixed interval. Disabled by default.
     agent:
-        # Half of one runtime contract shipped as two artifacts: this server stages TypeScript
-        # runners into a workspace and execs `bun` inside this image, so the image has to be a build
-        # that can run them. The tag therefore follows spring.application.version — the IMAGE_TAG the
-        # deploy already chose for the server image — because CI builds agent-pi under that same tag
-        # on every non-pull-request commit. A release replaces this with a cosign-verified digest
-        # through spring.config.import; an operator replaces both with HEPHAESTUS_AGENT_IMAGE_REFERENCE.
-        # Never name a release channel here: `latest` is whatever released most recently, which is a
-        # pairing no release ever produced. ADR 0031.
         image:
             reference: ghcr.io/ls1intum/hephaestus/agent-pi:${spring.application.version}
         enabled: ${AGENT_ENABLED:false}

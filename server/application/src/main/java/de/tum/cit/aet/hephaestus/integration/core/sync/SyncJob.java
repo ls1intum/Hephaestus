@@ -52,9 +52,8 @@ import org.jspecify.annotations.Nullable;
 // requested cancel. The flag itself is written only by the guarded markCancelRequested query.
 @DynamicUpdate
 @Table(
-    name = "sync_job",
-    indexes = { @Index(name = "ix_sync_job_connection_created", columnList = "connection_id, created_at DESC") }
-)
+        name = "sync_job",
+        indexes = {@Index(name = "ix_sync_job_connection_created", columnList = "connection_id, created_at DESC")})
 @Getter
 @Setter
 @NoArgsConstructor
@@ -74,17 +73,15 @@ public class SyncJob {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumns(
-        value = {
-            @JoinColumn(name = "connection_id", referencedColumnName = "id", insertable = false, updatable = false),
-            @JoinColumn(
-                name = "workspace_id",
-                referencedColumnName = "workspace_id",
-                insertable = false,
-                updatable = false
-            ),
-        },
-        foreignKey = @ForeignKey(name = "fk_sync_job_connection_workspace")
-    )
+            value = {
+                @JoinColumn(name = "connection_id", referencedColumnName = "id", insertable = false, updatable = false),
+                @JoinColumn(
+                        name = "workspace_id",
+                        referencedColumnName = "workspace_id",
+                        insertable = false,
+                        updatable = false),
+            },
+            foreignKey = @ForeignKey(name = "fk_sync_job_connection_workspace"))
     @Getter(AccessLevel.NONE)
     @Setter(AccessLevel.NONE)
     private @Nullable Connection tenantOwnedConnection;
@@ -162,13 +159,12 @@ public class SyncJob {
     private Long triggeredByUserId;
 
     public SyncJob(
-        Workspace workspace,
-        Connection connection,
-        IntegrationKind kind,
-        SyncJobType type,
-        SyncJobTrigger trigger,
-        @Nullable Long triggeredByUserId
-    ) {
+            Workspace workspace,
+            Connection connection,
+            IntegrationKind kind,
+            SyncJobType type,
+            SyncJobTrigger trigger,
+            @Nullable Long triggeredByUserId) {
         this.workspace = workspace;
         this.connection = connection;
         this.kind = kind;

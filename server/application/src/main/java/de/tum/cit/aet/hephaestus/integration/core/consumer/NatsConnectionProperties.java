@@ -5,6 +5,7 @@ import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.ConstructorBinding;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.boot.convert.DurationUnit;
 import org.springframework.validation.annotation.Validated;
@@ -21,26 +22,49 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "hephaestus.sync.nats")
 public record NatsConnectionProperties(
-    @DefaultValue("false") boolean enabled,
-    @Nullable String server,
-    @Nullable String durableConsumerName,
-    @Valid Consumer consumer
-) {
-    public NatsConnectionProperties(
-        boolean enabled,
+        @DefaultValue("false") boolean enabled,
         @Nullable String server,
+        @Nullable String username,
+        @Nullable String password,
         @Nullable String durableConsumerName,
-        @Nullable Consumer consumer
-    ) {
+        @Valid Consumer consumer) {
+    public NatsConnectionProperties(
+            boolean enabled,
+            @Nullable String server,
+            @Nullable String durableConsumerName,
+            @Nullable Consumer consumer) {
+        this(enabled, server, null, null, durableConsumerName, consumer);
+    }
+
+    @ConstructorBinding
+    public NatsConnectionProperties(
+            boolean enabled,
+            @Nullable String server,
+            @Nullable String username,
+            @Nullable String password,
+            @Nullable String durableConsumerName,
+            @Nullable Consumer consumer) {
         if (enabled && (server == null || server.isBlank())) {
             throw new IllegalStateException("hephaestus.sync.nats.server must be set when enabled=true");
         }
+        // application.yml binds `${NATS_USERNAME:}` / `${NATS_PASSWORD:}`, so an unset variable
+        // arrives as "" — treat blank as absent, or the pairing check below never fires from the
+        // environment and blank credentials would be sent to the broker.
+        String normalizedUsername = username == null || username.isBlank() ? null : username;
+        String normalizedPassword = password == null || password.isBlank() ? null : password;
+        if ((normalizedUsername == null) != (normalizedPassword == null)) {
+            throw new IllegalStateException("NATS username and password must be configured together");
+        }
         this.enabled = enabled;
         this.server = server;
+        this.username = normalizedUsername;
+        this.password = normalizedPassword;
         this.durableConsumerName = durableConsumerName;
         this.consumer = consumer == null ? new Consumer(Duration.ofSeconds(60)) : consumer;
     }
 
     /** Connection-side knobs shared between the consumer fleet and the publisher. */
-    public record Consumer(@DurationUnit(ChronoUnit.SECONDS) @DefaultValue("60s") Duration requestTimeout) {}
+    public record Consumer(
+            @DurationUnit(ChronoUnit.SECONDS) @DefaultValue("60s")
+            Duration requestTimeout) {}
 }

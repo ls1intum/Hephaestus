@@ -5,7 +5,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
@@ -47,23 +46,24 @@ class PracticeRevisionServiceTest extends BaseUnitTest {
 
     @Test
     void numbersEachRevisionAfterTheLast() {
-        when(revisionRepository.findFirstByPracticeIdOrderByRevisionNumberDesc(42L)).thenReturn(
-            Optional.of(new PracticeRevision(practice, 4))
-        );
+        when(revisionRepository.findFirstByPracticeIdOrderByRevisionNumberDesc(42L))
+                .thenReturn(Optional.of(new PracticeRevision(practice, 4)));
 
         assertThat(service.append(practice).getRevisionNumber()).isEqualTo(5);
     }
 
     @Test
     void startsAtOneForAPracticeWithNoHistory() {
-        when(revisionRepository.findFirstByPracticeIdOrderByRevisionNumberDesc(42L)).thenReturn(Optional.empty());
+        when(revisionRepository.findFirstByPracticeIdOrderByRevisionNumberDesc(42L))
+                .thenReturn(Optional.empty());
 
         assertThat(service.append(practice).getRevisionNumber()).isOne();
     }
 
     @Test
     void capturesTheDefinitionAsItWasSoAFindingCanCiteIt() {
-        when(revisionRepository.findFirstByPracticeIdOrderByRevisionNumberDesc(42L)).thenReturn(Optional.empty());
+        when(revisionRepository.findFirstByPracticeIdOrderByRevisionNumberDesc(42L))
+                .thenReturn(Optional.empty());
 
         PracticeRevision appended = service.append(practice);
 
@@ -74,7 +74,8 @@ class PracticeRevisionServiceTest extends BaseUnitTest {
 
     @Test
     void editingOnlyWhatPeopleReadLeavesTheReviewRuleFingerprintAlone() {
-        when(revisionRepository.findFirstByPracticeIdOrderByRevisionNumberDesc(42L)).thenReturn(Optional.empty());
+        when(revisionRepository.findFirstByPracticeIdOrderByRevisionNumberDesc(42L))
+                .thenReturn(Optional.empty());
         String before = service.append(practice).getReviewRuleFingerprint();
 
         practice.setWhyItMatters("It shortens review cycles.");
@@ -84,7 +85,8 @@ class PracticeRevisionServiceTest extends BaseUnitTest {
 
     @Test
     void editingTheDetectionCriteriaChangesTheFingerprint() {
-        when(revisionRepository.findFirstByPracticeIdOrderByRevisionNumberDesc(42L)).thenReturn(Optional.empty());
+        when(revisionRepository.findFirstByPracticeIdOrderByRevisionNumberDesc(42L))
+                .thenReturn(Optional.empty());
         String before = service.append(practice).getReviewRuleFingerprint();
 
         practice.setCriteria("Changed detector criteria");
@@ -94,25 +96,19 @@ class PracticeRevisionServiceTest extends BaseUnitTest {
 
     @Test
     void editingTheEvidenceDeclarationChangesTheFingerprint() {
-        when(revisionRepository.findFirstByPracticeIdOrderByRevisionNumberDesc(42L)).thenReturn(Optional.empty());
+        when(revisionRepository.findFirstByPracticeIdOrderByRevisionNumberDesc(42L))
+                .thenReturn(Optional.empty());
         String before = service.append(practice).getReviewRuleFingerprint();
 
         // The fingerprint has to follow an evidence edit: a review that reads a different set of
         // sources is a different rule, and a stale digest would report it as the shipped one.
-        practice.setBindings(
-            List.of(
-                PracticeBinding.on(
-                    ScmSignals.PULL_REQUEST_OPENED,
-                    List.of(
+        practice.setBindings(List.of(PracticeBinding.on(
+                ScmSignals.PULL_REQUEST_OPENED,
+                List.of(
                         new PracticeEvidenceRequirement(
-                            new SourceKind("scm.pull-request.core"),
-                            EvidenceStance.REQUIRED
-                        ),
-                        new PracticeEvidenceRequirement(new SourceKind("scm.review-threads"), EvidenceStance.CONTEXTUAL)
-                    )
-                )
-            )
-        );
+                                new SourceKind("scm.pull-request.core"), EvidenceStance.REQUIRED),
+                        new PracticeEvidenceRequirement(
+                                new SourceKind("scm.review-threads"), EvidenceStance.CONTEXTUAL)))));
 
         assertThat(service.append(practice).getReviewRuleFingerprint()).isNotEqualTo(before);
     }

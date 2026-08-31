@@ -1,3 +1,8 @@
+---
+title: Practice feedback schema
+description: The persisted shape of an observation and the feedback composed from it.
+---
+
 # Practice review data model
 
 This page records the durable relationships and invariants behind practice reviews. It deliberately
@@ -27,6 +32,7 @@ Use the executable sources for exact details:
 | `Observation`         | Evidence produced by one review job                                        | Belongs to one practice and one job; may support many pieces of feedback        |
 | `Feedback`            | One recipient-specific piece of feedback and its delivery outcome          | Belongs to one job; may draw on many observations and have many placements      |
 | `FeedbackApproval`    | Immutable decision to approve or reject one exact feedback proposal        | Stores the feedback ID, workspace, actor, decision context, content digest, and time |
+| `FeedbackDispatch`    | Crash-safe provider delivery of one exact review package                   | Owns one job or approved feedback proposal; records provider placements before ledger projection |
 | `FeedbackObservation` | Ordered evidence binding between one piece of feedback and one observation | Joins feedback to observations with a primary or supporting role                |
 | `FeedbackPlacement`   | Where a piece of feedback was placed                                       | Belongs to one `Feedback`; records a summary, inline, or conversation placement |
 | `Reaction`            | Legacy persistence name for an immutable feedback-response snapshot         | Belongs to one `Feedback`; stores usefulness, resolution, or both               |
@@ -41,9 +47,9 @@ separation preserves observations even when no feedback is composed or delivery 
 
 Observation rows are immutable. Practice criteria are mutable, so each observation can reference the
 criteria revision that applied to its review. Feedback content, provenance, and replacement link are
-immutable. A replacement is inserted with a link to the prior feedback before guarded lifecycle updates
-supersede it. Other guarded updates may change delivery state, delivery timestamp, or
-suppression reason.
+immutable. A re-review creates a new provider comment and a new feedback unit linked to the last delivered
+unit; it never rewrites the earlier review. Guarded lifecycle updates may change delivery state, delivery
+timestamp, or suppression reason.
 
 ### Occurrence and recurrence have different identities
 
@@ -110,10 +116,17 @@ Each feedback row retains its delivery outcome. See
 [Evaluation Provenance Contract](./evaluation-provenance.md) for state interpretation, evaluation joins,
 and limitations.
 
-`AWAITING_APPROVAL` is actionable feedback, not suppression. A guarded decision moves it once to
-`PREPARED` or terminal `DISCARDED` and writes one `FeedbackApproval`. The digest binds the approved content,
-recipient, channel, and artifact target; release refuses a stale or mismatched decision. Approval records
-retain identifier snapshots rather than JPA relationships so account erasure does not rewrite the audit.
+`AWAITING_APPROVAL` is actionable feedback, not suppression. Its ordered package contains the exact
+summary and inline comments. A guarded decision moves it once to `PREPARED` or terminal `DISCARDED` and
+writes one `FeedbackApproval`; one approval covers the complete package. The digest binds the content,
+recipient, channel, and artifact target, and release refuses a stale or mismatched decision. Approval
+records retain identifier snapshots rather than JPA relationships so account erasure does not rewrite the
+audit.
+
+Provider creates use one durable dispatch for the complete review package. The dispatch stores the exact
+content before egress and records each provider placement as it converges. A terminal package is projected
+into feedback and placement rows under a separate lease, so a crash between provider acknowledgement and
+ledger recording resumes projection without posting the package again.
 
 ### One feedback response has two independent dimensions
 

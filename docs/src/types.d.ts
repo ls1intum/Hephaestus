@@ -1,9 +1,9 @@
-declare module '!!raw-loader!*' {
-  const content: string;
-  export default content;
+declare module "*.mmd" {
+	const content: string;
+	export default content;
 }
 
-declare module '*.png' {
-  const source: string;
-  export default source;
+declare module "*.png" {
+	const source: string;
+	export default source;
 }

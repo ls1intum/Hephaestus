@@ -16,6 +16,7 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxException;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxService;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxSpec;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SecurityProfile;
+import de.tum.cit.aet.hephaestus.observability.StructuredLogKeys;
 import io.micrometer.core.instrument.Timer;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -46,14 +47,13 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
     // --cap-drop=ALL removes CAP_DAC_OVERRIDE, so root cannot bypass file permissions.
     // /workspace is owned by 1000:1000 in the image; run mkdir as the container user.
     private static final String PREP_MKDIR_CMD =
-        "mkdir -p /workspace/.runner /workspace/context/target /workspace/context/user /workspace/scratch && " +
-        "chmod 1777 /workspace /workspace/.runner /workspace/context/user /workspace/scratch && " +
-        "chmod 1755 /workspace/context /workspace/context/target";
+            "mkdir -p /workspace/.runner /workspace/context/target /workspace/context/user /workspace/scratch && "
+                    + "chmod 1777 /workspace /workspace/.runner /workspace/context/user /workspace/scratch && "
+                    + "chmod 1755 /workspace/context /workspace/context/target";
 
     // Per-dir, not -R: context/user must stay writable.
-    private static final String PREP_CHMOD_CMD =
-        "chmod -R a-w /workspace/context/target 2>/dev/null || true; " +
-        "chmod a-w /workspace/context 2>/dev/null || true";
+    private static final String PREP_CHMOD_CMD = "chmod -R a-w /workspace/context/target 2>/dev/null || true; "
+            + "chmod a-w /workspace/context 2>/dev/null || true";
 
     private static final int PREP_OUTPUT_PREVIEW_CAP = 512;
     private static final Duration PREP_EXEC_TIMEOUT = Duration.ofSeconds(30);
@@ -74,20 +74,19 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
     private final Object[] attachLocks = new Object[64];
 
     public DockerInteractiveSandboxAdapter(
-        InteractiveSandboxProperties properties,
-        SandboxProperties sandboxProperties,
-        SandboxNetworkManager networkManager,
-        SandboxWorkspaceManager workspaceManager,
-        SandboxContainerManager containerManager,
-        ContainerSecurityPolicy securityPolicy,
-        InteractiveSandboxRegistry registry,
-        InteractiveSandboxMetrics metrics,
-        ObjectMapper mapper,
-        Executor closeExecutor,
-        String dockerCli,
-        int serverPort,
-        MentorProxyCredentialRegistry mentorProxyCredentialRegistry
-    ) {
+            InteractiveSandboxProperties properties,
+            SandboxProperties sandboxProperties,
+            SandboxNetworkManager networkManager,
+            SandboxWorkspaceManager workspaceManager,
+            SandboxContainerManager containerManager,
+            ContainerSecurityPolicy securityPolicy,
+            InteractiveSandboxRegistry registry,
+            InteractiveSandboxMetrics metrics,
+            ObjectMapper mapper,
+            Executor closeExecutor,
+            String dockerCli,
+            int serverPort,
+            MentorProxyCredentialRegistry mentorProxyCredentialRegistry) {
         this.properties = properties;
         this.sandboxProperties = sandboxProperties;
         this.networkManager = networkManager;
@@ -137,48 +136,43 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
         DockerAttachedSandboxAdapter sandbox = null;
         boolean registered = false;
         try {
-            boolean allowInternet = spec.networkPolicy() != null && spec.networkPolicy().internetAccess();
+            boolean allowInternet =
+                    spec.networkPolicy() != null && spec.networkPolicy().internetAccess();
             networkId = networkManager.createJobNetwork(spec.sessionId(), allowInternet);
             String appServerIp = networkManager.connectAppServer(networkId);
             List<String> extraHosts = List.of();
             if (appServerIp == null) {
                 if (!allowInternet) {
                     throw new InteractiveSandboxException(
-                        "App-server is not in Docker and network is internal. Set allow_internet=true."
-                    );
+                            "App-server is not in Docker and network is internal. Set allow_internet=true.");
                 }
                 appServerIp = "host.docker.internal";
                 extraHosts = List.of("host.docker.internal:host-gateway");
             }
 
             SecurityProfile secProfile =
-                spec.securityProfile() != null ? spec.securityProfile() : SecurityProfile.DEFAULT;
-            DockerOperations.HostConfigSpec hostConfig = securityPolicy.buildHostConfig(
-                secProfile,
-                spec.resourceLimits(),
-                spec.networkPolicy()
-            );
+                    spec.securityProfile() != null ? spec.securityProfile() : SecurityProfile.DEFAULT;
+            DockerOperations.HostConfigSpec hostConfig =
+                    securityPolicy.buildHostConfig(secProfile, spec.resourceLimits(), spec.networkPolicy());
             Map<String, String> labels = Map.of(
-                SandboxLabels.MANAGED,
-                "true",
-                SandboxLabels.KIND,
-                SandboxLabels.KIND_INTERACTIVE,
-                SandboxLabels.SESSION_ID,
-                spec.sessionId().toString()
-            );
+                    SandboxLabels.MANAGED,
+                    "true",
+                    SandboxLabels.KIND,
+                    SandboxLabels.KIND_INTERACTIVE,
+                    SandboxLabels.SESSION_ID,
+                    spec.sessionId().toString());
             Map<String, String> runnerEnv = buildRunnerEnvironment(spec, appServerIp);
 
             DockerOperations.ContainerSpec containerSpec = new DockerOperations.ContainerSpec(
-                spec.image(),
-                SLEEPER_CMD,
-                Map.of(),
-                networkId,
-                CONTAINER_HOSTNAME,
-                CONTAINER_USER,
-                labels,
-                hostConfig,
-                extraHosts
-            );
+                    spec.image(),
+                    SLEEPER_CMD,
+                    Map.of(),
+                    networkId,
+                    CONTAINER_HOSTNAME,
+                    CONTAINER_USER,
+                    labels,
+                    hostConfig,
+                    extraHosts);
             try {
                 containerId = containerManager.createContainer(containerSpec);
             } catch (Exception e) {
@@ -219,8 +213,7 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
                 if (!sandbox.awaitFirstFrame(firstFrameTimeout)) {
                     metrics.attachFailureFirstFrameTimeout.increment();
                     throw new InteractiveSandboxException(
-                        "Runner did not emit first frame within " + firstFrameTimeout.toSeconds() + "s"
-                    );
+                            "Runner did not emit first frame within " + firstFrameTimeout.toSeconds() + "s");
                 }
             } catch (InteractiveSandboxException terminated) {
                 // Distinct from timeout: pump/writer terminated before any frame.
@@ -239,8 +232,7 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
                         sandbox.terminate(EvictionReason.ERROR);
                         if (!winner.hasRuntimeKey(runtimeKey)) {
                             throw new InteractiveSandboxException(
-                                "Concurrent attach resolved to an incompatible runtime"
-                            );
+                                    "Concurrent attach resolved to an incompatible runtime");
                         }
                         return winner;
                     }
@@ -249,10 +241,9 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
                 case MAX_SESSIONS_PER_USER, MAX_SESSIONS_TOTAL -> {
                     metrics.attachFailureMaxSessions.increment();
                     throw new InteractiveSandboxException(
-                        outcome == InteractiveSandboxRegistry.RegistrationOutcome.MAX_SESSIONS_PER_USER
-                            ? "Per-user session cap exceeded"
-                            : "Per-replica session cap exceeded"
-                    );
+                            outcome == InteractiveSandboxRegistry.RegistrationOutcome.MAX_SESSIONS_PER_USER
+                                    ? "Per-user session cap exceeded"
+                                    : "Per-replica session cap exceeded");
                 }
                 case REGISTERED -> registered = true;
             }
@@ -290,6 +281,12 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
             }
             env.put(entry.getKey(), entry.getValue());
         }
+        String traceId = MDC.get(StructuredLogKeys.TRACE_ID);
+        String spanId = MDC.get(StructuredLogKeys.SPAN_ID);
+        if (traceId != null && spanId != null) {
+            env.put("TRACE_ID", traceId);
+            env.put("TRACEPARENT", "00-" + traceId + "-" + spanId + "-00");
+        }
         if (spec.networkPolicy() != null && spec.networkPolicy().llmProxyUrl() != null) {
             String url = spec.networkPolicy().llmProxyUrl();
             if (url.contains(PROXY_URL_PLACEHOLDER)) {
@@ -298,9 +295,9 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
             env.put("LLM_PROXY_URL", url);
         } else if (spec.networkPolicy() != null && appServerIp != null) {
             env.put(
-                "LLM_PROXY_URL",
-                "http://" + appServerIp + ":" + sandboxProperties.resolvedLlmProxyPort(serverPort) + "/internal/llm"
-            );
+                    "LLM_PROXY_URL",
+                    "http://" + appServerIp + ":" + sandboxProperties.resolvedLlmProxyPort(serverPort)
+                            + "/internal/llm");
         }
         if (spec.networkPolicy() != null && spec.networkPolicy().llmProxyToken() != null) {
             env.put("LLM_PROXY_TOKEN", spec.networkPolicy().llmProxyToken());
@@ -309,12 +306,11 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
     }
 
     private DockerAttachedSandboxAdapter buildSandbox(
-        InteractiveSandboxSpec spec,
-        InteractiveSandboxRuntimeKey runtimeKey,
-        String containerId,
-        String networkId,
-        PiProcessHandle process
-    ) {
+            InteractiveSandboxSpec spec,
+            InteractiveSandboxRuntimeKey runtimeKey,
+            String containerId,
+            String networkId,
+            PiProcessHandle process) {
         FrameRingBuffer ring = new FrameRingBuffer(properties.ringBufferFrames(), metrics.ringBufferDropped);
         DockerAttachedSandboxAdapter.LifecycleOps lifecycleOps = new DockerAttachedSandboxAdapter.LifecycleOps() {
             @Override
@@ -331,35 +327,36 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
             public void disconnectAndRemoveNetwork(String nid) {
                 try {
                     networkManager.disconnectAppServer(nid);
-                } catch (Exception ignored) {}
+                } catch (Exception ignored) {
+                }
                 networkManager.removeNetwork(nid);
             }
         };
         return new DockerAttachedSandboxAdapter(
-            spec.sessionId(),
-            spec.userId(),
-            spec.workspaceId(),
-            containerId,
-            networkId,
-            runtimeKey,
-            process,
-            mapper,
-            ring,
-            properties.subscriberQueueCapacity(),
-            properties.stdinWriteTimeoutMs(),
-            properties.sendQueueCapacity(),
-            properties.maxFrameChars(),
-            Duration.ofSeconds(properties.graceTimeoutSeconds()),
-            metrics,
-            lifecycleOps,
-            closeExecutor,
-            this::onAttachedSandboxClosed
-        );
+                spec.sessionId(),
+                spec.userId(),
+                spec.workspaceId(),
+                containerId,
+                networkId,
+                runtimeKey,
+                process,
+                mapper,
+                ring,
+                properties.subscriberQueueCapacity(),
+                properties.stdinWriteTimeoutMs(),
+                properties.sendQueueCapacity(),
+                properties.maxFrameChars(),
+                Duration.ofSeconds(properties.graceTimeoutSeconds()),
+                metrics,
+                lifecycleOps,
+                closeExecutor,
+                this::onAttachedSandboxClosed);
     }
 
     private InteractiveSandboxRuntimeKey runtimeKey(InteractiveSandboxSpec spec) {
         String token = spec.networkPolicy() != null ? spec.networkPolicy().llmProxyToken() : null;
-        var routing = token != null ? mentorProxyCredentialRegistry.validate(token).orElse(null) : null;
+        var routing =
+                token != null ? mentorProxyCredentialRegistry.validate(token).orElse(null) : null;
         return InteractiveSandboxRuntimeKey.of(spec, routing);
     }
 
@@ -399,7 +396,8 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
                     }
                     out.write(buf, 0, Math.min(read, room));
                 }
-            } catch (IOException ignored) {}
+            } catch (IOException ignored) {
+            }
         });
         try {
             boolean exited = p.waitFor(PREP_EXEC_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
@@ -408,8 +406,7 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
                 drainer.join(500);
                 metrics.attachFailureOther.increment();
                 throw new InteractiveSandboxException(
-                    description + " timed out after " + PREP_EXEC_TIMEOUT.toSeconds() + "s"
-                );
+                        description + " timed out after " + PREP_EXEC_TIMEOUT.toSeconds() + "s");
             }
             drainer.join(500);
             int exit = p.exitValue();
@@ -430,11 +427,10 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
     }
 
     private void tearDownPartial(
-        @Nullable DockerAttachedSandboxAdapter sandbox,
-        @Nullable PiProcessHandle process,
-        @Nullable String networkId,
-        @Nullable String containerId
-    ) {
+            @Nullable DockerAttachedSandboxAdapter sandbox,
+            @Nullable PiProcessHandle process,
+            @Nullable String networkId,
+            @Nullable String containerId) {
         // Pump/writer threads may already be running; terminate() drives the full close path.
         if (sandbox != null) {
             sandbox.terminate(EvictionReason.ERROR);
@@ -444,7 +440,8 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
         if (process != null) {
             try {
                 process.destroyForcibly();
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+            }
         }
         if (containerId != null) {
             try {
@@ -456,7 +453,8 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
         if (networkId != null) {
             try {
                 networkManager.disconnectAppServer(networkId);
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+            }
             try {
                 networkManager.removeNetwork(networkId);
             } catch (Exception e) {

@@ -18,7 +18,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organizatio
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventType;
 import de.tum.cit.aet.hephaestus.integration.scm.github.issue.dto.GitHubIssueEventDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.RecordingScmEventListener;
@@ -80,7 +79,8 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     // Issue IDs from different fixtures
     private static final Long ISSUE_20_ID = 3578496080L; // opened, labeled, assigned, closed, reopened
-    private static final Long ISSUE_22_ID = 3578518416L; // milestoned, demilestoned, locked, unlocked, pinned, unpinned, transferred
+    private static final Long ISSUE_22_ID =
+            3578518416L; // milestoned, demilestoned, locked, unlocked, pinned, unpinned, transferred
     private static final Long ISSUE_23_ID = 3578523639L; // deleted
     private static final Long ISSUE_25_ID = 3578528003L; // typed, untyped
 
@@ -89,7 +89,7 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
     private static final String FIXTURE_ISSUE_TITLE = "Webhook fixture: parent tracker";
     private static final String FIXTURE_ISSUE_HTML_URL = "https://github.com/HephaestusTest/TestRepository/issues/20";
     private static final String FIXTURE_ISSUE_BODY =
-        "This parent issue seeds webhook fixtures for our ETL pipeline.\n\nChecklist:\n- [ ] add sub tasks\n- [ ] wire dependencies\n- [ ] tidy up at the end";
+            "This parent issue seeds webhook fixtures for our ETL pipeline.\n\nChecklist:\n- [ ] add sub tasks\n- [ ] wire dependencies\n- [ ] tidy up at the end";
     private static final Instant FIXTURE_ISSUE_CREATED_AT = Instant.parse("2025-11-01T21:42:45Z");
     private static final Instant FIXTURE_ISSUE_UPDATED_AT = Instant.parse("2025-11-01T21:42:45Z");
     private static final int FIXTURE_ISSUE_COMMENTS_COUNT = 0;
@@ -173,7 +173,9 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             // Then - verify ALL persisted fields against hardcoded fixture values
             // Use TransactionTemplate for lazy-loading assertions
             transactionTemplate.executeWithoutResult(status -> {
-                Issue issue = issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), 20).orElseThrow();
+                Issue issue = issueRepository
+                        .findByRepositoryIdAndNumber(testRepository.getId(), 20)
+                        .orElseThrow();
 
                 // Core identification fields
                 assertThat(issue.getNativeId()).isEqualTo(ISSUE_20_ID);
@@ -236,7 +238,9 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
             handler.handleEvent(editedEvent);
 
-            Issue issue = issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), 20).orElse(null);
+            Issue issue = issueRepository
+                    .findByRepositoryIdAndNumber(testRepository.getId(), 20)
+                    .orElse(null);
             assertNotNull(issue);
             // Issue should still exist (edited, not created new)
             assertThat(issueRepository.count()).isEqualTo(1);
@@ -252,7 +256,9 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
             handler.handleEvent(closedEvent);
 
-            Issue issue = issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), 20).orElse(null);
+            Issue issue = issueRepository
+                    .findByRepositoryIdAndNumber(testRepository.getId(), 20)
+                    .orElse(null);
             assertNotNull(issue);
             assertThat(issue.getState()).isEqualTo(Issue.State.CLOSED);
 
@@ -271,7 +277,9 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
             handler.handleEvent(reopenedEvent);
 
-            Issue issue = issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), 20).orElse(null);
+            Issue issue = issueRepository
+                    .findByRepositoryIdAndNumber(testRepository.getId(), 20)
+                    .orElse(null);
             assertNotNull(issue);
             assertThat(issue.getState()).isEqualTo(Issue.State.OPEN);
         }
@@ -290,14 +298,16 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             issueToDelete.setProvider(gitProvider);
             issueRepository.save(issueToDelete);
 
-            assertThat(issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), 23)).isPresent();
+            assertThat(issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), 23))
+                    .isPresent();
 
             GitHubIssueEventDTO deletedEvent = loadPayload("issues.deleted");
 
             // When - delete via handler (exercises processDeleted with natural key lookup)
             handler.handleEvent(deletedEvent);
 
-            assertThat(issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), 23)).isEmpty();
+            assertThat(issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), 23))
+                    .isEmpty();
         }
     }
 
@@ -318,13 +328,16 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
             // Then - use TransactionTemplate for lazy-loading assertions
             transactionTemplate.executeWithoutResult(status -> {
-                Issue issue = issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), 20).orElse(null);
+                Issue issue = issueRepository
+                        .findByRepositoryIdAndNumber(testRepository.getId(), 20)
+                        .orElse(null);
                 assertNotNull(issue);
                 assertThat(labelNames(issue)).contains("etl-sample");
             });
 
             // Verify label was created in repository
-            assertThat(labelRepository.findByNativeIdAndProviderId(9567656085L, gitProviderId())).isPresent();
+            assertThat(labelRepository.findByNativeIdAndProviderId(9567656085L, gitProviderId()))
+                    .isPresent();
 
             // Verify Labeled event was published
             assertThat(eventListener.ofType(ScmDomainEvent.IssueLabeled.class)).hasSize(1);
@@ -342,7 +355,8 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             handler.handleEvent(unlabeledEvent);
 
             // Then - Unlabeled event should be published
-            assertThat(eventListener.ofType(ScmDomainEvent.IssueUnlabeled.class)).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.IssueUnlabeled.class))
+                    .hasSize(1);
         }
     }
 
@@ -363,7 +377,9 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
             // Then - issue should be created with assignees from the DTO
             transactionTemplate.executeWithoutResult(status -> {
-                Issue issue = issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), 20).orElse(null);
+                Issue issue = issueRepository
+                        .findByRepositoryIdAndNumber(testRepository.getId(), 20)
+                        .orElse(null);
                 assertNotNull(issue);
                 // The assignees are set from the DTO on creation
                 assertThat(issue.getAssignees()).isNotEmpty();
@@ -382,7 +398,9 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             handler.handleEvent(unassignedEvent);
 
             // Then - issue still exists and was processed
-            Issue issue = issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), 20).orElse(null);
+            Issue issue = issueRepository
+                    .findByRepositoryIdAndNumber(testRepository.getId(), 20)
+                    .orElse(null);
             assertNotNull(issue);
         }
     }
@@ -401,7 +419,9 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
             // Then - use TransactionTemplate for lazy-loading assertions
             transactionTemplate.executeWithoutResult(status -> {
-                Issue issue = issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), 22).orElse(null);
+                Issue issue = issueRepository
+                        .findByRepositoryIdAndNumber(testRepository.getId(), 22)
+                        .orElse(null);
                 assertNotNull(issue);
                 assertThat(issue.getMilestone()).isNotNull();
                 assertThat(issue.getMilestone().getTitle()).isEqualTo("Webhook Fixtures");
@@ -409,7 +429,8 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             });
 
             // Verify milestone was created in repository
-            assertThat(milestoneRepository.findByNativeIdAndProviderId(14028563L, gitProviderId())).isPresent();
+            assertThat(milestoneRepository.findByNativeIdAndProviderId(14028563L, gitProviderId()))
+                    .isPresent();
         }
 
         @Test
@@ -422,7 +443,9 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             handler.handleEvent(demilestonedEvent);
 
             transactionTemplate.executeWithoutResult(status -> {
-                Issue issue = issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), 22).orElse(null);
+                Issue issue = issueRepository
+                        .findByRepositoryIdAndNumber(testRepository.getId(), 22)
+                        .orElse(null);
                 assertNotNull(issue);
                 assertThat(issue.getMilestone()).isNull();
             });
@@ -443,7 +466,9 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
             // Then - use TransactionTemplate for lazy-loading assertions
             transactionTemplate.executeWithoutResult(status -> {
-                Issue issue = issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), 25).orElse(null);
+                Issue issue = issueRepository
+                        .findByRepositoryIdAndNumber(testRepository.getId(), 25)
+                        .orElse(null);
                 assertNotNull(issue);
                 assertThat(issue.getIssueType()).isNotNull();
                 assertThat(issue.getIssueType().getName()).isEqualTo("Task");
@@ -465,7 +490,9 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             handler.handleEvent(untypedEvent);
 
             transactionTemplate.executeWithoutResult(status -> {
-                Issue issue = issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), 25).orElse(null);
+                Issue issue = issueRepository
+                        .findByRepositoryIdAndNumber(testRepository.getId(), 25)
+                        .orElse(null);
                 assertNotNull(issue);
                 assertThat(issue.getIssueType()).isNull();
             });
@@ -490,7 +517,9 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             handler.handleEvent(lockedEvent);
 
             // Then - issue processed (locked is treated like a general update)
-            Issue issue = issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), 20).orElse(null);
+            Issue issue = issueRepository
+                    .findByRepositoryIdAndNumber(testRepository.getId(), 20)
+                    .orElse(null);
             assertNotNull(issue);
         }
 
@@ -504,7 +533,9 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
             handler.handleEvent(unlockedEvent);
 
-            Issue issue = issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), 20).orElse(null);
+            Issue issue = issueRepository
+                    .findByRepositoryIdAndNumber(testRepository.getId(), 20)
+                    .orElse(null);
             assertNotNull(issue);
         }
     }
@@ -524,7 +555,8 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             handler.handleEvent(pinnedEvent);
 
             // Then - issue should still exist
-            assertThat(issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), 20)).isPresent();
+            assertThat(issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), 20))
+                    .isPresent();
         }
 
         @Test
@@ -537,7 +569,8 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
             handler.handleEvent(unpinnedEvent);
 
-            assertThat(issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), 20)).isPresent();
+            assertThat(issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), 20))
+                    .isPresent();
         }
     }
 
@@ -556,7 +589,9 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             handler.handleEvent(transferredEvent);
 
             // Then - issue should be processed
-            Issue issue = issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), 20).orElse(null);
+            Issue issue = issueRepository
+                    .findByRepositoryIdAndNumber(testRepository.getId(), 20)
+                    .orElse(null);
             assertNotNull(issue);
         }
     }
@@ -618,7 +653,8 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             handler.handleEvent(event);
 
             // Then - issue should be persisted with the correct ID
-            assertThat(issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), 20)).isPresent();
+            assertThat(issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), 20))
+                    .isPresent();
         }
 
         @Test
@@ -631,13 +667,17 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             handler.handleEvent(loadPayload("issues.opened"));
 
             // Then - author created with exact fixture values
-            var author = userRepository.findByNativeIdAndProviderId(FIXTURE_AUTHOR_ID, gitProviderId()).orElseThrow();
+            var author = userRepository
+                    .findByNativeIdAndProviderId(FIXTURE_AUTHOR_ID, gitProviderId())
+                    .orElseThrow();
             assertThat(author.getLogin()).isEqualTo(FIXTURE_AUTHOR_LOGIN);
             assertThat(author.getAvatarUrl()).isEqualTo(FIXTURE_AUTHOR_AVATAR_URL);
             assertThat(author.getHtmlUrl()).isEqualTo(FIXTURE_AUTHOR_HTML_URL);
 
             // Then - label created with exact fixture values
-            var label = labelRepository.findByNativeIdAndProviderId(FIXTURE_LABEL_ID, gitProviderId()).orElseThrow();
+            var label = labelRepository
+                    .findByNativeIdAndProviderId(FIXTURE_LABEL_ID, gitProviderId())
+                    .orElseThrow();
             assertThat(label.getName()).isEqualTo(FIXTURE_LABEL_NAME);
             assertThat(label.getColor()).isEqualTo(FIXTURE_LABEL_COLOR);
             assertThat(label.getDescription()).isNull(); // fixture has null description
@@ -658,10 +698,9 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
     private void setupTestData() {
         // Create GitHub provider
         gitProvider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-            .orElseGet(() ->
-                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseGet(() -> gitProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
 
         // Create organization matching fixture data
         Organization org = new Organization();
@@ -703,11 +742,7 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
     }
 
     private Set<String> labelNames(Issue issue) {
-        return issue
-            .getLabels()
-            .stream()
-            .map(l -> l.getName())
-            .collect(Collectors.toSet());
+        return issue.getLabels().stream().map(l -> l.getName()).collect(Collectors.toSet());
     }
 
     private Long gitProviderId() {

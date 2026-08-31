@@ -32,7 +32,9 @@ class WorkspaceMembershipSyncGitHubLiveIntegrationTest extends AbstractGitHubLiv
 
         // Verify org members were synced (repository stores only IDs, not full User objects)
         List<Long> orgMemberUserIds = organizationMembershipRepository.findUserIdsByOrganizationId(org.getId());
-        assertThat(orgMemberUserIds).as("organization members should be synced from GitHub").isNotEmpty();
+        assertThat(orgMemberUserIds)
+                .as("organization members should be synced from GitHub")
+                .isNotEmpty();
 
         // Verify at least one member exists (the person who installed the GitHub App)
         assertThat(orgMemberUserIds.size()).isGreaterThanOrEqualTo(1);

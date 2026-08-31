@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect } from "storybook/test";
+
 import {
 	mockMergeBinding,
 	mockPullRequestBinding,
@@ -7,6 +8,7 @@ import {
 	mockPullRequestWorkType,
 } from "@/mocks/fixtures/practice";
 import { expectNoOverflowingElement } from "@/test/reflow";
+
 import { PracticeEvidenceSummary } from "./PracticeEvidenceSummary";
 
 const meta = {

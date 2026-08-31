@@ -37,12 +37,10 @@ public enum ObservationOutcome {
     public static ObservationOutcome of(Presence presence, @Nullable Assessment assessment) {
         if (presence.carriesValence() != (assessment != null)) {
             throw new IllegalArgumentException(
-                "Assessment is required exactly for a presence that carries valence (presence=" +
-                    presence +
-                    ", assessment=" +
-                    assessment +
-                    ")"
-            );
+                    "Assessment is required exactly for a presence that carries valence (presence=" + presence
+                            + ", assessment="
+                            + assessment
+                            + ")");
         }
         return switch (presence) {
             case PRESENT -> assessment == Assessment.GOOD ? DEMONSTRATED_STRENGTH : COMMISSION_PROBLEM;

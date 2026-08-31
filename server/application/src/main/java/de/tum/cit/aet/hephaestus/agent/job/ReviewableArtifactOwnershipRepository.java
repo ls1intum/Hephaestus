@@ -24,26 +24,20 @@ import org.springframework.stereotype.Repository;
 @Repository
 @WorkspaceAgnostic("Ownership is the question; the workspace id is the parameter it is asked about")
 interface ReviewableArtifactOwnershipRepository extends JpaRepository<Issue, Long> {
-    @Query(
-        """
+    @Query("""
         SELECT COUNT(p) > 0 FROM PullRequest p
         JOIN p.repository r
         JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = r.nameWithOwner
         WHERE rtm.workspace.id = :workspaceId AND p.id = :pullRequestId AND TYPE(p) = PullRequest
-        """
-    )
+        """)
     boolean pullRequestBelongsToWorkspace(
-        @Param("workspaceId") Long workspaceId,
-        @Param("pullRequestId") Long pullRequestId
-    );
+            @Param("workspaceId") Long workspaceId, @Param("pullRequestId") Long pullRequestId);
 
-    @Query(
-        """
+    @Query("""
         SELECT COUNT(i) > 0 FROM Issue i
         JOIN i.repository r
         JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = r.nameWithOwner
         WHERE rtm.workspace.id = :workspaceId AND i.id = :issueId AND TYPE(i) = Issue
-        """
-    )
+        """)
     boolean issueBelongsToWorkspace(@Param("workspaceId") Long workspaceId, @Param("issueId") Long issueId);
 }

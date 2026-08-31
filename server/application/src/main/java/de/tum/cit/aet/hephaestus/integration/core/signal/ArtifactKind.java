@@ -31,8 +31,7 @@ public record ArtifactKind(String value) {
         }
         if (!GRAMMAR.matcher(value).matches()) {
             throw new IllegalArgumentException(
-                "artifact kind must be <domain>.<kind> in lowercase snake_case, got: " + value
-            );
+                    "artifact kind must be <domain>.<kind> in lowercase snake_case, got: " + value);
         }
     }
 

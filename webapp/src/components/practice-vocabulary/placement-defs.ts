@@ -1,5 +1,7 @@
 import { BotMessageSquareIcon, MapPinIcon, MessageSquareTextIcon } from "lucide-react";
+
 import type { ReviewPlacement } from "@/api/types.gen";
+
 import { DELIVERY_PLACE_DEFS, type DeliveryPlace } from "./delivery-place-defs";
 import type { StatusDefs } from "./status-def";
 

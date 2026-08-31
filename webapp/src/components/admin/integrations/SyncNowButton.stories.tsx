@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, userEvent } from "storybook/test";
+
 import type { SyncJob } from "@/api/types.gen";
+
 import { SyncNowButton } from "./SyncNowButton";
 
 const runningJob: SyncJob = {

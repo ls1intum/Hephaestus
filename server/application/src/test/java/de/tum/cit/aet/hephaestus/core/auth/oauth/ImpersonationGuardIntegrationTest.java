@@ -27,19 +27,19 @@ class ImpersonationGuardIntegrationTest extends BaseIntegrationTest {
         // POST /user is an authenticated, non-safe, non-escape path. The guard returns its 403 from a
         // servlet filter — before routing — so no controller side effect occurs even if a handler exists.
         webTestClient
-            .post()
-            .uri("/user")
-            .headers(headers -> headers.setBearerAuth(TestSecurityConfig.IMPERSONATION_TOKEN))
-            .exchange()
-            .expectStatus()
-            .isForbidden()
-            .expectHeader()
-            .contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON)
-            .expectBody()
-            .jsonPath("$.status")
-            .isEqualTo(403)
-            .jsonPath("$.code")
-            .isEqualTo("impersonation_read_only");
+                .post()
+                .uri("/user")
+                .headers(headers -> headers.setBearerAuth(TestSecurityConfig.IMPERSONATION_TOKEN))
+                .exchange()
+                .expectStatus()
+                .isForbidden()
+                .expectHeader()
+                .contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON)
+                .expectBody()
+                .jsonPath("$.status")
+                .isEqualTo(403)
+                .jsonPath("$.code")
+                .isEqualTo("impersonation_read_only");
     }
 
     @Test
@@ -49,12 +49,12 @@ class ImpersonationGuardIntegrationTest extends BaseIntegrationTest {
         // @PreAuthorize("isAuthenticated()") and the guard is the only thing that 403s it, so asserting
         // "not 403" precisely catches the trap regardless of the downstream exit outcome (204 / error).
         webTestClient
-            .post()
-            .uri("/auth/impersonate:exit")
-            .headers(headers -> headers.setBearerAuth(TestSecurityConfig.IMPERSONATION_TOKEN))
-            .exchange()
-            .expectStatus()
-            .value(status -> Assertions.assertThat(status).isNotEqualTo(403));
+                .post()
+                .uri("/auth/impersonate:exit")
+                .headers(headers -> headers.setBearerAuth(TestSecurityConfig.IMPERSONATION_TOKEN))
+                .exchange()
+                .expectStatus()
+                .value(status -> Assertions.assertThat(status).isNotEqualTo(403));
     }
 
     @Test
@@ -62,11 +62,11 @@ class ImpersonationGuardIntegrationTest extends BaseIntegrationTest {
         // GET is always allowed even under impersonation ("see what they see"). Any non-403 outcome
         // proves the guard did not block the GET.
         webTestClient
-            .get()
-            .uri("/auth/error")
-            .headers(headers -> headers.setBearerAuth(TestSecurityConfig.IMPERSONATION_TOKEN))
-            .exchange()
-            .expectStatus()
-            .value(status -> Assertions.assertThat(status).isNotEqualTo(403));
+                .get()
+                .uri("/auth/error")
+                .headers(headers -> headers.setBearerAuth(TestSecurityConfig.IMPERSONATION_TOKEN))
+                .exchange()
+                .expectStatus()
+                .value(status -> Assertions.assertThat(status).isNotEqualTo(403));
     }
 }

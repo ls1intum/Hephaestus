@@ -19,14 +19,13 @@ import org.jspecify.annotations.Nullable;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitLabDescendantGroupResponse(
-    String id,
-    String fullPath,
-    String name,
-    @Nullable String description,
-    @Nullable String webUrl,
-    @Nullable String visibility,
-    @Nullable ParentRef parent
-) {
+        String id,
+        String fullPath,
+        String name,
+        @Nullable String description,
+        @Nullable String webUrl,
+        @Nullable String visibility,
+        @Nullable ParentRef parent) {
     /**
      * Reference to the parent group.
      *

@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.sandbox.docker;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
+import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -59,35 +60,34 @@ public class SandboxReconciler {
     private final Clock clock;
 
     public SandboxReconciler(
-        AgentJobRepository jobRepository,
-        SandboxContainerManager containerManager,
-        SandboxNetworkManager networkManager,
-        MeterRegistry meterRegistry,
-        Clock clock
-    ) {
+            AgentJobRepository jobRepository,
+            SandboxContainerManager containerManager,
+            SandboxNetworkManager networkManager,
+            MeterRegistry meterRegistry,
+            Clock clock) {
         this.jobRepository = jobRepository;
         this.containerManager = containerManager;
         this.networkManager = networkManager;
         this.clock = clock;
-        this.orphanedContainers = Counter.builder("sandbox.reconciler.orphaned")
-            .tag("resource", "container")
-            .description("Orphaned containers removed")
-            .register(meterRegistry);
-        this.orphanedNetworks = Counter.builder("sandbox.reconciler.orphaned")
-            .tag("resource", "network")
-            .description("Orphaned networks removed")
-            .register(meterRegistry);
-        this.completedSweeps = Counter.builder("sandbox.reconciler.sweeps")
-            .tag("outcome", "completed")
-            .description("Reconciliation sweeps that ran to completion")
-            .register(meterRegistry);
-        this.skippedSweeps = Counter.builder("sandbox.reconciler.sweeps")
-            .tag("outcome", "skipped")
-            .description("Reconciliation sweeps skipped because an inventory they depend on was unreadable")
-            .register(meterRegistry);
-        this.reconciliationDuration = Timer.builder("sandbox.reconciler.duration")
-            .description("Duration of periodic reconciliation sweeps")
-            .register(meterRegistry);
+        this.orphanedContainers = Counter.builder(AgentMetrics.SANDBOX_RECONCILER_ORPHANED)
+                .tag("resource", "container")
+                .description("Orphaned containers removed")
+                .register(meterRegistry);
+        this.orphanedNetworks = Counter.builder(AgentMetrics.SANDBOX_RECONCILER_ORPHANED)
+                .tag("resource", "network")
+                .description("Orphaned networks removed")
+                .register(meterRegistry);
+        this.completedSweeps = Counter.builder(AgentMetrics.SANDBOX_RECONCILER_SWEEPS)
+                .tag("outcome", "completed")
+                .description("Reconciliation sweeps that ran to completion")
+                .register(meterRegistry);
+        this.skippedSweeps = Counter.builder(AgentMetrics.SANDBOX_RECONCILER_SWEEPS)
+                .tag("outcome", "skipped")
+                .description("Reconciliation sweeps skipped because an inventory they depend on was unreadable")
+                .register(meterRegistry);
+        this.reconciliationDuration = Timer.builder(AgentMetrics.SANDBOX_RECONCILER_DURATION)
+                .description("Duration of periodic reconciliation sweeps")
+                .register(meterRegistry);
     }
 
     /** On startup, clean only resources on this worker's Docker daemon. */
@@ -126,12 +126,9 @@ public class SandboxReconciler {
     private Optional<Set<UUID>> activeJobIds() {
         try {
             return Optional.of(
-                jobRepository
-                    .findByStatusIn(List.of(AgentJobStatus.QUEUED, AgentJobStatus.RUNNING))
-                    .stream()
-                    .map(AgentJob::getId)
-                    .collect(Collectors.toSet())
-            );
+                    jobRepository.findByStatusIn(List.of(AgentJobStatus.QUEUED, AgentJobStatus.RUNNING)).stream()
+                            .map(AgentJob::getId)
+                            .collect(Collectors.toSet()));
         } catch (Exception e) {
             log.warn("Skipping sandbox reconciliation — active jobs are unreadable: {}", e.getMessage());
             skippedSweeps.increment();
@@ -141,10 +138,9 @@ public class SandboxReconciler {
 
     /** Periodic sweep: clean up orphaned Docker resources. */
     @Scheduled(
-        initialDelayString = "${hephaestus.sandbox.reconciliation-initial-delay-seconds:10}",
-        fixedDelayString = "${hephaestus.sandbox.reconciliation-interval-seconds:60}",
-        timeUnit = TimeUnit.SECONDS
-    )
+            initialDelayString = "${hephaestus.sandbox.reconciliation-initial-delay-seconds:10}",
+            fixedDelayString = "${hephaestus.sandbox.reconciliation-interval-seconds:60}",
+            timeUnit = TimeUnit.SECONDS)
     public void periodicReconciliation() {
         MDC.put(MDC_RECONCILER_TYPE, "periodic");
         try {
@@ -203,7 +199,8 @@ public class SandboxReconciler {
 
     /** The job set is read before the container list, so a sandbox started in between is not in it. */
     private boolean isYoung(DockerOperations.ContainerInfo container) {
-        return container.createdAt() == null || container.createdAt().isAfter(clock.instant().minus(REAP_GRACE));
+        return container.createdAt() == null
+                || container.createdAt().isAfter(clock.instant().minus(REAP_GRACE));
     }
 
     private static Optional<UUID> parseUuid(@Nullable String value) {
@@ -239,10 +236,9 @@ public class SandboxReconciler {
                             networkManager.disconnectAppServer(network.id());
                         } catch (Exception disconnectEx) {
                             log.debug(
-                                "Could not disconnect app-server from orphaned network {}: {}",
-                                name,
-                                disconnectEx.getMessage()
-                            );
+                                    "Could not disconnect app-server from orphaned network {}: {}",
+                                    name,
+                                    disconnectEx.getMessage());
                         }
                         networkManager.removeNetwork(network.id());
                         orphanedNetworks.increment();

@@ -12,29 +12,38 @@ import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import jakarta.validation.constraints.NotNull;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.Immutable;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import org.jspecify.annotations.Nullable;
 
 @Entity
 @Immutable
 @Table(
-    name = "feedback",
-    uniqueConstraints = { @UniqueConstraint(name = "uk_feedback_unit", columnNames = { "agent_job_id", "position" }) },
-    indexes = {
-        @Index(name = "idx_feedback_agent_job", columnList = "agent_job_id"),
-        @Index(name = "idx_feedback_workspace", columnList = "workspace_id"),
-        @Index(name = "idx_feedback_workspace_created", columnList = "workspace_id, created_at DESC, id DESC"),
-        @Index(name = "idx_feedback_recipient_created", columnList = "recipient_user_id, created_at DESC"),
-        @Index(name = "idx_feedback_target", columnList = "artifact_kind, artifact_id"),
-        @Index(name = "idx_feedback_continuity", columnList = "thread_key"),
-        @Index(name = "idx_feedback_replaces", columnList = "replaces_id"),
-    }
-)
+        name = "feedback",
+        uniqueConstraints = {
+            @UniqueConstraint(
+                    name = "uk_feedback_unit",
+                    columnNames = {"agent_job_id", "position"}),
+            @UniqueConstraint(
+                    name = "uk_feedback_workspace_id",
+                    columnNames = {"workspace_id", "id"}),
+        },
+        indexes = {
+            @Index(name = "idx_feedback_agent_job", columnList = "agent_job_id"),
+            @Index(name = "idx_feedback_workspace", columnList = "workspace_id"),
+            @Index(name = "idx_feedback_workspace_created", columnList = "workspace_id, created_at DESC, id DESC"),
+            @Index(name = "idx_feedback_recipient_created", columnList = "recipient_user_id, created_at DESC"),
+            @Index(name = "idx_feedback_target", columnList = "artifact_kind, artifact_id"),
+            @Index(name = "idx_feedback_continuity", columnList = "thread_key"),
+            @Index(name = "idx_feedback_replaces", columnList = "replaces_id"),
+        })
 @Getter
 @Builder
 @NoArgsConstructor
@@ -82,13 +91,25 @@ public class Feedback {
     @Column(name = "delivery_state", nullable = false, length = 32)
     private FeedbackDeliveryState deliveryState;
 
-    /** Why a unit was withheld. Set iff {@link #deliveryState} is {@code SUPPRESSED}; NULL otherwise. */
     @Enumerated(EnumType.STRING)
     @Column(name = "suppression_reason", length = 32)
     private @Nullable FeedbackSuppressionReason suppressionReason;
 
     @Column(name = "body", columnDefinition = "TEXT")
     private @Nullable String body;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "proposed_placements", nullable = false, columnDefinition = "jsonb")
+    @Builder.Default
+    private List<ProposedPlacement> proposedPlacements = List.of();
+
+    @Column(name = "reviewed_revision", length = 64)
+    private @Nullable String reviewedRevision;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "proposed_practice_slugs", nullable = false, columnDefinition = "jsonb")
+    @Builder.Default
+    private List<String> proposedPracticeSlugs = List.of();
 
     @NotNull
     @Enumerated(EnumType.STRING)

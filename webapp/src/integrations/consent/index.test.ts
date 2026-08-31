@@ -1,16 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import {
 	CONSENT_STORAGE_KEY,
 	CONSENT_VERSION,
 	closeConsentReopen,
 	getStoredConsent,
+	hasErrorMonitoringConsent,
 	isConsentReopenRequested,
 	requestConsentReopen,
 	setStoredConsent,
 	subscribeConsent,
 } from "./index";
 
-describe("consent store", () => {
+describe("cookie consent", () => {
 	beforeEach(() => {
 		// getStoredConsent re-reads when the raw value changes, so clearing localStorage is enough to
 		// reset the module-level snapshot cache between tests.
@@ -24,33 +26,27 @@ describe("consent store", () => {
 		expect(getStoredConsent()).toBeNull();
 	});
 
-	it("persists a decision (stamped with the current version) and reads it back", () => {
-		setStoredConsent({ analytics: true, errorMonitoring: false });
+	it("stores only the configured error-monitoring choice at the current version", () => {
+		setStoredConsent({ errorMonitoring: true });
 		const stored = getStoredConsent();
-		expect(stored?.analytics).toBe(true);
-		expect(stored?.errorMonitoring).toBe(false);
-		expect(stored?.version).toBe(CONSENT_VERSION);
+		expect(stored).toMatchObject({ errorMonitoring: true, version: CONSENT_VERSION });
 		expect(typeof stored?.decidedAt).toBe("string");
+		expect(hasErrorMonitoringConsent()).toBe(true);
 	});
 
-	it("treats malformed or incomplete stored values as no decision", () => {
-		localStorage.setItem(CONSENT_STORAGE_KEY, "not json");
+	it("treats malformed or incomplete terminal storage as no decision", () => {
+		localStorage.setItem(CONSENT_STORAGE_KEY, "not-json");
 		expect(getStoredConsent()).toBeNull();
-		localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify({ analytics: true }));
+		localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify({ decidedAt: "x" }));
 		expect(getStoredConsent()).toBeNull();
 	});
 
-	// `"false"` is truthy, so reading this key for truthiness would turn analytics on for someone
-	// who declined — and anything can write the key.
+	// `"false"` is truthy, so reading this key for truthiness would turn error monitoring on for
+	// someone who declined — and anything can write the key.
 	it("treats a decision whose flags are not booleans as no decision, rather than taking it as given", () => {
 		localStorage.setItem(
 			CONSENT_STORAGE_KEY,
-			JSON.stringify({
-				analytics: "false",
-				errorMonitoring: "true",
-				decidedAt: "x",
-				version: CONSENT_VERSION,
-			}),
+			JSON.stringify({ errorMonitoring: "true", decidedAt: "x", version: CONSENT_VERSION }),
 		);
 
 		expect(getStoredConsent()).toBeNull();
@@ -59,17 +55,13 @@ describe("consent store", () => {
 	it("re-prompts (treats as no decision) when the stored consent version is older/missing", () => {
 		localStorage.setItem(
 			CONSENT_STORAGE_KEY,
-			JSON.stringify({ analytics: true, errorMonitoring: true, decidedAt: "x" }), // no version
+			JSON.stringify({ errorMonitoring: true, decidedAt: "x" }), // no version
 		);
 		expect(getStoredConsent()).toBeNull();
+		// Version 1 is the former consent surface, which still carried an analytics category.
 		localStorage.setItem(
 			CONSENT_STORAGE_KEY,
-			JSON.stringify({
-				analytics: true,
-				errorMonitoring: true,
-				decidedAt: "x",
-				version: CONSENT_VERSION - 1,
-			}),
+			JSON.stringify({ errorMonitoring: true, decidedAt: "x", version: CONSENT_VERSION - 1 }),
 		);
 		expect(getStoredConsent()).toBeNull();
 	});
@@ -77,19 +69,41 @@ describe("consent store", () => {
 	it("returns a referentially stable snapshot while the raw value is unchanged", () => {
 		// Guards the useSyncExternalStore getSnapshot contract: an unstable snapshot would crash the
 		// consumer hook with an infinite render loop.
-		setStoredConsent({ analytics: false, errorMonitoring: true });
+		setStoredConsent({ errorMonitoring: true });
+		expect(getStoredConsent()).toBe(getStoredConsent());
+	});
+
+	it("returns a stable null snapshot before any decision exists", () => {
+		// Also part of the getSnapshot contract: the no-decision answer must not be recomputed into
+		// a fresh value on every read.
+		expect(getStoredConsent()).toBeNull();
 		expect(getStoredConsent()).toBe(getStoredConsent());
 	});
 
 	it("requestConsentReopen opens edit mode until the next decision is recorded", () => {
-		setStoredConsent({ analytics: true, errorMonitoring: false });
+		setStoredConsent({ errorMonitoring: false });
 		expect(isConsentReopenRequested()).toBe(false);
 
 		requestConsentReopen();
 		expect(isConsentReopenRequested()).toBe(true);
 
 		// Saving (or cancelling) closes edit mode.
-		setStoredConsent({ analytics: false, errorMonitoring: false });
+		setStoredConsent({ errorMonitoring: false });
+		expect(isConsentReopenRequested()).toBe(false);
+	});
+
+	it("closes edit mode even when the decision cannot be persisted", () => {
+		// With localStorage blocked (private mode, quota) the banner must still close and
+		// subscribers must still re-read; the decision is simply not persisted.
+		requestConsentReopen();
+		const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+			throw new DOMException("QuotaExceededError");
+		});
+		try {
+			setStoredConsent({ errorMonitoring: true });
+		} finally {
+			setItem.mockRestore();
+		}
 		expect(isConsentReopenRequested()).toBe(false);
 	});
 
@@ -100,11 +114,11 @@ describe("consent store", () => {
 	it("notifies subscribers on set and on reopen", () => {
 		const listener = vi.fn();
 		const unsubscribe = subscribeConsent(listener);
-		setStoredConsent({ analytics: true, errorMonitoring: false });
+		setStoredConsent({ errorMonitoring: false });
 		requestConsentReopen();
 		expect(listener).toHaveBeenCalledTimes(2);
 		unsubscribe();
-		setStoredConsent({ analytics: false, errorMonitoring: false });
+		setStoredConsent({ errorMonitoring: false });
 		expect(listener).toHaveBeenCalledTimes(2);
 	});
 });

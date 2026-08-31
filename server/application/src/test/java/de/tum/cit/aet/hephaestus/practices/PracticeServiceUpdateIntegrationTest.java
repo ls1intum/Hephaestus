@@ -32,8 +32,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 class PracticeServiceUpdateIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     private static final String ONE_OCCASION_REFUSAL =
-        "A practice is reviewed on one occasion. To read different evidence at a different moment, " +
-        "split this into two practices.";
+            "A practice is reviewed on one occasion. To read different evidence at a different moment, "
+                    + "split this into two practices.";
 
     @Autowired
     private PracticeService practiceService;
@@ -60,18 +60,11 @@ class PracticeServiceUpdateIntegrationTest extends AbstractWorkspaceIntegrationT
         practice.setWorkspace(workspace);
         practice.setSlug(slug);
         practice.setName("Before the rule");
-        practice.setBindings(
-            List.of(
+        practice.setBindings(List.of(
                 PracticeBinding.on(
-                    ScmSignals.PULL_REQUEST_OPENED,
-                    PracticeTestEvidence.needsFor(ArtifactKinds.PULL_REQUEST)
-                ),
+                        ScmSignals.PULL_REQUEST_OPENED, PracticeTestEvidence.needsFor(ArtifactKinds.PULL_REQUEST)),
                 PracticeBinding.on(
-                    ScmSignals.PULL_REQUEST_MERGED,
-                    PracticeTestEvidence.needsFor(ArtifactKinds.PULL_REQUEST)
-                )
-            )
-        );
+                        ScmSignals.PULL_REQUEST_MERGED, PracticeTestEvidence.needsFor(ArtifactKinds.PULL_REQUEST))));
         practice.setCriteria("Assess the review");
         practice.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST));
         practice.setAutonomy(PracticeAutonomy.AUTOMATIC);
@@ -84,10 +77,9 @@ class PracticeServiceUpdateIntegrationTest extends AbstractWorkspaceIntegrationT
         persistTwoOccasionPractice("stored-with-two");
 
         Practice updated = practiceService.updatePractice(
-            ctx,
-            "stored-with-two",
-            new UpdatePracticeRequestDTO("After the rule", null, null, null, null, null, null, null, null)
-        );
+                ctx,
+                "stored-with-two",
+                new UpdatePracticeRequestDTO("After the rule", null, null, null, null, null, null, null, null));
 
         assertThat(updated.getName()).isEqualTo("After the rule");
         // Untouched, not truncated: an edit that says nothing about occasions decides nothing about them.
@@ -99,34 +91,27 @@ class PracticeServiceUpdateIntegrationTest extends AbstractWorkspaceIntegrationT
     void refusesASecondOccasionTheCallerSubmits() {
         persistTwoOccasionPractice("submits-two");
 
-        assertThatThrownBy(() ->
-            practiceService.updatePractice(
-                ctx,
-                "submits-two",
-                new UpdatePracticeRequestDTO(
-                    null,
-                    List.of(
-                        PracticeBinding.on(
-                            ScmSignals.PULL_REQUEST_OPENED,
-                            PracticeTestEvidence.needsFor(ArtifactKinds.PULL_REQUEST)
-                        ),
-                        PracticeBinding.on(
-                            ScmSignals.PULL_REQUEST_REVIEWED,
-                            PracticeTestEvidence.needsFor(ArtifactKinds.PULL_REQUEST)
-                        )
-                    ),
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null
-                )
-            )
-        )
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage(ONE_OCCASION_REFUSAL);
+        assertThatThrownBy(() -> practiceService.updatePractice(
+                        ctx,
+                        "submits-two",
+                        new UpdatePracticeRequestDTO(
+                                null,
+                                List.of(
+                                        PracticeBinding.on(
+                                                ScmSignals.PULL_REQUEST_OPENED,
+                                                PracticeTestEvidence.needsFor(ArtifactKinds.PULL_REQUEST)),
+                                        PracticeBinding.on(
+                                                ScmSignals.PULL_REQUEST_REVIEWED,
+                                                PracticeTestEvidence.needsFor(ArtifactKinds.PULL_REQUEST))),
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage(ONE_OCCASION_REFUSAL);
     }
 
     @Test
@@ -135,25 +120,20 @@ class PracticeServiceUpdateIntegrationTest extends AbstractWorkspaceIntegrationT
         persistTwoOccasionPractice("collapses-to-one");
 
         Practice updated = practiceService.updatePractice(
-            ctx,
-            "collapses-to-one",
-            new UpdatePracticeRequestDTO(
-                null,
-                List.of(
-                    PracticeBinding.on(
-                        ScmSignals.PULL_REQUEST_MERGED,
-                        PracticeTestEvidence.needsFor(ArtifactKinds.PULL_REQUEST)
-                    )
-                ),
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null
-            )
-        );
+                ctx,
+                "collapses-to-one",
+                new UpdatePracticeRequestDTO(
+                        null,
+                        List.of(PracticeBinding.on(
+                                ScmSignals.PULL_REQUEST_MERGED,
+                                PracticeTestEvidence.needsFor(ArtifactKinds.PULL_REQUEST))),
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null));
 
         assertThat(updated.getBindings()).hasSize(1);
         assertThat(updated.getBindings().getFirst().signals()).containsExactly(ScmSignals.PULL_REQUEST_MERGED);
@@ -168,25 +148,13 @@ class PracticeServiceUpdateIntegrationTest extends AbstractWorkspaceIntegrationT
     void stillValidatesTheRestOfAnEditToATwoOccasionPractice() {
         persistTwoOccasionPractice("still-validated");
 
-        assertThatThrownBy(() ->
-            practiceService.updatePractice(
-                ctx,
-                "still-validated",
-                new UpdatePracticeRequestDTO(
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    "Say PRESENT when it is there",
-                    null,
-                    null,
-                    null
-                )
-            )
-        )
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("Why it matters is guidance for people and must not use detector result labels");
+        assertThatThrownBy(() -> practiceService.updatePractice(
+                        ctx,
+                        "still-validated",
+                        new UpdatePracticeRequestDTO(
+                                null, null, null, null, null, "Say PRESENT when it is there", null, null, null)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Why it matters is guidance for people and must not use detector result labels");
     }
 
     /** A one-occasion practice — every other practice on the instance — is unaffected. */
@@ -203,12 +171,10 @@ class PracticeServiceUpdateIntegrationTest extends AbstractWorkspaceIntegrationT
         practice.setAutonomy(PracticeAutonomy.AUTOMATIC);
         practiceRepository.save(practice);
 
-        assertThatCode(() ->
-            practiceService.updatePractice(
-                ctx,
-                "ordinary",
-                new UpdatePracticeRequestDTO("Renamed", null, null, null, null, null, null, null, null)
-            )
-        ).doesNotThrowAnyException();
+        assertThatCode(() -> practiceService.updatePractice(
+                        ctx,
+                        "ordinary",
+                        new UpdatePracticeRequestDTO("Renamed", null, null, null, null, null, null, null, null)))
+                .doesNotThrowAnyException();
     }
 }

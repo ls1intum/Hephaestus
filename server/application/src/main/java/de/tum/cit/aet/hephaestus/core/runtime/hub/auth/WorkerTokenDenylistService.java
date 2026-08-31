@@ -27,7 +27,10 @@ public class WorkerTokenDenylistService {
 
     public WorkerTokenDenylistService(WorkerTokenDenylistRepository repository) {
         this.repository = repository;
-        this.cache = Caffeine.newBuilder().maximumSize(10_000).expireAfterWrite(CACHE_TTL).build();
+        this.cache = Caffeine.newBuilder()
+                .maximumSize(10_000)
+                .expireAfterWrite(CACHE_TTL)
+                .build();
     }
 
     public boolean isRevoked(String jti) {

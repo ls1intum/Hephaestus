@@ -13,7 +13,6 @@ import org.springframework.validation.annotation.Validated;
  * hephaestus:
  *   features:
  *     flags:
- *       practice-review-for-all: false
  *       gitlab-workspace-creation: false
  * }</pre>
  *

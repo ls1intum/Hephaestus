@@ -1,4 +1,5 @@
 import { Settings2Icon } from "lucide-react";
+
 import type { RepositoryInfo } from "@/api/types.gen";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";

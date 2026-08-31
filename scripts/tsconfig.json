@@ -3,11 +3,14 @@
 		"target": "ES2023",
 		"module": "ESNext",
 		"moduleResolution": "Bundler",
-		// Node runs these files as they are, and it resolves an import specifier literally, so a sibling
-		// module is imported by the name it has on disk. Nothing is ever emitted.
 		"allowImportingTsExtensions": true,
-		"lib": ["ES2023"],
+		// ESNext, not ES2023: Array.fromAsync ships in Node 24 but only lib.esnext types it.
+		"lib": ["ESNext", "DOM", "DOM.Iterable"],
 		"strict": true,
+		// The workflows import preview-controller.ts through actions/github-script, which runs on
+		// Node type stripping rather than a transpiler; syntax that needs a transform would fail there at
+		// runtime with no local signal.
+		"erasableSyntaxOnly": true,
 		"noEmit": true,
 		"noUncheckedIndexedAccess": true,
 		"noImplicitReturns": true,

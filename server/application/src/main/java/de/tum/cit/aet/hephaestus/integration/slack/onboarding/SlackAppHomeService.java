@@ -53,16 +53,15 @@ public class SlackAppHomeService {
     private final SlackHephaestusUiLinks uiLinks;
 
     public SlackAppHomeService(
-        SlackWorkspaceResolver workspaceResolver,
-        SlackMentorIdentityResolver identityResolver,
-        AccountPreferencesQuery preferencesQuery,
-        SlackParticipantConsentRepository participantConsentRepository,
-        SlackMonitoredChannelRepository monitoredChannelRepository,
-        MentorReadinessQuery mentorReadinessQuery,
-        SlackMessageService messageService,
-        SlackOnboardingService onboardingService,
-        SlackHephaestusUiLinks uiLinks
-    ) {
+            SlackWorkspaceResolver workspaceResolver,
+            SlackMentorIdentityResolver identityResolver,
+            AccountPreferencesQuery preferencesQuery,
+            SlackParticipantConsentRepository participantConsentRepository,
+            SlackMonitoredChannelRepository monitoredChannelRepository,
+            MentorReadinessQuery mentorReadinessQuery,
+            SlackMessageService messageService,
+            SlackOnboardingService onboardingService,
+            SlackHephaestusUiLinks uiLinks) {
         this.workspaceResolver = workspaceResolver;
         this.identityResolver = identityResolver;
         this.preferencesQuery = preferencesQuery;
@@ -93,24 +92,16 @@ public class SlackAppHomeService {
         boolean mentorReady = mentorReadinessQuery.isReady(workspaceId);
         Optional<String> login = identityResolver.resolveDeveloperLogin(workspaceId, teamId, slackUserId);
         boolean channelMessagesAllowed =
-            !participantConsentRepository.existsByWorkspaceIdAndSlackUserIdAndIngestionOptedOutTrue(
-                workspaceId,
-                slackUserId
-            );
-        long activeChannels = monitoredChannelRepository.countByWorkspaceIdAndConsentState(
-            workspaceId,
-            ConsentState.ACTIVE
-        );
-        boolean participating = login
-            .flatMap(preferencesQuery::preferencesForLogin)
-            .map(AccountPreferencesQuery.PreferencesView::participateInResearch)
-            .orElse(true); // opt-out model: default participation is on until the user turns it off
+                !participantConsentRepository.existsByWorkspaceIdAndSlackUserIdAndIngestionOptedOutTrue(
+                        workspaceId, slackUserId);
+        long activeChannels =
+                monitoredChannelRepository.countByWorkspaceIdAndConsentState(workspaceId, ConsentState.ACTIVE);
+        boolean participating = login.flatMap(preferencesQuery::preferencesForLogin)
+                .map(AccountPreferencesQuery.PreferencesView::participateInResearch)
+                .orElse(false);
 
-        blocks.addAll(
-            overviewBlocks(
-                new HomeOverviewState(mentorReady, login, channelMessagesAllowed, activeChannels, participating)
-            )
-        );
+        blocks.addAll(overviewBlocks(
+                new HomeOverviewState(mentorReady, login, channelMessagesAllowed, activeChannels, participating)));
         blocks.addAll(openHephaestusBlocks(uiLinks.userSettingsUrl()));
         blocks.add(divider());
         blocks.addAll(channelMessageBlocks(channelMessagesAllowed));
@@ -135,110 +126,66 @@ public class SlackAppHomeService {
         } else {
             mentorState = "Ready to answer";
         }
-        String accountState = state
-            .login()
-            .map(value -> "Linked as `" + value + "`")
-            .orElse("Not linked");
+        String accountState =
+                state.login().map(value -> "Linked as `" + value + "`").orElse("Not linked");
         String activeChannelText =
-            state.activeChannels() == 1 ? "1 active channel" : state.activeChannels() + " active channels";
-        String researchState = state.login().isEmpty()
-            ? "Link account first"
-            : state.participating()
-                ? "Included"
-                : "Not included";
+                state.activeChannels() == 1 ? "1 active channel" : state.activeChannels() + " active channels";
+        String researchState =
+                state.login().isEmpty() ? "Link account first" : state.participating() ? "Included" : "Not included";
         return List.of(
-            section(s -> s.text(markdownText(leadText(state.mentorReady(), state.login())))),
-            section(s ->
-                s.fields(
-                    List.of(
-                        markdownText(
-                            "*Mentor*\n" +
-                                stateIcon(state.mentorReady() && state.login().isPresent()) +
-                                " " +
-                                mentorState
-                        ),
+                section(s -> s.text(markdownText(leadText(state.mentorReady(), state.login())))),
+                section(s -> s.fields(List.of(
+                        markdownText("*Mentor*\n"
+                                + stateIcon(state.mentorReady() && state.login().isPresent())
+                                + " "
+                                + mentorState),
                         markdownText("*Account*\n" + stateIcon(state.login().isPresent()) + " " + accountState),
+                        markdownText("*Channel context*\n"
+                                + stateIcon(state.channelMessagesAllowed() && state.activeChannels() > 0)
+                                + " "
+                                + (state.channelMessagesAllowed() ? "Allowed, " + activeChannelText : "Not allowed")),
                         markdownText(
-                            "*Channel context*\n" +
-                                stateIcon(state.channelMessagesAllowed() && state.activeChannels() > 0) +
-                                " " +
-                                (state.channelMessagesAllowed() ? "Allowed, " + activeChannelText : "Not allowed")
-                        ),
-                        markdownText(
-                            "*Research use*\n" +
-                                stateIcon(state.login().isPresent() && state.participating()) +
-                                " " +
-                                researchState
-                        )
-                    )
-                )
-            ),
-            section(s ->
-                s.text(
-                    markdownText(
-                        "*Context and privacy.* Hephaestus can use your linked project work and new messages " +
-                            "you send in monitored channels. It does not read channel history from before the " +
-                            "channel was activated. It does not mentor in channels."
-                    )
-                )
-            )
-        );
+                                "*Research use*\n" + stateIcon(state.login().isPresent() && state.participating())
+                                        + " "
+                                        + researchState)))),
+                section(s -> s.text(markdownText(
+                        "*Context and privacy.* Hephaestus can use your linked project work and new messages "
+                                + "you send in monitored channels. It does not read channel history from before the "
+                                + "channel was activated. It does not mentor in channels."))));
     }
 
     record HomeOverviewState(
-        boolean mentorReady,
-        Optional<String> login,
-        boolean channelMessagesAllowed,
-        long activeChannels,
-        boolean participating
-    ) {}
+            boolean mentorReady,
+            Optional<String> login,
+            boolean channelMessagesAllowed,
+            long activeChannels,
+            boolean participating) {}
 
     private static List<LayoutBlock> openHephaestusBlocks(String url) {
         if (url == null || url.isBlank()) {
             return List.of();
         }
         return List.of(
-            section(s ->
-                s.text(
-                    markdownText(
-                        "*Account settings.* Use this Home tab for Slack message-use controls. " +
-                            "Open Hephaestus to manage sign-in, account linking, and web preferences."
-                    )
-                )
-            ),
-            actions(a ->
-                a.elements(
-                    asElements(
-                        button(b ->
-                            b
-                                .text(plainText("Open account settings"))
-                                .url(url)
-                                .actionId(ACTION_OPEN_HEPHAESTUS)
-                                .style("primary")
-                        )
-                    )
-                )
-            )
-        );
+                section(s ->
+                        s.text(markdownText("*Account settings.* Use this Home tab for Slack message-use controls. "
+                                + "Open Hephaestus to manage sign-in, account linking, and web preferences."))),
+                actions(a -> a.elements(asElements(button(b -> b.text(plainText("Open account settings"))
+                        .url(url)
+                        .actionId(ACTION_OPEN_HEPHAESTUS)
+                        .style("primary"))))));
     }
 
     private static String leadText(boolean mentorReady, Optional<String> login) {
         if (!mentorReady) {
-            return (
-                "*Mentor unavailable.* The mentor is disabled or not configured for this workspace. " +
-                "You can still manage privacy here."
-            );
+            return ("*Mentor unavailable.* The mentor is disabled or not configured for this workspace. "
+                    + "You can still manage privacy here.");
         }
         if (login.isEmpty()) {
-            return (
-                "*Link your account to use the mentor.* Hephaestus needs your project identity before it can " +
-                "answer with your project context. You can still manage channel-message privacy here."
-            );
+            return ("*Link your account to use the mentor.* Hephaestus needs your project identity before it can "
+                    + "answer with your project context. You can still manage channel-message privacy here.");
         }
-        return (
-            "*AI mentor for software project practices.* Ask in the Messages tab about PRs, reviews, issues, " +
-            "tests, or team habits. Replies stay in DM."
-        );
+        return ("*AI mentor for software project practices.* Ask in the Messages tab about PRs, reviews, issues, "
+                + "tests, or team habits. Replies stay in DM.");
     }
 
     private static String stateIcon(boolean ok) {
@@ -247,78 +194,51 @@ public class SlackAppHomeService {
 
     List<LayoutBlock> channelMessageBlocks(boolean allowed) {
         String status = allowed
-            ? "*Channel-message context is allowed.* New messages you send in monitored channels may personalize " +
-              "private mentoring. Turning this off stops future use and deletes channel-message data collected from you."
-            : "*Channel-message context is not allowed.* Hephaestus does not use your messages in monitored channels.";
+                ? "*Channel-message context is allowed.* New messages you send in monitored channels may personalize "
+                        + "private mentoring. Turning this off stops future use and deletes channel-message data collected from you."
+                : "*Channel-message context is not allowed.* Hephaestus does not use your messages in monitored channels.";
         return List.of(
-            section(s -> s.text(markdownText(status))),
-            actions(a ->
-                a.elements(
-                    asElements(
+                section(s -> s.text(markdownText(status))),
+                actions(a -> a.elements(asElements(
                         allowed
-                            ? button(b ->
-                                  b
-                                      .text(plainText("Stop using my messages"))
-                                      .actionId(ACTION_CHANNEL_MESSAGES_OPT_OUT)
-                                      .value("false")
-                                      .style("danger")
-                                      .confirm(SlackConsentBlocks.channelMessageOptOutConfirm())
-                              )
-                            : button(b ->
-                                  b
-                                      .text(plainText("Allow future messages"))
-                                      .actionId(ACTION_CHANNEL_MESSAGES_OPT_IN)
-                                      .value("true")
-                                      .style("primary")
-                                      .confirm(channelMessageOptInConfirm())
-                              )
-                    )
-                )
-            )
-        );
+                                ? button(b -> b.text(plainText("Stop using my messages"))
+                                        .actionId(ACTION_CHANNEL_MESSAGES_OPT_OUT)
+                                        .value("false")
+                                        .style("danger")
+                                        .confirm(SlackConsentBlocks.channelMessageOptOutConfirm()))
+                                : button(b -> b.text(plainText("Allow future messages"))
+                                        .actionId(ACTION_CHANNEL_MESSAGES_OPT_IN)
+                                        .value("true")
+                                        .style("primary")
+                                        .confirm(channelMessageOptInConfirm()))))));
     }
 
     private static ConfirmationDialogObject channelMessageOptInConfirm() {
         return ConfirmationDialogObject.builder()
-            .title(plainText("Allow future channel messages?"))
-            .text(
-                plainText(
-                    "This allows Hephaestus to use new messages you send in monitored channels. Deleted data is " +
-                        "not restored."
-                )
-            )
-            .confirm(plainText("Allow future messages"))
-            .deny(plainText("Cancel"))
-            .build();
+                .title(plainText("Allow future channel messages?"))
+                .text(plainText(
+                        "This allows Hephaestus to use new messages you send in monitored channels. Deleted data is "
+                                + "not restored."))
+                .confirm(plainText("Allow future messages"))
+                .deny(plainText("Cancel"))
+                .build();
     }
 
     List<LayoutBlock> researchToggleBlocks(boolean participating) {
         String status = participating
-            ? "*Research use is included.* De-identified practice data may be used to improve Hephaestus research."
-            : "*Research use is not included.* Your practice data is not used for research.";
+                ? "*Research use is included.* De-identified practice data may be used to improve Hephaestus research."
+                : "*Research use is not included.* Your practice data is not used for research.";
         return List.of(
-            section(s -> s.text(markdownText(status))),
-            actions(a ->
-                a.elements(
-                    asElements(
+                section(s -> s.text(markdownText(status))),
+                actions(a -> a.elements(asElements(
                         participating
-                            ? button(b ->
-                                  b
-                                      .text(plainText("Stop research use"))
-                                      .actionId(ACTION_RESEARCH_OPT_OUT)
-                                      .value("false")
-                                      .style("danger")
-                              )
-                            : button(b ->
-                                  b
-                                      .text(plainText("Allow research use"))
-                                      .actionId(ACTION_RESEARCH_OPT_IN)
-                                      .value("true")
-                                      .style("primary")
-                              )
-                    )
-                )
-            )
-        );
+                                ? button(b -> b.text(plainText("Stop research use"))
+                                        .actionId(ACTION_RESEARCH_OPT_OUT)
+                                        .value("false")
+                                        .style("danger"))
+                                : button(b -> b.text(plainText("Allow research use"))
+                                        .actionId(ACTION_RESEARCH_OPT_IN)
+                                        .value("true")
+                                        .style("primary"))))));
     }
 }

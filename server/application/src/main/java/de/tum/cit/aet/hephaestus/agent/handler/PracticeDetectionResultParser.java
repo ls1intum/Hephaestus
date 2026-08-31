@@ -32,22 +32,15 @@ public class PracticeDetectionResultParser {
 
     /** Only practices with correctness, security, or integrity consequences may block a merge. */
     static final Set<String> BLOCKING_ELIGIBLE_PRACTICES = Set.of(
-        "handles-errors-instead-of-swallowing-them",
-        "validates-inputs-and-edge-cases-at-the-boundary",
-        "avoids-unsafe-panics-and-chosen-crashes",
-        "validates-and-escapes-untrusted-input",
-        "avoids-insecure-defaults-and-over-broad-permissions",
-        "keeps-the-test-suite-honest"
-    );
-    private static final Set<String> OBSERVATION_FIELDS = Set.of(
-        "practiceSlug",
-        "summary",
-        "presence",
-        "assessment",
-        "severity",
-        "evidence",
-        "evidenceRationale"
-    );
+            "handles-errors-instead-of-swallowing-them",
+            "validates-inputs-and-edge-cases-at-the-boundary",
+            "avoids-unsafe-panics-and-chosen-crashes",
+            "validates-and-escapes-untrusted-input",
+            "avoids-insecure-defaults-and-over-broad-permissions",
+            "keeps-the-test-suite-honest");
+
+    private static final Set<String> OBSERVATION_FIELDS =
+            Set.of("practiceSlug", "summary", "presence", "assessment", "severity", "evidence", "evidenceRationale");
 
     static final int MAX_DELIVERY_DIFF_NOTES = 30;
 
@@ -57,7 +50,10 @@ public class PracticeDetectionResultParser {
     public PracticeDetectionResultParser(JsonMapper objectMapper) {
         this.objectMapper = objectMapper;
         // LLMs produce JSON with literal newlines/tabs/control chars inside string values that strict JSON rejects.
-        this.lenientMapper = objectMapper.rebuild().enable(JsonReadFeature.ALLOW_UNESCAPED_CONTROL_CHARS).build();
+        this.lenientMapper = objectMapper
+                .rebuild()
+                .enable(JsonReadFeature.ALLOW_UNESCAPED_CONTROL_CHARS)
+                .build();
     }
 
     public ParseResult parse(@Nullable JsonNode jobOutput) {
@@ -122,12 +118,10 @@ public class PracticeDetectionResultParser {
     }
 
     private ValidatedObservation validateEntry(JsonNode entry, int index) {
-        List<String> unknownFields = entry
-            .properties()
-            .stream()
-            .map(java.util.Map.Entry::getKey)
-            .filter(field -> !OBSERVATION_FIELDS.contains(field))
-            .toList();
+        List<String> unknownFields = entry.properties().stream()
+                .map(java.util.Map.Entry::getKey)
+                .filter(field -> !OBSERVATION_FIELDS.contains(field))
+                .toList();
         if (!unknownFields.isEmpty()) {
             throw new EntryValidationException("unknown observation fields: " + unknownFields);
         }
@@ -168,19 +162,11 @@ public class PracticeDetectionResultParser {
         }
         if (evidenceRationale.length() > MAX_EVIDENCE_RATIONALE_LENGTH) {
             throw new EntryValidationException(
-                "evidenceRationale exceeds " + MAX_EVIDENCE_RATIONALE_LENGTH + " characters"
-            );
+                    "evidenceRationale exceeds " + MAX_EVIDENCE_RATIONALE_LENGTH + " characters");
         }
 
         return new ValidatedObservation(
-            practiceSlug,
-            summary,
-            presence,
-            assessment,
-            severity,
-            evidence,
-            evidenceRationale
-        );
+                practiceSlug, summary, presence, assessment, severity, evidence, evidenceRationale);
     }
 
     /** Assessment exists only for outcomes that carry valence. */
@@ -255,9 +241,8 @@ public class PracticeDetectionResultParser {
     }
 
     private static boolean isValidJsonEscapeChar(char c) {
-        return (
-            c == '"' || c == '\\' || c == '/' || c == 'b' || c == 'f' || c == 'n' || c == 'r' || c == 't' || c == 'u'
-        );
+        return (c == '"' || c == '\\' || c == '/' || c == 'b' || c == 'f' || c == 'n' || c == 'r' || c == 't'
+                || c == 'u');
     }
 
     /**
@@ -315,39 +300,29 @@ public class PracticeDetectionResultParser {
      *     observation. {@code null} until stamped — the parser leaves it unset.
      */
     public record ValidatedObservation(
-        String practiceSlug,
-        String summary,
-        Presence presence,
-        @Nullable Assessment assessment,
-        @Nullable Severity severity,
-        @Nullable JsonNode evidence,
-        @Nullable String evidenceRationale,
-        @Nullable ObservationKeys keys
-    ) {
-        /** The parser's output shape: an observation not yet stamped with its persisted identities. */
-        public ValidatedObservation(
             String practiceSlug,
             String summary,
             Presence presence,
             @Nullable Assessment assessment,
             @Nullable Severity severity,
             @Nullable JsonNode evidence,
-            @Nullable String evidenceRationale
-        ) {
+            @Nullable String evidenceRationale,
+            @Nullable ObservationKeys keys) {
+        /** The parser's output shape: an observation not yet stamped with its persisted identities. */
+        public ValidatedObservation(
+                String practiceSlug,
+                String summary,
+                Presence presence,
+                @Nullable Assessment assessment,
+                @Nullable Severity severity,
+                @Nullable JsonNode evidence,
+                @Nullable String evidenceRationale) {
             this(practiceSlug, summary, presence, assessment, severity, evidence, evidenceRationale, null);
         }
 
         public ValidatedObservation withKeys(@Nullable ObservationKeys keys) {
             return new ValidatedObservation(
-                practiceSlug,
-                summary,
-                presence,
-                assessment,
-                severity,
-                evidence,
-                evidenceRationale,
-                keys
-            );
+                    practiceSlug, summary, presence, assessment, severity, evidence, evidenceRationale, keys);
         }
 
         public @Nullable String recurrenceKey() {
@@ -366,15 +341,13 @@ public class PracticeDetectionResultParser {
             if (isDefectDetector && a == Assessment.GOOD && p == Presence.PRESENT) {
                 p = Presence.NOT_APPLICABLE;
                 a = null;
-                r =
-                    "[auto-downgraded: defect-detector practice has no clean-bill-of-health observation] " +
-                    evidenceRationale;
+                r = "[auto-downgraded: defect-detector practice has no clean-bill-of-health observation] "
+                        + evidenceRationale;
             }
             if (!p.carriesValence()) {
                 a = null;
             }
-            Severity s =
-                a == Assessment.BAD
+            Severity s = a == Assessment.BAD
                     ? (severity == null || severity == Severity.INFO ? Severity.MINOR : severity)
                     : null;
             if (advisoryOnly && a == Assessment.BAD && (s == Severity.CRITICAL || s == Severity.MAJOR)) {
@@ -392,9 +365,7 @@ public class PracticeDetectionResultParser {
 
     /** Applies coherence rules to all observations and returns a mutable result. */
     public static List<ValidatedObservation> coerceCoherence(
-        List<ValidatedObservation> observations,
-        Set<String> defectDetectorSlugs
-    ) {
+            List<ValidatedObservation> observations, Set<String> defectDetectorSlugs) {
         List<ValidatedObservation> out = new ArrayList<>(observations.size());
         for (ValidatedObservation f : observations) {
             boolean advisoryOnly = !BLOCKING_ELIGIBLE_PRACTICES.contains(f.practiceSlug());
@@ -412,10 +383,7 @@ public class PracticeDetectionResultParser {
      * @param withheld the observations the composer chose not to render, for the ledger to record as SUPPRESSED
      */
     public record DeliveryContent(
-        @Nullable String mrNote,
-        List<DiffNote> diffNotes,
-        List<WithheldObservation> withheld
-    ) {
+            @Nullable String mrNote, List<DiffNote> diffNotes, List<WithheldObservation> withheld) {
         public DeliveryContent withDiffNotes(List<DiffNote> notes) {
             return new DeliveryContent(mrNote, notes, withheld);
         }
@@ -438,12 +406,11 @@ public class PracticeDetectionResultParser {
      *     carries it over from the stamped observation.
      */
     public record DiffNote(
-        String filePath,
-        int startLine,
-        @Nullable Integer endLine,
-        String body,
-        @Nullable String recurrenceKey
-    ) {
+            String filePath,
+            int startLine,
+            @Nullable Integer endLine,
+            String body,
+            @Nullable String recurrenceKey) {
         /** The parser's pre-correlation output shape: a note with no correlation key yet. */
         public DiffNote(String filePath, int startLine, @Nullable Integer endLine, String body) {
             this(filePath, startLine, endLine, body, null);

@@ -30,26 +30,23 @@ public class GitHubMilestoneMessageHandler extends AbstractIntegrationMessageHan
     private final GitHubMilestoneProcessor milestoneProcessor;
 
     GitHubMilestoneMessageHandler(
-        ProcessingContextFactory contextFactory,
-        GitHubMilestoneProcessor milestoneProcessor,
-        NatsMessageDeserializer deserializer,
-        TransactionTemplate transactionTemplate
-    ) {
+            ProcessingContextFactory contextFactory,
+            GitHubMilestoneProcessor milestoneProcessor,
+            NatsMessageDeserializer deserializer,
+            TransactionTemplate transactionTemplate) {
         super(
-            IntegrationKind.GITHUB,
-            "repository." + GitHubEventType.MILESTONE.getValue(),
-            GitHubMilestoneEventDTO.class,
-            deserializer,
-            transactionTemplate
-        );
+                IntegrationKind.GITHUB,
+                "repository." + GitHubEventType.MILESTONE.getValue(),
+                GitHubMilestoneEventDTO.class,
+                deserializer,
+                transactionTemplate);
         this.contextFactory = contextFactory;
         this.milestoneProcessor = milestoneProcessor;
     }
 
     @Override
     protected void handleEvent(GitHubMilestoneEventDTO event) {
-        @Nullable
-        GitHubMilestoneDTO milestoneDto = event.milestone();
+        @Nullable GitHubMilestoneDTO milestoneDto = event.milestone();
 
         if (milestoneDto == null) {
             log.warn("Received milestone event with missing data: action={}", event.action());
@@ -57,11 +54,10 @@ public class GitHubMilestoneMessageHandler extends AbstractIntegrationMessageHan
         }
 
         log.debug(
-            "Received milestone event: action={}, milestoneTitle={}, repoName={}",
-            event.action(),
-            sanitizeForLog(milestoneDto.title()),
-            event.repository() != null ? sanitizeForLog(event.repository().fullName()) : "unknown"
-        );
+                "Received milestone event: action={}, milestoneTitle={}, repoName={}",
+                event.action(),
+                sanitizeForLog(milestoneDto.title()),
+                event.repository() != null ? sanitizeForLog(event.repository().fullName()) : "unknown");
 
         ProcessingContext context = contextFactory.forWebhookEvent(event).orElse(null);
         if (context == null) {

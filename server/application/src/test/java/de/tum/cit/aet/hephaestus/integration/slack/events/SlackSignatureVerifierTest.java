@@ -42,17 +42,18 @@ class SlackSignatureVerifierTest extends BaseUnitTest {
     @Test
     void unconfiguredSecretFailsFast() {
         assertThatThrownBy(() -> newVerifier("   "))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("signing-secret is blank");
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("signing-secret is blank");
     }
 
     @Test
     @DisplayName("server role can enable Slack without the webhook-only signing secret")
     void serverRoleDoesNotCreateVerifierOrRequireSigningSecret() {
         new ApplicationContextRunner()
-            .withUserConfiguration(SlackSignatureVerifier.class)
-            .withPropertyValues("hephaestus.integration.slack.enabled=true", "hephaestus.runtime.webhook.enabled=false")
-            .run(context -> assertThat(context).doesNotHaveBean(SlackSignatureVerifier.class));
+                .withUserConfiguration(SlackSignatureVerifier.class)
+                .withPropertyValues(
+                        "hephaestus.integration.slack.enabled=true", "hephaestus.runtime.webhook.enabled=false")
+                .run(context -> assertThat(context).doesNotHaveBean(SlackSignatureVerifier.class));
     }
 
     private static Stream<Arguments> rejectedSignatures() {
@@ -70,11 +71,10 @@ class SlackSignatureVerifierTest extends BaseUnitTest {
         String nonNumericSig = sign(SECRET, nonNumericTs, plainBody);
 
         return Stream.of(
-            Arguments.of("expired timestamp outside replay window", expiredTs, expiredSig, expiredBody),
-            Arguments.of("tampered body", validTs, validSig, tamperedBody),
-            Arguments.of("wrong signature", validTs, "v0=deadbeef", plainBody),
-            Arguments.of("non-numeric timestamp", nonNumericTs, nonNumericSig, plainBody)
-        );
+                Arguments.of("expired timestamp outside replay window", expiredTs, expiredSig, expiredBody),
+                Arguments.of("tampered body", validTs, validSig, tamperedBody),
+                Arguments.of("wrong signature", validTs, "v0=deadbeef", plainBody),
+                Arguments.of("non-numeric timestamp", nonNumericTs, nonNumericSig, plainBody));
     }
 
     @ParameterizedTest(name = "{0} is rejected")

@@ -26,9 +26,9 @@ class ProxyBudgetGate {
     ProxyBudgetGate(LlmBudgetService budgetService) {
         this.budgetService = budgetService;
         this.headroomByWorkspace = Caffeine.newBuilder()
-            .expireAfterWrite(TTL)
-            .maximumSize(MAX_CACHED_WORKSPACES)
-            .build();
+                .expireAfterWrite(TTL)
+                .maximumSize(MAX_CACHED_WORKSPACES)
+                .build();
     }
 
     /**
@@ -41,9 +41,8 @@ class ProxyBudgetGate {
             return false;
         }
         LlmBudgetHeadroom headroom = headroomByWorkspace.get(workspaceId, budgetService::headroom);
-        return (
-            headroom != null &&
-            headroom.decideWith(routing.connectionScope(), routing.inFlightSpendUsd()).blocks(routing.connectionScope())
-        );
+        return (headroom != null
+                && headroom.decideWith(routing.connectionScope(), routing.inFlightSpendUsd())
+                        .blocks(routing.connectionScope()));
     }
 }

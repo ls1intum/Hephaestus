@@ -1,7 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
+
 import type { OutlineCollection } from "@/api/types.gen";
 import { expectSettledVisible } from "@/test/overlay";
+
 import { RemoveCollectionAlertDialog } from "./RemoveCollectionAlertDialog";
 
 const collection: OutlineCollection = {

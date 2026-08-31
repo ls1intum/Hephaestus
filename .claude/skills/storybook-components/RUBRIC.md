@@ -201,7 +201,7 @@ rather less than half the stories carry one, so the absence of a block is not by
 - **D** — A new rule added to prose that contradicts existing code, with no migration and no gate.
 - **C** — Rule in prose, no gate.
 - **B** — Rule in prose plus a mechanical check — an oxlint rule in `webapp/tools/oxlint/rules/`, or a
-  node gate in `scripts/` wired into `pnpm run check`.
+  repository gate in `scripts/` wired into `pnpm run check`.
 - **A** — B, and the gate's own comment explains the neighbouring shapes it deliberately does *not*
   match, so nobody widens it into a nuisance — the house rules in `webapp/tools/oxlint/rules/` are the
   worked examples.

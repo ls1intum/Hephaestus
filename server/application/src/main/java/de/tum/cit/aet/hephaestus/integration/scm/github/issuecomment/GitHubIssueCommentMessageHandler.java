@@ -41,19 +41,17 @@ public class GitHubIssueCommentMessageHandler extends AbstractIntegrationMessage
     private final GitHubIssueCommentProcessor commentProcessor;
 
     GitHubIssueCommentMessageHandler(
-        ProcessingContextFactory contextFactory,
-        GitHubIssueProcessor issueProcessor,
-        GitHubIssueCommentProcessor commentProcessor,
-        NatsMessageDeserializer deserializer,
-        TransactionTemplate transactionTemplate
-    ) {
+            ProcessingContextFactory contextFactory,
+            GitHubIssueProcessor issueProcessor,
+            GitHubIssueCommentProcessor commentProcessor,
+            NatsMessageDeserializer deserializer,
+            TransactionTemplate transactionTemplate) {
         super(
-            IntegrationKind.GITHUB,
-            "repository." + GitHubEventType.ISSUE_COMMENT.getValue(),
-            GitHubIssueCommentEventDTO.class,
-            deserializer,
-            transactionTemplate
-        );
+                IntegrationKind.GITHUB,
+                "repository." + GitHubEventType.ISSUE_COMMENT.getValue(),
+                GitHubIssueCommentEventDTO.class,
+                deserializer,
+                transactionTemplate);
         this.contextFactory = contextFactory;
         this.issueProcessor = issueProcessor;
         this.commentProcessor = commentProcessor;
@@ -70,13 +68,12 @@ public class GitHubIssueCommentMessageHandler extends AbstractIntegrationMessage
         }
 
         log.debug(
-            "Received issue_comment event: action={}, issueNumber={}, commentId={}, repoName={}, isPullRequest={}",
-            event.action(),
-            issueDto.number(),
-            commentDto.id(),
-            event.repository() != null ? sanitizeForLog(event.repository().fullName()) : "unknown",
-            issueDto.isPullRequest()
-        );
+                "Received issue_comment event: action={}, issueNumber={}, commentId={}, repoName={}, isPullRequest={}",
+                event.action(),
+                issueDto.number(),
+                commentDto.id(),
+                event.repository() != null ? sanitizeForLog(event.repository().fullName()) : "unknown",
+                issueDto.isPullRequest());
 
         ProcessingContext context = contextFactory.forWebhookEvent(event).orElse(null);
         if (context == null) {

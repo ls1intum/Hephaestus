@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { ArrowRightIcon, PlugZapIcon } from "lucide-react";
+
 import type { ConnectionSyncStatus, IntegrationCatalogEntry } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { RelativeTime } from "@/components/common/RelativeTime";
@@ -7,12 +8,13 @@ import { GithubIcon, GitlabIcon, OutlineIcon, SlackIcon } from "@/components/ico
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+
 import { ActiveJobProgress } from "./ActiveJobProgress";
 import { ConnectionHealthBadge } from "./ConnectionHealthBadge";
 import { ConnectionStateNotice } from "./ConnectionStateNotice";
 import { IntegrationCardHeading } from "./IntegrationCardHeading";
-import { SyncNowButton } from "./SyncNowButton";
 import { freshnessTone } from "./sync-format";
+import { SyncNowButton } from "./SyncNowButton";
 
 const DETAIL_ROUTE: Record<
 	IntegrationCatalogEntry["kind"],

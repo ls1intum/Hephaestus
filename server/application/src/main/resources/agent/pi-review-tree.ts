@@ -131,7 +131,8 @@ export function buildReviewTree(
 export async function mapConcurrent<T, R>(
 	items: readonly T[],
 	concurrency: number,
-	work: (item: T, index: number) => Promise<R>,
+	work: (item: T, index: number) => R | Promise<R>,
+	signal?: AbortSignal,
 ): Promise<R[]> {
 	if (!Number.isInteger(concurrency) || concurrency <= 0) {
 		throw new Error(`concurrency must be a positive integer, got: ${concurrency}`);
@@ -141,6 +142,7 @@ export async function mapConcurrent<T, R>(
 	let nextIndex = 0;
 	const workers = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
 		for (;;) {
+			if (signal?.aborted) return;
 			const index = nextIndex++;
 			if (index >= items.length) return;
 			const item = items[index];

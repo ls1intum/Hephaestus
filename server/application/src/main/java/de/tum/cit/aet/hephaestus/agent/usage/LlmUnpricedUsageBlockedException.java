@@ -20,9 +20,9 @@ public class LlmUnpricedUsageBlockedException extends RuntimeException {
 
     private static String message(FundingSource fundingSource) {
         return fundingSource == FundingSource.WORKSPACE
-            ? "Some usage has no price, so it can't be checked against the cap. A workspace admin can " +
-              "add the price or remove the cap."
-            : "Some usage has no price, so it can't be checked against the budget. An instance admin " +
-              "can add the price or remove the budget.";
+                ? "Some usage has no price, so it can't be checked against the cap. A workspace admin can "
+                        + "add the price or remove the cap."
+                : "Some usage has no price, so it can't be checked against the budget. An instance admin "
+                        + "can add the price or remove the budget.";
     }
 }

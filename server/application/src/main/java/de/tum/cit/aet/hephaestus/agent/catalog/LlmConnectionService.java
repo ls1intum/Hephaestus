@@ -42,7 +42,8 @@ public class LlmConnectionService {
     @Transactional
     public LlmConnection create(CreateLlmConnectionRequestDTO request) {
         String slug = connectionSlug(request.slug(), request.displayName());
-        if (StringUtils.hasText(request.slug()) && connectionRepository.findBySlug(slug).isPresent()) {
+        if (StringUtils.hasText(request.slug())
+                && connectionRepository.findBySlug(slug).isPresent()) {
             throw new LlmConnectionSlugConflictException(slug);
         }
         egressPolicy.validate(request.baseUrl());
@@ -71,14 +72,16 @@ public class LlmConnectionService {
     }
 
     private String connectionSlug(@Nullable String requested, String displayName) {
-        return CatalogSlug.unique(requested, displayName, slug -> connectionRepository.findBySlug(slug).isPresent());
+        return CatalogSlug.unique(
+                requested,
+                displayName,
+                slug -> connectionRepository.findBySlug(slug).isPresent());
     }
 
     @Transactional
     public LlmConnection update(Long id, UpdateLlmConnectionRequestDTO request) {
-        LlmConnection connection = connectionRepository
-            .findById(id)
-            .orElseThrow(() -> new EntityNotFoundException("LlmConnection", id));
+        LlmConnection connection =
+                connectionRepository.findById(id).orElseThrow(() -> new EntityNotFoundException("LlmConnection", id));
 
         if (request.displayName() != null) {
             connection.setDisplayName(request.displayName());
@@ -99,9 +102,8 @@ public class LlmConnectionService {
 
     @Transactional
     public void delete(Long id) {
-        LlmConnection connection = connectionRepository
-            .findById(id)
-            .orElseThrow(() -> new EntityNotFoundException("LlmConnection", id));
+        LlmConnection connection =
+                connectionRepository.findById(id).orElseThrow(() -> new EntityNotFoundException("LlmConnection", id));
         if (modelRepository.existsByConnectionId(id)) {
             throw new LlmConnectionInUseException(id);
         }

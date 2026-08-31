@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { type ActivityBadgeKey, getActivityBadgeMetadata } from "./activity-badge-metadata";
 
 const ORDER: readonly ActivityBadgeKey[] = [

@@ -82,9 +82,7 @@ public final class GraphQlPaginationHelper {
     private final GitHubGraphQlSyncCoordinator graphQlSyncHelper;
 
     public GraphQlPaginationHelper(
-        GitHubGraphQlClientProvider graphQlClientProvider,
-        GitHubGraphQlSyncCoordinator graphQlSyncHelper
-    ) {
+            GitHubGraphQlClientProvider graphQlClientProvider, GitHubGraphQlSyncCoordinator graphQlSyncHelper) {
         this.graphQlClientProvider = graphQlClientProvider;
         this.graphQlSyncHelper = graphQlSyncHelper;
     }
@@ -106,10 +104,9 @@ public final class GraphQlPaginationHelper {
             // Check for thread interruption (e.g., during application shutdown)
             if (Thread.interrupted()) {
                 log.info(
-                    "Pagination interrupted (shutdown requested): context={}, pagesProcessed={}",
-                    request.contextDescription(),
-                    pageCount
-                );
+                        "Pagination interrupted (shutdown requested): context={}, pagesProcessed={}",
+                        request.contextDescription(),
+                        pageCount);
                 // Preserve interrupt status for caller
                 Thread.currentThread().interrupt();
                 return new PaginationResult(pageCount, TerminationReason.INTERRUPTED);
@@ -119,10 +116,9 @@ public final class GraphQlPaginationHelper {
 
             if (pageCount > request.maxPages()) {
                 log.warn(
-                    "Reached maximum pagination limit: context={}, limit={}",
-                    request.contextDescription(),
-                    request.maxPages()
-                );
+                        "Reached maximum pagination limit: context={}, limit={}",
+                        request.contextDescription(),
+                        request.maxPages());
                 return new PaginationResult(pageCount - 1, TerminationReason.MAX_PAGES_REACHED);
             }
 
@@ -142,22 +138,17 @@ public final class GraphQlPaginationHelper {
             // This is CRITICAL: WebClient ExchangeFilterFunction retries only cover the HTTP exchange,
             // not body consumption. PrematureCloseException occurs DURING body streaming.
             ClientGraphQlResponse response = Mono.defer(() -> finalRequestBuilder.execute())
-                .retryWhen(
-                    Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
-                        .maxBackoff(TRANSPORT_MAX_BACKOFF)
-                        .jitter(JITTER_FACTOR)
-                        .filter(ScmTransportErrors::isTransportError)
-                        .doBeforeRetry(signal ->
-                            log.warn(
-                                "Retrying GraphQL request after transport error: context={}, page={}, attempt={}, error={}",
-                                request.contextDescription(),
-                                currentPage,
-                                signal.totalRetries() + 1,
-                                signal.failure().getMessage()
-                            )
-                        )
-                )
-                .block(request.timeout());
+                    .retryWhen(Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
+                            .maxBackoff(TRANSPORT_MAX_BACKOFF)
+                            .jitter(JITTER_FACTOR)
+                            .filter(ScmTransportErrors::isTransportError)
+                            .doBeforeRetry(signal -> log.warn(
+                                    "Retrying GraphQL request after transport error: context={}, page={}, attempt={}, error={}",
+                                    request.contextDescription(),
+                                    currentPage,
+                                    signal.totalRetries() + 1,
+                                    signal.failure().getMessage())))
+                    .block(request.timeout());
 
             if (response == null) {
                 log.warn("Received null GraphQL response: context={}", request.contextDescription());
@@ -168,32 +159,28 @@ public final class GraphQlPaginationHelper {
                 var classification = graphQlSyncHelper.classifyGraphQlErrors(response);
                 if (classification != null) {
                     boolean shouldRetry = graphQlSyncHelper.handleGraphQlClassification(
-                        new GitHubGraphQlSyncCoordinator.GraphQlClassificationContext(
-                            classification,
-                            retryAttempt,
-                            MAX_RETRY_ATTEMPTS,
-                            request.contextDescription(),
-                            "context",
-                            request.contextDescription(),
-                            log
-                        )
-                    );
+                            new GitHubGraphQlSyncCoordinator.GraphQlClassificationContext(
+                                    classification,
+                                    retryAttempt,
+                                    MAX_RETRY_ATTEMPTS,
+                                    request.contextDescription(),
+                                    "context",
+                                    request.contextDescription(),
+                                    log));
                     if (shouldRetry) {
                         retryAttempt++;
                         continue;
                     }
                     return new PaginationResult(
-                        pageCount,
-                        classification.category() == GitHubExceptionClassifier.Category.RATE_LIMITED
-                            ? TerminationReason.RATE_LIMIT_CRITICAL
-                            : TerminationReason.INVALID_RESPONSE
-                    );
+                            pageCount,
+                            classification.category() == GitHubExceptionClassifier.Category.RATE_LIMITED
+                                    ? TerminationReason.RATE_LIMIT_CRITICAL
+                                    : TerminationReason.INVALID_RESPONSE);
                 }
                 log.warn(
-                    "Received invalid GraphQL response: context={}, errors={}",
-                    request.contextDescription(),
-                    response.getErrors()
-                );
+                        "Received invalid GraphQL response: context={}, errors={}",
+                        request.contextDescription(),
+                        response.getErrors());
                 return new PaginationResult(pageCount, TerminationReason.INVALID_RESPONSE);
             }
 
@@ -202,15 +189,12 @@ public final class GraphQlPaginationHelper {
 
             // Check rate limit threshold
             if (graphQlClientProvider.isRateLimitCritical(request.scopeId())) {
-                if (
-                    !graphQlSyncHelper.waitForRateLimitIfNeeded(
+                if (!graphQlSyncHelper.waitForRateLimitIfNeeded(
                         request.scopeId(),
                         request.contextDescription(),
                         "context",
                         request.contextDescription(),
-                        log
-                    )
-                ) {
+                        log)) {
                     return new PaginationResult(pageCount, TerminationReason.RATE_LIMIT_CRITICAL);
                 }
             }
@@ -220,10 +204,9 @@ public final class GraphQlPaginationHelper {
 
             if (connection == null) {
                 log.debug(
-                    "Connection is null, ending pagination: context={}, pageCount={}",
-                    request.contextDescription(),
-                    pageCount
-                );
+                        "Connection is null, ending pagination: context={}, pageCount={}",
+                        request.contextDescription(),
+                        pageCount);
                 return new PaginationResult(pageCount, TerminationReason.NULL_CONNECTION);
             }
 
@@ -231,10 +214,9 @@ public final class GraphQlPaginationHelper {
             boolean shouldContinue = request.pageProcessor().processPage(connection);
             if (!shouldContinue) {
                 log.debug(
-                    "Processor requested early termination: context={}, pageCount={}",
-                    request.contextDescription(),
-                    pageCount
-                );
+                        "Processor requested early termination: context={}, pageCount={}",
+                        request.contextDescription(),
+                        pageCount);
                 return new PaginationResult(pageCount, TerminationReason.PROCESSOR_STOP);
             }
 
@@ -254,19 +236,18 @@ public final class GraphQlPaginationHelper {
      * @param <T> the connection type
      */
     public record PaginationRequest<T>(
-        HttpGraphQlClient client,
-        Long scopeId,
-        String documentName,
-        Map<String, Object> variables,
-        Duration timeout,
-        String connectionFieldPath,
-        Class<T> connectionType,
-        Function<T, GHPageInfo> pageInfoExtractor,
-        PageProcessor<T> pageProcessor,
-        String contextDescription,
-        @Nullable String initialCursor,
-        int maxPages
-    ) {
+            HttpGraphQlClient client,
+            Long scopeId,
+            String documentName,
+            Map<String, Object> variables,
+            Duration timeout,
+            String connectionFieldPath,
+            Class<T> connectionType,
+            Function<T, GHPageInfo> pageInfoExtractor,
+            PageProcessor<T> pageProcessor,
+            String contextDescription,
+            @Nullable String initialCursor,
+            int maxPages) {
         /**
          * Creates a builder for PaginationRequest.
          *
@@ -409,19 +390,18 @@ public final class GraphQlPaginationHelper {
                 }
 
                 return new PaginationRequest<>(
-                    client,
-                    scopeId,
-                    documentName,
-                    variables,
-                    timeout,
-                    connectionFieldPath,
-                    connectionType,
-                    pageInfoExtractor,
-                    pageProcessor,
-                    contextDescription,
-                    initialCursor,
-                    maxPages
-                );
+                        client,
+                        scopeId,
+                        documentName,
+                        variables,
+                        timeout,
+                        connectionFieldPath,
+                        connectionType,
+                        pageInfoExtractor,
+                        pageProcessor,
+                        contextDescription,
+                        initialCursor,
+                        maxPages);
             }
         }
     }
@@ -462,10 +442,8 @@ public final class GraphQlPaginationHelper {
          * Returns true if pagination was aborted due to an error or limit.
          */
         public boolean isAborted() {
-            return (
-                terminationReason != TerminationReason.COMPLETED &&
-                terminationReason != TerminationReason.PROCESSOR_STOP
-            );
+            return (terminationReason != TerminationReason.COMPLETED
+                    && terminationReason != TerminationReason.PROCESSOR_STOP);
         }
 
         /**

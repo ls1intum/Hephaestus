@@ -74,20 +74,18 @@ class SyncJobServiceTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         // Run the TransactionTemplate callback inline (execute + executeWithoutResult).
+        lenient().when(transactionTemplate.execute(any())).thenAnswer(inv -> {
+            TransactionCallback<?> callback = inv.getArgument(0);
+            return callback.doInTransaction(mock(TransactionStatus.class));
+        });
         lenient()
-            .when(transactionTemplate.execute(any()))
-            .thenAnswer(inv -> {
-                TransactionCallback<?> callback = inv.getArgument(0);
-                return callback.doInTransaction(mock(TransactionStatus.class));
-            });
-        lenient()
-            .doAnswer(inv -> {
-                Consumer<TransactionStatus> action = inv.getArgument(0);
-                action.accept(mock(TransactionStatus.class));
-                return null;
-            })
-            .when(transactionTemplate)
-            .executeWithoutResult(any());
+                .doAnswer(inv -> {
+                    Consumer<TransactionStatus> action = inv.getArgument(0);
+                    action.accept(mock(TransactionStatus.class));
+                    return null;
+                })
+                .when(transactionTemplate)
+                .executeWithoutResult(any());
 
         workspace = new Workspace();
         workspace.setId(WORKSPACE_ID);
@@ -99,111 +97,95 @@ class SyncJobServiceTest extends BaseUnitTest {
         lenient().when(connection.getKind()).thenReturn(IntegrationKind.GITHUB);
         lenient().when(connection.getState()).thenReturn(IntegrationState.ACTIVE);
         lenient()
-            .when(connectionRepository.findByIdAndWorkspaceId(CONNECTION_ID, WORKSPACE_ID))
-            .thenReturn(Optional.of(connection));
+                .when(connectionRepository.findByIdAndWorkspaceId(CONNECTION_ID, WORKSPACE_ID))
+                .thenReturn(Optional.of(connection));
 
-        lenient().when(syncJobRepository.findAbandonedForConnection(anyLong(), anyLong())).thenReturn(List.of());
+        lenient()
+                .when(syncJobRepository.findAbandonedForConnection(anyLong(), anyLong()))
+                .thenReturn(List.of());
         lenient().when(syncJobRepository.findAbandoned(anyLong())).thenReturn(List.of());
         lenient()
-            .when(syncJobRepository.findFirstByConnection_IdAndStatusInOrderByCreatedAtDesc(anyLong(), any()))
-            .thenReturn(Optional.empty());
+                .when(syncJobRepository.findFirstByConnection_IdAndStatusInOrderByCreatedAtDesc(anyLong(), any()))
+                .thenReturn(Optional.empty());
         // In-memory "table" backing findById, so markRunning/completeJob/persistProgress (which all
         // re-fetch by id before mutating) operate on the SAME instance the test holds via Started.job().
+        lenient().when(syncJobRepository.saveAndFlush(any())).thenAnswer(inv -> {
+            SyncJob job = inv.getArgument(0);
+            job.setId(idSequence.incrementAndGet());
+            store.put(job.getId(), job);
+            return job;
+        });
+        lenient().when(syncJobRepository.save(any())).thenAnswer(inv -> {
+            SyncJob job = inv.getArgument(0);
+            store.put(job.getId(), job);
+            return job;
+        });
         lenient()
-            .when(syncJobRepository.saveAndFlush(any()))
-            .thenAnswer(inv -> {
-                SyncJob job = inv.getArgument(0);
-                job.setId(idSequence.incrementAndGet());
-                store.put(job.getId(), job);
-                return job;
-            });
-        lenient()
-            .when(syncJobRepository.save(any()))
-            .thenAnswer(inv -> {
-                SyncJob job = inv.getArgument(0);
-                store.put(job.getId(), job);
-                return job;
-            });
-        lenient()
-            .when(syncJobRepository.findById(any()))
-            .thenAnswer(inv -> Optional.ofNullable(store.get((Long) inv.getArgument(0))));
-        lenient()
-            .when(syncJobRepository.markRunning(anyLong()))
-            .thenAnswer(inv -> {
-                SyncJob job = store.get((Long) inv.getArgument(0));
-                if (job == null || job.getStatus() != SyncJobStatus.PENDING) {
-                    return 0;
-                }
-                job.setStatus(SyncJobStatus.RUNNING);
-                job.setStartedAt(Instant.now());
-                job.setHeartbeatAt(Instant.now());
-                return 1;
-            });
-        lenient()
-            .when(syncJobRepository.findCancelFlags(any()))
-            .thenAnswer(inv -> {
-                List<Long> ids = inv.getArgument(0);
-                return ids
-                    .stream()
+                .when(syncJobRepository.findById(any()))
+                .thenAnswer(inv -> Optional.ofNullable(store.get((Long) inv.getArgument(0))));
+        lenient().when(syncJobRepository.markRunning(anyLong())).thenAnswer(inv -> {
+            SyncJob job = store.get((Long) inv.getArgument(0));
+            if (job == null || job.getStatus() != SyncJobStatus.PENDING) {
+                return 0;
+            }
+            job.setStatus(SyncJobStatus.RUNNING);
+            job.setStartedAt(Instant.now());
+            job.setHeartbeatAt(Instant.now());
+            return 1;
+        });
+        lenient().when(syncJobRepository.findCancelFlags(any())).thenAnswer(inv -> {
+            List<Long> ids = inv.getArgument(0);
+            return ids.stream()
                     .map(store::get)
                     .filter(java.util.Objects::nonNull)
-                    .map(job ->
-                        new SyncJobRepository.CancelFlagProjection() {
-                            @Override
-                            public Long getId() {
-                                return job.getId();
-                            }
-
-                            @Override
-                            public boolean isCancelRequested() {
-                                return job.isCancelRequested();
-                            }
+                    .map(job -> new SyncJobRepository.CancelFlagProjection() {
+                        @Override
+                        public Long getId() {
+                            return job.getId();
                         }
-                    )
+
+                        @Override
+                        public boolean isCancelRequested() {
+                            return job.isCancelRequested();
+                        }
+                    })
                     .toList();
-            });
+        });
         // In-memory stand-in for the terminal write. Its compare-and-set semantics (a late writer cannot
         // overwrite an already-terminal row) are proven against real Postgres in
         // SyncJobActiveIndexIntegrationTest, not here — this fake only needs to update the shared store so
         // the service-orchestration assertions in this file can read the resulting status back.
         lenient()
-            .when(syncJobRepository.completeActiveJob(anyLong(), any(), any(), any(), any(), any(), any()))
-            .thenAnswer(inv -> {
-                SyncJob job = store.get((Long) inv.getArgument(0));
-                if (job == null || !SyncJobStatus.ACTIVE.contains(job.getStatus())) {
-                    return 0;
-                }
-                job.setStatus(inv.getArgument(1));
-                job.setFinishedAt(Instant.now());
-                job.setErrorSummary(inv.getArgument(2));
-                job.setItemsProcessed(inv.getArgument(3));
-                job.setItemsTotal(inv.getArgument(4));
-                Map<String, Object> progress = inv.getArgument(5);
-                if (!progress.isEmpty()) {
-                    job.setProgress(progress);
-                }
-                return 1;
-            });
+                .when(syncJobRepository.completeActiveJob(anyLong(), any(), any(), any(), any(), any(), any()))
+                .thenAnswer(inv -> {
+                    SyncJob job = store.get((Long) inv.getArgument(0));
+                    if (job == null || !SyncJobStatus.ACTIVE.contains(job.getStatus())) {
+                        return 0;
+                    }
+                    job.setStatus(inv.getArgument(1));
+                    job.setFinishedAt(Instant.now());
+                    job.setErrorSummary(inv.getArgument(2));
+                    job.setItemsProcessed(inv.getArgument(3));
+                    job.setItemsTotal(inv.getArgument(4));
+                    Map<String, Object> progress = inv.getArgument(5);
+                    if (!progress.isEmpty()) {
+                        job.setProgress(progress);
+                    }
+                    return 1;
+                });
 
         service = new SyncJobService(
-            syncJobRepository,
-            connectionRepository,
-            workspaceRepository,
-            eventPublisher,
-            transactionTemplate,
-            clock
-        );
+                syncJobRepository,
+                connectionRepository,
+                workspaceRepository,
+                eventPublisher,
+                transactionTemplate,
+                clock);
     }
 
     private SyncJob newJob(long id, SyncJobStatus status) {
         SyncJob job = new SyncJob(
-            workspace,
-            connection,
-            IntegrationKind.GITHUB,
-            SyncJobType.INITIAL,
-            SyncJobTrigger.MANUAL,
-            null
-        );
+                workspace, connection, IntegrationKind.GITHUB, SyncJobType.INITIAL, SyncJobTrigger.MANUAL, null);
         job.setId(id);
         job.setStatus(status);
         return job;
@@ -212,16 +194,14 @@ class SyncJobServiceTest extends BaseUnitTest {
     @Test
     void beginJob_connectionAlreadyHasActiveJob_throwsConflictCarryingThatJob() {
         SyncJob active = newJob(5L, SyncJobStatus.RUNNING);
-        when(
-            syncJobRepository.findFirstByConnection_IdAndStatusInOrderByCreatedAtDesc(
-                CONNECTION_ID,
-                SyncJobStatus.ACTIVE
-            )
-        ).thenReturn(Optional.of(active));
+        when(syncJobRepository.findFirstByConnection_IdAndStatusInOrderByCreatedAtDesc(
+                        CONNECTION_ID, SyncJobStatus.ACTIVE))
+                .thenReturn(Optional.of(active));
 
         assertThatThrownBy(() -> service.beginJob(defaultRequest()))
-            .isInstanceOf(SyncJobConflictException.class)
-            .satisfies(e -> assertThat(((SyncJobConflictException) e).activeJob()).isSameAs(active));
+                .isInstanceOf(SyncJobConflictException.class)
+                .satisfies(e ->
+                        assertThat(((SyncJobConflictException) e).activeJob()).isSameAs(active));
 
         verify(syncJobRepository, never()).saveAndFlush(any());
     }
@@ -231,8 +211,8 @@ class SyncJobServiceTest extends BaseUnitTest {
         when(connection.getState()).thenReturn(IntegrationState.UNINSTALLED);
 
         assertThatThrownBy(() -> service.beginJob(defaultRequest()))
-            .isInstanceOf(SyncStateConflictException.class)
-            .hasMessageContaining("UNINSTALLED");
+                .isInstanceOf(SyncStateConflictException.class)
+                .hasMessageContaining("UNINSTALLED");
 
         verify(syncJobRepository, never()).saveAndFlush(any());
     }
@@ -242,8 +222,8 @@ class SyncJobServiceTest extends BaseUnitTest {
         workspace.setStatus(Workspace.WorkspaceStatus.PURGED);
 
         assertThatThrownBy(() -> service.beginJob(defaultRequest()))
-            .isInstanceOf(SyncStateConflictException.class)
-            .hasMessageContaining("PURGED");
+                .isInstanceOf(SyncStateConflictException.class)
+                .hasMessageContaining("PURGED");
 
         verify(connectionRepository, never()).acquireLifecycleLock(anyLong(), anyLong());
         verify(syncJobRepository, never()).saveAndFlush(any());
@@ -254,35 +234,32 @@ class SyncJobServiceTest extends BaseUnitTest {
         SyncJob raced = newJob(6L, SyncJobStatus.PENDING);
         // First read (before insert attempt): no active job visible yet.
         // Second read (after the constraint violation): the concurrent winner is now visible.
-        when(
-            syncJobRepository.findFirstByConnection_IdAndStatusInOrderByCreatedAtDesc(
-                CONNECTION_ID,
-                SyncJobStatus.ACTIVE
-            )
-        )
-            .thenReturn(Optional.empty())
-            .thenReturn(Optional.of(raced));
+        when(syncJobRepository.findFirstByConnection_IdAndStatusInOrderByCreatedAtDesc(
+                        CONNECTION_ID, SyncJobStatus.ACTIVE))
+                .thenReturn(Optional.empty())
+                .thenReturn(Optional.of(raced));
         // doThrow(...).when(mock) — NOT when(mock.method()).thenThrow(...) — because the latter's argument
         // expression (`saveAndFlush(any())`) is a real invocation that would run the setUp() answer stub
         // (with a null dummy argument) before this line even finishes evaluating, NPE-ing on job.getId().
-        doThrow(new DataIntegrityViolationException("ux_sync_job_active")).when(syncJobRepository).saveAndFlush(any());
+        doThrow(new DataIntegrityViolationException("ux_sync_job_active"))
+                .when(syncJobRepository)
+                .saveAndFlush(any());
 
         assertThatThrownBy(() -> service.beginJob(defaultRequest()))
-            .isInstanceOf(SyncJobConflictException.class)
-            .satisfies(e -> assertThat(((SyncJobConflictException) e).activeJob()).isSameAs(raced));
+                .isInstanceOf(SyncJobConflictException.class)
+                .satisfies(e ->
+                        assertThat(((SyncJobConflictException) e).activeJob()).isSameAs(raced));
     }
 
     @Test
     void beginJob_inlineReapClearsAbandonedJobBeforeGuardCheck_thenSucceeds() {
         SyncJob abandoned = newJob(7L, SyncJobStatus.RUNNING);
         when(syncJobRepository.findAbandonedForConnection(CONNECTION_ID, 900)).thenReturn(List.of(abandoned));
-        when(syncJobRepository.markAbandoned(7L, "Abandoned: no heartbeat (likely pod restart)", 900)).thenReturn(1);
-        when(
-            syncJobRepository.findFirstByConnection_IdAndStatusInOrderByCreatedAtDesc(
-                CONNECTION_ID,
-                SyncJobStatus.ACTIVE
-            )
-        ).thenReturn(Optional.empty());
+        when(syncJobRepository.markAbandoned(7L, "Abandoned: no heartbeat (likely pod restart)", 900))
+                .thenReturn(1);
+        when(syncJobRepository.findFirstByConnection_IdAndStatusInOrderByCreatedAtDesc(
+                        CONNECTION_ID, SyncJobStatus.ACTIVE))
+                .thenReturn(Optional.empty());
 
         SyncJobService.Started started = service.beginJob(defaultRequest());
 
@@ -295,19 +272,16 @@ class SyncJobServiceTest extends BaseUnitTest {
     void beginJob_partialIndexRace_reQueriesInFreshTxAndRethrowsWhenNoWinnerVisible() {
         // A DataIntegrityViolation whose fresh-tx re-read still shows NO active row is a genuine
         // integrity error, not a lost race — it must propagate rather than be masked as a 409-absorb.
-        when(
-            syncJobRepository.findFirstByConnection_IdAndStatusInOrderByCreatedAtDesc(
-                CONNECTION_ID,
-                SyncJobStatus.ACTIVE
-            )
-        )
-            .thenReturn(Optional.empty())
-            .thenReturn(Optional.empty());
-        doThrow(new DataIntegrityViolationException("ux_sync_job_active")).when(syncJobRepository).saveAndFlush(any());
+        when(syncJobRepository.findFirstByConnection_IdAndStatusInOrderByCreatedAtDesc(
+                        CONNECTION_ID, SyncJobStatus.ACTIVE))
+                .thenReturn(Optional.empty())
+                .thenReturn(Optional.empty());
+        doThrow(new DataIntegrityViolationException("ux_sync_job_active"))
+                .when(syncJobRepository)
+                .saveAndFlush(any());
 
-        assertThatThrownBy(() -> service.beginJob(defaultRequest())).isInstanceOf(
-            DataIntegrityViolationException.class
-        );
+        assertThatThrownBy(() -> service.beginJob(defaultRequest()))
+                .isInstanceOf(DataIntegrityViolationException.class);
     }
 
     @Test
@@ -319,14 +293,9 @@ class SyncJobServiceTest extends BaseUnitTest {
         assertThat(started.job().getStatus()).isEqualTo(SyncJobStatus.SUCCEEDED);
         assertThat(started.job().getFinishedAt()).isNotNull();
         verify(syncJobRepository).pruneOldJobs(CONNECTION_ID, 50);
-        verify(eventPublisher).publishEvent(
-            new SyncStateChangedEvent(
-                WORKSPACE_ID,
-                CONNECTION_ID,
-                IntegrationKind.GITHUB,
-                SyncStateChangedEvent.Scope.RESOURCES
-            )
-        );
+        verify(eventPublisher)
+                .publishEvent(new SyncStateChangedEvent(
+                        WORKSPACE_ID, CONNECTION_ID, IntegrationKind.GITHUB, SyncStateChangedEvent.Scope.RESOURCES));
     }
 
     @Test
@@ -346,16 +315,14 @@ class SyncJobServiceTest extends BaseUnitTest {
         CountDownLatch bodyEntered = new CountDownLatch(1);
         CountDownLatch releaseBody = new CountDownLatch(1);
         try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
-            var running = executor.submit(() ->
-                service.executeBody(started, handle -> {
-                    bodyEntered.countDown();
-                    try {
-                        releaseBody.await(2, TimeUnit.SECONDS);
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                    }
-                })
-            );
+            var running = executor.submit(() -> service.executeBody(started, handle -> {
+                bodyEntered.countDown();
+                try {
+                    releaseBody.await(2, TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }));
             assertThat(bodyEntered.await(2, TimeUnit.SECONDS)).isTrue();
 
             service.executeBody(started, handle -> {});
@@ -380,20 +347,18 @@ class SyncJobServiceTest extends BaseUnitTest {
         service.start();
 
         try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
-            var running = executor.submit(() ->
-                service.executeBody(started, handle -> {
-                    bodyEntered.countDown();
-                    try {
-                        assertThat(stopRequested.await(2, TimeUnit.SECONDS)).isTrue();
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        throw new IllegalStateException("runner was interrupted", e);
-                    }
-                    cancellationObserved.set(handle.isCancellationRequested());
-                    interruptFlagSeen.set(Thread.currentThread().isInterrupted());
-                    handle.reportCancelled();
-                })
-            );
+            var running = executor.submit(() -> service.executeBody(started, handle -> {
+                bodyEntered.countDown();
+                try {
+                    assertThat(stopRequested.await(2, TimeUnit.SECONDS)).isTrue();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException("runner was interrupted", e);
+                }
+                cancellationObserved.set(handle.isCancellationRequested());
+                interruptFlagSeen.set(Thread.currentThread().isInterrupted());
+                handle.reportCancelled();
+            }));
             assertThat(bodyEntered.await(2, TimeUnit.SECONDS)).isTrue();
 
             service.stop();
@@ -403,7 +368,9 @@ class SyncJobServiceTest extends BaseUnitTest {
         }
 
         assertThat(cancellationObserved).isTrue();
-        assertThat(interruptFlagSeen).as("stop() must not interrupt the runner thread").isFalse();
+        assertThat(interruptFlagSeen)
+                .as("stop() must not interrupt the runner thread")
+                .isFalse();
         assertThat(started.job().getStatus()).isEqualTo(SyncJobStatus.CANCELLED);
         assertThat(started.job().getFinishedAt()).isNotNull();
         verify(syncJobRepository).markCancelRequested(started.job().getId(), SyncJobStatus.ACTIVE);
@@ -421,18 +388,16 @@ class SyncJobServiceTest extends BaseUnitTest {
         service.start();
 
         try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
-            var running = executor.submit(() ->
-                service.executeBody(started, handle -> {
-                    // Body completed its work; hand control to stop() before executeBody maps the outcome.
-                    bodyReturning.countDown();
-                    try {
-                        assertThat(stopFired.await(2, TimeUnit.SECONDS)).isTrue();
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        throw new IllegalStateException(e);
-                    }
-                })
-            );
+            var running = executor.submit(() -> service.executeBody(started, handle -> {
+                // Body completed its work; hand control to stop() before executeBody maps the outcome.
+                bodyReturning.countDown();
+                try {
+                    assertThat(stopFired.await(2, TimeUnit.SECONDS)).isTrue();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException(e);
+                }
+            }));
             assertThat(bodyReturning.await(2, TimeUnit.SECONDS)).isTrue();
 
             service.stop();
@@ -442,7 +407,9 @@ class SyncJobServiceTest extends BaseUnitTest {
         }
 
         assertThat(started.job().getStatus()).isEqualTo(SyncJobStatus.SUCCEEDED);
-        assertThat(started.handle().cancelledReported()).as("only the runner may report that it aborted").isFalse();
+        assertThat(started.handle().cancelledReported())
+                .as("only the runner may report that it aborted")
+                .isFalse();
     }
 
     @Test
@@ -482,13 +449,11 @@ class SyncJobServiceTest extends BaseUnitTest {
         SyncJob crashed = newJob(7L, SyncJobStatus.RUNNING);
         crashed.setHeartbeatAt(Instant.now().minus(Duration.ofMinutes(30)));
         when(syncJobRepository.findAbandonedForConnection(CONNECTION_ID, 900)).thenReturn(List.of(crashed));
-        when(syncJobRepository.markAbandoned(7L, "Abandoned: no heartbeat (likely pod restart)", 900)).thenReturn(1);
-        when(
-            syncJobRepository.findFirstByConnection_IdAndStatusInOrderByCreatedAtDesc(
-                CONNECTION_ID,
-                SyncJobStatus.ACTIVE
-            )
-        ).thenReturn(Optional.empty());
+        when(syncJobRepository.markAbandoned(7L, "Abandoned: no heartbeat (likely pod restart)", 900))
+                .thenReturn(1);
+        when(syncJobRepository.findFirstByConnection_IdAndStatusInOrderByCreatedAtDesc(
+                        CONNECTION_ID, SyncJobStatus.ACTIVE))
+                .thenReturn(Optional.empty());
 
         assertThat(service.requestCancelForTeardown(CONNECTION_ID)).isEmpty();
 
@@ -498,12 +463,9 @@ class SyncJobServiceTest extends BaseUnitTest {
     @Test
     void requestCancelForTeardown_liveJob_requestsCancellationAndNamesItSoTheAdminCanRetry() {
         SyncJob live = newJob(8L, SyncJobStatus.RUNNING);
-        when(
-            syncJobRepository.findFirstByConnection_IdAndStatusInOrderByCreatedAtDesc(
-                CONNECTION_ID,
-                SyncJobStatus.ACTIVE
-            )
-        ).thenReturn(Optional.of(live));
+        when(syncJobRepository.findFirstByConnection_IdAndStatusInOrderByCreatedAtDesc(
+                        CONNECTION_ID, SyncJobStatus.ACTIVE))
+                .thenReturn(Optional.of(live));
         when(syncJobRepository.markCancelRequested(8L, SyncJobStatus.ACTIVE)).thenReturn(1);
 
         assertThat(service.requestCancelForTeardown(CONNECTION_ID)).contains(8L);
@@ -516,12 +478,9 @@ class SyncJobServiceTest extends BaseUnitTest {
     @Test
     void requestCancelForTeardown_jobCompletedBetweenReadAndWrite_reportsConnectionFree() {
         SyncJob raced = newJob(8L, SyncJobStatus.RUNNING);
-        when(
-            syncJobRepository.findFirstByConnection_IdAndStatusInOrderByCreatedAtDesc(
-                CONNECTION_ID,
-                SyncJobStatus.ACTIVE
-            )
-        ).thenReturn(Optional.of(raced));
+        when(syncJobRepository.findFirstByConnection_IdAndStatusInOrderByCreatedAtDesc(
+                        CONNECTION_ID, SyncJobStatus.ACTIVE))
+                .thenReturn(Optional.of(raced));
         when(syncJobRepository.markCancelRequested(8L, SyncJobStatus.ACTIVE)).thenReturn(0);
 
         assertThat(service.requestCancelForTeardown(CONNECTION_ID)).isEmpty();
@@ -530,13 +489,11 @@ class SyncJobServiceTest extends BaseUnitTest {
     @Test
     void requestCancelForTeardown_runningLocally_reachesTheRunnerWithoutWaitingForTheHeartbeat() {
         SyncJobService.Started started = beginTestJob();
-        when(
-            syncJobRepository.findFirstByConnection_IdAndStatusInOrderByCreatedAtDesc(
-                CONNECTION_ID,
-                SyncJobStatus.ACTIVE
-            )
-        ).thenReturn(Optional.of(started.job()));
-        when(syncJobRepository.markCancelRequested(started.job().getId(), SyncJobStatus.ACTIVE)).thenReturn(1);
+        when(syncJobRepository.findFirstByConnection_IdAndStatusInOrderByCreatedAtDesc(
+                        CONNECTION_ID, SyncJobStatus.ACTIVE))
+                .thenReturn(Optional.of(started.job()));
+        when(syncJobRepository.markCancelRequested(started.job().getId(), SyncJobStatus.ACTIVE))
+                .thenReturn(1);
 
         service.executeBody(started, handle -> {
             service.requestCancelForTeardown(CONNECTION_ID);
@@ -631,16 +588,14 @@ class SyncJobServiceTest extends BaseUnitTest {
     void executeBody_progressReportedInBody_isFlushedOnTerminalWrite() {
         SyncJobService.Started started = beginTestJob();
 
-        service.executeBody(started, handle ->
-            handle.progress(
-                4,
-                12,
-                de.tum.cit.aet.hephaestus.integration.core.spi.SyncProgress.of(
-                    de.tum.cit.aet.hephaestus.integration.core.spi.SyncPhase.PULL_REQUESTS,
-                    "pull-requests"
-                )
-            )
-        );
+        service.executeBody(
+                started,
+                handle -> handle.progress(
+                        4,
+                        12,
+                        de.tum.cit.aet.hephaestus.integration.core.spi.SyncProgress.of(
+                                de.tum.cit.aet.hephaestus.integration.core.spi.SyncPhase.PULL_REQUESTS,
+                                "pull-requests")));
 
         assertThat(started.job().getStatus()).isEqualTo(SyncJobStatus.SUCCEEDED);
         assertThat(started.job().getItemsProcessed()).isEqualTo(4);
@@ -665,13 +620,13 @@ class SyncJobServiceTest extends BaseUnitTest {
         SyncJobService.Started started = beginTestJob();
         List<SyncStateChangedEvent> published = new ArrayList<>();
         doAnswer(inv -> {
-            if (inv.getArgument(0) instanceof SyncStateChangedEvent e) {
-                published.add(e);
-            }
-            return null;
-        })
-            .when(eventPublisher)
-            .publishEvent(any(Object.class));
+                    if (inv.getArgument(0) instanceof SyncStateChangedEvent e) {
+                        published.add(e);
+                    }
+                    return null;
+                })
+                .when(eventPublisher)
+                .publishEvent(any(Object.class));
 
         List<SyncStateChangedEvent.Scope> seenWhileTheJobWasStillRunning = new ArrayList<>();
         service.executeBody(started, handle -> {
@@ -683,8 +638,8 @@ class SyncJobServiceTest extends BaseUnitTest {
         });
 
         assertThat(seenWhileTheJobWasStillRunning)
-            .contains(SyncStateChangedEvent.Scope.RESOURCES)
-            .contains(SyncStateChangedEvent.Scope.JOB);
+                .contains(SyncStateChangedEvent.Scope.RESOURCES)
+                .contains(SyncStateChangedEvent.Scope.JOB);
     }
 
     /**
@@ -699,26 +654,25 @@ class SyncJobServiceTest extends BaseUnitTest {
         CountDownLatch releaseBody = new CountDownLatch(1);
 
         try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
-            executor.execute(() ->
-                service.executeBody(started, handle -> {
-                    handle.progress(1, 10, SyncProgress.of(SyncPhase.ISSUES, "written"));
-                    // Throttled — buffered only. The runner then goes quiet, as it would while grinding
-                    // through a slow phase.
-                    handle.progress(7, 10, SyncProgress.of(SyncPhase.ISSUES, "suppressed"));
-                    reported.countDown();
-                    try {
-                        releaseBody.await(10, TimeUnit.SECONDS);
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                    }
-                })
-            );
+            executor.execute(() -> service.executeBody(started, handle -> {
+                handle.progress(1, 10, SyncProgress.of(SyncPhase.ISSUES, "written"));
+                // Throttled — buffered only. The runner then goes quiet, as it would while grinding
+                // through a slow phase.
+                handle.progress(7, 10, SyncProgress.of(SyncPhase.ISSUES, "suppressed"));
+                reported.countDown();
+                try {
+                    releaseBody.await(10, TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }));
             assertThat(reported.await(5, TimeUnit.SECONDS)).isTrue();
             assertThat(started.job().getItemsProcessed()).isEqualTo(1);
 
             // Advance past the throttle window instead of sleeping: the handle reads the same injected
             // clock, so the buffered "suppressed" update is now due for the trailing flush.
-            clock.advance(Duration.ofSeconds(SyncJobHandle.MIN_WRITE_INTERVAL_SECONDS).plusMillis(200));
+            clock.advance(
+                    Duration.ofSeconds(SyncJobHandle.MIN_WRITE_INTERVAL_SECONDS).plusMillis(200));
             service.flushBufferedProgress();
 
             assertThat(started.job().getItemsProcessed()).isEqualTo(7);
@@ -733,7 +687,8 @@ class SyncJobServiceTest extends BaseUnitTest {
         SyncJob stale = newJob(8L, SyncJobStatus.RUNNING);
         stale.setHeartbeatAt(Instant.now().minus(java.time.Duration.ofMinutes(30)));
         when(syncJobRepository.findAbandoned(900)).thenReturn(List.of(stale));
-        when(syncJobRepository.markAbandoned(8L, "Abandoned: no heartbeat (likely pod restart)", 900)).thenReturn(1);
+        when(syncJobRepository.markAbandoned(8L, "Abandoned: no heartbeat (likely pod restart)", 900))
+                .thenReturn(1);
 
         int reaped = service.reapAbandonedJobs();
 
@@ -754,7 +709,8 @@ class SyncJobServiceTest extends BaseUnitTest {
     void reapAbandonedJobs_heartbeatRefreshedAfterCandidateRead_doesNotReapOrPublish() {
         SyncJob candidate = newJob(8L, SyncJobStatus.RUNNING);
         when(syncJobRepository.findAbandoned(900)).thenReturn(List.of(candidate));
-        when(syncJobRepository.markAbandoned(8L, "Abandoned: no heartbeat (likely pod restart)", 900)).thenReturn(0);
+        when(syncJobRepository.markAbandoned(8L, "Abandoned: no heartbeat (likely pod restart)", 900))
+                .thenReturn(0);
 
         assertThat(service.reapAbandonedJobs()).isZero();
 
@@ -773,18 +729,16 @@ class SyncJobServiceTest extends BaseUnitTest {
         when(syncJobRepository.findAbandoned(900)).thenReturn(List.of(started.job()));
 
         try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
-            var running = executor.submit(() ->
-                service.executeBody(started, handle -> {
-                    bodyEntered.countDown();
-                    try {
-                        releaseBody.await();
-                    } catch (InterruptedException e) {
-                        interrupted.set(true);
-                        Thread.currentThread().interrupt();
-                        throw new IllegalStateException("locally-owned job was wrongly interrupted", e);
-                    }
-                })
-            );
+            var running = executor.submit(() -> service.executeBody(started, handle -> {
+                bodyEntered.countDown();
+                try {
+                    releaseBody.await();
+                } catch (InterruptedException e) {
+                    interrupted.set(true);
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException("locally-owned job was wrongly interrupted", e);
+                }
+            }));
             assertThat(bodyEntered.await(2, TimeUnit.SECONDS)).isTrue();
 
             try {
@@ -876,9 +830,8 @@ class SyncJobServiceTest extends BaseUnitTest {
         SyncJob terminal = newJob(9L, SyncJobStatus.SUCCEEDED);
         when(syncJobRepository.findByIdAndWorkspace_Id(9L, WORKSPACE_ID)).thenReturn(Optional.of(terminal));
 
-        assertThatThrownBy(() -> service.requestCancel(WORKSPACE_ID, 9L)).isInstanceOf(
-            SyncStateConflictException.class
-        );
+        assertThatThrownBy(() -> service.requestCancel(WORKSPACE_ID, 9L))
+                .isInstanceOf(SyncStateConflictException.class);
     }
 
     @Test
@@ -894,12 +847,6 @@ class SyncJobServiceTest extends BaseUnitTest {
 
     private static SyncJobRequest defaultRequest() {
         return new SyncJobRequest(
-            WORKSPACE_ID,
-            CONNECTION_ID,
-            IntegrationKind.GITHUB,
-            SyncJobType.INITIAL,
-            SyncJobTrigger.MANUAL,
-            null
-        );
+                WORKSPACE_ID, CONNECTION_ID, IntegrationKind.GITHUB, SyncJobType.INITIAL, SyncJobTrigger.MANUAL, null);
     }
 }

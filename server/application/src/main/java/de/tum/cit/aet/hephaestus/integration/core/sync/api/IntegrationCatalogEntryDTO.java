@@ -13,11 +13,16 @@ import org.jspecify.annotations.Nullable;
  */
 @Schema(description = "Integration kind availability + connection status for this workspace")
 public record IntegrationCatalogEntryDTO(
-    @NonNull @Schema(description = "Integration kind") IntegrationKind kind,
-    @NonNull @Schema(description = "Human-readable display name") String displayName,
-    @NonNull
-    @Schema(description = "Whether this workspace has a (non-UNINSTALLED) connection for this kind")
-    Boolean connected,
-    @Schema(description = "Connection id, if connected") @Nullable Long connectionId,
-    @Schema(description = "Connection state, if connected") @Nullable IntegrationState connectionState
-) {}
+        @NonNull @Schema(description = "Integration kind") IntegrationKind kind,
+
+        @NonNull @Schema(description = "Human-readable display name")
+        String displayName,
+
+        @NonNull @Schema(description = "Whether this workspace has a (non-UNINSTALLED) connection for this kind")
+        Boolean connected,
+
+        @Schema(description = "Connection id, if connected") @Nullable
+        Long connectionId,
+
+        @Schema(description = "Connection state, if connected") @Nullable
+        IntegrationState connectionState) {}

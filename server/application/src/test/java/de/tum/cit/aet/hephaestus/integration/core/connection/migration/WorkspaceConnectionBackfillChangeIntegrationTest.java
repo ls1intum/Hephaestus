@@ -78,15 +78,12 @@ class WorkspaceConnectionBackfillChangeIntegrationTest extends BaseIntegrationTe
         // Re-add legacy columns that section 9 of the unified-framework changelog
         // drops. Required so we can drive the backfill path that production v1 saw.
         // NOTE: account_login is a live current column — do NOT add/drop it here.
-        executeDdl(
-            "ALTER TABLE workspace " +
-                "ADD COLUMN IF NOT EXISTS git_provider_mode varchar(64), " +
-                "ADD COLUMN IF NOT EXISTS installation_id bigint, " +
-                "ADD COLUMN IF NOT EXISTS server_url varchar(255), " +
-                "ADD COLUMN IF NOT EXISTS personal_access_token text, " +
-                "ADD COLUMN IF NOT EXISTS gitlab_group_id bigint, " +
-                "ADD COLUMN IF NOT EXISTS gitlab_webhook_id bigint"
-        );
+        executeDdl("ALTER TABLE workspace " + "ADD COLUMN IF NOT EXISTS git_provider_mode varchar(64), "
+                + "ADD COLUMN IF NOT EXISTS installation_id bigint, "
+                + "ADD COLUMN IF NOT EXISTS server_url varchar(255), "
+                + "ADD COLUMN IF NOT EXISTS personal_access_token text, "
+                + "ADD COLUMN IF NOT EXISTS gitlab_group_id bigint, "
+                + "ADD COLUMN IF NOT EXISTS gitlab_webhook_id bigint");
     }
 
     @AfterEach
@@ -95,15 +92,12 @@ class WorkspaceConnectionBackfillChangeIntegrationTest extends BaseIntegrationTe
         // the restore, and the legacy columns must not survive on the shared schema.
         try {
             // NOTE: account_login is a live current column — do NOT drop it here.
-            executeDdl(
-                "ALTER TABLE workspace " +
-                    "DROP COLUMN IF EXISTS git_provider_mode, " +
-                    "DROP COLUMN IF EXISTS installation_id, " +
-                    "DROP COLUMN IF EXISTS server_url, " +
-                    "DROP COLUMN IF EXISTS personal_access_token, " +
-                    "DROP COLUMN IF EXISTS gitlab_group_id, " +
-                    "DROP COLUMN IF EXISTS gitlab_webhook_id"
-            );
+            executeDdl("ALTER TABLE workspace " + "DROP COLUMN IF EXISTS git_provider_mode, "
+                    + "DROP COLUMN IF EXISTS installation_id, "
+                    + "DROP COLUMN IF EXISTS server_url, "
+                    + "DROP COLUMN IF EXISTS personal_access_token, "
+                    + "DROP COLUMN IF EXISTS gitlab_group_id, "
+                    + "DROP COLUMN IF EXISTS gitlab_webhook_id");
         } finally {
             restoreSystemProperty();
         }
@@ -130,8 +124,8 @@ class WorkspaceConnectionBackfillChangeIntegrationTest extends BaseIntegrationTe
         assertThat(row.kind()).isEqualTo(IntegrationKind.GITHUB);
         assertThat(row.instanceKey()).isEqualTo("42");
         assertThat(row.credentialBlob())
-            .as("App mode mints installation tokens on demand — no credential blob")
-            .isNull();
+                .as("App mode mints installation tokens on demand — no credential blob")
+                .isNull();
 
         var connection = connectionRepository.findById(row.id()).orElseThrow();
         assertThat(connection.getConfig()).isInstanceOf(ConnectionConfig.GitHubAppConfig.class);
@@ -155,15 +149,15 @@ class WorkspaceConnectionBackfillChangeIntegrationTest extends BaseIntegrationTe
         assertThat(row.instanceKey()).isEqualTo("pat");
         assertThat(row.credentialBlob()).isNotNull();
         assertThat(row.credentialBlob()[0])
-            .as("v2 format version byte")
-            .isEqualTo(CredentialBundleConverter.FORMAT_VERSION_V2);
+                .as("v2 format version byte")
+                .isEqualTo(CredentialBundleConverter.FORMAT_VERSION_V2);
         // Prove a real rewrap happened rather than a passthrough store of the legacy bytes: the
         // persisted v2 blob must NOT be byte-equal to the legacy v1 ciphertext. (Distinct formats —
         // v1 is the ENC:base64 string, v2 is the binary FORMAT_VERSION_V2 envelope under the row's
         // AAD — so equality here would mean the migration copied bytes blindly.)
         assertThat(row.credentialBlob())
-            .as("v2 blob is a fresh AAD-bound rewrap, not a copy of the legacy v1 ciphertext")
-            .isNotEqualTo(legacyEncryptedPat.getBytes(StandardCharsets.UTF_8));
+                .as("v2 blob is a fresh AAD-bound rewrap, not a copy of the legacy v1 ciphertext")
+                .isNotEqualTo(legacyEncryptedPat.getBytes(StandardCharsets.UTF_8));
 
         // Decrypt with the production converter under the row's AAD — proves the
         // customChange writes blobs the running app can read.
@@ -177,13 +171,7 @@ class WorkspaceConnectionBackfillChangeIntegrationTest extends BaseIntegrationTe
     void backfillsGitlabPatModeWithComposedInstanceKey() throws Exception {
         String legacyEncryptedPat = encryptLegacy("glpat-xyz", KEY_BYTES);
         long workspaceId = insertWorkspaceWithLegacyColumns(
-            "GITLAB_PAT",
-            null,
-            null,
-            legacyEncryptedPat,
-            7777L,
-            "https://gitlab.example.com"
-        );
+                "GITLAB_PAT", null, null, legacyEncryptedPat, 7777L, "https://gitlab.example.com");
 
         runBackfill();
 
@@ -193,8 +181,8 @@ class WorkspaceConnectionBackfillChangeIntegrationTest extends BaseIntegrationTe
         assertThat(row.workspaceId()).isEqualTo(workspaceId);
         assertThat(row.kind()).isEqualTo(IntegrationKind.GITLAB);
         assertThat(row.instanceKey())
-            .as("instance_key = '<serverUrl>:<groupId>' per backfill contract")
-            .isEqualTo("https://gitlab.example.com:7777");
+                .as("instance_key = '<serverUrl>:<groupId>' per backfill contract")
+                .isEqualTo("https://gitlab.example.com:7777");
         assertThat(row.credentialBlob()).isNotNull();
 
         var connection = connectionRepository.findById(row.id()).orElseThrow();
@@ -215,8 +203,8 @@ class WorkspaceConnectionBackfillChangeIntegrationTest extends BaseIntegrationTe
 
         runBackfill();
         assertThat(countConnectionRows())
-            .as("idempotency: ON CONFLICT must skip already-backfilled rows")
-            .isEqualTo(firstRunCount);
+                .as("idempotency: ON CONFLICT must skip already-backfilled rows")
+                .isEqualTo(firstRunCount);
     }
 
     @Test
@@ -225,7 +213,9 @@ class WorkspaceConnectionBackfillChangeIntegrationTest extends BaseIntegrationTe
 
         runBackfill();
 
-        assertThat(countConnectionRows()).as("workspaces with NULL git_provider_mode are skipped silently").isZero();
+        assertThat(countConnectionRows())
+                .as("workspaces with NULL git_provider_mode are skipped silently")
+                .isZero();
     }
 
     @Test
@@ -252,40 +242,36 @@ class WorkspaceConnectionBackfillChangeIntegrationTest extends BaseIntegrationTe
     }
 
     private long insertWorkspaceWithLegacyColumns(
-        @Nullable String mode,
-        @Nullable String accountLogin,
-        @Nullable Long installationId,
-        @Nullable String encryptedPat,
-        @Nullable Long gitlabGroupId
-    ) throws Exception {
+            @Nullable String mode,
+            @Nullable String accountLogin,
+            @Nullable Long installationId,
+            @Nullable String encryptedPat,
+            @Nullable Long gitlabGroupId)
+            throws Exception {
         return insertWorkspaceWithLegacyColumns(mode, accountLogin, installationId, encryptedPat, gitlabGroupId, null);
     }
 
     private long insertWorkspaceWithLegacyColumns(
-        @Nullable String mode,
-        @Nullable String accountLogin,
-        @Nullable Long installationId,
-        @Nullable String encryptedPat,
-        @Nullable Long gitlabGroupId,
-        @Nullable String serverUrl
-    ) throws Exception {
-        try (
-            Connection conn = dataSource.getConnection();
-            var stmt = conn.prepareStatement(
-                "INSERT INTO workspace (" +
-                    "  slug, display_name, status, created_at, updated_at, " +
-                    "  account_type, is_publicly_viewable, " +
-                    "  practices_enabled, mentor_enabled, achievements_enabled, leaderboard_enabled, " +
-                    "  progression_enabled, leagues_enabled, " +
-                    "  practice_review_auto_trigger_enabled, practice_review_manual_trigger_enabled, " +
-                    "  git_provider_mode, account_login, installation_id, personal_access_token, " +
-                    "  gitlab_group_id, server_url" +
-                    ") VALUES (?, ?, ?, NOW(), NOW(), " +
-                    "  'ORG', false, " +
-                    "  false, false, false, false, false, false, true, true, " +
-                    "  ?, ?, ?, ?, ?, ?) RETURNING id"
-            )
-        ) {
+            @Nullable String mode,
+            @Nullable String accountLogin,
+            @Nullable Long installationId,
+            @Nullable String encryptedPat,
+            @Nullable Long gitlabGroupId,
+            @Nullable String serverUrl)
+            throws Exception {
+        try (Connection conn = dataSource.getConnection();
+                var stmt = conn.prepareStatement(
+                        "INSERT INTO workspace (" + "  slug, display_name, status, created_at, updated_at, "
+                                + "  account_type, is_publicly_viewable, "
+                                + "  practices_enabled, mentor_enabled, achievements_enabled, leaderboard_enabled, "
+                                + "  progression_enabled, leagues_enabled, "
+                                + "  practice_review_auto_trigger_enabled, practice_review_manual_trigger_enabled, "
+                                + "  git_provider_mode, account_login, installation_id, personal_access_token, "
+                                + "  gitlab_group_id, server_url"
+                                + ") VALUES (?, ?, ?, NOW(), NOW(), "
+                                + "  'ORG', false, "
+                                + "  false, false, false, false, false, false, true, true, "
+                                + "  ?, ?, ?, ?, ?, ?) RETURNING id")) {
             String slug = "ws-" + System.nanoTime();
             stmt.setString(1, slug);
             stmt.setString(2, "Backfill Fixture " + slug);
@@ -314,42 +300,35 @@ class WorkspaceConnectionBackfillChangeIntegrationTest extends BaseIntegrationTe
     }
 
     private List<ConnectionRow> listConnectionRows() throws Exception {
-        try (
-            Connection conn = dataSource.getConnection();
-            var stmt = conn.prepareStatement(
-                "SELECT id, workspace_id, kind, instance_key, credentials_encrypted FROM connection ORDER BY id"
-            );
-            var rs = stmt.executeQuery()
-        ) {
+        try (Connection conn = dataSource.getConnection();
+                var stmt = conn.prepareStatement(
+                        "SELECT id, workspace_id, kind, instance_key, credentials_encrypted FROM connection ORDER BY id");
+                var rs = stmt.executeQuery()) {
             var result = new ArrayList<ConnectionRow>();
             while (rs.next()) {
-                result.add(
-                    new ConnectionRow(
+                result.add(new ConnectionRow(
                         rs.getLong("id"),
                         rs.getLong("workspace_id"),
                         IntegrationKind.valueOf(rs.getString("kind")),
                         rs.getString("instance_key"),
-                        rs.getBytes("credentials_encrypted")
-                    )
-                );
+                        rs.getBytes("credentials_encrypted")));
             }
             return result;
         }
     }
 
     private long countConnectionRows() throws Exception {
-        try (
-            Connection conn = dataSource.getConnection();
-            var stmt = conn.prepareStatement("SELECT COUNT(*) FROM connection");
-            var rs = stmt.executeQuery()
-        ) {
+        try (Connection conn = dataSource.getConnection();
+                var stmt = conn.prepareStatement("SELECT COUNT(*) FROM connection");
+                var rs = stmt.executeQuery()) {
             rs.next();
             return rs.getLong(1);
         }
     }
 
     private void executeDdl(String sql) throws Exception {
-        try (Connection conn = dataSource.getConnection(); var stmt = conn.createStatement()) {
+        try (Connection conn = dataSource.getConnection();
+                var stmt = conn.createStatement()) {
             stmt.execute(sql);
         }
     }
@@ -368,10 +347,5 @@ class WorkspaceConnectionBackfillChangeIntegrationTest extends BaseIntegrationTe
     }
 
     private record ConnectionRow(
-        long id,
-        long workspaceId,
-        IntegrationKind kind,
-        String instanceKey,
-        byte[] credentialBlob
-    ) {}
+            long id, long workspaceId, IntegrationKind kind, String instanceKey, byte[] credentialBlob) {}
 }

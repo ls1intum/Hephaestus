@@ -93,14 +93,13 @@ public class LeaderboardTaskScheduler {
     private final Map<Long, ScheduledFuture<?>> registrations = new ConcurrentHashMap<>();
 
     public LeaderboardTaskScheduler(
-        LeaderboardProperties leaderboardProperties,
-        LeaderboardScheduleResolver scheduleResolver,
-        TaskScheduler taskScheduler,
-        List<LeaderboardNotificationTask> notificationTasks,
-        LeaguePointsUpdateTask leaguePointsUpdateTask,
-        WorkspaceRepository workspaceRepository,
-        LockProvider lockProvider
-    ) {
+            LeaderboardProperties leaderboardProperties,
+            LeaderboardScheduleResolver scheduleResolver,
+            TaskScheduler taskScheduler,
+            List<LeaderboardNotificationTask> notificationTasks,
+            LeaguePointsUpdateTask leaguePointsUpdateTask,
+            WorkspaceRepository workspaceRepository,
+            LockProvider lockProvider) {
         this.leaderboardProperties = leaderboardProperties;
         this.scheduleResolver = scheduleResolver;
         this.taskScheduler = taskScheduler;
@@ -154,9 +153,8 @@ public class LeaderboardTaskScheduler {
             // its window math, so cron fire-time and cycle boundary always agree. (All workspaces
             // share the server zone; there is no per-workspace timezone today.)
             ScheduledFuture<?> future = taskScheduler.schedule(
-                locked(() -> runForWorkspace(workspaceId), workspaceId),
-                new CronTrigger(cron, TimeZone.getDefault())
-            );
+                    locked(() -> runForWorkspace(workspaceId), workspaceId),
+                    new CronTrigger(cron, TimeZone.getDefault()));
             if (future != null) {
                 registrations.put(workspaceId, future);
             }
@@ -198,11 +196,10 @@ public class LeaderboardTaskScheduler {
                     task.runForWorkspace(workspace);
                 } catch (RuntimeException e) {
                     log.warn(
-                        "Leaderboard notification task failed: task={}, workspaceId={}, error={}",
-                        task.getClass().getSimpleName(),
-                        workspaceId,
-                        e.getMessage()
-                    );
+                            "Leaderboard notification task failed: task={}, workspaceId={}, error={}",
+                            task.getClass().getSimpleName(),
+                            workspaceId,
+                            e.getMessage());
                 }
             }
         }
@@ -222,8 +219,7 @@ public class LeaderboardTaskScheduler {
         String lockName = "leaderboard-workspace-" + workspaceId;
         return () -> {
             Optional<SimpleLock> lock = lockProvider.lock(
-                new LockConfiguration(Instant.now(), lockName, LOCK_AT_MOST_FOR, LOCK_AT_LEAST_FOR)
-            );
+                    new LockConfiguration(Instant.now(), lockName, LOCK_AT_MOST_FOR, LOCK_AT_LEAST_FOR));
             if (lock.isEmpty()) {
                 log.info("Skipped leaderboard task: reason=lockHeldByAnotherReplica, lock={}", lockName);
                 return;

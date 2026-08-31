@@ -1,153 +1,174 @@
 # Preview deployment setup
 
-Coolify deploys one application stack per pull request from `compose.app.yaml`. A preview has its own
-PostgreSQL and git-checkout volumes, but shares staging's NATS event stream and starts from a sanitized
-copy of the staging database.
+The preview application runs one isolated stack per opted-in pull request. Anyone who can push to
+this repository adds the `preview` label to their own pull request; the current head
+deploys, and every push after that redeploys. A preview waits only for CI to publish that commit's
+images, never for the test suite, so it exists even when the tests are red. Removing the label, closing the pull request, or converting it back to draft removes
+the stack and frees its slot.
 
-## Runtime topology
+This directory is infrastructure for this repository's own pull requests. It is not part of a
+self-hosted Hephaestus install — `docker/self-host/` is that. Contributors use previews through
+[CI/CD → Preview Deployments](https://ls1intum.github.io/Hephaestus/contributor/ci-cd).
 
-| Concern | Preview behavior | Why |
-|---|---|---|
-| PostgreSQL | Private volume per PR | Tests cannot mutate staging or another preview |
-| Seed data | One live `pg_dump` from `app-postgres-1` on first deploy | Realistic data without touching the staging data volume |
-| NATS | Shared staging `nats-server:4222` on `shared-network` | Previews see the same integration events as staging |
-| NATS consumer | `${SERVICE_NAME_APPSERVER}-consumer` | Every preview has an independent JetStream cursor |
-| Consumer lifetime | JetStream reaps the durable after `HEPHAESTUS_INTEGRATION_CONSUMER_INACTIVE_THRESHOLD` (72h here, 30d for a long-lived deployment) with nothing bound | A deleted preview cannot delete its own cursors, and its backlog lives on the shared stream until the durable goes |
-| App image | Immutable `${SOURCE_COMMIT}` tag from CI | The API and SPA both reflect the PR without a shared mutable tag |
-| Agent runtime | Enabled, one sandbox at a time | A selected workspace can run real reviews without exhausting the host |
-| Review automation | Paused in every cloned workspace | A clone cannot post reviews until an admin explicitly opts it in |
+## Security boundary
 
-Before the first restore, the seeder recreates only the uniquely resolved preview database. The marker
-`/var/lib/postgresql/data/.hephaestus-preview-seeded` is written only after the restore and sanitization
-both succeed. A failed or partial first attempt can therefore retry cleanly, while redeploying an
-already seeded PR preserves changes made while testing. A new preview volume gets a fresh staging clone.
+Pull-request code is untrusted even when it comes from a branch in this repository. These constraints
+hold, each enforced before Coolify is asked to deploy:
 
-## Preview policy
+- Coolify receives a signed synthetic GitHub webhook, HMAC-verified against this application's
+  manual webhook secret. Its stock PR handler queues the supplied full commit SHA; the public
+  `/api/v1/deploy` endpoint is not used because it queues mutable `HEAD`. Coolify selects the
+  application by the webhook's base ref, and the controller always sends the branch that application
+  is configured for, so a pull request stacked on another branch still routes to it.
+- Every service runs the image CI published for that exact commit — the same artifacts staging and
+  production run, buildpack-built application server included. Each digest must carry a GitHub build
+  attestation naming this repository's `reusable-docker-build.yml` as signer, checked before Coolify
+  is asked to pull it. Nothing is built on the deployment host, so a preview cannot pass on a
+  lookalike of the shipped image.
+- The database is this preview's own, seeded from staging so it starts with real data. The clone is
+  taken with `pg_dump` — staging's data volume is never mounted — and the preview policy runs before
+  the application server is allowed to boot: every review trigger, agent binding and sweep schedule
+  is disabled, queued jobs are cancelled, pending deliveries are failed, and the instance identity
+  (`login_provider`, `jwt_signing_key`, `issued_jwt`) is dropped so the preview signs its own tokens.
+  The seed loader verifies that against the database and refuses to mark the preview seeded
+  otherwise, so a policy that silently did not apply leaves the preview un-booted rather than live.
+- The application server reads staging's JetStream, so a preview sees the events a shared GitHub App
+  delivers there. Its durable is named per deploy, so previews never compete for one consumer, and
+  it expires 72h after the preview stops reading — a preview is deleted, not shut down, so it never
+  removes its own.
+- Agent execution, repository checkout, inbound webhooks and recurring sync stay disabled, which is
+  what keeps a stack holding real data from acting on it.
 
-`seed-loader` applies a policy to the restored clone before the application server starts, then
-verifies it took effect and only then writes the seed marker. A clone is another instance's live
-database, so the policy answers two questions, and it is organised by them.
+No container here holds the Docker socket. A `:ro` socket mount restricts the file and not the API —
+a container holding one can still create containers, and from there mount the host — so there is no
+scoped way to hold it and nothing does. The seed loader reads staging over the network instead, as a
+role that can only read.
 
-The SQL is inline in `compose.app.yaml` rather than a mounted `.sql` file: Coolify materialises a
-relative bind mount as an empty managed *directory*, which `psql <` reads as zero bytes and exits 0
-on. The seed marker is therefore written against the database's own answer rather than against an
-exit code — any live trigger, binding, job, pending delivery, or inherited identity fails the
-deployment.
+Only the seed loader and the application server join staging's network, the first to reach its
+database and the second its broker. The preview's own database and the SPA stay on Coolify's
+per-preview network — the one it creates and attaches its proxy to. This file defines no network of its own:
+Coolify runs every preview of this application under one Compose project named after the application
+UUID, so a network defined here would be `<uuid>_backend` for all of them at once, private-looking
+and shared. `staging-shared` is joined by name, which makes it a decision rather than a side effect.
 
-### Silence — a clone must not act
+PostgreSQL keeps a PR-specific volume; nothing else in the stack keeps state.
 
-1. disables automatic and manual practice-review triggers for every workspace;
-2. disables each `PRACTICE_REVIEW` model binding while preserving its selected model;
-3. pauses recurring review sweep schedules;
-4. cancels cloned active sync and agent jobs; and
-5. marks cloned pending feedback deliveries failed so recovery cannot publish a staging result.
+Deployment authority is deliberately the same as push authority;
+[ADR 0035](../../docs/decisions/0035-pull-request-previews-are-label-gated.md) records why, and what
+was declined. Operationally that means the gates decide what deploys, not a person: fork exclusion, a
+trusted author association, and refusal for any head that introduces changes to `.github/workflows/**`, `.github/actions/**`, or this
+directory. Any base branch in this repository is eligible, so a stacked layer previews the whole
+stack up to that layer; only forks are excluded.
 
-It deliberately does **not** disable the practices feature. The review settings and existing data stay
-visible in the UI. To test reviews for one workspace, enable its practice-review model binding and then
-enable the desired manual or automatic trigger in that workspace's practice-review settings. Those
-changes persist for the lifetime of the PR preview.
+Coolify re-reads this directory's Compose file from the commit it is deploying, not from `main`, so a
+pull request's own copy of it defines that pull request's stack. Two rules hold that line and neither
+works alone: the controller refuses to deploy a head that introduces changes anywhere under
+`docker/preview/` — compared against the default branch, so a stacked layer cannot inherit an edit
+from the layer below — and `ci-compose-validate.yml` renders the file on every pull request and fails if
+the stack gains a way out of its sandbox — a socket, a build stage, a published port, an unbounded
+memory limit, a network every preview would share, or a flipped integration switch.
+`scripts/check-preview-stack.ts` is the authoritative list; this paragraph is not.
 
-### Re-home — a clone must not keep the source instance's identity
+## Host capacity
 
-A preview runs with the **source instance's** `HEPHAESTUS_SECURITY_ENCRYPTION_KEY`, because that is the
-only key the cloned rows can be read with. Without it the preview boots and then fails every request
-that touches a credential, with `AEADBadTagException: Tag mismatch` in the log. That key also unseals
-the source's JWT signing key and decrypts its OAuth client secrets, so three tables are emptied and
-rebuilt from this deployment's own configuration:
+Memory and CPU ceilings are set per service in `compose.app.yaml`; budget roughly 3 GiB per slot.
+The CPU ceilings deliberately oversubscribe a small host: a preview is idle almost all the time, and
+a ceiling stops one stack taking the box rather than reserving capacity for it.
 
-| Table | Why it cannot be inherited |
+`PREVIEW_MAX_ACTIVE` caps concurrent previews and defaults to 3. It has to leave roughly 3 GiB of
+memory per slot in whatever staging is not already using — check `free -g` on the host before raising
+it, and move previews to their own destination rather than raising it much further. At the cap the
+controller refuses the next preview and names the pull requests holding the slots. Deployments are
+serialized through one Actions concurrency group, so previews never start at once.
+
+## Coolify configuration
+
+Create one Docker Compose application for `ls1intum/Hephaestus` on branch `main` and point it at
+`/docker/preview/compose.app.yaml`.
+
+1. Keep normal automatic deployment off. Disable the repository webhook that targets Coolify's
+   manual endpoint. Enable preview deployments so the Actions controller's signed webhook may create
+   and update PR records. This application's public/manual source is not selected by the normal
+   GitHub App webhook.
+2. Do not select **Deploy preview** in Coolify. That UI action bypasses attestation checking and the
+   admission limit.
+3. Assign the webapp and appserver sibling wildcard domains, shaped `pr<id>.<preview zone>` and
+   `pr<id>.api.<preview zone>`. The web hostname must match the `COOLIFY_PREVIEW_URL_TEMPLATE`
+   repository variable below — that variable is the single place the zone is written down.
+4. Set the values in `.env.example` — all of them. The server validates its production
+   configuration before it starts, so a missing `WEBHOOK_SECRET` or `HEPHAESTUS_AUTH_STATE_COOKIE_KEY`
+   makes every preview restart-loop rather than fail loudly. Generate new database, state-cookie, and encryption secrets for
+   this preview application. A GitHub OAuth app is optional, but if configured it must be
+   preview-only.
+5. Leave `SOURCE_COMMIT`, `COOLIFY_BRANCH`, and the `SERVICE_*` variables to Coolify. Define nothing
+   on this application beyond `.env.example`; anything else does not belong here.
+6. Disable **Connect to predefined network**. Coolify attaches its proxy to each generated preview
+   network; the services do not need the shared `coolify` network. The one network this stack joins,
+   staging's `shared-network`, it names itself.
+7. Deploy onto the host running staging: the stack reaches staging's database and broker over its
+   `shared-network`, which is local to that host. A seed source that is unreachable fails the
+   preview rather than quietly starting it on an empty database.
+8. Create the seeding role once, on staging's PostgreSQL, and put its password in
+   `PREVIEW_SEED_SOURCE_PASSWORD`. `pg_read_all_data` is the whole grant — the role can read every
+   table `pg_dump` needs and write nothing:
+
+   ```sql
+   CREATE ROLE preview_seed LOGIN PASSWORD '<generated>';
+   ALTER ROLE preview_seed WITH NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION CONNECTION LIMIT 4;
+   GRANT pg_read_all_data TO preview_seed;
+   GRANT CONNECT ON DATABASE hephaestus TO preview_seed;
+   ```
+
+   Rotating it is one `ALTER ROLE … PASSWORD` and one Coolify variable. Between the two, seeding
+   fails and previews stay down rather than coming up on an empty database.
+
+## GitHub configuration
+
+Create a repository label named exactly `preview`. It is the opt-in switch, so give it a description
+that says so.
+
+Set these repository variables:
+
+| Variable | Purpose |
 |---|---|
-| `login_provider` | The source's OAuth apps are registered against the source's hostname, so the provider rejects every sign-in that starts from a preview host |
-| `jwt_signing_key` | The preview would otherwise mint its own tokens signed with the source instance's production signing key |
-| `issued_jwt` | Cloned sessions belong to the source instance's users |
+| `COOLIFY_URL` | Coolify HTTPS origin |
+| `COOLIFY_APP_UUID` | Preview application UUID |
+| `COOLIFY_PREVIEW_URL_TEMPLATE` | Public web URL containing `{pr}` |
+| `PREVIEW_MAX_ACTIVE` | Concurrent preview limit (optional; defaults to 3) |
 
-`LoginProviderService` seeds `login_provider` from the environment whenever a registration id is
-absent, so emptying the table hands the preview its own login apps on the next boot — which is why the
-preview stack needs `GH_OAUTH_CLIENT_ID`/`GH_OAUTH_CLIENT_SECRET` (and any other provider it should
-offer) pointed at an OAuth app
-whose callback covers the preview hostnames. A provider with no credentials in the preview environment
-is simply not offered; Slack, being link-only, is normally absent for that reason.
+Set two repository secrets:
 
-Accounts survive all of this: `identity_link` keys on `identity_provider`, not on `login_provider`, so
-a cloned user signs in through the preview's own OAuth app and lands on the same account.
+| Secret | Scope |
+|---|---|
+| `COOLIFY_PREVIEW_WEBHOOK_SECRET` | Must equal this application's Coolify **Manual Webhook Secret (GitHub)** |
+| `COOLIFY_PREVIEW_READ_TOKEN` | Coolify API token with the `read` ability |
 
-## One-time server and Coolify setup
+The controller needs no Coolify mutation token: the HMAC-authenticated webhook queues deployments and
+requests preview cleanup, and the read token only follows deployment status.
 
-1. Keep staging's `nats-server` attached to the external Docker network `shared-network`.
-2. Point the Coolify application at `/docker/preview/compose.app.yaml` and enable preview deployments.
-3. Keep **Connect to predefined network** enabled for Coolify proxy routing. The app server explicitly
-   joins `shared-network` as a second network.
-4. Set `PREVIEW_SEED_SOURCE_CONTAINER=app-postgres-1` if the staging Compose project/container name
-   ever changes. The source user defaults to `root` and database to `hephaestus`.
-5. Set `HEPHAESTUS_SECURITY_ENCRYPTION_KEY` to the **seed source instance's** key, and point
-   `GH_OAUTH_CLIENT_ID`/`GH_OAUTH_CLIENT_SECRET` at an OAuth app whose callback covers the preview
-   hostnames — see the re-home policy above for both. The `GH_` prefix is deliberate: GitHub Actions
-   reserves `GITHUB_`, and the Compose file maps these onto the application's `GITHUB_OAUTH_*` inputs.
-6. Assign the web and API services sibling wildcard domains. With the current template these are
-   `pr<id>.hephaestus.felixdietrich.com` and `pr<id>.api.hephaestus.felixdietrich.com`.
-7. Leave the preview `IMAGE_TAG` unset. Coolify injects `SOURCE_COMMIT`, and CI publishes the matching
-   application-server image before the preview update is requested.
-8. Put every preview-safe value in the application's **base** environment variables, not in Coolify's
-   separate preview-variable scope. See below.
+### Rotating them
 
-## Why the safe values live in Coolify's base scope
+Each rotation fails closed, so a half-finished one blocks previews rather than weakening them.
 
-Coolify documents a second variable scope that only preview deployments see. On the installed version
-that scope is not injected into a Docker Compose application: a preview started with variables
-duplicated across both scopes receives the base value, and the preview copy is silently ignored. A
-preview would then inherit whatever the base entry happens to say — for this stack that meant agent
-support off, larger sandbox limits than the host can afford, and startup sync enabled.
+- **`COOLIFY_PREVIEW_WEBHOOK_SECRET`** — set the new value in Coolify's **Manual Webhook Secret
+  (GitHub)** and in the repository secret. Between the two, deploys and teardowns are refused by
+  Coolify's signature check; the nightly reconcile retries teardown once both agree.
+- **`COOLIFY_PREVIEW_READ_TOKEN`** — issue the new `read` token first, update the secret, then revoke
+  the old one. A deploy in flight reports "cannot read deployment status" and the next push retries.
 
-This Coolify application exists only to host PR previews; staging itself is deployed by GitHub Actions
-from `docker/compose.app.yaml` and never reads these entries. So the base scope is the safe place for
-them, and duplicating a key across both scopes is what to avoid — the duplicate reads like the
-effective value and is not.
+Leaving these unset disables previews. Every preview workflow is guarded on them, so nothing runs and
+nothing fails.
 
-| Variable | Value | Without it |
-|---|---|---|
-| `AGENT_ENABLED` | `true` | Reviews cannot be tested at all, even deliberately |
-| `NATS_SERVER`, `HEPHAESTUS_SYNC_NATS_SERVER` | staging NATS | The preview sees no integration events |
-| `SANDBOX_MAX_CONCURRENT`, `SANDBOX_CPUS`, `SANDBOX_MEMORY_BYTES` | `1`, `1.0`, `2147483648` | One preview's agent run can starve the host |
-| `MONITORING_RUN_ON_STARTUP`, `MONITORING_SYNC_CRON` | `false`, `-` | The clone starts a full lifecycle sync on boot |
+## Teardown
 
-`-` is Spring's disabled-cron value; an empty string fails the boot instead of disabling the schedule.
+Closing a pull request, merging it, dropping the `preview` label or converting the pull request to a
+draft sends Coolify a signed close event, and the GitHub deployment is then marked inactive so the
+slot is free. Coolify queues that teardown and answers immediately, so the workflow reports that the
+request was accepted, not that the containers are gone.
 
-## This file only takes effect once it reaches `main`
+Nothing here checks the host. That is a deliberate scope choice: verifying teardown would mean a
+standing credential on the deployment host. If leaks turn up, the nightly `Preview reconcile`
+workflow is where that check belongs — it already walks every retained preview and re-sends the close
+event.
 
-Coolify parses the Compose file from the branch configured on the application — `main` — and stores it
-on the application record. A preview deployment builds the pull request's images but runs that stored
-definition, so a change to `compose.app.yaml` is **not** exercised by the preview of the pull request
-that makes it. Reviewing a change here means reading it; the first
-preview that actually runs it is the next one created after the change is merged and Coolify has
-re-read `main`.
-
-## Host access
-
-Both the seeder and the application server mount `/var/run/docker.sock`. The seeder's `:ro` is a
-filesystem flag on a socket inode — it prevents unlinking, not any daemon command — so treat every
-one of these mounts as root on the host, confined to the trusted preview application and used only
-for `pg_dump`, restore, and sandbox execution.
-
-Coolify's `SERVICE_NAME_POSTGRES` is a network alias, so the seeder resolves the physical target
-container only when exactly one container carries both its own Compose project label and that
-service label.
-
-## Failure behavior
-
-Seeding is fail-closed. If staging Postgres is unavailable, the target container cannot be resolved,
-restore fails, or sanitization fails, `seed-loader` exits non-zero and the application server does not
-start. This prevents an apparently healthy but empty or unsanitized preview. Fix the source and
-redeploy; because the success marker is absent, the next deployment retries the clone.
-
-Useful checks on the staging VM:
-
-```bash
-docker ps --format '{{.Names}}' | grep -E '^(app-postgres-1|core-nats-server-1)$'
-docker network inspect shared-network
-docker exec app-postgres-1 pg_dump -U root -d hephaestus --schema-only >/dev/null
-```
-
-## File
-
-`compose.app.yaml` is the complete per-PR application stack. Shared NATS and webhook handling belong
-to staging and are deliberately not duplicated in this directory.
+Preview images are pulled per commit and are never removed by this system.

@@ -1,10 +1,12 @@
 import { XCircleIcon } from "lucide-react";
+
 import type { Profile, ProfileActivityMonitor } from "@/api/types.gen";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import type { ActivityMonitorFilters } from "@/lib/activity-monitor";
 import type { ProviderType } from "@/lib/provider";
 import type { LeaderboardSchedule } from "@/lib/timeframe";
+
 import {
 	PracticeGroupStandingCard,
 	type PracticeGroupStandingSectionProps,

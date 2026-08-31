@@ -3,7 +3,7 @@
 // guard could live — the LLM decides whether a guard is actually present. General by design: a per-language
 // pattern table keyed off the file extension, NOT a single-language scan. Adding a language = adding a row,
 // no engine change. NO observation, severity, or "defect" — facts only.
-import type { DiffFile, Hint, PullRequestMetadata } from "../lib/types";
+import type { DiffFile, Hint, PullRequestMetadata } from "../lib/types.ts";
 
 // Cross-language boundary/edge constructs. Most are language-agnostic enough to share, but the table is
 // keyed per-language so a row can be tuned without affecting others.

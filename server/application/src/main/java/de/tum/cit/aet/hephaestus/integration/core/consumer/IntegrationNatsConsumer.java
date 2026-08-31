@@ -109,6 +109,7 @@ public class IntegrationNatsConsumer {
      * here means a setup task is in-flight on a virtual thread.
      */
     private final Set<Long> pendingScopeSetup = ConcurrentHashMap.newKeySet();
+
     private final Set<Long> stoppingScopes = ConcurrentHashMap.newKeySet();
 
     /**
@@ -141,14 +142,13 @@ public class IntegrationNatsConsumer {
     private final ConnectionActivityRecorder activityRecorder;
 
     public IntegrationNatsConsumer(
-        NatsConnectionProperties connectionProperties,
-        NatsConsumerProperties consumerProperties,
-        NatsSubscriptionProvider subscriptionProvider,
-        IntegrationMessageDispatcher dispatcher,
-        IntegrationPoisonHandler poisonHandler,
-        IntegrationConsumerStats stats,
-        ConnectionActivityRecorder activityRecorder
-    ) {
+            NatsConnectionProperties connectionProperties,
+            NatsConsumerProperties consumerProperties,
+            NatsSubscriptionProvider subscriptionProvider,
+            IntegrationMessageDispatcher dispatcher,
+            IntegrationPoisonHandler poisonHandler,
+            IntegrationConsumerStats stats,
+            ConnectionActivityRecorder activityRecorder) {
         this.connectionProperties = connectionProperties;
         this.consumerProperties = consumerProperties;
         this.subscriptionProvider = subscriptionProvider;
@@ -178,16 +178,14 @@ public class IntegrationNatsConsumer {
             // gets a real signal instead of a silent dead consumer thread.
             stats.setNatsConnectionStatus("FAILED_BOOT");
             log.error(
-                "Integration NATS consumer failed to connect after {} attempts; health indicator will report DOWN",
-                MAX_RECONNECT_ATTEMPTS,
-                e
-            );
+                    "Integration NATS consumer failed to connect after {} attempts; health indicator will report DOWN",
+                    MAX_RECONNECT_ATTEMPTS,
+                    e);
             return;
         }
         log.info(
-            "Integration NATS consumer ready: server={}, awaiting WorkspacesInitializedEvent for installation consumer",
-            connectionProperties.server()
-        );
+                "Integration NATS consumer ready: server={}, awaiting WorkspacesInitializedEvent for installation consumer",
+                connectionProperties.server());
     }
 
     @EventListener(WorkspacesInitializedEvent.class)
@@ -386,17 +384,15 @@ public class IntegrationNatsConsumer {
             if (!retainFenceOnCommit || !stopped) {
                 stoppingScopes.remove(scopeId);
             } else if (TransactionSynchronizationManager.isSynchronizationActive()) {
-                TransactionSynchronizationManager.registerSynchronization(
-                    new TransactionSynchronization() {
-                        @Override
-                        public void afterCompletion(int status) {
-                            if (status != TransactionSynchronization.STATUS_COMMITTED) {
-                                stoppingScopes.remove(scopeId);
-                                startConsumingScope(scopeId);
-                            }
+                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                    @Override
+                    public void afterCompletion(int status) {
+                        if (status != TransactionSynchronization.STATUS_COMMITTED) {
+                            stoppingScopes.remove(scopeId);
+                            startConsumingScope(scopeId);
                         }
                     }
-                );
+                });
             }
         }
     }
@@ -464,12 +460,11 @@ public class IntegrationNatsConsumer {
             // Commit whatever is already running (see javadoc), then re-arm and rethrow.
             commitScopeConsumers(scopeId, next);
             log.error(
-                "Partial scope consumer reconcile: scopeId={}, running={}, desired={} — retrying",
-                scopeId,
-                next.size(),
-                desired.size(),
-                e
-            );
+                    "Partial scope consumer reconcile: scopeId={}, running={}, desired={} — retrying",
+                    scopeId,
+                    next.size(),
+                    desired.size(),
+                    e);
             scheduleScopeReconcileRetry(scopeId);
             throw e;
         }
@@ -508,11 +503,10 @@ public class IntegrationNatsConsumer {
         int attempt = scopeReconcileAttempts.merge(scopeId, 1, Integer::sum);
         if (attempt >= MAX_SCOPE_RECONCILE_ATTEMPTS) {
             log.error(
-                "Giving up on scope consumer reconcile after {} attempts: scopeId={}; " +
-                    "the scope is consuming only the streams that could be bound",
-                attempt,
-                scopeId
-            );
+                    "Giving up on scope consumer reconcile after {} attempts: scopeId={}; "
+                            + "the scope is consuming only the streams that could be bound",
+                    attempt,
+                    scopeId);
             scopeReconcileAttempts.remove(scopeId);
             return;
         }
@@ -582,36 +576,30 @@ public class IntegrationNatsConsumer {
         String consumerName = ConsumerSubjectMath.scopeConsumerName(durableBaseName(), scopeId) + "-" + streamName;
         try {
             JetStreamOptions jsOptions = JetStreamOptions.builder()
-                .requestTimeout(connectionProperties.consumer().requestTimeout())
-                .build();
-            StreamContext streamContext = Objects.requireNonNull(natsConnection).getStreamContext(
-                streamName,
-                jsOptions
-            );
+                    .requestTimeout(connectionProperties.consumer().requestTimeout())
+                    .build();
+            StreamContext streamContext =
+                    Objects.requireNonNull(natsConnection).getStreamContext(streamName, jsOptions);
             ConsumerContext consumerContext = createOrUpdateConsumer(streamContext, consumerName, subjects);
 
             ScopeConsumer scope = new ScopeConsumer(
-                scopeId,
-                consumerName,
-                streamName,
-                consumerContext,
-                streamContext,
-                subjects,
-                msg -> handleMessage(scopeId, msg)
-            );
+                    scopeId,
+                    consumerName,
+                    streamName,
+                    consumerContext,
+                    streamContext,
+                    subjects,
+                    msg -> handleMessage(scopeId, msg));
             scope.start();
             log.info(
-                "Started scope consumer: scopeId={}, stream={}, subjectCount={}",
-                scopeId,
-                streamName,
-                subjects.length
-            );
+                    "Started scope consumer: scopeId={}, stream={}, subjectCount={}",
+                    scopeId,
+                    streamName,
+                    subjects.length);
             return scope;
         } catch (JetStreamApiException e) {
             throw new IOException(
-                "Failed to set up scope consumer for scopeId=" + scopeId + " stream=" + streamName,
-                e
-            );
+                    "Failed to set up scope consumer for scopeId=" + scopeId + " stream=" + streamName, e);
         }
     }
 
@@ -633,9 +621,9 @@ public class IntegrationNatsConsumer {
     }
 
     private void setupInstallationConsumer() throws IOException {
-        String streamName = ConsumerSubjectMath.streamNameFor(INSTALLATION_AWARE_KIND).orElseThrow(() ->
-            new IllegalStateException("No NATS stream resolved for installation-aware kind=" + INSTALLATION_AWARE_KIND)
-        );
+        String streamName = ConsumerSubjectMath.streamNameFor(INSTALLATION_AWARE_KIND)
+                .orElseThrow(() -> new IllegalStateException(
+                        "No NATS stream resolved for installation-aware kind=" + INSTALLATION_AWARE_KIND));
         String[] subjects = new String[] {
             ConsumerSubjectMath.installationAwareSubjectFilter(INSTALLATION_AWARE_KIND),
         };
@@ -643,23 +631,20 @@ public class IntegrationNatsConsumer {
 
         try {
             JetStreamOptions jsOptions = JetStreamOptions.builder()
-                .requestTimeout(connectionProperties.consumer().requestTimeout())
-                .build();
-            StreamContext streamContext = Objects.requireNonNull(natsConnection).getStreamContext(
-                streamName,
-                jsOptions
-            );
+                    .requestTimeout(connectionProperties.consumer().requestTimeout())
+                    .build();
+            StreamContext streamContext =
+                    Objects.requireNonNull(natsConnection).getStreamContext(streamName, jsOptions);
             ConsumerContext consumerContext = createOrUpdateConsumer(streamContext, consumerName, subjects);
 
             ScopeConsumer installation = new ScopeConsumer(
-                null,
-                consumerName,
-                streamName,
-                consumerContext,
-                streamContext,
-                subjects,
-                msg -> handleMessage(null, msg)
-            );
+                    null,
+                    consumerName,
+                    streamName,
+                    consumerContext,
+                    streamContext,
+                    subjects,
+                    msg -> handleMessage(null, msg));
             installation.start();
             installationConsumer = installation;
             stats.setInstallationConsumerActive(true);
@@ -670,7 +655,7 @@ public class IntegrationNatsConsumer {
     }
 
     private ConsumerContext createOrUpdateConsumer(StreamContext streamContext, String consumerName, String[] subjects)
-        throws IOException, JetStreamApiException {
+            throws IOException, JetStreamApiException {
         boolean durable = !isBlank(connectionProperties.durableConsumerName());
 
         if (durable) {
@@ -683,25 +668,20 @@ public class IntegrationNatsConsumer {
                 // A consumer created before the threshold was configured keeps its old lifetime
                 // until something rewrites it, so reconcile it here rather than only on create.
                 boolean thresholdMatches = Objects.equals(
-                    Objects.requireNonNullElse(config.getInactiveThreshold(), Duration.ZERO),
-                    desiredThreshold
-                );
+                        Objects.requireNonNullElse(config.getInactiveThreshold(), Duration.ZERO), desiredThreshold);
                 if (existingSubjects.equals(desiredSubjects) && thresholdMatches) {
                     return existing;
                 }
                 log.info(
-                    "Updating durable consumer: consumerName={}, oldSubjectCount={}, newSubjectCount={}, inactiveThreshold={}",
-                    consumerName,
-                    existingSubjects.size(),
-                    desiredSubjects.size(),
-                    desiredThreshold
-                );
-                return streamContext.createOrUpdateConsumer(
-                    ConsumerConfiguration.builder(config)
+                        "Updating durable consumer: consumerName={}, oldSubjectCount={}, newSubjectCount={}, inactiveThreshold={}",
+                        consumerName,
+                        existingSubjects.size(),
+                        desiredSubjects.size(),
+                        desiredThreshold);
+                return streamContext.createOrUpdateConsumer(ConsumerConfiguration.builder(config)
                         .filterSubjects(subjects)
                         .inactiveThreshold(desiredThreshold)
-                        .build()
-                );
+                        .build());
             } catch (JetStreamApiException e) {
                 // 10014 = consumer not found: expected on first start / after cleanup, fall through
                 // to the create-new path. Any other API error (auth, server fault) is a real failure
@@ -713,43 +693,35 @@ public class IntegrationNatsConsumer {
             }
         }
 
-        ConsumerConfiguration configuration = newConsumerConfiguration(
-            subjects,
-            consumerProperties,
-            durable ? consumerName : null
-        );
+        ConsumerConfiguration configuration =
+                newConsumerConfiguration(subjects, consumerProperties, durable ? consumerName : null);
         log.info(
-            "Creating {} consumer: consumerName={}, subjectCount={}, deliverPolicy={}",
-            durable ? "durable" : "ephemeral",
-            durable ? consumerName : "(ephemeral)",
-            subjects.length,
-            configuration.getDeliverPolicy()
-        );
+                "Creating {} consumer: consumerName={}, subjectCount={}, deliverPolicy={}",
+                durable ? "durable" : "ephemeral",
+                durable ? consumerName : "(ephemeral)",
+                subjects.length,
+                configuration.getDeliverPolicy());
         return streamContext.createOrUpdateConsumer(configuration);
     }
 
     static ConsumerConfiguration newConsumerConfiguration(
-        String[] subjects,
-        NatsConsumerProperties consumerProperties,
-        @Nullable String durableName
-    ) {
+            String[] subjects, NatsConsumerProperties consumerProperties, @Nullable String durableName) {
         ConsumerConfiguration.Builder builder = ConsumerConfiguration.builder()
-            .filterSubjects(subjects)
-            .deliverPolicy(DeliverPolicy.New)
-            .ackWait(consumerProperties.ackWait())
-            .maxAckPending(consumerProperties.maxAckPending())
-            // Server-side cap on redeliveries. Without this, MaxDeliver=∞ would let a
-            // permanently-failing message NAK forever; the bound is enforced today only
-            // by IntegrationPoisonHandler counting deliveredCount on our side, which
-            // means a JetStream-side observability tool (`nats stream info`) cannot see
-            // the policy. Mirrors the value the poison handler uses to ACK-terminate.
-            .maxDeliver(consumerProperties.poison().maxRedeliver());
+                .filterSubjects(subjects)
+                .deliverPolicy(DeliverPolicy.New)
+                .ackWait(consumerProperties.ackWait())
+                .maxAckPending(consumerProperties.maxAckPending())
+                // Server-side cap on redeliveries. Without this, MaxDeliver=∞ would let a
+                // permanently-failing message NAK forever; the bound is enforced today only
+                // by IntegrationPoisonHandler counting deliveredCount on our side, which
+                // means a JetStream-side observability tool (`nats stream info`) cannot see
+                // the policy. Mirrors the value the poison handler uses to ACK-terminate.
+                .maxDeliver(consumerProperties.poison().maxRedeliver());
         if (!isBlank(durableName)) {
             // Only a durable is worth reaping: JetStream already deletes an ephemeral seconds after
             // its last pull, so a threshold here would lengthen that rather than bound it.
-            builder
-                .durable(Objects.requireNonNull(durableName))
-                .inactiveThreshold(consumerProperties.inactiveThreshold());
+            builder.durable(Objects.requireNonNull(durableName))
+                    .inactiveThreshold(consumerProperties.inactiveThreshold());
         }
         return builder.build();
     }
@@ -840,17 +812,14 @@ public class IntegrationNatsConsumer {
                 long delay = reconnectBackoffMs(attempt);
                 stats.setNatsConnectionStatus("RECONNECTING");
                 log.error(
-                    "NATS connection attempt failed: server={}, attempt={}, nextDelayMs={}",
-                    connectionProperties.server(),
-                    attempt,
-                    delay,
-                    e
-                );
+                        "NATS connection attempt failed: server={}, attempt={}, nextDelayMs={}",
+                        connectionProperties.server(),
+                        attempt,
+                        delay,
+                        e);
                 if (attempt >= MAX_RECONNECT_ATTEMPTS) {
                     throw new NatsConnectionException(
-                        "Failed to connect to NATS after " + MAX_RECONNECT_ATTEMPTS + " attempts",
-                        e
-                    );
+                            "Failed to connect to NATS after " + MAX_RECONNECT_ATTEMPTS + " attempts", e);
                 }
                 sleepUninterruptibly(delay);
                 attempt++;
@@ -859,22 +828,24 @@ public class IntegrationNatsConsumer {
     }
 
     private Options buildOptions() {
-        return Options.builder()
-            .server(connectionProperties.server())
-            .connectionListener((conn, type) -> {
-                if (conn != null && conn.getStatus() != null) {
-                    stats.setNatsConnectionStatus(conn.getStatus().name());
-                }
-                if (conn != null && conn.getServerInfo() != null) {
-                    log.debug("NATS connection event: type={}, port={}", type, conn.getServerInfo().getPort());
-                } else {
-                    log.debug("NATS connection event: type={}", type);
-                }
-            })
-            .maxReconnects(-1)
-            .reconnectWait(consumerProperties.reconnectDelay())
-            .connectionTimeout(CONNECTION_TIMEOUT)
-            .build();
+        return NatsOptions.builder(connectionProperties)
+                .connectionListener((conn, type) -> {
+                    if (conn != null && conn.getStatus() != null) {
+                        stats.setNatsConnectionStatus(conn.getStatus().name());
+                    }
+                    if (conn != null && conn.getServerInfo() != null) {
+                        log.debug(
+                                "NATS connection event: type={}, port={}",
+                                type,
+                                conn.getServerInfo().getPort());
+                    } else {
+                        log.debug("NATS connection event: type={}", type);
+                    }
+                })
+                .maxReconnects(-1)
+                .reconnectWait(consumerProperties.reconnectDelay())
+                .connectionTimeout(CONNECTION_TIMEOUT)
+                .build();
     }
 
     /** Package-private + overridable so the reconcile/retry paths are unit-testable without a broker. */

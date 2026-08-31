@@ -10,7 +10,7 @@ Also fixed, all surfaced by a stricter type and lint gate across the whole codeb
 
 - A review schedule saved with a time that had no minutes (`9` rather than `09:00`) stored no minute
   at all instead of falling back to the hour's start.
-- Audit-log entries and the curated-catalogue version panel printed `[object Object]` for any field
+- Audit-log entries and the instance catalog version panel printed `[object Object]` for any field
   whose value was not plain text.
 - A cookie-consent choice was read back from browser storage without checking it, so a corrupted
   entry could be treated as a decision.

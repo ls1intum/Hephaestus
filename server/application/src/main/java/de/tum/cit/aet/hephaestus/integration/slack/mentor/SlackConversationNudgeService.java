@@ -42,17 +42,16 @@ public class SlackConversationNudgeService {
     private final MentorReadinessQuery mentorReadinessQuery;
 
     private final Cache<Recipient, Instant> cooldowns = Caffeine.newBuilder()
-        .maximumSize(MAX_COOLDOWN_ENTRIES)
-        .expireAfterWrite(COOLDOWN)
-        .build();
+            .maximumSize(MAX_COOLDOWN_ENTRIES)
+            .expireAfterWrite(COOLDOWN)
+            .build();
 
     public SlackConversationNudgeService(
-        ConnectionService connectionService,
-        AccountPreferencesQuery accountPreferencesQuery,
-        SlackMentorIdentityResolver identityResolver,
-        SlackMessageService slackMessageService,
-        MentorReadinessQuery mentorReadinessQuery
-    ) {
+            ConnectionService connectionService,
+            AccountPreferencesQuery accountPreferencesQuery,
+            SlackMentorIdentityResolver identityResolver,
+            SlackMessageService slackMessageService,
+            MentorReadinessQuery mentorReadinessQuery) {
         this.connectionService = connectionService;
         this.accountPreferencesQuery = accountPreferencesQuery;
         this.identityResolver = identityResolver;
@@ -67,11 +66,10 @@ public class SlackConversationNudgeService {
             nudge(event);
         } catch (RuntimeException e) {
             log.warn(
-                "slack.nudge: failed for workspaceId={}, recipientUserId={}: {}",
-                event.workspaceId(),
-                event.recipientUserId(),
-                e.toString()
-            );
+                    "slack.nudge: failed for workspaceId={}, recipientUserId={}: {}",
+                    event.workspaceId(),
+                    event.recipientUserId(),
+                    e.toString());
         }
     }
 
@@ -90,18 +88,13 @@ public class SlackConversationNudgeService {
             log.debug("slack.nudge: skip, no ACTIVE Slack connection: workspaceId={}", workspaceId);
             return;
         }
-        boolean practiceFeedbackDeliveryEnabled = accountPreferencesQuery
-            .preferencesForUserId(recipientId)
-            .map(AccountPreferencesQuery.PreferencesView::practiceFeedbackDeliveryEnabled)
-            .orElse(true);
+        boolean practiceFeedbackDeliveryEnabled = accountPreferencesQuery.practiceFeedbackDeliveryEnabled(recipientId);
         if (!practiceFeedbackDeliveryEnabled) {
             log.debug("slack.nudge: skip, feedback delivery disabled: recipientUserId={}", recipientId);
             return;
         }
         Optional<String> slackUserId = identityResolver.resolveSlackUserId(
-            recipientId,
-            connection.get().getInstanceKey()
-        );
+                recipientId, connection.get().getInstanceKey());
         if (slackUserId.isEmpty()) {
             log.debug("slack.nudge: skip, no Slack identity link: recipientUserId={}", recipientId);
             return;
@@ -115,19 +108,14 @@ public class SlackConversationNudgeService {
         String text = message(event.unitCount());
         try {
             slackMessageService.sendForWorkspace(
-                workspaceId,
-                slackUserId.get(),
-                asBlocks(section(s -> s.text(markdownText(text)))),
-                text
-            );
+                    workspaceId, slackUserId.get(), asBlocks(section(s -> s.text(markdownText(text)))), text);
         } catch (SlackSendException e) {
             cooldowns.asMap().remove(recipient, now);
             log.warn(
-                "slack.nudge: send failed: workspaceId={}, recipientUserId={}, slackError={}",
-                workspaceId,
-                recipientId,
-                e.slackError()
-            );
+                    "slack.nudge: send failed: workspaceId={}, recipientUserId={}, slackError={}",
+                    workspaceId,
+                    recipientId,
+                    e.slackError());
         }
     }
 
@@ -138,8 +126,8 @@ public class SlackConversationNudgeService {
     /** Count-only copy — deliberately no finding details, no severity, no artifact references. */
     static String message(int unitCount) {
         return unitCount == 1
-            ? "You have 1 new practice observation to explore — reply here to go through it."
-            : "You have " + unitCount + " new practice observations to explore — reply here to go through them.";
+                ? "You have 1 new practice observation to explore — reply here to go through it."
+                : "You have " + unitCount + " new practice observations to explore — reply here to go through them.";
     }
 
     private record Recipient(long workspaceId, long userId) {}

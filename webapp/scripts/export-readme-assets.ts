@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
-import { mkdir } from "node:fs/promises";
+import { mkdir, rm } from "node:fs/promises";
 import { resolve } from "node:path";
+
 import { type Browser, chromium } from "playwright";
 
 const scriptDirectory = import.meta.dirname;
@@ -11,9 +12,8 @@ const storybookUrl = `http://127.0.0.1:${port}`;
 
 type Theme = "light" | "dark";
 
-type Breakpoint = "desktop" | "tablet" | "mobile";
-
 interface CaptureConfig {
+	name: string;
 	storyId: string;
 	selector: string;
 	viewportWidth: number;
@@ -21,61 +21,38 @@ interface CaptureConfig {
 	expectedWidth: number;
 }
 
-interface AssetExport {
-	name: string;
-	desktop: CaptureConfig;
-	tablet?: CaptureConfig;
-	mobile: CaptureConfig;
-}
-
 const themes: Theme[] = ["light", "dark"];
-
-const exportsToCapture: AssetExport[] = [
+const captureConfigs: CaptureConfig[] = [
 	{
-		name: "landing-feedback-preview",
-		desktop: {
-			storyId: "components-info-landing-landingfeedbackpreview--readme-export",
-			selector: '[data-readme-export="landing-feedback-preview"]',
-			viewportWidth: 900,
-			expectedWidth: 744,
-		},
-		mobile: {
-			storyId: "components-info-landing-landingfeedbackpreview--readme-export",
-			selector: '[data-readme-export="landing-feedback-preview"]',
-			viewportWidth: 390,
-			expectedWidth: 390,
-		},
+		name: "landing-hero",
+		storyId: "components-info-landing-landingherosection--readme-export",
+		selector: '[data-readme-export="landing-hero"]',
+		viewportWidth: 1440,
+		expectedWidth: 1280,
 	},
 	{
-		name: "feedback-loop",
-		desktop: {
-			storyId: "components-info-landing-landingfeedbackloop--readme-desktop-export",
-			selector: '[data-readme-export="feedback-loop-desktop"]',
-			viewportWidth: 1280,
-			expectedWidth: 1224,
-		},
-		tablet: {
-			storyId: "components-info-landing-landingfeedbackloop--readme-tablet-export",
-			selector: '[data-readme-export="feedback-loop-tablet"]',
-			viewportWidth: 824,
-			expectedWidth: 768,
-		},
-		mobile: {
-			storyId: "components-info-landing-landingfeedbackloop--readme-mobile-export",
-			selector: '[data-readme-export="feedback-loop-mobile"]',
-			viewportWidth: 390,
-			expectedWidth: 390,
-		},
+		name: "feedback-scene",
+		storyId: "components-info-landing-landingherosection--scene-export",
+		selector: '[data-readme-export="feedback-scene"]',
+		viewportWidth: 1024,
+		expectedWidth: 896,
 	},
 ];
 
-async function waitForStorybook(): Promise<void> {
+function indexContains(index: unknown, storyId: string): boolean {
+	if (!index || typeof index !== "object" || !("entries" in index)) return false;
+	const { entries } = index;
+	return Boolean(entries && typeof entries === "object" && storyId in entries);
+}
+
+async function waitForStorybook(storyId: string): Promise<void> {
 	for (let attempt = 0; attempt < 120; attempt += 1) {
-		try {
-			const response = await fetch(`${storybookUrl}/index.json`);
-			if (response.ok) return;
-		} catch {
-			// Storybook is still starting.
+		const response = await fetch(`${storybookUrl}/index.json`).catch(() => undefined);
+		if (response?.ok) {
+			if (!indexContains(await response.json(), storyId)) {
+				throw new Error(`Story ${storyId} is not in the Storybook index. Was it renamed?`);
+			}
+			return;
 		}
 		await new Promise((resolveDelay) => {
 			setTimeout(resolveDelay, 500);
@@ -88,7 +65,6 @@ async function capture(
 	browser: Browser,
 	theme: Theme,
 	name: string,
-	mode: Breakpoint,
 	config: CaptureConfig,
 ): Promise<void> {
 	const page = await browser.newPage({
@@ -107,7 +83,8 @@ async function capture(
 		await page.evaluate(() => document.fonts.ready);
 		await page.addStyleTag({
 			content:
-				"*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important}",
+				"*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important}" +
+				"[data-readme-actions]{display:none!important}",
 		});
 
 		const exportSurface = page.locator(config.selector);
@@ -115,24 +92,23 @@ async function capture(
 		const bounds = await exportSurface.boundingBox();
 		if (!bounds || Math.round(bounds.width) !== config.expectedWidth) {
 			throw new Error(
-				`${name} ${mode} export width was ${bounds?.width ?? "missing"}px; expected ${config.expectedWidth}px.`,
+				`${name} export width was ${bounds?.width ?? "missing"}px; expected ${config.expectedWidth}px.`,
 			);
 		}
 
-		const modeSuffix = mode === "desktop" ? "" : `${mode}-`;
-		const outputPath = resolve(outputDirectory, `${name}-${modeSuffix}${theme}.png`);
+		const outputPath = resolve(outputDirectory, `${name}-${theme}.png`);
 		await exportSurface.screenshot({ path: outputPath });
-		// oxlint-disable-next-line no-console -- This is a terminal script whose product is a set of image files, and stdout is the only channel that tells its operator which paths were written.
-		console.log(`Exported ${outputPath}`);
+		process.stdout.write(`Exported ${outputPath}\n`);
 	} finally {
 		await page.close();
 	}
 }
 
+await rm(outputDirectory, { recursive: true, force: true });
 await mkdir(outputDirectory, { recursive: true });
 const storybook = spawn(
 	"pnpm",
-	["exec", "storybook", "dev", "-p", String(port), "--ci", "--host", "127.0.0.1"],
+	["run", "storybook:dev", "--port", String(port), "--ci", "--host", "127.0.0.1"],
 	{
 		cwd: webappDirectory,
 		stdio: "ignore",
@@ -140,17 +116,11 @@ const storybook = spawn(
 );
 
 try {
-	await waitForStorybook();
+	for (const config of captureConfigs) await waitForStorybook(config.storyId);
 	const browser = await chromium.launch();
 	try {
-		for (const theme of themes) {
-			for (const asset of exportsToCapture) {
-				await capture(browser, theme, asset.name, "desktop", asset.desktop);
-				if (asset.tablet) {
-					await capture(browser, theme, asset.name, "tablet", asset.tablet);
-				}
-				await capture(browser, theme, asset.name, "mobile", asset.mobile);
-			}
+		for (const config of captureConfigs) {
+			for (const theme of themes) await capture(browser, theme, config.name, config);
 		}
 	} finally {
 		await browser.close();

@@ -6,8 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 /** Git provider rows are auto-created when workspaces are activated. */
 @WorkspaceAgnostic(
-    "IdentityProvider models a vendor instance (github.com, gitlab.lrz.de) shared across all workspaces; tenant scoping is enforced on the Connection aggregate."
-)
+        "IdentityProvider models a vendor instance (github.com, gitlab.lrz.de) shared across all workspaces; tenant scoping is enforced on the Connection aggregate.")
 public interface IdentityProviderRepository extends JpaRepository<IdentityProvider, Long> {
     Optional<IdentityProvider> findByTypeAndServerUrl(IdentityProviderType type, String serverUrl);
 }

@@ -44,9 +44,9 @@ class InAppFeedbackControllerIntegrationTest extends AbstractWorkspaceIntegratio
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final String IN_APP = "/workspaces/{slug}/practices/feedback/in-app";
     private static final String DIFF_EVIDENCE_JSON =
-        "{\"citations\":[{\"sourceKind\":\"scm.pull-request.diff\",\"artifactPath\":\"inputs/context/diff.patch\"," +
-        "\"path\":\"src/Main.java\",\"side\":\"NEW\",\"startLine\":42,\"endLine\":42,\"quote\":\"example\"," +
-        "\"quoteRedacted\":false}]}";
+            "{\"citations\":[{\"sourceKind\":\"scm.pull-request.diff\",\"artifactPath\":\"inputs/context/diff.patch\","
+                    + "\"path\":\"src/Main.java\",\"side\":\"NEW\",\"startLine\":42,\"endLine\":42,\"quote\":\"example\","
+                    + "\"quoteRedacted\":false}]}";
 
     @Autowired
     private WebTestClient webTestClient;
@@ -93,33 +93,30 @@ class InAppFeedbackControllerIntegrationTest extends AbstractWorkspaceIntegratio
     @DisplayName("a message prepared for this developer is returned, split into headline and body")
     void returnsTheDevelopersOwnPreparedMessage() {
         Feedback unit = persistInAppUnit(
-            workspace,
-            job,
-            developer,
-            7000,
-            FeedbackDeliveryState.PREPARED,
-            "You keep shipping untested changes",
-            "Across your last three pull requests the tests did not move with the code."
-        );
+                workspace,
+                job,
+                developer,
+                7000,
+                FeedbackDeliveryState.PREPARED,
+                "You keep shipping untested changes",
+                "Across your last three pull requests the tests did not move with the code.");
         bind(unit, persistObservation(practice, job, developer, 101L, "No test touched"));
 
         getOk(workspace)
-            .jsonPath("$.length()")
-            .isEqualTo(1)
-            .jsonPath("$[0].headline")
-            .isEqualTo("You keep shipping untested changes")
-            // The headline is lifted out of the stored layout; what is left is the message plus its next step.
-            .jsonPath("$[0].body")
-            .isEqualTo(
-                "Across your last three pull requests the tests did not move with the code.\n\n" +
-                    "**Try next:** Write the test first next time."
-            )
-            .jsonPath("$[0].practiceSlug")
-            .isEqualTo("ships-tests-with-changes")
-            .jsonPath("$[0].occurrenceCount")
-            .isEqualTo(1)
-            .jsonPath("$[0].evidence[0].artifactId")
-            .isEqualTo(101);
+                .jsonPath("$.length()")
+                .isEqualTo(1)
+                .jsonPath("$[0].headline")
+                .isEqualTo("You keep shipping untested changes")
+                // The headline is lifted out of the stored layout; what is left is the message plus its next step.
+                .jsonPath("$[0].body")
+                .isEqualTo("Across your last three pull requests the tests did not move with the code.\n\n"
+                        + "**Try next:** Write the test first next time.")
+                .jsonPath("$[0].practiceSlug")
+                .isEqualTo("ships-tests-with-changes")
+                .jsonPath("$[0].occurrenceCount")
+                .isEqualTo(1)
+                .jsonPath("$[0].evidence[0].artifactId")
+                .isEqualTo(101);
     }
 
     @Test
@@ -127,22 +124,15 @@ class InAppFeedbackControllerIntegrationTest extends AbstractWorkspaceIntegratio
     @DisplayName("a message prepared for somebody else is not on this developer's page")
     void doesNotReturnAnotherDevelopersMessage() {
         Feedback theirs = persistInAppUnit(
-            workspace,
-            job,
-            teammate,
-            7000,
-            FeedbackDeliveryState.PREPARED,
-            "Their habit",
-            "Not about the caller."
-        );
+                workspace, job, teammate, 7000, FeedbackDeliveryState.PREPARED, "Their habit", "Not about the caller.");
         bind(theirs, persistObservation(practice, job, teammate, 202L, "Their finding"));
 
         getOk(workspace).jsonPath("$.length()").isEqualTo(0);
 
         assertThat(feedbackRepository.findById(theirs.getId()))
-            .get()
-            .extracting(Feedback::getDeliveryState)
-            .isEqualTo(FeedbackDeliveryState.PREPARED);
+                .get()
+                .extracting(Feedback::getDeliveryState)
+                .isEqualTo(FeedbackDeliveryState.PREPARED);
     }
 
     /**
@@ -154,14 +144,13 @@ class InAppFeedbackControllerIntegrationTest extends AbstractWorkspaceIntegratio
     @DisplayName("the first read delivers the message; a second read does not re-deliver it")
     void firstReadFlipsPreparedToDeliveredAndTheSecondIsANoOp() {
         Feedback unit = persistInAppUnit(
-            workspace,
-            job,
-            developer,
-            7000,
-            FeedbackDeliveryState.PREPARED,
-            "You keep shipping untested changes",
-            "Across your last three pull requests the tests did not move with the code."
-        );
+                workspace,
+                job,
+                developer,
+                7000,
+                FeedbackDeliveryState.PREPARED,
+                "You keep shipping untested changes",
+                "Across your last three pull requests the tests did not move with the code.");
         bind(unit, persistObservation(practice, job, developer, 101L, "No test touched"));
 
         getOk(workspace).jsonPath("$[0].readAt").doesNotExist();
@@ -173,9 +162,9 @@ class InAppFeedbackControllerIntegrationTest extends AbstractWorkspaceIntegratio
         getOk(workspace).jsonPath("$[0].readAt").exists();
 
         assertThat(feedbackRepository.findById(unit.getId()))
-            .get()
-            .extracting(Feedback::getDeliveredAt)
-            .isEqualTo(afterFirstRead.getDeliveredAt());
+                .get()
+                .extracting(Feedback::getDeliveredAt)
+                .isEqualTo(afterFirstRead.getDeliveredAt());
     }
 
     /**
@@ -188,14 +177,13 @@ class InAppFeedbackControllerIntegrationTest extends AbstractWorkspaceIntegratio
     @DisplayName("a message whose evidence went non-current is hidden at read time, not deleted")
     void hidesAMessageWhoseEvidenceIsNoLongerCurrent() {
         Feedback unit = persistInAppUnit(
-            workspace,
-            job,
-            developer,
-            7000,
-            FeedbackDeliveryState.PREPARED,
-            "You keep shipping untested changes",
-            "Across your last three pull requests the tests did not move with the code."
-        );
+                workspace,
+                job,
+                developer,
+                7000,
+                FeedbackDeliveryState.PREPARED,
+                "You keep shipping untested changes",
+                "Across your last three pull requests the tests did not move with the code.");
         bind(unit, persistObservation(practice, job, developer, 101L, "No test touched"));
         getOk(workspace).jsonPath("$.length()").isEqualTo(1);
 
@@ -213,13 +201,13 @@ class InAppFeedbackControllerIntegrationTest extends AbstractWorkspaceIntegratio
 
     private WebTestClient.BodyContentSpec getOk(Workspace ws) {
         return webTestClient
-            .get()
-            .uri(IN_APP, ws.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody();
+                .get()
+                .uri(IN_APP, ws.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody();
     }
 
     private Practice persistPractice(Workspace ws, String slug, String name) {
@@ -248,38 +236,36 @@ class InAppFeedbackControllerIntegrationTest extends AbstractWorkspaceIntegratio
     private UUID persistObservation(Practice about, AgentJob agentJob, User subject, Long artifactId, String title) {
         UUID id = UUID.randomUUID();
         observationRepository.insertIfAbsent(
-            id,
-            "occ-" + id,
-            agentJob.getId(),
-            about.getId(),
-            about.getCurrentRevision().getId(),
-            "scm.pull_request",
-            artifactId,
-            subject.getId(),
-            title,
-            "ABSENT",
-            "BAD",
-            "MAJOR",
-            DIFF_EVIDENCE_JSON,
-            "Reasoning for " + title,
-            null,
-            Instant.now(),
-            "LIVE"
-        );
+                id,
+                "occ-" + id,
+                agentJob.getId(),
+                agentJob.getWorkspace().getId(),
+                about.getId(),
+                about.getCurrentRevision().getId(),
+                "scm.pull_request",
+                artifactId,
+                subject.getId(),
+                title,
+                "ABSENT",
+                "BAD",
+                "MAJOR",
+                DIFF_EVIDENCE_JSON,
+                "Reasoning for " + title,
+                null,
+                Instant.now(),
+                "LIVE");
         return id;
     }
 
     private Feedback persistInAppUnit(
-        Workspace ws,
-        AgentJob agentJob,
-        User recipient,
-        int position,
-        FeedbackDeliveryState state,
-        String headline,
-        String message
-    ) {
-        return feedbackRepository.save(
-            Feedback.builder()
+            Workspace ws,
+            AgentJob agentJob,
+            User recipient,
+            int position,
+            FeedbackDeliveryState state,
+            String headline,
+            String message) {
+        return feedbackRepository.save(Feedback.builder()
                 .agentJobId(agentJob.getId())
                 .workspaceId(ws.getId())
                 .recipientUserId(recipient.getId())
@@ -290,8 +276,7 @@ class InAppFeedbackControllerIntegrationTest extends AbstractWorkspaceIntegratio
                 .body(InAppFeedbackBody.render(headline, message, "Write the test first next time."))
                 .source(FeedbackSource.AGENT)
                 .createdAt(Instant.now())
-                .build()
-        );
+                .build());
     }
 
     private void bind(Feedback unit, UUID observationId) {

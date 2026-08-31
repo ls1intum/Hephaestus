@@ -1,6 +1,7 @@
 import type { VariantProps } from "class-variance-authority";
 import { formatDistanceStrict } from "date-fns";
 import { AlertCircleIcon, ChevronDownIcon, HistoryIcon } from "lucide-react";
+
 import type { SyncJob } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { RelativeTime } from "@/components/common/RelativeTime";
@@ -18,6 +19,7 @@ import {
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { Table, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { asDate } from "@/lib/dates";
+
 import {
 	JOB_STATUS_LABEL,
 	JOB_TRIGGER_LABEL,

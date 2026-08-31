@@ -1,5 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
+
 import type { GitLabGroup } from "@/api/types.gen";
+
 import { ConfigureWorkspaceStep } from "./ConfigureWorkspaceStep";
 import { makeGroup, withWizardState } from "./stories-utils";
 

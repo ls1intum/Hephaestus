@@ -37,6 +37,8 @@ The synchronised activity is analysed against a set of practices configured by t
 
 Contributors who sign in with their GitHub or LRZ-GitLab account get a personal dashboard summarising their observations and activity, access to the conversational mentor, and their account preferences. Sign-in adds the federated user identifier, username, display name, email, and avatar URL to what Hephaestus holds about that contributor. Workspace administrators can additionally enable a leaderboard, leagues, and achievements based on workspace activity (all off by default), plus Slack integration for App Home privacy controls, mentor DMs, optional digests, and explicitly activated monitored channels.
 
+Signed-in contributors can send product feedback and answer or dismiss surveys authored by instance administrators. These submissions stay in the instance database and are available to instance administrators for product improvement; they are not reused for research without the separate research opt-in.
+
 These workspace-level configuration choices are made by the workspace administrator and TUM/AET as joint controllers under Art. 26 GDPR (the choices are enumerated in "Legal basis" below). Hephaestus is built around the contributor's own development: observations serve the contributor and give the workspace administrator a way to deliver targeted feedback during the project. Observations are advisory and contestable; the platform makes no automated decisions within the meaning of Art. 22 GDPR and feeds no grading, assessment, HR, or access-control pipeline. Signed-in contributors can stop new practice-feedback comments and related Slack reminders through the in-app **Comments and Slack reminders** setting and respond to individual pieces of feedback by recording whether they were helpful and how they were handled. This delivery setting does not stop review processing; objections to processing under Art. 21 GDPR use the contact process in privacy §7.
 ```
 
@@ -55,7 +57,7 @@ Tick in DSMS:
 Tick in DSMS: Name(s), Contact details: email, Image data, Indicators of Behaviour, IP address, Social network data, User IDs and Passwords. Do **not** tick "Examination and academic performance" — practice observations are advisory, not graded.
 
 ```text
-Repository-activity artefacts authored by the contributor in the connected Git repositories (pull/merge requests, issues, code reviews, review comments, commit metadata and, when an enabled practice declares it, a bounded repository tree), AI guidance-assistant conversations, selected Outline project documents, and Slack integration data when enabled (Slack IDs, Slack identity links, App Home privacy choices, Hephaestus DM mentor messages, and new messages in administrator-activated monitored Slack channels).
+Repository-activity artefacts authored by the contributor in the connected Git repositories (pull/merge requests, issues, code reviews, review comments, commit metadata and, when an enabled practice declares it, a bounded repository tree), AI guidance-assistant conversations, product-feedback messages and page paths, survey answers and dismissals, selected Outline project documents, and Slack integration data when enabled (Slack IDs, Slack identity links, App Home privacy choices, Hephaestus DM mentor messages, and new messages in administrator-activated monitored Slack channels).
 ```
 
 Hephaestus does not intentionally solicit or classify special-category data (Art. 9(1) GDPR) or criminal-offence data (Art. 10 GDPR). Because repository and chat fields contain free text, incidental content may include and therefore cause processing of them. The privacy statement instructs users not to enter third-party personal or sensitive data.
@@ -78,7 +80,9 @@ Separate controller (not an Art. 28 processor):
 - Leibniz-Rechenzentrum (LRZ) der BAdW — operator of gitlab.lrz.de. The platform receives the contributor's identity from gitlab.lrz.de OIDC and synchronises connected gitlab.lrz.de repositories. Inter-public-body transmission under Art. 5(1) Nr. 1 BayDSG.
 ```
 
-Per-processor AVV detail and the EDPB 07/2020 reasoning for the LRZ relationship are in `processor-checklist.md`. PostHog (product analytics) is bundled in the webapp image but disabled in the TUM-operated deployment; activating PostHog would engage it as an Art. 28 U.S. processor with corresponding AVV / DPF / SCC framing, and would trigger an amendment to this record.
+Per-processor AVV detail and the EDPB 07/2020 reasoning for the LRZ relationship are in `processor-checklist.md`.
+
+Product feedback and surveys are first-party processing: submissions stay in the instance database, are visible to instance administrators, create no new recipient, and are not reused for research without the separate opt-in.
 
 ## Third-country transfers (Art. 30(1)(e))
 
@@ -89,7 +93,7 @@ U.S. recipients are covered by the EU-US Data Privacy Framework (Commission Impl
 **Where stored**
 
 ```text
-Self-hosted by AET at https://hephaestus.aet.cit.tum.de on AET-administered infrastructure at TUM. Application data — including authentication state (accounts, federated identity links, the cookie-session revocation list, and the auth-event log) — in PostgreSQL, which also holds the practice-review job queue; webhook and integration-sync events in NATS JetStream. Local working copies of monitored repositories may be stored on the host filesystem when practice-review code execution is enabled. Container stdout goes to the Docker json-file driver. Every service in the stack sets an explicit rotation cap in the compose files: 50 MiB per file × 5 files for the webapp, the release-pin init job, the application server, the worker and PostgreSQL; 10 MiB × 3 for the webhook receiver, NATS, the reverse proxy and the maintenance page. No layer of the stack writes an HTTP access log — Tomcat's is explicitly disabled in the production profile, the Traefik reverse proxy is not started with `--accesslog` (Traefik's default is off), and both nginx containers (the static frontend and the maintenance page) disable it at the server level. No per-request IP/URL record is created anywhere.
+Self-hosted by AET at https://hephaestus.aet.cit.tum.de on AET-administered infrastructure at TUM. Application data — including authentication state (accounts, federated identity links, the cookie-session revocation list, and the auth-event log) — in PostgreSQL, which also holds the practice-review job queue; webhook and integration-sync events in NATS JetStream. Local working copies of monitored repositories may be stored on the host filesystem when practice-review code execution is enabled. Container stdout goes to the Docker json-file driver. Every service in the stack sets an explicit rotation cap in the compose files: 50 MiB per file × 5 files for the webapp, the application server, the worker and PostgreSQL; 10 MiB × 3 for the webhook receiver, NATS, the reverse proxy and the maintenance page. No layer of the stack writes an HTTP access log — Tomcat's is explicitly disabled in the production profile, the Traefik reverse proxy is not started with `--accesslog` (Traefik's default is off), and both nginx containers (the static frontend and the maintenance page) disable it at the server level. No per-request IP/URL record is created anywhere.
 
 Application and authentication data reside on TUM infrastructure within the EU. AI-assisted features additionally forward code snippets and surrounding discussion to the workspace-configured LLM provider (default for the TUM-operated deployment: Microsoft Azure OpenAI in an EU region).
 ```
@@ -99,10 +103,10 @@ Application and authentication data reside on TUM infrastructure within the EU. 
 ```text
 Mixed retention by category:
 
-- Account-bound data (the Hephaestus account, federated identity links, analytics identity): removed on user-triggered account deletion via the in-app control.
+- Account-bound data (the Hephaestus account, federated identity links, product feedback, and survey responses or dismissals): removed on user-triggered account deletion via the in-app control. Workspace-scoped feedback and survey data are also removed when the workspace is purged.
 - Authentication-event log (sign-in / sign-out, token issue / refresh, impersonation begin / end; includes the source IP address and user agent): retained for 12 months in monthly partitions, the oldest dropped automatically, as a security measure (Art. 6(1)(f) i.V.m. Art. 32 GDPR). On account deletion the account reference is detached but the event row is retained for the remainder of its window.
 - Contributor profile (login, name, email, avatar) and account preferences: retained as instance-global identity records independently of workspace repository monitoring. Repository orphan cleanup and workspace purge do not remove them. They are removed or anonymised through operator-executed profile removal on receipt of a verified erasure request.
-- Authored repository artefacts (issues, pull/merge requests, comments, reviews) synchronised from GitHub / gitlab.lrz.de and their practice observations: the active PostgreSQL mirror is retained while at least one workspace monitors the source repository and is removed when the last workspace stops monitoring it, the last relevant connection is disconnected, the workspace is purged, or verified erasure is completed. Diagnostic, replay/CAS, and broker copies follow the bounded windows below and do not all support immediate selective erasure.
+- Authored repository artefacts (issues, pull/merge requests, comments, reviews) synchronised from GitHub / gitlab.lrz.de and their practice observations, delivery-policy traces, and pending delivery packages: the active PostgreSQL mirror is retained while at least one workspace monitors the source repository and is removed when the last workspace stops monitoring it, the last relevant connection is disconnected, the workspace is purged, or verified erasure is completed. A terminal delivery keeps only its idempotency and provider-placement record after the package is projected into the practice-feedback ledger; failed packages remain available for an administrator to retry. Diagnostic, replay/CAS, and broker copies follow the bounded windows below and do not all support immediate selective erasure.
 - Workspace memberships, AI conversations, and recognition signals: retained with the relevant workspace records. Removed when those records or the workspace are purged, or through operator-executed deletion or anonymisation on verified erasure. Disconnect or workspace purge removes the active PostgreSQL mirror of Slack and Outline content; materialized diagnostic output, replay/CAS artifacts, and broker messages expire under the bounded windows below.
 - Removal of the active mirror on disconnect / purge is an application of storage limitation (Art. 5(1)(e) GDPR): the integration is the sole purpose for which the mirror is held, so once it is severed there is no basis to retain that copy. It is a workspace-administrator action and is **not** the fulfilment path for a data subject's erasure request under Art. 17 — that remains the operator-executed process described under "Deletion responsibility" below, which also covers account-bound rows that no single workspace owns.
 - LLM-provider-side prompts: according to the chosen provider's terms. For the TUM-operated default (Microsoft Azure OpenAI in an EU region), within the enterprise abuse-monitoring window published in Microsoft's Azure OpenAI data-privacy documentation; eligible customers may apply for Microsoft's modified abuse monitoring (Limited Access program) to suppress prompt storage and human review.
@@ -129,13 +133,13 @@ Routine retention-driven deletion (logs, container stdout): handled automaticall
 **Access and portability fulfilment (Art. 15, Art. 20)**
 
 ```text
-Hephaestus provides a self-service data export (Art. 20): a signed-in contributor requests an export from the in-app settings (account "Danger Zone"), the platform compiles a JSON archive of the personal data it holds about that contributor — the Hephaestus account, federated identity links, workspace memberships, account preferences, and the contributor's own authentication-event history — and the contributor downloads it from the app. The archive deliberately excludes credentials and session/signing-key material. Anything outside that scope is added by AET operators on a verified Art. 15 request: the workspace-scoped records the export omits (AI conversations, practice observations and their feedback, recognition signals, mirrored repository artefacts), the analytics identity where PostHog is activated, and whatever of the requester's data still sits in the container-stdout rotation window. There are no HTTP access-log entries to disclose: no layer of the stack writes one. The IP addresses Hephaestus does hold are the ones on authentication events, which the self-service export already covers. Source-side content on GitHub or gitlab.lrz.de is exported by those source platforms, not by Hephaestus. Identity verification, response timeframe, and contact path are the same as for erasure.
+Hephaestus provides a self-service data export (Art. 20): a signed-in contributor requests an export from the in-app settings (account "Danger Zone"), the platform compiles a JSON archive of the personal data it holds about that contributor — the Hephaestus account, federated identity links, workspace memberships, account preferences, and the contributor's own authentication-event history — and the contributor downloads it from the app. The archive deliberately excludes credentials and session/signing-key material. Anything outside that scope is added by AET operators on a verified Art. 15 request: the workspace-scoped records the export omits (AI conversations, practice observations and their feedback, recognition signals, mirrored repository artefacts), product-feedback submissions and survey responses, and whatever of the requester's data still sits in the container-stdout rotation window. There are no HTTP access-log entries to disclose: no layer of the stack writes one. The IP addresses Hephaestus does hold are the ones on authentication events, which the self-service export already covers. Source-side content on GitHub or gitlab.lrz.de is exported by those source platforms, not by Hephaestus. Identity verification, response timeframe, and contact path are the same as for erasure.
 ```
 
 **Deletion guarantee**
 
 ```text
-- The Hephaestus account, federated identity links, and (where PostHog analytics is activated; off by default in the TUM-operated deployment) the corresponding analytics identity: removed by the in-app account-deletion control. Deletion immediately revokes all sessions and marks the account for deletion with a 48-hour cancellation window; after the window a scheduled sweeper hard-deletes the account-bound rows (identity links, feature flags, the session/revocation list, export artefacts), tombstones the account's contact PII, and severs the link to the git-provider activity mirror.
+- The Hephaestus account, federated identity links, product-feedback submissions, and survey responses: removed by the in-app account-deletion control. Deletion immediately revokes all sessions and marks the account for deletion with a 48-hour cancellation window; after the window a scheduled sweeper hard-deletes the account-bound rows (identity links, feature flags, the session/revocation list, export artefacts), tombstones the account's contact PII, and severs the link to the git-provider activity mirror.
 - Contributor profile and dependent records: account preferences and workspace memberships are covered by the
   account/operator paths. Automated person-level traversal does not cover every SCM-only identity, AI conversation,
   observation, feedback record, evaluation label, and retained evidence copy. Operators must locate and remove or
@@ -177,7 +181,7 @@ Confidentiality (Art. 32(1)(b))
 Integrity (Art. 32(1)(b))
 - Git is the authoritative source of all application code; signed commits and PR review.
 - Every production image is built by the release workflow, cosign-signed (Sigstore keyless) and provenance-attested via `actions/attest-build-provenance`, so any deployed image can be verified back to this repository's release run.
-- The practice-review sandbox image (`agent-pi`) — the only image that executes contributor repository content — is additionally referenced by **sha256 digest**, not by tag: the digest arrives in a cosign-verified release asset at deploy time and `AgentImagePinGuard` refuses to start the application if it is not digest-pinned. Verification recipe in [Agent image digests](../agent-image-digests.md).
+- The practice-review sandbox image (`agent-pi`) — the only image that executes contributor repository content — is additionally referenced by **sha256 digest**, not by tag: the digest arrives in a cosign-verified release asset at deploy time and `AgentImagePinGuard` refuses to start the application if it is not digest-pinned. Verification recipe in [Release image lock](../release-image-lock.md).
 - The platform's own service images (application server, worker, webhook receiver, webapp, PostgreSQL) are referenced by release tag rather than digest in the compose files, and third-party infrastructure images (Traefik, NATS, nginx) by upstream tag; signature verification of those is a manual pre-deploy step, not enforced at container start. Extending digest pinning to them is an open AET-ops item.
 
 Availability and resilience (Art. 32(1)(b))
@@ -204,6 +208,7 @@ Organisational
 Tick in DSMS:
 
 - Art. 6.1a GDPR (consent) — for workspaces collecting explicit consent (e.g., the AET capstone course).
+- Art. 6.1a GDPR (consent) — for optional academic-research participation requested at first login.
 - Art. 6.1b GDPR (contract / service request) — for voluntary sign-in by non-TUM contributors.
 - Art. 6.1e GDPR (public task) — for TUM/AET operation of the platform.
 
@@ -218,6 +223,10 @@ Per-workspace lawful basis: workspace administrator and TUM/AET are joint contro
 
 Voluntary sign-in by non-TUM contributors to use personal features: Art. 6(1)(b) GDPR.
 
+Optional academic-research participation: Art. 6(1)(a) GDPR. It is separate from the terms and from the public-task basis for platform operation. Research enrollment and analysis require the latest `RESEARCH_PARTICIPATION` decision to be a grant for the current notice version; they do not fall back to a preference flag or another legal basis after withdrawal. The append-only ledger records grants, refusals and withdrawals with a UTC timestamp, mechanism, notice version and SHA-256 digest. `consent_notice` preserves the corresponding first-layer text. Withdrawal ends the authorization for further research processing immediately. Account erasure removes the ledger's account reference; the resulting non-account-linked event remains with the archived notice as evidence of how consent was managed.
+
+Product feedback and surveys for improving the TUM-operated instance: Art. 6(1)(e) GDPR i.V.m. Art. 2 BayHIG and Art. 4(1) BayDSG. Responses are not reused for research without the separate research opt-in.
+
 The Hephaestus session cookie (`__Host-HEPHAESTUS_AT`), the CSRF + OAuth-state cookies, and theme-preference localStorage: § 25 Abs. 2 Nr. 2 TDDDG (technisch unbedingt erforderlich) i.V.m. Art. 6(1)(e) GDPR.
 ```
 
@@ -231,7 +240,7 @@ DSMS multi-select: tick `Data received from third parties` and `Directly from th
   from explicitly activated monitored channels after the visible announcement.
 - From a connected Outline workspace: documents and author attribution from collections explicitly selected by
   the workspace administrator; optional linked identity when a contributor connects Outline.
-- Directly from the data subject: account preferences, AI-assistant messages, and rights requests submitted through the contact process.
+- Directly from the data subject: account preferences, AI-assistant messages, product feedback, survey answers, and rights requests submitted through the contact process.
 - From the HTTP connection: nothing. No layer writes a per-request record. The source IP address and user agent are collected as such only for authentication events, and are retained under the auth-event log's own 12-month window described above.
 ```
 

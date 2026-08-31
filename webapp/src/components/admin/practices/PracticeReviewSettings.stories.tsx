@@ -1,26 +1,22 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn, userEvent } from "storybook/test";
-import type { AgentBinding } from "@/api/types.gen";
+import { expect, fn, screen, userEvent, within } from "storybook/test";
+import type { AgentBinding, PracticeReviewCoveragePreview } from "@/api/types.gen";
+import { expectGenuinelyDisabled, expectUnavailable } from "@/test/controls";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { PracticeReviewSettings } from "./PracticeReviewSettings";
 import { mockReviewSettings } from "./story-mock-data";
 
 const settings = mockReviewSettings({ deliverToMerged: false });
-
 const readyBinding: AgentBinding = {
 	purpose: "PRACTICE_REVIEW",
 	enabled: true,
 	ready: true,
 	instanceModelId: 1,
 };
-
 const model = {
+	status: "ready" as const,
 	binding: readyBinding,
-	isLoading: false,
-	isError: false,
-	onRetry: fn(),
 };
-
 const workspace = {
 	enabled: true,
 	autoTriggerEnabled: true,
@@ -28,28 +24,50 @@ const workspace = {
 	isSaving: false,
 	onUpdate: fn(),
 };
-
 const policy = {
 	settings,
 	isSaving: false,
 	onUpdate: fn(),
 	onReset: fn(),
 };
+const coverage = {
+	preview: fn(async () => ({
+		current: settings.coverageSummary,
+		proposed: settings.coverageSummary,
+		widens: true,
+	})),
+	repositories: {
+		status: "ready" as const,
+		options: ["acme/widgets", "acme/gadgets"].map((value) => ({ value, label: value })),
+	},
+	people: {
+		status: "ready" as const,
+		options: [
+			{ value: 7, label: "Ada Lovelace", description: "@ada" },
+			{ value: 8, label: "Grace Hopper", description: "@grace" },
+		],
+	},
+};
+const selectedSettings = mockReviewSettings({
+	reviewScope: {
+		repositoryMode: "SELECTED",
+		personMode: "SELECTED",
+		repositories: [{ nameWithOwner: "acme/widgets", baseBranches: ["main"] }],
+		personUserIds: [7],
+	},
+	coverageSummary: {
+		...settings.coverageSummary,
+		coveredRepositories: 1,
+		coveredPeople: 1,
+	},
+});
 
 const meta = {
 	title: "Workspace admin/Practices/Review/When and where",
 	component: PracticeReviewSettings,
-	parameters: {
-		layout: "padded",
-		chromatic: { viewports: [1440] },
-	},
+	parameters: { layout: "padded", chromatic: { viewports: [1440] } },
 	tags: ["autodocs"],
-	args: {
-		workspaceSlug: "acme",
-		model,
-		workspace,
-		policy,
-	},
+	args: { workspaceSlug: "acme", model, workspace, policy, coverage },
 	decorators: [
 		(Story) => (
 			<div className="mx-auto w-full max-w-3xl">
@@ -62,34 +80,15 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * A switch row stays a row: the control sits after its label and description, on the same line. This
- * is measured rather than believed because the reflow fix below it could have been bought by letting
- * the row stack instead, which is not the layout this surface wants at any width.
- */
-async function expectSwitchSitsBesideItsLabel(control: HTMLElement) {
-	const field = control.closest<HTMLElement>('[data-slot="field"]');
-	const content = field?.querySelector<HTMLElement>('[data-slot="field-content"]');
-	if (!content) throw new Error("The switch is not in a Field with a FieldContent.");
-
-	const controlBox = control.getBoundingClientRect();
-	const contentBox = content.getBoundingClientRect();
-	await expect(controlBox.left).toBeGreaterThanOrEqual(contentBox.right);
-	await expect(controlBox.top).toBeGreaterThanOrEqual(contentBox.top);
-	await expect(controlBox.top).toBeLessThan(contentBox.bottom);
-}
-
 export const Configured: Story = {
 	parameters: {
 		viewport: { defaultViewport: "reflow" },
 		chromatic: { viewports: [320, 1440] },
 	},
 	play: async ({ canvas }) => {
+		await expectGenuinelyDisabled(canvas.getByRole("button", { name: "Review changes" }));
+		await expect(canvas.getByRole("switch", { name: "Send feedback" })).toBeChecked();
 		await expectNoPageOverflow();
-		// Fitting at 320px is not the same as fitting by stacking: the row survives the narrow width.
-		await expectSwitchSitsBesideItsLabel(
-			canvas.getByRole("switch", { name: "Start practice reviews" }),
-		);
 	},
 };
 
@@ -97,15 +96,6 @@ export const NoModelSelected: Story = {
 	args: { model: { ...model, binding: undefined }, workspace: { ...workspace, enabled: false } },
 };
 
-export const SelectedModelUnavailable: Story = {
-	args: { model: { ...model, binding: { ...readyBinding, ready: false } } },
-};
-
-/**
- * Ready and turned off are two different facts about a model, and only one of them is `ready`. A
- * model that has been switched off elsewhere is still reported as ready by the binding, so a
- * readiness check that stops there offers to start reviews that cannot run.
- */
 export const SelectedModelTurnedOff: Story = {
 	args: {
 		model: { ...model, binding: { ...readyBinding, enabled: false } },
@@ -113,211 +103,275 @@ export const SelectedModelTurnedOff: Story = {
 	},
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText("The review model is unavailable")).toBeVisible();
-		await expect(canvas.getByRole("switch", { name: "Start practice reviews" })).toHaveAttribute(
-			"aria-disabled",
-			"true",
-		);
+		await expectUnavailable(canvas.getByRole("switch", { name: "Start practice reviews" }));
 	},
 };
 
-export const CheckingModelReadiness: Story = {
-	args: { model: { ...model, binding: undefined, isLoading: true } },
+export const SelectedPopulation: Story = {
+	args: { policy: { ...policy, settings: selectedSettings } },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("1 of 3 monitored repositories")).toBeVisible();
+		await expect(canvas.getByText("1 of 8 eligible people")).toBeVisible();
+	},
 };
 
-export const ModelReadinessUnavailable: Story = {
-	args: { model: { ...model, binding: undefined, isError: true } },
-};
+const longRepository =
+	"acme/identity-and-access-management-service-for-international-workspace-administration";
+const longBranch =
+	"feature/replace-legacy-workspace-membership-reconciliation-with-provider-scoped-identities";
 
-/**
- * Reviews on with both doors shut is the one state the page banner cannot see — it reads the switch
- * and the model, not the triggers — so it is said beside the switches that cause it.
- */
-export const TriggersOff: Story = {
+export const LongRepositoryAndBranchAtReflow: Story = {
 	args: {
-		workspace: { ...workspace, autoTriggerEnabled: false, manualTriggerEnabled: false },
+		policy: {
+			...policy,
+			settings: mockReviewSettings({
+				reviewScope: {
+					repositoryMode: "SELECTED",
+					personMode: "SELECTED",
+					repositories: [{ nameWithOwner: longRepository, baseBranches: [longBranch] }],
+					personUserIds: [7],
+				},
+			}),
+		},
+		coverage: {
+			...coverage,
+			repositories: {
+				status: "ready",
+				options: [{ value: longRepository, label: longRepository }],
+			},
+		},
+	},
+	parameters: {
+		viewport: { defaultViewport: "reflow" },
+		chromatic: { viewports: [320] },
 	},
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText("Nothing can start a review")).toBeVisible();
-		await expect(canvas.getByText(/both ways in are switched off/i)).toBeVisible();
+		await userEvent.click(
+			canvas.getByRole("button", { name: `Base branches for ${longRepository}` }),
+		);
+		await expect(canvas.getByTitle(longBranch)).toBeVisible();
+		await expectNoPageOverflow();
 	},
 };
 
-export const RequestedReviewsNamesEveryDoor: Story = {
-	play: async ({ canvas }) => {
-		const requested = canvas.getByRole("switch", { name: "Reviews somebody asks for" });
-		await expect(requested).toBeVisible();
-
-		// This story runs at the default viewport; the width is asserted so the row check below cannot
-		// pass by being measured at a narrow one.
-		await expect(window.innerWidth).toBeGreaterThanOrEqual(640);
-		await expectSwitchSitsBesideItsLabel(requested);
-
-		const description = canvas.getByText(/Turning this off stops every one of them/i);
-		await expect(description).toHaveTextContent("Review this now");
-		await expect(description).toHaveTextContent("backfill of past work");
-		await expect(description).toHaveTextContent("recurring check");
-		// Only GitLab publishes the comment event, so the copy must not promise it everywhere.
-		await expect(description).toHaveTextContent("GitLab merge request comment");
-	},
-};
-
-export const ReviewsPaused: Story = {
-	args: { workspace: { ...workspace, enabled: false } },
-};
-
-export const ReviewScopeNarrowed: Story = {
+export const PersistedTargetsNoLongerAvailable: Story = {
 	args: {
 		policy: {
 			...policy,
 			settings: {
-				...settings,
+				...selectedSettings,
 				reviewScope: {
-					targetBranches: ["main", "release/2026.1"],
-					repositories: ["acme/widgets", "acme/gadgets"],
+					...selectedSettings.reviewScope,
+					repositories: [{ nameWithOwner: "acme/retired-service", baseBranches: ["main"] }],
+					personUserIds: [99],
 				},
 			},
+		},
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("Not monitored")).toBeVisible();
+		await expect(canvas.getByTitle("Member 99 (unavailable)")).toBeVisible();
+	},
+};
+
+export const OptionsLoadingKeepsPersistedTargetsNeutral: Story = {
+	args: {
+		policy: { ...policy, settings: selectedSettings },
+		coverage: {
+			...coverage,
+			repositories: { status: "loading" },
+			people: { status: "loading" },
+		},
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("acme/widgets")).toBeVisible();
+		await expect(canvas.queryByText("Not monitored")).not.toBeInTheDocument();
+		await expect(canvas.getByRole("combobox", { name: "Choose repositories" })).toBeDisabled();
+	},
+};
+
+export const OptionLoadFailure: Story = {
+	args: {
+		policy: { ...policy, settings: selectedSettings },
+		coverage: {
+			...coverage,
+			repositories: { status: "error", error: new Error("offline"), onRetry: fn() },
+			people: { status: "error", error: new Error("offline"), onRetry: fn() },
+		},
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("Couldn't load repositories")).toBeVisible();
+		await expect(canvas.getByText("Couldn't load eligible members")).toBeVisible();
+		await expect(canvas.queryByText("Not monitored")).not.toBeInTheDocument();
+	},
+};
+
+export const CumulativeWideningDraft: Story = {
+	args: {
+		policy: { ...policy, settings: selectedSettings, onUpdate: fn() },
+		coverage: {
+			...coverage,
+			preview: fn(async () => ({
+				current: selectedSettings.coverageSummary,
+				proposed: settings.coverageSummary,
+				widens: true,
+			})),
 		},
 	},
 	parameters: {
 		viewport: { defaultViewport: "reflow" },
 		chromatic: { viewports: [320, 1440] },
 	},
-	play: async () => {
+	play: async ({ args, canvas }) => {
+		await userEvent.click(canvas.getByRole("radio", { name: "All monitored repositories" }));
+		await userEvent.click(canvas.getByRole("radio", { name: "All eligible linked members" }));
+		await expect(args.coverage.preview).not.toHaveBeenCalled();
+		await expect(canvas.getByText("You have unsaved coverage changes.")).toBeVisible();
+		await userEvent.click(canvas.getByRole("button", { name: "Review changes" }));
+		const dialog = within(await screen.findByRole("alertdialog"));
+		await expect(dialog.getByText(/Monitored repositories covered:/)).toHaveTextContent(
+			"Monitored repositories covered: 1 → 3 of 3",
+		);
 		await expectNoPageOverflow();
-	},
-};
-
-/**
- * Adding one entry has to send the *whole* narrowed scope, not just the branch that was typed:
- * patching one list would silently drop the other and widen reviews to every repository.
- */
-export const AddingATargetBranch: Story = {
-	args: {
-		policy: {
-			...policy,
-			onUpdate: fn(),
-			settings: {
-				...settings,
-				reviewScope: { targetBranches: [], repositories: ["acme/widgets"] },
+		await userEvent.click(dialog.getByRole("button", { name: "Apply wider coverage" }));
+		await expect(args.policy.onUpdate).toHaveBeenCalledWith(
+			{
+				reviewScope: {
+					repositoryMode: "ALL_MONITORED",
+					personMode: "ALL_ELIGIBLE",
+					repositories: [{ nameWithOwner: "acme/widgets", baseBranches: ["main"] }],
+					personUserIds: [7],
+				},
 			},
+			selectedSettings.etag,
+		);
+	},
+};
+
+export const NarrowingAppliesAfterOnePreview: Story = {
+	args: {
+		policy: { ...policy, onUpdate: fn() },
+		coverage: {
+			...coverage,
+			preview: fn(async () => ({
+				current: settings.coverageSummary,
+				proposed: { ...settings.coverageSummary, coveredRepositories: 0, coveredPeople: 0 },
+				widens: false,
+			})),
 		},
 	},
 	play: async ({ args, canvas }) => {
-		await userEvent.type(canvas.getByLabelText("Target branches"), "  release/2026.1  ");
-		await userEvent.click(canvas.getByRole("button", { name: "Add to target branches" }));
-
-		// Trimmed on the way out: a name with a stray space matches no branch the gate ever sees.
-		await expect(args.policy.onUpdate).toHaveBeenCalledWith({
-			reviewScope: { targetBranches: ["release/2026.1"], repositories: ["acme/widgets"] },
-		});
+		await userEvent.click(canvas.getByRole("radio", { name: "Selected repositories" }));
+		await userEvent.click(canvas.getByRole("radio", { name: "Selected people" }));
+		await expect(args.coverage.preview).not.toHaveBeenCalled();
+		await userEvent.click(canvas.getByRole("button", { name: "Review changes" }));
+		await expect(args.coverage.preview).toHaveBeenCalledTimes(1);
+		await expect(args.policy.onUpdate).toHaveBeenCalledTimes(1);
 	},
 };
 
-export const EnterAddsTheEntry: Story = {
-	args: { policy: { ...policy, onUpdate: fn() } },
+export const CoveragePreviewPending: Story = {
+	args: {
+		policy: { ...policy, settings: selectedSettings },
+		coverage: {
+			...coverage,
+			preview: fn(() => new Promise<PracticeReviewCoveragePreview>(() => {})),
+		},
+	},
+	play: async ({ canvas }) => {
+		await userEvent.click(canvas.getByRole("radio", { name: "All monitored repositories" }));
+		await userEvent.click(canvas.getByRole("button", { name: "Review changes" }));
+		await expect(canvas.getByRole("status")).toHaveTextContent("Checking impact…");
+		await expect(canvas.getByRole("button", { name: "Checking impact…" })).toBeDisabled();
+	},
+};
+
+export const CoveragePreviewUnavailable: Story = {
+	args: {
+		policy: { ...policy, settings: selectedSettings },
+		coverage: {
+			...coverage,
+			preview: fn(async () => {
+				throw new Error("preview unavailable");
+			}),
+		},
+	},
 	play: async ({ args, canvas }) => {
-		await userEvent.type(canvas.getByLabelText("Repositories"), "acme/gadgets{Enter}");
-
-		await expect(args.policy.onUpdate).toHaveBeenCalledWith({
-			reviewScope: { targetBranches: [], repositories: ["acme/gadgets"] },
-		});
+		await userEvent.click(canvas.getByRole("radio", { name: "All monitored repositories" }));
+		await userEvent.click(canvas.getByRole("button", { name: "Review changes" }));
+		await expect(canvas.getByRole("alert")).toHaveTextContent(
+			"Couldn't estimate the impact. Your draft is unchanged; try again.",
+		);
+		await userEvent.click(canvas.getByRole("button", { name: "Review changes" }));
+		await expect(args.coverage.preview).toHaveBeenCalledTimes(2);
 	},
 };
 
-/** Saying so has to reach the input itself: the Add button greying out announces nothing. */
-export const RefusingADuplicate: Story = {
+export const CoverageSavePending: Story = {
 	args: {
 		policy: {
 			...policy,
-			onUpdate: fn(),
-			settings: { ...settings, reviewScope: { targetBranches: ["main"], repositories: [] } },
+			onUpdate: fn(() => new Promise<void>(() => {})),
+		},
+		coverage: {
+			...coverage,
+			preview: fn(async () => ({
+				current: settings.coverageSummary,
+				proposed: { ...settings.coverageSummary, coveredRepositories: 0, coveredPeople: 0 },
+				widens: false,
+			})),
 		},
 	},
 	play: async ({ args, canvas }) => {
-		const input = canvas.getByLabelText("Target branches");
-		await userEvent.type(input, "main");
-
-		await expect(input).toBeInvalid();
-		await expect(input).toHaveAccessibleDescription(/main is already listed\./);
-		await expect(canvas.getByRole("button", { name: "Add to target branches" })).toBeDisabled();
-
-		await userEvent.type(input, "{Enter}");
-		await expect(args.policy.onUpdate).not.toHaveBeenCalled();
+		await userEvent.click(canvas.getByRole("radio", { name: "Selected repositories" }));
+		await userEvent.click(canvas.getByRole("radio", { name: "Selected people" }));
+		await userEvent.click(canvas.getByRole("button", { name: "Review changes" }));
+		await expect(args.policy.onUpdate).toHaveBeenCalledTimes(1);
+		await expect(canvas.getByText("Saving coverage…")).toBeVisible();
+		await expect(canvas.getByRole("button", { name: "Saving…" })).toBeDisabled();
 	},
 };
 
-export const RemovingATargetBranch: Story = {
+export const CoverageSaveRollsBack: Story = {
 	args: {
 		policy: {
 			...policy,
-			onUpdate: fn(),
-			settings: {
-				...settings,
-				reviewScope: { targetBranches: ["main", "release/2026.1"], repositories: [] },
-			},
+			onUpdate: fn(async () => {
+				throw new Error("conflict");
+			}),
+		},
+		coverage: {
+			...coverage,
+			preview: fn(async () => ({
+				current: settings.coverageSummary,
+				proposed: { ...settings.coverageSummary, coveredRepositories: 0, coveredPeople: 0 },
+				widens: false,
+			})),
 		},
 	},
 	play: async ({ args, canvas }) => {
-		await userEvent.click(canvas.getByRole("button", { name: "Remove release/2026.1" }));
-
-		await expect(args.policy.onUpdate).toHaveBeenCalledWith({
-			reviewScope: { targetBranches: ["main"], repositories: [] },
-		});
+		await userEvent.click(canvas.getByRole("radio", { name: "Selected repositories" }));
+		await userEvent.click(canvas.getByRole("radio", { name: "Selected people" }));
+		await userEvent.click(canvas.getByRole("button", { name: "Review changes" }));
+		await expect(args.policy.onUpdate).toHaveBeenCalledTimes(1);
+		await expect(canvas.getByRole("alert")).toHaveTextContent(
+			"Couldn't save the coverage. Your draft is unchanged; try again.",
+		);
+		await expect(canvas.getByRole("radio", { name: "Selected repositories" })).toBeChecked();
+		await expect(canvas.getByRole("radio", { name: "Selected people" })).toBeChecked();
 	},
 };
 
-/** Widening back to everything is a reset rather than an empty save. */
-export const WideningTheScopeAgain: Story = {
-	args: {
-		policy: {
-			...policy,
-			onReset: fn(),
-			settings: {
-				...settings,
-				reviewScope: { targetBranches: ["main"], repositories: [] },
-			},
-		},
+export const SendingPausedInDarkMode: Story = {
+	args: { policy: { ...policy, settings: { ...settings, deliveryStatus: "PAUSED" } } },
+	globals: { theme: "dark" },
+	parameters: {
+		viewport: { defaultViewport: "reflow" },
+		chromatic: { viewports: [320, 1440] },
 	},
-	play: async ({ args, canvas }) => {
-		const reset = canvas.getByRole("button", { name: /^Review everything again/ });
-		await userEvent.click(reset);
-
-		await expect(args.policy.onReset).toHaveBeenCalledWith("REVIEW_SCOPE");
-	},
-};
-
-export const ChangingTheTimeBetweenReviews: Story = {
-	args: { policy: { ...policy, onUpdate: fn() } },
-	play: async ({ args, canvas }) => {
-		const cooldown = canvas.getByRole("spinbutton", { name: "Time between reviews (minutes)" });
-
-		// Passing through the field is not an edit.
-		await userEvent.click(cooldown);
-		await userEvent.tab();
-		await expect(args.policy.onUpdate).not.toHaveBeenCalled();
-
-		await userEvent.clear(cooldown);
-		await userEvent.type(cooldown, "45");
-		await userEvent.tab();
-
-		await expect(args.policy.onUpdate).toHaveBeenCalledWith({ cooldownMinutes: 45 });
-	},
-};
-
-/**
- * `aria-invalid` says only *that* something is wrong, so the field also points at the sentence that
- * says what would be right (WCAG 2.2 SC 3.3.1).
- */
-export const RefusingATimeOutsideTheRange: Story = {
-	args: { policy: { ...policy, onUpdate: fn() } },
-	play: async ({ args, canvas }) => {
-		const cooldown = canvas.getByRole("spinbutton", { name: "Time between reviews (minutes)" });
-		await userEvent.clear(cooldown);
-		await userEvent.type(cooldown, "1500");
-		await userEvent.tab();
-
-		await expect(cooldown).toBeInvalid();
-		await expect(cooldown).toHaveAccessibleDescription("Enter a whole number from 0 to 1,440.");
-		await expect(args.policy.onUpdate).not.toHaveBeenCalled();
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("Sending is paused")).toBeVisible();
+		await expect(canvas.getByRole("switch", { name: "Send feedback" })).not.toBeChecked();
+		await expectNoPageOverflow();
 	},
 };

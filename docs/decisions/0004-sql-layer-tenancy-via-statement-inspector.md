@@ -139,3 +139,10 @@ above are not actually defense-in-depth and we need stronger SQL parsing or
 controller-layer enforcement only); or
 `tenancy.parse_failure.total` starts non-zero in prod (would mean the regex hits a
 pathological input class worth handling explicitly).
+
+## Update — 2026-08-30 ([issue #1603](https://github.com/ls1intum/Hephaestus/issues/1603))
+
+`throw` is now the default in every profile. The canary period described above has ended; `log` and
+`off` remain explicit diagnostic overrides and are not production settings. This changes only the
+default response to a violation the inspector already detects. The documented parser carve-outs and
+the requirement for workspace authorization remain unchanged.

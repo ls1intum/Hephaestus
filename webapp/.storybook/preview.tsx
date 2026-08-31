@@ -5,9 +5,11 @@ import { createRootRoute, createRouter, RouterProvider } from "@tanstack/react-r
 import { isCommonAssetRequest } from "msw";
 import { initialize, mswLoader } from "msw-storybook-addon";
 import React from "react";
+
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/integrations/theme";
 import { handlers } from "@/mocks/handlers";
+
 import "@/styles.css";
 
 initialize(

@@ -1,4 +1,5 @@
 import { useId } from "react";
+
 import { AUTONOMY_DEFS } from "@/components/practice-vocabulary/autonomy-defs";
 import { FieldLabel } from "@/components/ui/field";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";

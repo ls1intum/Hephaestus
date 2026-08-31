@@ -12,7 +12,6 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJob;
@@ -57,7 +56,6 @@ import de.tum.cit.aet.hephaestus.workspace.spi.WorkspacePurgeBlockedException;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -159,8 +157,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
      */
     private Workspace createGitLabWorkspaceWithData(String slug) {
         User owner = persistUser(slug + "-owner");
-        Workspace workspace = workspaceService.createWorkspace(
-            new CreateWorkspaceRequestDTO(
+        Workspace workspace = workspaceService.createWorkspace(new CreateWorkspaceRequestDTO(
                 slug,
                 "Purge Test " + slug,
                 slug + "-group",
@@ -168,9 +165,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 owner.getId(),
                 IntegrationKind.GITLAB,
                 "glpat-purge-test-token",
-                null
-            )
-        );
+                null));
 
         // GitLab webhook ids + Slack credentials live on Connection rows now (the
         // Connection registry); the legacy Workspace columns are scheduled for removal.
@@ -194,17 +189,16 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
         // Add an activity event
         activityEventRepository.insertIfAbsent(
-            UUID.randomUUID(),
-            "test:1:" + System.currentTimeMillis(),
-            ActivityEventType.REVIEW_COMMENTED.name(),
-            Instant.now(),
-            owner.getId(),
-            workspace.getId(),
-            null,
-            "pull_request",
-            1L,
-            1.5
-        );
+                UUID.randomUUID(),
+                "test:1:" + System.currentTimeMillis(),
+                ActivityEventType.REVIEW_COMMENTED.name(),
+                Instant.now(),
+                owner.getId(),
+                workspace.getId(),
+                null,
+                "pull_request",
+                1L,
+                1.5);
 
         // Link organization
         IdentityProvider provider = ensureGitLabProvider();
@@ -234,8 +228,8 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
         lateFailingContributor.setFail(true);
         try {
             assertThatThrownBy(() -> workspaceLifecycleService.purgeWorkspace(workspace.getWorkspaceSlug()))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessage("late purge failure");
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("late purge failure");
         } finally {
             lateFailingContributor.setFail(false);
         }
@@ -244,11 +238,11 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
         assertThat(reloaded.getStatus()).isEqualTo(Workspace.WorkspaceStatus.ACTIVE);
         assertThat(activityEventRepository.countByWorkspaceId(workspaceId)).isPositive();
         assertThat(connectionRepository.findByWorkspaceId(workspaceId))
-            .singleElement()
-            .satisfies(connection -> {
-                assertThat(connection.getState()).isEqualTo(IntegrationState.ACTIVE);
-                assertThat(connection.getCredentialsEncrypted()).isNotNull();
-            });
+                .singleElement()
+                .satisfies(connection -> {
+                    assertThat(connection.getState()).isEqualTo(IntegrationState.ACTIVE);
+                    assertThat(connection.getCredentialsEncrypted()).isNotNull();
+                });
     }
 
     // Data cleanup completeness
@@ -259,8 +253,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
         @Test
         void purgeDeletesAllWorkspaceScopedData() {
             User owner = persistUser("cleanup-owner");
-            Workspace workspace = workspaceService.createWorkspace(
-                new CreateWorkspaceRequestDTO(
+            Workspace workspace = workspaceService.createWorkspace(new CreateWorkspaceRequestDTO(
                     "cleanup-ws",
                     "Cleanup Test",
                     "cleanup-group",
@@ -268,9 +261,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
                     owner.getId(),
                     IntegrationKind.GITLAB,
                     "glpat-cleanup-token",
-                    null
-                )
-            );
+                    null));
             Long workspaceId = workspace.getId();
 
             // Add a monitored repository (saved directly — purge reloads workspace with EAGER fetch)
@@ -289,17 +280,16 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
             // Add activity event
             activityEventRepository.insertIfAbsent(
-                UUID.randomUUID(),
-                "test:cleanup:" + System.currentTimeMillis(),
-                ActivityEventType.REVIEW_COMMENTED.name(),
-                Instant.now(),
-                owner.getId(),
-                workspaceId,
-                null,
-                "pull_request",
-                1L,
-                1.0
-            );
+                    UUID.randomUUID(),
+                    "test:cleanup:" + System.currentTimeMillis(),
+                    ActivityEventType.REVIEW_COMMENTED.name(),
+                    Instant.now(),
+                    owner.getId(),
+                    workspaceId,
+                    null,
+                    "pull_request",
+                    1L,
+                    1.0);
 
             // Purge
             workspaceLifecycleService.purgeWorkspace(workspace.getWorkspaceSlug());
@@ -309,9 +299,12 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
             assertThat(purged.getStatus()).isEqualTo(Workspace.WorkspaceStatus.PURGED);
 
             // Verify all workspace-scoped data deleted
-            assertThat(repositoryToMonitorRepository.findByWorkspaceId(workspaceId)).isEmpty();
-            assertThat(workspaceSlugHistoryRepository.findByWorkspaceOrderByChangedAtDesc(purged)).isEmpty();
-            assertThat(workspaceMembershipRepository.findByWorkspace_Id(workspaceId)).isEmpty();
+            assertThat(repositoryToMonitorRepository.findByWorkspaceId(workspaceId))
+                    .isEmpty();
+            assertThat(workspaceSlugHistoryRepository.findByWorkspaceOrderByChangedAtDesc(purged))
+                    .isEmpty();
+            assertThat(workspaceMembershipRepository.findByWorkspace_Id(workspaceId))
+                    .isEmpty();
             assertThat(activityEventRepository.countByWorkspaceId(workspaceId)).isZero();
         }
     }
@@ -325,8 +318,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
         @DisplayName("purging an already-purged workspace is a no-op")
         void purgeIsIdempotent() {
             User owner = persistUser("idempotent-owner");
-            Workspace workspace = workspaceService.createWorkspace(
-                new CreateWorkspaceRequestDTO(
+            Workspace workspace = workspaceService.createWorkspace(new CreateWorkspaceRequestDTO(
                     "idempotent-ws",
                     "Idempotent Test",
                     "idempotent-group",
@@ -334,9 +326,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
                     owner.getId(),
                     IntegrationKind.GITLAB,
                     "glpat-idempotent-token",
-                    null
-                )
-            );
+                    null));
 
             // First purge
             Workspace first = workspaceLifecycleService.purgeWorkspace(workspace.getWorkspaceSlug());
@@ -355,25 +345,27 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
         @Test
         void purgeRefusesActiveIntegrationSync() {
             Workspace workspace = createGitLabWorkspaceWithData("active-sync");
-            var connection = connectionRepository.findByWorkspaceId(workspace.getId()).getFirst();
+            var connection =
+                    connectionRepository.findByWorkspaceId(workspace.getId()).getFirst();
             SyncJob job = new SyncJob(
-                workspace,
-                connection,
-                connection.getKind(),
-                SyncJobType.RECONCILIATION,
-                SyncJobTrigger.MANUAL,
-                null
-            );
+                    workspace,
+                    connection,
+                    connection.getKind(),
+                    SyncJobType.RECONCILIATION,
+                    SyncJobTrigger.MANUAL,
+                    null);
             job.setStatus(SyncJobStatus.RUNNING);
             syncJobRepository.saveAndFlush(job);
 
             assertThatThrownBy(() -> workspaceLifecycleService.purgeWorkspace(workspace.getWorkspaceSlug()))
-                .isInstanceOf(WorkspacePurgeBlockedException.class)
-                .hasMessageContaining("active integration sync");
+                    .isInstanceOf(WorkspacePurgeBlockedException.class)
+                    .hasMessageContaining("active integration sync");
 
-            assertThat(workspaceRepository.findById(workspace.getId()).orElseThrow().getStatus()).isEqualTo(
-                Workspace.WorkspaceStatus.ACTIVE
-            );
+            assertThat(workspaceRepository
+                            .findById(workspace.getId())
+                            .orElseThrow()
+                            .getStatus())
+                    .isEqualTo(Workspace.WorkspaceStatus.ACTIVE);
         }
 
         @Test
@@ -387,12 +379,14 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
             agentJobRepository.saveAndFlush(job);
 
             assertThatThrownBy(() -> workspaceLifecycleService.purgeWorkspace(workspace.getWorkspaceSlug()))
-                .isInstanceOf(WorkspacePurgeBlockedException.class)
-                .hasMessageContaining("AI runs are queued");
+                    .isInstanceOf(WorkspacePurgeBlockedException.class)
+                    .hasMessageContaining("AI runs are queued");
 
-            assertThat(workspaceRepository.findById(workspace.getId()).orElseThrow().getStatus()).isEqualTo(
-                Workspace.WorkspaceStatus.ACTIVE
-            );
+            assertThat(workspaceRepository
+                            .findById(workspace.getId())
+                            .orElseThrow()
+                            .getStatus())
+                    .isEqualTo(Workspace.WorkspaceStatus.ACTIVE);
         }
     }
 
@@ -443,12 +437,10 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
             // encrypted PAT blob and is ACTIVE.
             var connections = connectionRepository.findByWorkspaceId(workspaceId);
             assertThat(connections).isNotEmpty();
-            assertThat(connections).anyMatch(
-                c ->
-                    c.getKind() == IntegrationKind.GITLAB &&
-                    c.getState() == IntegrationState.ACTIVE &&
-                    c.getCredentialsEncrypted() != null
-            );
+            assertThat(connections)
+                    .anyMatch(c -> c.getKind() == IntegrationKind.GITLAB
+                            && c.getState() == IntegrationState.ACTIVE
+                            && c.getCredentialsEncrypted() != null);
 
             workspaceLifecycleService.purgeWorkspace(workspace.getWorkspaceSlug());
 
@@ -466,8 +458,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
         @Test
         void purgeDeletesChatThreads() {
             User owner = persistUser("chat-cleanup-owner");
-            Workspace workspace = workspaceService.createWorkspace(
-                new CreateWorkspaceRequestDTO(
+            Workspace workspace = workspaceService.createWorkspace(new CreateWorkspaceRequestDTO(
                     "chat-cleanup-ws",
                     "Chat Cleanup",
                     "chat-cleanup-group",
@@ -475,9 +466,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
                     owner.getId(),
                     IntegrationKind.GITLAB,
                     "glpat-chat-cleanup-token",
-                    null
-                )
-            );
+                    null));
 
             ChatThread t1 = new ChatThread();
             t1.setId(UUID.randomUUID());
@@ -505,12 +494,12 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
         Workspace workspace = createGitLabWorkspaceWithData("owner-purge");
 
         webTestClient
-            .delete()
-            .uri("/workspaces/{workspaceSlug}", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isNoContent();
+                .delete()
+                .uri("/workspaces/{workspaceSlug}", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isNoContent();
 
         Workspace purged = workspaceRepository.findById(workspace.getId()).orElseThrow();
         assertThat(purged.getStatus()).isEqualTo(Workspace.WorkspaceStatus.PURGED);
@@ -520,8 +509,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @WithMentorUser
     void shouldDenyPurgeWhenUserIsNotOwner() {
         User owner = persistUser("non-owner-test-owner");
-        Workspace workspace = workspaceService.createWorkspace(
-            new CreateWorkspaceRequestDTO(
+        Workspace workspace = workspaceService.createWorkspace(new CreateWorkspaceRequestDTO(
                 "non-owner-ws",
                 "Non-Owner Test",
                 "non-owner-group",
@@ -529,20 +517,18 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 owner.getId(),
                 IntegrationKind.GITLAB,
                 "glpat-non-owner-token",
-                null
-            )
-        );
+                null));
 
         User mentorUser = persistUser("mentor");
         ensureWorkspaceMembership(workspace, mentorUser, WorkspaceMembership.WorkspaceRole.MEMBER);
 
         webTestClient
-            .delete()
-            .uri("/workspaces/{workspaceSlug}", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isForbidden();
+                .delete()
+                .uri("/workspaces/{workspaceSlug}", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isForbidden();
 
         Workspace unchanged = workspaceRepository.findById(workspace.getId()).orElseThrow();
         assertThat(unchanged.getStatus()).isEqualTo(Workspace.WorkspaceStatus.ACTIVE);
@@ -555,8 +541,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
         private Workspace createBareWorkspace(String slug) {
             User owner = persistUser(slug + "-owner");
-            return workspaceService.createWorkspace(
-                new CreateWorkspaceRequestDTO(
+            return workspaceService.createWorkspace(new CreateWorkspaceRequestDTO(
                     slug,
                     "Slack Test " + slug,
                     slug + "-group",
@@ -564,9 +549,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
                     owner.getId(),
                     IntegrationKind.GITLAB,
                     "glpat-slack-test-token",
-                    null
-                )
-            );
+                    null));
         }
 
         private static String slackTs(Instant instant) {
@@ -587,15 +570,14 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
         /** Insert one ingested Slack message with a controlled {@code ingested_at} (native — bypasses @CreationTimestamp). */
         private void insertMessage(Long workspaceId, String slackTs, String slackThreadTs, Instant ingestedAt) {
             jdbcTemplate.update(
-                "INSERT INTO slack_message (workspace_id, slack_team_id, slack_channel_id, slack_ts, slack_thread_ts, ingested_at) " +
-                    "VALUES (?, ?, ?, ?, ?, ?)",
-                workspaceId,
-                "T1",
-                "C1",
-                slackTs,
-                slackThreadTs,
-                Timestamp.from(ingestedAt)
-            );
+                    "INSERT INTO slack_message (workspace_id, slack_team_id, slack_channel_id, slack_ts, slack_thread_ts, ingested_at) "
+                            + "VALUES (?, ?, ?, ?, ?, ?)",
+                    workspaceId,
+                    "T1",
+                    "C1",
+                    slackTs,
+                    slackThreadTs,
+                    Timestamp.from(ingestedAt));
         }
 
         /** Seed one row into each of the three non-message Slack tables for the workspace. */
@@ -638,8 +620,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
         @Test
         @DisplayName(
-            "retention sweep processes each workspace independently: B's recent message survives A's expired prune"
-        )
+                "retention sweep processes each workspace independently: B's recent message survives A's expired prune")
         void retentionSweepIsWorkspaceIsolated() {
             // Age-based pruning itself (which ts survives, message-grain vs. thread-grain) is proven by
             // SlackRetentionErasureIntegrationTest; this is the cross-workspace delta it doesn't cover — that the
@@ -678,25 +659,26 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
             // A's Slack rows are empty; B's rows are untouched.
             assertThat(slackMessageRepository.countByWorkspaceId(a.getId())).isZero();
             assertThat(slackThreadRepository.countByWorkspaceId(a.getId())).isZero();
-            assertThat(slackMonitoredChannelRepository.countByWorkspaceId(a.getId())).isZero();
-            assertThat(mentorSlackThreadRepository.countByWorkspaceId(a.getId())).isZero();
-            assertThat(
-                slackParticipantConsentRepository.countByWorkspaceIdAndIngestionOptedOutTrue(a.getId())
-            ).isZero();
+            assertThat(slackMonitoredChannelRepository.countByWorkspaceId(a.getId()))
+                    .isZero();
+            assertThat(mentorSlackThreadRepository.countByWorkspaceId(a.getId()))
+                    .isZero();
+            assertThat(slackParticipantConsentRepository.countByWorkspaceIdAndIngestionOptedOutTrue(a.getId()))
+                    .isZero();
 
             assertThat(slackMessageRepository.countByWorkspaceId(b.getId())).isEqualTo(1);
             assertThat(slackThreadRepository.countByWorkspaceId(b.getId())).isEqualTo(1);
-            assertThat(slackMonitoredChannelRepository.countByWorkspaceId(b.getId())).isEqualTo(1);
-            assertThat(mentorSlackThreadRepository.countByWorkspaceId(b.getId())).isEqualTo(1);
-            assertThat(
-                slackParticipantConsentRepository.countByWorkspaceIdAndIngestionOptedOutTrue(b.getId())
-            ).isEqualTo(1);
+            assertThat(slackMonitoredChannelRepository.countByWorkspaceId(b.getId()))
+                    .isEqualTo(1);
+            assertThat(mentorSlackThreadRepository.countByWorkspaceId(b.getId()))
+                    .isEqualTo(1);
+            assertThat(slackParticipantConsentRepository.countByWorkspaceIdAndIngestionOptedOutTrue(b.getId()))
+                    .isEqualTo(1);
         }
 
         @Test
         @DisplayName(
-            "SlackWorkspacePurgeAdapter erases the workspace's derived CONVERSATION rows; another workspace's survive"
-        )
+                "SlackWorkspacePurgeAdapter erases the workspace's derived CONVERSATION rows; another workspace's survive")
         void purgeAdapterErasesDerivedConversationRows() {
             Workspace a = createBareWorkspace("slack-conv-a");
             Workspace b = createBareWorkspace("slack-conv-b");
@@ -751,26 +733,25 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
             UUID observationId = UUID.randomUUID();
             observationRepository.insertIfAbsent(
-                observationId,
-                "occ-" + observationId,
-                job.getId(),
-                practice.getId(),
-                null,
-                ArtifactKinds.CONVERSATION_THREAD.value(),
-                threadId,
-                owner.getId(),
-                "Observation title",
-                "ABSENT",
-                "BAD",
-                "MAJOR",
-                null,
-                null,
-                null,
-                Instant.now(),
-                "LIVE"
-            );
-            Feedback feedback = feedbackRepository.save(
-                Feedback.builder()
+                    observationId,
+                    "occ-" + observationId,
+                    job.getId(),
+                    job.getWorkspace().getId(),
+                    practice.getId(),
+                    null,
+                    ArtifactKinds.CONVERSATION_THREAD.value(),
+                    threadId,
+                    owner.getId(),
+                    "Observation title",
+                    "ABSENT",
+                    "BAD",
+                    "MAJOR",
+                    null,
+                    null,
+                    null,
+                    Instant.now(),
+                    "LIVE");
+            Feedback feedback = feedbackRepository.save(Feedback.builder()
                     .agentJobId(job.getId())
                     .workspaceId(workspace.getId())
                     .artifactKind(ArtifactKinds.CONVERSATION_THREAD)
@@ -782,14 +763,9 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
                     .deliveryState(FeedbackDeliveryState.PREPARED)
                     .source(FeedbackSource.AGENT)
                     .createdAt(Instant.now())
-                    .build()
-            );
+                    .build());
             feedbackObservationRepository.insertIfAbsent(
-                feedback.getId(),
-                observationId,
-                EvidenceRole.PRIMARY.name(),
-                0
-            );
+                    feedback.getId(), observationId, EvidenceRole.PRIMARY.name(), 0);
             return observationId;
         }
     }

@@ -12,7 +12,7 @@
 
 	// Root-only, and global: `typeAware` governs every config in the repo, nested ones included. It
 	// needs `oxlint-tsgolint`; without it oxlint refuses to start rather than skipping the rules.
-	"options": { "reportUnusedDisableDirectives": "error", "typeAware": true },
+	"options": { "reportUnusedDisableDirectives": "error", "typeAware": true, "typeCheck": true },
 
 	"categories": {
 		"correctness": "error",
@@ -43,11 +43,11 @@
 		"unicorn/prefer-import-meta-properties": "error",
 		"oxc/no-accumulating-spread": "error",
 		"eqeqeq": [
-		"error",
-		"always",
-		{
-		"null": "ignore"
-		}
+			"error",
+			"always",
+			{
+				"null": "ignore"
+			}
 		],
 		"unicorn/no-abusive-eslint-disable": "error",
 		"no-fallthrough": "error",
@@ -206,10 +206,10 @@
 		"typescript/no-unnecessary-template-expression": "error",
 		"typescript/no-unnecessary-condition": "error",
 		"typescript/switch-exhaustiveness-check": [
-		"error",
-		{
-		"considerDefaultExhaustiveForUnions": true
-		}
+			"error",
+			{
+				"considerDefaultExhaustiveForUnions": true
+			}
 		],
 		// No allowance: the SPA's is for TanStack Router's thrown `Redirect`/`NotFoundError`, and nothing
 		// under this config depends on `@tanstack/router-core`. Out here an Error is the only thing to throw.
@@ -240,21 +240,20 @@
 		// GraphQL introspection names its own fields: a schema query asks for `__schema`.
 		"no-underscore-dangle": "off",
 		"promise/always-return": [
-		"error",
-		{
-		"ignoreLastCallback": true
-		}
+			"error",
+			{
+				"ignoreLastCallback": true
+			}
 		],
-		// No allowance: the SPA's covers CSS side effects and module augmentation, neither of which a Bun
-		// CLI or a build script has. An import here is for what it binds.
+		// Unlike the SPA, these trees have no approved CSS side-effect or module-augmentation imports.
 		"import/no-unassigned-import": "error",
 		"no-unused-vars": [
-		"error",
-		{
-		"argsIgnorePattern": "^_",
-		"varsIgnorePattern": "^_",
-		"caughtErrorsIgnorePattern": "^_"
-		}
+			"error",
+			{
+				"argsIgnorePattern": "^_",
+				"varsIgnorePattern": "^_",
+				"caughtErrorsIgnorePattern": "^_"
+			}
 		]
 	},
 
@@ -273,7 +272,7 @@
 			"rules": { "import/no-relative-parent-imports": "off" }
 		},
 		{
-			// The runner and the precompute scripts execute on Bun inside the agent sandbox, and a CLI
+			// The runner and the precompute scripts execute on Node inside the agent sandbox, and a CLI
 			// entry point ends the process rather than returning a status nobody reads.
 			"files": [
 				"server/application/src/main/resources/agent/**",

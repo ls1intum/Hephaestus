@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.runtime.worker;
 
+import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.CancelJob;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.CapacityReport;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.ForceReconnect;
@@ -87,27 +88,24 @@ public class WorkerControlClient {
     private volatile @Nullable BiConsumer<UUID, String> cancelHandler;
 
     public WorkerControlClient(
-        WorkerProperties properties,
-        FrameCodec codec,
-        ObjectMapper objectMapper,
-        MeterRegistry meterRegistry
-    ) {
+            WorkerProperties properties, FrameCodec codec, ObjectMapper objectMapper, MeterRegistry meterRegistry) {
         this.properties = properties;
         this.codec = codec;
         this.objectMapper = objectMapper;
-        this.httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
-        this.framesSent = Counter.builder("worker.control.frames.sent")
-            .description("WSS frames written to the hub")
-            .register(meterRegistry);
-        this.framesReceived = Counter.builder("worker.control.frames.received")
-            .description("WSS frames decoded from the hub")
-            .register(meterRegistry);
-        this.sendDropped = Counter.builder("worker.control.frames.dropped")
-            .description("Outbound frames dropped (queue full or transport closed)")
-            .register(meterRegistry);
-        this.reconnects = Counter.builder("worker.control.reconnects")
-            .description("Reconnection attempts after a connect/handshake failure")
-            .register(meterRegistry);
+        this.httpClient =
+                HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+        this.framesSent = Counter.builder(AgentMetrics.WORKER_CONTROL_FRAMES_SENT)
+                .description("WSS frames written to the hub")
+                .register(meterRegistry);
+        this.framesReceived = Counter.builder(AgentMetrics.WORKER_CONTROL_FRAMES_RECEIVED)
+                .description("WSS frames decoded from the hub")
+                .register(meterRegistry);
+        this.sendDropped = Counter.builder(AgentMetrics.WORKER_CONTROL_FRAMES_DROPPED)
+                .description("Outbound frames dropped (queue full or transport closed)")
+                .register(meterRegistry);
+        this.reconnects = Counter.builder(AgentMetrics.WORKER_CONTROL_RECONNECTS)
+                .description("Reconnection attempts after a connect/handshake failure")
+                .register(meterRegistry);
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -118,7 +116,9 @@ public class WorkerControlClient {
         this.outboundThread = newDaemon("worker-control-out", this::runOutboundLoop);
         this.inboundThread = newDaemon("worker-control-in", this::runInboundLoop);
         this.connectionThread = newDaemon("worker-control-fsm", this::runConnectionLoop);
-        log.info("Worker control client started; endpoint={}", properties.control().endpoint());
+        log.info(
+                "Worker control client started; endpoint={}",
+                properties.control().endpoint());
     }
 
     @PreDestroy
@@ -209,10 +209,9 @@ public class WorkerControlClient {
                 case WorkerWelcome welcome -> {
                     if (welcome.negotiatedVersion() != FrameEnvelope.CURRENT_VERSION) {
                         log.error(
-                            "Hub negotiated unsupported protocol v{}; expected v{}",
-                            welcome.negotiatedVersion(),
-                            FrameEnvelope.CURRENT_VERSION
-                        );
+                                "Hub negotiated unsupported protocol v{}; expected v{}",
+                                welcome.negotiatedVersion(),
+                                FrameEnvelope.CURRENT_VERSION);
                         forceReconnect("protocol-version-mismatch");
                         return;
                     }
@@ -264,11 +263,9 @@ public class WorkerControlClient {
             try {
                 if (!properties.control().isConfigured()) {
                     if (!unconfiguredLogged) {
-                        log.warn(
-                            "Worker control endpoint or registration token not configured " +
-                                "(set HEPHAESTUS_HUB_URL + HEPHAESTUS_WORKER_REGISTRATION_TOKEN); " +
-                                "the control channel will stay disconnected."
-                        );
+                        log.warn("Worker control endpoint or registration token not configured "
+                                + "(set HEPHAESTUS_HUB_URL + HEPHAESTUS_WORKER_REGISTRATION_TOKEN); "
+                                + "the control channel will stay disconnected.");
                         unconfiguredLogged = true;
                     }
                     Thread.sleep(Duration.ofMinutes(5).toMillis());
@@ -280,9 +277,8 @@ public class WorkerControlClient {
                 openWebSocket(jwt);
                 if (!latch.await(properties.control().handshakeTimeout().toMillis(), TimeUnit.MILLISECONDS)) {
                     forceReconnect("welcome-timeout");
-                    throw new IOException(
-                        "WorkerWelcome not received within " + properties.control().handshakeTimeout()
-                    );
+                    throw new IOException("WorkerWelcome not received within "
+                            + properties.control().handshakeTimeout());
                 }
                 backoff = MIN_BACKOFF;
                 failuresSinceSuccess = 0;
@@ -301,13 +297,15 @@ public class WorkerControlClient {
             } catch (Exception e) {
                 failuresSinceSuccess++;
                 if (failuresSinceSuccess <= 3) {
-                    log.warn("Control-channel attempt failed: {} ({})", e.getClass().getSimpleName(), e.getMessage());
+                    log.warn(
+                            "Control-channel attempt failed: {} ({})",
+                            e.getClass().getSimpleName(),
+                            e.getMessage());
                 } else {
                     log.debug(
-                        "Control-channel attempt failed (suppressed; failures={}): {}",
-                        failuresSinceSuccess,
-                        e.getClass().getSimpleName()
-                    );
+                            "Control-channel attempt failed (suppressed; failures={}): {}",
+                            failuresSinceSuccess,
+                            e.getClass().getSimpleName());
                 }
             }
             if (!running.get()) {
@@ -336,22 +334,24 @@ public class WorkerControlClient {
         if (endpoint == null) throw new IOException("worker control endpoint is not configured");
         URI exchangeUri = URI.create(httpBaseFrom(endpoint) + "/api/workers/exchange");
         String workerId = properties.resolvedWorkerId();
-        String body = objectMapper.writeValueAsString(
-            Map.of("workerId", workerId, "registrationToken", properties.control().registrationToken())
-        );
+        String body = objectMapper.writeValueAsString(Map.of(
+                "workerId", workerId, "registrationToken", properties.control().registrationToken()));
         HttpRequest request = HttpRequest.newBuilder()
-            .uri(exchangeUri)
-            .timeout(Duration.ofSeconds(10))
-            .header("Content-Type", "application/json")
-            .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8))
-            .build();
+                .uri(exchangeUri)
+                .timeout(Duration.ofSeconds(10))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8))
+                .build();
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() != 200) {
             throw new IOException("token exchange failed: HTTP " + response.statusCode());
         }
         tools.jackson.databind.JsonNode json = objectMapper.readTree(response.body());
         tools.jackson.databind.JsonNode token = json.get("token");
-        if (token == null || token.isNull() || !token.isString() || token.asString().isEmpty()) {
+        if (token == null
+                || token.isNull()
+                || !token.isString()
+                || token.asString().isEmpty()) {
             throw new IOException("token exchange response missing token");
         }
         return token.asString();
@@ -362,20 +362,19 @@ public class WorkerControlClient {
         if (endpoint == null) throw new IOException("worker control endpoint is not configured");
         try {
             WebSocket ws = httpClient
-                .newWebSocketBuilder()
-                .header("Authorization", "Bearer " + jwt)
-                .connectTimeout(Duration.ofSeconds(10))
-                .buildAsync(endpoint, new Listener())
-                .get(properties.control().handshakeTimeout().toSeconds(), TimeUnit.SECONDS);
+                    .newWebSocketBuilder()
+                    .header("Authorization", "Bearer " + jwt)
+                    .connectTimeout(Duration.ofSeconds(10))
+                    .buildAsync(endpoint, new Listener())
+                    .get(properties.control().handshakeTimeout().toSeconds(), TimeUnit.SECONDS);
             webSocket.set(ws);
             // Prime lastInboundAt so the silence-deadline check in runConnectionLoop doesn't
             // immediately trip on a freshly-opened socket (lastInboundAt starts at Instant.EPOCH).
             lastInboundAt.set(Instant.now());
             // Send WorkerHello immediately; connected flag flips on WorkerWelcome.
             String workerId = properties.resolvedWorkerId();
-            FrameEnvelope hello = FrameEnvelope.of(
-                new WorkerHello(workerId, List.of(FrameEnvelope.CURRENT_VERSION), null)
-            );
+            FrameEnvelope hello =
+                    FrameEnvelope.of(new WorkerHello(workerId, List.of(FrameEnvelope.CURRENT_VERSION), null));
             ws.sendText(codec.encode(hello), true).toCompletableFuture().get(5, TimeUnit.SECONDS);
         } catch (ExecutionException e) {
             Throwable cause = e.getCause();
@@ -437,7 +436,9 @@ public class WorkerControlClient {
                 try {
                     FrameEnvelope envelope = codec.decode(json);
                     if (!inbound.offer(envelope.payload())) {
-                        log.warn("Inbound queue full; dropping {}", envelope.payload().getClass().getSimpleName());
+                        log.warn(
+                                "Inbound queue full; dropping {}",
+                                envelope.payload().getClass().getSimpleName());
                     }
                 } catch (RuntimeException e) {
                     log.warn("Inbound frame decode failed: {}", e.getClass().getSimpleName());

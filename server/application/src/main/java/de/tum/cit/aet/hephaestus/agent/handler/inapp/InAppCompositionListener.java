@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.handler.inapp;
 
 import de.tum.cit.aet.hephaestus.agent.handler.FeedbackLedgerRecorder;
+import de.tum.cit.aet.hephaestus.agent.handler.PracticeFeedbackDeliveryPolicy;
 import de.tum.cit.aet.hephaestus.agent.handler.composition.ComposedFeedbackUnit;
 import de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionResultParser;
 import de.tum.cit.aet.hephaestus.agent.handler.conversation.PracticeDetectionDeliveredEvent;
@@ -10,6 +11,7 @@ import de.tum.cit.aet.hephaestus.config.FeedbackLaneExecutor;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ActorRole;
 import de.tum.cit.aet.hephaestus.practices.PracticeBinding;
+import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicySurface;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
@@ -70,16 +72,17 @@ public class InAppCompositionListener {
     private final WorkspaceReviewDefaultsProvider workspaceDefaults;
     private final FeedbackCompositionResultParser resultParser;
     private final InAppFeedbackPreparer preparer;
+    private final PracticeFeedbackDeliveryPolicy deliveryPolicy;
 
     public InAppCompositionListener(
-        AgentJobRepository agentJobRepository,
-        ObservationRepository observationRepository,
-        FeedbackRepository feedbackRepository,
-        ObservationVisibilityPolicy visibilityPolicy,
-        WorkspaceReviewDefaultsProvider workspaceDefaults,
-        FeedbackCompositionResultParser resultParser,
-        InAppFeedbackPreparer preparer
-    ) {
+            AgentJobRepository agentJobRepository,
+            ObservationRepository observationRepository,
+            FeedbackRepository feedbackRepository,
+            ObservationVisibilityPolicy visibilityPolicy,
+            WorkspaceReviewDefaultsProvider workspaceDefaults,
+            FeedbackCompositionResultParser resultParser,
+            InAppFeedbackPreparer preparer,
+            PracticeFeedbackDeliveryPolicy deliveryPolicy) {
         this.agentJobRepository = agentJobRepository;
         this.observationRepository = observationRepository;
         this.feedbackRepository = feedbackRepository;
@@ -87,6 +90,7 @@ public class InAppCompositionListener {
         this.workspaceDefaults = workspaceDefaults;
         this.resultParser = resultParser;
         this.preparer = preparer;
+        this.deliveryPolicy = deliveryPolicy;
     }
 
     @Async(FeedbackLaneExecutor.BEAN_NAME)
@@ -97,10 +101,9 @@ public class InAppCompositionListener {
             prepare(event.agentJobId(), event.agentJobId(), event.workspaceId());
         } catch (RuntimeException e) {
             log.warn(
-                "In-app composition routing failed (delivery unaffected): jobId={}, error={}",
-                event.agentJobId(),
-                e.toString()
-            );
+                    "In-app composition routing failed (delivery unaffected): jobId={}, error={}",
+                    event.agentJobId(),
+                    e.toString());
         }
     }
 
@@ -130,6 +133,10 @@ public class InAppCompositionListener {
     }
 
     private int route(UUID agentJobId, UUID outputJobId, Long workspaceId) {
+        AgentJob sourceJob = agentJobRepository.findById(agentJobId).orElse(null);
+        if (sourceJob == null || !deliveryPolicy.allowsComposition(sourceJob, DeliveryPolicySurface.IN_APP)) {
+            return 0;
+        }
         AgentJob job = agentJobRepository.findById(outputJobId).orElse(null);
         if (job == null) {
             return 0;
@@ -141,7 +148,7 @@ public class InAppCompositionListener {
         // One recipient in practice — a review job files its observations against one person — but
         // read rather than assumed, so a kind that ever files against several does not silently
         // deliver all of their patterns to whoever happened to be first.
-        List<Long> recipients = observationRepository.findSubjectUserIdsByAgentJobId(agentJobId);
+        List<Long> recipients = observationRepository.findSubjectUserIdsByAgentJobId(agentJobId, workspaceId);
         // Every recipient's units share this job's id, and (agent_job_id, position) is unique, so each
         // recipient gets its own slice of the band. The query orders by user id, so a re-run assigns
         // the same slices and the idempotency guard still recognises what it already wrote.
@@ -168,62 +175,54 @@ public class InAppCompositionListener {
      * that is a property of the evidence is not a withholding to explain.
      */
     private List<ComposedInAppMessage> inAppMessages(@Nullable JsonNode jobOutput) {
-        return resultParser
-            .parse(jobOutput, FeedbackChannel.IN_APP)
-            .stream()
-            .filter(unit -> unit.action() != ComposedFeedbackUnit.Action.WITHHOLD)
-            .filter(ComposedFeedbackUnit::isComplete)
-            .map(unit ->
-                new ComposedInAppMessage(
-                    unit.practiceSlug(),
-                    Objects.requireNonNull(unit.title()),
-                    Objects.requireNonNull(unit.body()),
-                    Objects.requireNonNull(unit.nextStep()),
-                    // Carried, not acted on here: whether the card it names is still unread is a fact
-                    // about the moment of writing, so the decision belongs where the write happens.
-                    unit.supersedesThreadKey()
-                )
-            )
-            .toList();
+        return resultParser.parse(jobOutput, FeedbackChannel.IN_APP).stream()
+                .filter(unit -> unit.action() != ComposedFeedbackUnit.Action.WITHHOLD)
+                .filter(ComposedFeedbackUnit::isComplete)
+                .map(unit -> new ComposedInAppMessage(
+                        unit.practiceSlug(),
+                        Objects.requireNonNull(unit.title()),
+                        Objects.requireNonNull(unit.body()),
+                        Objects.requireNonNull(unit.nextStep()),
+                        // Carried, not acted on here: whether the card it names is still unread is a fact
+                        // about the moment of writing, so the decision belongs where the write happens.
+                        unit.supersedesThreadKey()))
+                .toList();
     }
 
     private int prepareFor(
-        UUID agentJobId,
-        Long workspaceId,
-        Long recipientUserId,
-        List<ComposedInAppMessage> messages,
-        int positionBase
-    ) {
-        PracticeAutonomy workspaceDefault = workspaceDefaults.forWorkspace(workspaceId).defaultAutonomy();
+            UUID agentJobId,
+            Long workspaceId,
+            Long recipientUserId,
+            List<ComposedInAppMessage> messages,
+            int positionBase) {
+        PracticeAutonomy workspaceDefault =
+                workspaceDefaults.forWorkspace(workspaceId).defaultAutonomy();
         Instant now = Instant.now();
         Instant since = now.minus(Duration.ofDays(InAppFeedbackRouter.PATTERN_WINDOW_DAYS));
         List<InAppFeedbackPreparer.RoutedMessage> routed = new ArrayList<>(messages.size());
         for (ComposedInAppMessage message : messages) {
             List<Observation> evidence = visibleEvidence(workspaceId, recipientUserId, message.practiceSlug(), since);
             InAppRoutingDecision decision = InAppFeedbackRouter.route(
-                message,
-                evidence,
-                effectiveTier(evidence, workspaceDefault),
-                subjectRole(evidence),
-                feedbackRepository
-                    .lastInAppSurfacedAt(workspaceId, recipientUserId, message.practiceSlug())
-                    .orElse(null),
-                now
-            );
+                    message,
+                    evidence,
+                    effectiveTier(evidence, workspaceId, workspaceDefault),
+                    subjectRole(evidence),
+                    feedbackRepository
+                            .lastInAppSurfacedAt(workspaceId, recipientUserId, message.practiceSlug())
+                            .orElse(null),
+                    now);
             if (decision != InAppRoutingDecision.ADMIT) {
                 log.debug(
-                    "In-app message withheld: reason={}, practice={}, jobId={}",
-                    decision,
-                    message.practiceSlug(),
-                    agentJobId
-                );
+                        "In-app message withheld: reason={}, practice={}, jobId={}",
+                        decision,
+                        message.practiceSlug(),
+                        agentJobId);
             }
             // Only the problems are bound, not the whole window the router read: the card renders these
             // rows as "the pieces of work this habit was observed on", so a piece of work where the
             // practice went WELL must never appear among them.
-            routed.add(
-                new InAppFeedbackPreparer.RoutedMessage(message, decision, InAppFeedbackRouter.problemsIn(evidence))
-            );
+            routed.add(new InAppFeedbackPreparer.RoutedMessage(
+                    message, decision, InAppFeedbackRouter.problemsIn(evidence)));
         }
         return preparer.prepare(agentJobId, workspaceId, recipientUserId, List.copyOf(routed), positionBase);
     }
@@ -236,30 +235,15 @@ public class InAppCompositionListener {
      * cited. Composition freezes text; it must not freeze permission.
      */
     private List<Observation> visibleEvidence(
-        Long workspaceId,
-        Long recipientUserId,
-        String practiceSlug,
-        Instant since
-    ) {
+            Long workspaceId, Long recipientUserId, String practiceSlug, Instant since) {
         List<Observation> candidates = observationRepository.findRecentForSubjectAndPractice(
-            workspaceId,
-            recipientUserId,
-            practiceSlug,
-            since,
-            PageRequest.of(0, MAX_EVIDENCE_PER_PRACTICE)
-        );
+                workspaceId, recipientUserId, practiceSlug, since, PageRequest.of(0, MAX_EVIDENCE_PER_PRACTICE));
         if (candidates.isEmpty()) {
             return List.of();
         }
-        Set<UUID> visible = visibilityPolicy.permitsAll(
-            workspaceId,
-            candidates,
-            SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY
-        );
-        return candidates
-            .stream()
-            .filter(o -> visible.contains(o.getId()))
-            .toList();
+        Set<UUID> visible =
+                visibilityPolicy.permitsAll(workspaceId, candidates, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY);
+        return candidates.stream().filter(o -> visible.contains(o.getId())).toList();
     }
 
     /**
@@ -267,23 +251,21 @@ public class InAppCompositionListener {
      * projection rather than by walking associations — the same reason {@code FeedbackChannelRouter}
      * projects it: the routing rule must not depend on whether the caller holds a session.
      */
-    private @Nullable PracticeAutonomy effectiveTier(List<Observation> evidence, PracticeAutonomy workspaceDefault) {
-        List<UUID> ids = evidence.stream().map(Observation::getId).filter(Objects::nonNull).toList();
+    private @Nullable PracticeAutonomy effectiveTier(
+            List<Observation> evidence, Long workspaceId, PracticeAutonomy workspaceDefault) {
+        List<UUID> ids = evidence.stream()
+                .map(Observation::getId)
+                .filter(Objects::nonNull)
+                .toList();
         if (ids.isEmpty()) {
             return null;
         }
-        return observationRepository
-            .findPracticeAutonomyFor(ids)
-            .stream()
-            .findFirst()
-            .map(row ->
-                AutonomyResolver.resolvePractice(
-                    row.getPracticeAutonomy(),
-                    row.getGroupAutonomy(),
-                    workspaceDefault
-                ).autonomy()
-            )
-            .orElse(null);
+        return observationRepository.findPracticeAutonomyFor(ids, workspaceId).stream()
+                .findFirst()
+                .map(row -> AutonomyResolver.resolvePractice(
+                                row.getPracticeAutonomy(), row.getGroupAutonomy(), workspaceDefault)
+                        .autonomy())
+                .orElse(null);
     }
 
     /**
@@ -293,12 +275,11 @@ public class InAppCompositionListener {
      * produced it.
      */
     private ActorRole subjectRole(List<Observation> evidence) {
-        return evidence
-            .stream()
-            .map(Observation::getPractice)
-            .filter(Objects::nonNull)
-            .findFirst()
-            .map(practice -> PracticeBinding.subjectRoleOf(practice.getBindings(), null))
-            .orElse(ActorRole.AUTHOR);
+        return evidence.stream()
+                .map(Observation::getPractice)
+                .filter(Objects::nonNull)
+                .findFirst()
+                .map(practice -> PracticeBinding.subjectRoleOf(practice.getBindings(), null))
+                .orElse(ActorRole.AUTHOR);
     }
 }

@@ -34,11 +34,10 @@ public class GithubIntegrationSyncRunner implements IntegrationSyncRunner {
     private final SyncSchedulerProperties syncSchedulerProperties;
 
     public GithubIntegrationSyncRunner(
-        GithubDataSyncScheduler dataSyncScheduler,
-        SyncTargetProvider syncTargetProvider,
-        GitHubHistoricalBackfillService backfillService,
-        SyncSchedulerProperties syncSchedulerProperties
-    ) {
+            GithubDataSyncScheduler dataSyncScheduler,
+            SyncTargetProvider syncTargetProvider,
+            GitHubHistoricalBackfillService backfillService,
+            SyncSchedulerProperties syncSchedulerProperties) {
         this.dataSyncScheduler = dataSyncScheduler;
         this.syncTargetProvider = syncTargetProvider;
         this.backfillService = backfillService;
@@ -95,10 +94,9 @@ public class GithubIntegrationSyncRunner implements IntegrationSyncRunner {
             // every time one completed. Completed targets contribute their full high-water mark to both
             // sides of the fraction, so the total holds still and the bar only fills.
             List<SyncTarget> allTargets = syncTargetProvider.getSyncTargetsForScope(workspaceId);
-            List<SyncTarget> pending = allTargets
-                .stream()
-                .filter(target -> !target.isBackfillComplete())
-                .toList();
+            List<SyncTarget> pending = allTargets.stream()
+                    .filter(target -> !target.isBackfillComplete())
+                    .toList();
             if (pending.isEmpty()) {
                 break;
             }
@@ -117,28 +115,24 @@ public class GithubIntegrationSyncRunner implements IntegrationSyncRunner {
                 // under-calling it would leave a manual backfill looking frozen for long stretches
                 // before jumping straight to done.
                 boolean didWork = backfillService.runBackfillBatch(
-                    target,
-                    batchSize,
-                    (syncTargetId, repositoryName, phase, lowestNumberSeen, itemsSyncedInBatch) -> {
-                        tally.observe(syncTargetId, phase, lowestNumberSeen);
-                        handle.progress(
-                            tally.itemsProcessed(),
-                            tally.itemsTotal(),
-                            SyncProgress.ofResource(
-                                phase,
-                                step(
-                                    repositoryName,
-                                    phase,
-                                    lowestNumberSeen,
-                                    tally.highWaterMarkFor(syncTargetId, phase)
-                                ),
-                                repositoryName,
-                                reposDoneSoFar,
-                                reposTotal
-                            )
-                        );
-                    }
-                );
+                        target,
+                        batchSize,
+                        (syncTargetId, repositoryName, phase, lowestNumberSeen, itemsSyncedInBatch) -> {
+                            tally.observe(syncTargetId, phase, lowestNumberSeen);
+                            handle.progress(
+                                    tally.itemsProcessed(),
+                                    tally.itemsTotal(),
+                                    SyncProgress.ofResource(
+                                            phase,
+                                            step(
+                                                    repositoryName,
+                                                    phase,
+                                                    lowestNumberSeen,
+                                                    tally.highWaterMarkFor(syncTargetId, phase)),
+                                            repositoryName,
+                                            reposDoneSoFar,
+                                            reposTotal));
+                        });
                 anyWork = anyWork || didWork;
                 reposDone++;
                 // Batch boundary: the checkpoint columns have just been written, so re-read them. The
@@ -146,18 +140,16 @@ public class GithubIntegrationSyncRunner implements IntegrationSyncRunner {
                 // actually persisted (including a repo that finished, or one that did no work at all).
                 tally.refresh(syncTargetProvider.getSyncTargetsForScope(workspaceId));
                 handle.progress(
-                    tally.itemsProcessed(),
-                    tally.itemsTotal(),
-                    // Just the repository — "N of M" is already the progress bar's own reading
-                    // (unitsCompleted/unitsTotal travel on the same record).
-                    SyncProgress.ofResource(
-                        SyncPhase.REPOSITORIES,
-                        "Backfilled " + target.repositoryNameWithOwner(),
-                        target.repositoryNameWithOwner(),
-                        reposDone,
-                        pending.size()
-                    )
-                );
+                        tally.itemsProcessed(),
+                        tally.itemsTotal(),
+                        // Just the repository — "N of M" is already the progress bar's own reading
+                        // (unitsCompleted/unitsTotal travel on the same record).
+                        SyncProgress.ofResource(
+                                SyncPhase.REPOSITORIES,
+                                "Backfilled " + target.repositoryNameWithOwner(),
+                                target.repositoryNameWithOwner(),
+                                reposDone,
+                                pending.size()));
             }
 
             if (!anyWork) {
@@ -165,10 +157,9 @@ public class GithubIntegrationSyncRunner implements IntegrationSyncRunner {
                 // Every pending repo was skipped this pass (cooldown / rate limit) — avoid a tight
                 // spin loop; the scheduled backfill cycle keeps making progress at its own cadence.
                 log.info(
-                    "Manual backfill paused: reason=noProgressThisPass, workspaceId={}, reposPending={}",
-                    workspaceId,
-                    pending.size()
-                );
+                        "Manual backfill paused: reason=noProgressThisPass, workspaceId={}, reposPending={}",
+                        workspaceId,
+                        pending.size());
                 break;
             }
         }

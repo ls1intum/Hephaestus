@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+
 import {
 	createPracticeMutation,
 	getPracticeQueryKey,
@@ -8,6 +9,7 @@ import {
 } from "@/api/@tanstack/react-query.gen";
 import type { CreatePracticeRequest, Practice, UpdatePracticeRequest } from "@/api/types.gen";
 import { problemStatusOf } from "@/lib/problem-detail";
+
 import {
 	patchPractice,
 	practiceCatalogStructureScope,

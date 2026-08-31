@@ -34,7 +34,8 @@ import org.springframework.validation.annotation.Validated;
  */
 @Validated
 @ConfigurationProperties(prefix = "hephaestus.leaderboard")
-public record LeaderboardProperties(@Valid Schedule schedule, @Valid Notification notification) {
+public record LeaderboardProperties(
+        @Valid Schedule schedule, @Valid Notification notification) {
     /**
      * Compact constructor ensuring nested records are never null.
      */
@@ -57,15 +58,17 @@ public record LeaderboardProperties(@Valid Schedule schedule, @Valid Notificatio
      * @param time time in H, HH, H:mm, or HH:mm format (24-hour clock, minutes default to 00)
      */
     public record Schedule(
-        @Min(value = 1, message = "Schedule day must be between 1 (Monday) and 7 (Sunday)") @Max(
-            value = 7,
-            message = "Schedule day must be between 1 (Monday) and 7 (Sunday)"
-        ) @DefaultValue("1") int day,
-        @NotBlank(message = "Schedule time must not be blank") @Pattern(
-            regexp = "^([01]?[0-9]|2[0-3])(:[0-5][0-9])?$",
-            message = "Schedule time must be in H, HH, H:mm, or HH:mm format"
-        ) @DefaultValue("09:00") String time
-    ) {}
+            @Min(value = 1, message = "Schedule day must be between 1 (Monday) and 7 (Sunday)")
+            @Max(value = 7, message = "Schedule day must be between 1 (Monday) and 7 (Sunday)")
+            @DefaultValue("1")
+            int day,
+
+            @NotBlank(message = "Schedule time must not be blank")
+            @Pattern(
+                    regexp = "^([01]?[0-9]|2[0-3])(:[0-5][0-9])?$",
+                    message = "Schedule time must be in H, HH, H:mm, or HH:mm format")
+            @DefaultValue("09:00")
+            String time) {}
 
     /**
      * Global on/off switch for the weekly Slack post.

@@ -22,10 +22,9 @@ class DefaultMentorReadinessQuery implements MentorReadinessQuery {
     private final WorkspaceRepository workspaceRepository;
 
     DefaultMentorReadinessQuery(
-        WorkspaceAgentBindingRepository agentBindingRepository,
-        LlmModelResolver llmModelResolver,
-        WorkspaceRepository workspaceRepository
-    ) {
+            WorkspaceAgentBindingRepository agentBindingRepository,
+            LlmModelResolver llmModelResolver,
+            WorkspaceRepository workspaceRepository) {
         this.agentBindingRepository = agentBindingRepository;
         this.llmModelResolver = llmModelResolver;
         this.workspaceRepository = workspaceRepository;
@@ -35,16 +34,16 @@ class DefaultMentorReadinessQuery implements MentorReadinessQuery {
     public boolean isEnabled(long workspaceId) {
         try {
             return workspaceRepository
-                .findById(workspaceId)
-                .filter(workspace -> workspace.getStatus() == Workspace.WorkspaceStatus.ACTIVE)
-                .map(workspace -> Boolean.TRUE.equals(workspace.getFeatures().getMentorEnabled()))
-                .orElse(false);
+                    .findById(workspaceId)
+                    .filter(workspace -> workspace.getStatus() == Workspace.WorkspaceStatus.ACTIVE)
+                    .map(workspace ->
+                            Boolean.TRUE.equals(workspace.getFeatures().getMentorEnabled()))
+                    .orElse(false);
         } catch (RuntimeException exception) {
             log.debug(
-                "Could not resolve mentor feature policy: workspaceId={}, error={}",
-                workspaceId,
-                exception.toString()
-            );
+                    "Could not resolve mentor feature policy: workspaceId={}, error={}",
+                    workspaceId,
+                    exception.toString());
             return false;
         }
     }
@@ -56,16 +55,13 @@ class DefaultMentorReadinessQuery implements MentorReadinessQuery {
         }
         try {
             return agentBindingRepository
-                .findByWorkspaceIdAndPurposeWithModels(workspaceId, AgentPurpose.MENTOR)
-                .filter(WorkspaceAgentBinding::isEnabled)
-                .map(llmModelResolver::isAvailable)
-                .orElse(false);
+                    .findByWorkspaceIdAndPurposeWithModels(workspaceId, AgentPurpose.MENTOR)
+                    .filter(WorkspaceAgentBinding::isEnabled)
+                    .map(llmModelResolver::isAvailable)
+                    .orElse(false);
         } catch (RuntimeException exception) {
             log.debug(
-                "Could not resolve mentor readiness: workspaceId={}, error={}",
-                workspaceId,
-                exception.toString()
-            );
+                    "Could not resolve mentor readiness: workspaceId={}, error={}", workspaceId, exception.toString());
             return false;
         }
     }

@@ -14,29 +14,39 @@ import org.jspecify.annotations.Nullable;
  */
 @Schema(description = "An allow-listed Slack channel with its consent state and person opt-out count")
 public record SlackMonitoredChannelDTO(
-    @NonNull @Schema(description = "Internal allow-list row id") Long id,
-    @NonNull @Schema(description = "Slack team (workspace) id the channel belongs to") String slackTeamId,
-    @NonNull @Schema(description = "Slack channel id (stable C…/G… id; the natural key)") String slackChannelId,
-    @Schema(description = "Human-readable channel name, if known") @Nullable String channelName,
-    @NonNull @Schema(description = "Current per-channel consent lifecycle state") ConsentState consentState,
-    @Schema(description = "When the in-channel consent announcement was posted (stamped on first activation)")
-    @Nullable
-    Instant consentAnnouncedAt,
-    @NonNull
-    @Schema(description = "Number of workspace members who have opted out of ingestion (workspace-wide)")
-    Long optedOutMemberCount,
-    @NonNull @Schema(description = "When the channel was first discovered / allow-listed") Instant createdAt
-) {
+        @NonNull @Schema(description = "Internal allow-list row id")
+        Long id,
+
+        @NonNull @Schema(description = "Slack team (workspace) id the channel belongs to")
+        String slackTeamId,
+
+        @NonNull @Schema(description = "Slack channel id (stable C…/G… id; the natural key)")
+        String slackChannelId,
+
+        @Schema(description = "Human-readable channel name, if known") @Nullable
+        String channelName,
+
+        @NonNull @Schema(description = "Current per-channel consent lifecycle state")
+        ConsentState consentState,
+
+        @Schema(description = "When the in-channel consent announcement was posted (stamped on first activation)")
+        @Nullable
+        Instant consentAnnouncedAt,
+
+        @NonNull @Schema(description = "Number of workspace members who have opted out of ingestion (workspace-wide)")
+        Long optedOutMemberCount,
+
+        @NonNull @Schema(description = "When the channel was first discovered / allow-listed")
+        Instant createdAt) {
     public static SlackMonitoredChannelDTO from(SlackMonitoredChannel channel, long optedOutMemberCount) {
         return new SlackMonitoredChannelDTO(
-            channel.getId(),
-            channel.getSlackTeamId(),
-            channel.getSlackChannelId(),
-            channel.getChannelName(),
-            channel.getConsentState(),
-            channel.getConsentAnnouncedAt(),
-            optedOutMemberCount,
-            channel.getCreatedAt()
-        );
+                channel.getId(),
+                channel.getSlackTeamId(),
+                channel.getSlackChannelId(),
+                channel.getChannelName(),
+                channel.getConsentState(),
+                channel.getConsentAnnouncedAt(),
+                optedOutMemberCount,
+                channel.getCreatedAt());
     }
 }

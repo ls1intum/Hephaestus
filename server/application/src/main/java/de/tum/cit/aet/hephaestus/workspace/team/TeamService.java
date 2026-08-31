@@ -45,12 +45,11 @@ public class TeamService {
     private final WorkspaceMembershipService workspaceMembershipService;
 
     public TeamService(
-        TeamRepository teamRepository,
-        WorkspaceTeamScopeResolver workspaceTeamScopeResolver,
-        TeamRepositoryPermissionRepository permissionRepository,
-        WorkspaceTeamSettingsService workspaceTeamSettingsService,
-        WorkspaceMembershipService workspaceMembershipService
-    ) {
+            TeamRepository teamRepository,
+            WorkspaceTeamScopeResolver workspaceTeamScopeResolver,
+            TeamRepositoryPermissionRepository permissionRepository,
+            WorkspaceTeamSettingsService workspaceTeamSettingsService,
+            WorkspaceMembershipService workspaceMembershipService) {
         this.teamRepository = teamRepository;
         this.workspaceTeamScopeResolver = workspaceTeamScopeResolver;
         this.permissionRepository = permissionRepository;
@@ -77,21 +76,16 @@ public class TeamService {
         Set<Long> hiddenMemberIds = workspaceMembershipService.getHiddenMemberIds(workspaceId);
 
         List<Team> teams = teamRepository.findWithCollectionsByOrganizationIgnoreCaseAndProviderId(
-            scope.accountLogin(),
-            scope.providerId()
-        );
+                scope.accountLogin(), scope.providerId());
 
         // Batch fetch all label filters in ONE query instead of N queries (N+1 fix)
         Set<Long> teamIds = teams.stream().map(Team::getId).collect(Collectors.toSet());
-        Map<Long, Set<Label>> labelFiltersByTeam = workspaceTeamSettingsService.getTeamLabelFiltersForTeams(
-            workspaceId,
-            teamIds
-        );
+        Map<Long, Set<Label>> labelFiltersByTeam =
+                workspaceTeamSettingsService.getTeamLabelFiltersForTeams(workspaceId, teamIds);
 
-        return teams
-            .stream()
-            .map(team -> convertToDTO(team, hiddenTeamIds, hiddenRepoIds, labelFiltersByTeam, hiddenMemberIds))
-            .toList();
+        return teams.stream()
+                .map(team -> convertToDTO(team, hiddenTeamIds, hiddenRepoIds, labelFiltersByTeam, hiddenMemberIds))
+                .toList();
     }
 
     /**
@@ -106,8 +100,8 @@ public class TeamService {
     @Transactional
     public boolean updateTeamVisibility(Workspace workspace, Long teamId, Boolean hidden) {
         return workspaceTeamSettingsService
-            .updateTeamVisibility(workspace, teamId, Boolean.TRUE.equals(hidden))
-            .isPresent();
+                .updateTeamVisibility(workspace, teamId, Boolean.TRUE.equals(hidden))
+                .isPresent();
     }
 
     /**
@@ -123,18 +117,15 @@ public class TeamService {
      */
     @Transactional
     public boolean updateRepositoryVisibility(
-        Workspace workspace,
-        Long teamId,
-        Long repositoryId,
-        Boolean hiddenFromContributions
-    ) {
+            Workspace workspace, Long teamId, Long repositoryId, Boolean hiddenFromContributions) {
         if (hiddenFromContributions == null) {
             throw new IllegalArgumentException("hiddenFromContributions must not be null");
         }
 
         return workspaceTeamSettingsService
-            .updateRepositoryVisibility(workspace, teamId, repositoryId, Boolean.TRUE.equals(hiddenFromContributions))
-            .isPresent();
+                .updateRepositoryVisibility(
+                        workspace, teamId, repositoryId, Boolean.TRUE.equals(hiddenFromContributions))
+                .isPresent();
     }
 
     /**
@@ -148,9 +139,9 @@ public class TeamService {
     @Transactional(readOnly = true)
     public Team getTeam(Workspace workspace, Long teamId) {
         return teamRepository
-            .findById(teamId)
-            .filter(team -> belongsToWorkspace(team, workspace))
-            .orElseThrow(() -> new EntityNotFoundException("Team", teamId));
+                .findById(teamId)
+                .filter(team -> belongsToWorkspace(team, workspace))
+                .orElseThrow(() -> new EntityNotFoundException("Team", teamId));
     }
 
     /**
@@ -165,9 +156,10 @@ public class TeamService {
     @Transactional(readOnly = true)
     public TeamRepositoryPermission getTeamRepositoryPermission(Workspace workspace, Long teamId, Long repositoryId) {
         return permissionRepository
-            .findWithTeamByTeam_IdAndRepository_Id(teamId, repositoryId)
-            .filter(permission -> belongsToWorkspace(permission.getTeam(), workspace))
-            .orElseThrow(() -> new EntityNotFoundException("TeamRepositoryPermission", teamId + "/" + repositoryId));
+                .findWithTeamByTeam_IdAndRepository_Id(teamId, repositoryId)
+                .filter(permission -> belongsToWorkspace(permission.getTeam(), workspace))
+                .orElseThrow(
+                        () -> new EntityNotFoundException("TeamRepositoryPermission", teamId + "/" + repositoryId));
     }
 
     private boolean belongsToWorkspace(@Nullable Team team, Workspace workspace) {
@@ -175,9 +167,9 @@ public class TeamService {
             return false;
         }
         return workspaceTeamScopeResolver
-            .resolve(workspace)
-            .map(scope -> scope.contains(team))
-            .orElse(false);
+                .resolve(workspace)
+                .map(scope -> scope.contains(team))
+                .orElse(false);
     }
 
     /**
@@ -190,12 +182,11 @@ public class TeamService {
      * @return the DTO with workspace-scoped hidden/label settings
      */
     private TeamInfoDTO convertToDTO(
-        Team team,
-        Set<Long> hiddenTeamIds,
-        Set<Long> hiddenRepoIds,
-        Map<Long, Set<Label>> labelFiltersByTeam,
-        Set<Long> hiddenMemberIds
-    ) {
+            Team team,
+            Set<Long> hiddenTeamIds,
+            Set<Long> hiddenRepoIds,
+            Map<Long, Set<Label>> labelFiltersByTeam,
+            Set<Long> hiddenMemberIds) {
         boolean isHidden = hiddenTeamIds.contains(team.getId());
         Set<Label> workspaceLabels = labelFiltersByTeam.getOrDefault(team.getId(), Set.of());
 

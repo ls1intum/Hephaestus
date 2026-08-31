@@ -8,7 +8,7 @@ import java.lang.annotation.Target;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
 /** Gates a bean to the WEBHOOK runtime role. */
-@Target({ ElementType.TYPE, ElementType.METHOD })
+@Target({ElementType.TYPE, ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 @ConditionalOnProperty(name = RuntimeRole.WEBHOOK_PROPERTY, havingValue = "true", matchIfMissing = true)

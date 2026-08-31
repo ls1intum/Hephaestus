@@ -40,10 +40,7 @@ public class SlackInteractivityController {
     private final ObjectMapper objectMapper;
 
     public SlackInteractivityController(
-        SlackSignatureVerifier verifier,
-        SlackInteractivityHandler handler,
-        ObjectMapper objectMapper
-    ) {
+            SlackSignatureVerifier verifier, SlackInteractivityHandler handler, ObjectMapper objectMapper) {
         this.verifier = verifier;
         this.handler = handler;
         this.objectMapper = objectMapper;
@@ -52,10 +49,9 @@ public class SlackInteractivityController {
     @PostMapping(value = "/webhooks/slack/interactivity")
     @PreAuthorize("permitAll()")
     public ResponseEntity<String> interactivity(
-        @RequestBody(required = false) byte[] rawBody,
-        @RequestHeader HttpHeaders headers,
-        HttpServletRequest request
-    ) {
+            @RequestBody(required = false) byte[] rawBody,
+            @RequestHeader HttpHeaders headers,
+            HttpServletRequest request) {
         return interactivity(rawBodyFrom(request, rawBody), headers);
     }
 
@@ -65,18 +61,13 @@ public class SlackInteractivityController {
         }
         String timestamp = headers.getFirst("X-Slack-Request-Timestamp");
         String signature = headers.getFirst("X-Slack-Signature");
-        SlackSignatureVerifier.Verification verification = verifier.check(
-            timestamp,
-            signature,
-            rawBody,
-            Instant.now().getEpochSecond()
-        );
+        SlackSignatureVerifier.Verification verification =
+                verifier.check(timestamp, signature, rawBody, Instant.now().getEpochSecond());
         if (verification.status() != SlackSignatureVerifier.Verification.Status.VALID) {
             log.warn(
-                "Slack interactivity rejected: status={}, driftSeconds={}",
-                verification.status(),
-                verification.driftSeconds()
-            );
+                    "Slack interactivity rejected: status={}, driftSeconds={}",
+                    verification.status(),
+                    verification.driftSeconds());
             return ResponseEntity.status(401).build();
         }
 

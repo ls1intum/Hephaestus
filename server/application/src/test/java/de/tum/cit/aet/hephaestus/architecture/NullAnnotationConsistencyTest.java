@@ -47,15 +47,13 @@ class NullAnnotationConsistencyTest extends HephaestusArchitectureTest {
     @Test
     void noLombokNonNull() {
         ArchRule rule = noClasses()
-            .that()
-            .resideInAPackage(BASE_PACKAGE + "..")
-            .should()
-            .dependOnClassesThat()
-            .haveFullyQualifiedName("lombok.NonNull")
-            .because(
-                "Use org.jspecify.annotations.NonNull instead of lombok.NonNull " +
-                    "for consistent nullability semantics and OpenAPI spec generation"
-            );
+                .that()
+                .resideInAPackage(BASE_PACKAGE + "..")
+                .should()
+                .dependOnClassesThat()
+                .haveFullyQualifiedName("lombok.NonNull")
+                .because("Use org.jspecify.annotations.NonNull instead of lombok.NonNull "
+                        + "for consistent nullability semantics and OpenAPI spec generation");
         rule.check(classes);
     }
 
@@ -69,24 +67,22 @@ class NullAnnotationConsistencyTest extends HephaestusArchitectureTest {
     @Test
     void noJakartaAnnotationNonnull() {
         ArchRule rule = noClasses()
-            .that()
-            .resideInAPackage(BASE_PACKAGE + "..")
-            // Rule-scoped exemption for the openapi-generator-emitted Outline wire models: the generator
-            // stamps @jakarta.annotation.Nonnull on every required field and no clean flag suppresses it.
-            // These are generated, never part of the SpringDoc-exposed surface, and are governed on their
-            // own boundary by OutlineApiDtoIsolationTest — so the annotation-consistency rule (which exists
-            // to protect hand-authored code and correct SpringDoc generation) does not apply to them. The
-            // exemption lives here, on the one rule that genuinely trips, rather than as a blanket import
-            // exclusion that would also blind the isolation guard.
-            .and()
-            .resideOutsideOfPackage("..integration.outline.client.model..")
-            .should()
-            .dependOnClassesThat()
-            .haveFullyQualifiedName("jakarta.annotation.Nonnull")
-            .because(
-                "Use org.jspecify.annotations.NonNull instead of jakarta.annotation.Nonnull " +
-                    "for consistent nullability semantics and OpenAPI spec generation"
-            );
+                .that()
+                .resideInAPackage(BASE_PACKAGE + "..")
+                // Rule-scoped exemption for the openapi-generator-emitted Outline wire models: the generator
+                // stamps @jakarta.annotation.Nonnull on every required field and no clean flag suppresses it.
+                // These are generated, never part of the SpringDoc-exposed surface, and are governed on their
+                // own boundary by OutlineApiDtoIsolationTest — so the annotation-consistency rule (which exists
+                // to protect hand-authored code and correct SpringDoc generation) does not apply to them. The
+                // exemption lives here, on the one rule that genuinely trips, rather than as a blanket import
+                // exclusion that would also blind the isolation guard.
+                .and()
+                .resideOutsideOfPackage("..integration.outline.client.model..")
+                .should()
+                .dependOnClassesThat()
+                .haveFullyQualifiedName("jakarta.annotation.Nonnull")
+                .because("Use org.jspecify.annotations.NonNull instead of jakarta.annotation.Nonnull "
+                        + "for consistent nullability semantics and OpenAPI spec generation");
         rule.check(classes);
     }
 
@@ -98,17 +94,16 @@ class NullAnnotationConsistencyTest extends HephaestusArchitectureTest {
     @Test
     void noSpringLangNullness() {
         ArchRule rule = noClasses()
-            .that()
-            .resideInAPackage(BASE_PACKAGE + "..")
-            .should()
-            .dependOnClassesThat()
-            .haveFullyQualifiedName("org.springframework.lang.NonNull")
-            .orShould()
-            .dependOnClassesThat()
-            .haveFullyQualifiedName("org.springframework.lang.Nullable")
-            .because(
-                "org.springframework.lang.NonNull/Nullable are deprecated in Spring 7 — use org.jspecify.annotations.*"
-            );
+                .that()
+                .resideInAPackage(BASE_PACKAGE + "..")
+                .should()
+                .dependOnClassesThat()
+                .haveFullyQualifiedName("org.springframework.lang.NonNull")
+                .orShould()
+                .dependOnClassesThat()
+                .haveFullyQualifiedName("org.springframework.lang.Nullable")
+                .because(
+                        "org.springframework.lang.NonNull/Nullable are deprecated in Spring 7 — use org.jspecify.annotations.*");
         rule.check(classes);
     }
 }

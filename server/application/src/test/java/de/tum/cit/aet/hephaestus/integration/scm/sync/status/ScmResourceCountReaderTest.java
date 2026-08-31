@@ -53,12 +53,7 @@ class ScmResourceCountReaderTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         reader = new ScmResourceCountReader(
-            issueRepository,
-            issueCommentRepository,
-            reviewRepository,
-            reviewCommentRepository,
-            commitRepository
-        );
+                issueRepository, issueCommentRepository, reviewRepository, reviewCommentRepository, commitRepository);
     }
 
     /** Test double for the Spring Data projection the grouped count queries return. */
@@ -87,36 +82,29 @@ class ScmResourceCountReaderTest extends BaseUnitTest {
             // The short circuit is the point: an `IN ()` over an empty id list is a pointless round trip
             // per class, and some drivers reject it outright.
             verifyNoInteractions(
-                issueRepository,
-                issueCommentRepository,
-                reviewRepository,
-                reviewCommentRepository,
-                commitRepository
-            );
+                    issueRepository,
+                    issueCommentRepository,
+                    reviewRepository,
+                    reviewCommentRepository,
+                    commitRepository);
         }
 
         @Test
         void allSixQueries_mapOntoTheRightRepositoryAndClass() {
             // Distinct numbers everywhere so a class-to-class or repo-to-repo mix-up cannot pass by
             // coincidence — six same-shaped queries are easy to cross-wire.
-            when(issueRepository.countIssuesGroupedByRepositoryIds(anyCollection())).thenReturn(
-                List.of(row(REPO_A, 11), row(REPO_B, 21))
-            );
-            when(issueRepository.countPullRequestsGroupedByRepositoryIds(anyCollection())).thenReturn(
-                List.of(row(REPO_A, 12), row(REPO_B, 22))
-            );
-            when(issueCommentRepository.countGroupedByRepositoryIds(anyCollection())).thenReturn(
-                List.of(row(REPO_A, 13), row(REPO_B, 23))
-            );
-            when(reviewRepository.countGroupedByRepositoryIds(anyCollection())).thenReturn(
-                List.of(row(REPO_A, 14), row(REPO_B, 24))
-            );
-            when(reviewCommentRepository.countGroupedByRepositoryIds(anyCollection())).thenReturn(
-                List.of(row(REPO_A, 15), row(REPO_B, 25))
-            );
-            when(commitRepository.countGroupedByRepositoryIds(anyCollection())).thenReturn(
-                List.of(row(REPO_A, 16), row(REPO_B, 26))
-            );
+            when(issueRepository.countIssuesGroupedByRepositoryIds(anyCollection()))
+                    .thenReturn(List.of(row(REPO_A, 11), row(REPO_B, 21)));
+            when(issueRepository.countPullRequestsGroupedByRepositoryIds(anyCollection()))
+                    .thenReturn(List.of(row(REPO_A, 12), row(REPO_B, 22)));
+            when(issueCommentRepository.countGroupedByRepositoryIds(anyCollection()))
+                    .thenReturn(List.of(row(REPO_A, 13), row(REPO_B, 23)));
+            when(reviewRepository.countGroupedByRepositoryIds(anyCollection()))
+                    .thenReturn(List.of(row(REPO_A, 14), row(REPO_B, 24)));
+            when(reviewCommentRepository.countGroupedByRepositoryIds(anyCollection()))
+                    .thenReturn(List.of(row(REPO_A, 15), row(REPO_B, 25)));
+            when(commitRepository.countGroupedByRepositoryIds(anyCollection()))
+                    .thenReturn(List.of(row(REPO_A, 16), row(REPO_B, 26)));
 
             Map<Long, ScmResourceCounts> counts = reader.countsByRepositoryId(List.of(REPO_A, REPO_B));
 
@@ -127,11 +115,15 @@ class ScmResourceCountReaderTest extends BaseUnitTest {
 
         @Test
         void manyRepositories_issuesExactlySixQueriesRegardlessOfCount() {
-            when(issueRepository.countIssuesGroupedByRepositoryIds(anyCollection())).thenReturn(List.of());
-            when(issueRepository.countPullRequestsGroupedByRepositoryIds(anyCollection())).thenReturn(List.of());
-            when(issueCommentRepository.countGroupedByRepositoryIds(anyCollection())).thenReturn(List.of());
+            when(issueRepository.countIssuesGroupedByRepositoryIds(anyCollection()))
+                    .thenReturn(List.of());
+            when(issueRepository.countPullRequestsGroupedByRepositoryIds(anyCollection()))
+                    .thenReturn(List.of());
+            when(issueCommentRepository.countGroupedByRepositoryIds(anyCollection()))
+                    .thenReturn(List.of());
             when(reviewRepository.countGroupedByRepositoryIds(anyCollection())).thenReturn(List.of());
-            when(reviewCommentRepository.countGroupedByRepositoryIds(anyCollection())).thenReturn(List.of());
+            when(reviewCommentRepository.countGroupedByRepositoryIds(anyCollection()))
+                    .thenReturn(List.of());
             when(commitRepository.countGroupedByRepositoryIds(anyCollection())).thenReturn(List.of());
 
             reader.countsByRepositoryId(List.of(REPO_A, REPO_B, REPO_C));
@@ -149,15 +141,15 @@ class ScmResourceCountReaderTest extends BaseUnitTest {
         @Test
         void repositoryWithNoRowsAnywhere_isPresentWithZeroCounts() {
             // REPO_B is requested but appears in no query result — a freshly monitored repo.
-            when(issueRepository.countIssuesGroupedByRepositoryIds(anyCollection())).thenReturn(
-                List.of(row(REPO_A, 5))
-            );
-            when(issueRepository.countPullRequestsGroupedByRepositoryIds(anyCollection())).thenReturn(
-                List.of(row(REPO_A, 2))
-            );
-            when(issueCommentRepository.countGroupedByRepositoryIds(anyCollection())).thenReturn(List.of());
+            when(issueRepository.countIssuesGroupedByRepositoryIds(anyCollection()))
+                    .thenReturn(List.of(row(REPO_A, 5)));
+            when(issueRepository.countPullRequestsGroupedByRepositoryIds(anyCollection()))
+                    .thenReturn(List.of(row(REPO_A, 2)));
+            when(issueCommentRepository.countGroupedByRepositoryIds(anyCollection()))
+                    .thenReturn(List.of());
             when(reviewRepository.countGroupedByRepositoryIds(anyCollection())).thenReturn(List.of());
-            when(reviewCommentRepository.countGroupedByRepositoryIds(anyCollection())).thenReturn(List.of());
+            when(reviewCommentRepository.countGroupedByRepositoryIds(anyCollection()))
+                    .thenReturn(List.of());
             when(commitRepository.countGroupedByRepositoryIds(anyCollection())).thenReturn(List.of());
 
             Map<Long, ScmResourceCounts> counts = reader.countsByRepositoryId(List.of(REPO_A, REPO_B));
@@ -191,18 +183,17 @@ class ScmResourceCountReaderTest extends BaseUnitTest {
             List<SyncResourceCount> result = counts.toSyncResourceCounts(issuesSyncedAt, pullRequestsSyncedAt);
 
             assertThat(result)
-                .extracting(SyncResourceCount::key, SyncResourceCount::count, SyncResourceCount::lastSyncedAt)
-                .containsExactly(
-                    tuple(SyncResourceCount.KEY_ISSUES, 30L, issuesSyncedAt),
-                    tuple(SyncResourceCount.KEY_PULL_REQUESTS, 12L, pullRequestsSyncedAt),
-                    // The nested classes have no watermark column of their own. Reporting null ("not
-                    // tracked") rather than a sibling's timestamp is the whole point: borrowing would
-                    // assert exactly the freshness this breakdown exists to disprove.
-                    tuple(SyncResourceCount.KEY_ISSUE_COMMENTS, 13L, null),
-                    tuple(SyncResourceCount.KEY_REVIEWS, 14L, null),
-                    tuple(SyncResourceCount.KEY_REVIEW_COMMENTS, 15L, null),
-                    tuple(SyncResourceCount.KEY_COMMITS, 16L, null)
-                );
+                    .extracting(SyncResourceCount::key, SyncResourceCount::count, SyncResourceCount::lastSyncedAt)
+                    .containsExactly(
+                            tuple(SyncResourceCount.KEY_ISSUES, 30L, issuesSyncedAt),
+                            tuple(SyncResourceCount.KEY_PULL_REQUESTS, 12L, pullRequestsSyncedAt),
+                            // The nested classes have no watermark column of their own. Reporting null ("not
+                            // tracked") rather than a sibling's timestamp is the whole point: borrowing would
+                            // assert exactly the freshness this breakdown exists to disprove.
+                            tuple(SyncResourceCount.KEY_ISSUE_COMMENTS, 13L, null),
+                            tuple(SyncResourceCount.KEY_REVIEWS, 14L, null),
+                            tuple(SyncResourceCount.KEY_REVIEW_COMMENTS, 15L, null),
+                            tuple(SyncResourceCount.KEY_COMMITS, 16L, null));
             assertThat(result).allSatisfy(count -> assertThat(count.label()).isNotBlank());
         }
 
@@ -214,8 +205,8 @@ class ScmResourceCountReaderTest extends BaseUnitTest {
 
             // The GitLab case: no per-class watermark is persisted at all, so no class may claim one.
             assertThat(result)
-                .hasSize(6)
-                .allSatisfy(count -> assertThat(count.lastSyncedAt()).isNull());
+                    .hasSize(6)
+                    .allSatisfy(count -> assertThat(count.lastSyncedAt()).isNull());
         }
     }
 

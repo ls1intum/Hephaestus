@@ -36,17 +36,17 @@ public class WithMockUserSecurityContextFactory implements WithSecurityContextFa
 
         // Create mock JWT
         Jwt jwt = Jwt.withTokenValue("mock-token")
-            .header("alg", "HS256")
-            .header("typ", "JWT")
-            .claims(claimsMap -> claimsMap.putAll(claims))
-            .issuedAt(Instant.now())
-            .expiresAt(Instant.now().plusSeconds(3600))
-            .build();
+                .header("alg", "HS256")
+                .header("typ", "JWT")
+                .claims(claimsMap -> claimsMap.putAll(claims))
+                .issuedAt(Instant.now())
+                .expiresAt(Instant.now().plusSeconds(3600))
+                .build();
 
         // Create authorities from the annotation
         var authorities = Arrays.stream(annotation.authorities())
-            .map(SimpleGrantedAuthority::new)
-            .collect(Collectors.toList());
+                .map(SimpleGrantedAuthority::new)
+                .collect(Collectors.toList());
 
         // Create JWT authentication token
         Authentication authentication = new JwtAuthenticationToken(jwt, authorities);

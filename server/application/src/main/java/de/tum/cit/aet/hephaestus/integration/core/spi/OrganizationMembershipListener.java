@@ -54,10 +54,9 @@ public interface OrganizationMembershipListener {
      * @param role              the membership role (e.g., "admin", "member"), null for removals
      */
     record MembershipChangedEvent(
-        Long organizationId,
-        String organizationLogin,
-        Long userId,
-        String userLogin,
-        @Nullable String role
-    ) {}
+            Long organizationId,
+            String organizationLogin,
+            Long userId,
+            String userLogin,
+            @Nullable String role) {}
 }

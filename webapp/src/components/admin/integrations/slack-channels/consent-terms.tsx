@@ -1,4 +1,5 @@
 import { BanIcon, CheckIcon, ClockIcon, type LucideIcon, PauseIcon } from "lucide-react";
+
 import type { SlackMonitoredChannel } from "@/api/types.gen";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";

@@ -105,17 +105,16 @@ public class GitHubIssueDependencySyncService {
     private static final int MAX_RETRY_ATTEMPTS = 3;
 
     public GitHubIssueDependencySyncService(
-        IssueRepository issueRepository,
-        RepositoryRepository repositoryRepository,
-        SyncTargetProvider syncTargetProvider,
-        GitHubGraphQlClientProvider graphQlClientProvider,
-        GitHubSyncProperties syncProperties,
-        GitHubExceptionClassifier exceptionClassifier,
-        SyncSchedulerProperties syncSchedulerProperties,
-        GitHubIssueProcessor issueProcessor,
-        PlatformTransactionManager transactionManager,
-        GitHubGraphQlSyncCoordinator graphQlSyncHelper
-    ) {
+            IssueRepository issueRepository,
+            RepositoryRepository repositoryRepository,
+            SyncTargetProvider syncTargetProvider,
+            GitHubGraphQlClientProvider graphQlClientProvider,
+            GitHubSyncProperties syncProperties,
+            GitHubExceptionClassifier exceptionClassifier,
+            SyncSchedulerProperties syncSchedulerProperties,
+            GitHubIssueProcessor issueProcessor,
+            PlatformTransactionManager transactionManager,
+            GitHubGraphQlSyncCoordinator graphQlSyncHelper) {
         this.issueRepository = issueRepository;
         this.repositoryRepository = repositoryRepository;
         this.syncTargetProvider = syncTargetProvider;
@@ -143,11 +142,10 @@ public class GitHubIssueDependencySyncService {
     @Transactional
     public void processIssueDependencyEvent(long blockedIssueId, long blockingIssueId, boolean isBlock) {
         log.debug(
-            "Received issue dependency event: blockedIssueId={}, blockingIssueId={}, isBlock={}",
-            blockedIssueId,
-            blockingIssueId,
-            isBlock
-        );
+                "Received issue dependency event: blockedIssueId={}, blockingIssueId={}, isBlock={}",
+                blockedIssueId,
+                blockingIssueId,
+                isBlock);
 
         Optional<Issue> blockedIssueOpt = issueRepository.findById(blockedIssueId);
         if (blockedIssueOpt.isEmpty()) {
@@ -195,10 +193,9 @@ public class GitHubIssueDependencySyncService {
         SyncMetadata metadata = metadataOpt.get();
         if (!metadata.needsIssueDependenciesSync(syncSchedulerProperties.cooldownMinutes())) {
             log.debug(
-                "Skipped issue dependencies sync: reason=cooldownActive, scopeId={}, lastSyncedAt={}",
-                scopeId,
-                metadata.issueDependenciesSyncedAt()
-            );
+                    "Skipped issue dependencies sync: reason=cooldownActive, scopeId={}, lastSyncedAt={}",
+                    scopeId,
+                    metadata.issueDependenciesSyncedAt());
             return -1;
         }
 
@@ -226,9 +223,8 @@ public class GitHubIssueDependencySyncService {
             Optional<Repository> repoOpt = repositoryRepository.findByNameWithOwnerWithOrganization(repoNameWithOwner);
             if (repoOpt.isEmpty()) {
                 log.debug(
-                    "Skipped dependency sync: reason=repositoryNotFound, repoName={}",
-                    sanitizeForLog(repoNameWithOwner)
-                );
+                        "Skipped dependency sync: reason=repositoryNotFound, repoName={}",
+                        sanitizeForLog(repoNameWithOwner));
                 continue;
             }
 
@@ -241,17 +237,14 @@ public class GitHubIssueDependencySyncService {
             } catch (Exception e) {
                 failedRepoCount++;
                 ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
-                graphQlSyncHelper.handleGraphQlClassification(
-                    new GraphQlClassificationContext(
+                graphQlSyncHelper.handleGraphQlClassification(new GraphQlClassificationContext(
                         classification,
                         0,
                         MAX_RETRY_ATTEMPTS,
                         "dependency sync",
                         "repoName",
                         Objects.requireNonNullElse(sanitizeForLog(repoNameWithOwner), "<unknown>"),
-                        log
-                    )
-                );
+                        log));
             }
         }
 
@@ -261,11 +254,10 @@ public class GitHubIssueDependencySyncService {
         }
 
         log.info(
-            "Completed issue dependency sync: scopeId={}, dependencyCount={}, failedRepoCount={}",
-            scopeId,
-            totalSynced,
-            failedRepoCount
-        );
+                "Completed issue dependency sync: scopeId={}, dependencyCount={}, failedRepoCount={}",
+                scopeId,
+                totalSynced,
+                failedRepoCount);
         return totalSynced;
     }
 
@@ -274,10 +266,7 @@ public class GitHubIssueDependencySyncService {
      */
     private void updateSyncTimestamp(Long scopeId) {
         syncTargetProvider.updateScopeSyncTimestamp(
-            scopeId,
-            SyncTargetProvider.SyncType.ISSUE_DEPENDENCIES,
-            Instant.now()
-        );
+                scopeId, SyncTargetProvider.SyncType.ISSUE_DEPENDENCIES, Instant.now());
     }
 
     /**
@@ -307,10 +296,9 @@ public class GitHubIssueDependencySyncService {
             pageCount++;
             if (pageCount >= MAX_PAGINATION_PAGES) {
                 log.warn(
-                    "Reached maximum pagination limit for dependency sync: repoName={}, limit={}",
-                    safeNameWithOwner,
-                    MAX_PAGINATION_PAGES
-                );
+                        "Reached maximum pagination limit for dependency sync: repoName={}, limit={}",
+                        safeNameWithOwner,
+                        MAX_PAGINATION_PAGES);
                 break;
             }
 
@@ -318,61 +306,47 @@ public class GitHubIssueDependencySyncService {
             final String currentAfter = after;
             final int currentPage = pageCount;
 
-            ClientGraphQlResponse graphQlResponse = Mono.defer(() ->
-                client
-                    .documentName(GET_DEPENDENCIES_DOCUMENT)
-                    .variable("owner", owner)
-                    .variable("name", name)
-                    .variable(
-                        "first",
-                        adaptPageSize(LARGE_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId))
-                    )
-                    .variable("after", currentAfter)
-                    .execute()
-            )
-                .retryWhen(
-                    Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
-                        .maxBackoff(TRANSPORT_MAX_BACKOFF)
-                        .jitter(JITTER_FACTOR)
-                        .filter(ScmTransportErrors::isTransportError)
-                        .doBeforeRetry(signal ->
-                            log.warn(
-                                "Retrying after transport error: context=dependencySync, repoName={}, page={}, attempt={}, error={}",
-                                safeNameWithOwner,
-                                currentPage,
-                                signal.totalRetries() + 1,
-                                signal.failure().getMessage()
-                            )
-                        )
-                )
-                .block(syncProperties.graphqlTimeout());
+            ClientGraphQlResponse graphQlResponse = Mono.defer(() -> client.documentName(GET_DEPENDENCIES_DOCUMENT)
+                            .variable("owner", owner)
+                            .variable("name", name)
+                            .variable(
+                                    "first",
+                                    adaptPageSize(
+                                            LARGE_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId)))
+                            .variable("after", currentAfter)
+                            .execute())
+                    .retryWhen(Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
+                            .maxBackoff(TRANSPORT_MAX_BACKOFF)
+                            .jitter(JITTER_FACTOR)
+                            .filter(ScmTransportErrors::isTransportError)
+                            .doBeforeRetry(signal -> log.warn(
+                                    "Retrying after transport error: context=dependencySync, repoName={}, page={}, attempt={}, error={}",
+                                    safeNameWithOwner,
+                                    currentPage,
+                                    signal.totalRetries() + 1,
+                                    signal.failure().getMessage())))
+                    .block(syncProperties.graphqlTimeout());
 
             if (graphQlResponse == null || !graphQlResponse.isValid()) {
                 ClassificationResult classification = graphQlSyncHelper.classifyGraphQlErrors(graphQlResponse);
                 if (classification != null) {
-                    if (
-                        graphQlSyncHelper.handleGraphQlClassification(
-                            new GraphQlClassificationContext(
-                                classification,
-                                retryAttempt,
-                                MAX_RETRY_ATTEMPTS,
-                                "dependency repository sync",
-                                "repoName",
-                                safeNameWithOwner,
-                                log
-                            )
-                        )
-                    ) {
+                    if (graphQlSyncHelper.handleGraphQlClassification(new GraphQlClassificationContext(
+                            classification,
+                            retryAttempt,
+                            MAX_RETRY_ATTEMPTS,
+                            "dependency repository sync",
+                            "repoName",
+                            safeNameWithOwner,
+                            log))) {
                         retryAttempt++;
                         continue;
                     }
                     break;
                 }
                 log.warn(
-                    "Received invalid GraphQL response: repoName={}, errors={}",
-                    safeNameWithOwner,
-                    graphQlResponse != null ? graphQlResponse.getErrors() : "null"
-                );
+                        "Received invalid GraphQL response: repoName={}, errors={}",
+                        safeNameWithOwner,
+                        graphQlResponse != null ? graphQlResponse.getErrors() : "null");
                 break;
             }
 
@@ -381,22 +355,14 @@ public class GitHubIssueDependencySyncService {
 
             // Check if we should pause due to rate limiting
             if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
-                if (
-                    !graphQlSyncHelper.waitForRateLimitIfNeeded(
-                        scopeId,
-                        "dependency repository sync",
-                        "repoName",
-                        safeNameWithOwner,
-                        log
-                    )
-                ) {
+                if (!graphQlSyncHelper.waitForRateLimitIfNeeded(
+                        scopeId, "dependency repository sync", "repoName", safeNameWithOwner, log)) {
                     break;
                 }
             }
 
-            GHIssueConnection issueConnection = graphQlResponse
-                .field("repository.issues")
-                .toEntity(GHIssueConnection.class);
+            GHIssueConnection issueConnection =
+                    graphQlResponse.field("repository.issues").toEntity(GHIssueConnection.class);
 
             if (issueConnection == null || issueConnection.getNodes() == null) {
                 log.warn("Skipped dependency sync: reason=emptyGraphQLResponse, repoName={}", safeNameWithOwner);
@@ -418,20 +384,14 @@ public class GitHubIssueDependencySyncService {
 
             retryAttempt = 0;
 
-            totalSynced += transactionTemplate.execute(status ->
-                processIssueDependencies(issueConnection, repo, scopeId)
-            );
+            totalSynced +=
+                    transactionTemplate.execute(status -> processIssueDependencies(issueConnection, repo, scopeId));
         }
 
         // Raw issue nodes received (not dependency relationships synced) vs issues.totalCount.
         if (reportedTotalCount >= 0) {
             GraphQlConnectionOverflowDetector.checkPaginated(
-                "issues",
-                issuesReceived,
-                reportedTotalCount,
-                hasNextPage,
-                "repoName=" + safeNameWithOwner
-            );
+                    "issues", issuesReceived, reportedTotalCount, hasNextPage, "repoName=" + safeNameWithOwner);
         }
 
         return totalSynced;
@@ -483,7 +443,9 @@ public class GitHubIssueDependencySyncService {
 
         // Process blockedBy relationships
         var blockedBy = graphQlIssue.getBlockedBy();
-        if (blockedBy == null || blockedBy.getNodes() == null || blockedBy.getNodes().isEmpty()) {
+        if (blockedBy == null
+                || blockedBy.getNodes() == null
+                || blockedBy.getNodes().isEmpty()) {
             // No blockers - clear any existing relationships
             if (!issue.getBlockedBy().isEmpty()) {
                 issue.getBlockedBy().clear();
@@ -493,11 +455,10 @@ public class GitHubIssueDependencySyncService {
         }
 
         GraphQlConnectionOverflowDetector.check(
-            "blockedBy",
-            blockedBy.getNodes().size(),
-            blockedBy.getTotalCount(),
-            "Issue #" + graphQlIssue.getNumber()
-        );
+                "blockedBy",
+                blockedBy.getNodes().size(),
+                blockedBy.getTotalCount(),
+                "Issue #" + graphQlIssue.getNumber());
 
         return syncBlockedByRelationships(issue, blockedBy.getNodes(), scopeId);
     }
@@ -526,11 +487,10 @@ public class GitHubIssueDependencySyncService {
 
         // Issue doesn't exist - create it from GraphQL data as a stub
         log.debug(
-            "Creating stub issue from dependency sync: issueId={}, issueNumber={}, repoName={}",
-            issueId,
-            graphQlIssue.getNumber(),
-            sanitizeForLog(repo.getNameWithOwner())
-        );
+                "Creating stub issue from dependency sync: issueId={}, issueNumber={}, repoName={}",
+                issueId,
+                graphQlIssue.getNumber(),
+                sanitizeForLog(repo.getNameWithOwner()));
 
         GitHubIssueDTO dto = GitHubIssueDTO.fromIssue(graphQlIssue);
         if (dto == null) {
@@ -590,11 +550,10 @@ public class GitHubIssueDependencySyncService {
             if (createdBlocker != null) {
                 createdBlockers.add(createdBlocker);
                 log.debug(
-                    "Created stub blocker issue: blockerId={}, blockerNumber={}, blockedIssueNumber={}",
-                    createdBlocker.getId(),
-                    createdBlocker.getNumber(),
-                    issue.getNumber()
-                );
+                        "Created stub blocker issue: blockerId={}, blockerNumber={}, blockedIssueNumber={}",
+                        createdBlocker.getId(),
+                        createdBlocker.getNumber(),
+                        issue.getNumber());
             }
         }
 
@@ -646,10 +605,9 @@ public class GitHubIssueDependencySyncService {
         Repository blockerRepo = resolveBlockerRepository(blockerGraphQl);
         if (blockerRepo == null) {
             log.debug(
-                "Skipped creating blocker: reason=repositoryNotFound, blockerId={}, blockerNumber={}",
-                blockerGraphQl.getFullDatabaseId(),
-                blockerGraphQl.getNumber()
-            );
+                    "Skipped creating blocker: reason=repositoryNotFound, blockerId={}, blockerNumber={}",
+                    blockerGraphQl.getFullDatabaseId(),
+                    blockerGraphQl.getNumber());
             return null;
         }
 
@@ -681,7 +639,9 @@ public class GitHubIssueDependencySyncService {
             return null;
         }
 
-        return repositoryRepository.findByNameWithOwnerWithOrganization(nameWithOwner).orElse(null);
+        return repositoryRepository
+                .findByNameWithOwnerWithOrganization(nameWithOwner)
+                .orElse(null);
     }
 
     // HELPER METHODS
@@ -689,10 +649,9 @@ public class GitHubIssueDependencySyncService {
     private void addBlockingRelationship(Issue blockedIssue, Issue blockingIssue) {
         if (blockedIssue.getBlockedBy().contains(blockingIssue)) {
             log.debug(
-                "Skipped adding blocking relationship: reason=alreadyBlocked, blockedIssueNumber={}, blockingIssueNumber={}",
-                blockedIssue.getNumber(),
-                blockingIssue.getNumber()
-            );
+                    "Skipped adding blocking relationship: reason=alreadyBlocked, blockedIssueNumber={}, blockingIssueNumber={}",
+                    blockedIssue.getNumber(),
+                    blockingIssue.getNumber());
             return;
         }
 
@@ -700,10 +659,9 @@ public class GitHubIssueDependencySyncService {
         issueRepository.save(blockedIssue);
 
         log.info(
-            "Added blocking relationship: blockedIssueNumber={}, blockingIssueNumber={}",
-            blockedIssue.getNumber(),
-            blockingIssue.getNumber()
-        );
+                "Added blocking relationship: blockedIssueNumber={}, blockingIssueNumber={}",
+                blockedIssue.getNumber(),
+                blockingIssue.getNumber());
     }
 
     private void removeBlockingRelationship(Issue blockedIssue, Issue blockingIssue) {
@@ -712,16 +670,14 @@ public class GitHubIssueDependencySyncService {
         if (removed) {
             issueRepository.save(blockedIssue);
             log.info(
-                "Removed blocking relationship: blockedIssueNumber={}, blockingIssueNumber={}",
-                blockedIssue.getNumber(),
-                blockingIssue.getNumber()
-            );
+                    "Removed blocking relationship: blockedIssueNumber={}, blockingIssueNumber={}",
+                    blockedIssue.getNumber(),
+                    blockingIssue.getNumber());
         } else {
             log.debug(
-                "Skipped removing blocking relationship: reason=notBlocked, blockedIssueNumber={}, blockingIssueNumber={}",
-                blockedIssue.getNumber(),
-                blockingIssue.getNumber()
-            );
+                    "Skipped removing blocking relationship: reason=notBlocked, blockedIssueNumber={}, blockingIssueNumber={}",
+                    blockedIssue.getNumber(),
+                    blockingIssue.getNumber());
         }
     }
 }

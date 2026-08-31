@@ -52,8 +52,8 @@ public class CurrentAccountUsers {
     @Transactional(readOnly = true)
     public List<User> resolve() {
         List<AccountIdentityQuery.IdentityLinkView> links = SecurityUtils.getCurrentAccountId()
-            .map(accountIdentityQuery::activeLinksForAccount)
-            .orElseGet(List::of);
+                .map(accountIdentityQuery::activeLinksForAccount)
+                .orElseGet(List::of);
         if (links.isEmpty()) {
             return userRepository.getCurrentUser().map(List::of).orElseGet(List::of);
         }
@@ -61,8 +61,8 @@ public class CurrentAccountUsers {
         Map<Long, User> byId = new LinkedHashMap<>();
         for (AccountIdentityQuery.IdentityLinkView link : links) {
             resolveLinkUser(link)
-                .filter(user -> user.getId() != null)
-                .ifPresent(user -> byId.putIfAbsent(user.getId(), user));
+                    .filter(user -> user.getId() != null)
+                    .ifPresent(user -> byId.putIfAbsent(user.getId(), user));
         }
         return new ArrayList<>(byId.values());
     }

@@ -105,17 +105,16 @@ class WebhookFixtureHandlerResolutionTest extends BaseUnitTest {
      * added here with a reason. Keyed by the wire event token the deriver emits.
      */
     private static final Map<String, String> GITLAB_ACK_DROP_ALLOWLIST = Map.of(
-        "emoji",
-        "award/revoke emoji-reaction events — Hephaestus does not model reactions.",
-        "feature_flag",
-        "feature-flag toggles — outside the mirrored SCM domain.",
-        "release",
-        "GitLab releases are not mirrored yet (GitLabEventType javadoc: add a handler when needed).",
-        "tag_push",
-        "tag pushes are not mirrored — only branch pushes drive sync; TAG_PUSH has no handler by design.",
-        "wiki_page",
-        "wiki pages are not part of the mirrored SCM domain."
-    );
+            "emoji",
+            "award/revoke emoji-reaction events — Hephaestus does not model reactions.",
+            "feature_flag",
+            "feature-flag toggles — outside the mirrored SCM domain.",
+            "release",
+            "GitLab releases are not mirrored yet (GitLabEventType javadoc: add a handler when needed).",
+            "tag_push",
+            "tag pushes are not mirrored — only branch pushes drive sync; TAG_PUSH has no handler by design.",
+            "wiki_page",
+            "wiki pages are not part of the mirrored SCM domain.");
 
     /** Slack has no committed webhook fixtures today; every registered bolt event has a handler. */
     private static final Map<String, String> SLACK_ACK_DROP_ALLOWLIST = Map.of();
@@ -130,95 +129,88 @@ class WebhookFixtureHandlerResolutionTest extends BaseUnitTest {
         // Guard-health: if the registry came back empty the reflective scan silently broke and every
         // assertion below would vacuously pass. Anchor on the two team tiers.
         assertThat(registeredKeys)
-            .as("GitHub handler registry must be discoverable and non-empty")
-            .isNotEmpty()
-            .contains(new EventTypeKey(IntegrationKind.GITHUB, "organization.team"))
-            .contains(new EventTypeKey(IntegrationKind.GITHUB, "repository.team"));
+                .as("GitHub handler registry must be discoverable and non-empty")
+                .isNotEmpty()
+                .contains(new EventTypeKey(IntegrationKind.GITHUB, "organization.team"))
+                .contains(new EventTypeKey(IntegrationKind.GITHUB, "repository.team"));
 
         // Event tokens the system claims to handle = the last segment of every registered key
         // ("repository.issues" -> "issues", "organization.team" -> "team").
-        Set<String> claimedEventTokens = registeredKeys
-            .stream()
-            .map(k -> lastSegment(k.eventType()))
-            .collect(Collectors.toCollection(TreeSet::new));
+        Set<String> claimedEventTokens = registeredKeys.stream()
+                .map(k -> lastSegment(k.eventType()))
+                .collect(Collectors.toCollection(TreeSet::new));
 
         List<String> failures = resolutionFailures(
-            GITHUB_FIXTURE_DIR,
-            registeredKeys,
-            claimedEventTokens,
-            WebhookFixtureHandlerResolutionTest::githubEventToken,
-            (payload, eventToken) ->
-                GITHUB_PARSER.parse(GITHUB_DERIVER.deriveSubject(payload, Map.of("X-GitHub-Event", eventToken)))
-        );
+                GITHUB_FIXTURE_DIR,
+                registeredKeys,
+                claimedEventTokens,
+                WebhookFixtureHandlerResolutionTest::githubEventToken,
+                (payload, eventToken) -> GITHUB_PARSER.parse(
+                        GITHUB_DERIVER.deriveSubject(payload, Map.of("X-GitHub-Event", eventToken))));
 
         assertThat(failures)
-            .as(
-                "Every committed GitHub webhook fixture for a claimed event must round-trip to a " +
-                    "registered handler. A listed fixture derives a subject whose parsed EventTypeKey has " +
-                    "no handler — the consumer would ACK-drop it silently (invisible data loss)."
-            )
-            .isEmpty();
+                .as("Every committed GitHub webhook fixture for a claimed event must round-trip to a "
+                        + "registered handler. A listed fixture derives a subject whose parsed EventTypeKey has "
+                        + "no handler — the consumer would ACK-drop it silently (invisible data loss).")
+                .isEmpty();
     }
 
     @Test
     void everyGitlabFixtureResolvesOrIsAllowlisted() throws IOException {
         Set<EventTypeKey> registeredKeys = registeredKeys(GITLAB_HANDLER_PACKAGE);
         assertThat(registeredKeys)
-            .as("GitLab handler registry must be discoverable and non-empty")
-            .isNotEmpty()
-            .contains(new EventTypeKey(IntegrationKind.GITLAB, "merge_request"))
-            // Anchors the group-tier routing (project/subgroup/member).
-            .contains(new EventTypeKey(IntegrationKind.GITLAB, "project"))
-            .contains(new EventTypeKey(IntegrationKind.GITLAB, "member"));
+                .as("GitLab handler registry must be discoverable and non-empty")
+                .isNotEmpty()
+                .contains(new EventTypeKey(IntegrationKind.GITLAB, "merge_request"))
+                // Anchors the group-tier routing (project/subgroup/member).
+                .contains(new EventTypeKey(IntegrationKind.GITLAB, "project"))
+                .contains(new EventTypeKey(IntegrationKind.GITLAB, "member"));
 
         assertFixturesResolveOrAllowlisted(
-            "GitLab",
-            GITLAB_FIXTURE_DIR,
-            registeredKeys,
-            payload -> GITLAB_PARSER.parse(GITLAB_DERIVER.deriveSubject(payload, Map.of())),
-            GITLAB_ACK_DROP_ALLOWLIST
-        );
+                "GitLab",
+                GITLAB_FIXTURE_DIR,
+                registeredKeys,
+                payload -> GITLAB_PARSER.parse(GITLAB_DERIVER.deriveSubject(payload, Map.of())),
+                GITLAB_ACK_DROP_ALLOWLIST);
     }
 
     @Test
     void everySlackFixtureResolvesOrIsAllowlisted() throws IOException {
         Set<EventTypeKey> registeredKeys = registeredKeys(SLACK_HANDLER_PACKAGE);
         assertThat(registeredKeys)
-            .as("Slack handler registry must be discoverable and non-empty")
-            .isNotEmpty()
-            .contains(new EventTypeKey(IntegrationKind.SLACK, "message"))
-            .contains(new EventTypeKey(IntegrationKind.SLACK, "message_im"));
+                .as("Slack handler registry must be discoverable and non-empty")
+                .isNotEmpty()
+                .contains(new EventTypeKey(IntegrationKind.SLACK, "message"))
+                .contains(new EventTypeKey(IntegrationKind.SLACK, "message_im"));
 
         // No Slack webhook fixtures are committed today, so this block is vacuous now but becomes active
         // the instant a Slack fixture lands: a fixture for a bolt event with no handler will fail the
         // build unless it is handled or explicitly allowlisted, mirroring the SCM/Outline invariant.
         assertFixturesResolveOrAllowlisted(
-            "Slack",
-            SLACK_FIXTURE_DIR,
-            registeredKeys,
-            payload -> SLACK_PARSER.parse(SLACK_DERIVER.deriveSubject(payload, Map.of())),
-            SLACK_ACK_DROP_ALLOWLIST
-        );
+                "Slack",
+                SLACK_FIXTURE_DIR,
+                registeredKeys,
+                payload -> SLACK_PARSER.parse(SLACK_DERIVER.deriveSubject(payload, Map.of())),
+                SLACK_ACK_DROP_ALLOWLIST);
     }
 
     @Test
     void everyOutlineFixtureResolvesOrIsAllowlisted() throws IOException {
         Set<EventTypeKey> registeredKeys = registeredKeys(OUTLINE_HANDLER_PACKAGE);
         assertThat(registeredKeys)
-            .as("Outline handler registry must be discoverable and non-empty")
-            .isNotEmpty()
-            .contains(new EventTypeKey(IntegrationKind.OUTLINE, "document"));
+                .as("Outline handler registry must be discoverable and non-empty")
+                .isNotEmpty()
+                .contains(new EventTypeKey(IntegrationKind.OUTLINE, "document"));
 
         // Outline's parser folds every event onto the single `document` key, so every committed fixture
         // must resolve. This guards that collapse (and that each fixture yields a well-formed 3-part
         // subject the parser accepts) for the whole committed corpus.
         assertFixturesResolveOrAllowlisted(
-            "Outline",
-            OUTLINE_FIXTURE_DIR,
-            registeredKeys,
-            payload -> OUTLINE_PARSER.parse(OUTLINE_DERIVER.deriveSubject(payload, Map.of())),
-            OUTLINE_ACK_DROP_ALLOWLIST
-        );
+                "Outline",
+                OUTLINE_FIXTURE_DIR,
+                registeredKeys,
+                payload -> OUTLINE_PARSER.parse(OUTLINE_DERIVER.deriveSubject(payload, Map.of())),
+                OUTLINE_ACK_DROP_ALLOWLIST);
     }
 
     // --- pipeline ---
@@ -243,16 +235,15 @@ class WebhookFixtureHandlerResolutionTest extends BaseUnitTest {
      * fixture cannot leave a dead justification behind.
      */
     private static void assertFixturesResolveOrAllowlisted(
-        String kindLabel,
-        Path fixtureDir,
-        Set<EventTypeKey> registeredKeys,
-        KeyForPayload keyForPayload,
-        Map<String, String> allowlist
-    ) throws IOException {
-        Set<String> claimedEventTokens = registeredKeys
-            .stream()
-            .map(k -> lastSegment(k.eventType()))
-            .collect(Collectors.toCollection(TreeSet::new));
+            String kindLabel,
+            Path fixtureDir,
+            Set<EventTypeKey> registeredKeys,
+            KeyForPayload keyForPayload,
+            Map<String, String> allowlist)
+            throws IOException {
+        Set<String> claimedEventTokens = registeredKeys.stream()
+                .map(k -> lastSegment(k.eventType()))
+                .collect(Collectors.toCollection(TreeSet::new));
 
         List<String> failures = new ArrayList<>();
         Set<String> allowlistTokensSeen = new TreeSet<>();
@@ -262,10 +253,9 @@ class WebhookFixtureHandlerResolutionTest extends BaseUnitTest {
             fixtures = List.of();
         } else {
             try (var stream = Files.list(fixtureDir)) {
-                fixtures = stream
-                    .filter(p -> p.getFileName().toString().endsWith(".json"))
-                    .sorted()
-                    .toList();
+                fixtures = stream.filter(p -> p.getFileName().toString().endsWith(".json"))
+                        .sorted()
+                        .toList();
             }
         }
 
@@ -284,45 +274,37 @@ class WebhookFixtureHandlerResolutionTest extends BaseUnitTest {
             }
             String token = lastSegment(key.eventType());
             if (claimedEventTokens.contains(token)) {
-                failures.add(
-                    name +
-                        " (event=" +
-                        token +
-                        ") -> PARTIAL DROP: this event is handled on another tier but derived key " +
-                        key +
-                        " resolves no handler. Fix the routing — do NOT allowlist."
-                );
+                failures.add(name + " (event="
+                        + token
+                        + ") -> PARTIAL DROP: this event is handled on another tier but derived key "
+                        + key
+                        + " resolves no handler. Fix the routing — do NOT allowlist.");
             } else if (allowlist.containsKey(token)) {
                 allowlistTokensSeen.add(token);
             } else {
-                failures.add(
-                    name +
-                        " (event=" +
-                        token +
-                        ") -> UNHANDLED on every tier and not allowlisted. Either register a handler or add " +
-                        "an explicit allowlist entry justifying the ACK-drop so it can never regress silently."
-                );
+                failures.add(name + " (event="
+                        + token
+                        + ") -> UNHANDLED on every tier and not allowlisted. Either register a handler or add "
+                        + "an explicit allowlist entry justifying the ACK-drop so it can never regress silently.");
             }
         }
 
         assertThat(failures)
-            .as(
-                "Every committed %s webhook fixture must resolve a registered handler or be explicitly " +
-                    "allowlisted as an intentional ACK-drop. Offending fixtures below would be dropped " +
-                    "silently by IntegrationNatsConsumer (invisible data loss).",
-                kindLabel
-            )
-            .isEmpty();
+                .as(
+                        "Every committed %s webhook fixture must resolve a registered handler or be explicitly "
+                                + "allowlisted as an intentional ACK-drop. Offending fixtures below would be dropped "
+                                + "silently by IntegrationNatsConsumer (invisible data loss).",
+                        kindLabel)
+                .isEmpty();
 
         Set<String> staleAllowlist = new TreeSet<>(allowlist.keySet());
         staleAllowlist.removeAll(allowlistTokensSeen);
         assertThat(staleAllowlist)
-            .as(
-                "Stale %s allowlist entries: no committed fixture derives these tokens anymore (a handler " +
-                    "was added or the fixture removed). Remove them so the allowlist stays honest.",
-                kindLabel
-            )
-            .isEmpty();
+                .as(
+                        "Stale %s allowlist entries: no committed fixture derives these tokens anymore (a handler "
+                                + "was added or the fixture removed). Remove them so the allowlist stays honest.",
+                        kindLabel)
+                .isEmpty();
     }
 
     /** Kind-agnostic: derive the {@link EventTypeKey} the routing pipeline would compute for a fixture. */
@@ -332,22 +314,21 @@ class WebhookFixtureHandlerResolutionTest extends BaseUnitTest {
     }
 
     private static List<String> resolutionFailures(
-        Path fixtureDir,
-        Set<EventTypeKey> registeredKeys,
-        Set<String> claimedEventTokens,
-        java.util.function.Function<Path, String> eventTokenOf,
-        KeyForFixture keyForFixture
-    ) throws IOException {
+            Path fixtureDir,
+            Set<EventTypeKey> registeredKeys,
+            Set<String> claimedEventTokens,
+            java.util.function.Function<Path, String> eventTokenOf,
+            KeyForFixture keyForFixture)
+            throws IOException {
         List<String> failures = new ArrayList<>();
         if (!Files.isDirectory(fixtureDir)) {
             return failures;
         }
         List<Path> fixtures;
         try (var stream = Files.list(fixtureDir)) {
-            fixtures = stream
-                .filter(p -> p.getFileName().toString().endsWith(".json"))
-                .sorted()
-                .toList();
+            fixtures = stream.filter(p -> p.getFileName().toString().endsWith(".json"))
+                    .sorted()
+                    .toList();
         }
         for (Path fixture : fixtures) {
             String eventToken = eventTokenOf.apply(fixture);
@@ -392,7 +373,7 @@ class WebhookFixtureHandlerResolutionTest extends BaseUnitTest {
         var provider = new ClassPathScanningCandidateComponentProvider(false) {
             @Override
             protected boolean isCandidateComponent(org.springframework.core.type.classreading.MetadataReader mr)
-                throws IOException {
+                    throws IOException {
                 return typeFilter.match(mr, getMetadataReaderFactory());
             }
         };
@@ -407,9 +388,8 @@ class WebhookFixtureHandlerResolutionTest extends BaseUnitTest {
             }
             try {
                 Class<?> clazz = Class.forName(className);
-                if (
-                    Modifier.isAbstract(clazz.getModifiers()) || clazz.equals(AbstractIntegrationMessageHandler.class)
-                ) {
+                if (Modifier.isAbstract(clazz.getModifiers())
+                        || clazz.equals(AbstractIntegrationMessageHandler.class)) {
                     continue;
                 }
                 IntegrationMessageHandler handler = instantiateForKey(clazz);
@@ -426,8 +406,8 @@ class WebhookFixtureHandlerResolutionTest extends BaseUnitTest {
 
         // A handler we cannot introspect is a hole in the guard — fail loudly rather than under-cover.
         assertThat(introspectionFailures)
-            .as("Every %s handler must be reflectively introspectable to read its routing key", packageToScan)
-            .isEmpty();
+                .as("Every %s handler must be reflectively introspectable to read its routing key", packageToScan)
+                .isEmpty();
         return keys;
     }
 
@@ -443,16 +423,15 @@ class WebhookFixtureHandlerResolutionTest extends BaseUnitTest {
      */
     private static IntegrationMessageHandler instantiateForKey(Class<?> clazz) throws ReflectiveOperationException {
         Constructor<?> ctor = java.util.Arrays.stream(clazz.getDeclaredConstructors())
-            .max(Comparator.comparingInt(Constructor::getParameterCount))
-            .orElseThrow(() -> new NoSuchMethodException("no constructor on " + clazz.getName()));
+                .max(Comparator.comparingInt(Constructor::getParameterCount))
+                .orElseThrow(() -> new NoSuchMethodException("no constructor on " + clazz.getName()));
         ctor.setAccessible(true);
         Class<?>[] paramTypes = ctor.getParameterTypes();
         Object[] args = new Object[ctor.getParameterCount()];
         for (int i = 0; i < paramTypes.length; i++) {
             if (TransactionTemplate.class.equals(paramTypes[i])) {
                 args[i] = new TransactionTemplate(
-                    org.mockito.Mockito.mock(org.springframework.transaction.PlatformTransactionManager.class)
-                );
+                        org.mockito.Mockito.mock(org.springframework.transaction.PlatformTransactionManager.class));
             }
         }
         return (IntegrationMessageHandler) ctor.newInstance(args);

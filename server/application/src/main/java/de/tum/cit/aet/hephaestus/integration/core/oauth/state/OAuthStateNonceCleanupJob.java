@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.core.oauth.state;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.integration.core.metrics.IntegrationCoreMetrics;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
@@ -37,24 +38,18 @@ public class OAuthStateNonceCleanupJob {
     /** Spring-wired constructor; retention binds via {@link OAuthStateProperties}. */
     @Autowired
     public OAuthStateNonceCleanupJob(
-        OAuthStateNonceRepository repository,
-        OAuthStateProperties properties,
-        MeterRegistry meterRegistry
-    ) {
+            OAuthStateNonceRepository repository, OAuthStateProperties properties, MeterRegistry meterRegistry) {
         this(repository, properties.nonceRetention(), meterRegistry);
     }
 
     /** Canonical constructor (also the unit-test seam): retention passed directly. */
     public OAuthStateNonceCleanupJob(
-        OAuthStateNonceRepository repository,
-        @Nullable Duration retention,
-        MeterRegistry meterRegistry
-    ) {
+            OAuthStateNonceRepository repository, @Nullable Duration retention, MeterRegistry meterRegistry) {
         this.repository = repository;
         this.retention = retention == null ? Duration.ofDays(7) : retention;
-        this.prunedCounter = Counter.builder("oauth.state.nonce.pruned")
-            .description("Number of OAuth state nonces pruned by the daily sweep")
-            .register(meterRegistry);
+        this.prunedCounter = Counter.builder(IntegrationCoreMetrics.OAUTH_STATE_NONCE_PRUNED)
+                .description("Number of OAuth state nonces pruned by the daily sweep")
+                .register(meterRegistry);
     }
 
     @Scheduled(cron = "0 0 4 * * *")
@@ -67,10 +62,6 @@ public class OAuthStateNonceCleanupJob {
             prunedCounter.increment(deleted);
         }
         log.info(
-            "OAuthStateNonceCleanupJob: pruned {} nonces older than {} (retention={})",
-            deleted,
-            cutoff,
-            retention
-        );
+                "OAuthStateNonceCleanupJob: pruned {} nonces older than {} (retention={})", deleted, cutoff, retention);
     }
 }

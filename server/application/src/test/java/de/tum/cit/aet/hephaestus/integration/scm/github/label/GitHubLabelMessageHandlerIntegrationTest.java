@@ -14,7 +14,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organizatio
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventType;
 import de.tum.cit.aet.hephaestus.integration.scm.github.label.dto.GitHubLabelDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.label.dto.GitHubLabelEventDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.repository.dto.GitHubRepositoryRefDTO;
@@ -106,10 +105,9 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
     private void setupTestData() {
         // Create GitHub provider
         gitProvider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-            .orElseGet(() ->
-                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseGet(() -> gitProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
 
         // Create organization matching fixture data
         Organization org = new Organization();
@@ -158,12 +156,15 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
     @Test
     void shouldProcessCreatedLabelEvents() throws Exception {
         GitHubLabelEventDTO event = loadPayload("label.created");
-        assertThat(labelRepository.findByNativeIdAndProviderId(FIXTURE_LABEL_ID, providerId())).isEmpty();
+        assertThat(labelRepository.findByNativeIdAndProviderId(FIXTURE_LABEL_ID, providerId()))
+                .isEmpty();
 
         handler.handleEvent(event);
 
         // Then - verify ALL persisted fields against hardcoded fixture values
-        Label label = labelRepository.findByNativeIdAndProviderId(FIXTURE_LABEL_ID, providerId()).orElseThrow();
+        Label label = labelRepository
+                .findByNativeIdAndProviderId(FIXTURE_LABEL_ID, providerId())
+                .orElseThrow();
 
         // Core schema fields (mapped to DB columns)
         assertThat(label.getNativeId()).isEqualTo(FIXTURE_LABEL_ID);
@@ -199,7 +200,9 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
         handler.handleEvent(event);
 
         // Then - verify all mutable fields are updated from DTO
-        Label label = labelRepository.findByNativeIdAndProviderId(labelId, providerId()).orElseThrow();
+        Label label = labelRepository
+                .findByNativeIdAndProviderId(labelId, providerId())
+                .orElseThrow();
         assertThat(label.getName()).isEqualTo(eventLabel.name());
         assertThat(label.getColor()).isEqualTo(eventLabel.color());
         assertThat(label.getDescription()).isEqualTo(eventLabel.description());
@@ -225,11 +228,13 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
         labelRepository.save(existingLabel);
 
         // Verify it exists
-        assertThat(labelRepository.findByNativeIdAndProviderId(labelId, providerId())).isPresent();
+        assertThat(labelRepository.findByNativeIdAndProviderId(labelId, providerId()))
+                .isPresent();
 
         handler.handleEvent(event);
 
-        assertThat(labelRepository.findByNativeIdAndProviderId(labelId, providerId())).isEmpty();
+        assertThat(labelRepository.findByNativeIdAndProviderId(labelId, providerId()))
+                .isEmpty();
     }
 
     private GitHubLabelEventDTO loadPayload(String filename) throws IOException {
@@ -243,14 +248,13 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
      */
     private GitHubRepositoryRefDTO createTestRepoRef() {
         return new GitHubRepositoryRefDTO(
-            FIXTURE_REPO_ID,
-            "R_test",
-            FIXTURE_REPO_NAME,
-            FIXTURE_REPO_FULL_NAME,
-            false,
-            "https://github.com/" + FIXTURE_REPO_FULL_NAME,
-            null
-        );
+                FIXTURE_REPO_ID,
+                "R_test",
+                FIXTURE_REPO_NAME,
+                FIXTURE_REPO_FULL_NAME,
+                false,
+                "https://github.com/" + FIXTURE_REPO_FULL_NAME,
+                null);
     }
 
     // Edge Case Tests
@@ -273,15 +277,8 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
         @Test
         void shouldHandleMissingRepositoryContext() {
             // Given - event without repository
-            GitHubLabelDTO labelDto = new GitHubLabelDTO(
-                999999L,
-                "LA_test",
-                "test-label",
-                "Test description",
-                "ff0000",
-                null,
-                null
-            );
+            GitHubLabelDTO labelDto =
+                    new GitHubLabelDTO(999999L, "LA_test", "test-label", "Test description", "ff0000", null, null);
             GitHubLabelEventDTO event = new GitHubLabelEventDTO("created", labelDto, null, null);
 
             // When/Then - should not throw
@@ -293,25 +290,24 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
             // Given - create label DTO with null description
             Long labelId = 123456789L;
             GitHubLabelDTO labelDto = new GitHubLabelDTO(
-                labelId,
-                "LA_nodeId",
-                "no-description-label",
-                null, // null description
-                "abcdef",
-                null,
-                null
-            );
+                    labelId,
+                    "LA_nodeId",
+                    "no-description-label",
+                    null, // null description
+                    "abcdef",
+                    null,
+                    null);
             GitHubLabelEventDTO event = new GitHubLabelEventDTO("created", labelDto, createTestRepoRef(), null);
 
             handler.handleEvent(event);
 
             assertThat(labelRepository.findByNativeIdAndProviderId(labelId, providerId()))
-                .isPresent()
-                .get()
-                .satisfies(label -> {
-                    assertThat(label.getName()).isEqualTo("no-description-label");
-                    assertThat(label.getDescription()).isNull();
-                });
+                    .isPresent()
+                    .get()
+                    .satisfies(label -> {
+                        assertThat(label.getName()).isEqualTo("no-description-label");
+                        assertThat(label.getDescription()).isNull();
+                    });
         }
 
         @Test
@@ -329,23 +325,22 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
             // When - update with null description
             GitHubLabelDTO labelDto = new GitHubLabelDTO(
-                labelId,
-                "LA_nodeId",
-                "has-description",
-                null, // setting to null
-                "123456",
-                null,
-                null
-            );
+                    labelId,
+                    "LA_nodeId",
+                    "has-description",
+                    null, // setting to null
+                    "123456",
+                    null,
+                    null);
             GitHubLabelEventDTO event = new GitHubLabelEventDTO("edited", labelDto, createTestRepoRef(), null);
             handler.handleEvent(event);
 
             // Then - description should be null now
             assertThat(labelRepository.findByNativeIdAndProviderId(labelId, providerId()))
-                .isPresent()
-                .get()
-                .extracting(Label::getDescription)
-                .isNull();
+                    .isPresent()
+                    .get()
+                    .extracting(Label::getDescription)
+                    .isNull();
         }
 
         @Test
@@ -357,7 +352,8 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
             handler.handleEvent(event);
 
             // Then - only one label should exist
-            assertThat(labelRepository.findByNativeIdAndProviderId(FIXTURE_LABEL_ID, providerId())).isPresent();
+            assertThat(labelRepository.findByNativeIdAndProviderId(FIXTURE_LABEL_ID, providerId()))
+                    .isPresent();
             assertThat(labelRepository.count()).isEqualTo(1);
         }
 
@@ -365,7 +361,8 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
         void shouldHandleDeletionOfNonExistentLabel() throws Exception {
             // Given - label doesn't exist
             GitHubLabelEventDTO event = loadPayload("label.deleted");
-            assertThat(labelRepository.findByNativeIdAndProviderId(FIXTURE_LABEL_ID, providerId())).isEmpty();
+            assertThat(labelRepository.findByNativeIdAndProviderId(FIXTURE_LABEL_ID, providerId()))
+                    .isEmpty();
 
             // When/Then - should not throw
             assertThatCode(() -> handler.handleEvent(event)).doesNotThrowAnyException();
@@ -374,21 +371,13 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
         @Test
         void shouldHandleUnknownAction() {
             // Given - event with unknown action
-            GitHubLabelDTO labelDto = new GitHubLabelDTO(
-                111222333L,
-                "LA_unknown",
-                "unknown-action-label",
-                "desc",
-                "000000",
-                null,
-                null
-            );
+            GitHubLabelDTO labelDto =
+                    new GitHubLabelDTO(111222333L, "LA_unknown", "unknown-action-label", "desc", "000000", null, null);
             GitHubLabelEventDTO event = new GitHubLabelEventDTO(
-                "unknown_action", // not created/edited/deleted
-                labelDto,
-                createTestRepoRef(),
-                null
-            );
+                    "unknown_action", // not created/edited/deleted
+                    labelDto,
+                    createTestRepoRef(),
+                    null);
 
             // When/Then - should not throw
             assertThatCode(() -> handler.handleEvent(event)).doesNotThrowAnyException();
@@ -409,13 +398,13 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
             // Then — use TransactionTemplate for lazy-loaded repository access
             transactionTemplate.executeWithoutResult(status -> {
                 assertThat(labelRepository.findByNativeIdAndProviderId(FIXTURE_LABEL_ID, providerId()))
-                    .isPresent()
-                    .get()
-                    .satisfies(label -> {
-                        assertThat(label.getRepository()).isNotNull();
-                        assertThat(label.getRepository().getId()).isEqualTo(testRepository.getId());
-                        assertThat(label.getRepository().getNameWithOwner()).isEqualTo(FIXTURE_REPO_FULL_NAME);
-                    });
+                        .isPresent()
+                        .get()
+                        .satisfies(label -> {
+                            assertThat(label.getRepository()).isNotNull();
+                            assertThat(label.getRepository().getId()).isEqualTo(testRepository.getId());
+                            assertThat(label.getRepository().getNameWithOwner()).isEqualTo(FIXTURE_REPO_FULL_NAME);
+                        });
             });
         }
 
@@ -425,16 +414,14 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
             handler.handleEvent(event);
 
             assertNotNull(event.label());
-            var foundLabel = labelRepository.findByRepositoryIdAndName(testRepository.getId(), event.label().name());
+            var foundLabel = labelRepository.findByRepositoryIdAndName(
+                    testRepository.getId(), event.label().name());
 
-            assertThat(foundLabel)
-                .isPresent()
-                .get()
-                .satisfies(label -> {
-                    assertThat(label.getNativeId()).isEqualTo(FIXTURE_LABEL_ID);
-                    assertNotNull(event.label());
-                    assertThat(label.getName()).isEqualTo(event.label().name());
-                });
+            assertThat(foundLabel).isPresent().get().satisfies(label -> {
+                assertThat(label.getNativeId()).isEqualTo(FIXTURE_LABEL_ID);
+                assertNotNull(event.label());
+                assertThat(label.getName()).isEqualTo(event.label().name());
+            });
         }
     }
 
@@ -455,7 +442,9 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
             GitHubLabelEventDTO createEvent = loadPayload("label.created");
             handler.handleEvent(createEvent);
 
-            Label label = labelRepository.findByNativeIdAndProviderId(FIXTURE_LABEL_ID, providerId()).orElseThrow();
+            Label label = labelRepository
+                    .findByNativeIdAndProviderId(FIXTURE_LABEL_ID, providerId())
+                    .orElseThrow();
 
             Issue issue = new Issue();
             issue.setNativeId(12345L);
@@ -473,14 +462,13 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
             // When - edit the label
             assertNotNull(createEvent.label());
             GitHubLabelDTO editedDto = new GitHubLabelDTO(
-                FIXTURE_LABEL_ID,
-                createEvent.label().nodeId(),
-                "renamed-documentation",
-                "Updated description",
-                "ff0000",
-                null,
-                null
-            );
+                    FIXTURE_LABEL_ID,
+                    createEvent.label().nodeId(),
+                    "renamed-documentation",
+                    "Updated description",
+                    "ff0000",
+                    null,
+                    null);
             GitHubLabelEventDTO editEvent = new GitHubLabelEventDTO("edited", editedDto, createTestRepoRef(), null);
             handler.handleEvent(editEvent);
 
@@ -488,13 +476,10 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
             // Use TransactionTemplate for lazy loading assertions
             transactionTemplate.executeWithoutResult(status -> {
                 Issue updatedIssue = issueRepository.findById(savedIssueId).orElseThrow();
-                assertThat(updatedIssue.getLabels())
-                    .hasSize(1)
-                    .first()
-                    .satisfies(l -> {
-                        assertThat(l.getName()).isEqualTo("renamed-documentation");
-                        assertThat(l.getColor()).isEqualTo("ff0000");
-                    });
+                assertThat(updatedIssue.getLabels()).hasSize(1).first().satisfies(l -> {
+                    assertThat(l.getName()).isEqualTo("renamed-documentation");
+                    assertThat(l.getColor()).isEqualTo("ff0000");
+                });
             });
         }
     }

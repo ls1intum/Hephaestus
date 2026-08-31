@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -28,9 +27,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV
 import de.tum.cit.aet.hephaestus.integration.scm.github.issue.dto.EmbeddedProjectItemsDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.issue.dto.EmbeddedProjectItemsDTO.EmbeddedProjectItem;
 import de.tum.cit.aet.hephaestus.integration.scm.github.issue.dto.EmbeddedProjectItemsDTO.EmbeddedProjectReference;
-import de.tum.cit.aet.hephaestus.integration.scm.github.project.Project;
-import de.tum.cit.aet.hephaestus.integration.scm.github.project.ProjectItem;
-import de.tum.cit.aet.hephaestus.integration.scm.github.project.ProjectRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.project.dto.GitHubProjectFieldValueDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.project.dto.GitHubProjectItemDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -95,28 +91,26 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
     void setUp() {
         // Default exception classifier stub to prevent NPEs on unexpected exceptions
         lenient()
-            .when(exceptionClassifier.classifyWithDetails(any()))
-            .thenReturn(ClassificationResult.of(Category.UNKNOWN, "test error"));
+                .when(exceptionClassifier.classifyWithDetails(any()))
+                .thenReturn(ClassificationResult.of(Category.UNKNOWN, "test error"));
 
         service = new GitHubProjectItemSyncService(
-            projectRepository,
-            projectItemProcessor,
-            fieldValueSyncService,
-            graphQlClientProvider,
-            syncProperties,
-            new SyncSchedulerProperties(
-                true,
-                7,
-                "0 0 3 * * *",
-                15,
-                null,
-                null,
-                null,
-                new SyncSchedulerProperties.ProjectsProperties(true)
-            ),
-            exceptionClassifier,
-            transactionTemplate
-        );
+                projectRepository,
+                projectItemProcessor,
+                fieldValueSyncService,
+                graphQlClientProvider,
+                syncProperties,
+                new SyncSchedulerProperties(
+                        true,
+                        7,
+                        "0 0 3 * * *",
+                        15,
+                        null,
+                        null,
+                        null,
+                        new SyncSchedulerProperties.ProjectsProperties(true)),
+                exceptionClassifier,
+                transactionTemplate);
     }
 
     // Helper methods
@@ -139,24 +133,23 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
 
     private GitHubProjectItemDTO createItemDTO(String nodeId, List<GitHubProjectFieldValueDTO> fieldValues) {
         return new GitHubProjectItemDTO(
-            null,
-            100L,
-            nodeId,
-            PROJECT_NODE_ID,
-            "ISSUE",
-            null,
-            42,
-            null,
-            null,
-            false,
-            null,
-            fieldValues,
-            false,
-            fieldValues != null ? fieldValues.size() : 0,
-            null,
-            Instant.now(),
-            Instant.now()
-        );
+                null,
+                100L,
+                nodeId,
+                PROJECT_NODE_ID,
+                "ISSUE",
+                null,
+                42,
+                null,
+                null,
+                false,
+                null,
+                fieldValues,
+                false,
+                fieldValues != null ? fieldValues.size() : 0,
+                null,
+                Instant.now(),
+                Instant.now());
     }
 
     private GitHubProjectFieldValueDTO createFieldValueDTO(String fieldId, String type, @Nullable String value) {
@@ -165,15 +158,14 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
 
     private EmbeddedProjectReference createProjectRef() {
         return new EmbeddedProjectReference(
-            PROJECT_NODE_ID,
-            PROJECT_DB_ID,
-            1,
-            "Test Project",
-            "https://github.com/orgs/test/projects/1",
-            "test-org",
-            42L,
-            "ORGANIZATION"
-        );
+                PROJECT_NODE_ID,
+                PROJECT_DB_ID,
+                1,
+                "Test Project",
+                "https://github.com/orgs/test/projects/1",
+                "test-org",
+                42L,
+                "ORGANIZATION");
     }
 
     /**
@@ -197,10 +189,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
         @Test
         void shouldReturnZeroWhenEmbeddedItemsIsNull() {
             int result = service.processEmbeddedItems(
-                null,
-                ProcessingContext.forSync(SCOPE_ID, (Repository) null),
-                PARENT_ISSUE_ID
-            );
+                    null, ProcessingContext.forSync(SCOPE_ID, (Repository) null), PARENT_ISSUE_ID);
 
             assertThat(result).isZero();
             verify(projectItemProcessor, never()).process(any(), any(), any());
@@ -211,10 +200,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
             EmbeddedProjectItemsDTO emptyItems = EmbeddedProjectItemsDTO.empty();
 
             int result = service.processEmbeddedItems(
-                emptyItems,
-                ProcessingContext.forSync(SCOPE_ID, (Repository) null),
-                PARENT_ISSUE_ID
-            );
+                    emptyItems, ProcessingContext.forSync(SCOPE_ID, (Repository) null), PARENT_ISSUE_ID);
 
             assertThat(result).isZero();
             verify(projectItemProcessor, never()).process(any(), any(), any());
@@ -233,15 +219,11 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
             EmbeddedProjectItemsDTO embeddedItems = new EmbeddedProjectItemsDTO(List.of(embeddedItem), 1, false, null);
 
             ProjectItem processedItem = createProjectItem(77L);
-            when(projectItemProcessor.process(any(GitHubProjectItemDTO.class), eq(project), any())).thenReturn(
-                processedItem
-            );
+            when(projectItemProcessor.process(any(GitHubProjectItemDTO.class), eq(project), any()))
+                    .thenReturn(processedItem);
 
             int result = service.processEmbeddedItems(
-                embeddedItems,
-                ProcessingContext.forSync(SCOPE_ID, (Repository) null),
-                PARENT_ISSUE_ID
-            );
+                    embeddedItems, ProcessingContext.forSync(SCOPE_ID, (Repository) null), PARENT_ISSUE_ID);
 
             assertThat(result).isEqualTo(1);
             verify(fieldValueSyncService).processFieldValues(eq(77L), any(), eq(false), eq(null));
@@ -255,38 +237,33 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
             // Create a truncated item — more field values exist than were fetched inline
             GitHubProjectFieldValueDTO fv1 = createFieldValueDTO("field-1", "TEXT", "value1");
             GitHubProjectItemDTO itemDto = new GitHubProjectItemDTO(
-                null,
-                100L,
-                "PVTI_trunc",
-                PROJECT_NODE_ID,
-                "ISSUE",
-                null,
-                42,
-                null,
-                null,
-                false,
-                null,
-                List.of(fv1),
-                true, // truncated
-                15, // totalCount > fetched
-                "cursor-abc", // endCursor for pagination
-                Instant.now(),
-                Instant.now()
-            );
+                    null,
+                    100L,
+                    "PVTI_trunc",
+                    PROJECT_NODE_ID,
+                    "ISSUE",
+                    null,
+                    42,
+                    null,
+                    null,
+                    false,
+                    null,
+                    List.of(fv1),
+                    true, // truncated
+                    15, // totalCount > fetched
+                    "cursor-abc", // endCursor for pagination
+                    Instant.now(),
+                    Instant.now());
 
             EmbeddedProjectItem embeddedItem = new EmbeddedProjectItem(itemDto, createProjectRef());
             EmbeddedProjectItemsDTO embeddedItems = new EmbeddedProjectItemsDTO(List.of(embeddedItem), 1, false, null);
 
             ProjectItem processedItem = createProjectItem(88L);
-            when(projectItemProcessor.process(any(GitHubProjectItemDTO.class), eq(project), any())).thenReturn(
-                processedItem
-            );
+            when(projectItemProcessor.process(any(GitHubProjectItemDTO.class), eq(project), any()))
+                    .thenReturn(processedItem);
 
             service.processEmbeddedItems(
-                embeddedItems,
-                ProcessingContext.forSync(SCOPE_ID, (Repository) null),
-                PARENT_ISSUE_ID
-            );
+                    embeddedItems, ProcessingContext.forSync(SCOPE_ID, (Repository) null), PARENT_ISSUE_ID);
 
             // Assert — truncation flag and cursor are forwarded
             verify(fieldValueSyncService).processFieldValues(eq(88L), any(), eq(true), eq("cursor-abc"));
@@ -302,10 +279,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
             EmbeddedProjectItemsDTO embeddedItems = new EmbeddedProjectItemsDTO(List.of(embeddedItem), 1, false, null);
 
             int result = service.processEmbeddedItems(
-                embeddedItems,
-                ProcessingContext.forSync(SCOPE_ID, (Repository) null),
-                PARENT_ISSUE_ID
-            );
+                    embeddedItems, ProcessingContext.forSync(SCOPE_ID, (Repository) null), PARENT_ISSUE_ID);
 
             assertThat(result).isZero();
             verify(projectItemProcessor, never()).process(any(), any(), any());
@@ -322,23 +296,16 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
 
             EmbeddedProjectItem embedded1 = new EmbeddedProjectItem(item1, createProjectRef());
             EmbeddedProjectItem embedded2 = new EmbeddedProjectItem(item2, createProjectRef());
-            EmbeddedProjectItemsDTO embeddedItems = new EmbeddedProjectItemsDTO(
-                List.of(embedded1, embedded2),
-                2,
-                false,
-                null
-            );
+            EmbeddedProjectItemsDTO embeddedItems =
+                    new EmbeddedProjectItemsDTO(List.of(embedded1, embedded2), 2, false, null);
 
             // First item throws, second succeeds
             when(projectItemProcessor.process(any(GitHubProjectItemDTO.class), eq(project), any()))
-                .thenThrow(new RuntimeException("DB error"))
-                .thenReturn(createProjectItem(99L));
+                    .thenThrow(new RuntimeException("DB error"))
+                    .thenReturn(createProjectItem(99L));
 
             int result = service.processEmbeddedItems(
-                embeddedItems,
-                ProcessingContext.forSync(SCOPE_ID, (Repository) null),
-                PARENT_ISSUE_ID
-            );
+                    embeddedItems, ProcessingContext.forSync(SCOPE_ID, (Repository) null), PARENT_ISSUE_ID);
 
             // Assert — one succeeded despite the first failing
             assertThat(result).isEqualTo(1);
@@ -354,13 +321,11 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
             EmbeddedProjectItem embeddedItem = new EmbeddedProjectItem(itemDto, createProjectRef());
             EmbeddedProjectItemsDTO embeddedItems = new EmbeddedProjectItemsDTO(List.of(embeddedItem), 1, false, null);
 
-            when(projectItemProcessor.process(any(GitHubProjectItemDTO.class), eq(project), any())).thenReturn(null);
+            when(projectItemProcessor.process(any(GitHubProjectItemDTO.class), eq(project), any()))
+                    .thenReturn(null);
 
             int result = service.processEmbeddedItems(
-                embeddedItems,
-                ProcessingContext.forSync(SCOPE_ID, (Repository) null),
-                PARENT_ISSUE_ID
-            );
+                    embeddedItems, ProcessingContext.forSync(SCOPE_ID, (Repository) null), PARENT_ISSUE_ID);
 
             assertThat(result).isZero();
             verify(fieldValueSyncService, never()).processFieldValues(any(), any(), any(boolean.class), any());
@@ -377,15 +342,11 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
             EmbeddedProjectItemsDTO embeddedItems = new EmbeddedProjectItemsDTO(List.of(embeddedItem), 1, false, null);
 
             ProjectItem processedItem = createProjectItem(55L);
-            when(projectItemProcessor.process(any(GitHubProjectItemDTO.class), eq(project), any())).thenReturn(
-                processedItem
-            );
+            when(projectItemProcessor.process(any(GitHubProjectItemDTO.class), eq(project), any()))
+                    .thenReturn(processedItem);
 
             service.processEmbeddedItems(
-                embeddedItems,
-                ProcessingContext.forSync(SCOPE_ID, (Repository) null),
-                PARENT_ISSUE_ID
-            );
+                    embeddedItems, ProcessingContext.forSync(SCOPE_ID, (Repository) null), PARENT_ISSUE_ID);
 
             // Assert — verify that the DTO passed to processor has the parentIssueId injected
             ArgumentCaptor<GitHubProjectItemDTO> dtoCaptor = ArgumentCaptor.forClass(GitHubProjectItemDTO.class);
@@ -404,29 +365,21 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
 
             EmbeddedProjectItem embedded1 = new EmbeddedProjectItem(item1, createProjectRef());
             EmbeddedProjectItem embedded2 = new EmbeddedProjectItem(item2, createProjectRef());
-            EmbeddedProjectItemsDTO embeddedItems = new EmbeddedProjectItemsDTO(
-                List.of(embedded1, embedded2),
-                2,
-                false,
-                null
-            );
+            EmbeddedProjectItemsDTO embeddedItems =
+                    new EmbeddedProjectItemsDTO(List.of(embedded1, embedded2), 2, false, null);
 
             ProjectItem item1Result = createProjectItem(60L);
             ProjectItem item2Result = createProjectItem(61L);
             when(projectItemProcessor.process(any(GitHubProjectItemDTO.class), eq(project), any()))
-                .thenReturn(item1Result)
-                .thenReturn(item2Result);
+                    .thenReturn(item1Result)
+                    .thenReturn(item2Result);
 
             // fieldValueSyncService throws on the first item
-            when(fieldValueSyncService.processFieldValues(eq(60L), any(), any(boolean.class), any())).thenThrow(
-                new RuntimeException("Field value error")
-            );
+            when(fieldValueSyncService.processFieldValues(eq(60L), any(), any(boolean.class), any()))
+                    .thenThrow(new RuntimeException("Field value error"));
 
             int result = service.processEmbeddedItems(
-                embeddedItems,
-                ProcessingContext.forSync(SCOPE_ID, (Repository) null),
-                PARENT_ISSUE_ID
-            );
+                    embeddedItems, ProcessingContext.forSync(SCOPE_ID, (Repository) null), PARENT_ISSUE_ID);
 
             // Assert — first item fails (caught by exception handler), second succeeds
             assertThat(result).isEqualTo(1);
@@ -439,10 +392,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
             EmbeddedProjectItemsDTO embeddedItems = new EmbeddedProjectItemsDTO(List.of(embeddedItem), 1, false, null);
 
             int result = service.processEmbeddedItems(
-                embeddedItems,
-                ProcessingContext.forSync(SCOPE_ID, (Repository) null),
-                PARENT_ISSUE_ID
-            );
+                    embeddedItems, ProcessingContext.forSync(SCOPE_ID, (Repository) null), PARENT_ISSUE_ID);
 
             assertThat(result).isZero();
             verify(projectRepository, never()).findByNodeId(any());
@@ -455,10 +405,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
             EmbeddedProjectItemsDTO embeddedItems = new EmbeddedProjectItemsDTO(List.of(embeddedItem), 1, false, null);
 
             int result = service.processEmbeddedItems(
-                embeddedItems,
-                ProcessingContext.forSync(SCOPE_ID, (Repository) null),
-                PARENT_ISSUE_ID
-            );
+                    embeddedItems, ProcessingContext.forSync(SCOPE_ID, (Repository) null), PARENT_ISSUE_ID);
 
             assertThat(result).isZero();
             verify(projectItemProcessor, never()).process(any(), any(), any());
@@ -478,54 +425,38 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
 
             GitHubProjectItemDTO item1 = createItemDTO("PVTI_p1", List.of());
             GitHubProjectItemDTO item2 = new GitHubProjectItemDTO(
-                null,
-                200L,
-                "PVTI_p2",
-                "PVT_node2",
-                "PULL_REQUEST",
-                null,
-                99,
-                null,
-                null,
-                false,
-                null,
-                List.of(),
-                false,
-                0,
-                null,
-                Instant.now(),
-                Instant.now()
-            );
+                    null,
+                    200L,
+                    "PVTI_p2",
+                    "PVT_node2",
+                    "PULL_REQUEST",
+                    null,
+                    99,
+                    null,
+                    null,
+                    false,
+                    null,
+                    List.of(),
+                    false,
+                    0,
+                    null,
+                    Instant.now(),
+                    Instant.now());
 
             EmbeddedProjectReference projectRef2 = new EmbeddedProjectReference(
-                "PVT_node2",
-                20L,
-                2,
-                "Test Project 2",
-                null,
-                "test-org",
-                42L,
-                "ORGANIZATION"
-            );
+                    "PVT_node2", 20L, 2, "Test Project 2", null, "test-org", 42L, "ORGANIZATION");
 
             EmbeddedProjectItem embedded1 = new EmbeddedProjectItem(item1, createProjectRef());
             EmbeddedProjectItem embedded2 = new EmbeddedProjectItem(item2, projectRef2);
-            EmbeddedProjectItemsDTO embeddedItems = new EmbeddedProjectItemsDTO(
-                List.of(embedded1, embedded2),
-                2,
-                false,
-                null
-            );
+            EmbeddedProjectItemsDTO embeddedItems =
+                    new EmbeddedProjectItemsDTO(List.of(embedded1, embedded2), 2, false, null);
 
             when(projectItemProcessor.process(any(GitHubProjectItemDTO.class), any(Project.class), any()))
-                .thenReturn(createProjectItem(71L))
-                .thenReturn(createProjectItem(72L));
+                    .thenReturn(createProjectItem(71L))
+                    .thenReturn(createProjectItem(72L));
 
             int result = service.processEmbeddedItems(
-                embeddedItems,
-                ProcessingContext.forSync(SCOPE_ID, (Repository) null),
-                PARENT_ISSUE_ID
-            );
+                    embeddedItems, ProcessingContext.forSync(SCOPE_ID, (Repository) null), PARENT_ISSUE_ID);
 
             assertThat(result).isEqualTo(2);
             verify(projectItemProcessor).process(any(GitHubProjectItemDTO.class), eq(project1), any());
@@ -548,13 +479,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
         @Test
         void shouldReturnZeroWhenIssueNodeIdIsNull() {
             int result = service.syncRemainingProjectItems(
-                SCOPE_ID,
-                null,
-                false,
-                new Repository(),
-                "cursor",
-                PARENT_ISSUE_ID
-            );
+                    SCOPE_ID, null, false, new Repository(), "cursor", PARENT_ISSUE_ID);
 
             assertThat(result).isZero();
             verify(graphQlClientProvider, never()).forScope(any());
@@ -563,13 +488,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
         @Test
         void shouldReturnZeroWhenIssueNodeIdIsBlank() {
             int result = service.syncRemainingProjectItems(
-                SCOPE_ID,
-                "  ",
-                false,
-                new Repository(),
-                "cursor",
-                PARENT_ISSUE_ID
-            );
+                    SCOPE_ID, "  ", false, new Repository(), "cursor", PARENT_ISSUE_ID);
 
             assertThat(result).isZero();
             verify(graphQlClientProvider, never()).forScope(any());
@@ -613,18 +532,11 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
             // project lookup should find the project
             Project project = createProject();
             when(projectRepository.findByNodeId(any())).thenReturn(Optional.of(project));
-            when(projectItemProcessor.process(any(GitHubProjectItemDTO.class), any(Project.class), any())).thenReturn(
-                createProjectItem(150L)
-            );
+            when(projectItemProcessor.process(any(GitHubProjectItemDTO.class), any(Project.class), any()))
+                    .thenReturn(createProjectItem(150L));
 
             int result = service.syncRemainingProjectItems(
-                SCOPE_ID,
-                "I_nodeId123",
-                false,
-                repository,
-                "startCursor",
-                PARENT_ISSUE_ID
-            );
+                    SCOPE_ID, "I_nodeId123", false, repository, "startCursor", PARENT_ISSUE_ID);
 
             assertThat(result).isEqualTo(1);
             // Verify issue-specific query was used
@@ -653,13 +565,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
             when(requestSpec.execute()).thenReturn(Mono.just(response));
 
             int result = service.syncRemainingProjectItems(
-                SCOPE_ID,
-                "PR_nodeId456",
-                true,
-                repository,
-                "startCursor",
-                PARENT_ISSUE_ID
-            );
+                    SCOPE_ID, "PR_nodeId456", true, repository, "startCursor", PARENT_ISSUE_ID);
 
             assertThat(result).isZero();
             verify(graphQlClient).documentName("GetPullRequestProjectItems");
@@ -683,13 +589,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
             when(graphQlClientProvider.waitIfRateLimitLow(SCOPE_ID)).thenThrow(new InterruptedException("rate limit"));
 
             int result = service.syncRemainingProjectItems(
-                SCOPE_ID,
-                "I_nodeId",
-                false,
-                repository,
-                "cursor",
-                PARENT_ISSUE_ID
-            );
+                    SCOPE_ID, "I_nodeId", false, repository, "cursor", PARENT_ISSUE_ID);
 
             assertThat(result).isZero();
             verify(graphQlClientProvider).trackRateLimit(eq(SCOPE_ID), eq(response));
@@ -712,13 +612,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
             when(requestSpec.execute()).thenReturn(Mono.just(response));
 
             int result = service.syncRemainingProjectItems(
-                SCOPE_ID,
-                "I_nodeId",
-                false,
-                repository,
-                "cursor",
-                PARENT_ISSUE_ID
-            );
+                    SCOPE_ID, "I_nodeId", false, repository, "cursor", PARENT_ISSUE_ID);
 
             assertThat(result).isZero();
             verify(transactionTemplate, never()).execute(any());
@@ -737,13 +631,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
             when(requestSpec.execute()).thenReturn(Mono.just(response));
 
             int result = service.syncRemainingProjectItems(
-                SCOPE_ID,
-                "I_nodeId",
-                false,
-                repository,
-                "cursor",
-                PARENT_ISSUE_ID
-            );
+                    SCOPE_ID, "I_nodeId", false, repository, "cursor", PARENT_ISSUE_ID);
 
             assertThat(result).isZero();
         }
@@ -758,18 +646,11 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
 
             when(requestSpec.execute()).thenReturn(Mono.error(new RuntimeException("Network error")));
 
-            when(exceptionClassifier.classifyWithDetails(any())).thenReturn(
-                ClassificationResult.of(GitHubExceptionClassifier.Category.RETRYABLE, "Network error")
-            );
+            when(exceptionClassifier.classifyWithDetails(any()))
+                    .thenReturn(ClassificationResult.of(GitHubExceptionClassifier.Category.RETRYABLE, "Network error"));
 
             int result = service.syncRemainingProjectItems(
-                SCOPE_ID,
-                "I_nodeId",
-                false,
-                repository,
-                "cursor",
-                PARENT_ISSUE_ID
-            );
+                    SCOPE_ID, "I_nodeId", false, repository, "cursor", PARENT_ISSUE_ID);
 
             assertThat(result).isZero();
         }
@@ -829,17 +710,11 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
             Project project = createProject();
             when(projectRepository.findByNodeId(any())).thenReturn(Optional.of(project));
             when(projectItemProcessor.process(any(GitHubProjectItemDTO.class), any(Project.class), any()))
-                .thenReturn(createProjectItem(160L))
-                .thenReturn(createProjectItem(161L));
+                    .thenReturn(createProjectItem(160L))
+                    .thenReturn(createProjectItem(161L));
 
             int result = service.syncRemainingProjectItems(
-                SCOPE_ID,
-                "I_nodeId",
-                false,
-                repository,
-                "startCursor",
-                PARENT_ISSUE_ID
-            );
+                    SCOPE_ID, "I_nodeId", false, repository, "startCursor", PARENT_ISSUE_ID);
 
             assertThat(result).isEqualTo(2);
             verify(graphQlClientProvider, times(2)).trackRateLimit(eq(SCOPE_ID), any());

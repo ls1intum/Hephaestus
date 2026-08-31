@@ -6,10 +6,13 @@ on:
     branches: ["main"]
   pull_request:
     branches: ["**"]
+  merge_group:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions: {}
 
 jobs:
   detect-changes:
@@ -22,16 +25,16 @@ jobs:
       webapp: ${{ steps.filter.outputs.webapp }}
       webapp-image: ${{ steps.filter.outputs.webapp-image == 'true' || steps.webapp_image_source.outputs.webapp-image-source == 'true' }}
       application-server: ${{ steps.filter.outputs.application-server }}
+      tooling: ${{ steps.filter.outputs.tooling }}
       application-server-image: ${{ steps.filter.outputs.application-server-image }}
       e2e: ${{ steps.filter.outputs.e2e }}
       agent-images: ${{ steps.filter.outputs.agent-images }}
-      release-pin-fetcher: ${{ steps.filter.outputs.release-pin-fetcher }}
       postgres-image: ${{ steps.filter.outputs.postgres-image }}
       docs: ${{ steps.filter.outputs.docs }}
       ci-config: ${{ steps.filter.outputs.ci-config }}
       docker-config: ${{ steps.filter.outputs.docker-config }}
       pmd-canary: ${{ steps.filter.outputs.pmd-canary }}
-      any-code: ${{ steps.filter.outputs.webapp == 'true' || steps.filter.outputs.application-server == 'true' || steps.filter.outputs.agent-images == 'true' }}
+      any-code: ${{ steps.filter.outputs.webapp == 'true' || steps.filter.outputs.application-server == 'true' || steps.filter.outputs.tooling == 'true' || steps.filter.outputs.agent-images == 'true' || steps.filter.outputs.postgres-image == 'true' }}
       should_skip: ${{ steps.skip_check.outputs.should_skip }}
     timeout-minutes: 5
     steps:
@@ -52,20 +55,22 @@ jobs:
             webapp:
               - 'webapp/**'
               - 'docs/images/readme/**'
-              # webapp/.oxlintrc.json carries no `options` block and webapp/biome.jsonc declares
-              # `root: false`, so `typeAware`, `reportUnusedDisableDirectives` and the Biome graph
-              # root all come from these two files — they decide the webapp's verdict from outside
-              # webapp/.
+              # check:docs-tokens compares this stylesheet with webapp/src/styles.css, so both
+              # halves of that pair have to reach the leg that runs it.
+              - 'docs/src/css/custom.css'
               - '.oxlintrc.json'
-              - 'biome.jsonc'
-              # check:components, check:stories and check:story-sort live here, run on the Webapp leg.
-              - 'scripts/**'
+              - '.oxfmtrc.json'
+              - 'scripts/check-docs-tokens.ts'
+              - 'scripts/check-docs-tokens.test.ts'
+              - 'scripts/check-presentational-components.ts'
+              - 'scripts/check-story-prose.ts'
+              - 'scripts/check-story-sort.ts'
               - 'package.json'
               - 'pnpm-lock.yaml'
               - 'pnpm-workspace.yaml'
-              - '.npmrc'
-              - '.node-version'
             webapp-image:
+              - '.oxfmtrc.json'
+              - 'patches/**'
               - 'webapp/public/**'
               - 'webapp/docker/**'
               - 'webapp/Dockerfile'
@@ -78,47 +83,43 @@ jobs:
               - 'package.json'
               - 'pnpm-lock.yaml'
               - 'pnpm-workspace.yaml'
-              - '.npmrc'
             application-server:
               - 'server/**'
-              # check:env, check:contracts, check:diagrams and db-utils.sh all live here and run on
-              # the App Server or Database leg.
-              - 'scripts/**'
-              # test:agents and typecheck:agents cover the precompute tree and are configured here;
-              # the Bun they run on is read from the agent image.
-              - 'docker/agents/**'
-              - 'tsconfig.agents.json'
-              # The lint/format gate for every non-webapp TypeScript tree is assembled from all five:
-              # oxlint's rules, Biome's rules, the `:agents` scripts that invoke them, the pinned
-              # binaries, and the root tsconfig — which exists only to give the Bun trees, configured
-              # by tsconfig.agents.json, the project that oxlint's type-aware rules require.
-              - '.oxlintrc.json'
-              - 'biome.jsonc'
-              - 'tsconfig.json'
               - 'package.json'
               - 'pnpm-lock.yaml'
-              # Linted by the same leg (docs/.oxlintrc.json decides that verdict), markdown-linted by
-              # docs:lint, and parsed by check:diagrams. The `docs` filter below feeds no job, so this
-              # entry is the only thing that puts a docs-only PR into `any-code`.
-              - 'docs/**'
-              - '.changeset/*.cjs'
-              - 'commitlint.config.ts'
-              - '.github/scripts/**'
-              # check:biome-pin compares this file's $schema against the pinned version.
-              - 'webapp/biome.jsonc'
-              # check:env compares application.yml against the deployment that has to deliver it.
+              - 'scripts/run-mvnw.ts'
+              # check:env validates these deployment inputs against application.yml.
               - 'docker/compose.app.yaml'
               - 'docker/compose.core.yaml'
-              # check:instructions runs on this leg and reads every one of these. The two markdown
-              # globs are named even though webapp/** and server/** already carry them, because
-              # webapp/** is behind the *webapp* filter — a PR touching only webapp/CLAUDE.md would
-              # otherwise run the leg that does not hold this gate.
+              - '!server/**/AGENTS.md'
+              - '!server/**/CLAUDE.md'
+            tooling:
+              - 'scripts/**'
+              - 'docker/agents/**'
+              # format:load:check and test:load:syntax run on this leg.
+              - 'load-tests/**'
+              - 'docs/**'
+              - 'tsconfig.agents.json'
+              - 'tsconfig.json'
+              - '.oxlintrc.json'
+              - '.oxfmtrc.json'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - '.changeset/**'
+              - 'commitlint.config.ts'
+              - '.github/scripts/**'
               - '**/AGENTS.md'
               - '**/CLAUDE.md'
               - '.claude/**'
               - '.opencode/**'
               - '.agents/**'
               - 'opencode.json'
+              - 'renovate.json'
+              - 'openapitools.json'
+              - 'jean.json'
+              - 'project.code-workspace'
+              - '.vscode/settings.json'
             application-server-image:
               - 'server/application/src/main/**'
               - 'server/application/pom.xml'
@@ -142,16 +143,12 @@ jobs:
               - 'package.json'
               - 'pnpm-lock.yaml'
               - 'pnpm-workspace.yaml'
-              - '.npmrc'
-              - '.node-version'
               - '.github/workflows/cicd.yml'
               - '.github/workflows/ci-tests.yml'
               - '.github/actions/setup-caches/**'
-              - '.github/actions/setup-pnpm-node/**'
+              - '.github/actions/setup-node-pnpm/**'
             agent-images:
               - 'docker/agents/**'
-            release-pin-fetcher:
-              - 'docker/release-pin-fetcher/**'
             postgres-image:
               - 'docker/postgres/**'
             docs:
@@ -159,6 +156,7 @@ jobs:
             ci-config:
               - '.github/workflows/**'
               - '.github/actions/**'
+              - '.github/actionlint.yaml'
             docker-config:
               - '.github/workflows/ci-docker-build.yml'
               - '.github/workflows/reusable-docker-build.yml'
@@ -179,92 +177,54 @@ jobs:
               - '!webapp/src/**/*.stories.*'
               - '!webapp/src/test/**'
 
-  # Coolify creates previews for trusted same-repository pull requests. This job waits for the
-  # immutable application-server image, then updates the preview to the exact head commit. Coolify's
-  # deploy API only accepts a pull request that already has a preview, so a missing preview remains a
-  # safe no-op. Instance identifiers come from repository variables; forks never receive credentials.
-  preview:
-    name: "Preview / Coolify"
+  workflow-lint:
+    name: "Actionlint"
+    timeout-minutes: 10
     runs-on: ubuntu-latest
-    # Wait for Docker so SOURCE_COMMIT always names an image that already exists in GHCR. `always`
-    # preserves the link/no-op behavior when the Docker workflow is legitimately skipped.
-    needs: [detect-changes, Docker]
-    if: >-
-      always() &&
-      github.event_name == 'pull_request' &&
-      vars.COOLIFY_URL != '' &&
-      vars.COOLIFY_APP_UUID != '' &&
-      (needs.Docker.result == 'success' || needs.Docker.result == 'skipped')
+    needs: [detect-changes]
+    if: |
+      needs.detect-changes.outputs.should_skip != 'true' && (
+        needs.detect-changes.outputs.ci-config == 'true' ||
+        github.event_name != 'pull_request'
+      )
     permissions:
-      statuses: write
-    timeout-minutes: 2
-    env:
-      COOLIFY_URL: ${{ vars.COOLIFY_URL }}
-      COOLIFY_APP_UUID: ${{ vars.COOLIFY_APP_UUID }}
-      COOLIFY_PROJECT_UUID: ${{ vars.COOLIFY_PROJECT_UUID }}
-      COOLIFY_ENVIRONMENT_UUID: ${{ vars.COOLIFY_ENVIRONMENT_UUID }}
+      checks: write
+      contents: read
     steps:
-      - name: Link the preview deployments page on the PR
-        if: vars.COOLIFY_PROJECT_UUID != '' && vars.COOLIFY_ENVIRONMENT_UUID != ''
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          script: |
-            const { COOLIFY_URL, COOLIFY_PROJECT_UUID, COOLIFY_ENVIRONMENT_UUID, COOLIFY_APP_UUID } = process.env;
-            await github.rest.repos.createCommitStatus({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              sha: context.payload.pull_request.head.sha,
-              state: 'success',
-              target_url: `${COOLIFY_URL}/project/${COOLIFY_PROJECT_UUID}/environment/${COOLIFY_ENVIRONMENT_UUID}/application/${COOLIFY_APP_UUID}/preview-deployments`,
-              description: 'Click Details to view Coolify preview deployments',
-              context: 'Preview / Coolify',
-            });
+          persist-credentials: false
 
-      # Forks are skipped deliberately: a preview runs with the instance's real credentials.
-      - name: Update this PR's preview deployment, if it has one
-        if: >-
-          (github.event.action == 'opened' ||
-           github.event.action == 'reopened' ||
-           github.event.action == 'synchronize') &&
-          github.event.pull_request.head.repo.full_name == github.repository
+      - uses: reviewdog/action-actionlint@dbe5299849118fd6f099ba563d263d770955a64a # v1.73.2
         env:
-          COOLIFY_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          APP_SERVER_PUBLISHED: ${{ needs.Docker.outputs.application-server-published }}
-        run: |
-          set -euo pipefail
+          SHELLCHECK_OPTS: --severity=warning
+        with:
+          fail_level: error
+          filter_mode: nofilter
+          reporter: github-check
 
-          if [ -z "${COOLIFY_TOKEN}" ]; then
-            echo "::notice::COOLIFY_API_TOKEN is not configured; skipping preview update."
-            exit 0
-          fi
+  zizmor:
+    name: "Zizmor"
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: zizmor
+        uses: zizmorcore/zizmor-action@3dc1ecc9bcb9e94e9b2c709687979e1298497054 # v0.6.2
+        with:
+          min-confidence: medium
+          # renovate: datasource=github-releases depName=zizmorcore/zizmor
+          version: 1.29.0
 
-          # Coolify pins the preview to SOURCE_COMMIT, so without that tag the deployment can only
-          # fail on `manifest unknown` — under a green check, since queueing one always succeeds.
-          if [ "${APP_SERVER_PUBLISHED}" != 'true' ]; then
-            echo "::notice::No application-server image for this commit; skipping preview update."
-            exit 0
-          fi
-
-          body=$(mktemp)
-          status=$(curl -sS -o "${body}" -w '%{http_code}' -X POST \
-            -H "Authorization: Bearer ${COOLIFY_TOKEN}" \
-            -H 'Accept: application/json' \
-            --retry 3 --retry-connrefused --max-time 30 \
-            "${COOLIFY_URL}/api/v1/deploy?uuid=${COOLIFY_APP_UUID}&pr=${PR_NUMBER}")
-
-          if [ "${status}" -ge 400 ]; then
-            echo "::error::Coolify returned HTTP ${status}: $(cat "${body}")"
-            exit 1
-          fi
-
-          deployment=$(jq -r '.deployments[0].deployment_uuid // empty' "${body}")
-          if [ -z "${deployment}" ]; then
-            echo "::notice::PR #${PR_NUMBER} has no preview deployment ($(jq -r '.deployments[0].message // "no deployment queued"' "${body}"))."
-            exit 0
-          fi
-
-          echo "::notice::Queued Coolify deployment ${deployment} for PR #${PR_NUMBER}."
+      - name: Enforce Zizmor findings
+        env:
+          ZIZMOR_SARIF: ${{ steps.zizmor.outputs.output-file }}
+        run: jq -e '[.runs[]?.results[]?] | length == 0' "$ZIZMOR_SARIF"
 
   Quality:
     uses: ./.github/workflows/ci-quality-gates.yml
@@ -275,11 +235,16 @@ jobs:
         needs.detect-changes.outputs.ci-config == 'true' ||
         github.event_name != 'pull_request'
       )
-    secrets: inherit
+    permissions:
+      checks: write
+      contents: read
     with:
       should_skip: ${{ needs.detect-changes.outputs.should_skip }}
       webapp_changed: ${{ (needs.detect-changes.outputs.webapp == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       application_server_changed: ${{ (needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+      tooling_changed: ${{ (needs.detect-changes.outputs.tooling == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+      postgres_image_changed: ${{ (needs.detect-changes.outputs.postgres-image == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+      contracts_changed: ${{ (needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.postgres-image == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       pmd_canary: ${{ (needs.detect-changes.outputs.pmd-canary == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
 
   Security:
@@ -291,7 +256,9 @@ jobs:
         needs.detect-changes.outputs.ci-config == 'true' ||
         github.event_name != 'pull_request'
       )
-    secrets: inherit
+    permissions:
+      contents: read
+      security-events: write
     with:
       should_skip: ${{ needs.detect-changes.outputs.should_skip }}
 
@@ -304,21 +271,40 @@ jobs:
         needs.detect-changes.outputs.ci-config == 'true' ||
         github.event_name != 'pull_request'
       )
-    secrets: inherit
+    secrets:
+      CHROMATIC_PROJECT_TOKEN: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
+      SURGE_TOKEN: ${{ secrets.SURGE_TOKEN }}
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
+      statuses: write
     with:
       should_skip: ${{ needs.detect-changes.outputs.should_skip }}
       webapp_changed: ${{ (needs.detect-changes.outputs.webapp == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       application_server_changed: ${{ (needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       e2e_changed: ${{ (needs.detect-changes.outputs.e2e == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+      postgres_image_changed: ${{ (needs.detect-changes.outputs.postgres-image == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+
+  Changesets:
+    if: github.event_name == 'pull_request'
+    uses: ./.github/workflows/verify-changesets.yml
+    permissions:
+      contents: read
 
   Docker:
     uses: ./.github/workflows/ci-docker-build.yml
+    secrets:
+      SENTRY_AUTH_TOKEN: ${{ github.event_name != 'pull_request' && secrets.SENTRY_AUTH_TOKEN || '' }}
+      SENTRY_ORG: ${{ github.event_name != 'pull_request' && secrets.SENTRY_ORG || '' }}
+      SENTRY_PROJECT: ${{ github.event_name != 'pull_request' && secrets.SENTRY_PROJECT || '' }}
     # Image builds consume the detected source tree, not Quality outputs. Running both branches at
     # once keeps image and preview confidence without adding Docker as a second CI stage.
     needs: [detect-changes]
-    # Every same-repository pull request gets a Coolify preview pinned to SOURCE_COMMIT, so it needs
-    # an application-server tag at its head commit even when it touches only docs or the preview
-    # stack. The path filters below therefore gate fork pull requests only — forks get no preview.
+    # A preview runs the images CI published for its exact head commit, so a same-repository pull
+    # request needs commit-addressed tags even when it touches only docs — `Tag unchanged images`
+    # re-tags rather than rebuilds. The path filters therefore gate fork pull requests only; forks
+    # never receive a preview.
     if: |
       needs.detect-changes.outputs.should_skip != 'true' && (
         github.event_name != 'pull_request' ||
@@ -326,26 +312,30 @@ jobs:
         needs.detect-changes.outputs.any-code == 'true' ||
         needs.detect-changes.outputs.ci-config == 'true'
       )
-    secrets: inherit
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
     with:
       should_skip: ${{ needs.detect-changes.outputs.should_skip }}
       webapp_changed: ${{ (needs.detect-changes.outputs.webapp-image == 'true' || needs.detect-changes.outputs.docker-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       application_server_changed: ${{ (needs.detect-changes.outputs.application-server-image == 'true' || needs.detect-changes.outputs.docker-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       agent_images_changed: ${{ (needs.detect-changes.outputs.agent-images == 'true' || needs.detect-changes.outputs.docker-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
-      release_pin_fetcher_changed: ${{ (needs.detect-changes.outputs.release-pin-fetcher == 'true' || needs.detect-changes.outputs.docker-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       postgres_image_changed: ${{ (needs.detect-changes.outputs.postgres-image == 'true' || needs.detect-changes.outputs.docker-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
 
   all-ci-passed:
     name: "CI Status Gate"
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     permissions:
       actions: read
       statuses: write
-    needs: [detect-changes, Quality, Security, Test, Docker]
+    needs: [detect-changes, workflow-lint, zizmor, Quality, Security, Test, Changesets, Docker]
     if: always()
     steps:
       - name: Generate workflow timeline
-        uses: Kesin11/actions-timeline@7c7e0821d38f27460f4a71ef874a1c8cf23602e4 # v2
+        uses: Kesin11/actions-timeline@57fc93f20c6da7fbc14063c6d24a2a5627c799ad # v3.2.0
         with:
           show-waiting-runner: true
 
@@ -392,9 +382,12 @@ jobs:
         id: evaluate
         run: |
           echo "detect-changes: ${{ needs.detect-changes.result }}"
+          echo "workflow-lint: ${{ needs.workflow-lint.result }}"
+          echo "zizmor:        ${{ needs.zizmor.result }}"
           echo "Quality:        ${{ needs.Quality.result }}"
           echo "Security:       ${{ needs.Security.result }}"
           echo "Test:           ${{ needs.Test.result }}"
+          echo "Changesets:     ${{ needs.Changesets.result }}"
           echo "Docker:         ${{ needs.Docker.result }}"
 
           if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" ]]; then
@@ -439,8 +432,11 @@ jobs:
             esac
           }
 
+          echo "| Actionlint | $(result_to_emoji '${{ needs.workflow-lint.result }}') |" >> $GITHUB_STEP_SUMMARY
+          echo "| Zizmor | $(result_to_emoji '${{ needs.zizmor.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| Quality | $(result_to_emoji '${{ needs.Quality.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| Test | $(result_to_emoji '${{ needs.Test.result }}') |" >> $GITHUB_STEP_SUMMARY
+          echo "| Changesets | $(result_to_emoji '${{ needs.Changesets.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| Security | $(result_to_emoji '${{ needs.Security.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| Docker | $(result_to_emoji '${{ needs.Docker.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -490,6 +486,15 @@ jobs:
               echo "| Application server | \`cd server && ./mvnw test\` |" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "**Tip:** Check the **Test Results** tab above for specific failures." >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "</details>" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+            fi
+
+            if [[ "${{ needs.Changesets.result }}" == "failure" ]]; then
+              echo "<details><summary><b>❌ Changesets Failed</b></summary>" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "Run \`pnpm run check:changesets\` for policy-test failures; otherwise correct the changeset reported by the job." >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "</details>" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY

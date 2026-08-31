@@ -26,10 +26,8 @@ class FeedbackResponseSuppressionFilter {
 
     private static final Logger log = LoggerFactory.getLogger(FeedbackResponseSuppressionFilter.class);
 
-    private static final Set<FeedbackResolution> SUPPRESS_ACTIONS = Set.of(
-        FeedbackResolution.DISPUTED,
-        FeedbackResolution.NOT_APPLICABLE
-    );
+    private static final Set<FeedbackResolution> SUPPRESS_ACTIONS =
+            Set.of(FeedbackResolution.DISPUTED, FeedbackResolution.NOT_APPLICABLE);
 
     private static final String SECRET_SCANNER = "secret-diff-scanner";
 
@@ -39,11 +37,10 @@ class FeedbackResponseSuppressionFilter {
     private final PracticeReviewProperties reviewProperties;
 
     FeedbackResponseSuppressionFilter(
-        ObservationRepository observationRepository,
-        ReactionRepository reactionRepository,
-        FeedbackLedgerRecorder feedbackLedgerRecorder,
-        PracticeReviewProperties reviewProperties
-    ) {
+            ObservationRepository observationRepository,
+            ReactionRepository reactionRepository,
+            FeedbackLedgerRecorder feedbackLedgerRecorder,
+            PracticeReviewProperties reviewProperties) {
         this.observationRepository = observationRepository;
         this.reactionRepository = reactionRepository;
         this.feedbackLedgerRecorder = feedbackLedgerRecorder;
@@ -59,7 +56,8 @@ class FeedbackResponseSuppressionFilter {
         if (!reviewProperties.reactionSuppression()) {
             return new SuppressionDecision(scopedObservations, 0);
         }
-        List<Observation> persisted = observationRepository.findByAgentJobId(job.getId());
+        List<Observation> persisted = observationRepository.findByAgentJobId(
+                job.getId(), job.getWorkspace().getId());
         if (persisted.isEmpty()) {
             return new SuppressionDecision(scopedObservations, 0);
         }
@@ -81,10 +79,7 @@ class FeedbackResponseSuppressionFilter {
         }
         Map<String, FeedbackResolution> actionByKey = new HashMap<>();
         for (var row : reactionRepository.findCurrentResolutionByRecurrenceKeys(
-            recurrenceKeys,
-            aboutUserId,
-            job.getWorkspace().getId()
-        )) {
+                recurrenceKeys, aboutUserId, job.getWorkspace().getId())) {
             actionByKey.put(row.getRecurrenceKey(), FeedbackResolution.valueOf(row.getResolution()));
         }
         if (actionByKey.isEmpty()) {
@@ -101,10 +96,9 @@ class FeedbackResponseSuppressionFilter {
                 continue;
             }
             FeedbackResolution action = actionByKey.get(key);
-            boolean unsuppressableSecret =
-                vf.assessment() == Assessment.BAD &&
-                vf.evidence() != null &&
-                SECRET_SCANNER.equals(vf.evidence().path("detector").asString());
+            boolean unsuppressableSecret = vf.assessment() == Assessment.BAD
+                    && vf.evidence() != null
+                    && SECRET_SCANNER.equals(vf.evidence().path("detector").asString());
             if (!unsuppressableSecret && action != null && SUPPRESS_ACTIONS.contains(action)) {
                 Observation pf = persistedByOccurrence.get(vf.occurrenceKey());
                 if (pf != null) {
@@ -125,12 +119,11 @@ class FeedbackResponseSuppressionFilter {
         }
         if (suppressed > 0) {
             log.info(
-                "Feedback-response filter: jobId={}, suppressed={}, delivered={}/{}",
-                job.getId(),
-                suppressed,
-                deliverable.size(),
-                scopedObservations.size()
-            );
+                    "Feedback-response filter: jobId={}, suppressed={}, delivered={}/{}",
+                    job.getId(),
+                    suppressed,
+                    deliverable.size(),
+                    scopedObservations.size());
         }
         return new SuppressionDecision(deliverable, suppressed);
     }
@@ -138,23 +131,22 @@ class FeedbackResponseSuppressionFilter {
     private static ValidatedObservation withEscalatedReasoning(ValidatedObservation vf) {
         String prefix = "You previously marked this as fixed, but it is still present. ";
         String reasoning =
-            vf.evidenceRationale() == null || vf.evidenceRationale().isBlank()
-                ? prefix.trim()
-                : prefix + vf.evidenceRationale();
+                vf.evidenceRationale() == null || vf.evidenceRationale().isBlank()
+                        ? prefix.trim()
+                        : prefix + vf.evidenceRationale();
         return new ValidatedObservation(
-            vf.practiceSlug(),
-            vf.summary(),
-            vf.presence(),
-            vf.assessment(),
-            vf.severity(),
-            vf.evidence(),
-            reasoning
-        );
+                vf.practiceSlug(),
+                vf.summary(),
+                vf.presence(),
+                vf.assessment(),
+                vf.severity(),
+                vf.evidence(),
+                reasoning);
     }
 
     private static FeedbackSuppressionReason reasonFor(FeedbackResolution action) {
         return action == FeedbackResolution.DISPUTED
-            ? FeedbackSuppressionReason.REACTED_DISPUTED
-            : FeedbackSuppressionReason.REACTED_NOT_APPLICABLE;
+                ? FeedbackSuppressionReason.REACTED_DISPUTED
+                : FeedbackSuppressionReason.REACTED_NOT_APPLICABLE;
     }
 }

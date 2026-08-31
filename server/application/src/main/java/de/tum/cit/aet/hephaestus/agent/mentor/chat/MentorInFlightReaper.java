@@ -37,9 +37,9 @@ public class MentorInFlightReaper {
      * index, so the window must clear the longest turn a binding can produce. Derived from the ceiling
      * the binding API enforces, so raising that ceiling raises this floor with it.
      */
-    private static final Duration MINIMUM_SAFE_WINDOW = Duration.ofSeconds(AgentBindingLimits.MAX_TIMEOUT_SECONDS).plus(
-        OVERHEAD_ALLOWANCE
-    );
+    private static final Duration MINIMUM_SAFE_WINDOW =
+            Duration.ofSeconds(AgentBindingLimits.MAX_TIMEOUT_SECONDS).plus(OVERHEAD_ALLOWANCE);
+
     private final ChatMessageRepository chatMessageRepository;
     private final MentorInFlightAccounting accounting;
     private final MeterRegistry meterRegistry;
@@ -47,11 +47,10 @@ public class MentorInFlightReaper {
     private final Duration window;
 
     public MentorInFlightReaper(
-        ChatMessageRepository chatMessageRepository,
-        MentorInFlightAccounting accounting,
-        MeterRegistry meterRegistry,
-        @Value("${hephaestus.mentor.in-flight-reaper.window:PT70M}") Duration window
-    ) {
+            ChatMessageRepository chatMessageRepository,
+            MentorInFlightAccounting accounting,
+            MeterRegistry meterRegistry,
+            @Value("${hephaestus.mentor.in-flight-reaper.window:PT70M}") Duration window) {
         this.chatMessageRepository = chatMessageRepository;
         this.accounting = accounting;
         this.meterRegistry = meterRegistry;
@@ -62,10 +61,10 @@ public class MentorInFlightReaper {
     @SchedulerLock(name = "mentor-in-flight-reaper", lockAtMostFor = "PT10M", lockAtLeastFor = "PT30S")
     public void reap() {
         List<UUID> stale = chatMessageRepository
-            .findStaleInFlightForAccounting(Instant.now().minus(window))
-            .stream()
-            .map(ChatMessage::getId)
-            .toList();
+                .findStaleInFlightForAccounting(Instant.now().minus(window))
+                .stream()
+                .map(ChatMessage::getId)
+                .toList();
         int billed = 0;
         int failed = 0;
         for (UUID messageId : stale) {
@@ -77,28 +76,26 @@ public class MentorInFlightReaper {
                 failed++;
                 // Never rethrown: one turn losing its write must not stop the turns behind it.
                 log.warn(
-                    "Mentor in-flight reaper could not account turn {}; leaving it for the next tick",
-                    messageId,
-                    e
-                );
+                        "Mentor in-flight reaper could not account turn {}; leaving it for the next tick",
+                        messageId,
+                        e);
                 meterRegistry.counter("mentor.in_flight.reaper.failure").increment();
             }
         }
-        if (!stale.isEmpty()) log.info(
-            "Mentor in-flight reaper accounted {} stuck row(s); {} billed from proxy-recorded usage, {} failed",
-            stale.size(),
-            billed,
-            failed
-        );
+        if (!stale.isEmpty())
+            log.info(
+                    "Mentor in-flight reaper accounted {} stuck row(s); {} billed from proxy-recorded usage, {} failed",
+                    stale.size(),
+                    billed,
+                    failed);
     }
 
     private static Duration safeWindow(Duration configuredWindow) {
         if (configuredWindow.compareTo(MINIMUM_SAFE_WINDOW) < 0) {
             log.warn(
-                "Mentor in-flight reaper window {} is unsafe for configured turns; using {}",
-                configuredWindow,
-                MINIMUM_SAFE_WINDOW
-            );
+                    "Mentor in-flight reaper window {} is unsafe for configured turns; using {}",
+                    configuredWindow,
+                    MINIMUM_SAFE_WINDOW);
             return MINIMUM_SAFE_WINDOW;
         }
         return configuredWindow;

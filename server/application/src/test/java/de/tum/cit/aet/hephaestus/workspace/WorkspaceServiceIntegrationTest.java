@@ -43,21 +43,16 @@ class WorkspaceServiceIntegrationTest extends AbstractWorkspaceIntegrationTest {
         assertThat(workspace.getAccountType()).isEqualTo(AccountType.ORG);
 
         var membership = workspaceMembershipRepository
-            .findByWorkspace_IdAndUser_Id(workspace.getId(), owner.getId())
-            .orElseThrow();
+                .findByWorkspace_IdAndUser_Id(workspace.getId(), owner.getId())
+                .orElseThrow();
         assertThat(membership.getRole()).isEqualTo(WorkspaceMembership.WorkspaceRole.OWNER);
     }
 
     @Test
     void updateNotificationsPersistsStateAndValidatesChannel() {
         User owner = persistUser("notification-owner");
-        Workspace workspace = createWorkspace(
-            "notification-space",
-            "Notification Space",
-            "notification",
-            AccountType.ORG,
-            owner
-        );
+        Workspace workspace =
+                createWorkspace("notification-space", "Notification Space", "notification", AccountType.ORG, owner);
 
         // team + channelId live on the Slack Connection's config now,
         // so updateNotifications requires an ACTIVE Slack Connection to exist.
@@ -71,15 +66,15 @@ class WorkspaceServiceIntegrationTest extends AbstractWorkspaceIntegrationTest {
         assertThat(updated.getLeaderboardNotificationEnabled()).isTrue();
 
         // team + channel are read back from the Slack Connection config.
-        var slack = connectionService.findSlackNotificationConfig(workspace.getId()).orElseThrow();
+        var slack =
+                connectionService.findSlackNotificationConfig(workspace.getId()).orElseThrow();
         assertThat(slack.teamLabel()).isEqualTo("core-team");
         assertThat(slack.notificationChannelId()).isEqualTo("C12345678");
 
-        assertThatThrownBy(() ->
-            workspaceService.updateNotifications(workspace.getWorkspaceSlug(), true, null, "invalid")
-        )
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("Slack channel ID");
+        assertThatThrownBy(
+                        () -> workspaceService.updateNotifications(workspace.getWorkspaceSlug(), true, null, "invalid"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Slack channel ID");
     }
 
     @Test
@@ -89,10 +84,9 @@ class WorkspaceServiceIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
         // No Slack Connection seeded — supplying channelId must 409, not silently no-op.
         assertThatThrownBy(() ->
-            workspaceService.updateNotifications(workspace.getWorkspaceSlug(), null, null, "C12345678")
-        )
-            .isInstanceOf(ResponseStatusException.class)
-            .hasMessageContaining("No active Slack Connection");
+                        workspaceService.updateNotifications(workspace.getWorkspaceSlug(), null, null, "C12345678"))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("No active Slack Connection");
 
         // But toggling enabled-only without a Slack Connection is fine — independent meaning.
         workspaceService.updateNotifications(workspace.getWorkspaceSlug(), true, null, null);
@@ -102,11 +96,10 @@ class WorkspaceServiceIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     private void persistSlackConnection(Workspace workspace) {
         Connection conn = new Connection(
-            workspace,
-            IntegrationKind.SLACK,
-            "test-team-id",
-            new ConnectionConfig.SlackConfig("test-team-id", "Test Team", null, null, null, Set.of())
-        );
+                workspace,
+                IntegrationKind.SLACK,
+                "test-team-id",
+                new ConnectionConfig.SlackConfig("test-team-id", "Test Team", null, null, null, Set.of()));
         ReflectionTestUtils.setField(conn, "state", IntegrationState.ACTIVE);
         connectionRepository.save(conn);
     }
@@ -136,8 +129,8 @@ class WorkspaceServiceIntegrationTest extends AbstractWorkspaceIntegrationTest {
         assertThat(purged.getStatus()).isEqualTo(Workspace.WorkspaceStatus.PURGED);
 
         assertThatThrownBy(() -> workspaceLifecycleService.resumeWorkspace(workspace.getWorkspaceSlug()))
-            .isInstanceOf(WorkspaceLifecycleViolationException.class)
-            .hasMessageContaining("purged");
+                .isInstanceOf(WorkspaceLifecycleViolationException.class)
+                .hasMessageContaining("purged");
     }
 
     @Test
@@ -149,21 +142,17 @@ class WorkspaceServiceIntegrationTest extends AbstractWorkspaceIntegrationTest {
         // "PAT_ORG without token" shape the migration replaces. The lifecycle listener
         // should promote it cleanly to a GitHub App Connection.
 
-        Workspace promoted = githubLifecycleListener.createOrUpdateFromInstallation(
-            95711017L,
-            "ls1intum",
-            RepositorySelection.ALL
-        );
+        Workspace promoted =
+                githubLifecycleListener.createOrUpdateFromInstallation(95711017L, "ls1intum", RepositorySelection.ALL);
 
         // provider mode + installation id live on the Connection
         // registry now, not on Workspace.
         assertNotNull(promoted);
         assertThat(connectionService.findActiveProviderKind(promoted.getId())).hasValue(IntegrationKind.GITHUB);
-        assertThat(connectionService.findActiveGitHubAppConfig(promoted.getId())).hasValueSatisfying(cfg ->
-            assertThat(cfg.installationId()).isEqualTo(95711017L)
-        );
+        assertThat(connectionService.findActiveGitHubAppConfig(promoted.getId()))
+                .hasValueSatisfying(cfg -> assertThat(cfg.installationId()).isEqualTo(95711017L));
         assertThat(connectionService.findActiveBearerToken(promoted.getId(), IntegrationKind.GITHUB))
-            .as("App-mode Connections do not store a bearer credential blob")
-            .isEmpty();
+                .as("App-mode Connections do not store a bearer credential blob")
+                .isEmpty();
     }
 }

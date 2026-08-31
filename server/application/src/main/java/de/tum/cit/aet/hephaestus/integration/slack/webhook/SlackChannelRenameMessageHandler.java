@@ -15,9 +15,7 @@ import tools.jackson.databind.JsonNode;
 public class SlackChannelRenameMessageHandler extends SlackChannelLifecycleMessageHandler {
 
     public SlackChannelRenameMessageHandler(
-        SlackChannelLifecycleService lifecycleService,
-        NatsMessageDeserializer deserializer
-    ) {
+            SlackChannelLifecycleService lifecycleService, NatsMessageDeserializer deserializer) {
         super("channel_rename", lifecycleService, deserializer);
     }
 

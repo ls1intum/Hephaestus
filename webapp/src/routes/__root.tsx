@@ -11,31 +11,30 @@ import {
 } from "@tanstack/react-router";
 import type React from "react";
 import { toast } from "sonner";
-import {
-	getIntegrationCatalogOptions,
-	getUserSettingsOptions,
-	listThreadsOptions,
-} from "@/api/@tanstack/react-query.gen";
+
+import { getIntegrationCatalogOptions, listThreadsOptions } from "@/api/@tanstack/react-query.gen";
 import { ImpersonationBanner } from "@/components/auth/ImpersonationBanner";
 import { CookieConsentBanner } from "@/components/consent/CookieConsentBanner";
 import Footer from "@/components/core/Footer";
 import Header from "@/components/core/Header";
-import { StandardPageSurface } from "@/components/core/StandardPageSurface";
 import { AppSidebar, type SidebarContext } from "@/components/core/sidebar/AppSidebar";
+import { SkipToContent } from "@/components/core/SkipToContent";
+import { StandardPageSurface } from "@/components/core/StandardPageSurface";
+import { ActiveSurveyDialog } from "@/components/feedback/ActiveSurveyDialog";
+import { ProductFeedbackDialog } from "@/components/feedback/ProductFeedbackDialog";
 import { Chat } from "@/components/mentor/Chat";
 import { Copilot } from "@/components/mentor/Copilot";
 import { defaultPartRenderers } from "@/components/mentor/renderers";
-import { PostHogSurveyWidget } from "@/components/surveys/posthog-survey-widget";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Toaster } from "@/components/ui/sonner";
 import environment from "@/environment";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { useMentorChat } from "@/hooks/use-mentor-chat";
+import { useActiveSurvey, useSubmitProductFeedback } from "@/hooks/use-product-feedback";
 import { useWorkspaceAccess } from "@/hooks/use-workspace-access";
 import { useWorkspaceFeatures } from "@/hooks/use-workspace-features";
 import { type AuthContextType, useAuth } from "@/integrations/auth/AuthContext";
 import { FeatureFlagDevTools, useFeatureFlag } from "@/integrations/feature-flags";
-import { isPosthogEnabled } from "@/integrations/posthog/config";
 import { isCopilotExcludedRoute } from "@/lib/copilot-route";
 import { getProviderSlug } from "@/lib/provider";
 
@@ -63,13 +62,6 @@ function RootLayout() {
 	});
 	const { isAuthenticated, isLoading } = useAuth();
 	const { enabled: hasMentorAccess } = useFeatureFlag("MENTOR_ACCESS");
-	const { data: userSettings, isError: userSettingsError } = useQuery({
-		...getUserSettingsOptions({}),
-		enabled: isAuthenticated && isPosthogEnabled,
-		retry: 1,
-	});
-	const allowSurveys =
-		isPosthogEnabled && !userSettingsError && (userSettings?.participateInResearch ?? true);
 	const showCopilot =
 		!isLoading && isAuthenticated && hasMentorAccess && !isCopilotExcludedRoute(pathname);
 
@@ -77,9 +69,10 @@ function RootLayout() {
 		return (
 			<>
 				<HeadContent />
+				<SkipToContent />
 				<CookieConsentBanner />
 				<ProviderColorScope>
-					<main>
+					<main id="main-content" tabIndex={-1}>
 						<Outlet />
 					</main>
 				</ProviderColorScope>
@@ -91,6 +84,7 @@ function RootLayout() {
 	return (
 		<>
 			<HeadContent />
+			<SkipToContent />
 			{/* Rendered early so keyboard/AT users reach the consent region before the app chrome. */}
 			<CookieConsentBanner />
 			<ImpersonationBanner />
@@ -102,7 +96,7 @@ function RootLayout() {
 						style={{ marginRight: "var(--right-sidebar-width, 0)" }}
 					>
 						<HeaderContainer />
-						<div className="flex min-h-0 flex-1 flex-col">
+						<main id="main-content" tabIndex={-1} className="flex min-h-0 flex-1 flex-col">
 							{surface === "standard" ? (
 								<StandardPageSurface className="flex-1">
 									<Outlet />
@@ -116,21 +110,36 @@ function RootLayout() {
 									<Outlet />
 								</div>
 							)}
-							{surface !== "fullscreen" && (
-								<Footer
-									buildInfo={environment.buildInfo}
-									isProduction={environment.deployment.isProduction}
-								/>
-							)}
-						</div>
+						</main>
+						{surface !== "fullscreen" && (
+							<Footer
+								buildInfo={environment.buildInfo}
+								isProduction={environment.deployment.isProduction}
+							/>
+						)}
 					</SidebarInset>
 				</SidebarProvider>
 			</ProviderColorScope>
 			<Toaster />
 			{showCopilot && <GlobalCopilot />}
-			{!isLoading && isAuthenticated && allowSurveys && <PostHogSurveyWidget />}
 			<FeatureFlagDevTools />
+			{!isLoading && isAuthenticated ? <GlobalSurvey /> : null}
 		</>
+	);
+}
+
+function GlobalSurvey() {
+	const { workspaceSlug } = useActiveWorkspaceSlug();
+	const survey = useActiveSurvey(workspaceSlug);
+	return (
+		<ActiveSurveyDialog
+			key={survey.survey?.id}
+			survey={survey.survey}
+			isSubmitting={survey.isSubmitting}
+			isDismissing={survey.isDismissing}
+			onSubmit={survey.submit}
+			onDismiss={survey.dismiss}
+		/>
 	);
 }
 
@@ -140,7 +149,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 	component: RootLayout,
 	notFoundComponent: () => (
 		<div className="mx-auto flex w-full max-w-2xl flex-col items-center justify-center py-16 text-center">
-			<h2 className="text-3xl font-bold mb-4">Page Not Found</h2>
+			<h1 className="text-3xl font-bold mb-4">Page Not Found</h1>
 			<p className="text-muted-foreground mb-8">
 				The page you're looking for doesn't exist or you don't have permission to view it.
 			</p>
@@ -252,6 +261,7 @@ function HeaderContainer() {
 	const effectiveUsername = workspaceUserLogin ?? username;
 	const effectiveName =
 		workspaceUserName ?? (userProfile && `${userProfile.firstName} ${userProfile.lastName}`);
+	const feedback = useSubmitProductFeedback(workspaceSlug);
 
 	return (
 		<Header
@@ -265,6 +275,14 @@ function HeaderContainer() {
 			username={effectiveUsername}
 			avatarUrl={getUserProfilePictureUrl()}
 			workspaceSlug={workspaceSlug}
+			feedbackDialog={
+				<ProductFeedbackDialog
+					isSubmitting={feedback.isPending}
+					onSubmit={(kind, message) =>
+						feedback.submit({ kind, message, pagePath: window.location.pathname })
+					}
+				/>
+			}
 			onLogin={(idpHint) => login(idpHint)}
 			onLogout={() => void logout()}
 		/>

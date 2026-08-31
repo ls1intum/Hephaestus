@@ -9,6 +9,7 @@ import de.tum.cit.aet.hephaestus.agent.context.InsufficientEvidenceException;
 import de.tum.cit.aet.hephaestus.agent.handler.JobTypeHandlerRegistry;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.PreparedJobInputs;
+import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.agent.practice.PracticeAgentRequest;
 import de.tum.cit.aet.hephaestus.agent.practice.PracticePiAdapter;
 import de.tum.cit.aet.hephaestus.agent.practice.PracticeSandboxSpec;
@@ -33,7 +34,9 @@ import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
+import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtIssuer;
 import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessReport;
+import de.tum.cit.aet.hephaestus.observability.StructuredLogKeys;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
@@ -96,14 +99,13 @@ import tools.jackson.databind.node.ObjectNode;
 @Component
 // Expression rather than two @ConditionalOnProperty: Spring honors only one of those per element.
 @ConditionalOnExpression(
-    "${" + RuntimeRole.AGENT_ENABLED_PROPERTY + ":false} and ${" + RuntimeRole.WORKER_PROPERTY + ":true}"
-)
+        "${" + RuntimeRole.AGENT_ENABLED_PROPERTY + ":false} and ${" + RuntimeRole.WORKER_PROPERTY + ":true}")
 @WorkspaceAgnostic("Job poller processes jobs across all workspaces")
 public class AgentJobExecutor {
 
     private static final Logger log = LoggerFactory.getLogger(AgentJobExecutor.class);
 
-    private static final String MDC_JOB_ID = "agent.jobId";
+    private static final String MDC_JOB_ID = StructuredLogKeys.JOB_ID;
     private static final String MDC_JOB_TYPE = "agent.jobType";
     private static final int MAX_ERROR_MESSAGE_LENGTH = 4000;
     private static final int MAX_CONTAINER_LOGS_CHARS = 65536; // 64KB
@@ -120,17 +122,16 @@ public class AgentJobExecutor {
      * makes these usable directly against JPA's and {@code TransactionTemplate}'s wrapping.
      */
     static final RetryPolicy TERMINAL_PERSIST_POLICY = RetryPolicy.builder()
-        .includes(
-            TransientDataAccessException.class,
-            RecoverableDataAccessException.class,
-            DataAccessResourceFailureException.class,
-            CannotCreateTransactionException.class
-        )
-        .maxRetries(2)
-        .delay(Duration.ofMillis(200))
-        // Growing rather than fixed: a lock timeout or a failover outlasts an immediate retry.
-        .multiplier(2)
-        .build();
+            .includes(
+                    TransientDataAccessException.class,
+                    RecoverableDataAccessException.class,
+                    DataAccessResourceFailureException.class,
+                    CannotCreateTransactionException.class)
+            .maxRetries(2)
+            .delay(Duration.ofMillis(200))
+            // Growing rather than fixed: a lock timeout or a failover outlasts an immediate retry.
+            .multiplier(2)
+            .build();
 
     /**
      * Any failure of the pool-rejection requeue is worth another try: one statement, no side effect to
@@ -138,16 +139,17 @@ public class AgentJobExecutor {
      * so full exhaustion parks polling for the summed delay.
      */
     private static final RetryPolicy REQUEUE_REJECTED_CLAIM_POLICY = RetryPolicy.builder()
-        .includes(Exception.class)
-        .maxRetries(2)
-        .delay(Duration.ofMillis(200))
-        .build();
+            .includes(Exception.class)
+            .maxRetries(2)
+            .delay(Duration.ofMillis(200))
+            .build();
 
     private final AgentProperties agentProperties;
     private final AgentJobRepository jobRepository;
     private final WorkspaceAgentBindingRepository bindingRepository;
     private final JobTypeHandlerRegistry handlerRegistry;
     private final PracticePiAdapter practiceAgent;
+    private final WorkerJwtIssuer workerJwtIssuer;
 
     private final SandboxManager sandboxManager;
     private final AsyncTaskExecutor sandboxExecutor;
@@ -166,11 +168,13 @@ public class AgentJobExecutor {
     private final Counter concurrencyRejected;
     private final Timer claimLatency;
     private final Counter infraRetryRequeued;
+    private final AgentJobTelemetry jobTelemetry;
     private final AtomicBoolean running = new AtomicBoolean(false);
     private volatile @Nullable Thread pollThread;
     private final Phaser inFlight = new Phaser(1); // 1 = the executor itself; deregistered on stop
     /** Scopes drain and hub-initiated cancels to this worker's own jobs; also its free-capacity signal. */
     private final Set<UUID> localRunningJobs = ConcurrentHashMap.newKeySet();
+
     private final Optional<WorkerCapacityState> capacityState;
     private final Optional<WorkerProperties> workerProperties;
     /** Null only when the worker role is off; stamped on claimed jobs to fence terminal writes. */
@@ -180,32 +184,35 @@ public class AgentJobExecutor {
 
     @Autowired
     public AgentJobExecutor(
-        AgentProperties agentProperties,
-        AgentJobRepository jobRepository,
-        WorkspaceAgentBindingRepository bindingRepository,
-        JobTypeHandlerRegistry handlerRegistry,
-        PracticePiAdapter practiceAgent,
-        SandboxManager sandboxManager,
-        @Qualifier("sandboxExecutor") AsyncTaskExecutor sandboxExecutor,
-        TransactionTemplate transactionTemplate,
-        ObjectMapper objectMapper,
-        MeterRegistry meterRegistry,
-        LlmUsageRecorder usageRecorder,
-        LlmBudgetService llmBudgetService,
-        @Nullable LlmAdmissionService llmAdmissionService,
-        Optional<WorkerCapacityState> capacityState,
-        Optional<WorkerProperties> workerProperties
-    ) {
+            AgentProperties agentProperties,
+            AgentJobRepository jobRepository,
+            WorkspaceAgentBindingRepository bindingRepository,
+            JobTypeHandlerRegistry handlerRegistry,
+            PracticePiAdapter practiceAgent,
+            WorkerJwtIssuer workerJwtIssuer,
+            SandboxManager sandboxManager,
+            @Qualifier("sandboxExecutor") AsyncTaskExecutor sandboxExecutor,
+            TransactionTemplate transactionTemplate,
+            ObjectMapper objectMapper,
+            MeterRegistry meterRegistry,
+            AgentJobTelemetry jobTelemetry,
+            LlmUsageRecorder usageRecorder,
+            LlmBudgetService llmBudgetService,
+            @Nullable LlmAdmissionService llmAdmissionService,
+            Optional<WorkerCapacityState> capacityState,
+            Optional<WorkerProperties> workerProperties) {
         this.agentProperties = agentProperties;
         this.jobRepository = jobRepository;
         this.bindingRepository = bindingRepository;
         this.handlerRegistry = handlerRegistry;
         this.practiceAgent = practiceAgent;
+        this.workerJwtIssuer = workerJwtIssuer;
         this.sandboxManager = sandboxManager;
         this.sandboxExecutor = sandboxExecutor;
         this.transactionTemplate = transactionTemplate;
         this.objectMapper = objectMapper;
         this.meterRegistry = meterRegistry;
+        this.jobTelemetry = jobTelemetry;
         this.usageRecorder = usageRecorder;
         this.llmBudgetService = llmBudgetService;
         this.llmAdmissionService = llmAdmissionService;
@@ -213,15 +220,15 @@ public class AgentJobExecutor {
         this.workerProperties = workerProperties;
         this.workerId = workerProperties.map(WorkerProperties::resolvedWorkerId).orElse(null);
 
-        this.concurrencyRejected = Counter.builder("agent.job.concurrency.rejected")
-            .description("Jobs rejected due to concurrency limits")
-            .register(meterRegistry);
-        this.claimLatency = Timer.builder("agent.job.claim.latency")
-            .description("Time between a job becoming available (available_at) and being claimed")
-            .register(meterRegistry);
-        this.infraRetryRequeued = Counter.builder("agent.job.infra.retry.requeued")
-            .description("Jobs requeued (not failed) after a classified sandbox-infrastructure failure")
-            .register(meterRegistry);
+        this.concurrencyRejected = Counter.builder(AgentMetrics.AGENT_JOB_CONCURRENCY_REJECTED)
+                .description("Jobs rejected due to concurrency limits")
+                .register(meterRegistry);
+        this.claimLatency = Timer.builder(AgentMetrics.AGENT_JOB_CLAIM_LATENCY)
+                .description("Time between a job becoming available (available_at) and being claimed")
+                .register(meterRegistry);
+        this.infraRetryRequeued = Counter.builder(AgentMetrics.AGENT_JOB_INFRA_RETRY_REQUEUED)
+                .description("Jobs requeued (not failed) after a classified sandbox-infrastructure failure")
+                .register(meterRegistry);
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -234,11 +241,10 @@ public class AgentJobExecutor {
         pollThread = Thread.ofPlatform().name("agent-job-poll").daemon(true).start(this::pollLoop);
 
         log.info(
-            "Agent job executor started: workerId={}, pollInterval={}, claimBatchSize={}",
-            workerId,
-            agentProperties.pollInterval(),
-            agentProperties.claimBatchSize()
-        );
+                "Agent job executor started: workerId={}, pollInterval={}, claimBatchSize={}",
+                workerId,
+                agentProperties.pollInterval(),
+                agentProperties.claimBatchSize());
     }
 
     private static final Duration POLL_THREAD_JOIN_TIMEOUT = Duration.ofSeconds(10);
@@ -262,9 +268,8 @@ public class AgentJobExecutor {
             thread.join(POLL_THREAD_JOIN_TIMEOUT.toMillis());
             if (thread.isAlive()) {
                 log.warn(
-                    "Poll thread did not stop within {} of stopAcceptingNewJobs() — a claim may still be in flight",
-                    POLL_THREAD_JOIN_TIMEOUT
-                );
+                        "Poll thread did not stop within {} of stopAcceptingNewJobs() — a claim may still be in flight",
+                        POLL_THREAD_JOIN_TIMEOUT);
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -307,43 +312,41 @@ public class AgentJobExecutor {
         for (UUID jobId : snapshot) {
             try {
                 transactionTemplate.executeWithoutResult(status -> {
-                    AgentJob job = jobRepository.findByIdWithWorkspaceForUpdate(jobId).orElse(null);
+                    AgentJob job =
+                            jobRepository.findByIdWithWorkspaceForUpdate(jobId).orElse(null);
                     if (job == null) return;
                     // BEFORE requeuing: the requeue zeroes the accumulators, so a later read bills zero.
-                    AgentJobLlmUsage drainCounts =
-                        job.getExecutionStartedAt() != null ? jobRepository.findLlmUsageById(jobId).orElse(null) : null;
+                    AgentJobLlmUsage drainCounts = job.getExecutionStartedAt() != null
+                            ? jobRepository.findLlmUsageById(jobId).orElse(null)
+                            : null;
                     int updated =
-                        workerId != null ? requeueOrphanWithRotation(jobId, workerId, job.getRetryCount()) : 0;
+                            workerId != null ? requeueOrphanWithRotation(jobId, workerId, job.getRetryCount()) : 0;
                     if (updated > 0) {
                         if (job.getExecutionStartedAt() != null) {
                             billTerminatedJob(job, "worker draining", drainCounts);
                         }
                         return;
                     }
-                    int cancelled =
-                        workerId != null
+                    int cancelled = workerId != null
                             ? jobRepository.transitionToCancelledOwnedBy(
-                                  jobId,
-                                  Instant.now(),
-                                  "worker draining",
-                                  reason,
-                                  Set.of(AgentJobStatus.RUNNING),
-                                  workerId
-                              )
+                                    jobId,
+                                    Instant.now(),
+                                    "worker draining",
+                                    reason,
+                                    Set.of(AgentJobStatus.RUNNING),
+                                    workerId)
                             : jobRepository.transitionToCancelled(
-                                  jobId,
-                                  Instant.now(),
-                                  "worker draining",
-                                  reason,
-                                  Set.of(AgentJobStatus.RUNNING)
-                              );
+                                    jobId, Instant.now(), "worker draining", reason, Set.of(AgentJobStatus.RUNNING));
                     if (cancelled > 0 && job.getExecutionStartedAt() != null) {
                         billTerminatedJob(job, "worker draining");
                     }
                 });
                 sandboxManager.cancel(jobId);
             } catch (Exception e) {
-                log.warn("Failed to drain in-flight job {}: {}", jobId, e.getClass().getSimpleName());
+                log.warn(
+                        "Failed to drain in-flight job {}: {}",
+                        jobId,
+                        e.getClass().getSimpleName());
             }
         }
     }
@@ -427,8 +430,8 @@ public class AgentJobExecutor {
      */
     int computeCapacity() {
         int poolCapacity = capacityState
-            .map(cs -> Math.max(0, cs.reviewMax() - localRunningJobs.size()))
-            .orElse(agentProperties.claimBatchSize());
+                .map(cs -> Math.max(0, cs.reviewMax() - localRunningJobs.size()))
+                .orElse(agentProperties.claimBatchSize());
         int bounded = Math.min(poolCapacity, agentProperties.claimBatchSize());
         return Math.min(bounded, sandboxExecutorFreeCapacity());
     }
@@ -470,6 +473,10 @@ public class AgentJobExecutor {
             log.warn("Claim failed for job {}, will retry on next poll: {}", jobId, e.getMessage());
             return false;
         }
+        if (attempt instanceof TerminalClaim terminal) {
+            jobTelemetry.terminal(terminal.job(), terminal.status(), AgentJobTelemetry.age(terminal.job()));
+            return false;
+        }
         if (!(attempt instanceof ClaimResult claim)) {
             return false;
         }
@@ -491,9 +498,8 @@ public class AgentJobExecutor {
             inFlight.arriveAndDeregister();
             lastClaimPoolRejected = true;
             log.warn(
-                "Sandbox executor rejected claimed job {} (pool smaller than configured worker capacity?) — requeuing",
-                jobId
-            );
+                    "Sandbox executor rejected claimed job {} (pool smaller than configured worker capacity?) — requeuing",
+                    jobId);
             requeueRejectedClaim(jobId);
         }
     }
@@ -510,21 +516,16 @@ public class AgentJobExecutor {
      */
     private void requeueRejectedClaim(UUID jobId) {
         try {
-            requeueRetries.execute(
-                named("Requeue of rejected claim " + jobId, () -> {
-                    transactionTemplate.executeWithoutResult(status ->
-                        jobRepository.requeueRejectedClaim(jobId, workerId)
-                    );
-                    return null;
-                })
-            );
+            requeueRetries.execute(named("Requeue of rejected claim " + jobId, () -> {
+                transactionTemplate.executeWithoutResult(status -> jobRepository.requeueRejectedClaim(jobId, workerId));
+                return null;
+            }));
         } catch (RetryException e) {
             log.error(
-                "Failed to requeue rejected claim {} — row stays RUNNING under this worker until " +
-                    "liveness/timeout recovery reclaims it",
-                jobId,
-                e.getLastException()
-            );
+                    "Failed to requeue rejected claim {} — row stays RUNNING under this worker until "
+                            + "liveness/timeout recovery reclaims it",
+                    jobId,
+                    e.getLastException());
         } finally {
             releaseCapacity();
             localRunningJobs.remove(jobId);
@@ -538,24 +539,21 @@ public class AgentJobExecutor {
      */
     private static RetryTemplate retryTemplate(RetryPolicy policy) {
         RetryTemplate template = new RetryTemplate(policy);
-        template.setRetryListener(
-            new RetryListener() {
-                @Override
-                public void onRetryableExecution(RetryPolicy inUse, Retryable<?> operation, RetryState state) {
-                    // Fires after every execution, successful ones included; isSuccessful() is false
-                    // exactly when the attempt just recorded threw.
-                    if (state.isSuccessful()) {
-                        return;
-                    }
-                    log.warn(
+        template.setRetryListener(new RetryListener() {
+            @Override
+            public void onRetryableExecution(RetryPolicy inUse, Retryable<?> operation, RetryState state) {
+                // Fires after every execution, successful ones included; isSuccessful() is false
+                // exactly when the attempt just recorded threw.
+                if (state.isSuccessful()) {
+                    return;
+                }
+                log.warn(
                         "{} failed (attempt {}): {}",
                         operation.getName(),
                         state.getExceptions().size(),
-                        String.valueOf(state.getLastException())
-                    );
-                }
+                        String.valueOf(state.getLastException()));
             }
-        );
+        });
         return template;
     }
 
@@ -576,15 +574,24 @@ public class AgentJobExecutor {
 
     /** Runs on the sandbox executor, not the poll thread. */
     private void runClaimedJob(UUID jobId, ClaimResult claim) {
-        MDC.put(MDC_JOB_ID, jobId.toString());
         AgentJob job = claim.job;
+        MDC.put(StructuredLogKeys.TRACE_ID, job.getTraceId());
+        MDC.put(StructuredLogKeys.SPAN_ID, randomSpanId());
+        MDC.put(MDC_JOB_ID, jobId.toString());
+        MDC.put(StructuredLogKeys.WORKSPACE_ID, job.getWorkspace().getId().toString());
         MDC.put(MDC_JOB_TYPE, job.getJobType().name());
         Instant startTime = Instant.now();
         String metricOutcome = "unknown";
         boolean sandboxExecutionStarted = false;
         PreparedJobInputs stagedInputs = null;
         try {
-            log.info("Executing agent job: jobId={}, jobType={}", jobId, job.getJobType());
+            Duration queueDuration = Duration.between(job.getCreatedAt(), job.getStartedAt());
+            jobTelemetry.transition(
+                    job,
+                    "agent.job.started",
+                    AgentJobTelemetry.Phase.QUEUE,
+                    AgentJobTelemetry.Outcome.STARTED,
+                    queueDuration);
 
             PreparedSandbox preparedSandbox = prepareSandboxSpec(jobId, job, claim.snapshot);
             stagedInputs = preparedSandbox.stagedInputs();
@@ -607,28 +614,22 @@ public class AgentJobExecutor {
 
             log.info("Agent job completed: jobId={}, duration={}", jobId, Duration.between(startTime, Instant.now()));
         } catch (SandboxCancelledException e) {
-            handleCancellation(jobId, job);
-            metricOutcome = AgentJobStatus.CANCELLED.name();
+            metricOutcome = handleCancellation(jobId, job) ? AgentJobStatus.CANCELLED.name() : "OWNERSHIP_LOST";
         } catch (InsufficientEvidenceException e) {
             try {
                 persistRefusedEvidence(jobId, job.getJobType(), job.getRetryCount(), e.preparedInputs());
                 ObjectNode output = objectMapper.createObjectNode().put("outcome", "INSUFFICIENT_EVIDENCE");
-                Integer updated = transactionTemplate.execute(status ->
-                    jobRepository.transitionToEvidenceRefused(
-                        jobId,
-                        workerId,
-                        job.getRetryCount(),
-                        Instant.now(),
-                        output
-                    )
-                );
+                Integer updated = transactionTemplate.execute(status -> jobRepository.transitionToEvidenceRefused(
+                        jobId, workerId, job.getRetryCount(), Instant.now(), output));
                 if (updated != null && updated == 1) {
                     recordPracticeReviewRefusal(job, "insufficient_evidence");
+                    // Keep the pre-existing execution-duration outcome label; the lifecycle contract
+                    // still records the committed terminal state as COMPLETED.
                     metricOutcome = "INSUFFICIENT_EVIDENCE";
+                    jobTelemetry.terminal(job, AgentJobStatus.COMPLETED, AgentJobTelemetry.age(job));
                     log.info(
-                        "Completed agent job without model execution: jobId={}, outcome=INSUFFICIENT_EVIDENCE",
-                        jobId
-                    );
+                            "Completed agent job without model execution: jobId={}, outcome=INSUFFICIENT_EVIDENCE",
+                            jobId);
                 } else {
                     metricOutcome = "OWNERSHIP_LOST";
                 }
@@ -648,28 +649,54 @@ public class AgentJobExecutor {
             if (stagedInputs != null) {
                 stagedInputs.close();
             }
-            recordExecutionDuration(job.getJobType(), metricOutcome, Duration.between(startTime, Instant.now()));
+            Duration executionDuration = Duration.between(startTime, Instant.now());
+            recordExecutionDuration(job.getJobType(), metricOutcome, executionDuration);
+            jobTelemetry.record(AgentJobTelemetry.Phase.EXECUTION, executionDuration);
+            AgentJobStatus terminalStatus = terminalStatus(metricOutcome);
+            if (terminalStatus != null) {
+                jobTelemetry.terminal(job, terminalStatus, AgentJobTelemetry.age(job));
+            }
             releaseCapacity();
             localRunningJobs.remove(jobId);
             MDC.remove(MDC_JOB_ID);
+            MDC.remove(StructuredLogKeys.WORKSPACE_ID);
             MDC.remove(MDC_JOB_TYPE);
+            MDC.remove(StructuredLogKeys.TRACE_ID);
+            MDC.remove(StructuredLogKeys.SPAN_ID);
         }
     }
 
+    private static @Nullable AgentJobStatus terminalStatus(String outcome) {
+        try {
+            AgentJobStatus status = AgentJobStatus.valueOf(outcome);
+            return status.isTerminal() ? status : null;
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
+    }
+
+    /** Package-private: the zombie sweeper reuses it when it restores a reaped job's trace context. */
+    static String randomSpanId() {
+        long value;
+        do {
+            value = ThreadLocalRandom.current().nextLong();
+        } while (value == 0);
+        return "%016x".formatted(value);
+    }
+
     private boolean markExecutionStarted(UUID jobId) {
-        Integer updated = transactionTemplate.execute(status ->
-            jobRepository.markExecutionStarted(jobId, workerId, Instant.now())
-        );
+        Integer updated = transactionTemplate.execute(
+                status -> jobRepository.markExecutionStarted(jobId, workerId, Instant.now()));
         return updated != null && updated == 1;
     }
 
     private void recordExecutionDuration(AgentJobType jobType, String outcome, Duration duration) {
-        Timer.builder("agent.job.execution.duration")
-            .description("Total duration of agent job execution")
-            .tag("jobType", jobType != null ? jobType.name() : "unknown")
-            .tag("status", outcome)
-            .register(meterRegistry)
-            .record(duration);
+        Timer.builder(AgentMetrics.AGENT_JOB_EXECUTION_DURATION)
+                .description("Total duration of agent job execution")
+                .tag("jobType", jobType != null ? jobType.name() : "unknown")
+                .tag("status", outcome)
+                .register(meterRegistry)
+                .record(duration);
     }
 
     /**
@@ -684,61 +711,52 @@ public class AgentJobExecutor {
 
         // The claim transaction is long gone, so the handler needs a transaction of its own here to
         // resolve lazy JPA proxies, and a re-fetch that eagerly loads the workspace.
-        TransactionTemplate readOnlyTx = new TransactionTemplate(
-            Objects.requireNonNull(transactionTemplate.getTransactionManager())
-        );
+        TransactionTemplate readOnlyTx =
+                new TransactionTemplate(Objects.requireNonNull(transactionTemplate.getTransactionManager()));
         readOnlyTx.setReadOnly(true);
         PreparedJobInputs preparedInputs = readOnlyTx.execute(status -> {
             AgentJob managedJob = jobRepository.findByIdWithWorkspace(jobId).orElse(job);
             return handler.prepareInputs(managedJob);
         });
 
-        // Every sandbox reaches the provider through the in-app LLM proxy with the job's own token;
-        // there is no worker-side BYO-LLM override.
+        // Sandboxes access providers through the LLM proxy with an attempt-scoped credential.
+        String jobToken = workerJwtIssuer.issueForJob(
+                jobId,
+                job.getWorkspace().getId(),
+                job.getRetryCount(),
+                Duration.ofSeconds(snapshot.timeoutSeconds()).plusMinutes(5));
         PracticeAgentRequest adapterRequest = new PracticeAgentRequest(
-            snapshot.apiProtocol(),
-            snapshot.upstreamModelId(),
-            snapshot.contextWindow(),
-            snapshot.maxOutputTokens(),
-            snapshot.supportsReasoning(),
-            job.getJobToken(),
-            snapshot.allowInternet(),
-            snapshot.timeoutSeconds()
-        );
+                snapshot.apiProtocol(),
+                snapshot.upstreamModelId(),
+                snapshot.contextWindow(),
+                snapshot.maxOutputTokens(),
+                snapshot.supportsReasoning(),
+                jobToken,
+                snapshot.allowInternet(),
+                snapshot.timeoutSeconds());
 
         PracticeSandboxSpec agentSpec = practiceAgent.buildSandboxSpec(adapterRequest);
-        SandboxSpec sandboxSpec = buildSandboxSpec(
-            jobId,
-            preparedInputs.files(),
-            preparedInputs.filesOnDisk(),
-            agentSpec,
-            snapshot
-        );
+        SandboxSpec sandboxSpec =
+                buildSandboxSpec(jobId, preparedInputs.files(), preparedInputs.filesOnDisk(), agentSpec, snapshot);
         persistProvenanceDigests(
-            jobId,
-            job.getJobType(),
-            agentSpec.promptDigest(),
-            sandboxSpec.inputFiles(),
-            job.getRetryCount(),
-            preparedInputs.automatedReviewReadinessReport()
-        );
+                jobId,
+                job.getJobType(),
+                agentSpec.promptDigest(),
+                sandboxSpec.inputFiles(),
+                job.getRetryCount(),
+                preparedInputs.automatedReviewReadinessReport());
         return new PreparedSandbox(sandboxSpec, preparedInputs);
     }
 
     private void persistRefusedEvidence(
-        UUID jobId,
-        AgentJobType jobType,
-        int retryCount,
-        PreparedJobInputs preparedInputs
-    ) {
+            UUID jobId, AgentJobType jobType, int retryCount, PreparedJobInputs preparedInputs) {
         persistProvenanceDigests(
-            jobId,
-            jobType,
-            null,
-            preparedInputs.files(),
-            retryCount,
-            preparedInputs.automatedReviewReadinessReport()
-        );
+                jobId,
+                jobType,
+                null,
+                preparedInputs.files(),
+                retryCount,
+                preparedInputs.automatedReviewReadinessReport());
     }
 
     /**
@@ -746,30 +764,25 @@ public class AgentJobExecutor {
      * is unfixable evaluation data, so a failed write fails the run before any LLM cost accrues.
      */
     private void persistProvenanceDigests(
-        UUID jobId,
-        AgentJobType jobType,
-        @Nullable String promptDigest,
-        Map<String, byte[]> inputFiles,
-        int retryCount,
-        @Nullable AutomatedReviewReadinessReport automatedReviewReadinessReport
-    ) {
+            UUID jobId,
+            AgentJobType jobType,
+            @Nullable String promptDigest,
+            Map<String, byte[]> inputFiles,
+            int retryCount,
+            @Nullable AutomatedReviewReadinessReport automatedReviewReadinessReport) {
         String inputsDigest = ProvenanceDigest.inputsDigestHex(inputFiles, jobId);
         JsonNode evidenceSnapshot = evidenceSnapshot(inputFiles, automatedReviewReadinessReport);
-        Integer updated = transactionTemplate.execute(status ->
-            jobRepository.updateProvenanceDigests(
+        Integer updated = transactionTemplate.execute(status -> jobRepository.updateProvenanceDigests(
                 jobId,
                 workerId,
                 retryCount,
                 new AgentJobRepository.ProvenanceStamp(
-                    promptDigest,
-                    inputsDigest,
-                    evidenceSnapshot,
-                    automatedReviewReadinessReport == null
-                        ? null
-                        : objectMapper.valueToTree(automatedReviewReadinessReport)
-                )
-            )
-        );
+                        promptDigest,
+                        inputsDigest,
+                        evidenceSnapshot,
+                        automatedReviewReadinessReport == null
+                                ? null
+                                : objectMapper.valueToTree(automatedReviewReadinessReport))));
         if (updated == null || updated != 1) {
             throw new IllegalStateException("Provenance digest write matched no job row: jobId=" + jobId);
         }
@@ -777,9 +790,7 @@ public class AgentJobExecutor {
     }
 
     private @Nullable JsonNode evidenceSnapshot(
-        Map<String, byte[]> inputFiles,
-        @Nullable AutomatedReviewReadinessReport automatedReviewReadinessReport
-    ) {
+            Map<String, byte[]> inputFiles, @Nullable AutomatedReviewReadinessReport automatedReviewReadinessReport) {
         byte[] manifest = inputFiles.get(SandboxLayout.MANIFEST_PATH);
         byte[] practices = inputFiles.get(SandboxLayout.PRACTICES_PREFIX + "index.json");
         // Java null, not NullNode: NullNode serializes to the JSON value null, which is a non-SQL-NULL
@@ -797,53 +808,52 @@ public class AgentJobExecutor {
     }
 
     private static SandboxSpec buildSandboxSpec(
-        UUID jobId,
-        Map<String, byte[]> handlerFiles,
-        Map<String, java.nio.file.Path> handlerFilesOnDisk,
-        PracticeSandboxSpec agentSpec,
-        ConfigSnapshot snapshot
-    ) {
+            UUID jobId,
+            Map<String, byte[]> handlerFiles,
+            Map<String, java.nio.file.Path> handlerFilesOnDisk,
+            PracticeSandboxSpec agentSpec,
+            ConfigSnapshot snapshot) {
         Map<String, byte[]> allInputFiles = new HashMap<>(handlerFiles);
         allInputFiles.putAll(agentSpec.inputFiles());
 
         ResourceLimits limits = new ResourceLimits(
-            ResourceLimits.DEFAULT.memoryBytes(),
-            ResourceLimits.DEFAULT.cpus(),
-            ResourceLimits.DEFAULT.pidsLimit(),
-            Duration.ofSeconds(snapshot.timeoutSeconds())
-        );
+                ResourceLimits.DEFAULT.memoryBytes(),
+                ResourceLimits.DEFAULT.cpus(),
+                ResourceLimits.DEFAULT.pidsLimit(),
+                Duration.ofSeconds(snapshot.timeoutSeconds()));
 
         return new SandboxSpec(
-            jobId,
-            agentSpec.image(),
-            agentSpec.command(),
-            agentSpec.environment(),
-            agentSpec.networkPolicy(),
-            limits,
-            agentSpec.securityProfile(),
-            allInputFiles,
-            handlerFilesOnDisk,
-            agentSpec.outputPath(),
-            agentSpec.volumeMounts()
-        );
+                jobId,
+                agentSpec.image(),
+                agentSpec.command(),
+                agentSpec.environment(),
+                agentSpec.networkPolicy(),
+                limits,
+                agentSpec.securityProfile(),
+                allInputFiles,
+                handlerFilesOnDisk,
+                agentSpec.outputPath(),
+                agentSpec.volumeMounts());
     }
 
-    private void handleCancellation(UUID jobId, AgentJob job) {
-        transactionTemplate.executeWithoutResult(status -> {
-            int updated = transitionTerminal(
-                jobId,
-                AgentJobStatus.CANCELLED,
-                Instant.now(),
-                "Cancelled during execution"
-            );
+    private boolean handleCancellation(UUID jobId, AgentJob job) {
+        Boolean cancelled = transactionTemplate.execute(status -> {
+            int updated =
+                    transitionTerminal(jobId, AgentJobStatus.CANCELLED, Instant.now(), "Cancelled during execution");
             if (updated > 0) billTerminatedJob(job, "cancelled during execution");
+            return updated > 0;
         });
-        log.info("Agent job cancelled: jobId={}", jobId);
+        if (Boolean.TRUE.equals(cancelled)) {
+            log.info("Agent job cancelled: jobId={}", jobId);
+            return true;
+        }
+        return false;
     }
 
     /** Reads the counts itself, so this overload is safe only on terminal (non-requeue) paths. */
     private void billTerminatedJob(AgentJob job, String reason) {
-        billTerminatedJob(job, reason, jobRepository.findLlmUsageById(job.getId()).orElse(null));
+        billTerminatedJob(
+                job, reason, jobRepository.findLlmUsageById(job.getId()).orElse(null));
     }
 
     /**
@@ -856,20 +866,14 @@ public class AgentJobExecutor {
         LlmPriceSnapshot price = terminalPriceOrUnpriced(snapshot);
         // No runner report exists on this path by definition — the job never reached a clean finish.
         TerminalUsage usage = TerminalUsage.resolve(null, counts);
-        boolean billed = usage.appendTo(
-            usageRecorder,
-            job.getWorkspace().getId(),
-            job,
-            snapshot.upstreamModelId(),
-            price
-        );
+        boolean billed =
+                usage.appendTo(usageRecorder, job.getWorkspace().getId(), job, snapshot.upstreamModelId(), price);
         if (billed) {
             log.info(
-                "Recorded PRICED usage for terminated job ({}): jobId={}, calls={}",
-                reason,
-                job.getId(),
-                usage.totalCalls()
-            );
+                    "Recorded PRICED usage for terminated job ({}): jobId={}, calls={}",
+                    reason,
+                    job.getId(),
+                    usage.totalCalls());
         } else {
             log.info("Recorded UNPRICED usage ledger entry ({}): jobId={}", reason, job.getId());
         }
@@ -893,39 +897,35 @@ public class AgentJobExecutor {
             Integer updated = transactionTemplate.execute(status -> {
                 // BEFORE requeuing: the requeue zeroes the accumulators, so a later read bills zero.
                 AgentJobLlmUsage retryCounts = sandboxExecutionStarted
-                    ? jobRepository.findLlmUsageById(jobId).orElse(null)
-                    : null;
+                        ? jobRepository.findLlmUsageById(jobId).orElse(null)
+                        : null;
                 int rows = requeueOrphanWithRotation(jobId, workerId, currentRetryCount);
                 if (rows > 0 && sandboxExecutionStarted) {
                     billTerminatedJob(
-                        job,
-                        "infra-failure retry (attempt " + (currentRetryCount + 1) + ")",
-                        retryCounts
-                    );
+                            job, "infra-failure retry (attempt " + (currentRetryCount + 1) + ")", retryCounts);
                 }
                 return rows;
             });
             if (updated != null && updated > 0) {
                 infraRetryRequeued.increment();
                 log.warn(
-                    "Requeuing job {} after classified sandbox-infrastructure failure (attempt {}): {}",
-                    jobId,
-                    currentRetryCount + 1,
-                    errorMessage
-                );
+                        "Requeuing job {} after classified sandbox-infrastructure failure (attempt {}): {}",
+                        jobId,
+                        currentRetryCount + 1,
+                        errorMessage);
                 return "REQUEUED";
             }
             log.warn(
-                "Job {} hit an infra failure but could not be requeued (retry cap exhausted or fence lost) — failing terminally",
-                jobId
-            );
+                    "Job {} hit an infra failure but could not be requeued (retry cap exhausted or fence lost) — failing terminally",
+                    jobId);
         }
 
-        transactionTemplate.executeWithoutResult(status -> {
+        Integer failed = transactionTemplate.execute(status -> {
             int updated = transitionTerminal(jobId, AgentJobStatus.FAILED, Instant.now(), errorMessage);
             if (updated > 0 && sandboxExecutionStarted) billTerminatedJob(job, "execution failure");
+            return updated;
         });
-        return AgentJobStatus.FAILED.name();
+        return failed != null && failed > 0 ? AgentJobStatus.FAILED.name() : "OWNERSHIP_LOST";
     }
 
     /**
@@ -948,13 +948,7 @@ public class AgentJobExecutor {
         String newToken = AgentJob.generateJobToken();
         String newTokenHash = AgentJob.computeTokenHash(newToken);
         return jobRepository.requeueOrphan(
-            jobId,
-            owningWorkerId,
-            agentProperties.maxRetries(),
-            availableAt,
-            newToken,
-            newTokenHash
-        );
+                jobId, owningWorkerId, agentProperties.maxRetries(), availableAt, newToken, newTokenHash);
     }
 
     /** What one claim attempt produced: either a claimed job or the reason there is none. */
@@ -963,12 +957,12 @@ public class AgentJobExecutor {
     private enum ClaimOutcome implements ClaimAttempt {
         ALREADY_CLAIMED,
         CONCURRENCY_FULL,
-        BUDGET_BLOCKED,
         BUDGET_HELD,
-        MODEL_UNAVAILABLE,
     }
 
     private record ClaimResult(AgentJob job, ConfigSnapshot snapshot) implements ClaimAttempt {}
+
+    private record TerminalClaim(AgentJob job, AgentJobStatus status) implements ClaimAttempt {}
 
     private @Nullable ClaimAttempt claimJob(UUID jobId) {
         return transactionTemplate.execute(status -> {
@@ -980,9 +974,8 @@ public class AgentJobExecutor {
 
             AgentJob job = locked.get();
 
-            LlmBudgetBlockReason blockReason = llmBudgetService
-                .decide(job.getWorkspace().getId())
-                .forFunding(claimedFundingSource(job));
+            LlmBudgetBlockReason blockReason =
+                    llmBudgetService.decide(job.getWorkspace().getId()).forFunding(claimedFundingSource(job));
             if (blockReason != LlmBudgetBlockReason.NONE) {
                 return holdOrCancelOverBudget(job, blockReason);
             }
@@ -991,13 +984,12 @@ public class AgentJobExecutor {
             // stays frozen; only availability/grants and the price are refreshed, and a changed binding
             // is refused rather than silently switching the queued job to another model.
             AgentPurpose purpose = job.getPurpose();
-            WorkspaceAgentBinding binding =
-                purpose == null
+            WorkspaceAgentBinding binding = purpose == null
                     ? null
                     : bindingRepository
-                          .findByWorkspaceIdAndPurpose(job.getWorkspace().getId(), purpose)
-                          .filter(WorkspaceAgentBinding::isEnabled)
-                          .orElse(null);
+                            .findByWorkspaceIdAndPurpose(job.getWorkspace().getId(), purpose)
+                            .filter(WorkspaceAgentBinding::isEnabled)
+                            .orElse(null);
             if (binding == null) {
                 return refuseUnavailableModel(job);
             }
@@ -1007,13 +999,13 @@ public class AgentJobExecutor {
                 if (llmAdmissionService != null) {
                     var admitted = llmAdmissionService.admit(binding);
                     var ref = admitted.connection();
-                    if (
-                        submitted.connectionScope() != ref.scope() ||
-                        !java.util.Objects.equals(submitted.connectionId(), ref.connectionId()) ||
-                        !java.util.Objects.equals(submitted.modelId(), ref.modelId()) ||
-                        !java.util.Objects.equals(submitted.workspaceId(), ref.workspaceId()) ||
-                        !java.util.Objects.equals(submitted.upstreamModelId(), admitted.resolved().upstreamModelId())
-                    ) {
+                    if (submitted.connectionScope() != ref.scope()
+                            || !java.util.Objects.equals(submitted.connectionId(), ref.connectionId())
+                            || !java.util.Objects.equals(submitted.modelId(), ref.modelId())
+                            || !java.util.Objects.equals(submitted.workspaceId(), ref.workspaceId())
+                            || !java.util.Objects.equals(
+                                    submitted.upstreamModelId(),
+                                    admitted.resolved().upstreamModelId())) {
                         return refuseUnavailableModel(job);
                     }
                     snapshot = submitted.withPriceSnapshot(admitted.price());
@@ -1028,20 +1020,16 @@ public class AgentJobExecutor {
             // cannot race a sibling claim.
             {
                 long runningCount = jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(
-                    job.getWorkspace().getId(),
-                    purpose,
-                    Set.of(AgentJobStatus.RUNNING)
-                );
+                        job.getWorkspace().getId(), purpose, Set.of(AgentJobStatus.RUNNING));
                 if (runningCount >= binding.getMaxConcurrentJobs()) {
                     concurrencyRejected.increment();
                     log.info(
-                        "Concurrency limit reached: jobId={}, workspaceId={}, purpose={}, running={}, max={}",
-                        jobId,
-                        job.getWorkspace().getId(),
-                        purpose,
-                        runningCount,
-                        binding.getMaxConcurrentJobs()
-                    );
+                            "Concurrency limit reached: jobId={}, workspaceId={}, purpose={}, running={}, max={}",
+                            jobId,
+                            job.getWorkspace().getId(),
+                            purpose,
+                            runningCount,
+                            binding.getMaxConcurrentJobs());
                     return ClaimOutcome.CONCURRENCY_FULL;
                 }
             }
@@ -1078,31 +1066,27 @@ public class AgentJobExecutor {
      * having failed, so {@code retry_count} stays untouched. The age bound is what keeps that from
      * being unbounded when neither ever happens.
      */
-    private ClaimOutcome holdOrCancelOverBudget(AgentJob job, LlmBudgetBlockReason blockReason) {
+    private ClaimAttempt holdOrCancelOverBudget(AgentJob job, LlmBudgetBlockReason blockReason) {
         Instant now = Instant.now();
-        boolean tooOldToHold =
-            job.getCreatedAt() != null &&
-            Duration.between(job.getCreatedAt(), now).compareTo(BUDGET_HOLD_MAX_JOB_AGE) > 0;
+        boolean tooOldToHold = job.getCreatedAt() != null
+                && Duration.between(job.getCreatedAt(), now).compareTo(BUDGET_HOLD_MAX_JOB_AGE) > 0;
         if (tooOldToHold) {
             job.setStatus(AgentJobStatus.CANCELLED);
             job.setCompletedAt(now);
-            job.setErrorMessage(
-                "Cancelled: over the monthly AI budget, and this job is more than " +
-                    BUDGET_HOLD_MAX_JOB_AGE.toDays() +
-                    " days old."
-            );
+            job.setErrorMessage("Cancelled: over the monthly AI budget, and this job is more than "
+                    + BUDGET_HOLD_MAX_JOB_AGE.toDays()
+                    + " days old.");
             job.setCancellationReason(AgentJobCancellationReason.BUDGET_EXHAUSTED);
             jobRepository.save(job);
             log.info(
-                "Cancelling claim — over budget and older than {} days: jobId={}, workspaceId={}, blockReason={}",
-                BUDGET_HOLD_MAX_JOB_AGE.toDays(),
-                job.getId(),
-                job.getWorkspace().getId(),
-                blockReason
-            );
+                    "Cancelling claim — over budget and older than {} days: jobId={}, workspaceId={}, blockReason={}",
+                    BUDGET_HOLD_MAX_JOB_AGE.toDays(),
+                    job.getId(),
+                    job.getWorkspace().getId(),
+                    blockReason);
             recordPracticeReviewRefusal(job, "budget_exhausted");
             meterRegistry.counter("agent.job.budget.refused").increment();
-            return ClaimOutcome.BUDGET_BLOCKED;
+            return new TerminalClaim(job, AgentJobStatus.CANCELLED);
         }
         job.setAvailableAt(now.plus(BUDGET_HOLD_INTERVAL));
         // Marks this as a budget hold specifically, so raising the cap can release it at once instead
@@ -1110,17 +1094,16 @@ public class AgentJobExecutor {
         job.setHoldReason(AgentJob.HOLD_REASON_BUDGET);
         jobRepository.save(job);
         log.info(
-            "Holding claim — monthly LLM budget {}: jobId={}, workspaceId={}, retryAt={}",
-            blockReason == LlmBudgetBlockReason.EXHAUSTED ? "exhausted" : "unverifiable (cap set)",
-            job.getId(),
-            job.getWorkspace().getId(),
-            job.getAvailableAt()
-        );
+                "Holding claim — monthly LLM budget {}: jobId={}, workspaceId={}, retryAt={}",
+                blockReason == LlmBudgetBlockReason.EXHAUSTED ? "exhausted" : "unverifiable (cap set)",
+                job.getId(),
+                job.getWorkspace().getId(),
+                job.getAvailableAt());
         meterRegistry.counter("agent.job.budget.held").increment();
         return ClaimOutcome.BUDGET_HELD;
     }
 
-    private ClaimOutcome refuseUnavailableModel(AgentJob job) {
+    private ClaimAttempt refuseUnavailableModel(AgentJob job) {
         String message = "Configured model is unavailable.";
         job.setStatus(AgentJobStatus.CANCELLED);
         job.setCompletedAt(Instant.now());
@@ -1130,12 +1113,14 @@ public class AgentJobExecutor {
         meterRegistry.counter("agent.job.model.refused").increment();
         recordPracticeReviewRefusal(job, "model_unavailable");
         log.info("Refusing claim — configured model unavailable: jobId={}", job.getId());
-        return ClaimOutcome.MODEL_UNAVAILABLE;
+        return new TerminalClaim(job, AgentJobStatus.CANCELLED);
     }
 
     private void recordPracticeReviewRefusal(AgentJob job, String reason) {
         if (job.getPurpose() == AgentPurpose.PRACTICE_REVIEW) {
-            meterRegistry.counter("practice.review.refused", "phase", "execution", "reason", reason).increment();
+            meterRegistry
+                    .counter("practice.review.refused", "phase", "execution", "reason", reason)
+                    .increment();
         }
     }
 
@@ -1152,27 +1137,24 @@ public class AgentJobExecutor {
      */
     private int transitionTerminal(UUID jobId, AgentJobStatus status, Instant now, @Nullable String error) {
         return workerId != null
-            ? jobRepository.transitionStatusOwnedBy(jobId, status, now, error, Set.of(AgentJobStatus.RUNNING), workerId)
-            : jobRepository.transitionStatus(jobId, status, now, error, Set.of(AgentJobStatus.RUNNING));
+                ? jobRepository.transitionStatusOwnedBy(
+                        jobId, status, now, error, Set.of(AgentJobStatus.RUNNING), workerId)
+                : jobRepository.transitionStatus(jobId, status, now, error, Set.of(AgentJobStatus.RUNNING));
     }
 
-    private AgentJobStatus completeJob(
-        UUID jobId,
-        AgentResult agentResult,
-        SandboxResult sandboxResult,
-        JobTypeHandler handler,
-        AgentJob job
-    ) {
+    private @Nullable AgentJobStatus completeJob(
+            UUID jobId, AgentResult agentResult, SandboxResult sandboxResult, JobTypeHandler handler, AgentJob job) {
         AgentJobStatus terminalStatus = determineTerminalStatus(sandboxResult, agentResult);
         // persistTerminalState returns false when we lost the fence (cancelled / orphan-requeued); we
         // must not deliver then, or a stuck-then-recovered worker would double-post the sibling's findings.
         boolean persisted = persistTerminalState(jobId, agentResult, sandboxResult, terminalStatus);
         if (persisted) {
             deliverResults(jobId, terminalStatus, handler);
+            return terminalStatus;
         } else {
             log.info("Skipping delivery: job no longer owned/RUNNING (requeued or cancelled): jobId={}", jobId);
+            return null;
         }
-        return terminalStatus;
     }
 
     /**
@@ -1192,10 +1174,9 @@ public class AgentJobExecutor {
         // this distinctly from agent crashes; the secondary metric also alerts on image drift.
         if (sandboxResult.exitCode() == SandboxLayout.EXIT_ENVELOPE_MISMATCH) {
             log.error(
-                "Pi runner rejected task envelope (exit {}) — server/image schemaVersion or kind drift. " +
-                    "Rebuild the agent-pi image or roll back the server.",
-                SandboxLayout.EXIT_ENVELOPE_MISMATCH
-            );
+                    "Pi runner rejected task envelope (exit {}) — server/image schemaVersion or kind drift. "
+                            + "Rebuild the agent-pi image or roll back the server.",
+                    SandboxLayout.EXIT_ENVELOPE_MISMATCH);
             meterRegistry.counter("agent.pi.envelope.mismatch").increment();
             return AgentJobStatus.FAILED;
         }
@@ -1203,17 +1184,15 @@ public class AgentJobExecutor {
             Object rawOutput = agentResult.output().get("rawOutput");
             if (rawOutput instanceof String raw && !raw.isBlank()) {
                 log.info(
-                    "Agent exited with code {} but produced output — treating as COMPLETED for delivery",
-                    sandboxResult.exitCode()
-                );
+                        "Agent exited with code {} but produced output — treating as COMPLETED for delivery",
+                        sandboxResult.exitCode());
                 return AgentJobStatus.COMPLETED;
             }
             if (rawOutput != null) {
                 log.warn(
-                    "Agent exited with code {} and rawOutput is present but not a String (type={})",
-                    sandboxResult.exitCode(),
-                    rawOutput.getClass().getSimpleName()
-                );
+                        "Agent exited with code {} and rawOutput is present but not a String (type={})",
+                        sandboxResult.exitCode(),
+                        rawOutput.getClass().getSimpleName());
             }
         }
         return AgentJobStatus.FAILED;
@@ -1231,34 +1210,28 @@ public class AgentJobExecutor {
      *     cancelled or orphan-requeued to a sibling, in which case the caller must NOT deliver.
      */
     private boolean persistTerminalState(
-        UUID jobId,
-        AgentResult agentResult,
-        SandboxResult sandboxResult,
-        AgentJobStatus terminalStatus
-    ) {
-        String errorMessage = switch (terminalStatus) {
-            case TIMED_OUT -> "Container timed out";
-            case FAILED -> "Container exited with code " + sandboxResult.exitCode();
-            default -> null;
-        };
+            UUID jobId, AgentResult agentResult, SandboxResult sandboxResult, AgentJobStatus terminalStatus) {
+        String errorMessage =
+                switch (terminalStatus) {
+                    case TIMED_OUT -> "Container timed out";
+                    case FAILED -> "Container exited with code " + sandboxResult.exitCode();
+                    default -> null;
+                };
         try {
-            return terminalPersistRetries.execute(
-                named("Terminal persistence for jobId=" + jobId, () ->
-                    persistTerminalStateOnce(jobId, agentResult, sandboxResult, terminalStatus, errorMessage)
-                )
-            );
+            return terminalPersistRetries.execute(named(
+                    "Terminal persistence for jobId=" + jobId,
+                    () -> persistTerminalStateOnce(jobId, agentResult, sandboxResult, terminalStatus, errorMessage)));
         } catch (RetryException e) {
             throw new TerminalPersistenceException(e);
         }
     }
 
     private boolean persistTerminalStateOnce(
-        UUID jobId,
-        AgentResult agentResult,
-        SandboxResult sandboxResult,
-        AgentJobStatus terminalStatus,
-        @Nullable String errorMessage
-    ) {
+            UUID jobId,
+            AgentResult agentResult,
+            SandboxResult sandboxResult,
+            AgentJobStatus terminalStatus,
+            @Nullable String errorMessage) {
         Boolean persisted = transactionTemplate.execute(status -> {
             int updated = transitionTerminal(jobId, terminalStatus, Instant.now(), errorMessage);
             if (updated == 0) {
@@ -1278,10 +1251,9 @@ public class AgentJobExecutor {
             if (sandboxResult.logs() != null && !sandboxResult.logs().isBlank()) {
                 String logs = sandboxResult.logs();
                 freshJob.setContainerLogs(
-                    logs.length() > MAX_CONTAINER_LOGS_CHARS
-                        ? logs.substring(logs.length() - MAX_CONTAINER_LOGS_CHARS)
-                        : logs
-                );
+                        logs.length() > MAX_CONTAINER_LOGS_CHARS
+                                ? logs.substring(logs.length() - MAX_CONTAINER_LOGS_CHARS)
+                                : logs);
             }
             if (terminalStatus == AgentJobStatus.COMPLETED) {
                 freshJob.setDeliveryStatus(DeliveryStatus.PENDING);
@@ -1330,9 +1302,9 @@ public class AgentJobExecutor {
             return null;
         }
         return bindingRepository
-            .findByWorkspaceIdAndPurpose(job.getWorkspace().getId(), purpose)
-            .map(WorkspaceAgentBinding::getFundingSource)
-            .orElse(null);
+                .findByWorkspaceIdAndPurpose(job.getWorkspace().getId(), purpose)
+                .map(WorkspaceAgentBinding::getFundingSource)
+                .orElse(null);
     }
 
     private LlmPriceSnapshot admittedPrice(ConfigSnapshot snapshot) {
@@ -1362,13 +1334,26 @@ public class AgentJobExecutor {
         // Reload to get the freshly persisted output
         AgentJob deliverJob = jobRepository.findById(jobId).orElse(null);
         if (deliverJob != null) {
+            Instant deliveryStarted = Instant.now();
             try {
                 handler.deliver(deliverJob);
                 persistDeliveryStatus(jobId, DeliveryStatus.DELIVERED, deliverJob.getDeliveryCommentId());
+                jobTelemetry.transition(
+                        deliverJob,
+                        "agent.job.delivery",
+                        AgentJobTelemetry.Phase.DELIVERY,
+                        AgentJobTelemetry.Outcome.DELIVERED,
+                        Duration.between(deliveryStarted, Instant.now()));
             } catch (Exception e) {
                 log.warn("Delivery failed for job {} (output saved, job still COMPLETED): {}", jobId, e.getMessage());
                 // Preserve the comment id from a partial delivery: the comment may already be posted.
                 persistDeliveryStatus(jobId, DeliveryStatus.FAILED, deliverJob.getDeliveryCommentId());
+                jobTelemetry.transition(
+                        deliverJob,
+                        "agent.job.delivery",
+                        AgentJobTelemetry.Phase.DELIVERY,
+                        AgentJobTelemetry.Outcome.DELIVERY_FAILED,
+                        Duration.between(deliveryStarted, Instant.now()));
                 meterRegistry.counter("agent.job.delivery.failure").increment();
             }
         }
@@ -1376,9 +1361,8 @@ public class AgentJobExecutor {
 
     private void persistDeliveryStatus(UUID jobId, DeliveryStatus status, @Nullable String commentId) {
         try {
-            transactionTemplate.executeWithoutResult(tx ->
-                jobRepository.updateDeliveryStatus(jobId, status, commentId)
-            );
+            transactionTemplate.executeWithoutResult(
+                    tx -> jobRepository.updateDeliveryStatus(jobId, status, commentId));
         } catch (Exception e) {
             log.error("Failed to persist delivery status: jobId={}, status={}", jobId, status, e);
         }
@@ -1389,7 +1373,7 @@ public class AgentJobExecutor {
             return "Unknown error";
         }
         return message.length() > MAX_ERROR_MESSAGE_LENGTH
-            ? message.substring(0, MAX_ERROR_MESSAGE_LENGTH) + "... [truncated]"
-            : message;
+                ? message.substring(0, MAX_ERROR_MESSAGE_LENGTH) + "... [truncated]"
+                : message;
     }
 }

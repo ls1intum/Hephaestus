@@ -41,53 +41,55 @@ public class WorkspaceScopedTables {
     private static final Logger log = LoggerFactory.getLogger(WorkspaceScopedTables.class);
 
     public static final Set<String> GLOBAL_TABLES = Set.of(
-        // Tenant root + identity
-        "workspace",
-        "workspace_slug_history",
-        "user",
-        "user_preferences",
-        "user_achievement",
-        // Synced upstream identity (workspace linked separately via FK)
-        "organization",
-        "identity_provider",
-        "issue_type",
-        // Fleet-wide worker JWT revocation; worker JWTs are not workspace-scoped
-        "worker_token_denylist",
-        // core.auth (ADR 0017) — identity is user/system-scoped, not workspace-scoped.
-        // Account ↔ Workspace association lives on workspace_membership, not these tables.
-        "account",
-        "identity_link",
-        "account_feature",
-        "auth_event",
-        "issued_jwt",
-        "jwt_signing_key",
-        // GDPR Art. 20 self-service export — account-scoped, spans a principal's data across workspaces.
-        "account_export",
-        // Fleet-wide worker liveness/capacity registry (#1138); not workspace-scoped
-        "worker_registry",
-        // Instance-scoped OAuth login providers (sign-in options); shared across all workspaces
-        "login_provider",
-        // Singleton instance-wide operator settings (silent-mode brake); no tenant dimension exists
-        "instance_settings",
-        // Instance LLM-config catalog — app_admin-owned, curated, shared across all workspaces
-        "llm_connection",
-        // Instance-curated models behind a catalog connection; global, not tenant-scoped
-        "llm_model",
-        // Instance model price history; global pricing authority, not tenant-scoped
-        "llm_model_price",
-        // llm_model_workspace_grant is deliberately absent: it carries a workspace_id, so the
-        // inspector watches it and its cross-tenant admin reads opt out per method instead.
-        // Instance LLM settings singleton (egress allowlist + BYO enable); global
-        "instance_llm_settings",
-        // Instance-wide practice catalog overrides; no workspace owner
-        "curated_practice_override",
-        "curated_group_override",
-        // ECB daily reference rates for display-only currency conversion; not a tenant's property
-        "fx_rate",
-        // Liquibase machinery
-        "databasechangelog",
-        "databasechangeloglock"
-    );
+            // Tenant root + identity
+            "workspace",
+            "workspace_slug_history",
+            "user",
+            "user_preferences",
+            "user_achievement",
+            // Synced upstream identity (workspace linked separately via FK)
+            "organization",
+            "identity_provider",
+            "issue_type",
+            // Fleet-wide worker JWT revocation; worker JWTs are not workspace-scoped
+            "worker_token_denylist",
+            // core.auth (ADR 0017) — identity is user/system-scoped, not workspace-scoped.
+            // Account ↔ Workspace association lives on workspace_membership, not these tables.
+            "account",
+            "identity_link",
+            "account_feature",
+            "auth_event",
+            "issued_jwt",
+            "jwt_signing_key",
+            // GDPR Art. 20 self-service export — account-scoped, spans a principal's data across workspaces.
+            "account_export",
+            // Account-scoped consent evidence and its system-wide notice archive
+            "consent_decision",
+            "consent_notice",
+            // Fleet-wide worker liveness/capacity registry (#1138); not workspace-scoped
+            "worker_registry",
+            // Instance-scoped OAuth login providers (sign-in options); shared across all workspaces
+            "login_provider",
+            // Singleton instance-wide operator settings (silent-mode brake); no tenant dimension exists
+            "instance_settings",
+            // Instance LLM-config catalog — app_admin-owned, curated, shared across all workspaces
+            "llm_connection",
+            // Instance-curated models behind a catalog connection; global, not tenant-scoped
+            "llm_model",
+            // Instance model price history; global pricing authority, not tenant-scoped
+            "llm_model_price",
+            // llm_model_workspace_grant is deliberately absent: it carries a workspace_id, so the
+            // inspector watches it and its cross-tenant admin reads opt out per method instead.
+            // Instance LLM settings singleton (egress allowlist + BYO enable); global
+            "instance_llm_settings",
+            // Instance-wide practice catalog overrides; no workspace owner
+            "curated_practice_override",
+            "curated_group_override",
+            // ECB daily reference rates for display-only currency conversion; not a tenant's property
+            "fx_rate",
+            // Liquibase machinery
+            "databasechangelog",
+            "databasechangeloglock");
 
     private volatile Set<String> scopedTables = Set.of();
     private final ObjectProvider<EntityManagerFactory> entityManagerFactoryProvider;
@@ -107,9 +109,8 @@ public class WorkspaceScopedTables {
     @EventListener(ApplicationReadyEvent.class)
     void populateFromMetamodel() {
         EntityManagerFactory entityManagerFactory = entityManagerFactoryProvider.getObject();
-        SessionFactoryImplementor sf = entityManagerFactory
-            .unwrap(SessionFactory.class)
-            .unwrap(SessionFactoryImplementor.class);
+        SessionFactoryImplementor sf =
+                entityManagerFactory.unwrap(SessionFactory.class).unwrap(SessionFactoryImplementor.class);
         MappingMetamodel metamodel = sf.getMappingMetamodel();
         Set<EntityType<?>> entities = entityManagerFactory.getMetamodel().getEntities();
 
@@ -131,19 +132,15 @@ public class WorkspaceScopedTables {
         // mapping metamodel call chain regressed. A silently-empty set would turn the
         // inspector into a no-op — worst failure mode for a security control.
         if (tables.isEmpty() && !entities.isEmpty()) {
-            throw new IllegalStateException(
-                "WorkspaceScopedTables populated zero scoped tables from " +
-                    entities.size() +
-                    " entities. Tenancy enforcement would silently disable. " +
-                    "Check Hibernate MappingMetamodel API compatibility."
-            );
+            throw new IllegalStateException("WorkspaceScopedTables populated zero scoped tables from " + entities.size()
+                    + " entities. Tenancy enforcement would silently disable. "
+                    + "Check Hibernate MappingMetamodel API compatibility.");
         }
         this.scopedTables = Set.copyOf(tables);
         log.info(
-            "WorkspaceScopedTables populated: {} workspace-scoped tables (incl. join tables), {} global",
-            scopedTables.size(),
-            GLOBAL_TABLES.size()
-        );
+                "WorkspaceScopedTables populated: {} workspace-scoped tables (incl. join tables), {} global",
+                scopedTables.size(),
+                GLOBAL_TABLES.size());
     }
 
     private static void addIfScoped(Set<String> tables, String rawName) {

@@ -44,26 +44,24 @@ public class MentorInFlightAccounting {
         message.setMetadata(withAbandonedError(existingMetadata));
         // End the in-flight state before reading usage so the proxy accumulator can no longer change the totals.
         chatMessageRepository.saveAndFlush(message);
-        MentorTurnLlmUsage observed = chatMessageRepository
-            .findLlmUsageById(message.getId())
-            .orElse(MentorTurnLlmUsage.NONE);
+        MentorTurnLlmUsage observed =
+                chatMessageRepository.findLlmUsageById(message.getId()).orElse(MentorTurnLlmUsage.NONE);
         Long workspaceId = message.getThread().getWorkspace().getId();
         LlmUsageRecorder.LlmUsageSample sample = new LlmUsageRecorder.LlmUsageSample(
-            LlmUsageJobType.MENTOR_TURN,
-            LlmUsageSourceType.MENTOR_TURN,
-            message.getId(),
-            0,
-            MentorAdmissionMetadata.readModel(existingMetadata),
-            observed.inputTokens(),
-            observed.outputTokens(),
-            observed.cacheReadTokens(),
-            0,
-            observed.reasoningTokens(),
-            Math.max(1, observed.totalCalls()),
-            price,
-            observed.hasBillableUsage() ? UsageProvenance.PROXY : UsageProvenance.NONE,
-            Instant.now()
-        );
+                LlmUsageJobType.MENTOR_TURN,
+                LlmUsageSourceType.MENTOR_TURN,
+                message.getId(),
+                0,
+                MentorAdmissionMetadata.readModel(existingMetadata),
+                observed.inputTokens(),
+                observed.outputTokens(),
+                observed.cacheReadTokens(),
+                0,
+                observed.reasoningTokens(),
+                Math.max(1, observed.totalCalls()),
+                price,
+                observed.hasBillableUsage() ? UsageProvenance.PROXY : UsageProvenance.NONE,
+                Instant.now());
         if (observed.hasBillableUsage()) {
             usageRecorder.record(workspaceId, sample);
             return true;
@@ -73,8 +71,7 @@ public class MentorInFlightAccounting {
     }
 
     private static ObjectNode withAbandonedError(@Nullable JsonNode existingMetadata) {
-        ObjectNode metadata =
-            existingMetadata != null && existingMetadata.isObject()
+        ObjectNode metadata = existingMetadata != null && existingMetadata.isObject()
                 ? (ObjectNode) existingMetadata.deepCopy()
                 : JsonNodeFactory.instance.objectNode();
         metadata.put("error", "server restart");

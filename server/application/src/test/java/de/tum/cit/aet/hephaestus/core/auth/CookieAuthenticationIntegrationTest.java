@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.core.auth;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
@@ -60,17 +59,17 @@ class CookieAuthenticationIntegrationTest extends RealAuthIntegrationTest {
         IssuedAccount issued = issueRealTokenForNewAccount("Cookie Cat");
 
         webTestClient
-            .get()
-            .uri("/user")
-            .header(HttpHeaders.COOKIE, cookieName + "=" + issued.token())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.id")
-            .isEqualTo(issued.accountId())
-            .jsonPath("$.displayName")
-            .isEqualTo("Cookie Cat");
+                .get()
+                .uri("/user")
+                .header(HttpHeaders.COOKIE, cookieName + "=" + issued.token())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.id")
+                .isEqualTo(issued.accountId())
+                .jsonPath("$.displayName")
+                .isEqualTo("Cookie Cat");
     }
 
     @Test
@@ -78,15 +77,15 @@ class CookieAuthenticationIntegrationTest extends RealAuthIntegrationTest {
         IssuedAccount issued = issueRealTokenForNewAccount("Bearer Bear");
 
         webTestClient
-            .get()
-            .uri("/user")
-            .headers(headers -> headers.setBearerAuth(issued.token()))
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.id")
-            .isEqualTo(issued.accountId());
+                .get()
+                .uri("/user")
+                .headers(headers -> headers.setBearerAuth(issued.token()))
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.id")
+                .isEqualTo(issued.accountId());
     }
 
     @Test
@@ -102,31 +101,27 @@ class CookieAuthenticationIntegrationTest extends RealAuthIntegrationTest {
         IssuedAccount issued = issueRealTokenForNewAccount("Revoked Rita");
 
         webTestClient
-            .get()
-            .uri("/user")
-            .header(HttpHeaders.COOKIE, cookieName + "=" + issued.token())
-            .exchange()
-            .expectStatus()
-            .isOk();
+                .get()
+                .uri("/user")
+                .header(HttpHeaders.COOKIE, cookieName + "=" + issued.token())
+                .exchange()
+                .expectStatus()
+                .isOk();
 
         // Revoke every session for the account (the issuer persisted the issued_jwt row). The
         // @Modifying query needs an active, COMMITTED tx so the server thread's next read sees it.
-        new TransactionTemplate(txManager).executeWithoutResult(status ->
-            issuedJwtRepository.revokeAllForAccount(
-                issued.accountId(),
-                Instant.now(),
-                IssuedJwt.RevokedReason.SIGN_OUT_EVERYWHERE
-            )
-        );
+        new TransactionTemplate(txManager)
+                .executeWithoutResult(status -> issuedJwtRepository.revokeAllForAccount(
+                        issued.accountId(), Instant.now(), IssuedJwt.RevokedReason.SIGN_OUT_EVERYWHERE));
 
         // The SAME cookie now fails closed: 401 via the resource-server chain.
         webTestClient
-            .get()
-            .uri("/user")
-            .header(HttpHeaders.COOKIE, cookieName + "=" + issued.token())
-            .exchange()
-            .expectStatus()
-            .isUnauthorized();
+                .get()
+                .uri("/user")
+                .header(HttpHeaders.COOKIE, cookieName + "=" + issued.token())
+                .exchange()
+                .expectStatus()
+                .isUnauthorized();
     }
 
     // NOTE on CSRF: the cookie-style POST-without-token → 403 contract is covered by

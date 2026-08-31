@@ -19,22 +19,21 @@ class BackfillTallyTest extends BaseUnitTest {
      * @param issueCheckpoint lowest issue number reached so far (counts down to 0 = complete)
      */
     private static SyncTarget target(
-        long id,
-        @Nullable Integer issueHwm,
-        @Nullable Integer issueCheckpoint,
-        @Nullable Integer prHwm,
-        @Nullable Integer prCheckpoint
-    ) {
+            long id,
+            @Nullable Integer issueHwm,
+            @Nullable Integer issueCheckpoint,
+            @Nullable Integer prHwm,
+            @Nullable Integer prCheckpoint) {
         return SyncTargetTestBuilder.syncTarget()
-            .id(id)
-            .scopeId(1L)
-            .authMode(AuthMode.PERSONAL_ACCESS_TOKEN)
-            .repositoryNameWithOwner("owner/repo" + id)
-            .issueBackfillHighWaterMark(issueHwm)
-            .issueBackfillCheckpoint(issueCheckpoint)
-            .pullRequestBackfillHighWaterMark(prHwm)
-            .pullRequestBackfillCheckpoint(prCheckpoint)
-            .build();
+                .id(id)
+                .scopeId(1L)
+                .authMode(AuthMode.PERSONAL_ACCESS_TOKEN)
+                .repositoryNameWithOwner("owner/repo" + id)
+                .issueBackfillHighWaterMark(issueHwm)
+                .issueBackfillCheckpoint(issueCheckpoint)
+                .pullRequestBackfillHighWaterMark(prHwm)
+                .pullRequestBackfillCheckpoint(prCheckpoint)
+                .build();
     }
 
     @Test
@@ -73,9 +72,8 @@ class BackfillTallyTest extends BaseUnitTest {
 
     @Test
     void uninitializedTargetAlongsideAnInitializedOne_contributesToNeitherSide() {
-        BackfillTally tally = new BackfillTally(
-            List.of(target(1L, 100, 40, null, null), target(2L, null, null, null, null))
-        );
+        BackfillTally tally =
+                new BackfillTally(List.of(target(1L, 100, 40, null, null), target(2L, null, null, null, null)));
 
         // The uninitialized target must not inflate the numerator against a denominator it isn't in.
         assertThat(tally.itemsTotal()).isEqualTo(100);

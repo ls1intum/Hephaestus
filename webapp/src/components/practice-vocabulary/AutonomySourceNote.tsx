@@ -1,4 +1,5 @@
 import { CornerDownRight, Pin } from "lucide-react";
+
 import { type AutonomySource, autonomySourceSentence } from "@/lib/practice-autonomy";
 import { cn } from "@/lib/utils";
 

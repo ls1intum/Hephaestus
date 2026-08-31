@@ -41,18 +41,17 @@ class PracticeCatalogInstallationManager {
     private final Clock clock;
 
     PracticeCatalogInstallationManager(
-        @Value("${hephaestus.practices.seed-default-catalog:true}") boolean enabled,
-        PracticeGroupService groupService,
-        PracticeService practiceService,
-        PracticeGroupRepository groupRepository,
-        PracticeRepository practiceRepository,
-        CuratedCatalogService catalogService,
-        CuratedCatalogLock catalogLock,
-        PracticeCatalogInstallationRepository installationRepository,
-        WorkspaceRepository workspaceRepository,
-        TransactionOperations transactionOperations,
-        Clock clock
-    ) {
+            @Value("${hephaestus.practices.seed-default-catalog:true}") boolean enabled,
+            PracticeGroupService groupService,
+            PracticeService practiceService,
+            PracticeGroupRepository groupRepository,
+            PracticeRepository practiceRepository,
+            CuratedCatalogService catalogService,
+            CuratedCatalogLock catalogLock,
+            PracticeCatalogInstallationRepository installationRepository,
+            WorkspaceRepository workspaceRepository,
+            TransactionOperations transactionOperations,
+            Clock clock) {
         this.enabled = enabled;
         this.groupService = groupService;
         this.practiceService = practiceService;
@@ -72,11 +71,9 @@ class PracticeCatalogInstallationManager {
             return;
         }
         try {
-            workspaceRepository
-                .findAll()
-                .stream()
-                .sorted(Comparator.comparing(Workspace::getId, Comparator.nullsLast(Long::compareTo)))
-                .forEach(this::repairCatalogSafely);
+            workspaceRepository.findAll().stream()
+                    .sorted(Comparator.comparing(Workspace::getId, Comparator.nullsLast(Long::compareTo)))
+                    .forEach(this::repairCatalogSafely);
         } catch (RuntimeException exception) {
             log.error("Could not load workspaces for default practice catalog installation", exception);
         }
@@ -106,7 +103,8 @@ class PracticeCatalogInstallationManager {
 
     private void repairCatalog(Workspace workspace) {
         catalogLock.acquire();
-        Workspace lockedWorkspace = workspaceRepository.findByIdForUpdate(workspace.getId()).orElse(null);
+        Workspace lockedWorkspace =
+                workspaceRepository.findByIdForUpdate(workspace.getId()).orElse(null);
         if (lockedWorkspace == null || installationRepository.existsById(lockedWorkspace.getId())) {
             return;
         }
@@ -131,11 +129,10 @@ class PracticeCatalogInstallationManager {
         installationRepository.save(new PracticeCatalogInstallation(lockedWorkspace.getId(), now, now));
         if (seededPractices > 0) {
             log.info(
-                "Seeded practice catalog: {} groups, {} practices into workspace {}",
-                seededGroups,
-                seededPractices,
-                lockedWorkspace.getId()
-            );
+                    "Seeded practice catalog: {} groups, {} practices into workspace {}",
+                    seededGroups,
+                    seededPractices,
+                    lockedWorkspace.getId());
         }
     }
 }

@@ -15,8 +15,9 @@ import org.jspecify.annotations.Nullable;
  */
 @Schema(description = "Request to update a connection's lifecycle status")
 public record UpdateConnectionStatusRequestDTO(
-    @NotNull(message = "state is required")
-    @Schema(description = "Target lifecycle state. Admin-settable: ACTIVE, SUSPENDED, UNINSTALLED.")
-    IntegrationState state,
-    @Nullable @Schema(description = "Optional human-readable reason recorded on the audit trail") String reason
-) {}
+        @NotNull(message = "state is required")
+        @Schema(description = "Target lifecycle state. Admin-settable: ACTIVE, SUSPENDED, UNINSTALLED.")
+        IntegrationState state,
+
+        @Nullable @Schema(description = "Optional human-readable reason recorded on the audit trail")
+        String reason) {}

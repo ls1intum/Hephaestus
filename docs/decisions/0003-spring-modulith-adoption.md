@@ -64,7 +64,6 @@ keep the default (CLOSED) and expose the narrow sub-package APIs via
 - `practices` — `practices::model`, `practices::spi`, `practices::review`,
   `practices::finding`
 - `activity` — `activity::scoring`
-- `integrations` — `integrations::posthog`
 
 Wire `ModulithVerificationTest` into the architecture surefire group; generate
 diagrams under `server/application/target/modulith-docs/` as CI artifacts (not committed to git —

@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.workspace.context;
 
+import de.tum.cit.aet.hephaestus.observability.StructuredLogKeys;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,7 +14,7 @@ public final class WorkspaceContextHolder {
 
     private static final Logger log = LoggerFactory.getLogger(WorkspaceContextHolder.class);
 
-    private static final String MDC_WORKSPACE_ID = "workspace_id";
+    private static final String MDC_WORKSPACE_ID = StructuredLogKeys.WORKSPACE_ID;
     private static final String MDC_WORKSPACE_SLUG = "workspace_slug";
     private static final String MDC_INSTALLATION_ID = "installation_id";
 
@@ -34,10 +35,9 @@ public final class WorkspaceContextHolder {
         WorkspaceContext existing = contextHolder.get();
         if (existing != null && !existing.equals(context)) {
             log.warn(
-                "Detected context overwrite: existingSlug={}, newSlug={}",
-                existing.slug(),
-                context != null ? context.slug() : "null"
-            );
+                    "Detected context overwrite: existingSlug={}, newSlug={}",
+                    existing.slug(),
+                    context != null ? context.slug() : "null");
         }
 
         contextHolder.set(context);

@@ -62,11 +62,11 @@ public class GitDiffOperations {
         }
     }
 
-    private static ObjectId@Nullable [] resolveRange(Repository repo, String baseRef, String headRef)
-        throws IOException {
+    private static ObjectId @Nullable [] resolveRange(Repository repo, String baseRef, String headRef)
+            throws IOException {
         ObjectId baseId = repo.resolve(baseRef);
         ObjectId headId = repo.resolve(headRef);
-        return (baseId == null || headId == null) ? null : new ObjectId[] { baseId, headId };
+        return (baseId == null || headId == null) ? null : new ObjectId[] {baseId, headId};
     }
 
     /**
@@ -80,12 +80,8 @@ public class GitDiffOperations {
      *       {@code headSha}.</li>
      * </ol>
      */
-    public String@Nullable [] resolveDiffRange(
-        Path repoPath,
-        String targetBranch,
-        String sourceBranch,
-        @Nullable String headSha
-    ) {
+    public String @Nullable [] resolveDiffRange(
+            Path repoPath, String targetBranch, String sourceBranch, @Nullable String headSha) {
         if (headSha == null || headSha.isBlank()) {
             return null;
         }
@@ -107,11 +103,10 @@ public class GitDiffOperations {
                 // merge-base for a 3-dot range), so a source ref that differs from head is the normal expected
                 // condition, not an actionable problem.
                 log.debug(
-                    "source ref origin/{} resolves to {} not head {}, using merge-base range",
-                    sourceBranch,
-                    branchHead.getName(),
-                    headSha
-                );
+                        "source ref origin/{} resolves to {} not head {}, using merge-base range",
+                        sourceBranch,
+                        branchHead.getName(),
+                        headSha);
             }
 
             ObjectId target = branchBase != null ? branchBase : repo.resolve(targetBranch);
@@ -126,7 +121,7 @@ public class GitDiffOperations {
                 for (RevCommit commit : walk) {
                     RevCommit[] parents = commit.getParents();
                     if (parents.length >= 2 && parents[1].getId().equals(head)) {
-                        return new String[] { parents[0].getId().getName(), head.getName() };
+                        return new String[] {parents[0].getId().getName(), head.getName()};
                     }
                 }
             }
@@ -137,7 +132,7 @@ public class GitDiffOperations {
                 walk.markStart(walk.parseCommit(head));
                 RevCommit base = walk.next();
                 if (base != null && !base.getId().equals(head)) {
-                    return new String[] { base.getId().getName(), head.getName() };
+                    return new String[] {base.getId().getName(), head.getName()};
                 }
             }
 
@@ -157,12 +152,10 @@ public class GitDiffOperations {
             ObjectId[] range = resolveRange(repo, baseRef, headRef);
             if (range == null) return null;
 
-            try (
-                LimitedOutputStream out = new LimitedOutputStream(MAX_DIFF_BYTES);
-                ObjectReader reader = repo.newObjectReader();
-                RevWalk walk = new RevWalk(repo);
-                DiffFormatter formatter = newDiffFormatter(repo, out)
-            ) {
+            try (LimitedOutputStream out = new LimitedOutputStream(MAX_DIFF_BYTES);
+                    ObjectReader reader = repo.newObjectReader();
+                    RevWalk walk = new RevWalk(repo);
+                    DiffFormatter formatter = newDiffFormatter(repo, out)) {
                 formatter.format(treeIterator(reader, walk, range[0]), treeIterator(reader, walk, range[1]));
                 formatter.flush();
                 return out.content();
@@ -214,22 +207,17 @@ public class GitDiffOperations {
             if (range == null) return null;
 
             StringBuilder out = new StringBuilder();
-            try (
-                ObjectReader reader = repo.newObjectReader();
-                RevWalk walk = new RevWalk(repo);
-                DiffFormatter formatter = newDiffFormatter(repo, null)
-            ) {
-                List<DiffEntry> entries = formatter.scan(
-                    treeIterator(reader, walk, range[0]),
-                    treeIterator(reader, walk, range[1])
-                );
+            try (ObjectReader reader = repo.newObjectReader();
+                    RevWalk walk = new RevWalk(repo);
+                    DiffFormatter formatter = newDiffFormatter(repo, null)) {
+                List<DiffEntry> entries =
+                        formatter.scan(treeIterator(reader, walk, range[0]), treeIterator(reader, walk, range[1]));
                 for (DiffEntry entry : entries) {
-                    out
-                        .append(' ')
-                        .append(displayPath(entry))
-                        .append(" | ")
-                        .append(statColumn(formatter, entry))
-                        .append('\n');
+                    out.append(' ')
+                            .append(displayPath(entry))
+                            .append(" | ")
+                            .append(statColumn(formatter, entry))
+                            .append('\n');
                 }
             }
             return out.toString();
@@ -244,15 +232,11 @@ public class GitDiffOperations {
             if (range == null) return null;
 
             StringBuilder out = new StringBuilder();
-            try (
-                ObjectReader reader = repo.newObjectReader();
-                RevWalk walk = new RevWalk(repo);
-                DiffFormatter formatter = newDiffFormatter(repo, null)
-            ) {
-                for (DiffEntry entry : formatter.scan(
-                    treeIterator(reader, walk, range[0]),
-                    treeIterator(reader, walk, range[1])
-                )) {
+            try (ObjectReader reader = repo.newObjectReader();
+                    RevWalk walk = new RevWalk(repo);
+                    DiffFormatter formatter = newDiffFormatter(repo, null)) {
+                for (DiffEntry entry :
+                        formatter.scan(treeIterator(reader, walk, range[0]), treeIterator(reader, walk, range[1]))) {
                     out.append(singlePath(entry)).append('\n');
                 }
             }
@@ -273,7 +257,10 @@ public class GitDiffOperations {
                 walk.markUninteresting(walk.parseCommit(range[0]));
                 for (RevCommit commit : walk) {
                     AbbreviatedObjectId abbreviated = commit.abbreviate(7);
-                    out.append(abbreviated.name()).append('\t').append(commit.getShortMessage()).append('\n');
+                    out.append(abbreviated.name())
+                            .append('\t')
+                            .append(commit.getShortMessage())
+                            .append('\n');
                 }
             }
             return out.toString();
@@ -300,9 +287,8 @@ public class GitDiffOperations {
     }
 
     private static DiffFormatter newDiffFormatter(Repository repo, @Nullable OutputStream out) {
-        DiffFormatter formatter = new DiffFormatter(
-            out != null ? out : org.eclipse.jgit.util.io.DisabledOutputStream.INSTANCE
-        );
+        DiffFormatter formatter =
+                new DiffFormatter(out != null ? out : org.eclipse.jgit.util.io.DisabledOutputStream.INSTANCE);
         formatter.setRepository(repo);
         formatter.setDiffAlgorithm(DiffAlgorithm.getAlgorithm(DiffAlgorithm.SupportedAlgorithm.HISTOGRAM));
         formatter.setDiffComparator(RawTextComparator.DEFAULT);
@@ -313,7 +299,7 @@ public class GitDiffOperations {
     }
 
     private static AbstractTreeIterator treeIterator(ObjectReader reader, RevWalk walk, ObjectId commitId)
-        throws IOException {
+            throws IOException {
         CanonicalTreeParser parser = new CanonicalTreeParser();
         parser.reset(reader, walk.parseCommit(commitId).getTree());
         return parser;

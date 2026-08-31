@@ -2,24 +2,27 @@ services:
   reverse-proxy:
     # Keep at >=3.3: below it the app-server sticky.cookie.path label (workspace replica affinity)
     # fails to parse and Traefik silently drops the whole router. Pin a current 3.x.
-    image: traefik:v3.7.4
+    image: ${HEPHAESTUS_IMAGE_TRAEFIK:?verified release lock required}
     restart: unless-stopped
     networks:
       - shared-network
     ports:
       - "80:80"
       - "443:443"
-      - "8080:8080"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./letsencrypt:/letsencrypt
     command:
       - "--ping=true"
       - "--ping.entrypoint=http"
-      - "--api.dashboard=true"
-      - "--api.insecure=false"
+      - "--metrics.prometheus=true"
       - "--entrypoints.http.address=:80"
       - "--entrypoints.https.address=:443"
+      # Entrypoint-wide response headers only. The request-body-limit buffering middleware must NOT
+      # sit on the entrypoint: Traefik's buffering middleware buffers whole responses, which would
+      # hold back every SSE stream (mentor chat, sync live-push) until it closes. It is attached
+      # per-router to the non-streaming surfaces (webapp, webhook-server) instead.
+      - "--entrypoints.https.http.middlewares=security-headers@docker"
       - "--entrypoints.http.http.encodequerysemicolons=true"
       - "--entryPoints.http.http2.maxConcurrentStreams=50"
       - "--entrypoints.https.http.encodequerysemicolons=true"
@@ -37,11 +40,24 @@ services:
       - "--certificatesresolvers.letsencrypt.acme.email=admin@tum.de"
       - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=http"
       - "--providers.docker=true"
+      # TLS options and serversTransports are NOT definable through Docker labels (the docker
+      # provider silently drops them, and a dangling serversTransport reference disables the whole
+      # router), so they live in this file-provider fragment.
+      - "--providers.file.filename=/etc/traefik/dynamic.yml"
+    configs:
+      - source: traefik-dynamic
+        target: /etc/traefik/dynamic.yml
     labels:
       - traefik.enable=true
-      - traefik.http.routers.traefik.entrypoints=http
-      - traefik.http.routers.traefik.service=api@internal
-      - traefik.http.services.traefik.loadbalancer.server.port=8080
+      - traefik.http.middlewares.security-headers.headers.stsSeconds=2592000
+      - traefik.http.middlewares.security-headers.headers.stsIncludeSubdomains=true
+      - traefik.http.middlewares.security-headers.headers.contentTypeNosniff=true
+      - traefik.http.middlewares.security-headers.headers.frameDeny=true
+      - traefik.http.middlewares.security-headers.headers.referrerPolicy=strict-origin-when-cross-origin
+      - traefik.http.middlewares.security-headers.headers.permissionsPolicy=geolocation=(), camera=(), microphone=(), payment=()
+      - "traefik.http.middlewares.security-headers.headers.contentSecurityPolicy=default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https: wss:; worker-src 'self' blob:; manifest-src 'self'; upgrade-insecure-requests"
+      - traefik.http.middlewares.request-body-limit.buffering.maxRequestBodyBytes=26214400
+      - traefik.http.middlewares.request-body-limit.buffering.memRequestBodyBytes=1048576
       - traefik.http.middlewares.errorpage.errors.status=501,502,503,504
       - traefik.http.middlewares.errorpage.errors.service=maintenance
       - traefik.http.middlewares.errorpage.errors.query=/index.html
@@ -60,7 +76,7 @@ services:
         max-file: "3"
 
   maintenance:
-    image: nginx:alpine
+    image: ${HEPHAESTUS_IMAGE_NGINX:?verified release lock required}
     restart: unless-stopped
     configs:
       - source: maintenance-page
@@ -103,6 +119,22 @@ networks:
     driver: bridge
 
 configs:
+  traefik-dynamic:
+    content: |
+      # File-provider fragment for dynamic configuration the docker provider cannot express as
+      # labels. Traefik silently ignores tls.options and serversTransports labels, so putting
+      # these there would leave TLS 1.0/1.1 accepted and (for a referenced transport) disable
+      # the router that names it.
+      tls:
+        options:
+          default:
+            minVersion: VersionTLS12
+      http:
+        serversTransports:
+          application:
+            forwardingTimeouts:
+              dialTimeout: 10s
+              responseHeaderTimeout: 30s
   nginx-default-config:
     content: |
       server {

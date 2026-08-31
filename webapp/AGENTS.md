@@ -1,7 +1,7 @@
 # Webapp
 
 React 19 SPA on TanStack Router/Query, Tailwind 4, shadcn primitives over **Base UI**
-(`@base-ui/react`) — not Radix. Vitest + Storybook for tests, oxlint for lint and Biome for format,
+(`@base-ui/react`) — not Radix. Vitest + Storybook for tests, oxlint for lint and oxfmt for format,
 Vite for the build. React Compiler runs at build time.
 
 This file is the gotchas. Conventions that a look at the tree, or a lint message at the call site,
@@ -15,7 +15,7 @@ already tells you are not here.
 | Type check | `pnpm run typecheck:webapp` |
 | Lint + format | `pnpm run check:webapp` — does **not** type-check; that is the separate leg above |
 | Tests | `pnpm run test:webapp` |
-| Storybook | `pnpm --filter webapp run storybook` |
+| Storybook | `pnpm --filter webapp run storybook:dev` |
 
 ## Ask first
 
@@ -58,7 +58,7 @@ derives URL segments from the filenames there and the router owns that naming.
 
 ## Linting
 
-**oxlint lints, Biome formats.** `.oxlintrc.json` is the whole rule set, every rule it turns off
+**oxlint lints, oxfmt formats.** `.oxlintrc.json` is the whole rule set, every rule it turns off
 carries the reason beside it, and every restriction states itself at the call site when it fires. None
 of that is repeated here, and the repo-root `AGENTS.md` § Lint and format scopes explains why `lint`
 is spelled `cd .. && oxlint webapp`. What follows is what no diagnostic will ever tell you.
@@ -181,12 +181,14 @@ suppressed at the call site with their reason.
 `forwardRef` are not imports you may take from `react` — the import line says so and why.
 
 **A `useMemo` that survives is load-bearing, and deleting it breaks something that still type-checks.**
-There are only two shapes that earn the suppression, and each names its own on the line above the
+There are only three shapes that earn the suppression, and each names its own on the line above the
 import: the value is a **dependency of an effect**, so its identity is what decides whether the effect
-re-runs; or the component is **opted out of the compiler** by a library it uses, so nothing memoises
-for it. `useReactTable` is the second case — `react/incompatible-library` names the same fact — and
-TanStack Table rebuilds its column model, and every row model downstream, whenever `columns` changes
-identity. Anything else is the memo the compiler exists to remove.
+re-runs; the component is **opted out of the compiler** by a library it uses, so nothing memoises for
+it — `react/incompatible-library` names that case where it can; or a **library keys a cache on the
+value's identity**, which the compiler memoises as an optimisation rather than promises. TanStack
+Table is the third: `useTable` compares `options.columns` and `options.data` with `!==` and rebuilds
+the column model, and every row model downstream, when either changes — so a table here memoises
+them by hand. Anything else is the memo the compiler exists to remove.
 
 ## The time of day
 
@@ -232,7 +234,7 @@ a routing table on the front page; its `RUBRIC.md` is the grading instrument for
 ## Routing
 
 Declare routes with `createFileRoute`. Keep loaders side-effect free and prefer
-`context.queryClient.ensureQueryData(...)` with the generated options. Put shared data (query client,
+`context.queryClient.query(...)` with the generated options. Put shared data (query client,
 auth) on the router context. Never hand-edit `routeTree.gen.ts` — there is no `tsr` CLI here; the
 TanStack Router Vite plugin regenerates it when the dev server runs.
 
@@ -274,6 +276,15 @@ from the `--color-*` block in `src/styles.css` over a hard-coded value; `text-mu
 `text-foreground`, `bg-background` and `border-border` carry most of the tree. Read that block rather
 than guessing a name.
 
+**A `*.module.css` is for what a utility cannot express, and for nothing else.** There are two in the
+tree — `MentorIcon` and the landing scene — and each holds `@keyframes`, a generated `::before`, a
+`clip-path`, or a grid whose placement descendants override at a breakpoint. Anything a utility can
+say stays a utility: a module rule that is one `letter-spacing` or one `margin` is a utility in the
+wrong file, and it silently outranks the utility it duplicates, because Vite emits module CSS
+unlayered while Tailwind sits in `@layer utilities`. That inversion is the whole cost of the second
+system, so **own a property in one place or the other, never both** — a margin the module changes at
+a breakpoint belongs to the module at every width, not to `mt-8` at one of them.
+
 ## Testing
 
 `getByRole` > `getByLabelText` > `getByText`, and the ladder ends there: a `data-testid` skips past the
@@ -288,13 +299,7 @@ names the replacement in its message; for one it does not list, assert on the pl
 The matchers **are** available in stories, because `expect` from `storybook/test` ships them. Copying
 an assertion out of a story into a route test is exactly how this bites.
 
-## TypeScript versions
-
-Type checking runs on TypeScript 7 through the `typescript7` alias, invoked by path because both it
-and `typescript` install a `tsc` bin and the winner is undefined. `typescript` itself stays on 6
-because `@hey-api/openapi-ts` calls the TypeScript compiler API at runtime and the 7 package ships
-only `tsc` — its peer range accepts 7, so nothing warns you before the generator dies. A scoped
-`parent>typescript` pnpm override does **not** help: peers resolve from this package, not the override.
+## Type checking
 
 **A dot-directory is invisible to a `**/*` include.** `tsconfig.json`'s `**/*.ts` does not match
 `.storybook/`, so a file there is type-checked only if something names the directory explicitly —
@@ -490,4 +495,3 @@ the label about 60px and the row squashes.
 
 Fixed widths on a control inside a responsive field must be breakpoint-scoped for the same reason —
 `w-56` alone cannot stack.
-

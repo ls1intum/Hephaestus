@@ -20,10 +20,7 @@ public final class Jackson3FormatMapper implements FormatMapper {
 
     @Override
     public <T> @Nullable T fromString(
-        @Nullable CharSequence charSequence,
-        JavaType<T> javaType,
-        WrapperOptions wrapperOptions
-    ) {
+            @Nullable CharSequence charSequence, JavaType<T> javaType, WrapperOptions wrapperOptions) {
         if (charSequence == null) {
             return null;
         }
@@ -32,9 +29,7 @@ public final class Jackson3FormatMapper implements FormatMapper {
             return objectMapper.readValue(charSequence.toString(), objectMapper.constructType(rawType));
         } catch (JacksonException e) {
             throw new HibernateException(
-                "JSON deserialize failed for " + javaType.getJavaTypeClass().getSimpleName(),
-                e
-            );
+                    "JSON deserialize failed for " + javaType.getJavaTypeClass().getSimpleName(), e);
         }
     }
 
@@ -46,7 +41,8 @@ public final class Jackson3FormatMapper implements FormatMapper {
         try {
             return objectMapper.writeValueAsString(value);
         } catch (JacksonException e) {
-            throw new HibernateException("JSON serialize failed for " + javaType.getJavaTypeClass().getSimpleName(), e);
+            throw new HibernateException(
+                    "JSON serialize failed for " + javaType.getJavaTypeClass().getSimpleName(), e);
         }
     }
 }

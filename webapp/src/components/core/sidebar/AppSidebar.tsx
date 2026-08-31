@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { SquarePen } from "lucide-react";
 import type { MouseEvent, ReactNode } from "react";
+
 import type {
 	ChatThreadSummary,
 	IntegrationCatalogEntry,
@@ -21,6 +22,7 @@ import {
 	useSidebar,
 } from "@/components/ui/sidebar";
 import { NoWorkspace } from "@/components/workspace/NoWorkspace";
+
 import { NavAdmin } from "./NavAdmin";
 import { NavContextHeader } from "./NavContextHeader";
 import { NavDashboards } from "./NavDashboards";

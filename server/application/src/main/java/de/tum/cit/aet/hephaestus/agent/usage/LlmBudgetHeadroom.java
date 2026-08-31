@@ -16,13 +16,12 @@ import org.jspecify.annotations.Nullable;
  * so such a purse stays exhausted, and EXHAUSTED outranks UNVERIFIABLE.
  */
 public record LlmBudgetHeadroom(
-    @Nullable BigDecimal instanceSpentUsd,
-    @Nullable BigDecimal instanceBudgetUsd,
-    boolean instanceHasUnpricedSpend,
-    @Nullable BigDecimal workspaceSpentUsd,
-    @Nullable BigDecimal workspaceBudgetUsd,
-    boolean workspaceHasUnpricedSpend
-) {
+        @Nullable BigDecimal instanceSpentUsd,
+        @Nullable BigDecimal instanceBudgetUsd,
+        boolean instanceHasUnpricedSpend,
+        @Nullable BigDecimal workspaceSpentUsd,
+        @Nullable BigDecimal workspaceBudgetUsd,
+        boolean workspaceHasUnpricedSpend) {
     public static final LlmBudgetHeadroom UNCAPPED = new LlmBudgetHeadroom(null, null, false, null, null, false);
 
     /** The verdict on recorded spend alone. */
@@ -39,19 +38,16 @@ public record LlmBudgetHeadroom(
      */
     public LlmBudgetDecision decideWith(@Nullable FundingSource purse, BigDecimal inFlightUsd) {
         return new LlmBudgetDecision(
-            reason(
-                instanceSpentUsd,
-                instanceBudgetUsd,
-                instanceHasUnpricedSpend,
-                chargedTo(FundingSource.INSTANCE, purse, inFlightUsd)
-            ),
-            reason(
-                workspaceSpentUsd,
-                workspaceBudgetUsd,
-                workspaceHasUnpricedSpend,
-                chargedTo(FundingSource.WORKSPACE, purse, inFlightUsd)
-            )
-        );
+                reason(
+                        instanceSpentUsd,
+                        instanceBudgetUsd,
+                        instanceHasUnpricedSpend,
+                        chargedTo(FundingSource.INSTANCE, purse, inFlightUsd)),
+                reason(
+                        workspaceSpentUsd,
+                        workspaceBudgetUsd,
+                        workspaceHasUnpricedSpend,
+                        chargedTo(FundingSource.WORKSPACE, purse, inFlightUsd)));
     }
 
     private static BigDecimal chargedTo(FundingSource cap, @Nullable FundingSource purse, BigDecimal inFlightUsd) {
@@ -62,11 +58,10 @@ public record LlmBudgetHeadroom(
     }
 
     private static LlmBudgetBlockReason reason(
-        @Nullable BigDecimal spentUsd,
-        @Nullable BigDecimal budgetUsd,
-        boolean hasUnpricedSpend,
-        BigDecimal inFlightUsd
-    ) {
+            @Nullable BigDecimal spentUsd,
+            @Nullable BigDecimal budgetUsd,
+            boolean hasUnpricedSpend,
+            BigDecimal inFlightUsd) {
         if (budgetUsd == null || spentUsd == null) {
             return LlmBudgetBlockReason.NONE;
         }

@@ -1,11 +1,12 @@
+import { readFile } from "node:fs/promises";
 // Precompute HINTS for honours-linked-issue-acceptance-criteria: surface the LINK between this change and a
 // tracker issue, plus (when the linked issue's body is projected into context) whether that issue carries a
 // checkable acceptance-criteria block. FACTS only — closing-ref candidates + AC-block presence. The LLM maps
 // each criterion to done/deferred. No observation. This practice over-NAs when the linked-issue fact is absent, so
 // the point is to make BOTH the link and the issue's done-artifact visible when they exist.
-import { readContextJson } from "../lib/context";
-import { isJsonObject } from "../lib/practice-contract";
-import type { DiffFile, PullRequestMetadata } from "../lib/types";
+import { readContextJson } from "../lib/context.ts";
+import { isJsonObject } from "../lib/practice-contract.ts";
+import type { DiffFile, PullRequestMetadata } from "../lib/types.ts";
 
 // Closing-keyword grammar shared by GitHub/GitLab: close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved
 // followed by an issue reference. Generalised — adding a host = adding a URL row, no engine change.
@@ -80,9 +81,9 @@ async function readLinkedItemsFromRepoPath(repoPath: string): Promise<LinkedWork
 	const idx = repoPath.lastIndexOf("/inputs/");
 	if (idx < 0) return null;
 	try {
-		const data: unknown = await Bun.file(
-			`${repoPath.slice(0, idx)}/inputs/context/linked_work_items.json`,
-		).json();
+		const data: unknown = JSON.parse(
+			await readFile(`${repoPath.slice(0, idx)}/inputs/context/linked_work_items.json`, "utf8"),
+		);
 		return unwrapLinkedItems(data);
 	} catch {
 		// absent or unreadable — that itself is the over-NA condition; fall through.

@@ -59,20 +59,15 @@ class ConnectionActivityRecorderTest extends BaseUnitTest {
     void setUp() {
         clock = new MutableClock(Instant.parse("2026-07-14T10:00:00Z"), ZoneId.of("UTC"));
         org.mockito.Mockito.lenient()
-            .doAnswer(invocation -> {
-                java.util.function.Consumer<TransactionStatus> action = invocation.getArgument(0);
-                action.accept(org.mockito.Mockito.mock(TransactionStatus.class));
-                return null;
-            })
-            .when(transactionTemplate)
-            .executeWithoutResult(any());
+                .doAnswer(invocation -> {
+                    java.util.function.Consumer<TransactionStatus> action = invocation.getArgument(0);
+                    action.accept(org.mockito.Mockito.mock(TransactionStatus.class));
+                    return null;
+                })
+                .when(transactionTemplate)
+                .executeWithoutResult(any());
         recorder = new ConnectionActivityRecorder(
-            connectionRepository,
-            activityRepository,
-            eventPublisher,
-            clock,
-            transactionTemplate
-        );
+                connectionRepository, activityRepository, eventPublisher, clock, transactionTemplate);
     }
 
     @Test
@@ -100,13 +95,9 @@ class ConnectionActivityRecorderTest extends BaseUnitTest {
 
     @Test
     void recordEventProcessed_noActiveConnection_noOp() {
-        when(
-            connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
-                WORKSPACE_ID,
-                IntegrationKind.GITHUB,
-                IntegrationState.ACTIVE
-            )
-        ).thenReturn(Optional.empty());
+        when(connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
+                        WORKSPACE_ID, IntegrationKind.GITHUB, IntegrationState.ACTIVE))
+                .thenReturn(Optional.empty());
 
         recorder.recordEventProcessed(WORKSPACE_ID, IntegrationKind.GITHUB, "push");
 
@@ -118,32 +109,30 @@ class ConnectionActivityRecorderTest extends BaseUnitTest {
     void recordEventProcessed_repositoryThrows_neverPropagates() {
         stubActiveConnection(WORKSPACE_ID, IntegrationKind.GITHUB, CONNECTION_ID);
         doThrow(new RuntimeException("boom"))
-            .when(activityRepository)
-            .upsertActivity(anyLong(), anyLong(), any(), any());
+                .when(activityRepository)
+                .upsertActivity(anyLong(), anyLong(), any(), any());
 
-        assertThatCode(() ->
-            recorder.recordEventProcessed(WORKSPACE_ID, IntegrationKind.GITHUB, "push")
-        ).doesNotThrowAnyException();
+        assertThatCode(() -> recorder.recordEventProcessed(WORKSPACE_ID, IntegrationKind.GITHUB, "push"))
+                .doesNotThrowAnyException();
     }
 
     @Test
     void recordEventProcessed_transactionCommitFails_neverPropagates() {
-        doThrow(new UnexpectedRollbackException("commit failed")).when(transactionTemplate).executeWithoutResult(any());
+        doThrow(new UnexpectedRollbackException("commit failed"))
+                .when(transactionTemplate)
+                .executeWithoutResult(any());
 
-        assertThatCode(() ->
-            recorder.recordEventProcessed(WORKSPACE_ID, IntegrationKind.GITHUB, "push")
-        ).doesNotThrowAnyException();
+        assertThatCode(() -> recorder.recordEventProcessed(WORKSPACE_ID, IntegrationKind.GITHUB, "push"))
+                .doesNotThrowAnyException();
     }
 
     @Test
     void invalidate_forcesReResolutionOfConnectionIdOnNextCall() {
         stubActiveConnection(WORKSPACE_ID, IntegrationKind.GITHUB, CONNECTION_ID);
         recorder.recordEventProcessed(WORKSPACE_ID, IntegrationKind.GITHUB, "push");
-        verify(connectionRepository, times(1)).findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
-            WORKSPACE_ID,
-            IntegrationKind.GITHUB,
-            IntegrationState.ACTIVE
-        );
+        verify(connectionRepository, times(1))
+                .findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
+                        WORKSPACE_ID, IntegrationKind.GITHUB, IntegrationState.ACTIVE);
 
         recorder.invalidate(WORKSPACE_ID, IntegrationKind.GITHUB);
         stubActiveConnection(WORKSPACE_ID, IntegrationKind.GITHUB, OTHER_CONNECTION_ID);
@@ -151,18 +140,12 @@ class ConnectionActivityRecorderTest extends BaseUnitTest {
 
         recorder.recordEventProcessed(WORKSPACE_ID, IntegrationKind.GITHUB, "push");
 
-        verify(connectionRepository, times(2)).findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
-            WORKSPACE_ID,
-            IntegrationKind.GITHUB,
-            IntegrationState.ACTIVE
-        );
+        verify(connectionRepository, times(2))
+                .findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
+                        WORKSPACE_ID, IntegrationKind.GITHUB, IntegrationState.ACTIVE);
         ArgumentCaptor<Long> connectionIdCaptor = ArgumentCaptor.forClass(Long.class);
-        verify(activityRepository, times(2)).upsertActivity(
-            connectionIdCaptor.capture(),
-            eq(WORKSPACE_ID),
-            any(),
-            any()
-        );
+        verify(activityRepository, times(2))
+                .upsertActivity(connectionIdCaptor.capture(), eq(WORKSPACE_ID), any(), any());
         assertThat(connectionIdCaptor.getAllValues()).containsExactly(CONNECTION_ID, OTHER_CONNECTION_ID);
     }
 
@@ -170,20 +153,12 @@ class ConnectionActivityRecorderTest extends BaseUnitTest {
         Workspace workspace = new Workspace();
         workspace.setId(workspaceId);
         Connection connection = new Connection(
-            workspace,
-            kind,
-            "100",
-            new ConnectionConfig.GitHubAppConfig(100L, "acme", null, Set.of())
-        );
+                workspace, kind, "100", new ConnectionConfig.GitHubAppConfig(100L, "acme", null, Set.of()));
         setConnectionId(connection, connectionId);
         connection.setState(IntegrationState.ACTIVE);
-        when(
-            connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
-                workspaceId,
-                kind,
-                IntegrationState.ACTIVE
-            )
-        ).thenReturn(Optional.of(connection));
+        when(connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
+                        workspaceId, kind, IntegrationState.ACTIVE))
+                .thenReturn(Optional.of(connection));
     }
 
     private static void setConnectionId(Connection connection, long id) {

@@ -1,5 +1,6 @@
 import { RotateCcw } from "lucide-react";
 import { useId } from "react";
+
 import type {
 	CatalogEntryStatus,
 	CuratedGroupRequest,
@@ -13,6 +14,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { artifactKindLabel } from "@/lib/artifact-kinds";
 import { humanizeToken } from "@/lib/humanize";
 import { cn } from "@/lib/utils";
+
 import {
 	canKeepCurrentDefinition,
 	canUseHephaestusVersion,

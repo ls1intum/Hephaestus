@@ -51,32 +51,20 @@ class DockerSandboxLiveTest {
     @BeforeAll
     static void checkDocker() {
         assumeTrue(
-            DockerClientFactory.instance().isDockerAvailable(),
-            "Docker not available — skipping integration tests"
-        );
+                DockerClientFactory.instance().isDockerAvailable(),
+                "Docker not available — skipping integration tests");
     }
 
     @BeforeEach
     void setUp() {
         SandboxProperties properties = new SandboxProperties(
-            "unix:///var/run/docker.sock",
-            false,
-            null,
-            5,
-            10,
-            60,
-            null,
-            8080,
-            null,
-            209_715_200L,
-            500_000,
-            null
-        );
+                "unix:///var/run/docker.sock", false, null, 5, 10, 60, null, 8080, null, 209_715_200L, 500_000, null);
 
         var dockerClient = DockerClientImpl.getInstance(
-            DefaultDockerClientConfig.createDefaultConfigBuilder().build(),
-            new ApacheDockerHttpClient.Builder().dockerHost(URI.create("unix:///var/run/docker.sock")).build()
-        );
+                DefaultDockerClientConfig.createDefaultConfigBuilder().build(),
+                new ApacheDockerHttpClient.Builder()
+                        .dockerHost(URI.create("unix:///var/run/docker.sock"))
+                        .build());
 
         dockerOps = new DockerClientOperations(dockerClient, dockerClient);
         dockerWaitExecutor = Executors.newCachedThreadPool();
@@ -86,14 +74,13 @@ class DockerSandboxLiveTest {
         ContainerSecurityPolicy securityPolicy = new ContainerSecurityPolicy(properties, null);
 
         sandboxAdapter = new DockerSandboxAdapter(
-            networkManager,
-            workspaceManager,
-            containerManager,
-            securityPolicy,
-            properties,
-            8080,
-            new SimpleMeterRegistry()
-        );
+                networkManager,
+                workspaceManager,
+                containerManager,
+                securityPolicy,
+                properties,
+                8080,
+                new SimpleMeterRegistry());
     }
 
     @AfterEach
@@ -103,24 +90,24 @@ class DockerSandboxLiveTest {
         }
         // Safety net: remove any managed containers left over from failed tests
         try {
-            containerManager
-                .listManagedContainers()
-                .forEach(c -> {
-                    try {
-                        containerManager.forceRemove(c.id());
-                    } catch (Exception ignored) {}
-                });
-        } catch (Exception ignored) {}
+            containerManager.listManagedContainers().forEach(c -> {
+                try {
+                    containerManager.forceRemove(c.id());
+                } catch (Exception ignored) {
+                }
+            });
+        } catch (Exception ignored) {
+        }
 
         try {
-            networkManager
-                .listOrphanedNetworks()
-                .forEach(n -> {
-                    try {
-                        networkManager.removeNetwork(n.id());
-                    } catch (Exception ignored) {}
-                });
-        } catch (Exception ignored) {}
+            networkManager.listOrphanedNetworks().forEach(n -> {
+                try {
+                    networkManager.removeNetwork(n.id());
+                } catch (Exception ignored) {
+                }
+            });
+        } catch (Exception ignored) {
+        }
     }
 
     private SecurityProfile testSecurityProfile() {
@@ -135,20 +122,19 @@ class DockerSandboxLiveTest {
             UUID jobId = UUID.randomUUID();
 
             String script =
-                "#!/bin/sh\nmkdir -p /workspace/out\necho '{\"status\":\"ok\"}' > /workspace/out/result.json\necho 'done'";
+                    "#!/bin/sh\nmkdir -p /workspace/out\necho '{\"status\":\"ok\"}' > /workspace/out/result.json\necho 'done'";
 
             SandboxSpec spec = new SandboxSpec(
-                jobId,
-                "alpine:latest",
-                List.of("sh", "-c", script),
-                Map.of("TEST_VAR", "hello"),
-                new NetworkPolicy(true, null, null), // Use bridge for simplicity
-                new ResourceLimits(512 * 1024 * 1024, 1.0, 128, Duration.ofMinutes(1)),
-                testSecurityProfile(),
-                Map.of(),
-                "/workspace/out",
-                null
-            );
+                    jobId,
+                    "alpine:latest",
+                    List.of("sh", "-c", script),
+                    Map.of("TEST_VAR", "hello"),
+                    new NetworkPolicy(true, null, null), // Use bridge for simplicity
+                    new ResourceLimits(512 * 1024 * 1024, 1.0, 128, Duration.ofMinutes(1)),
+                    testSecurityProfile(),
+                    Map.of(),
+                    "/workspace/out",
+                    null);
 
             SandboxResult result = sandboxAdapter.execute(spec);
 
@@ -164,17 +150,16 @@ class DockerSandboxLiveTest {
             UUID jobId = UUID.randomUUID();
 
             SandboxSpec spec = new SandboxSpec(
-                jobId,
-                "alpine:latest",
-                List.of("sh", "-c", "exit 42"),
-                Map.of(),
-                new NetworkPolicy(true, null, null),
-                new ResourceLimits(256 * 1024 * 1024, 0.5, 64, Duration.ofMinutes(1)),
-                testSecurityProfile(),
-                Map.of(),
-                "/workspace/out",
-                null
-            );
+                    jobId,
+                    "alpine:latest",
+                    List.of("sh", "-c", "exit 42"),
+                    Map.of(),
+                    new NetworkPolicy(true, null, null),
+                    new ResourceLimits(256 * 1024 * 1024, 0.5, 64, Duration.ofMinutes(1)),
+                    testSecurityProfile(),
+                    Map.of(),
+                    "/workspace/out",
+                    null);
 
             SandboxResult result = sandboxAdapter.execute(spec);
 
@@ -191,17 +176,16 @@ class DockerSandboxLiveTest {
             UUID jobId = UUID.randomUUID();
 
             SandboxSpec spec = new SandboxSpec(
-                jobId,
-                "alpine:latest",
-                List.of("sh", "-c", "sleep 300"),
-                Map.of(),
-                new NetworkPolicy(true, null, null),
-                new ResourceLimits(256 * 1024 * 1024, 0.5, 64, Duration.ofSeconds(3)),
-                testSecurityProfile(),
-                Map.of(),
-                "/workspace/out",
-                null
-            );
+                    jobId,
+                    "alpine:latest",
+                    List.of("sh", "-c", "sleep 300"),
+                    Map.of(),
+                    new NetworkPolicy(true, null, null),
+                    new ResourceLimits(256 * 1024 * 1024, 0.5, 64, Duration.ofSeconds(3)),
+                    testSecurityProfile(),
+                    Map.of(),
+                    "/workspace/out",
+                    null);
 
             SandboxResult result = sandboxAdapter.execute(spec);
 
@@ -219,17 +203,16 @@ class DockerSandboxLiveTest {
             UUID jobId = UUID.randomUUID();
 
             SandboxSpec spec = new SandboxSpec(
-                jobId,
-                "alpine:latest",
-                List.of("sh", "-c", "mkdir -p /workspace/out && cat /workspace/.prompt > /workspace/out/echo.txt"),
-                Map.of(),
-                new NetworkPolicy(true, null, null),
-                new ResourceLimits(256 * 1024 * 1024, 0.5, 64, Duration.ofMinutes(1)),
-                testSecurityProfile(),
-                Map.of(".prompt", "injected content".getBytes()),
-                "/workspace/out",
-                null
-            );
+                    jobId,
+                    "alpine:latest",
+                    List.of("sh", "-c", "mkdir -p /workspace/out && cat /workspace/.prompt > /workspace/out/echo.txt"),
+                    Map.of(),
+                    new NetworkPolicy(true, null, null),
+                    new ResourceLimits(256 * 1024 * 1024, 0.5, 64, Duration.ofMinutes(1)),
+                    testSecurityProfile(),
+                    Map.of(".prompt", "injected content".getBytes()),
+                    "/workspace/out",
+                    null);
 
             SandboxResult result = sandboxAdapter.execute(spec);
 
@@ -247,35 +230,28 @@ class DockerSandboxLiveTest {
             UUID jobId = UUID.randomUUID();
 
             SandboxSpec spec = new SandboxSpec(
-                jobId,
-                "alpine:latest",
-                List.of("echo", "cleanup-test"),
-                Map.of(),
-                new NetworkPolicy(true, null, null),
-                new ResourceLimits(256 * 1024 * 1024, 0.5, 64, Duration.ofMinutes(1)),
-                testSecurityProfile(),
-                Map.of(),
-                "/workspace/out",
-                null
-            );
+                    jobId,
+                    "alpine:latest",
+                    List.of("echo", "cleanup-test"),
+                    Map.of(),
+                    new NetworkPolicy(true, null, null),
+                    new ResourceLimits(256 * 1024 * 1024, 0.5, 64, Duration.ofMinutes(1)),
+                    testSecurityProfile(),
+                    Map.of(),
+                    "/workspace/out",
+                    null);
 
             sandboxAdapter.execute(spec);
 
-            assertThat(
-                containerManager
-                    .listManagedContainers()
-                    .stream()
-                    .filter(c -> jobId.toString().equals(c.labels().get("hephaestus.job-id")))
-                    .toList()
-            ).isEmpty();
+            assertThat(containerManager.listManagedContainers().stream()
+                            .filter(c -> jobId.toString().equals(c.labels().get("hephaestus.job-id")))
+                            .toList())
+                    .isEmpty();
 
-            assertThat(
-                networkManager
-                    .listOrphanedNetworks()
-                    .stream()
-                    .filter(n -> n.name().contains(jobId.toString()))
-                    .toList()
-            ).isEmpty();
+            assertThat(networkManager.listOrphanedNetworks().stream()
+                            .filter(n -> n.name().contains(jobId.toString()))
+                            .toList())
+                    .isEmpty();
         }
     }
 }

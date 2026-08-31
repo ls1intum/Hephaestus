@@ -112,7 +112,7 @@ Login `ClientRegistration`s are built from the `login_provider` store by
 `LoginProviderClientRegistrationRepository` in `core.auth.provider` (it depends only on the store +
 Spring Security — integration may not reach into `core.auth.provider`). The integration side keeps
 `RegistrationToGitProviderResolver` (maps a registration to its provider record via the
-`GitProviderRegistry` SPI) and the reusable `IssuerDiscoveryProbe`; `ImpersonationGuard` lives in
+`GitProviderRegistry` SPI); `ImpersonationGuard` lives in
 `core.security`.
 
 Boundaries: `workspace` / `integration.scm` / `notification` depend on `core.auth` (read model +

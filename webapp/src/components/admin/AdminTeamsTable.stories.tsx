@@ -1,8 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "storybook/test";
+
 import type { LabelInfo, RepositoryInfo, TeamInfo } from "@/api/types.gen";
 import { withStandardPage } from "@/stories/decorators";
 import { expectNoPageOverflow } from "@/test/reflow";
+
 import { AdminTeamsTable } from "./AdminTeamsTable";
 
 const hephaestusRepo: RepositoryInfo = {

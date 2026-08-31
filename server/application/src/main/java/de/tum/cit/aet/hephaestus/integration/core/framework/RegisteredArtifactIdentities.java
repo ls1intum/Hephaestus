@@ -28,24 +28,14 @@ public class RegisteredArtifactIdentities implements ArtifactIdentities {
 
     public RegisteredArtifactIdentities(List<ArtifactIdentityResolver> resolvers, ArtifactCatalog artifacts) {
         this.artifacts = artifacts;
-        this.byKind = resolvers
-            .stream()
-            .collect(
-                Collectors.toUnmodifiableMap(
-                    ArtifactIdentityResolver::kind,
-                    resolver -> resolver,
-                    (a, b) -> {
-                        throw new IllegalStateException(
-                            "Duplicate ArtifactIdentityResolver for kind=" +
-                                a.kind() +
-                                ": " +
-                                a.getClass().getName() +
-                                " vs " +
-                                b.getClass().getName()
-                        );
-                    }
-                )
-            );
+        this.byKind = resolvers.stream()
+                .collect(Collectors.toUnmodifiableMap(ArtifactIdentityResolver::kind, resolver -> resolver, (a, b) -> {
+                    throw new IllegalStateException("Duplicate ArtifactIdentityResolver for kind=" + a.kind()
+                            + ": "
+                            + a.getClass().getName()
+                            + " vs "
+                            + b.getClass().getName());
+                }));
     }
 
     @Override
@@ -57,9 +47,9 @@ public class RegisteredArtifactIdentities implements ArtifactIdentities {
         ArtifactIdentityResolver resolver = byKind.get(kind);
         Map<Long, ArtifactIdentity> resolved = resolver == null ? Map.of() : resolver.resolve(workspaceId, ids);
         String fallbackLabel = artifacts
-            .descriptorFor(kind)
-            .map(ArtifactDescriptor::displayName)
-            .orElseGet(kind::value);
+                .descriptorFor(kind)
+                .map(ArtifactDescriptor::displayName)
+                .orElseGet(kind::value);
         Map<Long, ArtifactIdentity> answer = new HashMap<>(ids.size());
         for (Long id : ids) {
             ArtifactIdentity identity = resolved.get(id);

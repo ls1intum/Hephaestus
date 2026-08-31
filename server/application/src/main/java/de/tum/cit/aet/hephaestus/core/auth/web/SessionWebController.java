@@ -34,32 +34,26 @@ public class SessionWebController {
     }
 
     public record SessionViewDTO(
-        UUID jti,
-        @Nullable Instant issuedAt,
-        Instant expiresAt,
-        @Nullable String userAgent,
-        @Nullable String ip,
-        boolean current
-    ) {}
+            UUID jti,
+            @Nullable Instant issuedAt,
+            Instant expiresAt,
+            @Nullable String userAgent,
+            @Nullable String ip,
+            boolean current) {}
 
     @GetMapping
     @Operation(summary = "List active sessions for the current user", operationId = "listSessions")
     public ResponseEntity<List<SessionViewDTO>> list() {
         UUID currentJti = CurrentAccount.requireJti();
-        List<SessionViewDTO> views = sessionService
-            .activeSessions(CurrentAccount.requireId())
-            .stream()
-            .map(j ->
-                new SessionViewDTO(
-                    j.getJti(),
-                    j.getIssuedAt(),
-                    j.getExpiresAt(),
-                    j.getUserAgent(),
-                    j.getIpInet(),
-                    j.getJti().equals(currentJti)
-                )
-            )
-            .toList();
+        List<SessionViewDTO> views = sessionService.activeSessions(CurrentAccount.requireId()).stream()
+                .map(j -> new SessionViewDTO(
+                        j.getJti(),
+                        j.getIssuedAt(),
+                        j.getExpiresAt(),
+                        j.getUserAgent(),
+                        j.getIpInet(),
+                        j.getJti().equals(currentJti)))
+                .toList();
         return ResponseEntity.ok(views);
     }
 

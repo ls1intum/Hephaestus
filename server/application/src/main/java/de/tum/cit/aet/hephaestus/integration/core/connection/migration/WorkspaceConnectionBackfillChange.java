@@ -87,7 +87,8 @@ public class WorkspaceConnectionBackfillChange implements CustomTaskChange {
     private static final String LEGACY_PREFIX = "ENC:";
 
     private static final SecureRandom IV_GENERATOR = new SecureRandom();
-    private static final ObjectMapper MAPPER = JsonMapper.builder().findAndAddModules().build();
+    private static final ObjectMapper MAPPER =
+            JsonMapper.builder().findAndAddModules().build();
 
     @Override
     public String getConfirmationMessage() {
@@ -113,14 +114,11 @@ public class WorkspaceConnectionBackfillChange implements CustomTaskChange {
         int inserted = 0;
         int skipped = 0;
 
-        try (
-            Statement st = conn.createStatement();
-            ResultSet rs = st.executeQuery(
-                "SELECT id, git_provider_mode, installation_id, account_login, server_url, " +
-                    "personal_access_token, gitlab_group_id, gitlab_webhook_id " +
-                    "FROM workspace"
-            )
-        ) {
+        try (Statement st = conn.createStatement();
+                ResultSet rs =
+                        st.executeQuery("SELECT id, git_provider_mode, installation_id, account_login, server_url, "
+                                + "personal_access_token, gitlab_group_id, gitlab_webhook_id "
+                                + "FROM workspace")) {
             while (rs.next()) {
                 long workspaceId = rs.getLong("id");
                 String mode = rs.getString("git_provider_mode");
@@ -136,17 +134,16 @@ public class WorkspaceConnectionBackfillChange implements CustomTaskChange {
                 Long gitlabWebhookId = nullableLong(rs, "gitlab_webhook_id");
 
                 int rows = backfillScm(
-                    conn,
-                    workspaceId,
-                    mode,
-                    installationId,
-                    accountLogin,
-                    serverUrl,
-                    pat,
-                    gitlabGroupId,
-                    gitlabWebhookId,
-                    crypto
-                );
+                        conn,
+                        workspaceId,
+                        mode,
+                        installationId,
+                        accountLogin,
+                        serverUrl,
+                        pat,
+                        gitlabGroupId,
+                        gitlabWebhookId,
+                        crypto);
                 if (rows > 0) {
                     inserted++;
                 } else {
@@ -161,17 +158,17 @@ public class WorkspaceConnectionBackfillChange implements CustomTaskChange {
     }
 
     private int backfillScm(
-        JdbcConnection conn,
-        long workspaceId,
-        String mode,
-        @Nullable Long installationId,
-        @Nullable String accountLogin,
-        @Nullable String serverUrl,
-        @Nullable String encryptedPat,
-        @Nullable Long gitlabGroupId,
-        @Nullable Long gitlabWebhookId,
-        EncryptionKeyHolder crypto
-    ) throws Exception {
+            JdbcConnection conn,
+            long workspaceId,
+            String mode,
+            @Nullable Long installationId,
+            @Nullable String accountLogin,
+            @Nullable String serverUrl,
+            @Nullable String encryptedPat,
+            @Nullable Long gitlabGroupId,
+            @Nullable Long gitlabWebhookId,
+            EncryptionKeyHolder crypto)
+            throws Exception {
         IntegrationKind kind;
         String instanceKey;
         ConnectionConfig config;
@@ -181,9 +178,8 @@ public class WorkspaceConnectionBackfillChange implements CustomTaskChange {
             case "GITHUB_APP_INSTALLATION" -> {
                 if (installationId == null) {
                     log.warn(
-                        "Skipping workspace {}: mode=GITHUB_APP_INSTALLATION but installation_id is NULL",
-                        workspaceId
-                    );
+                            "Skipping workspace {}: mode=GITHUB_APP_INSTALLATION but installation_id is NULL",
+                            workspaceId);
                     return 0;
                 }
                 kind = IntegrationKind.GITHUB;
@@ -202,12 +198,11 @@ public class WorkspaceConnectionBackfillChange implements CustomTaskChange {
                 String url = serverUrl != null ? serverUrl : "https://gitlab.com";
                 instanceKey = url + ":" + (gitlabGroupId != null ? gitlabGroupId : "");
                 config = new GitLabConfig(
-                    url,
-                    gitlabGroupId,
-                    gitlabWebhookId,
-                    GitLabConfig.SigningMode.PLAINTEXT,
-                    Collections.emptySet()
-                );
+                        url,
+                        gitlabGroupId,
+                        gitlabWebhookId,
+                        GitLabConfig.SigningMode.PLAINTEXT,
+                        Collections.emptySet());
                 credentialBlob = rewrapPat(encryptedPat, workspaceId, kind, instanceKey, crypto);
             }
             default -> {
@@ -219,19 +214,17 @@ public class WorkspaceConnectionBackfillChange implements CustomTaskChange {
         int rows = insertConnection(conn, workspaceId, kind, instanceKey, config, credentialBlob);
         if (rows > 0) {
             log.info(
-                "Backfilled connection: workspace_id={}, kind={}, instance_key={}, has_credentials={}",
-                workspaceId,
-                kind,
-                instanceKey,
-                credentialBlob != null
-            );
+                    "Backfilled connection: workspace_id={}, kind={}, instance_key={}, has_credentials={}",
+                    workspaceId,
+                    kind,
+                    instanceKey,
+                    credentialBlob != null);
         } else {
             log.debug(
-                "Workspace {} already has a {} connection at instance_key={}; skipped by ON CONFLICT",
-                workspaceId,
-                kind,
-                instanceKey
-            );
+                    "Workspace {} already has a {} connection at instance_key={}; skipped by ON CONFLICT",
+                    workspaceId,
+                    kind,
+                    instanceKey);
         }
         return rows;
     }
@@ -242,20 +235,18 @@ public class WorkspaceConnectionBackfillChange implements CustomTaskChange {
      * inserted, {@code 0} when the row already existed.
      */
     private int insertConnection(
-        JdbcConnection conn,
-        long workspaceId,
-        IntegrationKind kind,
-        String instanceKey,
-        ConnectionConfig config,
-        byte@Nullable [] credentialBlob
-    ) throws Exception {
+            JdbcConnection conn,
+            long workspaceId,
+            IntegrationKind kind,
+            String instanceKey,
+            ConnectionConfig config,
+            byte @Nullable [] credentialBlob)
+            throws Exception {
         String configJson = MAPPER.writeValueAsString(config);
-        String sql =
-            "INSERT INTO connection (" +
-            "workspace_id, kind, instance_key, state, config, " +
-            "credentials_encrypted, credentials_alg, created_at, updated_at, version) " +
-            "VALUES (?, ?, ?, ?, CAST(? AS jsonb), ?, ?, NOW(), NOW(), 0) " +
-            "ON CONFLICT (workspace_id, kind, instance_key) DO NOTHING";
+        String sql = "INSERT INTO connection (" + "workspace_id, kind, instance_key, state, config, "
+                + "credentials_encrypted, credentials_alg, created_at, updated_at, version) "
+                + "VALUES (?, ?, ?, ?, CAST(? AS jsonb), ?, ?, NOW(), NOW(), 0) "
+                + "ON CONFLICT (workspace_id, kind, instance_key) DO NOTHING";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setLong(1, workspaceId);
             ps.setString(2, kind.name());
@@ -286,13 +277,13 @@ public class WorkspaceConnectionBackfillChange implements CustomTaskChange {
      * under {@link CredentialBundleConverter}'s v2 per-row AAD format. Returns {@code null}
      * when the input is null or blank.
      */
-    private static byte@Nullable [] rewrapPat(
-        @Nullable String encryptedValue,
-        long workspaceId,
-        IntegrationKind kind,
-        String instanceKey,
-        EncryptionKeyHolder crypto
-    ) throws Exception {
+    private static byte @Nullable [] rewrapPat(
+            @Nullable String encryptedValue,
+            long workspaceId,
+            IntegrationKind kind,
+            String instanceKey,
+            EncryptionKeyHolder crypto)
+            throws Exception {
         if (encryptedValue == null || encryptedValue.isBlank()) {
             return null;
         }
@@ -300,12 +291,8 @@ public class WorkspaceConnectionBackfillChange implements CustomTaskChange {
         String plaintext = decryptLegacy(encryptedValue, key);
         BearerToken bundle = new BearerToken(plaintext, null);
         byte[] bundleJson = MAPPER.writeValueAsBytes(bundle);
-        EncryptionContext ctx = new EncryptionContext(
-            workspaceId,
-            kind,
-            instanceKey,
-            "connection.credentials_encrypted"
-        );
+        EncryptionContext ctx =
+                new EncryptionContext(workspaceId, kind, instanceKey, "connection.credentials_encrypted");
         return encryptV2(bundleJson, key, ctx.toAad());
     }
 
@@ -362,7 +349,7 @@ public class WorkspaceConnectionBackfillChange implements CustomTaskChange {
      */
     private static final class EncryptionKeyHolder {
 
-        private byte@Nullable [] cachedKey;
+        private byte @Nullable [] cachedKey;
 
         private boolean resolved;
 
@@ -373,15 +360,14 @@ public class WorkspaceConnectionBackfillChange implements CustomTaskChange {
             }
             if (cachedKey == null) {
                 throw new IllegalStateException(
-                    "WorkspaceConnectionBackfillChange found an encrypted credential to rewrap, " +
-                        "but hephaestus.security.encryption-key / HEPHAESTUS_SECURITY_ENCRYPTION_KEY is not set. " +
-                        "Re-run Liquibase with the same 32-character key the running application uses."
-                );
+                        "WorkspaceConnectionBackfillChange found an encrypted credential to rewrap, "
+                                + "but hephaestus.security.encryption-key / HEPHAESTUS_SECURITY_ENCRYPTION_KEY is not set. "
+                                + "Re-run Liquibase with the same 32-character key the running application uses.");
             }
             return cachedKey;
         }
 
-        private static byte@Nullable [] resolveKey() {
+        private static byte @Nullable [] resolveKey() {
             String key = System.getProperty("hephaestus.security.encryption-key");
             if (key == null || key.isBlank()) {
                 key = System.getenv("HEPHAESTUS_SECURITY_ENCRYPTION_KEY");
@@ -391,8 +377,7 @@ public class WorkspaceConnectionBackfillChange implements CustomTaskChange {
             }
             if (key.length() != 32) {
                 throw new IllegalArgumentException(
-                    "Encryption key must be exactly 32 characters (256 bits). Got: " + key.length()
-                );
+                        "Encryption key must be exactly 32 characters (256 bits). Got: " + key.length());
             }
             return key.getBytes(StandardCharsets.UTF_8);
         }

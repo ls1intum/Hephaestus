@@ -1,6 +1,7 @@
 import deepEqual from "fast-deep-equal";
 import { ChevronRight, RotateCcw } from "lucide-react";
 import { useRef, useState } from "react";
+
 import type {
 	PracticeAutomatedReviewPolicy,
 	PracticeBinding,

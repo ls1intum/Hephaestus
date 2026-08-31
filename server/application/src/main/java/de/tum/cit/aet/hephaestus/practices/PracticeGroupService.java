@@ -8,6 +8,8 @@ import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeGroup;
+import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaults;
+import de.tum.cit.aet.hephaestus.practices.review.autonomy.AutonomyResolver;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
@@ -40,10 +42,9 @@ public class PracticeGroupService {
     @Transactional(readOnly = true)
     public List<PracticeGroup> listGroups(WorkspaceContext ctx, @Nullable Boolean visibleInPracticeDashboardsOnly) {
         return Boolean.TRUE.equals(visibleInPracticeDashboardsOnly)
-            ? practiceGroupRepository.findByWorkspaceIdAndVisibleInPracticeDashboardsTrueOrderByDisplayOrderAscNameAsc(
-                  ctx.id()
-              )
-            : practiceGroupRepository.findByWorkspaceIdOrderByDisplayOrderAscNameAsc(ctx.id());
+                ? practiceGroupRepository
+                        .findByWorkspaceIdAndVisibleInPracticeDashboardsTrueOrderByDisplayOrderAscNameAsc(ctx.id())
+                : practiceGroupRepository.findByWorkspaceIdOrderByDisplayOrderAscNameAsc(ctx.id());
     }
 
     @Transactional
@@ -56,17 +57,15 @@ public class PracticeGroupService {
         Set<String> existingSlugs = groups.stream().map(PracticeGroup::getSlug).collect(Collectors.toSet());
         Set<String> requestedSlugs = new HashSet<>(orderedSlugs);
         if (!existingSlugs.equals(requestedSlugs)) {
-            String unknown = requestedSlugs
-                .stream()
-                .filter(s -> !existingSlugs.contains(s))
-                .findFirst()
-                .orElse(null);
+            String unknown = requestedSlugs.stream()
+                    .filter(s -> !existingSlugs.contains(s))
+                    .findFirst()
+                    .orElse(null);
             if (unknown != null) {
                 throw new EntityNotFoundException("PracticeGroup", unknown);
             }
             throw new IllegalArgumentException(
-                "orderedSlugs must contain every practice group in the workspace (a complete ordering)"
-            );
+                    "orderedSlugs must contain every practice group in the workspace (a complete ordering)");
         }
         Map<String, PracticeGroup> bySlug = groups.stream().collect(Collectors.toMap(PracticeGroup::getSlug, a -> a));
         int order = 0;
@@ -84,8 +83,8 @@ public class PracticeGroupService {
 
     private PracticeGroup loadGroup(WorkspaceContext ctx, String slug) {
         return practiceGroupRepository
-            .findByWorkspaceIdAndSlug(ctx.id(), slug)
-            .orElseThrow(() -> new EntityNotFoundException("PracticeGroup", slug));
+                .findByWorkspaceIdAndSlug(ctx.id(), slug)
+                .orElseThrow(() -> new EntityNotFoundException("PracticeGroup", slug));
     }
 
     @Transactional
@@ -94,15 +93,10 @@ public class PracticeGroupService {
     }
 
     private PracticeGroup createGroup(
-        WorkspaceContext ctx,
-        String slug,
-        GroupAttributes attributes,
-        boolean recordAudit
-    ) {
+            WorkspaceContext ctx, String slug, GroupAttributes attributes, boolean recordAudit) {
         if (practiceGroupRepository.existsByWorkspaceIdAndSlug(ctx.id(), slug)) {
             throw new PracticeGroupSlugConflictException(
-                "A practice group with slug '" + slug + "' already exists in this workspace."
-            );
+                    "A practice group with slug '" + slug + "' already exists in this workspace.");
         }
         Workspace workspace = lockWorkspace(ctx);
 
@@ -112,10 +106,9 @@ public class PracticeGroupService {
         group.setName(Objects.requireNonNull(attributes.name()));
         group.setDescription(attributes.description());
         group.setDisplayOrder(
-            attributes.displayOrder() != null
-                ? attributes.displayOrder()
-                : practiceGroupRepository.findMaxDisplayOrder(ctx.id()) + 1
-        );
+                attributes.displayOrder() != null
+                        ? attributes.displayOrder()
+                        : practiceGroupRepository.findMaxDisplayOrder(ctx.id()) + 1);
         group.setIcon(attributes.icon());
         group.setColor(attributes.color());
 
@@ -126,19 +119,11 @@ public class PracticeGroupService {
                 throw ex;
             }
             throw new PracticeGroupSlugConflictException(
-                "A practice group with slug '" + slug + "' already exists in this workspace.",
-                ex
-            );
+                    "A practice group with slug '" + slug + "' already exists in this workspace.", ex);
         }
         if (recordAudit) {
-            configAudit.record(
-                ConfigAuditEntry.created(
-                    ConfigAuditEntityType.PRACTICE_GROUP,
-                    group.getId(),
-                    ctx.id(),
-                    PracticeGroupSnapshot.of(group)
-                )
-            );
+            configAudit.record(ConfigAuditEntry.created(
+                    ConfigAuditEntityType.PRACTICE_GROUP, group.getId(), ctx.id(), PracticeGroupSnapshot.of(group)));
         }
         log.info("Created practice group '{}' (slug={}) in workspace {}", group.getName(), group.getSlug(), ctx.slug());
         return group;
@@ -146,32 +131,22 @@ public class PracticeGroupService {
 
     @Transactional
     public PracticeGroup createGroupFromCatalog(
-        WorkspaceContext ctx,
-        String slug,
-        GroupDefinition definition,
-        int displayOrder
-    ) {
+            WorkspaceContext ctx, String slug, GroupDefinition definition, int displayOrder) {
         return createCatalogGroup(ctx, slug, definition, displayOrder);
     }
 
     private PracticeGroup createCatalogGroup(
-        WorkspaceContext ctx,
-        String slug,
-        GroupDefinition definition,
-        int displayOrder
-    ) {
+            WorkspaceContext ctx, String slug, GroupDefinition definition, int displayOrder) {
         PracticeGroup group = createGroup(
-            ctx,
-            slug,
-            new GroupAttributes(
-                definition.name(),
-                definition.description(),
-                displayOrder,
-                definition.icon(),
-                definition.color()
-            ),
-            false
-        );
+                ctx,
+                slug,
+                new GroupAttributes(
+                        definition.name(),
+                        definition.description(),
+                        displayOrder,
+                        definition.icon(),
+                        definition.color()),
+                false);
         group.setSourceCuratedSlug(slug);
         group.setSourceCuratedFingerprint(definition.provenanceFingerprint(slug));
         return practiceGroupRepository.save(group);
@@ -179,20 +154,10 @@ public class PracticeGroupService {
 
     @Transactional
     public PracticeGroup adoptGroupFromCatalog(
-        WorkspaceContext ctx,
-        String slug,
-        GroupDefinition definition,
-        int displayOrder
-    ) {
+            WorkspaceContext ctx, String slug, GroupDefinition definition, int displayOrder) {
         PracticeGroup group = createCatalogGroup(ctx, slug, definition, displayOrder);
-        configAudit.record(
-            ConfigAuditEntry.created(
-                ConfigAuditEntityType.PRACTICE_GROUP,
-                group.getId(),
-                ctx.id(),
-                PracticeGroupSnapshot.of(group)
-            )
-        );
+        configAudit.record(ConfigAuditEntry.created(
+                ConfigAuditEntityType.PRACTICE_GROUP, group.getId(), ctx.id(), PracticeGroupSnapshot.of(group)));
         return group;
     }
 
@@ -208,23 +173,24 @@ public class PracticeGroupService {
      */
     @Transactional
     public PracticeGroup setAutonomy(WorkspaceContext ctx, String slug, @Nullable PracticeAutonomy autonomy) {
-        lockWorkspace(ctx);
+        Workspace workspace = lockWorkspace(ctx);
         PracticeGroup group = loadGroup(ctx, slug);
         if (group.getAutonomy() == autonomy) {
             return group;
         }
+        List<Practice> practices =
+                practiceRepository.findByWorkspaceIdAndGroupIdOrderByDisplayOrderAscNameAsc(ctx.id(), group.getId());
+        Map<Long, PracticeAutonomy> effectiveBefore = effectiveAutonomies(practices, workspace);
         PracticeGroupSnapshot before = PracticeGroupSnapshot.of(group);
         group.setAutonomy(autonomy);
         group = practiceGroupRepository.save(group);
-        configAudit.record(
-            ConfigAuditEntry.updated(
+        bumpRolloutRevisionIfChanged(workspace, effectiveBefore, practices);
+        configAudit.record(ConfigAuditEntry.updated(
                 ConfigAuditEntityType.PRACTICE_GROUP,
                 group.getId(),
                 ctx.id(),
                 before,
-                PracticeGroupSnapshot.of(group)
-            )
-        );
+                PracticeGroupSnapshot.of(group)));
         return group;
     }
 
@@ -235,28 +201,26 @@ public class PracticeGroupService {
 
     @Transactional
     public PracticeGroup updateGroup(
-        WorkspaceContext ctx,
-        String slug,
-        GroupAttributes attributes,
-        @Nullable Boolean visibleInPracticeDashboards
-    ) {
+            WorkspaceContext ctx,
+            String slug,
+            GroupAttributes attributes,
+            @Nullable Boolean visibleInPracticeDashboards) {
         return applyGroupUpdate(ctx, slug, attributes, visibleInPracticeDashboards);
     }
 
     private PracticeGroup applyGroupUpdate(
-        WorkspaceContext ctx,
-        String slug,
-        GroupAttributes attributes,
-        @Nullable Boolean visibleInPracticeDashboards
-    ) {
+            WorkspaceContext ctx,
+            String slug,
+            GroupAttributes attributes,
+            @Nullable Boolean visibleInPracticeDashboards) {
         lockWorkspace(ctx);
         PracticeGroup group = loadGroup(ctx, slug);
         PracticeGroupSnapshot before = PracticeGroupSnapshot.of(group);
-        boolean snapshotChanged =
-            (attributes.name() != null && !Objects.equals(attributes.name(), group.getName())) ||
-            (attributes.description() != null && !Objects.equals(attributes.description(), group.getDescription())) ||
-            (attributes.icon() != null && !Objects.equals(attributes.icon(), group.getIcon())) ||
-            (attributes.color() != null && !Objects.equals(attributes.color(), group.getColor()));
+        boolean snapshotChanged = (attributes.name() != null && !Objects.equals(attributes.name(), group.getName()))
+                || (attributes.description() != null
+                        && !Objects.equals(attributes.description(), group.getDescription()))
+                || (attributes.icon() != null && !Objects.equals(attributes.icon(), group.getIcon()))
+                || (attributes.color() != null && !Objects.equals(attributes.color(), group.getColor()));
         if (attributes.name() != null) {
             group.setName(attributes.name());
         }
@@ -278,21 +242,16 @@ public class PracticeGroupService {
         group = practiceGroupRepository.save(group);
         if (snapshotChanged) {
             for (Practice practice : practiceRepository.findByWorkspaceIdAndGroupIdOrderByDisplayOrderAscNameAsc(
-                ctx.id(),
-                group.getId()
-            )) {
+                    ctx.id(), group.getId())) {
                 practiceRevisionService.append(practice);
             }
         }
-        configAudit.record(
-            ConfigAuditEntry.updated(
+        configAudit.record(ConfigAuditEntry.updated(
                 ConfigAuditEntityType.PRACTICE_GROUP,
                 group.getId(),
                 ctx.id(),
                 before,
-                PracticeGroupSnapshot.of(group)
-            )
-        );
+                PracticeGroupSnapshot.of(group)));
         return group;
     }
 
@@ -307,29 +266,20 @@ public class PracticeGroupService {
     }
 
     private void removeGroup(WorkspaceContext ctx, String slug, boolean deletePractices) {
-        lockWorkspace(ctx);
+        Workspace workspace = lockWorkspace(ctx);
         PracticeGroup group = loadGroup(ctx, slug);
         PracticeGroupSnapshot groupBefore = PracticeGroupSnapshot.of(group);
-        List<Practice> practices = practiceRepository.findByWorkspaceIdAndGroupIdOrderByDisplayOrderAscNameAsc(
-            ctx.id(),
-            group.getId()
-        );
+        List<Practice> practices =
+                practiceRepository.findByWorkspaceIdAndGroupIdOrderByDisplayOrderAscNameAsc(ctx.id(), group.getId());
+        Map<Long, PracticeAutonomy> effectiveBefore = effectiveAutonomies(practices, workspace);
         int nextOrder = deletePractices ? 0 : practiceRepository.findMaxDisplayOrder(ctx.id(), null) + 1;
         for (Practice practice : practices) {
-            PracticeDefinitionSnapshot before = PracticeDefinitionSnapshot.of(
-                practice,
-                practiceRevisionService.currentRevisionNumber(practice)
-            );
+            PracticeDefinitionSnapshot before =
+                    PracticeDefinitionSnapshot.of(practice, practiceRevisionService.currentRevisionNumber(practice));
             if (deletePractices) {
                 practiceRepository.delete(practice);
-                configAudit.record(
-                    ConfigAuditEntry.deleted(
-                        ConfigAuditEntityType.PRACTICE_DEFINITION,
-                        practice.getId(),
-                        ctx.id(),
-                        before
-                    )
-                );
+                configAudit.record(ConfigAuditEntry.deleted(
+                        ConfigAuditEntityType.PRACTICE_DEFINITION, practice.getId(), ctx.id(), before));
                 continue;
             }
             practice.setGroup(null);
@@ -339,49 +289,51 @@ public class PracticeGroupService {
             recordPlacementChange(ctx, practice, before, revisionNumber);
         }
         practiceGroupRepository.delete(group);
+        if (deletePractices && !practices.isEmpty()) {
+            workspace.getReviewSettings().incrementRolloutRevision();
+        } else if (!deletePractices) {
+            bumpRolloutRevisionIfChanged(workspace, effectiveBefore, practices);
+        }
         configAudit.record(
-            ConfigAuditEntry.deleted(ConfigAuditEntityType.PRACTICE_GROUP, group.getId(), ctx.id(), groupBefore)
-        );
+                ConfigAuditEntry.deleted(ConfigAuditEntityType.PRACTICE_GROUP, group.getId(), ctx.id(), groupBefore));
         log.info(
-            "Deleted practice group (slug={}) with deletePractices={} in workspace {}",
-            slug,
-            deletePractices,
-            ctx.slug()
-        );
+                "Deleted practice group (slug={}) with deletePractices={} in workspace {}",
+                slug,
+                deletePractices,
+                ctx.slug());
     }
 
     @Transactional
     public Practice bindPractice(WorkspaceContext ctx, String practiceSlug, @Nullable String groupSlug) {
-        lockWorkspace(ctx);
+        Workspace workspace = lockWorkspace(ctx);
         Practice practice = practiceRepository
-            .findByWorkspaceIdAndSlug(ctx.id(), practiceSlug)
-            .orElseThrow(() -> new EntityNotFoundException("Practice", practiceSlug));
+                .findByWorkspaceIdAndSlug(ctx.id(), practiceSlug)
+                .orElseThrow(() -> new EntityNotFoundException("Practice", practiceSlug));
 
-        PracticeDefinitionSnapshot before = PracticeDefinitionSnapshot.of(
-            practice,
-            practiceRevisionService.currentRevisionNumber(practice)
-        );
+        PracticeDefinitionSnapshot before =
+                PracticeDefinitionSnapshot.of(practice, practiceRevisionService.currentRevisionNumber(practice));
+        PracticeAutonomy effectiveBefore = effectiveAutonomy(practice, workspace);
         if (!applyBinding(ctx, practice, groupSlug)) {
             return practice;
         }
         practice = practiceRepository.save(practice);
+        if (effectiveBefore != effectiveAutonomy(practice, workspace)) {
+            workspace.getReviewSettings().incrementRolloutRevision();
+        }
         int revisionNumber = practiceRevisionService.append(practice).getRevisionNumber();
         recordPlacementChange(ctx, practice, before, revisionNumber);
         return practice;
     }
 
     boolean applyBinding(WorkspaceContext ctx, Practice practice, @Nullable String groupSlug) {
-        PracticeGroup group =
-            groupSlug == null
+        PracticeGroup group = groupSlug == null
                 ? null
                 : practiceGroupRepository
-                      .findByWorkspaceIdAndSlug(ctx.id(), groupSlug)
-                      .orElseThrow(() -> new EntityNotFoundException("PracticeGroup", groupSlug));
+                        .findByWorkspaceIdAndSlug(ctx.id(), groupSlug)
+                        .orElseThrow(() -> new EntityNotFoundException("PracticeGroup", groupSlug));
         PracticeGroup currentGroup = practice.getGroup();
-        if (
-            (currentGroup == null && group == null) ||
-            (currentGroup != null && group != null && Objects.equals(currentGroup.getId(), group.getId()))
-        ) {
+        if ((currentGroup == null && group == null)
+                || (currentGroup != null && group != null && Objects.equals(currentGroup.getId(), group.getId()))) {
             return false;
         }
 
@@ -393,24 +345,36 @@ public class PracticeGroupService {
 
     private Workspace lockWorkspace(WorkspaceContext ctx) {
         return workspaceRepository
-            .findByIdForUpdate(ctx.id())
-            .orElseThrow(() -> new EntityNotFoundException("Workspace", ctx.slug()));
+                .findByIdForUpdate(ctx.id())
+                .orElseThrow(() -> new EntityNotFoundException("Workspace", ctx.slug()));
+    }
+
+    private static Map<Long, PracticeAutonomy> effectiveAutonomies(List<Practice> practices, Workspace workspace) {
+        return practices.stream()
+                .collect(Collectors.toMap(Practice::getId, practice -> effectiveAutonomy(practice, workspace)));
+    }
+
+    private static PracticeAutonomy effectiveAutonomy(Practice practice, Workspace workspace) {
+        return AutonomyResolver.effectiveAutonomyOf(
+                practice, WorkspaceReviewDefaults.of(workspace).defaultAutonomy());
+    }
+
+    private static void bumpRolloutRevisionIfChanged(
+            Workspace workspace, Map<Long, PracticeAutonomy> before, List<Practice> practices) {
+        boolean changed = practices.stream()
+                .anyMatch(practice -> before.get(practice.getId()) != effectiveAutonomy(practice, workspace));
+        if (changed) {
+            workspace.getReviewSettings().incrementRolloutRevision();
+        }
     }
 
     private void recordPlacementChange(
-        WorkspaceContext ctx,
-        Practice practice,
-        PracticeDefinitionSnapshot before,
-        int revisionNumber
-    ) {
-        configAudit.record(
-            ConfigAuditEntry.updated(
+            WorkspaceContext ctx, Practice practice, PracticeDefinitionSnapshot before, int revisionNumber) {
+        configAudit.record(ConfigAuditEntry.updated(
                 ConfigAuditEntityType.PRACTICE_DEFINITION,
                 practice.getId(),
                 ctx.id(),
                 before,
-                PracticeDefinitionSnapshot.of(practice, revisionNumber)
-            )
-        );
+                PracticeDefinitionSnapshot.of(practice, revisionNumber)));
     }
 }

@@ -2,8 +2,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { assert, expect, it, vi } from "vitest";
+
 import { listWorkspacesQueryKey, updateFeaturesMutation } from "@/api/@tanstack/react-query.gen";
 import type { Workspace, WorkspaceListItem } from "@/api/types.gen";
+
 import { useUpdateWorkspaceFeatures } from "./use-update-workspace-features";
 
 vi.mock("@/api/@tanstack/react-query.gen", async (importOriginal) => {

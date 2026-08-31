@@ -1,5 +1,5 @@
-#!/usr/bin/env node
 import { readFileSync } from "node:fs";
+
 import { asRecord, isRecord, parseJson } from "./lib/json.ts";
 
 const dockerfile = readFileSync("docker/agents/pi/Dockerfile", "utf8");
@@ -16,8 +16,16 @@ function dockerArg(name: string): string {
 	return match[1];
 }
 
-const bunVersion = dockerArg("BUN_VERSION");
+const nodeVersion = dockerArg("NODE_VERSION");
 const piVersion = dockerArg("PI_VERSION");
+const devEngines = isRecord(packageJson.devEngines) ? packageJson.devEngines : {};
+const devEnginesRuntime = isRecord(devEngines.runtime) ? devEngines.runtime : {};
+const repoNodeVersion = devEnginesRuntime.version;
+if (repoNodeVersion !== nodeVersion) {
+	problems.push(
+		`package.json#devEngines.runtime pins Node ${String(repoNodeVersion)} but the agent image pins ${nodeVersion}.`,
+	);
+}
 const packagePiVersion = devDependencies["@earendil-works/pi-coding-agent"];
 if (packagePiVersion !== piVersion) {
 	problems.push(
@@ -37,17 +45,13 @@ for (const path of [
 	}
 }
 
-for (const architecture of ["x64", "aarch64"]) {
-	const hash = new RegExp(`bun_arch="${architecture}"; bun_sha256="([a-f0-9]+)"`).exec(
-		dockerfile,
-	)?.[1];
-	if (!hash || hash.length !== 64) {
-		problems.push(`docker/agents/pi/Dockerfile: Bun ${architecture} needs a 64-character SHA-256.`);
-	}
+const nodeBase = /^FROM node:\$\{NODE_VERSION\}-slim@sha256:([a-f0-9]{64})$/m.exec(dockerfile);
+if (!nodeBase) {
+	problems.push("docker/agents/pi/Dockerfile: Node base must be pinned by a 64-character digest.");
 }
 
 for (const marker of [
-	"datasource=github-releases depName=oven-sh/bun",
+	"datasource=docker depName=node",
 	"datasource=npm depName=@earendil-works/pi-coding-agent",
 ]) {
 	if (!dockerfile.includes(`# renovate: ${marker}`)) {
@@ -61,5 +65,5 @@ if (problems.length > 0) {
 }
 
 console.log(
-	`Agent runtime pins agree: Bun ${bunVersion} (x64 and arm64 hashes present); Pi ${piVersion} (image, TypeScript, and live tests).`,
+	`Agent runtime pins agree: Node ${nodeVersion} (base digest present); Pi ${piVersion} (image, TypeScript, and live tests).`,
 );

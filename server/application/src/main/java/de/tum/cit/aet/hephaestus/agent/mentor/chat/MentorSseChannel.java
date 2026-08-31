@@ -51,6 +51,7 @@ final class MentorSseChannel implements MentorChannel {
      * actually finished successfully.
      */
     private final AtomicBoolean closed = new AtomicBoolean(false);
+
     private final AtomicLong lastSendNanos = new AtomicLong(System.nanoTime());
     private final AtomicReference<@Nullable Runnable> disconnectHook = new AtomicReference<>();
     /**
@@ -60,6 +61,7 @@ final class MentorSseChannel implements MentorChannel {
      * the carrier OS thread for the full critical section incl. socket writes.
      */
     private final ReentrantLock writeLock = new ReentrantLock();
+
     private volatile @Nullable ScheduledFuture<?> heartbeat;
 
     MentorSseChannel(SseEmitter emitter, ObjectMapper objectMapper, ScheduledExecutorService scheduler) {
@@ -83,7 +85,8 @@ final class MentorSseChannel implements MentorChannel {
             flagDisconnected();
             try {
                 emitter.complete();
-            } catch (RuntimeException ignored) {}
+            } catch (RuntimeException ignored) {
+            }
         });
         emitter.onError(throwable -> {
             log.debug("SseEmitter error on mentor turn: {}", throwable.toString());
@@ -127,32 +130,31 @@ final class MentorSseChannel implements MentorChannel {
     @Override
     public void startKeepAlive() {
         heartbeat = scheduler.scheduleAtFixedRate(
-            () -> {
-                if (clientGone.get() || closed.get()) return;
-                long quietNs = System.nanoTime() - lastSendNanos.get();
-                if (quietNs < HEARTBEAT_QUIET_NS) return;
-                writeLock.lock();
-                try {
+                () -> {
                     if (clientGone.get() || closed.get()) return;
+                    long quietNs = System.nanoTime() - lastSendNanos.get();
+                    if (quietNs < HEARTBEAT_QUIET_NS) return;
+                    writeLock.lock();
                     try {
-                        emitter.send(SseEmitter.event().comment("ping"));
-                        lastSendNanos.set(System.nanoTime());
-                    } catch (IOException | IllegalStateException ex) {
-                        // Real disconnect: flip and stop. Spring's emitter callbacks fire and
-                        // unwind the orchestrator naturally. DEBUG-log so a flaky proxy that
-                        // closes the socket between chunks is observable (the lifecycle
-                        // callbacks also fire, but this path can win the race).
-                        log.debug("Heartbeat send failed; flagging disconnected: {}", ex.toString());
-                        flagDisconnected();
+                        if (clientGone.get() || closed.get()) return;
+                        try {
+                            emitter.send(SseEmitter.event().comment("ping"));
+                            lastSendNanos.set(System.nanoTime());
+                        } catch (IOException | IllegalStateException ex) {
+                            // Real disconnect: flip and stop. Spring's emitter callbacks fire and
+                            // unwind the orchestrator naturally. DEBUG-log so a flaky proxy that
+                            // closes the socket between chunks is observable (the lifecycle
+                            // callbacks also fire, but this path can win the race).
+                            log.debug("Heartbeat send failed; flagging disconnected: {}", ex.toString());
+                            flagDisconnected();
+                        }
+                    } finally {
+                        writeLock.unlock();
                     }
-                } finally {
-                    writeLock.unlock();
-                }
-            },
-            HEARTBEAT_INITIAL_DELAY_MS,
-            HEARTBEAT_TICK_MS,
-            TimeUnit.MILLISECONDS
-        );
+                },
+                HEARTBEAT_INITIAL_DELAY_MS,
+                HEARTBEAT_TICK_MS,
+                TimeUnit.MILLISECONDS);
     }
 
     /**
@@ -209,10 +211,12 @@ final class MentorSseChannel implements MentorChannel {
             if (closed.compareAndSet(false, true)) {
                 try {
                     emitter.send(SseEmitter.event().data("[DONE]"));
-                } catch (IOException | IllegalStateException ignored) {}
+                } catch (IOException | IllegalStateException ignored) {
+                }
                 try {
                     emitter.complete();
-                } catch (RuntimeException ignored) {}
+                } catch (RuntimeException ignored) {
+                }
             }
             return finishDelivered.get() ? DeliveryOutcome.DELIVERED : DeliveryOutcome.NOT_DELIVERED;
         } finally {
@@ -226,7 +230,8 @@ final class MentorSseChannel implements MentorChannel {
         cancelHeartbeat();
         try {
             send(new UIMessageChunk.Error(errorText));
-        } catch (RuntimeException ignored) {}
+        } catch (RuntimeException ignored) {
+        }
         completeWithDone();
     }
 
@@ -237,7 +242,8 @@ final class MentorSseChannel implements MentorChannel {
         try {
             send(UIMessageChunk.DataMentorStatus.of("conflict", "another turn is in flight for this thread"));
             send(new UIMessageChunk.Error("Another mentor turn is already in flight for this thread."));
-        } catch (RuntimeException ignored) {}
+        } catch (RuntimeException ignored) {
+        }
         completeWithDone();
     }
 

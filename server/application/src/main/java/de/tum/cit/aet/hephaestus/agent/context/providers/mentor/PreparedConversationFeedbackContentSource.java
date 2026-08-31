@@ -3,10 +3,17 @@ package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
 import de.tum.cit.aet.hephaestus.agent.context.ContentSource;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest.MentorChatRequest;
+import de.tum.cit.aet.hephaestus.agent.handler.PracticeFeedbackDeliveryPolicy;
+import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.practices.feedback.ConversationBriefBody;
+import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyStage;
+import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicySurface;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository.PreparedConversationFact;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
@@ -32,25 +39,34 @@ public class PreparedConversationFeedbackContentSource implements ContentSource 
     public static final String OUTPUT_KEY = OUTPUT_PREFIX + "prepared_conversation_feedback.json";
 
     private static final int MAX_PREPARED = 3;
+    private static final int MAX_CANDIDATES = 12;
 
     private final FeedbackObservationRepository feedbackObservationRepository;
     private final ConversationConsentGate consentGate;
     private final ObjectMapper objectMapper;
     private final ObservationRepository observationRepository;
     private final ObservationVisibilityPolicy visibilityPolicy;
+    private final AgentJobRepository agentJobRepository;
+    private final PracticeFeedbackDeliveryPolicy deliveryPolicy;
+    private final FeedbackRepository feedbackRepository;
 
     public PreparedConversationFeedbackContentSource(
-        FeedbackObservationRepository feedbackObservationRepository,
-        ConversationConsentGate consentGate,
-        ObjectMapper objectMapper,
-        ObservationRepository observationRepository,
-        ObservationVisibilityPolicy visibilityPolicy
-    ) {
+            FeedbackObservationRepository feedbackObservationRepository,
+            ConversationConsentGate consentGate,
+            ObjectMapper objectMapper,
+            ObservationRepository observationRepository,
+            ObservationVisibilityPolicy visibilityPolicy,
+            AgentJobRepository agentJobRepository,
+            PracticeFeedbackDeliveryPolicy deliveryPolicy,
+            FeedbackRepository feedbackRepository) {
         this.feedbackObservationRepository = feedbackObservationRepository;
         this.consentGate = consentGate;
         this.objectMapper = objectMapper;
         this.observationRepository = observationRepository;
         this.visibilityPolicy = visibilityPolicy;
+        this.agentJobRepository = agentJobRepository;
+        this.deliveryPolicy = deliveryPolicy;
+        this.feedbackRepository = feedbackRepository;
     }
 
     @Override
@@ -64,25 +80,18 @@ public class PreparedConversationFeedbackContentSource implements ContentSource 
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public void contribute(ContextRequest request, Map<String, byte[]> files) {
         MentorChatRequest req = (MentorChatRequest) request;
         long workspaceId = req.workspaceId();
         List<PreparedConversationFact> prepared =
-            feedbackObservationRepository.findPreparedConversationFactsForRecipient(
-                workspaceId,
-                req.developerId(),
-                PageRequest.of(0, MAX_PREPARED)
-            );
+                feedbackObservationRepository.findPreparedConversationFactsForRecipient(
+                        workspaceId, req.developerId(), PageRequest.of(0, MAX_CANDIDATES));
 
         Set<Long> activeThreadIds = consentGate.activeThreadIds(workspaceId, conversationThreadIds(prepared));
-        // Load and authorize the bound observations before exposing their evidence to the mentor.
         Map<UUID, Observation> observations = observationsById(workspaceId, prepared);
         Set<UUID> visible = visibilityPolicy.permitsAll(
-            workspaceId,
-            observations.values(),
-            SourceUsePurpose.CONVERSATIONAL_MENTORING
-        );
+                workspaceId, observations.values(), SourceUsePurpose.CONVERSATIONAL_MENTORING);
 
         ObjectNode root = objectMapper.createObjectNode();
 
@@ -90,13 +99,32 @@ public class PreparedConversationFeedbackContentSource implements ContentSource 
 
         ArrayNode arr = root.putArray("preparedConversationFeedback");
         for (PreparedConversationFact fact : prepared) {
+            if (arr.size() >= MAX_PREPARED) break;
             if (!visible.contains(fact.getObservationId())) {
                 continue;
             }
-            if (
-                ArtifactKinds.CONVERSATION_THREAD.equals(fact.getArtifactKind()) &&
-                (fact.getArtifactId() == null || !activeThreadIds.contains(fact.getArtifactId()))
-            ) {
+            if (ArtifactKinds.CONVERSATION_THREAD.equals(fact.getArtifactKind())
+                    && (fact.getArtifactId() == null || !activeThreadIds.contains(fact.getArtifactId()))) {
+                continue;
+            }
+            AgentJob job = agentJobRepository
+                    .findByIdAndWorkspaceId(fact.getAgentJobId(), workspaceId)
+                    .orElse(null);
+            if (job == null) {
+                feedbackRepository.markPreparedSuppressed(
+                        fact.getFeedbackId(), workspaceId, FeedbackSuppressionReason.ARTIFACT_GONE.name());
+                continue;
+            }
+            var decision = deliveryPolicy.evaluateRepositoryless(
+                    job,
+                    DeliveryPolicyStage.EGRESS,
+                    fact.getFeedbackId(),
+                    DeliveryPolicySurface.CONVERSATION,
+                    req.developerId(),
+                    Set.of(fact.getPracticeSlug()));
+            if (!decision.allowed()) {
+                feedbackRepository.markPreparedSuppressed(
+                        fact.getFeedbackId(), workspaceId, decision.refusal().name());
                 continue;
             }
             ObjectNode node = arr.addObject();
@@ -121,7 +149,6 @@ public class PreparedConversationFeedbackContentSource implements ContentSource 
             }
             Observation observation = observations.get(fact.getObservationId());
             if (observation != null && observation.getEvidence() != null) {
-                // The mentor grounds its own wording in the authorized measurement, not only the brief.
                 node.set("evidence", observation.getEvidence());
             }
             writeNotes(node, fact.getBody());
@@ -134,7 +161,6 @@ public class PreparedConversationFeedbackContentSource implements ContentSource 
         }
     }
 
-    /** Adds structured internal notes when the prepared body contains a complete brief. */
     private static void writeNotes(ObjectNode node, String body) {
         ConversationBriefBody.Brief brief = ConversationBriefBody.parse(body);
         if (brief == null) {
@@ -146,19 +172,11 @@ public class PreparedConversationFeedbackContentSource implements ContentSource 
         notes.put("capability", brief.capability());
         notes.put("evidenceSummary", brief.evidenceSummary());
         notes.put("inConversationSignal", brief.inConversationSignal());
-        // Absent on a brief written before the field existed, and absent when nothing has been put to them
-        // yet. Either way the mentor is told nothing rather than told there is nothing.
         if (brief.alreadySaid() != null) {
             notes.put("alreadySaid", brief.alreadySaid());
         }
     }
 
-    /**
-     * The observations behind {@code facts} that this workspace may read, keyed by id. Scoped to the
-     * workspace rather than fetched by bare id: the facts are already recipient- and workspace-filtered, so
-     * this changes no answer, and it means an observation and the feedback unit citing it can never be read
-     * from different tenants.
-     */
     private Map<UUID, Observation> observationsById(long workspaceId, List<PreparedConversationFact> facts) {
         Set<UUID> ids = new LinkedHashSet<>();
         for (PreparedConversationFact fact : facts) {

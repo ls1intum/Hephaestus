@@ -1,7 +1,10 @@
 import { type DefaultError, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
+
 import {
+	getConsentStatusOptions,
+	getConsentStatusQueryKey,
 	getCurrentUserQueryKey,
 	getSlackUserPreferencesOptions,
 	getSlackUserPreferencesQueryKey,
@@ -11,6 +14,7 @@ import {
 	listLinkedIdentitiesOptions,
 	listLinkedIdentitiesQueryKey,
 	unlinkIdentityMutation,
+	updateResearchConsentMutation,
 	updateSlackUserPreferencesMutation,
 	updateUserSettingsMutation,
 } from "@/api/@tanstack/react-query.gen";
@@ -25,7 +29,6 @@ import type { LinkedAccountsSectionProps } from "@/components/settings/LinkedAcc
 import { SettingsPage } from "@/components/settings/SettingsPage";
 import type { SlackPreferencesSectionProps } from "@/components/settings/SlackPreferencesSection";
 import { useAuth } from "@/integrations/auth/AuthContext";
-import { analyticsConfigured } from "@/integrations/consent";
 import { problemDetailOf } from "@/lib/problem-detail";
 import { hasText } from "@/lib/text";
 
@@ -37,6 +40,8 @@ function RouteComponent() {
 	const queryClient = useQueryClient();
 	const { logout, linkAccount } = useAuth();
 	const userSettingsQueryKey = getUserSettingsQueryKey();
+	const consentQuery = useQuery(getConsentStatusOptions({}));
+	const accountConsent = consentQuery.data;
 
 	const {
 		data: settings,
@@ -99,8 +104,16 @@ function RouteComponent() {
 	const handlePracticeFeedbackToggle = (checked: boolean) =>
 		updateSetting({ practiceFeedbackDeliveryEnabled: checked });
 
+	const researchConsentMutation = useMutation({
+		...updateResearchConsentMutation(),
+		onSuccess: (status) => {
+			queryClient.setQueryData(getConsentStatusQueryKey({}), status);
+		},
+		onError: () => toast.error("Failed to update research participation. Please try again."),
+	});
+
 	const handleResearchToggle = (checked: boolean) =>
-		updateSetting({ participateInResearch: checked });
+		researchConsentMutation.mutate({ body: { granted: checked } });
 
 	// After deletion: end the session. `logout()` performs a full reload to "/",
 	// so no further navigation is needed here.
@@ -227,11 +240,14 @@ function RouteComponent() {
 				onTogglePracticeFeedback: handlePracticeFeedbackToggle,
 				isLoading: updateSettingsMutation.isPending,
 			}}
-			showResearchSection={analyticsConfigured}
+			showResearchSection
 			researchProps={{
-				participateInResearch: settings?.participateInResearch ?? true,
+				participateInResearch: accountConsent?.participateInResearch ?? false,
 				onToggleResearch: handleResearchToggle,
-				isLoading: updateSettingsMutation.isPending,
+				isLoading: consentQuery.isLoading || researchConsentMutation.isPending,
+				isError: consentQuery.isError,
+				error: consentQuery.error,
+				onRetry: () => void consentQuery.refetch(),
 			}}
 			linkedAccountsProps={linkedAccountsProps}
 			showSlackPreferencesSection={slackAvailable}

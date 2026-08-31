@@ -39,11 +39,10 @@ public class WorkspaceOrganizationMembershipAdapter implements OrganizationMembe
     private final OrganizationMembershipRepository organizationMembershipRepository;
 
     public WorkspaceOrganizationMembershipAdapter(
-        WorkspaceRepository workspaceRepository,
-        WorkspaceMembershipRepository workspaceMembershipRepository,
-        WorkspaceMembershipService workspaceMembershipService,
-        OrganizationMembershipRepository organizationMembershipRepository
-    ) {
+            WorkspaceRepository workspaceRepository,
+            WorkspaceMembershipRepository workspaceMembershipRepository,
+            WorkspaceMembershipService workspaceMembershipService,
+            OrganizationMembershipRepository organizationMembershipRepository) {
         this.workspaceRepository = workspaceRepository;
         this.workspaceMembershipRepository = workspaceMembershipRepository;
         this.workspaceMembershipService = workspaceMembershipService;
@@ -77,18 +76,16 @@ public class WorkspaceOrganizationMembershipAdapter implements OrganizationMembe
         try {
             int synced = syncWorkspaceMembersFromOrganization(workspace, event.organizationId());
             log.info(
-                "Synced workspace members after scheduled org sync: workspaceId={}, orgLogin={}, memberCount={}",
-                workspace.getId(),
-                event.organizationLogin(),
-                synced
-            );
+                    "Synced workspace members after scheduled org sync: workspaceId={}, orgLogin={}, memberCount={}",
+                    workspace.getId(),
+                    event.organizationLogin(),
+                    synced);
         } catch (Exception e) {
             log.error(
-                "Failed to sync workspace members after scheduled sync: workspaceId={}, orgLogin={}",
-                workspace.getId(),
-                event.organizationLogin(),
-                e
-            );
+                    "Failed to sync workspace members after scheduled sync: workspaceId={}, orgLogin={}",
+                    workspace.getId(),
+                    event.organizationLogin(),
+                    e);
         }
     }
 
@@ -97,10 +94,9 @@ public class WorkspaceOrganizationMembershipAdapter implements OrganizationMembe
 
         if (workspaceOpt.isEmpty()) {
             log.debug(
-                "Skipped member sync: reason=noWorkspaceForOrg, orgLogin={}, action={}",
-                event.organizationLogin(),
-                action
-            );
+                    "Skipped member sync: reason=noWorkspaceForOrg, orgLogin={}, action={}",
+                    event.organizationLogin(),
+                    action);
             return;
         }
 
@@ -109,29 +105,27 @@ public class WorkspaceOrganizationMembershipAdapter implements OrganizationMembe
         try {
             int synced = syncWorkspaceMembersFromOrganization(workspace, event.organizationId());
             log.info(
-                "Synced workspace members after member change: workspaceId={}, orgLogin={}, action={}, userLogin={}, memberCount={}",
-                workspace.getId(),
-                event.organizationLogin(),
-                action,
-                event.userLogin(),
-                synced
-            );
+                    "Synced workspace members after member change: workspaceId={}, orgLogin={}, action={}, userLogin={}, memberCount={}",
+                    workspace.getId(),
+                    event.organizationLogin(),
+                    action,
+                    event.userLogin(),
+                    synced);
         } catch (Exception e) {
             log.error(
-                "Failed to sync workspace members after member change: workspaceId={}, orgLogin={}, action={}",
-                workspace.getId(),
-                event.organizationLogin(),
-                action,
-                e
-            );
+                    "Failed to sync workspace members after member change: workspaceId={}, orgLogin={}, action={}",
+                    workspace.getId(),
+                    event.organizationLogin(),
+                    action,
+                    e);
             // Don't rethrow - org membership change succeeded, workspace sync is secondary
         }
     }
 
     private Optional<Workspace> findWorkspaceByOrgLogin(String organizationLogin) {
         return workspaceRepository
-            .findByOrganization_Login(organizationLogin)
-            .or(() -> workspaceRepository.findByAccountLoginIgnoreCase(organizationLogin));
+                .findByOrganization_Login(organizationLogin)
+                .or(() -> workspaceRepository.findByAccountLoginIgnoreCase(organizationLogin));
     }
 
     /**
@@ -152,25 +146,21 @@ public class WorkspaceOrganizationMembershipAdapter implements OrganizationMembe
         Long workspaceId = workspace.getId();
 
         // Get current owners to preserve their role
-        Set<Long> currentOwnerIds = workspaceMembershipRepository
-            .findByWorkspace_Id(workspaceId)
-            .stream()
-            .filter(m -> m.getRole() == WorkspaceMembership.WorkspaceRole.OWNER)
-            .filter(m -> m.getUser() != null)
-            .map(m -> m.getUser().getId())
-            .collect(Collectors.toSet());
+        Set<Long> currentOwnerIds = workspaceMembershipRepository.findByWorkspace_Id(workspaceId).stream()
+                .filter(m -> m.getRole() == WorkspaceMembership.WorkspaceRole.OWNER)
+                .filter(m -> m.getUser() != null)
+                .map(m -> m.getUser().getId())
+                .collect(Collectors.toSet());
 
         // Get organization memberships and map to workspace roles
-        List<OrganizationMembership> orgMemberships = organizationMembershipRepository.findByOrganizationId(
-            organizationId
-        );
+        List<OrganizationMembership> orgMemberships =
+                organizationMembershipRepository.findByOrganizationId(organizationId);
 
         if (orgMemberships.isEmpty()) {
             log.debug(
-                "Skipped workspace member sync: reason=noOrgMembersFound, workspaceId={}, organizationId={}",
-                workspaceId,
-                organizationId
-            );
+                    "Skipped workspace member sync: reason=noOrgMembersFound, workspaceId={}, organizationId={}",
+                    workspaceId,
+                    organizationId);
             return 0;
         }
 

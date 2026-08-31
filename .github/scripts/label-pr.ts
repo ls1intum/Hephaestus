@@ -65,7 +65,6 @@ const GENERATED_PATTERNS = [
 	// Docs generated
 	/^docs\/contributor\/erd\/.*\.mmd$/, // Generated Mermaid ERD diagrams
 
-	// Lock files (not code, just dependency resolution)
 	/pnpm-lock\.yaml$/,
 	/\.lock$/,
 ];

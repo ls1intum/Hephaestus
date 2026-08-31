@@ -13,7 +13,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestR
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment.PullRequestReviewCommentRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventType;
 import de.tum.cit.aet.hephaestus.integration.scm.github.pullrequestreviewcomment.dto.GitHubPullRequestReviewCommentEventDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
@@ -73,10 +72,9 @@ class GitHubPullRequestReviewCommentMessageHandlerIntegrationTest extends BaseIn
     private void setupTestData() {
         // Create GitHub provider
         gitProvider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-            .orElseGet(() ->
-                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseGet(() -> gitProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
 
         // Create organization
         Organization org = new Organization();
@@ -139,34 +137,39 @@ class GitHubPullRequestReviewCommentMessageHandlerIntegrationTest extends BaseIn
         GitHubPullRequestReviewCommentEventDTO event = loadPayload("pull_request_review_comment.created");
 
         // Create the PR that the comment belongs to
-        createTestPullRequest(required(event.pullRequest().getDatabaseId()), event.pullRequest().number());
+        createTestPullRequest(
+                required(event.pullRequest().getDatabaseId()),
+                event.pullRequest().number());
 
         // Verify comment doesn't exist initially
-        assertThat(commentRepository.findByNativeIdAndProviderId(event.comment().id(), gitProviderId())).isEmpty();
+        assertThat(commentRepository.findByNativeIdAndProviderId(event.comment().id(), gitProviderId()))
+                .isEmpty();
 
         handler.handleEvent(event);
 
         // Then - verify comment is created with required fields
         assertThat(commentRepository.findByNativeIdAndProviderId(event.comment().id(), gitProviderId()))
-            .isPresent()
-            .get()
-            .satisfies(comment -> {
-                assertThat(comment.getNativeId()).isEqualTo(event.comment().id());
-                assertThat(comment.getBody()).isEqualTo(event.comment().body());
-                assertThat(comment.getPath()).isEqualTo(event.comment().path());
-                // Verify thread is created (required FK)
-                assertThat(comment.getThread()).isNotNull();
-                assertThat(comment.getThread().getId()).isNotNull();
-                // Verify required fields are populated
-                assertThat(comment.getCommitId()).isNotEmpty();
-            });
+                .isPresent()
+                .get()
+                .satisfies(comment -> {
+                    assertThat(comment.getNativeId()).isEqualTo(event.comment().id());
+                    assertThat(comment.getBody()).isEqualTo(event.comment().body());
+                    assertThat(comment.getPath()).isEqualTo(event.comment().path());
+                    // Verify thread is created (required FK)
+                    assertThat(comment.getThread()).isNotNull();
+                    assertThat(comment.getThread().getId()).isNotNull();
+                    // Verify required fields are populated
+                    assertThat(comment.getCommitId()).isNotEmpty();
+                });
     }
 
     @Test
     void shouldUpdateReviewCommentOnEditedEvent() throws Exception {
         // Given - first create the comment
         GitHubPullRequestReviewCommentEventDTO createEvent = loadPayload("pull_request_review_comment.created");
-        createTestPullRequest(required(createEvent.pullRequest().getDatabaseId()), createEvent.pullRequest().number());
+        createTestPullRequest(
+                required(createEvent.pullRequest().getDatabaseId()),
+                createEvent.pullRequest().number());
         handler.handleEvent(createEvent);
 
         // Load edited event
@@ -174,34 +177,37 @@ class GitHubPullRequestReviewCommentMessageHandlerIntegrationTest extends BaseIn
 
         handler.handleEvent(editEvent);
 
-        assertThat(commentRepository.findByNativeIdAndProviderId(editEvent.comment().id(), gitProviderId()))
-            .isPresent()
-            .get()
-            .satisfies(comment -> {
-                assertThat(comment.getBody()).isEqualTo(editEvent.comment().body());
-            });
+        assertThat(commentRepository.findByNativeIdAndProviderId(
+                        editEvent.comment().id(), gitProviderId()))
+                .isPresent()
+                .get()
+                .satisfies(comment -> {
+                    assertThat(comment.getBody()).isEqualTo(editEvent.comment().body());
+                });
     }
 
     @Test
     void shouldDeleteReviewCommentOnDeletedEvent() throws Exception {
         // Given - first create the comment
         GitHubPullRequestReviewCommentEventDTO createEvent = loadPayload("pull_request_review_comment.created");
-        createTestPullRequest(required(createEvent.pullRequest().getDatabaseId()), createEvent.pullRequest().number());
+        createTestPullRequest(
+                required(createEvent.pullRequest().getDatabaseId()),
+                createEvent.pullRequest().number());
         handler.handleEvent(createEvent);
 
         // Verify it exists
-        assertThat(
-            commentRepository.findByNativeIdAndProviderId(createEvent.comment().id(), gitProviderId())
-        ).isPresent();
+        assertThat(commentRepository.findByNativeIdAndProviderId(
+                        createEvent.comment().id(), gitProviderId()))
+                .isPresent();
 
         // Load deleted event
         GitHubPullRequestReviewCommentEventDTO deleteEvent = loadPayload("pull_request_review_comment.deleted");
 
         handler.handleEvent(deleteEvent);
 
-        assertThat(
-            commentRepository.findByNativeIdAndProviderId(deleteEvent.comment().id(), gitProviderId())
-        ).isEmpty();
+        assertThat(commentRepository.findByNativeIdAndProviderId(
+                        deleteEvent.comment().id(), gitProviderId()))
+                .isEmpty();
     }
 
     private GitHubPullRequestReviewCommentEventDTO loadPayload(String filename) throws IOException {

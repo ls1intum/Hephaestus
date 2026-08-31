@@ -18,6 +18,8 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentMatchers;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -44,7 +46,8 @@ class AuthRateLimitFilterTest extends BaseUnitTest {
 
     private final BucketResolver resolver = (key, config) -> {
         capturedConfigs.put(key, config);
-        return store.computeIfAbsent(key, k -> Bucket.builder().addLimit(config.getBandwidths()[0]).build());
+        return store.computeIfAbsent(
+                key, k -> Bucket.builder().addLimit(config.getBandwidths()[0]).build());
     };
 
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -56,20 +59,25 @@ class AuthRateLimitFilterTest extends BaseUnitTest {
     }
 
     private double blockedCount(String bucket) {
-        var counter = meterRegistry.find("auth.ratelimit.blocked").tag("bucket", bucket).counter();
+        var counter = meterRegistry
+                .find("auth.ratelimit.blocked")
+                .tag("bucket", bucket)
+                .counter();
         return counter == null ? 0d : counter.count();
     }
 
     private static AuthRateLimitProperties props(AuthRateLimitProperties.Limit... overrides) {
         // Defaults from the spec; tests override the oauth-authz limit via the first vararg.
         return new AuthRateLimitProperties(
-            true,
-            overrides.length > 0 ? overrides[0] : new AuthRateLimitProperties.Limit(20, Duration.ofMinutes(1)),
-            new AuthRateLimitProperties.Limit(60, Duration.ofMinutes(1)),
-            new AuthRateLimitProperties.Limit(10, Duration.ofMinutes(1)),
-            new AuthRateLimitProperties.Limit(3, Duration.ofHours(1)),
-            new AuthRateLimitProperties.Limit(10, Duration.ofHours(1))
-        );
+                true,
+                overrides.length > 0 ? overrides[0] : new AuthRateLimitProperties.Limit(20, Duration.ofMinutes(1)),
+                new AuthRateLimitProperties.Limit(60, Duration.ofMinutes(1)),
+                new AuthRateLimitProperties.Limit(10, Duration.ofMinutes(1)),
+                new AuthRateLimitProperties.Limit(3, Duration.ofHours(1)),
+                new AuthRateLimitProperties.Limit(10, Duration.ofHours(1)),
+                new AuthRateLimitProperties.Limit(20, Duration.ofMinutes(10)),
+                new AuthRateLimitProperties.Limit(10, Duration.ofHours(1)),
+                new AuthRateLimitProperties.Limit(10, Duration.ofHours(1)));
     }
 
     @AfterEach
@@ -79,10 +87,10 @@ class AuthRateLimitFilterTest extends BaseUnitTest {
 
     private static void authenticateAs(String subject) {
         Jwt jwt = Jwt.withTokenValue("token")
-            .header("alg", "ES256")
-            .subject(subject)
-            .claim("roles", List.of("app_admin"))
-            .build();
+                .header("alg", "ES256")
+                .subject(subject)
+                .claim("roles", List.of("app_admin"))
+                .build();
         AbstractAuthenticationToken auth = new JwtAuthenticationToken(jwt);
         auth.setAuthenticated(true);
         SecurityContextHolder.getContext().setAuthentication(auth);
@@ -103,13 +111,15 @@ class AuthRateLimitFilterTest extends BaseUnitTest {
     @Test
     void disabledFilterPassesThroughWithoutTouchingBuckets() throws Exception {
         AuthRateLimitProperties disabled = new AuthRateLimitProperties(
-            false,
-            new AuthRateLimitProperties.Limit(1, Duration.ofMinutes(1)),
-            new AuthRateLimitProperties.Limit(1, Duration.ofMinutes(1)),
-            new AuthRateLimitProperties.Limit(1, Duration.ofMinutes(1)),
-            new AuthRateLimitProperties.Limit(1, Duration.ofHours(1)),
-            new AuthRateLimitProperties.Limit(1, Duration.ofHours(1))
-        );
+                false,
+                new AuthRateLimitProperties.Limit(1, Duration.ofMinutes(1)),
+                new AuthRateLimitProperties.Limit(1, Duration.ofMinutes(1)),
+                new AuthRateLimitProperties.Limit(1, Duration.ofMinutes(1)),
+                new AuthRateLimitProperties.Limit(1, Duration.ofHours(1)),
+                new AuthRateLimitProperties.Limit(1, Duration.ofHours(1)),
+                new AuthRateLimitProperties.Limit(1, Duration.ofHours(1)),
+                new AuthRateLimitProperties.Limit(1, Duration.ofHours(1)),
+                new AuthRateLimitProperties.Limit(1, Duration.ofHours(1)));
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/auth/refresh");
         MockHttpServletResponse response = new MockHttpServletResponse();
         FilterChain chain = mock(FilterChain.class);
@@ -210,6 +220,25 @@ class AuthRateLimitFilterTest extends BaseUnitTest {
         assertThat(store).containsOnlyKeys("refresh:ip:192.0.2.55");
     }
 
+    @ParameterizedTest
+    @ValueSource(
+            strings = {
+                "/workspaces/demo/mentor/chat",
+                "/workspaces/demo/practices/review-requests",
+                "/workspaces/demo/connections/7/sync/jobs"
+            })
+    void expensiveEndpointsUseAccountBuckets(String path) throws Exception {
+        authenticateAs("42");
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", path);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain chain = mock(FilterChain.class);
+
+        filter(props()).doFilter(request, response, chain);
+
+        verify(chain).doFilter(request, response);
+        assertThat(store.keySet()).singleElement().asString().endsWith(":acct:42");
+    }
+
     @Test
     void impersonateBeginIsRateLimitedButExitIsNot() throws Exception {
         authenticateAs("99");
@@ -259,7 +288,7 @@ class AuthRateLimitFilterTest extends BaseUnitTest {
     void workerAndWebhookPathsAreNeverRateLimited() throws Exception {
         AuthRateLimitFilter f = filter(props());
 
-        for (String path : new String[] { "/api/workers/exchange", "/webhooks/gitlab", "/actuator/health" }) {
+        for (String path : new String[] {"/api/workers/exchange", "/webhooks/gitlab", "/actuator/health"}) {
             MockHttpServletRequest req = new MockHttpServletRequest("POST", path);
             MockHttpServletResponse res = new MockHttpServletResponse();
             FilterChain chain = mock(FilterChain.class);
@@ -318,8 +347,6 @@ class AuthRateLimitFilterTest extends BaseUnitTest {
 
     @Test
     void failsOpenAndRecordsMetricWhenBucketBackendThrows() throws Exception {
-        // A bucket-store blip (e.g. Postgres lock-timeout) must degrade to pass-through, not a hard
-        // outage — and the degradation must be observable via the backend-error metric.
         BucketResolver throwing = (key, config) -> {
             throw new RuntimeException("bucket store down");
         };
@@ -332,9 +359,26 @@ class AuthRateLimitFilterTest extends BaseUnitTest {
         FilterChain chain = mock(FilterChain.class);
         f.doFilter(req, res, chain);
 
-        verify(chain, times(1)).doFilter(req, res); // request passed through (failed open)
-        assertThat(res.getStatus()).isEqualTo(HttpStatus.OK.value()); // NOT 429
+        verify(chain, times(1)).doFilter(req, res);
+        assertThat(res.getStatus()).isEqualTo(HttpStatus.OK.value());
         verify(mockMetrics, times(1)).recordRateLimitBackendError();
+    }
+
+    @Test
+    void costlyRequestFailsClosedWhenBucketBackendThrows() throws Exception {
+        authenticateAs("42");
+        BucketResolver throwing = (key, config) -> {
+            throw new RuntimeException("bucket store down");
+        };
+        AuthRateLimitFilter f = new AuthRateLimitFilter(props(), throwing, objectMapper, metrics);
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/workspaces/demo/mentor/chat");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain chain = mock(FilterChain.class);
+
+        f.doFilter(request, response, chain);
+
+        verify(chain, never()).doFilter(request, response);
+        assertThat(response.getStatus()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE.value());
     }
 
     @Test
@@ -342,16 +386,13 @@ class AuthRateLimitFilterTest extends BaseUnitTest {
         authenticateAs("acct-42");
         AuthRateLimitFilter f = filter(props());
 
-        // POST /user/exports → matched + account-keyed (the expensive async assembly).
         f.doFilter(
-            new MockHttpServletRequest("POST", "/user/exports"),
-            new MockHttpServletResponse(),
-            mock(FilterChain.class)
-        );
+                new MockHttpServletRequest("POST", "/user/exports"),
+                new MockHttpServletResponse(),
+                mock(FilterChain.class));
         assertThat(store).hasSize(1);
         assertThat(store.keySet().iterator().next()).contains("acct-42");
 
-        // GET /user/exports/{id}/download → intentionally NOT rate-limited (no bucket, passes through).
         store.clear();
         MockHttpServletRequest dl = new MockHttpServletRequest("GET", "/user/exports/abc/download");
         MockHttpServletResponse dlRes = new MockHttpServletResponse();

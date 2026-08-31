@@ -63,26 +63,25 @@ public final class ObservationFingerprint {
      * @return the lowercase SHA-256 hex digest (exactly 64 characters)
      */
     public static String compute(
-        @Nullable String practiceSlug,
-        @Nullable String artifactKind,
-        long artifactId,
-        long aboutUserId,
-        @Nullable String firstLocationPath
-    ) {
+            @Nullable String practiceSlug,
+            @Nullable String artifactKind,
+            long artifactId,
+            long aboutUserId,
+            @Nullable String firstLocationPath) {
         Objects.requireNonNull(practiceSlug, "practiceSlug");
         Objects.requireNonNull(artifactKind, "artifactKind");
 
         String canonical = new StringBuilder()
-            .append(practiceSlug)
-            .append(SEP)
-            .append(artifactKind)
-            .append(SEP)
-            .append(artifactId)
-            .append(SEP)
-            .append(aboutUserId)
-            .append(SEP)
-            .append(firstLocationPath == null ? "" : normalizeAnchorText(firstLocationPath))
-            .toString();
+                .append(practiceSlug)
+                .append(SEP)
+                .append(artifactKind)
+                .append(SEP)
+                .append(artifactId)
+                .append(SEP)
+                .append(aboutUserId)
+                .append(SEP)
+                .append(firstLocationPath == null ? "" : normalizeAnchorText(firstLocationPath))
+                .toString();
 
         return sha256Hex(canonical);
     }

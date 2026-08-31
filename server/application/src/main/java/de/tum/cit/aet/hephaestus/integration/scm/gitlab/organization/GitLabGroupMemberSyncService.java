@@ -78,15 +78,14 @@ public class GitLabGroupMemberSyncService {
     private final TransactionTemplate requiresNewTransaction;
 
     public GitLabGroupMemberSyncService(
-        GitLabGraphQlClientProvider graphQlClientProvider,
-        GitLabGraphQlResponseHandler responseHandler,
-        OrganizationMembershipRepository organizationMembershipRepository,
-        UserRepository userRepository,
-        IdentityProviderRepository gitProviderRepository,
-        GitLabProperties gitLabProperties,
-        @Nullable OrganizationMembershipListener organizationMembershipListener,
-        TransactionTemplate transactionTemplate
-    ) {
+            GitLabGraphQlClientProvider graphQlClientProvider,
+            GitLabGraphQlResponseHandler responseHandler,
+            OrganizationMembershipRepository organizationMembershipRepository,
+            UserRepository userRepository,
+            IdentityProviderRepository gitProviderRepository,
+            GitLabProperties gitLabProperties,
+            @Nullable OrganizationMembershipListener organizationMembershipListener,
+            TransactionTemplate transactionTemplate) {
         this.graphQlClientProvider = graphQlClientProvider;
         this.responseHandler = responseHandler;
         this.organizationMembershipRepository = organizationMembershipRepository;
@@ -95,9 +94,8 @@ public class GitLabGroupMemberSyncService {
         this.gitLabProperties = gitLabProperties;
         this.organizationMembershipListener = organizationMembershipListener;
         // Isolated transaction for each user upsert — matches GitHubUserProcessor pattern.
-        this.requiresNewTransaction = new TransactionTemplate(
-            Objects.requireNonNull(transactionTemplate.getTransactionManager())
-        );
+        this.requiresNewTransaction =
+                new TransactionTemplate(Objects.requireNonNull(transactionTemplate.getTransactionManager()));
         this.requiresNewTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
@@ -119,10 +117,9 @@ public class GitLabGroupMemberSyncService {
     public int syncGroupMemberships(Long scopeId, @Nullable String groupFullPath, @Nullable Organization organization) {
         if (organization == null || groupFullPath == null || groupFullPath.isBlank()) {
             log.warn(
-                "Skipped group membership sync: reason=missingArgs, scopeId={}, groupPath={}",
-                scopeId,
-                groupFullPath != null ? sanitizeForLog(groupFullPath) : "null"
-            );
+                    "Skipped group membership sync: reason=missingArgs, scopeId={}, groupPath={}",
+                    scopeId,
+                    groupFullPath != null ? sanitizeForLog(groupFullPath) : "null");
             return -1;
         }
 
@@ -146,22 +143,19 @@ public class GitLabGroupMemberSyncService {
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     log.warn(
-                        "Interrupted during rate limit wait: context=groupMemberSync, groupPath={}",
-                        safeGroupPath
-                    );
+                            "Interrupted during rate limit wait: context=groupMemberSync, groupPath={}", safeGroupPath);
                     break;
                 }
 
                 int pageSize = adaptPageSize(DEFAULT_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId));
                 HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
 
-                ClientGraphQlResponse response = client
-                    .documentName(GET_GROUP_MEMBERS_DOCUMENT)
-                    .variable("fullPath", groupFullPath)
-                    .variable("first", pageSize)
-                    .variable("after", cursor)
-                    .execute()
-                    .block(gitLabProperties.graphqlTimeout());
+                ClientGraphQlResponse response = client.documentName(GET_GROUP_MEMBERS_DOCUMENT)
+                        .variable("fullPath", groupFullPath)
+                        .variable("first", pageSize)
+                        .variable("after", cursor)
+                        .execute()
+                        .block(gitLabProperties.graphqlTimeout());
 
                 var handleResult = responseHandler.handle(response, "group members for " + safeGroupPath, log);
                 if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.RETRY) {
@@ -175,8 +169,8 @@ public class GitLabGroupMemberSyncService {
                 graphQlClientProvider.recordSuccess();
 
                 List<GitLabGroupMemberResponse> members = Objects.requireNonNull(response)
-                    .field("group.groupMembers.nodes")
-                    .toEntityList(GitLabGroupMemberResponse.class);
+                        .field("group.groupMembers.nodes")
+                        .toEntityList(GitLabGroupMemberResponse.class);
 
                 for (GitLabGroupMemberResponse member : members) {
                     if (member == null || member.user() == null) {
@@ -195,8 +189,8 @@ public class GitLabGroupMemberSyncService {
 
                 // Check pagination
                 GitLabPageInfo pageInfo = Objects.requireNonNull(response)
-                    .field("group.groupMembers.pageInfo")
-                    .toEntity(GitLabPageInfo.class);
+                        .field("group.groupMembers.pageInfo")
+                        .toEntity(GitLabPageInfo.class);
 
                 if (pageInfo == null || !pageInfo.hasNextPage()) {
                     syncCompletedNormally = true;
@@ -206,15 +200,13 @@ public class GitLabGroupMemberSyncService {
                 cursor = pageInfo.endCursor();
                 if (cursor == null) {
                     log.warn(
-                        "Pagination cursor null despite hasNextPage=true: context=groupMemberSync, groupPath={}, page={}",
-                        safeGroupPath,
-                        pageCount
-                    );
+                            "Pagination cursor null despite hasNextPage=true: context=groupMemberSync, groupPath={}, page={}",
+                            safeGroupPath,
+                            pageCount);
                     break;
                 }
-                if (
-                    responseHandler.isPaginationLoop(cursor, previousCursor, "group members for " + safeGroupPath, log)
-                ) {
+                if (responseHandler.isPaginationLoop(
+                        cursor, previousCursor, "group members for " + safeGroupPath, log)) {
                     break;
                 }
                 previousCursor = cursor;
@@ -228,28 +220,25 @@ public class GitLabGroupMemberSyncService {
                 removeStaleMemberships(organization, syncedUserIds);
             } else {
                 log.warn(
-                    "Skipped stale membership removal: reason=incompleteSync, groupPath={}, pagesProcessed={}",
-                    safeGroupPath,
-                    pageCount + 1
-                );
+                        "Skipped stale membership removal: reason=incompleteSync, groupPath={}, pagesProcessed={}",
+                        safeGroupPath,
+                        pageCount + 1);
             }
 
             // Fire sync event only on complete sync — downstream reconciliation
             // should not run on partial data to avoid incorrect member removal.
             if (syncCompletedNormally && organizationMembershipListener != null) {
                 organizationMembershipListener.onOrganizationMembershipsSynced(
-                    new OrganizationSyncedEvent(organization.getId(), organization.getLogin())
-                );
+                        new OrganizationSyncedEvent(organization.getId(), organization.getLogin()));
             }
 
             log.info(
-                "Synced group memberships: scopeId={}, groupPath={}, memberCount={}, pages={}, complete={}",
-                scopeId,
-                safeGroupPath,
-                syncedUserIds.size(),
-                pageCount + 1,
-                syncCompletedNormally
-            );
+                    "Synced group memberships: scopeId={}, groupPath={}, memberCount={}, pages={}, complete={}",
+                    scopeId,
+                    safeGroupPath,
+                    syncedUserIds.size(),
+                    pageCount + 1,
+                    syncCompletedNormally);
 
             return syncedUserIds.size();
         } catch (InterruptedException e) {
@@ -298,22 +287,24 @@ public class GitLabGroupMemberSyncService {
                 log.debug("Could not acquire advisory lock for login={}, proceeding with upsert", login);
             }
             userRepository.upsertUser(
-                nativeId,
-                providerId,
-                login,
-                name,
-                avatarUrl,
-                htmlUrl,
-                GitLabUserClassifier.classify(login).name(),
-                null,
-                null,
-                null
-            );
+                    nativeId,
+                    providerId,
+                    login,
+                    name,
+                    avatarUrl,
+                    htmlUrl,
+                    GitLabUserClassifier.classify(login).name(),
+                    null,
+                    null,
+                    null);
         });
 
         // Load the persisted entity to get the database-assigned ID.
         // The REQUIRES_NEW transaction has committed, so this query sees the upserted row.
-        return userRepository.findByNativeIdAndProviderId(nativeId, providerId).map(User::getId).orElse(null);
+        return userRepository
+                .findByNativeIdAndProviderId(nativeId, providerId)
+                .map(User::getId)
+                .orElse(null);
     }
 
     /**
@@ -341,11 +332,10 @@ public class GitLabGroupMemberSyncService {
         if (!staleUserIds.isEmpty()) {
             organizationMembershipRepository.deleteByOrganizationIdAndUserIdIn(organization.getId(), staleUserIds);
             log.info(
-                "Removed stale group memberships: orgId={}, groupPath={}, removedCount={}",
-                organization.getId(),
-                sanitizeForLog(organization.getLogin()),
-                staleUserIds.size()
-            );
+                    "Removed stale group memberships: orgId={}, groupPath={}, removedCount={}",
+                    organization.getId(),
+                    sanitizeForLog(organization.getLogin()),
+                    staleUserIds.size());
         }
     }
 
@@ -357,11 +347,8 @@ public class GitLabGroupMemberSyncService {
      */
     private IdentityProvider resolveProvider() {
         return gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITLAB, gitLabProperties.defaultServerUrl())
-            .orElseThrow(() ->
-                new IllegalStateException(
-                    "IdentityProvider not found for type=GITLAB, serverUrl=" + gitLabProperties.defaultServerUrl()
-                )
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITLAB, gitLabProperties.defaultServerUrl())
+                .orElseThrow(() -> new IllegalStateException("IdentityProvider not found for type=GITLAB, serverUrl="
+                        + gitLabProperties.defaultServerUrl()));
     }
 }

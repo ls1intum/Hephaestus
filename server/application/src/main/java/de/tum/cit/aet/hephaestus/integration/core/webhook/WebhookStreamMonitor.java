@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.core.webhook;
 
 import de.tum.cit.aet.hephaestus.core.webhook.WebhookProperties;
 import de.tum.cit.aet.hephaestus.integration.core.consumer.ConsumerSubjectMath;
+import de.tum.cit.aet.hephaestus.integration.core.metrics.IntegrationCoreMetrics;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -60,6 +61,7 @@ class WebhookStreamMonitor {
     private final Map<String, Usage> usage = new ConcurrentHashMap<>();
     /** Lowest stream sequence the stream still held, per stream, as of the previous poll. */
     private final Map<String, Long> lastFirstSequence = new ConcurrentHashMap<>();
+
     private final Map<String, AtomicLong> unacknowledgedGap = new HashMap<>();
     private final Map<String, Counter> dropped = new HashMap<>();
     /**
@@ -77,11 +79,10 @@ class WebhookStreamMonitor {
     });
 
     WebhookStreamMonitor(
-        JetStreamManagement jsm,
-        WebhookProperties properties,
-        String durableConsumerName,
-        MeterRegistry meterRegistry
-    ) {
+            JetStreamManagement jsm,
+            WebhookProperties properties,
+            String durableConsumerName,
+            MeterRegistry meterRegistry) {
         this.jsm = jsm;
         this.properties = properties;
         this.durablePrefix = ConsumerSubjectMath.durablePrefix(durableConsumerName);
@@ -94,38 +95,40 @@ class WebhookStreamMonitor {
             gauge(meterRegistry, "webhook.stream.messages", tags, name, Usage::messages);
             // Effective retention, measured rather than claimed: max-age is a ceiling and max-bytes is
             // the floor under it, so which one a deployment actually gets is a function of its volume.
-            Gauge.builder("webhook.stream.oldest.message.age", this, monitor ->
-                monitor.usage.getOrDefault(name, UNKNOWN).oldestMessageAgeSeconds()
-            )
-                .tags(tags)
-                .baseUnit("seconds")
-                .register(meterRegistry);
+            Gauge.builder(
+                            IntegrationCoreMetrics.WEBHOOK_STREAM_OLDEST_MESSAGE_AGE,
+                            this,
+                            monitor -> monitor.usage.getOrDefault(name, UNKNOWN).oldestMessageAgeSeconds())
+                    .tags(tags)
+                    .baseUnit("seconds")
+                    .register(meterRegistry);
             // A durable nobody deletes shows up here as a count that only ever climbs.
             gauge(meterRegistry, "webhook.stream.consumers", tags, name, Usage::consumers);
 
             AtomicLong gap = new AtomicLong();
             unacknowledgedGap.put(name, gap);
-            Gauge.builder("webhook.stream.unacknowledged.gap", gap, AtomicLong::doubleValue)
-                .tags(tags)
-                .register(meterRegistry);
+            Gauge.builder(IntegrationCoreMetrics.WEBHOOK_STREAM_UNACKNOWLEDGED_GAP, gap, AtomicLong::doubleValue)
+                    .tags(tags)
+                    .register(meterRegistry);
             dropped.put(
-                name,
-                Counter.builder("webhook.stream.unacknowledged.deletions").tags(tags).register(meterRegistry)
-            );
+                    name,
+                    Counter.builder(IntegrationCoreMetrics.WEBHOOK_STREAM_UNACKNOWLEDGED_DELETIONS)
+                            .tags(tags)
+                            .register(meterRegistry));
 
             AtomicLong polled = new AtomicLong();
             lastSuccessfulPollMillis.put(name, polled);
-            Gauge.builder("webhook.stream.poll.age", polled, WebhookStreamMonitor::secondsSince)
-                .tags(tags)
-                .baseUnit("seconds")
-                .register(meterRegistry);
+            Gauge.builder(IntegrationCoreMetrics.WEBHOOK_STREAM_POLL_AGE, polled, WebhookStreamMonitor::secondsSince)
+                    .tags(tags)
+                    .baseUnit("seconds")
+                    .register(meterRegistry);
         }
     }
 
     private void gauge(MeterRegistry registry, String metric, Tags tags, String stream, ToDoubleFunction<Usage> read) {
         Gauge.builder(metric, this, monitor -> read.applyAsDouble(monitor.usage.getOrDefault(stream, UNKNOWN)))
-            .tags(tags)
-            .register(registry);
+                .tags(tags)
+                .register(registry);
     }
 
     @PostConstruct
@@ -152,15 +155,13 @@ class WebhookStreamMonitor {
                     continue;
                 }
                 usage.put(
-                    name,
-                    new Usage(
-                        state.getByteCount(),
-                        state.getMsgCount(),
-                        info.getConfiguration().getMaxBytes(),
-                        state.getConsumerCount(),
-                        ageSeconds(state)
-                    )
-                );
+                        name,
+                        new Usage(
+                                state.getByteCount(),
+                                state.getMsgCount(),
+                                info.getConfiguration().getMaxBytes(),
+                                state.getConsumerCount(),
+                                ageSeconds(state)));
                 accountForLoss(name, state.getFirstSequence());
                 Objects.requireNonNull(lastSuccessfulPollMillis.get(name)).set(System.currentTimeMillis());
                 recovered(name);
@@ -199,12 +200,11 @@ class WebhookStreamMonitor {
                 // it would re-charge the same loss on every restart.
                 if (gap > 0) {
                     log.error(
-                        "Consumer {} on stream {} is behind the oldest message the stream still holds: {} " +
-                            "webhook(s) were deleted before it read them",
-                        consumer.getName(),
-                        stream,
-                        gap
-                    );
+                            "Consumer {} on stream {} is behind the oldest message the stream still holds: {} "
+                                    + "webhook(s) were deleted before it read them",
+                            consumer.getName(),
+                            stream,
+                            gap);
                 }
                 continue;
             }
@@ -215,13 +215,12 @@ class WebhookStreamMonitor {
             if (lost > 0) {
                 newLoss += lost;
                 log.error(
-                    "Stream {} deleted {} unacknowledged webhook(s) that consumer {} had not read. " +
-                        "They are not recoverable: raise hephaestus.webhook.stream.max-bytes, lengthen " +
-                        "max-age, or find out why the consumer stopped keeping up.",
-                    stream,
-                    lost,
-                    consumer.getName()
-                );
+                        "Stream {} deleted {} unacknowledged webhook(s) that consumer {} had not read. "
+                                + "They are not recoverable: raise hephaestus.webhook.stream.max-bytes, lengthen "
+                                + "max-age, or find out why the consumer stopped keeping up.",
+                        stream,
+                        lost,
+                        consumer.getName());
             }
         }
         Objects.requireNonNull(unacknowledgedGap.get(stream)).set(worstGap);
@@ -239,12 +238,11 @@ class WebhookStreamMonitor {
     private void failed(String stream, Exception e) {
         if (failing.put(stream, Boolean.TRUE) == null) {
             log.warn(
-                "Webhook loss accounting stopped for stream {}: the dropped-webhook counter is frozen, " +
-                    "not zero, until this recovers ({}: {})",
-                stream,
-                e.getClass().getSimpleName(),
-                e.getMessage()
-            );
+                    "Webhook loss accounting stopped for stream {}: the dropped-webhook counter is frozen, "
+                            + "not zero, until this recovers ({}: {})",
+                    stream,
+                    e.getClass().getSimpleName(),
+                    e.getMessage());
             return;
         }
         log.debug("Stream usage poll still failing: stream={}, error={}", stream, e.getMessage());

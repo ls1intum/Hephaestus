@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.core.auth.oauth;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,7 +34,7 @@ public class GitHubEmailOAuth2UserService implements OAuth2UserService<OAuth2Use
 
     private static final Logger log = LoggerFactory.getLogger(GitHubEmailOAuth2UserService.class);
     private static final ParameterizedTypeReference<List<Map<String, Object>>> EMAIL_LIST =
-        new ParameterizedTypeReference<>() {};
+            new ParameterizedTypeReference<>() {};
     private static final String EMAILS_URI = "https://api.github.com/user/emails";
 
     private final DefaultOAuth2UserService delegate = new DefaultOAuth2UserService();
@@ -42,11 +43,13 @@ public class GitHubEmailOAuth2UserService implements OAuth2UserService<OAuth2Use
     @Override
     public OAuth2User loadUser(OAuth2UserRequest userRequest) throws OAuth2AuthenticationException {
         OAuth2User user = delegate.loadUser(userRequest);
-        String nameAttrKey = userRequest
-            .getClientRegistration()
-            .getProviderDetails()
-            .getUserInfoEndpoint()
-            .getUserNameAttributeName(); // "id"
+        String nameAttrKey = Objects.requireNonNull(
+                userRequest
+                        .getClientRegistration()
+                        .getProviderDetails()
+                        .getUserInfoEndpoint()
+                        .getUserNameAttributeName(),
+                "GitHub user-name attribute must be configured");
 
         Map<String, Object> attrs = new HashMap<>(user.getAttributes());
         fetchPrimaryVerifiedEmail(userRequest).ifPresent(email -> {
@@ -59,12 +62,14 @@ public class GitHubEmailOAuth2UserService implements OAuth2UserService<OAuth2Use
     private Optional<String> fetchPrimaryVerifiedEmail(OAuth2UserRequest userRequest) {
         try {
             List<Map<String, Object>> emails = restClient
-                .get()
-                .uri(EMAILS_URI)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + userRequest.getAccessToken().getTokenValue())
-                .accept(MediaType.APPLICATION_JSON)
-                .retrieve()
-                .body(EMAIL_LIST);
+                    .get()
+                    .uri(EMAILS_URI)
+                    .header(
+                            HttpHeaders.AUTHORIZATION,
+                            "Bearer " + userRequest.getAccessToken().getTokenValue())
+                    .accept(MediaType.APPLICATION_JSON)
+                    .retrieve()
+                    .body(EMAIL_LIST);
             return selectPrimaryVerifiedEmail(emails);
         } catch (RuntimeException ex) {
             // Email enrichment is best-effort: login must not fail because /user/emails is unreachable.
@@ -76,16 +81,14 @@ public class GitHubEmailOAuth2UserService implements OAuth2UserService<OAuth2Use
 
     /** The {@code primary && verified} address, or empty. Pure — the verification policy under test. */
     static Optional<String> selectPrimaryVerifiedEmail(
-        @org.jspecify.annotations.Nullable List<Map<String, Object>> emails
-    ) {
+            @org.jspecify.annotations.Nullable List<Map<String, Object>> emails) {
         if (emails == null) {
             return Optional.empty();
         }
-        return emails
-            .stream()
-            .filter(e -> Boolean.TRUE.equals(e.get("primary")) && Boolean.TRUE.equals(e.get("verified")))
-            .map(e -> (String) e.get("email"))
-            .filter(s -> s != null && !s.isBlank())
-            .findFirst();
+        return emails.stream()
+                .filter(e -> Boolean.TRUE.equals(e.get("primary")) && Boolean.TRUE.equals(e.get("verified")))
+                .map(e -> (String) e.get("email"))
+                .filter(s -> s != null && !s.isBlank())
+                .findFirst();
     }
 }

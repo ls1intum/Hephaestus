@@ -13,12 +13,11 @@ class GitLabUserClassifierTest {
 
     @ParameterizedTest
     @ValueSource(
-        strings = {
-            "group_185885_bot_39ba88423f879e8c9ec140214eda9548",
-            "group_328643_bot_de8d541a82d8e790c0ad41b12a6823ed",
-            "project_7_bot_abcdef0123456789",
-        }
-    )
+            strings = {
+                "group_185885_bot_39ba88423f879e8c9ec140214eda9548",
+                "group_328643_bot_de8d541a82d8e790c0ad41b12a6823ed",
+                "project_7_bot_abcdef0123456789",
+            })
     void isBot_recognisesTokenLogins(String login) {
         assertThat(GitLabUserClassifier.isBot(login)).isTrue();
         assertThat(GitLabUserClassifier.classify(login)).isEqualTo(User.Type.BOT);
@@ -26,18 +25,17 @@ class GitLabUserClassifierTest {
 
     @ParameterizedTest
     @ValueSource(
-        strings = {
-            "ga84xah",
-            "jennifer.wagner",
-            "LukasJochim",
-            "00000000014B3DCE",
-            "group_185885",
-            "bot_project_42",
-            "group_abc_bot_123",
-            "group__bot_deadbeef",
-            "group_1_bot_NOTHEX",
-        }
-    )
+            strings = {
+                "ga84xah",
+                "jennifer.wagner",
+                "LukasJochim",
+                "00000000014B3DCE",
+                "group_185885",
+                "bot_project_42",
+                "group_abc_bot_123",
+                "group__bot_deadbeef",
+                "group_1_bot_NOTHEX",
+            })
     void isBot_rejectsNonBotLogins(String login) {
         assertThat(GitLabUserClassifier.isBot(login)).isFalse();
         assertThat(GitLabUserClassifier.classify(login)).isEqualTo(User.Type.USER);

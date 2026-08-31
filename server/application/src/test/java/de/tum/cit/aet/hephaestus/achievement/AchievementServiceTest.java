@@ -52,12 +52,7 @@ class AchievementServiceTest extends BaseUnitTest {
         List<AchievementEvaluator> evaluators = List.of(standardCountEvaluator);
 
         service = new AchievementService(
-            userAchievementRepository,
-            evaluators,
-            achievementRegistry,
-            cacheManager,
-            new ObjectMapper()
-        );
+                userAchievementRepository, evaluators, achievementRegistry, cacheManager, new ObjectMapper());
         service.initEvaluatorMap();
 
         testUser = new User();
@@ -67,13 +62,12 @@ class AchievementServiceTest extends BaseUnitTest {
 
     private ActivitySavedEvent createEvent(ActivityEventType eventType) {
         return new ActivitySavedEvent(
-            Optional.of(testUser),
-            eventType,
-            Instant.parse("2024-08-15T10:00:00Z"),
-            1L,
-            ActivityTargetType.PULL_REQUEST,
-            100L
-        );
+                Optional.of(testUser),
+                eventType,
+                Instant.parse("2024-08-15T10:00:00Z"),
+                1L,
+                ActivityTargetType.PULL_REQUEST,
+                100L);
     }
 
     @Nested
@@ -82,13 +76,12 @@ class AchievementServiceTest extends BaseUnitTest {
         @Test
         void skipsWhenUserIsEmpty() {
             ActivitySavedEvent event = new ActivitySavedEvent(
-                Optional.empty(),
-                ActivityEventType.PULL_REQUEST_MERGED,
-                Instant.now(),
-                1L,
-                ActivityTargetType.PULL_REQUEST,
-                100L
-            );
+                    Optional.empty(),
+                    ActivityEventType.PULL_REQUEST_MERGED,
+                    Instant.now(),
+                    1L,
+                    ActivityTargetType.PULL_REQUEST,
+                    100L);
 
             List<AchievementDefinition> result = service.checkAndUnlock(event);
 
@@ -99,11 +92,11 @@ class AchievementServiceTest extends BaseUnitTest {
         @Test
         @DisplayName("skips when no achievements triggered by event type")
         void skipsWhenNoCandidates() {
-            when(achievementRegistry.getByTriggerEvent(ActivityEventType.PULL_REQUEST_MERGED)).thenReturn(List.of());
+            when(achievementRegistry.getByTriggerEvent(ActivityEventType.PULL_REQUEST_MERGED))
+                    .thenReturn(List.of());
 
-            List<AchievementDefinition> result = service.checkAndUnlock(
-                createEvent(ActivityEventType.PULL_REQUEST_MERGED)
-            );
+            List<AchievementDefinition> result =
+                    service.checkAndUnlock(createEvent(ActivityEventType.PULL_REQUEST_MERGED));
 
             assertThat(result).isEmpty();
             verify(userAchievementRepository, never()).save(any());
@@ -114,20 +107,20 @@ class AchievementServiceTest extends BaseUnitTest {
         void acquiresUserLockBeforeReads() {
             // Lock must precede any read so it can't be reordered after a flush-triggering query.
             AchievementDefinition def = new AchievementDefinition(
-                "pr.merged.common.1",
-                AchievementCategory.PULL_REQUESTS,
-                AchievementRarity.COMMON,
-                new LinearAchievementProgress(0, 1),
-                null,
-                false,
-                Set.of(ActivityEventType.PULL_REQUEST_MERGED),
-                "StandardCountEvaluator"
-            );
-            when(achievementRegistry.getByTriggerEvent(ActivityEventType.PULL_REQUEST_MERGED)).thenReturn(List.of(def));
-            when(userAchievementRepository.findByUserIdAndAchievementIdIn(eq(1L), any())).thenReturn(List.of());
-            when(
-                userAchievementRepository.insertIfAbsent(any(UUID.class), eq(1L), anyString(), anyString(), any())
-            ).thenReturn(1);
+                    "pr.merged.common.1",
+                    AchievementCategory.PULL_REQUESTS,
+                    AchievementRarity.COMMON,
+                    new LinearAchievementProgress(0, 1),
+                    null,
+                    false,
+                    Set.of(ActivityEventType.PULL_REQUEST_MERGED),
+                    "StandardCountEvaluator");
+            when(achievementRegistry.getByTriggerEvent(ActivityEventType.PULL_REQUEST_MERGED))
+                    .thenReturn(List.of(def));
+            when(userAchievementRepository.findByUserIdAndAchievementIdIn(eq(1L), any()))
+                    .thenReturn(List.of());
+            when(userAchievementRepository.insertIfAbsent(any(UUID.class), eq(1L), anyString(), anyString(), any()))
+                    .thenReturn(1);
 
             service.checkAndUnlock(createEvent(ActivityEventType.PULL_REQUEST_MERGED));
 
@@ -140,70 +133,58 @@ class AchievementServiceTest extends BaseUnitTest {
         @DisplayName("creates new UserAchievement and increments progress")
         void createsNewProgressRecord() {
             AchievementDefinition def = new AchievementDefinition(
-                "commit.common.1",
-                AchievementCategory.COMMITS,
-                AchievementRarity.COMMON,
-                new LinearAchievementProgress(0, 1),
-                null,
-                false,
-                Set.of(ActivityEventType.COMMIT_CREATED),
-                "StandardCountEvaluator"
-            );
+                    "commit.common.1",
+                    AchievementCategory.COMMITS,
+                    AchievementRarity.COMMON,
+                    new LinearAchievementProgress(0, 1),
+                    null,
+                    false,
+                    Set.of(ActivityEventType.COMMIT_CREATED),
+                    "StandardCountEvaluator");
 
-            when(achievementRegistry.getByTriggerEvent(ActivityEventType.COMMIT_CREATED)).thenReturn(List.of(def));
-            when(userAchievementRepository.findByUserIdAndAchievementIdIn(eq(1L), any())).thenReturn(List.of());
-            when(
-                userAchievementRepository.insertIfAbsent(
-                    any(UUID.class),
-                    eq(1L),
-                    eq("commit.common.1"),
-                    anyString(),
-                    any()
-                )
-            ).thenReturn(1);
+            when(achievementRegistry.getByTriggerEvent(ActivityEventType.COMMIT_CREATED))
+                    .thenReturn(List.of(def));
+            when(userAchievementRepository.findByUserIdAndAchievementIdIn(eq(1L), any()))
+                    .thenReturn(List.of());
+            when(userAchievementRepository.insertIfAbsent(
+                            any(UUID.class), eq(1L), eq("commit.common.1"), anyString(), any()))
+                    .thenReturn(1);
 
             List<AchievementDefinition> result = service.checkAndUnlock(createEvent(ActivityEventType.COMMIT_CREATED));
 
             assertThat(result).hasSize(1);
             assertThat(result.getFirst().id()).isEqualTo("commit.common.1");
-            verify(userAchievementRepository).insertIfAbsent(
-                any(UUID.class),
-                eq(1L),
-                eq("commit.common.1"),
-                anyString(),
-                any()
-            );
+            verify(userAchievementRepository)
+                    .insertIfAbsent(any(UUID.class), eq(1L), eq("commit.common.1"), anyString(), any());
             verify(userAchievementRepository, never()).save(any(UserAchievement.class));
         }
 
         @Test
         void skipsAlreadyUnlocked() {
             AchievementDefinition def = new AchievementDefinition(
-                "pr.merged.common.1",
-                AchievementCategory.PULL_REQUESTS,
-                AchievementRarity.COMMON,
-                new LinearAchievementProgress(0, 1),
-                null,
-                false,
-                Set.of(ActivityEventType.PULL_REQUEST_MERGED),
-                "StandardCountEvaluator"
-            );
+                    "pr.merged.common.1",
+                    AchievementCategory.PULL_REQUESTS,
+                    AchievementRarity.COMMON,
+                    new LinearAchievementProgress(0, 1),
+                    null,
+                    false,
+                    Set.of(ActivityEventType.PULL_REQUEST_MERGED),
+                    "StandardCountEvaluator");
 
             UserAchievement existingProgress = UserAchievement.builder()
-                .user(testUser)
-                .achievementId("pr.merged.common.1")
-                .progressData(new LinearAchievementProgress(1, 1))
-                .unlockedAt(Instant.parse("2024-07-01T00:00:00Z"))
-                .build();
+                    .user(testUser)
+                    .achievementId("pr.merged.common.1")
+                    .progressData(new LinearAchievementProgress(1, 1))
+                    .unlockedAt(Instant.parse("2024-07-01T00:00:00Z"))
+                    .build();
 
-            when(achievementRegistry.getByTriggerEvent(ActivityEventType.PULL_REQUEST_MERGED)).thenReturn(List.of(def));
-            when(userAchievementRepository.findByUserIdAndAchievementIdIn(eq(1L), any())).thenReturn(
-                List.of(existingProgress)
-            );
+            when(achievementRegistry.getByTriggerEvent(ActivityEventType.PULL_REQUEST_MERGED))
+                    .thenReturn(List.of(def));
+            when(userAchievementRepository.findByUserIdAndAchievementIdIn(eq(1L), any()))
+                    .thenReturn(List.of(existingProgress));
 
-            List<AchievementDefinition> result = service.checkAndUnlock(
-                createEvent(ActivityEventType.PULL_REQUEST_MERGED)
-            );
+            List<AchievementDefinition> result =
+                    service.checkAndUnlock(createEvent(ActivityEventType.PULL_REQUEST_MERGED));
 
             assertThat(result).isEmpty();
             verify(userAchievementRepository, never()).save(any());
@@ -212,30 +193,28 @@ class AchievementServiceTest extends BaseUnitTest {
         @Test
         void incrementsExistingProgress() {
             AchievementDefinition def = new AchievementDefinition(
-                "pr.merged.rare",
-                AchievementCategory.PULL_REQUESTS,
-                AchievementRarity.RARE,
-                new LinearAchievementProgress(0, 15),
-                "pr.merged.uncommon",
-                false,
-                Set.of(ActivityEventType.PULL_REQUEST_MERGED),
-                "StandardCountEvaluator"
-            );
+                    "pr.merged.rare",
+                    AchievementCategory.PULL_REQUESTS,
+                    AchievementRarity.RARE,
+                    new LinearAchievementProgress(0, 15),
+                    "pr.merged.uncommon",
+                    false,
+                    Set.of(ActivityEventType.PULL_REQUEST_MERGED),
+                    "StandardCountEvaluator");
 
             UserAchievement existingProgress = UserAchievement.builder()
-                .user(testUser)
-                .achievementId("pr.merged.rare")
-                .progressData(new LinearAchievementProgress(5, 15))
-                .build();
+                    .user(testUser)
+                    .achievementId("pr.merged.rare")
+                    .progressData(new LinearAchievementProgress(5, 15))
+                    .build();
 
-            when(achievementRegistry.getByTriggerEvent(ActivityEventType.PULL_REQUEST_MERGED)).thenReturn(List.of(def));
-            when(userAchievementRepository.findByUserIdAndAchievementIdIn(eq(1L), any())).thenReturn(
-                List.of(existingProgress)
-            );
+            when(achievementRegistry.getByTriggerEvent(ActivityEventType.PULL_REQUEST_MERGED))
+                    .thenReturn(List.of(def));
+            when(userAchievementRepository.findByUserIdAndAchievementIdIn(eq(1L), any()))
+                    .thenReturn(List.of(existingProgress));
 
-            List<AchievementDefinition> result = service.checkAndUnlock(
-                createEvent(ActivityEventType.PULL_REQUEST_MERGED)
-            );
+            List<AchievementDefinition> result =
+                    service.checkAndUnlock(createEvent(ActivityEventType.PULL_REQUEST_MERGED));
 
             assertThat(result).isEmpty(); // Not unlocked yet
             verify(userAchievementRepository).save(existingProgress);
@@ -247,46 +226,36 @@ class AchievementServiceTest extends BaseUnitTest {
         void setsUnlockedAtToEventTimestamp() {
             Instant historicalTimestamp = Instant.parse("2024-07-15T14:30:00Z");
             AchievementDefinition def = new AchievementDefinition(
-                "commit.common.1",
-                AchievementCategory.COMMITS,
-                AchievementRarity.COMMON,
-                new LinearAchievementProgress(0, 1),
-                null,
-                false,
-                Set.of(ActivityEventType.COMMIT_CREATED),
-                "StandardCountEvaluator"
-            );
+                    "commit.common.1",
+                    AchievementCategory.COMMITS,
+                    AchievementRarity.COMMON,
+                    new LinearAchievementProgress(0, 1),
+                    null,
+                    false,
+                    Set.of(ActivityEventType.COMMIT_CREATED),
+                    "StandardCountEvaluator");
 
-            when(achievementRegistry.getByTriggerEvent(ActivityEventType.COMMIT_CREATED)).thenReturn(List.of(def));
-            when(userAchievementRepository.findByUserIdAndAchievementIdIn(eq(1L), any())).thenReturn(List.of());
-            when(
-                userAchievementRepository.insertIfAbsent(
-                    any(UUID.class),
-                    eq(1L),
-                    eq("commit.common.1"),
-                    anyString(),
-                    eq(historicalTimestamp)
-                )
-            ).thenReturn(1);
+            when(achievementRegistry.getByTriggerEvent(ActivityEventType.COMMIT_CREATED))
+                    .thenReturn(List.of(def));
+            when(userAchievementRepository.findByUserIdAndAchievementIdIn(eq(1L), any()))
+                    .thenReturn(List.of());
+            when(userAchievementRepository.insertIfAbsent(
+                            any(UUID.class), eq(1L), eq("commit.common.1"), anyString(), eq(historicalTimestamp)))
+                    .thenReturn(1);
 
             ActivitySavedEvent event = new ActivitySavedEvent(
-                Optional.of(testUser),
-                ActivityEventType.COMMIT_CREATED,
-                historicalTimestamp,
-                1L,
-                ActivityTargetType.COMMIT,
-                200L
-            );
+                    Optional.of(testUser),
+                    ActivityEventType.COMMIT_CREATED,
+                    historicalTimestamp,
+                    1L,
+                    ActivityTargetType.COMMIT,
+                    200L);
 
             service.checkAndUnlock(event);
 
-            verify(userAchievementRepository).insertIfAbsent(
-                any(UUID.class),
-                eq(1L),
-                eq("commit.common.1"),
-                anyString(),
-                eq(historicalTimestamp)
-            );
+            verify(userAchievementRepository)
+                    .insertIfAbsent(
+                            any(UUID.class), eq(1L), eq("commit.common.1"), anyString(), eq(historicalTimestamp));
         }
     }
 
@@ -295,44 +264,38 @@ class AchievementServiceTest extends BaseUnitTest {
 
         private AchievementDefinition newAchievement() {
             return new AchievementDefinition(
-                "commit.common.1",
-                AchievementCategory.COMMITS,
-                AchievementRarity.COMMON,
-                new LinearAchievementProgress(0, 5),
-                null,
-                false,
-                Set.of(ActivityEventType.COMMIT_CREATED),
-                "StandardCountEvaluator"
-            );
+                    "commit.common.1",
+                    AchievementCategory.COMMITS,
+                    AchievementRarity.COMMON,
+                    new LinearAchievementProgress(0, 5),
+                    null,
+                    false,
+                    Set.of(ActivityEventType.COMMIT_CREATED),
+                    "StandardCountEvaluator");
         }
 
         @Test
         void shouldNotThrowWhenConcurrentInsertsCollideOnUniqueConstraint() {
             AchievementDefinition def = newAchievement();
-            when(achievementRegistry.getByTriggerEvent(ActivityEventType.COMMIT_CREATED)).thenReturn(List.of(def));
-            when(userAchievementRepository.findByUserIdAndAchievementIdIn(eq(1L), any())).thenReturn(List.of());
+            when(achievementRegistry.getByTriggerEvent(ActivityEventType.COMMIT_CREATED))
+                    .thenReturn(List.of(def));
+            when(userAchievementRepository.findByUserIdAndAchievementIdIn(eq(1L), any()))
+                    .thenReturn(List.of());
             // Simulate the losing side of the race: another @Async listener already
             // inserted a row for (userId=1, achievementId=commit.common.1) between
             // our findByUserIdAndAchievementIdIn read and our upsert.
-            when(
-                userAchievementRepository.insertIfAbsent(
-                    any(UUID.class),
-                    eq(1L),
-                    eq("commit.common.1"),
-                    anyString(),
-                    any()
-                )
-            ).thenReturn(0);
+            when(userAchievementRepository.insertIfAbsent(
+                            any(UUID.class), eq(1L), eq("commit.common.1"), anyString(), any()))
+                    .thenReturn(0);
 
             UserAchievement persistedByWinner = UserAchievement.builder()
-                .id(UUID.randomUUID())
-                .user(testUser)
-                .achievementId("commit.common.1")
-                .progressData(new LinearAchievementProgress(1, 5))
-                .build();
-            when(userAchievementRepository.findByUserIdAndAchievementId(1L, "commit.common.1")).thenReturn(
-                Optional.of(persistedByWinner)
-            );
+                    .id(UUID.randomUUID())
+                    .user(testUser)
+                    .achievementId("commit.common.1")
+                    .progressData(new LinearAchievementProgress(1, 5))
+                    .build();
+            when(userAchievementRepository.findByUserIdAndAchievementId(1L, "commit.common.1"))
+                    .thenReturn(Optional.of(persistedByWinner));
 
             // Must not throw DataIntegrityViolationException or anything else.
             List<AchievementDefinition> result = service.checkAndUnlock(createEvent(ActivityEventType.COMMIT_CREATED));
@@ -343,29 +306,24 @@ class AchievementServiceTest extends BaseUnitTest {
         @Test
         void shouldReapplyEvaluatorOnWinningRowWhenInsertLosesRace() {
             AchievementDefinition def = newAchievement();
-            when(achievementRegistry.getByTriggerEvent(ActivityEventType.COMMIT_CREATED)).thenReturn(List.of(def));
-            when(userAchievementRepository.findByUserIdAndAchievementIdIn(eq(1L), any())).thenReturn(List.of());
-            when(
-                userAchievementRepository.insertIfAbsent(
-                    any(UUID.class),
-                    eq(1L),
-                    eq("commit.common.1"),
-                    anyString(),
-                    any()
-                )
-            ).thenReturn(0);
+            when(achievementRegistry.getByTriggerEvent(ActivityEventType.COMMIT_CREATED))
+                    .thenReturn(List.of(def));
+            when(userAchievementRepository.findByUserIdAndAchievementIdIn(eq(1L), any()))
+                    .thenReturn(List.of());
+            when(userAchievementRepository.insertIfAbsent(
+                            any(UUID.class), eq(1L), eq("commit.common.1"), anyString(), any()))
+                    .thenReturn(0);
 
             // Winning transaction committed progress=1 (their event). Our event
             // must still bump it to 2 so the user is not under-counted.
             UserAchievement persistedByWinner = UserAchievement.builder()
-                .id(UUID.randomUUID())
-                .user(testUser)
-                .achievementId("commit.common.1")
-                .progressData(new LinearAchievementProgress(1, 5))
-                .build();
-            when(userAchievementRepository.findByUserIdAndAchievementId(1L, "commit.common.1")).thenReturn(
-                Optional.of(persistedByWinner)
-            );
+                    .id(UUID.randomUUID())
+                    .user(testUser)
+                    .achievementId("commit.common.1")
+                    .progressData(new LinearAchievementProgress(1, 5))
+                    .build();
+            when(userAchievementRepository.findByUserIdAndAchievementId(1L, "commit.common.1"))
+                    .thenReturn(Optional.of(persistedByWinner));
 
             service.checkAndUnlock(createEvent(ActivityEventType.COMMIT_CREATED));
 
@@ -377,28 +335,23 @@ class AchievementServiceTest extends BaseUnitTest {
         @Test
         void shouldSkipReapplyWhenWinningRowIsAlreadyUnlocked() {
             AchievementDefinition def = newAchievement();
-            when(achievementRegistry.getByTriggerEvent(ActivityEventType.COMMIT_CREATED)).thenReturn(List.of(def));
-            when(userAchievementRepository.findByUserIdAndAchievementIdIn(eq(1L), any())).thenReturn(List.of());
-            when(
-                userAchievementRepository.insertIfAbsent(
-                    any(UUID.class),
-                    eq(1L),
-                    eq("commit.common.1"),
-                    anyString(),
-                    any()
-                )
-            ).thenReturn(0);
+            when(achievementRegistry.getByTriggerEvent(ActivityEventType.COMMIT_CREATED))
+                    .thenReturn(List.of(def));
+            when(userAchievementRepository.findByUserIdAndAchievementIdIn(eq(1L), any()))
+                    .thenReturn(List.of());
+            when(userAchievementRepository.insertIfAbsent(
+                            any(UUID.class), eq(1L), eq("commit.common.1"), anyString(), any()))
+                    .thenReturn(0);
 
             UserAchievement alreadyUnlocked = UserAchievement.builder()
-                .id(UUID.randomUUID())
-                .user(testUser)
-                .achievementId("commit.common.1")
-                .progressData(new LinearAchievementProgress(5, 5))
-                .unlockedAt(Instant.parse("2024-08-14T10:00:00Z"))
-                .build();
-            when(userAchievementRepository.findByUserIdAndAchievementId(1L, "commit.common.1")).thenReturn(
-                Optional.of(alreadyUnlocked)
-            );
+                    .id(UUID.randomUUID())
+                    .user(testUser)
+                    .achievementId("commit.common.1")
+                    .progressData(new LinearAchievementProgress(5, 5))
+                    .unlockedAt(Instant.parse("2024-08-14T10:00:00Z"))
+                    .build();
+            when(userAchievementRepository.findByUserIdAndAchievementId(1L, "commit.common.1"))
+                    .thenReturn(Optional.of(alreadyUnlocked));
 
             service.checkAndUnlock(createEvent(ActivityEventType.COMMIT_CREATED));
 
@@ -412,26 +365,25 @@ class AchievementServiceTest extends BaseUnitTest {
         @Test
         void savesWhenProgressChanges() {
             AchievementDefinition def = new AchievementDefinition(
-                "pr.merged.rare",
-                AchievementCategory.PULL_REQUESTS,
-                AchievementRarity.RARE,
-                new LinearAchievementProgress(0, 15),
-                "pr.merged.uncommon",
-                false,
-                Set.of(ActivityEventType.PULL_REQUEST_MERGED),
-                "StandardCountEvaluator"
-            );
+                    "pr.merged.rare",
+                    AchievementCategory.PULL_REQUESTS,
+                    AchievementRarity.RARE,
+                    new LinearAchievementProgress(0, 15),
+                    "pr.merged.uncommon",
+                    false,
+                    Set.of(ActivityEventType.PULL_REQUEST_MERGED),
+                    "StandardCountEvaluator");
 
             UserAchievement existingProgress = UserAchievement.builder()
-                .user(testUser)
-                .achievementId("pr.merged.rare")
-                .progressData(new LinearAchievementProgress(3, 15))
-                .build();
+                    .user(testUser)
+                    .achievementId("pr.merged.rare")
+                    .progressData(new LinearAchievementProgress(3, 15))
+                    .build();
 
-            when(achievementRegistry.getByTriggerEvent(ActivityEventType.PULL_REQUEST_MERGED)).thenReturn(List.of(def));
-            when(userAchievementRepository.findByUserIdAndAchievementIdIn(eq(1L), any())).thenReturn(
-                List.of(existingProgress)
-            );
+            when(achievementRegistry.getByTriggerEvent(ActivityEventType.PULL_REQUEST_MERGED))
+                    .thenReturn(List.of(def));
+            when(userAchievementRepository.findByUserIdAndAchievementIdIn(eq(1L), any()))
+                    .thenReturn(List.of(existingProgress));
 
             service.checkAndUnlock(createEvent(ActivityEventType.PULL_REQUEST_MERGED));
 

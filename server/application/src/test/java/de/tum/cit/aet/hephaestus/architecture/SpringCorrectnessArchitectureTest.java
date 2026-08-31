@@ -29,17 +29,16 @@ class SpringCorrectnessArchitectureTest extends HephaestusArchitectureTest {
     @Test
     void shouldRequireTransactionalMethodsToBeProxyable() {
         ArchRule rule = methods()
-            .that(transactionalMethods())
-            .should()
-            .bePublic()
-            .andShould()
-            .notBeStatic()
-            .andShould()
-            .notBeFinal()
-            .andShould(beDeclaredInANonFinalClass())
-            .because(
-                "public instance methods work consistently with JDK and class-based proxies, while class-based proxies cannot advise final methods or classes"
-            );
+                .that(transactionalMethods())
+                .should()
+                .bePublic()
+                .andShould()
+                .notBeStatic()
+                .andShould()
+                .notBeFinal()
+                .andShould(beDeclaredInANonFinalClass())
+                .because(
+                        "public instance methods work consistently with JDK and class-based proxies, while class-based proxies cannot advise final methods or classes");
 
         rule.check(classes);
     }
@@ -47,8 +46,8 @@ class SpringCorrectnessArchitectureTest extends HephaestusArchitectureTest {
     @Test
     void shouldRejectTransactionalSelfInvocation() {
         ArchRule rule = methods()
-            .should(notCallTransactionalMethodsOnSelf())
-            .because("self-invocation bypasses Spring's transactional proxy");
+                .should(notCallTransactionalMethodsOnSelf())
+                .because("self-invocation bypasses Spring's transactional proxy");
 
         rule.check(classes);
     }
@@ -56,13 +55,13 @@ class SpringCorrectnessArchitectureTest extends HephaestusArchitectureTest {
     @Test
     void shouldUseSpringTransactionalAnnotation() {
         ArchRule methodsRule = methods()
-            .should()
-            .notBeAnnotatedWith(jakarta.transaction.Transactional.class)
-            .because("all transaction boundaries use Spring's annotation so the same architecture rules apply");
+                .should()
+                .notBeAnnotatedWith(jakarta.transaction.Transactional.class)
+                .because("all transaction boundaries use Spring's annotation so the same architecture rules apply");
         ArchRule classesRule = noClasses()
-            .should()
-            .beAnnotatedWith(jakarta.transaction.Transactional.class)
-            .because("all transaction boundaries use Spring's annotation so the same architecture rules apply");
+                .should()
+                .beAnnotatedWith(jakarta.transaction.Transactional.class)
+                .because("all transaction boundaries use Spring's annotation so the same architecture rules apply");
 
         methodsRule.check(classes);
         classesRule.check(classes);
@@ -70,9 +69,8 @@ class SpringCorrectnessArchitectureTest extends HephaestusArchitectureTest {
 
     @Test
     void shouldRejectAutowiredFields() {
-        ArchRule rule = fields()
-            .should(notBeAutowired())
-            .because("required collaborators must be explicit constructor dependencies");
+        ArchRule rule = fields().should(notBeAutowired())
+                .because("required collaborators must be explicit constructor dependencies");
 
         rule.check(classes);
     }
@@ -80,8 +78,8 @@ class SpringCorrectnessArchitectureTest extends HephaestusArchitectureTest {
     @Test
     void shouldValidateApplicationRequestBodies() {
         ArchRule rule = methods()
-            .should(haveValidatedRequestBodies())
-            .because("bean validation is not applied to a request body unless the parameter is @Valid");
+                .should(haveValidatedRequestBodies())
+                .because("bean validation is not applied to a request body unless the parameter is @Valid");
 
         rule.check(classes);
     }
@@ -89,10 +87,10 @@ class SpringCorrectnessArchitectureTest extends HephaestusArchitectureTest {
     @Test
     void shouldRejectTransactionsDuringPostConstruct() {
         ArchRule rule = methods()
-            .that()
-            .areAnnotatedWith(PostConstruct.class)
-            .should(notBeEffectivelyTransactional())
-            .because("@PostConstruct runs before the bean's transactional proxy is available");
+                .that()
+                .areAnnotatedWith(PostConstruct.class)
+                .should(notBeEffectivelyTransactional())
+                .because("@PostConstruct runs before the bean's transactional proxy is available");
 
         rule.check(classes);
     }
@@ -100,11 +98,11 @@ class SpringCorrectnessArchitectureTest extends HephaestusArchitectureTest {
     @Test
     void shouldReturnRepositoryCollectionsDirectly() {
         ArchRule rule = methods()
-            .that()
-            .areDeclaredInClassesThat()
-            .areAssignableTo(Repository.class)
-            .should(notReturnOptionalCollection())
-            .because("Spring Data multi-result queries return an empty result rather than null");
+                .that()
+                .areDeclaredInClassesThat()
+                .areAssignableTo(Repository.class)
+                .should(notReturnOptionalCollection())
+                .because("Spring Data multi-result queries return an empty result rather than null");
 
         rule.check(classes);
     }
@@ -114,9 +112,8 @@ class SpringCorrectnessArchitectureTest extends HephaestusArchitectureTest {
             @Override
             public void check(JavaMethod method, ConditionEvents events) {
                 if (method.getOwner().getModifiers().contains(JavaModifier.FINAL)) {
-                    events.add(
-                        SimpleConditionEvent.violated(method, method.getDescription() + " is declared in a final class")
-                    );
+                    events.add(SimpleConditionEvent.violated(
+                            method, method.getDescription() + " is declared in a final class"));
                 }
             }
         };
@@ -124,9 +121,8 @@ class SpringCorrectnessArchitectureTest extends HephaestusArchitectureTest {
 
     private static DescribedPredicate<JavaMethod> transactionalMethods() {
         return DescribedPredicate.describe(
-            "covered by a method-level or type-level @Transactional annotation",
-            SpringCorrectnessArchitectureTest::isEffectivelyTransactional
-        );
+                "covered by a method-level or type-level @Transactional annotation",
+                SpringCorrectnessArchitectureTest::isEffectivelyTransactional);
     }
 
     private static ArchCondition<JavaField> notBeAutowired() {
@@ -147,25 +143,18 @@ class SpringCorrectnessArchitectureTest extends HephaestusArchitectureTest {
                 if (method.getOwner().isInterface()) {
                     return;
                 }
-                method
-                    .getMethodCallsFromSelf()
-                    .stream()
-                    .filter(call -> method.getOwner().getAllClassesSelfIsAssignableTo().contains(call.getTargetOwner()))
-                    .filter(call ->
-                        call
-                            .getTarget()
-                            .resolveMember()
-                            .map(SpringCorrectnessArchitectureTest::isTransactionallyAnnotatedMethod)
-                            .orElse(false)
-                    )
-                    .forEach(call ->
-                        events.add(
-                            SimpleConditionEvent.violated(
+                method.getMethodCallsFromSelf().stream()
+                        .filter(call -> method.getOwner()
+                                .getAllClassesSelfIsAssignableTo()
+                                .contains(call.getTargetOwner()))
+                        .filter(call -> call.getTarget()
+                                .resolveMember()
+                                .map(SpringCorrectnessArchitectureTest::isTransactionallyAnnotatedMethod)
+                                .orElse(false))
+                        .forEach(call -> events.add(SimpleConditionEvent.violated(
                                 method,
-                                method.getDescription() + " calls transactional " + call.getTarget().getDescription()
-                            )
-                        )
-                    );
+                                method.getDescription() + " calls transactional "
+                                        + call.getTarget().getDescription())));
             }
         };
     }
@@ -174,26 +163,13 @@ class SpringCorrectnessArchitectureTest extends HephaestusArchitectureTest {
         return new ArchCondition<>("have @Valid on every @RequestBody parameter") {
             @Override
             public void check(JavaMethod method, ConditionEvents events) {
-                method
-                    .getParameters()
-                    .stream()
-                    .filter(parameter -> parameter.isAnnotatedWith(RequestBody.class))
-                    .filter(parameter ->
-                        parameter
-                            .getType()
-                            .getAllInvolvedRawTypes()
-                            .stream()
-                            .anyMatch(type -> type.getPackageName().startsWith(BASE_PACKAGE))
-                    )
-                    .filter(parameter -> !parameter.isAnnotatedWith(Valid.class))
-                    .forEach(parameter ->
-                        events.add(
-                            SimpleConditionEvent.violated(
-                                method,
-                                parameter.getDescription() + " is @RequestBody but is not @Valid"
-                            )
-                        )
-                    );
+                method.getParameters().stream()
+                        .filter(parameter -> parameter.isAnnotatedWith(RequestBody.class))
+                        .filter(parameter -> parameter.getType().getAllInvolvedRawTypes().stream()
+                                .anyMatch(type -> type.getPackageName().startsWith(BASE_PACKAGE)))
+                        .filter(parameter -> !parameter.isAnnotatedWith(Valid.class))
+                        .forEach(parameter -> events.add(SimpleConditionEvent.violated(
+                                method, parameter.getDescription() + " is @RequestBody but is not @Valid")));
             }
         };
     }
@@ -211,30 +187,20 @@ class SpringCorrectnessArchitectureTest extends HephaestusArchitectureTest {
 
     private static boolean isEffectivelyTransactional(JavaMethod method) {
         boolean methodAnnotated = isTransactionallyAnnotatedMethod(method);
-        boolean ownerAnnotated = method
-            .getOwner()
-            .getAllClassesSelfIsAssignableTo()
-            .stream()
-            .anyMatch(
-                owner -> owner.isAnnotatedWith(Transactional.class) || owner.isMetaAnnotatedWith(Transactional.class)
-            );
-        boolean proxyCandidate =
-            !method.getModifiers().contains(JavaModifier.PRIVATE) &&
-            !method.getModifiers().contains(JavaModifier.STATIC);
+        boolean ownerAnnotated = method.getOwner().getAllClassesSelfIsAssignableTo().stream()
+                .anyMatch(owner ->
+                        owner.isAnnotatedWith(Transactional.class) || owner.isMetaAnnotatedWith(Transactional.class));
+        boolean proxyCandidate = !method.getModifiers().contains(JavaModifier.PRIVATE)
+                && !method.getModifiers().contains(JavaModifier.STATIC);
         return methodAnnotated || (ownerAnnotated && proxyCandidate);
     }
 
     private static boolean isTransactionallyAnnotatedMethod(JavaMethod method) {
-        return method
-            .getOwner()
-            .getAllMethods()
-            .stream()
-            .filter(candidate -> candidate.getName().equals(method.getName()))
-            .filter(candidate -> candidate.getRawParameterTypes().equals(method.getRawParameterTypes()))
-            .anyMatch(
-                candidate ->
-                    candidate.isAnnotatedWith(Transactional.class) || candidate.isMetaAnnotatedWith(Transactional.class)
-            );
+        return method.getOwner().getAllMethods().stream()
+                .filter(candidate -> candidate.getName().equals(method.getName()))
+                .filter(candidate -> candidate.getRawParameterTypes().equals(method.getRawParameterTypes()))
+                .anyMatch(candidate -> candidate.isAnnotatedWith(Transactional.class)
+                        || candidate.isMetaAnnotatedWith(Transactional.class));
     }
 
     private static ArchCondition<JavaMethod> notReturnOptionalCollection() {
@@ -242,20 +208,13 @@ class SpringCorrectnessArchitectureTest extends HephaestusArchitectureTest {
             @Override
             public void check(JavaMethod method, ConditionEvents events) {
                 JavaType returnType = method.getReturnType();
-                if (
-                    returnType instanceof JavaParameterizedType parameterized &&
-                    returnType.toErasure().isEquivalentTo(Optional.class) &&
-                    parameterized
-                        .getActualTypeArguments()
-                        .stream()
-                        .anyMatch(SpringCorrectnessArchitectureTest::isMultiResultType)
-                ) {
-                    events.add(
-                        SimpleConditionEvent.violated(
+                if (returnType instanceof JavaParameterizedType parameterized
+                        && returnType.toErasure().isEquivalentTo(Optional.class)
+                        && parameterized.getActualTypeArguments().stream()
+                                .anyMatch(SpringCorrectnessArchitectureTest::isMultiResultType)) {
+                    events.add(SimpleConditionEvent.violated(
                             method,
-                            method.getDescription() + " returns Optional-wrapped collection " + returnType.getName()
-                        )
-                    );
+                            method.getDescription() + " returns Optional-wrapped collection " + returnType.getName()));
                 }
             }
         };

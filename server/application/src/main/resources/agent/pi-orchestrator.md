@@ -279,8 +279,8 @@ to`, `fixes`, `resolves`, `replaces`, `instead of`, `the reason`, `this lets us`
 4. **DEBUG-LEFTOVER RECALL (leaves-the-code-clean-with-intent-revealing-comments).**
    A bare `print(...)`, `NSLog(...)`, `console.log(...)`, `dump(...)`, or `debugPrint(...)` added inside a
    normal method flow (not a logging abstraction, not test code) IS a debug leftover — flag it BAD. Worked
-   example: an added `+ print("got here \(value)")` mid-method ⇒ `PRESENT, BAD` MINOR. The recall bar on bare
-   stdout traces is currently set too high; do not wave them past as intentional logging.
+   example: an added `+ print("got here \(value)")` mid-method ⇒ `PRESENT, BAD` MINOR. Do not treat bare
+   stdout traces as intentional logging.
 
 5. **NO FILE LOCUS ON NON-ANCHORED OBSERVATIONS.**
    ISSUE and unpositioned review-comment observations still require an exact citation, but their developer-facing

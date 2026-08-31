@@ -60,10 +60,9 @@ public class OutlineMirrorRetentionService {
     private final OutlineProperties properties;
 
     public OutlineMirrorRetentionService(
-        OutlineDocumentRepository documentRepository,
-        OutlineMirrorWriter mirrorWriter,
-        OutlineProperties properties
-    ) {
+            OutlineDocumentRepository documentRepository,
+            OutlineMirrorWriter mirrorWriter,
+            OutlineProperties properties) {
         this.documentRepository = documentRepository;
         this.mirrorWriter = mirrorWriter;
         this.properties = properties;
@@ -81,13 +80,12 @@ public class OutlineMirrorRetentionService {
      * @return how many rows were tombstoned
      */
     public int tombstoneVanished(
-        long workspaceId,
-        long connectionId,
-        String collectionId,
-        Map<String, OutlineDocumentSnapshot> existing,
-        Set<String> seen,
-        Instant now
-    ) {
+            long workspaceId,
+            long connectionId,
+            String collectionId,
+            Map<String, OutlineDocumentSnapshot> existing,
+            Set<String> seen,
+            Instant now) {
         int count = 0;
         for (OutlineDocumentSnapshot doc : List.copyOf(existing.values())) {
             if (!collectionId.equals(doc.collectionId()) || seen.contains(doc.documentId()) || doc.isDeleted()) {
@@ -107,12 +105,11 @@ public class OutlineMirrorRetentionService {
      * @param existing the caller's diff map to keep current, or {@code null} when the caller holds none
      */
     public void tombstone(
-        long workspaceId,
-        long connectionId,
-        String documentId,
-        Instant now,
-        @Nullable Map<String, OutlineDocumentSnapshot> existing
-    ) {
+            long workspaceId,
+            long connectionId,
+            String documentId,
+            Instant now,
+            @Nullable Map<String, OutlineDocumentSnapshot> existing) {
         OutlineDocumentSnapshot written = mirrorWriter.updateDocument(workspaceId, connectionId, documentId, doc -> {
             doc.setDeletedAt(now);
             doc.setBodyMarkdown(null);
@@ -167,11 +164,10 @@ public class OutlineMirrorRetentionService {
         }
         if (evicted > 0) {
             log.info(
-                "outline.sync: evicted {} body(ies) for workspaceId={} to honor {}MB cap",
-                evicted,
-                workspaceId,
-                properties.cache().maxSizeMb()
-            );
+                    "outline.sync: evicted {} body(ies) for workspaceId={} to honor {}MB cap",
+                    evicted,
+                    workspaceId,
+                    properties.cache().maxSizeMb());
         }
     }
 }

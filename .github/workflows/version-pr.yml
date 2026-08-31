@@ -1,21 +1,8 @@
 name: Version PR
 
-# Maintains the accumulating "Version PR" (changesets). On every push to main
-# it folds pending .changeset/*.md files into a PR that bumps the root
-# `hephaestus` package version and rewrites CHANGELOG.md. Merging that PR is
-# the deliberate act that cuts a release — release.yml takes over from there.
-#
-# This workflow only ever opens/updates the PR; it never tags or deploys.
-#
-# The PR is opened with GITHUB_TOKEN, so it is authored by github-actions[bot]
-# and carries no CI: events created with that token don't trigger workflows.
-# That is deliberate — the PR only bumps a version string and rewrites
-# CHANGELOG.md, and it is re-pushed on every merge to main, so running the full
-# matrix (Docker builds included) on it would burn CI on every merge without
-# validating anything. The real validation happens after the merge: main runs
-# the full suite and release.yml only cuts a release if that run succeeded.
-# `ls1intum/hephaestus-maintainers` bypasses the branch ruleset, so the missing
-# required checks do not block merging the Version PR.
+# Maintains the changesets Version PR; release.yml handles merged version bumps.
+# GITHUB_TOKEN-authored updates do not trigger CI, so release automation uses the
+# ruleset bypass. A release still requires successful main CI.
 #
 # Contributor guide: docs/contributor/release-management.mdx
 
@@ -31,6 +18,7 @@ permissions: {}
 
 jobs:
   version-pr:
+    timeout-minutes: 15
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -40,24 +28,15 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup pnpm + Node.js
-        uses: ./.github/actions/setup-pnpm-node
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          install: "frozen"
 
       - name: Maintain Version PR
-        uses: changesets/action@a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d # v1.9.0
+        uses: changesets/action@8488615a623b1b9c987934bb89eae8af6a946ac1 # v2.1.1
         with:
-          # Also syncs the self-host IMAGE_TAG / install-guide version to the new
-          # release (scripts/sync-release-version.ts), so those literals never
-          # drift. The changesets action commits whatever the version step writes.
-          version: pnpm run changeset:version
-          # No `publish:` — tagging, GitHub Release, and deploys are release.yml's
-          # job (it uses `v`-prefixed tags to stay consistent with existing tags,
-          # docker IMAGE_TAG, and the release-pin asset; `changeset tag` would emit
-          # `hephaestus@X.Y.Z` instead).
-          title: "chore(release): version packages"
-          commit: "chore(release): version packages"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          version-script: pnpm run changeset:version
+          pr-title: "chore(release): version packages"
+          commit-message: "chore(release): version packages"
+          github-token: ${{ secrets.GITHUB_TOKEN }}

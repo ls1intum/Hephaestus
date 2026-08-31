@@ -11,24 +11,23 @@ import org.jspecify.annotations.Nullable;
  * non-secret facts: {@link #llmApiKeySet} instead of the key, and a credential-free {@code baseUrl}.
  */
 record WorkspaceLlmConnectionSnapshot(
-    String slug,
-    String displayName,
-    @Nullable String baseUrl,
-    String apiProtocol,
-    LlmAuthMode authMode,
-    boolean llmApiKeySet,
-    boolean enabled
-) implements ConfigAuditSnapshot {
+        String slug,
+        String displayName,
+        @Nullable String baseUrl,
+        String apiProtocol,
+        LlmAuthMode authMode,
+        boolean llmApiKeySet,
+        boolean enabled)
+        implements ConfigAuditSnapshot {
     static WorkspaceLlmConnectionSnapshot of(WorkspaceLlmConnection c) {
         return new WorkspaceLlmConnectionSnapshot(
-            c.getSlug(),
-            c.getDisplayName(),
-            credentialFreeBaseUrl(c.getBaseUrl()),
-            c.getApiProtocol(),
-            c.getAuthMode(),
-            c.getApiKey() != null && !c.getApiKey().isBlank(),
-            c.isEnabled()
-        );
+                c.getSlug(),
+                c.getDisplayName(),
+                credentialFreeBaseUrl(c.getBaseUrl()),
+                c.getApiProtocol(),
+                c.getAuthMode(),
+                c.getApiKey() != null && !c.getApiKey().isBlank(),
+                c.isEnabled());
     }
 
     /**

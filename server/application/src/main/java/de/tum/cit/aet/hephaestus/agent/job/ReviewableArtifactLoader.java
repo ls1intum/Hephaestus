@@ -25,10 +25,9 @@ class ReviewableArtifactLoader {
     private final ReviewableArtifactOwnershipRepository ownership;
 
     ReviewableArtifactLoader(
-        PullRequestRepository pullRequestRepository,
-        IssueRepository issueRepository,
-        ReviewableArtifactOwnershipRepository ownership
-    ) {
+            PullRequestRepository pullRequestRepository,
+            IssueRepository issueRepository,
+            ReviewableArtifactOwnershipRepository ownership) {
         this.pullRequestRepository = pullRequestRepository;
         this.issueRepository = issueRepository;
         this.ownership = ownership;

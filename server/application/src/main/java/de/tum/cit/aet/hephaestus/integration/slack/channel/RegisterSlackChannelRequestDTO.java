@@ -12,17 +12,14 @@ import org.jspecify.annotations.NonNull;
  */
 @Schema(description = "Allow-list a Slack channel (lands in PENDING)")
 public record RegisterSlackChannelRequestDTO(
-    @NonNull
-    @NotBlank
-    @Pattern(regexp = "^[CG][A-Z0-9]{8,}$")
-    @Size(max = 32)
-    @Schema(
-        description = "Slack public/private channel id (stable C… or G… id)",
-        requiredMode = Schema.RequiredMode.REQUIRED
-    )
-    String slackChannelId,
+        @NonNull
+        @NotBlank
+        @Pattern(regexp = "^[CG][A-Z0-9]{8,}$")
+        @Size(max = 32)
+        @Schema(
+                description = "Slack public/private channel id (stable C… or G… id)",
+                requiredMode = Schema.RequiredMode.REQUIRED)
+        String slackChannelId,
 
-    @Size(max = 256)
-    @Schema(description = "Optional human-readable channel name to store alongside the id")
-    String channelName
-) {}
+        @Size(max = 256) @Schema(description = "Optional human-readable channel name to store alongside the id")
+        String channelName) {}

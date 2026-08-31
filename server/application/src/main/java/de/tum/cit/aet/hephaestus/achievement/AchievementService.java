@@ -79,6 +79,7 @@ public class AchievementService {
      * <p>Key format: user login (workspace-scoped).
      */
     public static final String ACHIEVEMENT_PROGRESS_CACHE = "achievementProgress";
+
     private final UserAchievementRepository userAchievementRepository;
 
     /**
@@ -98,14 +99,12 @@ public class AchievementService {
 
     @PostConstruct
     void initEvaluatorMap() {
-        this.evaluatorMap = evaluators
-            .stream()
-            .collect(Collectors.toMap(AchievementEvaluator::getClass, Function.identity()));
+        this.evaluatorMap =
+                evaluators.stream().collect(Collectors.toMap(AchievementEvaluator::getClass, Function.identity()));
         log.info(
-            "Registered {} achievement evaluator(s): {}",
-            evaluatorMap.size(),
-            evaluatorMap.keySet().stream().map(Class::getSimpleName).toList()
-        );
+                "Registered {} achievement evaluator(s): {}",
+                evaluatorMap.size(),
+                evaluatorMap.keySet().stream().map(Class::getSimpleName).toList());
     }
 
     /**
@@ -125,19 +124,16 @@ public class AchievementService {
             Class<?> clazz = Class.forName(className);
             if (!AchievementEvaluator.class.isAssignableFrom(clazz)) {
                 throw new IllegalStateException(
-                    "Evaluator class does not implement AchievementEvaluator: " + definition.evaluatorClass()
-                );
+                        "Evaluator class does not implement AchievementEvaluator: " + definition.evaluatorClass());
             }
             @SuppressWarnings("unchecked")
             AchievementEvaluator evaluator = evaluatorMap.get((Class<? extends AchievementEvaluator>) clazz);
             if (evaluator == null) {
                 throw new IllegalStateException(
-                    "No AchievementEvaluator bean registered for class: " +
-                        definition.evaluatorClass() +
-                        " (required by achievement " +
-                        definition.id() +
-                        ")"
-                );
+                        "No AchievementEvaluator bean registered for class: " + definition.evaluatorClass()
+                                + " (required by achievement "
+                                + definition.id()
+                                + ")");
             }
             return evaluator;
         } catch (ClassNotFoundException e) {
@@ -161,7 +157,10 @@ public class AchievementService {
      */
     // Thin tripwire only: the per-user advisory lock should make optimistic-lock failures
     // impossible, so a few retries are a safety net, not the latency sink the pre-lock code needed.
-    @Retryable(includes = { ObjectOptimisticLockingFailureException.class }, maxRetries = 2, delay = 100)
+    @Retryable(
+            includes = {ObjectOptimisticLockingFailureException.class},
+            maxRetries = 2,
+            delay = 100)
     @Transactional
     public List<AchievementDefinition> checkAndUnlock(ActivitySavedEvent event) {
         if (event.user().isEmpty()) {
@@ -184,12 +183,12 @@ public class AchievementService {
         }
 
         // Fetch existing progress records for the triggered achievement types
-        Set<String> candidateIds = candidates.stream().map(AchievementDefinition::id).collect(Collectors.toSet());
+        Set<String> candidateIds =
+                candidates.stream().map(AchievementDefinition::id).collect(Collectors.toSet());
 
-        Map<String, UserAchievement> existingMap = userAchievementRepository
-            .findByUserIdAndAchievementIdIn(user.getId(), candidateIds)
-            .stream()
-            .collect(Collectors.toMap(UserAchievement::getAchievementId, Function.identity()));
+        Map<String, UserAchievement> existingMap =
+                userAchievementRepository.findByUserIdAndAchievementIdIn(user.getId(), candidateIds).stream()
+                        .collect(Collectors.toMap(UserAchievement::getAchievementId, Function.identity()));
 
         List<AchievementDefinition> newlyUnlocked = new ArrayList<>();
 
@@ -199,10 +198,10 @@ public class AchievementService {
             boolean isNew = uaProgress == null;
             if (uaProgress == null) {
                 uaProgress = UserAchievement.builder()
-                    .user(user)
-                    .achievementId(achievementDefinition.id())
-                    .progressData(achievementDefinition.requirements())
-                    .build();
+                        .user(user)
+                        .achievementId(achievementDefinition.id())
+                        .progressData(achievementDefinition.requirements())
+                        .build();
             }
 
             // Skip if already unlocked
@@ -221,12 +220,11 @@ public class AchievementService {
                 uaProgress.setUnlockedAt(occurredAt);
                 newlyUnlocked.add(achievementDefinition);
                 log.debug(
-                    "Achievement unlocked: userId={}, achievement={}, progress={}, occurredAt={}",
-                    user.getId(),
-                    achievementDefinition.id(),
-                    uaProgress.getProgressData(),
-                    occurredAt
-                );
+                        "Achievement unlocked: userId={}, achievement={}, progress={}, occurredAt={}",
+                        user.getId(),
+                        achievementDefinition.id(),
+                        uaProgress.getProgressData(),
+                        occurredAt);
             }
 
             // Only persist if entity is new or progress actually changed
@@ -256,11 +254,7 @@ public class AchievementService {
      * {@code @Retryable} on {@link #checkAndUnlock} handles those collisions.
      */
     private void persistProgress(
-        UserAchievement uaProgress,
-        AchievementDefinition definition,
-        ActivitySavedEvent event,
-        boolean isNew
-    ) {
+            UserAchievement uaProgress, AchievementDefinition definition, ActivitySavedEvent event, boolean isNew) {
         if (!isNew) {
             userAchievementRepository.save(uaProgress);
             return;
@@ -275,21 +269,19 @@ public class AchievementService {
             progressJson = objectMapper.writeValueAsString(uaProgress.getProgressData());
         } catch (JacksonException e) {
             throw new IllegalStateException(
-                "Failed to serialize achievement progress for user=" +
-                    uaProgress.getUser().getId() +
-                    " achievement=" +
-                    uaProgress.getAchievementId(),
-                e
-            );
+                    "Failed to serialize achievement progress for user="
+                            + uaProgress.getUser().getId()
+                            + " achievement="
+                            + uaProgress.getAchievementId(),
+                    e);
         }
 
         int inserted = userAchievementRepository.insertIfAbsent(
-            uaProgress.getId(),
-            uaProgress.getUser().getId(),
-            uaProgress.getAchievementId(),
-            progressJson,
-            uaProgress.getUnlockedAt()
-        );
+                uaProgress.getId(),
+                uaProgress.getUser().getId(),
+                uaProgress.getAchievementId(),
+                progressJson,
+                uaProgress.getUnlockedAt());
 
         if (inserted == 1) {
             return;
@@ -298,20 +290,16 @@ public class AchievementService {
         // Another concurrent listener already inserted the row. Re-fetch it,
         // re-apply this event's progress delta, and save normally.
         log.debug(
-            "Concurrent insert detected for userId={} achievementId={} — re-applying progress on winning row",
-            uaProgress.getUser().getId(),
-            uaProgress.getAchievementId()
-        );
+                "Concurrent insert detected for userId={} achievementId={} — re-applying progress on winning row",
+                uaProgress.getUser().getId(),
+                uaProgress.getAchievementId());
         UserAchievement persisted = userAchievementRepository
-            .findByUserIdAndAchievementId(uaProgress.getUser().getId(), uaProgress.getAchievementId())
-            .orElseThrow(() ->
-                new IllegalStateException(
-                    "insertIfAbsent reported conflict but row is missing for userId=" +
-                        uaProgress.getUser().getId() +
-                        " achievementId=" +
-                        uaProgress.getAchievementId()
-                )
-            );
+                .findByUserIdAndAchievementId(uaProgress.getUser().getId(), uaProgress.getAchievementId())
+                .orElseThrow(() ->
+                        new IllegalStateException("insertIfAbsent reported conflict but row is missing for userId="
+                                + uaProgress.getUser().getId()
+                                + " achievementId="
+                                + uaProgress.getAchievementId()));
 
         // If the winning row is already unlocked, nothing left to do.
         if (persisted.getUnlockedAt() != null) {
@@ -348,10 +336,8 @@ public class AchievementService {
         Long userId = user.getId();
 
         // Fetch all progress records for this user (both in-progress and unlocked)
-        Map<String, UserAchievement> progressMap = userAchievementRepository
-            .findByUserId(userId)
-            .stream()
-            .collect(Collectors.toMap(UserAchievement::getAchievementId, Function.identity()));
+        Map<String, UserAchievement> progressMap = userAchievementRepository.findByUserId(userId).stream()
+                .collect(Collectors.toMap(UserAchievement::getAchievementId, Function.identity()));
 
         // Build DTOs for all achievements
         List<AchievementDTO> result = new ArrayList<>();
@@ -364,7 +350,7 @@ public class AchievementService {
             }
 
             AchievementProgress progressData =
-                progress != null ? progress.getProgressData() : achievement.requirements();
+                    progress != null ? progress.getProgressData() : achievement.requirements();
             Instant unlockedAt = progress != null ? progress.getUnlockedAt() : null;
             result.add(AchievementDTO.fromDefinition(achievement, status, progressData, unlockedAt));
         }
@@ -382,9 +368,7 @@ public class AchievementService {
      * </ul>
      */
     private AchievementStatus computeStatus(
-        AchievementDefinition achievement,
-        Map<String, UserAchievement> progressMap
-    ) {
+            AchievementDefinition achievement, Map<String, UserAchievement> progressMap) {
         // Check if this achievement is unlocked
         UserAchievement progress = progressMap.get(achievement.id());
         if (progress != null && progress.getUnlockedAt() != null) {
@@ -425,7 +409,9 @@ public class AchievementService {
 
     @Transactional(readOnly = true)
     public List<String> getAllAchievementDefinitionIds() {
-        return achievementRegistry.values().stream().map(AchievementDefinition::id).toList();
+        return achievementRegistry.values().stream()
+                .map(AchievementDefinition::id)
+                .toList();
     }
 
     /**
@@ -433,10 +419,8 @@ public class AchievementService {
      */
     @Transactional(readOnly = true)
     public List<AchievementDTO> getAllAchievementDefinitions() {
-        return achievementRegistry
-            .values()
-            .stream()
-            .map(def -> AchievementDTO.fromDefinition(def, AchievementStatus.LOCKED, def.requirements(), null))
-            .toList();
+        return achievementRegistry.values().stream()
+                .map(def -> AchievementDTO.fromDefinition(def, AchievementStatus.LOCKED, def.requirements(), null))
+                .toList();
     }
 }

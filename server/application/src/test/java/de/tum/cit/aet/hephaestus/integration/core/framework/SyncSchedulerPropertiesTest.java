@@ -26,13 +26,12 @@ class SyncSchedulerPropertiesTest {
 
     private ApplicationContextRunner contextRunner() {
         return new ApplicationContextRunner()
-            .withUserConfiguration(TestConfiguration.class, ValidationAutoConfiguration.class)
-            .withPropertyValues(
-                "hephaestus.sync.run-on-startup=true",
-                "hephaestus.sync.timeframe-days=7",
-                "hephaestus.sync.cron=0 0 3 * * *",
-                "hephaestus.sync.cooldown-minutes=15"
-            );
+                .withUserConfiguration(TestConfiguration.class, ValidationAutoConfiguration.class)
+                .withPropertyValues(
+                        "hephaestus.sync.run-on-startup=true",
+                        "hephaestus.sync.timeframe-days=7",
+                        "hephaestus.sync.cron=0 0 3 * * *",
+                        "hephaestus.sync.cooldown-minutes=15");
     }
 
     @Nested
@@ -56,9 +55,8 @@ class SyncSchedulerPropertiesTest {
         @Test
         void defaultBackfillValues_applied() {
             contextRunner().run(context -> {
-                SyncSchedulerProperties.BackfillProperties backfill = context
-                    .getBean(SyncSchedulerProperties.class)
-                    .backfill();
+                SyncSchedulerProperties.BackfillProperties backfill =
+                        context.getBean(SyncSchedulerProperties.class).backfill();
 
                 assertThat(backfill.enabled()).isFalse();
                 assertThat(backfill.batchSize()).isEqualTo(50);
@@ -70,9 +68,8 @@ class SyncSchedulerPropertiesTest {
         @Test
         void defaultFilterValues_applied() {
             contextRunner().run(context -> {
-                SyncSchedulerProperties.FilterProperties filters = context
-                    .getBean(SyncSchedulerProperties.class)
-                    .filters();
+                SyncSchedulerProperties.FilterProperties filters =
+                        context.getBean(SyncSchedulerProperties.class).filters();
 
                 assertThat(filters.allowedOrganizations()).isEmpty();
                 assertThat(filters.allowedRepositories()).isEmpty();
@@ -85,9 +82,8 @@ class SyncSchedulerPropertiesTest {
             // Note: Binding indexed properties to Sets in nested records may not work
             // in ApplicationContextRunner. This test verifies the properties exist as Sets.
             contextRunner().run(context -> {
-                SyncSchedulerProperties.FilterProperties filters = context
-                    .getBean(SyncSchedulerProperties.class)
-                    .filters();
+                SyncSchedulerProperties.FilterProperties filters =
+                        context.getBean(SyncSchedulerProperties.class).filters();
 
                 // Verify properties are Set type with expected defaults (empty)
                 assertThat(filters.allowedOrganizations()).isInstanceOf(Set.class);
@@ -103,84 +99,82 @@ class SyncSchedulerPropertiesTest {
 
         @Test
         void blankCron_validationFails() {
-            contextRunner()
-                .withPropertyValues("hephaestus.sync.cron=   ")
-                .run(context -> {
-                    assertThat(context).hasFailed();
-                });
+            contextRunner().withPropertyValues("hephaestus.sync.cron=   ").run(context -> {
+                assertThat(context).hasFailed();
+            });
         }
 
         @ParameterizedTest
-        @ValueSource(ints = { 0, -1 })
+        @ValueSource(ints = {0, -1})
         void timeframeDaysBelowMin_validationFails(int days) {
             contextRunner()
-                .withPropertyValues("hephaestus.sync.timeframe-days=" + days)
-                .run(context -> assertThat(context).hasFailed());
+                    .withPropertyValues("hephaestus.sync.timeframe-days=" + days)
+                    .run(context -> assertThat(context).hasFailed());
         }
 
         @ParameterizedTest
-        @ValueSource(ints = { 366, 1000 })
+        @ValueSource(ints = {366, 1000})
         @DisplayName("should fail when timeframe-days exceeds maximum")
         void timeframeDaysAboveMax_validationFails(int days) {
             contextRunner()
-                .withPropertyValues("hephaestus.sync.timeframe-days=" + days)
-                .run(context -> assertThat(context).hasFailed());
+                    .withPropertyValues("hephaestus.sync.timeframe-days=" + days)
+                    .run(context -> assertThat(context).hasFailed());
         }
 
         @ParameterizedTest
-        @ValueSource(ints = { 1, 30, 365 })
+        @ValueSource(ints = {1, 30, 365})
         void validTimeframeDays_passes(int days) {
             contextRunner()
-                .withPropertyValues("hephaestus.sync.timeframe-days=" + days)
-                .run(context -> assertThat(context).hasNotFailed());
+                    .withPropertyValues("hephaestus.sync.timeframe-days=" + days)
+                    .run(context -> assertThat(context).hasNotFailed());
         }
 
         @ParameterizedTest
-        @ValueSource(ints = { 0, -1 })
+        @ValueSource(ints = {0, -1})
         void cooldownMinutesBelowMin_validationFails(int minutes) {
             contextRunner()
-                .withPropertyValues("hephaestus.sync.cooldown-minutes=" + minutes)
-                .run(context -> assertThat(context).hasFailed());
+                    .withPropertyValues("hephaestus.sync.cooldown-minutes=" + minutes)
+                    .run(context -> assertThat(context).hasFailed());
         }
 
         @ParameterizedTest
-        @ValueSource(ints = { 1441, 10000 })
+        @ValueSource(ints = {1441, 10000})
         @DisplayName("should fail when cooldown-minutes exceeds maximum")
         void cooldownMinutesAboveMax_validationFails(int minutes) {
             contextRunner()
-                .withPropertyValues("hephaestus.sync.cooldown-minutes=" + minutes)
-                .run(context -> assertThat(context).hasFailed());
+                    .withPropertyValues("hephaestus.sync.cooldown-minutes=" + minutes)
+                    .run(context -> assertThat(context).hasFailed());
         }
 
         @ParameterizedTest
-        @ValueSource(ints = { 0, -1 })
+        @ValueSource(ints = {0, -1})
         void backfillBatchSizeBelowMin_validationFails(int batchSize) {
             // Note: Nested validation in records requires @Valid on the parent field
             // and the nested class to have validation annotations.
             // This test verifies that constraint violations are detected at startup.
             contextRunner()
-                .withPropertyValues("hephaestus.sync.backfill.batch-size=" + batchSize)
-                .run(context -> {
-                    // Validation may not cascade to nested records in ApplicationContextRunner
-                    // This documents current behavior - full Spring Boot context is needed
-                    // for complete nested validation
-                    if (context.getStartupFailure() != null) {
-                        assertThat(context).hasFailed();
-                    }
-                });
+                    .withPropertyValues("hephaestus.sync.backfill.batch-size=" + batchSize)
+                    .run(context -> {
+                        // Validation may not cascade to nested records in ApplicationContextRunner
+                        // This documents current behavior - full Spring Boot context is needed
+                        // for complete nested validation
+                        if (context.getStartupFailure() != null) {
+                            assertThat(context).hasFailed();
+                        }
+                    });
         }
 
         @ParameterizedTest
-        @ValueSource(ints = { 1001, 5000 })
+        @ValueSource(ints = {1001, 5000})
         void backfillBatchSizeAboveMax_validationFails(int batchSize) {
             // Note: Nested validation in records requires @Valid on the parent field
             contextRunner()
-                .withPropertyValues("hephaestus.sync.backfill.batch-size=" + batchSize)
-                .run(context -> {
-                    if (context.getStartupFailure() != null) {
-                        assertThat(context).hasFailed();
-                    }
-                });
+                    .withPropertyValues("hephaestus.sync.backfill.batch-size=" + batchSize)
+                    .run(context -> {
+                        if (context.getStartupFailure() != null) {
+                            assertThat(context).hasFailed();
+                        }
+                    });
         }
     }
 
@@ -198,10 +192,7 @@ class SyncSchedulerPropertiesTest {
         @Test
         void orgFilter_onlyAllowsListed() {
             var filters = new SyncSchedulerProperties.FilterProperties(
-                Set.of("ls1intum", "HephaestusTest"),
-                Set.of(),
-                Set.of()
-            );
+                    Set.of("ls1intum", "HephaestusTest"), Set.of(), Set.of());
 
             assertThat(filters.isOrganizationAllowed("ls1intum")).isTrue();
             assertThat(filters.isOrganizationAllowed("HephaestusTest")).isTrue();
@@ -218,10 +209,7 @@ class SyncSchedulerPropertiesTest {
         @Test
         void repoFilter_onlyAllowsListed() {
             var filters = new SyncSchedulerProperties.FilterProperties(
-                Set.of(),
-                Set.of("ls1intum/Hephaestus", "ls1intum/Artemis"),
-                Set.of()
-            );
+                    Set.of(), Set.of("ls1intum/Hephaestus", "ls1intum/Artemis"), Set.of());
 
             assertThat(filters.isRepositoryAllowed("ls1intum/Hephaestus")).isTrue();
             assertThat(filters.isRepositoryAllowed("ls1intum/Artemis")).isTrue();

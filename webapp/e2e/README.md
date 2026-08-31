@@ -8,7 +8,7 @@ These tests drive the SPA against the real backend using the local dev login. Se
 Start the backend:
 
 ```bash
-pnpm dev:server:e2e
+pnpm run dev:server:e2e
 ```
 
 Create the test account and seed its workspace:

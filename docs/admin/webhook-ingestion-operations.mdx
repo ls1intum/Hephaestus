@@ -1,6 +1,5 @@
 ---
 id: webhook-ingestion-operations
-sidebar_position: 6
 title: Webhook ingestion operations
 description: Metrics, storage bounds, and recovery for the webhook receiver and its JetStream streams.
 ---
@@ -228,17 +227,10 @@ first poll.
 
 ## Making a change actually reach the broker
 
-Two things in the deployment path will silently leave your change unapplied.
-
-**The webhook receiver and NATS are in the core stack, and staging CD deploys the app only.** A
-change to `hephaestus.webhook.stream.*` ships with the application server but does not reach the
-container that bootstraps the streams until core is deployed. CI warns when `docker/compose.core.yaml`
-changes; deploy it with **Deploy to Staging** and `deploy-core: true`.
-
 **Compose does not recreate NATS when only its config changes.** The broker's configuration is a
 Compose `configs:` block whose content renders to a bind-mounted file. Changing the content does not
-change the container's spec, so `docker compose up -d` reports no drift and the running broker keeps
-the config it started with — `max_payload` and `max_file` included. Force it:
+change the container's spec. The release deployment therefore recreates NATS before checking the
+complete topology. For a manual configuration change, run:
 
 ```bash
 docker compose -f compose.core.yaml up -d --force-recreate nats-server

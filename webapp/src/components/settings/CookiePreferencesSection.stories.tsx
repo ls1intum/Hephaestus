@@ -1,7 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, screen, userEvent } from "storybook/test";
+
 import { CookieConsentBanner } from "@/components/consent/CookieConsentBanner";
 import { CONSENT_STORAGE_KEY, closeConsentReopen, setStoredConsent } from "@/integrations/consent";
+
 import { CookiePreferencesSection } from "./CookiePreferencesSection";
 
 /**
@@ -16,7 +18,7 @@ const meta = {
 	// Seed a prior decision so the section shows a summary and the banner starts hidden. Teardown
 	// resets the stored decision + reopen flag so nothing leaks into the next story.
 	beforeEach: () => {
-		setStoredConsent({ analytics: true, errorMonitoring: false });
+		setStoredConsent({ errorMonitoring: false });
 		return () => {
 			localStorage.removeItem(CONSENT_STORAGE_KEY);
 			closeConsentReopen();

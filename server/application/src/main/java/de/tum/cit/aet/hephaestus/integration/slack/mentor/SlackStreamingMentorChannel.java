@@ -39,20 +39,20 @@ public class SlackStreamingMentorChannel implements MentorChannel {
      * {@value #MAX_CONSECUTIVE_FAILURES}, but an unbounded 429 storm must still terminate the turn eventually.
      */
     private static final int MAX_CONSECUTIVE_RATE_LIMITS = 20;
+
     private static final Duration GRACEFUL_SHUTDOWN_TIMEOUT = Duration.ofSeconds(2);
     private static final Duration FORCED_SHUTDOWN_TIMEOUT = Duration.ofSeconds(10);
 
     private static final Set<String> TERMINAL_ERRORS = Set.of(
-        "message_not_found",
-        "channel_not_found",
-        "thread_not_found",
-        "cant_update_message",
-        "message_deleted",
-        "is_archived",
-        "stream_not_found",
-        "cant_stream",
-        "silent_mode_engaged"
-    );
+            "message_not_found",
+            "channel_not_found",
+            "thread_not_found",
+            "cant_update_message",
+            "message_deleted",
+            "is_archived",
+            "stream_not_found",
+            "cant_stream",
+            "silent_mode_engaged");
 
     private final SlackMessageService slack;
     private final long workspaceId;
@@ -83,38 +83,33 @@ public class SlackStreamingMentorChannel implements MentorChannel {
     private final AtomicReference<String> streamTs = new AtomicReference<>();
     /** Serializes the open-or-append decision so the stream is opened exactly once across the flush + runner threads. */
     private final ReentrantLock streamLock = new ReentrantLock();
+
     private volatile @Nullable ScheduledFuture<?> flushTask;
     private int consecutiveFailures; // flush-thread only
     private int consecutiveRateLimits; // flush-thread only
 
     public SlackStreamingMentorChannel(
-        SlackMessageService slack,
-        long workspaceId,
-        String channel,
-        @Nullable String threadTs
-    ) {
+            SlackMessageService slack, long workspaceId, String channel, @Nullable String threadTs) {
         this(
-            slack,
-            workspaceId,
-            channel,
-            threadTs,
-            GRACEFUL_SHUTDOWN_TIMEOUT,
-            FORCED_SHUTDOWN_TIMEOUT,
-            INITIAL_DELAY_MS,
-            FLUSH_INTERVAL_MS
-        );
+                slack,
+                workspaceId,
+                channel,
+                threadTs,
+                GRACEFUL_SHUTDOWN_TIMEOUT,
+                FORCED_SHUTDOWN_TIMEOUT,
+                INITIAL_DELAY_MS,
+                FLUSH_INTERVAL_MS);
     }
 
     SlackStreamingMentorChannel(
-        SlackMessageService slack,
-        long workspaceId,
-        String channel,
-        @Nullable String threadTs,
-        Duration gracefulShutdownTimeout,
-        Duration forcedShutdownTimeout,
-        long initialFlushDelayMillis,
-        long flushIntervalMillis
-    ) {
+            SlackMessageService slack,
+            long workspaceId,
+            String channel,
+            @Nullable String threadTs,
+            Duration gracefulShutdownTimeout,
+            Duration forcedShutdownTimeout,
+            long initialFlushDelayMillis,
+            long flushIntervalMillis) {
         this.slack = slack;
         this.workspaceId = workspaceId;
         this.channel = channel;
@@ -140,7 +135,8 @@ public class SlackStreamingMentorChannel implements MentorChannel {
 
     @Override
     public void startKeepAlive() {
-        // Liveness while the sandbox warms up. Best-effort (assistant threads only); superseded by the first stream write.
+        // Liveness while the sandbox warms up. Best-effort (assistant threads only); superseded by the first stream
+        // write.
         slack.setStatus(workspaceId, channel, threadTs, "Thinking...");
         ensureFlushing();
     }
@@ -215,11 +211,7 @@ public class SlackStreamingMentorChannel implements MentorChannel {
             return;
         }
         flushTask = scheduler.scheduleWithFixedDelay(
-            this::tick,
-            initialFlushDelayMillis,
-            flushIntervalMillis,
-            TimeUnit.MILLISECONDS
-        );
+                this::tick, initialFlushDelayMillis, flushIntervalMillis, TimeUnit.MILLISECONDS);
     }
 
     /** One flush tick: drain a whitespace-aligned prefix and write it to Slack. Runs single-threaded. */
@@ -299,10 +291,9 @@ public class SlackStreamingMentorChannel implements MentorChannel {
                 honorRetryAfter(e.retryAfterMillis());
                 if (++consecutiveRateLimits >= MAX_CONSECUTIVE_RATE_LIMITS) {
                     log.warn(
-                        "Slack stream giving up after {} consecutive rate-limits (channel={})",
-                        consecutiveRateLimits,
-                        channel
-                    );
+                            "Slack stream giving up after {} consecutive rate-limits (channel={})",
+                            consecutiveRateLimits,
+                            channel);
                     terminate();
                 }
                 return;
@@ -310,19 +301,14 @@ public class SlackStreamingMentorChannel implements MentorChannel {
             // Transient (5xx / transport): retry next tick, counting toward the abort budget.
             if (++consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
                 log.warn(
-                    "Slack stream giving up after {} transient failures (channel={}): {}",
-                    consecutiveFailures,
-                    channel,
-                    e.slackError()
-                );
+                        "Slack stream giving up after {} transient failures (channel={}): {}",
+                        consecutiveFailures,
+                        channel,
+                        e.slackError());
                 terminate();
             } else {
                 log.debug(
-                    "Slack stream append retry {} (channel={}): {}",
-                    consecutiveFailures,
-                    channel,
-                    e.slackError()
-                );
+                        "Slack stream append retry {} (channel={}): {}", consecutiveFailures, channel, e.slackError());
             }
         }
     }

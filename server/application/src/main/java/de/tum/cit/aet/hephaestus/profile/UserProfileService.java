@@ -18,7 +18,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryInfoDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserInfoDTO;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.profile.dto.ProfileActivityMonitorDTO;
 import de.tum.cit.aet.hephaestus.profile.dto.ProfileActivityStatsDTO;
 import de.tum.cit.aet.hephaestus.profile.dto.ProfileDTO;
@@ -59,7 +58,6 @@ public class UserProfileService {
     private static final int DEFAULT_ACTIVITY_MONITOR_LIMIT = 5;
     private static final int MAX_ACTIVITY_MONITOR_LIMIT = 100;
 
-    private final UserRepository userRepository;
     private final ProfileRepositoryQueryRepository profileRepositoryQueryRepository;
     private final ProfilePullRequestQueryRepository profilePullRequestQueryRepository;
     private final PullRequestReviewRepository pullRequestReviewRepository;
@@ -87,14 +85,13 @@ public class UserProfileService {
         String safeLogin = LoggingUtils.sanitizeForLog(login);
         TimeRange timeRange = resolveTimeRange(login, after, before);
         log.debug(
-            "Getting user profile for login: {} in workspace: {} with timeframe {} - {}",
-            safeLogin,
-            workspaceId,
-            timeRange.after(),
-            timeRange.before()
-        );
+                "Getting user profile for login: {} in workspace: {} with timeframe {} - {}",
+                safeLogin,
+                workspaceId,
+                timeRange.after(),
+                timeRange.before());
 
-        Optional<User> optionalUser = userRepository.findByLogin(login);
+        Optional<User> optionalUser = workspaceMembershipService.findMemberByLogin(workspaceId, login);
         if (optionalUser.isEmpty()) {
             return Optional.empty();
         }
@@ -103,22 +100,18 @@ public class UserProfileService {
         int leaguePoints = workspaceMembershipService.getCurrentLeaguePoints(workspaceId, userEntity);
         UserInfoDTO user = Objects.requireNonNull(UserInfoDTO.fromUser(userEntity, leaguePoints));
 
-        Instant firstContribution =
-            workspaceId == null
+        Instant firstContribution = workspaceId == null
                 ? null
                 : workspaceContributionActivityService
-                      .findFirstContributionInstant(workspaceId, userEntity.getId())
-                      .orElse(null);
+                        .findFirstContributionInstant(workspaceId, userEntity.getId())
+                        .orElse(null);
 
-        List<RepositoryInfoDTO> contributedRepositories =
-            workspaceId == null
+        List<RepositoryInfoDTO> contributedRepositories = workspaceId == null
                 ? List.of()
-                : profileRepositoryQueryRepository
-                      .findContributedByLogin(login, workspaceId)
-                      .stream()
-                      .map(RepositoryInfoDTO::fromRepository)
-                      .sorted(Comparator.comparing(RepositoryInfoDTO::name))
-                      .toList();
+                : profileRepositoryQueryRepository.findContributedByLogin(login, workspaceId).stream()
+                        .map(RepositoryInfoDTO::fromRepository)
+                        .sorted(Comparator.comparing(RepositoryInfoDTO::name))
+                        .toList();
 
         ProfileXpRecordDTO xpRecord = buildUserXpRecord(workspaceId, user.id());
 
@@ -127,18 +120,13 @@ public class UserProfileService {
 
     @Transactional(readOnly = true)
     public Optional<ProfileActivityMonitorDTO> getActivityMonitor(
-        String login,
-        @Nullable Long workspaceId,
-        @Nullable Instant after,
-        @Nullable Instant before,
-        @Nullable Set<Long> repositoryIds,
-        @Nullable Integer limit
-    ) {
-        if (workspaceId == null) {
-            return Optional.empty();
-        }
-
-        Optional<User> optionalUser = userRepository.findByLogin(login);
+            String login,
+            Long workspaceId,
+            @Nullable Instant after,
+            @Nullable Instant before,
+            @Nullable Set<Long> repositoryIds,
+            @Nullable Integer limit) {
+        Optional<User> optionalUser = workspaceMembershipService.findMemberByLogin(workspaceId, login);
         if (optionalUser.isEmpty()) {
             return Optional.empty();
         }
@@ -146,54 +134,37 @@ public class UserProfileService {
         User user = optionalUser.get();
         TimeRange timeRange = resolveTimeRange(login, after, before);
         Set<Long> repoFilter = repositoryIds == null ? Set.of() : repositoryIds;
-        int resolvedLimit =
-            limit == null ? DEFAULT_ACTIVITY_MONITOR_LIMIT : Math.max(1, Math.min(limit, MAX_ACTIVITY_MONITOR_LIMIT));
+        int resolvedLimit = limit == null
+                ? DEFAULT_ACTIVITY_MONITOR_LIMIT
+                : Math.max(1, Math.min(limit, MAX_ACTIVITY_MONITOR_LIMIT));
 
         List<ProfileReviewActivityDTO> allReviewActivity = buildReviewActivity(user.getId(), workspaceId, timeRange);
         List<PullRequestInfoDTO> allAuthoredPullRequests = profilePullRequestQueryRepository
-            .findAuthoredByLoginAndStates(
-                login,
-                Set.of(Issue.State.OPEN),
-                workspaceId,
-                timeRange.after(),
-                timeRange.before()
-            )
-            .stream()
-            .map(PullRequestInfoDTO::fromPullRequest)
-            .toList();
+                .findAuthoredByLoginAndStates(
+                        login, Set.of(Issue.State.OPEN), workspaceId, timeRange.after(), timeRange.before())
+                .stream()
+                .map(PullRequestInfoDTO::fromPullRequest)
+                .toList();
 
         List<RepositoryInfoDTO> repositories = collectMonitorRepositories(allReviewActivity, allAuthoredPullRequests);
 
-        List<ProfileReviewActivityDTO> filteredReviewActivity = filterByRepository(
-            allReviewActivity,
-            activity -> repositoryIdOf(activity.pullRequest()),
-            repoFilter
-        );
-        List<PullRequestInfoDTO> filteredAuthoredPullRequests = filterByRepository(
-            allAuthoredPullRequests,
-            pr -> repositoryIdOf(pr.repository()),
-            repoFilter
-        );
+        List<ProfileReviewActivityDTO> filteredReviewActivity =
+                filterByRepository(allReviewActivity, activity -> repositoryIdOf(activity.pullRequest()), repoFilter);
+        List<PullRequestInfoDTO> filteredAuthoredPullRequests =
+                filterByRepository(allAuthoredPullRequests, pr -> repositoryIdOf(pr.repository()), repoFilter);
 
         // Aggregate stats come from the workspace-wide ledger so the badges reflect the user's
         // full activity, while the lists are filtered to the selected repositories.
         ProfileActivityStatsDTO activityStats = profileActivityQueryService.getActivityStats(
-            workspaceId,
-            user.getId(),
-            timeRange.after(),
-            timeRange.before()
-        );
+                workspaceId, user.getId(), timeRange.after(), timeRange.before());
 
-        return Optional.of(
-            new ProfileActivityMonitorDTO(
+        return Optional.of(new ProfileActivityMonitorDTO(
                 activityStats,
                 filteredReviewActivity.stream().limit(resolvedLimit).toList(),
                 filteredAuthoredPullRequests.stream().limit(resolvedLimit).toList(),
                 repositories,
                 filteredReviewActivity.size(),
-                filteredAuthoredPullRequests.size()
-            )
-        );
+                filteredAuthoredPullRequests.size()));
     }
 
     private TimeRange resolveTimeRange(String login, @Nullable Instant after, @Nullable Instant before) {
@@ -202,9 +173,7 @@ public class UserProfileService {
 
         if (resolvedAfter.isAfter(resolvedBefore)) {
             log.debug(
-                "Clamping activity window for user {} because after > before",
-                LoggingUtils.sanitizeForLog(login)
-            );
+                    "Clamping activity window for user {} because after > before", LoggingUtils.sanitizeForLog(login));
             resolvedAfter = resolvedBefore;
         }
 
@@ -235,104 +204,86 @@ public class UserProfileService {
 
         // Query ActivityEvent table (same source as leaderboard)
         List<ActivityEvent> activityEvents = activityEventRepository.findProfileActivityByActorInTimeframe(
-            workspaceId,
-            userId,
-            timeRange.after(),
-            timeRange.before()
-        );
+                workspaceId, userId, timeRange.after(), timeRange.before());
 
         if (activityEvents.isEmpty()) {
             return List.of();
         }
 
         // Separate review events from comment events
-        Set<Long> reviewIds = activityEvents
-            .stream()
-            .filter(e -> ActivityTargetType.REVIEW.getValue().equals(e.getTargetType()))
-            .map(ActivityEvent::getTargetId)
-            .collect(Collectors.toSet());
+        Set<Long> reviewIds = activityEvents.stream()
+                .filter(e -> ActivityTargetType.REVIEW.getValue().equals(e.getTargetType()))
+                .map(ActivityEvent::getTargetId)
+                .collect(Collectors.toSet());
 
-        Set<Long> commentIds = activityEvents
-            .stream()
-            .filter(e -> ActivityTargetType.ISSUE_COMMENT.getValue().equals(e.getTargetType()))
-            .map(ActivityEvent::getTargetId)
-            .collect(Collectors.toSet());
+        Set<Long> commentIds = activityEvents.stream()
+                .filter(e -> ActivityTargetType.ISSUE_COMMENT.getValue().equals(e.getTargetType()))
+                .map(ActivityEvent::getTargetId)
+                .collect(Collectors.toSet());
 
-        Set<Long> reviewCommentIds = activityEvents
-            .stream()
-            .filter(e -> ActivityTargetType.REVIEW_COMMENT.getValue().equals(e.getTargetType()))
-            .map(ActivityEvent::getTargetId)
-            .collect(Collectors.toSet());
+        Set<Long> reviewCommentIds = activityEvents.stream()
+                .filter(e -> ActivityTargetType.REVIEW_COMMENT.getValue().equals(e.getTargetType()))
+                .map(ActivityEvent::getTargetId)
+                .collect(Collectors.toSet());
 
         // Batch-fetch entity details
         Map<Long, PullRequestReview> reviewsById = reviewIds.isEmpty()
-            ? Map.of()
-            : pullRequestReviewRepository
-                  .findAllByIdWithRelations(reviewIds)
-                  .stream()
-                  .collect(Collectors.toMap(PullRequestReview::getId, Function.identity()));
+                ? Map.of()
+                : pullRequestReviewRepository.findAllByIdWithRelations(reviewIds).stream()
+                        .collect(Collectors.toMap(PullRequestReview::getId, Function.identity()));
 
         Map<Long, IssueComment> commentsById = commentIds.isEmpty()
-            ? Map.of()
-            : issueCommentRepository
-                  .findAllByIdWithRelations(commentIds)
-                  .stream()
-                  .collect(Collectors.toMap(IssueComment::getId, Function.identity()));
+                ? Map.of()
+                : issueCommentRepository.findAllByIdWithRelations(commentIds).stream()
+                        .collect(Collectors.toMap(IssueComment::getId, Function.identity()));
 
         Map<Long, PullRequestReviewComment> reviewCommentsById = reviewCommentIds.isEmpty()
-            ? Map.of()
-            : pullRequestReviewCommentRepository
-                  .findAllByIdWithRelations(reviewCommentIds)
-                  .stream()
-                  .collect(Collectors.toMap(PullRequestReviewComment::getId, Function.identity()));
+                ? Map.of()
+                : pullRequestReviewCommentRepository.findAllByIdWithRelations(reviewCommentIds).stream()
+                        .collect(Collectors.toMap(PullRequestReviewComment::getId, Function.identity()));
 
-        Map<ActivityTargetKey, Double> xpByTarget = activityEvents
-            .stream()
-            .collect(Collectors.toMap(ActivityTargetKey::from, ActivityEvent::getXp, Double::sum));
+        Map<ActivityTargetKey, Double> xpByTarget = activityEvents.stream()
+                .collect(Collectors.toMap(ActivityTargetKey::from, ActivityEvent::getXp, Double::sum));
 
-        List<ActivityEvent> distinctActivityEvents = new ArrayList<>(
-            activityEvents
-                .stream()
-                .collect(
-                    Collectors.toMap(
+        List<ActivityEvent> distinctActivityEvents = new ArrayList<>(activityEvents.stream()
+                .collect(Collectors.toMap(
                         ActivityTargetKey::from,
                         Function.identity(),
                         (existing, replacement) -> existing,
-                        LinkedHashMap::new
-                    )
-                )
-                .values()
-        );
+                        LinkedHashMap::new))
+                .values());
 
-        return distinctActivityEvents
-            .stream()
-            .map(event -> {
-                int xp = XpPrecision.roundToInt(xpByTarget.getOrDefault(ActivityTargetKey.from(event), 0.0));
-                if (ActivityTargetType.REVIEW.getValue().equals(event.getTargetType())) {
-                    PullRequestReview review = reviewsById.get(event.getTargetId());
-                    if (review != null) {
-                        return reviewActivityAssembler.assemble(review, xp);
+        return distinctActivityEvents.stream()
+                .map(event -> {
+                    int xp = XpPrecision.roundToInt(xpByTarget.getOrDefault(ActivityTargetKey.from(event), 0.0));
+                    if (ActivityTargetType.REVIEW.getValue().equals(event.getTargetType())) {
+                        PullRequestReview review = reviewsById.get(event.getTargetId());
+                        if (review != null) {
+                            return reviewActivityAssembler.assemble(review, xp);
+                        }
+                    } else if (ActivityTargetType.ISSUE_COMMENT.getValue().equals(event.getTargetType())) {
+                        IssueComment comment = commentsById.get(event.getTargetId());
+                        if (comment != null && isPullRequestComment(comment)) {
+                            return reviewActivityAssembler.assemble(comment, xp);
+                        }
+                    } else if (ActivityTargetType.REVIEW_COMMENT.getValue().equals(event.getTargetType())) {
+                        PullRequestReviewComment comment = reviewCommentsById.get(event.getTargetId());
+                        if (comment != null && !isOwnPullRequestComment(comment)) {
+                            return reviewActivityAssembler.assemble(comment, xp);
+                        }
                     }
-                } else if (ActivityTargetType.ISSUE_COMMENT.getValue().equals(event.getTargetType())) {
-                    IssueComment comment = commentsById.get(event.getTargetId());
-                    if (comment != null && isPullRequestComment(comment)) {
-                        return reviewActivityAssembler.assemble(comment, xp);
-                    }
-                } else if (ActivityTargetType.REVIEW_COMMENT.getValue().equals(event.getTargetType())) {
-                    PullRequestReviewComment comment = reviewCommentsById.get(event.getTargetId());
-                    if (comment != null && !isOwnPullRequestComment(comment)) {
-                        return reviewActivityAssembler.assemble(comment, xp);
-                    }
-                }
-                return null;
-            })
-            .filter(Objects::nonNull)
-            .sorted(Comparator.comparing(ProfileReviewActivityDTO::submittedAt).reversed())
-            .toList();
+                    return null;
+                })
+                .filter(Objects::nonNull)
+                .sorted(Comparator.comparing(ProfileReviewActivityDTO::submittedAt)
+                        .reversed())
+                .toList();
     }
 
     private static @Nullable Long repositoryIdOf(@Nullable PullRequestBaseInfoDTO pullRequest) {
-        return pullRequest != null && pullRequest.repository() != null ? pullRequest.repository().id() : null;
+        return pullRequest != null && pullRequest.repository() != null
+                ? pullRequest.repository().id()
+                : null;
     }
 
     private static @Nullable Long repositoryIdOf(@Nullable RepositoryInfoDTO repository) {
@@ -340,35 +291,31 @@ public class UserProfileService {
     }
 
     private static <T> List<T> filterByRepository(
-        List<T> items,
-        Function<T, @Nullable Long> repositoryIdExtractor,
-        Set<Long> repositoryIds
-    ) {
+            List<T> items, Function<T, @Nullable Long> repositoryIdExtractor, Set<Long> repositoryIds) {
         if (repositoryIds.isEmpty()) {
             return items;
         }
-        return items
-            .stream()
-            .filter(item -> repositoryIds.contains(repositoryIdExtractor.apply(item)))
-            .toList();
+        return items.stream()
+                .filter(item -> repositoryIds.contains(repositoryIdExtractor.apply(item)))
+                .toList();
     }
 
     private List<RepositoryInfoDTO> collectMonitorRepositories(
-        List<ProfileReviewActivityDTO> reviewActivity,
-        List<PullRequestInfoDTO> authoredPullRequests
-    ) {
+            List<ProfileReviewActivityDTO> reviewActivity, List<PullRequestInfoDTO> authoredPullRequests) {
         Map<Long, RepositoryInfoDTO> byId = new LinkedHashMap<>();
-        reviewActivity
-            .stream()
-            .map(activity -> activity.pullRequest() == null ? null : activity.pullRequest().repository())
-            .filter(Objects::nonNull)
-            .forEach(repo -> byId.putIfAbsent(repo.id(), repo));
-        authoredPullRequests
-            .stream()
-            .map(PullRequestInfoDTO::repository)
-            .filter(Objects::nonNull)
-            .forEach(repo -> byId.putIfAbsent(repo.id(), repo));
-        return byId.values().stream().sorted(Comparator.comparing(RepositoryInfoDTO::nameWithOwner)).toList();
+        reviewActivity.stream()
+                .map(activity -> activity.pullRequest() == null
+                        ? null
+                        : activity.pullRequest().repository())
+                .filter(Objects::nonNull)
+                .forEach(repo -> byId.putIfAbsent(repo.id(), repo));
+        authoredPullRequests.stream()
+                .map(PullRequestInfoDTO::repository)
+                .filter(Objects::nonNull)
+                .forEach(repo -> byId.putIfAbsent(repo.id(), repo));
+        return byId.values().stream()
+                .sorted(Comparator.comparing(RepositoryInfoDTO::nameWithOwner))
+                .toList();
     }
 
     private ProfileXpRecordDTO buildUserXpRecord(Long workspaceId, Long userId) {
@@ -390,12 +337,12 @@ public class UserProfileService {
     }
 
     private boolean isOwnPullRequestComment(PullRequestReviewComment comment) {
-        return (
-            comment.getAuthor() != null &&
-            comment.getPullRequest() != null &&
-            comment.getPullRequest().getAuthor() != null &&
-            Objects.equals(comment.getAuthor().getId(), comment.getPullRequest().getAuthor().getId())
-        );
+        return (comment.getAuthor() != null
+                && comment.getPullRequest() != null
+                && comment.getPullRequest().getAuthor() != null
+                && Objects.equals(
+                        comment.getAuthor().getId(),
+                        comment.getPullRequest().getAuthor().getId()));
     }
 
     private record ActivityTargetKey(String targetType, Long targetId) {

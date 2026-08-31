@@ -1,9 +1,4 @@
 spring:
-    # Pin written by release-pin-fetcher (docker/compose.app.yaml).
-    # AgentImagePinGuard fails closed in prod if missing.
-    config:
-        import: optional:file:/pin/release-pin.yaml
-
     datasource:
         url: jdbc:${DATABASE_URL}
         username: ${DATABASE_USERNAME}
@@ -85,11 +80,6 @@ hephaestus:
         # workspace must not be silently elevated (privilege-escalation). Explicit for clarity.
         auto-seed-membership: false
 
-    posthog:
-        enabled: ${POSTHOG_ENABLED:false}
-        api-host: ${POSTHOG_API_HOST:https://app.posthog.com}
-        project-id: ${POSTHOG_PROJECT_ID:}
-        personal-api-key: ${POSTHOG_PERSONAL_API_KEY:}
 
     # ═══════════════════════════════════════════════════════════════════════════
     # SCM + SLACK + OUTLINE INTEGRATION (Production)
@@ -161,7 +151,6 @@ hephaestus:
     # Sandbox, the agent job queue (PostgreSQL-backed), git checkout, and LLM proxy are
     # configured via env vars in compose.app.yaml. Defaults come from base application.yml.
 
-    # See docs/admin/agent-image-digests.md.
     agent:
         image:
             require-digest: true

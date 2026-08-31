@@ -18,11 +18,14 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
 import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
+import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtIssuer;
+import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtVerifier;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.testconfig.LlmCatalogTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import java.time.Duration;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
@@ -56,13 +59,20 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Autowired
     private LlmModelResolver modelResolver;
 
+    @Autowired
+    private WorkerJwtVerifier jwtVerifier;
+
+    @Autowired
+    private WorkerJwtIssuer jwtIssuer;
+
     private JobTokenAuthenticationFilter filter;
     private Workspace workspace;
 
     @BeforeEach
     void setUp() {
         SecurityContextHolder.clearContext();
-        filter = new JobTokenAuthenticationFilter(jobRepository, new MentorProxyCredentialRegistry(), objectMapper);
+        filter = new JobTokenAuthenticationFilter(
+                jobRepository, jwtVerifier, new MentorProxyCredentialRegistry(), objectMapper);
         User owner = persistUser("proxy-owner");
         workspace = createWorkspace("proxy-ws", "Proxy Workspace", "proxy-org", AccountType.ORG, owner);
     }
@@ -75,13 +85,47 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Test
     void shouldAuthenticateRunningJobTokenAgainstPersistedRouting() throws Exception {
         AgentJob job = runningJob(true);
-        AuthenticationResult result = authenticate(job.getJobToken());
+        AuthenticationResult result = authenticate(
+                jwtIssuer.issueForJob(job.getId(), workspace.getId(), job.getRetryCount(), Duration.ofMinutes(5)));
 
         assertThat(result.status()).isEqualTo(200);
         assertThat(result.authentication())
-            .isNotNull()
-            .extracting(Authentication::getPrincipal)
-            .isInstanceOf(ProxyRouting.class);
+                .isNotNull()
+                .extracting(Authentication::getPrincipal)
+                .isInstanceOf(ProxyRouting.class);
+    }
+
+    @Test
+    void shouldRejectLegacyOpaqueJobToken() throws Exception {
+        // The database-backed secret the entity still persists is a pre-migration credential; the
+        // proxy accepts only per-job JWTs — there is deliberately no dual-accept window.
+        AgentJob job = runningJob(true);
+
+        AuthenticationResult result = authenticate(job.getJobToken());
+
+        assertThat(result.status()).isEqualTo(401);
+        assertThat(result.authentication()).isNull();
+    }
+
+    @Test
+    void shouldRejectWorkerSessionJwtAtTheProxy() throws Exception {
+        runningJob(true);
+
+        AuthenticationResult result = authenticate(jwtIssuer.issue("worker-1").token());
+
+        assertThat(result.status()).isEqualTo(401);
+        assertThat(result.authentication()).isNull();
+    }
+
+    @Test
+    void shouldRejectJobJwtBoundToAnotherWorkspace() throws Exception {
+        AgentJob job = runningJob(true);
+
+        AuthenticationResult result = authenticate(
+                jwtIssuer.issueForJob(job.getId(), workspace.getId() + 1, job.getRetryCount(), Duration.ofMinutes(5)));
+
+        assertThat(result.status()).isEqualTo(401);
+        assertThat(result.authentication()).isNull();
     }
 
     @Test
@@ -90,11 +134,9 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         long connectionId = job.getConfigSnapshot().get("connectionId").asLong();
         long modelId = job.getConfigSnapshot().get("modelId").asLong();
 
-        assertThat(
-            modelResolver.resolveProxyCredential(
-                new ConnectionRef(FundingSource.INSTANCE, connectionId, modelId, workspace.getId())
-            )
-        ).isNull();
+        assertThat(modelResolver.resolveProxyCredential(
+                        new ConnectionRef(FundingSource.INSTANCE, connectionId, modelId, workspace.getId())))
+                .isNull();
     }
 
     private AuthenticationResult authenticate(String token) throws Exception {
@@ -104,9 +146,11 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         request.addHeader("Authorization", "Bearer " + token);
         MockHttpServletResponse response = new MockHttpServletResponse();
         AtomicReference<Authentication> authentication = new AtomicReference<>();
-        filter.doFilter(request, response, (filteredRequest, filteredResponse) ->
-            authentication.set(Objects.requireNonNull(SecurityContextHolder.getContext().getAuthentication()))
-        );
+        filter.doFilter(
+                request,
+                response,
+                (filteredRequest, filteredResponse) -> authentication.set(Objects.requireNonNull(
+                        SecurityContextHolder.getContext().getAuthentication())));
         return new AuthenticationResult(response.getStatus(), authentication.get());
     }
 
@@ -120,15 +164,8 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         connection.setApiKey("upstream-secret");
         connection = connectionRepository.save(connection);
 
-        LlmModel model = modelRepository.save(
-            LlmCatalogTestFixtures.model(
-                connection,
-                "model-" + System.nanoTime(),
-                "catalog-model",
-                ModelVisibility.PUBLIC,
-                modelEnabled
-            )
-        );
+        LlmModel model = modelRepository.save(LlmCatalogTestFixtures.model(
+                connection, "model-" + System.nanoTime(), "catalog-model", ModelVisibility.PUBLIC, modelEnabled));
         WorkspaceAgentBinding binding = new WorkspaceAgentBinding();
         binding.setWorkspace(workspace);
         binding.setPurpose(AgentPurpose.PRACTICE_REVIEW);

@@ -30,13 +30,15 @@ class PracticeAutonomyTest extends BaseUnitTest {
         @Test
         void shouldOnlyDeliverAutomaticallyAtAutomaticAutonomy() {
             assertThat(PracticeAutonomy.OFF.deliversWithoutApproval()).isFalse();
-            assertThat(PracticeAutonomy.HUMAN_APPROVAL.deliversWithoutApproval()).isFalse();
+            assertThat(PracticeAutonomy.HUMAN_APPROVAL.deliversWithoutApproval())
+                    .isFalse();
             assertThat(PracticeAutonomy.AUTOMATIC.deliversWithoutApproval()).isTrue();
         }
 
         @Test
         void shouldRequireApprovalAtHumanApprovalAutonomy() {
-            assertThat(PracticeAutonomy.HUMAN_APPROVAL.deliversWithoutApproval()).isFalse();
+            assertThat(PracticeAutonomy.HUMAN_APPROVAL.deliversWithoutApproval())
+                    .isFalse();
         }
     }
 
@@ -46,11 +48,8 @@ class PracticeAutonomyTest extends BaseUnitTest {
 
         @Test
         void shouldExposeOnlyTheThreeCanonicalAutonomies() {
-            assertThat(PracticeAutonomy.values()).containsExactly(
-                PracticeAutonomy.OFF,
-                PracticeAutonomy.HUMAN_APPROVAL,
-                PracticeAutonomy.AUTOMATIC
-            );
+            assertThat(PracticeAutonomy.values())
+                    .containsExactly(PracticeAutonomy.OFF, PracticeAutonomy.HUMAN_APPROVAL, PracticeAutonomy.AUTOMATIC);
         }
     }
 
@@ -60,9 +59,8 @@ class PracticeAutonomyTest extends BaseUnitTest {
 
         @Test
         void everyConstantFitsTheColumn() {
-            assertThat(Arrays.stream(PracticeAutonomy.values()).map(Enum::name).map(String::length)).allSatisfy(
-                length -> assertThat(length).isLessThanOrEqualTo(PracticeAutonomy.MAX_LENGTH)
-            );
+            assertThat(Arrays.stream(PracticeAutonomy.values()).map(Enum::name).map(String::length))
+                    .allSatisfy(length -> assertThat(length).isLessThanOrEqualTo(PracticeAutonomy.MAX_LENGTH));
         }
 
         @Test

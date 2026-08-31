@@ -29,11 +29,10 @@ class AgentImagePullBootstrapperTest extends BaseUnitTest {
 
     private AgentImagePullBootstrapper bootstrapperWith(ImagePullPolicy policy, SimpleMeterRegistry registry) {
         return new AgentImagePullBootstrapper(
-            imageOps,
-            new AgentImageProperties(IMAGE, policy),
-            registry,
-            new AgentImageContractVerifier(imageOps, registry)
-        );
+                imageOps,
+                new AgentImageProperties(IMAGE, policy),
+                registry,
+                new AgentImageContractVerifier(imageOps, registry));
     }
 
     @Test
@@ -46,16 +45,15 @@ class AgentImagePullBootstrapperTest extends BaseUnitTest {
         verify(imageOps).ping();
         verify(imageOps).imageLabels(IMAGE);
         verifyNoMoreInteractions(imageOps);
-        assertThat(registry.counter("agent.image.pull.skipped", "reason", "docker_unreachable").count()).isEqualTo(1d);
+        assertThat(registry.counter("agent.image.pull.skipped", "reason", "docker_unreachable")
+                        .count())
+                .isEqualTo(1d);
     }
 
     @ParameterizedTest(name = "ALWAYS pull returns {0} → outcome={1}, failure-counter={2}")
-    @CsvSource({ "true, success, 0", "false, failure, 1" })
+    @CsvSource({"true, success, 0", "false, failure, 1"})
     void shouldRecordOutcomeMetricWhenAlwaysPolicyRunsPull(
-        boolean pullSucceeds,
-        String outcomeTag,
-        int expectedFailureCount
-    ) {
+            boolean pullSucceeds, String outcomeTag, int expectedFailureCount) {
         var registry = new SimpleMeterRegistry();
         when(imageOps.ping()).thenReturn(true);
         when(imageOps.pullImage(IMAGE)).thenReturn(pullSucceeds);
@@ -64,12 +62,14 @@ class AgentImagePullBootstrapperTest extends BaseUnitTest {
 
         verify(imageOps, never()).imageIsPresent(IMAGE);
         verify(imageOps).pullImage(IMAGE);
-        assertThat(registry.timer("agent.image.pull.duration", "outcome", outcomeTag).count()).isEqualTo(1L);
+        assertThat(registry.timer("agent.image.pull.duration", "outcome", outcomeTag)
+                        .count())
+                .isEqualTo(1L);
         assertThat(registry.counter("agent.image.pull.failure").count()).isEqualTo(expectedFailureCount);
     }
 
     @ParameterizedTest(name = "IF_NOT_PRESENT, imageIsPresent={0} → pullImage invoked={1}")
-    @CsvSource({ "true, 0", "false, 1" })
+    @CsvSource({"true, 0", "false, 1"})
     void shouldHonourCacheWhenPolicyIsIfNotPresent(boolean alreadyPresent, int expectedPulls) {
         when(imageOps.imageIsPresent(IMAGE)).thenReturn(alreadyPresent);
         if (!alreadyPresent) {
@@ -77,25 +77,28 @@ class AgentImagePullBootstrapperTest extends BaseUnitTest {
             when(imageOps.pullImage(IMAGE)).thenReturn(true);
         }
 
-        bootstrapperWith(ImagePullPolicy.IF_NOT_PRESENT, new SimpleMeterRegistry()).pullOnStartup();
+        bootstrapperWith(ImagePullPolicy.IF_NOT_PRESENT, new SimpleMeterRegistry())
+                .pullOnStartup();
 
         verify(imageOps).imageIsPresent(IMAGE);
-        verify(imageOps, alreadyPresent ? never() : Mockito.times(expectedPulls)).pullImage(IMAGE);
+        verify(imageOps, alreadyPresent ? never() : Mockito.times(expectedPulls))
+                .pullImage(IMAGE);
     }
 
     @Test
     void shouldReportTheImagesRuntimeContractOnStartup() {
         var registry = new SimpleMeterRegistry();
         when(imageOps.imageIsPresent(IMAGE)).thenReturn(true);
-        when(imageOps.imageLabels(IMAGE)).thenReturn(
-            Optional.of(
-                Map.of(SandboxLayout.RUNTIME_CONTRACT_LABEL, Integer.toString(SandboxLayout.RUNTIME_CONTRACT_VERSION))
-            )
-        );
+        when(imageOps.imageLabels(IMAGE))
+                .thenReturn(Optional.of(Map.of(
+                        SandboxLayout.RUNTIME_CONTRACT_LABEL,
+                        Integer.toString(SandboxLayout.RUNTIME_CONTRACT_VERSION))));
 
         bootstrapperWith(ImagePullPolicy.IF_NOT_PRESENT, registry).pullOnStartup();
 
-        assertThat(registry.counter("agent.image.contract", "outcome", "verified").count()).isEqualTo(1d);
+        assertThat(registry.counter("agent.image.contract", "outcome", "verified")
+                        .count())
+                .isEqualTo(1d);
     }
 
     @Test

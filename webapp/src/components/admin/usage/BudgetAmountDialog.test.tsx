@@ -1,6 +1,8 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+
 import type { FxRateInfo } from "@/api/types.gen";
+
 import { BudgetAmountDialog, type BudgetAmountDialogProps } from "./BudgetAmountDialog";
 
 const eur: FxRateInfo = {

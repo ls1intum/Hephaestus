@@ -77,7 +77,8 @@ class GitLabPullRequestReviewThreadProcessorTest extends BaseUnitTest {
         void shouldAlwaysReturnPositiveValue() {
             for (int i = 0; i < 50; i++) {
                 String gid = "gid://gitlab/Discussion/" + Integer.toHexString(i * 997 + 13);
-                assertThat(GitLabPullRequestReviewThreadProcessor.deterministicNativeId(gid)).isNotNegative();
+                assertThat(GitLabPullRequestReviewThreadProcessor.deterministicNativeId(gid))
+                        .isNotNegative();
             }
         }
 
@@ -96,23 +97,22 @@ class GitLabPullRequestReviewThreadProcessorTest extends BaseUnitTest {
 
         @Test
         void shouldPopulateAllPositionMetadataWhenCreatingThread() {
-            when(threadRepository.findByNodeIdAndProviderId(DISCUSSION_GID, PROVIDER_ID)).thenReturn(Optional.empty());
-            when(threadRepository.save(any(PullRequestReviewThread.class))).thenAnswer(inv ->
-                inv.getArgument(0, PullRequestReviewThread.class)
-            );
+            when(threadRepository.findByNodeIdAndProviderId(DISCUSSION_GID, PROVIDER_ID))
+                    .thenReturn(Optional.empty());
+            when(threadRepository.save(any(PullRequestReviewThread.class)))
+                    .thenAnswer(inv -> inv.getArgument(0, PullRequestReviewThread.class));
 
             var data = new GitLabPullRequestReviewThreadProcessor.ThreadData(
-                DISCUSSION_GID,
-                false,
-                null,
-                "src/Foo.ts",
-                42,
-                null,
-                PullRequestReviewComment.Side.RIGHT,
-                "head-sha",
-                "base-sha",
-                CREATED_AT
-            );
+                    DISCUSSION_GID,
+                    false,
+                    null,
+                    "src/Foo.ts",
+                    42,
+                    null,
+                    PullRequestReviewComment.Side.RIGHT,
+                    "head-sha",
+                    "base-sha",
+                    CREATED_AT);
 
             PullRequestReviewThread saved = processor.findOrCreateThread(data, pr, provider, SCOPE_ID);
 
@@ -129,26 +129,25 @@ class GitLabPullRequestReviewThreadProcessorTest extends BaseUnitTest {
 
         @Test
         void shouldMarkThreadResolvedWhenDiscussionIsResolved() {
-            when(threadRepository.findByNodeIdAndProviderId(DISCUSSION_GID, PROVIDER_ID)).thenReturn(Optional.empty());
-            when(threadRepository.save(any(PullRequestReviewThread.class))).thenAnswer(inv ->
-                inv.getArgument(0, PullRequestReviewThread.class)
-            );
+            when(threadRepository.findByNodeIdAndProviderId(DISCUSSION_GID, PROVIDER_ID))
+                    .thenReturn(Optional.empty());
+            when(threadRepository.save(any(PullRequestReviewThread.class)))
+                    .thenAnswer(inv -> inv.getArgument(0, PullRequestReviewThread.class));
 
             User resolver = new User();
             resolver.setLogin("resolver");
 
             var data = new GitLabPullRequestReviewThreadProcessor.ThreadData(
-                DISCUSSION_GID,
-                true,
-                resolver,
-                "src/Foo.ts",
-                42,
-                null,
-                PullRequestReviewComment.Side.RIGHT,
-                "head-sha",
-                "base-sha",
-                CREATED_AT
-            );
+                    DISCUSSION_GID,
+                    true,
+                    resolver,
+                    "src/Foo.ts",
+                    42,
+                    null,
+                    PullRequestReviewComment.Side.RIGHT,
+                    "head-sha",
+                    "base-sha",
+                    CREATED_AT);
 
             PullRequestReviewThread saved = processor.findOrCreateThread(data, pr, provider, SCOPE_ID);
 
@@ -159,19 +158,13 @@ class GitLabPullRequestReviewThreadProcessorTest extends BaseUnitTest {
 
         @Test
         void shouldLeavePositionNullWhenDataHasNoPositionInfo() {
-            when(threadRepository.findByNodeIdAndProviderId(DISCUSSION_GID, PROVIDER_ID)).thenReturn(Optional.empty());
-            when(threadRepository.save(any(PullRequestReviewThread.class))).thenAnswer(inv ->
-                inv.getArgument(0, PullRequestReviewThread.class)
-            );
+            when(threadRepository.findByNodeIdAndProviderId(DISCUSSION_GID, PROVIDER_ID))
+                    .thenReturn(Optional.empty());
+            when(threadRepository.save(any(PullRequestReviewThread.class)))
+                    .thenAnswer(inv -> inv.getArgument(0, PullRequestReviewThread.class));
 
             var data = new GitLabPullRequestReviewThreadProcessor.ThreadData(
-                DISCUSSION_GID,
-                false,
-                null,
-                null,
-                null,
-                CREATED_AT
-            );
+                    DISCUSSION_GID, false, null, null, null, CREATED_AT);
 
             PullRequestReviewThread saved = processor.findOrCreateThread(data, pr, provider, SCOPE_ID);
 
@@ -186,24 +179,23 @@ class GitLabPullRequestReviewThreadProcessorTest extends BaseUnitTest {
 
         @Test
         void shouldMarkThreadOutdatedWhenPositionHasNullLines() {
-            when(threadRepository.findByNodeIdAndProviderId(DISCUSSION_GID, PROVIDER_ID)).thenReturn(Optional.empty());
-            when(threadRepository.save(any(PullRequestReviewThread.class))).thenAnswer(inv ->
-                inv.getArgument(0, PullRequestReviewThread.class)
-            );
+            when(threadRepository.findByNodeIdAndProviderId(DISCUSSION_GID, PROVIDER_ID))
+                    .thenReturn(Optional.empty());
+            when(threadRepository.save(any(PullRequestReviewThread.class)))
+                    .thenAnswer(inv -> inv.getArgument(0, PullRequestReviewThread.class));
 
             var data = new GitLabPullRequestReviewThreadProcessor.ThreadData(
-                DISCUSSION_GID,
-                false,
-                null,
-                "src/Foo.ts",
-                null,
-                null,
-                PullRequestReviewComment.Side.RIGHT,
-                "head-sha",
-                "base-sha",
-                true,
-                CREATED_AT
-            );
+                    DISCUSSION_GID,
+                    false,
+                    null,
+                    "src/Foo.ts",
+                    null,
+                    null,
+                    PullRequestReviewComment.Side.RIGHT,
+                    "head-sha",
+                    "base-sha",
+                    true,
+                    CREATED_AT);
 
             PullRequestReviewThread saved = processor.findOrCreateThread(data, pr, provider, SCOPE_ID);
 
@@ -213,24 +205,23 @@ class GitLabPullRequestReviewThreadProcessorTest extends BaseUnitTest {
 
         @Test
         void shouldMarkThreadOutdatedFalseWhenPositionIsActive() {
-            when(threadRepository.findByNodeIdAndProviderId(DISCUSSION_GID, PROVIDER_ID)).thenReturn(Optional.empty());
-            when(threadRepository.save(any(PullRequestReviewThread.class))).thenAnswer(inv ->
-                inv.getArgument(0, PullRequestReviewThread.class)
-            );
+            when(threadRepository.findByNodeIdAndProviderId(DISCUSSION_GID, PROVIDER_ID))
+                    .thenReturn(Optional.empty());
+            when(threadRepository.save(any(PullRequestReviewThread.class)))
+                    .thenAnswer(inv -> inv.getArgument(0, PullRequestReviewThread.class));
 
             var data = new GitLabPullRequestReviewThreadProcessor.ThreadData(
-                DISCUSSION_GID,
-                false,
-                null,
-                "src/Foo.ts",
-                42,
-                null,
-                PullRequestReviewComment.Side.RIGHT,
-                "head-sha",
-                "base-sha",
-                false,
-                CREATED_AT
-            );
+                    DISCUSSION_GID,
+                    false,
+                    null,
+                    "src/Foo.ts",
+                    42,
+                    null,
+                    PullRequestReviewComment.Side.RIGHT,
+                    "head-sha",
+                    "base-sha",
+                    false,
+                    CREATED_AT);
 
             PullRequestReviewThread saved = processor.findOrCreateThread(data, pr, provider, SCOPE_ID);
 
@@ -254,25 +245,22 @@ class GitLabPullRequestReviewThreadProcessorTest extends BaseUnitTest {
             existing.setState(PullRequestReviewThread.State.UNRESOLVED);
             // all metadata fields null to simulate legacy row
 
-            when(threadRepository.findByNodeIdAndProviderId(DISCUSSION_GID, PROVIDER_ID)).thenReturn(
-                Optional.of(existing)
-            );
-            when(threadRepository.save(any(PullRequestReviewThread.class))).thenAnswer(inv ->
-                inv.getArgument(0, PullRequestReviewThread.class)
-            );
+            when(threadRepository.findByNodeIdAndProviderId(DISCUSSION_GID, PROVIDER_ID))
+                    .thenReturn(Optional.of(existing));
+            when(threadRepository.save(any(PullRequestReviewThread.class)))
+                    .thenAnswer(inv -> inv.getArgument(0, PullRequestReviewThread.class));
 
             var data = new GitLabPullRequestReviewThreadProcessor.ThreadData(
-                DISCUSSION_GID,
-                false,
-                null,
-                "src/Foo.ts",
-                42,
-                null,
-                PullRequestReviewComment.Side.RIGHT,
-                "head-sha",
-                "base-sha",
-                CREATED_AT
-            );
+                    DISCUSSION_GID,
+                    false,
+                    null,
+                    "src/Foo.ts",
+                    42,
+                    null,
+                    PullRequestReviewComment.Side.RIGHT,
+                    "head-sha",
+                    "base-sha",
+                    CREATED_AT);
 
             PullRequestReviewThread result = processor.findOrCreateThread(data, pr, provider, SCOPE_ID);
 
@@ -299,22 +287,20 @@ class GitLabPullRequestReviewThreadProcessorTest extends BaseUnitTest {
             existing.setCommitSha("existing-head");
             existing.setOriginalCommitSha("existing-base");
 
-            when(threadRepository.findByNodeIdAndProviderId(DISCUSSION_GID, PROVIDER_ID)).thenReturn(
-                Optional.of(existing)
-            );
+            when(threadRepository.findByNodeIdAndProviderId(DISCUSSION_GID, PROVIDER_ID))
+                    .thenReturn(Optional.of(existing));
 
             var data = new GitLabPullRequestReviewThreadProcessor.ThreadData(
-                DISCUSSION_GID,
-                false,
-                null,
-                "incoming/path.ts",
-                42,
-                null,
-                PullRequestReviewComment.Side.RIGHT,
-                "incoming-head",
-                "incoming-base",
-                CREATED_AT
-            );
+                    DISCUSSION_GID,
+                    false,
+                    null,
+                    "incoming/path.ts",
+                    42,
+                    null,
+                    PullRequestReviewComment.Side.RIGHT,
+                    "incoming-head",
+                    "incoming-base",
+                    CREATED_AT);
 
             PullRequestReviewThread result = processor.findOrCreateThread(data, pr, provider, SCOPE_ID);
 
@@ -340,26 +326,23 @@ class GitLabPullRequestReviewThreadProcessorTest extends BaseUnitTest {
             existing.setLine(42);
             existing.setOutdated(null);
 
-            when(threadRepository.findByNodeIdAndProviderId(DISCUSSION_GID, PROVIDER_ID)).thenReturn(
-                Optional.of(existing)
-            );
-            when(threadRepository.save(any(PullRequestReviewThread.class))).thenAnswer(inv ->
-                inv.getArgument(0, PullRequestReviewThread.class)
-            );
+            when(threadRepository.findByNodeIdAndProviderId(DISCUSSION_GID, PROVIDER_ID))
+                    .thenReturn(Optional.of(existing));
+            when(threadRepository.save(any(PullRequestReviewThread.class)))
+                    .thenAnswer(inv -> inv.getArgument(0, PullRequestReviewThread.class));
 
             var data = new GitLabPullRequestReviewThreadProcessor.ThreadData(
-                DISCUSSION_GID,
-                false,
-                null,
-                "src/Foo.ts",
-                42,
-                null,
-                PullRequestReviewComment.Side.RIGHT,
-                "head-sha",
-                "base-sha",
-                true,
-                CREATED_AT
-            );
+                    DISCUSSION_GID,
+                    false,
+                    null,
+                    "src/Foo.ts",
+                    42,
+                    null,
+                    PullRequestReviewComment.Side.RIGHT,
+                    "head-sha",
+                    "base-sha",
+                    true,
+                    CREATED_AT);
 
             PullRequestReviewThread result = processor.findOrCreateThread(data, pr, provider, SCOPE_ID);
 
@@ -382,23 +365,21 @@ class GitLabPullRequestReviewThreadProcessorTest extends BaseUnitTest {
             existing.setOriginalCommitSha("base-sha");
             existing.setOutdated(false);
 
-            when(threadRepository.findByNodeIdAndProviderId(DISCUSSION_GID, PROVIDER_ID)).thenReturn(
-                Optional.of(existing)
-            );
+            when(threadRepository.findByNodeIdAndProviderId(DISCUSSION_GID, PROVIDER_ID))
+                    .thenReturn(Optional.of(existing));
 
             var data = new GitLabPullRequestReviewThreadProcessor.ThreadData(
-                DISCUSSION_GID,
-                false,
-                null,
-                "src/Foo.ts",
-                42,
-                null,
-                PullRequestReviewComment.Side.RIGHT,
-                "head-sha",
-                "base-sha",
-                true,
-                CREATED_AT
-            );
+                    DISCUSSION_GID,
+                    false,
+                    null,
+                    "src/Foo.ts",
+                    42,
+                    null,
+                    PullRequestReviewComment.Side.RIGHT,
+                    "head-sha",
+                    "base-sha",
+                    true,
+                    CREATED_AT);
 
             PullRequestReviewThread result = processor.findOrCreateThread(data, pr, provider, SCOPE_ID);
 
@@ -416,28 +397,16 @@ class GitLabPullRequestReviewThreadProcessorTest extends BaseUnitTest {
             existing.setPullRequest(pr);
             existing.setState(PullRequestReviewThread.State.UNRESOLVED);
 
-            when(threadRepository.findByNodeIdAndProviderId(DISCUSSION_GID, PROVIDER_ID)).thenReturn(
-                Optional.of(existing)
-            );
-            when(threadRepository.save(any(PullRequestReviewThread.class))).thenAnswer(inv ->
-                inv.getArgument(0, PullRequestReviewThread.class)
-            );
+            when(threadRepository.findByNodeIdAndProviderId(DISCUSSION_GID, PROVIDER_ID))
+                    .thenReturn(Optional.of(existing));
+            when(threadRepository.save(any(PullRequestReviewThread.class)))
+                    .thenAnswer(inv -> inv.getArgument(0, PullRequestReviewThread.class));
 
             User resolver = new User();
             resolver.setLogin("resolver");
 
             var data = new GitLabPullRequestReviewThreadProcessor.ThreadData(
-                DISCUSSION_GID,
-                true,
-                resolver,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                CREATED_AT
-            );
+                    DISCUSSION_GID, true, resolver, null, null, null, null, null, null, CREATED_AT);
 
             processor.findOrCreateThread(data, pr, provider, SCOPE_ID);
 
@@ -458,13 +427,7 @@ class GitLabPullRequestReviewThreadProcessorTest extends BaseUnitTest {
         @Test
         void shouldDefaultOptionalFieldsToNullFor6ArgCallers() {
             var data = new GitLabPullRequestReviewThreadProcessor.ThreadData(
-                DISCUSSION_GID,
-                false,
-                null,
-                "src/Foo.ts",
-                42,
-                CREATED_AT
-            );
+                    DISCUSSION_GID, false, null, "src/Foo.ts", 42, CREATED_AT);
 
             assertThat(data.side()).isNull();
             assertThat(data.oldLine()).isNull();
@@ -478,17 +441,16 @@ class GitLabPullRequestReviewThreadProcessorTest extends BaseUnitTest {
         @Test
         void shouldDefaultOutdatedToNullFor10ArgCallers() {
             var data = new GitLabPullRequestReviewThreadProcessor.ThreadData(
-                DISCUSSION_GID,
-                false,
-                null,
-                "src/Foo.ts",
-                42,
-                null,
-                PullRequestReviewComment.Side.RIGHT,
-                "head-sha",
-                "base-sha",
-                CREATED_AT
-            );
+                    DISCUSSION_GID,
+                    false,
+                    null,
+                    "src/Foo.ts",
+                    42,
+                    null,
+                    PullRequestReviewComment.Side.RIGHT,
+                    "head-sha",
+                    "base-sha",
+                    CREATED_AT);
 
             assertThat(data.outdated()).isNull();
             assertThat(data.commitSha()).isEqualTo("head-sha");

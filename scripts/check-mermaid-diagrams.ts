@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * Parses every committed diagram with the mermaid the docs site actually resolves — both the standalone
  * `.mmd` files and the ```mermaid blocks fenced inside `.md` and `.mdx`.
@@ -18,7 +17,9 @@
 import { readdir, readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { join, resolve, sep } from "node:path";
+
 import { JSDOM } from "jsdom";
+
 import { asRecord, asString, readJsonFile } from "./lib/json.ts";
 
 /** Resolved from this file, so the gate answers the same whatever the working directory is. */
@@ -51,8 +52,6 @@ interface Diagram {
 const diagrams: Diagram[] = [];
 for (const root of ROOTS) {
 	for (const entry of await readdir(root, { recursive: true })) {
-		// Dependency READMEs are neither committed documentation nor rendered by Docusaurus. pnpm may
-		// materialize docs/node_modules as a real directory, so recursive readdir must exclude it itself.
 		if (entry.split(sep).includes("node_modules")) continue;
 		const path = join(root, entry);
 		if (entry.endsWith(".mmd")) {

@@ -61,10 +61,9 @@ public class WorkspaceMembership {
     @ManyToOne(fetch = FetchType.LAZY)
     @MapsId("workspaceId")
     @JoinColumn(
-        name = "workspace_id",
-        nullable = false,
-        foreignKey = @ForeignKey(name = "fk_workspace_membership_workspace")
-    )
+            name = "workspace_id",
+            nullable = false,
+            foreignKey = @ForeignKey(name = "fk_workspace_membership_workspace"))
     @ToString.Exclude
     private Workspace workspace;
 
@@ -95,6 +94,14 @@ public class WorkspaceMembership {
     /** Timestamp when this membership was created */
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt = Instant.now();
+
+    public boolean hasHumanUser() {
+        return user != null && user.getType() == User.Type.USER;
+    }
+
+    public @Nullable Long getUserId() {
+        return user == null ? null : user.getId();
+    }
 
     /**
      * Composite primary key for workspace membership.

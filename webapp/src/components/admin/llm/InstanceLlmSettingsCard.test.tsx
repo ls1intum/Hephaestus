@@ -1,6 +1,8 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+
 import type { InstanceLlmSettings } from "@/api/types.gen";
+
 import { InstanceLlmSettingsCard } from "./InstanceLlmSettingsCard";
 
 const saved: InstanceLlmSettings = {

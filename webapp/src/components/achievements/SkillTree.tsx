@@ -6,12 +6,14 @@ import {
 	useEdgesState,
 	useNodesState,
 } from "@xyflow/react";
+
 import "@xyflow/react/dist/style.css";
+
 import { useEffect, useSyncExternalStore } from "react";
+
 import type { AchievementNode } from "@/components/achievements/AchievementNode";
 import type { AvatarNode } from "@/components/achievements/AvatarNode";
 import type { CategoryLabelNode } from "@/components/achievements/CategoryLabels";
-import { SkillTreeGraphBackground } from "@/components/achievements/SkillTreeGraphBackground";
 import {
 	edgeTypes,
 	getIsDarkMode,
@@ -19,6 +21,7 @@ import {
 	nodeTypes,
 	subscribeToTheme,
 } from "@/components/achievements/skill-tree-shared";
+import { SkillTreeGraphBackground } from "@/components/achievements/SkillTreeGraphBackground";
 import type { UIAchievement } from "@/components/achievements/types";
 import {
 	type AnyAchievementEdge,

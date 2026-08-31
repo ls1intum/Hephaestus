@@ -5,19 +5,18 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 public record SourceUseDecision(
-    String id,
-    SourceKind sourceKind,
-    SourceUsePurpose purpose,
-    SourceUseBasis basis,
-    SourceUseOutcome outcome,
-    @Nullable String modelProcessor,
-    RetentionPolicy retentionPolicy,
-    ErasurePolicy erasurePolicy,
-    Instant recordedAt,
-    @Nullable String reviewer,
-    @Nullable Instant decidedAt,
-    @Nullable Instant expiresAt
-) {
+        String id,
+        SourceKind sourceKind,
+        SourceUsePurpose purpose,
+        SourceUseBasis basis,
+        SourceUseOutcome outcome,
+        @Nullable String modelProcessor,
+        RetentionPolicy retentionPolicy,
+        ErasurePolicy erasurePolicy,
+        Instant recordedAt,
+        @Nullable String reviewer,
+        @Nullable Instant decidedAt,
+        @Nullable Instant expiresAt) {
     public SourceUseDecision {
         id = requireText(id, "id");
         Objects.requireNonNull(sourceKind, "sourceKind");
@@ -51,9 +50,8 @@ public record SourceUseDecision(
         if (purpose != requestedPurpose || instant.isBefore(recordedAt)) {
             return false;
         }
-        return (
-            !instant.isBefore(Objects.requireNonNull(decidedAt)) && instant.isBefore(Objects.requireNonNull(expiresAt))
-        );
+        return (!instant.isBefore(Objects.requireNonNull(decidedAt))
+                && instant.isBefore(Objects.requireNonNull(expiresAt)));
     }
 
     private static String requireText(String value, String field) {

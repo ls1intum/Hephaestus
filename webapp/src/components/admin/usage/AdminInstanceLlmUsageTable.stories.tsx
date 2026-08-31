@@ -1,7 +1,9 @@
 import type { Meta, StoryContext, StoryObj } from "@storybook/react";
 import { expect, fn, within } from "storybook/test";
+
 import type { AdminWorkspaceLlmUsage, WorkspaceLlmUsageReport } from "@/api/types.gen";
 import { expectTargetSize, horizontalScrollParentOf } from "@/test/reflow";
+
 import { AdminInstanceLlmUsageTable } from "./AdminInstanceLlmUsageTable";
 
 const FX_DISCLOSURE = /reference rate published on/;

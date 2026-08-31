@@ -31,14 +31,12 @@ import org.jspecify.annotations.Nullable;
  */
 @Entity
 @Table(
-    name = "discussion_comment",
-    uniqueConstraints = {
-        @UniqueConstraint(
-            name = "uq_discussion_comment_provider_native_id",
-            columnNames = { "provider_id", "native_id" }
-        ),
-    }
-)
+        name = "discussion_comment",
+        uniqueConstraints = {
+            @UniqueConstraint(
+                    name = "uq_discussion_comment_provider_native_id",
+                    columnNames = {"provider_id", "native_id"}),
+        })
 @Getter
 @Setter
 @NoArgsConstructor

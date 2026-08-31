@@ -1,4 +1,5 @@
 import { motion } from "motion/react";
+
 import { MentorIcon } from "./MentorIcon";
 
 export const Greeting = () => {

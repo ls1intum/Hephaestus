@@ -19,8 +19,7 @@ import org.springframework.stereotype.Repository;
 @Repository
 @WorkspaceAgnostic("Profile query helper joining with RepositoryToMonitor for workspace scoping")
 public interface ProfilePullRequestQueryRepository extends JpaRepository<PullRequest, Long> {
-    @Query(
-        """
+    @Query("""
         SELECT p
         FROM PullRequest p
         LEFT JOIN FETCH p.labels
@@ -34,18 +33,15 @@ public interface ProfilePullRequestQueryRepository extends JpaRepository<PullReq
             AND (CAST(:until AS Instant) IS NULL OR p.createdAt < :until)
             AND rtm.workspace.id = :workspaceId
         ORDER BY p.createdAt DESC
-        """
-    )
+        """)
     List<PullRequest> findAuthoredByLoginAndStates(
-        @Param("authorLogin") String authorLogin,
-        @Param("states") Set<PullRequest.State> states,
-        @Param("workspaceId") Long workspaceId,
-        @Param("since") @Nullable Instant since,
-        @Param("until") @Nullable Instant until
-    );
+            @Param("authorLogin") String authorLogin,
+            @Param("states") Set<PullRequest.State> states,
+            @Param("workspaceId") Long workspaceId,
+            @Param("since") @Nullable Instant since,
+            @Param("until") @Nullable Instant until);
 
-    @Query(
-        """
+    @Query("""
         SELECT p.author.id as authorId, COUNT(p) as count
         FROM PullRequest p
         JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = p.repository.nameWithOwner
@@ -55,17 +51,14 @@ public interface ProfilePullRequestQueryRepository extends JpaRepository<PullReq
             AND p.createdAt < :until
             AND rtm.workspace.id = :workspaceId
         GROUP BY p.author.id
-        """
-    )
+        """)
     List<AuthorCountProjection> countOpenPullRequestsByAuthors(
-        @Param("workspaceId") Long workspaceId,
-        @Param("authorIds") Set<Long> authorIds,
-        @Param("since") Instant since,
-        @Param("until") Instant until
-    );
+            @Param("workspaceId") Long workspaceId,
+            @Param("authorIds") Set<Long> authorIds,
+            @Param("since") Instant since,
+            @Param("until") Instant until);
 
-    @Query(
-        """
+    @Query("""
         SELECT p.author.id as authorId, COUNT(p) as count
         FROM PullRequest p
         JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = p.repository.nameWithOwner
@@ -92,18 +85,15 @@ public interface ProfilePullRequestQueryRepository extends JpaRepository<PullReq
                 AND wtrs.hiddenFromContributions = true
             )
         GROUP BY p.author.id
-        """
-    )
+        """)
     List<AuthorCountProjection> countOpenPullRequestsByAuthorsAndTeams(
-        @Param("workspaceId") Long workspaceId,
-        @Param("teamIds") Set<Long> teamIds,
-        @Param("authorIds") Set<Long> authorIds,
-        @Param("since") Instant since,
-        @Param("until") Instant until
-    );
+            @Param("workspaceId") Long workspaceId,
+            @Param("teamIds") Set<Long> teamIds,
+            @Param("authorIds") Set<Long> authorIds,
+            @Param("since") Instant since,
+            @Param("until") Instant until);
 
-    @Query(
-        """
+    @Query("""
         SELECT p.author.id as authorId, COUNT(p) as count
         FROM PullRequest p
         JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = p.repository.nameWithOwner
@@ -113,17 +103,14 @@ public interface ProfilePullRequestQueryRepository extends JpaRepository<PullReq
             AND p.mergedAt < :until
             AND rtm.workspace.id = :workspaceId
         GROUP BY p.author.id
-        """
-    )
+        """)
     List<AuthorCountProjection> countMergedPullRequestsByAuthors(
-        @Param("workspaceId") Long workspaceId,
-        @Param("authorIds") Set<Long> authorIds,
-        @Param("since") Instant since,
-        @Param("until") Instant until
-    );
+            @Param("workspaceId") Long workspaceId,
+            @Param("authorIds") Set<Long> authorIds,
+            @Param("since") Instant since,
+            @Param("until") Instant until);
 
-    @Query(
-        """
+    @Query("""
         SELECT p.author.id as authorId, COUNT(p) as count
         FROM PullRequest p
         JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = p.repository.nameWithOwner
@@ -150,18 +137,15 @@ public interface ProfilePullRequestQueryRepository extends JpaRepository<PullReq
                 AND wtrs.hiddenFromContributions = true
             )
         GROUP BY p.author.id
-        """
-    )
+        """)
     List<AuthorCountProjection> countMergedPullRequestsByAuthorsAndTeams(
-        @Param("workspaceId") Long workspaceId,
-        @Param("teamIds") Set<Long> teamIds,
-        @Param("authorIds") Set<Long> authorIds,
-        @Param("since") Instant since,
-        @Param("until") Instant until
-    );
+            @Param("workspaceId") Long workspaceId,
+            @Param("teamIds") Set<Long> teamIds,
+            @Param("authorIds") Set<Long> authorIds,
+            @Param("since") Instant since,
+            @Param("until") Instant until);
 
-    @Query(
-        """
+    @Query("""
         SELECT p.author.id as authorId, COUNT(p) as count
         FROM PullRequest p
         JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = p.repository.nameWithOwner
@@ -172,17 +156,14 @@ public interface ProfilePullRequestQueryRepository extends JpaRepository<PullReq
             AND p.mergedAt IS NULL
             AND rtm.workspace.id = :workspaceId
         GROUP BY p.author.id
-        """
-    )
+        """)
     List<AuthorCountProjection> countClosedPullRequestsByAuthors(
-        @Param("workspaceId") Long workspaceId,
-        @Param("authorIds") Set<Long> authorIds,
-        @Param("since") Instant since,
-        @Param("until") Instant until
-    );
+            @Param("workspaceId") Long workspaceId,
+            @Param("authorIds") Set<Long> authorIds,
+            @Param("since") Instant since,
+            @Param("until") Instant until);
 
-    @Query(
-        """
+    @Query("""
         SELECT p.author.id as authorId, COUNT(p) as count
         FROM PullRequest p
         JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = p.repository.nameWithOwner
@@ -210,18 +191,17 @@ public interface ProfilePullRequestQueryRepository extends JpaRepository<PullReq
                 AND wtrs.hiddenFromContributions = true
             )
         GROUP BY p.author.id
-        """
-    )
+        """)
     List<AuthorCountProjection> countClosedPullRequestsByAuthorsAndTeams(
-        @Param("workspaceId") Long workspaceId,
-        @Param("teamIds") Set<Long> teamIds,
-        @Param("authorIds") Set<Long> authorIds,
-        @Param("since") Instant since,
-        @Param("until") Instant until
-    );
+            @Param("workspaceId") Long workspaceId,
+            @Param("teamIds") Set<Long> teamIds,
+            @Param("authorIds") Set<Long> authorIds,
+            @Param("since") Instant since,
+            @Param("until") Instant until);
 
     interface AuthorCountProjection {
         Long getAuthorId();
+
         Long getCount();
     }
 }

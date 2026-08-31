@@ -14,11 +14,10 @@ import org.jspecify.annotations.Nullable;
  * to determine if additional API calls are needed.
  */
 public record EmbeddedCommentsDTO(
-    List<GitHubCommentDTO> comments,
-    int totalCount,
-    boolean hasNextPage,
-    @Nullable String endCursor
-) {
+        List<GitHubCommentDTO> comments,
+        int totalCount,
+        boolean hasNextPage,
+        @Nullable String endCursor) {
     /**
      * Creates an EmbeddedCommentsDTO from a GraphQL GHIssueCommentConnection.
      *
@@ -31,20 +30,18 @@ public record EmbeddedCommentsDTO(
             return empty();
         }
 
-        List<GitHubCommentDTO> comments =
-            connection.getNodes() != null
-                ? connection
-                      .getNodes()
-                      .stream()
-                      .map(GitHubCommentDTO::fromIssueComment)
-                      .filter(Objects::nonNull)
-                      .toList()
+        List<GitHubCommentDTO> comments = connection.getNodes() != null
+                ? connection.getNodes().stream()
+                        .map(GitHubCommentDTO::fromIssueComment)
+                        .filter(Objects::nonNull)
+                        .toList()
                 : Collections.emptyList();
 
-        boolean hasNextPage =
-            connection.getPageInfo() != null && Boolean.TRUE.equals(connection.getPageInfo().getHasNextPage());
+        boolean hasNextPage = connection.getPageInfo() != null
+                && Boolean.TRUE.equals(connection.getPageInfo().getHasNextPage());
 
-        String endCursor = connection.getPageInfo() != null ? connection.getPageInfo().getEndCursor() : null;
+        String endCursor =
+                connection.getPageInfo() != null ? connection.getPageInfo().getEndCursor() : null;
 
         return new EmbeddedCommentsDTO(comments, connection.getTotalCount(), hasNextPage, endCursor);
     }

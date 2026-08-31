@@ -8,7 +8,6 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.nats.client.Connection;
-import io.nats.client.JetStreamApiException;
 import io.nats.client.JetStreamManagement;
 import io.nats.client.api.StreamInfo;
 import java.io.IOException;

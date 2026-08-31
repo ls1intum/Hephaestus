@@ -29,43 +29,38 @@ import org.junit.jupiter.api.Test;
 class IntegrationConsumerBoundaryTest extends HephaestusArchitectureTest {
 
     private static final List<String> ALLOWED_SYNC_SUBPACKAGES = List.of(
-        // Historical-backfill scheduler + service stay here for the duration of this slice;
-        // they are Slice-C territory and not in scope for the consumer dissolution.
-        "de.tum.cit.aet.hephaestus.integration.scm.sync.backfill"
-    );
+            // Historical-backfill scheduler + service stay here for the duration of this slice;
+            // they are Slice-C territory and not in scope for the consumer dissolution.
+            "de.tum.cit.aet.hephaestus.integration.scm.sync.backfill");
 
     @Test
     void scmSyncIsEmptyOfNonBackfillCode() {
-        List<String> violations = classes
-            .stream()
-            .filter(c -> c.getPackageName().equals("de.tum.cit.aet.hephaestus.integration.scm.sync"))
-            .map(JavaClass::getFullName)
-            .collect(Collectors.toList());
+        List<String> violations = classes.stream()
+                .filter(c -> c.getPackageName().equals("de.tum.cit.aet.hephaestus.integration.scm.sync"))
+                .map(JavaClass::getFullName)
+                .collect(Collectors.toList());
 
         assertThat(violations)
-            .as(
-                "integration/scm/sync/ must be empty of production code — the unified " +
-                    "consumer lives under integration/consumer/ and the per-kind sync drivers live " +
-                    "under integration/<kind>/sync/. Sub-packages allowed: %s",
-                ALLOWED_SYNC_SUBPACKAGES
-            )
-            .isEmpty();
+                .as(
+                        "integration/scm/sync/ must be empty of production code — the unified "
+                                + "consumer lives under integration/consumer/ and the per-kind sync drivers live "
+                                + "under integration/<kind>/sync/. Sub-packages allowed: %s",
+                        ALLOWED_SYNC_SUBPACKAGES)
+                .isEmpty();
     }
 
     @Test
     void agentDoesNotDependOnIntegrationConsumer() {
         noClasses()
-            .that()
-            .resideInAPackage("de.tum.cit.aet.hephaestus.agent..")
-            .should()
-            .dependOnClassesThat()
-            .resideInAPackage("de.tum.cit.aet.hephaestus.integration.core.consumer..")
-            .because(
-                "the agent job queue is Postgres-backed, not NATS-backed; depending on " +
-                    "integration.consumer would mix bean clusters across roles and break the " +
-                    "runtime-role isolation locked by RuntimeRoleBoundaryTest"
-            )
-            .check(classes);
+                .that()
+                .resideInAPackage("de.tum.cit.aet.hephaestus.agent..")
+                .should()
+                .dependOnClassesThat()
+                .resideInAPackage("de.tum.cit.aet.hephaestus.integration.core.consumer..")
+                .because("the agent job queue is Postgres-backed, not NATS-backed; depending on "
+                        + "integration.consumer would mix bean clusters across roles and break the "
+                        + "runtime-role isolation locked by RuntimeRoleBoundaryTest")
+                .check(classes);
     }
 
     /**
@@ -75,15 +70,13 @@ class IntegrationConsumerBoundaryTest extends HephaestusArchitectureTest {
     @Test
     void agentDoesNotLinkAgainstJnatsAtAll() {
         noClasses()
-            .that()
-            .resideInAPackage("de.tum.cit.aet.hephaestus.agent..")
-            .should()
-            .dependOnClassesThat()
-            .resideInAPackage("io.nats..")
-            .because(
-                "the agent job queue is Postgres-backed (agent_job table, polled by " +
-                    "AgentJobExecutor) — the agent package must have zero io.nats dependency"
-            )
-            .check(classes);
+                .that()
+                .resideInAPackage("de.tum.cit.aet.hephaestus.agent..")
+                .should()
+                .dependOnClassesThat()
+                .resideInAPackage("io.nats..")
+                .because("the agent job queue is Postgres-backed (agent_job table, polled by "
+                        + "AgentJobExecutor) — the agent package must have zero io.nats dependency")
+                .check(classes);
     }
 }

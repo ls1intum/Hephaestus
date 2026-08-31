@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, userEvent } from "storybook/test";
+
 import { DetailDrawerStack } from "@/components/core/detail-drawer/DetailDrawerStack";
 import { LevelCancel } from "@/components/core/detail-drawer/LevelCancel";
 import {
@@ -12,9 +13,10 @@ import { withPageBehind } from "@/stories/decorators";
 import { Stateful } from "@/stories/stateful";
 import { settledDrawerPanel } from "@/test/overlay";
 import { expectNoPanelOverflow, expectPanelContentInset } from "@/test/reflow";
+
+import { curatedPracticeLevel, GUARDED_CURATED_LEVEL_KINDS } from "./curated-catalog-search";
 import { CuratedFormLevel } from "./CuratedFormLevel";
 import { CuratedPracticeForm, type CuratedPracticeFormInitialValue } from "./CuratedPracticeForm";
-import { curatedPracticeLevel, GUARDED_CURATED_LEVEL_KINDS } from "./curated-catalog-search";
 
 const groups = [
 	{ slug: "communication", name: "Communication" },

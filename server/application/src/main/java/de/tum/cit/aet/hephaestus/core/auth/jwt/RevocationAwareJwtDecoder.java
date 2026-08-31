@@ -61,13 +61,12 @@ public class RevocationAwareJwtDecoder implements JwtDecoder {
     private final AuthMetrics metrics;
 
     public RevocationAwareJwtDecoder(
-        JwtSigningKeyService keyService,
-        IssuedJwtRepository repository,
-        AuthProperties properties,
-        CacheManager cacheManager,
-        Clock clock,
-        AuthMetrics metrics
-    ) {
+            JwtSigningKeyService keyService,
+            IssuedJwtRepository repository,
+            AuthProperties properties,
+            CacheManager cacheManager,
+            Clock clock,
+            AuthMetrics metrics) {
         this.delegate = localSignatureDecoder(keyService, properties);
         this.repository = repository;
         this.cache = Objects.requireNonNull(cacheManager.getCache(CACHE_NAME));
@@ -99,13 +98,10 @@ public class RevocationAwareJwtDecoder implements JwtDecoder {
         // (spring-security#18230). issuer + audience are added on top.
         OAuth2TokenValidator<Jwt> defaults = JwtValidators.createDefault();
         OAuth2TokenValidator<Jwt> issuer = new JwtClaimValidator<String>(
-            JwtClaimNames.ISS,
-            iss -> iss != null && iss.equals(properties.issuer().toString())
-        );
+                JwtClaimNames.ISS,
+                iss -> iss != null && iss.equals(properties.issuer().toString()));
         OAuth2TokenValidator<Jwt> audience = new JwtClaimValidator<List<String>>(
-            JwtClaimNames.AUD,
-            aud -> aud != null && aud.contains(properties.audience())
-        );
+                JwtClaimNames.AUD, aud -> aud != null && aud.contains(properties.audience()));
         return new DelegatingOAuth2TokenValidator<>(defaults, issuer, audience);
     }
 

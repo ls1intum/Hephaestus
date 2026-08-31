@@ -16,13 +16,11 @@ class PracticeEvidenceSkipReasonTest {
     @Test
     @DisplayName("publishes exactly the reasons a readiness report can record, at either level")
     void coversBothReadinessReasonEnums() {
-        assertThat(
-            Arrays.stream(PracticeEvidenceSkipReason.values()).map(Enum::name)
-        ).containsExactlyInAnyOrderElementsOf(
-            Stream.concat(
-                Arrays.stream(SourceReadinessReason.values()).map(Enum::name),
-                Arrays.stream(AutomatedReviewReadinessReason.values()).map(Enum::name)
-            ).toList()
-        );
+        assertThat(Arrays.stream(PracticeEvidenceSkipReason.values()).map(Enum::name))
+                .containsExactlyInAnyOrderElementsOf(Stream.concat(
+                                Arrays.stream(SourceReadinessReason.values()).map(Enum::name),
+                                Arrays.stream(AutomatedReviewReadinessReason.values())
+                                        .map(Enum::name))
+                        .toList());
     }
 }

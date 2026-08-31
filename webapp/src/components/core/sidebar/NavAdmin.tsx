@@ -17,6 +17,7 @@ import {
 	Workflow,
 } from "lucide-react";
 import { type ReactElement, type ReactNode, useState } from "react";
+
 import type { IntegrationCatalogEntry } from "@/api/types.gen";
 import { ADMIN_NAV_LABELS } from "@/components/core/sidebar/admin-nav-labels";
 import { GithubIcon, GitlabIcon, OutlineIcon, SlackIcon } from "@/components/icons/brand";

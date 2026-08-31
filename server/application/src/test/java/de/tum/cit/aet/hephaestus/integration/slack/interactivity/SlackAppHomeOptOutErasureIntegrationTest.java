@@ -125,17 +125,19 @@ class SlackAppHomeOptOutErasureIntegrationTest extends BaseIntegrationTest {
     void setUp() {
         databaseTestUtils.cleanDatabase();
         jdbcTemplate.execute(
-            "ALTER TABLE slack_thread ADD COLUMN IF NOT EXISTS participant_member_ids BIGINT[] NOT NULL DEFAULT '{}'"
-        );
+                "ALTER TABLE slack_thread ADD COLUMN IF NOT EXISTS participant_member_ids BIGINT[] NOT NULL DEFAULT '{}'");
         IdentityProvider provider = identityProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-            .orElseGet(() ->
-                identityProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseGet(() -> identityProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
         Workspace workspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("slack-optout-erase"));
         workspaceId = workspace.getId();
-        meMemberId = userRepository.save(TestUserFactory.createUser(100L, "opting-out-user", provider)).getId();
-        otherMemberId = userRepository.save(TestUserFactory.createUser(200L, "co-participant", provider)).getId();
+        meMemberId = userRepository
+                .save(TestUserFactory.createUser(100L, "opting-out-user", provider))
+                .getId();
+        otherMemberId = userRepository
+                .save(TestUserFactory.createUser(200L, "co-participant", provider))
+                .getId();
         practice = savePractice(workspace);
         job = newJob(workspace);
 
@@ -143,21 +145,21 @@ class SlackAppHomeOptOutErasureIntegrationTest extends BaseIntegrationTest {
         SlackWorkspaceResolver workspaceResolver = mock(SlackWorkspaceResolver.class);
         when(workspaceResolver.resolveWorkspaceId(TEAM)).thenReturn(Optional.of(workspaceId));
         identityResolver = mock(SlackMentorIdentityResolver.class);
-        when(identityResolver.resolveMemberId(anyLong(), anyString(), anyString())).thenReturn(Optional.empty());
-        when(identityResolver.resolveMemberId(workspaceId, TEAM, OPTING_OUT_SLACK_USER)).thenReturn(
-            Optional.of(meMemberId)
-        );
-        when(identityResolver.resolveDeveloperLogin(any(Long.class), any(), any())).thenReturn(Optional.empty());
+        when(identityResolver.resolveMemberId(anyLong(), anyString(), anyString()))
+                .thenReturn(Optional.empty());
+        when(identityResolver.resolveMemberId(workspaceId, TEAM, OPTING_OUT_SLACK_USER))
+                .thenReturn(Optional.of(meMemberId));
+        when(identityResolver.resolveDeveloperLogin(any(Long.class), any(), any()))
+                .thenReturn(Optional.empty());
 
         handler = new SlackInteractivityHandler(
-            workspaceResolver,
-            identityResolver,
-            mock(ResearchParticipationCommand.class),
-            mock(SlackAppHomeService.class),
-            new SlackParticipantConsentService(participantConsentRepository),
-            new SlackPersonErasureService(messageRepository, threadRepository, conversationFeedbackErasure),
-            mock(SlackMessageService.class)
-        );
+                workspaceResolver,
+                identityResolver,
+                mock(ResearchParticipationCommand.class),
+                mock(SlackAppHomeService.class),
+                new SlackParticipantConsentService(participantConsentRepository),
+                new SlackPersonErasureService(messageRepository, threadRepository, conversationFeedbackErasure),
+                mock(SlackMessageService.class));
     }
 
     @Test
@@ -181,20 +183,15 @@ class SlackAppHomeOptOutErasureIntegrationTest extends BaseIntegrationTest {
         handler.handleBlockActions(optOut(OPTING_OUT_SLACK_USER));
 
         // 1) Future ingestion is now blocked for this person (consent recorded, ingestion_opted_out = true).
-        assertThat(
-            participantConsentRepository.existsByWorkspaceIdAndSlackUserIdAndIngestionOptedOutTrue(
-                workspaceId,
-                OPTING_OUT_SLACK_USER
-            )
-        ).isTrue();
+        assertThat(participantConsentRepository.existsByWorkspaceIdAndSlackUserIdAndIngestionOptedOutTrue(
+                        workspaceId, OPTING_OUT_SLACK_USER))
+                .isTrue();
 
         // 2) The person's stored message is erased; the co-participant's remains.
-        assertThat(
-            messageRepository.existsByWorkspaceIdAndSlackChannelIdAndSlackTs(workspaceId, CHANNEL, "me.1")
-        ).isFalse();
-        assertThat(
-            messageRepository.existsByWorkspaceIdAndSlackChannelIdAndSlackTs(workspaceId, CHANNEL, "other.1")
-        ).isTrue();
+        assertThat(messageRepository.existsByWorkspaceIdAndSlackChannelIdAndSlackTs(workspaceId, CHANNEL, "me.1"))
+                .isFalse();
+        assertThat(messageRepository.existsByWorkspaceIdAndSlackChannelIdAndSlackTs(workspaceId, CHANNEL, "other.1"))
+                .isTrue();
 
         // 3) The person's id is pruned out of participant_member_ids; the co-participant stays.
         assertThat(participantIds(threadId)).containsExactly(otherMemberId);
@@ -221,18 +218,13 @@ class SlackAppHomeOptOutErasureIntegrationTest extends BaseIntegrationTest {
 
         handler.handleBlockActions(optOut(unlinkedSlackUser));
 
-        assertThat(
-            messageRepository.existsByWorkspaceIdAndSlackChannelIdAndSlackTs(workspaceId, CHANNEL, "unlinked.1")
-        ).isFalse();
-        assertThat(
-            messageRepository.existsByWorkspaceIdAndSlackChannelIdAndSlackTs(workspaceId, CHANNEL, "other.1")
-        ).isTrue();
-        assertThat(
-            participantConsentRepository.existsByWorkspaceIdAndSlackUserIdAndIngestionOptedOutTrue(
-                workspaceId,
-                unlinkedSlackUser
-            )
-        ).isTrue();
+        assertThat(messageRepository.existsByWorkspaceIdAndSlackChannelIdAndSlackTs(workspaceId, CHANNEL, "unlinked.1"))
+                .isFalse();
+        assertThat(messageRepository.existsByWorkspaceIdAndSlackChannelIdAndSlackTs(workspaceId, CHANNEL, "other.1"))
+                .isTrue();
+        assertThat(participantConsentRepository.existsByWorkspaceIdAndSlackUserIdAndIngestionOptedOutTrue(
+                        workspaceId, unlinkedSlackUser))
+                .isTrue();
     }
 
     // --- payload + fixtures ---
@@ -265,27 +257,25 @@ class SlackAppHomeOptOutErasureIntegrationTest extends BaseIntegrationTest {
 
     private void insertMessage(String slackTs, long authorMemberId, String authorSlackUserId) {
         jdbcTemplate.update(
-            "INSERT INTO slack_message (workspace_id, slack_team_id, slack_channel_id, slack_ts, author_slack_user_id, author_member_id, ingested_at) " +
-                "VALUES (?, ?, ?, ?, ?, ?, now())",
-            workspaceId,
-            TEAM,
-            CHANNEL,
-            slackTs,
-            authorSlackUserId,
-            authorMemberId
-        );
+                "INSERT INTO slack_message (workspace_id, slack_team_id, slack_channel_id, slack_ts, author_slack_user_id, author_member_id, ingested_at) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, now())",
+                workspaceId,
+                TEAM,
+                CHANNEL,
+                slackTs,
+                authorSlackUserId,
+                authorMemberId);
     }
 
     private void insertUnlinkedMessage(String slackTs, String authorSlackUserId) {
         jdbcTemplate.update(
-            "INSERT INTO slack_message (workspace_id, slack_team_id, slack_channel_id, slack_ts, author_slack_user_id, author_member_id, ingested_at) " +
-                "VALUES (?, ?, ?, ?, ?, NULL, now())",
-            workspaceId,
-            TEAM,
-            CHANNEL,
-            slackTs,
-            authorSlackUserId
-        );
+                "INSERT INTO slack_message (workspace_id, slack_team_id, slack_channel_id, slack_ts, author_slack_user_id, author_member_id, ingested_at) "
+                        + "VALUES (?, ?, ?, ?, ?, NULL, now())",
+                workspaceId,
+                TEAM,
+                CHANNEL,
+                slackTs,
+                authorSlackUserId);
     }
 
     private long insertThreadWithParticipants(String threadTs, long... members) {
@@ -298,69 +288,65 @@ class SlackAppHomeOptOutErasureIntegrationTest extends BaseIntegrationTest {
         }
         arr.append('}');
         jdbcTemplate.update(
-            "INSERT INTO slack_thread (workspace_id, slack_channel_id, slack_thread_ts, first_ts, last_ts, message_count, participant_member_ids, created_at) " +
-                "VALUES (?, ?, ?, ?, ?, 1, ?::bigint[], now())",
-            workspaceId,
-            CHANNEL,
-            threadTs,
-            "1700000000.000000",
-            "1700000000.000000",
-            arr.toString()
-        );
+                "INSERT INTO slack_thread (workspace_id, slack_channel_id, slack_thread_ts, first_ts, last_ts, message_count, participant_member_ids, created_at) "
+                        + "VALUES (?, ?, ?, ?, ?, 1, ?::bigint[], now())",
+                workspaceId,
+                CHANNEL,
+                threadTs,
+                "1700000000.000000",
+                "1700000000.000000",
+                arr.toString());
         Long id = jdbcTemplate.queryForObject(
-            "SELECT id FROM slack_thread WHERE workspace_id = ? AND slack_channel_id = ? AND slack_thread_ts = ?",
-            Long.class,
-            workspaceId,
-            CHANNEL,
-            threadTs
-        );
+                "SELECT id FROM slack_thread WHERE workspace_id = ? AND slack_channel_id = ? AND slack_thread_ts = ?",
+                Long.class,
+                workspaceId,
+                CHANNEL,
+                threadTs);
         assertNotNull(id);
         return id;
     }
 
     private List<Long> participantIds(long threadId) {
         Long[] ids = jdbcTemplate.queryForObject(
-            "SELECT participant_member_ids FROM slack_thread WHERE id = ?",
-            (rs, n) -> (Long[]) rs.getArray(1).getArray(),
-            threadId
-        );
+                "SELECT participant_member_ids FROM slack_thread WHERE id = ?",
+                (rs, n) -> (Long[]) rs.getArray(1).getArray(),
+                threadId);
         return List.of(ids);
     }
 
     private SlackConversationTestSupport.BoundConversation seedBoundConversation(long threadId, long aboutUserId) {
         return SlackConversationTestSupport.seedBoundConversation(
-            observationRepository,
-            feedbackRepository,
-            feedbackObservationRepository,
-            workspaceId,
-            job.getId(),
-            practice.getId(),
-            threadId,
-            aboutUserId
-        );
+                observationRepository,
+                feedbackRepository,
+                feedbackObservationRepository,
+                workspaceId,
+                job.getId(),
+                practice.getId(),
+                threadId,
+                aboutUserId);
     }
 
     private UUID seedObservation(ArtifactKind artifactKind, long artifactId, long aboutUserId) {
         UUID observationId = UUID.randomUUID();
         observationRepository.insertIfAbsent(
-            observationId,
-            "occ-" + observationId,
-            job.getId(),
-            practice.getId(),
-            null,
-            artifactKind.value(),
-            artifactId,
-            aboutUserId,
-            "Observation title",
-            "ABSENT",
-            "BAD",
-            "MAJOR",
-            null,
-            null,
-            null,
-            Instant.now(),
-            "LIVE"
-        );
+                observationId,
+                "occ-" + observationId,
+                job.getId(),
+                job.getWorkspace().getId(),
+                practice.getId(),
+                null,
+                artifactKind.value(),
+                artifactId,
+                aboutUserId,
+                "Observation title",
+                "ABSENT",
+                "BAD",
+                "MAJOR",
+                null,
+                null,
+                null,
+                Instant.now(),
+                "LIVE");
         return observationId;
     }
 

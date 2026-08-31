@@ -30,20 +30,20 @@ public class OracleEvaluator implements AchievementEvaluator {
         Long userId = userAchievement.getUser().getId();
 
         return issueRepository
-            .findById(event.targetId())
-            .map(issue -> {
-                // Must be the issue author
-                if (issue.getAuthor() == null || !issue.getAuthor().getId().equals(userId)) {
+                .findById(event.targetId())
+                .map(issue -> {
+                    // Must be the issue author
+                    if (issue.getAuthor() == null || !issue.getAuthor().getId().equals(userId)) {
+                        return false;
+                    }
+                    // Must have zero comments from others
+                    long othersComments = issueCommentRepository.countByIssueIdAndAuthorIdNot(issue.getId(), userId);
+                    if (othersComments == 0) {
+                        userAchievement.setProgressData(new BinaryAchievementProgress(true));
+                        return true;
+                    }
                     return false;
-                }
-                // Must have zero comments from others
-                long othersComments = issueCommentRepository.countByIssueIdAndAuthorIdNot(issue.getId(), userId);
-                if (othersComments == 0) {
-                    userAchievement.setProgressData(new BinaryAchievementProgress(true));
-                    return true;
-                }
-                return false;
-            })
-            .orElse(false);
+                })
+                .orElse(false);
     }
 }

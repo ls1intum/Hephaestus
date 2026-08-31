@@ -11,7 +11,8 @@ class GitLabTeamProcessorTest {
 
     @Test
     void rootSlug_usesLastSegment() {
-        assertThat(GitLabTeamProcessor.rootSlug("ase/ipraktikum/IOS26/Introcourse")).isEqualTo("Introcourse");
+        assertThat(GitLabTeamProcessor.rootSlug("ase/ipraktikum/IOS26/Introcourse"))
+                .isEqualTo("Introcourse");
         assertThat(GitLabTeamProcessor.rootSlug("introcourse")).isEqualTo("introcourse");
     }
 
@@ -24,11 +25,9 @@ class GitLabTeamProcessorTest {
 
     @Test
     void computeRelativePath_stripsRootPrefix() {
-        assertThat(GitLabTeamProcessor.computeRelativePath("ase/introcourse/alpha", "ase/introcourse")).isEqualTo(
-            "alpha"
-        );
-        assertThat(
-            GitLabTeamProcessor.computeRelativePath("ase/introcourse/group1/alpha", "ase/introcourse")
-        ).isEqualTo("group1/alpha");
+        assertThat(GitLabTeamProcessor.computeRelativePath("ase/introcourse/alpha", "ase/introcourse"))
+                .isEqualTo("alpha");
+        assertThat(GitLabTeamProcessor.computeRelativePath("ase/introcourse/group1/alpha", "ase/introcourse"))
+                .isEqualTo("group1/alpha");
     }
 }

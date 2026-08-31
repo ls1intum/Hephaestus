@@ -37,12 +37,11 @@ public class LlmUsageController {
     @Operation(summary = "Get the workspace's LLM usage report for one month", operationId = "getLlmUsageReport")
     @RequireAtLeastWorkspaceAdmin
     public ResponseEntity<WorkspaceLlmUsageReportDTO> getReport(
-        WorkspaceContext workspaceContext,
-        @RequestParam(required = false) @Pattern(
-            regexp = "\\d{4}-(0[1-9]|1[0-2])",
-            message = "month must be ISO yyyy-MM"
-        ) @Nullable String month
-    ) {
+            WorkspaceContext workspaceContext,
+            @RequestParam(required = false)
+                    @Pattern(regexp = "\\d{4}-(0[1-9]|1[0-2])", message = "month must be ISO yyyy-MM")
+                    @Nullable
+                    String month) {
         YearMonth target = month != null ? YearMonth.parse(month) : YearMonth.now(ZoneOffset.UTC);
         return ResponseEntity.ok(llmUsageService.getWorkspaceReport(workspaceContext.id(), target));
     }

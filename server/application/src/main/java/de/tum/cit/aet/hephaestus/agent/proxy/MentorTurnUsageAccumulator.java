@@ -39,10 +39,9 @@ public class MentorTurnUsageAccumulator {
     private final MeterRegistry meterRegistry;
 
     MentorTurnUsageAccumulator(
-        ChatMessageRepository chatMessageRepository,
-        MentorProxyCredentialRegistry credentialRegistry,
-        MeterRegistry meterRegistry
-    ) {
+            ChatMessageRepository chatMessageRepository,
+            MentorProxyCredentialRegistry credentialRegistry,
+            MeterRegistry meterRegistry) {
         this.chatMessageRepository = chatMessageRepository;
         this.credentialRegistry = credentialRegistry;
         this.meterRegistry = meterRegistry;
@@ -57,12 +56,11 @@ public class MentorTurnUsageAccumulator {
         UUID turnId = attempt.sourceId();
         try {
             int rows = chatMessageRepository.accumulateLlmUsage(
-                turnId,
-                usage.billableInputTokens(),
-                usage.outputTokens(),
-                usage.reasoningTokens(),
-                usage.cacheReadTokens()
-            );
+                    turnId,
+                    usage.billableInputTokens(),
+                    usage.outputTokens(),
+                    usage.reasoningTokens(),
+                    usage.cacheReadTokens());
             if (rows == 0) {
                 recordSuperseded(turnId);
                 return;
@@ -89,10 +87,9 @@ public class MentorTurnUsageAccumulator {
      */
     private void recordSuperseded(UUID turnId) {
         log.warn(
-            "Dropping proxy usage from a finished mentor turn — turn {} is no longer in flight; " +
-                "this call goes unbilled rather than being added to a turn that has already been billed",
-            turnId
-        );
+                "Dropping proxy usage from a finished mentor turn — turn {} is no longer in flight; "
+                        + "this call goes unbilled rather than being added to a turn that has already been billed",
+                turnId);
         meterRegistry.counter("llm.proxy.usage.mentor.superseded").increment();
     }
 }

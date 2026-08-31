@@ -51,14 +51,13 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "hephaestus.activity")
 public record ExperiencePointProperties(
-    List<String> selfReviewAuthorLogins,
+        List<String> selfReviewAuthorLogins,
 
-    @Valid ReviewWeights reviewWeights,
+        @Valid ReviewWeights reviewWeights,
 
-    @Valid XpAwards xpAwards,
+        @Valid XpAwards xpAwards,
 
-    @Positive @Max(10_000) @DefaultValue("1000.0") double maxXpPerEvent
-) {
+        @Positive @Max(10_000) @DefaultValue("1000.0") double maxXpPerEvent) {
     /**
      * Weight multipliers for different code review outcomes.
      *
@@ -71,10 +70,9 @@ public record ExperiencePointProperties(
      */
     @Validated
     public record ReviewWeights(
-        @PositiveOrZero @Max(100) @DefaultValue("2.0") double approval,
-        @PositiveOrZero @Max(100) @DefaultValue("2.5") double changesRequested,
-        @PositiveOrZero @Max(100) @DefaultValue("1.5") double comment
-    ) {}
+            @PositiveOrZero @Max(100) @DefaultValue("2.0") double approval,
+            @PositiveOrZero @Max(100) @DefaultValue("2.5") double changesRequested,
+            @PositiveOrZero @Max(100) @DefaultValue("1.5") double comment) {}
 
     /**
      * Fixed XP values awarded for specific developer activities.
@@ -101,19 +99,18 @@ public record ExperiencePointProperties(
      */
     @Validated
     public record XpAwards(
-        @PositiveOrZero @Max(1000) @DefaultValue("0.0") double pullRequestOpened,
-        @PositiveOrZero @Max(1000) @DefaultValue("0.0") double pullRequestMerged,
-        @PositiveOrZero @Max(1000) @DefaultValue("0.0") double pullRequestReady,
-        @PositiveOrZero @Max(1000) @DefaultValue("0.5") double reviewComment,
-        @PositiveOrZero @Max(1000) @DefaultValue("0.0") double issueCreated,
-        @PositiveOrZero @Max(1000) @DefaultValue("0.0") double projectCreated,
-        @PositiveOrZero @Max(1000) @DefaultValue("0.0") double projectItemCreated,
-        @PositiveOrZero @Max(1000) @DefaultValue("0.0") double projectStatusUpdateCreated,
-        @PositiveOrZero @Max(1000) @DefaultValue("0.0") double commitCreated,
-        @PositiveOrZero @Max(1000) @DefaultValue("0.0") double discussionCreated,
-        @PositiveOrZero @Max(1000) @DefaultValue("0.0") double discussionAnswered,
-        @PositiveOrZero @Max(1000) @DefaultValue("0.0") double discussionCommentCreated
-    ) {}
+            @PositiveOrZero @Max(1000) @DefaultValue("0.0") double pullRequestOpened,
+            @PositiveOrZero @Max(1000) @DefaultValue("0.0") double pullRequestMerged,
+            @PositiveOrZero @Max(1000) @DefaultValue("0.0") double pullRequestReady,
+            @PositiveOrZero @Max(1000) @DefaultValue("0.5") double reviewComment,
+            @PositiveOrZero @Max(1000) @DefaultValue("0.0") double issueCreated,
+            @PositiveOrZero @Max(1000) @DefaultValue("0.0") double projectCreated,
+            @PositiveOrZero @Max(1000) @DefaultValue("0.0") double projectItemCreated,
+            @PositiveOrZero @Max(1000) @DefaultValue("0.0") double projectStatusUpdateCreated,
+            @PositiveOrZero @Max(1000) @DefaultValue("0.0") double commitCreated,
+            @PositiveOrZero @Max(1000) @DefaultValue("0.0") double discussionCreated,
+            @PositiveOrZero @Max(1000) @DefaultValue("0.0") double discussionAnswered,
+            @PositiveOrZero @Max(1000) @DefaultValue("0.0") double discussionCommentCreated) {}
 
     /** Compact constructor ensuring nested records are never null. */
     public ExperiencePointProperties {

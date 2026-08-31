@@ -84,13 +84,12 @@ class SsrfGuardedResolverGroupTest extends BaseUnitTest {
 
     @Test
     void blockedReasonRejectsUnresolvedAndInternal() throws Exception {
-        assertThat(SsrfGuardedResolverGroup.blockedReason(InetSocketAddress.createUnresolved("x", 1))).isNotNull();
-        assertThat(
-            SsrfGuardedResolverGroup.blockedReason(new InetSocketAddress(InetAddress.getByName("127.0.0.1"), 1))
-        ).isNotNull();
-        assertThat(
-            SsrfGuardedResolverGroup.blockedReason(new InetSocketAddress(InetAddress.getByName("1.1.1.1"), 1))
-        ).isNull();
+        assertThat(SsrfGuardedResolverGroup.blockedReason(InetSocketAddress.createUnresolved("x", 1)))
+                .isNotNull();
+        assertThat(SsrfGuardedResolverGroup.blockedReason(new InetSocketAddress(InetAddress.getByName("127.0.0.1"), 1)))
+                .isNotNull();
+        assertThat(SsrfGuardedResolverGroup.blockedReason(new InetSocketAddress(InetAddress.getByName("1.1.1.1"), 1)))
+                .isNull();
     }
 
     /**
@@ -115,11 +114,8 @@ class SsrfGuardedResolverGroupTest extends BaseUnitTest {
         @Test
         void resolverPassesLoopbackThroughWhenGuardedResolverIsExempt() throws Exception {
             InetSocketAddress fixed = new InetSocketAddress(InetAddress.getByName("127.0.0.1"), 443);
-            SsrfGuardedResolverGroup.GuardedResolver resolver = new SsrfGuardedResolverGroup.GuardedResolver(
-                EXEC,
-                new StubResolver(fixed),
-                true
-            );
+            SsrfGuardedResolverGroup.GuardedResolver resolver =
+                    new SsrfGuardedResolverGroup.GuardedResolver(EXEC, new StubResolver(fixed), true);
 
             Future<InetSocketAddress> result = resolver.resolve(UNRESOLVED);
 
@@ -130,11 +126,8 @@ class SsrfGuardedResolverGroupTest extends BaseUnitTest {
         @Test
         void resolverStillBlocksLoopbackWhenNotExempt() throws Exception {
             InetSocketAddress fixed = new InetSocketAddress(InetAddress.getByName("127.0.0.1"), 443);
-            SsrfGuardedResolverGroup.GuardedResolver resolver = new SsrfGuardedResolverGroup.GuardedResolver(
-                EXEC,
-                new StubResolver(fixed),
-                false
-            );
+            SsrfGuardedResolverGroup.GuardedResolver resolver =
+                    new SsrfGuardedResolverGroup.GuardedResolver(EXEC, new StubResolver(fixed), false);
 
             Future<InetSocketAddress> result = resolver.resolve(UNRESOLVED);
 
@@ -172,9 +165,7 @@ class SsrfGuardedResolverGroupTest extends BaseUnitTest {
 
         @Override
         public Future<List<InetSocketAddress>> resolveAll(
-            SocketAddress address,
-            Promise<List<InetSocketAddress>> promise
-        ) {
+                SocketAddress address, Promise<List<InetSocketAddress>> promise) {
             return promise.setSuccess(List.of(fixed));
         }
 

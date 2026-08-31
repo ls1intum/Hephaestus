@@ -1,4 +1,5 @@
 import type { LabelInfo, TeamInfo } from "@/api/types.gen";
+
 import { RepositoryCard } from "./RepositoryCard";
 import { TeamCard } from "./TeamCard";
 

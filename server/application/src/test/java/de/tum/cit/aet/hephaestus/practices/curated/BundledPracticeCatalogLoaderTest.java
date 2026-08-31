@@ -15,28 +15,27 @@ import tools.jackson.databind.json.JsonMapper;
 class BundledPracticeCatalogLoaderTest extends BaseUnitTest {
 
     private final JsonMapper objectMapper = JsonMapper.builder().build();
-    private final ClasspathArtifactSourceCatalogRegistry catalogs = new ClasspathArtifactSourceCatalogRegistry(
-        objectMapper,
-        java.time.Clock.systemUTC()
-    );
+    private final ClasspathArtifactSourceCatalogRegistry catalogs =
+            new ClasspathArtifactSourceCatalogRegistry(objectMapper, java.time.Clock.systemUTC());
     private final BundledPracticeCatalogLoader loader = new BundledPracticeCatalogLoader(
-        objectMapper,
-        new PracticeDefinitionValidator(catalogs, PracticeSignalOptionsFixture.real()),
-        new PracticeEvidenceDefaults(catalogs, PracticeSignalOptionsFixture.catalog())
-    );
+            objectMapper,
+            new PracticeDefinitionValidator(catalogs, PracticeSignalOptionsFixture.real()),
+            new PracticeEvidenceDefaults(catalogs, PracticeSignalOptionsFixture.catalog()));
 
     @Test
     void shouldLoadComposedDefinitionsAndScripts() {
         BundledPracticeCatalog catalog = loader.catalog();
 
-        assertThat(catalog.groups()).allSatisfy(group -> assertThat(group.definition().name()).isNotBlank());
-        assertThat(catalog.practices()).allSatisfy(practice ->
-            assertThat(practice.definition().criteria()).contains("\n\n---\n\n")
-        );
+        assertThat(catalog.groups())
+                .allSatisfy(group -> assertThat(group.definition().name()).isNotBlank());
         assertThat(catalog.practices())
-            .filteredOn(practice -> practice.slug().equals("ships-tests-with-the-change"))
-            .singleElement()
-            .satisfies(practice -> assertThat(practice.definition().precomputeScript()).isNotBlank());
+                .allSatisfy(
+                        practice -> assertThat(practice.definition().criteria()).contains("\n\n---\n\n"));
+        assertThat(catalog.practices())
+                .filteredOn(practice -> practice.slug().equals("ships-tests-with-the-change"))
+                .singleElement()
+                .satisfies(practice ->
+                        assertThat(practice.definition().precomputeScript()).isNotBlank());
     }
 
     /**
@@ -54,17 +53,14 @@ class BundledPracticeCatalogLoaderTest extends BaseUnitTest {
     void shouldShipTheSubjectDeclarationsThatKeepPracticesFromBeingAskedForNothing() {
         BundledPracticeCatalog catalog = loader.catalog();
 
-        assertThat(
-            catalog
-                .practices()
-                .stream()
-                .filter(practice -> practice.definition().bindings().getFirst().appliesWhen() != null)
-                .map(practice -> practice.slug())
-        ).containsExactlyInAnyOrder(
-            "changes-dependencies-deliberately",
-            "keeps-the-test-suite-honest",
-            "engaging-with-inline-review-comments"
-        );
+        assertThat(catalog.practices().stream()
+                        .filter(practice ->
+                                practice.definition().bindings().getFirst().appliesWhen() != null)
+                        .map(practice -> practice.slug()))
+                .containsExactlyInAnyOrder(
+                        "changes-dependencies-deliberately",
+                        "keeps-the-test-suite-honest",
+                        "engaging-with-inline-review-comments");
     }
 
     /**
@@ -79,18 +75,19 @@ class BundledPracticeCatalogLoaderTest extends BaseUnitTest {
                 return;
             }
             assertThat(subject.absentSays())
-                .as("%s must explain its own silence", practice.slug())
-                .isNotBlank()
-                .doesNotContain("NOT_APPLICABLE");
+                    .as("%s must explain its own silence", practice.slug())
+                    .isNotBlank()
+                    .doesNotContain("NOT_APPLICABLE");
             assertThat(subject.anyOf()).isNotEmpty();
         });
     }
 
     @Test
     void shouldShipOneOccasionPerPractice() {
-        assertThat(loader.catalog().practices()).allSatisfy(practice ->
-            assertThat(practice.definition().bindings()).as("occasions of '%s'", practice.slug()).hasSize(1)
-        );
+        assertThat(loader.catalog().practices())
+                .allSatisfy(practice -> assertThat(practice.definition().bindings())
+                        .as("occasions of '%s'", practice.slug())
+                        .hasSize(1));
     }
 
     @Test
@@ -99,29 +96,30 @@ class BundledPracticeCatalogLoaderTest extends BaseUnitTest {
 
         assertThat(loader.catalog().practices()).allSatisfy(practice -> {
             assertThat(practice.definition().whyItMatters())
-                .as("whyItMatters for '%s'", practice.slug())
-                .isNotNull()
-                .doesNotContainPattern(detectorVocabulary);
+                    .as("whyItMatters for '%s'", practice.slug())
+                    .isNotNull()
+                    .doesNotContainPattern(detectorVocabulary);
             assertThat(practice.definition().whatGoodLooksLike())
-                .as("whatGoodLooksLike for '%s'", practice.slug())
-                .isNotNull()
-                .doesNotContainPattern(detectorVocabulary);
+                    .as("whatGoodLooksLike for '%s'", practice.slug())
+                    .isNotNull()
+                    .doesNotContainPattern(detectorVocabulary);
         });
     }
 
     @Test
     void shouldUseRealNewlinesInCriteria() {
-        assertThat(loader.catalog().practices()).allSatisfy(practice ->
-            assertThat(practice.definition().criteria()).as("criteria for '%s'", practice.slug()).doesNotContain("\\n")
-        );
+        assertThat(loader.catalog().practices())
+                .allSatisfy(practice -> assertThat(practice.definition().criteria())
+                        .as("criteria for '%s'", practice.slug())
+                        .doesNotContain("\\n"));
     }
 
     @Test
     void shouldKeepFeedbackInstructionsOutOfMeasurementCriteria() {
-        assertThat(loader.catalog().practices()).allSatisfy(practice ->
-            assertThat(practice.definition().criteria().toLowerCase(Locale.ROOT))
-                .as("measurement criteria for '%s'", practice.slug())
-                .doesNotContain("guidance")
-        );
+        assertThat(loader.catalog().practices())
+                .allSatisfy(
+                        practice -> assertThat(practice.definition().criteria().toLowerCase(Locale.ROOT))
+                                .as("measurement criteria for '%s'", practice.slug())
+                                .doesNotContain("guidance"));
     }
 }

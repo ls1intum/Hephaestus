@@ -28,16 +28,10 @@ public class SlackSendException extends RuntimeException {
     }
 
     public SlackSendException(
-        long workspaceId,
-        String channelId,
-        String slackError,
-        long retryAfterMillis,
-        Throwable cause
-    ) {
+            long workspaceId, String channelId, String slackError, long retryAfterMillis, Throwable cause) {
         super(
-            "slack send failed: workspaceId=" + workspaceId + " channelId=" + channelId + " error=" + slackError,
-            cause
-        );
+                "slack send failed: workspaceId=" + workspaceId + " channelId=" + channelId + " error=" + slackError,
+                cause);
         this.workspaceId = workspaceId;
         this.channelId = channelId;
         this.slackError = slackError;

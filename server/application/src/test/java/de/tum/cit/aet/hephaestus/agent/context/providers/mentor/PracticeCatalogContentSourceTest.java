@@ -82,9 +82,8 @@ class PracticeCatalogContentSourceTest extends BaseUnitTest {
         // Stub a REAL cache so the compute-if-absent branch (cache.get(key, supplier)) is exercised — without
         // this, getCache returns null and only the uncached fallback path runs, leaving the race-closing line
         // (the one the javadoc calls load-bearing) uncovered.
-        when(cacheManager.getCache(eq("mentor_practice_context"))).thenReturn(
-            new ConcurrentMapCache("mentor_practice_context")
-        );
+        when(cacheManager.getCache(eq("mentor_practice_context")))
+                .thenReturn(new ConcurrentMapCache("mentor_practice_context"));
         Workspace ws = new Workspace();
         ws.setWorkspaceSlug("acme");
         when(workspaceRepository.findById(eq(1L))).thenReturn(Optional.of(ws));
@@ -104,8 +103,8 @@ class PracticeCatalogContentSourceTest extends BaseUnitTest {
         when(workspaceRepository.findById(eq(99L))).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> provider.buildPayload(99L))
-            .isInstanceOf(EntityNotFoundException.class)
-            .hasMessageContaining("99");
+                .isInstanceOf(EntityNotFoundException.class)
+                .hasMessageContaining("99");
     }
 
     @Test

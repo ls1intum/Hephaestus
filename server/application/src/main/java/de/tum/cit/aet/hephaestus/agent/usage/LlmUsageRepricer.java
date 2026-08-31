@@ -48,11 +48,10 @@ public class LlmUsageRepricer {
     private final WorkspaceLlmModelRepository workspaceModelRepository;
 
     public LlmUsageRepricer(
-        LlmUsageEventRepository usageRepository,
-        LlmModelRepository modelRepository,
-        LlmModelPriceRepository priceRepository,
-        WorkspaceLlmModelRepository workspaceModelRepository
-    ) {
+            LlmUsageEventRepository usageRepository,
+            LlmModelRepository modelRepository,
+            LlmModelPriceRepository priceRepository,
+            WorkspaceLlmModelRepository workspaceModelRepository) {
         this.usageRepository = usageRepository;
         this.modelRepository = modelRepository;
         this.workspaceModelRepository = workspaceModelRepository;
@@ -80,11 +79,7 @@ public class LlmUsageRepricer {
             return Outcome.STILL_UNPRICEABLE;
         }
         LlmPriceSnapshot.Cost computed = price.calculateCost(
-            row.inputTokens(),
-            row.outputTokens(),
-            row.cacheReadTokens(),
-            row.cacheWriteTokens()
-        );
+                row.inputTokens(), row.outputTokens(), row.cacheReadTokens(), row.cacheWriteTokens());
         if (computed.usd() == null || missesARateItNeeds(row, price)) {
             // The catalogue row exists and claims to be priced, but not for every bucket this event
             // actually used. Charging the buckets it does cover would under-bill silently, which is the
@@ -97,14 +92,13 @@ public class LlmUsageRepricer {
             return Outcome.STILL_UNPRICEABLE;
         }
         log.info(
-            "Repriced ledger event {} ({} tokens in / {} out, model {}) as {} at {} USD",
-            row.id(),
-            row.inputTokens(),
-            row.outputTokens(),
-            row.model(),
-            price.pricingState(),
-            computed.usd()
-        );
+                "Repriced ledger event {} ({} tokens in / {} out, model {}) as {} at {} USD",
+                row.id(),
+                row.inputTokens(),
+                row.outputTokens(),
+                row.model(),
+                price.pricingState(),
+                computed.usd());
         return Outcome.REPRICED;
     }
 
@@ -116,13 +110,11 @@ public class LlmUsageRepricer {
      */
     private static boolean missesARateItNeeds(UnpricedLedgerRow row, LlmPriceSnapshot price) {
         // NO_CHARGE has no rates by design and is a real zero, not a gap.
-        return (
-            price.pricingState() == PricingState.PRICED &&
-            ((row.inputTokens() > 0 && price.per1mInputUsd() == null) ||
-                (row.outputTokens() > 0 && price.per1mOutputUsd() == null) ||
-                (row.cacheReadTokens() > 0 && price.per1mCacheReadUsd() == null) ||
-                (row.cacheWriteTokens() > 0 && price.per1mCacheWriteUsd() == null))
-        );
+        return (price.pricingState() == PricingState.PRICED
+                && ((row.inputTokens() > 0 && price.per1mInputUsd() == null)
+                        || (row.outputTokens() > 0 && price.per1mOutputUsd() == null)
+                        || (row.cacheReadTokens() > 0 && price.per1mCacheReadUsd() == null)
+                        || (row.cacheWriteTokens() > 0 && price.per1mCacheWriteUsd() == null)));
     }
 
     /**
@@ -142,16 +134,16 @@ public class LlmUsageRepricer {
         }
         if (row.appliedWorkspaceModelId() != null) {
             return workspaceModelRepository
-                .findByIdAndWorkspaceId(row.appliedWorkspaceModelId(), row.workspaceId())
-                .map(Rates::of)
-                .orElse(null);
+                    .findByIdAndWorkspaceId(row.appliedWorkspaceModelId(), row.workspaceId())
+                    .map(Rates::of)
+                    .orElse(null);
         }
         if (row.model() == null || row.model().isBlank()) {
             return null;
         }
         return row.fundingSource() == FundingSource.WORKSPACE
-            ? uniqueWorkspaceModel(row).map(Rates::of).orElse(null)
-            : uniqueInstancePrice(row).map(Rates::of).orElse(null);
+                ? uniqueWorkspaceModel(row).map(Rates::of).orElse(null)
+                : uniqueInstancePrice(row).map(Rates::of).orElse(null);
     }
 
     private Optional<LlmModelPrice> uniqueInstancePrice(UnpricedLedgerRow row) {
@@ -161,15 +153,14 @@ public class LlmUsageRepricer {
             reportAmbiguity(row, candidates.size());
             return Optional.empty();
         }
-        return priceRepository.findByModelIdAndEffectiveToIsNull(candidates.getFirst().getId());
+        return priceRepository.findByModelIdAndEffectiveToIsNull(
+                candidates.getFirst().getId());
     }
 
     private Optional<WorkspaceLlmModel> uniqueWorkspaceModel(UnpricedLedgerRow row) {
         String model = Objects.requireNonNull(row.model());
-        List<WorkspaceLlmModel> candidates = workspaceModelRepository.findByWorkspaceIdAndUpstreamModelId(
-            row.workspaceId(),
-            model
-        );
+        List<WorkspaceLlmModel> candidates =
+                workspaceModelRepository.findByWorkspaceIdAndUpstreamModelId(row.workspaceId(), model);
         if (candidates.size() != 1) {
             reportAmbiguity(row, candidates.size());
             return Optional.empty();
@@ -180,65 +171,54 @@ public class LlmUsageRepricer {
     private static void reportAmbiguity(UnpricedLedgerRow row, int candidates) {
         if (candidates > 1) {
             log.warn(
-                "Ledger event {} names model '{}', which {} catalogue entries claim at possibly different " +
-                    "prices; leaving it unpriced rather than guessing which was billed",
-                row.id(),
-                row.model(),
-                candidates
-            );
+                    "Ledger event {} names model '{}', which {} catalogue entries claim at possibly different "
+                            + "prices; leaving it unpriced rather than guessing which was billed",
+                    row.id(),
+                    row.model(),
+                    candidates);
         }
     }
 
     /** The four per-million rates and whether the catalogue considers the model priced at all. */
     private record Rates(
-        PricingMode mode,
-        @Nullable Long priceId,
-        @Nullable Long workspaceModelId,
-        @Nullable BigDecimal input,
-        @Nullable BigDecimal output,
-        @Nullable BigDecimal cacheRead,
-        @Nullable BigDecimal cacheWrite
-    ) {
+            PricingMode mode,
+            @Nullable Long priceId,
+            @Nullable Long workspaceModelId,
+            @Nullable BigDecimal input,
+            @Nullable BigDecimal output,
+            @Nullable BigDecimal cacheRead,
+            @Nullable BigDecimal cacheWrite) {
         static Rates of(LlmModelPrice price) {
             return new Rates(
-                price.getPricingMode(),
-                price.getId(),
-                null,
-                price.getPer1mInputUsd(),
-                price.getPer1mOutputUsd(),
-                price.getPer1mCacheReadUsd(),
-                price.getPer1mCacheWriteUsd()
-            );
+                    price.getPricingMode(),
+                    price.getId(),
+                    null,
+                    price.getPer1mInputUsd(),
+                    price.getPer1mOutputUsd(),
+                    price.getPer1mCacheReadUsd(),
+                    price.getPer1mCacheWriteUsd());
         }
 
         static Rates of(WorkspaceLlmModel model) {
             return new Rates(
-                model.getPricingMode(),
-                null,
-                model.getId(),
-                model.getPer1mInputUsd(),
-                model.getPer1mOutputUsd(),
-                model.getPer1mCacheReadUsd(),
-                model.getPer1mCacheWriteUsd()
-            );
+                    model.getPricingMode(),
+                    null,
+                    model.getId(),
+                    model.getPer1mInputUsd(),
+                    model.getPer1mOutputUsd(),
+                    model.getPer1mCacheReadUsd(),
+                    model.getPer1mCacheWriteUsd());
         }
 
         LlmPriceSnapshot toSnapshot(FundingSource fundingSource) {
-            PricingState state = switch (mode) {
-                case PRICED -> PricingState.PRICED;
-                case NO_CHARGE -> PricingState.NO_CHARGE;
-                case UNPRICED -> PricingState.UNPRICED;
-            };
+            PricingState state =
+                    switch (mode) {
+                        case PRICED -> PricingState.PRICED;
+                        case NO_CHARGE -> PricingState.NO_CHARGE;
+                        case UNPRICED -> PricingState.UNPRICED;
+                    };
             return new LlmPriceSnapshot(
-                fundingSource,
-                state,
-                priceId,
-                workspaceModelId,
-                input,
-                output,
-                cacheRead,
-                cacheWrite
-            );
+                    fundingSource, state, priceId, workspaceModelId, input, output, cacheRead, cacheWrite);
         }
     }
 }

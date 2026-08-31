@@ -5,7 +5,7 @@
 // per-language SOURCE table + a SINK table keyed off the file extension. Adding a language = adding rows,
 // no engine change. The taint flow spans lines, so we pair each source to nearby sinks and hand the LLM
 // the exact span to trace.
-import type { DiffFile, Hint, PullRequestMetadata } from "../lib/types";
+import type { DiffFile, Hint, PullRequestMetadata } from "../lib/types.ts";
 
 /** A label -> pattern table row. The label is what a hint reports, so it is rendered verbatim. */
 type PatternRows = Array<[string, RegExp]>;

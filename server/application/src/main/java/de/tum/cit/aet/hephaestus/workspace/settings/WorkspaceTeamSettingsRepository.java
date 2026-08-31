@@ -23,8 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Repository
 @WorkspaceAgnostic("Queried by explicit workspace ID - settings queries always workspace-scoped")
 public interface WorkspaceTeamSettingsRepository
-    extends JpaRepository<WorkspaceTeamSettings, WorkspaceTeamSettings.Id>
-{
+        extends JpaRepository<WorkspaceTeamSettings, WorkspaceTeamSettings.Id> {
     /**
      * Finds all team settings for a given workspace.
      *
@@ -48,12 +47,10 @@ public interface WorkspaceTeamSettingsRepository
      * @param workspaceId the workspace ID
      * @return list of team settings for hidden teams
      */
-    @Query(
-        """
+    @Query("""
         SELECT wts FROM WorkspaceTeamSettings wts
         WHERE wts.workspace.id = :workspaceId AND wts.hidden = true
-        """
-    )
+        """)
     List<WorkspaceTeamSettings> findHiddenTeamsByWorkspace(@Param("workspaceId") Long workspaceId);
 
     /**
@@ -65,12 +62,10 @@ public interface WorkspaceTeamSettingsRepository
      * @param workspaceId the workspace ID
      * @return set of team IDs that are hidden in the workspace
      */
-    @Query(
-        """
+    @Query("""
         SELECT wts.team.id FROM WorkspaceTeamSettings wts
         WHERE wts.workspace.id = :workspaceId AND wts.hidden = true
-        """
-    )
+        """)
     Set<Long> findHiddenTeamIdsByWorkspace(@Param("workspaceId") Long workspaceId);
 
     /**

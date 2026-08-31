@@ -93,10 +93,9 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
     private void setupTestData() {
         // Create GitHub provider
         githubProvider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-            .orElseGet(() ->
-                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseGet(() -> gitProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
 
         // Create organization
         Organization org = new Organization();
@@ -156,15 +155,14 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
 
     private GitHubCommentDTO createCommentDTO(Long id, String body) {
         return new GitHubCommentDTO(
-            id,
-            "node_id_" + id,
-            "https://github.com/" + TEST_REPO_FULL_NAME + "/issues/42#issuecomment-" + id,
-            body,
-            null,
-            "OWNER",
-            Instant.now(),
-            Instant.now()
-        );
+                id,
+                "node_id_" + id,
+                "https://github.com/" + TEST_REPO_FULL_NAME + "/issues/42#issuecomment-" + id,
+                body,
+                null,
+                "OWNER",
+                Instant.now(),
+                Instant.now());
     }
 
     @Nested
@@ -185,13 +183,13 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
 
             // Verify CommentCreated event was published
             assertThat(eventListener.ofType(ScmDomainEvent.CommentCreated.class))
-                .hasSize(1)
-                .first()
-                .satisfies(event -> {
-                    assertThat(event.comment().id()).isEqualTo(result.getId());
-                    assertThat(event.issueId()).isEqualTo(testIssue.getId());
-                    assertThat(event.context().scopeId()).isEqualTo(testWorkspace.getId());
-                });
+                    .hasSize(1)
+                    .first()
+                    .satisfies(event -> {
+                        assertThat(event.comment().id()).isEqualTo(result.getId());
+                        assertThat(event.issueId()).isEqualTo(testIssue.getId());
+                        assertThat(event.context().scopeId()).isEqualTo(testWorkspace.getId());
+                    });
         }
 
         @Test
@@ -199,7 +197,8 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
             IssueComment result = processor.process(null, testIssue.getNumber(), createContext());
 
             assertThat(result).isNull();
-            assertThat(eventListener.ofType(ScmDomainEvent.CommentCreated.class)).isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.CommentCreated.class))
+                    .isEmpty();
         }
 
         @Test
@@ -209,7 +208,8 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
             IssueComment result = processor.process(dto, 999999, createContext());
 
             assertThat(result).isNull();
-            assertThat(eventListener.ofType(ScmDomainEvent.CommentCreated.class)).isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.CommentCreated.class))
+                    .isEmpty();
         }
     }
 
@@ -239,13 +239,13 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
 
             // Verify CommentUpdated event was published
             assertThat(eventListener.ofType(ScmDomainEvent.CommentUpdated.class))
-                .hasSize(1)
-                .first()
-                .satisfies(event -> {
-                    assertThat(event.comment().id()).isEqualTo(result.getId());
-                    assertThat(event.changedFields()).contains("body");
-                    assertThat(event.issueId()).isEqualTo(testIssue.getId());
-                });
+                    .hasSize(1)
+                    .first()
+                    .satisfies(event -> {
+                        assertThat(event.comment().id()).isEqualTo(result.getId());
+                        assertThat(event.changedFields()).contains("body");
+                        assertThat(event.issueId()).isEqualTo(testIssue.getId());
+                    });
         }
 
         @Test
@@ -256,8 +256,7 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
             existing.setProvider(githubProvider);
             existing.setBody("Same body");
             existing.setHtmlUrl(
-                "https://github.com/" + TEST_REPO_FULL_NAME + "/issues/42#issuecomment-" + TEST_COMMENT_ID
-            );
+                    "https://github.com/" + TEST_REPO_FULL_NAME + "/issues/42#issuecomment-" + TEST_COMMENT_ID);
             existing.setAuthorAssociation(AuthorAssociation.OWNER);
             existing.setCreatedAt(Instant.now());
             existing.setIssue(testIssue);
@@ -269,8 +268,10 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
             processor.process(dto, testIssue.getNumber(), createContext());
 
             // No events should be published for unchanged data
-            assertThat(eventListener.ofType(ScmDomainEvent.CommentCreated.class)).isEmpty();
-            assertThat(eventListener.ofType(ScmDomainEvent.CommentUpdated.class)).isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.CommentCreated.class))
+                    .isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.CommentUpdated.class))
+                    .isEmpty();
         }
     }
 
@@ -282,59 +283,55 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
 
         private GitHubIssueDTO createIssueDTOForNewIssue(Long issueId, boolean isPullRequest) {
             return new GitHubIssueDTO(
-                issueId,
-                issueId,
-                "node_id_" + issueId,
-                100,
-                "New Issue from Comment Webhook",
-                "Issue body",
-                "open",
-                null,
-                "https://github.com/" + TEST_REPO_FULL_NAME + "/issues/100",
-                0,
-                Instant.now(),
-                Instant.now(),
-                null,
-                false,
-                null,
-                Collections.emptyList(),
-                Collections.emptyList(),
-                null,
-                null,
-                null,
-                isPullRequest
-                    ? new GitHubIssueDTO.PullRequestRef(
-                          "https://api.github.com/repos/test/pulls/100",
-                          "https://github.com/test/pull/100"
-                      )
-                    : null
-            );
+                    issueId,
+                    issueId,
+                    "node_id_" + issueId,
+                    100,
+                    "New Issue from Comment Webhook",
+                    "Issue body",
+                    "open",
+                    null,
+                    "https://github.com/" + TEST_REPO_FULL_NAME + "/issues/100",
+                    0,
+                    Instant.now(),
+                    Instant.now(),
+                    null,
+                    false,
+                    null,
+                    Collections.emptyList(),
+                    Collections.emptyList(),
+                    null,
+                    null,
+                    null,
+                    isPullRequest
+                            ? new GitHubIssueDTO.PullRequestRef(
+                                    "https://api.github.com/repos/test/pulls/100", "https://github.com/test/pull/100")
+                            : null);
         }
 
         private GitHubIssueDTO createIssueDTOForExistingIssue(Long issueId, int number) {
             return new GitHubIssueDTO(
-                issueId,
-                issueId,
-                "node_id_" + issueId,
-                number,
-                "Existing Issue from Comment Webhook",
-                "Issue body",
-                "open",
-                null,
-                "https://github.com/" + TEST_REPO_FULL_NAME + "/issues/" + number,
-                0,
-                Instant.now(),
-                Instant.now(),
-                null,
-                false,
-                null,
-                Collections.emptyList(),
-                Collections.emptyList(),
-                null,
-                null,
-                null,
-                null
-            );
+                    issueId,
+                    issueId,
+                    "node_id_" + issueId,
+                    number,
+                    "Existing Issue from Comment Webhook",
+                    "Issue body",
+                    "open",
+                    null,
+                    "https://github.com/" + TEST_REPO_FULL_NAME + "/issues/" + number,
+                    0,
+                    Instant.now(),
+                    Instant.now(),
+                    null,
+                    false,
+                    null,
+                    Collections.emptyList(),
+                    Collections.emptyList(),
+                    null,
+                    null,
+                    null,
+                    null);
         }
 
         @Test
@@ -344,7 +341,8 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
             ProcessingContext context = createContext();
 
             // Verify issue does not exist
-            assertThat(issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), 100)).isEmpty();
+            assertThat(issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), 100))
+                    .isEmpty();
 
             IssueComment result = processor.processWithParentCreation(commentDto, issueDto, context);
 
@@ -354,7 +352,9 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
             assertThat(result.getBody()).isEqualTo("Comment on new issue");
 
             // Verify Issue stub was created
-            Issue createdIssue = issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), 100).orElseThrow();
+            Issue createdIssue = issueRepository
+                    .findByRepositoryIdAndNumber(testRepository.getId(), 100)
+                    .orElseThrow();
             assertThat(createdIssue.getNativeId()).isEqualTo(NEW_ISSUE_ID);
             assertThat(createdIssue.getNumber()).isEqualTo(100);
             assertThat(createdIssue.getTitle()).isEqualTo("New Issue from Comment Webhook");
@@ -372,7 +372,8 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
             ProcessingContext context = createContext();
 
             // Verify PR does not exist
-            assertThat(pullRequestRepository.findByRepositoryIdAndNumber(testRepository.getId(), 100)).isEmpty();
+            assertThat(pullRequestRepository.findByRepositoryIdAndNumber(testRepository.getId(), 100))
+                    .isEmpty();
 
             IssueComment result = processor.processWithParentCreation(commentDto, issueDto, context);
 
@@ -382,8 +383,8 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
 
             // Verify PullRequest stub was created (not Issue!)
             PullRequest createdPR = pullRequestRepository
-                .findByRepositoryIdAndNumber(testRepository.getId(), 100)
-                .orElseThrow();
+                    .findByRepositoryIdAndNumber(testRepository.getId(), 100)
+                    .orElseThrow();
             assertThat(createdPR.getNativeId()).isEqualTo(NEW_PR_ID);
             assertThat(createdPR.getNumber()).isEqualTo(100);
             assertThat(createdPR.getTitle()).isEqualTo("New Issue from Comment Webhook");
@@ -419,28 +420,27 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
         void shouldHandleMissingIssueIdGracefully() {
             GitHubCommentDTO commentDto = createCommentDTO(TEST_COMMENT_ID, "Comment");
             GitHubIssueDTO issueDto = new GitHubIssueDTO(
-                null,
-                null,
-                null,
-                100,
-                "Title",
-                null,
-                "open",
-                null,
-                null,
-                0,
-                Instant.now(),
-                Instant.now(),
-                null,
-                false,
-                null,
-                Collections.emptyList(),
-                Collections.emptyList(),
-                null,
-                null,
-                null,
-                null
-            );
+                    null,
+                    null,
+                    null,
+                    100,
+                    "Title",
+                    null,
+                    "open",
+                    null,
+                    null,
+                    0,
+                    Instant.now(),
+                    Instant.now(),
+                    null,
+                    false,
+                    null,
+                    Collections.emptyList(),
+                    Collections.emptyList(),
+                    null,
+                    null,
+                    null,
+                    null);
             ProcessingContext context = createContext();
 
             IssueComment result = processor.processWithParentCreation(commentDto, issueDto, context);
@@ -467,16 +467,17 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
             processor.delete(TEST_COMMENT_ID, createContext());
 
             // Verify comment is deleted
-            assertThat(commentRepository.findByNativeIdAndProviderId(TEST_COMMENT_ID, githubProviderId())).isEmpty();
+            assertThat(commentRepository.findByNativeIdAndProviderId(TEST_COMMENT_ID, githubProviderId()))
+                    .isEmpty();
 
             // Verify CommentDeleted event was published
             assertThat(eventListener.ofType(ScmDomainEvent.CommentDeleted.class))
-                .hasSize(1)
-                .first()
-                .satisfies(event -> {
-                    assertThat(event.commentId()).isEqualTo(TEST_COMMENT_ID);
-                    assertThat(event.issueId()).isEqualTo(testIssue.getId());
-                });
+                    .hasSize(1)
+                    .first()
+                    .satisfies(event -> {
+                        assertThat(event.commentId()).isEqualTo(TEST_COMMENT_ID);
+                        assertThat(event.issueId()).isEqualTo(testIssue.getId());
+                    });
         }
 
         @Test
@@ -499,17 +500,20 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
 
             // Delete should work without TransientObjectException
             // because the processor syncs bidirectional relationship
-            assertThatCode(() -> processor.delete(TEST_COMMENT_ID, createContext())).doesNotThrowAnyException();
+            assertThatCode(() -> processor.delete(TEST_COMMENT_ID, createContext()))
+                    .doesNotThrowAnyException();
 
             // Verify comment is deleted
-            assertThat(commentRepository.findByNativeIdAndProviderId(TEST_COMMENT_ID, githubProviderId())).isEmpty();
+            assertThat(commentRepository.findByNativeIdAndProviderId(TEST_COMMENT_ID, githubProviderId()))
+                    .isEmpty();
         }
 
         @Test
         void shouldHandleNullCommentId() {
             processor.delete(null, createContext());
 
-            assertThat(eventListener.ofType(ScmDomainEvent.CommentDeleted.class)).isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.CommentDeleted.class))
+                    .isEmpty();
         }
 
         @Test
@@ -517,7 +521,8 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
             processor.delete(999999L, createContext());
 
             // No event should be published for non-existent comment
-            assertThat(eventListener.ofType(ScmDomainEvent.CommentDeleted.class)).isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.CommentDeleted.class))
+                    .isEmpty();
         }
     }
 

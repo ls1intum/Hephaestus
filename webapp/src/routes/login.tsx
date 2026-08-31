@@ -1,9 +1,10 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { toast } from "sonner";
+
 import { LoginCard } from "@/components/auth/LoginCard";
-import { useAuth } from "@/integrations/auth/AuthContext";
 import { ACCOUNT_DELETED_NOTICE_KEY } from "@/integrations/auth/account-deleted-notice";
+import { useAuth } from "@/integrations/auth/AuthContext";
 import { resolveCurrentUser, safeReturnTo } from "@/integrations/auth/guard";
 
 interface LoginSearch {
@@ -58,7 +59,22 @@ function LoginPage() {
 	return (
 		<LoginCard
 			title="Welcome to Hephaestus"
-			description="Your AI mentor for growing as a software engineer."
+			description={
+				<span className="space-y-2">
+					<span className="block">Your AI mentor for growing as a software engineer.</span>
+					<span className="block text-left">
+						TUM's Applied Education Technologies group operates Hephaestus. Signing in shares your
+						provider identity with us. Hephaestus analyzes connected GitHub, GitLab, Slack, and
+						Outline activity against your team's practices to provide feedback. Research use is
+						optional and off by default. You can exercise your data-protection rights as described
+						in the{" "}
+						<Link to="/privacy" target="_blank" className="underline underline-offset-4">
+							privacy notice
+						</Link>
+						.
+					</span>
+				</span>
+			}
 			error={error}
 			onSignIn={(registrationId) => login(registrationId, returnTo)}
 			devReturnTo={returnTo}

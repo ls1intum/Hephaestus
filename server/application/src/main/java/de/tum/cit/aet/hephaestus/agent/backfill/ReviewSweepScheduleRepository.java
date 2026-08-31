@@ -28,24 +28,20 @@ public interface ReviewSweepScheduleRepository extends JpaRepository<ReviewSweep
      * and feature flags outside any transaction of its own. Ordering by {@code nextRunAt} keeps a
      * repeatedly-skipped workspace from starving behind one that is merely newer.
      */
-    @Query(
-        """
+    @Query("""
         SELECT s FROM ReviewSweepSchedule s
         JOIN FETCH s.workspace
         WHERE s.enabled = TRUE
           AND s.nextRunAt <= :now
         ORDER BY s.nextRunAt ASC
-        """
-    )
+        """)
     List<ReviewSweepSchedule> findDue(@Param("now") Instant now, Pageable pageable);
 
     /** Loads one schedule with its workspace, for the transaction that opens a run from it. */
-    @Query(
-        """
+    @Query("""
         SELECT s FROM ReviewSweepSchedule s
         JOIN FETCH s.workspace
         WHERE s.id = :id
-        """
-    )
+        """)
     Optional<ReviewSweepSchedule> findByIdWithWorkspace(@Param("id") UUID id);
 }

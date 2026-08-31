@@ -5,7 +5,9 @@
 // the explicitly-mocked auth endpoints are intercepted. Handlers reset after each test so a
 // `server.use(...)` override in one test never leaks into the next.
 
+import { toast } from "sonner";
 import { afterAll, afterEach, beforeAll } from "vitest";
+
 import { client } from "@/api/client.gen";
 import { server } from "@/mocks/server";
 
@@ -57,5 +59,12 @@ if (typeof Element.prototype.getAnimations !== "function") {
 }
 
 beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
-afterEach(() => server.resetHandlers());
+afterEach(() => {
+	server.resetHandlers();
+	// Sonner's toast store is a module singleton that outlives a test's render, and a `Toaster`
+	// replays every still-active toast to itself on mount — so a toast raised in one test reappears
+	// in the next one's DOM and answers its queries. Dismissing marks them all inactive, which is
+	// what the replay reads.
+	toast.dismiss();
+});
 afterAll(() => server.close());

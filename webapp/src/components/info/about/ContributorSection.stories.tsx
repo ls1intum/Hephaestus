@@ -1,27 +1,11 @@
 import type { Meta, StoryObj } from "@storybook/react";
+
 import { ContributorSection } from "./ContributorSection";
 
-/**
- * ContributorSection component for displaying project contributors with loading and error states.
- * Features error handling and integrates with the ContributorGrid component.
- */
 const meta = {
 	component: ContributorSection,
 	parameters: { layout: "padded" },
 	tags: ["autodocs"],
-	argTypes: {
-		contributors: {
-			description: "Array of contributor objects",
-		},
-		isLoading: {
-			control: "boolean",
-			description: "Whether contributors are currently being loaded",
-		},
-		isError: {
-			control: "boolean",
-			description: "Whether there was an error loading contributors",
-		},
-	},
 } satisfies Meta<typeof ContributorSection>;
 
 export default meta;
@@ -60,9 +44,6 @@ const MOCK_CONTRIBUTORS = [
 	},
 ];
 
-/**
- * Default contributor section with multiple contributors loaded.
- */
 export const Default: Story = {
 	args: {
 		contributors: MOCK_CONTRIBUTORS,
@@ -71,9 +52,6 @@ export const Default: Story = {
 	},
 };
 
-/**
- * Contributor section in loading state.
- */
 export const IsLoading: Story = {
 	args: {
 		contributors: [],
@@ -82,9 +60,6 @@ export const IsLoading: Story = {
 	},
 };
 
-/**
- * Contributor section in error state.
- */
 export const IsError: Story = {
 	args: {
 		contributors: [],
@@ -93,9 +68,6 @@ export const IsError: Story = {
 	},
 };
 
-/**
- * Contributor section with single contributor.
- */
 export const SingleContributor: Story = {
 	args: {
 		contributors: [ALICE_DEVELOPER],
@@ -104,9 +76,6 @@ export const SingleContributor: Story = {
 	},
 };
 
-/**
- * Contributor section with many contributors to test grid layout.
- */
 export const ManyContributors: Story = {
 	args: {
 		contributors: [

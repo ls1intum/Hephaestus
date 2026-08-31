@@ -28,20 +28,14 @@ class ConfigAuditService implements ConfigAuditQuery {
     @Override
     @Transactional(readOnly = true)
     public Page<ConfigAuditEntryViewDTO> listForWorkspace(
-        Long workspaceId,
-        ConfigAuditFilter filter,
-        Pageable pageable
-    ) {
+            Long workspaceId, ConfigAuditFilter filter, Pageable pageable) {
         return withIdentities(repository.findForWorkspace(workspaceId, filter, pageable));
     }
 
     @Override
     @Transactional(readOnly = true)
     public Page<ConfigAuditEntryViewDTO> listForAdmin(
-        @Nullable Long workspaceId,
-        ConfigAuditFilter filter,
-        Pageable pageable
-    ) {
+            @Nullable Long workspaceId, ConfigAuditFilter filter, Pageable pageable) {
         return withIdentities(repository.findForAdmin(workspaceId, filter, pageable));
     }
 
@@ -56,48 +50,36 @@ class ConfigAuditService implements ConfigAuditQuery {
             }
         }
         Map<Long, ConfigAuditActorRefDTO> identities = ids.isEmpty()
-            ? Map.of()
-            : accountRepository
-                  .findAllById(ids)
-                  .stream()
-                  .collect(
-                      Collectors.toMap(
-                          a -> Objects.requireNonNull(a.getId()),
-                          a ->
-                              new ConfigAuditActorRefDTO(
-                                  Objects.requireNonNull(a.getId()),
-                                  a.getDisplayName(),
-                                  a.getPrimaryEmail()
-                              ),
-                          (a, b) -> a
-                      )
-                  );
+                ? Map.of()
+                : accountRepository.findAllById(ids).stream()
+                        .collect(Collectors.toMap(
+                                a -> Objects.requireNonNull(a.getId()),
+                                a -> new ConfigAuditActorRefDTO(
+                                        Objects.requireNonNull(a.getId()), a.getDisplayName(), a.getPrimaryEmail()),
+                                (a, b) -> a));
         return events.map(e -> toView(e, identities));
     }
 
     private static ConfigAuditEntryViewDTO toView(ConfigAuditEvent e, Map<Long, ConfigAuditActorRefDTO> identities) {
         return new ConfigAuditEntryViewDTO(
-            e.getId(),
-            e.getOccurredAt(),
-            e.getWorkspaceId(),
-            e.getEntityType(),
-            e.getEntityId(),
-            e.getAction(),
-            e.getActorKind(),
-            e.getActorAccountId(),
-            e.getActingAccountId(),
-            refOf(e.getActorAccountId(), identities),
-            refOf(e.getActingAccountId(), identities),
-            e.changedKeyList(),
-            e.getOldValue(),
-            e.getNewValue()
-        );
+                e.getId(),
+                e.getOccurredAt(),
+                e.getWorkspaceId(),
+                e.getEntityType(),
+                e.getEntityId(),
+                e.getAction(),
+                e.getActorKind(),
+                e.getActorAccountId(),
+                e.getActingAccountId(),
+                refOf(e.getActorAccountId(), identities),
+                refOf(e.getActingAccountId(), identities),
+                e.changedKeyList(),
+                e.getOldValue(),
+                e.getNewValue());
     }
 
     private static @Nullable ConfigAuditActorRefDTO refOf(
-        @Nullable Long id,
-        Map<Long, ConfigAuditActorRefDTO> identities
-    ) {
+            @Nullable Long id, Map<Long, ConfigAuditActorRefDTO> identities) {
         return id == null ? null : identities.get(id);
     }
 }

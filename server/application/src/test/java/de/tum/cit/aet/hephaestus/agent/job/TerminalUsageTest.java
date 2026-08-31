@@ -49,9 +49,7 @@ class TerminalUsageTest extends BaseUnitTest {
     @DisplayName("compaction eating the runner's calls no longer under-bills: the proxy's larger count wins")
     void aCompactedRunnerReportDoesNotBeatTheProxy() {
         TerminalUsage usage = TerminalUsage.resolve(
-            runner(969_765, 120_000, 26),
-            new AgentJobLlmUsage(143, 4_274_916, 500_000, 0, 0, 0)
-        );
+                runner(969_765, 120_000, 26), new AgentJobLlmUsage(143, 4_274_916, 500_000, 0, 0, 0));
 
         assertThat(usage.totalCalls()).isEqualTo(143);
         assertThat(usage.inputTokens()).isEqualTo(4_274_916);
@@ -83,9 +81,7 @@ class TerminalUsageTest extends BaseUnitTest {
     @DisplayName("cache writes survive the maximum even though the proxy never counts them")
     void cacheWritesSurviveTheMaximum() {
         TerminalUsage usage = TerminalUsage.resolve(
-            new LlmUsage("m", 100, 200, 0, 0, 12_345, 0.0, 2),
-            new AgentJobLlmUsage(9, 8_000, 900, 0, 0, 0)
-        );
+                new LlmUsage("m", 100, 200, 0, 0, 12_345, 0.0, 2), new AgentJobLlmUsage(9, 8_000, 900, 0, 0, 0));
 
         assertThat(usage.cacheWriteTokens()).isEqualTo(12_345);
     }
@@ -179,7 +175,7 @@ class TerminalUsageTest extends BaseUnitTest {
         private final LlmUsageRecorder recorder = mock(LlmUsageRecorder.class);
 
         @ParameterizedTest(name = "verifiable={0} priced={1} -> billed={2}")
-        @CsvSource({ "true, true, true", "true, false, false", "false, true, false", "false, false, false" })
+        @CsvSource({"true, true, true", "true, false, false", "false, true, false", "false, false, false"})
         void billedOnlyWhenTheTokensAreRealAndAPriceWasResolved(boolean verifiable, boolean priced, boolean billed) {
             TerminalUsage usage = verifiable ? TerminalUsage.resolve(runner(1000, 700, 6), null) : TerminalUsage.none();
             LlmPriceSnapshot price = priced ? pricedInstance() : LlmPriceSnapshot.unpricedInstance();
@@ -187,9 +183,8 @@ class TerminalUsageTest extends BaseUnitTest {
             boolean wasBilled = usage.appendTo(recorder, 7L, jobFor(UUID.randomUUID(), 2), "gpt-5", price);
 
             assertThat(wasBilled).isEqualTo(billed);
-            ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample = ArgumentCaptor.forClass(
-                LlmUsageRecorder.LlmUsageSample.class
-            );
+            ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
+                    ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
             if (billed) {
                 verify(recorder).record(eq(7L), sample.capture());
             } else {
@@ -207,17 +202,11 @@ class TerminalUsageTest extends BaseUnitTest {
         void theRowIsKeyedByJobAndAttemptSoARetryBillsSeparately() {
             UUID jobId = UUID.randomUUID();
 
-            TerminalUsage.resolve(runner(10, 20, 1), null).appendTo(
-                recorder,
-                7L,
-                jobFor(jobId, 3),
-                "gpt-5",
-                pricedInstance()
-            );
+            TerminalUsage.resolve(runner(10, 20, 1), null)
+                    .appendTo(recorder, 7L, jobFor(jobId, 3), "gpt-5", pricedInstance());
 
-            ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample = ArgumentCaptor.forClass(
-                LlmUsageRecorder.LlmUsageSample.class
-            );
+            ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
+                    ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
             verify(recorder).record(eq(7L), sample.capture());
             assertThat(sample.getValue().sourceId()).isEqualTo(jobId);
             assertThat(sample.getValue().sourceAttempt()).isEqualTo(3);
@@ -226,17 +215,11 @@ class TerminalUsageTest extends BaseUnitTest {
         @Test
         @DisplayName("token counts survive onto an unpriced row")
         void unpricedRowKeepsItsTokenCounts() {
-            TerminalUsage.resolve(runner(900, 600, 4), null).appendTo(
-                recorder,
-                7L,
-                jobFor(UUID.randomUUID(), 0),
-                "gpt-5",
-                LlmPriceSnapshot.unpricedInstance()
-            );
+            TerminalUsage.resolve(runner(900, 600, 4), null)
+                    .appendTo(recorder, 7L, jobFor(UUID.randomUUID(), 0), "gpt-5", LlmPriceSnapshot.unpricedInstance());
 
-            ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample = ArgumentCaptor.forClass(
-                LlmUsageRecorder.LlmUsageSample.class
-            );
+            ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
+                    ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
             verify(recorder).recordUnverifiable(eq(7L), sample.capture());
             assertThat(sample.getValue().inputTokens()).isEqualTo(900);
             assertThat(sample.getValue().totalCalls()).isEqualTo(4);
@@ -252,15 +235,14 @@ class TerminalUsageTest extends BaseUnitTest {
 
         private LlmPriceSnapshot pricedInstance() {
             return new LlmPriceSnapshot(
-                FundingSource.INSTANCE,
-                PricingState.PRICED,
-                1L,
-                null,
-                BigDecimal.ONE,
-                BigDecimal.ONE,
-                BigDecimal.ZERO,
-                BigDecimal.ZERO
-            );
+                    FundingSource.INSTANCE,
+                    PricingState.PRICED,
+                    1L,
+                    null,
+                    BigDecimal.ONE,
+                    BigDecimal.ONE,
+                    BigDecimal.ZERO,
+                    BigDecimal.ZERO);
         }
     }
 }

@@ -14,11 +14,13 @@ Install and configure the following tools before you attempt a local build:
 1. **Java JDK 21** – Required for the Spring Boot application server.
 2. **Docker and Docker Compose** – Required for PostgreSQL and NATS. Verify both with `docker info`
    and `docker compose version`.
-3. **Node.js LTS (>= 24)** and **pnpm (>= 11)** (enable via `corepack enable`) – For the React client and root scripts.
-4. **Bun** – Runs the agent runtime and precompute tests (`pnpm run test:agents`). `corepack` does not
-   provide it; install it separately. Match the version the agent image pins — the `ARG BUN_VERSION`
-   line in `docker/agents/pi/Dockerfile`, which is also what CI installs. Why Bun and not Node:
-   [ADR 0030](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0030-agent-runtime-is-typescript-on-bun.md).
+3. **Node.js** – Match `package.json#devEngines.runtime`; it executes repository scripts and
+   application tooling.
+4. **pnpm** – Match `package.json#packageManager`. Use pnpm's
+   [pnpm 12 standalone installer](https://pnpm.io/installation#pnpm-12-using-a-standalone-script)
+   for that exact version; this repository does not use Corepack.
+
+Read both versions from `package.json`, then verify them with `node --version && pnpm --version`.
 5. **NATS CLI (optional)** – Helpful when inspecting the webhook/sync event stream (NATS is disabled by default locally). The agent job queue runs on PostgreSQL and needs no NATS.
 
 ## Recommended IDE setup
@@ -27,31 +29,41 @@ Open the repository using the `project.code-workspace` file in VS Code and insta
 
 - Java Extension Pack
 - Spring Boot tools
-- Node.js + TypeScript tooling
-- oxlint (lint) and Biome (format)
+- TypeScript tooling
+- oxlint (lint) and oxfmt (format)
 - Tailwind CSS IntelliSense
 
-The Biome extension picks up both configurations automatically: `biome.jsonc` at the repository root
-covers the Bun agent runtime, its specs, both precompute trees and `scripts/**`, and
-`webapp/biome.jsonc` (declared `"root": false`) covers the SPA. Editing a file in either tree
-formats it to that tree's rules on save. Both configs set `"linter": { "enabled": false }` — Biome
-formats and sorts imports and lints nothing anywhere, which is why the oxlint extension is a
-recommendation too.
+The Oxc extension provides oxlint diagnostics. Workspace settings use it to format JavaScript,
+TypeScript, and JSON files on save.
 
 Run the same checks from the shell with:
 
 ```bash
-pnpm run check:agents          # Biome format, then oxlint, then both typechecks, outside the webapp
+pnpm run check:agents          # Format check, lint, and both typechecks outside the webapp
 pnpm run check:agents:fix      # Apply every safe fix
-pnpm run check:webapp          # The SPA: Biome format check, then oxlint
+pnpm run check:webapp          # The SPA's format and lint checks
 pnpm run typecheck:webapp      # The SPA's typecheck — a separate leg, not part of check:webapp
-pnpm run check                 # Complete local quality gate; every leg also runs in CI
+pnpm run check                 # Complete local quality gate
 ```
 
-Every `pnpm run check` leg also runs in CI. Run it locally before pushing because it fails faster and
-reports the complete local gate in one command.
+Use the [local verification contract](./local-verification.mdx) for affected checks, the pre-push gate,
+budgets, and CI exclusions.
 
-JetBrains alternatives such as IntelliJ (Java) and WebStorm (React/TypeScript) work equally well.
+IntelliJ and WebStorm are also supported.
+
+### Java formatting
+
+```bash
+pnpm run format:java
+pnpm run format:java:check
+```
+
+The repository commands are the source of truth. Optional editor integrations:
+
+- [IntelliJ](https://plugins.jetbrains.com/plugin/13180-palantir-java-format)
+- [Eclipse](https://github.com/palantir/palantir-java-format/tree/develop/eclipse_plugin)
+
+Other editors should run the repository command.
 
 ## Application server
 
@@ -63,7 +75,7 @@ the per-role and per-purpose overlays (`worker`, `webhook`, `e2e`, `cds-training
 they are used.
 
 They are **not** Maven profiles. Maven passes the active Spring profile through the `app.profiles`
-property, so use `-Dapp.profiles=…` to override it; `pnpm dev:server:e2e` uses that interface.
+property, so use `-Dapp.profiles=…` to override it; `pnpm run dev:server:e2e` uses that interface.
 
 Create `application-local.yml` in `server/application/src/main/resources` to override defaults. This file is gitignored.
 
@@ -77,7 +89,7 @@ Never commit `application-local.yml`. It may contain secrets and machine-specifi
 2. From the repo root, start everything with one command:
 
    ```bash
-   pnpm dev
+   pnpm run dev
    ```
 
    This launches an `mprocs` session with the server and webapp in separate panes (switch with the arrow keys). The PostgreSQL container is brought up automatically.
@@ -85,8 +97,8 @@ Never commit `application-local.yml`. It may contain secrets and machine-specifi
    Prefer plain terminals? Run the two sides yourself:
 
    ```bash
-   pnpm dev:server   # terminal 1 — brings up Postgres, then Spring Boot
-   pnpm dev:webapp   # terminal 2 — Vite dev server
+   pnpm run dev:server   # terminal 1 — brings up Postgres, then Spring Boot
+   pnpm run dev:webapp   # terminal 2 — Vite dev server
    ```
 
 3. Access the API at `http://localhost:8080` and the webapp at `http://localhost:4200`.
@@ -99,7 +111,7 @@ Never commit `application-local.yml`. It may contain secrets and machine-specifi
    `pnpm run generate:api:application-server:specs` boots under the `specs` profile, which turns them on
    itself.
 
-To wipe the local database (e.g. after a bad migration or sync), run `pnpm dev:reset`. The Postgres data is a bind-mounted folder (`server/postgres-data`), so `docker compose down -v` alone does not clear it — `dev:reset` removes the folder and recreates the stack.
+To wipe the local database (e.g. after a bad migration or sync), run `pnpm run dev:reset`. The Postgres data is a bind-mounted folder (`server/postgres-data`), so `docker compose down -v` alone does not clear it — `dev:reset` removes the folder and recreates the stack.
 
 ### Port overrides
 
@@ -284,7 +296,7 @@ the stored configuration. New connections and models start inactive. Test the co
 its price (or explicitly mark it as having no metered API cost), then activate it and bind it to a
 purpose (`PRACTICE_REVIEW` or `MENTOR`) on the workspace's **AI models** page.
 
-For an automated local end-to-end setup, use `scripts/e2e-setup.sh`. It creates the connection,
+For an automated local end-to-end setup, use `pnpm run e2e:setup`. It creates the connection,
 model, and agent binding through the application API and keeps provider credentials out of source
 control and command-line history by reading them from `E2E_*` environment variables.
 
@@ -323,7 +335,7 @@ Authentication is Hephaestus-native (no Keycloak — see [ADR 0017](https://gith
    (callback `http://localhost:8080/login/oauth2/code/gitlab`, scope `read_user`),
    set `GITLAB_OAUTH_CLIENT_ID` / `GITLAB_OAUTH_CLIENT_SECRET`, and point `GITLAB_OAUTH_BASE_URL` at the
    instance (defaults to `https://gitlab.com`; e.g. `https://gitlab.lrz.de`). Leave the client id blank to hide the GitLab button.
-4. Run the application server with `pnpm dev:server`; it builds the generated-client module before
+4. Run the application server with `pnpm run dev:server`; it builds the generated-client module before
    invoking the application module. Postgres + NATS start automatically via Spring
    Boot's Docker Compose support. Open the webapp and click **Sign in with GitHub**.
 
@@ -335,7 +347,7 @@ App-level admin is the `APP_ADMIN` role on the `account` table (authority `app_a
 
 - **401 after login:** ensure `GITHUB_OAUTH_CLIENT_ID/SECRET` are set and the callback URL on the GitHub app matches your `SERVER_PORT`.
 - **Logins don't survive a server restart locally:** set `HEPHAESTUS_AUTH_STATE_COOKIE_KEY` (base64 32-byte; `openssl rand -base64 32`) in `server/.env` — otherwise an ephemeral per-boot key is used.
-- **Reset everything:** run `pnpm dev:reset` (Postgres is a bind-mounted folder, so `docker compose down -v` does **not** clear it — `dev:reset` removes `server/postgres-data` and recreates the stack); on next login the account + identity link are recreated.
+- **Reset everything:** run `pnpm run dev:reset` (Postgres is a bind-mounted folder, so `docker compose down -v` does **not** clear it — `dev:reset` removes `server/postgres-data` and recreates the stack); on next login the account + identity link are recreated.
 
 ### Webhook receiver
 
@@ -392,7 +404,7 @@ For Slack app setup, use the scope/event checklist in
 Storybook is the source of truth for presentational components.
 
 ```bash
-pnpm --filter webapp run storybook           # Local playground on http://localhost:6006
+pnpm --filter webapp run storybook:dev           # Local playground on http://localhost:6006
 pnpm --filter webapp run build-storybook     # Static bundle for Chromatic
 pnpm --filter webapp run chromatic:ci        # Visual regression in CI
 ```
@@ -406,7 +418,7 @@ pnpm --filter webapp run chromatic:ci        # Visual regression in CI
 The generated client in `src/api` is the only way the webapp talks to server services.
 
 ```bash
-pnpm --filter webapp run openapi-ts
+pnpm --filter webapp run generate:api
 ```
 
 - Generated types drop the `Dto` suffix and mirror the Spring Boot API responses.

@@ -35,101 +35,73 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
 
     @Test
     void readsAnInContextUnitAndResolvesItsAnchorFromTheCitation() {
-        List<ComposedFeedbackUnit> units = parser.parse(
-            output(
-                """
+        List<ComposedFeedbackUnit> units = parser.parse(output("""
                 { "channel": "IN_CONTEXT", "practiceSlug": "ships-tests-with-the-change",
                   "basedOn": ["obs-0"], "action": "NEW",
                   "title": "This branch is untested",
                   "nextStep": "Add a case that calls total with a tax-exempt customer.",
                   "placement": { "kind": "DIFF", "observationId": "obs-0", "citationIndex": 0 } }
-                """,
-                "[]"
-            )
-        );
+                """, "[]"));
 
-        assertThat(units)
-            .singleElement()
-            .satisfies(unit -> {
-                assertThat(unit.channel()).isEqualTo(FeedbackChannel.IN_CONTEXT);
-                assertThat(unit.basedOn()).containsExactly("obs-0");
-                var placement = unit.placement();
-                assertThat(placement).isNotNull();
-                var anchor = placement.diffAnchor();
-                assertThat(anchor).isNotNull();
-                assertThat(anchor.path()).isEqualTo("src/billing/InvoiceTotals.java");
-                assertThat(anchor.side()).isEqualTo("NEW");
-                assertThat(anchor.startLine()).isEqualTo(47);
-            });
+        assertThat(units).singleElement().satisfies(unit -> {
+            assertThat(unit.channel()).isEqualTo(FeedbackChannel.IN_CONTEXT);
+            assertThat(unit.basedOn()).containsExactly("obs-0");
+            var placement = unit.placement();
+            assertThat(placement).isNotNull();
+            var anchor = placement.diffAnchor();
+            assertThat(anchor).isNotNull();
+            assertThat(anchor.path()).isEqualTo("src/billing/InvoiceTotals.java");
+            assertThat(anchor.side()).isEqualTo("NEW");
+            assertThat(anchor.startLine()).isEqualTo(47);
+        });
     }
 
     @Test
     void readsAnArtifactPlacedInContextUnitWithoutInventingCoordinates() {
-        List<ComposedFeedbackUnit> units = parser.parse(
-            output(
-                """
+        List<ComposedFeedbackUnit> units = parser.parse(output("""
                 { "channel": "IN_CONTEXT", "practiceSlug": "ships-tests-with-the-change",
                   "basedOn": ["obs-0"], "action": "NEW",
                   "title": "The decision is not yet explained",
                   "nextStep": "Add the constraint that makes this option necessary.",
                   "placement": { "kind": "ARTIFACT" } }
-                """,
-                "[]"
-            )
-        );
+                """, "[]"));
 
-        assertThat(units)
-            .singleElement()
-            .satisfies(unit -> {
-                var placement = unit.placement();
-                assertThat(placement).isNotNull();
-                assertThat(placement.kind()).isEqualTo(ComposedFeedbackUnit.InContextPlacement.PlacementKind.ARTIFACT);
-                assertThat(placement.diffAnchor()).isNull();
-            });
+        assertThat(units).singleElement().satisfies(unit -> {
+            var placement = unit.placement();
+            assertThat(placement).isNotNull();
+            assertThat(placement.kind()).isEqualTo(ComposedFeedbackUnit.InContextPlacement.PlacementKind.ARTIFACT);
+            assertThat(placement.diffAnchor()).isNull();
+        });
     }
 
     @Test
     void shouldReadUnitWhenGroundedInPrimaryAndRelatedPracticeEvidence() {
-        List<ComposedFeedbackUnit> units = parser.parse(
-            output(
-                """
+        List<ComposedFeedbackUnit> units = parser.parse(output("""
                 { "channel": "IN_APP", "practiceSlug": "ships-tests-with-the-change",
                   "basedOn": ["obs-0", "obs-1"], "action": "NEW",
                   "title": "Review readiness breaks across the workflow",
                   "body": "The change enters review without tests and leaves follow-up work unresolved.",
                   "nextStep": "Add the test and resolve the linked review thread before requesting review." }
-                """,
-                "[]"
-            )
-        );
+                """, "[]"));
 
         assertThat(units)
-            .singleElement()
-            .satisfies(unit -> assertThat(unit.basedOn()).containsExactly("obs-0", "obs-1"));
+                .singleElement()
+                .satisfies(unit -> assertThat(unit.basedOn()).containsExactly("obs-0", "obs-1"));
     }
 
     @Test
     void shouldRejectUnitWhenArtifactPlacementHasCoordinates() {
-        assertThat(
-            parser.parse(
-                output(
-                    """
+        assertThat(parser.parse(output("""
                     { "channel": "IN_CONTEXT", "practiceSlug": "ships-tests-with-the-change",
                       "basedOn": ["obs-0"], "action": "NEW",
                       "title": "The decision is not yet explained", "nextStep": "Add the constraint.",
                       "placement": { "kind": "ARTIFACT", "observationId": "obs-0", "citationIndex": 0 } }
-                    """,
-                    "[]"
-                )
-            )
-        ).isEmpty();
+                    """, "[]"))).isEmpty();
     }
 
     @Test
     void shouldReadNotesWhenConversationUnitIsValid() {
-        List<ComposedFeedbackUnit> units = parser.parse(
-            output(
-                """
+        List<ComposedFeedbackUnit> units = parser.parse(output("""
                 { "channel": "IN_CHAT", "practiceSlug": "ships-tests-with-the-change",
                   "basedOn": ["obs-0"], "action": "NEW",
                   "title": "Tests arrive after review",
@@ -139,64 +111,46 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
                     "evidenceSummary": "On the last three changes the test arrived a push later.",
                     "inConversationSignal": "They name a check they could run before pushing."
                   } }
-                """,
-                "[]"
-            )
-        );
+                """, "[]"));
 
-        assertThat(units)
-            .singleElement()
-            .satisfies(unit -> {
-                assertThat(unit.body()).isNull();
-                assertThat(unit.notes()).isNotNull();
-                assertThat(unit.notes().situation()).isEqualTo(
-                    "On !18, !20 and !22 the test landed a push after the review comment."
-                );
-                assertThat(unit.notes().inConversationSignal()).isEqualTo(
-                    "They name a check they could run before pushing."
-                );
-            });
+        assertThat(units).singleElement().satisfies(unit -> {
+            assertThat(unit.body()).isNull();
+            assertThat(unit.notes()).isNotNull();
+            assertThat(unit.notes().situation())
+                    .isEqualTo("On !18, !20 and !22 the test landed a push after the review comment.");
+            assertThat(unit.notes().inConversationSignal())
+                    .isEqualTo("They name a check they could run before pushing.");
+        });
     }
 
     @ParameterizedTest
     @ValueSource(
-        strings = {
-            """
+            strings = {
+                """
             "situation": "On !18 the test landed a push after the review comment.",
             "evidenceSummary": "On the last three changes the test arrived a push later.",
             "inConversationSignal": "They name a check they could run before pushing."
             """,
-            """
+                """
             "situation": "On !18 the test landed a push after the review comment.",
             "capability": "   ",
             "evidenceSummary": "On the last three changes the test arrived a push later.",
             "inConversationSignal": "They name a check they could run before pushing."
             """,
-        }
-    )
+            })
     void shouldRejectConversationUnitWhenRequiredNoteIsMissing(String notes) {
-        assertThat(
-            parser.parse(
-                output(
-                    """
+        assertThat(parser.parse(output("""
                     { "channel": "IN_CHAT", "practiceSlug": "ships-tests-with-the-change",
                       "basedOn": ["obs-0"], "action": "NEW",
                       "title": "Tests arrive after review",
                       "notes": { %s } }
-                    """.formatted(notes),
-                    "[]"
-                )
-            )
-        ).isEmpty();
+                    """.formatted(notes), "[]"))).isEmpty();
     }
 
     @Test
     void refusesAnOverlongNoteInsteadOfPersistingAnArbitrarilyTruncatedPlan() {
         String oversized = "x".repeat(ComposedFeedbackUnit.MAX_AIM_LENGTH + 1);
-        assertThat(
-            parser.parse(
-                output(
-                    """
+        assertThat(parser.parse(output("""
                     { "channel": "IN_CHAT", "practiceSlug": "ships-tests-with-the-change",
                       "basedOn": ["obs-0"], "action": "NEW",
                       "title": "Tests arrive after review",
@@ -206,11 +160,7 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
                         "evidenceSummary": "Three merge requests show the sequence.",
                         "inConversationSignal": "The developer can name when the test belongs."
                       } }
-                    """.formatted(oversized),
-                    "[]"
-                )
-            )
-        ).isEmpty();
+                    """.formatted(oversized), "[]"))).isEmpty();
     }
 
     @Test
@@ -228,130 +178,75 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
 
     @Test
     void refusesAnAnchorPointingAtACitationTheObservationDoesNotHave() {
-        assertThat(
-            parser.parse(
-                output(
-                    """
+        assertThat(parser.parse(output("""
                     { "channel": "IN_CONTEXT", "practiceSlug": "ships-tests-with-the-change",
                       "basedOn": ["obs-0"], "action": "NEW",
                       "title": "t", "nextStep": "n",
                       "placement": { "kind": "DIFF", "observationId": "obs-0", "citationIndex": 4 } }
-                    """,
-                    "[]"
-                )
-            )
-        ).isEmpty();
+                    """, "[]"))).isEmpty();
     }
 
     @Test
     void refusesAnInContextUnitAnchoredToAnObservationThatIsNotOnTheDiff() {
-        assertThat(
-            parser.parse(
-                output(
-                    """
+        assertThat(parser.parse(output("""
                     { "channel": "IN_CONTEXT", "practiceSlug": "keeps-the-thread-moving",
                       "basedOn": ["obs-1"], "action": "NEW",
                       "title": "t", "nextStep": "n",
                       "placement": { "kind": "DIFF", "observationId": "obs-1", "citationIndex": 0 } }
-                    """,
-                    "[]"
-                )
-            )
-        ).isEmpty();
+                    """, "[]"))).isEmpty();
     }
 
     @Test
     void refusesAnInContextUnitWithNoAnchorAtAll() {
-        assertThat(
-            parser.parse(
-                output(
-                    """
+        assertThat(parser.parse(output("""
                     { "channel": "IN_CONTEXT", "practiceSlug": "ships-tests-with-the-change",
                       "basedOn": ["obs-0"], "action": "NEW",
                       "title": "t", "nextStep": "n" }
-                    """,
-                    "[]"
-                )
-            )
-        ).isEmpty();
+                    """, "[]"))).isEmpty();
     }
 
     @Test
     void refusesAnAnchorOnALongitudinalLane() {
-        assertThat(
-            parser.parse(
-                output(
-                    """
+        assertThat(parser.parse(output("""
                     { "channel": "IN_APP", "practiceSlug": "ships-tests-with-the-change",
                       "basedOn": ["obs-0"], "action": "NEW",
                       "title": "t", "body": "b", "nextStep": "n",
                       "placement": { "kind": "DIFF", "observationId": "obs-0", "citationIndex": 0 } }
-                    """,
-                    "[]"
-                )
-            )
-        ).isEmpty();
+                    """, "[]"))).isEmpty();
     }
 
     @Test
     void shouldKeepOnlyWithholdWhenReasonIsPresent() {
-        assertThat(
-            parser.parse(
-                output(
-                    """
+        assertThat(parser.parse(output("""
                     { "channel": "IN_APP", "practiceSlug": "ships-tests-with-the-change",
                       "basedOn": ["obs-0"], "action": "WITHHOLD", "withholdReason": "ALREADY_SAID" }
-                    """,
-                    "[]"
-                )
-            )
-        )
-            .singleElement()
-            .satisfies(unit -> {
-                assertThat(unit.action()).isEqualTo(ComposedFeedbackUnit.Action.WITHHOLD);
-                assertThat(unit.withholdReason()).isEqualTo(ComposedFeedbackUnit.WithholdReason.ALREADY_SAID);
-            });
+                    """, "[]"))).singleElement().satisfies(unit -> {
+            assertThat(unit.action()).isEqualTo(ComposedFeedbackUnit.Action.WITHHOLD);
+            assertThat(unit.withholdReason()).isEqualTo(ComposedFeedbackUnit.WithholdReason.ALREADY_SAID);
+        });
 
-        assertThat(
-            parser.parse(
-                output(
-                    """
+        assertThat(parser.parse(output("""
                     { "channel": "IN_APP", "practiceSlug": "ships-tests-with-the-change",
                       "basedOn": ["obs-0"], "action": "WITHHOLD" }
-                    """,
-                    "[]"
-                )
-            )
-        ).isEmpty();
+                    """, "[]"))).isEmpty();
     }
 
     @Test
     void rejectsEvidenceFromAnotherPracticeOrAnUnknownObservation() {
-        for (String reference : List.of(
-            "obs-1",
-            "obs-missing",
-            "prior:ships-tests-with-the-change",
-            "prior:keeps-the-thread-moving"
-        )) {
-            assertThat(
-                parser.parse(
-                    output(
-                        """
+        for (String reference :
+                List.of("obs-1", "obs-missing", "prior:ships-tests-with-the-change", "prior:keeps-the-thread-moving")) {
+            assertThat(parser.parse(output("""
                         { "channel": "IN_APP", "practiceSlug": "ships-tests-with-the-change",
                           "basedOn": ["%s"], "action": "NEW",
                           "title": "t", "body": "b", "nextStep": "n" }
-                        """.formatted(reference),
-                        "[]"
-                    )
-                )
-            )
-                .as("evidence reference %s", reference)
-                .isEmpty();
+                        """.formatted(reference), "[]")))
+                    .as("evidence reference %s", reference)
+                    .isEmpty();
         }
     }
 
     @ParameterizedTest
-    @ValueSource(strings = { "channel", "practiceSlug", "basedOn", "action", "title", "body", "nextStep" })
+    @ValueSource(strings = {"channel", "practiceSlug", "basedOn", "action", "title", "body", "nextStep"})
     void dropsAnInAppUnitMissingAnyLoadBearingPart(String omitted) {
         var unit = objectMapper.createObjectNode();
         unit.put("channel", "IN_APP");
@@ -363,35 +258,30 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
         unit.put("nextStep", "A next step");
         unit.remove(omitted);
 
-        assertThat(parser.parse(outputOf(objectMapper.createArrayNode().add(unit), "[]"))).isEmpty();
+        assertThat(parser.parse(outputOf(objectMapper.createArrayNode().add(unit), "[]")))
+                .isEmpty();
     }
 
     @Test
     void keepsOnlyTheFirstUnitForAPracticeOnOneChannel() {
-        List<ComposedFeedbackUnit> units = parser.parse(
-            outputOf(
-                objectMapper.readTree(
-                    """
+        List<ComposedFeedbackUnit> units = parser.parse(outputOf(objectMapper.readTree("""
                     [
                       { "channel": "IN_APP", "practiceSlug": "ships-tests-with-the-change", "basedOn": ["obs-0"], "action": "NEW",
                         "title": "First", "body": "b", "nextStep": "n" },
                       { "channel": "IN_APP", "practiceSlug": "ships-tests-with-the-change", "basedOn": ["obs-0"], "action": "NEW",
                         "title": "Second", "body": "b", "nextStep": "n" }
                     ]
-                    """
-                ),
-                "[]"
-            )
-        );
+                    """), "[]"));
 
-        assertThat(units).singleElement().extracting(ComposedFeedbackUnit::title).isEqualTo("First");
+        assertThat(units)
+                .singleElement()
+                .extracting(ComposedFeedbackUnit::title)
+                .isEqualTo("First");
     }
 
     @Test
     void filtersByChannelWithoutCollapsingOtherChannels() {
-        JsonNode jobOutput = outputOf(
-            objectMapper.readTree(
-                """
+        JsonNode jobOutput = outputOf(objectMapper.readTree("""
                 [
                   { "channel": "IN_CONTEXT", "practiceSlug": "ships-tests-with-the-change",
                     "basedOn": ["obs-0"], "action": "NEW", "title": "on the work", "nextStep": "n",
@@ -399,18 +289,15 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
                   { "channel": "IN_APP", "practiceSlug": "ships-tests-with-the-change",
                     "basedOn": ["obs-0"], "action": "NEW", "title": "on the page", "body": "b", "nextStep": "n" }
                 ]
-                """
-            ),
-            "[]"
-        );
+                """), "[]");
 
         assertThat(parser.parse(jobOutput))
-            .extracting(ComposedFeedbackUnit::channel)
-            .containsExactly(FeedbackChannel.IN_CONTEXT, FeedbackChannel.IN_APP);
+                .extracting(ComposedFeedbackUnit::channel)
+                .containsExactly(FeedbackChannel.IN_CONTEXT, FeedbackChannel.IN_APP);
         assertThat(parser.parse(jobOutput, FeedbackChannel.IN_APP))
-            .singleElement()
-            .extracting(ComposedFeedbackUnit::title)
-            .isEqualTo("on the page");
+                .singleElement()
+                .extracting(ComposedFeedbackUnit::title)
+                .isEqualTo("on the page");
     }
 
     @Test
@@ -439,20 +326,13 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
 
     @Test
     void normalisesPracticeSlug() {
-        assertThat(
-            parser.parse(
-                output(
-                    """
+        assertThat(parser.parse(output("""
                     { "channel": "IN_APP", "practiceSlug": "Ships_Tests_With_The_Change", "basedOn": ["obs-0"],
                       "action": "NEW", "title": "t", "body": "b", "nextStep": "n" }
-                    """,
-                    "[]"
-                )
-            )
-        )
-            .singleElement()
-            .extracting(ComposedFeedbackUnit::practiceSlug)
-            .isEqualTo("ships-tests-with-the-change");
+                    """, "[]")))
+                .singleElement()
+                .extracting(ComposedFeedbackUnit::practiceSlug)
+                .isEqualTo("ships-tests-with-the-change");
     }
 
     @Test
@@ -466,26 +346,23 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
 
     @Test
     void shouldReadTrimmedLeadWhenReviewComposedOne() {
-        JsonNode jobOutput = raw(
-            """
+        JsonNode jobOutput = raw("""
             { "lead": "  You kept this to one concern; the description just never says why.  ",
               "units": [] }
-            """
-        );
+            """);
 
-        assertThat(parser.lead(jobOutput)).isEqualTo(
-            "You kept this to one concern; the description just never says why."
-        );
+        assertThat(parser.lead(jobOutput))
+                .isEqualTo("You kept this to one concern; the description just never says why.");
     }
 
     @ParameterizedTest
-    @ValueSource(strings = { "{ \"units\": [] }", "{ \"lead\": null }", "{ \"lead\": \"\" }", "{ \"lead\": \"   \" }" })
+    @ValueSource(strings = {"{ \"units\": [] }", "{ \"lead\": null }", "{ \"lead\": \"\" }", "{ \"lead\": \"   \" }"})
     void shouldReturnNoLeadWhenTextIsBlankOrAbsent(String feedbackJson) {
         assertThat(parser.lead(raw(feedbackJson))).isNull();
     }
 
     @ParameterizedTest
-    @ValueSource(strings = { "{ \"lead\": 42 }", "{ \"lead\": true }", "{ \"lead\": [\"a\"] }", "{ \"lead\": {} }" })
+    @ValueSource(strings = {"{ \"lead\": 42 }", "{ \"lead\": true }", "{ \"lead\": [\"a\"] }", "{ \"lead\": {} }"})
     void shouldReturnNoLeadWhenValueIsNotText(String feedbackJson) {
         assertThat(parser.lead(raw(feedbackJson))).isNull();
     }
@@ -493,8 +370,8 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
     @Test
     void shouldReturnNoLeadWhenPayloadExceedsCeiling() {
         assertThat(parser.lead(raw("{ \"lead\": \"" + "x".repeat(5_000) + "\" }")))
-            .as("the payload ceiling is a bound on what the envelope may carry, not a place to trim prose")
-            .isNull();
+                .as("the payload ceiling is a bound on what the envelope may carry, not a place to trim prose")
+                .isNull();
     }
 
     @Test
@@ -512,10 +389,10 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
         var preparedTargets = objectMapper.createArrayNode();
         for (JsonNode key : objectMapper.readTree(preparedThreadKeysJson)) {
             preparedTargets
-                .addObject()
-                .put("threadKey", key.asString())
-                .put("channel", "IN_APP")
-                .put("practiceSlug", "ships-tests-with-the-change");
+                    .addObject()
+                    .put("threadKey", key.asString())
+                    .put("channel", "IN_APP")
+                    .put("practiceSlug", "ships-tests-with-the-change");
         }
         payload.set("preparedTargets", preparedTargets);
         payload.set("units", units);

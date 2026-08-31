@@ -44,11 +44,7 @@ import tools.jackson.databind.node.ObjectNode;
  *   <li><b>Turn latency</b> (prompt → settled terminal event) against the live LLM.</li>
  * </ul>
  *
- * <p>This deliberately bypasses Docker (Path C of the stress plan). The runner footprint
- * measured here is the FLOOR for sizing the per-(userId, workspaceId) container — Docker adds
- * cgroup overhead + image base layer but does NOT change Node/Pi-SDK heap. Multiplying these
- * numbers by the configured ceiling (`maxSessionsTotal=50`) tells us whether the policy
- * matches reality.
+ * <p>This bypasses Docker, so it measures direct runner RSS and latency without container overhead.
  *
  * <p>Run with: {@code N=10 ./mvnw -Plive-tests test -Dtest=MentorSandboxStressTest}.
  * Defaults to N=5 to stay polite on shared infra.
@@ -60,13 +56,8 @@ class MentorSandboxStressTest {
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final String PI_SDK_VERSION = "0.84.3";
     private static final Path SDK_DIR = Path.of("target", "pi-sdk").toAbsolutePath();
-    private static final Path RUNNER = Path.of(
-        "src",
-        "main",
-        "resources",
-        "agent",
-        "pi-mentor-runner.ts"
-    ).toAbsolutePath();
+    private static final Path RUNNER =
+            Path.of("src", "main", "resources", "agent", "pi-mentor-runner.ts").toAbsolutePath();
     /** Per-session deadline: cold-start + handshake + prompt + settlement against live LLM. */
     private static final Duration SESSION_BUDGET = Duration.ofSeconds(120);
 
@@ -77,10 +68,9 @@ class MentorSandboxStressTest {
     void teardown() {
         // Close all sandboxes in parallel — sequential close on 25 runners would serialise 25×
         // graceTimeout (50 s total) for no good reason.
-        var closes = sandboxes
-            .stream()
-            .map(s -> CompletableFuture.runAsync(() -> s.close(Duration.ofSeconds(2))))
-            .toArray(CompletableFuture[]::new);
+        var closes = sandboxes.stream()
+                .map(s -> CompletableFuture.runAsync(() -> s.close(Duration.ofSeconds(2))))
+                .toArray(CompletableFuture[]::new);
         try {
             CompletableFuture.allOf(closes).get(10, TimeUnit.SECONDS);
         } catch (Exception ignored) {
@@ -89,14 +79,14 @@ class MentorSandboxStressTest {
         sandboxes.clear();
         for (Path ws : stagedWorkspaces) {
             try (var stream = Files.walk(ws)) {
-                stream
-                    .sorted(Comparator.reverseOrder())
-                    .forEach(p -> {
-                        try {
-                            Files.deleteIfExists(p);
-                        } catch (IOException ignored) {}
-                    });
-            } catch (IOException ignored) {}
+                stream.sorted(Comparator.reverseOrder()).forEach(p -> {
+                    try {
+                        Files.deleteIfExists(p);
+                    } catch (IOException ignored) {
+                    }
+                });
+            } catch (IOException ignored) {
+            }
         }
         stagedWorkspaces.clear();
     }
@@ -129,15 +119,13 @@ class MentorSandboxStressTest {
             long t0 = System.nanoTime();
             var futures = new ArrayList<CompletableFuture<Void>>(n);
             for (var r : runners) {
-                futures.add(
-                    CompletableFuture.runAsync(() -> {
-                        try {
-                            runOneMultiSessionRunner(creds, r, sampler);
-                        } catch (Exception e) {
-                            r.failure = e;
-                        }
-                    })
-                );
+                futures.add(CompletableFuture.runAsync(() -> {
+                    try {
+                        runOneMultiSessionRunner(creds, r, sampler);
+                    } catch (Exception e) {
+                        r.failure = e;
+                    }
+                }));
             }
             // Budget: cold-start + K × per-turn ceiling. K=5 → 30s cold + 5×120s = 630s ceiling.
             long budget = 30 + (long) k * SESSION_BUDGET.toSeconds() + 30;
@@ -146,10 +134,7 @@ class MentorSandboxStressTest {
 
             reportMultiSession(n, k, elapsedMs, runners);
 
-            int failed = (int) runners
-                .stream()
-                .filter(r -> r.failure != null)
-                .count();
+            int failed = (int) runners.stream().filter(r -> r.failure != null).count();
             if (failed > 0) {
                 throw new AssertionError("multi-session stress failed: " + failed + "/" + n + " runners errored");
             }
@@ -159,20 +144,16 @@ class MentorSandboxStressTest {
             // model stops scaling. Both override via env.
             long peakRssBudgetKb = Long.parseLong(System.getenv().getOrDefault("PEAK_RSS_BUDGET_KB", "240000"));
             long marginalBudgetKb = Long.parseLong(System.getenv().getOrDefault("MARGINAL_RSS_BUDGET_KB", "2048"));
-            long maxRssKb = runners
-                .stream()
-                .filter(r -> !r.samples.isEmpty())
-                .flatMapToLong(r -> r.samples.stream().mapToLong(arr -> arr[1]))
-                .max()
-                .orElse(0L);
+            long maxRssKb = runners.stream()
+                    .filter(r -> !r.samples.isEmpty())
+                    .flatMapToLong(r -> r.samples.stream().mapToLong(arr -> arr[1]))
+                    .max()
+                    .orElse(0L);
             if (maxRssKb > peakRssBudgetKb) {
-                throw new AssertionError(
-                    "multi-session peak RSS regression: max=" +
-                        maxRssKb +
-                        " KB > budget=" +
-                        peakRssBudgetKb +
-                        " KB (override via PEAK_RSS_BUDGET_KB)"
-                );
+                throw new AssertionError("multi-session peak RSS regression: max=" + maxRssKb
+                        + " KB > budget="
+                        + peakRssBudgetKb
+                        + " KB (override via PEAK_RSS_BUDGET_KB)");
             }
             if (k > 1) {
                 // Clamp negative deltas at 0 — a runner whose RSS DROPPED between the floor and
@@ -180,21 +161,17 @@ class MentorSandboxStressTest {
                 // regression. Only growth is. The previous Math.abs() variant treated benign GC
                 // timing as a "regression" with no actionable signal; this asserts only the
                 // direction we care about.
-                long maxMarginalGrowthKb = runners
-                    .stream()
-                    .filter(r -> r.rssAfterOpenKb > 0 && r.rssOneSessionFloorKb > 0)
-                    .mapToLong(r -> Math.max(0L, (r.rssAfterOpenKb - r.rssOneSessionFloorKb) / (k - 1)))
-                    .max()
-                    .orElse(0L);
+                long maxMarginalGrowthKb = runners.stream()
+                        .filter(r -> r.rssAfterOpenKb > 0 && r.rssOneSessionFloorKb > 0)
+                        .mapToLong(r -> Math.max(0L, (r.rssAfterOpenKb - r.rssOneSessionFloorKb) / (k - 1)))
+                        .max()
+                        .orElse(0L);
                 if (maxMarginalGrowthKb > marginalBudgetKb) {
-                    throw new AssertionError(
-                        "marginal RSS growth per extra session: " +
-                            maxMarginalGrowthKb +
-                            " KB > budget=" +
-                            marginalBudgetKb +
-                            " KB — per-thread state bloated. " +
-                            "Override budget via MARGINAL_RSS_BUDGET_KB env."
-                    );
+                    throw new AssertionError("marginal RSS growth per extra session: " + maxMarginalGrowthKb
+                            + " KB > budget="
+                            + marginalBudgetKb
+                            + " KB — per-thread state bloated. "
+                            + "Override budget via MARGINAL_RSS_BUDGET_KB env.");
                 }
             }
         } finally {
@@ -218,28 +195,21 @@ class MentorSandboxStressTest {
             long t0 = System.nanoTime();
             var spawnFutures = new ArrayList<CompletableFuture<Void>>(n);
             for (var session : sessions) {
-                spawnFutures.add(
-                    CompletableFuture.runAsync(() -> {
-                        try {
-                            runOneSession(creds, session, sampler);
-                        } catch (Exception e) {
-                            session.failure = e;
-                        }
-                    })
-                );
+                spawnFutures.add(CompletableFuture.runAsync(() -> {
+                    try {
+                        runOneSession(creds, session, sampler);
+                    } catch (Exception e) {
+                        session.failure = e;
+                    }
+                }));
             }
-            CompletableFuture.allOf(spawnFutures.toArray(CompletableFuture[]::new)).get(
-                SESSION_BUDGET.toSeconds() + 30,
-                TimeUnit.SECONDS
-            );
+            CompletableFuture.allOf(spawnFutures.toArray(CompletableFuture[]::new))
+                    .get(SESSION_BUDGET.toSeconds() + 30, TimeUnit.SECONDS);
             long elapsedMs = (System.nanoTime() - t0) / 1_000_000;
 
             report(n, elapsedMs, sessions);
 
-            int failed = (int) sessions
-                .stream()
-                .filter(s -> s.failure != null)
-                .count();
+            int failed = (int) sessions.stream().filter(s -> s.failure != null).count();
             if (failed > 0) {
                 throw new AssertionError("stress test failed: " + failed + "/" + n + " sessions errored");
             }
@@ -249,35 +219,27 @@ class MentorSandboxStressTest {
             // shared CI hardware. Override via env for soak runs.
             long peakRssBudgetKb = Long.parseLong(System.getenv().getOrDefault("PEAK_RSS_BUDGET_KB", "240000"));
             long coldStartBudgetMs = Long.parseLong(System.getenv().getOrDefault("COLD_START_BUDGET_MS", "5000"));
-            long maxRssKb = sessions
-                .stream()
-                .filter(s -> !s.samples.isEmpty())
-                .flatMapToLong(s -> s.samples.stream().mapToLong(arr -> arr[1]))
-                .max()
-                .orElse(0L);
-            long maxColdStartMs = sessions
-                .stream()
-                .filter(s -> s.readyNanos > 0)
-                .mapToLong(s -> (s.readyNanos - s.spawnStartNanos) / 1_000_000)
-                .max()
-                .orElse(0L);
+            long maxRssKb = sessions.stream()
+                    .filter(s -> !s.samples.isEmpty())
+                    .flatMapToLong(s -> s.samples.stream().mapToLong(arr -> arr[1]))
+                    .max()
+                    .orElse(0L);
+            long maxColdStartMs = sessions.stream()
+                    .filter(s -> s.readyNanos > 0)
+                    .mapToLong(s -> (s.readyNanos - s.spawnStartNanos) / 1_000_000)
+                    .max()
+                    .orElse(0L);
             if (maxRssKb > peakRssBudgetKb) {
-                throw new AssertionError(
-                    "peak RSS regression: max=" +
-                        maxRssKb +
-                        " KB > budget=" +
-                        peakRssBudgetKb +
-                        " KB (override via PEAK_RSS_BUDGET_KB env)"
-                );
+                throw new AssertionError("peak RSS regression: max=" + maxRssKb
+                        + " KB > budget="
+                        + peakRssBudgetKb
+                        + " KB (override via PEAK_RSS_BUDGET_KB env)");
             }
             if (maxColdStartMs > coldStartBudgetMs) {
-                throw new AssertionError(
-                    "cold-start regression: max=" +
-                        maxColdStartMs +
-                        " ms > budget=" +
-                        coldStartBudgetMs +
-                        " ms (override via COLD_START_BUDGET_MS env)"
-                );
+                throw new AssertionError("cold-start regression: max=" + maxColdStartMs
+                        + " ms > budget="
+                        + coldStartBudgetMs
+                        + " ms (override via COLD_START_BUDGET_MS env)");
             }
         } finally {
             sampler.shutdownNow();
@@ -285,7 +247,7 @@ class MentorSandboxStressTest {
     }
 
     private void runOneSession(LiveLlmCredentials creds, SessionMetrics session, ScheduledExecutorService sampler)
-        throws Exception {
+            throws Exception {
         Path ws = stageWorkspace(creds, session.id);
         stagedWorkspaces.add(ws);
 
@@ -297,17 +259,17 @@ class MentorSandboxStressTest {
         // Sample RSS / Threads every 250 ms while the runner is alive. Stored as a flat list of
         // (timestampMs, rssKb, threads) tuples — small enough to keep in memory for ~120 s × 4 Hz.
         var sampleFuture = sampler.scheduleAtFixedRate(
-            () -> {
-                if (!sandbox.process().isAlive()) return;
-                try {
-                    long[] sample = readProcStatus(session.runnerPid);
-                    session.samples.add(sample);
-                } catch (IOException ignored) {}
-            },
-            0,
-            250,
-            TimeUnit.MILLISECONDS
-        );
+                () -> {
+                    if (!sandbox.process().isAlive()) return;
+                    try {
+                        long[] sample = readProcStatus(session.runnerPid);
+                        session.samples.add(sample);
+                    } catch (IOException ignored) {
+                    }
+                },
+                0,
+                250,
+                TimeUnit.MILLISECONDS);
 
         try {
             var driver = new RunnerDriver(sandbox);
@@ -324,17 +286,16 @@ class MentorSandboxStressTest {
             CompletableFuture<Void> turnComplete = new CompletableFuture<>();
             sandbox.subscribe(frame -> {
                 if (!"event".equals(frame.path("method").asString())) return;
-                if (!threadId.toString().equals(frame.path("params").path("threadId").asString())) return;
-                if ("agent_end".equals(frame.path("params").path("event").path("type").asString())) {
+                if (!threadId.toString()
+                        .equals(frame.path("params").path("threadId").asString())) return;
+                if ("agent_end"
+                        .equals(frame.path("params").path("event").path("type").asString())) {
                     turnComplete.complete(null);
                 }
             });
 
             driver.prompt(
-                threadId,
-                "Answer in exactly one sentence: what is dependency injection?",
-                Duration.ofSeconds(10)
-            );
+                    threadId, "Answer in exactly one sentence: what is dependency injection?", Duration.ofSeconds(10));
             session.promptAcceptedNanos = System.nanoTime();
 
             turnComplete.get(SESSION_BUDGET.toSeconds(), TimeUnit.SECONDS);
@@ -354,10 +315,7 @@ class MentorSandboxStressTest {
      * during each turn. Reported numbers: RSS at each stage so we can see the marginal cost.
      */
     private void runOneMultiSessionRunner(
-        LiveLlmCredentials creds,
-        MultiSessionRunnerMetrics r,
-        ScheduledExecutorService sampler
-    ) throws Exception {
+            LiveLlmCredentials creds, MultiSessionRunnerMetrics r, ScheduledExecutorService sampler) throws Exception {
         Path ws = stageWorkspace(creds, r.id);
         stagedWorkspaces.add(ws);
 
@@ -367,16 +325,16 @@ class MentorSandboxStressTest {
         r.runnerPid = sandbox.process().pid();
 
         var sampleFuture = sampler.scheduleAtFixedRate(
-            () -> {
-                if (!sandbox.process().isAlive()) return;
-                try {
-                    r.samples.add(readProcStatus(r.runnerPid));
-                } catch (IOException ignored) {}
-            },
-            0,
-            250,
-            TimeUnit.MILLISECONDS
-        );
+                () -> {
+                    if (!sandbox.process().isAlive()) return;
+                    try {
+                        r.samples.add(readProcStatus(r.runnerPid));
+                    } catch (IOException ignored) {
+                    }
+                },
+                0,
+                250,
+                TimeUnit.MILLISECONDS);
 
         try {
             var driver = new RunnerDriver(sandbox);
@@ -399,7 +357,8 @@ class MentorSandboxStressTest {
                 } catch (Exception e) {
                     return;
                 }
-                if ("agent_end".equals(frame.path("params").path("event").path("type").asString())) {
+                if ("agent_end"
+                        .equals(frame.path("params").path("event").path("type").asString())) {
                     CompletableFuture<Void> cf = turnCompletes.get(parsed);
                     if (cf != null) cf.complete(null);
                 }
@@ -431,10 +390,9 @@ class MentorSandboxStressTest {
                 UUID tid = r.threadIds[i];
                 long promptStart = System.nanoTime();
                 driver.prompt(
-                    tid,
-                    "In one sentence: what is dependency injection? (thread #" + (i + 1) + "/" + r.k + ")",
-                    Duration.ofSeconds(10)
-                );
+                        tid,
+                        "In one sentence: what is dependency injection? (thread #" + (i + 1) + "/" + r.k + ")",
+                        Duration.ofSeconds(10));
                 var turnComplete = turnCompletes.get(tid);
                 org.junit.jupiter.api.Assertions.assertNotNull(turnComplete);
                 turnComplete.get(SESSION_BUDGET.toSeconds(), TimeUnit.SECONDS);
@@ -460,56 +418,41 @@ class MentorSandboxStressTest {
         System.out.println("");
         System.out.println("══════════════════════════════════════════════════════════════════");
         System.out.printf(
-            "MULTI-SESSION STRESS — N=%d runners × K=%d sessions each (wall-clock %d ms)%n",
-            n,
-            k,
-            elapsedMs
-        );
+                "MULTI-SESSION STRESS — N=%d runners × K=%d sessions each (wall-clock %d ms)%n", n, k, elapsedMs);
         System.out.println("══════════════════════════════════════════════════════════════════");
 
-        long[] coldStarts = runners
-            .stream()
-            .filter(r -> r.readyNanos > 0)
-            .mapToLong(r -> (r.readyNanos - r.spawnStartNanos) / 1_000_000)
-            .sorted()
-            .toArray();
-        long[] openAllMs = runners
-            .stream()
-            .filter(r -> r.allThreadsOpenedNanos > 0)
-            .mapToLong(r -> (r.allThreadsOpenedNanos - r.readyNanos) / 1_000_000)
-            .sorted()
-            .toArray();
-        long[] turnMs = runners
-            .stream()
-            .flatMapToLong(r -> r.perTurnMs.stream().mapToLong(Long::longValue))
-            .sorted()
-            .toArray();
+        long[] coldStarts = runners.stream()
+                .filter(r -> r.readyNanos > 0)
+                .mapToLong(r -> (r.readyNanos - r.spawnStartNanos) / 1_000_000)
+                .sorted()
+                .toArray();
+        long[] openAllMs = runners.stream()
+                .filter(r -> r.allThreadsOpenedNanos > 0)
+                .mapToLong(r -> (r.allThreadsOpenedNanos - r.readyNanos) / 1_000_000)
+                .sorted()
+                .toArray();
+        long[] turnMs = runners.stream()
+                .flatMapToLong(r -> r.perTurnMs.stream().mapToLong(Long::longValue))
+                .sorted()
+                .toArray();
 
         // RSS measurements at three timepoints.
-        long[] rssAtOpenAll = runners
-            .stream()
-            .filter(r -> r.rssAfterOpenKb > 0)
-            .mapToLong(r -> r.rssAfterOpenKb)
-            .sorted()
-            .toArray();
-        long[] rssAfterTurns = runners
-            .stream()
-            .filter(r -> r.rssAfterAllTurnsKb > 0)
-            .mapToLong(r -> r.rssAfterAllTurnsKb)
-            .sorted()
-            .toArray();
-        long[] peakRssKb = runners
-            .stream()
-            .filter(r -> !r.samples.isEmpty())
-            .mapToLong(r ->
-                r.samples
-                    .stream()
-                    .mapToLong(arr -> arr[1])
-                    .max()
-                    .orElse(0)
-            )
-            .sorted()
-            .toArray();
+        long[] rssAtOpenAll = runners.stream()
+                .filter(r -> r.rssAfterOpenKb > 0)
+                .mapToLong(r -> r.rssAfterOpenKb)
+                .sorted()
+                .toArray();
+        long[] rssAfterTurns = runners.stream()
+                .filter(r -> r.rssAfterAllTurnsKb > 0)
+                .mapToLong(r -> r.rssAfterAllTurnsKb)
+                .sorted()
+                .toArray();
+        long[] peakRssKb = runners.stream()
+                .filter(r -> !r.samples.isEmpty())
+                .mapToLong(
+                        r -> r.samples.stream().mapToLong(arr -> arr[1]).max().orElse(0))
+                .sorted()
+                .toArray();
 
         printRow("cold-start (spawn→ready)", "ms", coldStarts);
         printRow("open K threads (total)", "ms", openAllMs);
@@ -521,43 +464,37 @@ class MentorSandboxStressTest {
         // True marginal: extra RSS each ADDITIONAL session costs on top of a fully-warm
         // one-session container. Pi SDK init + V8 baseline + per-runtime state are already
         // amortised into rssOneSessionFloorKb.
-        long[] rssOneSessionFloor = runners
-            .stream()
-            .filter(r -> r.rssOneSessionFloorKb > 0)
-            .mapToLong(r -> r.rssOneSessionFloorKb)
-            .sorted()
-            .toArray();
+        long[] rssOneSessionFloor = runners.stream()
+                .filter(r -> r.rssOneSessionFloorKb > 0)
+                .mapToLong(r -> r.rssOneSessionFloorKb)
+                .sorted()
+                .toArray();
         printRow("RSS after 1 warm session", "KB", rssOneSessionFloor);
 
-        long[] marginalKbPerExtraSession = runners
-            .stream()
-            .filter(r -> r.rssAfterOpenKb > 0 && r.rssOneSessionFloorKb > 0 && k > 1)
-            .mapToLong(r -> {
-                long delta = r.rssAfterOpenKb - r.rssOneSessionFloorKb;
-                return delta > 0 ? delta / (k - 1) : 0L;
-            })
-            .filter(v -> v > 0)
-            .sorted()
-            .toArray();
+        long[] marginalKbPerExtraSession = runners.stream()
+                .filter(r -> r.rssAfterOpenKb > 0 && r.rssOneSessionFloorKb > 0 && k > 1)
+                .mapToLong(r -> {
+                    long delta = r.rssAfterOpenKb - r.rssOneSessionFloorKb;
+                    return delta > 0 ? delta / (k - 1) : 0L;
+                })
+                .filter(v -> v > 0)
+                .sorted()
+                .toArray();
         if (marginalKbPerExtraSession.length > 0) {
             printRow("marginal RSS / extra session", "KB", marginalKbPerExtraSession);
         }
 
-        long totalPeakRssMb = (peakRssKb.length == 0 ? 0L : LongStream.of(peakRssKb).sum() / 1024L);
-        long avgFloorMb =
-            rssOneSessionFloor.length == 0
+        long totalPeakRssMb =
+                (peakRssKb.length == 0 ? 0L : LongStream.of(peakRssKb).sum() / 1024L);
+        long avgFloorMb = rssOneSessionFloor.length == 0
                 ? 0L
                 : (LongStream.of(rssOneSessionFloor).sum() / rssOneSessionFloor.length / 1024L);
-        long avgMarginalKb =
-            marginalKbPerExtraSession.length == 0
+        long avgMarginalKb = marginalKbPerExtraSession.length == 0
                 ? 0L
                 : LongStream.of(marginalKbPerExtraSession).sum() / marginalKbPerExtraSession.length;
         System.out.printf(
-            "%n  ▸ aggregate peak RSS across all %d runners (× %d sessions): %d MB%n",
-            peakRssKb.length,
-            k,
-            totalPeakRssMb
-        );
+                "%n  ▸ aggregate peak RSS across all %d runners (× %d sessions): %d MB%n",
+                peakRssKb.length, k, totalPeakRssMb);
         System.out.printf("  ▸ container floor per user (1 warm session): %d MB%n", avgFloorMb);
         if (avgMarginalKb > 0) {
             System.out.printf("  ▸ marginal RSS per extra session multiplexed in: %d KB%n", avgMarginalKb);
@@ -567,17 +504,11 @@ class MentorSandboxStressTest {
         long actualMb = totalPeakRssMb / Math.max(1L, n);
         if (naiveMb > 0 && actualMb > 0) {
             System.out.printf(
-                "  ▸ multiplexing saving vs naive 1-container-per-session: %.1f× (%d MB → %d MB per user)%n",
-                naiveMb / (double) actualMb,
-                naiveMb,
-                actualMb
-            );
+                    "  ▸ multiplexing saving vs naive 1-container-per-session: %.1f× (%d MB → %d MB per user)%n",
+                    naiveMb / (double) actualMb, naiveMb, actualMb);
         }
 
-        long failed = runners
-            .stream()
-            .filter(r -> r.failure != null)
-            .count();
+        long failed = runners.stream().filter(r -> r.failure != null).count();
         System.out.printf("  ▸ failures: %d / %d%n", failed, n);
         for (var r : runners) {
             if (r.failure != null) {
@@ -594,59 +525,43 @@ class MentorSandboxStressTest {
         System.out.println("══════════════════════════════════════════════════════════════════");
 
         // Cold-start: spawn → ready
-        long[] coldStarts = sessions
-            .stream()
-            .filter(s -> s.readyNanos > 0)
-            .mapToLong(s -> (s.readyNanos - s.spawnStartNanos) / 1_000_000)
-            .sorted()
-            .toArray();
+        long[] coldStarts = sessions.stream()
+                .filter(s -> s.readyNanos > 0)
+                .mapToLong(s -> (s.readyNanos - s.spawnStartNanos) / 1_000_000)
+                .sorted()
+                .toArray();
         // Hello round-trip
-        long[] helloMs = sessions
-            .stream()
-            .filter(s -> s.helloNanos > 0)
-            .mapToLong(s -> (s.helloNanos - s.readyNanos) / 1_000_000)
-            .sorted()
-            .toArray();
+        long[] helloMs = sessions.stream()
+                .filter(s -> s.helloNanos > 0)
+                .mapToLong(s -> (s.helloNanos - s.readyNanos) / 1_000_000)
+                .sorted()
+                .toArray();
         // open_thread
-        long[] openMs = sessions
-            .stream()
-            .filter(s -> s.openThreadNanos > 0)
-            .mapToLong(s -> (s.openThreadNanos - s.helloNanos) / 1_000_000)
-            .sorted()
-            .toArray();
+        long[] openMs = sessions.stream()
+                .filter(s -> s.openThreadNanos > 0)
+                .mapToLong(s -> (s.openThreadNanos - s.helloNanos) / 1_000_000)
+                .sorted()
+                .toArray();
         // Turn latency: prompt accepted → agent_end
-        long[] turnMs = sessions
-            .stream()
-            .filter(s -> s.agentEndNanos > 0)
-            .mapToLong(s -> (s.agentEndNanos - s.promptAcceptedNanos) / 1_000_000)
-            .sorted()
-            .toArray();
+        long[] turnMs = sessions.stream()
+                .filter(s -> s.agentEndNanos > 0)
+                .mapToLong(s -> (s.agentEndNanos - s.promptAcceptedNanos) / 1_000_000)
+                .sorted()
+                .toArray();
 
         // Per-session peak RSS.
-        long[] peakRssKb = sessions
-            .stream()
-            .filter(s -> !s.samples.isEmpty())
-            .mapToLong(s ->
-                s.samples
-                    .stream()
-                    .mapToLong(arr -> arr[1])
-                    .max()
-                    .orElse(0)
-            )
-            .sorted()
-            .toArray();
-        long[] peakThreads = sessions
-            .stream()
-            .filter(s -> !s.samples.isEmpty())
-            .mapToLong(s ->
-                s.samples
-                    .stream()
-                    .mapToLong(arr -> arr[2])
-                    .max()
-                    .orElse(0)
-            )
-            .sorted()
-            .toArray();
+        long[] peakRssKb = sessions.stream()
+                .filter(s -> !s.samples.isEmpty())
+                .mapToLong(
+                        s -> s.samples.stream().mapToLong(arr -> arr[1]).max().orElse(0))
+                .sorted()
+                .toArray();
+        long[] peakThreads = sessions.stream()
+                .filter(s -> !s.samples.isEmpty())
+                .mapToLong(
+                        s -> s.samples.stream().mapToLong(arr -> arr[2]).max().orElse(0))
+                .sorted()
+                .toArray();
 
         printRow("cold-start (spawn→ready)", "ms", coldStarts);
         printRow("hello round-trip", "ms", helloMs);
@@ -655,13 +570,11 @@ class MentorSandboxStressTest {
         printRow("peak RSS per runner", "KB", peakRssKb);
         printRow("peak threads per runner", "", peakThreads);
 
-        long totalPeakRssMb = (peakRssKb.length == 0 ? 0L : LongStream.of(peakRssKb).sum() / 1024L);
+        long totalPeakRssMb =
+                (peakRssKb.length == 0 ? 0L : LongStream.of(peakRssKb).sum() / 1024L);
         System.out.printf("%n  ▸ aggregate peak RSS across all %d runners: %d MB%n", peakRssKb.length, totalPeakRssMb);
 
-        long failed = sessions
-            .stream()
-            .filter(s -> s.failure != null)
-            .count();
+        long failed = sessions.stream().filter(s -> s.failure != null).count();
         System.out.printf("  ▸ failures: %d / %d%n", failed, n);
         for (var s : sessions) {
             if (s.failure != null) {
@@ -690,38 +603,22 @@ class MentorSandboxStressTest {
         long mean = LongStream.of(sortedSamples).sum() / sortedSamples.length;
         if (sortedSamples.length < PERCENTILE_MIN_N) {
             System.out.printf(
-                "  %-30s n=%3d  min=%6d  p50=%6d  max=%6d  mean=%6d  %s%n",
-                label,
-                sortedSamples.length,
-                min,
-                p50,
-                max,
-                mean,
-                unit
-            );
+                    "  %-30s n=%3d  min=%6d  p50=%6d  max=%6d  mean=%6d  %s%n",
+                    label, sortedSamples.length, min, p50, max, mean, unit);
             return;
         }
         long p95 = sortedSamples[(int) Math.min(sortedSamples.length - 1L, Math.round(sortedSamples.length * 0.95))];
         long p99 = sortedSamples[(int) Math.min(sortedSamples.length - 1L, Math.round(sortedSamples.length * 0.99))];
         System.out.printf(
-            "  %-30s n=%3d  min=%6d  p50=%6d  p95=%6d  p99=%6d  max=%6d  mean=%6d  %s%n",
-            label,
-            sortedSamples.length,
-            min,
-            p50,
-            p95,
-            p99,
-            max,
-            mean,
-            unit
-        );
+                "  %-30s n=%3d  min=%6d  p50=%6d  p95=%6d  p99=%6d  max=%6d  mean=%6d  %s%n",
+                label, sortedSamples.length, min, p50, p95, p99, max, mean, unit);
     }
 
     /** Read VmRSS (KB) and Threads from /proc/$pid/status. Returns [-1, rssKb, threads]. */
     private static long[] readProcStatus(long pid) throws IOException {
         Path status = Path.of("/proc", String.valueOf(pid), "status");
         if (!Files.exists(status)) {
-            return new long[] { System.currentTimeMillis(), -1L, -1L };
+            return new long[] {System.currentTimeMillis(), -1L, -1L};
         }
         long rssKb = -1L;
         long threads = -1L;
@@ -733,15 +630,14 @@ class MentorSandboxStressTest {
             }
             if (rssKb > 0 && threads > 0) break;
         }
-        return new long[] { System.currentTimeMillis(), rssKb, threads };
+        return new long[] {System.currentTimeMillis(), rssKb, threads};
     }
 
     private static void ensurePiSdkInstalled() throws Exception {
         Path marker = SDK_DIR.resolve(".installed-" + PI_SDK_VERSION);
         if (Files.exists(marker)) return;
         throw new IllegalStateException(
-            "Pi SDK not installed at " + SDK_DIR + " — run MentorLiveLlmTest first to install it"
-        );
+                "Pi SDK not installed at " + SDK_DIR + " — run MentorLiveLlmTest first to install it");
     }
 
     private Path stageWorkspace(LiveLlmCredentials creds, int idx) throws IOException {
@@ -753,25 +649,22 @@ class MentorSandboxStressTest {
         Path systemPromptDir = tmp.resolve("agent").resolve("mentor");
         Files.createDirectories(systemPromptDir);
         Files.writeString(
-            systemPromptDir.resolve("system.md"),
-            "You are a software engineering mentor. Answer concisely.\n"
-        );
+                systemPromptDir.resolve("system.md"), "You are a software engineering mentor. Answer concisely.\n");
 
         PiRuntimeFactory factory = new PiRuntimeFactory(MAPPER);
         PiPlanSpec spec = new PiPlanSpec(
-            "openai-completions",
-            creds.model(),
-            null,
-            null,
-            false,
-            "live-test-token",
-            // never actually checked — no real proxy sits in front of this test
-            true,
-            300,
-            new MentorRunnerProfile(),
-            Map.of(),
-            ""
-        );
+                "openai-completions",
+                creds.model(),
+                null,
+                null,
+                false,
+                "live-test-token",
+                // never actually checked — no real proxy sits in front of this test
+                true,
+                300,
+                new MentorRunnerProfile(),
+                Map.of(),
+                "");
         byte[] settingsBytes = factory.buildPiSettingsJson(spec.upstreamModelId());
 
         Path piHome = tmp.resolve(".pi-home");
@@ -780,9 +673,14 @@ class MentorSandboxStressTest {
 
         // pi-provider.json — written at the real tmp root; the runner-entry shim rewrites the
         // runner's hardcoded "/workspace/..." reads to this real path (see buildRunnerShim).
-        byte[] providerConfigBytes = MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(
-            Map.of("apiProtocol", spec.apiProtocol(), "modelId", spec.upstreamModelId(), "supportsReasoning", false)
-        );
+        byte[] providerConfigBytes = MAPPER.writerWithDefaultPrettyPrinter()
+                .writeValueAsBytes(Map.of(
+                        "apiProtocol",
+                        spec.apiProtocol(),
+                        "modelId",
+                        spec.upstreamModelId(),
+                        "supportsReasoning",
+                        false));
         Files.write(tmp.resolve("pi-provider.json"), providerConfigBytes);
         return tmp;
     }
@@ -801,15 +699,11 @@ class MentorSandboxStressTest {
         Path shim = workspace.resolve("runner-entry.ts");
         Path stagedRunner = workspace.resolve("pi-mentor-runner.ts");
         Files.writeString(shim, buildRunnerShim(workspace, stagedRunner));
-        pb.command("bun", shim.toString());
+        pb.command("node", shim.toString());
         pb.redirectErrorStream(false);
         Process process = pb.start();
         return new StdioAttachedSandbox(
-            UUID.randomUUID(),
-            "stress-user-" + workspace.getFileName(),
-            "stress-ws",
-            process
-        );
+                UUID.randomUUID(), "stress-user-" + workspace.getFileName(), "stress-ws", process);
     }
 
     private static String buildRunnerShim(Path workspace, Path runner) {
@@ -825,8 +719,7 @@ class MentorSandboxStressTest {
         } catch (tools.jackson.core.JacksonException e) {
             throw new IllegalStateException("failed to encode shim literals", e);
         }
-        return (
-            """
+        return ("""
             import path from "node:path";
             import fs from "node:fs";
             const WORKSPACE_REAL = __WORKSPACE__;
@@ -840,9 +733,7 @@ class MentorSandboxStressTest {
             const origMkdir = fs.mkdirSync; fs.mkdirSync = (p, opts) => origMkdir(rewrite(p), opts);
             const origReadFile = fs.readFileSync; fs.readFileSync = (p, opts) => origReadFile(rewrite(p), opts);
             await import(__RUNNER_URL__);
-            """
-        ).replace("__WORKSPACE__", workspaceLit)
-            .replace("__RUNNER_URL__", runnerLit);
+            """).replace("__WORKSPACE__", workspaceLit).replace("__RUNNER_URL__", runnerLit);
     }
 
     /** Per-runner metric capture for the multi-session test. K threads opened in one runner. */
@@ -902,10 +793,12 @@ class MentorSandboxStressTest {
             sandbox.subscribe(frame -> {
                 if (frame.has("id") && (frame.has("result") || frame.has("error"))) {
                     responses.add(frame);
-                } else if (
-                    "event".equals(frame.path("method").asString()) &&
-                    "runner_ready".equals(frame.path("params").path("event").path("type").asString())
-                ) {
+                } else if ("event".equals(frame.path("method").asString())
+                        && "runner_ready"
+                                .equals(frame.path("params")
+                                        .path("event")
+                                        .path("type")
+                                        .asString())) {
                     ready.add(frame);
                 }
             });

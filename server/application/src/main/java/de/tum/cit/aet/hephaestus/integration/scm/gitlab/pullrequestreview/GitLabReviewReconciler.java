@@ -46,9 +46,7 @@ public class GitLabReviewReconciler {
     private final ApplicationEventPublisher eventPublisher;
 
     public GitLabReviewReconciler(
-        PullRequestReviewRepository reviewRepository,
-        ApplicationEventPublisher eventPublisher
-    ) {
+            PullRequestReviewRepository reviewRepository, ApplicationEventPublisher eventPublisher) {
         this.reviewRepository = reviewRepository;
         this.eventPublisher = eventPublisher;
     }
@@ -68,21 +66,19 @@ public class GitLabReviewReconciler {
      */
     @Transactional(propagation = Propagation.REQUIRED)
     public @Nullable PullRequestReview findOrCreateCommentedReview(
-        PullRequest pr,
-        User author,
-        String discussionGlobalId,
-        @Nullable Instant earliestNoteCreatedAt,
-        IdentityProvider provider,
-        @Nullable ProcessingContext ctx
-    ) {
+            PullRequest pr,
+            User author,
+            String discussionGlobalId,
+            @Nullable Instant earliestNoteCreatedAt,
+            IdentityProvider provider,
+            @Nullable ProcessingContext ctx) {
         if (pr == null || author == null || author.getNativeId() == null || discussionGlobalId == null) {
             log.warn(
-                "Skipped COMMENTED review synthesis: prId={}, authorPresent={}, authorNativeIdPresent={}, discussionPresent={}",
-                pr != null ? pr.getId() : null,
-                author != null,
-                author != null && author.getNativeId() != null,
-                discussionGlobalId != null
-            );
+                    "Skipped COMMENTED review synthesis: prId={}, authorPresent={}, authorNativeIdPresent={}, discussionPresent={}",
+                    pr != null ? pr.getId() : null,
+                    author != null,
+                    author != null && author.getNativeId() != null,
+                    discussionGlobalId != null);
             return null;
         }
 
@@ -91,7 +87,9 @@ public class GitLabReviewReconciler {
         // leaderboard; synthesising a COMMENTED review here would inflate peer-review
         // counts (students whose only discussion activity is on their own MR would
         // appear to have reviewed peers).
-        if (pr.getAuthor() != null && pr.getAuthor().getId() != null && pr.getAuthor().getId().equals(author.getId())) {
+        if (pr.getAuthor() != null
+                && pr.getAuthor().getId() != null
+                && pr.getAuthor().getId().equals(author.getId())) {
             return null;
         }
 
@@ -99,16 +97,13 @@ public class GitLabReviewReconciler {
         Long providerId = Objects.requireNonNull(provider.getId());
 
         return reviewRepository
-            .findByNativeIdAndProviderId(reviewNativeId, providerId)
-            .map(existing -> updateReview(existing, earliestNoteCreatedAt, ctx))
-            .orElseGet(() -> createReview(reviewNativeId, pr, author, provider, earliestNoteCreatedAt, ctx));
+                .findByNativeIdAndProviderId(reviewNativeId, providerId)
+                .map(existing -> updateReview(existing, earliestNoteCreatedAt, ctx))
+                .orElseGet(() -> createReview(reviewNativeId, pr, author, provider, earliestNoteCreatedAt, ctx));
     }
 
     private PullRequestReview updateReview(
-        PullRequestReview existing,
-        @Nullable Instant earliestNoteCreatedAt,
-        @Nullable ProcessingContext ctx
-    ) {
+            PullRequestReview existing, @Nullable Instant earliestNoteCreatedAt, @Nullable ProcessingContext ctx) {
         if (earliestNoteCreatedAt != null) {
             Instant currentSubmittedAt = existing.getSubmittedAt();
             if (currentSubmittedAt == null || earliestNoteCreatedAt.isBefore(currentSubmittedAt)) {
@@ -123,23 +118,21 @@ public class GitLabReviewReconciler {
         // activity_event unique constraint on (workspace_id, event_key) dedupes, so
         // replaying is safe.
         if (ctx != null) {
-            ScmEventPayload.ReviewData.from(existing).ifPresent(reviewData ->
-                eventPublisher.publishEvent(new ScmDomainEvent.ReviewSubmitted(reviewData, EventContext.from(ctx)))
-            );
+            ScmEventPayload.ReviewData.from(existing)
+                    .ifPresent(reviewData -> eventPublisher.publishEvent(
+                            new ScmDomainEvent.ReviewSubmitted(reviewData, EventContext.from(ctx))));
         }
         return existing;
     }
 
     private PullRequestReview createReview(
-        long reviewNativeId,
-        PullRequest pr,
-        User author,
-        IdentityProvider provider,
-        @Nullable Instant earliestNoteCreatedAt,
-        @Nullable ProcessingContext ctx
-    ) {
-        Instant submittedAt =
-            earliestNoteCreatedAt != null
+            long reviewNativeId,
+            PullRequest pr,
+            User author,
+            IdentityProvider provider,
+            @Nullable Instant earliestNoteCreatedAt,
+            @Nullable ProcessingContext ctx) {
+        Instant submittedAt = earliestNoteCreatedAt != null
                 ? earliestNoteCreatedAt
                 : (pr.getUpdatedAt() != null ? pr.getUpdatedAt() : Instant.now());
 
@@ -158,17 +151,16 @@ public class GitLabReviewReconciler {
         pr.addReview(saved);
 
         if (ctx != null) {
-            ScmEventPayload.ReviewData.from(saved).ifPresent(reviewData ->
-                eventPublisher.publishEvent(new ScmDomainEvent.ReviewSubmitted(reviewData, EventContext.from(ctx)))
-            );
+            ScmEventPayload.ReviewData.from(saved)
+                    .ifPresent(reviewData -> eventPublisher.publishEvent(
+                            new ScmDomainEvent.ReviewSubmitted(reviewData, EventContext.from(ctx))));
         }
 
         log.debug(
-            "Created COMMENTED review from discussion: prId={}, author={}, nativeId={}",
-            pr.getId(),
-            author.getLogin(),
-            reviewNativeId
-        );
+                "Created COMMENTED review from discussion: prId={}, author={}, nativeId={}",
+                pr.getId(),
+                author.getLogin(),
+                reviewNativeId);
         return saved;
     }
 

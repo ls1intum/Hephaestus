@@ -4,24 +4,13 @@ import de.tum.cit.aet.hephaestus.core.auth.AuthProperties;
 import de.tum.cit.aet.hephaestus.core.security.StaleAuthCookieFilter;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
+import org.jspecify.annotations.Nullable;
 import org.springframework.security.oauth2.server.resource.web.BearerTokenResolver;
 import org.springframework.security.oauth2.server.resource.web.DefaultBearerTokenResolver;
 
 /**
- * Resolves the resource-server bearer token from the SPA's {@code __Host-HEPHAESTUS_AT} cookie
- * (name from {@link AuthProperties#cookieName()}), falling back to the standard
- * {@code Authorization: Bearer} header (ADR 0017).
- *
- * <p>The SPA authenticates by an HttpOnly access-token cookie set on the OAuth success path
- * ({@code HephaestusAuthSuccessHandler}) and sent automatically with {@code credentials:"include"};
- * it never sends an {@code Authorization} header. The framework default
- * ({@link DefaultBearerTokenResolver}) only reads the header, so without this resolver every
- * browser request is 401. Worker / API / bearer-token integration clients still authenticate via
- * the header fallback.
- *
- * <p>Order is cookie-first: a browser request carries only the cookie, while a non-browser client
- * carries only the header, so they never collide in practice. CSRF (double-submit) covers the
- * cookie-authenticated, state-changing browser path — see {@code SecurityConfig#requiresCsrf}.
+ * Resolves the configured access-token cookie before falling back to a standard bearer header.
+ * Rejected stale cookies are ignored. See ADR 0017 for the cookie-first security policy.
  */
 public class CookieBearerTokenResolver implements BearerTokenResolver {
 
@@ -33,10 +22,8 @@ public class CookieBearerTokenResolver implements BearerTokenResolver {
     }
 
     @Override
-    public String resolve(HttpServletRequest request) {
-        // A stale cookie already rejected by StaleAuthCookieFilter: ignore it so this request stays
-        // anonymous (a permitAll endpoint serves instead of 401ing on the dead token). The header
-        // fallback below still applies for worker/API/bearer clients.
+    public @Nullable String resolve(HttpServletRequest request) {
+        // A rejected stale cookie must not authenticate this request.
         if (Boolean.TRUE.equals(request.getAttribute(StaleAuthCookieFilter.COOKIE_INVALID_ATTRIBUTE))) {
             return headerResolver.resolve(request);
         }
@@ -51,7 +38,6 @@ public class CookieBearerTokenResolver implements BearerTokenResolver {
                 }
             }
         }
-        // No cookie token → fall back to the standard Authorization: Bearer header (worker/API/tests).
         return headerResolver.resolve(request);
     }
 }

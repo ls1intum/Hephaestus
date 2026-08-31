@@ -16,15 +16,14 @@ import org.jspecify.annotations.Nullable;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitHubDiscussionCategoryDTO(
-    @JsonProperty("id") String nodeId,
-    @JsonProperty("name") String name,
-    @JsonProperty("slug") String slug,
-    @JsonProperty("emoji") String emoji,
-    @JsonProperty("description") String description,
-    @JsonProperty("is_answerable") boolean isAnswerable,
-    @JsonProperty("created_at") @Nullable Instant createdAt,
-    @JsonProperty("updated_at") @Nullable Instant updatedAt
-) {
+        @JsonProperty("id") String nodeId,
+        @JsonProperty("name") String name,
+        @JsonProperty("slug") String slug,
+        @JsonProperty("emoji") String emoji,
+        @JsonProperty("description") String description,
+        @JsonProperty("is_answerable") boolean isAnswerable,
+        @JsonProperty("created_at") @Nullable Instant createdAt,
+        @JsonProperty("updated_at") @Nullable Instant updatedAt) {
     // STATIC FACTORY METHODS FOR GRAPHQL RESPONSES
 
     /**
@@ -39,14 +38,13 @@ public record GitHubDiscussionCategoryDTO(
             return null;
         }
         return new GitHubDiscussionCategoryDTO(
-            category.getId(),
-            category.getName(),
-            category.getSlug(),
-            category.getEmoji(),
-            category.getDescription(),
-            category.getIsAnswerable(),
-            toInstant(category.getCreatedAt()),
-            toInstant(category.getUpdatedAt())
-        );
+                category.getId(),
+                category.getName(),
+                category.getSlug(),
+                category.getEmoji(),
+                category.getDescription(),
+                category.getIsAnswerable(),
+                toInstant(category.getCreatedAt()),
+                toInstant(category.getUpdatedAt()));
     }
 }

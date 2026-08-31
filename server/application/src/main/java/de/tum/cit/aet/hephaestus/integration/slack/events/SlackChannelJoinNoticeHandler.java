@@ -41,13 +41,12 @@ public class SlackChannelJoinNoticeHandler {
     private final SlackChannelConsentService consentService;
 
     public SlackChannelJoinNoticeHandler(
-        SlackWorkspaceResolver workspaceResolver,
-        SlackChannelConsentGate consentGate,
-        SlackParticipantConsentGate participantConsentGate,
-        SlackMessageService messageService,
-        SlackHephaestusUiLinks uiLinks,
-        SlackChannelConsentService consentService
-    ) {
+            SlackWorkspaceResolver workspaceResolver,
+            SlackChannelConsentGate consentGate,
+            SlackParticipantConsentGate participantConsentGate,
+            SlackMessageService messageService,
+            SlackHephaestusUiLinks uiLinks,
+            SlackChannelConsentService consentService) {
         this.workspaceResolver = workspaceResolver;
         this.consentGate = consentGate;
         this.participantConsentGate = participantConsentGate;
@@ -79,7 +78,10 @@ public class SlackChannelJoinNoticeHandler {
 
         // Adding the app to a channel is Slack-native discovery. Register PENDING only; an admin still has to
         // activate the channel before anything is read.
-        if (messageService.resolveBotUserId(workspaceId).filter(joinerUserId::equals).isPresent()) {
+        if (messageService
+                .resolveBotUserId(workspaceId)
+                .filter(joinerUserId::equals)
+                .isPresent()) {
             consentService.register(workspaceId, channelId, null);
             return;
         }
@@ -98,19 +100,17 @@ public class SlackChannelJoinNoticeHandler {
         try {
             String hephaestusUrl = uiLinks.workspaceHomeUrl(workspaceId);
             messageService.sendEphemeralForWorkspace(
-                workspaceId,
-                channelId,
-                joinerUserId,
-                SlackConsentBlocks.lateJoinNotice(hephaestusUrl),
-                SlackConsentBlocks.lateJoinFallbackText(hephaestusUrl)
-            );
+                    workspaceId,
+                    channelId,
+                    joinerUserId,
+                    SlackConsentBlocks.lateJoinNotice(hephaestusUrl),
+                    SlackConsentBlocks.lateJoinFallbackText(hephaestusUrl));
         } catch (SlackSendException e) {
             log.warn(
-                "Slack join consent notice failed to post: workspaceId={}, channelId={}, error={}",
-                workspaceId,
-                channelId,
-                e.slackError()
-            );
+                    "Slack join consent notice failed to post: workspaceId={}, channelId={}, error={}",
+                    workspaceId,
+                    channelId,
+                    e.slackError());
         }
     }
 }

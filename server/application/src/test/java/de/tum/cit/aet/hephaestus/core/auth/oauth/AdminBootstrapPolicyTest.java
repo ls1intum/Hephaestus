@@ -17,7 +17,7 @@ import org.junit.jupiter.api.Test;
  */
 class AdminBootstrapPolicyTest extends BaseUnitTest {
 
-    private static AdminBootstrapPolicy policy(String @Nullable... entries) {
+    private static AdminBootstrapPolicy policy(String @Nullable ... entries) {
         AuthProperties props = mock(AuthProperties.class);
         when(props.bootstrapAdmins()).thenReturn(entries == null ? null : Arrays.asList(entries));
         return new AdminBootstrapPolicy(props);

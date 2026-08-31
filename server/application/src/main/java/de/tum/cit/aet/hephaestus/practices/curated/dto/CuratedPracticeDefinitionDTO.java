@@ -12,29 +12,27 @@ import org.jspecify.annotations.Nullable;
 
 @Schema(description = "A resolved curated practice definition")
 public record CuratedPracticeDefinitionDTO(
-    @NonNull String name,
-    @NonNull ArtifactKind artifactKind,
-    @NonNull List<PracticeBinding> bindings,
-    @NonNull String criteria,
-    @Nullable String precomputeScript,
-    @NonNull PracticeAutomatedReviewPolicy automatedReviewPolicy,
-    @NonNull PracticeAutomatedReviewValidation automatedReviewValidation,
-    @Nullable String whyItMatters,
-    @Nullable String whatGoodLooksLike,
-    @Nullable String groupSlug
-) {
+        @NonNull String name,
+        @NonNull ArtifactKind artifactKind,
+        @NonNull List<PracticeBinding> bindings,
+        @NonNull String criteria,
+        @Nullable String precomputeScript,
+        @NonNull PracticeAutomatedReviewPolicy automatedReviewPolicy,
+        @NonNull PracticeAutomatedReviewValidation automatedReviewValidation,
+        @Nullable String whyItMatters,
+        @Nullable String whatGoodLooksLike,
+        @Nullable String groupSlug) {
     public static CuratedPracticeDefinitionDTO from(String practiceSlug, PracticeDefinition definition) {
         return new CuratedPracticeDefinitionDTO(
-            definition.name(),
-            definition.artifactKind(),
-            definition.bindings(),
-            definition.criteria(),
-            definition.precomputeScript(),
-            definition.automatedReviewPolicy(),
-            PracticeAutomatedReviewValidation.authorDeclared(practiceSlug, definition),
-            definition.whyItMatters(),
-            definition.whatGoodLooksLike(),
-            definition.groupSlug()
-        );
+                definition.name(),
+                definition.artifactKind(),
+                definition.bindings(),
+                definition.criteria(),
+                definition.precomputeScript(),
+                definition.automatedReviewPolicy(),
+                PracticeAutomatedReviewValidation.authorDeclared(practiceSlug, definition),
+                definition.whyItMatters(),
+                definition.whatGoodLooksLike(),
+                definition.groupSlug());
     }
 }

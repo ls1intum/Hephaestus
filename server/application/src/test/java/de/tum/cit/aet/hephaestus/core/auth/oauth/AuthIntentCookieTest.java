@@ -13,11 +13,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
-/**
- * Pins the AES-GCM-sealed auth-intent cookie's server-side freshness gate: the {@code issuedAt} baked
- * into the sealed plaintext (not the client-controlled {@code Max-Age}) is authoritative, so a stale
- * or future-dated cookie is treated as absent (returns null).
- */
 class AuthIntentCookieTest extends BaseUnitTest {
 
     private static final byte[] KEY = "0123456789abcdef0123456789abcdef".getBytes();
@@ -27,7 +22,6 @@ class AuthIntentCookieTest extends BaseUnitTest {
         return new AuthIntentCookie(KEY, Clock.fixed(when, ZoneOffset.UTC));
     }
 
-    /** Seal {@code intent} (writer clock irrelevant) and return the cookie value. */
     private static Cookie seal(AuthIntentCookie.Intent intent) {
         MockHttpServletResponse res = new MockHttpServletResponse();
         new AuthIntentCookie(KEY).write(res, intent);
@@ -63,20 +57,63 @@ class AuthIntentCookieTest extends BaseUnitTest {
     }
 
     @Test
+    void cookieAtTtlBoundary_returnsIntent() {
+        Cookie cookie = seal(intentAt(T0.toEpochMilli()));
+        assertThat(readBack(at(T0.plusSeconds(600)), cookie)).isNotNull();
+    }
+
+    @Test
     void cookieOlderThanTtl_returnsNull() {
         Cookie cookie = seal(intentAt(T0.toEpochMilli()));
-        assertThat(readBack(at(T0.plusSeconds(601)), cookie)).isNull();
+        assertThat(readBack(at(T0.plusSeconds(600).plusMillis(1)), cookie)).isNull();
     }
 
     @Test
     void futureDatedCookie_returnsNull() {
         Cookie cookie = seal(intentAt(T0.toEpochMilli()));
-        assertThat(readBack(at(T0.minusSeconds(5)), cookie)).isNull();
+        assertThat(readBack(at(T0.minusMillis(1)), cookie)).isNull();
+    }
+
+    @Test
+    void writesHardenedCookieWithFreshCiphertext() {
+        AuthIntentCookie writer = at(T0);
+        AuthIntentCookie.Intent intent = intentAt(T0.toEpochMilli());
+        MockHttpServletResponse first = new MockHttpServletResponse();
+        MockHttpServletResponse second = new MockHttpServletResponse();
+
+        writer.write(first, intent);
+        writer.write(second, intent);
+
+        Cookie cookie = first.getCookie(AuthIntentCookie.COOKIE_NAME);
+        Cookie secondCookie = second.getCookie(AuthIntentCookie.COOKIE_NAME);
+        assertThat(cookie).isNotNull();
+        assertThat(secondCookie).isNotNull();
+        assertThat(cookie.isHttpOnly()).isTrue();
+        assertThat(cookie.getSecure()).isTrue();
+        assertThat(cookie.getPath()).isEqualTo("/");
+        assertThat(cookie.getMaxAge()).isEqualTo(600);
+        assertThat(cookie.getAttribute("SameSite")).isEqualTo("Lax");
+        assertThat(cookie.getValue()).isNotEqualTo(secondCookie.getValue());
+    }
+
+    @Test
+    void clearsWithAnExpiredHardenedCookie() {
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        at(T0).clear(response);
+
+        Cookie cookie = response.getCookie(AuthIntentCookie.COOKIE_NAME);
+        assertThat(cookie).isNotNull();
+        assertThat(cookie.getValue()).isEmpty();
+        assertThat(cookie.isHttpOnly()).isTrue();
+        assertThat(cookie.getSecure()).isTrue();
+        assertThat(cookie.getPath()).isEqualTo("/");
+        assertThat(cookie.getMaxAge()).isZero();
+        assertThat(cookie.getAttribute("SameSite")).isEqualTo("Lax");
     }
 
     @Test
     void legacyCookieWithoutIssuedAt_isTreatedAsStale() {
-        // issuedAt == 0 mimics a cookie minted before the field existed → ~56 years old → rejected.
         Cookie cookie = seal(intentAt(0L));
         assertThat(readBack(at(T0), cookie)).isNull();
     }

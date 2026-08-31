@@ -62,9 +62,8 @@ class GitlabSummaryChannelTest extends BaseUnitTest {
     void postSummaryReturnsNoteId() {
         FeedbackTarget target = gitlabTarget();
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
-        when(mrResolver.resolve(1L, "group/project", 42)).thenReturn(
-            new MrInfo("gid://gitlab/MR/42", "base", "head", "start")
-        );
+        when(mrResolver.resolve(1L, "group/project", 42))
+                .thenReturn(new MrInfo("gid://gitlab/MR/42", "base", "head", "start"));
 
         HttpGraphQlClient client = mock(HttpGraphQlClient.class);
         HttpGraphQlClient.RequestSpec spec = mock(HttpGraphQlClient.RequestSpec.class);
@@ -79,32 +78,31 @@ class GitlabSummaryChannelTest extends BaseUnitTest {
 
         assertThat(handle).isNotNull();
         assertThat(handle.externalId()).isEqualTo("gid://gitlab/Note/789");
+        verify(spec).variable("body", "hello\n\nmarker");
     }
 
     @Test
     void shouldBlockPostMutationWhenSilentModeIsEngaged() {
-        when(mrResolver.resolve(1L, "group/project", 42)).thenReturn(
-            new MrInfo("gid://gitlab/MR/42", "base", "head", "start")
-        );
+        when(mrResolver.resolve(1L, "group/project", 42))
+                .thenReturn(new MrInfo("gid://gitlab/MR/42", "base", "head", "start"));
         doThrow(new OutboundEgressSuppressedException("test"))
-            .when(egressGuard)
-            .requireDeliveryAllowed("gitlab.post-summary");
+                .when(egressGuard)
+                .requireDeliveryAllowed("gitlab.post-summary");
 
-        assertThatThrownBy(() ->
-            channel.postSummary(gitlabTarget(), new FeedbackContent("body", "marker"))
-        ).isInstanceOf(OutboundEgressSuppressedException.class);
+        assertThatThrownBy(() -> channel.postSummary(gitlabTarget(), new FeedbackContent("body", "marker")))
+                .isInstanceOf(OutboundEgressSuppressedException.class);
         verify(gitLabProvider, never()).forScope(anyLong());
     }
 
     @Test
     void shouldBlockUpdateMutationWhenSilentModeIsEngaged() {
         doThrow(new OutboundEgressSuppressedException("test"))
-            .when(egressGuard)
-            .requireDeliveryAllowed("gitlab.update-summary");
+                .when(egressGuard)
+                .requireDeliveryAllowed("gitlab.update-summary");
 
-        assertThatThrownBy(() ->
-            channel.updateSummary(gitlabTarget(), "gid://gitlab/Note/789", new FeedbackContent("body", "marker"))
-        ).isInstanceOf(OutboundEgressSuppressedException.class);
+        assertThatThrownBy(() -> channel.updateSummary(
+                        gitlabTarget(), "gid://gitlab/Note/789", new FeedbackContent("body", "marker")))
+                .isInstanceOf(OutboundEgressSuppressedException.class);
         verify(gitLabProvider, never()).forScope(anyLong());
     }
 
@@ -112,9 +110,8 @@ class GitlabSummaryChannelTest extends BaseUnitTest {
     void postSummaryEscapesSlashCommands() {
         FeedbackTarget target = gitlabTarget();
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
-        when(mrResolver.resolve(1L, "group/project", 42)).thenReturn(
-            new MrInfo("gid://gitlab/MR/42", "base", "head", "start")
-        );
+        when(mrResolver.resolve(1L, "group/project", 42))
+                .thenReturn(new MrInfo("gid://gitlab/MR/42", "base", "head", "start"));
 
         HttpGraphQlClient client = mock(HttpGraphQlClient.class);
         HttpGraphQlClient.RequestSpec spec = mock(HttpGraphQlClient.RequestSpec.class);
@@ -163,9 +160,8 @@ class GitlabSummaryChannelTest extends BaseUnitTest {
     @Test
     void escapeSlashCommands_leavesMidLineCommandsUntouched() {
         // MULTILINE anchors ^ to line-start, so only a line-start "/approve" is an action; mid-line text is untouched.
-        assertThat(GitlabSummaryChannel.escapeSlashCommands("Please ask them to /approve it")).isEqualTo(
-            "Please ask them to /approve it"
-        );
+        assertThat(GitlabSummaryChannel.escapeSlashCommands("Please ask them to /approve it"))
+                .isEqualTo("Please ask them to /approve it");
         assertThat(GitlabSummaryChannel.escapeSlashCommands("/approve\n/merge")).isEqualTo("`/approve`\n`/merge`");
     }
 
@@ -173,10 +169,9 @@ class GitlabSummaryChannelTest extends BaseUnitTest {
     void slashCommandPattern_matchesTheCanonicalPullRequestPosterLiteral() {
         // GitlabSummaryChannel.GITLAB_SLASH_COMMAND deliberately duplicates PullRequestCommentPoster's private
         // constant; this pins the copy against the canonical literal so the two cannot silently drift apart.
-        String canonical =
-            "^(\\s*/(?:approve|merge|close|reopen|assign|unassign|label|unlabel|lock|unlock|" +
-            "milestone|estimate|spend|award|subscribe|unsubscribe|todo|done|wip|draft|ready|" +
-            "due|remove_due_date|weight|epic|copy_metadata|move|confidential|shrug|tableflip)\\b)";
+        String canonical = "^(\\s*/(?:approve|merge|close|reopen|assign|unassign|label|unlabel|lock|unlock|"
+                + "milestone|estimate|spend|award|subscribe|unsubscribe|todo|done|wip|draft|ready|"
+                + "due|remove_due_date|weight|epic|copy_metadata|move|confidential|shrug|tableflip)\\b)";
         assertThat(GitlabSummaryChannel.GITLAB_SLASH_COMMAND.pattern()).isEqualTo(canonical);
     }
 
@@ -185,8 +180,8 @@ class GitlabSummaryChannelTest extends BaseUnitTest {
         FeedbackTarget target = gitlabTarget();
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(true);
         assertThatThrownBy(() -> channel.postSummary(target, new FeedbackContent("body", "marker")))
-            .isInstanceOf(FeedbackDeliveryException.class)
-            .hasMessageContaining("rate limit critical");
+                .isInstanceOf(FeedbackDeliveryException.class)
+                .hasMessageContaining("rate limit critical");
     }
 
     @Test
@@ -194,9 +189,8 @@ class GitlabSummaryChannelTest extends BaseUnitTest {
         // Must surface as FeedbackDeliveryException so PullRequestCommentPoster's catch-wrap stays uniform.
         FeedbackTarget target = gitlabTarget();
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
-        when(mrResolver.resolve(1L, "group/project", 42)).thenReturn(
-            new MrInfo("gid://gitlab/MR/42", "base", "head", "start")
-        );
+        when(mrResolver.resolve(1L, "group/project", 42))
+                .thenReturn(new MrInfo("gid://gitlab/MR/42", "base", "head", "start"));
 
         HttpGraphQlClient client = mock(HttpGraphQlClient.class);
         HttpGraphQlClient.RequestSpec spec = mock(HttpGraphQlClient.RequestSpec.class);
@@ -206,17 +200,16 @@ class GitlabSummaryChannelTest extends BaseUnitTest {
         when(spec.execute()).thenReturn(Mono.error(new RuntimeException("connection reset")));
 
         assertThatThrownBy(() -> channel.postSummary(target, new FeedbackContent("body", "marker")))
-            .isInstanceOf(FeedbackDeliveryException.class)
-            .hasMessageContaining("createNote transport error");
+                .isInstanceOf(FeedbackDeliveryException.class)
+                .hasMessageContaining("createNote transport error");
     }
 
     @Test
     void throwsOnMutationErrors() {
         FeedbackTarget target = gitlabTarget();
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
-        when(mrResolver.resolve(1L, "group/project", 42)).thenReturn(
-            new MrInfo("gid://gitlab/MR/42", "base", "head", "start")
-        );
+        when(mrResolver.resolve(1L, "group/project", 42))
+                .thenReturn(new MrInfo("gid://gitlab/MR/42", "base", "head", "start"));
 
         HttpGraphQlClient client = mock(HttpGraphQlClient.class);
         HttpGraphQlClient.RequestSpec spec = mock(HttpGraphQlClient.RequestSpec.class);
@@ -231,17 +224,14 @@ class GitlabSummaryChannelTest extends BaseUnitTest {
         when(spec.execute()).thenReturn(Mono.just(response));
 
         assertThatThrownBy(() -> channel.postSummary(target, new FeedbackContent("body", "marker")))
-            .isInstanceOf(FeedbackDeliveryException.class)
-            .hasMessageContaining("createNote failed");
+                .isInstanceOf(FeedbackDeliveryException.class)
+                .hasMessageContaining("createNote failed");
     }
 
     @Test
     void postSummaryRoutesIssueSubjectToIssueGid() {
-        FeedbackTarget issueTarget = new FeedbackTarget(
-            new IntegrationRef(IntegrationKind.GITLAB, 1L, null),
-            "group/project#7",
-            null
-        );
+        FeedbackTarget issueTarget =
+                new FeedbackTarget(new IntegrationRef(IntegrationKind.GITLAB, 1L, null), "group/project#7", null);
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
         when(mrResolver.resolveIssueGid(1L, "group/project", 7)).thenReturn("gid://gitlab/Issue/7");
 
@@ -281,17 +271,14 @@ class GitlabSummaryChannelTest extends BaseUnitTest {
         when(response.getErrors()).thenReturn(List.of());
         when(spec.execute()).thenReturn(Mono.just(response));
 
-        SummaryChannel.UpdateOutcome outcome = channel.updateSummary(
-            target,
-            "gid://gitlab/Note/789",
-            new FeedbackContent("updated body", "marker")
-        );
+        SummaryChannel.UpdateOutcome outcome =
+                channel.updateSummary(target, "gid://gitlab/Note/789", new FeedbackContent("updated body", "marker"));
 
         assertThat(outcome.kind()).isEqualTo(SummaryChannel.UpdateOutcome.Kind.EDITED);
         assertNotNull(outcome.handle());
         assertThat(outcome.handle().externalId()).isEqualTo("gid://gitlab/Note/789");
-        // No MR/issue resolution — the note id addresses the comment directly.
         verify(spec).variable(eq("id"), eq("gid://gitlab/Note/789"));
+        verify(spec).variable(eq("body"), eq("updated body\n\nmarker"));
     }
 
     @Test
@@ -300,11 +287,8 @@ class GitlabSummaryChannelTest extends BaseUnitTest {
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
         stubMutationErrors(List.of("note not found"));
 
-        SummaryChannel.UpdateOutcome outcome = channel.updateSummary(
-            target,
-            "gid://gitlab/Note/gone",
-            new FeedbackContent("body", "marker")
-        );
+        SummaryChannel.UpdateOutcome outcome =
+                channel.updateSummary(target, "gid://gitlab/Note/gone", new FeedbackContent("body", "marker"));
 
         assertThat(outcome.kind()).isEqualTo(SummaryChannel.UpdateOutcome.Kind.GONE);
     }
@@ -315,11 +299,8 @@ class GitlabSummaryChannelTest extends BaseUnitTest {
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
         stubMutationErrors(List.of("something went wrong"));
 
-        SummaryChannel.UpdateOutcome outcome = channel.updateSummary(
-            target,
-            "gid://gitlab/Note/1",
-            new FeedbackContent("body", "marker")
-        );
+        SummaryChannel.UpdateOutcome outcome =
+                channel.updateSummary(target, "gid://gitlab/Note/1", new FeedbackContent("body", "marker"));
 
         assertThat(outcome.kind()).isEqualTo(SummaryChannel.UpdateOutcome.Kind.TRANSIENT);
     }
@@ -329,11 +310,8 @@ class GitlabSummaryChannelTest extends BaseUnitTest {
         FeedbackTarget target = gitlabTarget();
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(true);
 
-        SummaryChannel.UpdateOutcome outcome = channel.updateSummary(
-            target,
-            "gid://gitlab/Note/1",
-            new FeedbackContent("body", "marker")
-        );
+        SummaryChannel.UpdateOutcome outcome =
+                channel.updateSummary(target, "gid://gitlab/Note/1", new FeedbackContent("body", "marker"));
 
         assertThat(outcome.kind()).isEqualTo(SummaryChannel.UpdateOutcome.Kind.TRANSIENT);
     }
@@ -342,8 +320,8 @@ class GitlabSummaryChannelTest extends BaseUnitTest {
     void updateSummaryThrowsOnBlankExternalId() {
         FeedbackTarget target = gitlabTarget();
         assertThatThrownBy(() -> channel.updateSummary(target, "  ", new FeedbackContent("body", "marker")))
-            .isInstanceOf(FeedbackDeliveryException.class)
-            .hasMessageContaining("external note id is missing");
+                .isInstanceOf(FeedbackDeliveryException.class)
+                .hasMessageContaining("external note id is missing");
     }
 
     private void stubMutationErrors(List<String> errors) {
@@ -377,17 +355,14 @@ class GitlabSummaryChannelTest extends BaseUnitTest {
 
         ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
         ResponseError notFound = mock(ResponseError.class);
-        when(notFound.getMessage()).thenReturn(
-            "The resource that you are attempting to access does not exist or you don't have permission to perform this action"
-        );
+        when(notFound.getMessage())
+                .thenReturn(
+                        "The resource that you are attempting to access does not exist or you don't have permission to perform this action");
         when(response.getErrors()).thenReturn(List.of(notFound));
         when(spec.execute()).thenReturn(Mono.just(response));
 
-        SummaryChannel.UpdateOutcome outcome = channel.updateSummary(
-            target,
-            "gid://gitlab/Note/4825166",
-            new FeedbackContent("body", "marker")
-        );
+        SummaryChannel.UpdateOutcome outcome =
+                channel.updateSummary(target, "gid://gitlab/Note/4825166", new FeedbackContent("body", "marker"));
 
         assertThat(outcome.kind()).isEqualTo(SummaryChannel.UpdateOutcome.Kind.GONE);
     }
@@ -405,12 +380,11 @@ class GitlabSummaryChannelTest extends BaseUnitTest {
 
     /** Keyed by response path, so a test that stubs the MR path fails outright if the channel reads the issue path. */
     private ClientGraphQlResponse mockNotesPage(
-        String notesPath,
-        List<Map<String, Object>> notes,
-        boolean hasPreviousPage,
-        @Nullable String startCursor,
-        List<ResponseError> errors
-    ) {
+            String notesPath,
+            List<Map<String, Object>> notes,
+            boolean hasPreviousPage,
+            @Nullable String startCursor,
+            List<ResponseError> errors) {
         ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
         lenient().when(response.getErrors()).thenReturn(errors);
         ClientResponseField nodesField = mock(ClientResponseField.class);
@@ -419,16 +393,13 @@ class GitlabSummaryChannelTest extends BaseUnitTest {
         ClientResponseField pageInfoField = mock(ClientResponseField.class);
         lenient().when(response.field(notesPath + ".pageInfo")).thenReturn(pageInfoField);
         lenient()
-            .when(pageInfoField.toEntity(GitLabBackwardPageInfo.class))
-            .thenReturn(new GitLabBackwardPageInfo(hasPreviousPage, startCursor));
+                .when(pageInfoField.toEntity(GitLabBackwardPageInfo.class))
+                .thenReturn(new GitLabBackwardPageInfo(hasPreviousPage, startCursor));
         return response;
     }
 
     private ClientGraphQlResponse mockMrNotesPage(
-        List<Map<String, Object>> notes,
-        boolean hasPreviousPage,
-        @Nullable String startCursor
-    ) {
+            List<Map<String, Object>> notes, boolean hasPreviousPage, @Nullable String startCursor) {
         return mockNotesPage(MR_NOTES_PATH, notes, hasPreviousPage, startCursor, List.of());
     }
 
@@ -444,10 +415,11 @@ class GitlabSummaryChannelTest extends BaseUnitTest {
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
         HttpGraphQlClient.RequestSpec spec = mockRequestChain();
         ClientGraphQlResponse page = mockMrNotesPage(
-            List.of(note("gid://gitlab/Note/1", "a human said hi"), note("gid://gitlab/Note/2", MARKER + "\nsummary")),
-            false,
-            null
-        );
+                List.of(
+                        note("gid://gitlab/Note/1", "a human said hi"),
+                        note("gid://gitlab/Note/2", MARKER + "\nsummary")),
+                false,
+                null);
         when(spec.execute()).thenReturn(Mono.just(page));
 
         ExistingSummaryLookup result = channel.findExistingSummary(gitlabTarget(), MARKER);
@@ -482,10 +454,9 @@ class GitlabSummaryChannelTest extends BaseUnitTest {
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
         HttpGraphQlClient.RequestSpec spec = mockRequestChain();
         ClientGraphQlResponse page = mockMrNotesPage(
-            List.of(note("gid://gitlab/Note/1", "unrelated")),
-            false, // hasPreviousPage=false — the walk reached the oldest note, every note was seen
-            null
-        );
+                List.of(note("gid://gitlab/Note/1", "unrelated")),
+                false, // hasPreviousPage=false — the walk reached the oldest note, every note was seen
+                null);
         when(spec.execute()).thenReturn(Mono.just(page));
 
         ExistingSummaryLookup result = channel.findExistingSummary(gitlabTarget(), MARKER);
@@ -497,11 +468,8 @@ class GitlabSummaryChannelTest extends BaseUnitTest {
     void findExistingSummary_pageBudgetExhaustedWithOlderNotesLeft_isUnknown_notAbsent() {
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
         HttpGraphQlClient.RequestSpec spec = mockRequestChain();
-        ClientGraphQlResponse page = mockMrNotesPage(
-            List.of(note("gid://gitlab/Note/1", "unrelated")),
-            true,
-            "cursor-1"
-        );
+        ClientGraphQlResponse page =
+                mockMrNotesPage(List.of(note("gid://gitlab/Note/1", "unrelated")), true, "cursor-1");
         when(spec.execute()).thenReturn(Mono.just(page));
 
         ExistingSummaryLookup result = channel.findExistingSummary(gitlabTarget(), MARKER);
@@ -527,11 +495,8 @@ class GitlabSummaryChannelTest extends BaseUnitTest {
     void findExistingSummary_secondPageHasTheMatch_isFound() {
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
         HttpGraphQlClient.RequestSpec spec = mockRequestChain();
-        ClientGraphQlResponse page1 = mockMrNotesPage(
-            List.of(note("gid://gitlab/Note/1", "unrelated")),
-            true,
-            "cursor-1"
-        );
+        ClientGraphQlResponse page1 =
+                mockMrNotesPage(List.of(note("gid://gitlab/Note/1", "unrelated")), true, "cursor-1");
         ClientGraphQlResponse page2 = mockMrNotesPage(List.of(note("gid://gitlab/Note/2", MARKER)), false, null);
         when(spec.execute()).thenReturn(Mono.just(page1), Mono.just(page2));
 
@@ -550,12 +515,7 @@ class GitlabSummaryChannelTest extends BaseUnitTest {
         HttpGraphQlClient.RequestSpec spec = mockRequestChain();
         ResponseError error = mock(ResponseError.class);
         ClientGraphQlResponse page = mockNotesPage(
-            MR_NOTES_PATH,
-            List.of(note("gid://gitlab/Note/1", "unrelated")),
-            false,
-            null,
-            List.of(error)
-        );
+                MR_NOTES_PATH, List.of(note("gid://gitlab/Note/1", "unrelated")), false, null, List.of(error));
         when(spec.execute()).thenReturn(Mono.just(page));
 
         ExistingSummaryLookup result = channel.findExistingSummary(gitlabTarget(), MARKER);
@@ -577,12 +537,7 @@ class GitlabSummaryChannelTest extends BaseUnitTest {
         when(spec.variable(any(), any())).thenReturn(spec);
         // Stubbed ONLY on the issue path: reading the merge-request path would yield null nodes → UNKNOWN.
         ClientGraphQlResponse page = mockNotesPage(
-            ISSUE_NOTES_PATH,
-            List.of(note("gid://gitlab/Note/7", MARKER + "\nsummary")),
-            false,
-            null,
-            List.of()
-        );
+                ISSUE_NOTES_PATH, List.of(note("gid://gitlab/Note/7", MARKER + "\nsummary")), false, null, List.of());
         when(spec.execute()).thenReturn(Mono.just(page));
 
         ExistingSummaryLookup result = channel.findExistingSummary(gitlabIssueTarget(), MARKER);
@@ -600,13 +555,8 @@ class GitlabSummaryChannelTest extends BaseUnitTest {
         // Fail-closed applies only while absence is unproven; a fully-scanned thread with no marker is proven absence.
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
         HttpGraphQlClient.RequestSpec spec = mockRequestChain();
-        ClientGraphQlResponse page = mockNotesPage(
-            ISSUE_NOTES_PATH,
-            List.of(note("gid://gitlab/Note/1", "hi")),
-            false,
-            null,
-            List.of()
-        );
+        ClientGraphQlResponse page =
+                mockNotesPage(ISSUE_NOTES_PATH, List.of(note("gid://gitlab/Note/1", "hi")), false, null, List.of());
         when(spec.execute()).thenReturn(Mono.just(page));
 
         ExistingSummaryLookup result = channel.findExistingSummary(gitlabIssueTarget(), MARKER);
@@ -684,9 +634,8 @@ class GitlabSummaryChannelTest extends BaseUnitTest {
         // A read-only GitLab instance returns no createNote payload, only a top-level error the channel must surface.
         FeedbackTarget target = gitlabTarget();
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
-        when(mrResolver.resolve(1L, "group/project", 42)).thenReturn(
-            new MrInfo("gid://gitlab/MR/42", "base", "head", "start")
-        );
+        when(mrResolver.resolve(1L, "group/project", 42))
+                .thenReturn(new MrInfo("gid://gitlab/MR/42", "base", "head", "start"));
 
         HttpGraphQlClient client = mock(HttpGraphQlClient.class);
         HttpGraphQlClient.RequestSpec spec = mock(HttpGraphQlClient.RequestSpec.class);
@@ -701,7 +650,7 @@ class GitlabSummaryChannelTest extends BaseUnitTest {
         when(spec.execute()).thenReturn(Mono.just(response));
 
         assertThatThrownBy(() -> channel.postSummary(target, new FeedbackContent("body", "marker")))
-            .isInstanceOf(FeedbackDeliveryException.class)
-            .hasMessageContaining("read-only instance");
+                .isInstanceOf(FeedbackDeliveryException.class)
+                .hasMessageContaining("read-only instance");
     }
 }

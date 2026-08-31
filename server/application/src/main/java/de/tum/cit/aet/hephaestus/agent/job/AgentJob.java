@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.core.security.EncryptedStringConverter;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.practices.review.TriggerMode;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
@@ -47,16 +48,21 @@ import tools.jackson.databind.JsonNode;
  */
 @Entity
 @Table(
-    name = "agent_job",
-    indexes = {
-        @Index(name = "idx_agent_job_workspace_created", columnList = "workspace_id, created_at DESC, id DESC"),
-        @Index(
-            name = "idx_agent_job_workspace_purpose_created",
-            columnList = "workspace_id, purpose, created_at DESC, id DESC"
-        ),
-    },
-    uniqueConstraints = @UniqueConstraint(name = "uk_agent_job_token", columnNames = { "job_token" })
-)
+        name = "agent_job",
+        indexes = {
+            @Index(name = "idx_agent_job_workspace_created", columnList = "workspace_id, created_at DESC, id DESC"),
+            @Index(
+                    name = "idx_agent_job_workspace_purpose_created",
+                    columnList = "workspace_id, purpose, created_at DESC, id DESC"),
+        },
+        uniqueConstraints = {
+            @UniqueConstraint(
+                    name = "uk_agent_job_token",
+                    columnNames = {"job_token"}),
+            @UniqueConstraint(
+                    name = "uk_agent_job_workspace_id",
+                    columnNames = {"workspace_id", "id"}),
+        })
 @Getter
 @Setter
 @NoArgsConstructor
@@ -107,6 +113,15 @@ public class AgentJob {
     @Nullable
     private ArtifactKind artifactKind;
 
+    @ColumnDefault("0")
+    @Column(name = "practice_rollout_revision", nullable = false)
+    private Long practiceRolloutRevision = 0L;
+
+    @Enumerated(EnumType.STRING)
+    @ColumnDefault("'MANUAL'")
+    @Column(name = "practice_trigger_mode", nullable = false, length = 24)
+    private TriggerMode practiceTriggerMode = TriggerMode.MANUAL;
+
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "metadata", columnDefinition = "jsonb")
     private @Nullable JsonNode metadata;
@@ -137,6 +152,9 @@ public class AgentJob {
 
     @Column(name = "idempotency_key", length = 255)
     private String idempotencyKey;
+
+    @Column(name = "trace_id", nullable = false, updatable = false, length = 32)
+    private String traceId;
 
     @Column(name = "exit_code")
     private Integer exitCode;
@@ -302,6 +320,9 @@ public class AgentJob {
     public void prePersist() {
         if (this.id == null) {
             this.id = UUID.randomUUID();
+        }
+        if (this.traceId == null) {
+            this.traceId = UUID.randomUUID().toString().replace("-", "");
         }
         if (this.jobToken == null) {
             this.jobToken = generateJobToken();

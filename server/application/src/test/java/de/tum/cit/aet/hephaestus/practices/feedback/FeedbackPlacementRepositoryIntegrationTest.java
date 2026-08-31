@@ -8,7 +8,6 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
@@ -60,10 +59,9 @@ class FeedbackPlacementRepositoryIntegrationTest extends BaseIntegrationTest {
         job.setConfigSnapshot(OBJECT_MAPPER.valueToTree(Map.of("model", "test")));
         job = agentJobRepository.save(job);
         IdentityProvider provider = identityProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-            .orElseGet(() ->
-                identityProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseGet(() -> identityProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
         recipient = userRepository.save(TestUserFactory.createUser(100L, "recipient", provider));
     }
 
@@ -71,17 +69,14 @@ class FeedbackPlacementRepositoryIntegrationTest extends BaseIntegrationTest {
     void latestDeliveredSummaryIgnoresNewerInlineOnlyFeedback() {
         String threadKey = "thread-key";
         Feedback summary = saveFeedback(0, threadKey, Instant.parse("2026-01-01T00:00:00Z"));
-        placementRepository.save(
-            FeedbackPlacement.builder()
+        placementRepository.save(FeedbackPlacement.builder()
                 .feedback(summary)
                 .placementType(PlacementType.SUMMARY)
                 .postedCommentRef("summary-1")
                 .createdAt(Instant.parse("2026-01-01T00:00:00Z"))
-                .build()
-        );
+                .build());
         Feedback inlineOnly = saveFeedback(1, threadKey, Instant.parse("2026-01-02T00:00:00Z"));
-        placementRepository.save(
-            FeedbackPlacement.builder()
+        placementRepository.save(FeedbackPlacement.builder()
                 .feedback(inlineOnly)
                 .placementType(PlacementType.INLINE)
                 .anchorKind(PlacementAnchorKind.LINE)
@@ -90,20 +85,18 @@ class FeedbackPlacementRepositoryIntegrationTest extends BaseIntegrationTest {
                 .anchorSide(PlacementAnchorSide.NEW)
                 .postedCommentRef("inline-1")
                 .createdAt(Instant.parse("2026-01-02T00:00:00Z"))
-                .build()
-        );
+                .build());
 
         assertThat(placementRepository.findLatestDeliveredSummary(threadKey))
-            .get()
-            .satisfies(placement -> {
-                assertThat(placement.getFeedbackId()).isEqualTo(summary.getId());
-                assertThat(placement.getPostedCommentRef()).isEqualTo("summary-1");
-            });
+                .get()
+                .satisfies(placement -> {
+                    assertThat(placement.getFeedbackId()).isEqualTo(summary.getId());
+                    assertThat(placement.getPostedCommentRef()).isEqualTo("summary-1");
+                });
     }
 
     private Feedback saveFeedback(int position, String threadKey, Instant createdAt) {
-        return feedbackRepository.save(
-            Feedback.builder()
+        return feedbackRepository.save(Feedback.builder()
                 .agentJobId(job.getId())
                 .workspaceId(workspace.getId())
                 .artifactKind(ArtifactKinds.PULL_REQUEST)
@@ -117,7 +110,6 @@ class FeedbackPlacementRepositoryIntegrationTest extends BaseIntegrationTest {
                 .threadKey(threadKey)
                 .createdAt(createdAt)
                 .deliveredAt(createdAt)
-                .build()
-        );
+                .build());
     }
 }

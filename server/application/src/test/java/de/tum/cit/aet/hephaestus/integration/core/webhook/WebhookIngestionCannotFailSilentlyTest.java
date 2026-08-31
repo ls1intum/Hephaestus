@@ -57,37 +57,31 @@ class WebhookIngestionCannotFailSilentlyTest extends BaseUnitTest {
      * derives from it. Always present, on every role: {@code readinessState}.
      */
     private static final Map<String, String> CONTRIBUTOR_BEANS = Map.of(
-        "webhookHealthIndicator",
-        "webhook",
-        "integrationConsumerHealthIndicator",
-        "integrationConsumer",
-        "practiceReviewHealthIndicator",
-        "practiceReview",
-        "catalogProvenanceBackfillStartup",
-        "catalogProvenanceBackfillStartup"
-    );
+            "webhookHealthIndicator",
+            "webhook",
+            "integrationConsumerHealthIndicator",
+            "integrationConsumer",
+            "practiceReviewHealthIndicator",
+            "practiceReview",
+            "catalogProvenanceBackfillStartup",
+            "catalogProvenanceBackfillStartup");
 
     /** What a webhook-only container has: the server role is off, so most of the group is absent. */
-    private static final Set<String> WEBHOOK_ROLE_ONLY = Set.of(
-        "webhookHealthIndicator",
-        "practiceReviewHealthIndicator"
-    );
+    private static final Set<String> WEBHOOK_ROLE_ONLY =
+            Set.of("webhookHealthIndicator", "practiceReviewHealthIndicator");
 
     @Test
     void readinessReportsWhetherThisRuntimeCanIngest() {
-        healthContext(CONTRIBUTOR_BEANS.keySet()).run(context ->
-            assertThat(context.getBean(HealthEndpointGroups.class).get("readiness"))
-                .as("the shipped keys must produce a configured readiness group, not the auto-configured probe group")
-                .isNotNull()
-                .satisfies(group ->
-                    assertThat(group.isMember("webhook"))
+        healthContext(CONTRIBUTOR_BEANS.keySet())
+                .run(context -> assertThat(
+                                context.getBean(HealthEndpointGroups.class).get("readiness"))
                         .as(
-                            "on the webhook-only container this is the only contributor that knows about " +
-                                "NATS; without it ADR 0008's webhook-server-down alert can never fire"
-                        )
-                        .isTrue()
-                )
-        );
+                                "the shipped keys must produce a configured readiness group, not the auto-configured probe group")
+                        .isNotNull()
+                        .satisfies(group -> assertThat(group.isMember("webhook"))
+                                .as("on the webhook-only container this is the only contributor that knows about "
+                                        + "NATS; without it ADR 0008's webhook-server-down alert can never fire")
+                                .isTrue()));
     }
 
     @Test
@@ -105,8 +99,8 @@ class WebhookIngestionCannotFailSilentlyTest extends BaseUnitTest {
         // The control for the test above. Every named contributor is role-gated, so with validation
         // on — its default — the split deployment this branch exists to protect cannot boot at all.
         healthContext(WEBHOOK_ROLE_ONLY)
-            .withPropertyValues("management.endpoint.health.validate-group-membership=true")
-            .run(context -> assertThat(context).hasFailed());
+                .withPropertyValues("management.endpoint.health.validate-group-membership=true")
+                .run(context -> assertThat(context).hasFailed());
     }
 
     @Test
@@ -114,13 +108,14 @@ class WebhookIngestionCannotFailSilentlyTest extends BaseUnitTest {
         // Turning validation off is what lets a container form the group without its absent
         // contributors; it also means a misspelled name is silently ignored forever. This is that
         // check, moved to where it can run against every role at once instead of one at a time.
-        List<String> configured = List.of(
-            binder().bind("management.endpoint.health.group.readiness.include", String.class).get().split(",")
-        );
+        List<String> configured =
+                List.of(binder().bind("management.endpoint.health.group.readiness.include", String.class)
+                        .get()
+                        .split(","));
 
         assertThat(configured)
-            .as("a name no contributor answers to is a member the probe silently never evaluates")
-            .isSubsetOf(union(Set.of("readinessState"), CONTRIBUTOR_BEANS.values()));
+                .as("a name no contributor answers to is a member the probe silently never evaluates")
+                .isSubsetOf(union(Set.of("readinessState"), CONTRIBUTOR_BEANS.values()));
     }
 
     @Test
@@ -131,15 +126,14 @@ class WebhookIngestionCannotFailSilentlyTest extends BaseUnitTest {
         long repairableTraffic = reconciliationWindowDays * MEASURED_GITHUB_BYTES_PER_DAY;
 
         assertThat(stream.maxBytesFor("github"))
-            .as(
-                "webhook deliveries are not redeliverable (ADR 0008), but nightly RECONCILIATION " +
-                    "re-fetches the last %d days from the provider API, so inside that window a shed " +
-                    "message is recoverable by other means and outside it by nothing. This manufactures a " +
-                    "coupling the code does not have: raising the reconciliation window without raising " +
-                    "the byte bound is meant to fail here rather than in production",
-                reconciliationWindowDays
-            )
-            .isGreaterThan(repairableTraffic);
+                .as(
+                        "webhook deliveries are not redeliverable (ADR 0008), but nightly RECONCILIATION "
+                                + "re-fetches the last %d days from the provider API, so inside that window a shed "
+                                + "message is recoverable by other means and outside it by nothing. This manufactures a "
+                                + "coupling the code does not have: raising the reconciliation window without raising "
+                                + "the byte bound is meant to fail here rather than in production",
+                        reconciliationWindowDays)
+                .isGreaterThan(repairableTraffic);
     }
 
     /**
@@ -149,20 +143,19 @@ class WebhookIngestionCannotFailSilentlyTest extends BaseUnitTest {
      * the default alone is green while the deployment it ships with loses messages.
      */
     private int widestShippedReconciliationWindowDays() throws IOException {
-        int fromYaml = binder().bind("hephaestus.sync.timeframe-days", Integer.class).get();
-        Matcher shipped = Pattern.compile("^MONITORING_TIMEFRAME=(\\d+)$", Pattern.MULTILINE).matcher(
-            Files.readString(SHIPPED_ENV)
-        );
+        int fromYaml =
+                binder().bind("hephaestus.sync.timeframe-days", Integer.class).get();
+        Matcher shipped = Pattern.compile("^MONITORING_TIMEFRAME=(\\d+)$", Pattern.MULTILINE)
+                .matcher(Files.readString(SHIPPED_ENV));
         return shipped.find() ? Math.max(fromYaml, Integer.parseInt(shipped.group(1))) : fromYaml;
     }
 
     @Test
     void theShippedEnvFileFitsInsideTheBudgetItSets() throws IOException {
         Map<String, Long> shipped = shippedEnvSizes(
-            "NATS_JS_MAX_FILE_BYTES",
-            "HEPHAESTUS_WEBHOOK_STREAM_MAX_BYTES",
-            "HEPHAESTUS_WEBHOOK_STREAM_MAX_BYTES_GITHUB"
-        );
+                "NATS_JS_MAX_FILE_BYTES",
+                "HEPHAESTUS_WEBHOOK_STREAM_MAX_BYTES",
+                "HEPHAESTUS_WEBHOOK_STREAM_MAX_BYTES_GITHUB");
         Long perStream = shipped.get("HEPHAESTUS_WEBHOOK_STREAM_MAX_BYTES");
         Long github = shipped.get("HEPHAESTUS_WEBHOOK_STREAM_MAX_BYTES_GITHUB");
         assertNotNull(perStream);
@@ -170,12 +163,10 @@ class WebhookIngestionCannotFailSilentlyTest extends BaseUnitTest {
         long total = github + perStream * (WebhookJetStreamBootstrap.STREAMS.length - 1);
 
         assertThat(total)
-            .as(
-                "these four numbers are what an operator following docker/.env.example runs, and the " +
-                    "receiver refuses to start when the bounds overcommit the budget. The defaults in " +
-                    "application.yml agree with each other whether or not this file does"
-            )
-            .isLessThanOrEqualTo(shipped.get("NATS_JS_MAX_FILE_BYTES"));
+                .as("these four numbers are what an operator following docker/.env.example runs, and the "
+                        + "receiver refuses to start when the bounds overcommit the budget. The defaults in "
+                        + "application.yml agree with each other whether or not this file does")
+                .isLessThanOrEqualTo(shipped.get("NATS_JS_MAX_FILE_BYTES"));
     }
 
     /**
@@ -187,7 +178,8 @@ class WebhookIngestionCannotFailSilentlyTest extends BaseUnitTest {
         String env = Files.readString(SHIPPED_ENV);
         Map<String, Long> values = new java.util.LinkedHashMap<>();
         for (String name : names) {
-            Matcher m = Pattern.compile("^" + Pattern.quote(name) + "=(\\S+)$", Pattern.MULTILINE).matcher(env);
+            Matcher m = Pattern.compile("^" + Pattern.quote(name) + "=(\\S+)$", Pattern.MULTILINE)
+                    .matcher(env);
             assertThat(m.find()).as("%s is set in docker/.env.example", name).isTrue();
             values.put(name, DataSize.parse(m.group(1)).toBytes());
         }
@@ -204,27 +196,26 @@ class WebhookIngestionCannotFailSilentlyTest extends BaseUnitTest {
         }
 
         assertThat(total)
-            .as("JetStream that fills the filesystem cannot write its own metadata and stays wedged")
-            .isLessThanOrEqualTo(stream.storageBudget().toBytes());
+                .as("JetStream that fills the filesystem cannot write its own metadata and stays wedged")
+                .isLessThanOrEqualTo(stream.storageBudget().toBytes());
     }
 
     @Test
     void theBrokerBudgetAndTheStreamBudgetAreTheSameNumber() throws IOException {
         assertThat(defaultOf("max_file"))
-            .as("two numbers for one budget means the deployed one is whichever file the reader did not open")
-            .isEqualTo(shippedStream().storageBudget().toBytes());
+                .as("two numbers for one budget means the deployed one is whichever file the reader did not open")
+                .isEqualTo(shippedStream().storageBudget().toBytes());
     }
 
     @Test
     void theBrokerCarriesEveryPayloadTheReceiverAccepts() throws IOException {
-        long accepted = binder().bind("hephaestus.webhook.http.max-payload-bytes", Long.class).get();
+        long accepted = binder().bind("hephaestus.webhook.http.max-payload-bytes", Long.class)
+                .get();
 
         assertThat(defaultOf("max_payload"))
-            .as(
-                "NATS defaults max_payload to 1MB: a delivery above it is verified, accepted, and then " +
-                    "refused at publish, which is loss the receiver has already answered for"
-            )
-            .isGreaterThanOrEqualTo(accepted);
+                .as("NATS defaults max_payload to 1MB: a delivery above it is verified, accepted, and then "
+                        + "refused at publish, which is loss the receiver has already answered for")
+                .isGreaterThanOrEqualTo(accepted);
     }
 
     /**
@@ -233,14 +224,10 @@ class WebhookIngestionCannotFailSilentlyTest extends BaseUnitTest {
      */
     private static ApplicationContextRunner healthContext(Set<String> contributorBeans) {
         ApplicationContextRunner runner = new ApplicationContextRunner()
-            .withConfiguration(
-                AutoConfigurations.of(
-                    HealthContributorRegistryAutoConfiguration.class,
-                    HealthEndpointAutoConfiguration.class
-                )
-            )
-            .withPropertyValues(shippedPropertyValues("management."))
-            .withBean("readinessState", HealthIndicator.class, () -> Health.up()::build);
+                .withConfiguration(AutoConfigurations.of(
+                        HealthContributorRegistryAutoConfiguration.class, HealthEndpointAutoConfiguration.class))
+                .withPropertyValues(shippedPropertyValues("management."))
+                .withBean("readinessState", HealthIndicator.class, () -> Health.up()::build);
         for (String bean : contributorBeans) {
             runner = runner.withBean(bean, HealthIndicator.class, () -> Health.up()::build);
         }
@@ -269,13 +256,15 @@ class WebhookIngestionCannotFailSilentlyTest extends BaseUnitTest {
     }
 
     private static WebhookProperties.Stream shippedStream() {
-        return binder().bind("hephaestus.webhook.stream", WebhookProperties.Stream.class).get();
+        return binder().bind("hephaestus.webhook.stream", WebhookProperties.Stream.class)
+                .get();
     }
 
     /** The `${VAR:-default}` a `nats-server.conf` setting falls back to when the operator sets nothing. */
     private static long defaultOf(String setting) throws IOException {
         String text = Files.readString(NATS_COMPOSE);
-        Matcher matcher = Pattern.compile(setting + ":\\s*\\$\\{[A-Z0-9_]+:-(\\d+)}").matcher(text);
+        Matcher matcher =
+                Pattern.compile(setting + ":\\s*\\$\\{[A-Z0-9_]+:-(\\d+)}").matcher(text);
         assertThat(matcher.find()).as("%s is set in %s", setting, NATS_COMPOSE).isTrue();
         return Long.parseLong(matcher.group(1));
     }

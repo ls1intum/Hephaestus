@@ -29,41 +29,34 @@ public interface IdentityLinkRepository extends JpaRepository<IdentityLink, Long
      * Active-only — disabled rows are not considered (a refresh-failed or admin-disabled
      * link must require explicit re-link, not silent re-bind).
      */
-    @Query(
-        """
+    @Query("""
         SELECT il
           FROM IdentityLink il
          WHERE il.providerId = :gitProviderId
            AND il.subject = :subject
            AND COALESCE(il.teamId, '') = COALESCE(:teamId, '')
            AND il.disabledAt IS NULL
-        """
-    )
+        """)
     Optional<IdentityLink> findActiveByProviderSubject(
-        @Param("gitProviderId") Long gitProviderId,
-        @Param("subject") String subject,
-        @Param("teamId") @Nullable String teamId
-    );
+            @Param("gitProviderId") Long gitProviderId,
+            @Param("subject") String subject,
+            @Param("teamId") @Nullable String teamId);
 
     @Modifying
-    @Query(
-        """
+    @Query("""
         UPDATE IdentityLink il
            SET il.lastLoginAt = :now
          WHERE il.id = :id
-        """
-    )
+        """)
     int touchLastLogin(@Param("id") Long id, @Param("now") Instant now);
 
     /** Active (non-disabled) identity links for an account. */
-    @Query(
-        """
+    @Query("""
         SELECT il
           FROM IdentityLink il
          WHERE il.account.id = :accountId
            AND il.disabledAt IS NULL
-        """
-    )
+        """)
     List<IdentityLink> findActiveByAccountId(@Param("accountId") Long accountId);
 
     /**
@@ -75,14 +68,12 @@ public interface IdentityLinkRepository extends JpaRepository<IdentityLink, Long
      * re-reads count 1, and is rejected.
      */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query(
-        """
+    @Query("""
         SELECT il
           FROM IdentityLink il
          WHERE il.account.id = :accountId
            AND il.disabledAt IS NULL
-        """
-    )
+        """)
     List<IdentityLink> findActiveByAccountIdForUpdate(@Param("accountId") Long accountId);
 
     /**
@@ -105,15 +96,13 @@ public interface IdentityLinkRepository extends JpaRepository<IdentityLink, Long
      * Account ids owning an active link wired to {@code externalActorId} — the reverse of
      * {@link #linkExternalActorIfAbsent}. Ordered by link id so the caller's first pick is deterministic.
      */
-    @Query(
-        """
+    @Query("""
         SELECT il.account.id
           FROM IdentityLink il
          WHERE il.externalActorId = :externalActorId
            AND il.disabledAt IS NULL
          ORDER BY il.id
-        """
-    )
+        """)
     List<Long> findActiveAccountIdsByExternalActorId(@Param("externalActorId") Long externalActorId);
 
     /**
@@ -125,13 +114,11 @@ public interface IdentityLinkRepository extends JpaRepository<IdentityLink, Long
      * @return number of rows updated (0 when the link is missing or already wired)
      */
     @Modifying
-    @Query(
-        """
+    @Query("""
         UPDATE IdentityLink il
            SET il.externalActorId = :externalActorId
          WHERE il.id = :id
            AND il.externalActorId IS NULL
-        """
-    )
+        """)
     int linkExternalActorIfAbsent(@Param("id") Long id, @Param("externalActorId") Long externalActorId);
 }

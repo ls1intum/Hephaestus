@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.core.security.SpaCsrfTokenRequestHandler;
 import de.tum.cit.aet.hephaestus.core.security.StaleAuthCookieFilter;
 import de.tum.cit.aet.hephaestus.feature.FeatureFlag;
 import de.tum.cit.aet.hephaestus.observability.ReplicaIdentityFilter;
+import de.tum.cit.aet.hephaestus.observability.RequestCorrelationFilter;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -57,19 +58,17 @@ public class SecurityConfig {
     private final String authCookieName;
 
     public SecurityConfig(
-        CorsProperties corsProperties,
-        Environment environment,
-        @Value("${hephaestus.dev.trigger-enabled:false}") boolean devTriggerEnabled,
-        @Value("${hephaestus.auth.dev-login-enabled:false}") boolean devLoginEnabled,
-        @Value("${hephaestus.auth.cookie-secure:true}") boolean cookieSecure,
-        @Value("${hephaestus.auth.cookie-name:" + AuthProperties.DEFAULT_COOKIE_NAME + "}") String authCookieName
-    ) {
+            CorsProperties corsProperties,
+            Environment environment,
+            @Value("${hephaestus.dev.trigger-enabled:false}") boolean devTriggerEnabled,
+            @Value("${hephaestus.auth.dev-login-enabled:false}") boolean devLoginEnabled,
+            @Value("${hephaestus.auth.cookie-secure:true}") boolean cookieSecure,
+            @Value("${hephaestus.auth.cookie-name:" + AuthProperties.DEFAULT_COOKIE_NAME + "}") String authCookieName) {
         // Fail-closed: insecure cookies (Secure off, __Host- prefix dropped) are a local-http-E2E-only
         // affordance and must be impossible in production.
         if (!cookieSecure && environment.acceptsProfiles(Profiles.of("prod"))) {
             throw new IllegalStateException(
-                "hephaestus.auth.cookie-secure must NOT be false under the 'prod' profile (fail-closed)."
-            );
+                    "hephaestus.auth.cookie-secure must NOT be false under the 'prod' profile (fail-closed).");
         }
         this.corsProperties = corsProperties;
         this.devTriggerEnabled = devTriggerEnabled;
@@ -92,19 +91,17 @@ public class SecurityConfig {
             // Flat `roles` claim on the Hephaestus-issued JWT (ADR 0017). The role strings
             // ("admin", "mentor_access", …) map 1:1 to granted authorities consumed by @PreAuthorize.
             final var roles = Optional.ofNullable((List<String>) claims.get("roles"));
-            return roles
-                .map(List::stream)
-                .orElse(Stream.empty())
-                .map(SimpleGrantedAuthority::new)
-                .map(GrantedAuthority.class::cast)
-                .toList();
+            return roles.map(List::stream)
+                    .orElse(Stream.empty())
+                    .map(SimpleGrantedAuthority::new)
+                    .map(GrantedAuthority.class::cast)
+                    .toList();
         };
     }
 
     @Bean
     JwtAuthenticationConverter authenticationConverter(
-        Converter<Map<String, Object>, Collection<GrantedAuthority>> authoritiesConverter
-    ) {
+            Converter<Map<String, Object>, Collection<GrantedAuthority>> authoritiesConverter) {
         var authenticationConverter = new JwtAuthenticationConverter();
         authenticationConverter.setJwtGrantedAuthoritiesConverter(jwt -> {
             return authoritiesConverter.convert(jwt.getClaims());
@@ -130,23 +127,21 @@ public class SecurityConfig {
         // Only paths whose auth lives at the controller / handshake layer go on this chain.
         // Other actuator endpoints (metrics, prometheus, loggers, heapdump, …) must NOT be
         // matched here — they fall through to the OAuth2 chain.
-        http
-            .securityMatcher(
-                "/api/workers/**",
-                "/actuator/health",
-                "/actuator/health/**",
-                "/actuator/info",
-                "/webhooks/github",
-                "/webhooks/gitlab",
-                "/webhooks/slack",
-                "/webhooks/slack/interactivity",
-                "/webhooks/outline",
-                "/oauth/callback/**"
-            )
-            .sessionManagement(sessions -> sessions.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .csrf(csrf -> csrf.disable())
-            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-            .authorizeHttpRequests(requests -> requests.anyRequest().permitAll());
+        http.securityMatcher(
+                        "/api/workers/**",
+                        "/actuator/health",
+                        "/actuator/health/**",
+                        "/actuator/info",
+                        "/webhooks/github",
+                        "/webhooks/gitlab",
+                        "/webhooks/slack",
+                        "/webhooks/slack/interactivity",
+                        "/webhooks/outline",
+                        "/oauth/callback/**")
+                .sessionManagement(sessions -> sessions.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .csrf(csrf -> csrf.disable())
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .authorizeHttpRequests(requests -> requests.anyRequest().permitAll());
         return http.build();
     }
 
@@ -166,17 +161,16 @@ public class SecurityConfig {
      */
     @Bean
     SecurityFilterChain appSecurityFilterChain(
-        HttpSecurity http,
-        ObjectProvider<JwtDecoder> jwtDecoderProvider,
-        ObjectProvider<BearerTokenResolver> bearerTokenResolverProvider,
-        ObjectProvider<StaleAuthCookieFilter> staleAuthCookieFilterProvider,
-        Converter<Jwt, AbstractAuthenticationToken> authenticationConverter,
-        ObjectProvider<AuthRateLimitFilter> authRateLimitFilterProvider,
-        tools.jackson.databind.ObjectMapper objectMapper
-    ) throws Exception {
-        http
-            .sessionManagement(sessions -> sessions.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .cors(cors -> cors.configurationSource(corsConfigurationSource()));
+            HttpSecurity http,
+            ObjectProvider<JwtDecoder> jwtDecoderProvider,
+            ObjectProvider<BearerTokenResolver> bearerTokenResolverProvider,
+            ObjectProvider<StaleAuthCookieFilter> staleAuthCookieFilterProvider,
+            Converter<Jwt, AbstractAuthenticationToken> authenticationConverter,
+            ObjectProvider<AuthRateLimitFilter> authRateLimitFilterProvider,
+            tools.jackson.databind.ObjectMapper objectMapper)
+            throws Exception {
+        http.sessionManagement(sessions -> sessions.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()));
 
         JwtDecoder jwtDecoder = jwtDecoderProvider.getIfAvailable();
         if (jwtDecoder == null) {
@@ -189,9 +183,8 @@ public class SecurityConfig {
                 // also be public on the lockdown chain so spec generation works on no-JWT-decoder boots
                 // (the `specs` profile boots without a JwtDecoder and would otherwise 403 on
                 // `mvn verify -Dapp.profiles=specs`).
-                requests
-                    .requestMatchers("/v3/api-docs/**", "/v3/api-docs.yaml", "/swagger-ui/**", "/swagger-ui.html")
-                    .permitAll();
+                requests.requestMatchers("/v3/api-docs/**", "/v3/api-docs.yaml", "/swagger-ui/**", "/swagger-ui.html")
+                        .permitAll();
                 if (devTriggerEnabled) {
                     requests.requestMatchers("/api/dev/**").permitAll();
                 }
@@ -242,12 +235,9 @@ public class SecurityConfig {
         // browser cross-site, so those requests are not CSRF-vulnerable (this also keeps API clients
         // and bearer-token integration tests working). Webhooks, OAuth callbacks and the optional
         // dev-trigger are additionally excluded — they are not browser cookie POSTs.
-        http.csrf(csrf ->
-            csrf
-                .csrfTokenRepository(csrfTokenRepository())
+        http.csrf(csrf -> csrf.csrfTokenRepository(csrfTokenRepository())
                 .csrfTokenRequestHandler(new SpaCsrfTokenRequestHandler())
-                .requireCsrfProtectionMatcher(this::requiresCsrf)
-        );
+                .requireCsrfProtectionMatcher(this::requiresCsrf));
         // Force the deferred token to render the __Host-XSRF-TOKEN cookie on every response so the SPA
         // always has a token to echo, even on a bare GET /user.
         http.addFilterAfter(new CsrfCookieFilter(), AuthorizationFilter.class);
@@ -256,11 +246,7 @@ public class SecurityConfig {
         // X-Content-Type-Options) for the user-facing resource-server chain.
         SecurityHeaders.apply(http);
 
-        // Token-bucket rate limiting on the hot auth endpoints (/auth/refresh, /auth/impersonate,
-        // DELETE /user). Registered after authentication so the account principal is resolvable;
-        // it no-ops on every other path. /oauth2/authorization/* is rate-limited on the oauth2Login
-        // chain (AuthSecurityConfig), which owns that path. Resolved via ObjectProvider: the filter
-        // is server-role-gated, so a non-server pod refreshes this chain without it.
+        // Register after authentication so account-scoped buckets can use the principal.
         AuthRateLimitFilter authRateLimitFilter = authRateLimitFilterProvider.getIfAvailable();
         if (authRateLimitFilter != null) {
             http.addFilterBefore(authRateLimitFilter, AuthorizationFilter.class);
@@ -300,9 +286,8 @@ public class SecurityConfig {
                 requests.requestMatchers(DEV_LOGIN_MATCHER).permitAll();
             }
             // OpenAPI documentation endpoints (public for spec generation and dev access)
-            requests
-                .requestMatchers("/v3/api-docs/**", "/v3/api-docs.yaml", "/swagger-ui/**", "/swagger-ui.html")
-                .permitAll();
+            requests.requestMatchers("/v3/api-docs/**", "/v3/api-docs.yaml", "/swagger-ui/**", "/swagger-ui.html")
+                    .permitAll();
             // Public auth discovery (core.auth module, ADR 0017): identity-provider list for the
             // login UI plus OIDC issuer metadata + JWKS. The OAuth login kickoff/callback paths
             // (/auth/login, /auth/error, /oauth2/authorization/**, /login/oauth2/code/**) are owned
@@ -318,7 +303,8 @@ public class SecurityConfig {
             // Public read for slugged workspace paths (filter enforces membership/public visibility).
             requests.requestMatchers(HttpMethod.GET, "/workspaces/*/**").permitAll();
             // Registry/listing stays authenticated to avoid leaking tenant directory.
-            requests.requestMatchers(HttpMethod.GET, "/workspaces", "/workspaces/").authenticated();
+            requests.requestMatchers(HttpMethod.GET, "/workspaces", "/workspaces/")
+                    .authenticated();
             // Non-GET workspace operations still require authentication.
             requests.requestMatchers("/workspaces/**").authenticated();
             // Public endpoints
@@ -342,7 +328,8 @@ public class SecurityConfig {
     private CookieCsrfTokenRepository csrfTokenRepository() {
         CookieCsrfTokenRepository repository = CookieCsrfTokenRepository.withHttpOnlyFalse();
         repository.setCookieName(csrfCookieName(cookieSecure));
-        repository.setCookieCustomizer(cookie -> cookie.secure(cookieSecure).path("/").sameSite("Lax"));
+        repository.setCookieCustomizer(
+                cookie -> cookie.secure(cookieSecure).path("/").sameSite("Lax"));
         return repository;
     }
 
@@ -354,17 +341,16 @@ public class SecurityConfig {
      * paths need no CSRF skip here: they are owned by the higher-precedence worker-hub and oauth2Login
      * chains and never reach this chain.
      */
-    static final RequestMatcher DEV_TRIGGER_MATCHER = PathPatternRequestMatcher.withDefaults().matcher("/api/dev/**");
+    static final RequestMatcher DEV_TRIGGER_MATCHER =
+            PathPatternRequestMatcher.withDefaults().matcher("/api/dev/**");
 
     /**
      * Single canonical matcher for the optional passwordless dev sign-in, shared by the authorize rule
      * and the CSRF predicate. The POST is pre-auth (no {@code __Host-} cookie yet), so it is not
      * CSRF-vulnerable; the carve-out is scoped to exactly this path and only active when the flag is on.
      */
-    static final RequestMatcher DEV_LOGIN_MATCHER = PathPatternRequestMatcher.withDefaults().matcher(
-        HttpMethod.POST,
-        "/auth/dev-login"
-    );
+    static final RequestMatcher DEV_LOGIN_MATCHER =
+            PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.POST, "/auth/dev-login");
 
     /**
      * CSRF applies only to cookie-authenticated, state-changing browser requests. Returns
@@ -408,7 +394,9 @@ public class SecurityConfig {
             return false;
         }
         for (jakarta.servlet.http.Cookie cookie : cookies) {
-            if (authCookieName.equals(cookie.getName()) && cookie.getValue() != null && !cookie.getValue().isBlank()) {
+            if (authCookieName.equals(cookie.getName())
+                    && cookie.getValue() != null
+                    && !cookie.getValue().isBlank()) {
                 return true;
             }
         }
@@ -421,23 +409,22 @@ public class SecurityConfig {
         configuration.setAllowedOrigins(corsProperties.allowedOrigins());
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"));
         configuration.setAllowedHeaders(
-            // X-XSRF-TOKEN: the SPA is cross-origin in dev and echoes the double-submit CSRF token on
-            //   every state-changing request (see SpaCsrfTokenRequestHandler + webapp/src/main.tsx).
-            //   Without it the preflight Access-Control-Allow-Headers omits the header and the browser
-            //   blocks every cookie-auth write cross-origin.
-            // X-Impersonation-Allow-Writes: opt-in guardrail header for impersonation write requests
-            //   (see ImpersonationGuard) — must survive preflight for the same cross-origin reason.
-            List.of(
-                "Authorization",
-                "Content-Type",
-                "Accept",
-                "X-Requested-With",
-                "Origin",
-                "X-XSRF-TOKEN",
-                "X-Impersonation-Allow-Writes"
-            )
-        );
-        configuration.setExposedHeaders(List.of(ReplicaIdentityFilter.HEADER_NAME));
+                // X-XSRF-TOKEN: the SPA is cross-origin in dev and echoes the double-submit CSRF token on
+                //   every state-changing request (see SpaCsrfTokenRequestHandler + webapp/src/main.tsx).
+                //   Without it the preflight Access-Control-Allow-Headers omits the header and the browser
+                //   blocks every cookie-auth write cross-origin.
+                // X-Impersonation-Allow-Writes: opt-in guardrail header for impersonation write requests
+                //   (see ImpersonationGuard) — must survive preflight for the same cross-origin reason.
+                List.of(
+                        "Authorization",
+                        "Content-Type",
+                        "Accept",
+                        "X-Requested-With",
+                        "Origin",
+                        "X-XSRF-TOKEN",
+                        "X-Impersonation-Allow-Writes"));
+        configuration.setExposedHeaders(
+                List.of(ReplicaIdentityFilter.HEADER_NAME, RequestCorrelationFilter.HEADER_NAME));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

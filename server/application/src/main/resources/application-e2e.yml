@@ -1,6 +1,7 @@
 hephaestus:
   security:
     encryption-key: ${HEPHAESTUS_SECURITY_ENCRYPTION_KEY:hephaestusLocalDevEncryptKey0123}
+    credential-encryption-key: ${HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY:hephaestusLocalDevEncryptKey0123}
   auth:
     dev-login-enabled: true
     cookie-secure: false

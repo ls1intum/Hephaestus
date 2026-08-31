@@ -27,34 +27,32 @@ class LlmUsageRecorderTest extends BaseUnitTest {
 
     private static LlmUsageRecorder.LlmUsageSample sample(LlmPriceSnapshot price, int attempt) {
         return new LlmUsageRecorder.LlmUsageSample(
-            LlmUsageJobType.PULL_REQUEST_REVIEW,
-            LlmUsageSourceType.AGENT_JOB,
-            UUID.randomUUID(),
-            attempt,
-            "authoritative-model",
-            1_000_000,
-            2_000_000,
-            500_000,
-            250_000,
-            900_000,
-            1,
-            price,
-            UsageProvenance.RUNNER,
-            Instant.now()
-        );
+                LlmUsageJobType.PULL_REQUEST_REVIEW,
+                LlmUsageSourceType.AGENT_JOB,
+                UUID.randomUUID(),
+                attempt,
+                "authoritative-model",
+                1_000_000,
+                2_000_000,
+                500_000,
+                250_000,
+                900_000,
+                1,
+                price,
+                UsageProvenance.RUNNER,
+                Instant.now());
     }
 
     private static LlmPriceSnapshot priced() {
         return new LlmPriceSnapshot(
-            FundingSource.WORKSPACE,
-            PricingState.PRICED,
-            null,
-            42L,
-            new BigDecimal("1"),
-            new BigDecimal("2"),
-            new BigDecimal("3"),
-            new BigDecimal("4")
-        );
+                FundingSource.WORKSPACE,
+                PricingState.PRICED,
+                null,
+                42L,
+                new BigDecimal("1"),
+                new BigDecimal("2"),
+                new BigDecimal("3"),
+                new BigDecimal("4"));
     }
 
     @Test
@@ -103,10 +101,12 @@ class LlmUsageRecorderTest extends BaseUnitTest {
         recorder.recordUnverifiable(7L, redelivered);
         recorder.recordUnverifiable(7L, redelivered);
 
-        assertThat(inserts.get()).as("both attempts reach the ledger's conflict guard").isEqualTo(2);
+        assertThat(inserts.get())
+                .as("both attempts reach the ledger's conflict guard")
+                .isEqualTo(2);
         assertThat(registry.counter("llm.usage.unverifiable").count())
-            .as("but only the attempt that actually inserted is counted")
-            .isEqualTo(1.0);
+                .as("but only the attempt that actually inserted is counted")
+                .isEqualTo(1.0);
     }
 
     @Test
@@ -120,8 +120,8 @@ class LlmUsageRecorderTest extends BaseUnitTest {
         LlmUsageRecorder recorder = recorder(repository);
 
         assertThatThrownBy(() -> recorder.record(7L, sample(priced(), 0)))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessage("database unavailable");
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("database unavailable");
     }
 
     @Test
@@ -154,15 +154,14 @@ class LlmUsageRecorderTest extends BaseUnitTest {
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
         AtomicReference<LlmUsageInsert> event = new AtomicReference<>();
         LlmPriceSnapshot missingOutputRate = new LlmPriceSnapshot(
-            FundingSource.WORKSPACE,
-            PricingState.PRICED,
-            null,
-            42L,
-            new BigDecimal("1"),
-            null, // output rate absent, and the sample below reports output tokens
-            new BigDecimal("3"),
-            new BigDecimal("4")
-        );
+                FundingSource.WORKSPACE,
+                PricingState.PRICED,
+                null,
+                42L,
+                new BigDecimal("1"),
+                null, // output rate absent, and the sample below reports output tokens
+                new BigDecimal("3"),
+                new BigDecimal("4"));
 
         recorderWith(registry, capturing(event)).record(7L, sample(missingOutputRate, 1));
 
@@ -183,9 +182,11 @@ class LlmUsageRecorderTest extends BaseUnitTest {
         recorderWith(registry, capturing(event)).record(7L, sampleOfInputTokensOnly(tinyRate, 1));
 
         assertThat(captured(event).costUsd())
-            .as("a paid call must stay distinguishable from a free one")
-            .isEqualByComparingTo("0.000001");
-        assertThat(registry.counter("llm.usage.cost.clamped", "direction", "up_to_minimum").count()).isEqualTo(1.0);
+                .as("a paid call must stay distinguishable from a free one")
+                .isEqualByComparingTo("0.000001");
+        assertThat(registry.counter("llm.usage.cost.clamped", "direction", "up_to_minimum")
+                        .count())
+                .isEqualTo(1.0);
     }
 
     @Test
@@ -198,7 +199,9 @@ class LlmUsageRecorderTest extends BaseUnitTest {
         recorderWith(registry, capturing(event)).record(7L, sampleOfInputTokensOnly(bigRate, 1_000_000_000_000L));
 
         assertThat(captured(event).costUsd()).isEqualByComparingTo("999999999.999999");
-        assertThat(registry.counter("llm.usage.cost.clamped", "direction", "down_to_maximum").count()).isEqualTo(1.0);
+        assertThat(registry.counter("llm.usage.cost.clamped", "direction", "down_to_maximum")
+                        .count())
+                .isEqualTo(1.0);
     }
 
     /**
@@ -211,21 +214,20 @@ class LlmUsageRecorderTest extends BaseUnitTest {
     void nonsensicalCountsAreClampedBeforeTheyReachTheLedger() {
         AtomicReference<LlmUsageInsert> event = new AtomicReference<>();
         LlmUsageRecorder.LlmUsageSample negative = new LlmUsageRecorder.LlmUsageSample(
-            LlmUsageJobType.PULL_REQUEST_REVIEW,
-            LlmUsageSourceType.AGENT_JOB,
-            UUID.randomUUID(),
-            -1,
-            "authoritative-model",
-            -5,
-            -6,
-            -7,
-            -8,
-            -9,
-            0,
-            priced(),
-            UsageProvenance.RUNNER,
-            Instant.now()
-        );
+                LlmUsageJobType.PULL_REQUEST_REVIEW,
+                LlmUsageSourceType.AGENT_JOB,
+                UUID.randomUUID(),
+                -1,
+                "authoritative-model",
+                -5,
+                -6,
+                -7,
+                -8,
+                -9,
+                0,
+                priced(),
+                UsageProvenance.RUNNER,
+                Instant.now());
 
         recorderWith(new SimpleMeterRegistry(), capturing(event)).record(7L, negative);
 
@@ -235,7 +237,9 @@ class LlmUsageRecorderTest extends BaseUnitTest {
         assertThat(captured(event).cacheReadTokens()).isZero();
         assertThat(captured(event).cacheWriteTokens()).isZero();
         assertThat(captured(event).reasoningTokens()).isZero();
-        assertThat(captured(event).totalCalls()).as("a recorded event is at least one call").isEqualTo(1);
+        assertThat(captured(event).totalCalls())
+                .as("a recorded event is at least one call")
+                .isEqualTo(1);
     }
 
     /**
@@ -249,8 +253,8 @@ class LlmUsageRecorderTest extends BaseUnitTest {
         LlmUsageRecorder recorder = recorderWith(new SimpleMeterRegistry(), capturing(event));
 
         assertThatThrownBy(() -> recorder.record(7L, sampleOfInputTokensOnly(instancePriced(), 1_000_000)))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("source result transaction");
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("source result transaction");
     }
 
     /**
@@ -277,53 +281,38 @@ class LlmUsageRecorderTest extends BaseUnitTest {
             TransactionSynchronizationManager.clearSynchronization();
         }
 
-        assertThat(captured(event).costUsd()).as("the charge itself still landed").isEqualByComparingTo("1.000000");
+        assertThat(captured(event).costUsd())
+                .as("the charge itself still landed")
+                .isEqualByComparingTo("1.000000");
         assertThat(registry.counter("llm.budget.alert.failure").count()).isEqualTo(1.0);
     }
 
     private static LlmPriceSnapshot instancePriced() {
         return new LlmPriceSnapshot(
-            FundingSource.INSTANCE,
-            PricingState.PRICED,
-            40L,
-            null,
-            new BigDecimal("1"),
-            null,
-            null,
-            null
-        );
+                FundingSource.INSTANCE, PricingState.PRICED, 40L, null, new BigDecimal("1"), null, null, null);
     }
 
     private static LlmPriceSnapshot pricedWithInputRate(BigDecimal per1mInputUsd) {
         return new LlmPriceSnapshot(
-            FundingSource.WORKSPACE,
-            PricingState.PRICED,
-            null,
-            42L,
-            per1mInputUsd,
-            null,
-            null,
-            null
-        );
+                FundingSource.WORKSPACE, PricingState.PRICED, null, 42L, per1mInputUsd, null, null, null);
     }
 
     private static LlmUsageRecorder.LlmUsageSample sampleOfInputTokensOnly(LlmPriceSnapshot price, long inputTokens) {
         return new LlmUsageRecorder.LlmUsageSample(
-            LlmUsageJobType.PULL_REQUEST_REVIEW,
-            LlmUsageSourceType.AGENT_JOB,
-            UUID.randomUUID(),
-            1,
-            "authoritative-model",
-            inputTokens,
-            0,
-            0,
-            0,
-            0,
-            1,
-            price,
-            UsageProvenance.RUNNER,
-            Instant.now()
-        );
+                LlmUsageJobType.PULL_REQUEST_REVIEW,
+                LlmUsageSourceType.AGENT_JOB,
+                UUID.randomUUID(),
+                1,
+                "authoritative-model",
+                inputTokens,
+                0,
+                0,
+                0,
+                0,
+                1,
+                price,
+                UsageProvenance.RUNNER,
+                Instant.now());
     }
 
     private static LlmUsageEventRepository capturing(AtomicReference<LlmUsageInsert> event) {

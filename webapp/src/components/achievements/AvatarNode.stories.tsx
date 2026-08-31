@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { ReactFlowProvider } from "@xyflow/react";
+
 import { AvatarNode } from "@/components/achievements/AvatarNode";
 
 const meta = {

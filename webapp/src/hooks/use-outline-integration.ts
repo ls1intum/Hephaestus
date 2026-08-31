@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+
 import {
 	deleteOutlineCollectionMutation,
 	getConnectionSyncStatusOptions,
@@ -17,9 +18,9 @@ import {
 } from "@/api/@tanstack/react-query.gen";
 import type { OutlineMirrorState } from "@/components/admin/integrations/outline/OutlineCollectionsSection";
 import type { OutlineConnectInput } from "@/components/admin/integrations/outline/OutlineConnectCard";
+import { syncPollInterval } from "@/components/admin/integrations/sync-format";
 import type { SyncResourcesTableProps } from "@/components/admin/integrations/SyncResourcesTable";
 import type { SyncStatusHeaderProps } from "@/components/admin/integrations/SyncStatusHeader";
-import { syncPollInterval } from "@/components/admin/integrations/sync-format";
 import { useLivePushUnavailable } from "@/hooks/use-sync-liveness";
 import { problemDetailOf } from "@/lib/problem-detail";
 

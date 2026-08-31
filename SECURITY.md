@@ -35,6 +35,8 @@ Hephaestus is pre-1.0 and released continuously from `main`; **only the latest r
 
 In scope: the code in this repository — the Spring Boot application server (including the webhook receiver), the React webapp, and the deployment/Docker configuration we ship.
 
+See the [published threat model](https://ls1intum.github.io/Hephaestus/admin/threat-model) for trust boundaries, attacker assumptions, controls, and residual risks.
+
 Out of scope:
 
 - Vulnerabilities in third-party dependencies without a Hephaestus-specific exploit path — report those upstream
@@ -46,7 +48,7 @@ Out of scope:
 
 Independent of this reporting channel, the project runs:
 
-- **Dependency updates**: [Renovate](https://docs.renovatebot.com/) (Mend-hosted) with vulnerability alerts prioritized and auto-merged ([`renovate.json`](renovate.json))
+- **Dependency updates**: [Renovate](https://docs.renovatebot.com/) proposes vulnerability fixes without dashboard approval or a minimum release age ([`renovate.json`](renovate.json))
 - **Dependency & secret scanning in CI**: Trivy filesystem scan and TruffleHog ([`ci-security-scan.yml`](.github/workflows/ci-security-scan.yml))
 - **Static analysis**: GitHub CodeQL
 - **Native alerts**: GitHub secret scanning and Dependabot dependency alerts

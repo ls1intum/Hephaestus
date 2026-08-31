@@ -10,36 +10,8 @@ import java.util.stream.Collectors;
 final class SlackMentorTextFilter {
 
     private static final Set<String> STOPWORDS = Set.of(
-        "a",
-        "an",
-        "and",
-        "are",
-        "at",
-        "be",
-        "can",
-        "could",
-        "do",
-        "for",
-        "focus",
-        "in",
-        "is",
-        "it",
-        "look",
-        "next",
-        "of",
-        "on",
-        "or",
-        "should",
-        "the",
-        "there",
-        "to",
-        "want",
-        "we",
-        "which",
-        "with",
-        "would",
-        "you"
-    );
+            "a", "an", "and", "are", "at", "be", "can", "could", "do", "for", "focus", "in", "is", "it", "look", "next",
+            "of", "on", "or", "should", "the", "there", "to", "want", "we", "which", "with", "would", "you");
 
     private final StringBuilder pending = new StringBuilder();
     private final StringBuilder emitted = new StringBuilder();
@@ -74,21 +46,20 @@ final class SlackMentorTextFilter {
         if (text == null || text.isEmpty()) {
             return text;
         }
-        return text
-            .replace('‑', '-')
-            .replace('‐', '-')
-            .replace('‒', '-')
-            .replace('−', '-')
-            .replace("—", "-")
-            .replace("–", "-")
-            .replace("…", "...")
-            .replace('\u00A0', ' ')
-            .replace('\u202F', ' ')
-            .replace("\u200B", "")
-            .replace('‘', '\'')
-            .replace('’', '\'')
-            .replace('“', '"')
-            .replace('”', '"');
+        return text.replace('‑', '-')
+                .replace('‐', '-')
+                .replace('‒', '-')
+                .replace('−', '-')
+                .replace("—", "-")
+                .replace("–", "-")
+                .replace("…", "...")
+                .replace('\u00A0', ' ')
+                .replace('\u202F', ' ')
+                .replace("\u200B", "")
+                .replace('‘', '\'')
+                .replace('’', '\'')
+                .replace('“', '"')
+                .replace('”', '"');
     }
 
     private String drainCompleteSentences() {
@@ -106,13 +77,11 @@ final class SlackMentorTextFilter {
         for (int i = 0; i < pending.length(); i++) {
             char c = pending.charAt(i);
             if (c == '.' || c == '?' || c == '!') {
-                if (
-                    c == '.' &&
-                    i > 0 &&
-                    i + 1 < pending.length() &&
-                    Character.isLetterOrDigit(pending.charAt(i - 1)) &&
-                    Character.isLetterOrDigit(pending.charAt(i + 1))
-                ) {
+                if (c == '.'
+                        && i > 0
+                        && i + 1 < pending.length()
+                        && Character.isLetterOrDigit(pending.charAt(i - 1))
+                        && Character.isLetterOrDigit(pending.charAt(i + 1))) {
                     continue;
                 }
                 int cut = i + 1;
@@ -192,16 +161,17 @@ final class SlackMentorTextFilter {
         }
         String normalized = sentence.stripLeading().toLowerCase(Locale.ROOT);
         return normalized.matches(
-            "^(user (wants|asks|is asking|asked|said)|we need to|need to|i need to|allowed paths:|use function fetch_context|according to (the )?(instructions|guidelines)).*"
-        );
+                "^(user (wants|asks|is asking|asked|said)|we need to|need to|i need to|allowed paths:|use function fetch_context|according to (the )?(instructions|guidelines)).*");
     }
 
     private static Set<String> meaningfulTokens(String lower) {
         return Arrays.stream(lower.replaceAll("[^a-z0-9#]+", " ").trim().split("\\s+"))
-            .filter(token -> !token.isBlank())
-            .filter(token -> token.length() > 2 || token.startsWith("#") || token.chars().allMatch(Character::isDigit))
-            .filter(token -> !STOPWORDS.contains(token))
-            .collect(Collectors.toSet());
+                .filter(token -> !token.isBlank())
+                .filter(token -> token.length() > 2
+                        || token.startsWith("#")
+                        || token.chars().allMatch(Character::isDigit))
+                .filter(token -> !STOPWORDS.contains(token))
+                .collect(Collectors.toSet());
     }
 
     private static double jaccard(Set<String> left, Set<String> right) {

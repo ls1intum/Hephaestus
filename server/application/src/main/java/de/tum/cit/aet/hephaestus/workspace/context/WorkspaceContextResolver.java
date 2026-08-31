@@ -34,15 +34,15 @@ public class WorkspaceContextResolver {
             throw new IllegalArgumentException("Workspace context does not provide an id or slug");
         }
         return workspaceRepository
-            .findByWorkspaceSlug(slug)
-            .orElseThrow(() -> new EntityNotFoundException("Workspace", slug));
+                .findByWorkspaceSlug(slug)
+                .orElseThrow(() -> new EntityNotFoundException("Workspace", slug));
     }
 
     /** Resolves a workspace by its primary key. */
     public Workspace requireWorkspace(Long workspaceId) {
         Objects.requireNonNull(workspaceId, "Workspace id must not be null");
         return workspaceRepository
-            .findById(workspaceId)
-            .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceId.toString()));
+                .findById(workspaceId)
+                .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceId.toString()));
     }
 }

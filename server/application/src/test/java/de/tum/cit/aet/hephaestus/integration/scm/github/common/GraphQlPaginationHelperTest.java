@@ -99,12 +99,10 @@ class GraphQlPaginationHelperTest {
 
             AtomicInteger processedCount = new AtomicInteger(0);
 
-            PaginationResult result = helper.paginate(
-                createRequest(conn -> {
-                    processedCount.addAndGet(conn.getNodes().size());
-                    return true;
-                })
-            );
+            PaginationResult result = helper.paginate(createRequest(conn -> {
+                processedCount.addAndGet(conn.getNodes().size());
+                return true;
+            }));
 
             assertThat(result.pagesProcessed()).isEqualTo(1);
             assertThat(result.terminationReason()).isEqualTo(TerminationReason.COMPLETED);
@@ -131,12 +129,10 @@ class GraphQlPaginationHelperTest {
 
             List<String> allItems = new ArrayList<>();
 
-            PaginationResult result = helper.paginate(
-                createRequest(conn -> {
-                    allItems.addAll(conn.getNodes());
-                    return true;
-                })
-            );
+            PaginationResult result = helper.paginate(createRequest(conn -> {
+                allItems.addAll(conn.getNodes());
+                return true;
+            }));
 
             assertThat(result.pagesProcessed()).isEqualTo(3);
             assertThat(result.terminationReason()).isEqualTo(TerminationReason.COMPLETED);
@@ -196,8 +192,8 @@ class GraphQlPaginationHelperTest {
             mockClientExecution(response);
 
             PaginationResult result = helper.paginate(
-                createRequest(conn -> false) // Processor requests stop
-            );
+                    createRequest(conn -> false) // Processor requests stop
+                    );
 
             assertThat(result.pagesProcessed()).isEqualTo(1);
             assertThat(result.terminationReason()).isEqualTo(TerminationReason.PROCESSOR_STOP);
@@ -218,8 +214,7 @@ class GraphQlPaginationHelperTest {
 
             AtomicInteger pageCount = new AtomicInteger(0);
 
-            PaginationResult result = helper.paginate(
-                PaginationRequest.<TestConnection>builder()
+            PaginationResult result = helper.paginate(PaginationRequest.<TestConnection>builder()
                     .client(client)
                     .scopeId(SCOPE_ID)
                     .documentName(DOCUMENT_NAME)
@@ -234,8 +229,7 @@ class GraphQlPaginationHelperTest {
                     })
                     .contextDescription("test")
                     .maxPages(3) // Limit to 3 pages
-                    .build()
-            );
+                    .build());
 
             assertThat(result.pagesProcessed()).isEqualTo(3);
             assertThat(result.terminationReason()).isEqualTo(TerminationReason.MAX_PAGES_REACHED);
@@ -251,8 +245,7 @@ class GraphQlPaginationHelperTest {
             ClientGraphQlResponse response = mockValidResponse(connection);
             mockClientExecution(response);
 
-            PaginationResult result = helper.paginate(
-                PaginationRequest.<TestConnection>builder()
+            PaginationResult result = helper.paginate(PaginationRequest.<TestConnection>builder()
                     .client(client)
                     .scopeId(SCOPE_ID)
                     .documentName(DOCUMENT_NAME)
@@ -264,8 +257,7 @@ class GraphQlPaginationHelperTest {
                     .pageProcessor(conn -> true)
                     .contextDescription("test")
                     .initialCursor(initialCursor)
-                    .build()
-            );
+                    .build());
 
             assertThat(result.isComplete()).isTrue();
             // Verify the initial cursor was used
@@ -297,8 +289,8 @@ class GraphQlPaginationHelperTest {
         @Test
         void shouldThrowWhenRequiredFieldsAreMissing() {
             assertThatThrownBy(() -> PaginationRequest.<TestConnection>builder().build())
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("client is required");
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("client is required");
         }
 
         @Test
@@ -320,17 +312,24 @@ class GraphQlPaginationHelperTest {
 
         @Test
         void isCompleteShouldReturnTrueOnlyForCompleted() {
-            assertThat(new PaginationResult(1, TerminationReason.COMPLETED).isComplete()).isTrue();
-            assertThat(new PaginationResult(1, TerminationReason.MAX_PAGES_REACHED).isComplete()).isFalse();
-            assertThat(new PaginationResult(1, TerminationReason.RATE_LIMIT_CRITICAL).isComplete()).isFalse();
+            assertThat(new PaginationResult(1, TerminationReason.COMPLETED).isComplete())
+                    .isTrue();
+            assertThat(new PaginationResult(1, TerminationReason.MAX_PAGES_REACHED).isComplete())
+                    .isFalse();
+            assertThat(new PaginationResult(1, TerminationReason.RATE_LIMIT_CRITICAL).isComplete())
+                    .isFalse();
         }
 
         @Test
         void isAbortedShouldReturnFalseForCompletedAndProcessorStop() {
-            assertThat(new PaginationResult(1, TerminationReason.COMPLETED).isAborted()).isFalse();
-            assertThat(new PaginationResult(1, TerminationReason.PROCESSOR_STOP).isAborted()).isFalse();
-            assertThat(new PaginationResult(1, TerminationReason.MAX_PAGES_REACHED).isAborted()).isTrue();
-            assertThat(new PaginationResult(1, TerminationReason.RATE_LIMIT_CRITICAL).isAborted()).isTrue();
+            assertThat(new PaginationResult(1, TerminationReason.COMPLETED).isAborted())
+                    .isFalse();
+            assertThat(new PaginationResult(1, TerminationReason.PROCESSOR_STOP).isAborted())
+                    .isFalse();
+            assertThat(new PaginationResult(1, TerminationReason.MAX_PAGES_REACHED).isAborted())
+                    .isTrue();
+            assertThat(new PaginationResult(1, TerminationReason.RATE_LIMIT_CRITICAL).isAborted())
+                    .isTrue();
         }
     }
 
@@ -387,20 +386,19 @@ class GraphQlPaginationHelperTest {
     // Helper methods
 
     private PaginationRequest<TestConnection> createRequest(
-        GraphQlPaginationHelper.PageProcessor<TestConnection> processor
-    ) {
+            GraphQlPaginationHelper.PageProcessor<TestConnection> processor) {
         return PaginationRequest.<TestConnection>builder()
-            .client(client)
-            .scopeId(SCOPE_ID)
-            .documentName(DOCUMENT_NAME)
-            .variables(Map.of("key", "value"))
-            .timeout(TIMEOUT)
-            .connectionFieldPath(FIELD_PATH)
-            .connectionType(TestConnection.class)
-            .pageInfoExtractor(TestConnection::getPageInfo)
-            .pageProcessor(processor)
-            .contextDescription("test")
-            .build();
+                .client(client)
+                .scopeId(SCOPE_ID)
+                .documentName(DOCUMENT_NAME)
+                .variables(Map.of("key", "value"))
+                .timeout(TIMEOUT)
+                .connectionFieldPath(FIELD_PATH)
+                .connectionType(TestConnection.class)
+                .pageInfoExtractor(TestConnection::getPageInfo)
+                .pageProcessor(processor)
+                .contextDescription("test")
+                .build();
     }
 
     // Shared setup helpers: stubs are lenient because not every caller exercises every stub

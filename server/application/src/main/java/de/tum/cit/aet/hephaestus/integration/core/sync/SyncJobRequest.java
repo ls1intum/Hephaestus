@@ -8,10 +8,9 @@ import org.jspecify.annotations.Nullable;
  * methods under the repo's 6-parameter ceiling (CodeQualityTest).
  */
 public record SyncJobRequest(
-    long workspaceId,
-    long connectionId,
-    IntegrationKind kind,
-    SyncJobType type,
-    SyncJobTrigger trigger,
-    @Nullable Long triggeredByUserId
-) {}
+        long workspaceId,
+        long connectionId,
+        IntegrationKind kind,
+        SyncJobType type,
+        SyncJobTrigger trigger,
+        @Nullable Long triggeredByUserId) {}

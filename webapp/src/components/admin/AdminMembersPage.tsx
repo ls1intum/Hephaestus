@@ -1,5 +1,6 @@
 import { BookUser } from "lucide-react";
 import type { ComponentProps, ReactElement } from "react";
+
 import type { TeamInfo } from "@/api/types.gen";
 import type { ExtendedUserTeams } from "@/components/admin/types";
 import { UsersTable, type UsersTableView } from "@/components/admin/UsersTable";

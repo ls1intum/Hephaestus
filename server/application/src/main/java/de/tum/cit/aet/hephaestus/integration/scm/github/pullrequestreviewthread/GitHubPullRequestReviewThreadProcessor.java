@@ -28,9 +28,7 @@ public class GitHubPullRequestReviewThreadProcessor {
     private final ApplicationEventPublisher eventPublisher;
 
     public GitHubPullRequestReviewThreadProcessor(
-        PullRequestReviewThreadRepository threadRepository,
-        ApplicationEventPublisher eventPublisher
-    ) {
+            PullRequestReviewThreadRepository threadRepository, ApplicationEventPublisher eventPublisher) {
         this.threadRepository = threadRepository;
         this.eventPublisher = eventPublisher;
     }
@@ -43,29 +41,26 @@ public class GitHubPullRequestReviewThreadProcessor {
         }
 
         return threadRepository
-            .findByNativeIdAndProviderId(threadId, Objects.requireNonNull(context.providerId()))
-            .map(thread -> {
-                thread.setState(PullRequestReviewThread.State.RESOLVED);
-                if (resolvedBy != null) {
-                    thread.setResolvedBy(resolvedBy);
-                }
-                thread = threadRepository.save(thread);
-                ScmEventPayload.ReviewThreadData.from(thread).ifPresent(threadData ->
-                    eventPublisher.publishEvent(
-                        new ScmDomainEvent.ReviewThreadResolved(threadData, EventContext.from(context))
-                    )
-                );
-                log.info(
-                    "Resolved thread: threadId={}, resolvedByLogin={}",
-                    threadId,
-                    resolvedBy != null ? resolvedBy.getLogin() : null
-                );
-                return true;
-            })
-            .orElseGet(() -> {
-                log.debug("Skipped thread resolve: reason=threadNotFound, threadId={}", threadId);
-                return false;
-            });
+                .findByNativeIdAndProviderId(threadId, Objects.requireNonNull(context.providerId()))
+                .map(thread -> {
+                    thread.setState(PullRequestReviewThread.State.RESOLVED);
+                    if (resolvedBy != null) {
+                        thread.setResolvedBy(resolvedBy);
+                    }
+                    thread = threadRepository.save(thread);
+                    ScmEventPayload.ReviewThreadData.from(thread)
+                            .ifPresent(threadData -> eventPublisher.publishEvent(
+                                    new ScmDomainEvent.ReviewThreadResolved(threadData, EventContext.from(context))));
+                    log.info(
+                            "Resolved thread: threadId={}, resolvedByLogin={}",
+                            threadId,
+                            resolvedBy != null ? resolvedBy.getLogin() : null);
+                    return true;
+                })
+                .orElseGet(() -> {
+                    log.debug("Skipped thread resolve: reason=threadNotFound, threadId={}", threadId);
+                    return false;
+                });
     }
 
     @Transactional
@@ -76,22 +71,20 @@ public class GitHubPullRequestReviewThreadProcessor {
         }
 
         return threadRepository
-            .findByNativeIdAndProviderId(threadId, Objects.requireNonNull(context.providerId()))
-            .map(thread -> {
-                thread.setState(PullRequestReviewThread.State.UNRESOLVED);
-                thread.setResolvedBy(null);
-                thread = threadRepository.save(thread);
-                ScmEventPayload.ReviewThreadData.from(thread).ifPresent(threadData ->
-                    eventPublisher.publishEvent(
-                        new ScmDomainEvent.ReviewThreadUnresolved(threadData, EventContext.from(context))
-                    )
-                );
-                log.info("Unresolved thread: threadId={}", threadId);
-                return true;
-            })
-            .orElseGet(() -> {
-                log.debug("Skipped thread unresolve: reason=threadNotFound, threadId={}", threadId);
-                return false;
-            });
+                .findByNativeIdAndProviderId(threadId, Objects.requireNonNull(context.providerId()))
+                .map(thread -> {
+                    thread.setState(PullRequestReviewThread.State.UNRESOLVED);
+                    thread.setResolvedBy(null);
+                    thread = threadRepository.save(thread);
+                    ScmEventPayload.ReviewThreadData.from(thread)
+                            .ifPresent(threadData -> eventPublisher.publishEvent(
+                                    new ScmDomainEvent.ReviewThreadUnresolved(threadData, EventContext.from(context))));
+                    log.info("Unresolved thread: threadId={}", threadId);
+                    return true;
+                })
+                .orElseGet(() -> {
+                    log.debug("Skipped thread unresolve: reason=threadNotFound, threadId={}", threadId);
+                    return false;
+                });
     }
 }

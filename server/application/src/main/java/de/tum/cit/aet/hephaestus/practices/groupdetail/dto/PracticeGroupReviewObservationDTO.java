@@ -13,41 +13,40 @@ import org.jspecify.annotations.Nullable;
 
 @Schema(description = "One concrete, evidence-backed observation from a review run")
 public record PracticeGroupReviewObservationDTO(
-    @NonNull UUID observationId,
-    @Nullable UUID feedbackId,
-    @Nullable FeedbackUsefulness feedbackUsefulness,
-    @Nullable FeedbackResolution feedbackResolution,
-    @Nullable String feedbackResponseComment,
-    @NonNull String practiceSlug,
-    @NonNull String practiceName,
-    @NonNull String title,
-    @NonNull Presence presence,
-    @Nullable
-    @Schema(description = "Good or bad for the developer; null when the review could not decide (INCONCLUSIVE)")
-    Assessment assessment,
-    @Nullable Severity severity,
-    @Nullable String recurrenceKey
-) {
-    public static PracticeGroupReviewObservationDTO from(
-        Observation observation,
+        @NonNull UUID observationId,
         @Nullable UUID feedbackId,
         @Nullable FeedbackUsefulness feedbackUsefulness,
         @Nullable FeedbackResolution feedbackResolution,
-        @Nullable String feedbackResponseComment
-    ) {
+        @Nullable String feedbackResponseComment,
+        @NonNull String practiceSlug,
+        @NonNull String practiceName,
+        @NonNull String title,
+        @NonNull Presence presence,
+
+        @Nullable
+        @Schema(description = "Good or bad for the developer; null when the review could not decide (INCONCLUSIVE)")
+        Assessment assessment,
+
+        @Nullable Severity severity,
+        @Nullable String recurrenceKey) {
+    public static PracticeGroupReviewObservationDTO from(
+            Observation observation,
+            @Nullable UUID feedbackId,
+            @Nullable FeedbackUsefulness feedbackUsefulness,
+            @Nullable FeedbackResolution feedbackResolution,
+            @Nullable String feedbackResponseComment) {
         return new PracticeGroupReviewObservationDTO(
-            observation.getId(),
-            feedbackId,
-            feedbackUsefulness,
-            feedbackResolution,
-            feedbackResponseComment,
-            observation.getPractice().getSlug(),
-            observation.getPractice().getName(),
-            observation.getSummary(),
-            observation.getPresence(),
-            observation.getAssessment(),
-            observation.getSeverity(),
-            observation.getRecurrenceKey()
-        );
+                observation.getId(),
+                feedbackId,
+                feedbackUsefulness,
+                feedbackResolution,
+                feedbackResponseComment,
+                observation.getPractice().getSlug(),
+                observation.getPractice().getName(),
+                observation.getSummary(),
+                observation.getPresence(),
+                observation.getAssessment(),
+                observation.getSeverity(),
+                observation.getRecurrenceKey());
     }
 }

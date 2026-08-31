@@ -59,15 +59,14 @@ final class MentorAdmissionMetadata {
         }
         try {
             return new LlmPriceSnapshot(
-                FundingSource.valueOf(rates.path("fundingSource").asString()),
-                PricingState.valueOf(rates.path("pricingState").asString()),
-                longOrNull(rates, "appliedPriceId"),
-                longOrNull(rates, "appliedWorkspaceModelId"),
-                decimalOrNull(rates, "per1mInputUsd"),
-                decimalOrNull(rates, "per1mOutputUsd"),
-                decimalOrNull(rates, "per1mCacheReadUsd"),
-                decimalOrNull(rates, "per1mCacheWriteUsd")
-            );
+                    FundingSource.valueOf(rates.path("fundingSource").asString()),
+                    PricingState.valueOf(rates.path("pricingState").asString()),
+                    longOrNull(rates, "appliedPriceId"),
+                    longOrNull(rates, "appliedWorkspaceModelId"),
+                    decimalOrNull(rates, "per1mInputUsd"),
+                    decimalOrNull(rates, "per1mOutputUsd"),
+                    decimalOrNull(rates, "per1mCacheReadUsd"),
+                    decimalOrNull(rates, "per1mCacheWriteUsd"));
         } catch (RuntimeException e) {
             log.warn("Unreadable LLM admission on a mentor turn; billing it as unpriced rather than stranding it", e);
             return LlmPriceSnapshot.unpricedInstance();

@@ -9,13 +9,17 @@ import org.jspecify.annotations.Nullable;
  */
 @Schema(description = "Result of GitLab PAT validation")
 public record GitLabPreflightResponseDTO(
-    @NonNull @Schema(description = "Whether the token is valid") boolean valid,
-    @Nullable
-    @Schema(description = "Username of the token owner (personal tokens) or group name (group tokens)")
-    String username,
-    @Nullable @Schema(description = "GitLab user ID or group ID") Long userId,
-    @Nullable @Schema(description = "Error message if validation failed") String error
-) {
+        @NonNull @Schema(description = "Whether the token is valid")
+        boolean valid,
+
+        @Nullable @Schema(description = "Username of the token owner (personal tokens) or group name (group tokens)")
+        String username,
+
+        @Nullable @Schema(description = "GitLab user ID or group ID")
+        Long userId,
+
+        @Nullable @Schema(description = "Error message if validation failed")
+        String error) {
     public static GitLabPreflightResponseDTO success(String username, Long userId) {
         return new GitLabPreflightResponseDTO(true, username, userId, null);
     }

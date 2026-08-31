@@ -56,8 +56,7 @@ public interface ProjectFieldRepository extends JpaRepository<ProjectField, Stri
      */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Transactional
-    @Query(
-        value = """
+    @Query(value = """
         INSERT INTO project_field (
             id, project_id, name, data_type, options, created_at, updated_at
         )
@@ -68,16 +67,13 @@ public interface ProjectFieldRepository extends JpaRepository<ProjectField, Stri
             data_type = EXCLUDED.data_type,
             options = EXCLUDED.options,
             updated_at = EXCLUDED.updated_at
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     int upsertCore(
-        @Param("id") String id,
-        @Param("projectId") Long projectId,
-        @Param("name") String name,
-        @Param("dataType") String dataType,
-        @Param("options") @Nullable String options,
-        @Param("createdAt") Instant createdAt,
-        @Param("updatedAt") Instant updatedAt
-    );
+            @Param("id") String id,
+            @Param("projectId") Long projectId,
+            @Param("name") String name,
+            @Param("dataType") String dataType,
+            @Param("options") @Nullable String options,
+            @Param("createdAt") Instant createdAt,
+            @Param("updatedAt") Instant updatedAt);
 }

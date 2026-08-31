@@ -24,14 +24,14 @@ import org.jspecify.annotations.Nullable;
  * @param observationOrigin the population these measurements belong to
  */
 public record DocumentReviewSubmissionRequest(
-    long documentId,
-    String title,
-    @Nullable String collectionName,
-    long aboutUserId,
-    SignalName signal,
-    SignalRevision revision,
-    ObservationOrigin observationOrigin
-) implements JobSubmissionRequest {
+        long documentId,
+        String title,
+        @Nullable String collectionName,
+        long aboutUserId,
+        SignalName signal,
+        SignalRevision revision,
+        ObservationOrigin observationOrigin)
+        implements JobSubmissionRequest {
     public DocumentReviewSubmissionRequest {
         Objects.requireNonNull(title, "title must not be null");
         Objects.requireNonNull(signal, "signal must not be null");

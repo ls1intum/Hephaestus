@@ -14,24 +14,22 @@ public interface InlineFeedbackChannel {
 
     InlineResult postInlineFeedback(SummaryChannel.FeedbackTarget target, List<InlineFeedback> feedback);
 
-    /**
-     * Removes this run's previously posted inline feedback (matched by {@code marker}) without posting new
-     * ones — the clear half of clear-then-post, callable on a zero-note re-run so stale notes from an earlier
-     * run never survive a review that now finds nothing inline (the empty-diff pathology where a re-reviewed
-     * PR keeps line-numbered notes on code no longer in the diff).
-     *
-     * <p>Default is a no-op for a vendor that offers no reconciliation at all. Both shipped channels override
-     * it: GitLab deletes every marker-bearing note; GitHub (whose threads cannot be deleted, only minimized)
-     * minimizes each vanished thread as {@code OUTDATED}. "Append-only" therefore does NOT mean "no-op" here.
-     */
-    default void clearStaleFeedback(SummaryChannel.FeedbackTarget target, String marker) {}
+    default InlineResult postImmutablePackage(SummaryChannel.FeedbackTarget target, List<InlineFeedback> feedback) {
+        return postInlineFeedback(target, feedback);
+    }
+
+    void clearStaleFeedback(SummaryChannel.FeedbackTarget target, String marker);
 
     /**
      * One piece of feedback to post inline. {@code recurrenceKey} carries the stable
      * {@link de.tum.cit.aet.hephaestus.practices.observation.ObservationFingerprint} identity so a delivery can be matched
      * back to its placement across re-runs; it is {@code null} when the caller has no key.
      */
-    record InlineFeedback(FeedbackAnchor anchor, String body, String marker, @Nullable String recurrenceKey) {}
+    record InlineFeedback(
+            FeedbackAnchor anchor,
+            String body,
+            String marker,
+            @Nullable String recurrenceKey) {}
 
     /**
      * Per-unit outcome of a delivery attempt, reported in {@link DeliveredSignal} so the placement layer can
@@ -58,12 +56,11 @@ public interface InlineFeedbackChannel {
      * the enclosing discussion/thread id; both are {@code null} when no durable handle exists (e.g. a failure).
      */
     record DeliveredSignal(
-        @Nullable String recurrenceKey,
-        FeedbackAnchor anchor,
-        Disposition disposition,
-        @Nullable String externalRef,
-        @Nullable String threadExternalRef
-    ) {}
+            @Nullable String recurrenceKey,
+            FeedbackAnchor anchor,
+            Disposition disposition,
+            @Nullable String externalRef,
+            @Nullable String threadExternalRef) {}
 
     /**
      * Aggregate delivery result. {@code signals} carries the per-unit {@link DeliveredSignal}s the placement
@@ -78,12 +75,11 @@ public interface InlineFeedbackChannel {
      * it is simply absent from both sides rather than violating the equality.
      */
     record InlineResult(
-        int posted,
-        int failed,
-        List<DeliveredSignal> signals,
-        boolean suppressed,
-        List<String> suppressedRecurrenceKeys
-    ) {
+            int posted,
+            int failed,
+            List<DeliveredSignal> signals,
+            boolean suppressed,
+            List<String> suppressedRecurrenceKeys) {
         public InlineResult(int posted, int failed, List<DeliveredSignal> signals) {
             this(posted, failed, signals, false, List.of());
         }
@@ -94,11 +90,7 @@ public interface InlineFeedbackChannel {
         }
 
         public static InlineResult suppressed(
-            int posted,
-            int failed,
-            List<DeliveredSignal> signals,
-            List<String> suppressedRecurrenceKeys
-        ) {
+                int posted, int failed, List<DeliveredSignal> signals, List<String> suppressedRecurrenceKeys) {
             return new InlineResult(posted, failed, List.copyOf(signals), true, List.copyOf(suppressedRecurrenceKeys));
         }
     }

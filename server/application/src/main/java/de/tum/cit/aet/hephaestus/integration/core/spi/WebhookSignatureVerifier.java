@@ -12,13 +12,11 @@ public interface WebhookSignatureVerifier {
     record WebhookRequest(byte[] body, Map<String, String> headers) {}
 
     sealed interface VerificationResult
-        permits
-            VerificationResult.Verified,
-            VerificationResult.Invalid,
-            VerificationResult.MissingSignature,
-            VerificationResult.StaleTimestamp,
-            VerificationResult.RespondImmediately
-    {
+            permits VerificationResult.Verified,
+                    VerificationResult.Invalid,
+                    VerificationResult.MissingSignature,
+                    VerificationResult.StaleTimestamp,
+                    VerificationResult.RespondImmediately {
         record Verified() implements VerificationResult {}
 
         /**
@@ -37,12 +35,8 @@ public interface WebhookSignatureVerifier {
          * published to NATS. Used for Slack {@code url_verification} and Asana's
          * X-Hook-Secret echo.
          */
-        record RespondImmediately(
-            int statusCode,
-            String contentType,
-            byte[] body,
-            Map<String, String> headers
-        ) implements VerificationResult {
+        record RespondImmediately(int statusCode, String contentType, byte[] body, Map<String, String> headers)
+                implements VerificationResult {
             public RespondImmediately(int statusCode, String contentType, byte[] body) {
                 this(statusCode, contentType, body, Map.of());
             }

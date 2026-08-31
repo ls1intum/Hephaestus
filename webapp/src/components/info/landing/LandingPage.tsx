@@ -1,9 +1,8 @@
-import { useRef } from "react";
 import { LandingCtaSection } from "./LandingCtaSection";
 import { LandingFaqSection } from "./LandingFaqSection";
 import { LandingFeaturesSection } from "./LandingFeaturesSection";
 import { LandingHeroSection } from "./LandingHeroSection";
-import { LandingWhyChooseSection } from "./LandingWhyChooseSection";
+import { LandingProjectOriginsSection } from "./LandingProjectOriginsSection";
 
 interface LandingPageProps {
 	onSignIn: (idpHint: string) => void;
@@ -12,27 +11,15 @@ interface LandingPageProps {
 }
 
 export function LandingPage({ onSignIn, onGoToDashboard, isSignedIn = false }: LandingPageProps) {
-	const learnMoreRef = useRef<HTMLDivElement>(null);
-
-	const handleLearnMoreClick = () => {
-		learnMoreRef.current?.scrollIntoView({
-			behavior: "smooth",
-			block: "start",
-		});
-	};
-
 	return (
 		<div className="flex flex-col">
 			<LandingHeroSection
 				onSignIn={onSignIn}
 				onGoToDashboard={onGoToDashboard}
 				isSignedIn={isSignedIn}
-				onLearnMoreClick={handleLearnMoreClick}
 			/>
-			<div ref={learnMoreRef}>
-				<LandingFeaturesSection />
-			</div>
-			<LandingWhyChooseSection />
+			<LandingFeaturesSection />
+			<LandingProjectOriginsSection />
 			<LandingFaqSection />
 			<LandingCtaSection
 				onSignIn={onSignIn}

@@ -150,20 +150,18 @@ public class GitLabRateLimitTracker {
             // Log based on severity
             if (currentRemaining < CRITICAL_REMAINING_THRESHOLD) {
                 log.error(
-                    "CRITICAL: GitLab GraphQL rate limit nearly exhausted: scopeId={}, remaining={}, limit={}, resetAt={}",
-                    scopeId,
-                    currentRemaining,
-                    currentLimit,
-                    state.resetAt.get()
-                );
+                        "CRITICAL: GitLab GraphQL rate limit nearly exhausted: scopeId={}, remaining={}, limit={}, resetAt={}",
+                        scopeId,
+                        currentRemaining,
+                        currentLimit,
+                        state.resetAt.get());
             } else if (currentRemaining < LOW_REMAINING_THRESHOLD) {
                 log.warn(
-                    "GitLab GraphQL rate limit low: scopeId={}, remaining={}, limit={}, resetAt={}",
-                    scopeId,
-                    currentRemaining,
-                    currentLimit,
-                    state.resetAt.get()
-                );
+                        "GitLab GraphQL rate limit low: scopeId={}, remaining={}, limit={}, resetAt={}",
+                        scopeId,
+                        currentRemaining,
+                        currentLimit,
+                        state.resetAt.get());
             }
         } catch (NumberFormatException e) {
             log.debug("Could not parse GitLab rate limit headers for scope {}: {}", scopeId, e.getMessage());
@@ -247,11 +245,10 @@ public class GitLabRateLimitTracker {
 
         if (currentRemaining >= CRITICAL_REMAINING_THRESHOLD) {
             log.info(
-                "GitLab rate limit low but continuing: scopeId={}, remaining={}, threshold={}",
-                scopeId,
-                currentRemaining,
-                LOW_REMAINING_THRESHOLD
-            );
+                    "GitLab rate limit low but continuing: scopeId={}, remaining={}, threshold={}",
+                    scopeId,
+                    currentRemaining,
+                    LOW_REMAINING_THRESHOLD);
             return false;
         }
 
@@ -278,12 +275,11 @@ public class GitLabRateLimitTracker {
         }
 
         log.warn(
-            "Pausing due to critical GitLab rate limit: scopeId={}, remaining={}, waitSeconds={}, resetAt={}",
-            scopeId,
-            currentRemaining,
-            waitTime.getSeconds(),
-            reset
-        );
+                "Pausing due to critical GitLab rate limit: scopeId={}, remaining={}, waitSeconds={}, resetAt={}",
+                scopeId,
+                currentRemaining,
+                waitTime.getSeconds(),
+                reset);
 
         Thread.sleep(waitTime.toMillis());
         return true;
@@ -362,12 +358,7 @@ public class GitLabRateLimitTracker {
             return null;
         }
         return RateLimitSnapshot.observed(
-            state.limit.get(),
-            state.remaining.get(),
-            state.resetAt.get(),
-            observedAt,
-            null
-        );
+                state.limit.get(), state.remaining.get(), state.resetAt.get(), observedAt, null);
     }
 
     /**
@@ -398,27 +389,24 @@ public class GitLabRateLimitTracker {
         }
 
         log.info(
-            "GitLab rate limit eviction completed: evicted={}, remaining={}",
-            scopesToEvict.size(),
-            stateByScope.size()
-        );
+                "GitLab rate limit eviction completed: evicted={}, remaining={}",
+                scopesToEvict.size(),
+                stateByScope.size());
     }
 
     private void deregisterMetrics(Long scopeId) {
         String scopeTag = String.valueOf(scopeId);
         List<Meter.Id> toRemove = new ArrayList<>();
 
-        meterRegistry
-            .getMeters()
-            .forEach(meter -> {
-                String meterName = meter.getId().getName();
-                if (meterName.startsWith(METRIC_PREFIX)) {
-                    String tagValue = meter.getId().getTag("scope_id");
-                    if (scopeTag.equals(tagValue)) {
-                        toRemove.add(meter.getId());
-                    }
+        meterRegistry.getMeters().forEach(meter -> {
+            String meterName = meter.getId().getName();
+            if (meterName.startsWith(METRIC_PREFIX)) {
+                String tagValue = meter.getId().getTag("scope_id");
+                if (scopeTag.equals(tagValue)) {
+                    toRemove.add(meter.getId());
                 }
-            });
+            }
+        });
 
         for (Meter.Id meterId : toRemove) {
             meterRegistry.remove(meterId);
@@ -439,36 +427,36 @@ public class GitLabRateLimitTracker {
 
         // NaN, not 0, while unobserved: a gauge is a measurement too, and 0 would read as "exhausted".
         Gauge.builder(METRIC_PREFIX + ".points.remaining", state, s -> asDouble(s.remaining.get()))
-            .tags(tags)
-            .description("GitLab GraphQL API rate limit points remaining")
-            .register(meterRegistry);
+                .tags(tags)
+                .description("GitLab GraphQL API rate limit points remaining")
+                .register(meterRegistry);
 
         Gauge.builder(METRIC_PREFIX + ".points.limit", state, s -> asDouble(s.limit.get()))
-            .tags(tags)
-            .description("GitLab GraphQL API rate limit total points per minute")
-            .register(meterRegistry);
+                .tags(tags)
+                .description("GitLab GraphQL API rate limit total points per minute")
+                .register(meterRegistry);
 
         Gauge.builder(METRIC_PREFIX + ".points.used", state.used, AtomicInteger::get)
-            .tags(tags)
-            .description("GitLab GraphQL API rate limit points used in current window")
-            .register(meterRegistry);
+                .tags(tags)
+                .description("GitLab GraphQL API rate limit points used in current window")
+                .register(meterRegistry);
 
         Gauge.builder(METRIC_PREFIX + ".last_query_cost", state.lastQueryCost, AtomicInteger::get)
-            .tags(tags)
-            .description("Points consumed by the last GitLab GraphQL query")
-            .register(meterRegistry);
+                .tags(tags)
+                .description("Points consumed by the last GitLab GraphQL query")
+                .register(meterRegistry);
 
         Gauge.builder(METRIC_PREFIX + ".seconds_until_reset", state, s -> {
-            Instant reset = s.resetAt.get();
-            if (reset == null) {
-                return 0.0;
-            }
-            long seconds = Duration.between(Instant.now(), reset).getSeconds();
-            return Math.max(0, seconds);
-        })
-            .tags(tags)
-            .description("Seconds until GitLab GraphQL rate limit resets")
-            .register(meterRegistry);
+                    Instant reset = s.resetAt.get();
+                    if (reset == null) {
+                        return 0.0;
+                    }
+                    long seconds = Duration.between(Instant.now(), reset).getSeconds();
+                    return Math.max(0, seconds);
+                })
+                .tags(tags)
+                .description("Seconds until GitLab GraphQL rate limit resets")
+                .register(meterRegistry);
     }
 
     /** Renders an unobserved value as NaN rather than a number that would be read as a measurement. */

@@ -20,14 +20,12 @@ import org.springframework.transaction.annotation.Transactional;
 @Repository
 @WorkspaceAgnostic("Labels scoped through repository_id -> repository.workspace_id")
 public interface LabelRepository extends JpaRepository<Label, Long> {
-    @Query(
-        """
+    @Query("""
         SELECT l
         FROM Label l
         WHERE l.repository.id = :repositoryId
         AND l.name = :name
-        """
-    )
+        """)
     Optional<Label> findByRepositoryIdAndName(@Param("repositoryId") Long repositoryId, @Param("name") String name);
 
     Optional<Label> findByNativeIdAndProviderId(Long nativeId, Long providerId);
@@ -45,19 +43,15 @@ public interface LabelRepository extends JpaRepository<Label, Long> {
      */
     @Modifying
     @Transactional
-    @Query(
-        value = """
+    @Query(value = """
         INSERT INTO label (native_id, provider_id, name, color, repository_id)
         VALUES (:nativeId, :providerId, :name, :color, :repositoryId)
         ON CONFLICT (repository_id, name) DO NOTHING
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     int insertIfAbsent(
-        @Param("nativeId") Long nativeId,
-        @Param("providerId") Long providerId,
-        @Param("name") String name,
-        @Param("color") @Nullable String color,
-        @Param("repositoryId") Long repositoryId
-    );
+            @Param("nativeId") Long nativeId,
+            @Param("providerId") Long providerId,
+            @Param("name") String name,
+            @Param("color") @Nullable String color,
+            @Param("repositoryId") Long repositoryId);
 }

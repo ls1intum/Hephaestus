@@ -31,9 +31,9 @@ public class SlackChannelConsentGate {
      */
     @Transactional(readOnly = true)
     public boolean ingestAllowed(long workspaceId, String channelId) {
-        return (
-            monitoredChannelRepository.findConsentState(workspaceId, channelId).orElse(ConsentState.PENDING) ==
-            ConsentState.ACTIVE
-        );
+        return (monitoredChannelRepository
+                        .findConsentState(workspaceId, channelId)
+                        .orElse(ConsentState.PENDING)
+                == ConsentState.ACTIVE);
     }
 }

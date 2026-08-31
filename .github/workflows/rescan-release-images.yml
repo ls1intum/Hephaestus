@@ -1,0 +1,87 @@
+name: Rescan supported release images
+on:
+  schedule:
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+permissions:
+  contents: read
+  packages: read
+  issues: write
+concurrency:
+  group: rescan-supported-release
+  cancel-in-progress: false
+jobs:
+  rescan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node-pnpm
+        with:
+          install: "none"
+      - uses: ./.github/actions/setup-release-security-tools
+        with:
+          install-syft: "false"
+      - name: Download and verify latest supported release evidence
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          tag=$(gh release view --repo "${{ github.repository }}" --json tagName --jq .tagName)
+          mkdir release-evidence
+          gh release download "$tag" --repo "${{ github.repository }}" --dir release-evidence
+          (cd release-evidence && sha256sum -c SHA256SUMS)
+          lock="release-$tag.json"
+          cosign verify-blob \
+            --bundle "release-evidence/$lock.sigstore.json" \
+            --certificate-identity 'https://github.com/ls1intum/Hephaestus/.github/workflows/release.yml@refs/heads/main' \
+            --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+            "release-evidence/$lock"
+          node scripts/release-image-lock.ts "release-evidence/$lock" \
+            release-evidence/manifest.json "$tag" /tmp/release-lock.env
+          node scripts/verify-release-evidence.ts release-evidence
+      - name: Rescan immutable subjects
+        env:
+          TRIVY_USERNAME: ${{ github.actor }}
+          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir reports
+          for attempt in 1 2 3; do
+            trivy image --timeout 90s --download-db-only && break
+            if [ "$attempt" -eq 3 ]; then
+              echo "::error::Trivy database download failed after $attempt attempts"
+              exit 1
+            fi
+            sleep $((attempt * 5))
+          done
+          db_metadata="${TRIVY_CACHE_DIR:-$HOME/.cache/trivy}/db/metadata.json"
+          jq -e '(.UpdatedAt | sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601) as $updated |
+            ((now - $updated) >= 0) and ((now - $updated) <= 86400)' \
+            "$db_metadata" >/dev/null
+          cp "$db_metadata" reports/trivy-db.json
+          jq -er '.subjects[] | [.image, .platform, .digest, .repository] | @tsv' release-evidence/manifest.json |
+          while IFS=$'\t' read -r image platform digest repository; do
+            suffix=${platform//\//-}
+            trivy image --skip-db-update --scanners vuln --format json --output "reports/$image-$suffix.json" "$repository@$digest"
+            node scripts/check-release-vulnerabilities.ts "$image" "$platform" "$digest" "$repository" \
+              "reports/$image-$suffix.json" security/vulnerability-policy.json \
+              "reports/$image-$suffix.policy.json"
+          done
+      - name: Upload diagnostic reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: supported-release-rescan-${{ github.run_id }}
+          path: reports
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Notify vulnerability response tracking
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue comment 1369 --repo "${{ github.repository }}" --body \
+            "The supported-release rescan is **unknown or failing policy**. Treat this as actionable until triaged: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"

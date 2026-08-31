@@ -12,101 +12,135 @@ import tools.jackson.databind.node.ObjectNode;
 
 @Schema(description = "Agent job execution record (job_token intentionally omitted)")
 public record AgentJobDTO(
-    @NonNull @Schema(description = "Job ID") UUID id,
-    @NonNull @Schema(description = "Job type") AgentJobType jobType,
-    @NonNull @Schema(description = "Current job status") AgentJobStatus status,
-    @NonNull @Schema(description = "Work item reviewed by this job") ReviewRunTargetDTO target,
-    @Schema(description = "Job metadata (routing/display info)") @Nullable Object metadata,
-    @Schema(description = "Job output (agent results)") Object output,
-    @NonNull
-    @Schema(
-        description = "Why a COMPLETED run produced the observations it did. INSUFFICIENT_EVIDENCE means no model " +
-            "ran because required evidence was missing, unreadable, stale, or unauthorized — so no observations " +
-            "means nothing was assessed, not that nothing was wrong. REVIEWED means the model ran against " +
-            "sufficient evidence."
-    )
-    ReviewRunOutcome reviewOutcome,
-    @NonNull
-    @Schema(
-        description = "Frozen agent config at submit time (an INSTANCE-scoped connection's baseUrl is redacted to scheme://host; only a WORKSPACE-scoped connection's baseUrl is left intact)"
-    )
-    Object configSnapshot,
-    @Schema(
-        description = "Upstream model this job was admitted on, frozen at submit time (e.g. gpt-5.4-mini). Available from submission, unlike llmModel, which the runner reports only once the job has run."
-    )
-    @Nullable
-    String model,
-    @Schema(description = "Container exit code") Integer exitCode,
-    @Schema(description = "Human-readable error message") String errorMessage,
-    @Schema(
-        description = "Delivery status: null = not applicable, PENDING = awaiting delivery, DELIVERED = posted, FAILED = delivery error"
-    )
-    DeliveryStatus deliveryStatus,
-    @Schema(description = "Git provider comment/note ID for posted feedback") @Nullable String deliveryCommentId,
-    @NonNull @Schema(description = "Number of retry attempts") Integer retryCount,
-    @NonNull
-    @Schema(
-        description = "When this job becomes eligible to be claimed. In the future while the job is " +
-            "waiting — on a retry backoff, or on a hold. Read together with holdReason: a QUEUED job " +
-            "with availableAt in the future is waiting, not starved for workers."
-    )
-    Instant availableAt,
-    @Schema(
-        description = "Why a QUEUED job is waiting rather than eligible, when the reason is one an admin " +
-            "can undo. BUDGET = the payer is over its monthly LLM cap and the job resumes by itself once " +
-            "the cap is raised or the month rolls over. Absent means no such hold — a future availableAt " +
-            "is then an ordinary retry backoff."
-    )
-    @Nullable
-    String holdReason,
-    @NonNull @Schema(description = "Timestamp when the job was created") Instant createdAt,
-    @Schema(description = "Timestamp when the job started running") Instant startedAt,
-    @Schema(description = "Timestamp when the job completed") Instant completedAt,
-    @Schema(description = "LLM model used (e.g. gpt-5.4-mini, openai/gpt-oss-120b)") @Nullable String llmModel,
-    @Schema(
-        description = "Model version/snapshot date (e.g. 2026-03-17). Only jobs from before the model catalog " +
-            "carry one; absent on everything newer."
-    )
-    @Nullable
-    String llmModelVersion,
-    @Schema(description = "Total LLM API calls (steps) during execution") @Nullable Integer llmTotalCalls,
-    @Schema(description = "Total input tokens consumed") @Nullable Integer llmTotalInputTokens,
-    @Schema(description = "Total output tokens generated") @Nullable Integer llmTotalOutputTokens,
-    @Schema(description = "Total reasoning/thinking tokens") @Nullable Integer llmTotalReasoningTokens,
-    @Schema(description = "Tokens read from prompt cache") @Nullable Integer llmCacheReadTokens,
-    @Schema(description = "Tokens written to prompt cache") @Nullable Integer llmCacheWriteTokens
-) {
+        @NonNull @Schema(description = "Job ID") UUID id,
+        @NonNull @Schema(description = "Job type") AgentJobType jobType,
+        @NonNull @Schema(description = "Current job status") AgentJobStatus status,
+
+        @NonNull @Schema(description = "Work item reviewed by this job")
+        ReviewRunTargetDTO target,
+
+        @Schema(description = "Job metadata (routing/display info)") @Nullable
+        Object metadata,
+
+        @Schema(description = "Job output (agent results)") Object output,
+
+        @NonNull
+        @Schema(
+                description =
+                        "Why a COMPLETED run produced the observations it did. INSUFFICIENT_EVIDENCE means no model "
+                                + "ran because required evidence was missing, unreadable, stale, or unauthorized — so no observations "
+                                + "means nothing was assessed, not that nothing was wrong. REVIEWED means the model ran against "
+                                + "sufficient evidence.")
+        ReviewRunOutcome reviewOutcome,
+
+        @NonNull
+        @Schema(
+                description =
+                        "Frozen agent config at submit time (an INSTANCE-scoped connection's baseUrl is redacted to scheme://host; only a WORKSPACE-scoped connection's baseUrl is left intact)")
+        Object configSnapshot,
+
+        @Schema(
+                description =
+                        "Upstream model this job was admitted on, frozen at submit time (e.g. gpt-5.4-mini). Available from submission, unlike llmModel, which the runner reports only once the job has run.")
+        @Nullable
+        String model,
+
+        @Schema(description = "Container exit code") Integer exitCode,
+
+        @Schema(description = "Human-readable error message")
+        String errorMessage,
+
+        @Schema(
+                description =
+                        "Delivery status: null = not applicable, PENDING = awaiting delivery, DELIVERED = posted, FAILED = delivery error")
+        DeliveryStatus deliveryStatus,
+
+        @Schema(description = "Git provider comment/note ID for posted feedback") @Nullable
+        String deliveryCommentId,
+
+        @NonNull @Schema(description = "Number of retry attempts")
+        Integer retryCount,
+
+        @NonNull
+        @Schema(
+                description = "When this job becomes eligible to be claimed. In the future while the job is "
+                        + "waiting — on a retry backoff, or on a hold. Read together with holdReason: a QUEUED job "
+                        + "with availableAt in the future is waiting, not starved for workers.")
+        Instant availableAt,
+
+        @Schema(
+                description = "Why a QUEUED job is waiting rather than eligible, when the reason is one an admin "
+                        + "can undo. BUDGET = the payer is over its monthly LLM cap and the job resumes by itself once "
+                        + "the cap is raised or the month rolls over. Absent means no such hold — a future availableAt "
+                        + "is then an ordinary retry backoff.")
+        @Nullable
+        String holdReason,
+
+        @NonNull @Schema(description = "Timestamp when the job was created")
+        Instant createdAt,
+
+        @Schema(description = "Timestamp when the job started running")
+        Instant startedAt,
+
+        @Schema(description = "Timestamp when the job completed")
+        Instant completedAt,
+
+        @Schema(description = "LLM model used (e.g. gpt-5.4-mini, openai/gpt-oss-120b)") @Nullable
+        String llmModel,
+
+        @Schema(
+                description = "Model version/snapshot date (e.g. 2026-03-17). Only jobs from before the model catalog "
+                        + "carry one; absent on everything newer.")
+        @Nullable
+        String llmModelVersion,
+
+        @Schema(description = "Total LLM API calls (steps) during execution") @Nullable
+        Integer llmTotalCalls,
+
+        @Schema(description = "Total input tokens consumed") @Nullable
+        Integer llmTotalInputTokens,
+
+        @Schema(description = "Total output tokens generated") @Nullable
+        Integer llmTotalOutputTokens,
+
+        @Schema(description = "Total reasoning/thinking tokens") @Nullable
+        Integer llmTotalReasoningTokens,
+
+        @Schema(description = "Tokens read from prompt cache") @Nullable
+        Integer llmCacheReadTokens,
+
+        @Schema(description = "Tokens written to prompt cache") @Nullable
+        Integer llmCacheWriteTokens) {
     public static AgentJobDTO from(AgentJob job) {
         JsonNode snapshot = job.getConfigSnapshot();
         return new AgentJobDTO(
-            job.getId(),
-            job.getJobType(),
-            job.getStatus(),
-            ReviewRunTargetDTO.from(job),
-            job.getMetadata(),
-            job.getOutput(),
-            ReviewRunOutcome.fromJobOutput(job.getOutput()),
-            redactInstanceBaseUrl(snapshot),
-            snapshotString(snapshot, "upstreamModelId"),
-            job.getExitCode(),
-            job.getErrorMessage(),
-            job.getDeliveryStatus(),
-            job.getDeliveryCommentId(),
-            job.getRetryCount(),
-            job.getAvailableAt(),
-            job.getHoldReason(),
-            job.getCreatedAt(),
-            job.getStartedAt(),
-            job.getCompletedAt(),
-            job.getLlmModel(),
-            job.getLlmModelVersion(),
-            job.getLlmTotalCalls(),
-            job.getLlmTotalInputTokens(),
-            job.getLlmTotalOutputTokens(),
-            job.getLlmTotalReasoningTokens(),
-            job.getLlmCacheReadTokens(),
-            job.getLlmCacheWriteTokens()
-        );
+                job.getId(),
+                job.getJobType(),
+                job.getStatus(),
+                ReviewRunTargetDTO.from(job),
+                job.getMetadata(),
+                job.getOutput(),
+                ReviewRunOutcome.fromJobOutput(job.getOutput()),
+                redactInstanceBaseUrl(snapshot),
+                snapshotString(snapshot, "upstreamModelId"),
+                job.getExitCode(),
+                job.getErrorMessage(),
+                job.getDeliveryStatus(),
+                job.getDeliveryCommentId(),
+                job.getRetryCount(),
+                job.getAvailableAt(),
+                job.getHoldReason(),
+                job.getCreatedAt(),
+                job.getStartedAt(),
+                job.getCompletedAt(),
+                job.getLlmModel(),
+                job.getLlmModelVersion(),
+                job.getLlmTotalCalls(),
+                job.getLlmTotalInputTokens(),
+                job.getLlmTotalOutputTokens(),
+                job.getLlmTotalReasoningTokens(),
+                job.getLlmCacheReadTokens(),
+                job.getLlmCacheWriteTokens());
     }
 
     /**

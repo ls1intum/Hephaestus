@@ -61,38 +61,33 @@ public interface WorkspaceRepository extends JpaRepository<Workspace, Long> {
         if (installationId == null) {
             return Optional.empty();
         }
-        return findWorkspaceIdByGitHubInstallationInstanceKey(installationId.toString()).flatMap(
-            this::findByIdForUpdate
-        );
+        return findWorkspaceIdByGitHubInstallationInstanceKey(installationId.toString())
+                .flatMap(this::findByIdForUpdate);
     }
 
     default Optional<Workspace> findActiveByInstallationIdForUpdate(Long installationId) {
-        return findByInstallationIdForUpdate(installationId).filter(
-            workspace -> workspace.getStatus() == Workspace.WorkspaceStatus.ACTIVE
-        );
+        return findByInstallationIdForUpdate(installationId)
+                .filter(workspace -> workspace.getStatus() == Workspace.WorkspaceStatus.ACTIVE);
     }
 
-    @Query(
-        """
+    @Query("""
         SELECT c.workspace
         FROM Connection c
         WHERE c.kind = de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind.GITHUB
           AND c.instanceKey = :instanceKey
-        """
-    )
+        """)
     Optional<Workspace> findByGitHubInstallationInstanceKey(@Param("instanceKey") String instanceKey);
 
-    @Query(
-        """
+    @Query("""
         SELECT c.workspace.id
         FROM Connection c
         WHERE c.kind = de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind.GITHUB
           AND c.instanceKey = :instanceKey
-        """
-    )
+        """)
     Optional<Long> findWorkspaceIdByGitHubInstallationInstanceKey(@Param("instanceKey") String instanceKey);
 
     Optional<Workspace> findByRepositoriesToMonitor_NameWithOwner(String nameWithOwner);
+
     Optional<Workspace> findByOrganization_Login(String login);
 
     /**
@@ -112,8 +107,11 @@ public interface WorkspaceRepository extends JpaRepository<Workspace, Long> {
     Optional<Workspace> findByAccountLoginIgnoreCaseForUpdate(@Param("login") String login);
 
     List<Workspace> findAllByAccountLoginIgnoreCase(String login);
+
     Optional<Workspace> findByWorkspaceSlug(String workspaceSlug);
+
     boolean existsByWorkspaceSlug(String workspaceSlug);
+
     boolean existsByOrganizationId(Long organizationId);
 
     boolean existsByIdAndOrganizationId(Long id, Long organizationId);
@@ -131,18 +129,14 @@ public interface WorkspaceRepository extends JpaRepository<Workspace, Long> {
      * workspace and this count is always 0 in production. It is kept so
      * {@link ScmWorkspaceContentEraser} stays correct if that 1:1 mapping is ever relaxed.
      */
-    @Query(
-        """
+    @Query("""
         SELECT COUNT(w) FROM Workspace w
         WHERE w.organization.id = :organizationId
           AND w.id <> :excludedWorkspaceId
           AND w.status <> de.tum.cit.aet.hephaestus.workspace.Workspace.WorkspaceStatus.PURGED
-        """
-    )
+        """)
     long countOtherActiveWorkspacesForOrganization(
-        @Param("organizationId") Long organizationId,
-        @Param("excludedWorkspaceId") Long excludedWorkspaceId
-    );
+            @Param("organizationId") Long organizationId, @Param("excludedWorkspaceId") Long excludedWorkspaceId);
 
     List<Workspace> findByStatusNot(Workspace.WorkspaceStatus status);
 
@@ -172,14 +166,12 @@ public interface WorkspaceRepository extends JpaRepository<Workspace, Long> {
         return ids.isEmpty() ? Optional.empty() : Optional.of(ids.get(0));
     }
 
-    @Query(
-        """
+    @Query("""
         SELECT m.workspace.id
         FROM RepositoryToMonitor m
         JOIN Repository r ON r.nameWithOwner = m.nameWithOwner
         WHERE r.id = :repositoryId
         ORDER BY m.workspace.id
-        """
-    )
+        """)
     List<Long> findWorkspaceIdsByRepositoryId(@Param("repositoryId") Long repositoryId, Pageable pageable);
 }

@@ -63,7 +63,98 @@ Before upgrading to any new `0.x.0` version:
 Entries exist only for releases that need operator action. Everything else is in the
 [release notes](https://github.com/ls1intum/Hephaestus/releases).
 
+### Next release
+
+#### 🔴 Integration credentials use a dedicated encryption key
+
+**Affected**: reference deployments and custom deployments. The supported self-host installer handles
+this migration automatically.
+
+**Before**: integration credentials use `HEPHAESTUS_SECURITY_ENCRYPTION_KEY`.
+
+**After**: integration credentials use `HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY`, which can be
+rotated independently without invalidating sessions or unrelated encrypted data.
+
+**Migration**: before deploying, set `HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY` to the current
+value of `HEPHAESTUS_SECURITY_ENCRYPTION_KEY`. After every runtime is upgraded, follow the
+[credential-key rotation procedure](https://ls1intum.github.io/Hephaestus/admin/credential-key-rotation)
+to replace it with an independent key. Self-hosted installations using `docker/self-host/setup.sh`
+receive the initial value automatically.
+
+#### 🔴 Server logs are now structured JSON
+
+**Affected**: deployments that parse the application server or worker console output — log shippers,
+alerting rules, or grep-based tooling built for the previous plain-text lines.
+
+**Before**: the server and worker wrote human-readable plain-text log lines.
+
+**After**: every log line is a single JSON object (`timestamp`, `level`, `logger`, `message`, `mdc`,
+`stacktrace`), in every profile, with known credential formats masked before output. Nothing changes
+for `docker compose logs` itself — the lines are still printed to the console, just as JSON.
+
+**Migration**: point existing parsers at the JSON fields instead of the plain-text layout. Filters
+that matched free text can key on `mdc."job.id"` and `mdc."workspace.id"`; see the log-correlation
+examples in the practice-review operations guide.
+
+#### 🔴 Restore PostgreSQL 17 data into PostgreSQL 18 before starting the stack
+
+**Affected**: operators upgrading a self-hosted deployment whose database volume was initialized by
+the bundled PostgreSQL 17 image.
+
+**Migration**: before starting this release, follow the
+[Backup & Restore](https://ls1intum.github.io/Hephaestus/admin/backup-restore#postgresql-17-to-18).
+Keep the PostgreSQL 17 volume until the upgraded deployment passes its acceptance checks.
+
+### v0.76.0
+
+#### 🔴 Upgrade the server and agent image together
+
+**Affected**: every deployment that runs practice reviews or mentor sessions.
+
+**Before**: runtime contract v1 executes staged TypeScript with Bun.
+
+**After**: runtime contract v2 executes it with Node.js 24, a 256 MB V8 heap ceiling, and scoped
+runner filesystem permissions. The server reports an image with a different contract as unsupported before sandbox work
+starts.
+
+**Migration**: deploy the application server/worker and the matching `hephaestus-agent` image from the
+same release. Do not reuse or independently pin an older agent image. After deployment, verify the agent
+image reports `hephaestus.agent.runtime-contract=2`, contains Node 24, and does not contain Bun.
+
 ### v0.75.0
+
+#### 🔴 Practice reviews now require the person being evaluated to be a workspace member
+
+**Affected**: every workspace with practice reviews turned on, and in particular any workspace whose
+monitored repositories take pull requests from outside the organization.
+
+**Before**: a review ran on any pull request or issue in a monitored repository, whoever it evaluated.
+
+**After**: coverage has two dimensions — repositories and people — and both must admit the work. The
+people dimension is workspace membership. Most practices evaluate the pull-request or issue author;
+reviewer practices evaluate the reviewer. If that person is not an identifiable linked human member, no
+review runs and no feedback is prepared about them.
+
+**Migration**: nothing to change before upgrading.
+
+**Operator action after upgrading**: open **Practices → Review → When and where** and confirm the
+**People** and **Repositories** counts. Existing members need no action. If expected contributors are
+missing, follow [Who counts as a person](https://ls1intum.github.io/Hephaestus/admin/practice-review#who-counts-as-a-person).
+
+#### 🔴 Production configuration is validated before startup
+
+**Affected**: deployments that activate the `prod` Spring profile and have a missing, malformed, or
+role-inconsistent required setting.
+
+Production processes now validate the applicable requirements in the configuration readiness
+catalog together and refuse to start until every reported error is resolved. The failure report
+identifies properties and documentation but never includes configured values.
+
+**Action**: before upgrading, compare every production role's settings with the
+[configuration readiness guide](https://ls1intum.github.io/Hephaestus/admin/configuration-readiness).
+Run a staging process with the production profile and correct every required setting it reports.
+After the server role starts, an instance administrator can inspect the redacted facts through
+`GET /api/admin/configuration-readiness`.
 
 #### 🔴 Practice area API names are replaced by practice group names
 
@@ -113,6 +204,35 @@ complete response and is safe to repeat. GET returns the response that currently
 **Action**: repoint any direct API caller at the new endpoint. Existing response history is preserved and
 participates in current-response reads; no operator data migration is required.
 
+#### 🟢 Pull request previews are opt-in, and the preview stack no longer runs agents
+
+**Affected**: anyone operating the Coolify preview application. Upgrading needs no action — the
+steps below are only for turning previews on. Staging and production are untouched.
+
+**Before**: Coolify deployed a preview for every same-repository pull request by itself, onto a stack
+that ran the agent sandbox and mounted the Docker socket. The v0.74.0 note below told you to name the
+preview's agent image in its `.env`.
+
+**After**: a preview starts only when someone with push access adds the `preview` label to a pull
+request — including a layer stacked on another branch — and at most `PREVIEW_MAX_ACTIVE` run at once
+(three unless you set that repository variable). GitHub Actions drives the whole lifecycle
+through a signed webhook; Coolify's own automatic deployment stays off. The stack runs no agent, no
+worker, no webhook ingestion and no integrations, so `AGENT_ENABLED` and
+`HEPHAESTUS_AGENT_IMAGE_REFERENCE` are gone from `docker/preview/.env.example` and the v0.74.0 note
+below no longer applies to previews.
+
+**Do this before enabling previews:**
+
+1. Refresh the preview application's Compose definition from `main`, then confirm the cached
+   definition has no Docker socket and no staging network.
+2. Turn Coolify's automatic deployment and its repository webhook off, and preview deployments on.
+3. Create a repository label named exactly `preview`.
+4. Set the repository variables and the two scoped secrets listed in the
+   [preview runbook](https://github.com/ls1intum/Hephaestus/blob/main/docker/preview/README.md),
+   then delete the old broad `COOLIFY_API_TOKEN`.
+
+Leaving previews disabled needs no action: without the repository variables, nothing deploys.
+
 ### v0.74.0
 
 #### 🔴 An agent image reference naming a channel tag is now refused
@@ -161,7 +281,7 @@ HEPHAESTUS_AGENT_IMAGE_REFERENCE=ghcr.io/ls1intum/hephaestus/agent-pi@sha256:<di
 
 A deployment tracking `main` keeps `HEPHAESTUS_RELEASE_PIN_SKIP=true` and
 `HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST=false`; the derived reference is a matched tag, not a digest.
-See [Agent image digests](https://ls1intum.github.io/Hephaestus/admin/agent-image-digests).
+See [Release image lock](https://ls1intum.github.io/Hephaestus/admin/release-image-lock).
 
 #### 🟡 Preview deployments name their own agent image
 
@@ -171,7 +291,8 @@ request which does not touch `docker/agents/**`.
 A preview now derives its agent image from its own commit, and CI publishes one at that commit only
 when the pull request changed the agent tree or a workflow. Previously such a preview silently used
 the last release's image. Set `HEPHAESTUS_AGENT_IMAGE_REFERENCE` in the preview's `.env` to the agent
-image you want it to exercise — `docker/preview/.env.example` shows the line.
+image you want it to exercise — `docker/preview/.env.example` shows the line. (Superseded for
+previews in v0.75.0: previews no longer run agents, and that variable is gone from the file.)
 #### 🔴 `NATS_JS_MAX_FILE` is gone, and webhook streams now have a disk bound
 
 **Affected**: every deployment.
@@ -305,8 +426,8 @@ record whose conduct it judged, so their observations were filed against the aut
 rather than the reviewer who wrote the comments. An occasion now records it, and a review that cannot
 name the reviewer does not run.
 
-A workspace installs the shipped catalogue once, so an existing workspace still holds the old wording.
-Open **Practice catalogue** and apply the update to those three practices to pick it up. Until you do,
+A workspace installs the shipped catalog once, so an existing workspace still holds the old wording.
+Open **Practice catalog** and apply the update to those three practices to pick it up. Until you do,
 they behave exactly as they did before — nothing new is recorded against the wrong person, because the
 new guard reads the occasion and the old wording still says *author*.
 
@@ -738,7 +859,7 @@ action:
 **Migration**:
 
 1. Deploy host must reach `github.com`, `fulcio.sigstore.dev`, `rekor.sigstore.dev`, and `tuf-repo-cdn.sigstore.dev` over HTTPS.
-2. Remove `docker/agent-image-pin.local.env`. Use `application-local.yml` or a shell env var instead — see [Agent image digests](https://github.com/ls1intum/Hephaestus/blob/main/docs/admin/agent-image-digests.md).
+2. Remove `docker/agent-image-pin.local.env`. Use `application-local.yml` or a shell env var instead — see [Release image lock](https://github.com/ls1intum/Hephaestus/blob/main/docs/admin/release-image-lock.md).
 3. Confirm `HEPHAESTUS_AGENT_IMAGE_REFERENCE` is not pre-set in your deploy substrate; an unintended value shadows the verified pin.
 4. Rolling back to a pre-v0.69.0 release: set `HEPHAESTUS_RELEASE_PIN_SKIP=true` plus an explicit `HEPHAESTUS_AGENT_IMAGE_REFERENCE=...@sha256:<digest>` env override on the init service.
 
@@ -761,7 +882,7 @@ HEPHAESTUS_MENTOR_AGENT_PULL_POLICY=IF_NOT_PRESENT
 **Migration**:
 
 1. Drop the four old env vars from your prod configuration.
-2. See [Agent image digests](https://github.com/ls1intum/Hephaestus/blob/main/docs/admin/agent-image-digests.md) for verification + rollback.
+2. See [Release image lock](https://github.com/ls1intum/Hephaestus/blob/main/docs/admin/release-image-lock.md) for verification + rollback.
 
 ---
 

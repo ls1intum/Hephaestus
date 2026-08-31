@@ -1,3 +1,2 @@
-// Development stub - overwritten by Docker entrypoint in production
-// This prevents 404 errors during local development (pnpm run dev)
+// Development default; the container entrypoint replaces it.
 window.__ENV__ = {};

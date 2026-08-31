@@ -2,6 +2,10 @@
 
 Read the [local development guide](https://ls1intum.github.io/Hephaestus/contributor/local-development) on how to set up your environment.
 
+Repository tooling requires the Node.js version pinned in `package.json#devEngines.runtime`. pnpm
+installs dependencies and dispatches package scripts; TypeScript scripts and application tools execute
+on Node.js.
+
 ## Maintenance Status
 
 Hephaestus is a research project at TUM, actively developed but maintained primarily by one person. Issues and pull requests are triaged on a best-effort basis. Security reports are the exception and get priority — see [SECURITY.md](SECURITY.md) for how to report vulnerabilities privately.
@@ -28,6 +32,10 @@ Contributions that do not adhere to these guidelines will be rejected. We align 
 
 ## Contribution Process
 
+Use `pnpm run check:affected` for fast feedback. Before pushing, run `pnpm run check`; the hook runs it
+automatically. Run `pnpm run verify` before requesting review. Scope, budgets, and exclusions are documented in the
+[local verification guide](https://ls1intum.github.io/Hephaestus/contributor/local-verification).
+
 1. **External contributors only**: Fork the Repository and create a branch.
 2. **Create a feature branch**: Work on your changes in a separate branch.
 3. **Follow pull request title guidelines**: Ensure your PR title follows the [Conventional Commits](https://www.conventionalcommits.org/) specification.
@@ -49,6 +57,14 @@ The optional [`gh stack`](https://github.com/github/gh-stack) extension manages 
 follow GitHub's [stacked PR quickstart](https://docs.github.com/en/pull-requests/get-started/stacked-prs-quickstart).
 This workflow is for branches in this repository; contributors working from forks should use one PR or
 coordinate with a maintainer.
+
+### Preview Deployments
+
+Want a running copy of your branch on a URL? Add the `preview` label to your pull request. It runs the
+images CI built for your commit and redeploys on every push; it never waits for your tests, so it
+exists even when they are red. Remove the label to tear it down. See
+[Preview Deployments](https://ls1intum.github.io/Hephaestus/contributor/ci-cd) for what a preview does
+and does not contain.
 
 ## Pull Request Title Guidelines
 
@@ -111,12 +127,12 @@ write good changesets, and what a version number promises all live in the
 **Infrastructure scopes** (tooling and process):
 
 - `ci`: CI/CD workflows
-- `config`: Tooling configuration (renovate, biome, oxlint, tsconfig, etc.)
+- `config`: Tooling configuration (renovate, oxfmt, oxlint, tsconfig, etc.)
 - `deps-dev`: Dev dependencies only
 - `scripts`: Helper scripts
 - `release`: Release engineering (also used by the automated Version PR)
 
-> ⚠️ **`config` scope warning:** Only use for tooling config files like `renovate.json`, `biome.jsonc`, `webapp/.oxlintrc.json`. Do NOT use for:
+> ⚠️ **`config` scope warning:** Only use for tooling config files like `renovate.json`, `.oxfmtrc.json`, `webapp/.oxlintrc.json`. Do NOT use for:
 > - Runtime config (`application.yml`) → use `server`
 > - Dockerfiles → use service scope (`webapp`, `server`, etc.)
 > - Production compose files → use `docker`

@@ -1,41 +1,15 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { fn } from "storybook/test";
-import { LandingHeroSection } from "./LandingHeroSection";
+import { expect, fn } from "storybook/test";
+import { HeroScene, LandingHeroSection } from "./LandingHeroSection";
 
 const meta = {
 	component: LandingHeroSection,
-	parameters: {
-		layout: "fullscreen",
-		docs: {
-			description: {
-				component:
-					"The hero introduces practice feedback in plain language and uses a responsive, reduced-motion-aware preview to show how project work leads to feedback and conversation.",
-			},
-		},
-	},
+	parameters: { layout: "fullscreen" },
 	tags: ["autodocs"],
-	argTypes: {
-		onSignIn: {
-			description: "Callback function triggered when the sign-in button is clicked",
-			action: "signed in",
-		},
-		onGoToDashboard: {
-			description: "Callback function triggered when the 'Go to dashboard' button is clicked",
-			action: "go to dashboard",
-		},
-		isSignedIn: {
-			description: "Whether the user is currently signed in",
-			control: "boolean",
-		},
-		onLearnMoreClick: {
-			description: "Callback function triggered when the learn more button is clicked",
-			action: "learn more clicked",
-		},
-	},
 	args: {
 		onSignIn: fn(),
 		onGoToDashboard: fn(),
-		onLearnMoreClick: fn(),
+		isSignedIn: false,
 	},
 } satisfies Meta<typeof LandingHeroSection>;
 
@@ -43,13 +17,56 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
-	args: {
-		isSignedIn: false,
+	play: async ({ canvas }) => {
+		// One DOM serves the scattered and the stacked composition; a second copy means the
+		// two layouts have drifted apart.
+		await expect(canvas.getAllByText("Export reports to CSV")).toHaveLength(1);
 	},
 };
 
 export const SignedIn: Story = {
-	args: {
-		isSignedIn: true,
+	args: { isSignedIn: true },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("button", { name: /dashboard/i })).toBeVisible();
 	},
+};
+
+export const Mobile: Story = {
+	parameters: {
+		viewport: { defaultViewport: "reflow" },
+		chromatic: { viewports: [320] },
+	},
+};
+
+export const Tablet: Story = {
+	parameters: {
+		viewport: { defaultViewport: "tablet" },
+		chromatic: { viewports: [768] },
+	},
+};
+
+export const DarkMode: Story = {
+	globals: { theme: "dark" },
+};
+
+export const ReadmeExport: Story = {
+	parameters: {
+		chromatic: { disableSnapshot: true },
+	},
+	render: (args) => (
+		<div data-readme-export="landing-hero" className="mx-auto w-full max-w-[1280px] bg-background">
+			<LandingHeroSection {...args} />
+		</div>
+	),
+};
+
+export const SceneExport: Story = {
+	parameters: {
+		chromatic: { disableSnapshot: true },
+	},
+	render: () => (
+		<div data-readme-export="feedback-scene" className="w-[56rem] bg-background p-6">
+			<HeroScene />
+		</div>
+	),
 };

@@ -1,11 +1,13 @@
-import { describe, expect, test } from "bun:test";
+import assert from "node:assert/strict";
+import { describe, test } from "node:test";
+
 import {
 	buildReviewTree,
 	mapConcurrent,
 	missingPracticeSlugs,
 	type ReviewPractice,
 	resolveReviewConcurrency,
-} from "../../../main/resources/agent/pi-review-tree";
+} from "../../../main/resources/agent/pi-review-tree.ts";
 
 const practices: ReviewPractice[] = [
 	{
@@ -23,7 +25,7 @@ const practices: ReviewPractice[] = [
 	},
 ];
 
-describe("buildReviewTree", () => {
+void describe("buildReviewTree", () => {
 	const laneCases: Array<{
 		name: string;
 		practices: ReviewPractice[];
@@ -79,17 +81,18 @@ describe("buildReviewTree", () => {
 	];
 
 	for (const scenario of laneCases) {
-		test(scenario.name, () => {
+		void test(scenario.name, () => {
 			const tree = buildReviewTree(scenario.practices, 4);
 
-			expect(tree.practiceCount).toBe(scenario.practices.length);
-			expect(tree.groups.map((group) => [group.id, group.practiceSlugs])).toEqual(
+			assert.equal(tree.practiceCount, scenario.practices.length);
+			assert.deepEqual(
+				tree.groups.map((group) => [group.id, group.practiceSlugs]),
 				scenario.expected,
 			);
 		});
 	}
 
-	test("classifies mixed evidence lanes deterministically", () => {
+	void test("classifies mixed evidence lanes deterministically", () => {
 		const mixed: ReviewPractice[] = laneCases.flatMap((scenario) => scenario.practices);
 		const expected = [
 			["pull-request-1", ["clear-pull-request-description"]],
@@ -98,19 +101,21 @@ describe("buildReviewTree", () => {
 			["code-1", ["tests-behavior-changes"]],
 		];
 
-		expect(
+		assert.deepEqual(
 			buildReviewTree(mixed, 4).groups.map((group) => [group.id, group.practiceSlugs]),
-		).toEqual(expected);
-		expect(
+			expected,
+		);
+		assert.deepEqual(
 			buildReviewTree(mixed.toReversed(), 4).groups.map((group) => [group.id, group.practiceSlugs]),
-		).toEqual(expected);
+			expected,
+		);
 	});
 
-	test("returns no work for an empty catalogue", () => {
-		expect(buildReviewTree([], 4)).toEqual({ practiceCount: 0, groups: [] });
+	void test("returns no work for an empty catalogue", () => {
+		assert.deepEqual(buildReviewTree([], 4), { practiceCount: 0, groups: [] });
 	});
 
-	test("uses the configured capacity instead of assuming a catalog size", () => {
+	void test("uses the configured capacity instead of assuming a catalog size", () => {
 		const dynamic = Array.from({ length: 7 }, (_, index) => ({
 			slug: `practice-${index}`,
 			readsSources: ["scm.pull-request.diff"],
@@ -118,12 +123,18 @@ describe("buildReviewTree", () => {
 
 		const tree = buildReviewTree(dynamic, 3);
 
-		expect(tree.practiceCount).toBe(7);
-		expect(tree.groups.map((group) => group.practiceSlugs.length)).toEqual([3, 3, 1]);
-		expect(tree.groups.map((group) => group.id)).toEqual(["code-1", "code-2", "code-3"]);
+		assert.equal(tree.practiceCount, 7);
+		assert.deepEqual(
+			tree.groups.map((group) => group.practiceSlugs.length),
+			[3, 3, 1],
+		);
+		assert.deepEqual(
+			tree.groups.map((group) => group.id),
+			["code-1", "code-2", "code-3"],
+		);
 	});
 
-	test("keeps groups separate when area names normalize alike", () => {
+	void test("keeps groups separate when area names normalize alike", () => {
 		const tree = buildReviewTree(
 			[
 				{ slug: "api", area: "API / UX", readsSources: ["scm.pull-request.diff"] },
@@ -132,10 +143,13 @@ describe("buildReviewTree", () => {
 			2,
 		);
 
-		expect(tree.groups.map((group) => group.id)).toEqual(["code-1", "code-2"]);
+		assert.deepEqual(
+			tree.groups.map((group) => group.id),
+			["code-1", "code-2"],
+		);
 	});
 
-	test("normalizes sources before classifying a group", () => {
+	void test("normalizes sources before classifying a group", () => {
 		const tree = buildReviewTree(
 			[
 				{ slug: "b", readsSources: [" scm.pull-request.core "] },
@@ -147,41 +161,42 @@ describe("buildReviewTree", () => {
 			2,
 		);
 
-		expect(tree.groups[0]).toEqual({
+		assert.deepEqual(tree.groups[0], {
 			id: "pull-request-1",
 			lane: "pull-request",
 			practiceSlugs: ["a", "b"],
 		});
 	});
 
-	test("rejects invalid capacity, blank slugs, and duplicate slugs", () => {
-		expect(() => buildReviewTree(practices, 0)).toThrow("positive integer");
-		expect(() => buildReviewTree([{ slug: " " }], 1)).toThrow("non-empty slug");
-		expect(() => buildReviewTree([{ slug: "same" }, { slug: "same" }], 1)).toThrow(
-			"duplicate practice slug: same",
+	void test("rejects invalid capacity, blank slugs, and duplicate slugs", () => {
+		assert.throws(() => buildReviewTree(practices, 0), /positive integer/);
+		assert.throws(() => buildReviewTree([{ slug: " " }], 1), /non-empty slug/);
+		assert.throws(
+			() => buildReviewTree([{ slug: "same" }, { slug: "same" }], 1),
+			/duplicate practice slug: same/,
 		);
 	});
 });
 
-test("missingPracticeSlugs requires explicit coverage for every selected practice", () => {
-	expect(missingPracticeSlugs(["a", "b", "c"], ["c", "a"])).toEqual(["b"]);
-	expect(missingPracticeSlugs(["a", "b"], ["b", "a"])).toEqual([]);
+void test("missingPracticeSlugs requires explicit coverage for every selected practice", () => {
+	assert.deepEqual(missingPracticeSlugs(["a", "b", "c"], ["c", "a"]), ["b"]);
+	assert.deepEqual(missingPracticeSlugs(["a", "b"], ["b", "a"]), []);
 });
 
-test("derives bounded review concurrency", () => {
-	expect(resolveReviewConcurrency(undefined, 1)).toBe(1);
-	expect(resolveReviewConcurrency(undefined, 16)).toBe(4);
-	expect(resolveReviewConcurrency(undefined, 27)).toBe(7);
-	expect(resolveReviewConcurrency(undefined, 100)).toBe(8);
-	expect(resolveReviewConcurrency("1", 27)).toBe(1);
-	expect(resolveReviewConcurrency("8", 1)).toBe(8);
+void test("derives bounded review concurrency", () => {
+	assert.equal(resolveReviewConcurrency(undefined, 1), 1);
+	assert.equal(resolveReviewConcurrency(undefined, 16), 4);
+	assert.equal(resolveReviewConcurrency(undefined, 27), 7);
+	assert.equal(resolveReviewConcurrency(undefined, 100), 8);
+	assert.equal(resolveReviewConcurrency("1", 27), 1);
+	assert.equal(resolveReviewConcurrency("8", 1), 8);
 	for (const invalid of ["0", "9", "2.5", "nope"]) {
-		expect(() => resolveReviewConcurrency(invalid, 27)).toThrow("integer from 1 to 8");
+		assert.throws(() => resolveReviewConcurrency(invalid, 27), /integer from 1 to 8/);
 	}
-	expect(() => resolveReviewConcurrency(undefined, -1)).toThrow("non-negative integer");
+	assert.throws(() => resolveReviewConcurrency(undefined, -1), /non-negative integer/);
 });
 
-test("mapConcurrent bounds active work and preserves input order", async () => {
+void test("mapConcurrent bounds active work and preserves input order", async () => {
 	const started: number[] = [];
 	const releases = Array.from({ length: 4 }, () => Promise.withResolvers<undefined>());
 	const firstPairStarted = Promise.withResolvers<undefined>();
@@ -195,11 +210,11 @@ test("mapConcurrent bounds active work and preserves input order", async () => {
 	});
 
 	await firstPairStarted.promise;
-	expect(started).toEqual([0, 1]);
+	assert.deepEqual(started, [0, 1]);
 	releases[1]?.resolve(undefined);
 	await thirdStarted.promise;
-	expect(started).toEqual([0, 1, 2]);
+	assert.deepEqual(started, [0, 1, 2]);
 	for (const release of releases) release.resolve(undefined);
 	const results = await resultPromise;
-	expect(results).toEqual([0, 1, 2, 3]);
+	assert.deepEqual(results, [0, 1, 2, 3]);
 });

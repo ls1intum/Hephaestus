@@ -9,13 +9,12 @@ end_of_line = lf
 insert_final_newline = true
 trim_trailing_whitespace = true
 
-# Java - 4 spaces (matches Prettier config)
 [*.java]
 indent_style = space
 indent_size = 4
 max_line_length = 120
 
-# TypeScript/JavaScript - tabs (matches Biome config)
+# TypeScript/JavaScript
 # .cjs is included for the changesets changelog plugin, which changesets loads by `require`.
 [*.{ts,tsx,js,jsx,mjs,cjs}]
 indent_style = tab
@@ -23,7 +22,7 @@ indent_size = 2
 tab_width = unset
 max_line_length = 100
 
-# JSON - tabs (matches Biome config)
+# JSON
 [*.{json,jsonc}]
 indent_style = tab
 indent_size = 2

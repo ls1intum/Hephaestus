@@ -71,8 +71,7 @@ class SlackParticipantConsentFirewallIntegrationTest extends BaseIntegrationTest
         databaseTestUtils.cleanDatabase();
         // Add the raw-JDBC-only participant_member_ids column — see SlackConversationTestSupport.
         jdbcTemplate.execute(
-            "ALTER TABLE slack_thread ADD COLUMN IF NOT EXISTS participant_member_ids BIGINT[] NOT NULL DEFAULT '{}'"
-        );
+                "ALTER TABLE slack_thread ADD COLUMN IF NOT EXISTS participant_member_ids BIGINT[] NOT NULL DEFAULT '{}'");
         Workspace workspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("slack-person-firewall"));
         workspaceId = workspace.getId();
 
@@ -96,16 +95,15 @@ class SlackParticipantConsentFirewallIntegrationTest extends BaseIntegrationTest
         when(identityResolver.resolveMemberId(anyLong(), any(), any())).thenReturn(Optional.empty());
 
         ingestService = new SlackIngestService(
-            workspaceResolver,
-            monitoredChannelRepository,
-            new SlackChannelConsentGate(monitoredChannelRepository),
-            new SlackParticipantConsentGate(participantConsentRepository),
-            messageRepository,
-            threadRepository,
-            identityResolver,
-            conversationFeedbackErasure,
-            /* conversationIngestEnabled */ true
-        );
+                workspaceResolver,
+                monitoredChannelRepository,
+                new SlackChannelConsentGate(monitoredChannelRepository),
+                new SlackParticipantConsentGate(participantConsentRepository),
+                messageRepository,
+                threadRepository,
+                identityResolver,
+                conversationFeedbackErasure,
+                /* conversationIngestEnabled */ true);
     }
 
     @Test
@@ -119,11 +117,11 @@ class SlackParticipantConsentFirewallIntegrationTest extends BaseIntegrationTest
 
         // The opted-out author's message is NOT persisted; the allowed author's IS.
         assertThat(messageRepository.existsByWorkspaceIdAndSlackChannelIdAndSlackTs(workspaceId, CHANNEL, "100.1"))
-            .as("opted-out author's message must be dropped by the person firewall")
-            .isFalse();
+                .as("opted-out author's message must be dropped by the person firewall")
+                .isFalse();
         assertThat(messageRepository.existsByWorkspaceIdAndSlackChannelIdAndSlackTs(workspaceId, CHANNEL, "200.1"))
-            .as("non-opted-out author's message must be stored")
-            .isTrue();
+                .as("non-opted-out author's message must be stored")
+                .isTrue();
     }
 
     @Test
@@ -131,21 +129,19 @@ class SlackParticipantConsentFirewallIntegrationTest extends BaseIntegrationTest
     void personFirewall_optBackIn_reallowsIngest() {
         participantConsentRepository.upsert(workspaceId, OPTED_OUT_USER, true, true, "SLACK_APP_HOME");
         ingestService.ingestChannelMessage(TEAM, CHANNEL, "100.1", null, OPTED_OUT_USER, "while opted out");
-        assertThat(
-            messageRepository.existsByWorkspaceIdAndSlackChannelIdAndSlackTs(workspaceId, CHANNEL, "100.1")
-        ).isFalse();
+        assertThat(messageRepository.existsByWorkspaceIdAndSlackChannelIdAndSlackTs(workspaceId, CHANNEL, "100.1"))
+                .isFalse();
 
         // Opt back in (ingestion_opted_out → false), then a fresh message from the same author is now stored.
         participantConsentRepository.upsert(workspaceId, OPTED_OUT_USER, false, false, "SLACK_APP_HOME");
         ingestService.ingestChannelMessage(TEAM, CHANNEL, "300.1", null, OPTED_OUT_USER, "after opting back in");
 
         assertThat(messageRepository.existsByWorkspaceIdAndSlackChannelIdAndSlackTs(workspaceId, CHANNEL, "300.1"))
-            .as("after opting back in, the author's ingest is allowed again")
-            .isTrue();
+                .as("after opting back in, the author's ingest is allowed again")
+                .isTrue();
         // The message sent while opted out stays absent (no retroactive ingest).
-        assertThat(
-            messageRepository.existsByWorkspaceIdAndSlackChannelIdAndSlackTs(workspaceId, CHANNEL, "100.1")
-        ).isFalse();
+        assertThat(messageRepository.existsByWorkspaceIdAndSlackChannelIdAndSlackTs(workspaceId, CHANNEL, "100.1"))
+                .isFalse();
     }
 
     @Test
@@ -154,23 +150,16 @@ class SlackParticipantConsentFirewallIntegrationTest extends BaseIntegrationTest
         participantConsentRepository.upsert(workspaceId, OPTED_OUT_USER, false, true, "SLACK_APP_HOME");
 
         participantConsentRepository.optOutOfIngestion(
-            workspaceId,
-            OPTED_OUT_USER,
-            SlackParticipantConsentService.SOURCE_SLACK_CHANNEL_NOTICE
-        );
+                workspaceId, OPTED_OUT_USER, SlackParticipantConsentService.SOURCE_SLACK_CHANNEL_NOTICE);
 
-        assertThat(
-            participantConsentRepository.existsByWorkspaceIdAndSlackUserIdAndIngestionOptedOutTrue(
-                workspaceId,
-                OPTED_OUT_USER
-            )
-        ).isTrue();
+        assertThat(participantConsentRepository.existsByWorkspaceIdAndSlackUserIdAndIngestionOptedOutTrue(
+                        workspaceId, OPTED_OUT_USER))
+                .isTrue();
         Boolean researchOptedOut = jdbcTemplate.queryForObject(
-            "SELECT research_opted_out FROM slack_participant_consent WHERE workspace_id = ? AND slack_user_id = ?",
-            Boolean.class,
-            workspaceId,
-            OPTED_OUT_USER
-        );
+                "SELECT research_opted_out FROM slack_participant_consent WHERE workspace_id = ? AND slack_user_id = ?",
+                Boolean.class,
+                workspaceId,
+                OPTED_OUT_USER);
         assertThat(researchOptedOut).isTrue();
     }
 }

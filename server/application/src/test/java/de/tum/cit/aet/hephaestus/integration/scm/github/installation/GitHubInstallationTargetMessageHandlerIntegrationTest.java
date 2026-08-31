@@ -58,10 +58,9 @@ class GitHubInstallationTargetMessageHandlerIntegrationTest extends BaseIntegrat
     private void setupTestWorkspace(Long installationId, String login) {
         // Create GitHub provider
         IdentityProvider gitProvider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-            .orElseGet(() ->
-                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseGet(() -> gitProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
 
         // Create organization
         Organization org = new Organization();
@@ -79,17 +78,11 @@ class GitHubInstallationTargetMessageHandlerIntegrationTest extends BaseIntegrat
         // Provider classification + installation id come from the Connection registry,
         // not from legacy Workspace columns.
         WorkspaceTestFixtures.WorkspaceBuilder builder = WorkspaceTestFixtures.installationWorkspace(
-            installationId,
-            login
-        )
-            .withSlug(login.toLowerCase())
-            .withAccountType(AccountType.ORG);
+                        installationId, login)
+                .withSlug(login.toLowerCase())
+                .withAccountType(AccountType.ORG);
         Workspace saved = WorkspaceTestFixtures.persistInstallationWorkspace(
-            workspaceRepository,
-            connectionRepository,
-            builder,
-            installationId
-        );
+                workspaceRepository, connectionRepository, builder, installationId);
         saved.setIsPubliclyViewable(true);
         saved.setOrganization(org);
         workspaceRepository.save(saved);
@@ -129,13 +122,13 @@ class GitHubInstallationTargetMessageHandlerIntegrationTest extends BaseIntegrat
     void shouldHandleNullAccountGracefully() {
         // Given - event with null account
         GitHubInstallationTargetEventDTO event = new GitHubInstallationTargetEventDTO(
-            "renamed",
-            null, // installation
-            null, // account
-            "Organization",
-            null, // changes
-            null // sender
-        );
+                "renamed",
+                null, // installation
+                null, // account
+                "Organization",
+                null, // changes
+                null // sender
+                );
 
         // When - should not throw
         handler.handleEvent(event);
@@ -147,13 +140,12 @@ class GitHubInstallationTargetMessageHandlerIntegrationTest extends BaseIntegrat
         // Given - load a valid event and create with unknown action
         GitHubInstallationTargetEventDTO baseEvent = loadPayload("installation_target");
         GitHubInstallationTargetEventDTO event = new GitHubInstallationTargetEventDTO(
-            "unknown_action",
-            baseEvent.installation(),
-            baseEvent.account(),
-            baseEvent.targetType(),
-            baseEvent.changes(),
-            baseEvent.sender()
-        );
+                "unknown_action",
+                baseEvent.installation(),
+                baseEvent.account(),
+                baseEvent.targetType(),
+                baseEvent.changes(),
+                baseEvent.sender());
         setupTestWorkspace(required(baseEvent.installation()).id(), "OldName");
 
         // When - should not throw

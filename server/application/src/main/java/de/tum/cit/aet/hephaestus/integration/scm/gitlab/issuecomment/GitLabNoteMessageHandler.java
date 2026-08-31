@@ -41,23 +41,21 @@ public class GitLabNoteMessageHandler extends AbstractIntegrationMessageHandler<
     private final ApplicationEventPublisher eventPublisher;
 
     GitLabNoteMessageHandler(
-        GitLabIssueCommentProcessor issueCommentProcessor,
-        GitLabDiffNoteWebhookProcessor diffNoteProcessor,
-        GitLabMergeRequestProcessor mergeRequestProcessor,
-        GitLabWebhookContextResolver contextResolver,
-        PullRequestRepository pullRequestRepository,
-        UserRepository userRepository,
-        NatsMessageDeserializer deserializer,
-        TransactionTemplate transactionTemplate,
-        ApplicationEventPublisher eventPublisher
-    ) {
+            GitLabIssueCommentProcessor issueCommentProcessor,
+            GitLabDiffNoteWebhookProcessor diffNoteProcessor,
+            GitLabMergeRequestProcessor mergeRequestProcessor,
+            GitLabWebhookContextResolver contextResolver,
+            PullRequestRepository pullRequestRepository,
+            UserRepository userRepository,
+            NatsMessageDeserializer deserializer,
+            TransactionTemplate transactionTemplate,
+            ApplicationEventPublisher eventPublisher) {
         super(
-            IntegrationKind.GITLAB,
-            GitLabEventType.NOTE.getValue(),
-            GitLabNoteEventDTO.class,
-            deserializer,
-            transactionTemplate
-        );
+                IntegrationKind.GITLAB,
+                GitLabEventType.NOTE.getValue(),
+                GitLabNoteEventDTO.class,
+                deserializer,
+                transactionTemplate);
         this.issueCommentProcessor = issueCommentProcessor;
         this.diffNoteProcessor = diffNoteProcessor;
         this.mergeRequestProcessor = mergeRequestProcessor;
@@ -87,13 +85,16 @@ public class GitLabNoteMessageHandler extends AbstractIntegrationMessageHandler<
 
         // Skip internal/confidential notes
         if (event.isInternalNote()) {
-            log.debug("Skipped internal note: noteId={}", event.objectAttributes().id());
+            log.debug(
+                    "Skipped internal note: noteId={}", event.objectAttributes().id());
             return;
         }
 
         // Skip notes on confidential issues
         if (event.isConfidentialIssue()) {
-            log.debug("Skipped note on confidential issue: noteId={}", event.objectAttributes().id());
+            log.debug(
+                    "Skipped note on confidential issue: noteId={}",
+                    event.objectAttributes().id());
             return;
         }
 
@@ -108,20 +109,18 @@ public class GitLabNoteMessageHandler extends AbstractIntegrationMessageHandler<
 
         if (action == GitLabEventAction.UNKNOWN) {
             log.debug(
-                "Skipped note with unknown action: projectPath={}, noteId={}",
-                safeProjectPath,
-                event.objectAttributes().id()
-            );
+                    "Skipped note with unknown action: projectPath={}, noteId={}",
+                    safeProjectPath,
+                    event.objectAttributes().id());
             return;
         }
 
         log.info(
-            "Processing note event: projectPath={}, noteableType={}, noteId={}, action={}",
-            safeProjectPath,
-            noteableType,
-            event.objectAttributes().id(),
-            action
-        );
+                "Processing note event: projectPath={}, noteableType={}, noteId={}, action={}",
+                safeProjectPath,
+                noteableType,
+                event.objectAttributes().id(),
+                action);
 
         ProcessingContext context = contextResolver.resolve(projectPath, action.getValue(), "note");
         if (context == null) {
@@ -130,11 +129,9 @@ public class GitLabNoteMessageHandler extends AbstractIntegrationMessageHandler<
 
         // Bot command detection: check for commands like "/hephaestus review" on MR notes.
         // Publishes an event so the agent module can process it asynchronously.
-        if (
-            "MergeRequest".equals(noteableType) &&
-            action == GitLabEventAction.CREATE &&
-            isBotCommand(event.objectAttributes().note())
-        ) {
+        if ("MergeRequest".equals(noteableType)
+                && action == GitLabEventAction.CREATE
+                && isBotCommand(event.objectAttributes().note())) {
             handleBotCommand(event, context, safeProjectPath);
         }
 
@@ -151,22 +148,24 @@ public class GitLabNoteMessageHandler extends AbstractIntegrationMessageHandler<
                 // carry merge_request.detailed_merge_status = "requested_changes".
                 detectRequestedChanges(event, context);
             }
-            case "Commit" -> log.debug(
-                "Skipped commit note: projectPath={}, noteId={}",
-                safeProjectPath,
-                event.objectAttributes().id()
-            );
-            case null, default -> log.debug(
-                "Skipped note with unsupported noteable type: projectPath={}, noteableType={}, noteId={}",
-                safeProjectPath,
-                noteableType,
-                event.objectAttributes().id()
-            );
+            case "Commit" ->
+                log.debug(
+                        "Skipped commit note: projectPath={}, noteId={}",
+                        safeProjectPath,
+                        event.objectAttributes().id());
+            case null, default ->
+                log.debug(
+                        "Skipped note with unsupported noteable type: projectPath={}, noteableType={}, noteId={}",
+                        safeProjectPath,
+                        noteableType,
+                        event.objectAttributes().id());
         }
     }
 
     private static boolean isBotCommand(String noteBody) {
-        return noteBody != null && !noteBody.isBlank() && noteBody.strip().toLowerCase().startsWith(BOT_COMMAND_PREFIX);
+        return noteBody != null
+                && !noteBody.isBlank()
+                && noteBody.strip().toLowerCase().startsWith(BOT_COMMAND_PREFIX);
     }
 
     /**
@@ -189,21 +188,26 @@ public class GitLabNoteMessageHandler extends AbstractIntegrationMessageHandler<
         // Don't create CHANGES_REQUESTED for the MR author commenting on their own PR
         var repository = context.repository();
         if (repository == null) return;
-        var pullRequest = pullRequestRepository.findByRepositoryIdAndNumber(repository.getId(), mr.iid()).orElse(null);
+        var pullRequest = pullRequestRepository
+                .findByRepositoryIdAndNumber(repository.getId(), mr.iid())
+                .orElse(null);
         if (pullRequest == null) return;
 
         // Self-review guard: skip if reviewer == MR author
-        if (
-            pullRequest.getAuthor() != null &&
-            pullRequest.getAuthor().getNativeId() != null &&
-            pullRequest.getAuthor().getNativeId().equals(event.user().id().longValue())
-        ) {
+        if (pullRequest.getAuthor() != null
+                && pullRequest.getAuthor().getNativeId() != null
+                && pullRequest
+                        .getAuthor()
+                        .getNativeId()
+                        .equals(event.user().id().longValue())) {
             return;
         }
 
         Long providerId = context.providerId();
         if (providerId == null) return;
-        User reviewer = userRepository.findByNativeIdAndProviderId(event.user().id(), providerId).orElse(null);
+        User reviewer = userRepository
+                .findByNativeIdAndProviderId(event.user().id(), providerId)
+                .orElse(null);
         if (reviewer == null) return;
 
         mergeRequestProcessor.processRequestedChangesFromNote(pullRequest, reviewer, context);
@@ -217,10 +221,9 @@ public class GitLabNoteMessageHandler extends AbstractIntegrationMessageHandler<
         var mr = event.mergeRequest();
         if (mr == null || mr.iid() == null) {
             log.warn(
-                "Bot command on MR note but no embedded merge_request data: projectPath={}, noteId={}",
-                safeProjectPath,
-                attrs.id()
-            );
+                    "Bot command on MR note but no embedded merge_request data: projectPath={}, noteId={}",
+                    safeProjectPath,
+                    attrs.id());
             return;
         }
 
@@ -237,22 +240,20 @@ public class GitLabNoteMessageHandler extends AbstractIntegrationMessageHandler<
         Long scopeId = context.scopeId();
         if (user == null || user.id() == null || providerId == null || scopeId == null) {
             log.warn(
-                "Bot command: no identifiable author on the note payload, projectPath={}, mrIid={}, noteId={}",
-                safeProjectPath,
-                mr.iid(),
-                attrs.id()
-            );
+                    "Bot command: no identifiable author on the note payload, projectPath={}, mrIid={}, noteId={}",
+                    safeProjectPath,
+                    mr.iid(),
+                    attrs.id());
             return;
         }
 
         log.info(
-            "Bot command detected: command={}, projectPath={}, mrIid={}, author={}, noteId={}",
-            attrs.note().strip(),
-            safeProjectPath,
-            mr.iid(),
-            user.username(),
-            attrs.id()
-        );
+                "Bot command detected: command={}, projectPath={}, mrIid={}, author={}, noteId={}",
+                attrs.note().strip(),
+                safeProjectPath,
+                mr.iid(),
+                user.username(),
+                attrs.id());
 
         String username = user.username();
         if (username == null) {
@@ -260,8 +261,7 @@ public class GitLabNoteMessageHandler extends AbstractIntegrationMessageHandler<
             return;
         }
 
-        eventPublisher.publishEvent(
-            new BotCommandReceivedEvent(
+        eventPublisher.publishEvent(new BotCommandReceivedEvent(
                 IntegrationKind.GITLAB,
                 repository.getId(),
                 mr.iid(),
@@ -270,8 +270,6 @@ public class GitLabNoteMessageHandler extends AbstractIntegrationMessageHandler<
                 providerId,
                 user.id().longValue(),
                 attrs.id(),
-                scopeId
-            )
-        );
+                scopeId));
     }
 }

@@ -27,10 +27,9 @@ public class AccountRoleQueryService implements AccountRoleQuery {
     @Override
     @Transactional(readOnly = true)
     public boolean hasFeatureFlag(
-        long gitProviderId,
-        @org.jspecify.annotations.Nullable String subject,
-        @org.jspecify.annotations.Nullable String flag
-    ) {
+            long gitProviderId,
+            @org.jspecify.annotations.Nullable String subject,
+            @org.jspecify.annotations.Nullable String flag) {
         if (subject == null || subject.isBlank() || flag == null || flag.isBlank()) {
             return false;
         }
@@ -38,12 +37,11 @@ public class AccountRoleQueryService implements AccountRoleQuery {
             return accountFeatureRepository.existsActiveFeatureForProviderSubject(gitProviderId, subject, flag);
         } catch (RuntimeException e) {
             log.error(
-                "auth.role: feature-flag check failed for gitProviderId={}, subject={}, flag={}",
-                gitProviderId,
-                subject,
-                flag,
-                e
-            );
+                    "auth.role: feature-flag check failed for gitProviderId={}, subject={}, flag={}",
+                    gitProviderId,
+                    subject,
+                    flag,
+                    e);
             return false; // fail-closed
         }
     }

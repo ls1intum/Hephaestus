@@ -1,4 +1,5 @@
 import { CircleAlert, Copy, ShieldCheck } from "lucide-react";
+
 import type { CatalogPracticePreview, PracticeDefinitionOptions } from "@/api/types.gen";
 import { PracticeDefinitionPreview } from "@/components/admin/practice-adoption/PracticeDefinitionPreview";
 import { GroupPill } from "@/components/admin/practice-catalog/GroupPill";

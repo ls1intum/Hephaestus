@@ -19,9 +19,7 @@ public class SlackChannelDirectoryService {
     private final SlackMonitoredChannelRepository monitoredChannelRepository;
 
     public SlackChannelDirectoryService(
-        SlackMessageService slackMessageService,
-        SlackMonitoredChannelRepository monitoredChannelRepository
-    ) {
+            SlackMessageService slackMessageService, SlackMonitoredChannelRepository monitoredChannelRepository) {
         this.slackMessageService = slackMessageService;
         this.monitoredChannelRepository = monitoredChannelRepository;
     }
@@ -29,26 +27,23 @@ public class SlackChannelDirectoryService {
     // Deliberately not @Transactional: the single repository read is auto-committed, and a tx here would hold a
     // pooled connection across the paginated (rate-limited) Slack conversations.list call.
     public List<SlackChannelCandidateDTO> listCandidates(long workspaceId) {
-        Map<String, SlackMonitoredChannel> monitoredById = monitoredChannelRepository
-            .findByWorkspaceIdOrderByCreatedAtDesc(workspaceId)
-            .stream()
-            .collect(Collectors.toMap(SlackMonitoredChannel::getSlackChannelId, Function.identity(), (a, b) -> a));
+        Map<String, SlackMonitoredChannel> monitoredById =
+                monitoredChannelRepository.findByWorkspaceIdOrderByCreatedAtDesc(workspaceId).stream()
+                        .collect(Collectors.toMap(
+                                SlackMonitoredChannel::getSlackChannelId, Function.identity(), (a, b) -> a));
 
-        return slackMessageService
-            .listConversations(workspaceId)
-            .stream()
-            .map(channel -> {
-                SlackMonitoredChannel monitored = monitoredById.get(channel.channelId());
-                return new SlackChannelCandidateDTO(
-                    channel.channelId(),
-                    channel.channelName(),
-                    channel.privateChannel(),
-                    channel.member(),
-                    channel.archived(),
-                    monitored == null ? null : monitored.getConsentState()
-                );
-            })
-            .sorted(Comparator.comparing(SlackChannelCandidateDTO::channelName, String.CASE_INSENSITIVE_ORDER))
-            .toList();
+        return slackMessageService.listConversations(workspaceId).stream()
+                .map(channel -> {
+                    SlackMonitoredChannel monitored = monitoredById.get(channel.channelId());
+                    return new SlackChannelCandidateDTO(
+                            channel.channelId(),
+                            channel.channelName(),
+                            channel.privateChannel(),
+                            channel.member(),
+                            channel.archived(),
+                            monitored == null ? null : monitored.getConsentState());
+                })
+                .sorted(Comparator.comparing(SlackChannelCandidateDTO::channelName, String.CASE_INSENSITIVE_ORDER))
+                .toList();
     }
 }

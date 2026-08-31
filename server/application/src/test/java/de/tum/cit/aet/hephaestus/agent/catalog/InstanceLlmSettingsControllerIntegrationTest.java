@@ -19,15 +19,15 @@ class InstanceLlmSettingsControllerIntegrationTest extends AbstractWorkspaceInte
     @Test
     void getReturnsDefaultsBeforeAnyUpdate() {
         InstanceLlmSettingsDTO settings = webTestClient
-            .get()
-            .uri("/admin/llm/settings")
-            .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody(InstanceLlmSettingsDTO.class)
-            .returnResult()
-            .getResponseBody();
+                .get()
+                .uri("/admin/llm/settings")
+                .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(InstanceLlmSettingsDTO.class)
+                .returnResult()
+                .getResponseBody();
 
         assertThat(settings).isNotNull();
         assertThat(settings.allowWorkspaceConnections()).isTrue();
@@ -38,32 +38,32 @@ class InstanceLlmSettingsControllerIntegrationTest extends AbstractWorkspaceInte
         var request = new UpdateInstanceLlmSettingsRequestDTO("api.openai.com\napi.anthropic.com", false);
 
         InstanceLlmSettingsDTO updated = webTestClient
-            .put()
-            .uri("/admin/llm/settings")
-            .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(request)
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody(InstanceLlmSettingsDTO.class)
-            .returnResult()
-            .getResponseBody();
+                .put()
+                .uri("/admin/llm/settings")
+                .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(InstanceLlmSettingsDTO.class)
+                .returnResult()
+                .getResponseBody();
 
         assertThat(updated).isNotNull();
         assertThat(updated.allowWorkspaceConnections()).isFalse();
         assertThat(updated.allowedEgressHosts()).contains("api.openai.com");
 
         InstanceLlmSettingsDTO fetched = webTestClient
-            .get()
-            .uri("/admin/llm/settings")
-            .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody(InstanceLlmSettingsDTO.class)
-            .returnResult()
-            .getResponseBody();
+                .get()
+                .uri("/admin/llm/settings")
+                .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(InstanceLlmSettingsDTO.class)
+                .returnResult()
+                .getResponseBody();
         assertThat(fetched).isNotNull();
         assertThat(fetched.allowWorkspaceConnections()).isFalse();
     }
@@ -71,27 +71,27 @@ class InstanceLlmSettingsControllerIntegrationTest extends AbstractWorkspaceInte
     @Test
     void anAbsentFieldOnPatchLeavesItsCurrentValueUntouched() {
         webTestClient
-            .put()
-            .uri("/admin/llm/settings")
-            .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(new UpdateInstanceLlmSettingsRequestDTO("api.openai.com", false))
-            .exchange()
-            .expectStatus()
-            .isOk();
+                .put()
+                .uri("/admin/llm/settings")
+                .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(new UpdateInstanceLlmSettingsRequestDTO("api.openai.com", false))
+                .exchange()
+                .expectStatus()
+                .isOk();
 
         InstanceLlmSettingsDTO fetched = webTestClient
-            .put()
-            .uri("/admin/llm/settings")
-            .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(new UpdateInstanceLlmSettingsRequestDTO("api.openai.com\napi.anthropic.com", null))
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody(InstanceLlmSettingsDTO.class)
-            .returnResult()
-            .getResponseBody();
+                .put()
+                .uri("/admin/llm/settings")
+                .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(new UpdateInstanceLlmSettingsRequestDTO("api.openai.com\napi.anthropic.com", null))
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(InstanceLlmSettingsDTO.class)
+                .returnResult()
+                .getResponseBody();
 
         assertThat(fetched).isNotNull();
         assertThat(fetched.allowWorkspaceConnections()).isFalse();
@@ -101,11 +101,11 @@ class InstanceLlmSettingsControllerIntegrationTest extends AbstractWorkspaceInte
     @Test
     void nonAdminIsForbidden() {
         webTestClient
-            .get()
-            .uri("/admin/llm/settings")
-            .headers(h -> h.setBearerAuth(MENTOR_TOKEN))
-            .exchange()
-            .expectStatus()
-            .isForbidden();
+                .get()
+                .uri("/admin/llm/settings")
+                .headers(h -> h.setBearerAuth(MENTOR_TOKEN))
+                .exchange()
+                .expectStatus()
+                .isForbidden();
     }
 }

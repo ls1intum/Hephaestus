@@ -40,12 +40,11 @@ public class LlmUsageAdminService {
     private final FxRateLookup fxRateLookup;
 
     public LlmUsageAdminService(
-        LlmUsageEventRepository usageRepository,
-        WorkspaceRepository workspaceRepository,
-        ConfigAuditPort configAudit,
-        AgentJobRepository jobRepository,
-        FxRateLookup fxRateLookup
-    ) {
+            LlmUsageEventRepository usageRepository,
+            WorkspaceRepository workspaceRepository,
+            ConfigAuditPort configAudit,
+            AgentJobRepository jobRepository,
+            FxRateLookup fxRateLookup) {
         this.usageRepository = usageRepository;
         this.workspaceRepository = workspaceRepository;
         this.configAudit = configAudit;
@@ -59,11 +58,10 @@ public class LlmUsageAdminService {
         LlmBudgetService.MonthWindow window = LlmBudgetService.MonthWindow.of(month);
         boolean isCurrentMonth = month.equals(YearMonth.now(ZoneOffset.UTC));
         FxRateInfoDTO fx = fxRateLookup.forMonth(month).orElse(null);
-        List<AdminWorkspaceLlmUsageDTO> workspaces = usageRepository
-            .aggregateByWorkspace(window.from(), window.to())
-            .stream()
-            .map(row -> toRollup(row, isCurrentMonth))
-            .toList();
+        List<AdminWorkspaceLlmUsageDTO> workspaces =
+                usageRepository.aggregateByWorkspace(window.from(), window.to()).stream()
+                        .map(row -> toRollup(row, isCurrentMonth))
+                        .toList();
         return new AdminLlmUsageReportDTO(month.toString(), fx, workspaces);
     }
 
@@ -74,52 +72,40 @@ public class LlmUsageAdminService {
         // by two different people, and Hibernate's UPDATE covers every column — without the lock, two
         // concurrent patches each revert the other's cap.
         Workspace workspace = workspaceRepository
-            .findByWorkspaceSlugForUpdate(workspaceSlug)
-            .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceSlug));
+                .findByWorkspaceSlugForUpdate(workspaceSlug)
+                .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceSlug));
         BigDecimal before = workspace.getMonthlyLlmBudgetUsd();
         workspace.setMonthlyLlmBudgetUsd(monthlyLlmBudgetUsd);
         workspaceRepository.save(workspace);
-        configAudit.record(
-            ConfigAuditEntry.updated(
+        configAudit.record(ConfigAuditEntry.updated(
                 ConfigAuditEntityType.WORKSPACE_INSTANCE_LLM_BUDGET,
                 workspace.getId(),
                 workspace.getId(),
                 new LlmBudgetSnapshot(before),
-                new LlmBudgetSnapshot(monthlyLlmBudgetUsd)
-            )
-        );
+                new LlmBudgetSnapshot(monthlyLlmBudgetUsd)));
         // So a raised cap takes effect on the next poll rather than up to an hour later. A job released
         // under a lowered cap is simply re-held on its next claim attempt.
         jobRepository.releaseBudgetHolds(workspace.getId(), Instant.now());
     }
 
     private static AdminWorkspaceLlmUsageDTO toRollup(
-        LlmUsageEventRepository.WorkspaceAggregate row,
-        boolean isCurrentMonth
-    ) {
+            LlmUsageEventRepository.WorkspaceAggregate row, boolean isCurrentMonth) {
         LlmBudgetVerdict instanceVerdict = LlmBudgetService.verdictFor(
-            row.getPricedTotalCostUsd(),
-            row.isHasUnpricedInstanceUsage(),
-            row.getMonthlyBudgetUsd()
-        );
+                row.getPricedTotalCostUsd(), row.isHasUnpricedInstanceUsage(), row.getMonthlyBudgetUsd());
         LlmBudgetVerdict ownProviderVerdict = LlmBudgetService.verdictFor(
-            row.getByoTotalCostUsd(),
-            row.isHasUnpricedByoUsage(),
-            row.getByoMonthlyBudgetUsd()
-        );
+                row.getByoTotalCostUsd(), row.isHasUnpricedByoUsage(), row.getByoMonthlyBudgetUsd());
         return new AdminWorkspaceLlmUsageDTO(
-            row.getWorkspaceSlug(),
-            row.getDisplayName(),
-            row.getMonthlyBudgetUsd(),
-            row.getByoMonthlyBudgetUsd(),
-            row.getPricedTotalCostUsd(),
-            row.getByoTotalCostUsd(),
-            row.getEvents(),
-            instanceVerdict,
-            ownProviderVerdict,
-            isCurrentMonth && instanceVerdict != LlmBudgetVerdict.WITHIN,
-            isCurrentMonth && ownProviderVerdict != LlmBudgetVerdict.WITHIN
-        );
+                row.getWorkspaceSlug(),
+                row.getDisplayName(),
+                row.getMonthlyBudgetUsd(),
+                row.getByoMonthlyBudgetUsd(),
+                row.getPricedTotalCostUsd(),
+                row.getByoTotalCostUsd(),
+                row.getEvents(),
+                instanceVerdict,
+                ownProviderVerdict,
+                isCurrentMonth && instanceVerdict != LlmBudgetVerdict.WITHIN,
+                isCurrentMonth && ownProviderVerdict != LlmBudgetVerdict.WITHIN);
     }
 
     /** {@code null} = uncapped. */

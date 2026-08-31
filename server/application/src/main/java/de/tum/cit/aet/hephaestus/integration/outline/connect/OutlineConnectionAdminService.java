@@ -47,9 +47,9 @@ public class OutlineConnectionAdminService {
         ConnectionConfig.OutlineConfig config = (ConnectionConfig.OutlineConfig) connection.getConfig();
         String serverUrl = Objects.requireNonNull(config.serverUrl(), "Outline connection must have a server URL");
         String token = connectionService
-            .findActiveBearerToken(workspaceId, IntegrationKind.OUTLINE)
-            .map(BearerToken::token)
-            .orElse(null);
+                .findActiveBearerToken(workspaceId, IntegrationKind.OUTLINE)
+                .map(BearerToken::token)
+                .orElse(null);
         if (token == null) {
             return new OutlineTokenStatusDTO(false, null, null, null, null);
         }
@@ -61,18 +61,17 @@ public class OutlineConnectionAdminService {
         }
         try {
             return apiClient
-                .describeToken(serverUrl, token)
-                .map(d -> new OutlineTokenStatusDTO(true, d.name(), d.last4(), d.expiresAt(), d.lastActiveAt()))
-                .orElseGet(() -> new OutlineTokenStatusDTO(true, null, null, null, null));
+                    .describeToken(serverUrl, token)
+                    .map(d -> new OutlineTokenStatusDTO(true, d.name(), d.last4(), d.expiresAt(), d.lastActiveAt()))
+                    .orElseGet(() -> new OutlineTokenStatusDTO(true, null, null, null, null));
         } catch (OutlineApiException e) {
             // The token is accepted (auth.info passed); only the metadata probe faltered — a flaky
             // apiKeys.list must not turn a healthy token into a 502. Treat it like the 403 case:
             // token accepted, metadata unavailable.
             log.debug(
-                "outline.admin: token accepted but metadata probe failed for workspaceId={}: {}",
-                workspaceId,
-                e.toString()
-            );
+                    "outline.admin: token accepted but metadata probe failed for workspaceId={}: {}",
+                    workspaceId,
+                    e.toString());
             return new OutlineTokenStatusDTO(true, null, null, null, null);
         }
     }

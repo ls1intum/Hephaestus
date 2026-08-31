@@ -9,7 +9,6 @@ import org.jspecify.annotations.Nullable;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitHubBranchRefDTO(
-    @JsonProperty("ref") String ref,
-    @JsonProperty("sha") String sha,
-    @JsonProperty("label") @Nullable String label
-) {}
+        @JsonProperty("ref") String ref,
+        @JsonProperty("sha") String sha,
+        @JsonProperty("label") @Nullable String label) {}

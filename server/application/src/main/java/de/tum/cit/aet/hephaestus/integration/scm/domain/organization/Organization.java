@@ -25,12 +25,15 @@ import org.jspecify.annotations.Nullable;
 @NoArgsConstructor
 @ToString(callSuper = true)
 @Table(
-    name = "organization",
-    uniqueConstraints = {
-        @UniqueConstraint(name = "uq_organization_provider_native_id", columnNames = { "provider_id", "native_id" }),
-        @UniqueConstraint(name = "uq_organization_provider_login", columnNames = { "provider_id", "login" }),
-    }
-)
+        name = "organization",
+        uniqueConstraints = {
+            @UniqueConstraint(
+                    name = "uq_organization_provider_native_id",
+                    columnNames = {"provider_id", "native_id"}),
+            @UniqueConstraint(
+                    name = "uq_organization_provider_login",
+                    columnNames = {"provider_id", "login"}),
+        })
 public class Organization extends BaseGitServiceEntity {
 
     /**

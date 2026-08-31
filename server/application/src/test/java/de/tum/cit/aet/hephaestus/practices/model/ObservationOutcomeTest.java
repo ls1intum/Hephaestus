@@ -13,15 +13,12 @@ class ObservationOutcomeTest {
     @Test
     @DisplayName("maps every cell of the presence × assessment matrix")
     void shouldMapEveryMatrixCell() {
-        assertThat(ObservationOutcome.of(Presence.PRESENT, Assessment.GOOD)).isEqualTo(
-            ObservationOutcome.DEMONSTRATED_STRENGTH
-        );
-        assertThat(ObservationOutcome.of(Presence.PRESENT, Assessment.BAD)).isEqualTo(
-            ObservationOutcome.COMMISSION_PROBLEM
-        );
-        assertThat(ObservationOutcome.of(Presence.ABSENT, Assessment.GOOD)).isEqualTo(
-            ObservationOutcome.SAFE_AVOIDANCE
-        );
+        assertThat(ObservationOutcome.of(Presence.PRESENT, Assessment.GOOD))
+                .isEqualTo(ObservationOutcome.DEMONSTRATED_STRENGTH);
+        assertThat(ObservationOutcome.of(Presence.PRESENT, Assessment.BAD))
+                .isEqualTo(ObservationOutcome.COMMISSION_PROBLEM);
+        assertThat(ObservationOutcome.of(Presence.ABSENT, Assessment.GOOD))
+                .isEqualTo(ObservationOutcome.SAFE_AVOIDANCE);
         assertThat(ObservationOutcome.of(Presence.ABSENT, Assessment.BAD)).isEqualTo(ObservationOutcome.OMISSION_GAP);
     }
 
@@ -35,15 +32,12 @@ class ObservationOutcomeTest {
     @Test
     @DisplayName("rejects a pair the presence/assessment coherence CHECK would reject")
     void shouldRejectIncoherentPairs() {
-        assertThatThrownBy(() -> ObservationOutcome.of(Presence.PRESENT, null)).isInstanceOf(
-            IllegalArgumentException.class
-        );
-        assertThatThrownBy(() -> ObservationOutcome.of(Presence.NOT_APPLICABLE, Assessment.GOOD)).isInstanceOf(
-            IllegalArgumentException.class
-        );
-        assertThatThrownBy(() -> ObservationOutcome.of(Presence.INCONCLUSIVE, Assessment.BAD)).isInstanceOf(
-            IllegalArgumentException.class
-        );
+        assertThatThrownBy(() -> ObservationOutcome.of(Presence.PRESENT, null))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> ObservationOutcome.of(Presence.NOT_APPLICABLE, Assessment.GOOD))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> ObservationOutcome.of(Presence.INCONCLUSIVE, Assessment.BAD))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
@@ -62,10 +56,14 @@ class ObservationOutcomeTest {
     @Test
     @DisplayName("denies a defect detector the demonstrated strength that would be its own defect")
     void shouldDenyDefectDetectorAnIncoherentStrength() {
-        assertThat(ObservationOutcome.DEMONSTRATED_STRENGTH.isCoherentStrengthFor(true)).isFalse();
-        assertThat(ObservationOutcome.SAFE_AVOIDANCE.isCoherentStrengthFor(true)).isTrue();
+        assertThat(ObservationOutcome.DEMONSTRATED_STRENGTH.isCoherentStrengthFor(true))
+                .isFalse();
+        assertThat(ObservationOutcome.SAFE_AVOIDANCE.isCoherentStrengthFor(true))
+                .isTrue();
 
-        assertThat(ObservationOutcome.DEMONSTRATED_STRENGTH.isCoherentStrengthFor(false)).isTrue();
-        assertThat(ObservationOutcome.SAFE_AVOIDANCE.isCoherentStrengthFor(false)).isTrue();
+        assertThat(ObservationOutcome.DEMONSTRATED_STRENGTH.isCoherentStrengthFor(false))
+                .isTrue();
+        assertThat(ObservationOutcome.SAFE_AVOIDANCE.isCoherentStrengthFor(false))
+                .isTrue();
     }
 }

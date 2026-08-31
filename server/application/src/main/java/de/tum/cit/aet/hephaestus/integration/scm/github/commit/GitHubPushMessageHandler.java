@@ -61,24 +61,22 @@ public class GitHubPushMessageHandler extends AbstractIntegrationMessageHandler<
     private final SyncTargetProvider syncTargetProvider;
 
     public GitHubPushMessageHandler(
-        GitRepositoryManager gitRepositoryManager,
-        GitHubAppTokenService tokenService,
-        RepositoryRepository repositoryRepository,
-        CommitRepository commitRepository,
-        CommitAuthorResolver authorResolver,
-        ApplicationEventPublisher eventPublisher,
-        ScopeIdResolver scopeIdResolver,
-        SyncTargetProvider syncTargetProvider,
-        NatsMessageDeserializer deserializer,
-        TransactionTemplate transactionTemplate
-    ) {
+            GitRepositoryManager gitRepositoryManager,
+            GitHubAppTokenService tokenService,
+            RepositoryRepository repositoryRepository,
+            CommitRepository commitRepository,
+            CommitAuthorResolver authorResolver,
+            ApplicationEventPublisher eventPublisher,
+            ScopeIdResolver scopeIdResolver,
+            SyncTargetProvider syncTargetProvider,
+            NatsMessageDeserializer deserializer,
+            TransactionTemplate transactionTemplate) {
         super(
-            IntegrationKind.GITHUB,
-            "repository." + GitHubEventType.PUSH.getValue(),
-            GitHubPushEventDTO.class,
-            deserializer,
-            transactionTemplate
-        );
+                IntegrationKind.GITHUB,
+                "repository." + GitHubEventType.PUSH.getValue(),
+                GitHubPushEventDTO.class,
+                deserializer,
+                transactionTemplate);
         this.gitRepositoryManager = gitRepositoryManager;
         this.tokenService = tokenService;
         this.repositoryRepository = repositoryRepository;
@@ -91,7 +89,8 @@ public class GitHubPushMessageHandler extends AbstractIntegrationMessageHandler<
 
     @Override
     protected void handleEvent(GitHubPushEventDTO event) {
-        String repoName = event.repository() != null ? sanitizeForLog(event.repository().fullName()) : "unknown";
+        String repoName =
+                event.repository() != null ? sanitizeForLog(event.repository().fullName()) : "unknown";
 
         // Skip branch deletions - no commits to process
         if (event.deleted()) {
@@ -106,12 +105,11 @@ public class GitHubPushMessageHandler extends AbstractIntegrationMessageHandler<
         }
 
         log.debug(
-            "Received push event: branch={}, commitCount={}, forced={}, repoName={}",
-            getBranchName(event.ref()),
-            event.commits().size(),
-            event.forced(),
-            repoName
-        );
+                "Received push event: branch={}, commitCount={}, forced={}, repoName={}",
+                getBranchName(event.ref()),
+                event.commits().size(),
+                event.forced(),
+                repoName);
 
         // Get repository from database by its GitHub ID
         Long repoId = event.repository() != null ? event.repository().id() : null;
@@ -120,7 +118,8 @@ public class GitHubPushMessageHandler extends AbstractIntegrationMessageHandler<
             return;
         }
 
-        Repository repository = repositoryRepository.findByIdWithOrganization(repoId).orElse(null);
+        Repository repository =
+                repositoryRepository.findByIdWithOrganization(repoId).orElse(null);
         if (repository == null) {
             log.debug("Skipped push event: reason=repositoryNotFound, repoId={}, repoName={}", repoId, repoName);
             return;
@@ -130,11 +129,10 @@ public class GitHubPushMessageHandler extends AbstractIntegrationMessageHandler<
         String defaultBranch = repository.getDefaultBranch();
         if (defaultBranch == null || !isDefaultBranch(event.ref(), defaultBranch)) {
             log.debug(
-                "Skipped push event: reason=notDefaultBranch, branch={}, defaultBranch={}, repoName={}",
-                getBranchName(event.ref()),
-                defaultBranch,
-                repoName
-            );
+                    "Skipped push event: reason=notDefaultBranch, branch={}, defaultBranch={}, repoName={}",
+                    getBranchName(event.ref()),
+                    defaultBranch,
+                    repoName);
             return;
         }
 
@@ -150,10 +148,9 @@ public class GitHubPushMessageHandler extends AbstractIntegrationMessageHandler<
         } else {
             if (gitRepositoryManager.isEnabled() && !scopeActive) {
                 log.debug(
-                    "Skipped local git processing: reason=scopeNotActive, scopeId={}, repoName={}",
-                    scopeId,
-                    repoName
-                );
+                        "Skipped local git processing: reason=scopeNotActive, scopeId={}, repoName={}",
+                        scopeId,
+                        repoName);
             }
             processCommitsViaWebhook(event, repository, false);
         }
@@ -189,10 +186,7 @@ public class GitHubPushMessageHandler extends AbstractIntegrationMessageHandler<
 
             // Walk commits from before to after
             List<GitRepositoryManager.CommitInfo> commitInfos = gitRepositoryManager.walkCommits(
-                repository.getId(),
-                isInitialPush(beforeSha) ? null : beforeSha,
-                afterSha
-            );
+                    repository.getId(), isInitialPush(beforeSha) ? null : beforeSha, afterSha);
 
             int processed = 0;
             for (GitRepositoryManager.CommitInfo info : commitInfos) {
@@ -202,18 +196,16 @@ public class GitHubPushMessageHandler extends AbstractIntegrationMessageHandler<
             }
 
             log.info(
-                "Processed push commits via local git: processed={}, total={}, branch={}, repoName={}",
-                processed,
-                commitInfos.size(),
-                getBranchName(event.ref()),
-                repoName
-            );
+                    "Processed push commits via local git: processed={}, total={}, branch={}, repoName={}",
+                    processed,
+                    commitInfos.size(),
+                    getBranchName(event.ref()),
+                    repoName);
         } catch (Exception e) {
             log.error(
-                "Failed to process commits via local git, falling back to webhook: repoName={}, error={}",
-                repoName,
-                e.getMessage()
-            );
+                    "Failed to process commits via local git, falling back to webhook: repoName={}, error={}",
+                    repoName,
+                    e.getMessage());
             // Fall back to webhook-only data (preserves any richer data already persisted)
             processCommitsViaWebhook(event, repository, true);
         }
@@ -251,38 +243,40 @@ public class GitHubPushMessageHandler extends AbstractIntegrationMessageHandler<
 
             // Count changed files from the file lists
             int added = webhookCommit.added() != null ? webhookCommit.added().size() : 0;
-            int removed = webhookCommit.removed() != null ? webhookCommit.removed().size() : 0;
-            int modified = webhookCommit.modified() != null ? webhookCommit.modified().size() : 0;
+            int removed =
+                    webhookCommit.removed() != null ? webhookCommit.removed().size() : 0;
+            int modified =
+                    webhookCommit.modified() != null ? webhookCommit.modified().size() : 0;
             int changedFiles = added + removed + modified;
 
             // Resolve author/committer by username
             Long providerId = repository.getProvider().getId();
             Long authorId = authorResolver.resolveByLogin(
-                webhookCommit.author() != null ? webhookCommit.author().username() : null,
-                providerId
-            );
+                    webhookCommit.author() != null ? webhookCommit.author().username() : null, providerId);
             Long committerId = authorResolver.resolveByLogin(
-                webhookCommit.committer() != null ? webhookCommit.committer().username() : null,
-                providerId
-            );
+                    webhookCommit.committer() != null
+                            ? webhookCommit.committer().username()
+                            : null,
+                    providerId);
 
             commitRepository.upsertCommit(
-                webhookCommit.sha(),
-                message,
-                messageBody,
-                htmlUrl,
-                authoredAt,
-                authoredAt, // committedAt = authoredAt (webhook doesn't distinguish)
-                asFallback ? null : 0, // additions: null preserves existing richer data on fallback
-                asFallback ? null : 0, // deletions: null preserves existing richer data on fallback
-                asFallback ? null : changedFiles, // changedFiles: null preserves on fallback
-                Instant.now(),
-                repository.getId(),
-                authorId,
-                committerId,
-                webhookCommit.author() != null ? webhookCommit.author().email() : null,
-                webhookCommit.committer() != null ? webhookCommit.committer().email() : null
-            );
+                    webhookCommit.sha(),
+                    message,
+                    messageBody,
+                    htmlUrl,
+                    authoredAt,
+                    authoredAt, // committedAt = authoredAt (webhook doesn't distinguish)
+                    asFallback ? null : 0, // additions: null preserves existing richer data on fallback
+                    asFallback ? null : 0, // deletions: null preserves existing richer data on fallback
+                    asFallback ? null : changedFiles, // changedFiles: null preserves on fallback
+                    Instant.now(),
+                    repository.getId(),
+                    authorId,
+                    committerId,
+                    webhookCommit.author() != null ? webhookCommit.author().email() : null,
+                    webhookCommit.committer() != null
+                            ? webhookCommit.committer().email()
+                            : null);
 
             // Publish CommitCreated event after persisting
             publishCommitCreated(webhookCommit.sha(), repository);
@@ -291,13 +285,12 @@ public class GitHubPushMessageHandler extends AbstractIntegrationMessageHandler<
         }
 
         log.info(
-            "Processed push commits via webhook: processed={}, total={}, branch={}, fallback={}, repoName={}",
-            processed,
-            commits.size(),
-            getBranchName(event.ref()),
-            asFallback,
-            repoName
-        );
+                "Processed push commits via webhook: processed={}, total={}, branch={}, fallback={}, repoName={}",
+                processed,
+                commits.size(),
+                getBranchName(event.ref()),
+                asFallback,
+                repoName);
     }
 
     /**
@@ -324,26 +317,27 @@ public class GitHubPushMessageHandler extends AbstractIntegrationMessageHandler<
         // Defense-in-depth: git_commit.message is NOT NULL; default to empty string
         String message = info.message() != null ? info.message() : "";
         commitRepository.upsertCommit(
-            info.sha(),
-            message,
-            info.messageBody(),
-            buildCommitUrl(repository.getNameWithOwner(), info.sha()),
-            info.authoredAt(),
-            info.committedAt(),
-            info.additions(),
-            info.deletions(),
-            info.changedFiles(),
-            Instant.now(),
-            repository.getId(),
-            authorId,
-            committerId,
-            info.authorEmail(),
-            info.committerEmail()
-        );
+                info.sha(),
+                message,
+                info.messageBody(),
+                buildCommitUrl(repository.getNameWithOwner(), info.sha()),
+                info.authoredAt(),
+                info.committedAt(),
+                info.additions(),
+                info.deletions(),
+                info.changedFiles(),
+                Instant.now(),
+                repository.getId(),
+                authorId,
+                committerId,
+                info.authorEmail(),
+                info.committerEmail());
 
         // Attach file changes if present
         if (!info.fileChanges().isEmpty()) {
-            Commit commit = commitRepository.findByShaAndRepositoryId(info.sha(), repository.getId()).orElse(null);
+            Commit commit = commitRepository
+                    .findByShaAndRepositoryId(info.sha(), repository.getId())
+                    .orElse(null);
             if (commit != null) {
                 for (GitRepositoryManager.FileChange fc : info.fileChanges()) {
                     CommitFileChange fileChange = new CommitFileChange();
@@ -381,7 +375,9 @@ public class GitHubPushMessageHandler extends AbstractIntegrationMessageHandler<
      * @param repository the repository entity (with organization eagerly loaded)
      */
     private void publishCommitCreated(String sha, Repository repository) {
-        Commit commit = commitRepository.findByShaAndRepositoryId(sha, repository.getId()).orElse(null);
+        Commit commit = commitRepository
+                .findByShaAndRepositoryId(sha, repository.getId())
+                .orElse(null);
         if (commit == null) {
             log.debug("Cannot publish CommitCreated: commit not found after upsert: sha={}", sha);
             return;
@@ -389,15 +385,14 @@ public class GitHubPushMessageHandler extends AbstractIntegrationMessageHandler<
 
         ScmEventPayload.CommitData commitData = ScmEventPayload.CommitData.from(commit);
         EventContext context = new EventContext(
-            UUID.randomUUID(),
-            Instant.now(),
-            resolveScopeId(repository),
-            RepositoryRef.from(repository),
-            DataSource.WEBHOOK,
-            null,
-            UUID.randomUUID().toString(),
-            IdentityProviderType.GITHUB
-        );
+                UUID.randomUUID(),
+                Instant.now(),
+                resolveScopeId(repository),
+                RepositoryRef.from(repository),
+                DataSource.WEBHOOK,
+                null,
+                UUID.randomUUID().toString(),
+                IdentityProviderType.GITHUB);
 
         eventPublisher.publishEvent(new ScmDomainEvent.CommitCreated(commitData, context));
     }
@@ -424,7 +419,9 @@ public class GitHubPushMessageHandler extends AbstractIntegrationMessageHandler<
                 return scopeId;
             }
         }
-        return scopeIdResolver.findScopeIdByRepositoryName(repository.getNameWithOwner()).orElse(null);
+        return scopeIdResolver
+                .findScopeIdByRepositoryName(repository.getNameWithOwner())
+                .orElse(null);
     }
 
     // Utility Methods

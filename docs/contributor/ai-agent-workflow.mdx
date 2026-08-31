@@ -44,6 +44,36 @@ right.
 actually break: the test file that covers it rather than "run the tests", a request against the
 endpoint you added, a query confirming the row was written, the logs after the change.
 
+## Parallel delivery protocol
+
+Parallel work stays parallel only when contributors avoid manufacturing shared diffs:
+
+1. **Reserve hot-file lanes at assignment time.** Only one in-flight PR may write each lane:
+   `.github/workflows/**` and `.github/actions/**`; root `package.json` with `pnpm-lock.yaml`;
+   `CHANGELOG.md` and `MIGRATION.md` (release automation only); `webapp/src/api/**`; and
+   `server/application/src/main/resources/db/master.xml`. Migration fragments remove `MIGRATION.md`
+   from feature work, but release automation still owns it exclusively. Dependent changes use
+   `/gh-stack`; otherwise, do not make one PR wait for another.
+2. **Commit only regeneration caused by the change.** If OpenAPI, ERD, route-tree, or another generator
+   produces unrelated drift, stop and report it. One dedicated PR or the owning automation lands that
+   drift; feature branches do not each carry a copy.
+3. **Repair broken `main` once.** One queue-jumping hotfix owns the repair; feature branches neither
+   duplicate it nor absorb it.
+4. **Let the merge queue integrate.** Branch from a freshly fetched `origin/main`, rebase immediately
+   before requesting merge, then use `gh pr merge --squash --auto`. Do not repeatedly rebase behind
+   unrelated PRs or bypass the queue's final integration. A genuine dependency is a stack, not an
+   informal waiting chain.
+
+The assignee for a hot-file lane releases it when the PR merges or abandons the edit. If two tasks
+discover they need the same lane, split or sequence that part explicitly rather than resolving the
+same predictable conflict later.
+
+These rules follow observed failure modes: one merge day spent six rebases on lane collisions and
+none on disputed behavior; five sibling PRs carried the same generated API refresh; and one commitlint
+repair appeared in four branches plus duplicate PRs
+([#1632](https://github.com/ls1intum/Hephaestus/pull/1632),
+[#1634](https://github.com/ls1intum/Hephaestus/pull/1634)).
+
 ## Slash commands
 
 | Command | Does |

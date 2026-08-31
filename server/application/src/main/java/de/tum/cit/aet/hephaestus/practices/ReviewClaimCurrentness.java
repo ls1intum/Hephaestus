@@ -13,22 +13,18 @@ public enum ReviewClaimCurrentness {
 
     public static ReviewClaimCurrentness of(@Nullable PracticeRevision evaluated, Practice practice) {
         PracticeRevision current = practice.getCurrentRevision();
-        if (
-            evaluated != null &&
-            current != null &&
-            !evaluated.equals(current) &&
-            evaluated.getAutomatedReviewPolicy() == null &&
-            current.getAutomatedReviewPolicy() != null
-        ) {
+        if (evaluated != null
+                && current != null
+                && !evaluated.equals(current)
+                && evaluated.getAutomatedReviewPolicy() == null
+                && current.getAutomatedReviewPolicy() != null) {
             return STALE;
         }
         return of(fingerprint(evaluated), fingerprint(current));
     }
 
     public static ReviewClaimCurrentness of(
-        @Nullable String evaluatedFingerprint,
-        @Nullable String currentFingerprint
-    ) {
+            @Nullable String evaluatedFingerprint, @Nullable String currentFingerprint) {
         if (evaluatedFingerprint == null || currentFingerprint == null) {
             return UNVERIFIABLE;
         }

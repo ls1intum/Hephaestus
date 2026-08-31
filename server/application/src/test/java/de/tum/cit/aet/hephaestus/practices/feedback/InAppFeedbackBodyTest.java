@@ -14,7 +14,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 class InAppFeedbackBodyTest extends BaseUnitTest {
 
     @ParameterizedTest
-    @ValueSource(strings = { "Tests are arriving one commit late", "One word", "Punctuation: it's fine — really" })
+    @ValueSource(strings = {"Tests are arriving one commit late", "One word", "Punctuation: it's fine — really"})
     void roundTripsAnyHeadlineItWrote(String headline) {
         String body = InAppFeedbackBody.render(headline, "The message.", "Try this next.");
 
@@ -43,10 +43,10 @@ class InAppFeedbackBodyTest extends BaseUnitTest {
      */
     @Test
     void reportsNoHeadlineForABodyItDidNotWrite() {
-        assertThat(InAppFeedbackBody.headlineOf("A plain in-context comment body.")).isNull();
-        assertThat(InAppFeedbackBody.messageOf("A plain in-context comment body.")).isEqualTo(
-            "A plain in-context comment body."
-        );
+        assertThat(InAppFeedbackBody.headlineOf("A plain in-context comment body."))
+                .isNull();
+        assertThat(InAppFeedbackBody.messageOf("A plain in-context comment body."))
+                .isEqualTo("A plain in-context comment body.");
     }
 
     @Test

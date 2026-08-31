@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { detailStackSchema, encodeDetailStack, parseDetailStack } from "./detail-stack";
 
 const KINDS = ["group", "practice"] as const;

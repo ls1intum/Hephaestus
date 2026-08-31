@@ -4,12 +4,14 @@ import {
 	Building2,
 	CircleDollarSign,
 	Gauge,
+	Inbox,
 	KeyRound,
 	LibraryBig,
 	ScrollText,
 	Settings2,
 	Users,
 } from "lucide-react";
+
 import { ADMIN_NAV_LABELS } from "@/components/core/sidebar/admin-nav-labels";
 import {
 	SidebarGroup,
@@ -18,12 +20,19 @@ import {
 	SidebarMenuButton,
 	SidebarMenuItem,
 } from "@/components/ui/sidebar";
+
 import { NavContextHeader } from "./NavContextHeader";
 
 const ADMIN_NAV_GROUPS = [
 	{
 		label: "Access",
 		items: [
+			{
+				to: "/admin/feedback",
+				label: "Product feedback",
+				icon: Inbox,
+				tooltip: "Surveys and feedback inbox",
+			},
 			{ to: "/admin/users", label: "Users", icon: Users, tooltip: "Manage accounts" },
 			{ to: "/admin/workspaces", label: "Workspaces", icon: Building2, tooltip: "All workspaces" },
 			{

@@ -1,10 +1,12 @@
 import { Sparkles, SquareArrowOutUpRight, SquarePen, X } from "lucide-react";
 import { type RefObject, useEffect, useRef, useState } from "react";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+
 import { MentorIcon } from "./MentorIcon";
 
 /** The `document.body` inline styles the scroll lock overwrites, kept so it can put them back. */
@@ -116,7 +118,7 @@ export function Copilot({
 							onClick={handleTriggerClick}
 							className="size-16 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 active:scale-95"
 							size="icon"
-							aria-label="Open Heph - AI Mentor"
+							aria-label="Open Heph, AI mentor"
 						>
 							<MentorIcon size={56} pad={8} />
 						</Button>
@@ -190,7 +192,7 @@ export function Copilot({
 													variant="outline"
 													size="icon"
 													onClick={handleClose}
-													aria-label="Close Heph - AI Mentor"
+													aria-label="Close Heph, AI mentor"
 												/>
 											}
 										>

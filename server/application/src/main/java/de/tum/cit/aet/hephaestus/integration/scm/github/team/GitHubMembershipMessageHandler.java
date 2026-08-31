@@ -38,20 +38,18 @@ public class GitHubMembershipMessageHandler extends AbstractIntegrationMessageHa
     private final TeamMembershipRepository teamMembershipRepository;
 
     GitHubMembershipMessageHandler(
-        GitHubUserProcessor userProcessor,
-        IdentityProviderRepository gitProviderRepository,
-        TeamRepository teamRepository,
-        TeamMembershipRepository teamMembershipRepository,
-        NatsMessageDeserializer deserializer,
-        TransactionTemplate transactionTemplate
-    ) {
+            GitHubUserProcessor userProcessor,
+            IdentityProviderRepository gitProviderRepository,
+            TeamRepository teamRepository,
+            TeamMembershipRepository teamMembershipRepository,
+            NatsMessageDeserializer deserializer,
+            TransactionTemplate transactionTemplate) {
         super(
-            IntegrationKind.GITHUB,
-            "organization." + GitHubEventType.MEMBERSHIP.getValue(),
-            GitHubMembershipEventDTO.class,
-            deserializer,
-            transactionTemplate
-        );
+                IntegrationKind.GITHUB,
+                "organization." + GitHubEventType.MEMBERSHIP.getValue(),
+                GitHubMembershipEventDTO.class,
+                deserializer,
+                transactionTemplate);
         this.userProcessor = userProcessor;
         this.gitProviderRepository = gitProviderRepository;
         this.teamRepository = teamRepository;
@@ -69,20 +67,19 @@ public class GitHubMembershipMessageHandler extends AbstractIntegrationMessageHa
         }
 
         log.debug(
-            "Received membership event: action={}, userLogin={}, teamName={}, orgLogin={}",
-            event.action(),
-            sanitizeForLog(memberDto.login()),
-            sanitizeForLog(teamDto.name()),
-            event.organization() != null ? sanitizeForLog(event.organization().login()) : "unknown"
-        );
+                "Received membership event: action={}, userLogin={}, teamName={}, orgLogin={}",
+                event.action(),
+                sanitizeForLog(memberDto.login()),
+                sanitizeForLog(teamDto.name()),
+                event.organization() != null
+                        ? sanitizeForLog(event.organization().login())
+                        : "unknown");
 
         // Resolve GitHub provider ID for user upsert
-        Long providerId = Objects.requireNonNull(
-            gitProviderRepository
+        Long providerId = Objects.requireNonNull(gitProviderRepository
                 .findByTypeAndServerUrl(IdentityProviderType.GITHUB, GITHUB_SERVER_URL)
                 .orElseThrow(() -> new IllegalStateException("IdentityProvider not found for GitHub"))
-                .getId()
-        );
+                .getId());
         Long teamId = teamDto.id();
         if (teamId == null) {
             log.warn("Skipped membership event: reason=missingTeamId");
@@ -116,10 +113,9 @@ public class GitHubMembershipMessageHandler extends AbstractIntegrationMessageHa
         // Check if membership already exists
         if (teamMembershipRepository.existsByTeam_IdAndUser_Id(team.getId(), user.getId())) {
             log.debug(
-                "Skipped membership creation: reason=alreadyExists, userLogin={}, teamName={}",
-                sanitizeForLog(user.getLogin()),
-                sanitizeForLog(team.getName())
-            );
+                    "Skipped membership creation: reason=alreadyExists, userLogin={}, teamName={}",
+                    sanitizeForLog(user.getLogin()),
+                    sanitizeForLog(team.getName()));
             return;
         }
 
@@ -127,28 +123,25 @@ public class GitHubMembershipMessageHandler extends AbstractIntegrationMessageHa
         TeamMembership membership = new TeamMembership(team, user, TeamMembership.Role.MEMBER);
         teamMembershipRepository.save(membership);
         log.info(
-            "Created team membership: userLogin={}, teamName={}",
-            sanitizeForLog(user.getLogin()),
-            sanitizeForLog(team.getName())
-        );
+                "Created team membership: userLogin={}, teamName={}",
+                sanitizeForLog(user.getLogin()),
+                sanitizeForLog(team.getName()));
     }
 
     private void handleMemberRemoved(Team team, User user) {
         // Delete the membership if it exists
         if (!teamMembershipRepository.existsByTeam_IdAndUser_Id(team.getId(), user.getId())) {
             log.debug(
-                "Skipped membership removal: reason=notFound, userLogin={}, teamName={}",
-                sanitizeForLog(user.getLogin()),
-                sanitizeForLog(team.getName())
-            );
+                    "Skipped membership removal: reason=notFound, userLogin={}, teamName={}",
+                    sanitizeForLog(user.getLogin()),
+                    sanitizeForLog(team.getName()));
             return;
         }
 
         teamMembershipRepository.deleteByTeam_IdAndUser_Id(team.getId(), user.getId());
         log.info(
-            "Removed team membership: userLogin={}, teamName={}",
-            sanitizeForLog(user.getLogin()),
-            sanitizeForLog(team.getName())
-        );
+                "Removed team membership: userLogin={}, teamName={}",
+                sanitizeForLog(user.getLogin()),
+                sanitizeForLog(team.getName()));
     }
 }

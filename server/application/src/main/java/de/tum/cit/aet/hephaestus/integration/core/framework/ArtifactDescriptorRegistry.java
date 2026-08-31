@@ -23,24 +23,14 @@ public class ArtifactDescriptorRegistry implements ArtifactCatalog {
     private final Map<ArtifactKind, ArtifactDescriptor> byKind;
 
     public ArtifactDescriptorRegistry(List<ArtifactDescriptor> descriptors) {
-        this.byKind = descriptors
-            .stream()
-            .collect(
-                Collectors.toUnmodifiableMap(
-                    ArtifactDescriptor::kind,
-                    d -> d,
-                    (a, b) -> {
-                        throw new IllegalStateException(
-                            "Duplicate ArtifactDescriptor for kind=" +
-                                a.kind() +
-                                ": " +
-                                a.getClass().getName() +
-                                " vs " +
-                                b.getClass().getName()
-                        );
-                    }
-                )
-            );
+        this.byKind = descriptors.stream()
+                .collect(Collectors.toUnmodifiableMap(ArtifactDescriptor::kind, d -> d, (a, b) -> {
+                    throw new IllegalStateException("Duplicate ArtifactDescriptor for kind=" + a.kind()
+                            + ": "
+                            + a.getClass().getName()
+                            + " vs "
+                            + b.getClass().getName());
+                }));
     }
 
     @Override

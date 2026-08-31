@@ -117,8 +117,8 @@ class DockerClientOperationsTest extends BaseUnitTest {
             when(cmd.exec()).thenThrow(new DockerException("Network conflict", 409));
 
             assertThatThrownBy(() -> ops.createNetwork("dup-net", false))
-                .isInstanceOf(SandboxException.class)
-                .hasMessageContaining("dup-net");
+                    .isInstanceOf(SandboxException.class)
+                    .hasMessageContaining("dup-net");
         }
     }
 
@@ -185,8 +185,8 @@ class DockerClientOperationsTest extends BaseUnitTest {
             when(network.getContainers()).thenReturn(Map.of());
 
             assertThatThrownBy(() -> ops.connectToNetwork("net-1", "ctr-1"))
-                .isInstanceOf(SandboxException.class)
-                .hasMessageContaining("not found in network");
+                    .isInstanceOf(SandboxException.class)
+                    .hasMessageContaining("not found in network");
         }
     }
 
@@ -257,8 +257,8 @@ class DockerClientOperationsTest extends BaseUnitTest {
             when(cmd.exec()).thenThrow(new DockerException("server error", 500));
 
             assertThatThrownBy(() -> ops.stopContainer("ctr-1", 10))
-                .isInstanceOf(SandboxException.class)
-                .hasMessageContaining("ctr-1");
+                    .isInstanceOf(SandboxException.class)
+                    .hasMessageContaining("ctr-1");
         }
     }
 
@@ -290,7 +290,7 @@ class DockerClientOperationsTest extends BaseUnitTest {
 
             Container container = mock(Container.class);
             when(container.getId()).thenReturn("ctr-1");
-            when(container.getNames()).thenReturn(new String[] { "/my-container" });
+            when(container.getNames()).thenReturn(new String[] {"/my-container"});
             when(container.getLabels()).thenReturn(Map.of("key", "value"));
             when(container.getState()).thenReturn("running");
 
@@ -378,8 +378,8 @@ class DockerClientOperationsTest extends BaseUnitTest {
 
             InputStream tarStream = new ByteArrayInputStream(new byte[0]);
             assertThatThrownBy(() -> ops.copyArchiveToContainer("ctr-1", "/workspace", tarStream))
-                .isInstanceOf(SandboxException.class)
-                .hasMessageContaining("ctr-1");
+                    .isInstanceOf(SandboxException.class)
+                    .hasMessageContaining("ctr-1");
         }
 
         @Test
@@ -389,8 +389,8 @@ class DockerClientOperationsTest extends BaseUnitTest {
             when(cmd.exec()).thenThrow(new DockerException("No such path", 404));
 
             assertThatThrownBy(() -> ops.copyArchiveFromContainer("ctr-1", "/output"))
-                .isInstanceOf(SandboxException.class)
-                .hasMessageContaining("/output");
+                    .isInstanceOf(SandboxException.class)
+                    .hasMessageContaining("/output");
         }
     }
 
@@ -413,31 +413,29 @@ class DockerClientOperationsTest extends BaseUnitTest {
             when(response.getId()).thenReturn("new-ctr");
 
             DockerOperations.ContainerSpec spec = new DockerOperations.ContainerSpec(
-                "alpine:latest",
-                List.of("echo", "hello"),
-                Map.of("FOO", "bar"),
-                "net-123",
-                "agent",
-                "1000:1000",
-                Map.of("label", "value"),
-                new DockerOperations.HostConfigSpec(
-                    4L * 1024 * 1024 * 1024,
-                    4L * 1024 * 1024 * 1024,
-                    2_000_000_000L,
-                    256,
-                    true,
-                    false,
-                    List.of("ALL"),
-                    List.of("no-new-privileges"),
-                    Map.of("/tmp", "rw,noexec"),
-                    List.of("0.0.0.0"),
-                    "private",
-                    "none",
-                    null,
-                    Map.of()
-                ),
-                List.of()
-            );
+                    "alpine:latest",
+                    List.of("echo", "hello"),
+                    Map.of("FOO", "bar"),
+                    "net-123",
+                    "agent",
+                    "1000:1000",
+                    Map.of("label", "value"),
+                    new DockerOperations.HostConfigSpec(
+                            4L * 1024 * 1024 * 1024,
+                            4L * 1024 * 1024 * 1024,
+                            2_000_000_000L,
+                            256,
+                            true,
+                            false,
+                            List.of("ALL"),
+                            List.of("no-new-privileges"),
+                            Map.of("/tmp", "rw,noexec"),
+                            List.of("0.0.0.0"),
+                            "private",
+                            "none",
+                            null,
+                            Map.of()),
+                    List.of());
 
             String id = ops.createContainer(spec);
 
@@ -459,31 +457,29 @@ class DockerClientOperationsTest extends BaseUnitTest {
             when(response.getId()).thenReturn("new-ctr");
 
             DockerOperations.ContainerSpec spec = new DockerOperations.ContainerSpec(
-                "alpine:latest",
-                List.of(), // empty command
-                Map.of(), // empty env
-                "net-123",
-                null, // no hostname
-                null, // no user
-                Map.of(),
-                new DockerOperations.HostConfigSpec(
-                    1024L,
-                    1024L,
-                    1_000_000_000L,
-                    100,
-                    false,
-                    false,
-                    List.of(),
-                    List.of(),
+                    "alpine:latest",
+                    List.of(), // empty command
+                    Map.of(), // empty env
+                    "net-123",
+                    null, // no hostname
+                    null, // no user
                     Map.of(),
-                    List.of(),
-                    null,
-                    null,
-                    null,
-                    Map.of()
-                ),
-                List.of()
-            );
+                    new DockerOperations.HostConfigSpec(
+                            1024L,
+                            1024L,
+                            1_000_000_000L,
+                            100,
+                            false,
+                            false,
+                            List.of(),
+                            List.of(),
+                            Map.of(),
+                            List.of(),
+                            null,
+                            null,
+                            null,
+                            Map.of()),
+                    List.of());
 
             ops.createContainer(spec);
 
@@ -535,8 +531,8 @@ class DockerClientOperationsTest extends BaseUnitTest {
             when(cmd.exec()).thenThrow(new DockerException("no such container", 404));
 
             assertThatThrownBy(() -> ops.startContainer("ctr-bad"))
-                .isInstanceOf(SandboxException.class)
-                .hasMessageContaining("ctr-bad");
+                    .isInstanceOf(SandboxException.class)
+                    .hasMessageContaining("ctr-bad");
         }
     }
 }

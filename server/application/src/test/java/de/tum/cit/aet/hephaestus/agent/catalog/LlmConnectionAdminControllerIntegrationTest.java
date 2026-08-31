@@ -26,16 +26,14 @@ class LlmConnectionAdminControllerIntegrationTest extends AbstractWorkspaceInteg
 
     private LlmConnectionDTO createConnection(String slug) {
         var request = new CreateLlmConnectionRequestDTO(
-            slug,
-            "Test Connection",
-            "https://api.openai.com",
-            "openai-completions",
-            LlmAuthMode.BEARER,
-            "sk-test-secret-1234",
-            true
-        );
-        return Objects.requireNonNull(
-            webTestClient
+                slug,
+                "Test Connection",
+                "https://api.openai.com",
+                "openai-completions",
+                LlmAuthMode.BEARER,
+                "sk-test-secret-1234",
+                true);
+        return Objects.requireNonNull(webTestClient
                 .post()
                 .uri("/admin/llm/connections")
                 .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
@@ -46,8 +44,7 @@ class LlmConnectionAdminControllerIntegrationTest extends AbstractWorkspaceInteg
                 .isCreated()
                 .expectBody(LlmConnectionDTO.class)
                 .returnResult()
-                .getResponseBody()
-        );
+                .getResponseBody());
     }
 
     @Test
@@ -59,87 +56,84 @@ class LlmConnectionAdminControllerIntegrationTest extends AbstractWorkspaceInteg
         assertThat(created.apiKeyLast4()).isEqualTo("1234");
 
         webTestClient
-            .get()
-            .uri("/admin/llm/connections/{id}", created.id())
-            .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.slug")
-            .isEqualTo("openai-prod");
+                .get()
+                .uri("/admin/llm/connections/{id}", created.id())
+                .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.slug")
+                .isEqualTo("openai-prod");
 
         webTestClient
-            .get()
-            .uri("/admin/llm/connections")
-            .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.length()")
-            .isEqualTo(1);
+                .get()
+                .uri("/admin/llm/connections")
+                .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.length()")
+                .isEqualTo(1);
 
         var updateRequest = new UpdateLlmConnectionRequestDTO("Renamed Connection", null, null, null);
         webTestClient
-            .patch()
-            .uri("/admin/llm/connections/{id}", created.id())
-            .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(updateRequest)
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.displayName")
-            .isEqualTo("Renamed Connection")
-            // The key was never re-supplied on this update — it must survive untouched.
-            .jsonPath("$.hasApiKey")
-            .isEqualTo(true)
-            .jsonPath("$.apiKeyLast4")
-            .isEqualTo("1234");
+                .patch()
+                .uri("/admin/llm/connections/{id}", created.id())
+                .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(updateRequest)
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.displayName")
+                .isEqualTo("Renamed Connection")
+                // The key was never re-supplied on this update — it must survive untouched.
+                .jsonPath("$.hasApiKey")
+                .isEqualTo(true)
+                .jsonPath("$.apiKeyLast4")
+                .isEqualTo("1234");
 
         webTestClient
-            .delete()
-            .uri("/admin/llm/connections/{id}", created.id())
-            .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
-            .exchange()
-            .expectStatus()
-            .isNoContent();
+                .delete()
+                .uri("/admin/llm/connections/{id}", created.id())
+                .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
+                .exchange()
+                .expectStatus()
+                .isNoContent();
 
         webTestClient
-            .get()
-            .uri("/admin/llm/connections/{id}", created.id())
-            .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
-            .exchange()
-            .expectStatus()
-            .isNotFound();
+                .get()
+                .uri("/admin/llm/connections/{id}", created.id())
+                .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
+                .exchange()
+                .expectStatus()
+                .isNotFound();
     }
 
     @Test
     void apiKeyIsNeverExposedInAnyResponse() {
         String body = webTestClient
-            .post()
-            .uri("/admin/llm/connections")
-            .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(
-                new CreateLlmConnectionRequestDTO(
-                    "redaction-test",
-                    "Redaction Test",
-                    "https://api.openai.com",
-                    "openai-completions",
-                    LlmAuthMode.BEARER,
-                    "sk-super-secret-value",
-                    true
-                )
-            )
-            .exchange()
-            .expectStatus()
-            .isCreated()
-            .expectBody(String.class)
-            .returnResult()
-            .getResponseBody();
+                .post()
+                .uri("/admin/llm/connections")
+                .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(new CreateLlmConnectionRequestDTO(
+                        "redaction-test",
+                        "Redaction Test",
+                        "https://api.openai.com",
+                        "openai-completions",
+                        LlmAuthMode.BEARER,
+                        "sk-super-secret-value",
+                        true))
+                .exchange()
+                .expectStatus()
+                .isCreated()
+                .expectBody(String.class)
+                .returnResult()
+                .getResponseBody();
 
         assertThat(body).isNotNull();
         assertThat(body).doesNotContain("sk-super-secret-value");
@@ -150,31 +144,26 @@ class LlmConnectionAdminControllerIntegrationTest extends AbstractWorkspaceInteg
     @Test
     void deletingAConnectionWithModelsReturns409() {
         LlmConnectionDTO connection = createConnection("in-use-connection");
-        llmModelRepository.save(
-            LlmCatalogTestFixtures.model(
-                llmConnectionRepository.findById(connection.id()).orElseThrow(),
-                "gpt-5-eu",
-                "gpt-5"
-            )
-        );
+        llmModelRepository.save(LlmCatalogTestFixtures.model(
+                llmConnectionRepository.findById(connection.id()).orElseThrow(), "gpt-5-eu", "gpt-5"));
 
         webTestClient
-            .delete()
-            .uri("/admin/llm/connections/{id}", connection.id())
-            .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
-            .exchange()
-            .expectStatus()
-            .isEqualTo(409);
+                .delete()
+                .uri("/admin/llm/connections/{id}", connection.id())
+                .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
+                .exchange()
+                .expectStatus()
+                .isEqualTo(409);
     }
 
     @Test
     void nonAdminIsForbidden() {
         webTestClient
-            .get()
-            .uri("/admin/llm/connections")
-            .headers(h -> h.setBearerAuth(MENTOR_TOKEN))
-            .exchange()
-            .expectStatus()
-            .isForbidden();
+                .get()
+                .uri("/admin/llm/connections")
+                .headers(h -> h.setBearerAuth(MENTOR_TOKEN))
+                .exchange()
+                .expectStatus()
+                .isForbidden();
     }
 }

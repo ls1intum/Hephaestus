@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { generateSlug } from "@/components/workspace/create-workspace/slug-utils";
 
 describe("generateSlug", () => {

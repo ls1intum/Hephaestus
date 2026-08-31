@@ -34,25 +34,24 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "hephaestus.integration.consumer")
 public record NatsConsumerProperties(
-    @DurationUnit(ChronoUnit.MINUTES)
-    @DefaultValue("5m")
-    @NotNull(message = "ack-wait must not be null")
-    Duration ackWait,
-    @DefaultValue("500")
-    @Min(value = 1, message = "max-ack-pending must be at least 1")
-    @Max(value = 10_000, message = "max-ack-pending must not exceed 10,000")
-    int maxAckPending,
-    @DurationUnit(ChronoUnit.SECONDS)
-    @DefaultValue("2s")
-    @NotNull(message = "reconnect-delay must not be null")
-    Duration reconnectDelay,
-    @DurationUnit(ChronoUnit.HOURS)
-    @DefaultValue("30d")
-    @NotNull(message = "inactive-threshold must not be null")
-    @DurationMin(message = "inactive-threshold must not be negative")
-    Duration inactiveThreshold,
-    @Valid PoisonProperties poison
-) {
+        @DurationUnit(ChronoUnit.MINUTES) @DefaultValue("5m") @NotNull(message = "ack-wait must not be null")
+        Duration ackWait,
+
+        @DefaultValue("500")
+        @Min(value = 1, message = "max-ack-pending must be at least 1")
+        @Max(value = 10_000, message = "max-ack-pending must not exceed 10,000")
+        int maxAckPending,
+
+        @DurationUnit(ChronoUnit.SECONDS) @DefaultValue("2s") @NotNull(message = "reconnect-delay must not be null")
+        Duration reconnectDelay,
+
+        @DurationUnit(ChronoUnit.HOURS)
+        @DefaultValue("30d")
+        @NotNull(message = "inactive-threshold must not be null")
+        @DurationMin(message = "inactive-threshold must not be negative")
+        Duration inactiveThreshold,
+
+        @Valid PoisonProperties poison) {
     /**
      * Shortest reapable lifetime. Below this a restart, a deploy or a brief partition can outlast the
      * threshold, and the replacement durable starts at {@link io.nats.client.api.DeliverPolicy#New}.
@@ -64,19 +63,14 @@ public record NatsConsumerProperties(
         if (poison == null) {
             poison = new PoisonProperties(10, Duration.ofSeconds(2), Duration.ofMinutes(5));
         }
-        if (
-            inactiveThreshold != null &&
-            !inactiveThreshold.isZero() &&
-            !inactiveThreshold.isNegative() &&
-            inactiveThreshold.compareTo(INACTIVE_THRESHOLD_FLOOR) < 0
-        ) {
-            throw new IllegalArgumentException(
-                "inactive-threshold (" +
-                    inactiveThreshold +
-                    ") must be 0 to disable reaping, or at least " +
-                    INACTIVE_THRESHOLD_FLOOR +
-                    " — a shorter one reaps a durable across an ordinary restart and loses its position"
-            );
+        if (inactiveThreshold != null
+                && !inactiveThreshold.isZero()
+                && !inactiveThreshold.isNegative()
+                && inactiveThreshold.compareTo(INACTIVE_THRESHOLD_FLOOR) < 0) {
+            throw new IllegalArgumentException("inactive-threshold (" + inactiveThreshold
+                    + ") must be 0 to disable reaping, or at least "
+                    + INACTIVE_THRESHOLD_FLOOR
+                    + " — a shorter one reaps a durable across an ordinary restart and loses its position");
         }
     }
 
@@ -97,12 +91,12 @@ public record NatsConsumerProperties(
      *                     are still waiting on our own NAK backoff.
      */
     public record PoisonProperties(
-        @DefaultValue("10") @Positive(message = "max-redeliver must be positive") int maxRedeliver,
-        @DurationUnit(ChronoUnit.SECONDS) @DefaultValue("2s") @NotNull(
-            message = "base-delay must not be null"
-        ) Duration baseDelay,
-        @DurationUnit(ChronoUnit.MINUTES) @DefaultValue("5m") @NotNull(
-            message = "max-delay must not be null"
-        ) Duration maxDelay
-    ) {}
+            @DefaultValue("10") @Positive(message = "max-redeliver must be positive")
+            int maxRedeliver,
+
+            @DurationUnit(ChronoUnit.SECONDS) @DefaultValue("2s") @NotNull(message = "base-delay must not be null")
+            Duration baseDelay,
+
+            @DurationUnit(ChronoUnit.MINUTES) @DefaultValue("5m") @NotNull(message = "max-delay must not be null")
+            Duration maxDelay) {}
 }

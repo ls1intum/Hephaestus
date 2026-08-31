@@ -71,18 +71,15 @@ public class SlackLeaderboardDigestPublisher {
     public void onDigestReady(LeaderboardDigestReadyEvent event) {
         List<User> allSlackUsers = slackMessageService.listMembers(event.workspaceId());
 
-        List<String> rankedMentions = event
-            .topEntries()
-            .stream()
-            .map(entry -> mentionFor(entry, allSlackUsers))
-            .filter(s -> s != null && !s.isBlank())
-            .toList();
+        List<String> rankedMentions = event.topEntries().stream()
+                .map(entry -> mentionFor(entry, allSlackUsers))
+                .filter(s -> s != null && !s.isBlank())
+                .toList();
         if (rankedMentions.isEmpty()) {
             log.info(
-                "Skipped Slack notification: reason=noReviewersToRender, workspaceId={}, channelId={}",
-                event.workspaceId(),
-                event.channelId()
-            );
+                    "Skipped Slack notification: reason=noReviewersToRender, workspaceId={}, channelId={}",
+                    event.workspaceId(),
+                    event.channelId());
             return;
         }
 
@@ -91,11 +88,10 @@ public class SlackLeaderboardDigestPublisher {
             slackMessageService.sendForWorkspace(event.workspaceId(), event.channelId(), blocks, FALLBACK_TEXT);
         } catch (SlackSendException e) {
             log.warn(
-                "Failed to send scheduled Slack message: workspaceId={}, channelId={}, slackError={}",
-                event.workspaceId(),
-                e.channelId(),
-                e.slackError()
-            );
+                    "Failed to send scheduled Slack message: workspaceId={}, channelId={}, slackError={}",
+                    event.workspaceId(),
+                    e.channelId(),
+                    e.slackError());
         }
     }
 
@@ -105,15 +101,14 @@ public class SlackLeaderboardDigestPublisher {
             return null;
         }
         return exactMatch(reviewer, allSlackUsers)
-            .map(user -> "<@" + user.getId() + ">")
-            .orElseGet(() -> plainName(reviewer));
+                .map(user -> "<@" + user.getId() + ">")
+                .orElseGet(() -> plainName(reviewer));
     }
 
     private static Optional<User> exactMatch(UserInfoDTO reviewer, List<User> allSlackUsers) {
-        return allSlackUsers
-            .stream()
-            .filter(user -> reviewer.name() != null && reviewer.name().equalsIgnoreCase(user.getName()))
-            .findFirst();
+        return allSlackUsers.stream()
+                .filter(user -> reviewer.name() != null && reviewer.name().equalsIgnoreCase(user.getName()))
+                .findFirst();
     }
 
     private static String plainName(UserInfoDTO reviewer) {
@@ -128,47 +123,26 @@ public class SlackLeaderboardDigestPublisher {
         final String workspaceBase = baseUrl + "/w/" + event.workspaceSlug();
         String teamFilter = event.teamLabel() == null ? "all" : event.teamLabel();
         return asBlocks(
-            header(header -> header.text(plainText(pt -> pt.text(":newspaper: Weekly review highlights :newspaper:")))),
-            context(context ->
-                context.elements(
-                    List.of(
-                        markdownText(
-                            "<!date^" +
-                                event.currentDateEpochSeconds() +
-                                "^{date} at {time}|Weekly digest> | " +
-                                workspaceBase
-                        )
-                    )
-                )
-            ),
-            divider(),
-            section(section ->
-                section.text(
-                    markdownText(
-                        "Last week's review leaderboard is finalized. See where you landed <" +
-                            workspaceBase +
-                            "?after=" +
-                            encode(formatDateForURL(event.after())) +
-                            "&before=" +
-                            encode(formatDateForURL(event.before())) +
-                            "&team=" +
-                            encode(teamFilter) +
-                            "|here>."
-                    )
-                )
-            ),
-            section(section -> section.text(markdownText("Congrats to last week's top 3 reviewers:"))),
-            section(section ->
-                section.text(
-                    markdownText(
-                        IntStream.range(0, rankedMentions.size())
-                            .mapToObj(i -> ((i + 1) + ". " + rankedMentions.get(i)))
-                            .collect(Collectors.joining("\n"))
-                    )
-                )
-            ),
-            section(section -> section.text(markdownText("Thanks for keeping reviews moving! :rocket:")))
-        );
+                header(header ->
+                        header.text(plainText(pt -> pt.text(":newspaper: Weekly review highlights :newspaper:")))),
+                context(context -> context.elements(List.of(markdownText("<!date^" + event.currentDateEpochSeconds()
+                        + "^{date} at {time}|Weekly digest> | "
+                        + workspaceBase)))),
+                divider(),
+                section(section -> section.text(markdownText(
+                        "Last week's review leaderboard is finalized. See where you landed <" + workspaceBase
+                                + "?after="
+                                + encode(formatDateForURL(event.after()))
+                                + "&before="
+                                + encode(formatDateForURL(event.before()))
+                                + "&team="
+                                + encode(teamFilter)
+                                + "|here>."))),
+                section(section -> section.text(markdownText("Congrats to last week's top 3 reviewers:"))),
+                section(section -> section.text(markdownText(IntStream.range(0, rankedMentions.size())
+                        .mapToObj(i -> ((i + 1) + ". " + rankedMentions.get(i)))
+                        .collect(Collectors.joining("\n"))))),
+                section(section -> section.text(markdownText("Thanks for keeping reviews moving! :rocket:"))));
     }
 
     private String formatDateForURL(Instant instant) {

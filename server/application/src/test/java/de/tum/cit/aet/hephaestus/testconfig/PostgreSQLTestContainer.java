@@ -43,14 +43,9 @@ public final class PostgreSQLTestContainer {
     public static synchronized TestDatabase createDatabase(String name) {
         validateDatabaseName(name);
         PostgreSQLContainer<?> postgres = getInstance();
-        try (
-            Connection connection = DriverManager.getConnection(
-                postgres.getJdbcUrl(),
-                postgres.getUsername(),
-                postgres.getPassword()
-            );
-            Statement statement = connection.createStatement()
-        ) {
+        try (Connection connection = DriverManager.getConnection(
+                        postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword());
+                Statement statement = connection.createStatement()) {
             statement.execute("CREATE DATABASE \"" + name + "\"");
         } catch (SQLException exception) {
             throw new IllegalStateException("Failed to create test database " + name, exception);
@@ -70,14 +65,9 @@ public final class PostgreSQLTestContainer {
 
     private static TestDatabase cloneDatabase(String name, String templateName) {
         PostgreSQLContainer<?> postgres = getInstance();
-        try (
-            Connection connection = DriverManager.getConnection(
-                postgres.getJdbcUrl(),
-                postgres.getUsername(),
-                postgres.getPassword()
-            );
-            Statement statement = connection.createStatement()
-        ) {
+        try (Connection connection = DriverManager.getConnection(
+                        postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword());
+                Statement statement = connection.createStatement()) {
             statement.execute("CREATE DATABASE \"" + name + "\" TEMPLATE \"" + templateName + "\"");
         } catch (SQLException exception) {
             throw new IllegalStateException("Failed to clone test database " + name, exception);
@@ -88,16 +78,10 @@ public final class PostgreSQLTestContainer {
     public static void migrateDatabase(TestDatabase testDatabase, String contexts) {
         String validationSetting = System.getProperty("liquibase.validateXmlChangelogFiles");
         System.setProperty("liquibase.validateXmlChangelogFiles", "false");
-        try (
-            Connection connection = DriverManager.getConnection(
-                testDatabase.jdbcUrl(),
-                testDatabase.username(),
-                testDatabase.password()
-            )
-        ) {
-            Database database = DatabaseFactory.getInstance().findCorrectDatabaseImplementation(
-                new JdbcConnection(connection)
-            );
+        try (Connection connection =
+                DriverManager.getConnection(testDatabase.jdbcUrl(), testDatabase.username(), testDatabase.password())) {
+            Database database =
+                    DatabaseFactory.getInstance().findCorrectDatabaseImplementation(new JdbcConnection(connection));
             try (Liquibase liquibase = new Liquibase("db/master.xml", new ClassLoaderResourceAccessor(), database)) {
                 liquibase.update(new Contexts(contexts));
             }
@@ -131,33 +115,27 @@ public final class PostgreSQLTestContainer {
 
     @SuppressWarnings("resource") // Closed by the JVM shutdown hook.
     private static PostgreSQLContainer<?> createContainer() {
-        PostgreSQLContainer<?> newContainer = new PostgreSQLContainer<>("postgres:16")
-            .withDatabaseName(DEFAULT_TEST_DB)
-            .withUsername(DEFAULT_TEST_USER)
-            .withPassword(DEFAULT_TEST_PASSWORD);
+        PostgreSQLContainer<?> newContainer = new PostgreSQLContainer<>("postgres:18")
+                .withDatabaseName(DEFAULT_TEST_DB)
+                .withUsername(DEFAULT_TEST_USER)
+                .withPassword(DEFAULT_TEST_PASSWORD);
 
         newContainer.start();
         ensureExtensions(
-            database(newContainer, "template1").jdbcUrl(),
-            newContainer.getUsername(),
-            newContainer.getPassword()
-        );
+                database(newContainer, "template1").jdbcUrl(), newContainer.getUsername(), newContainer.getPassword());
         ensureExtensions(newContainer.getJdbcUrl(), newContainer.getUsername(), newContainer.getPassword());
 
         LOGGER.info(
-            "Started PostgreSQL Testcontainer: jdbcUrl={}, username={}, database={}",
-            newContainer.getJdbcUrl(),
-            newContainer.getUsername(),
-            newContainer.getDatabaseName()
-        );
+                "Started PostgreSQL Testcontainer: jdbcUrl={}, username={}, database={}",
+                newContainer.getJdbcUrl(),
+                newContainer.getUsername(),
+                newContainer.getDatabaseName());
 
-        Runtime.getRuntime().addShutdownHook(
-            new Thread(() -> {
-                if (newContainer.isRunning()) {
-                    newContainer.stop();
-                }
-            })
-        );
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            if (newContainer.isRunning()) {
+                newContainer.stop();
+            }
+        }));
 
         return newContainer;
     }
@@ -168,10 +146,9 @@ public final class PostgreSQLTestContainer {
             connection.createStatement().execute("CREATE EXTENSION IF NOT EXISTS citext");
         } catch (SQLException exception) {
             throw new IllegalStateException(
-                "Failed to enable required PostgreSQL extension 'citext' on the test database: " +
-                    exception.getMessage(),
-                exception
-            );
+                    "Failed to enable required PostgreSQL extension 'citext' on the test database: "
+                            + exception.getMessage(),
+                    exception);
         }
     }
 }

@@ -17,16 +17,15 @@ import org.springframework.validation.annotation.Validated;
 @ConfigurationProperties(prefix = "hephaestus.llm")
 @Validated
 public record LlmProperties(
-    @Pattern(
-        regexp = "|" + SUPPORTED_DISPLAY_CURRENCIES,
-        flags = Pattern.Flag.CASE_INSENSITIVE,
-        message = "must be empty or one of: " + SUPPORTED_DISPLAY_CURRENCIES
-    )
-    @DefaultValue("")
-    String displayCurrency,
-    @Valid @DefaultValue Egress egress,
-    @Valid @DefaultValue Fx fx
-) {
+        @Pattern(
+                regexp = "|" + SUPPORTED_DISPLAY_CURRENCIES,
+                flags = Pattern.Flag.CASE_INSENSITIVE,
+                message = "must be empty or one of: " + SUPPORTED_DISPLAY_CURRENCIES)
+        @DefaultValue("")
+        String displayCurrency,
+
+        @Valid @DefaultValue Egress egress,
+        @Valid @DefaultValue Fx fx) {
     /**
      * Supported display currencies as a regex alternation. Widening it means widening {@code fx_rate}
      * first: that table holds a single {@code usd_per_eur} scalar.

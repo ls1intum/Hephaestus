@@ -54,24 +54,28 @@ class SessionRefreshLifecycleIntegrationTest extends RealAuthIntegrationTest {
     @Test
     void userExposesAccessTokenExpiry() {
         Account account = accountRepository.save(new Account("Expiry Eddie"));
-        String token = jwtIssuer.issue(principalFactory.forAccount(account), null, null).value();
+        String token = jwtIssuer
+                .issue(principalFactory.forAccount(account), null, null)
+                .value();
 
         webTestClient
-            .get()
-            .uri("/user")
-            .header(HttpHeaders.COOKIE, cookieName + "=" + token)
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.accessTokenExpiresAt")
-            .isNumber();
+                .get()
+                .uri("/user")
+                .header(HttpHeaders.COOKIE, cookieName + "=" + token)
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.accessTokenExpiresAt")
+                .isNumber();
     }
 
     @Test
     void refreshRotatesTheSessionAndKeepsAppRequestsWorkingAcrossManyCycles() {
         Account account = accountRepository.save(new Account("Rolling Rosa"));
-        String current = jwtIssuer.issue(principalFactory.forAccount(account), null, null).value();
+        String current = jwtIssuer
+                .issue(principalFactory.forAccount(account), null, null)
+                .value();
         String csrf = fetchCsrfToken();
 
         // Five consecutive refreshes: more wall-clock than a single 15-min token would survive, so a
@@ -81,7 +85,9 @@ class SessionRefreshLifecycleIntegrationTest extends RealAuthIntegrationTest {
 
             String rotated = refreshAndReadNewCookie(current, csrf);
 
-            assertThat(rotated).as("cycle %d: refresh must mint a NEW token", cycle).isNotEqualTo(current);
+            assertThat(rotated)
+                    .as("cycle %d: refresh must mint a NEW token", cycle)
+                    .isNotEqualTo(current);
             getUser(rotated).expectStatus().isOk();
             // The token we just rotated away from is immediately dead (no parallel session).
             getUser(current).expectStatus().isUnauthorized();
@@ -96,8 +102,8 @@ class SessionRefreshLifecycleIntegrationTest extends RealAuthIntegrationTest {
         // A 2-minute absolute session ceiling — well under the 15-min access TTL, so it binds.
         long ceiling = java.time.Instant.now().getEpochSecond() + 120;
         String token = jwtIssuer
-            .issue(principalFactory.forAccount(account), null, null, java.time.Instant.ofEpochSecond(ceiling), null)
-            .value();
+                .issue(principalFactory.forAccount(account), null, null, java.time.Instant.ofEpochSecond(ceiling), null)
+                .value();
 
         // The access expiry is capped at the session ceiling, NOT now + accessTtl (15 min).
         assertUserExpiryNear(token, ceiling);
@@ -110,30 +116,33 @@ class SessionRefreshLifecycleIntegrationTest extends RealAuthIntegrationTest {
 
     private void assertUserExpiryNear(String token, long expectedEpochSeconds) {
         getUser(token)
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.accessTokenExpiresAt")
-            .value(v ->
-                assertThat(((Number) v).longValue()).isBetween(expectedEpochSeconds - 5, expectedEpochSeconds + 2)
-            );
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.accessTokenExpiresAt")
+                .value(v -> assertThat(((Number) v).longValue())
+                        .isBetween(expectedEpochSeconds - 5, expectedEpochSeconds + 2));
     }
 
     private WebTestClient.ResponseSpec getUser(String token) {
-        return webTestClient.get().uri("/user").header(HttpHeaders.COOKIE, cookieName + "=" + token).exchange();
+        return webTestClient
+                .get()
+                .uri("/user")
+                .header(HttpHeaders.COOKIE, cookieName + "=" + token)
+                .exchange();
     }
 
     /** POST /auth/refresh with the auth cookie + CSRF double-submit; returns the rotated access token. */
     private String refreshAndReadNewCookie(String token, String csrf) {
         var result = webTestClient
-            .post()
-            .uri("/auth/refresh")
-            .header(HttpHeaders.COOKIE, cookieName + "=" + token + "; " + XSRF_COOKIE + "=" + csrf)
-            .header(XSRF_HEADER, csrf)
-            .exchange()
-            .expectStatus()
-            .isNoContent()
-            .returnResult(Void.class);
+                .post()
+                .uri("/auth/refresh")
+                .header(HttpHeaders.COOKIE, cookieName + "=" + token + "; " + XSRF_COOKIE + "=" + csrf)
+                .header(XSRF_HEADER, csrf)
+                .exchange()
+                .expectStatus()
+                .isNoContent()
+                .returnResult(Void.class);
         ResponseCookie rotated = result.getResponseCookies().getFirst(cookieName);
         assertThat(rotated).as("refresh must Set-Cookie a new access token").isNotNull();
         return rotated.getValue();
@@ -142,12 +151,12 @@ class SessionRefreshLifecycleIntegrationTest extends RealAuthIntegrationTest {
     /** A valid double-submit CSRF token, rendered by CsrfCookieFilter on a safe GET. */
     private String fetchCsrfToken() {
         var result = webTestClient
-            .get()
-            .uri("/identity-providers")
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .returnResult(Void.class);
+                .get()
+                .uri("/identity-providers")
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .returnResult(Void.class);
         List<ResponseCookie> cookies = result.getResponseCookies().get(XSRF_COOKIE);
         assertThat(cookies).as("XSRF-TOKEN cookie issued on safe GET").isNotEmpty();
         assertNotNull(cookies);

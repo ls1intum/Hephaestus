@@ -1,6 +1,6 @@
 # ADR 0030: The agent runtime is TypeScript on Bun, with no Node in the sandbox
 
-**Status:** Accepted
+**Status:** Superseded by [ADR 0036](0036-agent-runtime-runs-on-node-24.md)
 **Date:** 2026-08-22
 **Authors:** Felix T.J. Dietrich
 **Builds on:** [ADR 0007](0007-sandbox-spi-shape.md) (the sandbox SPI the runner is staged into), [ADR 0026](0026-per-purpose-agent-bindings-and-llm-governance.md) (the mentor and practice-review purposes this runtime serves)
@@ -49,7 +49,7 @@ image contains no Node and no npm: the base is `debian:bookworm-slim`, the Pi SD
 Type-checking, linting and formatting cover the runner and the precompute trees as one project:
 `tsconfig.agents.json` (strict, plus `noUncheckedIndexedAccess`) with the Pi SDK as a devDependency
 pinned to the version the image installs, the root `.oxlintrc.json` for lint, and the root
-`biome.jsonc` for format.
+`.oxfmtrc.json` for formatting.
 
 ## Consequences
 
@@ -83,9 +83,6 @@ pinned to the version the image installs, the root `.oxlintrc.json` for lint, an
   mimalloc and the tuning no longer reaches the allocator that matters. It was applied as a
   command-line prefix rather than as container environment, so this is a deliberate removal, not
   something the sandbox environment blocklist forced.
-- **CI's Bun version is coupled to the Dockerfile's text.** `ci-quality-gates.yml` extracts
-  `ARG BUN_VERSION=` with a regex so the gates run the Bun the sandbox ships. It fails closed when
-  the line is absent, but a reformatted `ARG` line is a CI break with no local signal.
 - **`rootDirs` and `allowImportingTsExtensions` are load-bearing**, not conveniences: the runner
   imports siblings as `./x.ts` because that is what Bun resolves, and the precompute trees are two
   directories that a runtime symlink merges into one. Removing either breaks the type-check against
@@ -131,5 +128,5 @@ pinned to the version the image installs, the root `.oxlintrc.json` for lint, an
 ## Contract locations
 
 - [Pi agent workspace ABI](../contributor/agent/workspace-abi.mdx)
-- `docker/agents/pi/Dockerfile`, `tsconfig.agents.json`, `.oxlintrc.json`, `biome.jsonc`
+- `docker/agents/pi/Dockerfile`, `tsconfig.agents.json`, `.oxlintrc.json`, `.oxfmtrc.json`
 - `PiRuntimeFactory`, `PiRunnerProfile`, `MentorRunnerProfile`, `PracticeRunnerProfile`

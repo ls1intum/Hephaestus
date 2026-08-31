@@ -86,7 +86,7 @@ CI enforces 1 and 2 mechanically (see below); 3 is a review responsibility.
 
 ## CI validation
 
-Three GitHub Actions checks guard the database (all in `ci-quality-gates.yml`):
+CI uses complementary database checks:
 
 1. **Migration-chain replay** (`Database` gate) – Applies the full `master.xml` chain via
    `liquibase:update` to an empty pg_partman PostgreSQL (the production image). A changelog that
@@ -100,8 +100,15 @@ Three GitHub Actions checks guard the database (all in `ci-quality-gates.yml`):
    renamed, or deleted, or if an existing `master.xml` `<include>` line was removed, reordered,
    or edited. This catches exactly the edits Liquibase checksums miss (preconditions, contexts,
    labels, comments, and deleted changesets).
+4. **Seeded release upgrade** (`release-upgrade.yml`) – Boots the previous stable release, creates
+   representative account and workspace data, then boots the candidate against the same database. The gate
+   verifies that Liquibase reaches application readiness, seeded relationships and the practice catalog
+   survive, and authenticated core reads succeed. Release publication depends on this gate, and the same test
+   runs weekly.
 
-The replay applies **every** changeset (the Maven plugin sets no context filter), so it validates
+Baseline changes must update the fixture without breaking the supported previous-release upgrade.
+
+The empty-database replay applies **every** changeset (the Maven plugin sets no context filter), so it validates
 that the whole chain is well-formed — it does **not** reproduce a specific instance's boot (a real
 `dev`/`prod` boot filters by `spring.liquibase.contexts`) and, running against an empty database,
 does **not** catch data-incompatible migrations (a `NOT NULL` add or a `CHECK` that existing rows
@@ -146,7 +153,7 @@ flowchart TD
     A[Entity changes] --> B[Migrations]
     B --> C[ERD docs]
 
-    subgraph CI [CI quality gates]
+    subgraph CI [Pull request gates]
         D[Schema validation]
         E[ERD validation]
         F[Changelog immutability]

@@ -1,4 +1,5 @@
 import { useId, useState } from "react";
+
 import type { PracticeGroup } from "@/api/types.gen";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,6 +15,7 @@ import {
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
+
 import { GroupVisualPicker } from "./GroupVisualPicker";
 
 export interface GroupDetails {

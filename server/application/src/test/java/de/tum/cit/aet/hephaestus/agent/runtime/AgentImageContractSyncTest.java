@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Test;
  */
 class AgentImageContractSyncTest extends BaseUnitTest {
 
-    private static final Pattern BUN_VERSION_ARG = Pattern.compile("^ARG BUN_VERSION=(\\S+)$", Pattern.MULTILINE);
+    private static final Pattern NODE_VERSION_ARG = Pattern.compile("^ARG NODE_VERSION=(\\S+)$", Pattern.MULTILINE);
     private static final Pattern PI_VERSION_ARG = Pattern.compile("^ARG PI_VERSION=(\\S+)$", Pattern.MULTILINE);
 
     @Test
@@ -27,15 +27,14 @@ class AgentImageContractSyncTest extends BaseUnitTest {
         String body = dockerfile();
 
         assertThat(body)
-            .as("agent image labels the runtime contract SandboxLayout stages for")
-            .contains(
-                "LABEL " + SandboxLayout.RUNTIME_CONTRACT_LABEL + "=" + SandboxLayout.RUNTIME_CONTRACT_VERSION + "\n"
-            );
+                .as("agent image labels the runtime contract SandboxLayout stages for")
+                .contains("LABEL " + SandboxLayout.RUNTIME_CONTRACT_LABEL + "=" + SandboxLayout.RUNTIME_CONTRACT_VERSION
+                        + "\n");
 
         assertThat(body)
-            .as("drift reports can name the interpreter and SDK the image actually carries")
-            .contains("LABEL hephaestus.agent.bun-version=${BUN_VERSION}")
-            .contains("LABEL hephaestus.agent.pi-version=${PI_VERSION}");
+                .as("drift reports can name the interpreter and SDK the image actually carries")
+                .contains("LABEL hephaestus.agent.node-version=${NODE_VERSION}")
+                .contains("LABEL hephaestus.agent.pi-version=${PI_VERSION}");
     }
 
     /**
@@ -47,24 +46,23 @@ class AgentImageContractSyncTest extends BaseUnitTest {
     void dockerfileStaysOnTheInterpreterAndSdkMajorsTheRunnersAreWrittenAgainst() throws IOException {
         String body = dockerfile();
 
-        assertThat(majorOf(body, BUN_VERSION_ARG, "BUN_VERSION"))
-            .as(
-                "docker/agents/pi/Dockerfile moved to a new Bun major: decide whether the staged runners " +
-                    "still run on it, then bump SandboxLayout.BUN_MAJOR and RUNTIME_CONTRACT_VERSION together"
-            )
-            .isEqualTo(SandboxLayout.BUN_MAJOR);
+        assertThat(majorOf(body, NODE_VERSION_ARG, "NODE_VERSION"))
+                .as("docker/agents/pi/Dockerfile moved to a new Node major: decide whether the staged runners "
+                        + "still run on it, then bump SandboxLayout.NODE_MAJOR and RUNTIME_CONTRACT_VERSION together")
+                .isEqualTo(SandboxLayout.NODE_MAJOR);
 
         assertThat(majorOf(body, PI_VERSION_ARG, "PI_VERSION"))
-            .as(
-                "docker/agents/pi/Dockerfile moved to a new Pi SDK major: decide whether the runners still " +
-                    "import against it, then bump SandboxLayout.PI_SDK_MAJOR and RUNTIME_CONTRACT_VERSION together"
-            )
-            .isEqualTo(SandboxLayout.PI_SDK_MAJOR);
+                .as(
+                        "docker/agents/pi/Dockerfile moved to a new Pi SDK major: decide whether the runners still "
+                                + "import against it, then bump SandboxLayout.PI_SDK_MAJOR and RUNTIME_CONTRACT_VERSION together")
+                .isEqualTo(SandboxLayout.PI_SDK_MAJOR);
     }
 
     private static int majorOf(String body, Pattern arg, String name) {
         Matcher matcher = arg.matcher(body);
-        assertThat(matcher.find()).as("docker/agents/pi/Dockerfile declares ARG %s", name).isTrue();
+        assertThat(matcher.find())
+                .as("docker/agents/pi/Dockerfile declares ARG %s", name)
+                .isTrue();
         String version = matcher.group(1);
         assertThat(version).as("ARG %s is a dotted version", name).matches("\\d+\\.\\d+.*");
         return Integer.parseInt(version.substring(0, version.indexOf('.')));

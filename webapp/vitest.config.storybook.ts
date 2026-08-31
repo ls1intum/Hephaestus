@@ -3,6 +3,7 @@ import path from "node:path";
 import { storybookTest } from "@storybook/addon-vitest/vitest-plugin";
 import { playwright } from "@vitest/browser-playwright";
 import { defineConfig } from "vitest/config";
+
 import pkg from "./package.json" with { type: "json" };
 import { appSourcePlugins } from "./vite.shared.ts";
 
@@ -13,7 +14,7 @@ export default defineConfig({
 		...appSourcePlugins(),
 		storybookTest({
 			configDir: path.join(import.meta.dirname, ".storybook"),
-			storybookScript: "pnpm run storybook -- --ci",
+			storybookScript: "pnpm run storybook:dev -- --ci",
 		}),
 	],
 	resolve: {
@@ -29,7 +30,6 @@ export default defineConfig({
 		noDiscovery: true,
 		include: [
 			...runtimeDeps.filter((dependency) => dependency !== "@monaco-editor/react"),
-			"posthog-js/react",
 			"use-sync-external-store/shim",
 			"use-sync-external-store/shim/with-selector",
 		],

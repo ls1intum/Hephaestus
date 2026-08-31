@@ -25,16 +25,15 @@ import org.jspecify.annotations.Nullable;
  */
 @Entity
 @Table(
-    name = "slack_message",
-    uniqueConstraints = @UniqueConstraint(
-        name = "uk_slack_message",
-        columnNames = { "workspace_id", "slack_channel_id", "slack_ts" }
-    ),
-    indexes = {
-        @Index(name = "idx_slack_message_ingest", columnList = "workspace_id, ingested_at"),
-        @Index(name = "idx_slack_message_thread", columnList = "workspace_id, slack_channel_id, slack_thread_ts"),
-    }
-)
+        name = "slack_message",
+        uniqueConstraints =
+                @UniqueConstraint(
+                        name = "uk_slack_message",
+                        columnNames = {"workspace_id", "slack_channel_id", "slack_ts"}),
+        indexes = {
+            @Index(name = "idx_slack_message_ingest", columnList = "workspace_id, ingested_at"),
+            @Index(name = "idx_slack_message_thread", columnList = "workspace_id, slack_channel_id, slack_thread_ts"),
+        })
 @Getter
 @Setter
 @NoArgsConstructor

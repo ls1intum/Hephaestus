@@ -13,8 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
  * row that already names its workspace cannot leak across tenants).
  */
 public interface SlackParticipantConsentRepository
-    extends JpaRepository<SlackParticipantConsent, SlackParticipantConsent.Id>
-{
+        extends JpaRepository<SlackParticipantConsent, SlackParticipantConsent.Id> {
     /**
      * The single read behind {@code SlackParticipantConsentGate}: is this individual currently opted OUT of
      * ingestion in this workspace? Absent row ⇒ {@code false} (allowed) — the person firewall fails <em>open</em> on
@@ -30,8 +29,7 @@ public interface SlackParticipantConsentRepository
      */
     @Modifying
     @Transactional
-    @Query(
-        value = """
+    @Query(value = """
         INSERT INTO slack_participant_consent (workspace_id, slack_user_id, ingestion_opted_out, research_opted_out, source, decided_at)
         VALUES (:workspaceId, :slackUserId, :ingestionOptedOut, :researchOptedOut, :source, now())
         ON CONFLICT (workspace_id, slack_user_id) DO UPDATE SET
@@ -39,16 +37,13 @@ public interface SlackParticipantConsentRepository
             research_opted_out = EXCLUDED.research_opted_out,
             source = EXCLUDED.source,
             decided_at = now()
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     void upsert(
-        @Param("workspaceId") long workspaceId,
-        @Param("slackUserId") String slackUserId,
-        @Param("ingestionOptedOut") boolean ingestionOptedOut,
-        @Param("researchOptedOut") boolean researchOptedOut,
-        @Param("source") @Nullable String source
-    );
+            @Param("workspaceId") long workspaceId,
+            @Param("slackUserId") String slackUserId,
+            @Param("ingestionOptedOut") boolean ingestionOptedOut,
+            @Param("researchOptedOut") boolean researchOptedOut,
+            @Param("source") @Nullable String source);
 
     /**
      * Idempotently records a channel-message ingestion opt-out without silently changing the research bit. New rows
@@ -57,61 +52,49 @@ public interface SlackParticipantConsentRepository
      */
     @Modifying
     @Transactional
-    @Query(
-        value = """
+    @Query(value = """
         INSERT INTO slack_participant_consent (workspace_id, slack_user_id, ingestion_opted_out, research_opted_out, source, decided_at)
         VALUES (:workspaceId, :slackUserId, true, false, :source, now())
         ON CONFLICT (workspace_id, slack_user_id) DO UPDATE SET
             ingestion_opted_out = true,
             source = EXCLUDED.source,
             decided_at = now()
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     void optOutOfIngestion(
-        @Param("workspaceId") long workspaceId,
-        @Param("slackUserId") String slackUserId,
-        @Param("source") @Nullable String source
-    );
+            @Param("workspaceId") long workspaceId,
+            @Param("slackUserId") String slackUserId,
+            @Param("source") @Nullable String source);
 
     @Modifying
     @Transactional
-    @Query(
-        value = """
+    @Query(value = """
         INSERT INTO slack_participant_consent (workspace_id, slack_user_id, ingestion_opted_out, research_opted_out, source, decided_at)
         VALUES (:workspaceId, :slackUserId, false, false, :source, now())
         ON CONFLICT (workspace_id, slack_user_id) DO UPDATE SET
             ingestion_opted_out = false,
             source = EXCLUDED.source,
             decided_at = now()
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     void optInToIngestion(
-        @Param("workspaceId") long workspaceId,
-        @Param("slackUserId") String slackUserId,
-        @Param("source") @Nullable String source
-    );
+            @Param("workspaceId") long workspaceId,
+            @Param("slackUserId") String slackUserId,
+            @Param("source") @Nullable String source);
 
     @Modifying
     @Transactional
-    @Query(
-        value = """
+    @Query(value = """
         INSERT INTO slack_participant_consent (workspace_id, slack_user_id, ingestion_opted_out, research_opted_out, source, decided_at)
         VALUES (:workspaceId, :slackUserId, false, :researchOptedOut, :source, now())
         ON CONFLICT (workspace_id, slack_user_id) DO UPDATE SET
             research_opted_out = EXCLUDED.research_opted_out,
             source = EXCLUDED.source,
             decided_at = now()
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     void setResearchOptOut(
-        @Param("workspaceId") long workspaceId,
-        @Param("slackUserId") String slackUserId,
-        @Param("researchOptedOut") boolean researchOptedOut,
-        @Param("source") @Nullable String source
-    );
+            @Param("workspaceId") long workspaceId,
+            @Param("slackUserId") String slackUserId,
+            @Param("researchOptedOut") boolean researchOptedOut,
+            @Param("source") @Nullable String source);
 
     /**
      * Count of individuals who have opted OUT of ingestion in this workspace. Person opt-out is workspace-scoped

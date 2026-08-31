@@ -46,26 +46,25 @@ public class OutlineApiClient implements OutlineTokenClient, OutlineContentClien
     // Envelope shapes, one per call. Explicit ParameterizedTypeReferences because the {data,pagination}
     // wrapper is generic — the generated models describe only the inner data payload.
     private static final ParameterizedTypeReference<OutlineEnvelope<OutlineAuth>> AUTH_INFO =
-        new ParameterizedTypeReference<>() {};
+            new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<OutlineEnvelope<List<OutlineApiKey>>> API_KEY_LIST =
-        new ParameterizedTypeReference<>() {};
+            new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<OutlineEnvelope<List<OutlineCollectionModel>>> COLLECTION_LIST =
-        new ParameterizedTypeReference<>() {};
+            new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<OutlineEnvelope<List<OutlineNavigationNode>>> COLLECTION_DOCUMENTS =
-        new ParameterizedTypeReference<>() {};
+            new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<OutlineEnvelope<List<OutlineDocumentModel>>> DOCUMENT_LIST =
-        new ParameterizedTypeReference<>() {};
+            new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<OutlineEnvelope<OutlineDocumentModel>> DOCUMENT_INFO =
-        new ParameterizedTypeReference<>() {};
+            new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<OutlineEnvelope<String>> EXPORT =
-        new ParameterizedTypeReference<>() {};
-    private static final ParameterizedTypeReference<
-        OutlineEnvelope<List<OutlineWebhookSubscription>>
-    > WEBHOOK_SUBSCRIPTION_LIST = new ParameterizedTypeReference<>() {};
+            new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<OutlineEnvelope<List<OutlineWebhookSubscription>>>
+            WEBHOOK_SUBSCRIPTION_LIST = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<OutlineEnvelope<OutlineWebhookSubscription>> WEBHOOK_SUBSCRIPTION =
-        new ParameterizedTypeReference<>() {};
+            new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<OutlineEnvelope<Void>> EMPTY =
-        new ParameterizedTypeReference<>() {};
+            new ParameterizedTypeReference<>() {};
 
     private final WebClient webClient;
     private final CircuitBreaker circuitBreaker;
@@ -74,11 +73,10 @@ public class OutlineApiClient implements OutlineTokenClient, OutlineContentClien
 
     @Autowired
     public OutlineApiClient(
-        @Qualifier("outlineRestApiCircuitBreaker") CircuitBreaker circuitBreaker,
-        @Qualifier("outlineRestApiRetry") Retry retry,
-        @Qualifier("outlineWebClient") WebClient webClient,
-        OutlineOriginPolicy originPolicy
-    ) {
+            @Qualifier("outlineRestApiCircuitBreaker") CircuitBreaker circuitBreaker,
+            @Qualifier("outlineRestApiRetry") Retry retry,
+            @Qualifier("outlineWebClient") WebClient webClient,
+            OutlineOriginPolicy originPolicy) {
         this.webClient = webClient;
         this.circuitBreaker = circuitBreaker;
         this.retry = retry;
@@ -86,7 +84,10 @@ public class OutlineApiClient implements OutlineTokenClient, OutlineContentClien
     }
 
     /** Identity from Outline's {@code auth.info}. The team id is stable per instance and becomes the Connection's instance key. */
-    public record OutlineIdentity(String teamId, @Nullable String teamName, @Nullable String userId) {}
+    public record OutlineIdentity(
+            String teamId,
+            @Nullable String teamName,
+            @Nullable String userId) {}
 
     /**
      * Validates a token via {@code auth.info}, returning the resolved identity. Throws
@@ -96,29 +97,23 @@ public class OutlineApiClient implements OutlineTokenClient, OutlineContentClien
     public OutlineIdentity validateToken(String serverUrl, String token) {
         String resolvedUrl = resolveAndValidateServerUrl(serverUrl);
         OutlineEnvelope<OutlineAuth> response = post(resolvedUrl, token, "/api/auth.info", Map.of(), AUTH_INFO);
-        if (
-            response == null ||
-            response.data() == null ||
-            response.data().getTeam() == null ||
-            response.data().getTeam().getId() == null
-        ) {
+        if (response == null
+                || response.data() == null
+                || response.data().getTeam() == null
+                || response.data().getTeam().getId() == null) {
             throw new OutlineApiException("Outline auth.info returned no team for this token");
         }
         OutlineTeam team = response.data().getTeam();
         OutlineUser user = response.data().getUser();
         return new OutlineIdentity(
-            Objects.requireNonNull(team.getId()),
-            team.getName(),
-            user == null ? null : user.getId()
-        );
+                Objects.requireNonNull(team.getId()), team.getName(), user == null ? null : user.getId());
     }
 
     public record OutlineTokenDescription(
-        @Nullable String name,
-        @Nullable String last4,
-        @Nullable Instant expiresAt,
-        @Nullable Instant lastActiveAt
-    ) {}
+            @Nullable String name,
+            @Nullable String last4,
+            @Nullable Instant expiresAt,
+            @Nullable Instant lastActiveAt) {}
 
     /**
      * Describes the token via {@code apiKeys.list}, matched on the {@code last4} suffix. Empty when the key
@@ -142,14 +137,11 @@ public class OutlineApiClient implements OutlineTokenClient, OutlineContentClien
             return Optional.empty();
         }
         String suffix = token.substring(token.length() - 4);
-        return response
-            .data()
-            .stream()
-            .filter(key -> suffix.equals(key.getLast4()))
-            .findFirst()
-            .map(key ->
-                new OutlineTokenDescription(key.getName(), key.getLast4(), key.getExpiresAt(), key.getLastActiveAt())
-            );
+        return response.data().stream()
+                .filter(key -> suffix.equals(key.getLast4()))
+                .findFirst()
+                .map(key -> new OutlineTokenDescription(
+                        key.getName(), key.getLast4(), key.getExpiresAt(), key.getLastActiveAt()));
     }
 
     /** Lists the collections the token can see ({@code collections.list}); the catalog pass refreshes mirrored-collection metadata. */
@@ -168,12 +160,11 @@ public class OutlineApiClient implements OutlineTokenClient, OutlineContentClien
         List<OutlineCollectionModel> all = new ArrayList<>();
         for (int page = 0, offset = 0; page < maxPages; page++, offset += PAGE_LIMIT) {
             OutlineEnvelope<List<OutlineCollectionModel>> body = post(
-                resolvedUrl,
-                token,
-                "/api/collections.list",
-                Map.of("offset", offset, "limit", PAGE_LIMIT),
-                COLLECTION_LIST
-            );
+                    resolvedUrl,
+                    token,
+                    "/api/collections.list",
+                    Map.of("offset", offset, "limit", PAGE_LIMIT),
+                    COLLECTION_LIST);
             List<OutlineCollectionModel> pageData = body == null ? null : body.data();
             if (pageData == null || pageData.isEmpty()) {
                 return all;
@@ -184,11 +175,10 @@ public class OutlineApiClient implements OutlineTokenClient, OutlineContentClien
             }
         }
         log.info(
-            "outline.client: collections.list stopped at the {}-page cap ({} collections) for {} — result may be truncated",
-            maxPages,
-            all.size(),
-            resolvedUrl
-        );
+                "outline.client: collections.list stopped at the {}-page cap ({} collections) for {} — result may be truncated",
+                maxPages,
+                all.size(),
+                resolvedUrl);
         return all;
     }
 
@@ -200,12 +190,7 @@ public class OutlineApiClient implements OutlineTokenClient, OutlineContentClien
     public List<OutlineNavigationNode> listCollectionDocuments(String serverUrl, String token, String collectionId) {
         String resolvedUrl = resolveAndValidateServerUrl(serverUrl);
         OutlineEnvelope<List<OutlineNavigationNode>> body = post(
-            resolvedUrl,
-            token,
-            "/api/collections.documents",
-            Map.of("id", collectionId),
-            COLLECTION_DOCUMENTS
-        );
+                resolvedUrl, token, "/api/collections.documents", Map.of("id", collectionId), COLLECTION_DOCUMENTS);
         List<OutlineNavigationNode> data = body == null ? null : body.data();
         return data == null ? List.of() : data;
     }
@@ -220,23 +205,21 @@ public class OutlineApiClient implements OutlineTokenClient, OutlineContentClien
         List<OutlineDocumentModel> all = new ArrayList<>();
         for (int page = 0, offset = 0; page < MAX_PAGES; page++, offset += PAGE_LIMIT) {
             OutlineEnvelope<List<OutlineDocumentModel>> body = post(
-                resolvedUrl,
-                token,
-                "/api/documents.list",
-                Map.of(
-                    "collectionId",
-                    collectionId,
-                    "offset",
-                    offset,
-                    "limit",
-                    PAGE_LIMIT,
-                    "sort",
-                    "updatedAt",
-                    "direction",
-                    "DESC"
-                ),
-                DOCUMENT_LIST
-            );
+                    resolvedUrl,
+                    token,
+                    "/api/documents.list",
+                    Map.of(
+                            "collectionId",
+                            collectionId,
+                            "offset",
+                            offset,
+                            "limit",
+                            PAGE_LIMIT,
+                            "sort",
+                            "updatedAt",
+                            "direction",
+                            "DESC"),
+                    DOCUMENT_LIST);
             List<OutlineDocumentModel> pageData = requirePage(body, "documents.list", collectionId);
             if (pageData.isEmpty()) {
                 return all;
@@ -279,25 +262,23 @@ public class OutlineApiClient implements OutlineTokenClient, OutlineContentClien
         List<OutlineDocumentModel> all = new ArrayList<>();
         for (int page = 0, offset = 0; page < MAX_PAGES; page++, offset += PAGE_LIMIT) {
             OutlineEnvelope<List<OutlineDocumentModel>> body = post(
-                resolvedUrl,
-                token,
-                "/api/documents.list",
-                Map.of(
-                    "collectionId",
-                    collectionId,
-                    "offset",
-                    offset,
-                    "limit",
-                    PAGE_LIMIT,
-                    "sort",
-                    "updatedAt",
-                    "direction",
-                    "DESC",
-                    "statusFilter",
-                    List.of("archived")
-                ),
-                DOCUMENT_LIST
-            );
+                    resolvedUrl,
+                    token,
+                    "/api/documents.list",
+                    Map.of(
+                            "collectionId",
+                            collectionId,
+                            "offset",
+                            offset,
+                            "limit",
+                            PAGE_LIMIT,
+                            "sort",
+                            "updatedAt",
+                            "direction",
+                            "DESC",
+                            "statusFilter",
+                            List.of("archived")),
+                    DOCUMENT_LIST);
             List<OutlineDocumentModel> pageData = requirePage(body, "documents.list[archived]", collectionId);
             if (pageData.isEmpty()) {
                 return all;
@@ -318,36 +299,27 @@ public class OutlineApiClient implements OutlineTokenClient, OutlineContentClien
      * call skips the sweep, leaving the mirror intact.
      */
     private static List<OutlineDocumentModel> requirePage(
-        OutlineEnvelope<List<OutlineDocumentModel>> body,
-        String call,
-        String collectionId
-    ) {
+            OutlineEnvelope<List<OutlineDocumentModel>> body, String call, String collectionId) {
         List<OutlineDocumentModel> pageData = body == null ? null : body.data();
         if (pageData == null) {
-            throw new OutlineApiException(
-                "Outline " +
-                    call +
-                    " returned no data for collection " +
-                    collectionId +
-                    " — refusing to treat a malformed page as the end of the listing"
-            );
+            throw new OutlineApiException("Outline " + call
+                    + " returned no data for collection "
+                    + collectionId
+                    + " — refusing to treat a malformed page as the end of the listing");
         }
         return pageData;
     }
 
     /** Same contract as {@link #requirePage}: an enumeration that hits the page cap is truncated, i.e. wrong. */
     private static OutlineApiException pageCapExhausted(String call, String collectionId, int collected) {
-        return new OutlineApiException(
-            "Outline " +
-                call +
-                " exceeded the " +
-                MAX_PAGES +
-                "-page cap for collection " +
-                collectionId +
-                " after " +
-                collected +
-                " documents — refusing to sync a truncated listing"
-        );
+        return new OutlineApiException("Outline " + call
+                + " exceeded the "
+                + MAX_PAGES
+                + "-page cap for collection "
+                + collectionId
+                + " after "
+                + collected
+                + " documents — refusing to sync a truncated listing");
     }
 
     /**
@@ -360,12 +332,11 @@ public class OutlineApiClient implements OutlineTokenClient, OutlineContentClien
         List<OutlineWebhookSubscription> all = new ArrayList<>();
         for (int page = 0, offset = 0; page < MAX_PAGES; page++, offset += PAGE_LIMIT) {
             OutlineEnvelope<List<OutlineWebhookSubscription>> body = post(
-                resolvedUrl,
-                token,
-                "/api/webhookSubscriptions.list",
-                Map.of("offset", offset, "limit", PAGE_LIMIT),
-                WEBHOOK_SUBSCRIPTION_LIST
-            );
+                    resolvedUrl,
+                    token,
+                    "/api/webhookSubscriptions.list",
+                    Map.of("offset", offset, "limit", PAGE_LIMIT),
+                    WEBHOOK_SUBSCRIPTION_LIST);
             List<OutlineWebhookSubscription> pageData = body == null ? null : body.data();
             if (pageData == null || pageData.isEmpty()) {
                 break;
@@ -380,25 +351,22 @@ public class OutlineApiClient implements OutlineTokenClient, OutlineContentClien
 
     /** A permanent failure whose wire cause was an HTTP 404 — the addressed resource is gone upstream. */
     private static boolean isNotFound(OutlineApiException e) {
-        return (e.getCause() instanceof WebClientResponseException wire && wire.getStatusCode().value() == 404);
+        return (e.getCause() instanceof WebClientResponseException wire
+                && wire.getStatusCode().value() == 404);
     }
 
     /** Outline answers 403 both for an out-of-scope token and for a call the key's user may not make. */
     private static boolean isForbidden(OutlineApiException e) {
-        return (e.getCause() instanceof WebClientResponseException wire && wire.getStatusCode().value() == 403);
+        return (e.getCause() instanceof WebClientResponseException wire
+                && wire.getStatusCode().value() == 403);
     }
 
     /** Exports a document's body as Markdown ({@code documents.export}); {@code null} when Outline responds without a body. */
     @Override
     public @Nullable String exportDocument(String serverUrl, String token, String documentId) {
         String resolvedUrl = resolveAndValidateServerUrl(serverUrl);
-        OutlineEnvelope<String> body = post(
-            resolvedUrl,
-            token,
-            "/api/documents.export",
-            Map.of("id", documentId),
-            EXPORT
-        );
+        OutlineEnvelope<String> body =
+                post(resolvedUrl, token, "/api/documents.export", Map.of("id", documentId), EXPORT);
         return body == null ? null : body.data();
     }
 
@@ -408,21 +376,19 @@ public class OutlineApiClient implements OutlineTokenClient, OutlineContentClien
      */
     @Override
     public @Nullable String createWebhookSubscription(
-        String serverUrl,
-        String token,
-        String name,
-        String deliveryUrl,
-        String signingSecret,
-        List<String> events
-    ) {
+            String serverUrl,
+            String token,
+            String name,
+            String deliveryUrl,
+            String signingSecret,
+            List<String> events) {
         String resolvedUrl = resolveAndValidateServerUrl(serverUrl);
         OutlineEnvelope<OutlineWebhookSubscription> body = post(
-            resolvedUrl,
-            token,
-            "/api/webhookSubscriptions.create",
-            Map.of("name", name, "url", deliveryUrl, "secret", signingSecret, "events", events),
-            WEBHOOK_SUBSCRIPTION
-        );
+                resolvedUrl,
+                token,
+                "/api/webhookSubscriptions.create",
+                Map.of("name", name, "url", deliveryUrl, "secret", signingSecret, "events", events),
+                WEBHOOK_SUBSCRIPTION);
         return body == null || body.data() == null ? null : body.data().getId();
     }
 
@@ -440,12 +406,11 @@ public class OutlineApiClient implements OutlineTokenClient, OutlineContentClien
 
     /** One {@code POST} through the retry decorator; each attempt goes through the circuit breaker so every failure counts toward the rate. */
     private <T> T post(
-        String resolvedUrl,
-        String token,
-        String path,
-        Object requestBody,
-        ParameterizedTypeReference<T> responseType
-    ) {
+            String resolvedUrl,
+            String token,
+            String path,
+            Object requestBody,
+            ParameterizedTypeReference<T> responseType) {
         return retry.executeSupplier(() -> executeOnce(resolvedUrl, token, path, requestBody, responseType));
     }
 
@@ -456,14 +421,12 @@ public class OutlineApiClient implements OutlineTokenClient, OutlineContentClien
      * → a distinct permanent {@link OutlineApiException}.
      */
     private <T> T executeOnce(
-        String resolvedUrl,
-        String token,
-        String path,
-        Object requestBody,
-        ParameterizedTypeReference<T> responseType
-    ) {
-        Supplier<T> call = () ->
-            webClient
+            String resolvedUrl,
+            String token,
+            String path,
+            Object requestBody,
+            ParameterizedTypeReference<T> responseType) {
+        Supplier<T> call = () -> webClient
                 .post()
                 .uri(resolvedUrl + path)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
@@ -479,10 +442,9 @@ public class OutlineApiClient implements OutlineTokenClient, OutlineContentClien
             int status = e.getStatusCode().value();
             log.debug("Outline {} failed: status={}, serverUrl={}", path, status, resolvedUrl);
             throw new OutlineApiException(
-                "Outline " + path + " failed (HTTP " + status + ")",
-                e,
-                e.getStatusCode().is5xxServerError()
-            );
+                    "Outline " + path + " failed (HTTP " + status + ")",
+                    e,
+                    e.getStatusCode().is5xxServerError());
         } catch (CallNotPermittedException e) {
             throw new OutlineApiException("Outline API is temporarily unavailable (circuit open)", e);
         } catch (OutlineApiException e) {

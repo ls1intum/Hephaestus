@@ -24,35 +24,22 @@ class WorkerTokenExchangeIntegrationTest extends BaseIntegrationTest {
     @Test
     void shouldReturnVerifiableJwtWhenRegistrationTokenIsValid() throws Exception {
         WorkerTokenProperties properties = new WorkerTokenProperties(
-            "hephaestus-hub",
-            "hephaestus-worker",
-            Duration.ofHours(1),
-            REGISTRATION_TOKEN,
-            List.of(),
-            null
-        );
-        WorkerTokenExchangeController controller = new WorkerTokenExchangeController(
-            issuer,
-            properties,
-            new SimpleMeterRegistry()
-        );
+                "hephaestus-hub", "hephaestus-worker", Duration.ofHours(1), REGISTRATION_TOKEN, List.of(), null);
+        WorkerTokenExchangeController controller =
+                new WorkerTokenExchangeController(issuer, properties, new SimpleMeterRegistry());
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setRemoteAddr("127.0.0.1");
 
         ResponseEntity<?> response = controller.exchange(
-            new WorkerTokenExchangeController.ExchangeRequest("worker-it", REGISTRATION_TOKEN),
-            request
-        );
+                new WorkerTokenExchangeController.ExchangeRequest("worker-it", REGISTRATION_TOKEN), request);
 
         assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
-        assertThat(response.getBody()).isInstanceOfSatisfying(
-            WorkerTokenExchangeController.ExchangeResponse.class,
-            body -> {
-                WorkerJwt jwt = verifier.verify(body.token());
-                assertThat(jwt.workerId()).isEqualTo("worker-it");
-                assertThat(jwt.jti()).isNotBlank();
-                assertThat(body.expiresAt()).isNotNull();
-            }
-        );
+        assertThat(response.getBody())
+                .isInstanceOfSatisfying(WorkerTokenExchangeController.ExchangeResponse.class, body -> {
+                    WorkerSessionJwt jwt = (WorkerSessionJwt) verifier.verify(body.token());
+                    assertThat(jwt.workerId()).isEqualTo("worker-it");
+                    assertThat(jwt.jti()).isNotBlank();
+                    assertThat(body.expiresAt()).isNotNull();
+                });
     }
 }

@@ -24,41 +24,35 @@ import org.springframework.transaction.annotation.Transactional;
 public interface WorkspaceMembershipRepository extends JpaRepository<WorkspaceMembership, WorkspaceMembership.Id> {
     List<WorkspaceMembership> findByWorkspace_Id(Long workspaceId);
 
-    @Query(
-        """
+    @Query("""
             SELECT wm
             FROM WorkspaceMembership wm
             JOIN FETCH wm.user
             WHERE wm.workspace.id = :workspaceId
-        """
-    )
+        """)
     List<WorkspaceMembership> findAllWithUserByWorkspaceId(@Param("workspaceId") Long workspaceId);
 
-    @Query(
-        """
+    @Query("""
             SELECT wm FROM WorkspaceMembership wm
             JOIN FETCH wm.user
             WHERE wm.workspace.id = :workspaceId
-        """
-    )
+        """)
     Page<WorkspaceMembership> findAllByWorkspace_Id(@Param("workspaceId") Long workspaceId, Pageable pageable);
 
-    @Query(
-        """
+    @Query("""
             SELECT wm FROM WorkspaceMembership wm
             JOIN FETCH wm.user
             WHERE wm.workspace.id = :workspaceId AND wm.user.id = :userId
-        """
-    )
+        """)
     Optional<WorkspaceMembership> findByWorkspace_IdAndUser_Id(
-        @Param("workspaceId") Long workspaceId,
-        @Param("userId") Long userId
-    );
+            @Param("workspaceId") Long workspaceId, @Param("userId") Long userId);
+
+    Optional<WorkspaceMembership> findFirstByWorkspace_IdAndUser_LoginIgnoreCaseOrderByUser_Id(
+            Long workspaceId, String login);
 
     List<WorkspaceMembership> findAllByWorkspace_IdAndUser_IdIn(Long workspaceId, Collection<Long> userIds);
 
-    @Query(
-        """
+    @Query("""
             SELECT DISTINCT u
             FROM WorkspaceMembership wm
             JOIN wm.user u
@@ -66,8 +60,7 @@ public interface WorkspaceMembershipRepository extends JpaRepository<WorkspaceMe
             LEFT JOIN FETCH tm.team t
             WHERE wm.workspace.id = :workspaceId
             AND u.type = 'USER'
-        """
-    )
+        """)
     List<User> findHumanUsersWithTeamsByWorkspaceId(@Param("workspaceId") Long workspaceId);
 
     List<WorkspaceMembership> findByUser_Id(Long userId);
@@ -87,14 +80,12 @@ public interface WorkspaceMembershipRepository extends JpaRepository<WorkspaceMe
      * {@code core.auth} GDPR data-export to flatten a principal's workspace memberships without
      * the auth module importing workspace domain types. Login match is case-insensitive.
      */
-    @Query(
-        """
+    @Query("""
             SELECT wm FROM WorkspaceMembership wm
             JOIN FETCH wm.workspace
             JOIN wm.user u
             WHERE LOWER(u.login) IN :logins
-        """
-    )
+        """)
     List<WorkspaceMembership> findAllWithWorkspaceByUserLoginInLowercase(@Param("logins") Collection<String> logins);
 
     long countByWorkspace_IdAndRole(Long workspaceId, WorkspaceRole role);
@@ -103,13 +94,11 @@ public interface WorkspaceMembershipRepository extends JpaRepository<WorkspaceMe
     long countByWorkspace_Id(Long workspaceId);
 
     /** Members in the given role, oldest membership first — for the instance-admin overview/support entry. */
-    @Query(
-        """
+    @Query("""
             SELECT wm.user FROM WorkspaceMembership wm
             WHERE wm.workspace.id = :workspaceId AND wm.role = :role
             ORDER BY wm.createdAt, wm.user.id
-        """
-    )
+        """)
     List<User> findUsersByWorkspaceIdAndRole(@Param("workspaceId") Long workspaceId, @Param("role") WorkspaceRole role);
 
     @Query("SELECT wm.user.id FROM WorkspaceMembership wm WHERE wm.workspace.id = :workspaceId AND wm.hidden = true")
@@ -120,20 +109,16 @@ public interface WorkspaceMembershipRepository extends JpaRepository<WorkspaceMe
      */
     @Modifying
     @Transactional
-    @Query(
-        value = """
+    @Query(value = """
         INSERT INTO workspace_membership (workspace_id, user_id, role, league_points, hidden, created_at)
         VALUES (:workspaceId, :userId, :role, :leaguePoints, false, CURRENT_TIMESTAMP)
         ON CONFLICT (workspace_id, user_id) DO NOTHING
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     int insertIfAbsent(
-        @Param("workspaceId") Long workspaceId,
-        @Param("userId") Long userId,
-        @Param("role") String role,
-        @Param("leaguePoints") int leaguePoints
-    );
+            @Param("workspaceId") Long workspaceId,
+            @Param("userId") Long userId,
+            @Param("role") String role,
+            @Param("leaguePoints") int leaguePoints);
 
     /**
      * Deletes all memberships for a workspace.

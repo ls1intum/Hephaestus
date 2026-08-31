@@ -23,23 +23,14 @@ class PracticePiAdapterTest extends BaseUnitTest {
         ObjectMapper mapper = new ObjectMapper();
         SimpleMeterRegistry metrics = new SimpleMeterRegistry();
         adapter = new PracticePiAdapter(
-            new PiRuntimeFactory(mapper),
-            new PiResultParser(mapper, metrics),
-            new AgentImageProperties(IMAGE, ImagePullPolicy.IF_NOT_PRESENT)
-        );
+                new PiRuntimeFactory(mapper),
+                new PiResultParser(mapper, metrics),
+                new AgentImageProperties(IMAGE, ImagePullPolicy.IF_NOT_PRESENT));
     }
 
     private PracticeAgentRequest proxyRequest() {
         return new PracticeAgentRequest(
-            "azure-openai-responses",
-            "gpt-5.4-mini",
-            null,
-            null,
-            false,
-            "job-token-123",
-            false,
-            600
-        );
+                "azure-openai-responses", "gpt-5.4-mini", null, null, false, "job-token-123", false, 600);
     }
 
     @Test
@@ -52,11 +43,11 @@ class PracticePiAdapterTest extends BaseUnitTest {
     void precomputeReferencesContextTarget() {
         String step = PracticePiAdapter.buildPrecomputeStep();
         assertThat(step)
-            .contains("/workspace/" + SandboxLayout.CONTEXT_PREFIX + "diff.patch")
-            .contains("/workspace/" + SandboxLayout.CONTEXT_PREFIX + "metadata.json")
-            // scripts receive the materialised context dir so they can read project_inventory.json etc.
-            .contains("--context /workspace/" + SandboxLayout.CONTEXT_PREFIX)
-            .doesNotContain("/workspace/.context/");
+                .contains("/workspace/" + SandboxLayout.CONTEXT_PREFIX + "diff.patch")
+                .contains("/workspace/" + SandboxLayout.CONTEXT_PREFIX + "metadata.json")
+                // scripts receive the materialised context dir so they can read project_inventory.json etc.
+                .contains("--context /workspace/" + SandboxLayout.CONTEXT_PREFIX)
+                .doesNotContain("/workspace/.context/");
     }
 
     @Test
@@ -65,18 +56,27 @@ class PracticePiAdapterTest extends BaseUnitTest {
         // properties are load-bearing: a failed (or absent) precompute must NOT abort the whole agent run.
         String step = PracticePiAdapter.buildPrecomputeStep();
         assertThat(step)
-            // Non-fatal contract: a failed runner falls into the '|| { … ; true; }' guard and continues.
-            .contains("|| {")
-            .contains("; true; }")
-            // Zero-script tolerance: bun is reached via ';' (not '&&') after the sed strip, so a missing
-            // '*.ts' / failed cp still lets the runner start.
-            .contains("2>/dev/null ; bun run")
-            // The runner gets the repo mount, the cleaned diff, and writes into the precompute-out dir.
-            .contains("--repo " + SandboxLayout.REPO_MOUNT)
-            .contains("/diff_clean.patch")
-            .contains("--output /workspace/work/precompute-out")
-            // The agent-facing [L<n>] line annotations are stripped to a raw diff for the static parser.
-            .contains("sed 's/^\\[L[0-9]*\\] //'");
+                // Non-fatal contract: a failed runner falls into the '|| { … ; true; }' guard and continues.
+                .contains("|| {")
+                .contains("; true; }")
+                // Zero-script tolerance: Node is reached via ';' (not '&&') after the sed strip, so a missing
+                // '*.ts' / failed cp still lets the runner start.
+                .contains("2>/dev/null ; env -i HOME=/home/agent PATH=/usr/local/bin:/usr/bin:/bin TMPDIR=/tmp node")
+                // env -i re-resolves node from its own PATH, which must cover /usr/local/bin (node:24-slim).
+                .contains("PATH=/usr/local/bin:")
+                // The output dir must exist before the sed redirect writes diff_clean.patch into it.
+                .contains("mkdir -p /workspace/work/precompute-stage/practices /workspace/work/precompute-out")
+                .contains("--permission")
+                .contains("--allow-fs-read=/workspace")
+                .contains("--allow-fs-read=/opt/precompute")
+                .contains("'--allow-fs-write=/workspace/work/precompute-out*'")
+                .contains("--allow-child-process /opt/precompute/runner.ts")
+                // The runner gets the repo mount, the cleaned diff, and writes into the precompute-out dir.
+                .contains("--repo " + SandboxLayout.REPO_MOUNT)
+                .contains("/diff_clean.patch")
+                .contains("--output /workspace/work/precompute-out")
+                // The agent-facing [L<n>] line annotations are stripped to a raw diff for the static parser.
+                .contains("sed 's/^\\[L[0-9]*\\] //'");
     }
 
     @Test
@@ -101,15 +101,7 @@ class PracticePiAdapterTest extends BaseUnitTest {
     @Test
     void buildsWithCapabilityFields() {
         PracticeAgentRequest request = new PracticeAgentRequest(
-            "openai-completions",
-            "gpt-oss-120b",
-            131072,
-            4096,
-            true,
-            "job-token-123",
-            false,
-            600
-        );
+                "openai-completions", "gpt-oss-120b", 131072, 4096, true, "job-token-123", false, 600);
 
         var spec = adapter.buildSandboxSpec(request);
 

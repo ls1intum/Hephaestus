@@ -36,11 +36,11 @@ class GitLabConnectionStateListenerTest extends BaseUnitTest {
     /** Makes the mocked executor run submitted work inline so blocking teardown is observable. */
     private void runExecutorSynchronously() {
         doAnswer(invocation -> {
-            invocation.<Runnable>getArgument(0).run();
-            return null;
-        })
-            .when(monitoringExecutor)
-            .execute(any(Runnable.class));
+                    invocation.<Runnable>getArgument(0).run();
+                    return null;
+                })
+                .when(monitoringExecutor)
+                .execute(any(Runnable.class));
     }
 
     @Test
@@ -80,8 +80,8 @@ class GitLabConnectionStateListenerTest extends BaseUnitTest {
         doThrow(new IllegalStateException("gitlab is down")).when(initService).initializeAsync(5L);
 
         assertThatCode(() ->
-            listener.onActivated(new ConnectionLifecycleEvent.Activated(42L, 5L, IntegrationKind.GITLAB))
-        ).doesNotThrowAnyException();
+                        listener.onActivated(new ConnectionLifecycleEvent.Activated(42L, 5L, IntegrationKind.GITLAB)))
+                .doesNotThrowAnyException();
 
         // Distinguishes "attempted and swallowed" from "silently never dispatched": the swallow is only
         // correct if initialization was actually tried for this workspace.

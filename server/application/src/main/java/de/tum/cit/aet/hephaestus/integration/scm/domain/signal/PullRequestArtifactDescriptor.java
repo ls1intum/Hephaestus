@@ -31,35 +31,32 @@ import org.springframework.stereotype.Component;
 public class PullRequestArtifactDescriptor implements ArtifactDescriptor {
 
     private static final List<Signal> SIGNALS = List.of(
-        // Recommended signals are the moments where work arrives to look at — a merge or a close is the
-        // end of the story, and a submitted review is about somebody else's conduct.
-        declareRecommended(ScmSignals.PULL_REQUEST_OPENED, "Opened", Set.of(GITHUB_PULL_REQUEST, GITLAB_MERGE_REQUEST)),
-        declareRecommended(
-            ScmSignals.PULL_REQUEST_READY,
-            "Marked ready for review",
-            Set.of(GITHUB_PULL_REQUEST, GITLAB_MERGE_REQUEST)
-        ),
-        // GitHub only: GitLab's webhook path derives no "new commits" transition, so a practice watching
-        // this signal is silent on GitLab. Naming the provenance is what makes that visible instead of
-        // indistinguishable from a workspace where nobody pushes.
-        declareRecommended(ScmSignals.PULL_REQUEST_SYNCHRONIZED, "New commits pushed", Set.of(GITHUB_PULL_REQUEST)),
-        // GitHub has a dedicated review event; GitLab splits the same fact across an approval on the
-        // merge request and a review note.
-        declare(
-            ScmSignals.PULL_REQUEST_REVIEWED,
-            "Review submitted",
-            Set.of(GITHUB_PULL_REQUEST_REVIEW, GITLAB_MERGE_REQUEST, GITLAB_NOTE)
-        ),
-        declare(ScmSignals.PULL_REQUEST_MERGED, "Merged", Set.of(GITHUB_PULL_REQUEST, GITLAB_MERGE_REQUEST)),
-        declare(
-            ScmSignals.PULL_REQUEST_CLOSED,
-            "Closed without merging",
-            Set.of(GITHUB_PULL_REQUEST, GITLAB_MERGE_REQUEST)
-        ),
-        // No ingested event raises this one: it is somebody asking for a review by hand. Declaring the
-        // empty provenance is what stops a vendor from claiming it can raise it.
-        declareManualRequest(ScmSignals.PULL_REQUEST_MANUAL_REVIEW, "Review requested by hand")
-    );
+            // Recommended signals are the moments where work arrives to look at — a merge or a close is the
+            // end of the story, and a submitted review is about somebody else's conduct.
+            declareRecommended(
+                    ScmSignals.PULL_REQUEST_OPENED, "Opened", Set.of(GITHUB_PULL_REQUEST, GITLAB_MERGE_REQUEST)),
+            declareRecommended(
+                    ScmSignals.PULL_REQUEST_READY,
+                    "Marked ready for review",
+                    Set.of(GITHUB_PULL_REQUEST, GITLAB_MERGE_REQUEST)),
+            // GitHub only: GitLab's webhook path derives no "new commits" transition, so a practice watching
+            // this signal is silent on GitLab. Naming the provenance is what makes that visible instead of
+            // indistinguishable from a workspace where nobody pushes.
+            declareRecommended(ScmSignals.PULL_REQUEST_SYNCHRONIZED, "New commits pushed", Set.of(GITHUB_PULL_REQUEST)),
+            // GitHub has a dedicated review event; GitLab splits the same fact across an approval on the
+            // merge request and a review note.
+            declare(
+                    ScmSignals.PULL_REQUEST_REVIEWED,
+                    "Review submitted",
+                    Set.of(GITHUB_PULL_REQUEST_REVIEW, GITLAB_MERGE_REQUEST, GITLAB_NOTE)),
+            declare(ScmSignals.PULL_REQUEST_MERGED, "Merged", Set.of(GITHUB_PULL_REQUEST, GITLAB_MERGE_REQUEST)),
+            declare(
+                    ScmSignals.PULL_REQUEST_CLOSED,
+                    "Closed without merging",
+                    Set.of(GITHUB_PULL_REQUEST, GITLAB_MERGE_REQUEST)),
+            // No ingested event raises this one: it is somebody asking for a review by hand. Declaring the
+            // empty provenance is what stops a vendor from claiming it can raise it.
+            declareManualRequest(ScmSignals.PULL_REQUEST_MANUAL_REVIEW, "Review requested by hand"));
 
     @Override
     public ArtifactKind kind() {
@@ -89,12 +86,9 @@ public class PullRequestArtifactDescriptor implements ArtifactDescriptor {
 
     @Override
     public List<ReviewLimitation> reviewLimitations() {
-        return List.of(
-            new ReviewLimitation(
+        return List.of(new ReviewLimitation(
                 "RUNTIME_BEHAVIOR_NOT_OBSERVED",
-                "Repository evidence does not establish behavior in a deployed runtime."
-            )
-        );
+                "Repository evidence does not establish behavior in a deployed runtime."));
     }
 
     @Override

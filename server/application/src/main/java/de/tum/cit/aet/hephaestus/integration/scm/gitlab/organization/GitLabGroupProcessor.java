@@ -37,9 +37,7 @@ public class GitLabGroupProcessor {
     private final IdentityProviderRepository gitProviderRepository;
 
     public GitLabGroupProcessor(
-        OrganizationRepository organizationRepository,
-        IdentityProviderRepository gitProviderRepository
-    ) {
+            OrganizationRepository organizationRepository, IdentityProviderRepository gitProviderRepository) {
         this.organizationRepository = organizationRepository;
         this.gitProviderRepository = gitProviderRepository;
     }
@@ -73,14 +71,14 @@ public class GitLabGroupProcessor {
         }
 
         Organization organization = organizationRepository
-            .findByNativeIdAndProviderId(nativeId, providerId)
-            .orElseGet(() -> {
-                Organization org = new Organization();
-                org.setNativeId(nativeId);
-                org.setProvider(gitProviderRepository.getReferenceById(providerId));
-                org.setCreatedAt(Instant.now());
-                return org;
-            });
+                .findByNativeIdAndProviderId(nativeId, providerId)
+                .orElseGet(() -> {
+                    Organization org = new Organization();
+                    org.setNativeId(nativeId);
+                    org.setProvider(gitProviderRepository.getReferenceById(providerId));
+                    org.setCreatedAt(Instant.now());
+                    return org;
+                });
 
         // Update mutable fields
         organization.setLogin(group.fullPath());

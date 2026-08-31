@@ -26,27 +26,25 @@ class AgentImageDefaultResolutionTest extends BaseUnitTest {
     private static AgentImageProperties bindWith(Map<String, Object> overrides) throws IOException {
         var environment = new StandardEnvironment();
         environment.getPropertySources().addFirst(new MapPropertySource("overrides", overrides));
-        List<PropertySource<?>> documents = new YamlPropertySourceLoader().load(
-            "application.yml",
-            new ClassPathResource("application.yml")
-        );
+        List<PropertySource<?>> documents =
+                new YamlPropertySourceLoader().load("application.yml", new ClassPathResource("application.yml"));
         documents.forEach(environment.getPropertySources()::addLast);
-        return Binder.get(environment).bind("hephaestus.agent.image", AgentImageProperties.class).get();
+        return Binder.get(environment)
+                .bind("hephaestus.agent.image", AgentImageProperties.class)
+                .get();
     }
 
     @Test
     void shouldFollowTheImageTagTheDeploymentIsRunning() throws IOException {
-        assertThat(bindWith(Map.of("APP_VERSION", "1.2.3")).reference()).isEqualTo(
-            "ghcr.io/ls1intum/hephaestus/agent-pi:1.2.3"
-        );
+        assertThat(bindWith(Map.of("APP_VERSION", "1.2.3")).reference())
+                .isEqualTo("ghcr.io/ls1intum/hephaestus/agent-pi:1.2.3");
     }
 
     @Test
     void shouldFollowACommitShaDeploy() throws IOException {
         String sha = "9a1f0c2e1b7d4a6f8c3e5b2d9a7f4c1e0b8d6a35";
-        assertThat(bindWith(Map.of("APP_VERSION", sha)).reference()).isEqualTo(
-            "ghcr.io/ls1intum/hephaestus/agent-pi:" + sha
-        );
+        assertThat(bindWith(Map.of("APP_VERSION", sha)).reference())
+                .isEqualTo("ghcr.io/ls1intum/hephaestus/agent-pi:" + sha);
     }
 
     @Test

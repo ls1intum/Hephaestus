@@ -57,14 +57,13 @@ public class GitHubLabelSyncService {
     private final GraphQlPaginationHelper paginationHelper;
 
     public GitHubLabelSyncService(
-        RepositoryRepository repositoryRepository,
-        GitHubGraphQlClientProvider graphQlClientProvider,
-        GitHubLabelProcessor labelProcessor,
-        LabelRepository labelRepository,
-        GitHubSyncProperties syncProperties,
-        GitHubExceptionClassifier exceptionClassifier,
-        GraphQlPaginationHelper paginationHelper
-    ) {
+            RepositoryRepository repositoryRepository,
+            GitHubGraphQlClientProvider graphQlClientProvider,
+            GitHubLabelProcessor labelProcessor,
+            LabelRepository labelRepository,
+            GitHubSyncProperties syncProperties,
+            GitHubExceptionClassifier exceptionClassifier,
+            GraphQlPaginationHelper paginationHelper) {
         this.repositoryRepository = repositoryRepository;
         this.graphQlClientProvider = graphQlClientProvider;
         this.labelProcessor = labelProcessor;
@@ -104,8 +103,7 @@ public class GitHubLabelSyncService {
             AtomicInteger totalSynced = new AtomicInteger(0);
             Set<String> syncedNames = new HashSet<>();
 
-            PaginationResult result = paginationHelper.paginate(
-                PaginationRequest.<GHLabelConnection>builder()
+            PaginationResult result = paginationHelper.paginate(PaginationRequest.<GHLabelConnection>builder()
                     .client(client)
                     .scopeId(scopeId)
                     .documentName(GET_LABELS_DOCUMENT)
@@ -129,8 +127,7 @@ public class GitHubLabelSyncService {
                         return true; // Continue to next page
                     })
                     .contextDescription("labels for " + safeNameWithOwner)
-                    .build()
-            );
+                    .build());
 
             // Remove stale labels (labels in DB that no longer exist on GitHub)
             // CRITICAL: Only remove stale labels if sync completed fully.
@@ -141,21 +138,19 @@ public class GitHubLabelSyncService {
                 removedCount = removeStaleLabels(repositoryId, syncedNames, context);
             } else {
                 log.warn(
-                    "Skipped stale label removal: reason=incompleteSync, repoName={}, pagesProcessed={}",
-                    safeNameWithOwner,
-                    result.pagesProcessed()
-                );
+                        "Skipped stale label removal: reason=incompleteSync, repoName={}, pagesProcessed={}",
+                        safeNameWithOwner,
+                        result.pagesProcessed());
             }
 
             log.info(
-                "Completed label sync: repoName={}, labelCount={}, removedCount={}, pagesProcessed={}, completed={}, scopeId={}",
-                safeNameWithOwner,
-                totalSynced.get(),
-                removedCount,
-                result.pagesProcessed(),
-                result.isComplete(),
-                scopeId
-            );
+                    "Completed label sync: repoName={}, labelCount={}, removedCount={}, pagesProcessed={}, completed={}, scopeId={}",
+                    safeNameWithOwner,
+                    totalSynced.get(),
+                    removedCount,
+                    result.pagesProcessed(),
+                    result.isComplete(),
+                    scopeId);
             return totalSynced.get();
         } catch (InstallationNotFoundException e) {
             // Re-throw to abort the entire sync operation
@@ -163,40 +158,39 @@ public class GitHubLabelSyncService {
         } catch (Exception e) {
             ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
             switch (classification.category()) {
-                case RATE_LIMITED -> log.warn(
-                    "Rate limited during label sync: repoName={}, scopeId={}, message={}",
-                    safeNameWithOwner,
-                    scopeId,
-                    classification.message()
-                );
-                case NOT_FOUND -> log.warn(
-                    "Resource not found during label sync: repoName={}, scopeId={}, message={}",
-                    safeNameWithOwner,
-                    scopeId,
-                    classification.message()
-                );
+                case RATE_LIMITED ->
+                    log.warn(
+                            "Rate limited during label sync: repoName={}, scopeId={}, message={}",
+                            safeNameWithOwner,
+                            scopeId,
+                            classification.message());
+                case NOT_FOUND ->
+                    log.warn(
+                            "Resource not found during label sync: repoName={}, scopeId={}, message={}",
+                            safeNameWithOwner,
+                            scopeId,
+                            classification.message());
                 case AUTH_ERROR -> {
                     log.error(
-                        "Authentication error during label sync: repoName={}, scopeId={}, message={}",
-                        safeNameWithOwner,
-                        scopeId,
-                        classification.message()
-                    );
+                            "Authentication error during label sync: repoName={}, scopeId={}, message={}",
+                            safeNameWithOwner,
+                            scopeId,
+                            classification.message());
                     throw e;
                 }
-                case RETRYABLE -> log.warn(
-                    "Retryable error during label sync: repoName={}, scopeId={}, message={}",
-                    safeNameWithOwner,
-                    scopeId,
-                    classification.message()
-                );
-                default -> log.error(
-                    "Unexpected error during label sync: repoName={}, scopeId={}, message={}",
-                    safeNameWithOwner,
-                    scopeId,
-                    classification.message(),
-                    e
-                );
+                case RETRYABLE ->
+                    log.warn(
+                            "Retryable error during label sync: repoName={}, scopeId={}, message={}",
+                            safeNameWithOwner,
+                            scopeId,
+                            classification.message());
+                default ->
+                    log.error(
+                            "Unexpected error during label sync: repoName={}, scopeId={}, message={}",
+                            safeNameWithOwner,
+                            scopeId,
+                            classification.message(),
+                            e);
             }
             return 0;
         }
@@ -225,10 +219,9 @@ public class GitHubLabelSyncService {
                 labelProcessor.delete(existingLabel.getId(), context);
                 removedCount++;
                 log.debug(
-                    "Removed stale label: labelName={}, repoId={}",
-                    sanitizeForLog(existingLabel.getName()),
-                    repositoryId
-                );
+                        "Removed stale label: labelName={}, repoId={}",
+                        sanitizeForLog(existingLabel.getName()),
+                        repositoryId);
             }
         }
 

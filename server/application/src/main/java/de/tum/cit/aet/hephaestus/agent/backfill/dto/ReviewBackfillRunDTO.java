@@ -22,53 +22,61 @@ import org.jspecify.annotations.Nullable;
  *     means this campaign's baseline has holes in it, which is why it is reported apart from a pass.
  */
 public record ReviewBackfillRunDTO(
-    @NonNull UUID id,
-    @NonNull ArtifactKind artifactKind,
-    @NonNull Instant fromAt,
-    @NonNull Instant toAt,
-    @NonNull ReviewBackfillStatus status,
-    @Schema(description = "BACKFILL for a campaign an admin scoped by hand, SWEEP for one a recurring schedule opened")
-    @NonNull
-    DiscoveredVia discoveredVia,
-    @Schema(description = "The schedule that opened this run; absent for a campaign an admin scoped by hand")
-    @Nullable
-    UUID sweepScheduleId,
-    @Schema(description = "Set only while the run is PAUSED") @Nullable ReviewBackfillPauseReason pauseReason,
-    @NonNull Integer estimatedArtifacts,
-    @Schema(description = "Forecast total spend in USD; absent when the workspace has no priced review history")
-    @Nullable
-    BigDecimal estimatedCostUsd,
-    @NonNull Integer submittedCount,
-    @NonNull Integer passedCount,
-    @NonNull Integer failedCount,
-    @NonNull Long requestedByAccountId,
-    @Schema(description = "Who authorised the spend; absent until the run is confirmed")
-    @Nullable
-    Long confirmedByAccountId,
-    @NonNull Instant createdAt,
-    @Nullable Instant startedAt,
-    @Nullable Instant finishedAt
-) {
+        @NonNull UUID id,
+        @NonNull ArtifactKind artifactKind,
+        @NonNull Instant fromAt,
+        @NonNull Instant toAt,
+        @NonNull ReviewBackfillStatus status,
+
+        @Schema(
+                description =
+                        "BACKFILL for a campaign an admin scoped by hand, SWEEP for one a recurring schedule opened")
+        @NonNull
+        DiscoveredVia discoveredVia,
+
+        @Schema(description = "The schedule that opened this run; absent for a campaign an admin scoped by hand")
+        @Nullable
+        UUID sweepScheduleId,
+
+        @Schema(description = "Set only while the run is PAUSED") @Nullable
+        ReviewBackfillPauseReason pauseReason,
+
+        @NonNull Integer estimatedArtifacts,
+
+        @Schema(description = "Forecast total spend in USD; absent when the workspace has no priced review history")
+        @Nullable
+        BigDecimal estimatedCostUsd,
+
+        @NonNull Integer submittedCount,
+        @NonNull Integer passedCount,
+        @NonNull Integer failedCount,
+        @NonNull Long requestedByAccountId,
+
+        @Schema(description = "Who authorised the spend; absent until the run is confirmed") @Nullable
+        Long confirmedByAccountId,
+
+        @NonNull Instant createdAt,
+        @Nullable Instant startedAt,
+        @Nullable Instant finishedAt) {
     public static ReviewBackfillRunDTO from(ReviewBackfillRun run) {
         return new ReviewBackfillRunDTO(
-            run.getId(),
-            run.kind(),
-            run.getFromAt(),
-            run.getToAt(),
-            run.getStatus(),
-            run.getDiscoveredVia(),
-            run.getSweepScheduleId(),
-            run.getPauseReason(),
-            run.getEstimatedArtifacts(),
-            run.getEstimatedCostUsd(),
-            run.getSubmittedCount(),
-            run.getPassedCount(),
-            run.getFailedCount(),
-            run.getRequestedByAccountId(),
-            run.getConfirmedByAccountId(),
-            run.getCreatedAt(),
-            run.getStartedAt(),
-            run.getFinishedAt()
-        );
+                run.getId(),
+                run.kind(),
+                run.getFromAt(),
+                run.getToAt(),
+                run.getStatus(),
+                run.getDiscoveredVia(),
+                run.getSweepScheduleId(),
+                run.getPauseReason(),
+                run.getEstimatedArtifacts(),
+                run.getEstimatedCostUsd(),
+                run.getSubmittedCount(),
+                run.getPassedCount(),
+                run.getFailedCount(),
+                run.getRequestedByAccountId(),
+                run.getConfirmedByAccountId(),
+                run.getCreatedAt(),
+                run.getStartedAt(),
+                run.getFinishedAt());
     }
 }

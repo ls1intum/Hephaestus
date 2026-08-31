@@ -19,7 +19,10 @@ import org.slf4j.LoggerFactory;
  * <p>This value object captures the essential repository information needed
  * by event consumers without carrying the JPA entity.
  */
-public record RepositoryRef(@NonNull Long id, @NonNull String nameWithOwner, @NonNull String defaultBranch) {
+public record RepositoryRef(
+        @NonNull Long id,
+        @NonNull String nameWithOwner,
+        @NonNull String defaultBranch) {
     private static final Logger log = LoggerFactory.getLogger(RepositoryRef.class);
 
     /**
@@ -36,9 +39,8 @@ public record RepositoryRef(@NonNull Long id, @NonNull String nameWithOwner, @No
             return null;
         }
         return new RepositoryRef(
-            repository.getId(),
-            repository.getNameWithOwner(),
-            repository.getDefaultBranch() != null ? repository.getDefaultBranch() : "main"
-        );
+                repository.getId(),
+                repository.getNameWithOwner(),
+                repository.getDefaultBranch() != null ? repository.getDefaultBranch() : "main");
     }
 }

@@ -44,15 +44,13 @@ import org.jspecify.annotations.Nullable;
 @Entity
 @Immutable
 @Table(
-    name = "practice_revision",
-    uniqueConstraints = {
-        @UniqueConstraint(
-            name = "uk_practice_revision_practice_number",
-            columnNames = { "practice_id", "revision_number" }
-        ),
-    },
-    indexes = { @Index(name = "idx_practice_revision_practice", columnList = "practice_id") }
-)
+        name = "practice_revision",
+        uniqueConstraints = {
+            @UniqueConstraint(
+                    name = "uk_practice_revision_practice_number",
+                    columnNames = {"practice_id", "revision_number"}),
+        },
+        indexes = {@Index(name = "idx_practice_revision_practice", columnList = "practice_id")})
 @Getter
 @NoArgsConstructor
 @ToString
@@ -67,10 +65,9 @@ public class PracticeRevision {
     /** The practice this revision belongs to. CASCADE: deleting a practice removes its revision history. */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(
-        name = "practice_id",
-        nullable = false,
-        foreignKey = @ForeignKey(name = "fk_practice_revision_practice")
-    )
+            name = "practice_id",
+            nullable = false,
+            foreignKey = @ForeignKey(name = "fk_practice_revision_practice"))
     @OnDelete(action = OnDeleteAction.CASCADE)
     @ToString.Exclude
     private Practice practice;
@@ -146,10 +143,8 @@ public class PracticeRevision {
         this.bindings = List.copyOf(Objects.requireNonNull(practice.getBindings(), "practice.bindings"));
         this.criteria = Objects.requireNonNull(practice.getCriteria(), "practice.criteria");
         this.precomputeScript = practice.getPrecomputeScript();
-        this.automatedReviewPolicy = Objects.requireNonNull(
-            practice.getAutomatedReviewPolicy(),
-            "practice.automatedReviewPolicy"
-        );
+        this.automatedReviewPolicy =
+                Objects.requireNonNull(practice.getAutomatedReviewPolicy(), "practice.automatedReviewPolicy");
         this.whyItMatters = practice.getWhyItMatters();
         this.whatGoodLooksLike = practice.getWhatGoodLooksLike();
         PracticeGroup group = practice.getGroup();
@@ -165,14 +160,7 @@ public class PracticeRevision {
 
     public String computeReviewRuleFingerprint() {
         return ReviewRuleFingerprint.of(
-            slug,
-            name,
-            bindings,
-            criteria,
-            precomputeScript,
-            automatedReviewPolicy,
-            groupSlug
-        );
+                slug, name, bindings, criteria, precomputeScript, automatedReviewPolicy, groupSlug);
     }
 
     @PrePersist

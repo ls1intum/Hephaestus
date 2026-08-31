@@ -14,7 +14,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRe
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReviewRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventType;
 import de.tum.cit.aet.hephaestus.integration.scm.github.pullrequestreview.dto.GitHubPullRequestReviewEventDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
@@ -74,10 +73,9 @@ class GitHubPullRequestReviewMessageHandlerIntegrationTest extends BaseIntegrati
     private void setupTestData() {
         // Create git provider
         gitProvider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-            .orElseGet(() ->
-                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseGet(() -> gitProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
 
         // Create organization
         Organization org = new Organization();
@@ -140,31 +138,37 @@ class GitHubPullRequestReviewMessageHandlerIntegrationTest extends BaseIntegrati
         GitHubPullRequestReviewEventDTO event = loadPayload("pull_request_review.submitted");
 
         // Create the PR that the review belongs to
-        createTestPullRequest(required(event.pullRequest().getDatabaseId()), event.pullRequest().number());
+        createTestPullRequest(
+                required(event.pullRequest().getDatabaseId()),
+                event.pullRequest().number());
 
         // Verify review doesn't exist initially (lookup by native ID + provider)
-        assertThat(
-            reviewRepository.findByNativeIdAndProviderId(required(event.review().id()), gitProviderId())
-        ).isEmpty();
+        assertThat(reviewRepository.findByNativeIdAndProviderId(
+                        required(event.review().id()), gitProviderId()))
+                .isEmpty();
 
         handler.handleEvent(event);
 
         // Then (lookup by native ID + provider, since JPA PK is auto-generated)
-        assertThat(reviewRepository.findByNativeIdAndProviderId(required(event.review().id()), gitProviderId()))
-            .isPresent()
-            .get()
-            .satisfies(review -> {
-                assertThat(review.getNativeId()).isEqualTo(required(event.review().id()));
-                assertThat(review.getBody()).isEqualTo(event.review().body());
-                assertThat(review.getHtmlUrl()).isEqualTo(event.review().htmlUrl());
-            });
+        assertThat(reviewRepository.findByNativeIdAndProviderId(
+                        required(event.review().id()), gitProviderId()))
+                .isPresent()
+                .get()
+                .satisfies(review -> {
+                    assertThat(review.getNativeId())
+                            .isEqualTo(required(event.review().id()));
+                    assertThat(review.getBody()).isEqualTo(event.review().body());
+                    assertThat(review.getHtmlUrl()).isEqualTo(event.review().htmlUrl());
+                });
     }
 
     @Test
     void shouldUpdateReviewOnEditedEvent() throws Exception {
         // Given - first create the review
         GitHubPullRequestReviewEventDTO submitEvent = loadPayload("pull_request_review.submitted");
-        createTestPullRequest(required(submitEvent.pullRequest().getDatabaseId()), submitEvent.pullRequest().number());
+        createTestPullRequest(
+                required(submitEvent.pullRequest().getDatabaseId()),
+                submitEvent.pullRequest().number());
         handler.handleEvent(submitEvent);
 
         // Load edited event
@@ -172,12 +176,13 @@ class GitHubPullRequestReviewMessageHandlerIntegrationTest extends BaseIntegrati
 
         handler.handleEvent(editEvent);
 
-        assertThat(reviewRepository.findByNativeIdAndProviderId(required(editEvent.review().id()), gitProviderId()))
-            .isPresent()
-            .get()
-            .satisfies(review -> {
-                assertThat(review.getBody()).isEqualTo(editEvent.review().body());
-            });
+        assertThat(reviewRepository.findByNativeIdAndProviderId(
+                        required(editEvent.review().id()), gitProviderId()))
+                .isPresent()
+                .get()
+                .satisfies(review -> {
+                    assertThat(review.getBody()).isEqualTo(editEvent.review().body());
+                });
     }
 
     @Test
@@ -185,9 +190,8 @@ class GitHubPullRequestReviewMessageHandlerIntegrationTest extends BaseIntegrati
         // Given - load dismissed event first to get the correct review ID
         GitHubPullRequestReviewEventDTO dismissEvent = loadPayload("pull_request_review.dismissed");
         createTestPullRequest(
-            required(dismissEvent.pullRequest().getDatabaseId()),
-            dismissEvent.pullRequest().number()
-        );
+                required(dismissEvent.pullRequest().getDatabaseId()),
+                dismissEvent.pullRequest().number());
 
         // Create the review first (simulate submitted state) with the native ID that will be dismissed
         PullRequest pr = testPullRequest;
@@ -202,12 +206,13 @@ class GitHubPullRequestReviewMessageHandlerIntegrationTest extends BaseIntegrati
         handler.handleEvent(dismissEvent);
 
         // Then - review should be marked as dismissed
-        assertThat(reviewRepository.findByNativeIdAndProviderId(required(dismissEvent.review().id()), gitProviderId()))
-            .isPresent()
-            .get()
-            .satisfies(review -> {
-                assertThat(review.isDismissed()).isTrue();
-            });
+        assertThat(reviewRepository.findByNativeIdAndProviderId(
+                        required(dismissEvent.review().id()), gitProviderId()))
+                .isPresent()
+                .get()
+                .satisfies(review -> {
+                    assertThat(review.isDismissed()).isTrue();
+                });
     }
 
     private GitHubPullRequestReviewEventDTO loadPayload(String filename) throws IOException {

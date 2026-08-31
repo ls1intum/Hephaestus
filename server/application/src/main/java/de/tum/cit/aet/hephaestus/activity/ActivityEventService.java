@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.activity;
 
+import de.tum.cit.aet.hephaestus.activity.metrics.ActivityMetrics;
 import de.tum.cit.aet.hephaestus.activity.scoring.ExperiencePointProperties;
 import de.tum.cit.aet.hephaestus.activity.scoring.XpPrecision;
 import de.tum.cit.aet.hephaestus.activity.spi.ActivityRecorder;
@@ -63,29 +64,28 @@ public class ActivityEventService implements ActivityRecorder {
     private final ConcurrentHashMap<ActivityEventType, Timer> eventTypeTimers = new ConcurrentHashMap<>();
 
     public ActivityEventService(
-        ActivityEventRepository eventRepository,
-        WorkspaceRepository workspaceRepository,
-        ExperiencePointProperties xpProperties,
-        MeterRegistry meterRegistry,
-        ApplicationEventPublisher eventPublisher
-    ) {
+            ActivityEventRepository eventRepository,
+            WorkspaceRepository workspaceRepository,
+            ExperiencePointProperties xpProperties,
+            MeterRegistry meterRegistry,
+            ApplicationEventPublisher eventPublisher) {
         this.eventRepository = eventRepository;
         this.workspaceRepository = workspaceRepository;
         this.xpProperties = xpProperties;
         this.eventPublisher = eventPublisher;
-        this.eventsRecordedCounter = Counter.builder("activity.events.recorded")
-            .description("Number of activity events recorded")
-            .register(meterRegistry);
-        this.eventsDuplicateCounter = Counter.builder("activity.events.duplicate")
-            .description("Number of duplicate activity events skipped")
-            .register(meterRegistry);
-        this.eventsFailedCounter = Counter.builder("activity.events.failed")
-            .description("Number of activity events that failed to record after retries")
-            .register(meterRegistry);
-        this.xpDistribution = DistributionSummary.builder("activity.xp.distribution")
-            .description("Distribution of XP values recorded")
-            .publishPercentiles(0.5, 0.95, 0.99)
-            .register(meterRegistry);
+        this.eventsRecordedCounter = Counter.builder(ActivityMetrics.ACTIVITY_EVENTS_RECORDED)
+                .description("Number of activity events recorded")
+                .register(meterRegistry);
+        this.eventsDuplicateCounter = Counter.builder(ActivityMetrics.ACTIVITY_EVENTS_DUPLICATE)
+                .description("Number of duplicate activity events skipped")
+                .register(meterRegistry);
+        this.eventsFailedCounter = Counter.builder(ActivityMetrics.ACTIVITY_EVENTS_FAILED)
+                .description("Number of activity events that failed to record after retries")
+                .register(meterRegistry);
+        this.xpDistribution = DistributionSummary.builder(ActivityMetrics.ACTIVITY_XP_DISTRIBUTION)
+                .description("Distribution of XP values recorded")
+                .publishPercentiles(0.5, 0.95, 0.99)
+                .register(meterRegistry);
         this.meterRegistry = meterRegistry;
     }
 
@@ -94,13 +94,13 @@ public class ActivityEventService implements ActivityRecorder {
      * Pre-registers timers to avoid unbounded cardinality.
      */
     private Timer getTimerForEventType(ActivityEventType eventType) {
-        return eventTypeTimers.computeIfAbsent(eventType, type ->
-            Timer.builder("activity.events.record.duration.by_type")
-                .description("Time to persist activity event by type")
-                .tag("eventType", type.name())
-                .publishPercentiles(0.5, 0.95, 0.99)
-                .register(meterRegistry)
-        );
+        return eventTypeTimers.computeIfAbsent(
+                eventType,
+                type -> Timer.builder(ActivityMetrics.ACTIVITY_EVENTS_RECORD_DURATION_BY_TYPE)
+                        .description("Time to persist activity event by type")
+                        .tag("eventType", type.name())
+                        .publishPercentiles(0.5, 0.95, 0.99)
+                        .register(meterRegistry));
     }
 
     /**
@@ -118,37 +118,34 @@ public class ActivityEventService implements ActivityRecorder {
     @Transactional
     @Observed(name = "activity.record", contextualName = "record-activity-event")
     public boolean record(
-        Long workspaceId,
-        ActivityEventType eventType,
-        Instant occurredAt,
-        @Nullable User actor,
-        @Nullable Repository repository,
-        ActivityTargetType targetType,
-        Long targetId,
-        double xp
-    ) {
+            Long workspaceId,
+            ActivityEventType eventType,
+            Instant occurredAt,
+            @Nullable User actor,
+            @Nullable Repository repository,
+            ActivityTargetType targetType,
+            Long targetId,
+            double xp) {
         return persist(workspaceId, eventType, occurredAt, actor, repository, targetType, targetId, xp);
     }
 
     private boolean persist(
-        Long workspaceId,
-        ActivityEventType eventType,
-        Instant occurredAt,
-        @Nullable User actor,
-        @Nullable Repository repository,
-        ActivityTargetType targetType,
-        Long targetId,
-        double xp
-    ) {
+            Long workspaceId,
+            ActivityEventType eventType,
+            Instant occurredAt,
+            @Nullable User actor,
+            @Nullable Repository repository,
+            ActivityTargetType targetType,
+            Long targetId,
+            double xp) {
         // Validate workspace exists first (cheap lookup)
         if (!workspaceRepository.existsById(workspaceId)) {
             eventsFailedCounter.increment();
             log.warn(
-                "Failed to record event, workspace not found: scopeId={}, eventType={}, targetId={}",
-                workspaceId,
-                eventType,
-                targetId
-            );
+                    "Failed to record event, workspace not found: scopeId={}, eventType={}, targetId={}",
+                    workspaceId,
+                    eventType,
+                    targetId);
             return false;
         }
 
@@ -169,17 +166,16 @@ public class ActivityEventService implements ActivityRecorder {
         Timer eventTimer = getTimerForEventType(eventType);
         long startTime = System.nanoTime();
         int rowsInserted = eventRepository.insertIfAbsent(
-            UUID.randomUUID(),
-            eventKey,
-            eventType.name(),
-            occurredAt,
-            actor != null ? actor.getId() : null,
-            workspaceId,
-            repository != null ? repository.getId() : null,
-            targetType.getValue(),
-            targetId,
-            roundedXp
-        );
+                UUID.randomUUID(),
+                eventKey,
+                eventType.name(),
+                occurredAt,
+                actor != null ? actor.getId() : null,
+                workspaceId,
+                repository != null ? repository.getId() : null,
+                targetType.getValue(),
+                targetId,
+                roundedXp);
         eventTimer.record(System.nanoTime() - startTime, TimeUnit.NANOSECONDS);
 
         if (rowsInserted == 0) {
@@ -192,21 +188,19 @@ public class ActivityEventService implements ActivityRecorder {
         xpDistribution.record(roundedXp);
 
         // Publish event for downstream listeners (e.g., achievement system)
-        eventPublisher.publishEvent(
-            new ActivitySavedEvent(Optional.ofNullable(actor), eventType, occurredAt, workspaceId, targetType, targetId)
-        );
+        eventPublisher.publishEvent(new ActivitySavedEvent(
+                Optional.ofNullable(actor), eventType, occurredAt, workspaceId, targetType, targetId));
 
         // One line per recorded event — DEBUG by default (per-event bookkeeping; the
         // eventsRecordedCounter / xpDistribution metrics already track volume). Per-repo
         // sync rollups carry the INFO-level summary.
         log.debug(
-            "Recorded activity event: eventType={}, targetId={}, xp={}, scopeId={}, actorId={}",
-            eventType,
-            targetId,
-            roundedXp,
-            workspaceId,
-            actor != null ? actor.getId() : null
-        );
+                "Recorded activity event: eventType={}, targetId={}, xp={}, scopeId={}, actorId={}",
+                eventType,
+                targetId,
+                roundedXp,
+                workspaceId,
+                actor != null ? actor.getId() : null);
         return true;
     }
 
@@ -222,15 +216,14 @@ public class ActivityEventService implements ActivityRecorder {
      */
     public boolean record(RecordActivityCommand command) {
         return persist(
-            command.workspaceId(),
-            command.eventType(),
-            command.occurredAt(),
-            command.actor(),
-            command.repository(),
-            command.targetType(),
-            command.targetId(),
-            command.xp()
-        );
+                command.workspaceId(),
+                command.eventType(),
+                command.occurredAt(),
+                command.actor(),
+                command.repository(),
+                command.targetType(),
+                command.targetId(),
+                command.xp());
     }
 
     /**
@@ -254,22 +247,21 @@ public class ActivityEventService implements ActivityRecorder {
     @Transactional
     @Observed(name = "activity.record.deleted", contextualName = "record-deleted-activity-event")
     public boolean recordDeleted(
-        Long workspaceId,
-        ActivityEventType eventType,
-        Instant occurredAt,
-        ActivityTargetType targetType,
-        Long targetId
-    ) {
+            Long workspaceId,
+            ActivityEventType eventType,
+            Instant occurredAt,
+            ActivityTargetType targetType,
+            Long targetId) {
         // Record with null actor and repository - acceptable for deletion audit trail
         return persist(
-            workspaceId,
-            eventType,
-            occurredAt,
-            null, // actor unknown for deleted entities
-            null, // repository unknown for deleted entities
-            targetType,
-            targetId,
-            0.0 // deletions have no XP value
-        );
+                workspaceId,
+                eventType,
+                occurredAt,
+                null, // actor unknown for deleted entities
+                null, // repository unknown for deleted entities
+                targetType,
+                targetId,
+                0.0 // deletions have no XP value
+                );
     }
 }

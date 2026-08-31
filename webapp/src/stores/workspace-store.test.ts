@@ -1,5 +1,7 @@
 import { afterEach, assert, beforeEach, describe, expect, it } from "vitest";
+
 import { isRecord } from "@/lib/is-record";
+
 import { useWorkspaceStore } from "./workspace-store";
 
 const STORAGE_KEY = "hephaestus-workspace-selection";

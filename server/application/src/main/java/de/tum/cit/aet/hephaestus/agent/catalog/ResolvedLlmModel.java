@@ -12,10 +12,9 @@ import org.jspecify.annotations.Nullable;
  * <p>{@code apiProtocol} is Pi's own {@code api} token, passed through verbatim.
  */
 public record ResolvedLlmModel(
-    String baseUrl,
-    String apiProtocol,
-    String upstreamModelId,
-    @Nullable Integer contextWindow,
-    @Nullable Integer maxOutputTokens,
-    boolean supportsReasoning
-) {}
+        String baseUrl,
+        String apiProtocol,
+        String upstreamModelId,
+        @Nullable Integer contextWindow,
+        @Nullable Integer maxOutputTokens,
+        boolean supportsReasoning) {}

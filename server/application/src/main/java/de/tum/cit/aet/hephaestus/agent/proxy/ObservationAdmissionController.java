@@ -31,19 +31,18 @@ public class ObservationAdmissionController {
     @PostMapping("/admit-observations")
     @WorkspaceAgnostic("Authenticated sandbox token carries and constrains workspace route")
     public ObjectNode admit(@RequestBody JsonNode request, Authentication authentication) {
-        if (request.path("schemaVersion").asInt(-1) != 1 || !request.path("observations").isArray()) {
+        if (request.path("schemaVersion").asInt(-1) != 1
+                || !request.path("observations").isArray()) {
             throw new ResponseStatusException(
-                HttpStatus.BAD_REQUEST,
-                "Expected schemaVersion 1 and observations array"
-            );
+                    HttpStatus.BAD_REQUEST, "Expected schemaVersion 1 and observations array");
         }
         if (!(authentication.getPrincipal() instanceof ProxyRouting routing)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Agent-job credential required");
         }
         UUID jobId = routing.sourceId();
-        if (
-            jobId == null || routing.attempt() == null || routing.attempt().sourceType() != LlmUsageSourceType.AGENT_JOB
-        ) {
+        if (jobId == null
+                || routing.attempt() == null
+                || routing.attempt().sourceType() != LlmUsageSourceType.AGENT_JOB) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Agent-job credential required");
         }
         try {

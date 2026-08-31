@@ -49,26 +49,36 @@ abstract class IntegrationManifestContractTest extends BaseUnitTest {
     @Test
     void identifiesItself() {
         IntegrationManifest manifest = manifest();
-        assertThat(manifest.kind()).as("every manifest names the integration it describes").isNotNull();
-        assertThat(manifest.displayName()).as("display name is shown to operators").isNotBlank();
-        assertThat(manifest.declaredCapabilities()).as("capabilities may be empty but never null").isNotNull();
+        assertThat(manifest.kind())
+                .as("every manifest names the integration it describes")
+                .isNotNull();
+        assertThat(manifest.displayName())
+                .as("display name is shown to operators")
+                .isNotBlank();
+        assertThat(manifest.declaredCapabilities())
+                .as("capabilities may be empty but never null")
+                .isNotNull();
         assertThat(manifest.reviewContribution())
-            .as("a contribution of none() is a declaration; null is an omission")
-            .isNotNull();
+                .as("a contribution of none() is a declaration; null is an omission")
+                .isNotNull();
     }
 
     @Test
     void satisfiesTheReviewContractTheBootstrapEnforces() {
         List<String> violations = validator().validateContribution(manifest());
 
-        assertThat(violations).as("this manifest would fail boot validation on an instance that enables it").isEmpty();
+        assertThat(violations)
+                .as("this manifest would fail boot validation on an instance that enables it")
+                .isEmpty();
     }
 
     @Test
     void declaresDescriptorsThatSatisfyTheirOwnContract() {
         List<String> violations = validator().validateDescriptors();
 
-        assertThat(violations).as("the descriptors this manifest observes are themselves well-formed").isEmpty();
+        assertThat(violations)
+                .as("the descriptors this manifest observes are themselves well-formed")
+                .isEmpty();
     }
 
     @Test
@@ -76,23 +86,19 @@ abstract class IntegrationManifestContractTest extends BaseUnitTest {
         // The mirror of the bootstrap's rule that a claimed lane needs its capability, so capability and
         // lane must agree in both directions.
         IntegrationManifest manifest = manifest();
-        Set<FeedbackLane> lanes = manifest
-            .reviewContribution()
-            .delivers()
-            .values()
-            .stream()
-            .flatMap(Set::stream)
-            .collect(Collectors.toUnmodifiableSet());
+        Set<FeedbackLane> lanes = manifest.reviewContribution().delivers().values().stream()
+                .flatMap(Set::stream)
+                .collect(Collectors.toUnmodifiableSet());
 
         if (manifest.declaredCapabilities().contains(Capability.FEEDBACK_DELIVERY)) {
             assertThat(lanes)
-                .as("%s declares FEEDBACK_DELIVERY but names no artifact it would deliver to", manifest.kind())
-                .containsAnyOf(FeedbackLane.IN_CONTEXT_SUMMARY, FeedbackLane.IN_CHAT);
+                    .as("%s declares FEEDBACK_DELIVERY but names no artifact it would deliver to", manifest.kind())
+                    .containsAnyOf(FeedbackLane.IN_CONTEXT_SUMMARY, FeedbackLane.IN_CHAT);
         }
         if (manifest.declaredCapabilities().contains(Capability.INLINE_FEEDBACK)) {
             assertThat(lanes)
-                .as("%s declares INLINE_FEEDBACK but names no artifact it would anchor them to", manifest.kind())
-                .contains(FeedbackLane.IN_CONTEXT_INLINE);
+                    .as("%s declares INLINE_FEEDBACK but names no artifact it would anchor them to", manifest.kind())
+                    .contains(FeedbackLane.IN_CONTEXT_INLINE);
         }
     }
 
@@ -116,12 +122,12 @@ abstract class IntegrationManifestContractTest extends BaseUnitTest {
                 executable.add(kind);
             }
         }
-        List<IntegrationMessageHandler> handlers = producers.stream().map(FixtureIntegration::handler).toList();
+        List<IntegrationMessageHandler> handlers =
+                producers.stream().map(FixtureIntegration::handler).toList();
         return new ReviewContractValidator(
-            new ArtifactDescriptorRegistry(descriptors),
-            new IntegrationMessageHandlerRegistry(handlers),
-            builders,
-            () -> executable
-        );
+                new ArtifactDescriptorRegistry(descriptors),
+                new IntegrationMessageHandlerRegistry(handlers),
+                builders,
+                () -> executable);
     }
 }

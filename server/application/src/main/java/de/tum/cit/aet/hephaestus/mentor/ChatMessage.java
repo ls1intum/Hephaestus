@@ -26,9 +26,8 @@ import tools.jackson.databind.JsonNode;
  */
 @Entity
 @Table(
-    name = "chat_message",
-    indexes = { @Index(name = "idx_chat_message_thread_created", columnList = "thread_id, created_at") }
-)
+        name = "chat_message",
+        indexes = {@Index(name = "idx_chat_message_thread_created", columnList = "thread_id, created_at")})
 @Getter
 @Setter
 @NoArgsConstructor
@@ -74,11 +73,10 @@ public class ChatMessage {
      * Child messages - branches from this message
      */
     @OneToMany(
-        mappedBy = "parentMessage",
-        cascade = { CascadeType.PERSIST, CascadeType.MERGE },
-        fetch = FetchType.LAZY,
-        orphanRemoval = true
-    )
+            mappedBy = "parentMessage",
+            cascade = {CascadeType.PERSIST, CascadeType.MERGE},
+            fetch = FetchType.LAZY,
+            orphanRemoval = true)
     @OrderBy("createdAt ASC")
     @ToString.Exclude
     @JsonIgnore

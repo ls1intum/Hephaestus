@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "storybook/test";
+
 import { expectAmountRejected } from "@/test/budget-amount-field";
+
 import { SetBudgetDialog } from "./SetBudgetDialog";
 
 const meta = {

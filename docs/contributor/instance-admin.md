@@ -1,3 +1,8 @@
+---
+title: Instance administration
+description: "The instance-wide console: what it configures and how it differs from workspace administration."
+---
+
 # Instance Admin Area
 
 The **instance admin** (a.k.a. super-admin) area lets an operator manage the whole Hephaestus
@@ -57,8 +62,8 @@ Slack are refused at the provider gateway.
 
 Suppression is prospective: a suppressed review is recorded as `SUPPRESSED(INSTANCE_SILENCED)` for
 audit and preview, but is never queued for replay. Releasing the brake therefore sends nothing by
-itself; only a new source event can deliver. A re-review that would have edited an existing comment
-records the attempted replacement without superseding the live delivered ledger unit.
+itself; only a new source event can deliver. Each re-review is a new feedback unit, so a suppressed
+re-review is recorded without changing or superseding the last delivered one.
 
 OAuth/token lifecycle operations, webhook registration, and operator alerts remain available while
 Silent Mode is engaged.

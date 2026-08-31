@@ -39,7 +39,8 @@ class PracticeSignalCoverageTest extends BaseUnitTest {
     @Test
     @DisplayName("a vocabulary whose every ingested signal is covered is accepted")
     void aFullyCoveredVocabularyIsAccepted() {
-        assertThatCode(coverage(everyIngestedSignal())::validateAuthoringVocabulary).doesNotThrowAnyException();
+        assertThatCode(coverage(everyIngestedSignal())::validateAuthoringVocabulary)
+                .doesNotThrowAnyException();
     }
 
     @Test
@@ -49,9 +50,9 @@ class PracticeSignalCoverageTest extends BaseUnitTest {
         covered.remove(ScmSignals.PULL_REQUEST_SYNCHRONIZED);
 
         assertThatThrownBy(coverage(covered)::validateAuthoringVocabulary)
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("scm.pull_request.synchronized")
-            .hasMessageContaining("would never fire");
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("scm.pull_request.synchronized")
+                .hasMessageContaining("would never fire");
     }
 
     @Test
@@ -60,10 +61,8 @@ class PracticeSignalCoverageTest extends BaseUnitTest {
         // Raised by a scheduler and by a person, not an integration; demanding one behind them would
         // fail the boot for telling the truth.
         Set<SignalName> covered = everyIngestedSignal();
-        assertThat(covered).doesNotContain(
-            ChatSignals.CONVERSATION_THREAD_SETTLED,
-            ScmSignals.PULL_REQUEST_MANUAL_REVIEW
-        );
+        assertThat(covered)
+                .doesNotContain(ChatSignals.CONVERSATION_THREAD_SETTLED, ScmSignals.PULL_REQUEST_MANUAL_REVIEW);
 
         assertThatCode(coverage(covered)::validateAuthoringVocabulary).doesNotThrowAnyException();
     }
@@ -83,7 +82,9 @@ class PracticeSignalCoverageTest extends BaseUnitTest {
     private Set<SignalName> everyIngestedSignal() {
         Set<SignalName> signals = new HashSet<>();
         for (ArtifactKind kind : options.authorableKinds()) {
-            options.eligibleFor(kind).stream().filter(options::producedByIngestion).forEach(signals::add);
+            options.eligibleFor(kind).stream()
+                    .filter(options::producedByIngestion)
+                    .forEach(signals::add);
         }
         return signals;
     }

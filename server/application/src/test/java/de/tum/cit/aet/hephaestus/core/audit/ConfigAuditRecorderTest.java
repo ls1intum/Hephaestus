@@ -6,7 +6,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditAction;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditActorKind;
@@ -33,10 +32,8 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 class ConfigAuditRecorderTest {
 
     private final ConfigAuditEventRepository repository = mock(ConfigAuditEventRepository.class);
-    private final ConfigAuditRecorder recorder = new ConfigAuditRecorder(
-        repository,
-        Clock.fixed(Instant.parse("2026-07-16T10:15:30Z"), ZoneOffset.UTC)
-    );
+    private final ConfigAuditRecorder recorder =
+            new ConfigAuditRecorder(repository, Clock.fixed(Instant.parse("2026-07-16T10:15:30Z"), ZoneOffset.UTC));
 
     record Snap(@Nullable Integer cooldownMinutes) implements ConfigAuditSnapshot {}
 
@@ -51,8 +48,8 @@ class ConfigAuditRecorderTest {
         // Without this, a producer that forgot @Transactional would commit its change and silently
         // leave no audit row — the failure this port exists to prevent.
         assertThatThrownBy(() -> recorder.record(entry(new Snap(30), new Snap(10))))
-            .isInstanceOf(ConfigAuditUnavailableException.class)
-            .hasMessageContaining("inside the transaction");
+                .isInstanceOf(ConfigAuditUnavailableException.class)
+                .hasMessageContaining("inside the transaction");
         verify(repository, never()).save(any());
     }
 
@@ -61,8 +58,8 @@ class ConfigAuditRecorderTest {
         // readOnly satisfies MANDATORY but never flushes, so the INSERT would silently not happen.
         inTransaction(true);
         assertThatThrownBy(() -> recorder.record(entry(new Snap(30), new Snap(10))))
-            .isInstanceOf(ConfigAuditUnavailableException.class)
-            .hasMessageContaining("read-only");
+                .isInstanceOf(ConfigAuditUnavailableException.class)
+                .hasMessageContaining("read-only");
         verify(repository, never()).save(any());
     }
 
@@ -163,7 +160,8 @@ class ConfigAuditRecorderTest {
     }
 
     private static void authenticate(String subject, @Nullable String impersonatorId) {
-        Jwt.Builder jwt = Jwt.withTokenValue("t").header("alg", "none").subject(subject).claim("sub", subject);
+        Jwt.Builder jwt =
+                Jwt.withTokenValue("t").header("alg", "none").subject(subject).claim("sub", subject);
         if (impersonatorId != null) {
             jwt.claim("act", Map.of("sub", impersonatorId));
         }

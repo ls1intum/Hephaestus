@@ -23,15 +23,16 @@ class TaskSealedHierarchyTest {
 
         JsonSubTypes subtypesAnn = Task.class.getAnnotation(JsonSubTypes.class);
         assertThat(subtypesAnn).as("Task must declare @JsonSubTypes").isNotNull();
-        Set<Class<?>> jacksonSubtypes = Arrays.stream(subtypesAnn.value())
-            .map(JsonSubTypes.Type::value)
-            .collect(Collectors.toSet());
+        Set<Class<?>> jacksonSubtypes =
+                Arrays.stream(subtypesAnn.value()).map(JsonSubTypes.Type::value).collect(Collectors.toSet());
 
         assertThat(jacksonSubtypes).isEqualTo(Set.of(Task.class.getPermittedSubclasses()));
 
         for (JsonSubTypes.Type entry : subtypesAnn.value()) {
             JsonTypeName typeNameAnn = entry.value().getAnnotation(JsonTypeName.class);
-            assertThat(typeNameAnn).as("%s must declare @JsonTypeName", entry.value()).isNotNull();
+            assertThat(typeNameAnn)
+                    .as("%s must declare @JsonTypeName", entry.value())
+                    .isNotNull();
             assertThat(typeNameAnn.value()).isEqualTo(entry.name());
         }
     }

@@ -25,15 +25,14 @@ class WorkspaceContextHolderTest {
     @Test
     void shouldStoreAndRetrieveContext() {
         WorkspaceContext context = new WorkspaceContext(
-            1L,
-            "test-workspace",
-            "Test Workspace",
-            AccountType.ORG,
-            123L,
-            false,
-            false,
-            Set.of(WorkspaceRole.OWNER)
-        );
+                1L,
+                "test-workspace",
+                "Test Workspace",
+                AccountType.ORG,
+                123L,
+                false,
+                false,
+                Set.of(WorkspaceRole.OWNER));
 
         WorkspaceContextHolder.setContext(context);
         WorkspaceContext retrieved = WorkspaceContextHolder.getContext();
@@ -49,42 +48,26 @@ class WorkspaceContextHolderTest {
 
     @Test
     void shouldEnrichMDC() {
-        WorkspaceContext context = new WorkspaceContext(
-            42L,
-            "test-slug",
-            "Test",
-            AccountType.USER,
-            999L,
-            false,
-            false,
-            Set.of()
-        );
+        WorkspaceContext context =
+                new WorkspaceContext(42L, "test-slug", "Test", AccountType.USER, 999L, false, false, Set.of());
 
         WorkspaceContextHolder.setContext(context);
 
-        assertEquals("42", MDC.get("workspace_id"));
+        assertEquals("42", MDC.get("workspace.id"));
         assertEquals("test-slug", MDC.get("workspace_slug"));
         assertEquals("999", MDC.get("installation_id"));
     }
 
     @Test
     void shouldClearContextAndMDC() {
-        WorkspaceContext context = new WorkspaceContext(
-            1L,
-            "test",
-            "Test",
-            AccountType.ORG,
-            100L,
-            false,
-            false,
-            Set.of()
-        );
+        WorkspaceContext context =
+                new WorkspaceContext(1L, "test", "Test", AccountType.ORG, 100L, false, false, Set.of());
         WorkspaceContextHolder.setContext(context);
 
         WorkspaceContextHolder.clearContext();
 
         assertNull(WorkspaceContextHolder.getContext());
-        assertNull(MDC.get("workspace_id"));
+        assertNull(MDC.get("workspace.id"));
         assertNull(MDC.get("workspace_slug"));
         assertNull(MDC.get("installation_id"));
     }
@@ -92,19 +75,18 @@ class WorkspaceContextHolderTest {
     @Test
     void shouldHandleNullInstallationId() {
         WorkspaceContext context = new WorkspaceContext(
-            1L,
-            "test",
-            "Test",
-            AccountType.ORG,
-            null, // No installation ID
-            false,
-            false,
-            Set.of()
-        );
+                1L,
+                "test",
+                "Test",
+                AccountType.ORG,
+                null, // No installation ID
+                false,
+                false,
+                Set.of());
 
         WorkspaceContextHolder.setContext(context);
 
-        assertEquals("1", MDC.get("workspace_id"));
+        assertEquals("1", MDC.get("workspace.id"));
         assertEquals("test", MDC.get("workspace_slug"));
         assertNull(MDC.get("installation_id"));
     }
@@ -112,26 +94,10 @@ class WorkspaceContextHolderTest {
     @Test
     void shouldIsolateContextBetweenThreads() throws InterruptedException {
         WorkspaceContext mainContext = new WorkspaceContext(
-            1L,
-            "main-workspace",
-            "Main",
-            AccountType.ORG,
-            100L,
-            false,
-            false,
-            Set.of(WorkspaceRole.OWNER)
-        );
+                1L, "main-workspace", "Main", AccountType.ORG, 100L, false, false, Set.of(WorkspaceRole.OWNER));
 
         WorkspaceContext otherContext = new WorkspaceContext(
-            2L,
-            "other-workspace",
-            "Other",
-            AccountType.USER,
-            200L,
-            false,
-            false,
-            Set.of(WorkspaceRole.MEMBER)
-        );
+                2L, "other-workspace", "Other", AccountType.USER, 200L, false, false, Set.of(WorkspaceRole.MEMBER));
 
         WorkspaceContextHolder.setContext(mainContext);
 
@@ -167,22 +133,14 @@ class WorkspaceContextHolderTest {
 
     @Test
     void shouldHandleSettingNullContext() {
-        WorkspaceContext context = new WorkspaceContext(
-            1L,
-            "test",
-            "Test",
-            AccountType.ORG,
-            100L,
-            false,
-            false,
-            Set.of()
-        );
+        WorkspaceContext context =
+                new WorkspaceContext(1L, "test", "Test", AccountType.ORG, 100L, false, false, Set.of());
         WorkspaceContextHolder.setContext(context);
 
         WorkspaceContextHolder.setContext(null);
 
         assertNull(WorkspaceContextHolder.getContext());
-        assertNull(MDC.get("workspace_id"));
+        assertNull(MDC.get("workspace.id"));
         assertNull(MDC.get("workspace_slug"));
     }
 }

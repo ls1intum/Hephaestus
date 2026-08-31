@@ -42,9 +42,9 @@ class OutlineDocumentSelectorTest extends BaseUnitTest {
     @Test
     void delegatesTrimmedQueryAndClampsTheLimit() {
         OutlineDocument hit = new OutlineDocument();
-        when(
-            documentRepository.searchByRelevance(WORKSPACE_ID, "deploy OR rollback", OutlineDocumentSelector.MAX_LIMIT)
-        ).thenReturn(List.of(hit));
+        when(documentRepository.searchByRelevance(
+                        WORKSPACE_ID, "deploy OR rollback", OutlineDocumentSelector.MAX_LIMIT))
+                .thenReturn(List.of(hit));
 
         List<OutlineDocument> result = selector.select(WORKSPACE_ID, "  deploy OR rollback  ", 500);
 

@@ -30,8 +30,7 @@ class OrchestratorPromptWorkspaceTest extends BaseUnitTest {
      * stated. Hand-maintained on purpose: a new collector output has to be added here, which is the same
      * edit that forces the author to say what it is in the prompt.
      */
-    private static final Set<String> STAGED_INPUT_PATHS = new LinkedHashSet<>(
-        java.util.List.of(
+    private static final Set<String> STAGED_INPUT_PATHS = new LinkedHashSet<>(java.util.List.of(
             // Pull request
             SandboxLayout.CONTEXT_PREFIX + "metadata.json",
             SandboxLayout.CONTEXT_PREFIX + "comments.json",
@@ -54,16 +53,13 @@ class OrchestratorPromptWorkspaceTest extends BaseUnitTest {
             OutlineDocumentContentSource.UNRESOLVED_REFERENCES_KEY,
             ReviewHistoryContentSource.OBSERVATIONS_FILE,
             ReviewHistoryContentSource.FEEDBACK_FILE,
-            SandboxLayout.MANIFEST_PATH
-        )
-    );
+            SandboxLayout.MANIFEST_PATH));
 
     /** Directories and templated paths the prompt names as prefixes rather than as concrete files. */
     private static final Set<String> STAGED_INPUT_PREFIXES = Set.of(
-        SandboxLayout.REPO_MOUNT_RELATIVE,
-        SandboxLayout.PRACTICES_PREFIX,
-        OutlineDocumentContentSource.REVIEW_PREFIX
-    );
+            SandboxLayout.REPO_MOUNT_RELATIVE,
+            SandboxLayout.PRACTICES_PREFIX,
+            OutlineDocumentContentSource.REVIEW_PREFIX);
 
     @Test
     @DisplayName("every file a review collector stages is described in the orchestrator prompt")
@@ -71,39 +67,38 @@ class OrchestratorPromptWorkspaceTest extends BaseUnitTest {
         String prompt = orchestratorPrompt();
 
         assertThat(STAGED_INPUT_PATHS)
-            .as("a staged file the prompt never mentions is context the model was not told it has")
-            .allSatisfy(path -> assertThat(prompt).as("prompt mentions %s", path).contains(path));
+                .as("a staged file the prompt never mentions is context the model was not told it has")
+                .allSatisfy(path ->
+                        assertThat(prompt).as("prompt mentions %s", path).contains(path));
     }
 
     @Test
     @DisplayName("the orchestrator prompt names no sandbox input that nothing stages")
     void promptNamesNoUnstagedInput() throws IOException {
         Set<String> named = new LinkedHashSet<>();
-        Matcher matcher = Pattern.compile("inputs/[A-Za-z0-9_./<>-]*[A-Za-z0-9_>]").matcher(orchestratorPrompt());
+        Matcher matcher =
+                Pattern.compile("inputs/[A-Za-z0-9_./<>-]*[A-Za-z0-9_>]").matcher(orchestratorPrompt());
         while (matcher.find()) {
             named.add(matcher.group());
         }
 
         assertThat(named).isNotEmpty();
         assertThat(named)
-            .as("the prompt sends the model to a path nothing writes; it will read nothing and say so")
-            .allSatisfy(path ->
-                assertThat(
-                    STAGED_INPUT_PATHS.contains(path) ||
-                        STAGED_INPUT_PREFIXES.stream().anyMatch(prefix -> path.startsWith(prefix)) ||
-                        // Trailing-slash and templated forms of the prefixes above.
-                        STAGED_INPUT_PREFIXES.stream().anyMatch(prefix -> prefix.startsWith(path))
-                )
-                    .as("prompt path %s is staged", path)
-                    .isTrue()
-            );
+                .as("the prompt sends the model to a path nothing writes; it will read nothing and say so")
+                .allSatisfy(path -> assertThat(STAGED_INPUT_PATHS.contains(path)
+                                || STAGED_INPUT_PREFIXES.stream().anyMatch(prefix -> path.startsWith(prefix))
+                                ||
+                                // Trailing-slash and templated forms of the prefixes above.
+                                STAGED_INPUT_PREFIXES.stream().anyMatch(prefix -> prefix.startsWith(path)))
+                        .as("prompt path %s is staged", path)
+                        .isTrue());
     }
 
     private static String orchestratorPrompt() throws IOException {
         Path candidate = Path.of("src/main/resources/agent/pi-orchestrator.md");
         Path resolved = Files.exists(candidate)
-            ? candidate
-            : Path.of("server/application/src/main/resources/agent/pi-orchestrator.md");
+                ? candidate
+                : Path.of("server/application/src/main/resources/agent/pi-orchestrator.md");
         assertThat(resolved).isRegularFile();
         return Files.readString(resolved, StandardCharsets.UTF_8);
     }

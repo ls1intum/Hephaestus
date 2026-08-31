@@ -1,4 +1,5 @@
 import { AlertCircle, Users } from "lucide-react";
+
 import { type Contributor, ContributorGrid } from "@/components/shared/ContributorGrid";
 
 interface ContributorSectionProps {

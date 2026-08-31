@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, screen, within } from "storybook/test";
+
 import { expectNoPageOverflow } from "@/test/reflow";
+
 import { ObservationDetailPage } from "./ObservationDetailPage";
 import { observationDetail, reviewObservationDetail, workspacePractices } from "./story-mock-data";
 

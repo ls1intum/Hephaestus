@@ -1,56 +1,61 @@
 import { Hammer } from "lucide-react";
+import { InstitutionalAttribution } from "@/components/core/InstitutionalAttribution";
 import { MentorIcon } from "@/components/mentor/MentorIcon";
 import { Badge } from "@/components/ui/badge";
 import { FeatureCard, type FeatureData } from "./FeatureCard";
 
 const FEATURES_DATA: FeatureData[] = [
 	{
-		icon: Hammer,
+		icon: <Hammer className="size-5" strokeWidth={1.7} />,
 		badge: "Core feature",
 		title: "Practice feedback",
 		description: "Specific feedback on how the work was done",
 		content:
-			"Hephaestus reviews eligible project work against the practices a workspace has chosen. Today, that includes pull requests, merge requests, and issues. Each piece of feedback points to evidence and suggests what to try next.",
+			"Hephaestus reads a contribution and the work around it against the practices a workspace has chosen. Each piece of feedback names the practice it came from and points back to what it saw.",
 	},
 	{
-		icon: MentorIcon,
+		icon: <MentorIcon className="size-5" size={20} strokeWidth={1.7} animated={false} />,
 		badge: "Core feature",
-		title: "Chat with Heph",
-		description: "Talk through feedback and recent work",
+		title: "Talk it through",
+		description: "Ask why, push back, or work out the next step",
 		content:
-			"Heph can use recent project activity, feedback the developer has received, and selected Slack messages or Outline documents as context. Developers can chat in the web app or, when connected, in Slack.",
+			"In chat Hephaestus goes by Heph, and draws on recent project activity, the feedback a developer has received, and any Slack messages or Outline documents their admins connected. Available in the web app and, when connected, in Slack.",
 	},
 ];
 
 export function AboutMissionSection() {
 	return (
-		<section className="space-y-12">
+		<section aria-labelledby="about-mission-heading" className="space-y-12">
 			<div>
 				<Badge className="mb-4" variant="outline">
 					Our purpose
 				</Badge>
-				<h2 className="text-3xl font-bold mb-6">The mission</h2>
+				<h2 id="about-mission-heading" className="text-3xl font-bold mb-6">
+					The mission
+				</h2>
 
-				<div className="space-y-6">
-					<p className="text-lg leading-relaxed">
-						Developers learn engineering practices by doing the work and getting feedback. Expert
-						attention is limited, so feedback is often uneven or missing. Hephaestus provides
-						routine practice feedback without replacing human judgement or mentoring relationships.
-					</p>
-
-					<div className="border-l-4 border-primary pl-6 py-2">
-						<p className="text-lg font-medium">
-							Every developer should be able to see what worked, what could improve, and what to try
-							next.
-						</p>
-					</div>
-				</div>
+				<p className="text-lg leading-relaxed">
+					Developers learn to work well in a team by doing the work and getting feedback on it. That
+					feedback is a mentor's job, whether that is a coach on a university capstone or an
+					experienced maintainer on an open-source project, and there is never enough of that
+					attention to go round. The developers who need it most often get none. Hephaestus carries
+					the routine part so that everyone gets some.
+				</p>
 			</div>
 
 			<div className="grid grid-cols-1 md:grid-cols-2 gap-8">
 				{FEATURES_DATA.map((feature) => (
 					<FeatureCard key={feature.title} feature={feature} />
 				))}
+			</div>
+
+			<div className="rounded-2xl border border-border bg-muted/20 p-6 text-center">
+				<h3 className="text-xl font-semibold">Developed at TUM and open source</h3>
+				<p className="mx-auto mb-6 mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+					Hephaestus is an MIT-licensed open-source project developed by Applied Education
+					Technologies at the Technical University of Munich.
+				</p>
+				<InstitutionalAttribution />
 			</div>
 		</section>
 	);

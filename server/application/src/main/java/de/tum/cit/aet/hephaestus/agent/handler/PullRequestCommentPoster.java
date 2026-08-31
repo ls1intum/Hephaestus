@@ -41,10 +41,8 @@ class PullRequestCommentPoster {
     /** Matches @mentions (e.g., @username) — backtick-escaped to prevent notification spam.
      *  Lookbehind covers start-of-line, whitespace, punctuation, and markdown formatting chars
      *  ({@code * _ ~ > | -}) to prevent bypass via {@code *@user*}, {@code >@user}, or {@code - @user}. */
-    private static final Pattern AT_MENTION = Pattern.compile(
-        "(?<=^|[\\s(\\[\"'*_~>|#!+={}\\-,.:;/)])@([a-zA-Z0-9][-a-zA-Z0-9._]*)",
-        Pattern.MULTILINE
-    );
+    private static final Pattern AT_MENTION =
+            Pattern.compile("(?<=^|[\\s(\\[\"'*_~>|#!+={}\\-,.:;/)])@([a-zA-Z0-9][-a-zA-Z0-9._]*)", Pattern.MULTILINE);
 
     /** Matches inline markdown images: ![alt](url) — stripped to prevent tracking pixels. */
     private static final Pattern MARKDOWN_IMAGE_INLINE = Pattern.compile("!\\[[^\\]]*]\\([^)]*\\)");
@@ -54,62 +52,57 @@ class PullRequestCommentPoster {
     /** Matches HTML comments — stripped to prevent hidden instructions for AI tools. */
     private static final Pattern HTML_COMMENT = Pattern.compile("<!--[\\s\\S]*?-->");
 
-    private static final Pattern HTML_TAG = Pattern.compile(
-        "</?([a-zA-Z][a-zA-Z0-9]*)\\b[^>]*/?>",
-        Pattern.CASE_INSENSITIVE
-    );
+    private static final Pattern HTML_TAG =
+            Pattern.compile("</?([a-zA-Z][a-zA-Z0-9]*)\\b[^>]*/?>", Pattern.CASE_INSENSITIVE);
 
     /**
      * Tags allowed in sanitized output. All attributes are stripped from allowed tags.
      * Notably excludes disclosure tags so agent content cannot create misleading hidden sections.
      */
     static final Set<String> SAFE_HTML_TAGS = Set.of(
-        "br",
-        "hr",
-        "code",
-        "pre",
-        "sub",
-        "sup",
-        "em",
-        "strong",
-        "b",
-        "i",
-        "p",
-        "ul",
-        "ol",
-        "li",
-        "blockquote",
-        "h1",
-        "h2",
-        "h3",
-        "h4",
-        "h5",
-        "h6",
-        "table",
-        "thead",
-        "tbody",
-        "tr",
-        "td",
-        "th"
-    );
+            "br",
+            "hr",
+            "code",
+            "pre",
+            "sub",
+            "sup",
+            "em",
+            "strong",
+            "b",
+            "i",
+            "p",
+            "ul",
+            "ol",
+            "li",
+            "blockquote",
+            "h1",
+            "h2",
+            "h3",
+            "h4",
+            "h5",
+            "h6",
+            "table",
+            "thead",
+            "tbody",
+            "tr",
+            "td",
+            "th");
 
     /**
      * Matches standalone approval language that could mislead reviewers.
      * Tolerates trailing punctuation (e.g., "LGTM!", "Approved.").
      */
     private static final Pattern APPROVAL_LANGUAGE = Pattern.compile(
-        "^\\s*(?:LGTM|(?:looks good to me)|(?:approved)|(?:ready to merge)|(?:ship it)|(?:approved by\\b[^\\n]*))[.!?]*\\s*$",
-        Pattern.CASE_INSENSITIVE | Pattern.MULTILINE
-    );
+            "^\\s*(?:LGTM|(?:looks good to me)|(?:approved)|(?:ready to merge)|(?:ship it)|(?:approved by\\b[^\\n]*))[.!?]*\\s*$",
+            Pattern.CASE_INSENSITIVE | Pattern.MULTILINE);
 
     /**
      * Matches invisible Unicode characters: bidi controls, zero-width chars, BOM.
      * Prevents text direction attacks and @mention bypass via zero-width spaces.
      * Excludes U+200D (Zero Width Joiner) — used in compound emoji sequences.
      */
-    private static final Pattern INVISIBLE_CHARS = Pattern.compile(
-        "[\\u200B\\u200C\\u200E\\u200F\\u061C\\u202A-\\u202E\\u2066-\\u2069\\uFEFF]"
-    );
+    private static final Pattern INVISIBLE_CHARS =
+            Pattern.compile("[\\u200B\\u200C\\u200E\\u200F\\u061C\\u202A-\\u202E\\u2066-\\u2069\\uFEFF]");
 
     /**
      * Matches GitLab slash commands at the start of a line (e.g., /approve, /merge, /close).
@@ -117,11 +110,10 @@ class PullRequestCommentPoster {
      * Escaped by wrapping in backticks (inline code) so they render as plain text.
      */
     private static final Pattern GITLAB_SLASH_COMMAND = Pattern.compile(
-        "^(\\s*/(?:approve|merge|close|reopen|assign|unassign|label|unlabel|lock|unlock|" +
-            "milestone|estimate|spend|award|subscribe|unsubscribe|todo|done|wip|draft|ready|" +
-            "due|remove_due_date|weight|epic|copy_metadata|move|confidential|shrug|tableflip)\\b)",
-        Pattern.CASE_INSENSITIVE | Pattern.MULTILINE
-    );
+            "^(\\s*/(?:approve|merge|close|reopen|assign|unassign|label|unlabel|lock|unlock|"
+                    + "milestone|estimate|spend|award|subscribe|unsubscribe|todo|done|wip|draft|ready|"
+                    + "due|remove_due_date|weight|epic|copy_metadata|move|confidential|shrug|tableflip)\\b)",
+            Pattern.CASE_INSENSITIVE | Pattern.MULTILINE);
 
     /** Matches markdown autolinks: &lt;https://...&gt; — protected from HTML tag stripping. */
     private static final Pattern AUTOLINK = Pattern.compile("<(https?://[^>\\s]+)>");
@@ -142,14 +134,11 @@ class PullRequestCommentPoster {
         for (SummaryChannel channel : feedbackChannels) {
             SummaryChannel previous = map.putIfAbsent(channel.kind(), channel);
             if (previous != null) {
-                throw new IllegalStateException(
-                    "Duplicate SummaryChannel for kind " +
-                        channel.kind() +
-                        ": " +
-                        previous.getClass().getName() +
-                        " conflicts with " +
-                        channel.getClass().getName()
-                );
+                throw new IllegalStateException("Duplicate SummaryChannel for kind " + channel.kind()
+                        + ": "
+                        + previous.getClass().getName()
+                        + " conflicts with "
+                        + channel.getClass().getName());
             }
         }
         this.channels = map;
@@ -167,22 +156,13 @@ class PullRequestCommentPoster {
 
     private String postFormattedBody(AgentJob job, String formattedBody, String marker) {
         long workspaceId = job.getWorkspace().getId();
-        IntegrationKind kind = job.getIntegrationKind();
-        if (kind == null) {
-            throw new JobDeliveryException(
-                "AgentJob.integrationKind is null — cannot resolve a delivery channel. jobId=" + job.getId()
-            );
-        }
+        IntegrationKind kind = requireIntegrationKind(job);
         SummaryChannel channel = requireChannel(kind);
         FeedbackTarget target = buildTarget(job, kind, workspaceId);
         try {
             SummaryHandle handle = channel.postSummary(target, new FeedbackContent(formattedBody, marker));
             log.info(
-                "Posted feedback comment: jobId={}, kind={}, commentId={}",
-                job.getId(),
-                kind,
-                handle.externalId()
-            );
+                    "Posted feedback comment: jobId={}, kind={}, commentId={}", job.getId(), kind, handle.externalId());
             return handle.externalId();
         } catch (OutboundEgressSuppressedException e) {
             throw new JobDeliverySuppressedException(e.toString(), e);
@@ -191,113 +171,28 @@ class PullRequestCommentPoster {
         }
     }
 
-    /**
-     * Edits an already-posted summary in place so re-reviews keep one evolving thread. A
-     * {@code TRANSIENT} outcome means keep the prior summary: a flaky update must not double-post.
-     *
-     * @param externalRef the vendor comment id returned by a prior {@link #postFormattedBody}
-     */
-    UpdateResult updateFormattedBody(AgentJob job, String externalRef, String formattedBody) {
-        long workspaceId = job.getWorkspace().getId();
-        IntegrationKind kind = job.getIntegrationKind();
-        if (kind == null) {
-            throw new JobDeliveryException(
-                "AgentJob.integrationKind is null — cannot resolve a delivery channel. jobId=" + job.getId()
-            );
-        }
-        SummaryChannel channel = requireChannel(kind);
-        FeedbackTarget target = buildTarget(job, kind, workspaceId);
-        SummaryChannel.UpdateOutcome outcome;
-        try {
-            outcome = channel.updateSummary(
-                target,
-                externalRef,
-                new FeedbackContent(formattedBody, summaryMarkerFor(job))
-            );
-        } catch (OutboundEgressSuppressedException e) {
-            throw new JobDeliverySuppressedException(e.toString(), e);
-        }
-        return switch (outcome.kind()) {
-            case EDITED -> {
-                log.info(
-                    "Edited feedback summary in place: jobId={}, kind={}, commentId={}",
-                    job.getId(),
-                    kind,
-                    Objects.requireNonNull(outcome.handle()).externalId()
-                );
-                yield new UpdateResult(UpdateResult.Kind.EDITED, Objects.requireNonNull(outcome.handle()).externalId());
-            }
-            case GONE -> {
-                log.info(
-                    "Summary edit found the prior comment gone; will post anew: jobId={}, reason={}",
-                    job.getId(),
-                    outcome.reason()
-                );
-                yield new UpdateResult(UpdateResult.Kind.GONE, null);
-            }
-            case TRANSIENT -> {
-                log.warn(
-                    "Summary edit hit a transient error; keeping the prior summary, not re-posting: jobId={}, reason={}",
-                    job.getId(),
-                    outcome.reason()
-                );
-                yield new UpdateResult(UpdateResult.Kind.TRANSIENT, null);
-            }
-            case UNSUPPORTED -> {
-                log.debug(
-                    "Channel {} cannot edit a summary in place; caller will post anew: jobId={}",
-                    kind,
-                    job.getId()
-                );
-                yield new UpdateResult(UpdateResult.Kind.UNSUPPORTED, null);
-            }
-        };
-    }
-
-    record UpdateResult(Kind kind, @Nullable String externalId) {
-        enum Kind {
-            EDITED,
-            GONE,
-            TRANSIENT,
-            UNSUPPORTED,
-        }
+    @Nullable
+    String postIssueFormattedBody(AgentJob job, String formattedBody) {
+        return postIssueFormattedBody(job, formattedBody, summaryMarkerFor(job));
     }
 
     @Nullable
-    String postIssueFormattedBody(AgentJob job, String formattedBody) {
+    String postIssueApprovedProposal(AgentJob job, java.util.UUID feedbackId, String formattedBody) {
+        return postIssueFormattedBody(job, formattedBody, "<!-- hephaestus:approved-feedback:" + feedbackId + " -->");
+    }
+
+    private String postIssueFormattedBody(AgentJob job, String formattedBody, String marker) {
         long workspaceId = job.getWorkspace().getId();
-        IntegrationKind kind = job.getIntegrationKind();
-        if (kind == null) {
-            throw new JobDeliveryException(
-                "AgentJob.integrationKind is null — cannot resolve a delivery channel. jobId=" + job.getId()
-            );
-        }
+        IntegrationKind kind = requireIntegrationKind(job);
         SummaryChannel channel = requireChannel(kind);
-        JsonNode metadata = job.getMetadata();
-        String repoFullName = requireMetadataText(metadata, "repository_full_name");
-        int issueNumber = requireMetadataInt(metadata, "issue_number");
-        String subjectExternalId;
+        FeedbackTarget target = buildIssueTarget(job, kind, workspaceId);
         try {
-            subjectExternalId = channel.formatIssueSubjectId(repoFullName, issueNumber);
-        } catch (IllegalArgumentException e) {
-            throw new JobDeliveryException(e.toString(), e);
-        }
-        FeedbackTarget target = new FeedbackTarget(
-            new IntegrationRef(kind, workspaceId, null),
-            subjectExternalId,
-            null
-        );
-        try {
-            SummaryHandle handle = channel.postSummary(
-                target,
-                new FeedbackContent(formattedBody, summaryMarkerFor(job))
-            );
+            SummaryHandle handle = channel.postSummary(target, new FeedbackContent(formattedBody, marker));
             log.info(
-                "Posted issue feedback comment: jobId={}, kind={}, commentId={}",
-                job.getId(),
-                kind,
-                handle.externalId()
-            );
+                    "Posted issue feedback comment: jobId={}, kind={}, commentId={}",
+                    job.getId(),
+                    kind,
+                    handle.externalId());
             return handle.externalId();
         } catch (OutboundEgressSuppressedException e) {
             throw new JobDeliverySuppressedException(e.toString(), e);
@@ -343,16 +238,17 @@ class PullRequestCommentPoster {
             }
             SummaryChannel.ExistingSummaryLookup lookup = channel.findExistingSummary(target, marker);
             return switch (lookup.kind()) {
-                case FOUND -> ExistingDeliveryLookup.found(Objects.requireNonNull(lookup.handle()).externalId());
+                case FOUND ->
+                    ExistingDeliveryLookup.found(
+                            Objects.requireNonNull(lookup.handle()).externalId());
                 case ABSENT -> ExistingDeliveryLookup.absent();
                 case UNKNOWN -> ExistingDeliveryLookup.unknown();
             };
         } catch (RuntimeException e) {
             log.debug(
-                "Existing-summary dedup lookup failed (treated as unknown): jobId={}, error={}",
-                job.getId(),
-                e.getMessage()
-            );
+                    "Existing-summary dedup lookup failed (treated as unknown): jobId={}, error={}",
+                    job.getId(),
+                    e.toString());
             return ExistingDeliveryLookup.unknown();
         }
     }
@@ -360,13 +256,32 @@ class PullRequestCommentPoster {
     private SummaryChannel requireChannel(IntegrationKind kind) {
         SummaryChannel channel = channels.get(kind);
         if (channel == null) {
-            throw new JobDeliveryException(
-                "No SummaryChannel wired for kind " +
-                    kind +
-                    " — check that the vendor integration is enabled and its channel bean is registered"
-            );
+            throw new JobDeliveryException("No SummaryChannel wired for kind " + kind
+                    + " — check that the vendor integration is enabled and its channel bean is registered");
         }
         return channel;
+    }
+
+    private IntegrationKind requireIntegrationKind(AgentJob job) {
+        IntegrationKind kind = job.getIntegrationKind();
+        if (kind == null) {
+            throw new JobDeliveryException(
+                    "AgentJob.integrationKind is null — cannot resolve a delivery channel. jobId=" + job.getId());
+        }
+        return kind;
+    }
+
+    private FeedbackTarget buildIssueTarget(AgentJob job, IntegrationKind kind, long workspaceId) {
+        JsonNode metadata = job.getMetadata();
+        String repoFullName = requireMetadataText(metadata, "repository_full_name");
+        int issueNumber = requireMetadataInt(metadata, "issue_number");
+        String subjectExternalId;
+        try {
+            subjectExternalId = requireChannel(kind).formatIssueSubjectId(repoFullName, issueNumber);
+        } catch (IllegalArgumentException e) {
+            throw new JobDeliveryException(e.toString(), e);
+        }
+        return new FeedbackTarget(new IntegrationRef(kind, workspaceId, null), subjectExternalId, null);
     }
 
     FeedbackTarget buildTarget(AgentJob job, IntegrationKind kind, long workspaceId) {
@@ -546,8 +461,7 @@ class PullRequestCommentPoster {
         }
         if (!node.isNumber()) {
             throw new JobDeliveryException(
-                "Expected numeric metadata field '" + field + "', got: " + node.getNodeType()
-            );
+                    "Expected numeric metadata field '" + field + "', got: " + node.getNodeType());
         }
         return node.asInt();
     }

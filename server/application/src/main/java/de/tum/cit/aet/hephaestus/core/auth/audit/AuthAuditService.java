@@ -40,13 +40,12 @@ public class AuthAuditService {
 
     /** Audit-viewer filters; every field null = unfiltered. */
     public record Filter(
-        @Nullable Long accountId,
-        @Nullable Long actingAccountId,
-        @Nullable List<AuthEvent.EventType> eventTypes,
-        @Nullable List<AuthEvent.Result> results,
-        @Nullable Instant from,
-        @Nullable Instant to
-    ) {
+            @Nullable Long accountId,
+            @Nullable Long actingAccountId,
+            @Nullable List<AuthEvent.EventType> eventTypes,
+            @Nullable List<AuthEvent.Result> results,
+            @Nullable Instant from,
+            @Nullable Instant to) {
         /**
          * Hibernate cannot bind an empty {@code IN} list, and an empty selection means the same thing
          * as an absent one, so both collapse to null before reaching the query.
@@ -62,7 +61,8 @@ public class AuthAuditService {
     }
 
     /** A human-readable account identity for an audit row. {@code displayName}/{@code email} may be null. */
-    public record AccountRef(long id, @Nullable String displayName, @Nullable String email) {}
+    public record AccountRef(
+            long id, @Nullable String displayName, @Nullable String email) {}
 
     /** A page of audit events plus the resolved identities for the accounts referenced on that page. */
     public record AuditPage(Page<AuthEvent> events, Map<Long, AccountRef> identities) {}
@@ -71,14 +71,13 @@ public class AuthAuditService {
     @Transactional(readOnly = true)
     public AuditPage list(Filter filter, Pageable pageable) {
         Page<AuthEvent> events = authEventRepository.findForAdmin(
-            filter.accountId(),
-            filter.actingAccountId(),
-            filter.eventTypes(),
-            filter.results(),
-            filter.from(),
-            filter.to(),
-            pageable
-        );
+                filter.accountId(),
+                filter.actingAccountId(),
+                filter.eventTypes(),
+                filter.results(),
+                filter.from(),
+                filter.to(),
+                pageable);
         Set<Long> ids = new HashSet<>();
         for (AuthEvent e : events.getContent()) {
             if (e.getAccountId() != null) {
@@ -89,22 +88,13 @@ public class AuthAuditService {
             }
         }
         Map<Long, AccountRef> identities = ids.isEmpty()
-            ? Map.of()
-            : accountRepository
-                  .findAllById(ids)
-                  .stream()
-                  .collect(
-                      Collectors.toMap(
-                          a -> Objects.requireNonNull(a.getId()),
-                          a ->
-                              new AccountRef(
-                                  Objects.requireNonNull(a.getId()),
-                                  a.getDisplayName(),
-                                  a.getPrimaryEmail()
-                              ),
-                          (a, b) -> a
-                      )
-                  );
+                ? Map.of()
+                : accountRepository.findAllById(ids).stream()
+                        .collect(Collectors.toMap(
+                                a -> Objects.requireNonNull(a.getId()),
+                                a -> new AccountRef(
+                                        Objects.requireNonNull(a.getId()), a.getDisplayName(), a.getPrimaryEmail()),
+                                (a, b) -> a));
         return new AuditPage(events, identities);
     }
 

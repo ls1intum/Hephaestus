@@ -8,8 +8,7 @@ import org.jspecify.annotations.NonNull;
 
 @Schema(description = "A complete review run in a developer's practice-group history")
 public record PracticeGroupReviewRunDTO(
-    @NonNull UUID reviewId,
-    @NonNull Instant reviewedAt,
-    @NonNull PracticeGroupReviewedWorkDTO reviewedWork,
-    @NonNull List<PracticeGroupReviewObservationDTO> observations
-) {}
+        @NonNull UUID reviewId,
+        @NonNull Instant reviewedAt,
+        @NonNull PracticeGroupReviewedWorkDTO reviewedWork,
+        @NonNull List<PracticeGroupReviewObservationDTO> observations) {}

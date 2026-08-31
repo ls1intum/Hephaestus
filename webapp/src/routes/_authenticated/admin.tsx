@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Outlet, redirect, useMatchRoute } from "@tanstack/react-router";
+
 import { adminGetInstanceSettingsOptions } from "@/api/@tanstack/react-query.gen";
 import { SilentModeBanner } from "@/components/admin/instance/SilentModeBanner";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";

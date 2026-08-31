@@ -25,9 +25,7 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
     void revokeIsIdempotent() {
         UUID sessionId = UUID.randomUUID();
         String token = registry.mint(
-            sessionId,
-            new Route("openai-completions", "https://api.openai.com", null, null, null, null)
-        );
+                sessionId, new Route("openai-completions", "https://api.openai.com", null, null, null, null));
 
         registry.revoke(sessionId);
         registry.revoke(sessionId);
@@ -39,9 +37,7 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
     void revokingAnUnknownSessionLeavesEveryLiveSessionUntouched() {
         UUID liveSession = UUID.randomUUID();
         String liveToken = registry.mint(
-            liveSession,
-            new Route("openai-completions", "https://api.openai.com", null, null, null, null)
-        );
+                liveSession, new Route("openai-completions", "https://api.openai.com", null, null, null, null));
 
         registry.revoke(UUID.randomUUID());
 
@@ -54,13 +50,9 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
         UUID sessionA = UUID.randomUUID();
         UUID sessionB = UUID.randomUUID();
         String tokenA = registry.mint(
-            sessionA,
-            new Route("openai-completions", "https://api.openai.com", null, null, null, null)
-        );
+                sessionA, new Route("openai-completions", "https://api.openai.com", null, null, null, null));
         String tokenB = registry.mint(
-            sessionB,
-            new Route("anthropic-messages", "https://api.anthropic.com", null, null, null, null)
-        );
+                sessionB, new Route("anthropic-messages", "https://api.anthropic.com", null, null, null, null));
 
         registry.revoke(sessionA);
 
@@ -72,9 +64,8 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
     void validateReportsRoutingForTheBoundConnection() {
         UUID sessionId = UUID.randomUUID();
         String token = registry.mint(
-            sessionId,
-            new Route("anthropic-messages", "https://api.anthropic.com", FundingSource.INSTANCE, 42L, null, null)
-        );
+                sessionId,
+                new Route("anthropic-messages", "https://api.anthropic.com", FundingSource.INSTANCE, 42L, null, null));
 
         var routing = registry.validate(token).orElseThrow();
 
@@ -95,21 +86,19 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
         private final MentorProxyCredentialRegistry registry = new MentorProxyCredentialRegistry();
 
         private static final LlmPriceSnapshot TEN_DOLLARS_PER_MILLION = new LlmPriceSnapshot(
-            FundingSource.INSTANCE,
-            PricingState.PRICED,
-            1L,
-            null,
-            new BigDecimal("10"),
-            new BigDecimal("10"),
-            new BigDecimal("10"),
-            new BigDecimal("10")
-        );
+                FundingSource.INSTANCE,
+                PricingState.PRICED,
+                1L,
+                null,
+                new BigDecimal("10"),
+                new BigDecimal("10"),
+                new BigDecimal("10"),
+                new BigDecimal("10"));
 
         private String mint(UUID sessionId) {
             return registry.mint(
-                sessionId,
-                new Route("openai-completions", "https://api.openai.com", FundingSource.INSTANCE, 1L, 2L, 3L)
-            );
+                    sessionId,
+                    new Route("openai-completions", "https://api.openai.com", FundingSource.INSTANCE, 1L, 2L, 3L));
         }
 
         @Test
@@ -140,7 +129,8 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
             assertThat(attempt.sourceId()).isEqualTo(turnId);
             assertThat(attempt.number()).isZero();
             assertThat(attempt.spentUsd()).isEqualByComparingTo("2.00");
-            assertThat(registry.validate(token).orElseThrow().inFlightSpendUsd()).isEqualByComparingTo("2.00");
+            assertThat(registry.validate(token).orElseThrow().inFlightSpendUsd())
+                    .isEqualByComparingTo("2.00");
         }
 
         @Test
@@ -171,8 +161,12 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
 
             registry.unbindTurn(sessionId, meter);
 
-            assertThat(registry.validate(token).orElseThrow().attempt()).as("no longer billable").isNull();
-            assertThat(meter.observed().inputTokens()).as("still readable by the terminal write").isEqualTo(50_000);
+            assertThat(registry.validate(token).orElseThrow().attempt())
+                    .as("no longer billable")
+                    .isNull();
+            assertThat(meter.observed().inputTokens())
+                    .as("still readable by the terminal write")
+                    .isEqualTo(50_000);
             assertThat(registry.boundTurns()).isZero();
         }
 
@@ -201,7 +195,8 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
 
             registry.bindTurn(sessionId, new MentorTurnMeter(UUID.randomUUID(), TEN_DOLLARS_PER_MILLION));
 
-            assertThat(registry.accumulate(turnA.turnId(), new ProxyTokenUsage(10, 0, 0, 0))).isFalse();
+            assertThat(registry.accumulate(turnA.turnId(), new ProxyTokenUsage(10, 0, 0, 0)))
+                    .isFalse();
             assertThat(registry.boundTurns()).isEqualTo(1);
         }
 
@@ -211,10 +206,8 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
             mint(sessionId);
             registry.revoke(sessionId);
 
-            boolean bound = registry.bindTurn(
-                sessionId,
-                new MentorTurnMeter(UUID.randomUUID(), TEN_DOLLARS_PER_MILLION)
-            );
+            boolean bound =
+                    registry.bindTurn(sessionId, new MentorTurnMeter(UUID.randomUUID(), TEN_DOLLARS_PER_MILLION));
 
             assertThat(bound).isFalse();
             assertThat(registry.boundTurns()).isZero();
@@ -230,7 +223,8 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
             registry.revoke(sessionId);
 
             assertThat(registry.boundTurns()).isZero();
-            assertThat(registry.accumulate(meter.turnId(), new ProxyTokenUsage(10, 0, 0, 0))).isFalse();
+            assertThat(registry.accumulate(meter.turnId(), new ProxyTokenUsage(10, 0, 0, 0)))
+                    .isFalse();
         }
 
         @Test
@@ -264,9 +258,7 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
         void aTokenThatIsNeverPresentedAgainStillExpiresAndDropsItsSessionEntry() {
             UUID sessionId = UUID.randomUUID();
             String token = registry.mint(
-                sessionId,
-                new Route("openai-completions", "https://api.openai.com", null, null, null, null)
-            );
+                    sessionId, new Route("openai-completions", "https://api.openai.com", null, null, null, null));
             assertThat(registry.trackedSessions()).isEqualTo(1);
 
             ticker.advance(Duration.ofHours(13));
@@ -280,9 +272,7 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
         void aTokenInsideItsTtlSurvives() {
             UUID sessionId = UUID.randomUUID();
             String token = registry.mint(
-                sessionId,
-                new Route("openai-completions", "https://api.openai.com", null, null, null, null)
-            );
+                    sessionId, new Route("openai-completions", "https://api.openai.com", null, null, null, null));
 
             ticker.advance(Duration.ofHours(11));
             registry.runPendingEviction();
@@ -295,13 +285,9 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
         void reMintingForOneSessionRetiresTheTokenItReplaces() {
             UUID sessionId = UUID.randomUUID();
             String first = registry.mint(
-                sessionId,
-                new Route("openai-completions", "https://api.openai.com", null, null, null, null)
-            );
+                    sessionId, new Route("openai-completions", "https://api.openai.com", null, null, null, null));
             String second = registry.mint(
-                sessionId,
-                new Route("openai-completions", "https://api.openai.com", null, null, null, null)
-            );
+                    sessionId, new Route("openai-completions", "https://api.openai.com", null, null, null, null));
 
             assertThat(registry.validate(first)).isEmpty();
             assertThat(registry.validate(second)).isPresent();

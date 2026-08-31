@@ -44,41 +44,39 @@ public class AccountWebController {
     }
 
     public record CurrentUserViewDTO(
-        Long id,
-        String displayName,
-        @Nullable String primaryEmail,
-        String appRole,
-        String status,
-        boolean impersonating,
-        @Nullable Long impersonatorId,
-        // Identity fields the SPA's useAuth() surface needs (sourced from the primary IdentityLink).
-        @Nullable String username,
-        @Nullable String avatarUrl,
-        @Nullable String profileUrl,
-        @Nullable String identityProvider,
-        @Nullable String gitProviderId,
-        boolean hasGitLabIdentity,
-        // Every SCM instance the user has an active identity on, so the workspace-creation wizard can
-        // gate on the *target instance* rather than merely "has any GitLab identity".
-        List<LinkedProviderDTO> linkedProviders,
-        List<String> roles,
-        // Access-token expiry (epoch seconds) so the SPA can schedule a proactive refresh before it
-        // lapses, rather than waiting for a 401 (BFF pattern; see CurrentAccount.accessTokenExpiresAt).
-        @Nullable Long accessTokenExpiresAt
-    ) {}
+            Long id,
+            String displayName,
+            @Nullable String primaryEmail,
+            String appRole,
+            String status,
+            boolean impersonating,
+            @Nullable Long impersonatorId,
+            // Identity fields the SPA's useAuth() surface needs (sourced from the primary IdentityLink).
+            @Nullable String username,
+            @Nullable String avatarUrl,
+            @Nullable String profileUrl,
+            @Nullable String identityProvider,
+            @Nullable String gitProviderId,
+            boolean hasGitLabIdentity,
+            // Every SCM instance the user has an active identity on, so the workspace-creation wizard can
+            // gate on the *target instance* rather than merely "has any GitLab identity".
+            List<LinkedProviderDTO> linkedProviders,
+            List<String> roles,
+            // Access-token expiry (epoch seconds) so the SPA can schedule a proactive refresh before it
+            // lapses, rather than waiting for a 401 (BFF pattern; see CurrentAccount.accessTokenExpiresAt).
+            @Nullable Long accessTokenExpiresAt) {}
 
     /** A provider instance the current user is linked to: its type + server-url origin. */
     public record LinkedProviderDTO(String type, @Nullable String serverUrl) {}
 
     public record IdentityViewDTO(
-        Long id,
-        String providerType,
-        String subject,
-        @Nullable String username,
-        @Nullable String displayName,
-        @Nullable String avatarUrl,
-        @Nullable Instant lastLoginAt
-    ) {}
+            Long id,
+            String providerType,
+            String subject,
+            @Nullable String username,
+            @Nullable String displayName,
+            @Nullable String avatarUrl,
+            @Nullable Instant lastLoginAt) {}
 
     @GetMapping
     @Operation(summary = "Get the current user", operationId = "getCurrentUser")
@@ -88,19 +86,14 @@ public class AccountWebController {
         var identities = accountService.activeIdentities(Objects.requireNonNull(account.getId()));
         // Primary identity = most recently used active link (login source for the SPA).
         IdentityLink primary = identities.stream().findFirst().orElse(null);
-        List<LinkedProviderDTO> linkedProviders = identities
-            .stream()
-            .map(il ->
-                new LinkedProviderDTO(
-                    gitProviderRegistry.providerTypeName(il.getProviderId()),
-                    gitProviderRegistry.providerServerUrl(il.getProviderId())
-                )
-            )
-            .distinct()
-            .toList();
+        List<LinkedProviderDTO> linkedProviders = identities.stream()
+                .map(il -> new LinkedProviderDTO(
+                        gitProviderRegistry.providerTypeName(il.getProviderId()),
+                        gitProviderRegistry.providerServerUrl(il.getProviderId())))
+                .distinct()
+                .toList();
         boolean hasGitLab = linkedProviders.stream().anyMatch(p -> "GITLAB".equals(p.type()));
-        return ResponseEntity.ok(
-            new CurrentUserViewDTO(
+        return ResponseEntity.ok(new CurrentUserViewDTO(
                 Objects.requireNonNull(account.getId()),
                 account.getDisplayName(),
                 account.getPrimaryEmail(),
@@ -116,34 +109,25 @@ public class AccountWebController {
                 hasGitLab,
                 linkedProviders,
                 CurrentAccount.roles(),
-                CurrentAccount.accessTokenExpiresAt()
-            )
-        );
+                CurrentAccount.accessTokenExpiresAt()));
     }
 
     @GetMapping("/identities")
     @Operation(summary = "List linked identity providers", operationId = "listLinkedIdentities")
     public ResponseEntity<List<IdentityViewDTO>> identities() {
-        List<IdentityViewDTO> views = accountService
-            .activeIdentities(CurrentAccount.requireId())
-            .stream()
-            .map(this::toView)
-            .toList();
+        List<IdentityViewDTO> views = accountService.activeIdentities(CurrentAccount.requireId()).stream()
+                .map(this::toView)
+                .toList();
         return ResponseEntity.ok(views);
     }
 
     @DeleteMapping("/identities/{id}")
     @Operation(summary = "Unlink one of the current user's linked identity providers", operationId = "unlinkIdentity")
-    @ApiResponses(
-        {
-            @ApiResponse(responseCode = "204", description = "Identity unlinked"),
-            @ApiResponse(responseCode = "404", description = "No such identity on the current account"),
-            @ApiResponse(
-                responseCode = "409",
-                description = "Cannot unlink the account's only remaining sign-in method"
-            ),
-        }
-    )
+    @ApiResponses({
+        @ApiResponse(responseCode = "204", description = "Identity unlinked"),
+        @ApiResponse(responseCode = "404", description = "No such identity on the current account"),
+        @ApiResponse(responseCode = "409", description = "Cannot unlink the account's only remaining sign-in method"),
+    })
     public ResponseEntity<Void> unlinkIdentity(@PathVariable Long id) {
         accountService.unlinkIdentity(CurrentAccount.requireId(), id, CurrentAccount.impersonatorId());
         return ResponseEntity.noContent().build();
@@ -152,14 +136,11 @@ public class AccountWebController {
     @DeleteMapping
     @Operation(summary = "Delete the current account (GDPR Art. 17)", operationId = "deleteCurrentUser")
     public ResponseEntity<Void> deleteAccount(
-        @RequestHeader(value = "X-Confirm-Delete", required = false) @Nullable String confirmHeader
-    ) {
+            @RequestHeader(value = "X-Confirm-Delete", required = false) @Nullable String confirmHeader) {
         Long accountId = CurrentAccount.requireId();
         if (confirmHeader == null || !confirmHeader.equals(String.valueOf(accountId))) {
             throw new ResponseStatusException(
-                HttpStatus.BAD_REQUEST,
-                "X-Confirm-Delete header must equal your account id to confirm deletion"
-            );
+                    HttpStatus.BAD_REQUEST, "X-Confirm-Delete header must equal your account id to confirm deletion");
         }
         accountService.softDelete(accountId, CurrentAccount.impersonatorId());
         return ResponseEntity.noContent().build();
@@ -168,13 +149,12 @@ public class AccountWebController {
     private IdentityViewDTO toView(IdentityLink il) {
         String providerType = gitProviderRegistry.providerTypeName(il.getProviderId());
         return new IdentityViewDTO(
-            il.getId(),
-            providerType,
-            il.getSubject(),
-            il.getUsernameAtSignup(),
-            il.getDisplayName(),
-            il.getAvatarUrl(),
-            il.getLastLoginAt()
-        );
+                il.getId(),
+                providerType,
+                il.getSubject(),
+                il.getUsernameAtSignup(),
+                il.getDisplayName(),
+                il.getAvatarUrl(),
+                il.getLastLoginAt());
     }
 }

@@ -50,10 +50,9 @@ public interface IntegrationManifest {
      * @param delivers each lane is held to the {@link Capability} that carries it
      */
     record ReviewContribution(
-        Set<ArtifactKind> observes,
-        Map<ArtifactKind, Set<SignalName>> raises,
-        Map<ArtifactKind, Set<FeedbackLane>> delivers
-    ) {
+            Set<ArtifactKind> observes,
+            Map<ArtifactKind, Set<SignalName>> raises,
+            Map<ArtifactKind, Set<FeedbackLane>> delivers) {
         private static final ReviewContribution NONE = new ReviewContribution(Set.of(), Map.of(), Map.of());
 
         public ReviewContribution {
@@ -73,10 +72,8 @@ public interface IntegrationManifest {
         }
 
         private static <V> Map<ArtifactKind, Set<V>> deepCopy(Map<ArtifactKind, Set<V>> source) {
-            return source
-                .entrySet()
-                .stream()
-                .collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, entry -> Set.copyOf(entry.getValue())));
+            return source.entrySet().stream()
+                    .collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, entry -> Set.copyOf(entry.getValue())));
         }
     }
 }

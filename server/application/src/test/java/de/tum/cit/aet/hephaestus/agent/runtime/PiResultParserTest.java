@@ -35,7 +35,10 @@ class PiResultParserTest extends BaseUnitTest {
     void emitsParseFailureMetric() {
         var bad = "not-json".getBytes(StandardCharsets.UTF_8);
         parser.parseUsage(bad);
-        assertThat(meterRegistry.counter("agent.pi.result.parse.failure", "stage", "usage").count()).isEqualTo(1d);
+        assertThat(meterRegistry
+                        .counter("agent.pi.result.parse.failure", "stage", "usage")
+                        .count())
+                .isEqualTo(1d);
     }
 
     @Test
@@ -56,55 +59,45 @@ class PiResultParserTest extends BaseUnitTest {
         String reviewState = """
             {"observations":[{"practiceSlug":"x","title":"t","presence":"ABSENT","assessment":"BAD","severity":"MAJOR",
             "evidence":{"citations":[]},"reasoning":"r"}]}""";
-        var result = parser.parse(
-            new SandboxResult(
+        var result = parser.parse(new SandboxResult(
                 1,
                 Map.of("review-state.json", reviewState.getBytes(StandardCharsets.UTF_8)),
                 "runner failed",
                 false,
-                Duration.ofSeconds(10)
-            )
-        );
+                Duration.ofSeconds(10)));
         String raw = rawOutput(result).toString();
         assertThat(raw).contains("\"x\"").contains("\"ABSENT\"");
     }
 
     @Test
     void extractsJsonFromMixedText() {
-        String mixed =
-            "Here:\n```json\n{\"observations\":[{\"practiceSlug\":\"t\",\"title\":\"a\"," +
-            "\"presence\":\"ABSENT\",\"assessment\":\"BAD\",\"severity\":\"MAJOR\",\"confidence\":0.8}]}\n```";
+        String mixed = "Here:\n```json\n{\"observations\":[{\"practiceSlug\":\"t\",\"title\":\"a\","
+                + "\"presence\":\"ABSENT\",\"assessment\":\"BAD\",\"severity\":\"MAJOR\",\"confidence\":0.8}]}\n```";
         var result = parser.parse(
-            new SandboxResult(0, Map.of("result.json", mixed.getBytes()), "done", false, Duration.ofSeconds(10))
-        );
+                new SandboxResult(0, Map.of("result.json", mixed.getBytes()), "done", false, Duration.ofSeconds(10)));
         assertThat(rawOutput(result).toString()).contains("observations").contains("ABSENT");
     }
 
     @Test
     void surfacesUsageAndRunnerDebug() {
         String observations =
-            "{\"observations\":[{\"practiceSlug\":\"t\",\"title\":\"x\",\"presence\":\"PRESENT\",\"assessment\":\"GOOD\"," +
-            "\"severity\":\"INFO\",\"confidence\":0.9}]}";
-        String usage =
-            "{\"model\":\"m\",\"inputTokens\":10,\"outputTokens\":5,\"cacheReadTokens\":20," +
-            "\"costUsd\":0.12,\"totalCalls\":2}";
+                "{\"observations\":[{\"practiceSlug\":\"t\",\"title\":\"x\",\"presence\":\"PRESENT\",\"assessment\":\"GOOD\","
+                        + "\"severity\":\"INFO\",\"confidence\":0.9}]}";
+        String usage = "{\"model\":\"m\",\"inputTokens\":10,\"outputTokens\":5,\"cacheReadTokens\":20,"
+                + "\"costUsd\":0.12,\"totalCalls\":2}";
         String debug = "{\"attempts\":[],\"usageTotals\":{\"totalCalls\":2}}";
-        var result = parser.parse(
-            new SandboxResult(
+        var result = parser.parse(new SandboxResult(
                 0,
                 Map.of(
-                    "result.json",
-                    observations.getBytes(),
-                    "usage.json",
-                    usage.getBytes(),
-                    "runner-debug.json",
-                    debug.getBytes()
-                ),
+                        "result.json",
+                        observations.getBytes(),
+                        "usage.json",
+                        usage.getBytes(),
+                        "runner-debug.json",
+                        debug.getBytes()),
                 "done",
                 false,
-                Duration.ofSeconds(10)
-            )
-        );
+                Duration.ofSeconds(10)));
         assertThat(result.usage()).isNotNull();
         assertThat(result.usage().model()).isEqualTo("m");
         assertThat(result.usage().totalCalls()).isEqualTo(2);
@@ -115,11 +108,64 @@ class PiResultParserTest extends BaseUnitTest {
     }
 
     @Test
+    void surfacesPerRunPracticeCoverageAndRecordsItsRatio() {
+        String coverage = """
+                {"eligible":4,"evaluated":2,"outcomes":[
+                  {"practiceSlug":"a","outcome":"EVALUATED"},
+                  {"practiceSlug":"b","outcome":"NOT_REACHED"},
+                  {"practiceSlug":"c","outcome":"EVALUATED"},
+                  {"practiceSlug":"d","outcome":"NOT_REACHED"}]}
+                """;
+
+        var result = parser.parse(new SandboxResult(
+                1,
+                Map.of("practice-coverage.json", coverage.getBytes(StandardCharsets.UTF_8)),
+                "budget exhausted",
+                false,
+                Duration.ofSeconds(10)));
+
+        assertThat(result.output()).containsKey("practiceCoverage");
+        assertThat(meterRegistry
+                        .get("agent.review.practice.coverage.eligible")
+                        .summary()
+                        .totalAmount())
+                .isEqualTo(4);
+        assertThat(meterRegistry
+                        .get("agent.review.practice.coverage.evaluated")
+                        .summary()
+                        .totalAmount())
+                .isEqualTo(2);
+        assertThat(meterRegistry
+                        .get("agent.review.practice.coverage.ratio")
+                        .summary()
+                        .totalAmount())
+                .isEqualTo(0.5);
+    }
+
+    @Test
+    void rejectsIncompleteOrContradictoryPracticeCoverage() {
+        String[] invalid = {
+            "{\"eligible\":2,\"evaluated\":1,\"outcomes\":[]}",
+            "{\"eligible\":2,\"evaluated\":1,\"outcomes\":[{\"practiceSlug\":\"a\",\"outcome\":\"EVALUATED\"},{\"practiceSlug\":\"a\",\"outcome\":\"NOT_REACHED\"}]}",
+            "{\"eligible\":1,\"evaluated\":1,\"outcomes\":[{\"practiceSlug\":\"a\",\"outcome\":\"UNKNOWN\"}]}"
+        };
+
+        for (String coverage : invalid) {
+            Map<String, Object> output = new java.util.HashMap<>();
+            parser.addPracticeCoverage(output, coverage.getBytes(StandardCharsets.UTF_8));
+            assertThat(output).doesNotContainKey("practiceCoverage");
+        }
+        assertThat(meterRegistry
+                        .counter("agent.pi.result.parse.failure", "stage", "practice_coverage")
+                        .count())
+                .isEqualTo(invalid.length);
+    }
+
+    @Test
     @DisplayName("reasoningTokens is populated from the responses-path shape when the runner reports it")
     void populatesReasoningTokensWhenPresent() {
-        String usage =
-            "{\"model\":\"gpt-5.4\",\"inputTokens\":100,\"outputTokens\":50,\"reasoningTokens\":30," +
-            "\"totalCalls\":1}";
+        String usage = "{\"model\":\"gpt-5.4\",\"inputTokens\":100,\"outputTokens\":50,\"reasoningTokens\":30,"
+                + "\"totalCalls\":1}";
         var result = parser.parseUsage(usage.getBytes(StandardCharsets.UTF_8));
 
         assertThat(result).isNotNull();
@@ -140,13 +186,11 @@ class PiResultParserTest extends BaseUnitTest {
 
     @Test
     void sanitizesSwiftEscapes() {
-        String json =
-            "{\"observations\":[{\"practiceSlug\":\"t\",\"title\":\"line1\\nline2\"," +
-            "\"presence\":\"PRESENT\",\"assessment\":\"GOOD\",\"severity\":\"INFO\",\"confidence\":0.9," +
-            "\"reasoning\":\"Text(\\\"\\(weather.temp)°\\\")\"}]}";
+        String json = "{\"observations\":[{\"practiceSlug\":\"t\",\"title\":\"line1\\nline2\","
+                + "\"presence\":\"PRESENT\",\"assessment\":\"GOOD\",\"severity\":\"INFO\",\"confidence\":0.9,"
+                + "\"reasoning\":\"Text(\\\"\\(weather.temp)°\\\")\"}]}";
         var result = parser.parse(
-            new SandboxResult(0, Map.of("result.json", json.getBytes()), "done", false, Duration.ofSeconds(10))
-        );
+                new SandboxResult(0, Map.of("result.json", json.getBytes()), "done", false, Duration.ofSeconds(10)));
         assertThat(result.success()).isTrue();
         assertThat(rawOutput(result).toString()).contains("line1\\nline2");
     }
@@ -155,30 +199,24 @@ class PiResultParserTest extends BaseUnitTest {
     @DisplayName("watchdog-killed marker is surfaced into output")
     void surfacesWatchdogState() {
         String marker = "{\"budgetMs\":540000,\"elapsedMs\":570000,\"reason\":\"x\"}";
-        var result = parser.parse(
-            new SandboxResult(
+        var result = parser.parse(new SandboxResult(
                 3,
                 Map.of("watchdog-killed.json", marker.getBytes(StandardCharsets.UTF_8)),
                 "killed",
                 false,
-                Duration.ofSeconds(570)
-            )
-        );
+                Duration.ofSeconds(570)));
         assertThat(result.output()).containsKey("watchdogKilled");
     }
 
     @Test
     void emptyReviewStateNoOutput() {
         String empty = "{\"observations\":[]}";
-        var result = parser.parse(
-            new SandboxResult(
+        var result = parser.parse(new SandboxResult(
                 1,
                 Map.of("review-state.json", empty.getBytes(StandardCharsets.UTF_8)),
                 "failed",
                 false,
-                Duration.ofSeconds(10)
-            )
-        );
+                Duration.ofSeconds(10)));
         assertThat(result.output()).doesNotContainKey("rawOutput");
     }
 
@@ -186,15 +224,12 @@ class PiResultParserTest extends BaseUnitTest {
     void zeroCallsUsageIgnored() {
         String observations = "{\"observations\":[]}";
         String usage = "{\"model\":\"m\",\"totalCalls\":0}";
-        var result = parser.parse(
-            new SandboxResult(
+        var result = parser.parse(new SandboxResult(
                 0,
                 Map.of("result.json", observations.getBytes(), "usage.json", usage.getBytes()),
                 "done",
                 false,
-                Duration.ofSeconds(10)
-            )
-        );
+                Duration.ofSeconds(10)));
         assertThat(result.usage()).isNull();
     }
 }

@@ -11,8 +11,14 @@ import org.jspecify.annotations.Nullable;
  */
 @Schema(description = "Update your AI provider connection (all fields optional)")
 public record UpdateWorkspaceLlmConnectionRequestDTO(
-    @Nullable @Size(max = 128) @Schema(description = "Human-readable name") String displayName,
-    @Nullable @Schema(description = "New API key (write-only; never returned)") String apiKey,
-    @Nullable @Schema(description = "Set true to clear the stored API key") Boolean clearApiKey,
-    @Nullable @Schema(description = "Whether the connection is active") Boolean enabled
-) {}
+        @Nullable @Size(max = 128) @Schema(description = "Human-readable name")
+        String displayName,
+
+        @Nullable @Schema(description = "New API key (write-only; never returned)")
+        String apiKey,
+
+        @Nullable @Schema(description = "Set true to clear the stored API key")
+        Boolean clearApiKey,
+
+        @Nullable @Schema(description = "Whether the connection is active")
+        Boolean enabled) {}

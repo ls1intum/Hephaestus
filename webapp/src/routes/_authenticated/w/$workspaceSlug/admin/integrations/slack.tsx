@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
+
 import {
 	getConnectionSyncStatusOptions,
 	getConnectionSyncStatusQueryKey,
@@ -27,9 +28,9 @@ import { AdminSlackNotificationSettings } from "@/components/admin/integrations/
 import { ConnectionStateNotice } from "@/components/admin/integrations/ConnectionStateNotice";
 import { IntegrationCardHeading } from "@/components/admin/integrations/IntegrationCardHeading";
 import { JobHistoryCard } from "@/components/admin/integrations/JobHistoryCard";
+import { syncPollInterval } from "@/components/admin/integrations/sync-format";
 import { SyncResourcesTable } from "@/components/admin/integrations/SyncResourcesTable";
 import { SyncStatusHeader } from "@/components/admin/integrations/SyncStatusHeader";
-import { syncPollInterval } from "@/components/admin/integrations/sync-format";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { PageHeader } from "@/components/core/PageHeader";
 import { PageLayout } from "@/components/core/PageLayout";

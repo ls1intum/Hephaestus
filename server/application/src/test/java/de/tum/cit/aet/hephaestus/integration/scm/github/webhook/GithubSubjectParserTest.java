@@ -46,15 +46,15 @@ class GithubSubjectParserTest extends BaseUnitTest {
     @Test
     void tooFewComponentsThrows() {
         assertThatThrownBy(() -> parser.parse("github.acme.web"))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining(">= 4");
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining(">= 4");
     }
 
     @Test
     void wrongPrefixThrows() {
         assertThatThrownBy(() -> parser.parse("gitlab.acme.web.push"))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("github.");
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("github.");
     }
 
     @Test

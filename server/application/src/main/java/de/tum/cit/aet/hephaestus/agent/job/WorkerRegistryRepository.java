@@ -17,11 +17,10 @@ public interface WorkerRegistryRepository extends JpaRepository<WorkerRegistry, 
     /** Upsert this worker's heartbeat on the DB clock, so every liveness comparison stays on one clock. */
     @Modifying
     @Query(
-        value = "INSERT INTO worker_registry (worker_id, last_heartbeat, registered_at) " +
-            "VALUES (:workerId, now(), now()) " +
-            "ON CONFLICT (worker_id) DO UPDATE SET last_heartbeat = now()",
-        nativeQuery = true
-    )
+            value = "INSERT INTO worker_registry (worker_id, last_heartbeat, registered_at) "
+                    + "VALUES (:workerId, now(), now()) "
+                    + "ON CONFLICT (worker_id) DO UPDATE SET last_heartbeat = now()",
+            nativeQuery = true)
     void heartbeat(@Param("workerId") String workerId);
 
     /**
@@ -32,8 +31,7 @@ public interface WorkerRegistryRepository extends JpaRepository<WorkerRegistry, 
      */
     @Modifying
     @Query(
-        value = "DELETE FROM worker_registry WHERE last_heartbeat < now() - make_interval(secs => :ttlSeconds)",
-        nativeQuery = true
-    )
+            value = "DELETE FROM worker_registry WHERE last_heartbeat < now() - make_interval(secs => :ttlSeconds)",
+            nativeQuery = true)
     int deleteStale(@Param("ttlSeconds") long ttlSeconds);
 }

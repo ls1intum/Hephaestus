@@ -2,9 +2,17 @@
 
 **⚠️ Do NOT stage, commit, or push unless you have permission to do so.**
 
-Hephaestus reviews software practices for engineering teams: it ingests work from GitHub, GitLab,
-Slack and Outline, has an LLM agent observe it against a curated practice catalogue, and delivers
-feedback to the developer in-context, in a reflection page, or in conversation.
+Hephaestus is an open-source AI mentor for software teams. It reads the work developers already do
+in GitHub, GitLab, Slack and Outline against the engineering practices their project cares about — a
+curated set of practices ships with it — and delivers practice feedback on the work itself, on the developer's
+own practice pages, or in conversation.
+
+`docs/contributor/practice-feedback-language.md` is the normative vocabulary and it binds this file
+too: the unit a review records is an **observation**, the unit a developer receives is **feedback**,
+and neither the application nor a review is an *agent*.
+
+Parallel contributions follow the hot-file lanes, generated-artifact, main-breakage, and merge-queue
+protocol in `docs/contributor/ai-agent-workflow.mdx` § Parallel delivery protocol.
 
 - `server/` — Spring Boot 4 + Java 21 + Spring Modulith 2. Liquibase-managed PostgreSQL, SQL-layer
   multi-tenancy (`core/tenancy/`), generated `openapi.yaml`. Three runtime roles (`server`, `worker`,
@@ -13,13 +21,13 @@ feedback to the developer in-context, in a reflection page, or in conversation.
   See `webapp/AGENTS.md`.
 - `docs/` — contributor docs published to GitHub Pages, including the generated ERD.
 
-Node is pinned in `.node-version` and drives the repo's own tooling; the repo is pnpm 11 workspaces.
-`webapp` is the main TypeScript package; `docs` is a second, with its own tooling. The agent sandbox runs no Node at all: the runner
+The repository uses Node.js for repository scripts and application tooling, and pnpm for package
+management; `package.json#devEngines.runtime` and `packageManager` are the authoritative versions.
+`webapp` is the main TypeScript package; `docs` is a second. The runner
 (`server/application/src/main/resources/agent/`), the precompute runner and lib (`docker/agents/precompute/`) and
 the per-practice precompute scripts (`server/application/src/main/resources/practices/precompute/`) are
-TypeScript executed directly by Bun, whose version the agent image pins in
-`docker/agents/pi/Dockerfile`. They are type-checked as one project via `tsconfig.agents.json` and
-linted by the root `.oxlintrc.json` and formatted by the root `biome.jsonc`. JDK 21, and Docker
+type-checked as one project via `tsconfig.agents.json` and
+linted by the root `.oxlintrc.json` and formatted by the root `.oxfmtrc.json`. JDK 21, and Docker
 for the database helpers.
 
 ## Skills
@@ -43,36 +51,41 @@ drifts. Copy a skill nowhere else.
 Finish every change set with `pnpm run format` then `pnpm run check`, so styling and type checks
 reflect the final state. Document any skipped gate in the PR description.
 
+Use `pnpm run check:affected` for in-session feedback; it is not the pre-push gate. Its contract is in
+`docs/contributor/local-verification.mdx`.
+
 | Command | Does |
 |---|---|
 | `pnpm run format` / `format:check` | Apply / verify formatting (Java + TypeScript) |
 | `pnpm run check` | Static analysis, formatting checks, agent tests, and repository policy checks — every leg is listed in the root `package.json` |
+| `pnpm run verify` | Complete local CI mirror for checks that need no live service, image build, or hosted credential |
 | `pnpm run test:webapp` | Vitest |
-| `pnpm run test:agents` | Agent runtime and precompute specs, on Bun |
-| `cd server && ./mvnw test` | Server unit tests — see `server/AGENTS.md` for all four tiers |
+| `pnpm run test:agents` | Agent runtime and precompute specs, on Node |
+| `pnpm run test:server:unit` | Server unit tests — see `server/AGENTS.md` for all four tiers |
 
 Naming: `format` applies, `format:check` verifies read-only for CI, `lint` lints, `check` is the
 comprehensive local quality gate. A `:webapp`, `:server` or `:agents` suffix scopes any of them; `:java`
 scopes `format` and `lint` only — the Java leg of `check` is `check:server`.
 
-**Every leg of `check` also runs in CI.** CI additionally runs the Vite build and generated route-tree
-comparison, webapp tests, server test tiers, image and security checks, and other workflow-specific
-gates. It cannot run anything needing a live credential. Run `check` before pushing because it is the
-fastest complete local quality gate, then run the affected test or build commands above.
+`pnpm run check` is the complete local quality gate; `pnpm run verify` adds locally runnable builds and
+broader tests. CI distributes these checks across required jobs,
+using path filters where appropriate, and adds builds, generated-file checks, broader tests, image
+checks, and security scans. Run `check` before pushing and `verify` before requesting review.
 
 ### Lint and format scopes
 
-**oxlint lints every TypeScript tree in the repo; Biome formats and sorts imports.**
+**Oxlint owns linting; oxfmt owns the formatting scopes below and sorts imports.**
 
 | Tree | oxlint config | Formatted by | Scripts |
 |---|---|---|---|
-| the SPA (`webapp/`) | `webapp/.oxlintrc.json` | Biome (`webapp/biome.jsonc`) | `format:webapp`, `lint:webapp`, `check:webapp` |
-| the docs site (`docs/`) | `docs/.oxlintrc.json` | nothing — only `.editorconfig` | linted by `lint:agents`, which passes `docs` as a path |
-| the Bun agent runtime and specs, both precompute trees, `scripts/**`, `.changeset/`, `.github/` and the root config files | `.oxlintrc.json` | Biome (`biome.jsonc`) | `format:agents`, `lint:agents`, `check:agents` |
+| the SPA (`webapp/`) | `webapp/.oxlintrc.json` | oxfmt (`.oxfmtrc.json`) | `format:webapp`, `lint:webapp`, `check:webapp` |
+| the docs site (`docs/`) | `docs/.oxlintrc.json` | oxfmt for JavaScript, TypeScript, JSON/JSONC, and CSS (`.oxfmtrc.json`) | `format:docs`; linted by `lint:agents` |
+| the agent runtime and specs, both precompute trees, and `scripts/**` | `.oxlintrc.json` | oxfmt (`.oxfmtrc.json`) | `format:agents`, `lint:agents`, `check:agents` |
+| selected repository tooling configuration | `.oxlintrc.json` where applicable | oxfmt (`.oxfmtrc.json`) | `format:config` |
 
 `docs:lint` is **not** the oxlint leg — it is the docs package's own `typecheck` plus
 `markdownlint-cli2`, configured by `docs/.markdownlint-cli2.jsonc`, which states both the file scope
-and the rules. It is the last leg of `pnpm run check` and runs on the App Server CI leg, which
+and the rules. It is the last leg of `pnpm run check` and runs on the Tooling and Docs CI leg, which
 `docs/**` already triggers.
 
 **Start every oxlint run from the repo root.** A nested config *replaces* the root's rules for the
@@ -82,7 +95,7 @@ discovers as the *root*. Start it inside `webapp/` and every type-aware rule rea
 checks nothing.
 
 Type-aware rules need a project, and oxlint finds one by looking for a file named exactly
-`tsconfig.json`. The root stub exists only so the Bun trees — configured by `tsconfig.agents.json` —
+`tsconfig.json`. The root stub exists only so the Node trees — configured by `tsconfig.agents.json` —
 have one; without it every ambient global resolves to an error type there.
 
 Each config carries the reasoning for its own deltas; read it before switching a rule either way. The
@@ -92,9 +105,15 @@ adding a rule there enables it nowhere. `webapp/AGENTS.md` § Linting has the re
 
 ## TypeScript, in every tree
 
-Holds wherever TypeScript is written here, the Bun agent trees and `scripts/**` included.
+Holds wherever TypeScript is written here, the Node agent trees and `scripts/**` included.
 `webapp/AGENTS.md` wins over it inside the SPA.
 
+Prefer typed Node.js/TypeScript for repository automation, validation, and tests. Keep shell only at a
+real runtime boundary where Node.js is unavailable, such as an end-user bootstrap that must run before
+the application toolchain is installed; keep that boundary POSIX-compatible and move its substantive
+test orchestration into TypeScript.
+
+- Separate import groups with blank lines wherever their relative evaluation order must not change; oxfmt sorts within each group.
 - **A leading `_` marks what the language or a tool reads that way** — an intentionally unused
   binding, a server field name (`_id`), a runtime global. It never marks something private, which
   carries no prefix.
@@ -165,11 +184,11 @@ as a Liquibase `<changeSet>` — a schema change needs both. Full flow:
   ✗ `Refactor LeaderboardService scoring hooks` → ✓ `Fixes duplicate leaderboard entries after a team rename.`
   One changeset per user-visible change.
 - **The bump is the operator's upgrade cost, not code semantics.** `patch` — no action needed.
-  `minor` — new capability; name any new *optional* env var. `major` — the operator must act, and
-  `MIGRATION.md` is updated. **Pre-1.0 (now): never pick `major`** — it would cut 1.0.0 and
+  `minor` — new capability; name any new *optional* env var. `major` — the operator must act, and a
+  matching `.migration/<changeset-slug>.md` is added. **Pre-1.0 (now): never pick `major`** — it would cut 1.0.0 and
   `verify-changesets` rejects it. Breaking changes ride in `minor`, so a pre-1.0 `minor` is not
-  guaranteed zero-action: say `**Operators:** …` in the summary and update `MIGRATION.md` exactly as a
-  `major` would.
+  guaranteed zero-action: say `**Operators:** …` in the summary and add a migration fragment exactly
+  as a `major` would.
 - **Automatic migrations are flagged by the release workflow** (it diffs `db/changelog/`), so the
   changeset does not mention them — keep it user-facing. Touching `db/changelog/` without touching
   `.changeset/` is always wrong.
@@ -178,10 +197,11 @@ as a Liquibase `<changeSet>` — a schema change needs both. Full flow:
 
 Each of these fails *quietly* — the command reports success and leaves you with a stale or wrong result.
 
-- **`generate:api:application-server:specs` exits 0 when the app never started.** It boots the server
-  to scrape springdoc, so a busy HTTP, management **or JMX** port means no spec is written and the exit
-  code is still 0 — you commit a spec missing your new endpoint. Pass free ports; the full recipe and
-  the default port numbers are in `server/AGENTS.md`.
+- **`generate:api:application-server:specs` needs three free ports.** It boots the server to scrape
+  springdoc, so a busy HTTP, management **or JMX** port fails the run. It fails loudly and restores
+  the previous spec rather than committing an empty one — `scripts/generate-openapi-spec.ts` — so the
+  cost is a wasted Maven cycle, not a wrong spec. The recipe and the default port numbers are in
+  `server/AGENTS.md` § OpenAPI generation ports.
 - **That script runs a full Maven `verify`.** On a cold cache the first run downloads the whole Spring
   Boot dependency tree; expect several minutes.
 - **`db:draft-changelog` needs Docker on PATH** and a running daemon.

@@ -1,8 +1,8 @@
 // Precompute HINTS for ready-and-traceable-handoff: (1) traceability references to a motivating issue
 // (closing OR non-closing — traceability does not require a closing keyword), and (2) the repo-wide
 // test-absence negative (expensive for a model to prove). FACTS only — the LLM judges readiness.
-import { findFiles } from "../lib/grep";
-import type { DiffFile, PullRequestMetadata } from "../lib/types";
+import { findFiles } from "../lib/grep.ts";
+import type { DiffFile, PullRequestMetadata } from "../lib/types.ts";
 
 const isTest = (p: string) =>
 	/(^|\/)(tests?|specs?|__tests__)(\/)|[._-](test|tests|spec|specs)\.[a-z]+$|Tests?\.[a-z0-9]+$|Spec\.[a-z0-9]+$/i.test(

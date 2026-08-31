@@ -26,24 +26,18 @@ public class JobTypeHandlerRegistry {
         for (JobTypeHandler handler : handlerList) {
             JobTypeHandler existing = map.put(handler.jobType(), handler);
             if (existing != null) {
-                throw new IllegalStateException(
-                    "Duplicate JobTypeHandler for " +
-                        handler.jobType() +
-                        ": " +
-                        existing.getClass().getSimpleName() +
-                        " and " +
-                        handler.getClass().getSimpleName()
-                );
+                throw new IllegalStateException("Duplicate JobTypeHandler for " + handler.jobType()
+                        + ": "
+                        + existing.getClass().getSimpleName()
+                        + " and "
+                        + handler.getClass().getSimpleName());
             }
         }
         for (AgentJobType type : AgentJobType.values()) {
             if (!map.containsKey(type)) {
-                throw new IllegalStateException(
-                    "No JobTypeHandler registered for " +
-                        type +
-                        ". Add a bean implementing JobTypeHandler with jobType()=" +
-                        type
-                );
+                throw new IllegalStateException("No JobTypeHandler registered for " + type
+                        + ". Add a bean implementing JobTypeHandler with jobType()="
+                        + type);
             }
         }
         this.handlers = Map.copyOf(map);

@@ -52,10 +52,9 @@ public record WorkerSigningKey(String kid, RSAPublicKey publicKey, RSAPrivateKey
             throw new IllegalArgumentException("PEM must not be blank for kid=" + kid);
         }
         try {
-            String stripped = pem
-                .replaceAll("-----BEGIN [A-Z ]+-----", "")
-                .replaceAll("-----END [A-Z ]+-----", "")
-                .replaceAll("\\s", "");
+            String stripped = pem.replaceAll("-----BEGIN [A-Z ]+-----", "")
+                    .replaceAll("-----END [A-Z ]+-----", "")
+                    .replaceAll("\\s", "");
             byte[] der = Base64.getDecoder().decode(stripped);
             KeyFactory kf = KeyFactory.getInstance("RSA");
             PrivateKey privateKey = kf.generatePrivate(new PKCS8EncodedKeySpec(der));
@@ -63,10 +62,8 @@ public record WorkerSigningKey(String kid, RSAPublicKey publicKey, RSAPrivateKey
             // carries the real public exponent. Reading {@code (modulus, 65537)} would silently
             // use the wrong public key for any keypair generated with a non-standard exponent.
             if (!(privateKey instanceof RSAPrivateCrtKey rsa)) {
-                throw new IllegalArgumentException(
-                    "expected RSA CRT private key (PKCS#8 with public exponent), got: " +
-                        privateKey.getClass().getSimpleName()
-                );
+                throw new IllegalArgumentException("expected RSA CRT private key (PKCS#8 with public exponent), got: "
+                        + privateKey.getClass().getSimpleName());
             }
             PublicKey publicKey = kf.generatePublic(new RSAPublicKeySpec(rsa.getModulus(), rsa.getPublicExponent()));
             return new WorkerSigningKey(kid, (RSAPublicKey) publicKey, rsa, false);

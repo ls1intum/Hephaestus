@@ -44,9 +44,9 @@ public class WorkspaceContributionActivityService {
         Instant firstIssueComment = contributionQueryRepository.findEarliestCommentCreatedAt(workspaceId, userId);
 
         Instant firstContribution = Stream.of(firstPullRequest, firstReview, firstIssueComment)
-            .filter(Objects::nonNull)
-            .min(Instant::compareTo)
-            .orElse(null);
+                .filter(Objects::nonNull)
+                .min(Instant::compareTo)
+                .orElse(null);
 
         return Optional.ofNullable(firstContribution);
     }

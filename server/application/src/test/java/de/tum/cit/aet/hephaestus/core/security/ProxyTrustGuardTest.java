@@ -31,31 +31,31 @@ class ProxyTrustGuardTest extends BaseUnitTest {
     @Test
     void prodNativeWithBlankFailsClosed() {
         assertThatThrownBy(() -> guard(true, "native", "").assertProxyTrustPinnedInProd())
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("HEPHAESTUS_TRUSTED_PROXIES");
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("HEPHAESTUS_TRUSTED_PROXIES");
     }
 
     @Test
     void prodNativeWithWhitespaceOnlyFailsClosed() {
-        assertThatThrownBy(() -> guard(true, "native", "   ").assertProxyTrustPinnedInProd()).isInstanceOf(
-            IllegalStateException.class
-        );
+        assertThatThrownBy(() -> guard(true, "native", "   ").assertProxyTrustPinnedInProd())
+                .isInstanceOf(IllegalStateException.class);
     }
 
     @Test
     void prodNativeWithPinnedAddressPasses() {
-        assertThatCode(() ->
-            guard(true, "native", "10\\.42\\.0\\.\\d{1,3}").assertProxyTrustPinnedInProd()
-        ).doesNotThrowAnyException();
+        assertThatCode(() -> guard(true, "native", "10\\.42\\.0\\.\\d{1,3}").assertProxyTrustPinnedInProd())
+                .doesNotThrowAnyException();
     }
 
     @Test
     void nonProdIsNeverChecked() {
-        assertThatCode(() -> guard(false, "native", "").assertProxyTrustPinnedInProd()).doesNotThrowAnyException();
+        assertThatCode(() -> guard(false, "native", "").assertProxyTrustPinnedInProd())
+                .doesNotThrowAnyException();
     }
 
     @Test
     void prodWithoutNativeForwardingIsNeverChecked() {
-        assertThatCode(() -> guard(true, "none", "").assertProxyTrustPinnedInProd()).doesNotThrowAnyException();
+        assertThatCode(() -> guard(true, "none", "").assertProxyTrustPinnedInProd())
+                .doesNotThrowAnyException();
     }
 }

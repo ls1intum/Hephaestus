@@ -14,7 +14,6 @@ import de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionIn
 import de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionResultParser;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.ExistingDeliveryLookup;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
-import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliverySuppressedException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmission;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
@@ -27,7 +26,9 @@ import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelope;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
+import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyStage;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
@@ -67,23 +68,28 @@ public class IssueReviewHandler implements JobTypeHandler {
     private final FeedbackLedgerRecorder feedbackLedgerRecorder;
     private final PracticeFeedbackDeliveryPolicy deliveryPolicy;
     private final PracticeFeedbackCommentFormatter commentFormatter;
+    private final FeedbackResponseSuppressionFilter feedbackResponseSuppressionFilter;
     private final ObservationRepository observationRepository;
+    private final PracticeFeedbackDispatchService dispatchService;
+    private final FeedbackDeliveryService feedbackDeliveryService;
 
     IssueReviewHandler(
-        JsonMapper objectMapper,
-        WorkspaceContextBuilder workspaceContextBuilder,
-        TaskEnvelopeWriter taskEnvelopeWriter,
-        PracticeCatalogInjector practiceCatalogInjector,
-        PracticeDetectionResultParser resultParser,
-        FeedbackCompositionResultParser compositionResultParser,
-        PracticeDetectionDeliveryService deliveryService,
-        InContextDeliveryGate inContextDeliveryGate,
-        PullRequestCommentPoster commentPoster,
-        FeedbackLedgerRecorder feedbackLedgerRecorder,
-        PracticeFeedbackDeliveryPolicy deliveryPolicy,
-        PracticeFeedbackCommentFormatter commentFormatter,
-        ObservationRepository observationRepository
-    ) {
+            JsonMapper objectMapper,
+            WorkspaceContextBuilder workspaceContextBuilder,
+            TaskEnvelopeWriter taskEnvelopeWriter,
+            PracticeCatalogInjector practiceCatalogInjector,
+            PracticeDetectionResultParser resultParser,
+            FeedbackCompositionResultParser compositionResultParser,
+            PracticeDetectionDeliveryService deliveryService,
+            InContextDeliveryGate inContextDeliveryGate,
+            PullRequestCommentPoster commentPoster,
+            FeedbackLedgerRecorder feedbackLedgerRecorder,
+            PracticeFeedbackDeliveryPolicy deliveryPolicy,
+            PracticeFeedbackCommentFormatter commentFormatter,
+            FeedbackResponseSuppressionFilter feedbackResponseSuppressionFilter,
+            ObservationRepository observationRepository,
+            PracticeFeedbackDispatchService dispatchService,
+            FeedbackDeliveryService feedbackDeliveryService) {
         this.objectMapper = objectMapper;
         this.workspaceContextBuilder = workspaceContextBuilder;
         this.taskEnvelopeWriter = taskEnvelopeWriter;
@@ -96,7 +102,10 @@ public class IssueReviewHandler implements JobTypeHandler {
         this.feedbackLedgerRecorder = feedbackLedgerRecorder;
         this.deliveryPolicy = deliveryPolicy;
         this.commentFormatter = commentFormatter;
+        this.feedbackResponseSuppressionFilter = feedbackResponseSuppressionFilter;
         this.observationRepository = observationRepository;
+        this.dispatchService = dispatchService;
+        this.feedbackDeliveryService = feedbackDeliveryService;
     }
 
     @Override
@@ -107,15 +116,13 @@ public class IssueReviewHandler implements JobTypeHandler {
     @Override
     public JobSubmission createSubmission(JobSubmissionRequest request) {
         if (!(request instanceof IssueReviewSubmissionRequest r)) {
-            throw new IllegalArgumentException(
-                "Expected IssueReviewSubmissionRequest, got: " + request.getClass().getSimpleName()
-            );
+            throw new IllegalArgumentException("Expected IssueReviewSubmissionRequest, got: "
+                    + request.getClass().getSimpleName());
         }
         ObjectNode metadata = objectMapper.createObjectNode();
         metadata.put(
-            PracticeDetectionDeliveryService.ORIGIN_METADATA_KEY,
-            Objects.requireNonNull(r.observationOrigin()).name()
-        );
+                PracticeDetectionDeliveryService.ORIGIN_METADATA_KEY,
+                Objects.requireNonNull(r.observationOrigin()).name());
         metadata.put("artifact_kind", ArtifactKinds.ISSUE.value());
         metadata.put("repository_id", r.repositoryId());
         metadata.put("repository_full_name", r.repositoryFullName());
@@ -128,13 +135,15 @@ public class IssueReviewHandler implements JobTypeHandler {
             metadata.put("issue_url", r.url());
         }
         if (r.triggerSignal() != null) {
-            metadata.put(PracticeCatalogInjector.SIGNAL_METADATA_KEY, r.triggerSignal().value());
+            metadata.put(
+                    PracticeCatalogInjector.SIGNAL_METADATA_KEY,
+                    r.triggerSignal().value());
         }
 
         String version = r.updatedAt() != null ? String.valueOf(r.updatedAt().toEpochMilli()) : "0";
         String phase = r.triggerSignal() != null ? r.triggerSignal().value() : "manual";
         String idempotencyKey =
-            "issue_review:" + r.repositoryFullName() + ":" + r.issueNumber() + ":" + phase + ":" + version;
+                "issue_review:" + r.repositoryFullName() + ":" + r.issueNumber() + ":" + phase + ":" + version;
         return new JobSubmission(metadata, idempotencyKey);
     }
 
@@ -147,18 +156,10 @@ public class IssueReviewHandler implements JobTypeHandler {
         SignalName signal = PracticeCatalogInjector.signalOf(job);
         List<Practice> practices = practiceCatalogInjector.resolveEligiblePractices(job, ArtifactKinds.ISSUE);
         PreparedEvidence prepared = workspaceContextBuilder.prepare(
-            new ContextRequest.IssueReviewRequest(job),
-            EvidencePlan.compile(practices)
-        );
+                new ContextRequest.IssueReviewRequest(job), EvidencePlan.compile(practices));
         var artifactSourceManifest = prepared.manifest();
         var readiness = workspaceContextBuilder.prepareAutomatedReviewReadiness(
-            prepared.manifest(),
-            practices,
-            job.getId().toString(),
-            job.getCreatedAt(),
-            signal,
-            prepared.files()
-        );
+                prepared.manifest(), practices, job.getId().toString(), job.getCreatedAt(), signal, prepared.files());
         List<Practice> eligible = practices;
         practices = readiness.readyPractices();
         // A practice not put to the model leaves no trace in the delivered review, so a reader cannot
@@ -167,30 +168,24 @@ public class IssueReviewHandler implements JobTypeHandler {
         // administration surface and the artifact trace read it back from there.
         if (practices.size() < eligible.size()) {
             log.info(
-                "Not asking {} of {} practice(s): jobId={}, skipped={}",
-                eligible.size() - practices.size(),
-                eligible.size(),
-                job.getId(),
-                readiness
-                    .report()
-                    .decisions()
-                    .stream()
-                    .filter(decision -> !decision.ready())
-                    .map(decision -> decision.practiceSlug() + decision.reasonCodes())
-                    .toList()
-            );
+                    "Not asking {} of {} practice(s): jobId={}, skipped={}",
+                    eligible.size() - practices.size(),
+                    eligible.size(),
+                    job.getId(),
+                    readiness.report().decisions().stream()
+                            .filter(decision -> !decision.ready())
+                            .map(decision -> decision.practiceSlug() + decision.reasonCodes())
+                            .toList());
         }
         if (practices.isEmpty()) {
             throw new InsufficientEvidenceException(
-                "No practice has sufficient evidence: jobId=" + job.getId(),
-                new PreparedJobInputs(
-                    prepared.files(),
-                    prepared.filesOnDisk(),
-                    prepared.cleanups(),
-                    artifactSourceManifest,
-                    readiness.report()
-                )
-            );
+                    "No practice has sufficient evidence: jobId=" + job.getId(),
+                    new PreparedJobInputs(
+                            prepared.files(),
+                            prepared.filesOnDisk(),
+                            prepared.cleanups(),
+                            artifactSourceManifest,
+                            readiness.report()));
         }
         Map<String, byte[]> files = new LinkedHashMap<>(prepared.files());
         files.put(SandboxLayout.TASK_ENVELOPE_FILENAME, taskEnvelopeWriter.write(buildTaskEnvelope(job, metadata)));
@@ -198,24 +193,17 @@ public class IssueReviewHandler implements JobTypeHandler {
         // See PullRequestReviewHandler: a second, separate turn composes this developer's feedback once
         // the measurements are final. An issue has no diff, so the note it may place is artifact-level.
         FeedbackCompositionInputs.stage(
-            files,
-            PracticeDetectionDeliveryService.originOf(metadata),
-            ISSUE_REVIEW_CHANNELS,
-            EnumSet.of(FeedbackCompositionInputs.InContextPlacementKind.ARTIFACT)
-        );
+                files,
+                PracticeDetectionDeliveryService.originOf(metadata),
+                ISSUE_REVIEW_CHANNELS,
+                EnumSet.of(FeedbackCompositionInputs.InContextPlacementKind.ARTIFACT));
         log.info(
-            "Issue context preparation complete: {} files, issueNumber={}, jobId={}",
-            files.size(),
-            metadata.path("issue_number").asInt(),
-            job.getId()
-        );
+                "Issue context preparation complete: {} files, issueNumber={}, jobId={}",
+                files.size(),
+                metadata.path("issue_number").asInt(),
+                job.getId());
         return new PreparedJobInputs(
-            files,
-            prepared.filesOnDisk(),
-            prepared.cleanups(),
-            artifactSourceManifest,
-            readiness.report()
-        );
+                files, prepared.filesOnDisk(), prepared.cleanups(), artifactSourceManifest, readiness.report());
     }
 
     private TaskEnvelope buildTaskEnvelope(AgentJob job, JsonNode metadata) {
@@ -229,65 +217,72 @@ public class IssueReviewHandler implements JobTypeHandler {
     }
 
     private String buildPrompt(int issueNumber, String repoName, AgentJob job) {
-        String prompt =
-            "Review issue #" +
-            issueNumber +
-            " in " +
-            repoName +
-            ". This is an ISSUE, not a pull request — there is no code diff. Read the issue context files " +
-            "(inputs/context/issue_summary.md, inputs/context/metadata.json, inputs/context/comments.json, and " +
-            "inputs/context/project_inventory.json for cross-artifact checks like duplicate/overlapping issues), then " +
-            "evaluate each practice in inputs/practices/ against the issue and persist every justified observation via the " +
-            "report_observation tool. Evidence citations should reference the issue thread/metadata, not source files. " +
-            "Follow " +
-            SandboxLayout.ORCHESTRATOR_PATH +
-            " for the observation schema and rules.";
+        String prompt = "Review issue #" + issueNumber
+                + " in "
+                + repoName
+                + ". This is an ISSUE, not a pull request — there is no code diff. Read the issue context files "
+                + "(inputs/context/issue_summary.md, inputs/context/metadata.json, inputs/context/comments.json, and "
+                + "inputs/context/project_inventory.json for cross-artifact checks like duplicate/overlapping issues), then "
+                + "evaluate each practice in inputs/practices/ against the issue and persist every justified observation via the "
+                + "report_observation tool. Evidence citations should reference the issue thread/metadata, not source files. "
+                + "Follow "
+                + SandboxLayout.ORCHESTRATOR_PATH
+                + " for the observation schema and rules.";
         log.info("Built issue orchestrator prompt: {} chars, jobId={}", prompt.length(), job.getId());
         return prompt;
     }
 
     @Override
     public void deliver(AgentJob job) {
+        if (feedbackDeliveryService.recoverAutomaticPackageIfPresent(job)) return;
         ObservationAdmissionService.requireMatchingCompositionDigest(job);
-        List<PracticeDetectionResultParser.ValidatedObservation> observations = observationRepository
-            .findByAgentJobId(job.getId())
-            .stream()
-            .map(this::validated)
-            .toList();
-        List<PracticeDetectionResultParser.ValidatedObservation> loudEnough = inContextDeliveryGate.admitInContext(
-            job,
-            observations
-        );
-        List<PracticeDetectionResultParser.ValidatedObservation> proposals = inContextDeliveryGate.awaitingApproval(
-            job,
-            observations
-        );
+        List<PracticeDetectionResultParser.ValidatedObservation> observations =
+                observationRepository
+                        .findByAgentJobId(job.getId(), job.getWorkspace().getId())
+                        .stream()
+                        .map(this::validated)
+                        .toList();
+        List<PracticeDetectionResultParser.ValidatedObservation> eligible =
+                feedbackResponseSuppressionFilter.evaluate(job, observations).deliverable();
+        List<PracticeDetectionResultParser.ValidatedObservation> loudEnough =
+                inContextDeliveryGate.admitInContext(job, eligible);
+        List<PracticeDetectionResultParser.ValidatedObservation> proposals =
+                inContextDeliveryGate.awaitingApproval(job, eligible);
         Map<String, String> why = practiceCatalogInjector.whyBySlug(job.getWorkspace(), ArtifactKinds.ISSUE);
         List<ComposedFeedbackUnit> units = compositionResultParser.parse(job.getOutput(), FeedbackChannel.IN_CONTEXT);
         String lead = compositionResultParser.lead(job.getOutput());
+        if (!proposals.isEmpty()) {
+            Set<String> included = java.util.stream.Stream.concat(proposals.stream(), loudEnough.stream())
+                    .map(PracticeDetectionResultParser.ValidatedObservation::occurrenceKey)
+                    .collect(java.util.stream.Collectors.toUnmodifiableSet());
+            List<PracticeDetectionResultParser.ValidatedObservation> reviewPackage = observations.stream()
+                    .filter(observation -> included.contains(observation.occurrenceKey()))
+                    .toList();
+            feedbackLedgerRecorder.recordProposal(
+                    job,
+                    DeliveryComposer.compose(reviewPackage, ArtifactKinds.ISSUE, why, null, units, lead),
+                    reviewPackage);
+            return;
+        }
         var note = DeliveryComposer.compose(loudEnough, ArtifactKinds.ISSUE, why, null, units, lead);
-        // An approved proposal posts as its own comment, so only one of the two may open on the lead.
-        // The auto-posted note is composed first and takes it; the proposal takes it only when there is
-        // no such note, which is the all-approval workspace where the proposal is the only comment.
-        feedbackLedgerRecorder.recordProposal(
-            job,
-            DeliveryComposer.compose(proposals, ArtifactKinds.ISSUE, why, null, units, note == null ? lead : null),
-            proposals
-        );
-        postIssueNote(job, note);
+        postIssueNote(
+                job,
+                note,
+                loudEnough.stream()
+                        .map(PracticeDetectionResultParser.ValidatedObservation::practiceSlug)
+                        .collect(java.util.stream.Collectors.toUnmodifiableSet()));
     }
 
     private PracticeDetectionResultParser.ValidatedObservation validated(Observation observation) {
         return new PracticeDetectionResultParser.ValidatedObservation(
-            observation.getPractice().getSlug(),
-            observation.getSummary(),
-            observation.getPresence(),
-            observation.getAssessment(),
-            observation.getSeverity(),
-            observation.getEvidence(),
-            observation.getEvidenceRationale(),
-            new ObservationKeys(observation.getOccurrenceKey(), observation.getRecurrenceKey())
-        );
+                observation.getPractice().getSlug(),
+                observation.getSummary(),
+                observation.getPresence(),
+                observation.getAssessment(),
+                observation.getSeverity(),
+                observation.getEvidence(),
+                observation.getEvidenceRationale(),
+                new ObservationKeys(observation.getOccurrenceKey(), observation.getRecurrenceKey()));
     }
 
     public void admitObservations(AgentJob job, JsonNode observations) {
@@ -299,12 +294,8 @@ public class IssueReviewHandler implements JobTypeHandler {
         if (parsed.validObservations().isEmpty()) {
             throw new JobDeliveryException("No valid observations in agent output: jobId=" + job.getId());
         }
-        var admitted = new ArrayList<>(
-            PracticeDetectionResultParser.coerceCoherence(
-                parsed.validObservations(),
-                practiceCatalogInjector.defectDetectorSlugs(job)
-            )
-        );
+        var admitted = new ArrayList<>(PracticeDetectionResultParser.coerceCoherence(
+                parsed.validObservations(), practiceCatalogInjector.defectDetectorSlugs(job)));
         deliveryService.deliver(job, admitted);
     }
 
@@ -313,9 +304,13 @@ public class IssueReviewHandler implements JobTypeHandler {
         return commentPoster.findExistingSummaryComment(job);
     }
 
-    void postIssueNote(AgentJob job, PracticeDetectionResultParser.@Nullable DeliveryContent delivery) {
+    void postIssueNote(
+            AgentJob job,
+            PracticeDetectionResultParser.@Nullable DeliveryContent delivery,
+            Set<String> contributingPracticeSlugs) {
         if (delivery == null || delivery.mrNote() == null) return;
-        PracticeFeedbackDeliveryPolicy.Decision<Issue> decision = deliveryPolicy.evaluateIssue(job);
+        PracticeFeedbackDeliveryPolicy.Decision<Issue> decision =
+                deliveryPolicy.evaluateIssue(job, DeliveryPolicyStage.AUTOMATIC, null, contributingPracticeSlugs);
         if (!decision.allowed()) {
             if (decision.suppressionReason() != null) recordSuppressed(job, delivery, decision.suppressionReason());
             return;
@@ -325,35 +320,28 @@ public class IssueReviewHandler implements JobTypeHandler {
             recordSuppressed(job, delivery, FeedbackSuppressionReason.EMPTY_AFTER_SANITIZE);
             return;
         }
-        try {
-            String formatted = commentFormatter.format(sanitized, job);
-            String prior = feedbackLedgerRecorder.priorLiveSummaryRef(job).orElse(null);
-            PullRequestCommentPoster.UpdateResult update =
-                prior == null ? null : commentPoster.updateFormattedBody(job, prior, formatted);
-            if (update != null && update.kind() == PullRequestCommentPoster.UpdateResult.Kind.TRANSIENT) {
-                job.setDeliveryCommentId(Objects.requireNonNull(prior));
-                return;
-            }
-            String commentId =
-                update != null && update.kind() == PullRequestCommentPoster.UpdateResult.Kind.EDITED
-                    ? update.externalId()
-                    : commentPoster.postIssueFormattedBody(job, formatted);
-            if (commentId == null) {
-                feedbackLedgerRecorder.recordUndelivered(job, delivery);
-                return;
-            }
-            job.setDeliveryCommentId(commentId);
-            feedbackLedgerRecorder.record(job, delivery, ArtifactKinds.ISSUE, List.of());
-        } catch (JobDeliverySuppressedException e) {
-            recordSuppressed(job, delivery, FeedbackSuppressionReason.INSTANCE_SILENCED);
+        String formatted = commentFormatter.format(sanitized, job);
+        var providerPackage =
+                new PracticeDetectionResultParser.DeliveryContent(formatted, delivery.diffNotes(), delivery.withheld());
+        PracticeFeedbackDispatchService.Result result =
+                dispatchService.dispatchAutomaticPackage(job, providerPackage, contributingPracticeSlugs);
+        var dispatch = dispatchService.automaticPackage(job);
+        if (dispatch.getState() == FeedbackDispatchState.SENT
+                || dispatch.getState() == FeedbackDispatchState.SUPPRESSED
+                || dispatch.getState() == FeedbackDispatchState.FAILED) {
+            feedbackDeliveryService.projectAutomaticPackage(job, dispatch);
         }
+        if (result.status() == PracticeFeedbackDispatchService.Result.Status.SENT) {
+            job.setDeliveryCommentId(result.externalRef());
+            return;
+        }
+        if (result.status() == PracticeFeedbackDispatchService.Result.Status.SUPPRESSED) return;
+        throw new JobDeliveryException(
+                "Issue review package dispatch is awaiting reconciliation: jobId=" + job.getId());
     }
 
     private void recordSuppressed(
-        AgentJob job,
-        PracticeDetectionResultParser.DeliveryContent delivery,
-        FeedbackSuppressionReason reason
-    ) {
+            AgentJob job, PracticeDetectionResultParser.DeliveryContent delivery, FeedbackSuppressionReason reason) {
         feedbackLedgerRecorder.recordSuppressedUnit(job, delivery, reason);
     }
 }

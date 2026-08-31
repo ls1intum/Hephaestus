@@ -79,9 +79,8 @@ public class WorkspaceStatementInspector implements StatementInspector {
      * explicitly anyway.
      */
     private static final Pattern TABLE_REFERENCE_PATTERN = Pattern.compile(
-        "(?:\\bFROM\\b|\\bJOIN\\b|\\bUPDATE\\b)\\s+(\"?[A-Za-z_][A-Za-z0-9_]*\"?(?:\\s*\\.\\s*\"?[A-Za-z_][A-Za-z0-9_]*\"?)?)",
-        Pattern.CASE_INSENSITIVE
-    );
+            "(?:\\bFROM\\b|\\bJOIN\\b|\\bUPDATE\\b)\\s+(\"?[A-Za-z_][A-Za-z0-9_]*\"?(?:\\s*\\.\\s*\"?[A-Za-z_][A-Za-z0-9_]*\"?)?)",
+            Pattern.CASE_INSENSITIVE);
 
     /**
      * Matches Hibernate-emitted DML on a single row identified solely by primary key —
@@ -99,14 +98,13 @@ public class WorkspaceStatementInspector implements StatementInspector {
      * standard {@code workspace_id} check, preserving enforcement for hand-written queries.
      */
     private static final Pattern PK_ONLY_DML_PATTERN = Pattern.compile(
-        "^\\s*(?:DELETE\\s+FROM|UPDATE)\\s+\"?[A-Za-z_][A-Za-z0-9_]*\"?" +
-            "(?:\\s+SET\\s+.+?)?" +
-            "\\s+WHERE\\s+\"?(?:id|[A-Za-z_][A-Za-z0-9_]*_id)\"?\\s*=\\s*\\?" +
-            // Optional @Version optimistic-lock predicate: AND version = ?
-            "(?:\\s+AND\\s+\"?version\"?\\s*=\\s*\\?)?" +
-            "\\s*$",
-        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
-    );
+            "^\\s*(?:DELETE\\s+FROM|UPDATE)\\s+\"?[A-Za-z_][A-Za-z0-9_]*\"?" + "(?:\\s+SET\\s+.+?)?"
+                    + "\\s+WHERE\\s+\"?(?:id|[A-Za-z_][A-Za-z0-9_]*_id)\"?\\s*=\\s*\\?"
+                    +
+                    // Optional @Version optimistic-lock predicate: AND version = ?
+                    "(?:\\s+AND\\s+\"?version\"?\\s*=\\s*\\?)?"
+                    + "\\s*$",
+            Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
 
     /**
      * Matches a Hibernate-emitted load that pins the result set to a single row (or a
@@ -132,20 +130,16 @@ public class WorkspaceStatementInspector implements StatementInspector {
      * dropping the alias-PK predicate entirely.
      */
     private static final Pattern PK_ONLY_SELECT_PATTERN = Pattern.compile(
-        "^\\s*SELECT\\b.+?\\bFROM\\s+\"?[A-Za-z_][A-Za-z0-9_]*\"?\\s+([A-Za-z_][A-Za-z0-9_]*)\\b" +
-            ".*?" +
-            "\\bWHERE\\b" +
-            ".*?" +
-            "\\b\\1\\s*\\.\\s*\"?(?:id|[A-Za-z_][A-Za-z0-9_]*_id)\"?\\s*=\\s*\\?" +
-            ".*?$",
-        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
-    );
+            "^\\s*SELECT\\b.+?\\bFROM\\s+\"?[A-Za-z_][A-Za-z0-9_]*\"?\\s+([A-Za-z_][A-Za-z0-9_]*)\\b" + ".*?"
+                    + "\\bWHERE\\b"
+                    + ".*?"
+                    + "\\b\\1\\s*\\.\\s*\"?(?:id|[A-Za-z_][A-Za-z0-9_]*_id)\"?\\s*=\\s*\\?"
+                    + ".*?$",
+            Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
 
     /** Identifies INSERTs cheaply without anchoring to whitespace shape. */
-    private static final Pattern INSERT_STATEMENT_PATTERN = Pattern.compile(
-        "^\\s*INSERT\\s+INTO\\b",
-        Pattern.CASE_INSENSITIVE
-    );
+    private static final Pattern INSERT_STATEMENT_PATTERN =
+            Pattern.compile("^\\s*INSERT\\s+INTO\\b", Pattern.CASE_INSENSITIVE);
 
     /**
      * A standalone {@code OR} token. The PK-only fast paths anchor on a single
@@ -164,14 +158,14 @@ public class WorkspaceStatementInspector implements StatementInspector {
     private final TenancyViolationReporter reporter;
     private final Counter parseFailureCounter;
 
-    private final Cache<String, Decision> decisionCache = Caffeine.newBuilder().maximumSize(10_000).build();
+    private final Cache<String, Decision> decisionCache =
+            Caffeine.newBuilder().maximumSize(10_000).build();
 
     public WorkspaceStatementInspector(
-        WorkspaceScopedTables scopedTables,
-        TenancyEnforcement mode,
-        TenancyViolationReporter reporter,
-        Counter parseFailureCounter
-    ) {
+            WorkspaceScopedTables scopedTables,
+            TenancyEnforcement mode,
+            TenancyViolationReporter reporter,
+            Counter parseFailureCounter) {
         this.scopedTables = scopedTables;
         this.mode = mode;
         this.reporter = reporter;
@@ -204,7 +198,8 @@ public class WorkspaceStatementInspector implements StatementInspector {
         // Hibernate-emitted entity load / lazy-fetch by PK is safe for the same reason —
         // the caller already had the primary key. A disjunction (OR) would broaden the result
         // set past the single keyed row, so it disqualifies the fast path.
-        if (PK_ONLY_SELECT_PATTERN.matcher(sql).matches() && !OR_TOKEN_PATTERN.matcher(sql).find()) {
+        if (PK_ONLY_SELECT_PATTERN.matcher(sql).matches()
+                && !OR_TOKEN_PATTERN.matcher(sql).find()) {
             return Decision.ok();
         }
         if (WORKSPACE_ID_PATTERN.matcher(sql).find()) {
@@ -226,11 +221,10 @@ public class WorkspaceStatementInspector implements StatementInspector {
             parseFailureCounter.increment();
             if (log.isDebugEnabled()) {
                 log.debug(
-                    "Tenancy regex analysis failed ({}: {}): {}",
-                    e.getClass().getSimpleName(),
-                    e.getMessage(),
-                    LoggingUtils.truncate(sql, 200)
-                );
+                        "Tenancy regex analysis failed ({}: {}): {}",
+                        e.getClass().getSimpleName(),
+                        e.getMessage(),
+                        LoggingUtils.truncate(sql, 200));
             }
             return Decision.ok();
         }

@@ -13,7 +13,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organizatio
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventType;
 import de.tum.cit.aet.hephaestus.integration.scm.github.issuecomment.dto.GitHubIssueCommentEventDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
@@ -73,10 +72,9 @@ class GitHubIssueCommentMessageHandlerIntegrationTest extends BaseIntegrationTes
     private void setupTestData() {
         // Create GitHub provider
         gitProvider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-            .orElseGet(() ->
-                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseGet(() -> gitProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
 
         // Create organization
         Organization org = new Organization();
@@ -143,27 +141,31 @@ class GitHubIssueCommentMessageHandlerIntegrationTest extends BaseIntegrationTes
         createTestIssue(required(event.issue().getDatabaseId()), event.issue().number());
 
         // Verify comment doesn't exist initially
-        assertThat(
-            commentRepository.findByNativeIdAndProviderId(required(event.comment().id()), gitProviderId())
-        ).isEmpty();
+        assertThat(commentRepository.findByNativeIdAndProviderId(
+                        required(event.comment().id()), gitProviderId()))
+                .isEmpty();
 
         handler.handleEvent(event);
 
-        assertThat(commentRepository.findByNativeIdAndProviderId(required(event.comment().id()), gitProviderId()))
-            .isPresent()
-            .get()
-            .satisfies(comment -> {
-                assertThat(comment.getNativeId()).isEqualTo(required(event.comment().id()));
-                assertThat(comment.getBody()).isEqualTo(event.comment().body());
-                assertThat(comment.getHtmlUrl()).isEqualTo(event.comment().htmlUrl());
-            });
+        assertThat(commentRepository.findByNativeIdAndProviderId(
+                        required(event.comment().id()), gitProviderId()))
+                .isPresent()
+                .get()
+                .satisfies(comment -> {
+                    assertThat(comment.getNativeId())
+                            .isEqualTo(required(event.comment().id()));
+                    assertThat(comment.getBody()).isEqualTo(event.comment().body());
+                    assertThat(comment.getHtmlUrl()).isEqualTo(event.comment().htmlUrl());
+                });
     }
 
     @Test
     void shouldUpdateCommentOnEditedEvent() throws Exception {
         // Given - first create the comment
         GitHubIssueCommentEventDTO createEvent = loadPayload("issue_comment.created");
-        createTestIssue(required(createEvent.issue().getDatabaseId()), createEvent.issue().number());
+        createTestIssue(
+                required(createEvent.issue().getDatabaseId()),
+                createEvent.issue().number());
         handler.handleEvent(createEvent);
 
         // Load edited event
@@ -171,34 +173,37 @@ class GitHubIssueCommentMessageHandlerIntegrationTest extends BaseIntegrationTes
 
         handler.handleEvent(editEvent);
 
-        assertThat(commentRepository.findByNativeIdAndProviderId(required(editEvent.comment().id()), gitProviderId()))
-            .isPresent()
-            .get()
-            .satisfies(comment -> {
-                assertThat(comment.getBody()).isEqualTo(editEvent.comment().body());
-            });
+        assertThat(commentRepository.findByNativeIdAndProviderId(
+                        required(editEvent.comment().id()), gitProviderId()))
+                .isPresent()
+                .get()
+                .satisfies(comment -> {
+                    assertThat(comment.getBody()).isEqualTo(editEvent.comment().body());
+                });
     }
 
     @Test
     void shouldDeleteCommentOnDeletedEvent() throws Exception {
         // Given - first create the comment
         GitHubIssueCommentEventDTO createEvent = loadPayload("issue_comment.created");
-        createTestIssue(required(createEvent.issue().getDatabaseId()), createEvent.issue().number());
+        createTestIssue(
+                required(createEvent.issue().getDatabaseId()),
+                createEvent.issue().number());
         handler.handleEvent(createEvent);
 
         // Verify it exists
-        assertThat(
-            commentRepository.findByNativeIdAndProviderId(required(createEvent.comment().id()), gitProviderId())
-        ).isPresent();
+        assertThat(commentRepository.findByNativeIdAndProviderId(
+                        required(createEvent.comment().id()), gitProviderId()))
+                .isPresent();
 
         // Load deleted event
         GitHubIssueCommentEventDTO deleteEvent = loadPayload("issue_comment.deleted");
 
         handler.handleEvent(deleteEvent);
 
-        assertThat(
-            commentRepository.findByNativeIdAndProviderId(required(deleteEvent.comment().id()), gitProviderId())
-        ).isEmpty();
+        assertThat(commentRepository.findByNativeIdAndProviderId(
+                        required(deleteEvent.comment().id()), gitProviderId()))
+                .isEmpty();
     }
 
     private GitHubIssueCommentEventDTO loadPayload(String filename) throws IOException {

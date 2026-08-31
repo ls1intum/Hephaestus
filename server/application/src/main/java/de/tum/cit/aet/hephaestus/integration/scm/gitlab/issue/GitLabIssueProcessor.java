@@ -61,27 +61,25 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
     private final ApplicationEventPublisher eventPublisher;
 
     public GitLabIssueProcessor(
-        GitLabUserService gitLabUserService,
-        IssueRepository issueRepository,
-        MilestoneRepository milestoneRepository,
-        IssueTypeRepository issueTypeRepository,
-        UserRepository userRepository,
-        LabelRepository labelRepository,
-        RepositoryRepository repositoryRepository,
-        ScopeIdResolver scopeIdResolver,
-        RepositoryScopeFilter repositoryScopeFilter,
-        GitLabProperties gitLabProperties,
-        ApplicationEventPublisher eventPublisher
-    ) {
+            GitLabUserService gitLabUserService,
+            IssueRepository issueRepository,
+            MilestoneRepository milestoneRepository,
+            IssueTypeRepository issueTypeRepository,
+            UserRepository userRepository,
+            LabelRepository labelRepository,
+            RepositoryRepository repositoryRepository,
+            ScopeIdResolver scopeIdResolver,
+            RepositoryScopeFilter repositoryScopeFilter,
+            GitLabProperties gitLabProperties,
+            ApplicationEventPublisher eventPublisher) {
         super(
-            gitLabUserService,
-            userRepository,
-            labelRepository,
-            repositoryRepository,
-            scopeIdResolver,
-            repositoryScopeFilter,
-            gitLabProperties
-        );
+                gitLabUserService,
+                userRepository,
+                labelRepository,
+                repositoryRepository,
+                scopeIdResolver,
+                repositoryScopeFilter,
+                gitLabProperties);
         this.issueRepository = issueRepository;
         this.milestoneRepository = milestoneRepository;
         this.issueTypeRepository = issueTypeRepository;
@@ -110,33 +108,30 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
         }
 
         User author = resolveWebhookAuthor(event, Objects.requireNonNull(context.providerId()));
-        Long providerId = Objects.requireNonNull(Objects.requireNonNull(context.repository()).getProvider().getId());
+        Long providerId = Objects.requireNonNull(
+                Objects.requireNonNull(context.repository()).getProvider().getId());
         Long milestoneId = resolveWebhookMilestoneId(attrs.milestoneId(), providerId);
         Issue issue = upsertIssue(
-            attrs.id(),
-            attrs.iid(),
-            attrs.title(),
-            attrs.description(),
-            attrs.state(),
-            attrs.url(),
-            attrs.createdAt(),
-            attrs.updatedAt(),
-            attrs.closedAt(),
-            author,
-            milestoneId,
-            Objects.requireNonNull(context.repository()),
-            context
-        );
+                attrs.id(),
+                attrs.iid(),
+                attrs.title(),
+                attrs.description(),
+                attrs.state(),
+                attrs.url(),
+                attrs.createdAt(),
+                attrs.updatedAt(),
+                attrs.closedAt(),
+                author,
+                milestoneId,
+                Objects.requireNonNull(context.repository()),
+                context);
 
         if (issue == null) return null;
 
         // Update relationships
         boolean changed = updateLabels(event.labels(), issue.getLabels(), Objects.requireNonNull(context.repository()));
-        changed |= updateAssignees(
-            event.assignees(),
-            issue.getAssignees(),
-            Objects.requireNonNull(context.providerId())
-        );
+        changed |=
+                updateAssignees(event.assignees(), issue.getAssignees(), Objects.requireNonNull(context.providerId()));
         if (changed) {
             issue = issueRepository.save(issue);
         }
@@ -167,17 +162,13 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
         long repositoryId = Objects.requireNonNull(context.repository()).getId();
         // Issue-typed tombstone: a confidential-issue IID must never touch a live merge request that
         // happens to share the IID — GitLab issues and MRs are separate per-project namespaces.
-        int tombstoned = issueRepository.tombstoneIssuesByRepositoryIdAndNumbers(
-            repositoryId,
-            List.of(number),
-            Instant.now()
-        );
+        int tombstoned =
+                issueRepository.tombstoneIssuesByRepositoryIdAndNumbers(repositoryId, List.of(number), Instant.now());
         if (tombstoned > 0) {
             log.info(
-                "Tombstoned public snapshot of now-confidential issue: repositoryId={}, iid={}",
-                repositoryId,
-                number
-            );
+                    "Tombstoned public snapshot of now-confidential issue: repositoryId={}, iid={}",
+                    repositoryId,
+                    number);
         }
         return tombstoned > 0;
     }
@@ -200,13 +191,10 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
         for (GitLabWebhookLabel labelDto : addedLabels) {
             Label label = findOrCreateLabel(labelDto, Objects.requireNonNull(context.repository()));
             if (label != null) {
-                eventPublisher.publishEvent(
-                    new ScmDomainEvent.IssueLabeled(
+                eventPublisher.publishEvent(new ScmDomainEvent.IssueLabeled(
                         ScmEventPayload.IssueData.from(issue),
                         ScmEventPayload.LabelData.from(label),
-                        EventContext.from(context)
-                    )
-                );
+                        EventContext.from(context)));
             }
         }
         return issue;
@@ -215,45 +203,46 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
     /**
      * Label data extracted from GraphQL response for sync processing.
      */
-    public record SyncLabelData(@Nullable String globalId, @Nullable String title, @Nullable String color) {}
+    public record SyncLabelData(
+            @Nullable String globalId,
+            @Nullable String title,
+            @Nullable String color) {}
 
     /**
      * Assignee data extracted from GraphQL response for sync processing.
      */
     public record SyncAssigneeData(
-        @Nullable String globalId,
-        @Nullable String username,
-        @Nullable String name,
-        @Nullable String avatarUrl,
-        @Nullable String webUrl
-    ) {}
+            @Nullable String globalId,
+            @Nullable String username,
+            @Nullable String name,
+            @Nullable String avatarUrl,
+            @Nullable String webUrl) {}
 
     /**
      * All data needed to sync a single GitLab issue from GraphQL.
      */
     public record SyncIssueData(
-        @Nullable String globalId,
-        @Nullable String iid,
-        @Nullable String title,
-        @Nullable String description,
-        @Nullable String state,
-        boolean confidential,
-        @Nullable String webUrl,
-        @Nullable String createdAt,
-        @Nullable String updatedAt,
-        @Nullable String closedAt,
-        @Nullable String authorGlobalId,
-        @Nullable String authorUsername,
-        @Nullable String authorName,
-        @Nullable String authorAvatarUrl,
-        @Nullable String authorWebUrl,
-        int commentsCount,
-        @Nullable List<SyncLabelData> syncLabels,
-        @Nullable List<SyncAssigneeData> syncAssignees,
-        @Nullable Integer milestoneIid,
-        @Nullable String typeName,
-        @Nullable String closedAsDuplicateOfGid
-    ) {}
+            @Nullable String globalId,
+            @Nullable String iid,
+            @Nullable String title,
+            @Nullable String description,
+            @Nullable String state,
+            boolean confidential,
+            @Nullable String webUrl,
+            @Nullable String createdAt,
+            @Nullable String updatedAt,
+            @Nullable String closedAt,
+            @Nullable String authorGlobalId,
+            @Nullable String authorUsername,
+            @Nullable String authorName,
+            @Nullable String authorAvatarUrl,
+            @Nullable String authorWebUrl,
+            int commentsCount,
+            @Nullable List<SyncLabelData> syncLabels,
+            @Nullable List<SyncAssigneeData> syncAssignees,
+            @Nullable Integer milestoneIid,
+            @Nullable String typeName,
+            @Nullable String closedAsDuplicateOfGid) {}
 
     /**
      * Process a GitLab issue from GraphQL sync.
@@ -297,15 +286,13 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
 
         // Resolve author
         User author = findOrCreateUser(
-            GitLabUserLookup.of(
-                data.authorGlobalId(),
-                data.authorUsername(),
-                data.authorName(),
-                data.authorAvatarUrl(),
-                data.authorWebUrl()
-            ),
-            providerId
-        );
+                GitLabUserLookup.of(
+                        data.authorGlobalId(),
+                        data.authorUsername(),
+                        data.authorName(),
+                        data.authorAvatarUrl(),
+                        data.authorWebUrl()),
+                providerId);
 
         // State mapping
         Issue.State issueState = convertState(data.state());
@@ -314,9 +301,9 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
         Long milestoneId = null;
         if (data.milestoneIid() != null) {
             milestoneId = milestoneRepository
-                .findByNumberAndRepositoryId(data.milestoneIid(), repository.getId())
-                .map(Milestone::getId)
-                .orElse(null);
+                    .findByNumberAndRepositoryId(data.milestoneIid(), repository.getId())
+                    .map(Milestone::getId)
+                    .orElse(null);
         }
 
         String stateReason = resolveStateReason(issueState, data.closedAsDuplicateOfGid());
@@ -324,31 +311,33 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
 
         Instant now = Instant.now();
         issueRepository.upsertCore(
-            nativeId,
-            providerId,
-            issueNumber,
-            Objects.requireNonNullElse(sanitize(data.title()), ""),
-            sanitize(data.description()),
-            issueState.name(),
-            stateReason,
-            data.webUrl(),
-            null, // locked — not available in GitLab API, null lets COALESCE preserve existing or default
-            parseGitLabTimestamp(data.closedAt()),
-            data.commentsCount(),
-            now,
-            parseGitLabTimestamp(data.createdAt()),
-            parseGitLabTimestamp(data.updatedAt()),
-            author != null ? author.getId() : null,
-            repository.getId(),
-            milestoneId,
-            issueTypeId,
-            null, // parentIssueId
-            null, // subIssuesTotal
-            null, // subIssuesCompleted
-            null // subIssuesPercentCompleted
-        );
+                nativeId,
+                providerId,
+                issueNumber,
+                Objects.requireNonNullElse(sanitize(data.title()), ""),
+                sanitize(data.description()),
+                issueState.name(),
+                stateReason,
+                data.webUrl(),
+                null, // locked — not available in GitLab API, null lets COALESCE preserve existing or default
+                parseGitLabTimestamp(data.closedAt()),
+                data.commentsCount(),
+                now,
+                parseGitLabTimestamp(data.createdAt()),
+                parseGitLabTimestamp(data.updatedAt()),
+                author != null ? author.getId() : null,
+                repository.getId(),
+                milestoneId,
+                issueTypeId,
+                null, // parentIssueId
+                null, // subIssuesTotal
+                null, // subIssuesCompleted
+                null // subIssuesPercentCompleted
+                );
 
-        Issue issue = issueRepository.findByRepositoryIdAndNumber(repository.getId(), issueNumber).orElse(null);
+        Issue issue = issueRepository
+                .findByRepositoryIdAndNumber(repository.getId(), issueNumber)
+                .orElse(null);
 
         if (issue == null) {
             return null;
@@ -366,8 +355,7 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
         ProcessingContext ctx = ProcessingContext.forSync(scopeId, repository);
         if (isNew) {
             eventPublisher.publishEvent(
-                new ScmDomainEvent.IssueCreated(ScmEventPayload.IssueData.from(issue), EventContext.from(ctx))
-            );
+                    new ScmDomainEvent.IssueCreated(ScmEventPayload.IssueData.from(issue), EventContext.from(ctx)));
             log.debug("Created issue from sync: issueId={}, iid={}", nativeId, data.iid());
         }
 
@@ -375,13 +363,10 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
         // ISSUE_CLOSED activity for issues that were already closed when first ingested. The activity_event
         // (workspace_id, event_key) unique constraint dedupes, so replaying an existing close is a safe no-op.
         if (issueState == Issue.State.CLOSED) {
-            eventPublisher.publishEvent(
-                new ScmDomainEvent.IssueClosed(
+            eventPublisher.publishEvent(new ScmDomainEvent.IssueClosed(
                     ScmEventPayload.IssueData.from(issue),
                     stateReason != null ? stateReason : "completed",
-                    EventContext.from(ctx)
-                )
-            );
+                    EventContext.from(ctx)));
         }
 
         return issue;
@@ -392,13 +377,8 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
     public Issue processClosed(GitLabIssueEventDTO event, ProcessingContext context) {
         Issue issue = processInternal(event, context);
         if (issue != null) {
-            eventPublisher.publishEvent(
-                new ScmDomainEvent.IssueClosed(
-                    ScmEventPayload.IssueData.from(issue),
-                    "completed",
-                    EventContext.from(context)
-                )
-            );
+            eventPublisher.publishEvent(new ScmDomainEvent.IssueClosed(
+                    ScmEventPayload.IssueData.from(issue), "completed", EventContext.from(context)));
             log.debug("Closed issue: issueId={}", issue.getId());
         }
         return issue;
@@ -409,9 +389,8 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
     public Issue processReopened(GitLabIssueEventDTO event, ProcessingContext context) {
         Issue issue = processInternal(event, context);
         if (issue != null) {
-            eventPublisher.publishEvent(
-                new ScmDomainEvent.IssueReopened(ScmEventPayload.IssueData.from(issue), EventContext.from(context))
-            );
+            eventPublisher.publishEvent(new ScmDomainEvent.IssueReopened(
+                    ScmEventPayload.IssueData.from(issue), EventContext.from(context)));
             log.debug("Reopened issue: issueId={}", issue.getId());
         }
         return issue;
@@ -462,27 +441,26 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
             return null;
         }
         return milestoneRepository
-            .findByNativeIdAndProviderId(gitlabMilestoneId, providerId)
-            .map(Milestone::getId)
-            .orElse(null);
+                .findByNativeIdAndProviderId(gitlabMilestoneId, providerId)
+                .map(Milestone::getId)
+                .orElse(null);
     }
 
     @Nullable
     private Issue upsertIssue(
-        Long rawId,
-        Integer iid,
-        @Nullable String title,
-        @Nullable String description,
-        @Nullable String state,
-        @Nullable String htmlUrl,
-        @Nullable String createdAt,
-        @Nullable String updatedAt,
-        @Nullable String closedAt,
-        @Nullable User author,
-        @Nullable Long milestoneId,
-        Repository repository,
-        ProcessingContext context
-    ) {
+            Long rawId,
+            Integer iid,
+            @Nullable String title,
+            @Nullable String description,
+            @Nullable String state,
+            @Nullable String htmlUrl,
+            @Nullable String createdAt,
+            @Nullable String updatedAt,
+            @Nullable String closedAt,
+            @Nullable User author,
+            @Nullable Long milestoneId,
+            Repository repository,
+            ProcessingContext context) {
         if (rawId == null || iid == null) {
             log.warn("Skipped issue processing: reason=missingIdOrIid");
             return null;
@@ -499,39 +477,39 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
 
         Instant now = Instant.now();
         issueRepository.upsertCore(
-            nativeId,
-            providerId,
-            issueNumber,
-            Objects.requireNonNullElse(sanitize(title), ""),
-            sanitize(description),
-            issueState.name(),
-            null, // stateReason
-            htmlUrl,
-            null, // locked — not in webhook, null lets COALESCE preserve existing or default
-            parseGitLabTimestamp(closedAt),
-            null, // commentsCount — not in webhook, null lets COALESCE preserve existing or default
-            now,
-            parseGitLabTimestamp(createdAt),
-            parseGitLabTimestamp(updatedAt),
-            author != null ? author.getId() : null,
-            repository.getId(),
-            milestoneId,
-            null,
-            null,
-            null,
-            null,
-            null
-        );
+                nativeId,
+                providerId,
+                issueNumber,
+                Objects.requireNonNullElse(sanitize(title), ""),
+                sanitize(description),
+                issueState.name(),
+                null, // stateReason
+                htmlUrl,
+                null, // locked — not in webhook, null lets COALESCE preserve existing or default
+                parseGitLabTimestamp(closedAt),
+                null, // commentsCount — not in webhook, null lets COALESCE preserve existing or default
+                now,
+                parseGitLabTimestamp(createdAt),
+                parseGitLabTimestamp(updatedAt),
+                author != null ? author.getId() : null,
+                repository.getId(),
+                milestoneId,
+                null,
+                null,
+                null,
+                null,
+                null);
 
-        Issue issue = issueRepository.findByRepositoryIdAndNumber(repository.getId(), issueNumber).orElse(null);
+        Issue issue = issueRepository
+                .findByRepositoryIdAndNumber(repository.getId(), issueNumber)
+                .orElse(null);
 
         if (issue != null) {
             issue.setProvider(repository.getProvider());
 
             if (isNew) {
-                eventPublisher.publishEvent(
-                    new ScmDomainEvent.IssueCreated(ScmEventPayload.IssueData.from(issue), EventContext.from(context))
-                );
+                eventPublisher.publishEvent(new ScmDomainEvent.IssueCreated(
+                        ScmEventPayload.IssueData.from(issue), EventContext.from(context)));
                 log.debug("Created issue: nativeId={}, iid={}", nativeId, issueNumber);
             }
         }
@@ -560,10 +538,7 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
      * Updates labels from GraphQL sync data within the current transaction.
      */
     private boolean updateSyncLabels(
-        @Nullable List<SyncLabelData> syncLabels,
-        Collection<Label> currentLabels,
-        Repository repository
-    ) {
+            @Nullable List<SyncLabelData> syncLabels, Collection<Label> currentLabels, Repository repository) {
         if (syncLabels == null) {
             return false;
         }
@@ -623,10 +598,8 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
         if (organization == null || organization.getId() == null) {
             return null;
         }
-        Optional<IssueType> orgScoped = issueTypeRepository.findByOrganizationIdAndNameIgnoreCase(
-            organization.getId(),
-            humanised
-        );
+        Optional<IssueType> orgScoped =
+                issueTypeRepository.findByOrganizationIdAndNameIgnoreCase(organization.getId(), humanised);
         if (orgScoped.isPresent()) {
             return orgScoped.get().getId();
         }
@@ -639,9 +612,9 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
         // proxy here raised LazyInitializationException when the Repository outlived
         // its original Hibernate session.
         return issueTypeRepository
-            .findFirstByOrganizationProviderAndNameIgnoreCase(organization.getId(), humanised)
-            .map(IssueType::getId)
-            .orElse(null);
+                .findFirstByOrganizationProviderAndNameIgnoreCase(organization.getId(), humanised)
+                .map(IssueType::getId)
+                .orElse(null);
     }
 
     /**
@@ -666,10 +639,7 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
      * Updates assignees from GraphQL sync data within the current transaction.
      */
     private boolean updateSyncAssignees(
-        @Nullable List<SyncAssigneeData> syncAssignees,
-        Set<User> currentAssignees,
-        Long providerId
-    ) {
+            @Nullable List<SyncAssigneeData> syncAssignees, Set<User> currentAssignees, Long providerId) {
         if (syncAssignees == null) {
             return false;
         }
@@ -677,9 +647,8 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
         Set<User> newAssignees = new HashSet<>();
         for (SyncAssigneeData data : syncAssignees) {
             User user = findOrCreateUser(
-                GitLabUserLookup.of(data.globalId(), data.username(), data.name(), data.avatarUrl(), data.webUrl()),
-                providerId
-            );
+                    GitLabUserLookup.of(data.globalId(), data.username(), data.name(), data.avatarUrl(), data.webUrl()),
+                    providerId);
             if (user != null) {
                 newAssignees.add(user);
             }

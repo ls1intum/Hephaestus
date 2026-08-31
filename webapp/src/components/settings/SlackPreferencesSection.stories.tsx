@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, screen, userEvent } from "storybook/test";
+
 import { SlackPreferencesSection } from "./SlackPreferencesSection";
 
 const meta = {

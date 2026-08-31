@@ -22,9 +22,7 @@ public class OutlineCredentialProvider implements ApiCredentialProvider {
     private final CredentialBundleConverter credentialConverter;
 
     public OutlineCredentialProvider(
-        ConnectionService connectionService,
-        CredentialBundleConverter credentialConverter
-    ) {
+            ConnectionService connectionService, CredentialBundleConverter credentialConverter) {
         this.connectionService = connectionService;
         this.credentialConverter = credentialConverter;
     }

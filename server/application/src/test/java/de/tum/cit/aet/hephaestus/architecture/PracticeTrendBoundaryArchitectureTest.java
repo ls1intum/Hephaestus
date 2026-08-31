@@ -20,12 +20,12 @@ class PracticeTrendBoundaryArchitectureTest extends HephaestusArchitectureTest {
             "TrendSupportFactory",
         }) {
             noClasses()
-                .that()
-                .resideOutsideOfPackage(TREND_PACKAGE)
-                .should()
-                .dependOnClassesThat()
-                .haveSimpleName(internal)
-                .check(classes);
+                    .that()
+                    .resideOutsideOfPackage(TREND_PACKAGE)
+                    .should()
+                    .dependOnClassesThat()
+                    .haveSimpleName(internal)
+                    .check(classes);
         }
     }
 }

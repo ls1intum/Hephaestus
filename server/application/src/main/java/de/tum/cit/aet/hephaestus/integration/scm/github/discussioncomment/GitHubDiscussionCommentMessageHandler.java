@@ -30,8 +30,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Slf4j
 @Component
 public class GitHubDiscussionCommentMessageHandler
-    extends AbstractIntegrationMessageHandler<GitHubDiscussionCommentEventDTO>
-{
+        extends AbstractIntegrationMessageHandler<GitHubDiscussionCommentEventDTO> {
 
     private final ProcessingContextFactory contextFactory;
     private final GitHubDiscussionProcessor discussionProcessor;
@@ -39,20 +38,18 @@ public class GitHubDiscussionCommentMessageHandler
     private final SyncSchedulerProperties syncSchedulerProperties;
 
     public GitHubDiscussionCommentMessageHandler(
-        ProcessingContextFactory contextFactory,
-        GitHubDiscussionProcessor discussionProcessor,
-        GitHubDiscussionCommentProcessor commentProcessor,
-        SyncSchedulerProperties syncSchedulerProperties,
-        NatsMessageDeserializer deserializer,
-        TransactionTemplate transactionTemplate
-    ) {
+            ProcessingContextFactory contextFactory,
+            GitHubDiscussionProcessor discussionProcessor,
+            GitHubDiscussionCommentProcessor commentProcessor,
+            SyncSchedulerProperties syncSchedulerProperties,
+            NatsMessageDeserializer deserializer,
+            TransactionTemplate transactionTemplate) {
         super(
-            IntegrationKind.GITHUB,
-            "repository." + GitHubEventType.DISCUSSION_COMMENT.getValue(),
-            GitHubDiscussionCommentEventDTO.class,
-            deserializer,
-            transactionTemplate
-        );
+                IntegrationKind.GITHUB,
+                "repository." + GitHubEventType.DISCUSSION_COMMENT.getValue(),
+                GitHubDiscussionCommentEventDTO.class,
+                deserializer,
+                transactionTemplate);
         this.contextFactory = contextFactory;
         this.discussionProcessor = discussionProcessor;
         this.commentProcessor = commentProcessor;
@@ -78,12 +75,11 @@ public class GitHubDiscussionCommentMessageHandler
         }
 
         log.debug(
-            "Received discussion_comment event: action={}, discussionNumber={}, commentId={}, repoName={}",
-            event.action(),
-            discussionDto.number(),
-            commentDto.getDatabaseId(),
-            event.repository() != null ? sanitizeForLog(event.repository().fullName()) : "unknown"
-        );
+                "Received discussion_comment event: action={}, discussionNumber={}, commentId={}, repoName={}",
+                event.action(),
+                discussionDto.number(),
+                commentDto.getDatabaseId(),
+                event.repository() != null ? sanitizeForLog(event.repository().fullName()) : "unknown");
 
         ProcessingContext context = contextFactory.forWebhookEvent(event).orElse(null);
         if (context == null) {
@@ -98,9 +94,8 @@ public class GitHubDiscussionCommentMessageHandler
             Discussion discussion = discussionProcessor.process(discussionDto, context);
             if (discussion == null) {
                 log.warn(
-                    "Failed to process parent discussion: discussionNumber={}, skipping comment",
-                    discussionDto.number()
-                );
+                        "Failed to process parent discussion: discussionNumber={}, skipping comment",
+                        discussionDto.number());
                 return;
             }
 

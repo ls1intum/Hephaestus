@@ -82,20 +82,15 @@ class GitHubIssueCommentSyncServiceTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         lenient()
-            .when(exceptionClassifier.classifyWithDetails(any()))
-            .thenReturn(ClassificationResult.of(Category.UNKNOWN, "test error"));
+                .when(exceptionClassifier.classifyWithDetails(any()))
+                .thenReturn(ClassificationResult.of(Category.UNKNOWN, "test error"));
         lenient().when(syncProperties.graphqlTimeout()).thenReturn(Duration.ofSeconds(30));
         lenient().when(graphQlClientProvider.forScope(SCOPE_ID)).thenReturn(graphQlClient);
         lenient().when(graphQlClientProvider.getRateLimitRemaining(SCOPE_ID)).thenReturn(5000);
         lenient().when(graphQlClientProvider.isRateLimitCritical(SCOPE_ID)).thenReturn(false);
 
         service = new GitHubIssueCommentSyncService(
-            graphQlClientProvider,
-            commentProcessor,
-            syncProperties,
-            exceptionClassifier,
-            graphQlSyncHelper
-        );
+                graphQlClientProvider, commentProcessor, syncProperties, exceptionClassifier, graphQlSyncHelper);
     }
 
     // Helper methods
@@ -151,10 +146,9 @@ class GitHubIssueCommentSyncServiceTest extends BaseUnitTest {
             pr.setRepository(createRepository());
             when(commentProcessor.process(any(), eq(NUMBER), any())).thenReturn(new IssueComment());
             stubSingleCommentPage(
-                "GetPullRequestComments",
-                "repository.pullRequest.comments",
-                List.of(createGHComment(1001L, "tail comment"))
-            );
+                    "GetPullRequestComments",
+                    "repository.pullRequest.comments",
+                    List.of(createGHComment(1001L, "tail comment")));
 
             int synced = service.syncRemainingComments(SCOPE_ID, pr, "cursor-page-1");
 
@@ -177,10 +171,9 @@ class GitHubIssueCommentSyncServiceTest extends BaseUnitTest {
             issue.setRepository(createRepository());
             when(commentProcessor.process(any(), eq(NUMBER), any())).thenReturn(new IssueComment());
             stubSingleCommentPage(
-                "GetIssueComments",
-                "repository.issue.comments",
-                List.of(createGHComment(2001L, "issue tail comment"))
-            );
+                    "GetIssueComments",
+                    "repository.issue.comments",
+                    List.of(createGHComment(2001L, "issue tail comment")));
 
             int synced = service.syncRemainingComments(SCOPE_ID, issue, "cursor-page-1");
 

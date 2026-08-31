@@ -47,7 +47,11 @@ final class ProgressFooterRenderer {
         if (!resolved.isEmpty()) {
             sb.append("**Resolved ✓**\n");
             for (LocusTransition t : resolved) {
-                sb.append("- ").append(titleOf(t)).append(" (`").append(t.practiceSlug()).append("`)\n");
+                sb.append("- ")
+                        .append(titleOf(t))
+                        .append(" (`")
+                        .append(t.practiceSlug())
+                        .append("`)\n");
             }
             sb.append("\n");
         }
@@ -56,7 +60,11 @@ final class ProgressFooterRenderer {
         if (!regressed.isEmpty()) {
             sb.append("**Slipped back** — these were satisfied last time and are flagged again:\n");
             for (LocusTransition t : regressed) {
-                sb.append("- ").append(titleOf(t)).append(" (`").append(t.practiceSlug()).append("`)\n");
+                sb.append("- ")
+                        .append(titleOf(t))
+                        .append(" (`")
+                        .append(t.practiceSlug())
+                        .append("`)\n");
             }
             sb.append("\n");
         }
@@ -73,7 +81,9 @@ final class ProgressFooterRenderer {
         // The title is LLM-authored (untrusted) and is interpolated into the footer AFTER the summary body
         // has already been sanitized, so it would otherwise bypass the bidi / zero-width / HTML-comment
         // scrub. Sanitize it here and collapse internal newlines so the markdown list item stays one line.
-        String clean = PullRequestCommentPoster.sanitize(title).replaceAll("[\\r\\n]+", " ").strip();
+        String clean = PullRequestCommentPoster.sanitize(title)
+                .replaceAll("[\\r\\n]+", " ")
+                .strip();
         return clean.isBlank() ? t.practiceSlug() : clean;
     }
 }

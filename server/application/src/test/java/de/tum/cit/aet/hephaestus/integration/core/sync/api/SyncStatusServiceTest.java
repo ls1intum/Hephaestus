@@ -20,7 +20,6 @@ import de.tum.cit.aet.hephaestus.integration.core.framework.IntegrationManifestR
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionSyncDetails;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionSyncStateProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationSyncRunner;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResourceState;
@@ -64,6 +63,7 @@ class SyncStatusServiceTest extends BaseUnitTest {
     private static final long CONNECTION_ID = 10L;
     /** A sibling connection in the SAME workspace — the cross-connection cancel scope check. */
     private static final long OTHER_CONNECTION_ID = 11L;
+
     private static final long JOB_ID = 555L;
 
     @Mock
@@ -98,39 +98,37 @@ class SyncStatusServiceTest extends BaseUnitTest {
         Workspace workspace = new Workspace();
         workspace.setId(WORKSPACE_ID);
         connection = new Connection(
-            workspace,
-            IntegrationKind.GITHUB,
-            "100",
-            new ConnectionConfig.GitHubAppConfig(100L, "acme", null, Set.of())
-        );
+                workspace,
+                IntegrationKind.GITHUB,
+                "100",
+                new ConnectionConfig.GitHubAppConfig(100L, "acme", null, Set.of()));
         setConnectionId(connection, CONNECTION_ID);
         connection.setState(IntegrationState.ACTIVE);
 
         lenient()
-            .when(connectionAdminService.findInWorkspaceOrThrow(WORKSPACE_ID, CONNECTION_ID))
-            .thenReturn(connection);
+                .when(connectionAdminService.findInWorkspaceOrThrow(WORKSPACE_ID, CONNECTION_ID))
+                .thenReturn(connection);
         lenient().when(githubProvider.kind()).thenReturn(IntegrationKind.GITHUB);
         lenient().when(githubProvider.describe(any(), anyLong())).thenReturn(ConnectionSyncDetails.empty());
         lenient().when(githubProvider.resources(any(), anyLong())).thenReturn(List.of());
         lenient().when(githubRunner.kind()).thenReturn(IntegrationKind.GITHUB);
 
         lenient()
-            .when(syncJobRepository.findFirstByConnection_IdAndStatusInOrderByCreatedAtDesc(anyLong(), any()))
-            .thenReturn(Optional.empty());
+                .when(syncJobRepository.findFirstByConnection_IdAndStatusInOrderByCreatedAtDesc(anyLong(), any()))
+                .thenReturn(Optional.empty());
         lenient()
-            .when(syncJobRepository.findFirstByConnection_IdAndStatusInOrderByFinishedAtDesc(anyLong(), any()))
-            .thenReturn(Optional.empty());
+                .when(syncJobRepository.findFirstByConnection_IdAndStatusInOrderByFinishedAtDesc(anyLong(), any()))
+                .thenReturn(Optional.empty());
         lenient().when(connectionActivityRepository.findById(anyLong())).thenReturn(Optional.empty());
 
         service = new SyncStatusService(
-            connectionAdminService,
-            syncJobService,
-            syncJobRepository,
-            connectionActivityRepository,
-            taskExecutor,
-            List.of(githubProvider),
-            List.of(githubRunner)
-        );
+                connectionAdminService,
+                syncJobService,
+                syncJobRepository,
+                connectionActivityRepository,
+                taskExecutor,
+                List.of(githubProvider),
+                List.of(githubRunner));
     }
 
     // --- health derivation ---
@@ -157,12 +155,9 @@ class SyncStatusServiceTest extends BaseUnitTest {
     @Test
     void getStatus_activeLastFinishedJobFailed_healthIsFailed() {
         SyncJob failed = terminalJob(SyncJobStatus.FAILED);
-        when(
-            syncJobRepository.findFirstByConnection_IdAndStatusInOrderByFinishedAtDesc(
-                CONNECTION_ID,
-                SyncJobStatus.TERMINAL
-            )
-        ).thenReturn(Optional.of(failed));
+        when(syncJobRepository.findFirstByConnection_IdAndStatusInOrderByFinishedAtDesc(
+                        CONNECTION_ID, SyncJobStatus.TERMINAL))
+                .thenReturn(Optional.of(failed));
 
         assertThat(service.getStatus(WORKSPACE_ID, CONNECTION_ID).health()).isEqualTo(ConnectionHealth.FAILED);
     }
@@ -170,31 +165,27 @@ class SyncStatusServiceTest extends BaseUnitTest {
     @Test
     void getStatus_activeLastFinishedJobSucceededWithWarnings_healthIsDegraded() {
         SyncJob warned = terminalJob(SyncJobStatus.SUCCEEDED_WITH_WARNINGS);
-        when(
-            syncJobRepository.findFirstByConnection_IdAndStatusInOrderByFinishedAtDesc(
-                CONNECTION_ID,
-                SyncJobStatus.TERMINAL
-            )
-        ).thenReturn(Optional.of(warned));
+        when(syncJobRepository.findFirstByConnection_IdAndStatusInOrderByFinishedAtDesc(
+                        CONNECTION_ID, SyncJobStatus.TERMINAL))
+                .thenReturn(Optional.of(warned));
 
         assertThat(service.getStatus(WORKSPACE_ID, CONNECTION_ID).health()).isEqualTo(ConnectionHealth.DEGRADED);
     }
 
     private static SyncResourceState resource(long id, @Nullable Instant lastSyncedAt, @Nullable String lastError) {
         return new SyncResourceState(
-            id,
-            "owner/repo" + id,
-            "repo" + id,
-            SyncResourceState.Type.REPOSITORY,
-            lastSyncedAt == null ? SyncResourceState.STATE_PENDING : SyncResourceState.STATE_SYNCED,
-            lastSyncedAt,
-            0L,
-            List.of(),
-            null,
-            lastError,
-            null,
-            null
-        );
+                id,
+                "owner/repo" + id,
+                "repo" + id,
+                SyncResourceState.Type.REPOSITORY,
+                lastSyncedAt == null ? SyncResourceState.STATE_PENDING : SyncResourceState.STATE_SYNCED,
+                lastSyncedAt,
+                0L,
+                List.of(),
+                null,
+                lastError,
+                null,
+                null);
     }
 
     /** The overview's honest headline: "3 stale · 1 never synced · 2 errored of 42". */
@@ -203,18 +194,16 @@ class SyncStatusServiceTest extends BaseUnitTest {
 
         private void withResources(List<SyncResourceState> resources, @Nullable Duration cadence) {
             when(githubProvider.resources(any(), anyLong())).thenReturn(resources);
-            when(githubProvider.describe(any(), anyLong())).thenReturn(
-                new ConnectionSyncDetails(null, null, cadence, null, null, false)
-            );
+            when(githubProvider.describe(any(), anyLong()))
+                    .thenReturn(new ConnectionSyncDetails(null, null, cadence, null, null, false));
         }
 
         @Test
         void resourceNeverSynced_countsAsPending() {
             Instant fresh = Instant.now();
             withResources(
-                List.of(resource(1L, fresh, null), resource(2L, null, null), resource(3L, null, null)),
-                Duration.ofHours(1)
-            );
+                    List.of(resource(1L, fresh, null), resource(2L, null, null), resource(3L, null, null)),
+                    Duration.ofHours(1));
 
             var counts = service.getStatus(WORKSPACE_ID, CONNECTION_ID).resourceCounts();
 
@@ -242,7 +231,10 @@ class SyncStatusServiceTest extends BaseUnitTest {
             Instant justOverOneCadence = Instant.now().minus(Duration.ofMinutes(90));
             withResources(List.of(resource(1L, justOverOneCadence, null)), Duration.ofHours(1));
 
-            assertThat(service.getStatus(WORKSPACE_ID, CONNECTION_ID).resourceCounts().stale()).isZero();
+            assertThat(service.getStatus(WORKSPACE_ID, CONNECTION_ID)
+                            .resourceCounts()
+                            .stale())
+                    .isZero();
         }
 
         @Test
@@ -252,7 +244,10 @@ class SyncStatusServiceTest extends BaseUnitTest {
 
             // Without a known cron there is no yardstick; inventing a default would either flag healthy
             // resources or hide real ones, and the UI must simply not make the claim.
-            assertThat(service.getStatus(WORKSPACE_ID, CONNECTION_ID).resourceCounts().stale()).isZero();
+            assertThat(service.getStatus(WORKSPACE_ID, CONNECTION_ID)
+                            .resourceCounts()
+                            .stale())
+                    .isZero();
         }
 
         @Test
@@ -295,24 +290,20 @@ class SyncStatusServiceTest extends BaseUnitTest {
 
     @Test
     void getStatus_erroredResourcePresent_healthIsDegraded() {
-        when(githubProvider.resources(any(), anyLong())).thenReturn(
-            List.of(
-                new SyncResourceState(
-                    1L,
-                    "owner/repo",
-                    "repo",
-                    SyncResourceState.Type.REPOSITORY,
-                    "ERROR",
-                    null,
-                    null,
-                    List.of(),
-                    null,
-                    "boom",
-                    null,
-                    null
-                )
-            )
-        );
+        when(githubProvider.resources(any(), anyLong()))
+                .thenReturn(List.of(new SyncResourceState(
+                        1L,
+                        "owner/repo",
+                        "repo",
+                        SyncResourceState.Type.REPOSITORY,
+                        "ERROR",
+                        null,
+                        null,
+                        List.of(),
+                        null,
+                        "boom",
+                        null,
+                        null)));
 
         var status = service.getStatus(WORKSPACE_ID, CONNECTION_ID);
 
@@ -323,9 +314,8 @@ class SyncStatusServiceTest extends BaseUnitTest {
 
     @Test
     void getStatus_vendorHealthDegraded_healthIsDegraded() {
-        when(githubProvider.describe(any(), anyLong())).thenReturn(
-            new ConnectionSyncDetails(null, null, null, null, null, true)
-        );
+        when(githubProvider.describe(any(), anyLong()))
+                .thenReturn(new ConnectionSyncDetails(null, null, null, null, null, true));
 
         assertThat(service.getStatus(WORKSPACE_ID, CONNECTION_ID).health()).isEqualTo(ConnectionHealth.DEGRADED);
     }
@@ -333,14 +323,13 @@ class SyncStatusServiceTest extends BaseUnitTest {
     @Test
     void getStatus_noProviderRegistered_gracefullyDegradesToEmptyDetails() {
         SyncStatusService noProviders = new SyncStatusService(
-            connectionAdminService,
-            syncJobService,
-            syncJobRepository,
-            connectionActivityRepository,
-            taskExecutor,
-            List.of(),
-            List.of()
-        );
+                connectionAdminService,
+                syncJobService,
+                syncJobRepository,
+                connectionActivityRepository,
+                taskExecutor,
+                List.of(),
+                List.of());
 
         var status = noProviders.getStatus(WORKSPACE_ID, CONNECTION_ID);
 
@@ -353,9 +342,8 @@ class SyncStatusServiceTest extends BaseUnitTest {
     @Test
     void getStatus_activityRecorded_includesLastEventProcessedAtFromActivityRepository_notProvider() {
         Instant lastEventAt = Instant.parse("2026-07-14T10:00:00Z");
-        when(connectionActivityRepository.findById(CONNECTION_ID)).thenReturn(
-            Optional.of(new ConnectionActivity(CONNECTION_ID, WORKSPACE_ID, lastEventAt, "push"))
-        );
+        when(connectionActivityRepository.findById(CONNECTION_ID))
+                .thenReturn(Optional.of(new ConnectionActivity(CONNECTION_ID, WORKSPACE_ID, lastEventAt, "push")));
 
         var status = service.getStatus(WORKSPACE_ID, CONNECTION_ID);
 
@@ -378,29 +366,31 @@ class SyncStatusServiceTest extends BaseUnitTest {
     void getStatus_runnerSupportsBackfill_backfillSupportedIsTrue() {
         when(githubRunner.supportsBackfill()).thenReturn(true);
 
-        assertThat(service.getStatus(WORKSPACE_ID, CONNECTION_ID).backfillSupported()).isTrue();
+        assertThat(service.getStatus(WORKSPACE_ID, CONNECTION_ID).backfillSupported())
+                .isTrue();
     }
 
     @Test
     void getStatus_runnerDoesNotSupportBackfill_backfillSupportedIsFalse() {
         when(githubRunner.supportsBackfill()).thenReturn(false);
 
-        assertThat(service.getStatus(WORKSPACE_ID, CONNECTION_ID).backfillSupported()).isFalse();
+        assertThat(service.getStatus(WORKSPACE_ID, CONNECTION_ID).backfillSupported())
+                .isFalse();
     }
 
     @Test
     void getStatus_noRunnerRegisteredForKind_backfillSupportedIsFalse() {
         SyncStatusService noRunners = new SyncStatusService(
-            connectionAdminService,
-            syncJobService,
-            syncJobRepository,
-            connectionActivityRepository,
-            taskExecutor,
-            List.of(githubProvider),
-            List.of()
-        );
+                connectionAdminService,
+                syncJobService,
+                syncJobRepository,
+                connectionActivityRepository,
+                taskExecutor,
+                List.of(githubProvider),
+                List.of());
 
-        assertThat(noRunners.getStatus(WORKSPACE_ID, CONNECTION_ID).backfillSupported()).isFalse();
+        assertThat(noRunners.getStatus(WORKSPACE_ID, CONNECTION_ID).backfillSupported())
+                .isFalse();
     }
 
     // --- trigger ---
@@ -409,36 +399,32 @@ class SyncStatusServiceTest extends BaseUnitTest {
     void triggerSync_notActiveConnection_throwsStateConflict() {
         connection.setState(IntegrationState.SUSPENDED);
 
-        assertThatThrownBy(() ->
-            service.triggerSync(WORKSPACE_ID, CONNECTION_ID, SyncJobType.RECONCILIATION, null)
-        ).isInstanceOf(SyncStateConflictException.class);
+        assertThatThrownBy(() -> service.triggerSync(WORKSPACE_ID, CONNECTION_ID, SyncJobType.RECONCILIATION, null))
+                .isInstanceOf(SyncStateConflictException.class);
         verify(syncJobService, never()).beginJob(any());
     }
 
     @Test
     void triggerSync_noRunnerForKind_throwsSyncNotSupported() {
         SyncStatusService noRunners = new SyncStatusService(
-            connectionAdminService,
-            syncJobService,
-            syncJobRepository,
-            connectionActivityRepository,
-            taskExecutor,
-            List.of(githubProvider),
-            List.of()
-        );
+                connectionAdminService,
+                syncJobService,
+                syncJobRepository,
+                connectionActivityRepository,
+                taskExecutor,
+                List.of(githubProvider),
+                List.of());
 
-        assertThatThrownBy(() ->
-            noRunners.triggerSync(WORKSPACE_ID, CONNECTION_ID, SyncJobType.RECONCILIATION, null)
-        ).isInstanceOf(SyncNotSupportedException.class);
+        assertThatThrownBy(() -> noRunners.triggerSync(WORKSPACE_ID, CONNECTION_ID, SyncJobType.RECONCILIATION, null))
+                .isInstanceOf(SyncNotSupportedException.class);
     }
 
     @Test
     void triggerSync_backfillUnsupportedByRunner_throwsSyncNotSupported() {
         when(githubRunner.supportsBackfill()).thenReturn(false);
 
-        assertThatThrownBy(() ->
-            service.triggerSync(WORKSPACE_ID, CONNECTION_ID, SyncJobType.BACKFILL, null)
-        ).isInstanceOf(SyncNotSupportedException.class);
+        assertThatThrownBy(() -> service.triggerSync(WORKSPACE_ID, CONNECTION_ID, SyncJobType.BACKFILL, null))
+                .isInstanceOf(SyncNotSupportedException.class);
     }
 
     @Test
@@ -446,9 +432,8 @@ class SyncStatusServiceTest extends BaseUnitTest {
         // INITIAL is lifecycle-owned: a manual INITIAL on a mature connection would run a full sync that
         // silently skips the deletion sweep and record a bogus INITIAL/MANUAL job. Only RECONCILIATION
         // and BACKFILL are client-triggerable — reject INITIAL before any job row is begun.
-        assertThatThrownBy(() ->
-            service.triggerSync(WORKSPACE_ID, CONNECTION_ID, SyncJobType.INITIAL, null)
-        ).isInstanceOf(SyncStateConflictException.class);
+        assertThatThrownBy(() -> service.triggerSync(WORKSPACE_ID, CONNECTION_ID, SyncJobType.INITIAL, null))
+                .isInstanceOf(SyncStateConflictException.class);
 
         verify(syncJobService, never()).beginJob(any());
     }
@@ -457,25 +442,17 @@ class SyncStatusServiceTest extends BaseUnitTest {
     void triggerSync_newJob_dispatchesAsyncAndReturnsCreatedTrue() {
         SyncJob created = pendingJob();
         SyncJobService.Started started = new SyncJobService.Started(created, mock(SyncJobHandle.class));
-        when(
-            syncJobService.beginJob(
-                new SyncJobRequest(
-                    WORKSPACE_ID,
-                    CONNECTION_ID,
-                    IntegrationKind.GITHUB,
-                    SyncJobType.RECONCILIATION,
-                    SyncJobTrigger.MANUAL,
-                    42L
-                )
-            )
-        ).thenReturn(started);
+        when(syncJobService.beginJob(new SyncJobRequest(
+                        WORKSPACE_ID,
+                        CONNECTION_ID,
+                        IntegrationKind.GITHUB,
+                        SyncJobType.RECONCILIATION,
+                        SyncJobTrigger.MANUAL,
+                        42L)))
+                .thenReturn(started);
 
-        SyncStatusService.TriggerOutcome outcome = service.triggerSync(
-            WORKSPACE_ID,
-            CONNECTION_ID,
-            SyncJobType.RECONCILIATION,
-            42L
-        );
+        SyncStatusService.TriggerOutcome outcome =
+                service.triggerSync(WORKSPACE_ID, CONNECTION_ID, SyncJobType.RECONCILIATION, 42L);
 
         assertThat(outcome.created()).isTrue();
         assertThat(outcome.job().id()).isEqualTo(created.getId());
@@ -485,25 +462,17 @@ class SyncStatusServiceTest extends BaseUnitTest {
     @Test
     void triggerSync_duplicateActiveJob_returnsCreatedFalseWithActiveJob() {
         SyncJob active = pendingJob();
-        when(
-            syncJobService.beginJob(
-                new SyncJobRequest(
-                    WORKSPACE_ID,
-                    CONNECTION_ID,
-                    IntegrationKind.GITHUB,
-                    SyncJobType.RECONCILIATION,
-                    SyncJobTrigger.MANUAL,
-                    null
-                )
-            )
-        ).thenThrow(new SyncJobConflictException(active));
+        when(syncJobService.beginJob(new SyncJobRequest(
+                        WORKSPACE_ID,
+                        CONNECTION_ID,
+                        IntegrationKind.GITHUB,
+                        SyncJobType.RECONCILIATION,
+                        SyncJobTrigger.MANUAL,
+                        null)))
+                .thenThrow(new SyncJobConflictException(active));
 
-        SyncStatusService.TriggerOutcome outcome = service.triggerSync(
-            WORKSPACE_ID,
-            CONNECTION_ID,
-            SyncJobType.RECONCILIATION,
-            null
-        );
+        SyncStatusService.TriggerOutcome outcome =
+                service.triggerSync(WORKSPACE_ID, CONNECTION_ID, SyncJobType.RECONCILIATION, null);
 
         assertThat(outcome.created()).isFalse();
         assertThat(outcome.job().id()).isEqualTo(active.getId());
@@ -518,9 +487,8 @@ class SyncStatusServiceTest extends BaseUnitTest {
         SyncJob reconciling = pendingJob(); // type == RECONCILIATION
         when(syncJobService.beginJob(any())).thenThrow(new SyncJobConflictException(reconciling));
 
-        assertThatThrownBy(() ->
-            service.triggerSync(WORKSPACE_ID, CONNECTION_ID, SyncJobType.BACKFILL, null)
-        ).isInstanceOf(SyncStateConflictException.class);
+        assertThatThrownBy(() -> service.triggerSync(WORKSPACE_ID, CONNECTION_ID, SyncJobType.BACKFILL, null))
+                .isInstanceOf(SyncStateConflictException.class);
         verify(taskExecutor, never()).execute(any());
     }
 
@@ -532,11 +500,12 @@ class SyncStatusServiceTest extends BaseUnitTest {
         SyncJob created = pendingJob();
         SyncJobService.Started started = new SyncJobService.Started(created, mock(SyncJobHandle.class));
         when(syncJobService.beginJob(any())).thenReturn(started);
-        doThrow(new TaskRejectedException("executor saturated")).when(taskExecutor).execute(any());
+        doThrow(new TaskRejectedException("executor saturated"))
+                .when(taskExecutor)
+                .execute(any());
 
-        assertThatThrownBy(() ->
-            service.triggerSync(WORKSPACE_ID, CONNECTION_ID, SyncJobType.RECONCILIATION, null)
-        ).isInstanceOf(TaskRejectedException.class);
+        assertThatThrownBy(() -> service.triggerSync(WORKSPACE_ID, CONNECTION_ID, SyncJobType.RECONCILIATION, null))
+                .isInstanceOf(TaskRejectedException.class);
 
         verify(syncJobService).failStarted(eq(started), any());
     }
@@ -545,21 +514,18 @@ class SyncStatusServiceTest extends BaseUnitTest {
 
     @Test
     @DisplayName(
-        "cancelling a job that belongs to a SIBLING connection in the same workspace must 404 without cancelling"
-    )
+            "cancelling a job that belongs to a SIBLING connection in the same workspace must 404 without cancelling")
     void cancelJob_jobBelongsToDifferentConnection_throwsEntityNotFoundAndNeverCancels() {
         // The (workspace, connection) scope check is a security control: a job id that exists and is
         // readable in this workspace, but hangs off a DIFFERENT connection, must not have its cancel
         // flag flipped through the path connection. `never(requestCancel)` is the assertion that dies
         // if the ownership `.filter(...)` is dropped — the trailing re-read would 404 regardless.
         SyncJob siblingConnectionJob = jobOnConnection(OTHER_CONNECTION_ID);
-        when(syncJobRepository.findByIdAndWorkspace_Id(JOB_ID, WORKSPACE_ID)).thenReturn(
-            Optional.of(siblingConnectionJob)
-        );
+        when(syncJobRepository.findByIdAndWorkspace_Id(JOB_ID, WORKSPACE_ID))
+                .thenReturn(Optional.of(siblingConnectionJob));
 
-        assertThatThrownBy(() -> service.cancelJob(WORKSPACE_ID, CONNECTION_ID, JOB_ID)).isInstanceOf(
-            EntityNotFoundException.class
-        );
+        assertThatThrownBy(() -> service.cancelJob(WORKSPACE_ID, CONNECTION_ID, JOB_ID))
+                .isInstanceOf(EntityNotFoundException.class);
 
         verify(syncJobService, never()).requestCancel(anyLong(), anyLong());
     }
@@ -573,9 +539,8 @@ class SyncStatusServiceTest extends BaseUnitTest {
         when(syncJobRepository.findByIdAndWorkspace_Id(JOB_ID, WORKSPACE_ID)).thenReturn(Optional.empty());
         lenient().when(syncJobRepository.findById(JOB_ID)).thenReturn(Optional.of(jobOnConnection(CONNECTION_ID)));
 
-        assertThatThrownBy(() -> service.cancelJob(WORKSPACE_ID, CONNECTION_ID, JOB_ID)).isInstanceOf(
-            EntityNotFoundException.class
-        );
+        assertThatThrownBy(() -> service.cancelJob(WORKSPACE_ID, CONNECTION_ID, JOB_ID))
+                .isInstanceOf(EntityNotFoundException.class);
 
         verify(syncJobService, never()).requestCancel(anyLong(), anyLong());
     }
@@ -597,12 +562,11 @@ class SyncStatusServiceTest extends BaseUnitTest {
         SyncJob job = jobOnConnection(CONNECTION_ID);
         when(syncJobRepository.findByIdAndWorkspace_Id(JOB_ID, WORKSPACE_ID)).thenReturn(Optional.of(job));
         doThrow(new SyncStateConflictException("already terminal", Map.of()))
-            .when(syncJobService)
-            .requestCancel(WORKSPACE_ID, JOB_ID);
+                .when(syncJobService)
+                .requestCancel(WORKSPACE_ID, JOB_ID);
 
-        assertThatThrownBy(() -> service.cancelJob(WORKSPACE_ID, CONNECTION_ID, JOB_ID)).isInstanceOf(
-            SyncStateConflictException.class
-        );
+        assertThatThrownBy(() -> service.cancelJob(WORKSPACE_ID, CONNECTION_ID, JOB_ID))
+                .isInstanceOf(SyncStateConflictException.class);
     }
 
     // --- catalog ---
@@ -617,19 +581,17 @@ class SyncStatusServiceTest extends BaseUnitTest {
         List<IntegrationCatalogEntryDTO> catalog = service.catalog(WORKSPACE_ID);
 
         assertThat(catalog).hasSize(2);
-        IntegrationCatalogEntryDTO githubEntry = catalog
-            .stream()
-            .filter(e -> e.kind() == IntegrationKind.GITHUB)
-            .findFirst()
-            .orElseThrow();
+        IntegrationCatalogEntryDTO githubEntry = catalog.stream()
+                .filter(e -> e.kind() == IntegrationKind.GITHUB)
+                .findFirst()
+                .orElseThrow();
         assertThat(githubEntry.connected()).isTrue();
         assertThat(githubEntry.connectionId()).isEqualTo(CONNECTION_ID);
 
-        IntegrationCatalogEntryDTO slackEntry = catalog
-            .stream()
-            .filter(e -> e.kind() == IntegrationKind.SLACK)
-            .findFirst()
-            .orElseThrow();
+        IntegrationCatalogEntryDTO slackEntry = catalog.stream()
+                .filter(e -> e.kind() == IntegrationKind.SLACK)
+                .findFirst()
+                .orElseThrow();
         assertThat(slackEntry.connected()).isFalse();
         assertThat(slackEntry.connectionId()).isNull();
     }
@@ -637,15 +599,14 @@ class SyncStatusServiceTest extends BaseUnitTest {
     @Test
     void catalog_exposesOnlyTheWorkspaceScmProvider() {
         when(connectionAdminService.manifests()).thenReturn(manifests);
-        when(manifests.registeredKinds()).thenReturn(
-            Set.of(IntegrationKind.GITHUB, IntegrationKind.GITLAB, IntegrationKind.SLACK)
-        );
+        when(manifests.registeredKinds())
+                .thenReturn(Set.of(IntegrationKind.GITHUB, IntegrationKind.GITLAB, IntegrationKind.SLACK));
         when(manifests.manifestFor(any())).thenReturn(Optional.empty());
         when(connectionAdminService.listForWorkspace(WORKSPACE_ID)).thenReturn(List.of(connection));
 
         assertThat(service.catalog(WORKSPACE_ID))
-            .extracting(IntegrationCatalogEntryDTO::kind)
-            .containsExactly(IntegrationKind.GITHUB, IntegrationKind.SLACK);
+                .extracting(IntegrationCatalogEntryDTO::kind)
+                .containsExactly(IntegrationKind.GITHUB, IntegrationKind.SLACK);
     }
 
     // --- helpers ---
@@ -661,13 +622,7 @@ class SyncStatusServiceTest extends BaseUnitTest {
         Workspace ws = new Workspace();
         ws.setId(WORKSPACE_ID);
         SyncJob job = new SyncJob(
-            ws,
-            connection,
-            IntegrationKind.GITHUB,
-            SyncJobType.RECONCILIATION,
-            SyncJobTrigger.MANUAL,
-            null
-        );
+                ws, connection, IntegrationKind.GITHUB, SyncJobType.RECONCILIATION, SyncJobTrigger.MANUAL, null);
         job.setId(JOB_ID);
         job.setCreatedAt(Instant.now());
         return job;
@@ -678,20 +633,13 @@ class SyncStatusServiceTest extends BaseUnitTest {
         Workspace ws = new Workspace();
         ws.setId(WORKSPACE_ID);
         Connection owner = new Connection(
-            ws,
-            IntegrationKind.GITHUB,
-            String.valueOf(connectionId),
-            new ConnectionConfig.GitHubAppConfig(connectionId, "acme", null, Set.of())
-        );
+                ws,
+                IntegrationKind.GITHUB,
+                String.valueOf(connectionId),
+                new ConnectionConfig.GitHubAppConfig(connectionId, "acme", null, Set.of()));
         setConnectionId(owner, connectionId);
-        SyncJob job = new SyncJob(
-            ws,
-            owner,
-            IntegrationKind.GITHUB,
-            SyncJobType.RECONCILIATION,
-            SyncJobTrigger.MANUAL,
-            null
-        );
+        SyncJob job =
+                new SyncJob(ws, owner, IntegrationKind.GITHUB, SyncJobType.RECONCILIATION, SyncJobTrigger.MANUAL, null);
         job.setId(JOB_ID);
         job.setCreatedAt(Instant.now());
         return job;

@@ -22,8 +22,5 @@ public interface ConfigAuditQuery {
      * @param workspaceId optional narrowing; null spans every workspace
      */
     Page<ConfigAuditEntryViewDTO> listForAdmin(
-        @org.jspecify.annotations.Nullable Long workspaceId,
-        ConfigAuditFilter filter,
-        Pageable pageable
-    );
+            @org.jspecify.annotations.Nullable Long workspaceId, ConfigAuditFilter filter, Pageable pageable);
 }

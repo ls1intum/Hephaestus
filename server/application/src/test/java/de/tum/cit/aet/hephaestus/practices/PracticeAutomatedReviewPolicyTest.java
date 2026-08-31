@@ -24,26 +24,22 @@ class PracticeAutomatedReviewPolicyTest extends BaseUnitTest {
     @Test
     void shouldRejectLimitationsWithoutAutomatedReview() {
         assertThatThrownBy(() -> policy(none(), List.of(new PracticeEvidenceLimitation("UNSUPPORTED_CLAIM", "Claim."))))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("without automated review");
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("without automated review");
     }
 
     @Test
     void shouldRejectDuplicateLimitationCodesAndInsufficientEvidenceWithNoReason() {
-        PracticeEvidenceLimitation limitation = new PracticeEvidenceLimitation(
-            "MISSING_CONTEXT",
-            "Context is missing."
-        );
+        PracticeEvidenceLimitation limitation =
+                new PracticeEvidenceLimitation("MISSING_CONTEXT", "Context is missing.");
         assertThatThrownBy(() -> policy(languageModel(), List.of(limitation, limitation)))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("codes must be unique");
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("codes must be unique");
         PracticeAutomatedReview additionalContext = new PracticeAutomatedReview(
-            PracticeAutomatedReviewMode.LANGUAGE_MODEL,
-            PracticeEvidenceSufficiency.DECLARED_EVIDENCE_INSUFFICIENT
-        );
+                PracticeAutomatedReviewMode.LANGUAGE_MODEL, PracticeEvidenceSufficiency.DECLARED_EVIDENCE_INSUFFICIENT);
         assertThatThrownBy(() -> policy(additionalContext, List.of()))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("must state why a human is needed");
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("must state why a human is needed");
     }
 
     /**
@@ -53,36 +49,30 @@ class PracticeAutomatedReviewPolicyTest extends BaseUnitTest {
     @Test
     void shouldCanonicalizeLimitationOrder() {
         PracticeAutomatedReviewPolicy policy = policy(
-            languageModel(),
-            List.of(
-                new PracticeEvidenceLimitation("SECOND_LIMITATION", "Second."),
-                new PracticeEvidenceLimitation("FIRST_LIMITATION", "First.")
-            )
-        );
+                languageModel(),
+                List.of(
+                        new PracticeEvidenceLimitation("SECOND_LIMITATION", "Second."),
+                        new PracticeEvidenceLimitation("FIRST_LIMITATION", "First.")));
 
         assertThat(policy.knownLimitations())
-            .extracting(PracticeEvidenceLimitation::code)
-            .containsExactly("FIRST_LIMITATION", "SECOND_LIMITATION");
+                .extracting(PracticeEvidenceLimitation::code)
+                .containsExactly("FIRST_LIMITATION", "SECOND_LIMITATION");
     }
 
     private static PracticeAutomatedReviewPolicy policy(
-        PracticeAutomatedReview automatedReview,
-        List<PracticeEvidenceLimitation> knownLimitations
-    ) {
+            PracticeAutomatedReview automatedReview, List<PracticeEvidenceLimitation> knownLimitations) {
         return new PracticeAutomatedReviewPolicy(
-            VERSION,
-            automatedReview,
-            PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,
-            knownLimitations,
-            null
-        );
+                VERSION,
+                automatedReview,
+                PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,
+                knownLimitations,
+                null);
     }
 
     private static PracticeAutomatedReview languageModel() {
         return new PracticeAutomatedReview(
-            PracticeAutomatedReviewMode.LANGUAGE_MODEL,
-            PracticeEvidenceSufficiency.SUFFICIENT_WHEN_REQUIREMENTS_MET
-        );
+                PracticeAutomatedReviewMode.LANGUAGE_MODEL,
+                PracticeEvidenceSufficiency.SUFFICIENT_WHEN_REQUIREMENTS_MET);
     }
 
     private static PracticeAutomatedReview none() {

@@ -10,19 +10,17 @@ final class ImagePullBootstrapperSupport {
     private ImagePullBootstrapperSupport() {}
 
     static void applyPolicy(
-        String image,
-        ImagePullPolicy policy,
-        DockerImageOperations imageOps,
-        String metricBase,
-        MeterRegistry meterRegistry,
-        Logger log
-    ) {
+            String image,
+            ImagePullPolicy policy,
+            DockerImageOperations imageOps,
+            String metricBase,
+            MeterRegistry meterRegistry,
+            Logger log) {
         if (policy == ImagePullPolicy.NEVER) {
             if (!imageOps.imageIsPresent(image)) {
                 log.warn(
-                    "pull-policy=NEVER but {} is not in the local Docker daemon — container creation will fail.",
-                    image
-                );
+                        "pull-policy=NEVER but {} is not in the local Docker daemon — container creation will fail.",
+                        image);
             }
             return;
         }
@@ -34,7 +32,9 @@ final class ImagePullBootstrapperSupport {
 
         if (!imageOps.ping()) {
             log.warn("Docker daemon not reachable; skipping startup image pull for {}", image);
-            meterRegistry.counter(metricBase + ".skipped", "reason", "docker_unreachable").increment();
+            meterRegistry
+                    .counter(metricBase + ".skipped", "reason", "docker_unreachable")
+                    .increment();
             return;
         }
         log.info("Pulling image {} (policy={}) …", image, policy);

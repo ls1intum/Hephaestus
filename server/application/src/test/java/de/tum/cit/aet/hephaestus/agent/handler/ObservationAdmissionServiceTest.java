@@ -13,6 +13,7 @@ import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -39,9 +40,13 @@ class ObservationAdmissionServiceTest extends BaseUnitTest {
         job.setId(UUID.randomUUID());
         job.setStatus(AgentJobStatus.RUNNING);
         job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
+        Workspace workspace = new Workspace();
+        workspace.setId(1L);
+        job.setWorkspace(workspace);
         job.setMetadata(mapper.createObjectNode());
         when(jobs.findByIdWithWorkspaceForUpdate(job.getId())).thenReturn(Optional.of(job));
-        when(observations.findByAgentJobId(job.getId())).thenReturn(List.of());
+        when(observations.findByAgentJobId(job.getId(), job.getWorkspace().getId()))
+                .thenReturn(List.of());
     }
 
     @Test
@@ -50,25 +55,26 @@ class ObservationAdmissionServiceTest extends BaseUnitTest {
         ObjectNode first = service.admit(job.getId(), payload);
         ObjectNode replay = service.admit(job.getId(), payload);
 
-        assertThat(replay.path("admissionDigest").asString()).isEqualTo(first.path("admissionDigest").asString());
+        assertThat(replay.path("admissionDigest").asString())
+                .isEqualTo(first.path("admissionDigest").asString());
         verify(pullRequests, times(1)).admitObservations(job, payload);
     }
 
     @Test
     void changedPayloadConflictsAfterAdmission() {
         service.admit(job.getId(), mapper.createArrayNode().add("one"));
-        assertThatThrownBy(() -> service.admit(job.getId(), mapper.createArrayNode().add("two"))).isInstanceOf(
-            ObservationAdmissionService.AdmissionConflictException.class
-        );
+        assertThatThrownBy(() ->
+                        service.admit(job.getId(), mapper.createArrayNode().add("two")))
+                .isInstanceOf(ObservationAdmissionService.AdmissionConflictException.class);
         verify(pullRequests, times(1)).admitObservations(eq(job), any());
     }
 
     @Test
     void refusesJobThatIsNotRunning() {
         job.setStatus(AgentJobStatus.COMPLETED);
-        assertThatThrownBy(() -> service.admit(job.getId(), mapper.createArrayNode().add("one"))).isInstanceOf(
-            IllegalStateException.class
-        );
+        assertThatThrownBy(() ->
+                        service.admit(job.getId(), mapper.createArrayNode().add("one")))
+                .isInstanceOf(IllegalStateException.class);
         verifyNoInteractions(pullRequests, issues);
     }
 
@@ -87,7 +93,10 @@ class ObservationAdmissionServiceTest extends BaseUnitTest {
         Observation observation = mock(Observation.class);
         Practice practice = mock(Practice.class);
         ObjectNode evidence = mapper.createObjectNode();
-        evidence.putArray("citations").addObject().put("sourceKind", "scm.issue.core").put("quote", "why");
+        evidence.putArray("citations")
+                .addObject()
+                .put("sourceKind", "scm.issue.core")
+                .put("quote", "why");
         when(observation.getId()).thenReturn(UUID.randomUUID());
         when(observation.getPractice()).thenReturn(practice);
         when(practice.getSlug()).thenReturn("explains-why");
@@ -95,17 +104,28 @@ class ObservationAdmissionServiceTest extends BaseUnitTest {
         when(observation.getPresence()).thenReturn(Presence.PRESENT);
         when(observation.getEvidence()).thenReturn(evidence);
         when(observation.getEvidenceRationale()).thenReturn("The issue states why.");
-        when(observations.findByAgentJobId(job.getId())).thenReturn(List.of(observation));
+        when(observations.findByAgentJobId(job.getId(), job.getWorkspace().getId()))
+                .thenReturn(List.of(observation));
 
-        ObjectNode response = service.admit(job.getId(), mapper.createArrayNode().add("one"));
+        ObjectNode response =
+                service.admit(job.getId(), mapper.createArrayNode().add("one"));
 
         assertThat(response.path("observations").get(0).path("id").asString()).isNotBlank();
-        assertThat(response.path("observations").get(0).path("evidence").path("citations")).hasSize(1);
-        assertThat(response.path("observations").get(0).path("citations").get(0).path("quote").asString()).isEqualTo(
-            "why"
-        );
-        assertThat(
-            response.path("observations").get(0).path("citations").get(0).path("anchorable").asBoolean()
-        ).isFalse();
+        assertThat(response.path("observations").get(0).path("evidence").path("citations"))
+                .hasSize(1);
+        assertThat(response.path("observations")
+                        .get(0)
+                        .path("citations")
+                        .get(0)
+                        .path("quote")
+                        .asString())
+                .isEqualTo("why");
+        assertThat(response.path("observations")
+                        .get(0)
+                        .path("citations")
+                        .get(0)
+                        .path("anchorable")
+                        .asBoolean())
+                .isFalse();
     }
 }

@@ -22,14 +22,13 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "hephaestus.webhook")
 public record WebhookProperties(
-    @Nullable String externalUrl,
-    @Nullable String secret,
-    @DefaultValue TokenRotation tokenRotation,
-    @DefaultValue Publish publish,
-    @DefaultValue Stream stream,
-    @DefaultValue Shutdown shutdown,
-    @DefaultValue Http http
-) {
+        @Nullable String externalUrl,
+        @Nullable String secret,
+        @DefaultValue TokenRotation tokenRotation,
+        @DefaultValue Publish publish,
+        @DefaultValue Stream stream,
+        @DefaultValue Shutdown shutdown,
+        @DefaultValue Http http) {
     /** Minimum HMAC-SHA256 secret length recommended by NIST SP 800-107. */
     public static final int MIN_SECRET_LENGTH = 32;
 
@@ -43,9 +42,9 @@ public record WebhookProperties(
      * {@code stream} and {@code http} is asserted here — the shape {@code WorkspaceProperties} uses.
      */
     @AssertTrue(
-        message = "hephaestus.webhook.stream.max-bytes, and every max-bytes-by-stream entry, must be at least " +
-            "4 x hephaestus.webhook.http.max-payload-bytes; a smaller stream rejects payloads the receiver accepted"
-    )
+            message =
+                    "hephaestus.webhook.stream.max-bytes, and every max-bytes-by-stream entry, must be at least "
+                            + "4 x hephaestus.webhook.http.max-payload-bytes; a smaller stream rejects payloads the receiver accepted")
     @SuppressWarnings("PMD.UnusedPrivateMethod")
     private boolean isStreamAbleToHoldWhatTheReceiverAccepts() {
         if (stream == null || http == null) {
@@ -55,47 +54,40 @@ public record WebhookProperties(
         if (stream.maxBytes().toBytes() < floor) {
             return false;
         }
-        return stream
-            .maxBytesByStream()
-            .values()
-            .stream()
-            .allMatch(size -> size.toBytes() >= floor);
+        return stream.maxBytesByStream().values().stream().allMatch(size -> size.toBytes() >= floor);
     }
 
     /** {@code true} iff auto-registration with the provider can be attempted. Pure predicate — no side effects. */
     public boolean isConfigured() {
-        return (
-            externalUrl != null &&
-            !externalUrl.isBlank() &&
-            secret != null &&
-            !secret.isBlank() &&
-            secret.length() >= MIN_SECRET_LENGTH
-        );
+        return (externalUrl != null
+                && !externalUrl.isBlank()
+                && secret != null
+                && !secret.isBlank()
+                && secret.length() >= MIN_SECRET_LENGTH);
     }
 
     /** Redacts {@code secret} so accidental {@code log.info("config: {}", props)} doesn't leak it. */
     @Override
     public String toString() {
-        return (
-            "WebhookProperties[externalUrl=" +
-            externalUrl +
-            ", secret=" +
-            (secret == null || secret.isBlank() ? "<unset>" : "<redacted>") +
-            ", tokenRotation=" +
-            tokenRotation +
-            ", publish=" +
-            publish +
-            ", stream=" +
-            stream +
-            ", shutdown=" +
-            shutdown +
-            ", http=" +
-            http +
-            "]"
-        );
+        return ("WebhookProperties[externalUrl=" + externalUrl
+                + ", secret="
+                + (secret == null || secret.isBlank() ? "<unset>" : "<redacted>")
+                + ", tokenRotation="
+                + tokenRotation
+                + ", publish="
+                + publish
+                + ", stream="
+                + stream
+                + ", shutdown="
+                + shutdown
+                + ", http="
+                + http
+                + "]");
     }
 
-    public record TokenRotation(@DefaultValue("7") int thresholdDays, @DefaultValue("90") int validityDays) {
+    public record TokenRotation(
+            @DefaultValue("7") int thresholdDays,
+            @DefaultValue("90") int validityDays) {
         public TokenRotation {
             if (thresholdDays < 0) {
                 throw new IllegalArgumentException("tokenRotation.thresholdDays must be >= 0, got: " + thresholdDays);
@@ -107,10 +99,9 @@ public record WebhookProperties(
     }
 
     public record Publish(
-        @DefaultValue("9s") Duration timeout,
-        @DefaultValue("5") int maxRetries,
-        @DefaultValue("200ms") Duration retryBaseDelay
-    ) {
+            @DefaultValue("9s") Duration timeout,
+            @DefaultValue("5") int maxRetries,
+            @DefaultValue("200ms") Duration retryBaseDelay) {
         public Publish {
             if (timeout.isZero() || timeout.isNegative()) {
                 throw new IllegalArgumentException("publish.timeout must be positive, got: " + timeout);
@@ -139,41 +130,40 @@ public record WebhookProperties(
      *     ingestion operations</a>
      */
     public record Stream(
-        // Replay-defense invariant: the JetStream dedup window MUST be >= the largest per-vendor
-        // timestamp replay tolerance, otherwise a captured-but-still-timestamp-valid request can be
-        // replayed once its dedup entry has expired (the 2-5 min band). The widest vendor tolerance
-        // is 5m (GitLab whsec TIMESTAMP_TOLERANCE, Slack v0 MAX_DRIFT_SECONDS); we set 10m to also
-        // cover GitHub — which has NO timestamp, so the dedup window keyed on X-GitHub-Delivery is
-        // its ONLY replay defense — plus provider redelivery horizons. See REPLAY_TOLERANCE_FLOOR.
-        @DefaultValue("10m") Duration duplicateWindow,
-        @DefaultValue("180d") Duration maxAge,
-        @DefaultValue Map<String, Duration> maxAgeByStream,
-        @DefaultValue("1GB") DataSize maxBytes,
-        /** Per-stream {@link #maxBytes} overrides keyed by stream name — {@code github} dwarfs the rest. */
-        @DefaultValue Map<String, DataSize> maxBytesByStream,
-        /**
-         * What the broker may hold for all webhook streams together, which must stay at or below the
-         * free space on its volume. Keeping the per-stream bounds inside it is what keeps a full
-         * stream a stream that refuses messages rather than a broker that cannot write at all.
-         */
-        @DefaultValue("16GB") DataSize storageBudget,
-        /**
-         * Lets startup apply a limit change that would delete messages the stream already holds.
-         * Off by default: bounding a stream that has outgrown the new limit deletes the excess
-         * immediately, so it is a decision an operator makes rather than one a deploy makes for them.
-         */
-        @DefaultValue("false") boolean allowDestructiveLimitUpdates,
-        /**
-         * How long startup waits for one stream limit update. Bounding a stream that has outgrown
-         * the new limit deletes the excess before the broker answers, so the work is proportional to
-         * the bytes being shed rather than to the size of the request — tens of GB take far longer
-         * than the request timeout the health probes want. This is deliberately separate from the
-         * consumer request timeout so a slow admin call cannot slow a readiness answer.
-         */
-        @DefaultValue("5m") Duration limitUpdateTimeout,
-        /** How often the stream monitor reads stream and consumer state. */
-        @DefaultValue("60s") Duration monitorInterval
-    ) {
+            // Replay-defense invariant: the JetStream dedup window MUST be >= the largest per-vendor
+            // timestamp replay tolerance, otherwise a captured-but-still-timestamp-valid request can be
+            // replayed once its dedup entry has expired (the 2-5 min band). The widest vendor tolerance
+            // is 5m (GitLab whsec TIMESTAMP_TOLERANCE, Slack v0 MAX_DRIFT_SECONDS); we set 10m to also
+            // cover GitHub — which has NO timestamp, so the dedup window keyed on X-GitHub-Delivery is
+            // its ONLY replay defense — plus provider redelivery horizons. See REPLAY_TOLERANCE_FLOOR.
+            @DefaultValue("10m") Duration duplicateWindow,
+            @DefaultValue("180d") Duration maxAge,
+            @DefaultValue Map<String, Duration> maxAgeByStream,
+            @DefaultValue("1GB") DataSize maxBytes,
+            /** Per-stream {@link #maxBytes} overrides keyed by stream name — {@code github} dwarfs the rest. */
+            @DefaultValue Map<String, DataSize> maxBytesByStream,
+            /**
+             * What the broker may hold for all webhook streams together, which must stay at or below the
+             * free space on its volume. Keeping the per-stream bounds inside it is what keeps a full
+             * stream a stream that refuses messages rather than a broker that cannot write at all.
+             */
+            @DefaultValue("16GB") DataSize storageBudget,
+            /**
+             * Lets startup apply a limit change that would delete messages the stream already holds.
+             * Off by default: bounding a stream that has outgrown the new limit deletes the excess
+             * immediately, so it is a decision an operator makes rather than one a deploy makes for them.
+             */
+            @DefaultValue("false") boolean allowDestructiveLimitUpdates,
+            /**
+             * How long startup waits for one stream limit update. Bounding a stream that has outgrown
+             * the new limit deletes the excess before the broker answers, so the work is proportional to
+             * the bytes being shed rather than to the size of the request — tens of GB take far longer
+             * than the request timeout the health probes want. This is deliberately separate from the
+             * consumer request timeout so a slow admin call cannot slow a readiness answer.
+             */
+            @DefaultValue("5m") Duration limitUpdateTimeout,
+            /** How often the stream monitor reads stream and consumer state. */
+            @DefaultValue("60s") Duration monitorInterval) {
         /**
          * Lower bound for {@link #duplicateWindow}: the maximum per-vendor timestamp replay
          * tolerance across all webhook verifiers (GitLab whsec + Slack v0 both use 5 minutes).
@@ -188,13 +178,10 @@ public record WebhookProperties(
                 throw new IllegalArgumentException("stream.duplicateWindow must be positive, got: " + duplicateWindow);
             }
             if (duplicateWindow.compareTo(REPLAY_TOLERANCE_FLOOR) < 0) {
-                throw new IllegalArgumentException(
-                    "stream.duplicateWindow (" +
-                        duplicateWindow +
-                        ") must be >= the max vendor replay tolerance (" +
-                        REPLAY_TOLERANCE_FLOOR +
-                        ") so a timestamp-valid request cannot outlive its dedup entry"
-                );
+                throw new IllegalArgumentException("stream.duplicateWindow (" + duplicateWindow
+                        + ") must be >= the max vendor replay tolerance ("
+                        + REPLAY_TOLERANCE_FLOOR
+                        + ") so a timestamp-valid request cannot outlive its dedup entry");
             }
             if (maxAge.isZero() || maxAge.isNegative()) {
                 throw new IllegalArgumentException("stream.maxAge must be positive, got: " + maxAge);
@@ -204,19 +191,15 @@ public record WebhookProperties(
                 Duration v = e.getValue();
                 if (v == null || v.isZero() || v.isNegative()) {
                     throw new IllegalArgumentException(
-                        "stream.maxAgeByStream." + e.getKey() + " must be positive, got: " + v
-                    );
+                            "stream.maxAgeByStream." + e.getKey() + " must be positive, got: " + v);
                 }
                 if (v.compareTo(duplicateWindow) < 0) {
-                    throw new IllegalArgumentException(
-                        "stream.maxAgeByStream." +
-                            e.getKey() +
-                            " (" +
-                            v +
-                            ") must be >= duplicateWindow (" +
-                            duplicateWindow +
-                            ") or the dedup guarantee is meaningless"
-                    );
+                    throw new IllegalArgumentException("stream.maxAgeByStream." + e.getKey()
+                            + " ("
+                            + v
+                            + ") must be >= duplicateWindow ("
+                            + duplicateWindow
+                            + ") or the dedup guarantee is meaningless");
                 }
             }
             requirePositive("stream.maxBytes", maxBytes);
@@ -227,8 +210,7 @@ public record WebhookProperties(
             requirePositive("stream.storageBudget", storageBudget);
             if (limitUpdateTimeout.isZero() || limitUpdateTimeout.isNegative()) {
                 throw new IllegalArgumentException(
-                    "stream.limitUpdateTimeout must be positive, got: " + limitUpdateTimeout
-                );
+                        "stream.limitUpdateTimeout must be positive, got: " + limitUpdateTimeout);
             }
             if (monitorInterval.isZero() || monitorInterval.isNegative()) {
                 throw new IllegalArgumentException("stream.monitorInterval must be positive, got: " + monitorInterval);

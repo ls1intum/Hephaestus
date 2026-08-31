@@ -54,8 +54,8 @@ erDiagram
     }
 
     AgentJob {
-        UUID id PK
-        BIGINT workspace_id FK "NOT NULL"
+        UUID id PK,UK
+        BIGINT workspace_id FK,UK "NOT NULL"
         VARCHAR(50) job_type "NOT NULL"
         VARCHAR(20) status "NOT NULL"
         JSONB metadata
@@ -96,6 +96,9 @@ erDiagram
         JSONB review_readiness
         TIMESTAMPTZ in_chat_prepared_at
         TIMESTAMPTZ in_app_prepared_at
+        BIGINT practice_rollout_revision "NOT NULL"
+        VARCHAR(24) practice_trigger_mode "NOT NULL"
+        VARCHAR(32) trace_id "NOT NULL"
     }
 
     ArtifactSignal {
@@ -226,6 +229,7 @@ erDiagram
         TIMESTAMPTZ created_at "NOT NULL"
         TIMESTAMPTZ updated_at "NOT NULL"
         BIGINT version "NOT NULL"
+        INTEGER credentials_key_version
     }
 
     ConnectionActivity {
@@ -246,6 +250,24 @@ erDiagram
         VARCHAR(64) correlation_id
         JSONB detail
         TIMESTAMPTZ occurred_at "NOT NULL"
+    }
+
+    ConsentDecision {
+        BIGINT id PK
+        BIGINT account_id FK
+        VARCHAR(40) purpose "NOT NULL"
+        BOOLEAN granted "NOT NULL"
+        VARCHAR(32) mechanism "NOT NULL"
+        VARCHAR(32) notice_version FK "NOT NULL"
+        VARCHAR(64) notice_sha256 FK "NOT NULL"
+        TIMESTAMPTZ occurred_at "NOT NULL"
+    }
+
+    ConsentNotice {
+        VARCHAR(32) version PK,UK
+        TEXT notice_text "NOT NULL"
+        VARCHAR(64) sha256 UK "NOT NULL"
+        TIMESTAMPTZ published_at "NOT NULL"
     }
 
     CuratedGroupOverride {
@@ -279,6 +301,23 @@ erDiagram
         TIMESTAMPTZ updated_at "NOT NULL"
         BIGINT version "NOT NULL"
         JSONB automated_review_policy
+    }
+
+    DeliveryPolicyEvaluation {
+        UUID id PK
+        BIGINT workspace_id FK "NOT NULL"
+        UUID agent_job_id FK "NOT NULL"
+        UUID feedback_id FK
+        BIGINT admitted_revision "NOT NULL"
+        BIGINT evaluated_revision
+        VARCHAR(16) resolver_version "NOT NULL"
+        VARCHAR(24) surface "NOT NULL"
+        VARCHAR(24) stage "NOT NULL"
+        BOOLEAN allowed "NOT NULL"
+        VARCHAR(48) decisive_reason
+        JSONB checks "NOT NULL"
+        JSONB facts "NOT NULL"
+        TIMESTAMPTZ evaluated_at "NOT NULL"
     }
 
     Discussion {
@@ -343,9 +382,9 @@ erDiagram
     }
 
     Feedback {
-        UUID id PK
+        UUID id PK,UK
         UUID agent_job_id FK,UK "NOT NULL"
-        BIGINT workspace_id FK "NOT NULL"
+        BIGINT workspace_id FK,UK "NOT NULL"
         VARCHAR(64) artifact_kind
         BIGINT artifact_id
         BIGINT recipient_user_id FK "NOT NULL"
@@ -360,6 +399,9 @@ erDiagram
         VARCHAR(64) thread_key
         TIMESTAMPTZ created_at "NOT NULL"
         TIMESTAMPTZ delivered_at
+        JSONB proposed_placements "NOT NULL"
+        VARCHAR(64) reviewed_revision
+        JSONB proposed_practice_slugs "NOT NULL"
     }
 
     FeedbackApproval {
@@ -374,6 +416,33 @@ erDiagram
         TIMESTAMPTZ decided_at "NOT NULL"
     }
 
+    FeedbackDispatch {
+        UUID id PK
+        VARCHAR(96) destination_key UK "NOT NULL"
+        BIGINT workspace_id FK "NOT NULL"
+        UUID agent_job_id FK "NOT NULL"
+        UUID feedback_id FK
+        VARCHAR(40) destination "NOT NULL"
+        VARCHAR(16) state "NOT NULL"
+        TEXT body "NOT NULL"
+        JSONB practice_slugs "NOT NULL"
+        JSONB package_content "NOT NULL"
+        JSONB delivered_placements "NOT NULL"
+        BOOLEAN write_started "NOT NULL"
+        VARCHAR(255) delivered_external_ref
+        VARCHAR(64) lease_owner
+        TIMESTAMPTZ lease_expires_at
+        TIMESTAMPTZ next_attempt_at "NOT NULL"
+        INTEGER attempt_count "NOT NULL"
+        VARCHAR(48) suppression_reason
+        VARCHAR(512) last_error
+        TIMESTAMPTZ projected_at
+        VARCHAR(64) projection_owner
+        TIMESTAMPTZ projection_expires_at
+        TIMESTAMPTZ created_at "NOT NULL"
+        TIMESTAMPTZ updated_at "NOT NULL"
+    }
+
     FeedbackObservation {
         UUID feedback_id PK,FK
         UUID observation_id PK,FK
@@ -383,14 +452,14 @@ erDiagram
 
     FeedbackPlacement {
         UUID id PK
-        UUID feedback_id FK "NOT NULL"
+        UUID feedback_id FK,UK "NOT NULL"
         VARCHAR(32) placement_type "NOT NULL"
         VARCHAR(16) anchor_kind
         TEXT anchor_path
         INTEGER anchor_start_line
         INTEGER anchor_end_line
         VARCHAR(8) anchor_side
-        TEXT posted_comment_ref
+        TEXT posted_comment_ref UK
         TIMESTAMPTZ created_at "NOT NULL"
         UUID chat_message_id FK
     }
@@ -741,6 +810,7 @@ erDiagram
         BIGINT practice_revision_id FK
         VARCHAR(8) assessment
         VARCHAR(16) origin "NOT NULL"
+        BIGINT workspace_id FK "NOT NULL"
     }
 
     Organization {
@@ -823,7 +893,7 @@ erDiagram
     }
 
     Practice {
-        BIGINT id PK
+        BIGINT id PK,UK
         BIGINT workspace_id FK,UK "NOT NULL"
         VARCHAR(64) slug UK "NOT NULL"
         VARCHAR(128) name "NOT NULL"
@@ -867,6 +937,17 @@ erDiagram
         VARCHAR(16) autonomy
     }
 
+    PracticeReviewPersonTarget {
+        BIGINT workspace_id PK,FK
+        BIGINT user_id PK,FK
+    }
+
+    PracticeReviewRepositoryTarget {
+        BIGINT workspace_id PK,FK
+        BIGINT repository_monitor_id PK,FK
+        JSONB base_branches "NOT NULL"
+    }
+
     PracticeRevision {
         BIGINT id PK
         BIGINT practice_id FK,UK "NOT NULL"
@@ -887,6 +968,40 @@ erDiagram
         VARCHAR(32) group_color
         VARCHAR(96) review_rule_fingerprint
         JSONB automated_review_policy
+    }
+
+    ProductFeedback {
+        UUID id PK
+        BIGINT account_id FK,UK "NOT NULL"
+        BIGINT workspace_id FK
+        VARCHAR(16) kind "NOT NULL"
+        VARCHAR(5000) message "NOT NULL"
+        VARCHAR(500) page_path
+        TIMESTAMPTZ created_at "NOT NULL"
+        TIMESTAMPTZ submission_minute UK "NOT NULL"
+    }
+
+    ProductSurvey {
+        UUID id PK
+        VARCHAR(160) title "NOT NULL"
+        VARCHAR(500) description "NOT NULL"
+        JSONB questions_json "NOT NULL"
+        BIGINT workspace_id FK
+        TIMESTAMPTZ starts_at "NOT NULL"
+        TIMESTAMPTZ ends_at
+        BOOLEAN active "NOT NULL"
+        BIGINT created_by_account_id FK
+        TIMESTAMPTZ created_at "NOT NULL"
+    }
+
+    ProductSurveySubmission {
+        UUID id PK
+        UUID survey_id FK,UK "NOT NULL"
+        BIGINT account_id FK,UK "NOT NULL"
+        BIGINT workspace_id FK
+        VARCHAR(16) disposition "NOT NULL"
+        JSONB answers_json
+        TIMESTAMPTZ created_at "NOT NULL"
     }
 
     Project {
@@ -1082,12 +1197,12 @@ erDiagram
     }
 
     RepositoryToMonitor {
-        BIGINT id PK
+        BIGINT id PK,UK
         TIMESTAMPTZ labels_synced_at
         TIMESTAMPTZ milestones_synced_at
         VARCHAR(255) name_with_owner
         TIMESTAMPTZ repository_synced_at
-        BIGINT workspace_id FK "NOT NULL"
+        BIGINT workspace_id FK,UK "NOT NULL"
         TIMESTAMPTZ backfill_last_run_at
         TIMESTAMPTZ collaborators_synced_at
         VARCHAR(255) issue_sync_cursor
@@ -1336,8 +1451,12 @@ erDiagram
         INTEGER practice_cooldown_minutes
         NUMERIC(10,2) monthly_llm_budget_usd
         NUMERIC(10,2) monthly_byo_llm_budget_usd
-        JSONB practice_review_scope
         VARCHAR(16) practice_default_autonomy
+        VARCHAR(24) practice_repository_coverage_mode "NOT NULL"
+        VARCHAR(24) practice_person_coverage_mode "NOT NULL"
+        VARCHAR(16) practice_delivery_status "NOT NULL"
+        BIGINT practice_rollout_revision "NOT NULL"
+        BIGINT practice_config_version "NOT NULL"
     }
 
     WorkspaceAgentBinding {
@@ -1433,6 +1552,7 @@ erDiagram
     DiscussionComment ||--|| Discussion : references
     PracticeRevision ||--|| Practice : references
     Workspace ||--|| PracticeCatalogInstallation : has
+    WorkspaceMembership ||--|| PracticeReviewPersonTarget : reviewed
     PullRequestReviewComment ||--|| PullRequestReviewThread : reviewed
     User ||--|| UserPreference : has
     Organization ||--|| Workspace : has
@@ -1463,6 +1583,11 @@ erDiagram
     Workspace ||--o{ ConfigAuditEvent : has
     Workspace ||--o{ Connection : has
     Connection ||--o{ ConnectionAudit : has
+    Account ||--o{ ConsentDecision : has
+    ConsentNotice ||--o{ ConsentDecision : references
+    Feedback ||--o{ DeliveryPolicyEvaluation : references
+    AgentJob ||--o{ DeliveryPolicyEvaluation : references
+    Workspace ||--o{ DeliveryPolicyEvaluation : has
     User ||--o{ Discussion : references
     User ||--o{ Discussion : authored_by
     DiscussionCategory ||--o{ Discussion : has
@@ -1478,6 +1603,9 @@ erDiagram
     Feedback ||--o{ Feedback : references
     User ||--o{ Feedback : about_user_id
     Workspace ||--o{ Feedback : has
+    Feedback ||--o{ FeedbackDispatch : references
+    AgentJob ||--o{ FeedbackDispatch : references
+    Workspace ||--o{ FeedbackDispatch : has
     Feedback ||--o{ FeedbackPlacement : has
     ChatMessage ||--o{ FeedbackPlacement : has
     User ||--o{ GitCommit : authored_by
@@ -1509,6 +1637,7 @@ erDiagram
     User ||--o{ Milestone : created_by
     Practice ||--o{ Observation : has
     PracticeRevision ||--o{ Observation : has
+    Workspace ||--o{ Observation : has
     AgentJob ||--o{ Observation : has
     User ||--o{ Observation : has
     IdentityProvider ||--o{ Organization : references
@@ -1522,6 +1651,13 @@ erDiagram
     Workspace ||--o{ Practice : has
     Workspace ||--o{ PracticeGroup : has
     Practice ||--o{ PracticeRevision : has
+    Account ||--o{ ProductFeedback : has
+    Workspace ||--o{ ProductFeedback : has
+    Account ||--o{ ProductSurvey : has
+    Workspace ||--o{ ProductSurvey : has
+    Account ||--o{ ProductSurveySubmission : has
+    ProductSurvey ||--o{ ProductSurveySubmission : has
+    Workspace ||--o{ ProductSurveySubmission : has
     User ||--o{ Project : created_by
     IdentityProvider ||--o{ Project : references
     Project ||--o{ ProjectField : has
@@ -1595,6 +1731,8 @@ erDiagram
     Label }o--o{ IssueLabel : labeled
     LlmModel }o--o{ LlmModelWorkspaceGrant : has
     Workspace }o--o{ LlmModelWorkspaceGrant : has
+    RepositoryToMonitor }o--o{ PracticeReviewRepositoryTarget : reviewed
+    Workspace }o--o{ PracticeReviewRepositoryTarget : reviewed
     Issue }o--o{ PullRequestRequestedReviewer : reviewed
     User }o--o{ PullRequestRequestedReviewer : reviewed
     Repository }o--o{ RepositoryCollaborator : has

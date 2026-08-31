@@ -60,25 +60,23 @@ class DocumentReviewHandlerTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         handler = new DocumentReviewHandler(
-            objectMapper,
-            workspaceContextBuilder,
-            new TaskEnvelopeWriter(objectMapper),
-            practiceCatalogInjector,
-            new PracticeDetectionResultParser(objectMapper),
-            deliveryService
-        );
+                objectMapper,
+                workspaceContextBuilder,
+                new TaskEnvelopeWriter(objectMapper),
+                practiceCatalogInjector,
+                new PracticeDetectionResultParser(objectMapper),
+                deliveryService);
     }
 
     private DocumentReviewSubmissionRequest sampleRequest() {
         return new DocumentReviewSubmissionRequest(
-            77L,
-            "Deployment runbook",
-            "Engineering",
-            42L,
-            PUBLISHED,
-            SignalRevision.ofContentDigest("Deployment runbook", "hash-a"),
-            ObservationOrigin.LIVE
-        );
+                77L,
+                "Deployment runbook",
+                "Engineering",
+                42L,
+                PUBLISHED,
+                SignalRevision.ofContentDigest("Deployment runbook", "hash-a"),
+                ObservationOrigin.LIVE);
     }
 
     @Nested
@@ -90,14 +88,17 @@ class DocumentReviewHandlerTest extends BaseUnitTest {
             JsonNode metadata = submission.metadata();
 
             assertThat(metadata.get("artifact_kind").asString()).isEqualTo("docs.document");
-            assertThat(metadata.get(DocumentContentSource.DOCUMENT_ID_METADATA_KEY).asLong()).isEqualTo(77L);
+            assertThat(metadata.get(DocumentContentSource.DOCUMENT_ID_METADATA_KEY)
+                            .asLong())
+                    .isEqualTo(77L);
             assertThat(metadata.get("title").asString()).isEqualTo("Deployment runbook");
             assertThat(metadata.get("docs_collection_name").asString()).isEqualTo("Engineering");
             assertThat(metadata.get("about_user_id").asLong()).isEqualTo(42L);
-            assertThat(metadata.get(PracticeCatalogInjector.SIGNAL_METADATA_KEY).asString()).isEqualTo(
-                "docs.document.published"
-            );
-            assertThat(metadata.get(PracticeDetectionDeliveryService.ORIGIN_METADATA_KEY).asString()).isEqualTo("LIVE");
+            assertThat(metadata.get(PracticeCatalogInjector.SIGNAL_METADATA_KEY).asString())
+                    .isEqualTo("docs.document.published");
+            assertThat(metadata.get(PracticeDetectionDeliveryService.ORIGIN_METADATA_KEY)
+                            .asString())
+                    .isEqualTo("LIVE");
         }
 
         @Test
@@ -113,9 +114,9 @@ class DocumentReviewHandlerTest extends BaseUnitTest {
             // extractCooldownKeyPrefix cuts at the LAST colon; asserting the cut here rather than calling
             // it keeps this a unit of the handler while still pinning the contract between the two.
             assertThat(key.substring(0, key.lastIndexOf(':') + 1)).isEqualTo("document_review:77:42:published:");
-            assertThat(key.substring(key.lastIndexOf(':') + 1)).isEqualTo(
-                SignalRevision.ofContentDigest("Deployment runbook", "hash-a").value()
-            );
+            assertThat(key.substring(key.lastIndexOf(':') + 1))
+                    .isEqualTo(SignalRevision.ofContentDigest("Deployment runbook", "hash-a")
+                            .value());
         }
 
         @Test
@@ -123,27 +124,19 @@ class DocumentReviewHandlerTest extends BaseUnitTest {
         void revisionCarriesNoSegmentSeparator() {
             String key = handler.createSubmission(sampleRequest()).idempotencyKey();
 
-            assertThat(
-                key
-                    .chars()
-                    .filter(c -> c == ':')
-                    .count()
-            ).isEqualTo(4);
+            assertThat(key.chars().filter(c -> c == ':').count()).isEqualTo(4);
         }
 
         @Test
         void omitsACollectionNameItDoesNotHave() {
-            JobSubmission submission = handler.createSubmission(
-                new DocumentReviewSubmissionRequest(
+            JobSubmission submission = handler.createSubmission(new DocumentReviewSubmissionRequest(
                     77L,
                     "Untitled",
                     null,
                     42L,
                     PUBLISHED,
                     SignalRevision.ofTerminalState("archived"),
-                    ObservationOrigin.LIVE
-                )
-            );
+                    ObservationOrigin.LIVE));
 
             assertThat(submission.metadata().has("docs_collection_name")).isFalse();
         }
@@ -151,8 +144,8 @@ class DocumentReviewHandlerTest extends BaseUnitTest {
         @Test
         void rejectsWrongRequestType() {
             assertThatThrownBy(() -> handler.createSubmission(new WrongRequest()))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Expected DocumentReviewSubmissionRequest");
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("Expected DocumentReviewSubmissionRequest");
         }
     }
 
@@ -187,23 +180,16 @@ class DocumentReviewHandlerTest extends BaseUnitTest {
             var revision = new PracticeRevision();
             ReflectionTestUtils.setField(revision, "id", 12L);
             practice.setCurrentRevision(revision);
-            when(practiceCatalogInjector.resolveEligiblePractices(job, ArtifactKinds.DOCUMENT)).thenReturn(
-                List.of(practice)
-            );
-            when(workspaceContextBuilder.prepare(any(), any())).thenReturn(
-                new PreparedEvidence(
-                    Map.of(SandboxLayout.CONTEXT_PREFIX + "document.md", "# Runbook".getBytes()),
-                    mock(ArtifactSourceManifest.class)
-                )
-            );
-            when(
-                workspaceContextBuilder.prepareAutomatedReviewReadiness(any(), any(), anyString(), any(), any(), any())
-            ).thenReturn(
-                new ContextManifestBuilder.PreparedAutomatedReviewReadiness(
-                    List.of(practice),
-                    mock(AutomatedReviewReadinessReport.class)
-                )
-            );
+            when(practiceCatalogInjector.resolveEligiblePractices(job, ArtifactKinds.DOCUMENT))
+                    .thenReturn(List.of(practice));
+            when(workspaceContextBuilder.prepare(any(), any()))
+                    .thenReturn(new PreparedEvidence(
+                            Map.of(SandboxLayout.CONTEXT_PREFIX + "document.md", "# Runbook".getBytes()),
+                            mock(ArtifactSourceManifest.class)));
+            when(workspaceContextBuilder.prepareAutomatedReviewReadiness(
+                            any(), any(), anyString(), any(), any(), any()))
+                    .thenReturn(new ContextManifestBuilder.PreparedAutomatedReviewReadiness(
+                            List.of(practice), mock(AutomatedReviewReadinessReport.class)));
 
             Map<String, byte[]> files = handler.prepareInputs(job).files();
 

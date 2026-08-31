@@ -6,23 +6,16 @@ import java.nio.charset.StandardCharsets;
 import org.jspecify.annotations.Nullable;
 
 /**
- * AES-GCM Additional Authenticated Data context bound to a single {@link Connection}
- * row. Closes the cross-row substitution attack the static-AAD v1 format left open.
+ * AES-GCM Additional Authenticated Data bound to a connection row.
  *
- * <p>Construction is private to the {@code registry} package — only {@link Connection}
- * itself ({@code setCredentials} / {@code credentials}) and the {@link CredentialBundleConverter}
- * test surface should build one. Caller-provided context would defeat the purpose
- * (caller A could pass B's context).
- *
- * <p>Layout (per AWS Encryption SDK + Vault Transit conventions: length-prefix every
- * variable field, no delimiters):
+ * <p>Persisted layout:
  * <pre>
- *   "hephaestus-credential-bundle"              // 28-byte domain separator
- *   u8(2)                                       // AAD schema version
- *   u16_be(len(workspaceId_ascii)) || ascii     // Long → decimal string
- *   u16_be(len(kind))               || utf8     // e.g. "GITHUB"
- *   u16_be(len(instanceKey))        || utf8     // "" when null (pre-bind OAuth slot)
- *   u16_be(len(columnFqn))          || utf8     // e.g. "connection.credentials_encrypted"
+ *   "hephaestus-credential-bundle\x1f"
+ *   u8(2)
+ *   u16_be(len(workspaceId_ascii)) || ascii
+ *   u16_be(len(kind))               || utf8
+ *   u16_be(len(instanceKey))        || utf8
+ *   u16_be(len(columnFqn))          || utf8
  * </pre>
  *
  * @param workspaceId Hephaestus workspace primary key
@@ -31,12 +24,7 @@ import org.jspecify.annotations.Nullable;
  * @param columnFqn   stable column FQN — future-proof against a second encrypted column
  */
 public record EncryptionContext(
-    long workspaceId,
-    IntegrationKind kind,
-    @Nullable String instanceKey,
-    String columnFqn
-) {
-    /** AAD schema version. Only V2 is supported; decrypt rejects any other version byte. */
+        long workspaceId, IntegrationKind kind, @Nullable String instanceKey, String columnFqn) {
     public static final byte SCHEMA_VERSION_V2 = 0x02;
 
     private static final byte[] DOMAIN_SEPARATOR = "hephaestus-credential-bundle".getBytes(StandardCharsets.UTF_8);
@@ -45,41 +33,36 @@ public record EncryptionContext(
         if (kind == null) {
             throw new IllegalArgumentException("kind must not be null");
         }
+        if (instanceKey != null && instanceKey.isBlank()) {
+            throw new IllegalArgumentException("instanceKey must not be blank");
+        }
         if (columnFqn == null || columnFqn.isBlank()) {
             throw new IllegalArgumentException("columnFqn must not be blank");
         }
     }
 
-    /**
-     * Canonical context for {@code Connection.credentials_encrypted}. Only call site
-     * outside this package is the JPA entity {@link Connection}; arch-test pins this.
-     */
     static EncryptionContext forConnectionCredentials(
-        long workspaceId,
-        IntegrationKind kind,
-        @Nullable String instanceKey
-    ) {
+            long workspaceId, IntegrationKind kind, @Nullable String instanceKey) {
         return new EncryptionContext(workspaceId, kind, instanceKey, "connection.credentials_encrypted");
     }
 
-    /** Serialise to the AAD byte sequence — see class javadoc for layout. */
     public byte[] toAad() {
         byte[] workspaceBytes = Long.toString(workspaceId).getBytes(StandardCharsets.US_ASCII);
         byte[] kindBytes = kind.name().getBytes(StandardCharsets.UTF_8);
         byte[] instanceBytes = (instanceKey == null ? "" : instanceKey).getBytes(StandardCharsets.UTF_8);
         byte[] columnBytes = columnFqn.getBytes(StandardCharsets.UTF_8);
 
-        int len =
-            DOMAIN_SEPARATOR.length +
-            1 + // schema version
-            2 +
-            workspaceBytes.length +
-            2 +
-            kindBytes.length +
-            2 +
-            instanceBytes.length +
-            2 +
-            columnBytes.length;
+        int len = DOMAIN_SEPARATOR.length
+                + 1
+                + // schema version
+                2
+                + workspaceBytes.length
+                + 2
+                + kindBytes.length
+                + 2
+                + instanceBytes.length
+                + 2
+                + columnBytes.length;
 
         ByteBuffer buf = ByteBuffer.allocate(len);
         buf.put(DOMAIN_SEPARATOR);

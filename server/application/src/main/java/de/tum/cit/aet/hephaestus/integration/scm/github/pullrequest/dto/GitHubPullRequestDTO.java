@@ -36,69 +36,67 @@ import org.jspecify.annotations.Nullable;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitHubPullRequestDTO(
-    @JsonProperty("id") @Nullable Long id,
-    @JsonProperty("database_id") @Nullable Long databaseId,
-    @JsonProperty("node_id") String nodeId,
-    @JsonProperty("number") int number,
-    @JsonProperty("title") String title,
-    @JsonProperty("body") @Nullable String body,
-    @JsonProperty("state") @Nullable String state,
-    @JsonProperty("html_url") @Nullable String htmlUrl,
-    @JsonProperty("created_at") @Nullable Instant createdAt,
-    @JsonProperty("updated_at") @Nullable Instant updatedAt,
-    @JsonProperty("closed_at") @Nullable Instant closedAt,
-    @JsonProperty("merged_at") @Nullable Instant mergedAt,
-    @JsonProperty("merged_by") @Nullable GitHubUserDTO mergedBy,
-    @JsonProperty("merge_commit_sha") @Nullable String mergeCommitSha,
-    @JsonProperty("draft") boolean isDraft,
-    @JsonProperty("merged") boolean isMerged,
-    @JsonProperty("mergeable") @Nullable String mergeable,
-    @JsonProperty("locked") boolean locked,
-    @JsonProperty("additions") int additions,
-    @JsonProperty("deletions") int deletions,
-    @JsonProperty("changed_files") int changedFiles,
-    @JsonProperty("commits") int commits,
-    @JsonProperty("comments") int commentsCount,
-    @JsonProperty("review_comments") int reviewCommentsCount,
-    @JsonProperty("user") @Nullable GitHubUserDTO author,
-    @JsonProperty("assignees") @Nullable List<GitHubUserDTO> assignees,
-    @JsonProperty("requested_reviewers") @Nullable List<GitHubUserDTO> requestedReviewers,
-    @JsonProperty("labels") @Nullable List<GitHubLabelDTO> labels,
-    @JsonProperty("milestone") @Nullable GitHubMilestoneDTO milestone,
-    @JsonProperty("head") @Nullable GitHubBranchRefDTO head,
-    @JsonProperty("base") @Nullable GitHubBranchRefDTO base,
-    @JsonProperty("repository") @Nullable GitHubRepositoryRefDTO repository,
-    // GraphQL-only fields
-    @Nullable ReviewDecision reviewDecision,
-    @Nullable MergeStateStatus mergeStateStatus,
-    @Nullable Boolean isMergeable,
-    boolean maintainerCanModify,
-    /**
-     * Merge commit metadata extracted from GraphQL.
-     * Null when the PR is not merged or when created from webhook payloads
-     * (which only provide the SHA via {@link #mergeCommitSha}).
-     */
-    @Nullable MergeCommitInfo mergeCommitInfo
-) {
+        @JsonProperty("id") @Nullable Long id,
+        @JsonProperty("database_id") @Nullable Long databaseId,
+        @JsonProperty("node_id") String nodeId,
+        @JsonProperty("number") int number,
+        @JsonProperty("title") String title,
+        @JsonProperty("body") @Nullable String body,
+        @JsonProperty("state") @Nullable String state,
+        @JsonProperty("html_url") @Nullable String htmlUrl,
+        @JsonProperty("created_at") @Nullable Instant createdAt,
+        @JsonProperty("updated_at") @Nullable Instant updatedAt,
+        @JsonProperty("closed_at") @Nullable Instant closedAt,
+        @JsonProperty("merged_at") @Nullable Instant mergedAt,
+        @JsonProperty("merged_by") @Nullable GitHubUserDTO mergedBy,
+        @JsonProperty("merge_commit_sha") @Nullable String mergeCommitSha,
+        @JsonProperty("draft") boolean isDraft,
+        @JsonProperty("merged") boolean isMerged,
+        @JsonProperty("mergeable") @Nullable String mergeable,
+        @JsonProperty("locked") boolean locked,
+        @JsonProperty("additions") int additions,
+        @JsonProperty("deletions") int deletions,
+        @JsonProperty("changed_files") int changedFiles,
+        @JsonProperty("commits") int commits,
+        @JsonProperty("comments") int commentsCount,
+        @JsonProperty("review_comments") int reviewCommentsCount,
+        @JsonProperty("user") @Nullable GitHubUserDTO author,
+        @JsonProperty("assignees") @Nullable List<GitHubUserDTO> assignees,
+        @JsonProperty("requested_reviewers") @Nullable List<GitHubUserDTO> requestedReviewers,
+        @JsonProperty("labels") @Nullable List<GitHubLabelDTO> labels,
+        @JsonProperty("milestone") @Nullable GitHubMilestoneDTO milestone,
+        @JsonProperty("head") @Nullable GitHubBranchRefDTO head,
+        @JsonProperty("base") @Nullable GitHubBranchRefDTO base,
+        @JsonProperty("repository") @Nullable GitHubRepositoryRefDTO repository,
+        // GraphQL-only fields
+        @Nullable ReviewDecision reviewDecision,
+        @Nullable MergeStateStatus mergeStateStatus,
+        @Nullable Boolean isMergeable,
+        boolean maintainerCanModify,
+        /**
+         * Merge commit metadata extracted from GraphQL.
+         * Null when the PR is not merged or when created from webhook payloads
+         * (which only provide the SHA via {@link #mergeCommitSha}).
+         */
+        @Nullable MergeCommitInfo mergeCommitInfo) {
     /**
      * Merge commit metadata from GraphQL PR queries. All flat fields on the
      * Commit type — zero additional rate limit cost.
      */
     public record MergeCommitInfo(
-        String sha,
-        @Nullable String message,
-        @Nullable String messageBody,
-        @Nullable String url,
-        @Nullable Instant authoredDate,
-        @Nullable Instant committedDate,
-        @Nullable Integer additions,
-        @Nullable Integer deletions,
-        @Nullable Integer changedFiles,
-        @Nullable String authorLogin,
-        @Nullable String committerLogin,
-        @Nullable String authorEmail,
-        @Nullable String committerEmail
-    ) {}
+            String sha,
+            @Nullable String message,
+            @Nullable String messageBody,
+            @Nullable String url,
+            @Nullable Instant authoredDate,
+            @Nullable Instant committedDate,
+            @Nullable Integer additions,
+            @Nullable Integer deletions,
+            @Nullable Integer changedFiles,
+            @Nullable String authorLogin,
+            @Nullable String committerLogin,
+            @Nullable String authorEmail,
+            @Nullable String committerEmail) {}
 
     /**
      * Get the database ID, preferring databaseId over id for GraphQL responses.
@@ -130,45 +128,44 @@ public record GitHubPullRequestDTO(
         }
 
         return new GitHubPullRequestDTO(
-            null,
-            toLong(pr.getFullDatabaseId()),
-            pr.getId(),
-            pr.getNumber(),
-            pr.getTitle(),
-            pr.getBody(),
-            convertState(pr.getState()),
-            uriToString(pr.getUrl()),
-            toInstant(pr.getCreatedAt()),
-            toInstant(pr.getUpdatedAt()),
-            toInstant(pr.getClosedAt()),
-            toInstant(pr.getMergedAt()),
-            GitHubUserDTO.fromActor(pr.getMergedBy()),
-            pr.getMergeCommit() != null ? pr.getMergeCommit().getOid() : null,
-            pr.getIsDraft(),
-            isMerged,
-            null, // mergeable
-            pr.getLocked(),
-            pr.getAdditions(),
-            pr.getDeletions(),
-            pr.getChangedFiles(),
-            commitsCount,
-            0, // comments count
-            0, // review comments count
-            GitHubUserDTO.fromActor(pr.getAuthor()),
-            extractAssignees(pr.getAssignees(), "PR #" + pr.getNumber()),
-            extractRequestedReviewers(pr.getReviewRequests(), "PR #" + pr.getNumber()),
-            GitHubLabelDTO.fromLabelConnection(pr.getLabels(), "PR #" + pr.getNumber()),
-            GitHubMilestoneDTO.fromMilestone(pr.getMilestone()),
-            new GitHubBranchRefDTO(pr.getHeadRefName(), pr.getHeadRefOid(), null),
-            new GitHubBranchRefDTO(pr.getBaseRefName(), pr.getBaseRefOid(), null),
-            null,
-            // GraphQL-only fields
-            convertReviewDecision(pr.getReviewDecision()),
-            convertMergeStateStatus(pr.getMergeStateStatus()),
-            convertMergeableState(pr.getMergeable()),
-            pr.getMaintainerCanModify(),
-            extractMergeCommitInfo(pr)
-        );
+                null,
+                toLong(pr.getFullDatabaseId()),
+                pr.getId(),
+                pr.getNumber(),
+                pr.getTitle(),
+                pr.getBody(),
+                convertState(pr.getState()),
+                uriToString(pr.getUrl()),
+                toInstant(pr.getCreatedAt()),
+                toInstant(pr.getUpdatedAt()),
+                toInstant(pr.getClosedAt()),
+                toInstant(pr.getMergedAt()),
+                GitHubUserDTO.fromActor(pr.getMergedBy()),
+                pr.getMergeCommit() != null ? pr.getMergeCommit().getOid() : null,
+                pr.getIsDraft(),
+                isMerged,
+                null, // mergeable
+                pr.getLocked(),
+                pr.getAdditions(),
+                pr.getDeletions(),
+                pr.getChangedFiles(),
+                commitsCount,
+                0, // comments count
+                0, // review comments count
+                GitHubUserDTO.fromActor(pr.getAuthor()),
+                extractAssignees(pr.getAssignees(), "PR #" + pr.getNumber()),
+                extractRequestedReviewers(pr.getReviewRequests(), "PR #" + pr.getNumber()),
+                GitHubLabelDTO.fromLabelConnection(pr.getLabels(), "PR #" + pr.getNumber()),
+                GitHubMilestoneDTO.fromMilestone(pr.getMilestone()),
+                new GitHubBranchRefDTO(pr.getHeadRefName(), pr.getHeadRefOid(), null),
+                new GitHubBranchRefDTO(pr.getBaseRefName(), pr.getBaseRefOid(), null),
+                null,
+                // GraphQL-only fields
+                convertReviewDecision(pr.getReviewDecision()),
+                convertMergeStateStatus(pr.getMergeStateStatus()),
+                convertMergeableState(pr.getMergeable()),
+                pr.getMaintainerCanModify(),
+                extractMergeCommitInfo(pr));
     }
 
     /**
@@ -204,22 +201,23 @@ public record GitHubPullRequestDTO(
         }
 
         return new MergeCommitInfo(
-            mc.getOid(),
-            subject,
-            body,
-            uriToString(mc.getUrl()),
-            toInstant(mc.getAuthoredDate()),
-            toInstant(mc.getCommittedDate()),
-            mc.getAdditions(),
-            mc.getDeletions(),
-            mc.getChangedFilesIfAvailable(),
-            mc.getAuthor() != null && mc.getAuthor().getUser() != null ? mc.getAuthor().getUser().getLogin() : null,
-            mc.getCommitter() != null && mc.getCommitter().getUser() != null
-                ? mc.getCommitter().getUser().getLogin()
-                : null,
-            mc.getAuthor() != null ? mc.getAuthor().getEmail() : null,
-            mc.getCommitter() != null ? mc.getCommitter().getEmail() : null
-        );
+                mc.getOid(),
+                subject,
+                body,
+                uriToString(mc.getUrl()),
+                toInstant(mc.getAuthoredDate()),
+                toInstant(mc.getCommittedDate()),
+                mc.getAdditions(),
+                mc.getDeletions(),
+                mc.getChangedFilesIfAvailable(),
+                mc.getAuthor() != null && mc.getAuthor().getUser() != null
+                        ? mc.getAuthor().getUser().getLogin()
+                        : null,
+                mc.getCommitter() != null && mc.getCommitter().getUser() != null
+                        ? mc.getCommitter().getUser().getLogin()
+                        : null,
+                mc.getAuthor() != null ? mc.getAuthor().getEmail() : null,
+                mc.getCommitter() != null ? mc.getCommitter().getEmail() : null);
     }
 
     // CONVERSION HELPERS
@@ -292,20 +290,16 @@ public record GitHubPullRequestDTO(
         if (connection == null || connection.getNodes() == null) {
             return Collections.emptyList();
         }
-        List<GitHubUserDTO> result = connection
-            .getNodes()
-            .stream()
-            .map(GitHubUserDTO::fromUser)
-            .filter(Objects::nonNull)
-            .toList();
+        List<GitHubUserDTO> result = connection.getNodes().stream()
+                .map(GitHubUserDTO::fromUser)
+                .filter(Objects::nonNull)
+                .toList();
         GraphQlConnectionOverflowDetector.check("assignees", result.size(), connection.getTotalCount(), context);
         return result;
     }
 
     private static List<GitHubUserDTO> extractRequestedReviewers(
-        @Nullable GHReviewRequestConnection connection,
-        String context
-    ) {
+            @Nullable GHReviewRequestConnection connection, String context) {
         if (connection == null || connection.getNodes() == null) {
             return Collections.emptyList();
         }
@@ -315,19 +309,13 @@ public record GitHubPullRequestDTO(
         // false-positive overflow warnings whenever non-User reviewers existed.
         int fetchedCount = connection.getNodes().size();
         GraphQlConnectionOverflowDetector.check(
-            "requestedReviewers",
-            fetchedCount,
-            connection.getTotalCount(),
-            context
-        );
-        List<GitHubUserDTO> result = connection
-            .getNodes()
-            .stream()
-            .map(GHReviewRequest::getRequestedReviewer)
-            .filter(reviewer -> reviewer instanceof GHUser)
-            .map(reviewer -> GitHubUserDTO.fromUser((GHUser) reviewer))
-            .filter(Objects::nonNull)
-            .toList();
+                "requestedReviewers", fetchedCount, connection.getTotalCount(), context);
+        List<GitHubUserDTO> result = connection.getNodes().stream()
+                .map(GHReviewRequest::getRequestedReviewer)
+                .filter(reviewer -> reviewer instanceof GHUser)
+                .map(reviewer -> GitHubUserDTO.fromUser((GHUser) reviewer))
+                .filter(Objects::nonNull)
+                .toList();
         return result;
     }
 }

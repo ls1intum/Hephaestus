@@ -71,7 +71,7 @@ public final class TranslatorState {
     private String observedStopReason;
 
     /** Verbatim Pi SDK session JSONL captured from {@code session_persisted}; see {@link ChatThread#getSessionJsonl}. */
-    private byte@Nullable [] observedSessionJsonl;
+    private byte @Nullable [] observedSessionJsonl;
 
     /**
      * Which connection funds this turn's LLM calls, frozen at turn start. Unsynchronized unlike the
@@ -267,26 +267,26 @@ public final class TranslatorState {
     }
 
     private static void addUsage(ObjectNode target, JsonNode source) {
-        source
-            .properties()
-            .forEach(entry -> {
-                String name = entry.getKey();
-                JsonNode value = entry.getValue();
-                if (value.isObject()) {
-                    ObjectNode nested =
-                        target.has(name) && target.get(name).isObject()
-                            ? (ObjectNode) target.get(name)
-                            : target.putObject(name);
-                    addUsage(nested, value);
-                } else if (value.isIntegralNumber()) {
-                    long existing = target.has(name) && target.get(name).isNumber() ? target.get(name).asLong() : 0L;
-                    target.put(name, existing + value.asLong());
-                } else if (value.isFloatingPointNumber()) {
-                    double existing =
-                        target.has(name) && target.get(name).isNumber() ? target.get(name).asDouble() : 0D;
-                    target.put(name, existing + value.asDouble());
-                }
-            });
+        source.properties().forEach(entry -> {
+            String name = entry.getKey();
+            JsonNode value = entry.getValue();
+            if (value.isObject()) {
+                ObjectNode nested = target.has(name) && target.get(name).isObject()
+                        ? (ObjectNode) target.get(name)
+                        : target.putObject(name);
+                addUsage(nested, value);
+            } else if (value.isIntegralNumber()) {
+                long existing = target.has(name) && target.get(name).isNumber()
+                        ? target.get(name).asLong()
+                        : 0L;
+                target.put(name, existing + value.asLong());
+            } else if (value.isFloatingPointNumber()) {
+                double existing = target.has(name) && target.get(name).isNumber()
+                        ? target.get(name).asDouble()
+                        : 0D;
+                target.put(name, existing + value.asDouble());
+            }
+        });
     }
 
     @Nullable
@@ -311,14 +311,14 @@ public final class TranslatorState {
         return observedStopReason;
     }
 
-    public synchronized void observeSessionJsonl(byte@Nullable [] bytes) {
+    public synchronized void observeSessionJsonl(byte @Nullable [] bytes) {
         if (bytes == null || bytes.length == 0) {
             return;
         }
         this.observedSessionJsonl = bytes.clone();
     }
 
-    public synchronized byte@Nullable [] observedSessionJsonl() {
+    public synchronized byte @Nullable [] observedSessionJsonl() {
         return observedSessionJsonl;
     }
 }

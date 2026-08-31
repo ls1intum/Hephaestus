@@ -1,10 +1,12 @@
 import { Search, Users } from "lucide-react";
+
 import type { LabelInfo, TeamInfo } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { PageHeader } from "@/components/core/PageHeader";
 import { PageLayout } from "@/components/core/PageLayout";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+
 import { TeamTree } from "./teams/TeamTree";
 
 export interface TeamsTableProps {

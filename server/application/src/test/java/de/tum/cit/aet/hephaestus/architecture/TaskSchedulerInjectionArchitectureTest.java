@@ -16,11 +16,11 @@ class TaskSchedulerInjectionArchitectureTest extends HephaestusArchitectureTest 
     @Test
     void productionCodeMustNotDependOnConcreteThreadPoolTaskScheduler() {
         noClasses()
-            .that()
-            .resideInAPackage(BASE_PACKAGE + "..")
-            .should()
-            .dependOnClassesThat()
-            .areAssignableTo(ThreadPoolTaskScheduler.class)
-            .check(classes);
+                .that()
+                .resideInAPackage(BASE_PACKAGE + "..")
+                .should()
+                .dependOnClassesThat()
+                .areAssignableTo(ThreadPoolTaskScheduler.class)
+                .check(classes);
     }
 }

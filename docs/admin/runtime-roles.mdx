@@ -1,3 +1,8 @@
+---
+title: Runtime roles
+description: The three roles one Hephaestus image boots into, and why the webhook role runs in its own container.
+---
+
 # Runtime Roles
 
 Hephaestus ships **one JAR** that boots in any of three runtime roles. The same artifact runs as the application server, as a worker pod, as a webhook receiver, or as all three together (monolith). Roles are gated by three boolean properties:
@@ -8,7 +13,7 @@ Hephaestus ships **one JAR** that boots in any of three runtime roles. The same 
 | Worker | `hephaestus.runtime.worker.enabled` | `true` |
 | Webhook | `hephaestus.runtime.webhook.enabled` | `true` |
 
-All three default-on means `pnpm dev:server` starts a working monolith.
+All three default-on means `pnpm run dev:server` starts a working monolith.
 
 ## Boot log
 

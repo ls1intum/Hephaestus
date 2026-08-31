@@ -11,15 +11,13 @@ class GitDiffOperationsTest extends BaseUnitTest {
     @Test
     @DisplayName("annotates + and context lines with [L<n>] source line numbers")
     void annotatesDiff() {
-        String diff =
-            "diff --git a/Foo.swift b/Foo.swift\n" +
-            "--- a/Foo.swift\n" +
-            "+++ b/Foo.swift\n" +
-            "@@ -1,3 +1,4 @@\n" +
-            " import SwiftUI\n" +
-            "+import Foundation\n" +
-            " \n" +
-            " struct Foo {\n";
+        String diff = "diff --git a/Foo.swift b/Foo.swift\n" + "--- a/Foo.swift\n"
+                + "+++ b/Foo.swift\n"
+                + "@@ -1,3 +1,4 @@\n"
+                + " import SwiftUI\n"
+                + "+import Foundation\n"
+                + " \n"
+                + " struct Foo {\n";
         String annotated = GitDiffOperations.annotateDiffWithLineNumbers(diff);
         assertThat(annotated).contains("[L1]  import SwiftUI");
         assertThat(annotated).contains("[L2] +import Foundation");
@@ -30,15 +28,13 @@ class GitDiffOperationsTest extends BaseUnitTest {
     @Test
     @DisplayName("annotates deleted lines with old-side positions")
     void annotatesDeletions() {
-        String diff =
-            "diff --git a/Bar.swift b/Bar.swift\n" +
-            "--- a/Bar.swift\n" +
-            "+++ b/Bar.swift\n" +
-            "@@ -5,4 +5,3 @@\n" +
-            " context\n" +
-            "-deleted line\n" +
-            "+added line\n" +
-            " more context\n";
+        String diff = "diff --git a/Bar.swift b/Bar.swift\n" + "--- a/Bar.swift\n"
+                + "+++ b/Bar.swift\n"
+                + "@@ -5,4 +5,3 @@\n"
+                + " context\n"
+                + "-deleted line\n"
+                + "+added line\n"
+                + " more context\n";
         String annotated = GitDiffOperations.annotateDiffWithLineNumbers(diff);
         assertThat(annotated).contains("[L5]  context");
         assertThat(annotated).contains("[L6] +added line");
@@ -49,19 +45,17 @@ class GitDiffOperationsTest extends BaseUnitTest {
     @Test
     @DisplayName("resets line numbers for each file")
     void multiFileDiff_resetsLineCounterPerFile() {
-        String diff =
-            "diff --git a/First.swift b/First.swift\n" +
-            "--- a/First.swift\n" +
-            "+++ b/First.swift\n" +
-            "@@ -1,2 +1,2 @@\n" +
-            " line one\n" +
-            "+line two\n" +
-            "diff --git a/Second.swift b/Second.swift\n" +
-            "--- a/Second.swift\n" +
-            "+++ b/Second.swift\n" +
-            "@@ -100,1 +100,2 @@\n" +
-            " hundred\n" +
-            "+hundred one\n";
+        String diff = "diff --git a/First.swift b/First.swift\n" + "--- a/First.swift\n"
+                + "+++ b/First.swift\n"
+                + "@@ -1,2 +1,2 @@\n"
+                + " line one\n"
+                + "+line two\n"
+                + "diff --git a/Second.swift b/Second.swift\n"
+                + "--- a/Second.swift\n"
+                + "+++ b/Second.swift\n"
+                + "@@ -100,1 +100,2 @@\n"
+                + " hundred\n"
+                + "+hundred one\n";
         String annotated = GitDiffOperations.annotateDiffWithLineNumbers(diff);
 
         assertThat(annotated).contains("[L1]  line one");
@@ -75,14 +69,12 @@ class GitDiffOperationsTest extends BaseUnitTest {
     @Test
     @DisplayName("preserves the no-newline marker without advancing the counter")
     void noNewlineMarker_emittedVerbatim_doesNotAdvanceCounter() {
-        String diff =
-            "diff --git a/Foo.swift b/Foo.swift\n" +
-            "--- a/Foo.swift\n" +
-            "+++ b/Foo.swift\n" +
-            "@@ -1,1 +1,2 @@\n" +
-            " first\n" +
-            "+second\n" +
-            "\\ No newline at end of file\n";
+        String diff = "diff --git a/Foo.swift b/Foo.swift\n" + "--- a/Foo.swift\n"
+                + "+++ b/Foo.swift\n"
+                + "@@ -1,1 +1,2 @@\n"
+                + " first\n"
+                + "+second\n"
+                + "\\ No newline at end of file\n";
         String annotated = GitDiffOperations.annotateDiffWithLineNumbers(diff);
 
         assertThat(annotated).contains("[L1]  first");
@@ -94,13 +86,11 @@ class GitDiffOperationsTest extends BaseUnitTest {
     @Test
     @DisplayName("does not emit a spurious [L<n>] for the trailing empty element of a diff ending in a newline")
     void trailingNewline_doesNotEmitSpuriousMarker() {
-        String diff =
-            "diff --git a/Foo.swift b/Foo.swift\n" +
-            "--- a/Foo.swift\n" +
-            "+++ b/Foo.swift\n" +
-            "@@ -1,1 +1,2 @@\n" +
-            " first\n" +
-            "+second\n";
+        String diff = "diff --git a/Foo.swift b/Foo.swift\n" + "--- a/Foo.swift\n"
+                + "+++ b/Foo.swift\n"
+                + "@@ -1,1 +1,2 @@\n"
+                + " first\n"
+                + "+second\n";
         String annotated = GitDiffOperations.annotateDiffWithLineNumbers(diff);
 
         assertThat(annotated).contains("[L1]  first");
@@ -111,12 +101,10 @@ class GitDiffOperationsTest extends BaseUnitTest {
     @Test
     @DisplayName("leaves diff metadata lines unmodified (before first hunk header)")
     void preservesMetadata() {
-        String diff =
-            "diff --git a/Foo.swift b/Foo.swift\n" +
-            "--- a/Foo.swift\n" +
-            "+++ b/Foo.swift\n" +
-            "@@ -1 +1 @@\n" +
-            "+added\n";
+        String diff = "diff --git a/Foo.swift b/Foo.swift\n" + "--- a/Foo.swift\n"
+                + "+++ b/Foo.swift\n"
+                + "@@ -1 +1 @@\n"
+                + "+added\n";
         String annotated = GitDiffOperations.annotateDiffWithLineNumbers(diff);
         assertThat(annotated).contains("diff --git a/Foo.swift b/Foo.swift\n");
         assertThat(annotated).contains("--- a/Foo.swift\n");

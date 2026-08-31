@@ -1,6 +1,7 @@
 import { Copy, KeyRound, Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+
 import type { LoginProviderView } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import {

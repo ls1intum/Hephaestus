@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { assert, describe, expect, it } from "vitest";
+
 import { holdReasonCopy, jobWait, MoneyCell } from "./job-utils";
 
 const NOW = new Date("2026-05-20T12:00:00Z").getTime();

@@ -5,7 +5,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 
 /**
- * Rate-limit knobs for the hot auth endpoints, bound to {@code hephaestus.auth.rate-limit.*}.
+ * Rate-limit knobs for sensitive and resource-intensive endpoints, bound to {@code hephaestus.auth.rate-limit.*}.
  *
  * <p>Each limit is a token bucket of {@code capacity} tokens that refills the full capacity once
  * per {@code period} (interval refill — a fresh budget every window, not a trickle). Defaults match
@@ -30,13 +30,15 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  */
 @ConfigurationProperties(prefix = "hephaestus.auth.rate-limit")
 public record AuthRateLimitProperties(
-    @DefaultValue("true") boolean enabled,
-    @DefaultValue Limit oauthAuthorization,
-    @DefaultValue Limit refresh,
-    @DefaultValue Limit impersonate,
-    @DefaultValue Limit deleteUser,
-    @DefaultValue Limit export
-) {
+        @DefaultValue("true") boolean enabled,
+        @DefaultValue Limit oauthAuthorization,
+        @DefaultValue Limit refresh,
+        @DefaultValue Limit impersonate,
+        @DefaultValue Limit deleteUser,
+        @DefaultValue Limit export,
+        @DefaultValue Limit mentorChat,
+        @DefaultValue Limit reviewRequest,
+        @DefaultValue Limit syncTrigger) {
     public AuthRateLimitProperties {
         // Bind nulls (a partially-specified YAML block) to the spec defaults so a misconfigured
         // sub-key never silently disables a limit.
@@ -47,6 +49,9 @@ public record AuthRateLimitProperties(
         // 10/hour: generous for legit "download my data" (POST + a few download polls) but caps a
         // session from spamming async bundle assemblies (each persisting a BYTEA blob).
         export = export != null ? export : Limit.of(10, Duration.ofHours(1));
+        mentorChat = mentorChat != null ? mentorChat : Limit.of(20, Duration.ofMinutes(10));
+        reviewRequest = reviewRequest != null ? reviewRequest : Limit.of(10, Duration.ofHours(1));
+        syncTrigger = syncTrigger != null ? syncTrigger : Limit.of(10, Duration.ofHours(1));
     }
 
     /**
@@ -55,7 +60,9 @@ public record AuthRateLimitProperties(
      * @param capacity max requests permitted within one {@code period}; must be {@code >= 1}.
      * @param period   refill window; must be positive.
      */
-    public record Limit(@DefaultValue("20") long capacity, @DefaultValue("1m") Duration period) {
+    public record Limit(
+            @DefaultValue("20") long capacity,
+            @DefaultValue("1m") Duration period) {
         public Limit {
             if (capacity < 1) {
                 throw new IllegalArgumentException("rate-limit capacity must be >= 1, got: " + capacity);

@@ -33,9 +33,9 @@ Nothing staged or modified means nothing to land.
 `.github/workflows/cicd.yml` holds the `dorny/paths-filter` block that decides this; read it rather
 than guessing, and note the two shapes that surprise people:
 
-- **`scripts/**` and the repo-root config files (`package.json`, `pnpm-lock.yaml`, `.oxlintrc.json`,
-  `biome.jsonc`) trigger both the webapp and the app-server legs**, because the gates they configure
-  run on both.
+- **`scripts/**` and the root lint, formatter, TypeScript, and package configuration listed in
+  the workflow trigger both the webapp and app-server legs**, because the gates they configure run
+  on both.
 - **`docs/**` triggers the app-server leg.** There is no such thing as a docs-only PR that skips
   validation: `docs:lint` and `check:diagrams` run there.
 
@@ -62,9 +62,10 @@ pnpm run db:draft-changelog    # entities changed (needs Docker); then prune the
 pnpm run db:generate-erd-docs  # after any changelog change
 ```
 
-`generate:api:application-server:specs` **exits 0 having written nothing** when a port it needs is
-busy — HTTP, management, or the JMX port it defaults to. Pass free ports; the exact invocation is in
-`server/AGENTS.md` § OpenAPI generation exits 0 having written nothing.
+`generate:api:application-server:specs` **fails when a port it needs is busy** — HTTP, management, or
+the JMX port it defaults to. It restores the previous spec rather than committing an empty one, so
+the cost is a wasted Maven cycle. Pass free ports; the exact invocation is in `server/AGENTS.md`
+§ OpenAPI generation ports.
 
 ## 5. Run the tests your diff can break
 

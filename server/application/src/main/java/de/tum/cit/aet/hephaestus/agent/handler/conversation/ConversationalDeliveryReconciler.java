@@ -36,12 +36,11 @@ public class ConversationalDeliveryReconciler {
     private final ObservationVisibilityPolicy visibilityPolicy;
 
     public ConversationalDeliveryReconciler(
-        FeedbackRepository feedbackRepository,
-        FeedbackObservationRepository feedbackObservationRepository,
-        FeedbackPlacementRepository feedbackPlacementRepository,
-        ObservationRepository observationRepository,
-        ObservationVisibilityPolicy visibilityPolicy
-    ) {
+            FeedbackRepository feedbackRepository,
+            FeedbackObservationRepository feedbackObservationRepository,
+            FeedbackPlacementRepository feedbackPlacementRepository,
+            ObservationRepository observationRepository,
+            ObservationVisibilityPolicy visibilityPolicy) {
         this.feedbackRepository = feedbackRepository;
         this.feedbackObservationRepository = feedbackObservationRepository;
         this.feedbackPlacementRepository = feedbackPlacementRepository;
@@ -51,44 +50,34 @@ public class ConversationalDeliveryReconciler {
 
     public int reconcile(long workspaceId, long recipientUserId, UUID chatMessageId, List<UUID> linkedObservationIds) {
         Instant now = Instant.now();
-        for (Observation observation : admitted(workspaceId, linkedObservationIds).values()) {
+        for (Observation observation :
+                admitted(workspaceId, linkedObservationIds).values()) {
             UUID observationId = observation.getId();
             List<UUID> feedbackIds = feedbackObservationRepository.findPreparedConversationFeedbackIdsByObservation(
-                workspaceId,
-                recipientUserId,
-                observationId
-            );
+                    workspaceId, recipientUserId, observationId);
             if (feedbackIds.isEmpty()) {
                 continue;
             }
-            if (
-                observation.getRecurrenceKey() != null &&
-                feedbackRepository.existsDeliveredInContextForRecurrenceKey(
-                    workspaceId,
-                    recipientUserId,
-                    observation.getRecurrenceKey()
-                )
-            ) {
+            if (observation.getRecurrenceKey() != null
+                    && feedbackRepository.existsDeliveredInContextForRecurrenceKey(
+                            workspaceId, recipientUserId, observation.getRecurrenceKey())) {
                 continue;
             }
             UUID feedbackId = feedbackIds.get(0);
             int flipped = feedbackRepository.markConversationDelivered(feedbackId, now);
             if (flipped == 1) {
                 Feedback unit = feedbackRepository.getReferenceById(feedbackId);
-                feedbackPlacementRepository.save(
-                    FeedbackPlacement.builder()
+                feedbackPlacementRepository.save(FeedbackPlacement.builder()
                         .feedback(unit)
                         .placementType(PlacementType.CONVERSATION_TURN)
                         .chatMessageId(chatMessageId)
                         .createdAt(now)
-                        .build()
-                );
+                        .build());
                 log.info(
-                    "Conversational feedback delivered: feedbackId={}, chatMessageId={}, recipient={}",
-                    feedbackId,
-                    chatMessageId,
-                    recipientUserId
-                );
+                        "Conversational feedback delivered: feedbackId={}, chatMessageId={}, recipient={}",
+                        feedbackId,
+                        chatMessageId,
+                        recipientUserId);
                 return 1;
             }
         }
@@ -128,11 +117,8 @@ public class ConversationalDeliveryReconciler {
         for (Observation observation : rows) {
             byId.put(observation.getId(), observation);
         }
-        Set<UUID> visible = visibilityPolicy.permitsAll(
-            workspaceId,
-            byId.values(),
-            SourceUsePurpose.CONVERSATIONAL_MENTORING
-        );
+        Set<UUID> visible =
+                visibilityPolicy.permitsAll(workspaceId, byId.values(), SourceUsePurpose.CONVERSATIONAL_MENTORING);
         Map<UUID, Observation> admitted = new LinkedHashMap<>();
         for (UUID observationId : observationIds) {
             Observation observation = byId.get(observationId);
@@ -155,20 +141,16 @@ public class ConversationalDeliveryReconciler {
     public int suppressForSilentMode(long workspaceId, long recipientUserId, List<UUID> linkedObservationIds) {
         for (UUID observationId : admitted(workspaceId, linkedObservationIds).keySet()) {
             List<UUID> feedbackIds = feedbackObservationRepository.findPreparedConversationFeedbackIdsByObservation(
-                workspaceId,
-                recipientUserId,
-                observationId
-            );
+                    workspaceId, recipientUserId, observationId);
             if (feedbackIds.isEmpty()) {
                 continue;
             }
             UUID feedbackId = feedbackIds.get(0);
             if (feedbackRepository.markConversationSuppressedBySilentMode(feedbackId) == 1) {
                 log.info(
-                    "Conversational feedback suppressed by instance Silent Mode: feedbackId={}, recipient={}",
-                    feedbackId,
-                    recipientUserId
-                );
+                        "Conversational feedback suppressed by instance Silent Mode: feedbackId={}, recipient={}",
+                        feedbackId,
+                        recipientUserId);
                 return 1;
             }
         }

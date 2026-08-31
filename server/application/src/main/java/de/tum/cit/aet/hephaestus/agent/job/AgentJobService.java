@@ -23,11 +23,14 @@ import de.tum.cit.aet.hephaestus.integration.core.signal.SignalRecorder;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalStateReason;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.observability.StructuredLogKeys;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
+import de.tum.cit.aet.hephaestus.practices.review.GateDecision.Detect;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
+import de.tum.cit.aet.hephaestus.practices.review.TriggerMode;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaults;
 import de.tum.cit.aet.hephaestus.practices.review.autonomy.AutonomyResolver;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -40,6 +43,7 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -69,19 +73,18 @@ public class AgentJobService {
     private final SignalRecorder signalRecorder;
 
     public AgentJobService(
-        AgentJobRepository agentJobRepository,
-        WorkspaceAgentBindingRepository agentBindingRepository,
-        WorkspaceRepository workspaceRepository,
-        ConnectionService connectionService,
-        JobTypeHandlerRegistry handlerRegistry,
-        ObjectMapper objectMapper,
-        TransactionTemplate transactionTemplate,
-        PracticeReviewProperties reviewProperties,
-        PracticeRepository practiceRepository,
-        LlmBudgetService llmBudgetService,
-        LlmModelResolver llmModelResolver,
-        SignalRecorder signalRecorder
-    ) {
+            AgentJobRepository agentJobRepository,
+            WorkspaceAgentBindingRepository agentBindingRepository,
+            WorkspaceRepository workspaceRepository,
+            ConnectionService connectionService,
+            JobTypeHandlerRegistry handlerRegistry,
+            ObjectMapper objectMapper,
+            TransactionTemplate transactionTemplate,
+            PracticeReviewProperties reviewProperties,
+            PracticeRepository practiceRepository,
+            LlmBudgetService llmBudgetService,
+            LlmModelResolver llmModelResolver,
+            SignalRecorder signalRecorder) {
         this.agentJobRepository = agentJobRepository;
         this.agentBindingRepository = agentBindingRepository;
         this.workspaceRepository = workspaceRepository;
@@ -107,8 +110,8 @@ public class AgentJobService {
     @Transactional(readOnly = true)
     public AgentJob getJob(Long workspaceId, UUID jobId) {
         return agentJobRepository
-            .findByIdAndWorkspaceId(jobId, workspaceId)
-            .orElseThrow(() -> new EntityNotFoundException("AgentJob", jobId.toString()));
+                .findByIdAndWorkspaceId(jobId, workspaceId)
+                .orElseThrow(() -> new EntityNotFoundException("AgentJob", jobId.toString()));
     }
 
     // Submit
@@ -130,13 +133,12 @@ public class AgentJobService {
         }
         log.info("Dev trigger: building review request for PR {} ({})", pr.getId(), pr.getHtmlUrl());
         return new PullRequestReviewSubmissionRequest(
-            ScmEventPayload.PullRequestData.from(pr),
-            pr.getHeadRefName(),
-            pr.getHeadRefOid(),
-            pr.getBaseRefName(),
-            triggerSignal,
-            ObservationOrigin.MANUAL
-        );
+                ScmEventPayload.PullRequestData.from(pr),
+                pr.getHeadRefName(),
+                pr.getHeadRefOid(),
+                pr.getBaseRefName(),
+                triggerSignal,
+                ObservationOrigin.MANUAL);
     }
 
     /** Issue-shaped companion to {@link #buildReviewRequest}, with the same session requirement. */
@@ -147,18 +149,17 @@ public class AgentJobService {
         }
         log.info("Dev trigger: building issue request for issue {} ({})", issue.getId(), issue.getHtmlUrl());
         return new IssueReviewSubmissionRequest(
-            issue.getId(),
-            issue.getNumber(),
-            issue.getRepository().getId(),
-            issue.getRepository().getNameWithOwner(),
-            issue.getTitle(),
-            issue.getBody() != null ? issue.getBody() : "",
-            issue.getState() != null ? issue.getState().name() : "OPEN",
-            issue.getHtmlUrl(),
-            issue.getUpdatedAt(),
-            triggerSignal,
-            ObservationOrigin.MANUAL
-        );
+                issue.getId(),
+                issue.getNumber(),
+                issue.getRepository().getId(),
+                issue.getRepository().getNameWithOwner(),
+                issue.getTitle(),
+                issue.getBody() != null ? issue.getBody() : "",
+                issue.getState() != null ? issue.getState().name() : "OPEN",
+                issue.getHtmlUrl(),
+                issue.getUpdatedAt(),
+                triggerSignal,
+                ObservationOrigin.MANUAL);
     }
 
     /**
@@ -166,11 +167,7 @@ public class AgentJobService {
      * transaction commits.
      */
     public String submitPrepared(
-        Long workspaceId,
-        AgentJobType jobType,
-        JobSubmissionRequest request,
-        @Nullable SignalKey signalKey
-    ) {
+            Long workspaceId, AgentJobType jobType, JobSubmissionRequest request, @Nullable SignalKey signalKey) {
         SubmissionOutcome outcome = submitWithOutcome(workspaceId, jobType, request, signalKey);
         if (outcome.job() != null) {
             return "Job submitted: " + outcome.job().getId();
@@ -193,12 +190,18 @@ public class AgentJobService {
      *     practice-review binding, or the cap funding it is reached
      */
     public Optional<AgentJob> submit(
-        Long workspaceId,
-        AgentJobType jobType,
-        JobSubmissionRequest request,
-        @Nullable SignalKey signalKey
-    ) {
-        return Optional.ofNullable(submitWithOutcome(workspaceId, jobType, request, signalKey).job());
+            Long workspaceId, AgentJobType jobType, JobSubmissionRequest request, @Nullable SignalKey signalKey) {
+        return submit(workspaceId, jobType, request, signalKey, null);
+    }
+
+    public Optional<AgentJob> submit(
+            Long workspaceId,
+            AgentJobType jobType,
+            JobSubmissionRequest request,
+            @Nullable SignalKey signalKey,
+            @Nullable Detect admission) {
+        return Optional.ofNullable(submitWithOutcome(workspaceId, jobType, request, signalKey, admission)
+                .job());
     }
 
     /**
@@ -206,19 +209,24 @@ public class AgentJobService {
      * it stopped on instead of flattening it into an empty result.
      */
     SubmissionOutcome submitWithOutcome(
-        Long workspaceId,
-        AgentJobType jobType,
-        JobSubmissionRequest request,
-        @Nullable SignalKey signalKey
-    ) {
+            Long workspaceId, AgentJobType jobType, JobSubmissionRequest request, @Nullable SignalKey signalKey) {
+        return submitWithOutcome(workspaceId, jobType, request, signalKey, null);
+    }
+
+    SubmissionOutcome submitWithOutcome(
+            Long workspaceId,
+            AgentJobType jobType,
+            JobSubmissionRequest request,
+            @Nullable SignalKey signalKey,
+            @Nullable Detect admission) {
         Workspace workspace = workspaceRepository
-            .findById(workspaceId)
-            .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceId.toString()));
+                .findById(workspaceId)
+                .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceId.toString()));
 
         WorkspaceAgentBinding binding = agentBindingRepository
-            .findByWorkspaceIdAndPurposeWithModels(workspaceId, AgentPurpose.PRACTICE_REVIEW)
-            .filter(WorkspaceAgentBinding::isEnabled)
-            .orElse(null);
+                .findByWorkspaceIdAndPurposeWithModels(workspaceId, AgentPurpose.PRACTICE_REVIEW)
+                .filter(WorkspaceAgentBinding::isEnabled)
+                .orElse(null);
         if (binding == null) {
             log.debug("No practice-review binding to run: workspaceId={}", workspaceId);
             return refuse(signalKey, SignalStateReason.REVIEW_MODEL_UNBOUND);
@@ -234,7 +242,8 @@ public class AgentJobService {
         JobTypeHandler handler = handlerRegistry.getHandler(jobType);
         JobSubmission submission = handler.createSubmission(request);
 
-        return submitForBinding(workspace, jobType, artifactKindFor(jobType, request), submission, signalKey);
+        return submitForBinding(
+                workspace, jobType, artifactKindFor(jobType, request), submission, signalKey, admission);
     }
 
     /**
@@ -254,49 +263,52 @@ public class AgentJobService {
      * transaction because the discovery read in {@link #submit} runs detached.
      */
     private SubmissionOutcome submitForBinding(
-        Workspace workspace,
-        AgentJobType jobType,
-        ArtifactKind artifactKind,
-        JobSubmission submission,
-        @Nullable SignalKey signalKey
-    ) {
+            Workspace workspace,
+            AgentJobType jobType,
+            ArtifactKind artifactKind,
+            JobSubmission submission,
+            @Nullable SignalKey signalKey,
+            @Nullable Detect admission) {
         String detectionKey = submission.idempotencyKey() + ":detection";
 
         SubmissionOutcome outcome = transactionTemplate.execute(status -> {
             Workspace currentWorkspace = workspaceRepository
-                .findByIdForUpdate(workspace.getId())
-                .orElseThrow(() -> new EntityNotFoundException("Workspace", workspace.getId().toString()));
+                    .findByIdForUpdate(workspace.getId())
+                    .orElseThrow(() -> new EntityNotFoundException(
+                            "Workspace", workspace.getId().toString()));
             if (currentWorkspace.getStatus() != Workspace.WorkspaceStatus.ACTIVE) {
                 log.debug(
-                    "Skipping agent job submission for inactive workspace: workspaceId={}, status={}",
-                    currentWorkspace.getId(),
-                    currentWorkspace.getStatus()
-                );
+                        "Skipping agent job submission for inactive workspace: workspaceId={}, status={}",
+                        currentWorkspace.getId(),
+                        currentWorkspace.getStatus());
                 return refuseInTransaction(signalKey, SignalStateReason.WORKSPACE_INACTIVE);
             }
             if (!Boolean.TRUE.equals(currentWorkspace.getFeatures().getPracticesEnabled())) {
                 log.debug(
-                    "Skipping practice review while the workspace feature is off: workspaceId={}",
-                    workspace.getId()
-                );
+                        "Skipping practice review while the workspace feature is off: workspaceId={}",
+                        workspace.getId());
                 return refuseInTransaction(signalKey, SignalStateReason.PRACTICES_DISABLED);
+            }
+            if (admission != null
+                    && admission.rolloutRevision()
+                            != currentWorkspace.getReviewSettings().getRolloutRevision()) {
+                return refuseInTransaction(signalKey, SignalStateReason.STALE_ROLLOUT_REVISION);
             }
             // Resolved, not filtered in SQL: a practice that inherits its autonomy stores NULL, and
             // `autonomy <> 'OFF'` answers UNKNOWN for it, which would refuse review for every
             // workspace that left a practice to inherit.
             if (!hasReviewablePractice(currentWorkspace, artifactKind)) {
                 log.debug(
-                    "Skipping practice review with no active practice for its work type: workspaceId={}, jobType={}",
-                    workspace.getId(),
-                    jobType
-                );
+                        "Skipping practice review with no active practice for its work type: workspaceId={}, jobType={}",
+                        workspace.getId(),
+                        jobType);
                 return refuseInTransaction(signalKey, SignalStateReason.NO_ACTIVE_PRACTICE);
             }
 
             WorkspaceAgentBinding binding = agentBindingRepository
-                .findByWorkspaceIdAndPurpose(workspace.getId(), AgentPurpose.PRACTICE_REVIEW)
-                .filter(WorkspaceAgentBinding::isEnabled)
-                .orElse(null);
+                    .findByWorkspaceIdAndPurpose(workspace.getId(), AgentPurpose.PRACTICE_REVIEW)
+                    .filter(WorkspaceAgentBinding::isEnabled)
+                    .orElse(null);
             if (binding == null) {
                 // Unbound or disabled since discovery.
                 return refuseInTransaction(signalKey, SignalStateReason.REVIEW_MODEL_UNBOUND);
@@ -307,17 +319,13 @@ public class AgentJobService {
             // still active, so it is reached only by paths that cannot name a signal.
             if (signalKey == null) {
                 Optional<AgentJob> existing = agentJobRepository.findByWorkspaceIdAndIdempotencyKeyAndStatusIn(
-                    workspace.getId(),
-                    detectionKey,
-                    ACTIVE_STATUSES
-                );
+                        workspace.getId(), detectionKey, ACTIVE_STATUSES);
                 if (existing.isPresent()) {
                     log.info(
-                        "Deduplicated job submission: existingJobId={}, idempotencyKey={}",
-                        existing.get().getId(),
-                        detectionKey
-                    );
-                    return SubmissionOutcome.of(existing.get());
+                            "Deduplicated job submission: existingJobId={}, idempotencyKey={}",
+                            existing.get().getId(),
+                            detectionKey);
+                    return SubmissionOutcome.joined(existing.get());
                 }
             }
 
@@ -329,19 +337,15 @@ public class AgentJobService {
                 String escaped = rawPrefix.replace("%", "\\%").replace("_", "\\_");
                 String cooldownPrefix = escaped + "%:detection";
                 Instant cutoff = Instant.now().minus(java.time.Duration.ofMinutes(cooldown));
-                Optional<AgentJob> recent = agentJobRepository.findRecentJobByKeyPrefix(
-                    workspace.getId(),
-                    cooldownPrefix,
-                    cutoff
-                );
+                Optional<AgentJob> recent =
+                        agentJobRepository.findRecentJobByKeyPrefix(workspace.getId(), cooldownPrefix, cutoff);
                 if (recent.isPresent()) {
                     log.info(
-                        "Cooldown active: skipping submission, recentJobId={}, createdAt={}, cooldownMinutes={}, key={}",
-                        recent.get().getId(),
-                        recent.get().getCreatedAt(),
-                        cooldown,
-                        detectionKey
-                    );
+                            "Cooldown active: skipping submission, recentJobId={}, createdAt={}, cooldownMinutes={}, key={}",
+                            recent.get().getId(),
+                            recent.get().getCreatedAt(),
+                            cooldown,
+                            detectionKey);
                     return refuseInTransaction(signalKey, SignalStateReason.COOLDOWN_ACTIVE);
                 }
             }
@@ -351,15 +355,18 @@ public class AgentJobService {
             job.setPurpose(AgentPurpose.PRACTICE_REVIEW);
             job.setJobType(jobType);
             job.setArtifactKind(artifactKind);
+            job.setPracticeRolloutRevision(currentWorkspace.getReviewSettings().getRolloutRevision());
+            job.setPracticeTriggerMode(admission == null ? TriggerMode.MANUAL : admission.triggerMode());
             job.setMetadata(submission.metadata());
             job.setIdempotencyKey(detectionKey);
+            job.setTraceId(resolveTraceId());
             try {
-                job.setConfigSnapshot(ConfigSnapshot.from(binding, llmModelResolver).toJson(objectMapper));
+                job.setConfigSnapshot(
+                        ConfigSnapshot.from(binding, llmModelResolver).toJson(objectMapper));
             } catch (IllegalStateException unavailableModel) {
                 log.warn(
-                    "Skipping practice-review binding whose model is no longer available: workspaceId={}",
-                    workspace.getId()
-                );
+                        "Skipping practice-review binding whose model is no longer available: workspaceId={}",
+                        workspace.getId());
                 return refuseInTransaction(signalKey, SignalStateReason.MODEL_UNAVAILABLE);
             }
             // Resolved here rather than per-path so EVERY submission carries a delivery channel; without
@@ -369,11 +376,10 @@ public class AgentJobService {
                 job.setIntegrationKind(resolvedKind.get());
             } else {
                 log.warn(
-                    "No active SCM connection for workspace {} — agent job will run but feedback delivery " +
-                        "will fail (no integrationKind). Configure a provider connection to enable delivery. jobType={}",
-                    workspace.getId(),
-                    jobType
-                );
+                        "No active SCM connection for workspace {} — agent job will run but feedback delivery "
+                                + "will fail (no integrationKind). Configure a provider connection to enable delivery. jobType={}",
+                        workspace.getId(),
+                        jobType);
             }
 
             // The credential is NEVER frozen onto the job: the proxy resolves it live from the snapshot's
@@ -394,17 +400,20 @@ public class AgentJobService {
                 signalRecorder.markTriggered(signalKey, job.getId());
             }
 
-            log.info(
-                "Agent job submitted: jobId={}, jobType={}, workspaceId={}",
-                job.getId(),
-                jobType,
-                workspace.getId()
-            );
-
-            return SubmissionOutcome.of(job);
+            return SubmissionOutcome.created(job);
         });
-        // Every branch above returns an outcome; a null here would be a refusal with no reason.
-        return Objects.requireNonNull(outcome, "submission outcome");
+        SubmissionOutcome committed = Objects.requireNonNull(outcome, "submission outcome");
+        AgentJob job = committed.job();
+        if (job != null && committed.created()) {
+            AgentJobTelemetry.queued(job);
+        }
+        return committed;
+    }
+
+    private String resolveTraceId() {
+        return Objects.requireNonNullElseGet(
+                MDC.get(StructuredLogKeys.TRACE_ID),
+                () -> UUID.randomUUID().toString().replace("-", ""));
     }
 
     /** Settle a refused signal inside the submission transaction, so the two stand or fall together. */
@@ -417,16 +426,14 @@ public class AgentJobService {
 
     /** Whether any practice of this work type resolves to an autonomy that admits a review. */
     private boolean hasReviewablePractice(Workspace workspace, ArtifactKind artifactKind) {
-        PracticeAutonomy workspaceDefault = WorkspaceReviewDefaults.of(workspace).defaultAutonomy();
-        return practiceRepository
-            .findAutonomyRows(workspace.getId())
-            .stream()
-            .filter(row -> artifactKind.equals(row.getArtifactKind()))
-            .anyMatch(row ->
-                AutonomyResolver.resolvePractice(row.getPracticeAutonomy(), row.getGroupAutonomy(), workspaceDefault)
-                    .autonomy()
-                    .admitsReview()
-            );
+        PracticeAutonomy workspaceDefault =
+                WorkspaceReviewDefaults.of(workspace).defaultAutonomy();
+        return practiceRepository.findAutonomyRows(workspace.getId()).stream()
+                .filter(row -> artifactKind.equals(row.getArtifactKind()))
+                .anyMatch(row -> AutonomyResolver.resolvePractice(
+                                row.getPracticeAutonomy(), row.getGroupAutonomy(), workspaceDefault)
+                        .autonomy()
+                        .admitsReview());
     }
 
     /**

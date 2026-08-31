@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+
 import {
 	type AgentSession,
 	type AgentSessionEvent,
@@ -9,6 +10,7 @@ import {
 	SessionManager,
 	SettingsManager,
 } from "@earendil-works/pi-coding-agent";
+
 import { errorText } from "./pi-error-text.ts";
 import {
 	citationMatchesArtifact,
@@ -20,6 +22,7 @@ import {
 	validateInapplicabilityScope,
 	validateSearchScope,
 } from "./pi-observation-normalize.ts";
+import { PracticeCoverageLedger } from "./pi-practice-coverage.ts";
 import { loadProviderConfig, registerHephaestusProvider } from "./pi-provider.ts";
 import {
 	buildReviewTree,
@@ -580,6 +583,7 @@ function appendObservations(observations: unknown[]): {
 	}
 	persistReviewState();
 	maybeWriteResultFile();
+	persistPracticeCoverage();
 	return { inserted, duplicates, negatives };
 }
 
@@ -703,6 +707,25 @@ function accumulateUsage(prev: UsageReport | null, curr: UsageReport): void {
 
 function loadPracticeSlugs(): string[] {
 	return practiceIndex.map((practice) => practice.slug).filter(Boolean);
+}
+
+let practiceCoverageLedger: PracticeCoverageLedger | null = null;
+
+function persistPracticeCoverage() {
+	if (practiceCoverageLedger === null)
+		throw new Error("practice coverage ledger is not initialized");
+	return practiceCoverageLedger.markEvaluated(
+		reviewState.observations.map((item) => item.practiceSlug),
+	);
+}
+
+function logPracticeCoverage() {
+	const coverage = persistPracticeCoverage();
+	const ratio =
+		coverage.eligible === 0 ? "n/a" : (coverage.evaluated / coverage.eligible).toFixed(4);
+	console.error(
+		`[pi-runner] Practice coverage: evaluated=${coverage.evaluated}, eligible=${coverage.eligible}, ratio=${ratio}`,
+	);
 }
 
 const PERSIST_DISCIPLINE =
@@ -1023,17 +1046,15 @@ function leanObservations(observations: readonly AdmittedObservation[]): LeanObs
 		assessment: observation.assessment,
 		severity: observation.severity,
 		anchorable: observation.anchorable,
-		citations: observation.citations.map(
-			(citation): LeanCitation => ({
-				index: citation.index,
-				sourceKind: citation.sourceKind,
-				path: citation.path,
-				side: citation.side,
-				startLine: citation.startLine,
-				endLine: citation.endLine,
-				anchorable: citation.anchorable,
-			}),
-		),
+		citations: observation.citations.map((citation): LeanCitation => ({
+			index: citation.index,
+			sourceKind: citation.sourceKind,
+			path: citation.path,
+			side: citation.side,
+			startLine: citation.startLine,
+			endLine: citation.endLine,
+			anchorable: citation.anchorable,
+		})),
 	}));
 }
 
@@ -1458,6 +1479,7 @@ async function admitObservations() {
 		headers: {
 			authorization: `Bearer ${process.env.LLM_PROXY_TOKEN}`,
 			"content-type": "application/json",
+			...(process.env.TRACEPARENT ? { traceparent: process.env.TRACEPARENT } : {}),
 		},
 		body: JSON.stringify({ schemaVersion: 1, observations: reviewState.observations }),
 	});
@@ -1640,9 +1662,11 @@ async function main() {
 
 	let prevUsage: UsageReport | null = null;
 	const activeSessions = new Set<AgentSession>();
+	const hardAbort = new AbortController();
 
 	const hardTimer = setTimeout(() => {
 		hardAborted = true;
+		hardAbort.abort();
 		console.error(`[pi-runner] Hard timeout — aborting ${activeSessions.size} active session(s)`);
 		for (const activeSession of activeSessions) {
 			activeSession.dispose();
@@ -1653,6 +1677,7 @@ async function main() {
 	const startMs = Date.now();
 
 	const allSlugs = loadPracticeSlugs();
+	practiceCoverageLedger = new PracticeCoverageLedger(`${OUTPUT}/practice-coverage.json`, allSlugs);
 	const groupCapacity = process.env.PI_PRACTICE_BATCH_SIZE
 		? Number(process.env.PI_PRACTICE_BATCH_SIZE)
 		: 6;
@@ -1722,64 +1747,68 @@ async function main() {
 
 	try {
 		let remainingGroups = tree.groups.length;
-		await mapConcurrent(tree.groups, concurrency, async (group, index) => {
-			if (hardAborted) return;
-			const seedFile = groupSeedFiles.get(group.id);
-			const manager = seedFile
-				? SessionManager.open(seedFile, sessionDir)
-				: SessionManager.create(CWD, sessionDir);
-			const scopedTool = buildReportObservationTool(group.practiceSlugs);
-			const { session: observerSession } = await createAgentSession({
-				cwd: CWD,
-				agentDir: AGENT_DIR,
-				tools: [...EVIDENCE_TOOLS, "report_observation"],
-				customTools: [scopedTool],
-				sessionManager: manager,
-				settingsManager,
-				modelRuntime,
-				model,
-			});
-			const unsubscribeObserver = subscribeSession(observerSession, `observer:${group.id}`);
-			activeSessions.add(observerSession);
-			const remainingMs = Math.max(1, reviewDeadline - Date.now());
-			const activeSlots = Math.min(concurrency, remainingGroups);
-			const groupBudgetMs = deriveWorkstreamBudget(remainingMs, activeSlots, remainingGroups);
-			const timing = deriveTurnTiming(groupBudgetMs, 1);
-			const timers = scheduleTurnTimers(
-				observerSession,
-				index + 1,
-				tree.groups.length,
-				timing.softNudgeMs,
-				timing.fairShareMs,
-			);
-			try {
-				await Promise.race([
-					observerSession.prompt(
-						`${prompt}\n\n## Practice group: ${group.id}\nEvaluate exactly these practices: ${group.practiceSlugs.join(", ")}. ` +
-							`Read their files under inputs/practices/, then start with the cheapest decisive practice. Persist each ` +
-							`observation as soon as it is supported; do not finish a group-wide evidence map first. Reuse evidence ` +
-							`already gathered when investigating the remaining practices. Persist at least one disposition for ` +
-							`every listed practice, plus any distinct material problems a practice exposes. Use ` +
-							`NO_REVIEW_OCCASION only after complete evidence proves the practice's explicit prerequisite did not ` +
-							`occur; missing evidence is not an occasion that failed to happen. Do not skip a practice because its ` +
-							`behavior is absent.`,
-					),
-					timers.hardDeadline,
-				]);
-			} catch (error) {
-				console.error(`[pi-runner] observer ${group.id} failed: ${errorText(error)}`);
-			} finally {
-				const sessionFile = observerSession.sessionManager.getSessionFile();
-				if (sessionFile) groupSessionFiles.set(group.id, sessionFile);
-				softTimeoutFired ||= timers.state.softTimedOut;
-				clearTimeout(timers.softTimer);
-				clearTimeout(timers.hardTimer);
-				activeSessions.delete(observerSession);
-				unsubscribeObserver();
-				observerSession.dispose();
-				remainingGroups--;
-			}
-		});
+		await mapConcurrent(
+			tree.groups,
+			concurrency,
+			async (group, index) => {
+				const seedFile = groupSeedFiles.get(group.id);
+				const manager = seedFile
+					? SessionManager.open(seedFile, sessionDir)
+					: SessionManager.create(CWD, sessionDir);
+				const scopedTool = buildReportObservationTool(group.practiceSlugs);
+				const { session: observerSession } = await createAgentSession({
+					cwd: CWD,
+					agentDir: AGENT_DIR,
+					tools: [...EVIDENCE_TOOLS, "report_observation"],
+					customTools: [scopedTool],
+					sessionManager: manager,
+					settingsManager,
+					modelRuntime,
+					model,
+				});
+				const unsubscribeObserver = subscribeSession(observerSession, `observer:${group.id}`);
+				activeSessions.add(observerSession);
+				const remainingMs = Math.max(1, reviewDeadline - Date.now());
+				const activeSlots = Math.min(concurrency, remainingGroups);
+				const groupBudgetMs = deriveWorkstreamBudget(remainingMs, activeSlots, remainingGroups);
+				const timing = deriveTurnTiming(groupBudgetMs, 1);
+				const timers = scheduleTurnTimers(
+					observerSession,
+					index + 1,
+					tree.groups.length,
+					timing.softNudgeMs,
+					timing.fairShareMs,
+				);
+				try {
+					await Promise.race([
+						observerSession.prompt(
+							`${prompt}\n\n## Practice group: ${group.id}\nEvaluate exactly these practices: ${group.practiceSlugs.join(", ")}. ` +
+								`Read their files under inputs/practices/, then start with the cheapest decisive practice. Persist each ` +
+								`observation as soon as it is supported; do not finish a group-wide evidence map first. Reuse evidence ` +
+								`already gathered when investigating the remaining practices. Persist at least one disposition for ` +
+								`every listed practice, plus any distinct material problems a practice exposes. Use ` +
+								`NO_REVIEW_OCCASION only after complete evidence proves the practice's explicit prerequisite did not ` +
+								`occur; missing evidence is not an occasion that failed to happen. Do not skip a practice because its ` +
+								`behavior is absent.`,
+						),
+						timers.hardDeadline,
+					]);
+				} catch (error) {
+					console.error(`[pi-runner] observer ${group.id} failed: ${errorText(error)}`);
+				} finally {
+					const sessionFile = observerSession.sessionManager.getSessionFile();
+					if (sessionFile) groupSessionFiles.set(group.id, sessionFile);
+					softTimeoutFired ||= timers.state.softTimedOut;
+					clearTimeout(timers.softTimer);
+					clearTimeout(timers.hardTimer);
+					activeSessions.delete(observerSession);
+					unsubscribeObserver();
+					observerSession.dispose();
+					remainingGroups--;
+				}
+			},
+			hardAbort.signal,
+		);
 	} finally {
 		clearTimeout(hardTimer);
 	}
@@ -1811,6 +1840,7 @@ async function main() {
 		allSlugs,
 		reviewState.observations.map((item) => item.practiceSlug),
 	);
+	if (missingAfterInitial.length === 0) logPracticeCoverage();
 
 	if (resultFileSource === "agent" && missingAfterInitial.length === 0) {
 		console.error(`[pi-runner] SUCCESS: result.json valid after initial run`);
@@ -1829,8 +1859,10 @@ async function main() {
 		`[pi-runner] Retrying ${missingAfterInitial.length} missing practice observer(s): ${missingAfterInitial.join(", ")}`,
 	);
 
+	const retryAbort = new AbortController();
 	const retryTimer = setTimeout(() => {
 		retryAborted = true;
+		retryAbort.abort();
 		console.error(`[pi-runner] Retry hard timeout — aborting`);
 		for (const activeSession of activeSessions) {
 			activeSession.dispose();
@@ -1848,49 +1880,57 @@ async function main() {
 			}))
 			.filter((group) => group.practiceSlugs.length > 0);
 		let retriesRemaining = retryGroups.length;
-		await mapConcurrent(retryGroups, concurrency, async (group) => {
-			if (retryAborted) return;
-			const retryTool = buildReportObservationTool(group.practiceSlugs);
-			const priorSessionFile = groupSessionFiles.get(group.id);
-			const { session: retrySession } = await createAgentSession({
-				cwd: CWD,
-				agentDir: AGENT_DIR,
-				tools: [...EVIDENCE_TOOLS, "report_observation"],
-				customTools: [retryTool],
-				sessionManager: priorSessionFile
-					? SessionManager.open(priorSessionFile, sessionDir)
-					: SessionManager.inMemory(),
-				settingsManager,
-				modelRuntime,
-				model,
-			});
-			const unsubscribeRetry = subscribeSession(retrySession, `retry:${group.id}`);
-			activeSessions.add(retrySession);
-			const activeSlots = Math.min(concurrency, retriesRemaining);
-			const retryBudgetMs = deriveWorkstreamBudget(RETRY_TIMEOUT_MS, activeSlots, retriesRemaining);
-			const retryDeadline = scheduleDeadline(retryBudgetMs, () => {
-				retrySession.dispose();
-			});
-			try {
-				await Promise.race([
-					retrySession.prompt(
-						`${prompt}\n\n## Recovery practice group\nThe earlier group did not persist: ${group.practiceSlugs.join(", ")}. ` +
-							`Continue from its evidence and tool feedback. Persist one best-justified outcome for each missing ` +
-							`practice now; read more only to resolve a specific validation failure or genuinely open evidence ` +
-							`question. Evaluate no other practice. ${PERSIST_DISCIPLINE}`,
-					),
-					retryDeadline.elapsed,
-				]);
-			} catch (error) {
-				console.error(`[pi-runner] retry ${group.id} failed: ${errorText(error)}`);
-			} finally {
-				clearTimeout(retryDeadline.timer);
-				activeSessions.delete(retrySession);
-				unsubscribeRetry();
-				retrySession.dispose();
-				retriesRemaining--;
-			}
-		});
+		await mapConcurrent(
+			retryGroups,
+			concurrency,
+			async (group) => {
+				const retryTool = buildReportObservationTool(group.practiceSlugs);
+				const priorSessionFile = groupSessionFiles.get(group.id);
+				const { session: retrySession } = await createAgentSession({
+					cwd: CWD,
+					agentDir: AGENT_DIR,
+					tools: [...EVIDENCE_TOOLS, "report_observation"],
+					customTools: [retryTool],
+					sessionManager: priorSessionFile
+						? SessionManager.open(priorSessionFile, sessionDir)
+						: SessionManager.inMemory(),
+					settingsManager,
+					modelRuntime,
+					model,
+				});
+				const unsubscribeRetry = subscribeSession(retrySession, `retry:${group.id}`);
+				activeSessions.add(retrySession);
+				const activeSlots = Math.min(concurrency, retriesRemaining);
+				const retryBudgetMs = deriveWorkstreamBudget(
+					RETRY_TIMEOUT_MS,
+					activeSlots,
+					retriesRemaining,
+				);
+				const retryDeadline = scheduleDeadline(retryBudgetMs, () => {
+					retrySession.dispose();
+				});
+				try {
+					await Promise.race([
+						retrySession.prompt(
+							`${prompt}\n\n## Recovery practice group\nThe earlier group did not persist: ${group.practiceSlugs.join(", ")}. ` +
+								`Continue from its evidence and tool feedback. Persist one best-justified outcome for each missing ` +
+								`practice now; read more only to resolve a specific validation failure or genuinely open evidence ` +
+								`question. Evaluate no other practice. ${PERSIST_DISCIPLINE}`,
+						),
+						retryDeadline.elapsed,
+					]);
+				} catch (error) {
+					console.error(`[pi-runner] retry ${group.id} failed: ${errorText(error)}`);
+				} finally {
+					clearTimeout(retryDeadline.timer);
+					activeSessions.delete(retrySession);
+					unsubscribeRetry();
+					retrySession.dispose();
+					retriesRemaining--;
+				}
+			},
+			retryAbort.signal,
+		);
 	} finally {
 		clearTimeout(retryTimer);
 	}
@@ -1919,6 +1959,7 @@ async function main() {
 		allSlugs,
 		reviewState.observations.map((item) => item.practiceSlug),
 	);
+	logPracticeCoverage();
 	if (missingAfterRetry.length > 0) {
 		console.error(
 			`[pi-runner] FAILED: ${missingAfterRetry.length} practice observer(s) still missing after retry: ${missingAfterRetry.join(", ")}`,

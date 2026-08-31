@@ -44,16 +44,14 @@ class WorkspaceLlmModelControllerIntegrationTest extends AbstractWorkspaceIntegr
 
     private WorkspaceLlmConnectionDTO createWorkspaceConnection(Workspace workspace, String slug) {
         var request = new CreateWorkspaceLlmConnectionRequestDTO(
-            slug,
-            "My Provider",
-            "https://api.openai.com",
-            "openai-completions",
-            LlmAuthMode.BEARER,
-            "sk-workspace-secret",
-            true
-        );
-        return Objects.requireNonNull(
-            webTestClient
+                slug,
+                "My Provider",
+                "https://api.openai.com",
+                "openai-completions",
+                LlmAuthMode.BEARER,
+                "sk-workspace-secret",
+                true);
+        return Objects.requireNonNull(webTestClient
                 .post()
                 .uri("/workspaces/{slug}/llm/connections", workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
@@ -64,34 +62,30 @@ class WorkspaceLlmModelControllerIntegrationTest extends AbstractWorkspaceIntegr
                 .isCreated()
                 .expectBody(WorkspaceLlmConnectionDTO.class)
                 .returnResult()
-                .getResponseBody()
-        );
+                .getResponseBody());
     }
 
     private WorkspaceLlmModelDTO createWorkspaceModel(Workspace workspace, Long connectionId, String slug) {
         var request = new CreateWorkspaceLlmModelRequestDTO(
-            slug,
-            "My Model",
-            "gpt-5-secret-upstream-id",
-            null,
-            null,
-            null,
-            true,
-            PricingMode.NO_CHARGE,
-            null,
-            null,
-            null,
-            null,
-            "Test-owned model has no per-token charge"
-        );
-        return Objects.requireNonNull(
-            webTestClient
+                slug,
+                "My Model",
+                "gpt-5-secret-upstream-id",
+                null,
+                null,
+                null,
+                true,
+                PricingMode.NO_CHARGE,
+                null,
+                null,
+                null,
+                null,
+                "Test-owned model has no per-token charge");
+        return Objects.requireNonNull(webTestClient
                 .post()
                 .uri(
-                    "/workspaces/{slug}/llm/connections/{connectionId}/models",
-                    workspace.getWorkspaceSlug(),
-                    connectionId
-                )
+                        "/workspaces/{slug}/llm/connections/{connectionId}/models",
+                        workspace.getWorkspaceSlug(),
+                        connectionId)
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(request)
@@ -100,8 +94,7 @@ class WorkspaceLlmModelControllerIntegrationTest extends AbstractWorkspaceIntegr
                 .isCreated()
                 .expectBody(WorkspaceLlmModelDTO.class)
                 .returnResult()
-                .getResponseBody()
-        );
+                .getResponseBody());
     }
 
     private void saveGrant(Long modelId, Long workspaceId) {
@@ -111,18 +104,10 @@ class WorkspaceLlmModelControllerIntegrationTest extends AbstractWorkspaceIntegr
     }
 
     private LlmModel seedInstanceModel(String upstreamId, ModelVisibility visibility, boolean enabled) {
-        LlmConnection connection = llmConnectionRepository.save(
-            LlmCatalogTestFixtures.connection("instance-conn-" + System.nanoTime())
-        );
-        return llmModelRepository.save(
-            LlmCatalogTestFixtures.model(
-                connection,
-                "instance-model-" + System.nanoTime(),
-                upstreamId,
-                visibility,
-                enabled
-            )
-        );
+        LlmConnection connection =
+                llmConnectionRepository.save(LlmCatalogTestFixtures.connection("instance-conn-" + System.nanoTime()));
+        return llmModelRepository.save(LlmCatalogTestFixtures.model(
+                connection, "instance-model-" + System.nanoTime(), upstreamId, visibility, enabled));
     }
 
     @Test
@@ -136,68 +121,57 @@ class WorkspaceLlmModelControllerIntegrationTest extends AbstractWorkspaceIntegr
         assertThat(created.slug()).isEqualTo("model-1");
 
         webTestClient
-            .get()
-            .uri("/workspaces/{slug}/llm/models/{id}", workspace.getWorkspaceSlug(), created.id())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.slug")
-            .isEqualTo("model-1");
+                .get()
+                .uri("/workspaces/{slug}/llm/models/{id}", workspace.getWorkspaceSlug(), created.id())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.slug")
+                .isEqualTo("model-1");
 
         webTestClient
-            .get()
-            .uri("/workspaces/{slug}/llm/models", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.length()")
-            .isEqualTo(1);
+                .get()
+                .uri("/workspaces/{slug}/llm/models", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.length()")
+                .isEqualTo(1);
 
         var updateRequest = new UpdateWorkspaceLlmModelRequestDTO(
-            "Renamed Model",
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null
-        );
+                "Renamed Model", null, null, null, null, null, null, null, null, null, null);
         webTestClient
-            .patch()
-            .uri("/workspaces/{slug}/llm/models/{id}", workspace.getWorkspaceSlug(), created.id())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(updateRequest)
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.displayName")
-            .isEqualTo("Renamed Model");
+                .patch()
+                .uri("/workspaces/{slug}/llm/models/{id}", workspace.getWorkspaceSlug(), created.id())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(updateRequest)
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.displayName")
+                .isEqualTo("Renamed Model");
 
         webTestClient
-            .delete()
-            .uri("/workspaces/{slug}/llm/models/{id}", workspace.getWorkspaceSlug(), created.id())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isNoContent();
+                .delete()
+                .uri("/workspaces/{slug}/llm/models/{id}", workspace.getWorkspaceSlug(), created.id())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isNoContent();
 
         webTestClient
-            .get()
-            .uri("/workspaces/{slug}/llm/models/{id}", workspace.getWorkspaceSlug(), created.id())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isNotFound();
+                .get()
+                .uri("/workspaces/{slug}/llm/models/{id}", workspace.getWorkspaceSlug(), created.id())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isNotFound();
     }
 
     @Test
@@ -208,22 +182,17 @@ class WorkspaceLlmModelControllerIntegrationTest extends AbstractWorkspaceIntegr
         WorkspaceLlmModelDTO modelInA = createWorkspaceModel(workspaceA, connectionA.id(), "model-a");
 
         User ownerB = persistUser("wsmodel-tenancy-owner-b");
-        Workspace workspaceB = createWorkspace(
-            "wsmodel-tenancy-b",
-            "Tenancy B",
-            "wsmodel-tenancy-org-b",
-            AccountType.ORG,
-            ownerB
-        );
+        Workspace workspaceB =
+                createWorkspace("wsmodel-tenancy-b", "Tenancy B", "wsmodel-tenancy-org-b", AccountType.ORG, ownerB);
         ensureAdminMembership(workspaceB);
 
         webTestClient
-            .get()
-            .uri("/workspaces/{slug}/llm/models/{id}", workspaceB.getWorkspaceSlug(), modelInA.id())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isNotFound();
+                .get()
+                .uri("/workspaces/{slug}/llm/models/{id}", workspaceB.getWorkspaceSlug(), modelInA.id())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isNotFound();
     }
 
     @Test
@@ -235,21 +204,21 @@ class WorkspaceLlmModelControllerIntegrationTest extends AbstractWorkspaceIntegr
         createWorkspaceModel(workspace, connection.id(), "my-model");
 
         List<AvailableLlmModelDTO> available = webTestClient
-            .get()
-            .uri("/workspaces/{slug}/llm/available-models", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody(new ParameterizedTypeReference<List<AvailableLlmModelDTO>>() {})
-            .returnResult()
-            .getResponseBody();
+                .get()
+                .uri("/workspaces/{slug}/llm/available-models", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(new ParameterizedTypeReference<List<AvailableLlmModelDTO>>() {})
+                .returnResult()
+                .getResponseBody();
 
         assertThat(available).isNotNull();
         assertThat(available).hasSize(2);
         assertThat(available)
-            .extracting(AvailableLlmModelDTO::scope)
-            .containsExactlyInAnyOrder(LlmModelScope.SHARED, LlmModelScope.WORKSPACE);
+                .extracting(AvailableLlmModelDTO::scope)
+                .containsExactlyInAnyOrder(LlmModelScope.SHARED, LlmModelScope.WORKSPACE);
     }
 
     @Test
@@ -258,25 +227,20 @@ class WorkspaceLlmModelControllerIntegrationTest extends AbstractWorkspaceIntegr
         Workspace workspace = setupWorkspace("avail-grant-ws");
         LlmModel grantedElsewhere = seedInstanceModel("gpt-5-granted-upstream", ModelVisibility.GRANTED, true);
         User otherOwner = persistUser("avail-grant-other-owner");
-        Workspace otherWorkspace = createWorkspace(
-            "avail-grant-other-ws",
-            "Other",
-            "avail-grant-other-org",
-            AccountType.ORG,
-            otherOwner
-        );
+        Workspace otherWorkspace =
+                createWorkspace("avail-grant-other-ws", "Other", "avail-grant-other-org", AccountType.ORG, otherOwner);
         saveGrant(grantedElsewhere.getId(), otherWorkspace.getId());
 
         List<AvailableLlmModelDTO> available = webTestClient
-            .get()
-            .uri("/workspaces/{slug}/llm/available-models", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody(new ParameterizedTypeReference<List<AvailableLlmModelDTO>>() {})
-            .returnResult()
-            .getResponseBody();
+                .get()
+                .uri("/workspaces/{slug}/llm/available-models", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(new ParameterizedTypeReference<List<AvailableLlmModelDTO>>() {})
+                .returnResult()
+                .getResponseBody();
 
         assertThat(available).isNotNull();
         assertThat(available).isEmpty();
@@ -290,15 +254,15 @@ class WorkspaceLlmModelControllerIntegrationTest extends AbstractWorkspaceIntegr
         saveGrant(granted.getId(), workspace.getId());
 
         List<AvailableLlmModelDTO> available = webTestClient
-            .get()
-            .uri("/workspaces/{slug}/llm/available-models", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody(new ParameterizedTypeReference<List<AvailableLlmModelDTO>>() {})
-            .returnResult()
-            .getResponseBody();
+                .get()
+                .uri("/workspaces/{slug}/llm/available-models", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(new ParameterizedTypeReference<List<AvailableLlmModelDTO>>() {})
+                .returnResult()
+                .getResponseBody();
 
         assertThat(available).isNotNull();
         assertThat(available).hasSize(1);
@@ -313,27 +277,26 @@ class WorkspaceLlmModelControllerIntegrationTest extends AbstractWorkspaceIntegr
         WorkspaceLlmConnectionDTO connection = createWorkspaceConnection(workspace, "conn-1");
         WorkspaceLlmModelDTO ownModel = createWorkspaceModel(workspace, connection.id(), "own-model");
         webTestClient
-            .patch()
-            .uri("/workspaces/{slug}/llm/models/{id}", workspace.getWorkspaceSlug(), ownModel.id())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(
-                new UpdateWorkspaceLlmModelRequestDTO(null, null, null, null, false, null, null, null, null, null, null)
-            )
-            .exchange()
-            .expectStatus()
-            .isOk();
+                .patch()
+                .uri("/workspaces/{slug}/llm/models/{id}", workspace.getWorkspaceSlug(), ownModel.id())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(new UpdateWorkspaceLlmModelRequestDTO(
+                        null, null, null, null, false, null, null, null, null, null, null))
+                .exchange()
+                .expectStatus()
+                .isOk();
 
         List<AvailableLlmModelDTO> available = webTestClient
-            .get()
-            .uri("/workspaces/{slug}/llm/available-models", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody(new ParameterizedTypeReference<List<AvailableLlmModelDTO>>() {})
-            .returnResult()
-            .getResponseBody();
+                .get()
+                .uri("/workspaces/{slug}/llm/available-models", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(new ParameterizedTypeReference<List<AvailableLlmModelDTO>>() {})
+                .returnResult()
+                .getResponseBody();
 
         assertThat(available).isNotNull();
         assertThat(available).isEmpty();
@@ -348,15 +311,15 @@ class WorkspaceLlmModelControllerIntegrationTest extends AbstractWorkspaceIntegr
         createWorkspaceModel(workspace, connection.id(), "my-model");
 
         String body = webTestClient
-            .get()
-            .uri("/workspaces/{slug}/llm/available-models", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody(String.class)
-            .returnResult()
-            .getResponseBody();
+                .get()
+                .uri("/workspaces/{slug}/llm/available-models", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(String.class)
+                .returnResult()
+                .getResponseBody();
 
         assertThat(body).isNotNull();
         assertThat(body).doesNotContain("upstreamModelId");
@@ -378,40 +341,40 @@ class WorkspaceLlmModelControllerIntegrationTest extends AbstractWorkspaceIntegr
         String slug = workspace.getWorkspaceSlug();
 
         webTestClient
-            .get()
-            .uri("/workspaces/{slug}/llm/models", slug)
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isForbidden();
+                .get()
+                .uri("/workspaces/{slug}/llm/models", slug)
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isForbidden();
 
         webTestClient
-            .get()
-            .uri("/workspaces/{slug}/llm/available-models", slug)
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isForbidden();
+                .get()
+                .uri("/workspaces/{slug}/llm/available-models", slug)
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isForbidden();
 
         webTestClient
-            .post()
-            .uri("/workspaces/{slug}/llm/connections/{connectionId}/models", slug, 1)
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            // A raw map, not the request record: authorization runs before body binding, so the
-            // body only has to be well-formed JSON for the 403 to be the assertion that fails first.
-            .bodyValue(Map.of("displayName", "Member Model", "upstreamModelId", "gpt-5"))
-            .exchange()
-            .expectStatus()
-            .isForbidden();
+                .post()
+                .uri("/workspaces/{slug}/llm/connections/{connectionId}/models", slug, 1)
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                // A raw map, not the request record: authorization runs before body binding, so the
+                // body only has to be well-formed JSON for the 403 to be the assertion that fails first.
+                .bodyValue(Map.of("displayName", "Member Model", "upstreamModelId", "gpt-5"))
+                .exchange()
+                .expectStatus()
+                .isForbidden();
 
         webTestClient
-            .delete()
-            .uri("/workspaces/{slug}/llm/models/{id}", slug, 1)
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isForbidden();
+                .delete()
+                .uri("/workspaces/{slug}/llm/models/{id}", slug, 1)
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isForbidden();
     }
 
     @Test
@@ -424,27 +387,22 @@ class WorkspaceLlmModelControllerIntegrationTest extends AbstractWorkspaceIntegr
         ensureWorkspaceMembership(own, admin, WorkspaceRole.ADMIN);
 
         Workspace other = createWorkspace(
-            "wsmodel-other-ws",
-            "Other",
-            "wsmodel-other-org",
-            AccountType.ORG,
-            persistUser("wsmodel-other-owner")
-        );
+                "wsmodel-other-ws", "Other", "wsmodel-other-org", AccountType.ORG, persistUser("wsmodel-other-owner"));
 
         webTestClient
-            .get()
-            .uri("/workspaces/{slug}/llm/models", other.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isForbidden();
+                .get()
+                .uri("/workspaces/{slug}/llm/models", other.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isForbidden();
 
         webTestClient
-            .get()
-            .uri("/workspaces/{slug}/llm/models", own.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk();
+                .get()
+                .uri("/workspaces/{slug}/llm/models", own.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk();
     }
 }

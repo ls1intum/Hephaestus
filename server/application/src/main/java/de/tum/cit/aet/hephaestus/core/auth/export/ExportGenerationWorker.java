@@ -39,11 +39,10 @@ public class ExportGenerationWorker {
     private final Clock clock;
 
     public ExportGenerationWorker(
-        AccountExportRepository accountExportRepository,
-        ExportBundleAssembler assembler,
-        ObjectMapper objectMapper,
-        Clock clock
-    ) {
+            AccountExportRepository accountExportRepository,
+            ExportBundleAssembler assembler,
+            ObjectMapper objectMapper,
+            Clock clock) {
         this.accountExportRepository = accountExportRepository;
         this.assembler = assembler;
         this.objectMapper = objectMapper;
@@ -58,7 +57,9 @@ public class ExportGenerationWorker {
     @Async
     @Transactional
     public void generate(Long exportId, Long accountId) {
-        AccountExport export = accountExportRepository.findByIdAndAccountId(exportId, accountId).orElse(null);
+        AccountExport export = accountExportRepository
+                .findByIdAndAccountId(exportId, accountId)
+                .orElse(null);
         if (export == null) {
             // Row vanished (e.g. account hard-deleted between request and pickup). Nothing to do.
             log.warn("auth.export: generation skipped, export {} for account {} not found", exportId, accountId);

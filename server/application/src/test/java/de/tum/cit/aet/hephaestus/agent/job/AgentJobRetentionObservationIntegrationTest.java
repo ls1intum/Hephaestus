@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
@@ -43,13 +42,8 @@ class AgentJobRetentionObservationIntegrationTest extends AbstractWorkspaceInteg
     @Transactional
     void keepsAJobThatIsTheOnlyProvenanceForAStoredFinding() {
         var owner = persistUser("retention-owner");
-        Workspace workspace = createWorkspace(
-            "retention-observation",
-            "Retention",
-            "retention-org",
-            AccountType.ORG,
-            owner
-        );
+        Workspace workspace =
+                createWorkspace("retention-observation", "Retention", "retention-org", AccountType.ORG, owner);
         Practice practice = new Practice();
         practice.setAutomatedReviewPolicy(PracticeTestEvidence.pullRequest());
         practice.setWorkspace(workspace);
@@ -65,29 +59,27 @@ class AgentJobRetentionObservationIntegrationTest extends AbstractWorkspaceInteg
         jobRepository.saveAllAndFlush(List.of(referenced, unreferenced));
         UUID findingId = UUID.randomUUID();
         observationRepository.insertIfAbsent(
-            findingId,
-            "retention-" + findingId,
-            referenced.getId(),
-            practice.getId(),
-            null,
-            ArtifactKinds.PULL_REQUEST.value(),
-            7L,
-            owner.getId(),
-            "Stored finding",
-            "ABSENT",
-            "BAD",
-            "MAJOR",
-            "{}",
-            "Reasoning",
-            "retention-locus",
-            Instant.now(),
-            "LIVE"
-        );
+                findingId,
+                "retention-" + findingId,
+                referenced.getId(),
+                referenced.getWorkspace().getId(),
+                practice.getId(),
+                null,
+                ArtifactKinds.PULL_REQUEST.value(),
+                7L,
+                owner.getId(),
+                "Stored finding",
+                "ABSENT",
+                "BAD",
+                "MAJOR",
+                "{}",
+                "Reasoning",
+                "retention-locus",
+                Instant.now(),
+                "LIVE");
 
         int deleted = jobRepository.deleteUnreferencedTerminalRowsOlderThan(
-            Instant.now().minus(Duration.ofDays(90)),
-            100
-        );
+                Instant.now().minus(Duration.ofDays(90)), 100);
 
         assertThat(deleted).isEqualTo(1);
         assertThat(jobRepository.existsById(referenced.getId())).isTrue();

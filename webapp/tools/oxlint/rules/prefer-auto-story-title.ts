@@ -1,5 +1,7 @@
 import { relative } from "node:path";
+
 import { defineRule, type ESTree } from "@oxlint/plugins";
+
 import { propertyName } from "../property.ts";
 
 const STORY_SUFFIX = /\.stories\.[cm]?[jt]sx?$/;

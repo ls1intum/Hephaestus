@@ -1,8 +1,11 @@
-import { afterEach, describe, expect, it } from "bun:test";
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import assert from "node:assert/strict";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { findFiles, grep } from "./grep";
+import { afterEach, describe, it } from "node:test";
+
+import { globFilesSync } from "./files.ts";
+import { findFiles, grep } from "./grep.ts";
 
 const tempDirs: string[] = [];
 
@@ -16,12 +19,12 @@ afterEach(async () => {
 	await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
 });
 
-describe("grep", () => {
-	it("treats fixed-string patterns literally without shell interpretation", async () => {
+void describe("grep", () => {
+	void it("treats fixed-string patterns literally without shell interpretation", async () => {
 		const dir = await createTempDir();
 		const nestedDir = join(dir, "nested dir");
 		await mkdir(nestedDir, { recursive: true });
-		await Bun.write(
+		await writeFile(
 			join(nestedDir, "example.ts"),
 			"const marker = \"literal $(echo nope) 'quotes'\";\n",
 		);
@@ -31,73 +34,84 @@ describe("grep", () => {
 			glob: "**/*.ts",
 		});
 
-		expect(matches).toHaveLength(1);
-		expect(matches[0]?.file).toBe("nested dir/example.ts");
+		assert.equal(matches.length, 1);
+		assert.equal(matches[0]?.file, "nested dir/example.ts");
 	});
 
-	it("enforces maxResults globally across files", async () => {
+	void it("enforces maxResults globally across files", async () => {
 		const dir = await createTempDir();
-		await Bun.write(join(dir, "one.txt"), "needle\nneedle\n");
-		await Bun.write(join(dir, "two.txt"), "needle\nneedle\n");
-		await Bun.write(join(dir, "three.txt"), "needle\nneedle\n");
+		await writeFile(join(dir, "one.txt"), "needle\nneedle\n");
+		await writeFile(join(dir, "two.txt"), "needle\nneedle\n");
+		await writeFile(join(dir, "three.txt"), "needle\nneedle\n");
 
 		const matches = await grep("needle", dir, {
 			fixedString: true,
 			maxResults: 2,
 		});
 
-		expect(matches).toHaveLength(2);
-		expect(matches.every((match) => match.content === "needle")).toBe(true);
+		assert.equal(matches.length, 2);
+		assert.equal(
+			matches.every((match) => match.content === "needle"),
+			true,
+		);
 	});
 
-	it("applies path-aware glob filters instead of basename-only includes", async () => {
+	void it("applies path-aware glob filters instead of basename-only includes", async () => {
 		const dir = await createTempDir();
 		const nestedDir = join(dir, "src", "nested");
 		await mkdir(nestedDir, { recursive: true });
-		await Bun.write(join(nestedDir, "match.ts"), "needle\n");
-		await Bun.write(join(nestedDir, "skip.js"), "needle\n");
+		await writeFile(join(nestedDir, "match.ts"), "needle\n");
+		await writeFile(join(nestedDir, "skip.js"), "needle\n");
 
 		const matches = await grep("needle", dir, {
 			fixedString: true,
 			glob: "src/**/*.ts",
 		});
 
-		expect(matches).toHaveLength(1);
-		expect(matches[0]?.file).toBe("src/nested/match.ts");
+		assert.equal(matches.length, 1);
+		assert.equal(matches[0]?.file, "src/nested/match.ts");
 	});
 
-	it("auto-expands basename-only globs to recursive matching", async () => {
+	void it("auto-expands basename-only globs to recursive matching", async () => {
 		const dir = await createTempDir();
 		await mkdir(join(dir, "src", "Views"), { recursive: true });
-		await Bun.write(join(dir, "src", "Views", "ContentView.swift"), 'print("hello")\n');
-		await Bun.write(join(dir, "RootFile.swift"), 'print("root")\n');
+		await writeFile(join(dir, "src", "Views", "ContentView.swift"), 'print("hello")\n');
+		await writeFile(join(dir, "RootFile.swift"), 'print("root")\n');
 
 		const matches = await grep("print", dir, {
 			fixedString: true,
 			glob: "*.swift",
 		});
 
-		expect(matches).toHaveLength(2);
+		assert.equal(matches.length, 2);
 		const files = matches.map((m) => m.file).toSorted();
-		expect(files).toContain("RootFile.swift");
-		expect(files).toContain("src/Views/ContentView.swift");
+		assert.ok(files.includes("RootFile.swift"));
+		assert.ok(files.includes("src/Views/ContentView.swift"));
 	});
 
-	it("finds extension matches without shelling out and skips ignored paths", async () => {
+	void it("finds extension matches without shelling out and skips ignored paths", async () => {
 		const dir = await createTempDir();
 		await mkdir(join(dir, "src", "nested"), { recursive: true });
 		await mkdir(join(dir, ".hidden"), { recursive: true });
 		await mkdir(join(dir, "node_modules", "pkg"), { recursive: true });
 		await mkdir(join(dir, ".build"), { recursive: true });
 
-		await Bun.write(join(dir, "src", "nested", "match.swift"), "struct Match {}\n");
-		await Bun.write(join(dir, ".hidden", "hidden.swift"), "struct Hidden {}\n");
-		await Bun.write(join(dir, "node_modules", "pkg", "dep.swift"), "struct Dep {}\n");
-		await Bun.write(join(dir, ".build", "generated.swift"), "struct Generated {}\n");
+		await writeFile(join(dir, "src", "nested", "match.swift"), "struct Match {}\n");
+		await writeFile(join(dir, ".hidden", "hidden.swift"), "struct Hidden {}\n");
+		await writeFile(join(dir, "node_modules", "pkg", "dep.swift"), "struct Dep {}\n");
+		await writeFile(join(dir, ".build", "generated.swift"), "struct Generated {}\n");
 
 		const files = findFiles(dir, "swift");
 
-		expect(files).toHaveLength(1);
-		expect(files[0]).toBe(join(dir, "src", "nested", "match.swift"));
+		assert.equal(files.length, 1);
+		assert.equal(files[0], join(dir, "src", "nested", "match.swift"));
+	});
+
+	void it("never returns a directory whose name matches the file pattern", async () => {
+		const dir = await createTempDir();
+		await mkdir(join(dir, "directory.ts"));
+		await writeFile(join(dir, "file.ts"), "export {};\n");
+
+		assert.deepEqual(globFilesSync("*.ts", dir), ["file.ts"]);
 	});
 });

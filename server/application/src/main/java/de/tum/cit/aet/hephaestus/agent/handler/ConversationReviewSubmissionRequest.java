@@ -16,13 +16,13 @@ import org.jspecify.annotations.Nullable;
  * @param lastTs the thread's newest message {@code ts} — the disposable freshness segment
  */
 public record ConversationReviewSubmissionRequest(
-    long slackThreadId,
-    String slackChannelId,
-    @Nullable String slackChannelName,
-    String slackThreadTs,
-    long aboutUserId,
-    String lastTs
-) implements JobSubmissionRequest {
+        long slackThreadId,
+        String slackChannelId,
+        @Nullable String slackChannelName,
+        String slackThreadTs,
+        long aboutUserId,
+        String lastTs)
+        implements JobSubmissionRequest {
     public ConversationReviewSubmissionRequest {
         Objects.requireNonNull(slackChannelId, "slackChannelId must not be null");
         Objects.requireNonNull(slackThreadTs, "slackThreadTs must not be null");

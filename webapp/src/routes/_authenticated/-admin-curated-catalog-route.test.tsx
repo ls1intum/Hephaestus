@@ -2,6 +2,7 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { delay, HttpResponse, http, type PathParams } from "msw";
 import { describe, expect, it, vi } from "vitest";
+
 import type { CuratedPracticeRequest } from "@/api/types.gen";
 import {
 	mockAuthorDeclaredEvidenceValidation,

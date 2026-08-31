@@ -66,12 +66,11 @@ public class ReviewBackfillSubmitter {
     private final SignalRecorder signalRecorder;
 
     public ReviewBackfillSubmitter(
-        AgentJobService agentJobService,
-        PullRequestRepository pullRequestRepository,
-        IssueRepository issueRepository,
-        PracticeReviewDetectionGate detectionGate,
-        SignalRecorder signalRecorder
-    ) {
+            AgentJobService agentJobService,
+            PullRequestRepository pullRequestRepository,
+            IssueRepository issueRepository,
+            PracticeReviewDetectionGate detectionGate,
+            SignalRecorder signalRecorder) {
         this.agentJobService = agentJobService;
         this.pullRequestRepository = pullRequestRepository;
         this.issueRepository = issueRepository;
@@ -82,12 +81,13 @@ public class ReviewBackfillSubmitter {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Outcome offer(ReviewBackfillRun run, long artifactId) {
         return ArtifactKinds.PULL_REQUEST.equals(run.kind())
-            ? offerPullRequest(run, artifactId)
-            : offerIssue(run, artifactId);
+                ? offerPullRequest(run, artifactId)
+                : offerIssue(run, artifactId);
     }
 
     private Outcome offerPullRequest(ReviewBackfillRun run, long artifactId) {
-        PullRequest pr = pullRequestRepository.findByIdWithAllForGate(artifactId).orElse(null);
+        PullRequest pr =
+                pullRequestRepository.findByIdWithAllForGate(artifactId).orElse(null);
         if (pr == null || pr.getHeadRefName() == null || pr.getHeadRefOid() == null || pr.getBaseRefName() == null) {
             // No branch refs means nothing to clone or diff: there was never a reviewable artifact here.
             return Outcome.PASSED;
@@ -106,25 +106,25 @@ public class ReviewBackfillSubmitter {
             }
             case GateDecision.Detect detect -> {
                 agentJobService.submit(
-                    detect.workspace().getId(),
-                    AgentJobType.PULL_REQUEST_REVIEW,
-                    new PullRequestReviewSubmissionRequest(
-                        ScmEventPayload.PullRequestData.from(pr),
-                        pr.getHeadRefName(),
-                        pr.getHeadRefOid(),
-                        pr.getBaseRefName(),
-                        key.get().signalName(),
-                        SignalOrigins.observationOriginOf(run.getDiscoveredVia())
-                    ),
-                    key.get()
-                );
+                        detect.workspace().getId(),
+                        AgentJobType.PULL_REQUEST_REVIEW,
+                        new PullRequestReviewSubmissionRequest(
+                                ScmEventPayload.PullRequestData.from(pr),
+                                pr.getHeadRefName(),
+                                pr.getHeadRefOid(),
+                                pr.getBaseRefName(),
+                                key.get().signalName(),
+                                SignalOrigins.observationOriginOf(run.getDiscoveredVia())),
+                        key.get(),
+                        detect);
                 return Outcome.SUBMITTED;
             }
         }
     }
 
     private Outcome offerIssue(ReviewBackfillRun run, long artifactId) {
-        Issue issue = issueRepository.findByIdWithRepositoryAndAssignees(artifactId).orElse(null);
+        Issue issue =
+                issueRepository.findByIdWithRepositoryAndAssignees(artifactId).orElse(null);
         if (issue == null || issue.getRepository() == null) {
             return Outcome.PASSED;
         }
@@ -142,23 +142,22 @@ public class ReviewBackfillSubmitter {
             }
             case GateDecision.Detect detect -> {
                 agentJobService.submit(
-                    detect.workspace().getId(),
-                    AgentJobType.ISSUE_REVIEW,
-                    new IssueReviewSubmissionRequest(
-                        issue.getId(),
-                        issue.getNumber(),
-                        issue.getRepository().getId(),
-                        issue.getRepository().getNameWithOwner(),
-                        issue.getTitle(),
-                        issue.getBody() != null ? issue.getBody() : "",
-                        issue.getState() != null ? issue.getState().name() : "OPEN",
-                        issue.getHtmlUrl(),
-                        issue.getUpdatedAt(),
-                        key.get().signalName(),
-                        SignalOrigins.observationOriginOf(run.getDiscoveredVia())
-                    ),
-                    key.get()
-                );
+                        detect.workspace().getId(),
+                        AgentJobType.ISSUE_REVIEW,
+                        new IssueReviewSubmissionRequest(
+                                issue.getId(),
+                                issue.getNumber(),
+                                issue.getRepository().getId(),
+                                issue.getRepository().getNameWithOwner(),
+                                issue.getTitle(),
+                                issue.getBody() != null ? issue.getBody() : "",
+                                issue.getState() != null ? issue.getState().name() : "OPEN",
+                                issue.getHtmlUrl(),
+                                issue.getUpdatedAt(),
+                                key.get().signalName(),
+                                SignalOrigins.observationOriginOf(run.getDiscoveredVia())),
+                        key.get(),
+                        detect);
                 return Outcome.SUBMITTED;
             }
         }

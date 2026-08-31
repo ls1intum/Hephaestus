@@ -42,7 +42,7 @@ Adopt option 1 (flat top-level). `server/application-server/` → `server/`.
 - All CI workflow filters, Dockerfile contexts, scripts, and IDE configs needed one-shot updates
   (~80 files; mechanical, no logic change).
 - Docker image names, Compose service names, Traefik labels, and the
-  `generate:api:application-server` pnpm script are intentionally NOT renamed in this epic —
+  `generate:api:application-server` package script are intentionally NOT renamed in this epic —
   they're deploy-side concerns with a rollback story and live in a follow-up issue.
 - The current top-level layout is: `server/`, `webapp/`, `docs/`. The webhook receiver runs from
   the `server/` artifact under the `webhook` Spring profile and ships as a separate

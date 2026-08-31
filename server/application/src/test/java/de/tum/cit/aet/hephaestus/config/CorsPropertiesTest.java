@@ -22,10 +22,8 @@ class CorsPropertiesTest {
     static class TestConfiguration {}
 
     private ApplicationContextRunner contextRunner() {
-        return new ApplicationContextRunner().withUserConfiguration(
-            TestConfiguration.class,
-            ValidationAutoConfiguration.class
-        );
+        return new ApplicationContextRunner()
+                .withUserConfiguration(TestConfiguration.class, ValidationAutoConfiguration.class);
     }
 
     @Nested
@@ -34,47 +32,46 @@ class CorsPropertiesTest {
         @Test
         void singleOrigin_boundCorrectly() {
             contextRunner()
-                .withPropertyValues("hephaestus.cors.allowed-origins[0]=https://example.com")
-                .run(context -> {
-                    assertThat(context).hasNotFailed();
-                    CorsProperties props = context.getBean(CorsProperties.class);
+                    .withPropertyValues("hephaestus.cors.allowed-origins[0]=https://example.com")
+                    .run(context -> {
+                        assertThat(context).hasNotFailed();
+                        CorsProperties props = context.getBean(CorsProperties.class);
 
-                    assertThat(props.allowedOrigins()).containsExactly("https://example.com");
-                });
+                        assertThat(props.allowedOrigins()).containsExactly("https://example.com");
+                    });
         }
 
         @Test
         void multipleOrigins_boundCorrectly() {
             contextRunner()
-                .withPropertyValues(
-                    "hephaestus.cors.allowed-origins[0]=https://app.example.com",
-                    "hephaestus.cors.allowed-origins[1]=https://admin.example.com",
-                    "hephaestus.cors.allowed-origins[2]=http://localhost:4200"
-                )
-                .run(context -> {
-                    assertThat(context).hasNotFailed();
-                    CorsProperties props = context.getBean(CorsProperties.class);
+                    .withPropertyValues(
+                            "hephaestus.cors.allowed-origins[0]=https://app.example.com",
+                            "hephaestus.cors.allowed-origins[1]=https://admin.example.com",
+                            "hephaestus.cors.allowed-origins[2]=http://localhost:4200")
+                    .run(context -> {
+                        assertThat(context).hasNotFailed();
+                        CorsProperties props = context.getBean(CorsProperties.class);
 
-                    assertThat(props.allowedOrigins()).containsExactly(
-                        "https://app.example.com",
-                        "https://admin.example.com",
-                        "http://localhost:4200"
-                    );
-                });
+                        assertThat(props.allowedOrigins())
+                                .containsExactly(
+                                        "https://app.example.com",
+                                        "https://admin.example.com",
+                                        "http://localhost:4200");
+                    });
         }
 
         @Test
         @DisplayName("should handle environment variable placeholders in origins")
         void environmentVariablePlaceholder_resolvedCorrectly() {
             contextRunner()
-                .withSystemProperties("TEST_ORIGIN=https://resolved.example.com")
-                .withPropertyValues("hephaestus.cors.allowed-origins[0]=${TEST_ORIGIN}")
-                .run(context -> {
-                    assertThat(context).hasNotFailed();
-                    CorsProperties props = context.getBean(CorsProperties.class);
+                    .withSystemProperties("TEST_ORIGIN=https://resolved.example.com")
+                    .withPropertyValues("hephaestus.cors.allowed-origins[0]=${TEST_ORIGIN}")
+                    .run(context -> {
+                        assertThat(context).hasNotFailed();
+                        CorsProperties props = context.getBean(CorsProperties.class);
 
-                    assertThat(props.allowedOrigins()).containsExactly("https://resolved.example.com");
-                });
+                        assertThat(props.allowedOrigins()).containsExactly("https://resolved.example.com");
+                    });
         }
     }
 
@@ -89,8 +86,8 @@ class CorsPropertiesTest {
         @Test
         void explicitlyEmptyList_validationFails() {
             contextRunner()
-                .withPropertyValues("hephaestus.cors.allowed-origins=")
-                .run(context -> assertThat(context).hasFailed());
+                    .withPropertyValues("hephaestus.cors.allowed-origins=")
+                    .run(context -> assertThat(context).hasFailed());
         }
     }
 }

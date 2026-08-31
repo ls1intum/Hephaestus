@@ -47,22 +47,20 @@ public class GitHubProjectItemMessageHandler extends AbstractIntegrationMessageH
     private final SyncSchedulerProperties syncSchedulerProperties;
 
     GitHubProjectItemMessageHandler(
-        GitHubProjectItemProcessor itemProcessor,
-        ProjectRepository projectRepository,
-        ProjectItemRepository projectItemRepository,
-        ScopeIdResolver scopeIdResolver,
-        IdentityProviderRepository gitProviderRepository,
-        SyncSchedulerProperties syncSchedulerProperties,
-        NatsMessageDeserializer deserializer,
-        TransactionTemplate transactionTemplate
-    ) {
+            GitHubProjectItemProcessor itemProcessor,
+            ProjectRepository projectRepository,
+            ProjectItemRepository projectItemRepository,
+            ScopeIdResolver scopeIdResolver,
+            IdentityProviderRepository gitProviderRepository,
+            SyncSchedulerProperties syncSchedulerProperties,
+            NatsMessageDeserializer deserializer,
+            TransactionTemplate transactionTemplate) {
         super(
-            IntegrationKind.GITHUB,
-            "organization." + GitHubEventType.PROJECTS_V2_ITEM.getValue(),
-            GitHubProjectItemEventDTO.class,
-            deserializer,
-            transactionTemplate
-        );
+                IntegrationKind.GITHUB,
+                "organization." + GitHubEventType.PROJECTS_V2_ITEM.getValue(),
+                GitHubProjectItemEventDTO.class,
+                deserializer,
+                transactionTemplate);
         this.itemProcessor = itemProcessor;
         this.projectRepository = projectRepository;
         this.projectItemRepository = projectItemRepository;
@@ -93,27 +91,25 @@ public class GitHubProjectItemMessageHandler extends AbstractIntegrationMessageH
         String ownerIdentifier = event.getOwnerIdentifier();
 
         log.debug(
-            "Received projects_v2_item event: action={}, itemNodeId={}, ownerType={}, owner={}",
-            event.action(),
-            itemDto.nodeId() != null ? sanitizeForLog(itemDto.nodeId()) : "unknown",
-            ownerType,
-            ownerIdentifier != null ? sanitizeForLog(ownerIdentifier) : "unknown"
-        );
+                "Received projects_v2_item event: action={}, itemNodeId={}, ownerType={}, owner={}",
+                event.action(),
+                itemDto.nodeId() != null ? sanitizeForLog(itemDto.nodeId()) : "unknown",
+                ownerType,
+                ownerIdentifier != null ? sanitizeForLog(ownerIdentifier) : "unknown");
 
         // Resolve scope based on owner type
         Long scopeId = resolveScopeId(event, ownerType);
         if (scopeId == null) {
             log.debug(
-                "Skipped projects_v2_item event: reason=noAssociatedScope, ownerType={}, owner={}",
-                ownerType,
-                sanitizeForLog(ownerIdentifier)
-            );
+                    "Skipped projects_v2_item event: reason=noAssociatedScope, ownerType={}, owner={}",
+                    ownerType,
+                    sanitizeForLog(ownerIdentifier));
             return;
         }
 
         IdentityProvider gitHubProvider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-            .orElseThrow(() -> new IllegalStateException("GitHub provider not configured"));
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseThrow(() -> new IllegalStateException("GitHub provider not configured"));
         ProcessingContext context = ProcessingContext.forWebhook(scopeId, gitHubProvider, event.action());
 
         // Extract the actor (sender) ID from the webhook event
@@ -132,12 +128,10 @@ public class GitHubProjectItemMessageHandler extends AbstractIntegrationMessageH
                 String projNodeId = itemDto.projectNodeId();
                 if (itemNodeId != null && projNodeId != null) {
                     projectRepository
-                        .findByNodeId(projNodeId)
-                        .ifPresent(project ->
-                            projectItemRepository
-                                .findByProjectIdAndNodeId(project.getId(), itemNodeId)
-                                .ifPresent(item -> itemProcessor.delete(item.getId(), project.getId(), context))
-                        );
+                            .findByNodeId(projNodeId)
+                            .ifPresent(project -> projectItemRepository
+                                    .findByProjectIdAndNodeId(project.getId(), itemNodeId)
+                                    .ifPresent(item -> itemProcessor.delete(item.getId(), project.getId(), context)));
                 }
             }
             case ARCHIVED -> {
@@ -199,9 +193,8 @@ public class GitHubProjectItemMessageHandler extends AbstractIntegrationMessageH
         String projectNodeId = itemDto.projectNodeId();
         if (projectNodeId == null || projectNodeId.isBlank()) {
             log.debug(
-                "Cannot find project for item: reason=missingProjectNodeId, itemNodeId={}",
-                sanitizeForLog(itemDto.nodeId())
-            );
+                    "Cannot find project for item: reason=missingProjectNodeId, itemNodeId={}",
+                    sanitizeForLog(itemDto.nodeId()));
             return null;
         }
 
@@ -226,14 +219,16 @@ public class GitHubProjectItemMessageHandler extends AbstractIntegrationMessageH
     private @Nullable Long resolveScopeId(GitHubProjectItemEventDTO event, Project.OwnerType ownerType) {
         return switch (ownerType) {
             case ORGANIZATION -> {
-                String orgLogin = event.organization() != null ? event.organization().login() : null;
+                String orgLogin =
+                        event.organization() != null ? event.organization().login() : null;
                 if (orgLogin == null) {
                     yield null;
                 }
                 yield scopeIdResolver.findScopeIdByOrgLogin(orgLogin).orElse(null);
             }
             case REPOSITORY -> {
-                String repoFullName = event.repository() != null ? event.repository().fullName() : null;
+                String repoFullName =
+                        event.repository() != null ? event.repository().fullName() : null;
                 if (repoFullName == null) {
                     yield null;
                 }
@@ -243,9 +238,8 @@ public class GitHubProjectItemMessageHandler extends AbstractIntegrationMessageH
                 // User-level projects are not associated with a monitored workspace
                 // Log at info level since this is a known limitation
                 log.info(
-                    "User-owned project item detected - not currently supported: sender={}",
-                    event.sender() != null ? sanitizeForLog(event.sender().login()) : "unknown"
-                );
+                        "User-owned project item detected - not currently supported: sender={}",
+                        event.sender() != null ? sanitizeForLog(event.sender().login()) : "unknown");
                 yield null;
             }
         };

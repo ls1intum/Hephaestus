@@ -1,6 +1,7 @@
 import { onlineManager } from "@tanstack/react-query";
 import { RssIcon, WifiOffIcon } from "lucide-react";
 import { useSyncExternalStore } from "react";
+
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useLivePushUnavailable } from "@/hooks/use-sync-liveness";
 

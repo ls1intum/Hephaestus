@@ -31,10 +31,10 @@ import org.jspecify.annotations.Nullable;
 final class ConfigAuditSnapshotMapper {
 
     private static final ObjectMapper MAPPER = JsonMapper.builder()
-        .addModule(new JavaTimeModule())
-        .serializationInclusion(JsonInclude.Include.ALWAYS)
-        .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
-        .build();
+            .addModule(new JavaTimeModule())
+            .serializationInclusion(JsonInclude.Include.ALWAYS)
+            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+            .build();
 
     private ConfigAuditSnapshotMapper() {}
 

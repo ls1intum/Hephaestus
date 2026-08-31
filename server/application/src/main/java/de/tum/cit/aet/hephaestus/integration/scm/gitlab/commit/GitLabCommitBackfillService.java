@@ -69,9 +69,8 @@ public class GitLabCommitBackfillService {
      * to tolerate both {@code Co-authored-by:} and {@code Co-Authored-By:} variants
      * that different clients emit.
      */
-    private static final Pattern CO_AUTHORED_BY_PATTERN = Pattern.compile(
-        "(?im)^\\s*co-authored-by:\\s*([^<]+?)\\s*<([^>]+)>\\s*$"
-    );
+    private static final Pattern CO_AUTHORED_BY_PATTERN =
+            Pattern.compile("(?im)^\\s*co-authored-by:\\s*([^<]+?)\\s*<([^>]+)>\\s*$");
 
     private final GitRepositoryManager gitRepositoryManager;
     private final GitLabTokenService tokenService;
@@ -82,14 +81,13 @@ public class GitLabCommitBackfillService {
     private final TransactionTemplate transactionTemplate;
 
     public GitLabCommitBackfillService(
-        GitRepositoryManager gitRepositoryManager,
-        GitLabTokenService tokenService,
-        CommitRepository commitRepository,
-        CommitContributorRepository contributorRepository,
-        CommitAuthorResolver authorResolver,
-        ApplicationEventPublisher eventPublisher,
-        TransactionTemplate transactionTemplate
-    ) {
+            GitRepositoryManager gitRepositoryManager,
+            GitLabTokenService tokenService,
+            CommitRepository commitRepository,
+            CommitContributorRepository contributorRepository,
+            CommitAuthorResolver authorResolver,
+            ApplicationEventPublisher eventPublisher,
+            TransactionTemplate transactionTemplate) {
         this.gitRepositoryManager = gitRepositoryManager;
         this.tokenService = tokenService;
         this.commitRepository = commitRepository;
@@ -119,10 +117,9 @@ public class GitLabCommitBackfillService {
             // because the JGit path returned completed(0), so the REST fallback was never
             // reached.
             log.warn(
-                "Skipped JGit commit backfill: reason=gitDisabled, repoId={}, repoName={} — caller should fall through to REST commit sync",
-                repository.getId(),
-                sanitizeForLog(repository.getNameWithOwner())
-            );
+                    "Skipped JGit commit backfill: reason=gitDisabled, repoId={}, repoName={} — caller should fall through to REST commit sync",
+                    repository.getId(),
+                    sanitizeForLog(repository.getNameWithOwner()));
             return SyncResult.abortedError(0);
         }
 
@@ -146,11 +143,10 @@ public class GitLabCommitBackfillService {
             String headSha = gitRepositoryManager.resolveDefaultBranchHead(repoId, defaultBranch);
             if (headSha == null) {
                 log.warn(
-                    "Skipped commit backfill: reason=cannotResolveHead, repoId={}, repoName={}, branch={}",
-                    repoId,
-                    repoName,
-                    defaultBranch
-                );
+                        "Skipped commit backfill: reason=cannotResolveHead, repoId={}, repoName={}, branch={}",
+                        repoId,
+                        repoName,
+                        defaultBranch);
                 return SyncResult.completed(0);
             }
 
@@ -158,11 +154,10 @@ public class GitLabCommitBackfillService {
             String fromSha = findLatestKnownSha(repoId);
             if (fromSha != null && fromSha.equals(headSha)) {
                 log.debug(
-                    "Skipped commit backfill: reason=alreadyUpToDate, repoId={}, repoName={}, headSha={}",
-                    repoId,
-                    repoName,
-                    abbreviateSha(headSha)
-                );
+                        "Skipped commit backfill: reason=alreadyUpToDate, repoId={}, repoName={}, headSha={}",
+                        repoId,
+                        repoName,
+                        abbreviateSha(headSha));
                 return SyncResult.completed(0);
             }
 
@@ -178,9 +173,8 @@ public class GitLabCommitBackfillService {
             // Phase 5: Process commits (with batch limit)
             int total = commitInfos.size();
             boolean truncated = total > MAX_COMMITS_PER_CYCLE;
-            List<GitRepositoryManager.CommitInfo> batch = truncated
-                ? commitInfos.subList(0, MAX_COMMITS_PER_CYCLE)
-                : commitInfos;
+            List<GitRepositoryManager.CommitInfo> batch =
+                    truncated ? commitInfos.subList(0, MAX_COMMITS_PER_CYCLE) : commitInfos;
 
             int processed = 0;
             for (GitRepositoryManager.CommitInfo info : batch) {
@@ -191,32 +185,29 @@ public class GitLabCommitBackfillService {
 
             if (truncated) {
                 log.info(
-                    "Commit backfill batch limit reached: repoId={}, repoName={}, processed={}, total={}, remaining={}",
-                    repoId,
-                    repoName,
-                    processed,
-                    total,
-                    total - MAX_COMMITS_PER_CYCLE
-                );
+                        "Commit backfill batch limit reached: repoId={}, repoName={}, processed={}, total={}, remaining={}",
+                        repoId,
+                        repoName,
+                        processed,
+                        total,
+                        total - MAX_COMMITS_PER_CYCLE);
             } else if (processed > 0) {
                 log.info(
-                    "Completed commit backfill: repoId={}, repoName={}, newCommits={}, totalWalked={}, mode={}, scope=all-branches",
-                    repoId,
-                    repoName,
-                    processed,
-                    total,
-                    fromSha != null ? "incremental" : "full"
-                );
+                        "Completed commit backfill: repoId={}, repoName={}, newCommits={}, totalWalked={}, mode={}, scope=all-branches",
+                        repoId,
+                        repoName,
+                        processed,
+                        total,
+                        fromSha != null ? "incremental" : "full");
             }
 
             return SyncResult.completed(processed);
         } catch (GitRepositoryManager.GitOperationException e) {
             log.error(
-                "Commit backfill failed (git operation): repoId={}, repoName={}, error={}",
-                repoId,
-                repoName,
-                e.getMessage()
-            );
+                    "Commit backfill failed (git operation): repoId={}, repoName={}, error={}",
+                    repoId,
+                    repoName,
+                    e.getMessage());
             return SyncResult.abortedError(0);
         } catch (Exception e) {
             log.error("Commit backfill failed: repoId={}, repoName={}, error={}", repoId, repoName, e.getMessage(), e);
@@ -226,23 +217,23 @@ public class GitLabCommitBackfillService {
 
     @Nullable
     private String findLatestKnownSha(Long repositoryId) {
-        return commitRepository.findLatestByRepositoryId(repositoryId).map(Commit::getSha).orElse(null);
+        return commitRepository
+                .findLatestByRepositoryId(repositoryId)
+                .map(Commit::getSha)
+                .orElse(null);
     }
 
     private boolean processCommitInfo(
-        GitRepositoryManager.CommitInfo info,
-        Repository repository,
-        Long scopeId,
-        String serverUrl
-    ) {
+            GitRepositoryManager.CommitInfo info, Repository repository, Long scopeId, String serverUrl) {
         Boolean result = transactionTemplate.execute(status -> {
             if (commitRepository.existsByShaAndRepositoryId(info.sha(), repository.getId())) {
                 return false;
             }
 
             Long providerId = Objects.requireNonNull(
-                repository.getProvider() != null ? Objects.requireNonNull(repository.getProvider().getId()) : null
-            );
+                    repository.getProvider() != null
+                            ? Objects.requireNonNull(repository.getProvider().getId())
+                            : null);
             Long authorId = authorResolver.resolveAndBackfillByEmail(info.authorEmail(), providerId);
             Long committerId = authorResolver.resolveAndBackfillByEmail(info.committerEmail(), providerId);
 
@@ -250,22 +241,21 @@ public class GitLabCommitBackfillService {
             String htmlUrl = CommitUtils.buildGitLabCommitUrl(serverUrl, repository.getNameWithOwner(), info.sha());
 
             commitRepository.upsertCommit(
-                info.sha(),
-                message,
-                info.messageBody(),
-                htmlUrl,
-                info.authoredAt(),
-                info.committedAt(),
-                info.additions(),
-                info.deletions(),
-                info.changedFiles(),
-                Instant.now(),
-                repository.getId(),
-                authorId,
-                committerId,
-                info.authorEmail(),
-                info.committerEmail()
-            );
+                    info.sha(),
+                    message,
+                    info.messageBody(),
+                    htmlUrl,
+                    info.authoredAt(),
+                    info.committedAt(),
+                    info.additions(),
+                    info.deletions(),
+                    info.changedFiles(),
+                    Instant.now(),
+                    repository.getId(),
+                    authorId,
+                    committerId,
+                    info.authorEmail(),
+                    info.committerEmail());
 
             // Persist parent topology from the local clone walk. The REST-first
             // path in GitLabCommitSyncService also sets these via the
@@ -273,18 +263,16 @@ public class GitLabCommitBackfillService {
             // runs first wins and subsequent runs are COALESCE-idempotent.
             if (info.parentShas() != null && !info.parentShas().isEmpty()) {
                 commitRepository.updateParentMetadataBySha(
-                    repository.getId(),
-                    info.sha(),
-                    info.parentShas().size(),
-                    String.join(",", info.parentShas())
-                );
+                        repository.getId(), info.sha(), info.parentShas().size(), String.join(",", info.parentShas()));
             } else if (info.parentShas() != null) {
                 // Root commit (parent_count = 0). Write the count so downstream
                 // queries can distinguish "populated=0 parents" from "unpopulated".
                 commitRepository.updateParentMetadataBySha(repository.getId(), info.sha(), 0, null);
             }
 
-            Commit commit = commitRepository.findByShaAndRepositoryId(info.sha(), repository.getId()).orElse(null);
+            Commit commit = commitRepository
+                    .findByShaAndRepositoryId(info.sha(), repository.getId())
+                    .orElse(null);
             if (commit == null) {
                 // Upsert just ran — this should never happen. Defensive: skip downstream writes.
                 return true;
@@ -327,32 +315,24 @@ public class GitLabCommitBackfillService {
      * </ul>
      */
     private void upsertContributors(
-        Long commitId,
-        GitRepositoryManager.CommitInfo info,
-        @Nullable Long authorId,
-        @Nullable Long committerId,
-        @Nullable Long providerId
-    ) {
+            Long commitId,
+            GitRepositoryManager.CommitInfo info,
+            @Nullable Long authorId,
+            @Nullable Long committerId,
+            @Nullable Long providerId) {
         if (info.authorEmail() != null && !info.authorEmail().isBlank()) {
             contributorRepository.upsertContributor(
-                commitId,
-                authorId,
-                CommitContributor.Role.AUTHOR.name(),
-                info.authorName(),
-                info.authorEmail(),
-                0
-            );
+                    commitId, authorId, CommitContributor.Role.AUTHOR.name(), info.authorName(), info.authorEmail(), 0);
         }
 
         if (info.committerEmail() != null && !info.committerEmail().isBlank()) {
             contributorRepository.upsertContributor(
-                commitId,
-                committerId,
-                CommitContributor.Role.COMMITTER.name(),
-                info.committerName(),
-                info.committerEmail(),
-                0
-            );
+                    commitId,
+                    committerId,
+                    CommitContributor.Role.COMMITTER.name(),
+                    info.committerName(),
+                    info.committerEmail(),
+                    0);
         }
 
         List<CoAuthor> coAuthors = parseCoAuthors(info.messageBody(), info.authorEmail());
@@ -360,13 +340,7 @@ public class GitLabCommitBackfillService {
             CoAuthor ca = coAuthors.get(i);
             Long coAuthorUserId = authorResolver.resolveAndBackfillByEmail(ca.email(), providerId);
             contributorRepository.upsertContributor(
-                commitId,
-                coAuthorUserId,
-                CommitContributor.Role.CO_AUTHOR.name(),
-                ca.name(),
-                ca.email(),
-                i + 1
-            );
+                    commitId, coAuthorUserId, CommitContributor.Role.CO_AUTHOR.name(), ca.name(), ca.email(), i + 1);
         }
     }
 
@@ -408,15 +382,14 @@ public class GitLabCommitBackfillService {
     private void publishCommitCreated(Commit commit, Repository repository, Long scopeId) {
         ScmEventPayload.CommitData commitData = ScmEventPayload.CommitData.from(commit);
         EventContext context = new EventContext(
-            UUID.randomUUID(),
-            Instant.now(),
-            scopeId,
-            Objects.requireNonNull(RepositoryRef.from(repository)),
-            DataSource.GRAPHQL_SYNC,
-            null,
-            UUID.randomUUID().toString(),
-            IdentityProviderType.GITLAB
-        );
+                UUID.randomUUID(),
+                Instant.now(),
+                scopeId,
+                Objects.requireNonNull(RepositoryRef.from(repository)),
+                DataSource.GRAPHQL_SYNC,
+                null,
+                UUID.randomUUID().toString(),
+                IdentityProviderType.GITLAB);
 
         eventPublisher.publishEvent(new ScmDomainEvent.CommitCreated(commitData, context));
     }

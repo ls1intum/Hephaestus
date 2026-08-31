@@ -19,24 +19,21 @@ import org.springframework.stereotype.Repository;
  */
 @Repository
 @WorkspaceAgnostic(
-    "Account is the Hephaestus-native principal; it spans workspaces (membership lives on WorkspaceMembership)"
-)
+        "Account is the Hephaestus-native principal; it spans workspaces (membership lives on WorkspaceMembership)")
 public interface AccountRepository extends JpaRepository<Account, Long> {
     /**
      * Ids of accounts whose GDPR soft-delete cooldown has elapsed: {@code status = DELETING} and
      * {@code deleted_at} strictly older than {@code cutoff}, oldest first. Paged so a large erasure
      * backlog is purged one bounded page at a time. Backs {@code AccountHardDeleteSweeper}.
      */
-    @Query(
-        """
+    @Query("""
         SELECT a.id
           FROM Account a
          WHERE a.status = de.tum.cit.aet.hephaestus.core.auth.domain.Account.Status.DELETING
            AND a.deletedAt IS NOT NULL
            AND a.deletedAt < :cutoff
          ORDER BY a.deletedAt
-        """
-    )
+        """)
     List<Long> findDeletingPastCooldown(@Param("cutoff") Instant cutoff, Pageable pageable);
 
     /**
@@ -45,6 +42,10 @@ public interface AccountRepository extends JpaRepository<Account, Long> {
      * email is forensic-only).
      */
     Optional<Account> findByPrimaryEmail(String primaryEmail);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT a FROM Account a WHERE a.id = :id")
+    Optional<Account> findByIdForUpdate(@Param("id") Long id);
 
     /**
      * Usable (ACTIVE) accounts in the given role, write-locked for the surrounding transaction. Backs
@@ -56,9 +57,7 @@ public interface AccountRepository extends JpaRepository<Account, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT a FROM Account a WHERE a.appRole = :role AND a.status = :status")
     List<Account> findByAppRoleAndStatusForUpdate(
-        @Param("role") Account.AppRole role,
-        @Param("status") Account.Status status
-    );
+            @Param("role") Account.AppRole role, @Param("status") Account.Status status);
 
     /**
      * Break-glass first-admin promotion (backs {@code POST /auth/bootstrap-admin}). Promotes the
@@ -76,8 +75,7 @@ public interface AccountRepository extends JpaRepository<Account, Long> {
      * hard single-winner gate.
      */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query(
-        """
+    @Query("""
         UPDATE Account a
            SET a.appRole = de.tum.cit.aet.hephaestus.core.auth.domain.Account.AppRole.APP_ADMIN
          WHERE a.id = :id
@@ -87,7 +85,6 @@ public interface AccountRepository extends JpaRepository<Account, Long> {
                 WHERE b.appRole = de.tum.cit.aet.hephaestus.core.auth.domain.Account.AppRole.APP_ADMIN
                   AND b.status = de.tum.cit.aet.hephaestus.core.auth.domain.Account.Status.ACTIVE
            )
-        """
-    )
+        """)
     int promoteToFirstAdminIfNoneExists(@Param("id") Long id);
 }

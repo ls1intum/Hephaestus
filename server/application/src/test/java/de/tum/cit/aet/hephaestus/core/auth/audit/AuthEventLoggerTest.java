@@ -21,13 +21,16 @@ class AuthEventLoggerTest extends BaseUnitTest {
     @Test
     void recordAbsorbsWriterFailureSoTheCallerTransactionSurvives() {
         AuthEventWriter writer = mock(AuthEventWriter.class);
-        doThrow(new UnexpectedRollbackException("inner audit tx was rolled back")).when(writer).write(any());
+        doThrow(new UnexpectedRollbackException("inner audit tx was rolled back"))
+                .when(writer)
+                .write(any());
 
         AuthEventLogger logger = new AuthEventLogger(writer);
 
-        assertThatCode(() ->
-            logger.event(AuthEvent.EventType.IDENTITY_UNLINKED, AuthEvent.Result.SUCCESS).account(1L).record()
-        ).doesNotThrowAnyException();
+        assertThatCode(() -> logger.event(AuthEvent.EventType.IDENTITY_UNLINKED, AuthEvent.Result.SUCCESS)
+                        .account(1L)
+                        .record())
+                .doesNotThrowAnyException();
 
         verify(writer).write(any());
     }

@@ -47,21 +47,17 @@ public class GitlabSummaryChannel implements SummaryChannel {
      * — duplicated, not shared, so this adapter is safe on its own regardless of the agent layer.
      */
     static final Pattern GITLAB_SLASH_COMMAND = Pattern.compile(
-        "^(\\s*/(?:approve|merge|close|reopen|assign|unassign|label|unlabel|lock|unlock|" +
-            "milestone|estimate|spend|award|subscribe|unsubscribe|todo|done|wip|draft|ready|" +
-            "due|remove_due_date|weight|epic|copy_metadata|move|confidential|shrug|tableflip)\\b)",
-        Pattern.CASE_INSENSITIVE | Pattern.MULTILINE
-    );
+            "^(\\s*/(?:approve|merge|close|reopen|assign|unassign|label|unlabel|lock|unlock|"
+                    + "milestone|estimate|spend|award|subscribe|unsubscribe|todo|done|wip|draft|ready|"
+                    + "due|remove_due_date|weight|epic|copy_metadata|move|confidential|shrug|tableflip)\\b)",
+            Pattern.CASE_INSENSITIVE | Pattern.MULTILINE);
 
     private final GitLabGraphQlClientProvider gitLabProvider;
     private final GitlabMrResolver mrResolver;
     private final OutboundEgressGuard egressGuard;
 
     public GitlabSummaryChannel(
-        GitLabGraphQlClientProvider gitLabProvider,
-        GitlabMrResolver mrResolver,
-        OutboundEgressGuard egressGuard
-    ) {
+            GitLabGraphQlClientProvider gitLabProvider, GitlabMrResolver mrResolver, OutboundEgressGuard egressGuard) {
         this.gitLabProvider = gitLabProvider;
         this.mrResolver = mrResolver;
         this.egressGuard = egressGuard;
@@ -85,8 +81,7 @@ public class GitlabSummaryChannel implements SummaryChannel {
         long scopeId = target.ref().workspaceId();
         if (gitLabProvider.isRateLimitCritical(scopeId)) {
             throw new FeedbackDeliveryException(
-                "GitLab rate limit critical — skipping summary post for scope " + scopeId
-            );
+                    "GitLab rate limit critical — skipping summary post for scope " + scopeId);
         }
 
         // The subject is a merge request ("path!iid") or an issue ("path#iid"); both post via the same
@@ -98,20 +93,21 @@ public class GitlabSummaryChannel implements SummaryChannel {
             noteableGid = mrResolver.resolveIssueGid(scopeId, issue.projectPath(), issue.iid());
         } else {
             MrCoordinates mr = GitlabMrResolver.parseSubjectExternalId(subject);
-            noteableGid = mrResolver.resolve(scopeId, mr.projectPath(), mr.iid()).globalId();
+            noteableGid =
+                    mrResolver.resolve(scopeId, mr.projectPath(), mr.iid()).globalId();
         }
-        String body = escapeSlashCommands(content.body());
+        String body = escapeSlashCommands(content.externalBody());
 
         ClientGraphQlResponse response;
         try {
             egressGuard.requireDeliveryAllowed("gitlab.post-summary");
             response = gitLabProvider
-                .forScope(scopeId)
-                .documentName("CreateMergeRequestNote")
-                .variable("noteableId", noteableGid)
-                .variable("body", body)
-                .execute()
-                .block(GRAPHQL_TIMEOUT);
+                    .forScope(scopeId)
+                    .documentName("CreateMergeRequestNote")
+                    .variable("noteableId", noteableGid)
+                    .variable("body", body)
+                    .execute()
+                    .block(GRAPHQL_TIMEOUT);
         } catch (OutboundEgressSuppressedException e) {
             throw e;
         } catch (RuntimeException e) {
@@ -126,22 +122,22 @@ public class GitlabSummaryChannel implements SummaryChannel {
 
         // Surface TOP-LEVEL GraphQL errors with their real reason — createNote returns no payload at all when
         // the instance is read-only, the gid is unresolvable, or permission is denied.
-        List<String> topLevelErrors = Objects.requireNonNull(response)
-            .getErrors()
-            .stream()
-            .map(e -> e.getMessage())
-            .filter(Objects::nonNull)
-            .toList();
+        List<String> topLevelErrors = Objects.requireNonNull(response).getErrors().stream()
+                .map(e -> e.getMessage())
+                .filter(Objects::nonNull)
+                .toList();
         if (!topLevelErrors.isEmpty()) {
             throw new FeedbackDeliveryException("GitLab createNote failed: " + topLevelErrors);
         }
 
-        List<String> mutationErrors = Objects.requireNonNull(response).field("createNote.errors").getValue();
+        List<String> mutationErrors =
+                Objects.requireNonNull(response).field("createNote.errors").getValue();
         if (mutationErrors != null && !mutationErrors.isEmpty()) {
             throw new FeedbackDeliveryException("GitLab createNote failed: " + mutationErrors);
         }
 
-        String noteId = Objects.requireNonNull(response).field("createNote.note.id").getValue();
+        String noteId =
+                Objects.requireNonNull(response).field("createNote.note.id").getValue();
         if (noteId == null) {
             throw new FeedbackDeliveryException("No note ID in createNote response");
         }
@@ -166,18 +162,18 @@ public class GitlabSummaryChannel implements SummaryChannel {
         if (gitLabProvider.isRateLimitCritical(scopeId)) {
             return UpdateOutcome.transientFailure("GitLab rate limit critical for scope " + scopeId);
         }
-        String body = escapeSlashCommands(content.body());
+        String body = escapeSlashCommands(content.externalBody());
 
         ClientGraphQlResponse response;
         try {
             egressGuard.requireDeliveryAllowed("gitlab.update-summary");
             response = gitLabProvider
-                .forScope(scopeId)
-                .documentName("UpdateNote")
-                .variable("id", externalId)
-                .variable("body", body)
-                .execute()
-                .block(GRAPHQL_TIMEOUT);
+                    .forScope(scopeId)
+                    .documentName("UpdateNote")
+                    .variable("id", externalId)
+                    .variable("body", body)
+                    .execute()
+                    .block(GRAPHQL_TIMEOUT);
         } catch (OutboundEgressSuppressedException e) {
             throw e;
         } catch (RuntimeException e) {
@@ -191,26 +187,26 @@ public class GitlabSummaryChannel implements SummaryChannel {
         // A DELETED note surfaces as a TOP-LEVEL GraphQL error (the global id resolves to nothing), NOT a
         // mutation-payload error — GitLab returns no `updateNote` object at all. Left unchecked, that falls
         // through to the no-id branch below and is mis-read as TRANSIENT, so an orphaned summary never re-posts.
-        List<String> topLevelErrors = Objects.requireNonNull(response)
-            .getErrors()
-            .stream()
-            .map(e -> e.getMessage())
-            .filter(Objects::nonNull)
-            .toList();
+        List<String> topLevelErrors = Objects.requireNonNull(response).getErrors().stream()
+                .map(e -> e.getMessage())
+                .filter(Objects::nonNull)
+                .toList();
         if (!topLevelErrors.isEmpty()) {
             return looksGone(topLevelErrors)
-                ? UpdateOutcome.gone("GitLab updateNote (top-level): " + topLevelErrors)
-                : UpdateOutcome.transientFailure("GitLab updateNote top-level errors: " + topLevelErrors);
+                    ? UpdateOutcome.gone("GitLab updateNote (top-level): " + topLevelErrors)
+                    : UpdateOutcome.transientFailure("GitLab updateNote top-level errors: " + topLevelErrors);
         }
 
-        List<String> mutationErrors = Objects.requireNonNull(response).field("updateNote.errors").getValue();
+        List<String> mutationErrors =
+                Objects.requireNonNull(response).field("updateNote.errors").getValue();
         if (mutationErrors != null && !mutationErrors.isEmpty()) {
             return looksGone(mutationErrors)
-                ? UpdateOutcome.gone("GitLab updateNote: " + mutationErrors)
-                : UpdateOutcome.transientFailure("GitLab updateNote failed: " + mutationErrors);
+                    ? UpdateOutcome.gone("GitLab updateNote: " + mutationErrors)
+                    : UpdateOutcome.transientFailure("GitLab updateNote failed: " + mutationErrors);
         }
 
-        String noteId = Objects.requireNonNull(response).field("updateNote.note.id").getValue();
+        String noteId =
+                Objects.requireNonNull(response).field("updateNote.note.id").getValue();
         if (noteId == null) {
             // The mutation neither confirmed gone nor returned an id — treat as transient, don't double-post.
             return UpdateOutcome.transientFailure("No note id in updateNote response");
@@ -260,21 +256,22 @@ public class GitlabSummaryChannel implements SummaryChannel {
         for (int page = 0; page < EXISTING_SUMMARY_SEARCH_PAGE_BUDGET; page++) {
             try {
                 ClientGraphQlResponse response = gitLabProvider
-                    .forScope(scopeId)
-                    .documentName(documentName)
-                    .variable("fullPath", coordinates.projectPath())
-                    .variable("iid", String.valueOf(coordinates.iid()))
-                    .variable("last", EXISTING_SUMMARY_SEARCH_PAGE_SIZE)
-                    .variable("before", cursor)
-                    .execute()
-                    .block(GRAPHQL_TIMEOUT);
-                if (response == null || !Objects.requireNonNull(response).getErrors().isEmpty()) {
+                        .forScope(scopeId)
+                        .documentName(documentName)
+                        .variable("fullPath", coordinates.projectPath())
+                        .variable("iid", String.valueOf(coordinates.iid()))
+                        .variable("last", EXISTING_SUMMARY_SEARCH_PAGE_SIZE)
+                        .variable("before", cursor)
+                        .execute()
+                        .block(GRAPHQL_TIMEOUT);
+                if (response == null
+                        || !Objects.requireNonNull(response).getErrors().isEmpty()) {
                     return ExistingSummaryLookup.unknown();
                 }
 
                 List<Map<String, Object>> notes = Objects.requireNonNull(response)
-                    .field(notesPath + ".nodes")
-                    .getValue();
+                        .field(notesPath + ".nodes")
+                        .getValue();
                 if (notes == null) {
                     return ExistingSummaryLookup.unknown();
                 }
@@ -287,8 +284,8 @@ public class GitlabSummaryChannel implements SummaryChannel {
                 }
 
                 GitLabBackwardPageInfo pageInfo = Objects.requireNonNull(response)
-                    .field(notesPath + ".pageInfo")
-                    .toEntity(GitLabBackwardPageInfo.class);
+                        .field(notesPath + ".pageInfo")
+                        .toEntity(GitLabBackwardPageInfo.class);
                 if (pageInfo == null) {
                     return ExistingSummaryLookup.unknown();
                 }
@@ -301,10 +298,9 @@ public class GitlabSummaryChannel implements SummaryChannel {
                 }
             } catch (RuntimeException e) {
                 log.debug(
-                    "Existing-summary dedup lookup failed (treated as unknown, not absent): scopeId={}, error={}",
-                    scopeId,
-                    e.getMessage()
-                );
+                        "Existing-summary dedup lookup failed (treated as unknown, not absent): scopeId={}, error={}",
+                        scopeId,
+                        e.getMessage());
                 return ExistingSummaryLookup.unknown();
             }
         }
@@ -318,17 +314,13 @@ public class GitlabSummaryChannel implements SummaryChannel {
 
     /** Conservative NOT_FOUND heuristic: GitLab signals a deleted note only via a free-text mutation error. */
     private static boolean looksGone(List<String> errors) {
-        return errors
-            .stream()
-            .filter(Objects::nonNull)
-            .map(e -> e.toLowerCase(Locale.ROOT))
-            .anyMatch(
-                e ->
-                    e.contains("not found") ||
-                    e.contains("does not exist") ||
-                    e.contains("could not be found") ||
-                    e.contains("couldn't be found")
-            );
+        return errors.stream()
+                .filter(Objects::nonNull)
+                .map(e -> e.toLowerCase(Locale.ROOT))
+                .anyMatch(e -> e.contains("not found")
+                        || e.contains("does not exist")
+                        || e.contains("could not be found")
+                        || e.contains("couldn't be found"));
     }
 
     static String escapeSlashCommands(String body) {

@@ -42,48 +42,42 @@ class GitHubWorkspaceDataSyncTriggerTest extends BaseUnitTest {
 
         when(target.scopeId()).thenReturn(41L);
         when(targetProvider.findSyncTargetById(7L)).thenReturn(Optional.of(target));
-        when(
-            connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
-                41L,
-                IntegrationKind.GITHUB,
-                IntegrationState.ACTIVE
-            )
-        ).thenReturn(Optional.of(connection));
+        when(connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
+                        41L, IntegrationKind.GITHUB, IntegrationState.ACTIVE))
+                .thenReturn(Optional.of(connection));
         when(connection.getId()).thenReturn(99L);
         doAnswer(invocation -> {
-            java.util.function.Consumer<SyncJobHandle> body = invocation.getArgument(1);
-            body.accept(null);
-            return null;
-        })
-            .when(syncJobService)
-            .run(any(SyncJobRequest.class), any());
+                    java.util.function.Consumer<SyncJobHandle> body = invocation.getArgument(1);
+                    body.accept(null);
+                    return null;
+                })
+                .when(syncJobService)
+                .run(any(SyncJobRequest.class), any());
         doAnswer(invocation -> {
-            invocation.<Runnable>getArgument(0).run();
-            return null;
-        })
-            .when(executor)
-            .execute(any(Runnable.class));
+                    invocation.<Runnable>getArgument(0).run();
+                    return null;
+                })
+                .when(executor)
+                .execute(any(Runnable.class));
 
         var trigger = new GitHubWorkspaceDataSyncTrigger(
-            requiredProvider(dataSyncService),
-            optionalProvider(targetProvider),
-            optionalProvider(connectionRepository),
-            optionalProvider(syncJobService),
-            executor
-        );
+                requiredProvider(dataSyncService),
+                optionalProvider(targetProvider),
+                optionalProvider(connectionRepository),
+                optionalProvider(syncJobService),
+                executor);
 
         trigger.syncSingleSyncTarget(7L);
 
         ArgumentCaptor<SyncJobRequest> request = ArgumentCaptor.forClass(SyncJobRequest.class);
         verify(syncJobService).run(request.capture(), any());
         assertThat(request.getValue())
-            .extracting(
-                SyncJobRequest::workspaceId,
-                SyncJobRequest::connectionId,
-                SyncJobRequest::type,
-                SyncJobRequest::trigger
-            )
-            .containsExactly(41L, 99L, SyncJobType.INITIAL, SyncJobTrigger.LIFECYCLE);
+                .extracting(
+                        SyncJobRequest::workspaceId,
+                        SyncJobRequest::connectionId,
+                        SyncJobRequest::type,
+                        SyncJobRequest::trigger)
+                .containsExactly(41L, 99L, SyncJobType.INITIAL, SyncJobTrigger.LIFECYCLE);
         verify(dataSyncService).syncSyncTarget(target);
     }
 

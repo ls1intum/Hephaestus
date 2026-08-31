@@ -1,6 +1,7 @@
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import type { CatalogPracticePreview } from "@/api/types.gen";
 import { mockPractices } from "@/components/admin/practices/story-mock-data";
 import {

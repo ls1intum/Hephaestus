@@ -18,9 +18,7 @@ import org.springframework.scheduling.support.CronExpression;
 class LeaderboardScheduleResolverTest extends BaseUnitTest {
 
     private final LeaderboardProperties globalDefault = new LeaderboardProperties(
-        new LeaderboardProperties.Schedule(1, "09:00"),
-        new LeaderboardProperties.Notification(true)
-    );
+            new LeaderboardProperties.Schedule(1, "09:00"), new LeaderboardProperties.Notification(true));
     private final LeaderboardScheduleResolver resolver = new LeaderboardScheduleResolver(globalDefault);
 
     private static Workspace workspace(@Nullable Integer day, @Nullable String time) {

@@ -52,17 +52,9 @@ class SyncPushServiceNatsIntegrationTest extends BaseIntegrationTest {
         firstHub.subscribe(WORKSPACE_ID);
         secondHub.subscribe(WORKSPACE_ID);
         firstService = new SyncPushService(
-            firstHub,
-            mapper,
-            objectProviderReturning(firstConnection),
-            new SimpleMeterRegistry()
-        );
+                firstHub, mapper, objectProviderReturning(firstConnection), new SimpleMeterRegistry());
         secondService = new SyncPushService(
-            secondHub,
-            mapper,
-            objectProviderReturning(secondConnection),
-            new SimpleMeterRegistry()
-        );
+                secondHub, mapper, objectProviderReturning(secondConnection), new SimpleMeterRegistry());
         firstConnection.flush(Duration.ofSeconds(2));
         secondConnection.flush(Duration.ofSeconds(2));
     }
@@ -80,25 +72,19 @@ class SyncPushServiceNatsIntegrationTest extends BaseIntegrationTest {
     @Test
     void publishedInvalidationReachesOriginAndSiblingReplica() throws Exception {
         SyncStateChangedEvent event = new SyncStateChangedEvent(
-            WORKSPACE_ID,
-            CONNECTION_ID,
-            IntegrationKind.GITHUB,
-            SyncStateChangedEvent.Scope.JOB
-        );
+                WORKSPACE_ID, CONNECTION_ID, IntegrationKind.GITHUB, SyncStateChangedEvent.Scope.JOB);
 
         firstService.onSyncStateChanged(event);
         firstConnection.flush(Duration.ofSeconds(2));
 
-        await()
-            .atMost(Duration.ofSeconds(5))
-            .untilAsserted(() -> {
-                assertThat(firstEmitter.frames()).anySatisfy(frame ->
-                    assertThat(frame).contains("\"scope\":\"job\"").contains("\"connectionId\":7")
-                );
-                assertThat(secondEmitter.frames()).anySatisfy(frame ->
-                    assertThat(frame).contains("\"scope\":\"job\"").contains("\"connectionId\":7")
-                );
-            });
+        await().atMost(Duration.ofSeconds(5)).untilAsserted(() -> {
+            assertThat(firstEmitter.frames())
+                    .anySatisfy(frame ->
+                            assertThat(frame).contains("\"scope\":\"job\"").contains("\"connectionId\":7"));
+            assertThat(secondEmitter.frames())
+                    .anySatisfy(frame ->
+                            assertThat(frame).contains("\"scope\":\"job\"").contains("\"connectionId\":7"));
+        });
     }
 
     @SuppressWarnings("unchecked")

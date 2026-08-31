@@ -10,29 +10,25 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface IssueTypeRepository extends JpaRepository<IssueType, String> {
-    @Query(
-        """
+    @Query("""
         SELECT it
         FROM IssueType it
         WHERE it.organization.id = :organizationId
         AND it.isEnabled = true
         ORDER BY it.name ASC
-        """
-    )
+        """)
     List<IssueType> findEnabledByOrganizationId(@Param("organizationId") long organizationId);
 
     /**
      * Find all issue types for an organization (including disabled).
      * Used for cleanup of deleted issue types during sync.
      */
-    @Query(
-        """
+    @Query("""
         SELECT it
         FROM IssueType it
         WHERE it.organization.id = :organizationId
         ORDER BY it.name ASC
-        """
-    )
+        """)
     List<IssueType> findAllByOrganizationId(@Param("organizationId") Long organizationId);
 
     /**
@@ -41,19 +37,15 @@ public interface IssueTypeRepository extends JpaRepository<IssueType, String> {
      * Used by GitLab issue sync to resolve {@code issue.issue_type_id} from the
      * GraphQL {@code Issue.type} enum ({@code ISSUE}, {@code TASK}, {@code INCIDENT}, …).
      */
-    @Query(
-        """
+    @Query("""
         SELECT it
         FROM IssueType it
         WHERE it.organization.id = :organizationId
         AND lower(it.name) = lower(:name)
         AND it.isEnabled = true
-        """
-    )
+        """)
     Optional<IssueType> findByOrganizationIdAndNameIgnoreCase(
-        @Param("organizationId") Long organizationId,
-        @Param("name") String name
-    );
+            @Param("organizationId") Long organizationId, @Param("name") String name);
 
     /**
      * Provider-scoped case-insensitive name lookup used as a fallback when a GitLab
@@ -72,21 +64,16 @@ public interface IssueTypeRepository extends JpaRepository<IssueType, String> {
      * {@link Pageable} with size 1 gives us "first" semantics without provoking
      * Spring Data runtime warnings about unordered single-row queries.
      */
-    @Query(
-        """
+    @Query("""
         SELECT it
         FROM IssueType it
         WHERE lower(it.name) = lower(:name)
         AND it.isEnabled = true
         AND it.organization.provider.id = :providerId
         ORDER BY it.organization.id ASC
-        """
-    )
+        """)
     List<IssueType> findByProviderIdAndNameIgnoreCase(
-        @Param("providerId") Long providerId,
-        @Param("name") String name,
-        Pageable pageable
-    );
+            @Param("providerId") Long providerId, @Param("name") String name, Pageable pageable);
 
     default Optional<IssueType> findFirstByProviderIdAndNameIgnoreCase(Long providerId, String name) {
         List<IssueType> results = findByProviderIdAndNameIgnoreCase(providerId, name, Pageable.ofSize(1));
@@ -101,8 +88,7 @@ public interface IssueTypeRepository extends JpaRepository<IssueType, String> {
      * which was raising {@code LazyInitializationException} during GitLab issue sync
      * when the {@code Repository}'s Organization proxy outlived its Hibernate session.
      */
-    @Query(
-        """
+    @Query("""
         SELECT it
         FROM IssueType it
         WHERE lower(it.name) = lower(:name)
@@ -111,13 +97,9 @@ public interface IssueTypeRepository extends JpaRepository<IssueType, String> {
             SELECT o.provider.id FROM Organization o WHERE o.id = :organizationId
         )
         ORDER BY it.organization.id ASC
-        """
-    )
+        """)
     List<IssueType> findByOrganizationProviderAndNameIgnoreCase(
-        @Param("organizationId") Long organizationId,
-        @Param("name") String name,
-        Pageable pageable
-    );
+            @Param("organizationId") Long organizationId, @Param("name") String name, Pageable pageable);
 
     default Optional<IssueType> findFirstByOrganizationProviderAndNameIgnoreCase(Long organizationId, String name) {
         List<IssueType> results = findByOrganizationProviderAndNameIgnoreCase(organizationId, name, Pageable.ofSize(1));

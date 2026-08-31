@@ -54,15 +54,14 @@ public class ImpersonationService {
     private final Clock clock;
 
     public ImpersonationService(
-        AccountRepository accountRepository,
-        HephaestusJwtIssuer jwtIssuer,
-        JwtPrincipalFactory principalFactory,
-        IssuedJwtRepository issuedJwtRepository,
-        AuthEventLogger authEventLogger,
-        ObjectMapper objectMapper,
-        AuthProperties properties,
-        Clock clock
-    ) {
+            AccountRepository accountRepository,
+            HephaestusJwtIssuer jwtIssuer,
+            JwtPrincipalFactory principalFactory,
+            IssuedJwtRepository issuedJwtRepository,
+            AuthEventLogger authEventLogger,
+            ObjectMapper objectMapper,
+            AuthProperties properties,
+            Clock clock) {
         this.accountRepository = accountRepository;
         this.jwtIssuer = jwtIssuer;
         this.principalFactory = principalFactory;
@@ -74,7 +73,10 @@ public class ImpersonationService {
     }
 
     /** Result of begin/exit — the freshly-minted token the controller writes to the cookie. */
-    public record Result(HephaestusJwtIssuer.Token token, Long targetAccountId, @Nullable Long actingAccountId) {}
+    public record Result(
+            HephaestusJwtIssuer.Token token,
+            Long targetAccountId,
+            @Nullable Long actingAccountId) {}
 
     /**
      * Begin impersonating {@code targetAccountId} as {@code operatorAccountId}. The operator
@@ -83,23 +85,19 @@ public class ImpersonationService {
      */
     @Transactional
     public Result begin(
-        Long operatorAccountId,
-        Long targetAccountId,
-        String reason,
-        @Nullable HttpServletRequest request
-    ) {
+            Long operatorAccountId, Long targetAccountId, String reason, @Nullable HttpServletRequest request) {
         if (reason == null || reason.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "impersonation reason is required");
         }
         Account operator = accountRepository
-            .findById(operatorAccountId)
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "operator account not found"));
+                .findById(operatorAccountId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "operator account not found"));
         if (operator.getAppRole() != Account.AppRole.APP_ADMIN) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "only app admins may impersonate");
         }
         Account target = accountRepository
-            .findById(targetAccountId)
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "target account not found"));
+                .findById(targetAccountId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "target account not found"));
         if (Objects.requireNonNull(target.getId()).equals(operator.getId())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "cannot impersonate yourself");
         }
@@ -117,19 +115,15 @@ public class ImpersonationService {
         // the operator. Issued via the principal factory so preferred_username = target login.
         // imp_exp stamps the absolute time-box so silent refresh can't renew it indefinitely.
         Instant impersonationExpiresAt = clock.instant().plus(properties.impersonationMaxLifetime());
-        HephaestusJwtIssuer.Token token = jwtIssuer.issue(
-            principalFactory.forAccount(target),
-            operator.getId(),
-            impersonationExpiresAt,
-            request
-        );
+        HephaestusJwtIssuer.Token token =
+                jwtIssuer.issue(principalFactory.forAccount(target), operator.getId(), impersonationExpiresAt, request);
 
         authEventLogger
-            .event(AuthEvent.EventType.IMPERSONATION_BEGIN, AuthEvent.Result.SUCCESS)
-            .account(target.getId())
-            .actingAccount(operator.getId())
-            .details(writeReasonJson(reason))
-            .record();
+                .event(AuthEvent.EventType.IMPERSONATION_BEGIN, AuthEvent.Result.SUCCESS)
+                .account(target.getId())
+                .actingAccount(operator.getId())
+                .details(writeReasonJson(reason))
+                .record();
         log.info("auth.impersonation: operator={} began impersonating target={}", operator.getId(), target.getId());
 
         return new Result(token, target.getId(), operator.getId());
@@ -142,28 +136,20 @@ public class ImpersonationService {
      */
     @Transactional
     public Result exit(
-        Long operatorAccountId,
-        Long targetAccountId,
-        UUID currentJti,
-        @Nullable HttpServletRequest request
-    ) {
+            Long operatorAccountId, Long targetAccountId, UUID currentJti, @Nullable HttpServletRequest request) {
         issuedJwtRepository.revoke(currentJti, clock.instant(), IssuedJwt.RevokedReason.IMPERSONATION_EXIT);
-        HephaestusJwtIssuer.Token token = jwtIssuer.issue(
-            principalFactory.forAccountId(operatorAccountId),
-            null,
-            request
-        );
+        HephaestusJwtIssuer.Token token =
+                jwtIssuer.issue(principalFactory.forAccountId(operatorAccountId), null, request);
 
         authEventLogger
-            .event(AuthEvent.EventType.IMPERSONATION_END, AuthEvent.Result.SUCCESS)
-            .account(targetAccountId)
-            .actingAccount(operatorAccountId)
-            .record();
+                .event(AuthEvent.EventType.IMPERSONATION_END, AuthEvent.Result.SUCCESS)
+                .account(targetAccountId)
+                .actingAccount(operatorAccountId)
+                .record();
         log.info(
-            "auth.impersonation: operator={} exited impersonation of target={}",
-            operatorAccountId,
-            targetAccountId
-        );
+                "auth.impersonation: operator={} exited impersonation of target={}",
+                operatorAccountId,
+                targetAccountId);
 
         return new Result(token, operatorAccountId, null);
     }

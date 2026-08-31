@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
+
 import { AchievementProgressDisplay } from "@/components/achievements/AchievementProgressDisplay";
 import {
 	apolloClarity,

@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
+
 import { MentorIcon } from "./MentorIcon";
 
 const meta: Meta<typeof MentorIcon> = {
@@ -10,7 +11,8 @@ const meta: Meta<typeof MentorIcon> = {
 	argTypes: {
 		size: {
 			control: { type: "range", min: 12, max: 64, step: 2 },
-			description: "Size of the icon in pixels",
+			description:
+				"Intrinsic width and height in pixels, set as SVG attributes. They are presentation hints, so any CSS width or height on the icon wins over them.",
 		},
 		animated: {
 			control: "boolean",

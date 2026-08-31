@@ -28,19 +28,17 @@ public class GitHubDiscussionMessageHandler extends AbstractIntegrationMessageHa
     private final SyncSchedulerProperties syncSchedulerProperties;
 
     public GitHubDiscussionMessageHandler(
-        ProcessingContextFactory contextFactory,
-        GitHubDiscussionProcessor discussionProcessor,
-        SyncSchedulerProperties syncSchedulerProperties,
-        NatsMessageDeserializer deserializer,
-        TransactionTemplate transactionTemplate
-    ) {
+            ProcessingContextFactory contextFactory,
+            GitHubDiscussionProcessor discussionProcessor,
+            SyncSchedulerProperties syncSchedulerProperties,
+            NatsMessageDeserializer deserializer,
+            TransactionTemplate transactionTemplate) {
         super(
-            IntegrationKind.GITHUB,
-            "repository." + GitHubEventType.DISCUSSION.getValue(),
-            GitHubDiscussionEventDTO.class,
-            deserializer,
-            transactionTemplate
-        );
+                IntegrationKind.GITHUB,
+                "repository." + GitHubEventType.DISCUSSION.getValue(),
+                GitHubDiscussionEventDTO.class,
+                deserializer,
+                transactionTemplate);
         this.contextFactory = contextFactory;
         this.discussionProcessor = discussionProcessor;
         this.syncSchedulerProperties = syncSchedulerProperties;
@@ -64,11 +62,10 @@ public class GitHubDiscussionMessageHandler extends AbstractIntegrationMessageHa
         }
 
         log.debug(
-            "Received discussion event: action={}, discussionNumber={}, repoName={}",
-            event.action(),
-            discussionDto.number(),
-            event.repository() != null ? sanitizeForLog(event.repository().fullName()) : "unknown"
-        );
+                "Received discussion event: action={}, discussionNumber={}, repoName={}",
+                event.action(),
+                discussionDto.number(),
+                event.repository() != null ? sanitizeForLog(event.repository().fullName()) : "unknown");
 
         ProcessingContext context = contextFactory.forWebhookEvent(event).orElse(null);
         if (context == null) {
@@ -79,33 +76,28 @@ public class GitHubDiscussionMessageHandler extends AbstractIntegrationMessageHa
     }
 
     private void routeToProcessor(
-        GitHubDiscussionEventDTO event,
-        GitHubDiscussionDTO discussionDto,
-        ProcessingContext context
-    ) {
+            GitHubDiscussionEventDTO event, GitHubDiscussionDTO discussionDto, ProcessingContext context) {
         switch (event.actionType()) {
             // A transfer moves the discussion OUT of this repository, and the payload's discussion is
             // the source-side row. Upserting it here would re-create the very phantom the removal is
             // meant to retire. Unlike issues, discussions have no reconciliation sweep to heal it, so
             // the phantom would be permanent — route the transfer to the removal path instead, which
             // hard-deletes the same as DELETED.
-            case
-                GitHubEventAction.Discussion.DELETED,
-                GitHubEventAction.Discussion.TRANSFERRED -> discussionProcessor.processDeleted(discussionDto, context);
+            case GitHubEventAction.Discussion.DELETED, GitHubEventAction.Discussion.TRANSFERRED ->
+                discussionProcessor.processDeleted(discussionDto, context);
             case GitHubEventAction.Discussion.CLOSED -> discussionProcessor.processClosed(discussionDto, context);
             case GitHubEventAction.Discussion.REOPENED -> discussionProcessor.processReopened(discussionDto, context);
             case GitHubEventAction.Discussion.ANSWERED -> discussionProcessor.processAnswered(discussionDto, context);
-            case
-                GitHubEventAction.Discussion.CREATED,
-                GitHubEventAction.Discussion.EDITED,
-                GitHubEventAction.Discussion.PINNED,
-                GitHubEventAction.Discussion.UNPINNED,
-                GitHubEventAction.Discussion.LOCKED,
-                GitHubEventAction.Discussion.UNLOCKED,
-                GitHubEventAction.Discussion.CATEGORY_CHANGED,
-                GitHubEventAction.Discussion.UNANSWERED,
-                GitHubEventAction.Discussion.LABELED,
-                GitHubEventAction.Discussion.UNLABELED -> discussionProcessor.process(discussionDto, context);
+            case GitHubEventAction.Discussion.CREATED,
+                    GitHubEventAction.Discussion.EDITED,
+                    GitHubEventAction.Discussion.PINNED,
+                    GitHubEventAction.Discussion.UNPINNED,
+                    GitHubEventAction.Discussion.LOCKED,
+                    GitHubEventAction.Discussion.UNLOCKED,
+                    GitHubEventAction.Discussion.CATEGORY_CHANGED,
+                    GitHubEventAction.Discussion.UNANSWERED,
+                    GitHubEventAction.Discussion.LABELED,
+                    GitHubEventAction.Discussion.UNLABELED -> discussionProcessor.process(discussionDto, context);
             // Unknown/unmapped actions SKIP rather than upsert. A future action that means "removed"
             // must not fall through to an upsert that re-creates a phantom — the explicit cases above
             // already cover every real upsert action, so the safe default is to ack and ignore.

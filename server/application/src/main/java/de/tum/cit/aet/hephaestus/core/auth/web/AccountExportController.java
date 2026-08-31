@@ -51,8 +51,10 @@ public class AccountExportController {
         AccountExport export = exportService.requestExport(accountId);
         URI location = URI.create("/user/exports/" + Objects.requireNonNull(export.getId()));
         return ResponseEntity.accepted()
-            .location(location)
-            .body(new ExportCreatedDTO(Objects.requireNonNull(export.getId()), export.getStatus().name()));
+                .location(location)
+                .body(new ExportCreatedDTO(
+                        Objects.requireNonNull(export.getId()),
+                        export.getStatus().name()));
     }
 
     @GetMapping("/{id}")
@@ -60,8 +62,8 @@ public class AccountExportController {
     public ResponseEntity<ExportStatusDTO> status(@PathVariable Long id) {
         Long accountId = CurrentAccount.requireId();
         ExportStatusDTO status = exportService
-            .status(id, accountId)
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "export not found"));
+                .status(id, accountId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "export not found"));
         return ResponseEntity.ok(status);
     }
 
@@ -70,14 +72,14 @@ public class AccountExportController {
     public ResponseEntity<byte[]> download(@PathVariable Long id) {
         Long accountId = CurrentAccount.requireId();
         byte[] payload = exportService
-            .downloadPayload(id, accountId)
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "export not available"));
+                .downloadPayload(id, accountId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "export not available"));
         ContentDisposition disposition = ContentDisposition.attachment()
-            .filename("hephaestus-export-" + id + ".json")
-            .build();
+                .filename("hephaestus-export-" + id + ".json")
+                .build();
         return ResponseEntity.ok()
-            .contentType(MediaType.APPLICATION_JSON)
-            .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
-            .body(payload);
+                .contentType(MediaType.APPLICATION_JSON)
+                .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
+                .body(payload);
     }
 }

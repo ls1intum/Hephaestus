@@ -28,13 +28,14 @@ import tools.jackson.databind.json.JsonMapper;
 class PracticeAutomatedReviewPolicySchemaTest extends BaseUnitTest {
 
     private static final String SCHEMA_RESOURCE =
-        "contracts/artifact-source/1.0.0/practice-automated-review-policy.schema.json";
+            "contracts/artifact-source/1.0.0/practice-automated-review-policy.schema.json";
 
     private final JsonMapper objectMapper = JsonMapper.builder().build();
 
     @Test
     void shouldDeclareExactlyThePolicyRecordsFields() throws IOException {
-        Set<String> declared = Set.copyOf(objectMapper.readTree(read()).path("properties").propertyNames());
+        Set<String> declared =
+                Set.copyOf(objectMapper.readTree(read()).path("properties").propertyNames());
 
         assertThat(declared).isEqualTo(componentNames());
     }
@@ -43,25 +44,23 @@ class PracticeAutomatedReviewPolicySchemaTest extends BaseUnitTest {
     @Test
     void shouldRequireEveryFieldThePolicyCannotBeBuiltWithout() throws IOException {
         JsonNode required = objectMapper.readTree(read()).path("required");
-        Set<String> requiredNames = required
-            .valueStream()
-            .map(JsonNode::asString)
-            .collect(Collectors.toUnmodifiableSet());
+        Set<String> requiredNames =
+                required.valueStream().map(JsonNode::asString).collect(Collectors.toUnmodifiableSet());
 
         // JSpecify's @Nullable is a TYPE_USE annotation, so it is on the component's annotated type
         // rather than on the component declaration.
         Set<String> nonNullable = Arrays.stream(PracticeAutomatedReviewPolicy.class.getRecordComponents())
-            .filter(component -> component.getAnnotatedType().getAnnotation(Nullable.class) == null)
-            .map(RecordComponent::getName)
-            .collect(Collectors.toUnmodifiableSet());
+                .filter(component -> component.getAnnotatedType().getAnnotation(Nullable.class) == null)
+                .map(RecordComponent::getName)
+                .collect(Collectors.toUnmodifiableSet());
 
         assertThat(requiredNames).isEqualTo(nonNullable);
     }
 
     private static Set<String> componentNames() {
         return Arrays.stream(PracticeAutomatedReviewPolicy.class.getRecordComponents())
-            .map(RecordComponent::getName)
-            .collect(Collectors.toUnmodifiableSet());
+                .map(RecordComponent::getName)
+                .collect(Collectors.toUnmodifiableSet());
     }
 
     private InputStream read() throws IOException {

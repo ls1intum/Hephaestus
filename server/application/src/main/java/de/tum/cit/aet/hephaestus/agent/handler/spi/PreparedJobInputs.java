@@ -9,19 +9,18 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 public record PreparedJobInputs(
-    Map<String, byte[]> files,
-    /** Staged by path so their bytes never enter this process; see {@code EvidenceContribution#filesOnDisk}. */
-    Map<String, java.nio.file.Path> filesOnDisk,
-    /** Releases the staging directories behind {@link #filesOnDisk} once the sandbox holds the files. */
-    java.util.List<AutoCloseable> cleanups,
-    @Nullable ArtifactSourceManifest artifactSourceManifest,
-    @Nullable AutomatedReviewReadinessReport automatedReviewReadinessReport
-) implements AutoCloseable {
-    public PreparedJobInputs(
         Map<String, byte[]> files,
+        /** Staged by path so their bytes never enter this process; see {@code EvidenceContribution#filesOnDisk}. */
+        Map<String, java.nio.file.Path> filesOnDisk,
+        /** Releases the staging directories behind {@link #filesOnDisk} once the sandbox holds the files. */
+        java.util.List<AutoCloseable> cleanups,
         @Nullable ArtifactSourceManifest artifactSourceManifest,
-        @Nullable AutomatedReviewReadinessReport automatedReviewReadinessReport
-    ) {
+        @Nullable AutomatedReviewReadinessReport automatedReviewReadinessReport)
+        implements AutoCloseable {
+    public PreparedJobInputs(
+            Map<String, byte[]> files,
+            @Nullable ArtifactSourceManifest artifactSourceManifest,
+            @Nullable AutomatedReviewReadinessReport automatedReviewReadinessReport) {
         this(files, Map.of(), java.util.List.of(), artifactSourceManifest, automatedReviewReadinessReport);
     }
 

@@ -1,0 +1,54 @@
+---
+title: Observability
+---
+
+# Observability contract
+
+Production logs are JSON records. `job.id` and `workspace.id` are fields, not metric labels.
+
+## Agent-job lifecycle
+
+Lifecycle records contain `event.name`, `job.id`, `workspace.id`, `job.type`, `job.phase`,
+`job.outcome`, and `duration.ms`.
+
+| `event.name` | Emitted when | `job.phase` | `job.outcome` | `duration.ms` |
+| --- | --- | --- | --- | --- |
+| `agent.job.queued` | A new job transaction commits | `queue` | `queued` | `0` |
+| `agent.job.started` | A worker starts a claimed job | `queue` | `started` | Creation to start |
+| `agent.job.delivery` | A delivery attempt finishes | `delivery` | `delivered`, `failed` | Delivery attempt |
+| `agent.job.terminal` | A terminal transition commits | `total` | `completed`, `failed`, `timed_out`, `cancelled` | Creation to terminal emission |
+
+Delivery is optional. Jobs that do not complete successfully may have no delivery event.
+
+## Agent-job metrics
+
+| Prometheus name | Type | Labels | Meaning |
+| --- | --- | --- | --- |
+| `agent_job_total` | Counter | `outcome` | Committed terminal transitions |
+| `agent_job_duration_seconds` | Histogram | `phase` | Queue, execution-attempt, delivery-attempt, and total durations |
+
+`outcome` is one of `completed`, `failed`, `timed_out`, or `cancelled`. `phase` is one of `queue`,
+`execution`, `delivery`, or `total`. Identifiers, model and provider names, worker IDs, and exception text are not
+labels. See [Practice Review Operations](./practice-review-operations.mdx) for queue health and the
+existing execution metric.
+
+## Correlating a request
+
+Every HTTP response carries an `X-Request-Id` header whose value is the request's W3C trace ID — a
+random 32-character hex string that is never derived from user attributes. The same value appears as
+the `traceId` field in every JSON log line written while handling that request, and it follows the
+work the request caused: a queued review job restores it when it executes, the sandbox and its LLM
+proxy calls carry it, and Sentry events are tagged with it. Access logs stay off at every layer, so
+this is the join key for "what happened to this request".
+
+No collector or log aggregator is required. From a reference deployment, take the ID a user reports
+(or the `X-Request-Id` of a failing response) and search the container logs:
+
+```bash
+docker compose logs --no-color | grep '"traceId":"<the-id>"'
+```
+
+That returns the request's own log lines, the lifecycle events of any job it enqueued (the
+`agent.job.*` events above), and the proxy calls made on its behalf. A job triggered by the scheduler
+rather than a request mints its own trace ID, so its lifecycle is still joinable even though no HTTP
+response ever carried it.

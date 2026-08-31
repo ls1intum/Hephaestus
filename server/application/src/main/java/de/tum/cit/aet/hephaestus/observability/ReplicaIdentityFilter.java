@@ -27,7 +27,7 @@ public class ReplicaIdentityFilter extends OncePerRequestFilter {
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
-        throws ServletException, IOException {
+            throws ServletException, IOException {
         response.setHeader(HEADER_NAME, REPLICA_ID);
         chain.doFilter(request, response);
     }

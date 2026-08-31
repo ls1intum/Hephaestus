@@ -1,4 +1,5 @@
 import { Grid3x3, Magnet, MessageSquareOff, Move, Save } from "lucide-react";
+
 import type { EdgeDisplayMode } from "@/components/achievements/utils";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";

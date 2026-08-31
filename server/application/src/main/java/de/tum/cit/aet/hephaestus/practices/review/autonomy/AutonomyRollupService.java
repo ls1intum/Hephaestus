@@ -37,7 +37,8 @@ public class AutonomyRollupService {
         Map<Long, List<Practice>> byGroup = new LinkedHashMap<>();
         for (Practice practice : practiceRepository.findAllForCatalog(workspaceId)) {
             PracticeGroup group = practice.getGroup();
-            byGroup.computeIfAbsent(group == null ? null : group.getId(), key -> new ArrayList<>()).add(practice);
+            byGroup.computeIfAbsent(group == null ? null : group.getId(), key -> new ArrayList<>())
+                    .add(practice);
             PracticeAutonomy effective = AutonomyResolver.effectiveAutonomyOf(practice, workspaceDefault);
             workspaceCounts.merge(effective, 1, Integer::sum);
         }
@@ -52,20 +53,15 @@ public class AutonomyRollupService {
         }
 
         return new AutonomyRollupDTO(
-            AutonomyAssignmentDTO.of(
-                new EffectiveAutonomy(workspaceDefault, AutonomySource.WORKSPACE),
-                workspaceDefaults.rawDefaultAutonomy(workspaceId)
-            ),
-            workspaceCounts,
-            List.copyOf(groups)
-        );
+                AutonomyAssignmentDTO.of(
+                        new EffectiveAutonomy(workspaceDefault, AutonomySource.WORKSPACE),
+                        workspaceDefaults.rawDefaultAutonomy(workspaceId)),
+                workspaceCounts,
+                List.copyOf(groups));
     }
 
     private GroupAutonomyRollupDTO groupRollup(
-        @Nullable PracticeGroup group,
-        List<Practice> practices,
-        PracticeAutonomy workspaceDefault
-    ) {
+            @Nullable PracticeGroup group, List<Practice> practices, PracticeAutonomy workspaceDefault) {
         Map<PracticeAutonomy, Integer> counts = emptyCounts();
         int overridden = 0;
         for (Practice practice : practices) {
@@ -75,15 +71,13 @@ public class AutonomyRollupService {
             }
         }
         return new GroupAutonomyRollupDTO(
-            group == null ? null : group.getSlug(),
-            group == null ? null : group.getName(),
-            AutonomyAssignmentDTO.of(
-                AutonomyResolver.resolveGroup(group, workspaceDefault),
-                group == null ? null : group.getAutonomy()
-            ),
-            counts,
-            overridden
-        );
+                group == null ? null : group.getSlug(),
+                group == null ? null : group.getName(),
+                AutonomyAssignmentDTO.of(
+                        AutonomyResolver.resolveGroup(group, workspaceDefault),
+                        group == null ? null : group.getAutonomy()),
+                counts,
+                overridden);
     }
 
     private static Map<PracticeAutonomy, Integer> emptyCounts() {

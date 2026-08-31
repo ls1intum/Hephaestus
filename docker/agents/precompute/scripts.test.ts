@@ -1,18 +1,17 @@
-// Unit tests for the version-controlled precompute scripts' classification logic. Stages each real
-// script next to a symlinked lib/ (exactly as the runner does), imports it, and asserts on its
-// metrics/directions output.
-import { afterEach, beforeAll, describe, expect, it } from "bun:test";
+import assert from "node:assert/strict";
 import { cp, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { isPracticeModule } from "./lib/practice-contract";
-import type { DiffFile, PracticeScript } from "./lib/types";
+import { afterEach, before, describe, it } from "node:test";
+
+import { isPracticeModule } from "./lib/practice-contract.ts";
+import type { DiffFile, PracticeScript } from "./lib/types.ts";
 
 const SCRIPTS_DIR = resolve(
-	import.meta.dir,
+	import.meta.dirname,
 	"../../../server/application/src/main/resources/practices/precompute",
 );
-const LIB_DIR = resolve(import.meta.dir, "lib");
+const LIB_DIR = resolve(import.meta.dirname, "lib");
 
 const tempDirs: string[] = [];
 
@@ -29,6 +28,7 @@ async function createTempDir(prefix: string): Promise<string> {
 async function loadScript(name: string): Promise<PracticeScript> {
 	const work = await createTempDir(`pc-script-${name}-`);
 	await mkdir(join(work, "practices"), { recursive: true });
+	await writeFile(join(work, "package.json"), '{"type":"module"}\n');
 	await symlink(LIB_DIR, join(work, "lib"));
 	const staged = join(work, "practices", `${name}.ts`);
 	await cp(join(SCRIPTS_DIR, `${name}.ts`), staged);
@@ -48,9 +48,9 @@ afterEach(async () => {
 	await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
 });
 
-describe("ships-tests-with-the-change", () => {
+void describe("ships-tests-with-the-change", () => {
 	let run: PracticeScript;
-	beforeAll(async () => {
+	before(async () => {
 		run = await loadScript("ships-tests-with-the-change");
 	});
 
@@ -64,7 +64,7 @@ describe("ships-tests-with-the-change", () => {
 		return repo;
 	}
 
-	it("classifies code vs test files in a single walk and flags an untested prod change", async () => {
+	void it("classifies code vs test files in a single walk and flags an untested prod change", async () => {
 		const repo = await repoWith({
 			"src/App.swift": "struct App {}",
 			"src/util.ts": "export const x = 1;",
@@ -75,15 +75,15 @@ describe("ships-tests-with-the-change", () => {
 
 		const result = await run(repo, diff, {});
 
-		expect(result.metrics.repoCodeFileCount).toBe(3);
-		expect(result.metrics.repoTestFileCount).toBe(1);
-		expect(result.metrics.worktreeVisible).toBe(1);
-		expect(result.metrics.diffProductionFiles).toBe(1);
-		expect(result.metrics.diffTestFiles).toBe(0);
-		expect(result.directions.join(" ")).toContain("0 test file(s)");
+		assert.equal(result.metrics.repoCodeFileCount, 3);
+		assert.equal(result.metrics.repoTestFileCount, 1);
+		assert.equal(result.metrics.worktreeVisible, 1);
+		assert.equal(result.metrics.diffProductionFiles, 1);
+		assert.equal(result.metrics.diffTestFiles, 0);
+		assert.ok(result.directions.join(" ").includes("0 test file(s)"));
 	});
 
-	it("excludes node_modules / dotfile / .build dirs from the census", async () => {
+	void it("excludes node_modules / dotfile / .build dirs from the census", async () => {
 		const repo = await repoWith({
 			"src/main.ts": "export const a = 1;",
 			"node_modules/dep/index.js": "module.exports = {};",
@@ -94,15 +94,15 @@ describe("ships-tests-with-the-change", () => {
 		const result = await run(repo, new Map<string, DiffFile>(), {});
 
 		// Only src/main.ts counts; the three excluded-dir files are skipped.
-		expect(result.metrics.repoCodeFileCount).toBe(1);
+		assert.equal(result.metrics.repoCodeFileCount, 1);
 	});
 
-	it("reports the worktree as not visible when zero source files are seen", async () => {
+	void it("reports the worktree as not visible when zero source files are seen", async () => {
 		const repo = await repoWith({ "README.md": "# docs only" });
 
 		const result = await run(repo, new Map<string, DiffFile>(), {});
 
-		expect(result.metrics.worktreeVisible).toBe(0);
-		expect(result.directions.join(" ")).toContain("WORKTREE NOT VISIBLE");
+		assert.equal(result.metrics.worktreeVisible, 0);
+		assert.ok(result.directions.join(" ").includes("WORKTREE NOT VISIBLE"));
 	});
 });

@@ -20,13 +20,11 @@ public record PracticeSubjectCheck(boolean absent, String describedAs, List<Subj
         if (clauses.isEmpty()) {
             throw new IllegalArgumentException("A subject check requires at least one clause");
         }
-        boolean everyClauseSettledAndEmpty = clauses
-            .stream()
-            .allMatch(clause -> clause.finding() == SubjectFinding.NOT_FOUND);
+        boolean everyClauseSettledAndEmpty =
+                clauses.stream().allMatch(clause -> clause.finding() == SubjectFinding.NOT_FOUND);
         if (absent != everyClauseSettledAndEmpty) {
             throw new IllegalArgumentException(
-                "A subject is absent exactly when every declared alternative was decided and none was found"
-            );
+                    "A subject is absent exactly when every declared alternative was decided and none was found");
         }
     }
 }

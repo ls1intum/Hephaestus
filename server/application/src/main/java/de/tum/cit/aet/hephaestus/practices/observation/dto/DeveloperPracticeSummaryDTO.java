@@ -11,21 +11,27 @@ import org.jspecify.annotations.Nullable;
  */
 @Schema(description = "Per-practice observation summary for a developer")
 public record DeveloperPracticeSummaryDTO(
-    @NonNull @Schema(description = "Practice slug") String practiceSlug,
-    @NonNull @Schema(description = "Practice name") String practiceName,
-    @NonNull @Schema(description = "Total number of observations") Long totalObservations,
-    @NonNull @Schema(description = "Number of GOOD (strength) observations") Long goodCount,
-    @NonNull @Schema(description = "Number of BAD (problem) observations") Long badCount,
-    @Nullable @Schema(description = "Timestamp of most recent observation") Instant lastObservedAt
-) {
+        @NonNull @Schema(description = "Practice slug") String practiceSlug,
+        @NonNull @Schema(description = "Practice name") String practiceName,
+
+        @NonNull @Schema(description = "Total number of observations")
+        Long totalObservations,
+
+        @NonNull @Schema(description = "Number of GOOD (strength) observations")
+        Long goodCount,
+
+        @NonNull @Schema(description = "Number of BAD (problem) observations")
+        Long badCount,
+
+        @Nullable @Schema(description = "Timestamp of most recent observation")
+        Instant lastObservedAt) {
     public static DeveloperPracticeSummaryDTO from(DeveloperPracticeSummaryProjection p) {
         return new DeveloperPracticeSummaryDTO(
-            p.getPracticeSlug(),
-            p.getPracticeName(),
-            p.getTotalObservations(),
-            p.getGoodCount(),
-            p.getBadCount(),
-            p.getLastObservedAt()
-        );
+                p.getPracticeSlug(),
+                p.getPracticeName(),
+                p.getTotalObservations(),
+                p.getGoodCount(),
+                p.getBadCount(),
+                p.getLastObservedAt());
     }
 }

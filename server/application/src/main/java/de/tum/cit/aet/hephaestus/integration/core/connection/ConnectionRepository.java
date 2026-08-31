@@ -14,41 +14,39 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface ConnectionRepository extends JpaRepository<Connection, Long> {
+    @WorkspaceAgnostic("Rotates credentials across all workspaces")
+    @Query(value = """
+                    SELECT id FROM connection
+                    WHERE credentials_encrypted IS NOT NULL
+                      AND credentials_key_version IS DISTINCT FROM :activeVersion
+                    ORDER BY id
+                    LIMIT :batchSize
+                    FOR UPDATE SKIP LOCKED
+                    """, nativeQuery = true)
+    List<Long> lockCredentialRotationBatch(
+            @Param("activeVersion") int activeVersion, @Param("batchSize") int batchSize);
     /**
      * Serializes connection lifecycle changes with sync-job creation. Both paths acquire this row lock
      * before checking their respective state, closing the check-then-act window in which a job could
      * start while an uninstall was committing.
      */
     @Query(
-        value = "SELECT id FROM connection WHERE id = :id AND workspace_id = :workspaceId FOR UPDATE",
-        nativeQuery = true
-    )
+            value = "SELECT id FROM connection WHERE id = :id AND workspace_id = :workspaceId FOR UPDATE",
+            nativeQuery = true)
     Long acquireLifecycleLock(@Param("id") long id, @Param("workspaceId") long workspaceId);
 
     Optional<Connection> findByWorkspaceIdAndKindAndInstanceKey(
-        long workspaceId,
-        IntegrationKind kind,
-        @Nullable String instanceKey
-    );
+            long workspaceId, IntegrationKind kind, @Nullable String instanceKey);
 
     Optional<Connection> findFirstByKindAndInstanceKeyAndState(
-        IntegrationKind kind,
-        String instanceKey,
-        IntegrationState state
-    );
+            IntegrationKind kind, String instanceKey, IntegrationState state);
 
     List<Connection> findAllByKindAndInstanceKeyInAndState(
-        IntegrationKind kind,
-        Collection<String> instanceKeys,
-        IntegrationState state
-    );
+            IntegrationKind kind, Collection<String> instanceKeys, IntegrationState state);
 
     /** Lookup for kinds where there is at most one row per (workspace, kind). */
     Optional<Connection> findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
-        long workspaceId,
-        IntegrationKind kind,
-        IntegrationState state
-    );
+            long workspaceId, IntegrationKind kind, IntegrationState state);
 
     default Optional<Connection> findActive(long workspaceId, IntegrationKind kind) {
         return findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(workspaceId, kind, IntegrationState.ACTIVE);
@@ -64,11 +62,7 @@ public interface ConnectionRepository extends JpaRepository<Connection, Long> {
 
     @WorkspaceAgnostic("Provider uninstall guard checks whether another workspace still uses the same installation")
     boolean existsByKindAndInstanceKeyAndStateNotAndIdNot(
-        IntegrationKind kind,
-        String instanceKey,
-        IntegrationState state,
-        Long id
-    );
+            IntegrationKind kind, String instanceKey, IntegrationState state, Long id);
 
     @Query("SELECT c FROM Connection c WHERE c.workspace.id = :workspaceId")
     List<Connection> findByWorkspaceId(@Param("workspaceId") long workspaceId);
@@ -80,9 +74,7 @@ public interface ConnectionRepository extends JpaRepository<Connection, Long> {
      */
     @Query("SELECT DISTINCT c.workspace.id FROM Connection c WHERE c.kind = :kind AND c.state = :state")
     List<Long> findWorkspaceIdsByKindAndState(
-        @Param("kind") IntegrationKind kind,
-        @Param("state") IntegrationState state
-    );
+            @Param("kind") IntegrationKind kind, @Param("state") IntegrationState state);
 
     /**
      * Resolves the ACTIVE Outline Connection that registered {@code subscriptionId} — a single
@@ -106,8 +98,7 @@ public interface ConnectionRepository extends JpaRepository<Connection, Long> {
      * ambiguity the caller can reject, rather than as a {@code NonUniqueResultException} thrown at
      * an anonymous caller.
      */
-    @Query(
-        value = """
+    @Query(value = """
         SELECT c.workspace_id AS "workspaceId",
                c.config ->> 'serverUrl' AS "serverUrl",
                c.config ->> 'webhookSecret' AS "signingSecret"
@@ -115,12 +106,9 @@ public interface ConnectionRepository extends JpaRepository<Connection, Long> {
         WHERE c.kind = 'OUTLINE'
           AND c.state = 'ACTIVE'
           AND c.config ->> 'webhookSubscriptionId' = :subscriptionId
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     List<OutlineSubscriptionProjection> findOutlineSubscriptionsBySubscriptionId(
-        @Param("subscriptionId") String subscriptionId
-    );
+            @Param("subscriptionId") String subscriptionId);
 
     /**
      * The (workspace, encrypted signing secret) pair behind one Outline change-notification

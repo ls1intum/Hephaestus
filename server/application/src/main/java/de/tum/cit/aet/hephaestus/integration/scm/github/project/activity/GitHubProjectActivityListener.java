@@ -62,27 +62,25 @@ public class GitHubProjectActivityListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onProjectCreated(GitHubProjectEvent.ProjectCreated event) {
         var projectData = event.project();
-        if (!hasValidScopeId("Project created", projectData.id(), event.context().scopeId())) {
+        if (!hasValidScopeId(
+                "Project created", projectData.id(), event.context().scopeId())) {
             return;
         }
-        Instant occurredAt =
-            projectData.createdAt() != null
+        Instant occurredAt = projectData.createdAt() != null
                 ? projectData.createdAt()
-                : projectData.updatedAt() != null
-                    ? projectData.updatedAt()
-                    : Instant.now();
-        safeRecord("project created", projectData.id(), () ->
-            activityRecorder.record(
-                Objects.requireNonNull(event.context().scopeId()),
-                ActivityEventType.PROJECT_CREATED,
-                occurredAt,
-                getActorOrNull(projectData.creatorId()),
-                getRepositoryForProject(projectData),
-                ActivityTargetType.PROJECT,
+                : projectData.updatedAt() != null ? projectData.updatedAt() : Instant.now();
+        safeRecord(
+                "project created",
                 projectData.id(),
-                0.0
-            )
-        );
+                () -> activityRecorder.record(
+                        Objects.requireNonNull(event.context().scopeId()),
+                        ActivityEventType.PROJECT_CREATED,
+                        occurredAt,
+                        getActorOrNull(projectData.creatorId()),
+                        getRepositoryForProject(projectData),
+                        ActivityTargetType.PROJECT,
+                        projectData.id(),
+                        0.0));
     }
 
     @Async
@@ -90,23 +88,24 @@ public class GitHubProjectActivityListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onProjectUpdated(GitHubProjectEvent.ProjectUpdated event) {
         var projectData = event.project();
-        if (!hasValidScopeId("Project updated", projectData.id(), event.context().scopeId())) {
+        if (!hasValidScopeId(
+                "Project updated", projectData.id(), event.context().scopeId())) {
             return;
         }
         Instant occurredAt = projectData.updatedAt() != null ? projectData.updatedAt() : Instant.now();
         Long actorId = projectData.actorId() != null ? projectData.actorId() : projectData.creatorId();
-        safeRecord("project updated", projectData.id(), () ->
-            activityRecorder.record(
-                Objects.requireNonNull(event.context().scopeId()),
-                ActivityEventType.PROJECT_UPDATED,
-                occurredAt,
-                getActorOrNull(actorId),
-                getRepositoryForProject(projectData),
-                ActivityTargetType.PROJECT,
+        safeRecord(
+                "project updated",
                 projectData.id(),
-                0.0
-            )
-        );
+                () -> activityRecorder.record(
+                        Objects.requireNonNull(event.context().scopeId()),
+                        ActivityEventType.PROJECT_UPDATED,
+                        occurredAt,
+                        getActorOrNull(actorId),
+                        getRepositoryForProject(projectData),
+                        ActivityTargetType.PROJECT,
+                        projectData.id(),
+                        0.0));
     }
 
     @Async
@@ -117,25 +116,22 @@ public class GitHubProjectActivityListener {
         if (!hasValidScopeId("Project closed", projectData.id(), event.context().scopeId())) {
             return;
         }
-        Instant occurredAt =
-            projectData.closedAt() != null
+        Instant occurredAt = projectData.closedAt() != null
                 ? projectData.closedAt()
-                : projectData.updatedAt() != null
-                    ? projectData.updatedAt()
-                    : Instant.now();
+                : projectData.updatedAt() != null ? projectData.updatedAt() : Instant.now();
         Long actorId = projectData.actorId() != null ? projectData.actorId() : projectData.creatorId();
-        safeRecord("project closed", projectData.id(), () ->
-            activityRecorder.record(
-                Objects.requireNonNull(event.context().scopeId()),
-                ActivityEventType.PROJECT_CLOSED,
-                occurredAt,
-                getActorOrNull(actorId),
-                getRepositoryForProject(projectData),
-                ActivityTargetType.PROJECT,
+        safeRecord(
+                "project closed",
                 projectData.id(),
-                0.0
-            )
-        );
+                () -> activityRecorder.record(
+                        Objects.requireNonNull(event.context().scopeId()),
+                        ActivityEventType.PROJECT_CLOSED,
+                        occurredAt,
+                        getActorOrNull(actorId),
+                        getRepositoryForProject(projectData),
+                        ActivityTargetType.PROJECT,
+                        projectData.id(),
+                        0.0));
     }
 
     @Async
@@ -143,23 +139,24 @@ public class GitHubProjectActivityListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onProjectReopened(GitHubProjectEvent.ProjectReopened event) {
         var projectData = event.project();
-        if (!hasValidScopeId("Project reopened", projectData.id(), event.context().scopeId())) {
+        if (!hasValidScopeId(
+                "Project reopened", projectData.id(), event.context().scopeId())) {
             return;
         }
         Instant occurredAt = projectData.updatedAt() != null ? projectData.updatedAt() : Instant.now();
         Long actorId = projectData.actorId() != null ? projectData.actorId() : projectData.creatorId();
-        safeRecord("project reopened", projectData.id(), () ->
-            activityRecorder.record(
-                Objects.requireNonNull(event.context().scopeId()),
-                ActivityEventType.PROJECT_REOPENED,
-                occurredAt,
-                getActorOrNull(actorId),
-                getRepositoryForProject(projectData),
-                ActivityTargetType.PROJECT,
+        safeRecord(
+                "project reopened",
                 projectData.id(),
-                0.0
-            )
-        );
+                () -> activityRecorder.record(
+                        Objects.requireNonNull(event.context().scopeId()),
+                        ActivityEventType.PROJECT_REOPENED,
+                        occurredAt,
+                        getActorOrNull(actorId),
+                        getRepositoryForProject(projectData),
+                        ActivityTargetType.PROJECT,
+                        projectData.id(),
+                        0.0));
     }
 
     @Async
@@ -172,15 +169,15 @@ public class GitHubProjectActivityListener {
         }
         Long scopeId = Objects.requireNonNull(event.context().scopeId());
         log.debug("Recording project deleted event: projectId={}", projectId);
-        safeRecord("project deleted", projectId, () ->
-            activityRecorder.recordDeleted(
-                scopeId,
-                ActivityEventType.PROJECT_DELETED,
-                Instant.now(),
-                ActivityTargetType.PROJECT,
-                projectId
-            )
-        );
+        safeRecord(
+                "project deleted",
+                projectId,
+                () -> activityRecorder.recordDeleted(
+                        scopeId,
+                        ActivityEventType.PROJECT_DELETED,
+                        Instant.now(),
+                        ActivityTargetType.PROJECT,
+                        projectId));
     }
 
     // Project Item Events
@@ -190,28 +187,26 @@ public class GitHubProjectActivityListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onProjectItemCreated(GitHubProjectEvent.ProjectItemCreated event) {
         var itemData = event.item();
-        if (!hasValidScopeId("Project item created", itemData.id(), event.context().scopeId())) {
+        if (!hasValidScopeId(
+                "Project item created", itemData.id(), event.context().scopeId())) {
             return;
         }
-        Instant occurredAt =
-            itemData.createdAt() != null
+        Instant occurredAt = itemData.createdAt() != null
                 ? itemData.createdAt()
-                : itemData.updatedAt() != null
-                    ? itemData.updatedAt()
-                    : Instant.now();
+                : itemData.updatedAt() != null ? itemData.updatedAt() : Instant.now();
         User actor = getActorOrNull(itemData.actorId());
-        safeRecord("project item created", itemData.id(), () ->
-            activityRecorder.record(
-                Objects.requireNonNull(event.context().scopeId()),
-                ActivityEventType.PROJECT_ITEM_CREATED,
-                occurredAt,
-                actor,
-                resolveRepositoryForProjectItem(itemData, event.projectId()),
-                ActivityTargetType.PROJECT_ITEM,
+        safeRecord(
+                "project item created",
                 itemData.id(),
-                0.0
-            )
-        );
+                () -> activityRecorder.record(
+                        Objects.requireNonNull(event.context().scopeId()),
+                        ActivityEventType.PROJECT_ITEM_CREATED,
+                        occurredAt,
+                        actor,
+                        resolveRepositoryForProjectItem(itemData, event.projectId()),
+                        ActivityTargetType.PROJECT_ITEM,
+                        itemData.id(),
+                        0.0));
     }
 
     @Async
@@ -219,22 +214,23 @@ public class GitHubProjectActivityListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onProjectItemUpdated(GitHubProjectEvent.ProjectItemUpdated event) {
         var itemData = event.item();
-        if (!hasValidScopeId("Project item updated", itemData.id(), event.context().scopeId())) {
+        if (!hasValidScopeId(
+                "Project item updated", itemData.id(), event.context().scopeId())) {
             return;
         }
         Instant occurredAt = itemData.updatedAt() != null ? itemData.updatedAt() : Instant.now();
-        safeRecord("project item updated", itemData.id(), () ->
-            activityRecorder.record(
-                Objects.requireNonNull(event.context().scopeId()),
-                ActivityEventType.PROJECT_ITEM_UPDATED,
-                occurredAt,
-                getActorOrNull(itemData.actorId()),
-                resolveRepositoryForProjectItem(itemData, event.projectId()),
-                ActivityTargetType.PROJECT_ITEM,
+        safeRecord(
+                "project item updated",
                 itemData.id(),
-                0.0
-            )
-        );
+                () -> activityRecorder.record(
+                        Objects.requireNonNull(event.context().scopeId()),
+                        ActivityEventType.PROJECT_ITEM_UPDATED,
+                        occurredAt,
+                        getActorOrNull(itemData.actorId()),
+                        resolveRepositoryForProjectItem(itemData, event.projectId()),
+                        ActivityTargetType.PROJECT_ITEM,
+                        itemData.id(),
+                        0.0));
     }
 
     @Async
@@ -242,22 +238,23 @@ public class GitHubProjectActivityListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onProjectItemArchived(GitHubProjectEvent.ProjectItemArchived event) {
         var itemData = event.item();
-        if (!hasValidScopeId("Project item archived", itemData.id(), event.context().scopeId())) {
+        if (!hasValidScopeId(
+                "Project item archived", itemData.id(), event.context().scopeId())) {
             return;
         }
         Instant occurredAt = itemData.updatedAt() != null ? itemData.updatedAt() : Instant.now();
-        safeRecord("project item archived", itemData.id(), () ->
-            activityRecorder.record(
-                Objects.requireNonNull(event.context().scopeId()),
-                ActivityEventType.PROJECT_ITEM_ARCHIVED,
-                occurredAt,
-                getActorOrNull(itemData.actorId()),
-                resolveRepositoryForProjectItem(itemData, event.projectId()),
-                ActivityTargetType.PROJECT_ITEM,
+        safeRecord(
+                "project item archived",
                 itemData.id(),
-                0.0
-            )
-        );
+                () -> activityRecorder.record(
+                        Objects.requireNonNull(event.context().scopeId()),
+                        ActivityEventType.PROJECT_ITEM_ARCHIVED,
+                        occurredAt,
+                        getActorOrNull(itemData.actorId()),
+                        resolveRepositoryForProjectItem(itemData, event.projectId()),
+                        ActivityTargetType.PROJECT_ITEM,
+                        itemData.id(),
+                        0.0));
     }
 
     @Async
@@ -265,22 +262,23 @@ public class GitHubProjectActivityListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onProjectItemRestored(GitHubProjectEvent.ProjectItemRestored event) {
         var itemData = event.item();
-        if (!hasValidScopeId("Project item restored", itemData.id(), event.context().scopeId())) {
+        if (!hasValidScopeId(
+                "Project item restored", itemData.id(), event.context().scopeId())) {
             return;
         }
         Instant occurredAt = itemData.updatedAt() != null ? itemData.updatedAt() : Instant.now();
-        safeRecord("project item restored", itemData.id(), () ->
-            activityRecorder.record(
-                Objects.requireNonNull(event.context().scopeId()),
-                ActivityEventType.PROJECT_ITEM_RESTORED,
-                occurredAt,
-                getActorOrNull(itemData.actorId()),
-                resolveRepositoryForProjectItem(itemData, event.projectId()),
-                ActivityTargetType.PROJECT_ITEM,
+        safeRecord(
+                "project item restored",
                 itemData.id(),
-                0.0
-            )
-        );
+                () -> activityRecorder.record(
+                        Objects.requireNonNull(event.context().scopeId()),
+                        ActivityEventType.PROJECT_ITEM_RESTORED,
+                        occurredAt,
+                        getActorOrNull(itemData.actorId()),
+                        resolveRepositoryForProjectItem(itemData, event.projectId()),
+                        ActivityTargetType.PROJECT_ITEM,
+                        itemData.id(),
+                        0.0));
     }
 
     @Async
@@ -292,18 +290,18 @@ public class GitHubProjectActivityListener {
             return;
         }
         log.debug("Recording project item deleted event: itemId={}", itemId);
-        safeRecord("project item deleted", itemId, () ->
-            activityRecorder.record(
-                Objects.requireNonNull(event.context().scopeId()),
-                ActivityEventType.PROJECT_ITEM_DELETED,
-                Instant.now(),
-                null,
-                resolveRepositoryForProjectId(event.projectId()),
-                ActivityTargetType.PROJECT_ITEM,
+        safeRecord(
+                "project item deleted",
                 itemId,
-                0.0
-            )
-        );
+                () -> activityRecorder.record(
+                        Objects.requireNonNull(event.context().scopeId()),
+                        ActivityEventType.PROJECT_ITEM_DELETED,
+                        Instant.now(),
+                        null,
+                        resolveRepositoryForProjectId(event.projectId()),
+                        ActivityTargetType.PROJECT_ITEM,
+                        itemId,
+                        0.0));
     }
 
     @Async
@@ -311,22 +309,23 @@ public class GitHubProjectActivityListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onProjectItemConverted(GitHubProjectEvent.ProjectItemConverted event) {
         var itemData = event.item();
-        if (!hasValidScopeId("Project item converted", itemData.id(), event.context().scopeId())) {
+        if (!hasValidScopeId(
+                "Project item converted", itemData.id(), event.context().scopeId())) {
             return;
         }
         Instant occurredAt = itemData.updatedAt() != null ? itemData.updatedAt() : Instant.now();
-        safeRecord("project item converted", itemData.id(), () ->
-            activityRecorder.record(
-                Objects.requireNonNull(event.context().scopeId()),
-                ActivityEventType.PROJECT_ITEM_CONVERTED,
-                occurredAt,
-                getActorOrNull(itemData.actorId()),
-                resolveRepositoryForProjectItem(itemData, event.projectId()),
-                ActivityTargetType.PROJECT_ITEM,
+        safeRecord(
+                "project item converted",
                 itemData.id(),
-                0.0
-            )
-        );
+                () -> activityRecorder.record(
+                        Objects.requireNonNull(event.context().scopeId()),
+                        ActivityEventType.PROJECT_ITEM_CONVERTED,
+                        occurredAt,
+                        getActorOrNull(itemData.actorId()),
+                        resolveRepositoryForProjectItem(itemData, event.projectId()),
+                        ActivityTargetType.PROJECT_ITEM,
+                        itemData.id(),
+                        0.0));
     }
 
     @Async
@@ -334,22 +333,23 @@ public class GitHubProjectActivityListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onProjectItemReordered(GitHubProjectEvent.ProjectItemReordered event) {
         var itemData = event.item();
-        if (!hasValidScopeId("Project item reordered", itemData.id(), event.context().scopeId())) {
+        if (!hasValidScopeId(
+                "Project item reordered", itemData.id(), event.context().scopeId())) {
             return;
         }
         Instant occurredAt = itemData.updatedAt() != null ? itemData.updatedAt() : Instant.now();
-        safeRecord("project item reordered", itemData.id(), () ->
-            activityRecorder.record(
-                Objects.requireNonNull(event.context().scopeId()),
-                ActivityEventType.PROJECT_ITEM_REORDERED,
-                occurredAt,
-                getActorOrNull(itemData.actorId()),
-                resolveRepositoryForProjectItem(itemData, event.projectId()),
-                ActivityTargetType.PROJECT_ITEM,
+        safeRecord(
+                "project item reordered",
                 itemData.id(),
-                0.0
-            )
-        );
+                () -> activityRecorder.record(
+                        Objects.requireNonNull(event.context().scopeId()),
+                        ActivityEventType.PROJECT_ITEM_REORDERED,
+                        occurredAt,
+                        getActorOrNull(itemData.actorId()),
+                        resolveRepositoryForProjectItem(itemData, event.projectId()),
+                        ActivityTargetType.PROJECT_ITEM,
+                        itemData.id(),
+                        0.0));
     }
 
     // Project Status Update Events
@@ -359,23 +359,25 @@ public class GitHubProjectActivityListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onProjectStatusUpdateCreated(GitHubProjectEvent.ProjectStatusUpdateCreated event) {
         var data = event.statusUpdate();
-        if (!hasValidScopeId("Project status update created", data.id(), event.context().scopeId())) {
+        if (!hasValidScopeId(
+                "Project status update created", data.id(), event.context().scopeId())) {
             return;
         }
-        Instant occurredAt =
-            data.createdAt() != null ? data.createdAt() : data.updatedAt() != null ? data.updatedAt() : Instant.now();
-        safeRecord("project status update created", data.id(), () ->
-            activityRecorder.record(
-                Objects.requireNonNull(event.context().scopeId()),
-                ActivityEventType.PROJECT_STATUS_UPDATE_CREATED,
-                occurredAt,
-                getActorOrNull(data.creatorId()),
-                resolveRepositoryForProjectId(event.projectId()),
-                ActivityTargetType.PROJECT_STATUS_UPDATE,
+        Instant occurredAt = data.createdAt() != null
+                ? data.createdAt()
+                : data.updatedAt() != null ? data.updatedAt() : Instant.now();
+        safeRecord(
+                "project status update created",
                 data.id(),
-                0.0
-            )
-        );
+                () -> activityRecorder.record(
+                        Objects.requireNonNull(event.context().scopeId()),
+                        ActivityEventType.PROJECT_STATUS_UPDATE_CREATED,
+                        occurredAt,
+                        getActorOrNull(data.creatorId()),
+                        resolveRepositoryForProjectId(event.projectId()),
+                        ActivityTargetType.PROJECT_STATUS_UPDATE,
+                        data.id(),
+                        0.0));
     }
 
     @Async
@@ -383,22 +385,23 @@ public class GitHubProjectActivityListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onProjectStatusUpdateUpdated(GitHubProjectEvent.ProjectStatusUpdateUpdated event) {
         var data = event.statusUpdate();
-        if (!hasValidScopeId("Project status update updated", data.id(), event.context().scopeId())) {
+        if (!hasValidScopeId(
+                "Project status update updated", data.id(), event.context().scopeId())) {
             return;
         }
         Instant occurredAt = data.updatedAt() != null ? data.updatedAt() : Instant.now();
-        safeRecord("project status update updated", data.id(), () ->
-            activityRecorder.record(
-                Objects.requireNonNull(event.context().scopeId()),
-                ActivityEventType.PROJECT_STATUS_UPDATE_UPDATED,
-                occurredAt,
-                getActorOrNull(data.creatorId()),
-                resolveRepositoryForProjectId(event.projectId()),
-                ActivityTargetType.PROJECT_STATUS_UPDATE,
+        safeRecord(
+                "project status update updated",
                 data.id(),
-                0.0
-            )
-        );
+                () -> activityRecorder.record(
+                        Objects.requireNonNull(event.context().scopeId()),
+                        ActivityEventType.PROJECT_STATUS_UPDATE_UPDATED,
+                        occurredAt,
+                        getActorOrNull(data.creatorId()),
+                        resolveRepositoryForProjectId(event.projectId()),
+                        ActivityTargetType.PROJECT_STATUS_UPDATE,
+                        data.id(),
+                        0.0));
     }
 
     @Async
@@ -406,21 +409,22 @@ public class GitHubProjectActivityListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onProjectStatusUpdateDeleted(GitHubProjectEvent.ProjectStatusUpdateDeleted event) {
         Long id = event.statusUpdateId();
-        if (!hasValidScopeId("Project status update deleted", id, event.context().scopeId())) {
+        if (!hasValidScopeId(
+                "Project status update deleted", id, event.context().scopeId())) {
             return;
         }
-        safeRecord("project status update deleted", id, () ->
-            activityRecorder.record(
-                Objects.requireNonNull(event.context().scopeId()),
-                ActivityEventType.PROJECT_STATUS_UPDATE_DELETED,
-                Instant.now(),
-                null,
-                resolveRepositoryForProjectId(event.projectId()),
-                ActivityTargetType.PROJECT_STATUS_UPDATE,
+        safeRecord(
+                "project status update deleted",
                 id,
-                0.0
-            )
-        );
+                () -> activityRecorder.record(
+                        Objects.requireNonNull(event.context().scopeId()),
+                        ActivityEventType.PROJECT_STATUS_UPDATE_DELETED,
+                        Instant.now(),
+                        null,
+                        resolveRepositoryForProjectId(event.projectId()),
+                        ActivityTargetType.PROJECT_STATUS_UPDATE,
+                        id,
+                        0.0));
     }
 
     // Helpers (mirrored from ActivityEventListener — see class javadoc)
@@ -474,16 +478,15 @@ public class GitHubProjectActivityListener {
 
     @Nullable
     private Repository resolveRepositoryForProjectItem(
-        GitHubProjectEventPayload.ProjectItemData itemData,
-        @Nullable Long projectId
-    ) {
+            GitHubProjectEventPayload.ProjectItemData itemData, @Nullable Long projectId) {
         if (itemData == null) {
             return resolveRepositoryForProjectId(projectId);
         }
         if (itemData.issueId() != null) {
             var issue = issueRepository.findById(itemData.issueId()).orElse(null);
             if (issue != null && issue.getRepository() != null) {
-                return repositoryRepository.getReferenceById(issue.getRepository().getId());
+                return repositoryRepository.getReferenceById(
+                        issue.getRepository().getId());
             }
         }
         return resolveRepositoryForProjectId(projectId);

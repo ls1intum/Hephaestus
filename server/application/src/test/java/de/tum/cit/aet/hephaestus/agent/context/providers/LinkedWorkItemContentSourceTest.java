@@ -56,12 +56,7 @@ class LinkedWorkItemContentSourceTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         provider = new LinkedWorkItemContentSource(
-            objectMapper,
-            pullRequestRepository,
-            issueRepository,
-            gitRepositoryManager,
-            gitDiffOperations
-        );
+                objectMapper, pullRequestRepository, issueRepository, gitRepositoryManager, gitDiffOperations);
         // Git disabled by default; the commit-subject scan must no-op. Individual tests enable it.
         lenient().when(gitRepositoryManager.isEnabled()).thenReturn(false);
     }
@@ -147,15 +142,15 @@ class LinkedWorkItemContentSourceTest extends BaseUnitTest {
         PullRequest pr = new PullRequest();
         pr.setBody("Related to #7 — see context.");
         when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
-        when(issueRepository.findByRepositoryIdAndNumber(REPO_ID, 7)).thenReturn(
-            Optional.of(issue(7, "Background", "Some background"))
-        );
+        when(issueRepository.findByRepositoryIdAndNumber(REPO_ID, 7))
+                .thenReturn(Optional.of(issue(7, "Background", "Some background")));
 
         Map<String, byte[]> files = new LinkedHashMap<>();
         provider.contribute(request(sampleMetadata()), files);
 
         JsonNode root = objectMapper.readTree(files.get("inputs/context/linked_work_items.json"));
-        assertThat(root.get("workItems").get(0).get("closingKeyword").asBoolean()).isFalse();
+        assertThat(root.get("workItems").get(0).get("closingKeyword").asBoolean())
+                .isFalse();
     }
 
     @Test
@@ -165,9 +160,8 @@ class LinkedWorkItemContentSourceTest extends BaseUnitTest {
         PullRequest pr = new PullRequest();
         pr.setBody("This work relates to #42. It also touches the version bump #1.2 which is not an issue.");
         when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
-        when(issueRepository.findByRepositoryIdAndNumber(REPO_ID, 42)).thenReturn(
-            Optional.of(issue(42, "Trailing period ref", "Some body"))
-        );
+        when(issueRepository.findByRepositoryIdAndNumber(REPO_ID, 42))
+                .thenReturn(Optional.of(issue(42, "Trailing period ref", "Some body")));
 
         Map<String, byte[]> files = new LinkedHashMap<>();
         provider.contribute(request(sampleMetadata()), files);
@@ -187,9 +181,8 @@ class LinkedWorkItemContentSourceTest extends BaseUnitTest {
         pr.setBody("No references in body.");
         pr.setHeadRefName("feat/18-improve-logging");
         when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
-        when(issueRepository.findByRepositoryIdAndNumber(REPO_ID, 18)).thenReturn(
-            Optional.of(issue(18, "Improve logging", "criteria"))
-        );
+        when(issueRepository.findByRepositoryIdAndNumber(REPO_ID, 18))
+                .thenReturn(Optional.of(issue(18, "Improve logging", "criteria")));
 
         ObjectNode metadata = sampleMetadata();
         metadata.put("source_branch", "feat/18-improve-logging");
@@ -208,17 +201,15 @@ class LinkedWorkItemContentSourceTest extends BaseUnitTest {
         pr.setBody("Fixes #5");
         when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
         String longBody = "x".repeat(2000);
-        when(issueRepository.findByRepositoryIdAndNumber(REPO_ID, 5)).thenReturn(
-            Optional.of(issue(5, "Big", longBody))
-        );
+        when(issueRepository.findByRepositoryIdAndNumber(REPO_ID, 5))
+                .thenReturn(Optional.of(issue(5, "Big", longBody)));
 
         Map<String, byte[]> files = new LinkedHashMap<>();
         provider.contribute(request(sampleMetadata()), files);
 
         JsonNode root = objectMapper.readTree(files.get("inputs/context/linked_work_items.json"));
-        assertThat(root.get("workItems").get(0).get("bodyExcerpt").asString()).hasSize(
-            LinkedWorkItemContentSource.EXCERPT_CHARS
-        );
+        assertThat(root.get("workItems").get(0).get("bodyExcerpt").asString())
+                .hasSize(LinkedWorkItemContentSource.EXCERPT_CHARS);
     }
 
     @Test
@@ -272,9 +263,10 @@ class LinkedWorkItemContentSourceTest extends BaseUnitTest {
         var captured = provider.capture(request(sampleMetadata()), provider.sourceKinds());
 
         assertThat(captured.completeness()).containsValue(SourceCompleteness.PARTIAL);
-        assertThat(
-            objectMapper.readTree(captured.files().get(LinkedWorkItemContentSource.OUTPUT_FILE)).path("workItems")
-        ).isEmpty();
+        assertThat(objectMapper
+                        .readTree(captured.files().get(LinkedWorkItemContentSource.OUTPUT_FILE))
+                        .path("workItems"))
+                .isEmpty();
     }
 
     @Test
@@ -282,9 +274,8 @@ class LinkedWorkItemContentSourceTest extends BaseUnitTest {
         var job = new AgentJob();
         var req = new ContextRequest.PracticeReviewRequest(job);
 
-        assertThatExceptionOfType(EvidenceCollectionException.class).isThrownBy(() ->
-            provider.capture(req, provider.sourceKinds())
-        );
+        assertThatExceptionOfType(EvidenceCollectionException.class)
+                .isThrownBy(() -> provider.capture(req, provider.sourceKinds()));
     }
 
     @Test
@@ -292,9 +283,8 @@ class LinkedWorkItemContentSourceTest extends BaseUnitTest {
         ObjectNode metadata = objectMapper.createObjectNode();
         metadata.put("pull_request_id", PR_ID);
 
-        assertThatExceptionOfType(EvidenceCollectionException.class).isThrownBy(() ->
-            provider.capture(request(metadata), provider.sourceKinds())
-        );
+        assertThatExceptionOfType(EvidenceCollectionException.class)
+                .isThrownBy(() -> provider.capture(request(metadata), provider.sourceKinds()));
     }
 
     @Test
@@ -305,9 +295,8 @@ class LinkedWorkItemContentSourceTest extends BaseUnitTest {
         when(issueRepository.findByRepositoryIdAndNumber(REPO_ID, 42)).thenThrow(new RuntimeException("DB down"));
 
         Map<String, byte[]> files = new LinkedHashMap<>();
-        assertThatExceptionOfType(EvidenceCollectionException.class).isThrownBy(() ->
-            provider.contribute(request(sampleMetadata()), files)
-        );
+        assertThatExceptionOfType(EvidenceCollectionException.class)
+                .isThrownBy(() -> provider.contribute(request(sampleMetadata()), files));
         assertThat(files).isEmpty();
     }
 
@@ -322,34 +311,27 @@ class LinkedWorkItemContentSourceTest extends BaseUnitTest {
         when(gitRepositoryManager.isEnabled()).thenReturn(true);
         when(gitRepositoryManager.isRepositoryCloned(REPO_ID)).thenReturn(true);
         when(gitRepositoryManager.getRepositoryPath(REPO_ID)).thenReturn(java.nio.file.Path.of("/tmp/repo/123"));
-        when(
-            gitDiffOperations.resolveDiffRange(
-                java.nio.file.Path.of("/tmp/repo/123"),
-                "main",
-                "feature/plain",
-                "abc123def456"
-            )
-        ).thenReturn(new String[] { "base", "head" });
+        when(gitDiffOperations.resolveDiffRange(
+                        java.nio.file.Path.of("/tmp/repo/123"), "main", "feature/plain", "abc123def456"))
+                .thenReturn(new String[] {"base", "head"});
         var commit = new GitRepositoryManager.CommitInfo(
-            "sha1",
-            "fix: resolve crash, fixes #77",
-            null,
-            "Author",
-            "author@example.com",
-            java.time.Instant.now(),
-            "Author",
-            "author@example.com",
-            java.time.Instant.now(),
-            1,
-            0,
-            1,
-            List.of(),
-            List.of()
-        );
+                "sha1",
+                "fix: resolve crash, fixes #77",
+                null,
+                "Author",
+                "author@example.com",
+                java.time.Instant.now(),
+                "Author",
+                "author@example.com",
+                java.time.Instant.now(),
+                1,
+                0,
+                1,
+                List.of(),
+                List.of());
         when(gitRepositoryManager.walkCommits(REPO_ID, "base", "head", 501)).thenReturn(List.of(commit));
-        when(issueRepository.findByRepositoryIdAndNumber(REPO_ID, 77)).thenReturn(
-            Optional.of(issue(77, "Crash on launch", "criteria"))
-        );
+        when(issueRepository.findByRepositoryIdAndNumber(REPO_ID, 77))
+                .thenReturn(Optional.of(issue(77, "Crash on launch", "criteria")));
 
         ObjectNode metadata = sampleMetadata();
         metadata.put("source_branch", "feature/plain");
@@ -359,7 +341,8 @@ class LinkedWorkItemContentSourceTest extends BaseUnitTest {
 
         JsonNode root = objectMapper.readTree(files.get("inputs/context/linked_work_items.json"));
         assertThat(root.get("workItems").get(0).get("number").asInt()).isEqualTo(77);
-        assertThat(root.get("workItems").get(0).get("closingKeyword").asBoolean()).isTrue();
+        assertThat(root.get("workItems").get(0).get("closingKeyword").asBoolean())
+                .isTrue();
         assertThat(root.get("resolvedFrom").toString()).contains("commits");
     }
 
@@ -373,9 +356,8 @@ class LinkedWorkItemContentSourceTest extends BaseUnitTest {
         when(gitRepositoryManager.isRepositoryCloned(REPO_ID)).thenReturn(true);
         var repoPath = java.nio.file.Path.of("/tmp/repo/123");
         when(gitRepositoryManager.getRepositoryPath(REPO_ID)).thenReturn(repoPath);
-        when(gitDiffOperations.resolveDiffRange(repoPath, "main", "feature/plain", "abc123def456")).thenReturn(
-            new String[] { "base", "head" }
-        );
+        when(gitDiffOperations.resolveDiffRange(repoPath, "main", "feature/plain", "abc123def456"))
+                .thenReturn(new String[] {"base", "head"});
         when(gitRepositoryManager.walkCommits(REPO_ID, "base", "head", 501)).thenReturn(List.of());
 
         ObjectNode metadata = sampleMetadata();
@@ -386,9 +368,10 @@ class LinkedWorkItemContentSourceTest extends BaseUnitTest {
         // to this scan, so even an exhaustive one stays PARTIAL rather than COMPLETE.
         assertThat(captured.completeness()).containsValue(SourceCompleteness.PARTIAL);
         assertThat(captured.contentStates()).containsValue(SourceContentState.EMPTY);
-        assertThat(
-            objectMapper.readTree(captured.files().get(LinkedWorkItemContentSource.OUTPUT_FILE)).path("workItems")
-        ).isEmpty();
+        assertThat(objectMapper
+                        .readTree(captured.files().get(LinkedWorkItemContentSource.OUTPUT_FILE))
+                        .path("workItems"))
+                .isEmpty();
     }
 
     @Test
@@ -401,34 +384,30 @@ class LinkedWorkItemContentSourceTest extends BaseUnitTest {
         when(gitRepositoryManager.isRepositoryCloned(REPO_ID)).thenReturn(true);
         var repoPath = java.nio.file.Path.of("/tmp/repo/123");
         when(gitRepositoryManager.getRepositoryPath(REPO_ID)).thenReturn(repoPath);
-        when(gitDiffOperations.resolveDiffRange(repoPath, "main", "feature/plain", "abc123def456")).thenReturn(
-            new String[] { "base", "head" }
-        );
+        when(gitDiffOperations.resolveDiffRange(repoPath, "main", "feature/plain", "abc123def456"))
+                .thenReturn(new String[] {"base", "head"});
         var commit = new GitRepositoryManager.CommitInfo(
-            "sha",
-            "ordinary change",
-            null,
-            "Author",
-            "author@example.com",
-            java.time.Instant.EPOCH,
-            "Author",
-            "author@example.com",
-            java.time.Instant.EPOCH,
-            1,
-            0,
-            1,
-            List.of(),
-            List.of()
-        );
-        when(gitRepositoryManager.walkCommits(REPO_ID, "base", "head", 501)).thenReturn(
-            java.util.Collections.nCopies(501, commit)
-        );
+                "sha",
+                "ordinary change",
+                null,
+                "Author",
+                "author@example.com",
+                java.time.Instant.EPOCH,
+                "Author",
+                "author@example.com",
+                java.time.Instant.EPOCH,
+                1,
+                0,
+                1,
+                List.of(),
+                List.of());
+        when(gitRepositoryManager.walkCommits(REPO_ID, "base", "head", 501))
+                .thenReturn(java.util.Collections.nCopies(501, commit));
 
         ObjectNode metadata = sampleMetadata();
         metadata.put("source_branch", "feature/plain");
 
-        assertThat(provider.capture(request(metadata), provider.sourceKinds()).completeness()).containsValue(
-            SourceCompleteness.PARTIAL
-        );
+        assertThat(provider.capture(request(metadata), provider.sourceKinds()).completeness())
+                .containsValue(SourceCompleteness.PARTIAL);
     }
 }

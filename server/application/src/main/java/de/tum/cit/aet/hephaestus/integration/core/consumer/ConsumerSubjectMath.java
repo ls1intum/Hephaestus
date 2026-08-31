@@ -23,15 +23,14 @@ public final class ConsumerSubjectMath {
 
     /** Subject-prefix allow-list — the kinds that publish to JetStream. */
     private static final Map<String, IntegrationKind> PREFIX_TO_KIND = Map.of(
-        "github",
-        IntegrationKind.GITHUB,
-        "gitlab",
-        IntegrationKind.GITLAB,
-        "slack",
-        IntegrationKind.SLACK,
-        "outline",
-        IntegrationKind.OUTLINE
-    );
+            "github",
+            IntegrationKind.GITHUB,
+            "gitlab",
+            IntegrationKind.GITLAB,
+            "slack",
+            IntegrationKind.SLACK,
+            "outline",
+            IntegrationKind.OUTLINE);
 
     private ConsumerSubjectMath() {}
 
@@ -57,19 +56,14 @@ public final class ConsumerSubjectMath {
         String sanitized = nameWithOwner.trim().replace(".", "~");
         String[] parts = sanitized.split("/", -1);
         if (Arrays.stream(parts).anyMatch(String::isBlank)) {
-            throw new IllegalArgumentException(
-                String.format("Invalid repository format: '%s'. Empty path segments are not allowed.", nameWithOwner)
-            );
+            throw new IllegalArgumentException(String.format(
+                    "Invalid repository format: '%s'. Empty path segments are not allowed.", nameWithOwner));
         }
 
         if ("gitlab".equals(streamName)) {
             if (parts.length < 2) {
-                throw new IllegalArgumentException(
-                    String.format(
-                        "Invalid GitLab repository format: '%s'. Expected 'namespace/project'.",
-                        nameWithOwner
-                    )
-                );
+                throw new IllegalArgumentException(String.format(
+                        "Invalid GitLab repository format: '%s'. Expected 'namespace/project'.", nameWithOwner));
             }
             String namespace = String.join("~", Arrays.copyOfRange(parts, 0, parts.length - 1));
             String project = parts[parts.length - 1];
@@ -77,9 +71,8 @@ public final class ConsumerSubjectMath {
         }
 
         if (parts.length != 2) {
-            throw new IllegalArgumentException(
-                String.format("Invalid repository format: '%s'. Expected format 'owner/repository'.", nameWithOwner)
-            );
+            throw new IllegalArgumentException(String.format(
+                    "Invalid repository format: '%s'. Expected format 'owner/repository'.", nameWithOwner));
         }
         return streamName + "." + parts[0] + "." + parts[1];
     }
@@ -123,11 +116,9 @@ public final class ConsumerSubjectMath {
         }
         return switch (kind) {
             case GITHUB -> buildSubjectPrefix("github", "?/?") + ".>";
-            case GITLAB, SLACK, OUTLINE -> throw new UnsupportedOperationException(
-                "Installation-aware subject filter not yet supported for kind=" +
-                    kind +
-                    " (only GITHUB publishes installation events today)"
-            );
+            case GITLAB, SLACK, OUTLINE ->
+                throw new UnsupportedOperationException("Installation-aware subject filter not yet supported for kind="
+                        + kind + " (only GITHUB publishes installation events today)");
         };
     }
 

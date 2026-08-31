@@ -32,9 +32,7 @@ public class GitLabCommentReactionSink implements ScmCommentReactionSink {
     private final OutboundEgressGuard egressGuard;
 
     public GitLabCommentReactionSink(
-        GitLabGraphQlClientProvider gitLabGraphQlProvider,
-        OutboundEgressGuard egressGuard
-    ) {
+            GitLabGraphQlClientProvider gitLabGraphQlProvider, OutboundEgressGuard egressGuard) {
         this.gitLabGraphQlProvider = gitLabGraphQlProvider;
         this.egressGuard = egressGuard;
     }
@@ -50,38 +48,35 @@ public class GitLabCommentReactionSink implements ScmCommentReactionSink {
             String awardableId = "gid://gitlab/Note/" + commentNativeId;
             egressGuard.requireDeliveryAllowed("gitlab.react-to-comment");
             var response = gitLabGraphQlProvider
-                .forScope(scopeId)
-                .documentName("AwardEmojiAdd")
-                .variable("awardableId", awardableId)
-                .variable("name", reactionName)
-                .execute()
-                .block(GRAPHQL_TIMEOUT);
+                    .forScope(scopeId)
+                    .documentName("AwardEmojiAdd")
+                    .variable("awardableId", awardableId)
+                    .variable("name", reactionName)
+                    .execute()
+                    .block(GRAPHQL_TIMEOUT);
 
             if (response != null && Objects.requireNonNull(response).isValid()) {
                 log.debug("Added {} reaction: noteId={}, scopeId={}", reactionName, commentNativeId, scopeId);
             } else {
                 log.debug(
-                    "{} reaction GraphQL response invalid: noteId={}, errors={}",
-                    reactionName,
-                    commentNativeId,
-                    response != null ? Objects.requireNonNull(response).getErrors() : "null"
-                );
+                        "{} reaction GraphQL response invalid: noteId={}, errors={}",
+                        reactionName,
+                        commentNativeId,
+                        response != null ? Objects.requireNonNull(response).getErrors() : "null");
             }
         } catch (OutboundEgressSuppressedException e) {
             log.debug(
-                "Suppressed GitLab comment reaction while instance Silent Mode is engaged: reactionName={}, noteId={}, scopeId={}",
-                reactionName,
-                commentNativeId,
-                scopeId
-            );
+                    "Suppressed GitLab comment reaction while instance Silent Mode is engaged: reactionName={}, noteId={}, scopeId={}",
+                    reactionName,
+                    commentNativeId,
+                    scopeId);
         } catch (Exception e) {
             log.debug(
-                "Failed to add {} reaction (non-fatal): noteId={}, scopeId={}, error={}",
-                reactionName,
-                commentNativeId,
-                scopeId,
-                e.getMessage()
-            );
+                    "Failed to add {} reaction (non-fatal): noteId={}, scopeId={}, error={}",
+                    reactionName,
+                    commentNativeId,
+                    scopeId,
+                    e.getMessage());
         }
     }
 }

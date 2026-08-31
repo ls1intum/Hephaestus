@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
+
 import { FacetMultiSelect } from "./FacetMultiSelect";
 
 const eventTypes = [

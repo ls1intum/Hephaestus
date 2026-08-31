@@ -31,8 +31,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @Component
 public class GitHubPullRequestReviewMessageHandler
-    extends AbstractIntegrationMessageHandler<GitHubPullRequestReviewEventDTO>
-{
+        extends AbstractIntegrationMessageHandler<GitHubPullRequestReviewEventDTO> {
 
     private static final Logger log = LoggerFactory.getLogger(GitHubPullRequestReviewMessageHandler.class);
 
@@ -40,18 +39,16 @@ public class GitHubPullRequestReviewMessageHandler
     private final GitHubPullRequestReviewProcessor reviewProcessor;
 
     GitHubPullRequestReviewMessageHandler(
-        ProcessingContextFactory contextFactory,
-        GitHubPullRequestReviewProcessor reviewProcessor,
-        NatsMessageDeserializer deserializer,
-        TransactionTemplate transactionTemplate
-    ) {
+            ProcessingContextFactory contextFactory,
+            GitHubPullRequestReviewProcessor reviewProcessor,
+            NatsMessageDeserializer deserializer,
+            TransactionTemplate transactionTemplate) {
         super(
-            IntegrationKind.GITHUB,
-            "repository." + GitHubEventType.PULL_REQUEST_REVIEW.getValue(),
-            GitHubPullRequestReviewEventDTO.class,
-            deserializer,
-            transactionTemplate
-        );
+                IntegrationKind.GITHUB,
+                "repository." + GitHubEventType.PULL_REQUEST_REVIEW.getValue(),
+                GitHubPullRequestReviewEventDTO.class,
+                deserializer,
+                transactionTemplate);
         this.contextFactory = contextFactory;
         this.reviewProcessor = reviewProcessor;
     }
@@ -67,12 +64,11 @@ public class GitHubPullRequestReviewMessageHandler
         }
 
         log.debug(
-            "Received pull_request_review event: action={}, prNumber={}, reviewId={}, repoName={}",
-            event.action(),
-            prDto.number(),
-            reviewDto.id(),
-            event.repository() != null ? sanitizeForLog(event.repository().fullName()) : "unknown"
-        );
+                "Received pull_request_review event: action={}, prNumber={}, reviewId={}, repoName={}",
+                event.action(),
+                prDto.number(),
+                reviewDto.id(),
+                event.repository() != null ? sanitizeForLog(event.repository().fullName()) : "unknown");
 
         ProcessingContext context = contextFactory.forWebhookEvent(event).orElse(null);
         if (context == null) {

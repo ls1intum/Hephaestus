@@ -41,9 +41,8 @@ import org.springframework.test.context.ActiveProfiles;
 @LiveGitHubTest
 public abstract class BaseGitHubLiveIntegrationTest extends BaseIntegrationTest {
 
-    private static final DateTimeFormatter SUFFIX_FORMATTER = DateTimeFormatter.ofPattern(
-        "yyyyMMdd-HHmmss-SSS"
-    ).withZone(ZoneOffset.UTC);
+    private static final DateTimeFormatter SUFFIX_FORMATTER =
+            DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss-SSS").withZone(ZoneOffset.UTC);
 
     @Autowired
     private Environment environment;
@@ -88,15 +87,12 @@ public abstract class BaseGitHubLiveIntegrationTest extends BaseIntegrationTest 
         // operations that the installation token can't perform (e.g., creating repos in
         // some orgs)
         Assumptions.assumeFalse(
-            missingAppId || missingKeyMaterial || missingInstallation,
-            () ->
-                "GitHub integration credentials missing. Missing: " +
-                (missingAppId ? "appId " : "") +
-                (missingKeyMaterial ? "privateKey " : "") +
-                (missingInstallation ? "installationId " : "") +
-                ". Copy application-live-local.example.yml to application-live-local.yml " +
-                "or provide environment overrides."
-        );
+                missingAppId || missingKeyMaterial || missingInstallation,
+                () -> "GitHub integration credentials missing. Missing: " + (missingAppId ? "appId " : "")
+                        + (missingKeyMaterial ? "privateKey " : "")
+                        + (missingInstallation ? "installationId " : "")
+                        + ". Copy application-live-local.example.yml to application-live-local.yml "
+                        + "or provide environment overrides.");
     }
 
     protected String githubOrganization() {

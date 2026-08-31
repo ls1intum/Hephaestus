@@ -54,8 +54,7 @@ class ArtifactSignalReaperClockIntegrationTest extends BaseIntegrationTest {
         // every workspace — so a leftover PENDING row from another test would land in this one's batches.
         databaseTestUtils.cleanDatabase();
         workspace = workspaces.save(
-            WorkspaceTestFixtures.activeWorkspace("reaper-clock-" + SLUG_SEQUENCE.incrementAndGet())
-        );
+                WorkspaceTestFixtures.activeWorkspace("reaper-clock-" + SLUG_SEQUENCE.incrementAndGet()));
     }
 
     @Test
@@ -78,8 +77,8 @@ class ArtifactSignalReaperClockIntegrationTest extends BaseIntegrationTest {
 
         assertThat(lapsedAt).as("still PENDING after 30 days of sweeps").isNotNull();
         assertThat(Duration.between(START, lapsedAt))
-            .isGreaterThanOrEqualTo(LAPSE_AFTER)
-            .isLessThan(LAPSE_AFTER.plus(SWEEP_INTERVAL.multipliedBy(2)));
+                .isGreaterThanOrEqualTo(LAPSE_AFTER)
+                .isLessThan(LAPSE_AFTER.plus(SWEEP_INTERVAL.multipliedBy(2)));
         assertThat(reload(key).getStateReason()).isEqualTo(SignalStateReason.PENDING_DEADLINE_EXCEEDED);
     }
 
@@ -106,8 +105,8 @@ class ArtifactSignalReaperClockIntegrationTest extends BaseIntegrationTest {
 
         assertThat(lapsedAt).as("still PENDING after 30 days of sweeps").isNotNull();
         assertThat(Duration.between(START, lapsedAt))
-            .isGreaterThanOrEqualTo(LAPSE_AFTER)
-            .isLessThan(LAPSE_AFTER.plus(SWEEP_INTERVAL.multipliedBy(2)));
+                .isGreaterThanOrEqualTo(LAPSE_AFTER)
+                .isLessThan(LAPSE_AFTER.plus(SWEEP_INTERVAL.multipliedBy(2)));
     }
 
     @Test
@@ -136,7 +135,9 @@ class ArtifactSignalReaperClockIntegrationTest extends BaseIntegrationTest {
 
         ArtifactSignal stillPending = reload(key);
         assertThat(stillPending.getStateReason()).isEqualTo(SignalStateReason.WORKSPACE_INACTIVE);
-        assertThat(stillPending.getStateChangedAt()).as("the wait must keep running").isEqualTo(START);
+        assertThat(stillPending.getStateChangedAt())
+                .as("the wait must keep running")
+                .isEqualTo(START);
     }
 
     @Test
@@ -168,11 +169,9 @@ class ArtifactSignalReaperClockIntegrationTest extends BaseIntegrationTest {
     }
 
     private List<UUID> sweepBatch(Instant now, int size) {
-        return signals
-            .findRetryablePending(now.minus(RETRY_AFTER), PageRequest.ofSize(size))
-            .stream()
-            .map(ArtifactSignal::getId)
-            .toList();
+        return signals.findRetryablePending(now.minus(RETRY_AFTER), PageRequest.ofSize(size)).stream()
+                .map(ArtifactSignal::getId)
+                .toList();
     }
 
     private void claim(List<UUID> ids, Instant now) {
@@ -184,14 +183,9 @@ class ArtifactSignalReaperClockIntegrationTest extends BaseIntegrationTest {
     /** Records a signal and leaves it PENDING, exactly as a refused submission would. */
     private SignalKey recordPending(long artifactId, Instant at) {
         SignalKey key = new SignalKey(
-            workspace.getId(),
-            artifactId,
-            ScmSignals.PULL_REQUEST_READY,
-            new SignalRevision("sha~" + artifactId)
-        );
-        transactionTemplate.executeWithoutResult(status ->
-            signals.insertIfAbsent(key, UUID.randomUUID(), at, DiscoveredVia.EVENT.name(), at)
-        );
+                workspace.getId(), artifactId, ScmSignals.PULL_REQUEST_READY, new SignalRevision("sha~" + artifactId));
+        transactionTemplate.executeWithoutResult(
+                status -> signals.insertIfAbsent(key, UUID.randomUUID(), at, DiscoveredVia.EVENT.name(), at));
         refuse(key, SignalState.PENDING, SignalStateReason.BUDGET_EXHAUSTED, at);
         return key;
     }
@@ -201,11 +195,9 @@ class ArtifactSignalReaperClockIntegrationTest extends BaseIntegrationTest {
     }
 
     private ArtifactSignal reload(SignalKey key) {
-        return signals
-            .findForArtifact(key.workspaceId(), key.artifactKind().value(), key.artifactId())
-            .stream()
-            .filter(signal -> signal.getSignalName().equals(key.signalName().value()))
-            .findFirst()
-            .orElseThrow();
+        return signals.findForArtifact(key.workspaceId(), key.artifactKind().value(), key.artifactId()).stream()
+                .filter(signal -> signal.getSignalName().equals(key.signalName().value()))
+                .findFirst()
+                .orElseThrow();
     }
 }

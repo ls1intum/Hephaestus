@@ -48,18 +48,16 @@ class GitlabMrResolverTest extends BaseUnitTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = { "  ", "no-separator", "!42", "path!", "path!x", "path#42" })
+    @ValueSource(strings = {"  ", "no-separator", "!42", "path!", "path!x", "path#42"})
     void parseSubjectExternalId_rejectsMalformed(String raw) {
-        assertThatThrownBy(() -> GitlabMrResolver.parseSubjectExternalId(raw)).isInstanceOf(
-            FeedbackDeliveryException.class
-        );
+        assertThatThrownBy(() -> GitlabMrResolver.parseSubjectExternalId(raw))
+                .isInstanceOf(FeedbackDeliveryException.class);
     }
 
     @Test
     void parseSubjectExternalId_rejectsNull() {
-        assertThatThrownBy(() -> GitlabMrResolver.parseSubjectExternalId(null)).isInstanceOf(
-            FeedbackDeliveryException.class
-        );
+        assertThatThrownBy(() -> GitlabMrResolver.parseSubjectExternalId(null))
+                .isInstanceOf(FeedbackDeliveryException.class);
     }
 
     // --- pure issue-coordinate parser -----------------------------------------------------------
@@ -72,11 +70,10 @@ class GitlabMrResolverTest extends BaseUnitTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = { "  ", "no-separator", "#7", "path#", "path#x", "path!7" })
+    @ValueSource(strings = {"  ", "no-separator", "#7", "path#", "path#x", "path!7"})
     void parseIssueSubjectExternalId_rejectsMalformed(String raw) {
-        assertThatThrownBy(() -> GitlabMrResolver.parseIssueSubjectExternalId(raw)).isInstanceOf(
-            FeedbackDeliveryException.class
-        );
+        assertThatThrownBy(() -> GitlabMrResolver.parseIssueSubjectExternalId(raw))
+                .isInstanceOf(FeedbackDeliveryException.class);
     }
 
     // --- resolve() -------------------------------------------------------------------------------
@@ -85,8 +82,8 @@ class GitlabMrResolverTest extends BaseUnitTest {
     void resolve_nullResponseThrows() {
         stubExecute(Mono.empty());
         assertThatThrownBy(() -> resolver().resolve(1L, "group/project", 42))
-            .isInstanceOf(FeedbackDeliveryException.class)
-            .hasMessageContaining("Null response");
+                .isInstanceOf(FeedbackDeliveryException.class)
+                .hasMessageContaining("Null response");
     }
 
     @Test
@@ -97,9 +94,9 @@ class GitlabMrResolverTest extends BaseUnitTest {
         stubExecute(Mono.just(response));
 
         assertThatThrownBy(() -> resolver().resolve(1L, "group/project", 42))
-            .isInstanceOf(FeedbackDeliveryException.class)
-            .hasMessageContaining("MR not found")
-            .hasMessageContaining("errors=");
+                .isInstanceOf(FeedbackDeliveryException.class)
+                .hasMessageContaining("MR not found")
+                .hasMessageContaining("errors=");
     }
 
     @Test
@@ -126,8 +123,8 @@ class GitlabMrResolverTest extends BaseUnitTest {
     void resolveIssueGid_nullResponseThrows() {
         stubExecute(Mono.empty());
         assertThatThrownBy(() -> resolver().resolveIssueGid(1L, "group/project", 7))
-            .isInstanceOf(FeedbackDeliveryException.class)
-            .hasMessageContaining("Null response");
+                .isInstanceOf(FeedbackDeliveryException.class)
+                .hasMessageContaining("Null response");
     }
 
     @Test
@@ -138,8 +135,8 @@ class GitlabMrResolverTest extends BaseUnitTest {
         stubExecute(Mono.just(response));
 
         assertThatThrownBy(() -> resolver().resolveIssueGid(1L, "group/project", 7))
-            .isInstanceOf(FeedbackDeliveryException.class)
-            .hasMessageContaining("Issue not found");
+                .isInstanceOf(FeedbackDeliveryException.class)
+                .hasMessageContaining("Issue not found");
     }
 
     @Test

@@ -1,9 +1,11 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { delay, HttpResponse, http } from "msw";
 import { expect, fn, screen, within } from "storybook/test";
+
 import type { SlackChannelConsentEvent, SlackMonitoredChannel } from "@/api/types.gen";
 import { daysBefore } from "@/components/common/story-clock";
 import { expectSettledVisible } from "@/test/overlay";
+
 import { ChannelHistorySheet } from "./ChannelHistorySheet";
 
 const CONSENT_EVENTS_URL = "*/slack/channels/:slackChannelId/consent-events";

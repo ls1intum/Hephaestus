@@ -46,18 +46,13 @@ public final class WorkspaceTestFixtures {
      * by {@code installationId} and discoverable via {@code ConnectionRepository.findByWorkspaceIdAndKind}.
      */
     public static Workspace persistInstallationWorkspace(
-        WorkspaceRepository workspaceRepository,
-        ConnectionRepository connectionRepository,
-        WorkspaceBuilder builder,
-        long installationId
-    ) {
+            WorkspaceRepository workspaceRepository,
+            ConnectionRepository connectionRepository,
+            WorkspaceBuilder builder,
+            long installationId) {
         Workspace saved = workspaceRepository.save(builder.build());
         ConnectionConfig.GitHubAppConfig cfg = new ConnectionConfig.GitHubAppConfig(
-            installationId,
-            saved.getAccountLogin(),
-            /* serverUrl */ null,
-            Set.of()
-        );
+                installationId, saved.getAccountLogin(), /* serverUrl */ null, Set.of());
         Connection connection = new Connection(saved, IntegrationKind.GITHUB, Long.toString(installationId), cfg);
         connection.setDisplayName(saved.getAccountLogin());
         ReflectionTestUtils.setField(connection, "state", IntegrationState.ACTIVE);
@@ -71,19 +66,13 @@ public final class WorkspaceTestFixtures {
      * {@code ConnectionService.rotateBearerToken} in tests that need a real token blob.
      */
     public static Workspace persistGitLabWorkspace(
-        WorkspaceRepository workspaceRepository,
-        ConnectionRepository connectionRepository,
-        GitLabWorkspaceBuilder builder,
-        String serverUrl
-    ) {
+            WorkspaceRepository workspaceRepository,
+            ConnectionRepository connectionRepository,
+            GitLabWorkspaceBuilder builder,
+            String serverUrl) {
         Workspace saved = workspaceRepository.save(builder.build());
         ConnectionConfig.GitLabConfig cfg = new ConnectionConfig.GitLabConfig(
-            serverUrl,
-            null,
-            null,
-            ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
-            Set.of()
-        );
+                serverUrl, null, null, ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT, Set.of());
         Connection connection = new Connection(saved, IntegrationKind.GITLAB, serverUrl, cfg);
         connection.setDisplayName(saved.getAccountLogin());
         ReflectionTestUtils.setField(connection, "state", IntegrationState.ACTIVE);

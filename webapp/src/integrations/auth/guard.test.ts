@@ -1,5 +1,11 @@
-import { describe, expect, it } from "vitest";
-import { isAppAdmin, safeReturnTo } from "./guard";
+import { QueryClient } from "@tanstack/react-query";
+import { HttpResponse, http } from "msw";
+import { describe, expect, it, vi } from "vitest";
+
+import { currentUser } from "@/mocks/fixtures/auth";
+import { server } from "@/mocks/server";
+
+import { isAppAdmin, resolveCurrentUser, safeReturnTo } from "./guard";
 
 // `safeReturnTo` is the single open-redirect defense for the post-login `?returnTo` param.
 // A regression here is a security bug (open redirect / XSS via javascript: URLs), so the
@@ -92,5 +98,71 @@ describe("isAppAdmin", () => {
 	});
 	it.each([null, undefined])("is false for %s", (u) => {
 		expect(isAppAdmin(u)).toBe(false);
+	});
+});
+
+/**
+ * The guard runs on every authenticated navigation, so what it does with a *stale* cache is the
+ * whole design: answer from it, refresh behind it, and never let the refresh decide the navigation.
+ */
+describe("resolveCurrentUser", () => {
+	function client() {
+		return new QueryClient({ defaultOptions: { queries: { retry: false } } });
+	}
+
+	/** Installs the answer to `GET /user` and counts how often it is asked for. */
+	function serve(answer: () => Response) {
+		const asked = { times: 0 };
+		server.use(
+			http.get("*/user", () => {
+				asked.times += 1;
+				return answer();
+			}),
+		);
+		return asked;
+	}
+
+	const asAppRole = (appRole: "APP_ADMIN" | "APP_USER") => () =>
+		HttpResponse.json({ ...currentUser, appRole });
+
+	/** Marks the cached user stale without refetching, the way a mutation or a 401 handler would. */
+	const goStale = (queryClient: QueryClient) =>
+		queryClient.invalidateQueries({ refetchType: "none" });
+
+	it("fetches when nothing is cached", async () => {
+		serve(asAppRole("APP_ADMIN"));
+
+		expect(await resolveCurrentUser(client())).toMatchObject({ appRole: "APP_ADMIN" });
+	});
+
+	it("answers null rather than throwing when the probe fails", async () => {
+		serve(() => new HttpResponse(null, { status: 401 }));
+
+		expect(await resolveCurrentUser(client())).toBeNull();
+	});
+
+	it("answers from a stale cache and refreshes behind it", async () => {
+		const queryClient = client();
+		serve(asAppRole("APP_ADMIN"));
+		await resolveCurrentUser(queryClient);
+		await goStale(queryClient);
+		const revoked = serve(asAppRole("APP_USER"));
+
+		// The stale answer is still instant — the navigation never waits on the network…
+		expect(await resolveCurrentUser(queryClient)).toMatchObject({ appRole: "APP_ADMIN" });
+		// …and the revocation fetched behind it lands for the next one.
+		await vi.waitFor(() => expect(revoked.times).toBe(1));
+		expect(await resolveCurrentUser(queryClient)).toMatchObject({ appRole: "APP_USER" });
+	});
+
+	it("keeps serving the cached user when the background refresh fails", async () => {
+		const queryClient = client();
+		serve(asAppRole("APP_ADMIN"));
+		await resolveCurrentUser(queryClient);
+		await goStale(queryClient);
+		const failing = serve(() => HttpResponse.error());
+
+		expect(await resolveCurrentUser(queryClient)).toMatchObject({ appRole: "APP_ADMIN" });
+		await vi.waitFor(() => expect(failing.times).toBe(1));
 	});
 });

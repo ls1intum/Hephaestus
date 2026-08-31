@@ -34,57 +34,46 @@ public class PracticeGroupDetailController {
 
     @GetMapping("/trend")
     @Operation(
-        operationId = "getPracticeGroupTrend",
-        summary = "Get the evidence-supported trend for a practice group",
-        description = "Returns the group direction and every eligible practice direction with inspectable support."
-    )
+            operationId = "getPracticeGroupTrend",
+            summary = "Get the evidence-supported trend for a practice group",
+            description = "Returns the group direction and every eligible practice direction with inspectable support.")
     @ApiResponse(responseCode = "200", description = "Practice-group trend returned")
     @ApiResponse(
-        responseCode = "404",
-        description = "Practice group not found",
-        content = @Content(schema = @Schema(hidden = true))
-    )
+            responseCode = "404",
+            description = "Practice group not found",
+            content = @Content(schema = @Schema(hidden = true)))
     public ResponseEntity<PracticeGroupTrendDTO> getTrend(
-        WorkspaceContext workspaceContext,
-        @PathVariable String groupSlug
-    ) {
+            WorkspaceContext workspaceContext, @PathVariable String groupSlug) {
         return ResponseEntity.ok(trendQueryService.get(workspaceContext, groupSlug));
     }
 
     @GetMapping("/review-runs")
     @Operation(
-        operationId = "listPracticeGroupReviewRuns",
-        summary = "List complete review runs for a practice group",
-        description = "Returns complete review runs newest first, including visible undecided observations."
-    )
+            operationId = "listPracticeGroupReviewRuns",
+            summary = "List complete review runs for a practice group",
+            description = "Returns complete review runs newest first, including visible undecided observations.")
     @ApiResponse(responseCode = "200", description = "Paginated review runs returned")
     @ApiResponse(
-        responseCode = "400",
-        description = "Invalid filter or pagination",
-        content = @Content(
-            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-            schema = @Schema(implementation = ProblemDetail.class)
-        )
-    )
+            responseCode = "400",
+            description = "Invalid filter or pagination",
+            content =
+                    @Content(
+                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetail.class)))
     @ApiResponse(
-        responseCode = "404",
-        description = "Practice group not found",
-        content = @Content(schema = @Schema(hidden = true))
-    )
+            responseCode = "404",
+            description = "Practice group not found",
+            content = @Content(schema = @Schema(hidden = true)))
     public ResponseEntity<PracticeGroupReviewRunsPageDTO> listReviewRuns(
-        WorkspaceContext workspaceContext,
-        @PathVariable String groupSlug,
-        @Valid @ParameterObject PracticeGroupReviewRunFilterParams filter
-    ) {
-        return ResponseEntity.ok(
-            reviewRunService.list(
+            WorkspaceContext workspaceContext,
+            @PathVariable String groupSlug,
+            @Valid @ParameterObject PracticeGroupReviewRunFilterParams filter) {
+        return ResponseEntity.ok(reviewRunService.list(
                 workspaceContext,
                 groupSlug,
                 filter.practiceSlug(),
                 filter.kinds(),
                 filter.severities(),
-                filter.pageable()
-            )
-        );
+                filter.pageable()));
     }
 }

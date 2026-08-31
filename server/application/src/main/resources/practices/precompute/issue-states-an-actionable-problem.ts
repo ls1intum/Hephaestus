@@ -3,8 +3,8 @@
 // reproduction / expected-vs-actual (BUG) or a value clause (STORY), and stub/empty/template bodies.
 // FACTS and DIRECTIONS only — the LLM decides whether the report is genuinely act-on-able. No observation.
 
-import { type InventoryItem, readProjectInventory } from "../lib/context";
-import type { Hint } from "../lib/types";
+import { type InventoryItem, readProjectInventory } from "../lib/context.ts";
+import type { Hint } from "../lib/types.ts";
 
 /** Title-token overlap (Jaccard) — a coarse near-duplicate signal across the project inventory. */
 function titleOverlap(a: string, b: string): number {

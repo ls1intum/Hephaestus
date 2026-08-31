@@ -1,8 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+
 import { listTracedArtifactsOptions } from "@/api/@tanstack/react-query.gen";
-import { TRACE_PAGE_SIZE, TraceListPage } from "@/components/practice-trace/TraceListPage";
 import { type TraceSearch, traceSearchSchema } from "@/components/practice-trace/trace-search";
+import { TRACE_PAGE_SIZE, TraceListPage } from "@/components/practice-trace/TraceListPage";
 import { pageParam } from "@/lib/search-params";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/reviews/")({

@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, userEvent } from "storybook/test";
+
 import { expectGenuinelyDisabled } from "@/test/controls";
+
 import { TablePagination } from "./TablePagination";
 
 const meta = {

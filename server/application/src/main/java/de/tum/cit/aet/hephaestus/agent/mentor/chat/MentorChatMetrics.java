@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.mentor.chat;
 
+import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -59,31 +60,29 @@ public class MentorChatMetrics {
 
     public MentorChatMetrics(MeterRegistry registry) {
         this.registry = registry;
-        this.started = Counter.builder("mentor.turn.started")
-            .description(
-                "Mentor chat turns observed at executor submit — increments on every dispatch, regardless of lock outcome."
-            )
-            .register(registry);
-        this.duration = Timer.builder("mentor.turn.duration")
-            .description("Mentor chat turn wall-clock duration including sandbox attach + Pi RPC.")
-            .publishPercentileHistogram()
-            .register(registry);
-        this.costUsd = DistributionSummary.builder("mentor.turn.cost.usd")
-            .description("Per-turn LLM cost in USD (skipped for turns where cost is unresolvable).")
-            .baseUnit("USD")
-            .register(registry);
+        this.started = Counter.builder(AgentMetrics.MENTOR_TURN_STARTED)
+                .description(
+                        "Mentor chat turns observed at executor submit — increments on every dispatch, regardless of lock outcome.")
+                .register(registry);
+        this.duration = Timer.builder(AgentMetrics.MENTOR_TURN_DURATION)
+                .description("Mentor chat turn wall-clock duration including sandbox attach + Pi RPC.")
+                .publishPercentileHistogram()
+                .register(registry);
+        this.costUsd = DistributionSummary.builder(AgentMetrics.MENTOR_TURN_COST_USD)
+                .description("Per-turn LLM cost in USD (skipped for turns where cost is unresolvable).")
+                .baseUnit("USD")
+                .register(registry);
 
         // Pre-register one Counter per outcome at construction. Avoids per-call
         // Counter.builder + Tags allocation on the hot path (Micrometer perf wiki).
         this.completedByOutcome = new EnumMap<>(Outcome.class);
         for (Outcome o : Outcome.values()) {
             completedByOutcome.put(
-                o,
-                Counter.builder("mentor.turn.completed")
-                    .description("Mentor chat turns terminated, tagged by outcome.")
-                    .tag("outcome", o.tag())
-                    .register(registry)
-            );
+                    o,
+                    Counter.builder(AgentMetrics.MENTOR_TURN_COMPLETED)
+                            .description("Mentor chat turns terminated, tagged by outcome.")
+                            .tag("outcome", o.tag())
+                            .register(registry));
         }
     }
 

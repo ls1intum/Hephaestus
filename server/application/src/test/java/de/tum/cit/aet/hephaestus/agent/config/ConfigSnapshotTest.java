@@ -25,8 +25,8 @@ class ConfigSnapshotTest extends BaseUnitTest {
 
     // Mirrors spring.jackson.deserialization.fail-on-null-for-primitives=false from application.yml.
     private static final ObjectMapper OBJECT_MAPPER = JsonMapper.builder()
-        .disable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
-        .build();
+            .disable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
+            .build();
 
     @Mock
     private LlmModelResolver resolver;
@@ -49,19 +49,16 @@ class ConfigSnapshotTest extends BaseUnitTest {
     }
 
     private void stubResolver(WorkspaceAgentBinding binding) {
-        when(resolver.resolve(binding)).thenReturn(
-            new ResolvedLlmModel(
-                "https://api.anthropic.com",
-                "anthropic-messages",
-                "claude-sonnet-4-20250514",
-                200000,
-                8192,
-                false
-            )
-        );
-        when(resolver.connectionRef(binding)).thenReturn(
-            new LlmModelResolver.ConnectionRef(FundingSource.INSTANCE, 7L, null, null)
-        );
+        when(resolver.resolve(binding))
+                .thenReturn(new ResolvedLlmModel(
+                        "https://api.anthropic.com",
+                        "anthropic-messages",
+                        "claude-sonnet-4-20250514",
+                        200000,
+                        8192,
+                        false));
+        when(resolver.connectionRef(binding))
+                .thenReturn(new LlmModelResolver.ConnectionRef(FundingSource.INSTANCE, 7L, null, null));
     }
 
     @Nested
@@ -168,8 +165,8 @@ class ConfigSnapshotTest extends BaseUnitTest {
             ((tools.jackson.databind.node.ObjectNode) json).put("schemaVersion", 999);
 
             assertThatThrownBy(() -> ConfigSnapshot.fromJson(json, OBJECT_MAPPER))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("newer than supported version");
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("newer than supported version");
         }
 
         @Test
@@ -191,13 +188,12 @@ class ConfigSnapshotTest extends BaseUnitTest {
             // configId/configName, v5 dropped both. Such a row must read through the CURRENT shape with
             // the two dead keys ignored — not the pre-v4 legacy translation, which would null the
             // connection identity and leave an in-flight job unroutable at the proxy.
-            String v4 =
-                "{\"schemaVersion\":4,\"configId\":42,\"configName\":\"detection\"," +
-                "\"apiProtocol\":\"openai-completions\",\"baseUrl\":\"https://gpu.example.com/v1\"," +
-                "\"upstreamModelId\":\"gpt-oss-120b\",\"modelVersion\":\"2025-05-01\"," +
-                "\"contextWindow\":128000,\"maxOutputTokens\":4096,\"supportsReasoning\":true," +
-                "\"connectionScope\":\"WORKSPACE\",\"connectionId\":7,\"modelId\":20,\"workspaceId\":1," +
-                "\"timeoutSeconds\":900,\"allowInternet\":true,\"priceSnapshot\":null}";
+            String v4 = "{\"schemaVersion\":4,\"configId\":42,\"configName\":\"detection\","
+                    + "\"apiProtocol\":\"openai-completions\",\"baseUrl\":\"https://gpu.example.com/v1\","
+                    + "\"upstreamModelId\":\"gpt-oss-120b\",\"modelVersion\":\"2025-05-01\","
+                    + "\"contextWindow\":128000,\"maxOutputTokens\":4096,\"supportsReasoning\":true,"
+                    + "\"connectionScope\":\"WORKSPACE\",\"connectionId\":7,\"modelId\":20,\"workspaceId\":1,"
+                    + "\"timeoutSeconds\":900,\"allowInternet\":true,\"priceSnapshot\":null}";
             JsonNode node = OBJECT_MAPPER.readTree(v4);
 
             ConfigSnapshot snapshot = ConfigSnapshot.fromJson(node, OBJECT_MAPPER);
@@ -223,11 +219,10 @@ class ConfigSnapshotTest extends BaseUnitTest {
         void shouldDeserializeLegacyV3Snapshot() {
             // An in-flight job dispatched before the v4 deploy still needs a usable
             // apiProtocol/baseUrl/upstreamModelId, so fromJson must translate rather than default-null.
-            String legacy =
-                "{\"schemaVersion\":3,\"configId\":42,\"configName\":\"legacy\"," +
-                "\"llmProvider\":\"ANTHROPIC\",\"credentialMode\":\"PROXY\"," +
-                "\"modelName\":\"claude-sonnet-4-20250514\"," +
-                "\"modelVersion\":null,\"llmBaseUrl\":null,\"timeoutSeconds\":600,\"allowInternet\":false}";
+            String legacy = "{\"schemaVersion\":3,\"configId\":42,\"configName\":\"legacy\","
+                    + "\"llmProvider\":\"ANTHROPIC\",\"credentialMode\":\"PROXY\","
+                    + "\"modelName\":\"claude-sonnet-4-20250514\","
+                    + "\"modelVersion\":null,\"llmBaseUrl\":null,\"timeoutSeconds\":600,\"allowInternet\":false}";
             JsonNode node = OBJECT_MAPPER.readTree(legacy);
 
             ConfigSnapshot snapshot = ConfigSnapshot.fromJson(node, OBJECT_MAPPER);
@@ -242,11 +237,10 @@ class ConfigSnapshotTest extends BaseUnitTest {
 
         @Test
         void shouldDeserializeLegacyV3SnapshotWithExplicitBaseUrl() {
-            String legacy =
-                "{\"schemaVersion\":3,\"configId\":9,\"configName\":\"gateway\"," +
-                "\"llmProvider\":\"OPENAI\",\"credentialMode\":\"API_KEY\"," +
-                "\"modelName\":\"gpt-oss-120b\",\"llmBaseUrl\":\"https://gpu.example.com\"," +
-                "\"timeoutSeconds\":300,\"allowInternet\":true}";
+            String legacy = "{\"schemaVersion\":3,\"configId\":9,\"configName\":\"gateway\","
+                    + "\"llmProvider\":\"OPENAI\",\"credentialMode\":\"API_KEY\","
+                    + "\"modelName\":\"gpt-oss-120b\",\"llmBaseUrl\":\"https://gpu.example.com\","
+                    + "\"timeoutSeconds\":300,\"allowInternet\":true}";
             JsonNode node = OBJECT_MAPPER.readTree(legacy);
 
             ConfigSnapshot snapshot = ConfigSnapshot.fromJson(node, OBJECT_MAPPER);
@@ -260,10 +254,9 @@ class ConfigSnapshotTest extends BaseUnitTest {
         void shouldDeserializeV1WithoutSchemaVersion() {
             // Earliest snapshot shape predates the schemaVersion guard. fromJson reads
             // missing schemaVersion as 0 (< v4), so v1 rows are translated via the legacy path.
-            String v1 =
-                "{\"configId\":7,\"configName\":\"v1\",\"agentType\":\"OPENCODE\"," +
-                "\"llmProvider\":\"OPENAI\",\"credentialMode\":\"PROXY\"," +
-                "\"modelName\":\"gpt-4o-mini\",\"timeoutSeconds\":300,\"allowInternet\":false}";
+            String v1 = "{\"configId\":7,\"configName\":\"v1\",\"agentType\":\"OPENCODE\","
+                    + "\"llmProvider\":\"OPENAI\",\"credentialMode\":\"PROXY\","
+                    + "\"modelName\":\"gpt-4o-mini\",\"timeoutSeconds\":300,\"allowInternet\":false}";
             JsonNode node = OBJECT_MAPPER.readTree(v1);
 
             ConfigSnapshot snapshot = ConfigSnapshot.fromJson(node, OBJECT_MAPPER);
@@ -278,41 +271,38 @@ class ConfigSnapshotTest extends BaseUnitTest {
 
         private ConfigSnapshot snapshot(String apiProtocol, String baseUrl, int timeoutSeconds) {
             return new ConfigSnapshot(
-                ConfigSnapshot.SCHEMA_VERSION,
-                apiProtocol,
-                baseUrl,
-                "gpt",
-                null,
-                null,
-                null,
-                false,
-                null,
-                null,
-                null,
-                null,
-                timeoutSeconds,
-                false,
-                null
-            );
+                    ConfigSnapshot.SCHEMA_VERSION,
+                    apiProtocol,
+                    baseUrl,
+                    "gpt",
+                    null,
+                    null,
+                    null,
+                    false,
+                    null,
+                    null,
+                    null,
+                    null,
+                    timeoutSeconds,
+                    false,
+                    null);
         }
 
         @ParameterizedTest(name = "a snapshot with no {2} cannot be built")
         @CsvSource(
-            nullValues = "NULL",
-            value = { "NULL, https://api.openai.com, apiProtocol", "openai-completions, NULL, baseUrl" }
-        )
+                nullValues = "NULL",
+                value = {"NULL, https://api.openai.com, apiProtocol", "openai-completions, NULL, baseUrl"})
         void shouldRejectAMissingRoutingField(String apiProtocol, String baseUrl, String missingField) {
             assertThatThrownBy(() -> snapshot(apiProtocol, baseUrl, 600))
-                .as(missingField)
-                .isInstanceOf(NullPointerException.class);
+                    .as(missingField)
+                    .isInstanceOf(NullPointerException.class);
         }
 
         @ParameterizedTest(name = "a timeout of {0}s cannot be built")
-        @ValueSource(ints = { 0, -1 })
+        @ValueSource(ints = {0, -1})
         void shouldRejectANonPositiveTimeout(int timeoutSeconds) {
-            assertThatThrownBy(() ->
-                snapshot("openai-completions", "https://api.openai.com", timeoutSeconds)
-            ).isInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(() -> snapshot("openai-completions", "https://api.openai.com", timeoutSeconds))
+                    .isInstanceOf(IllegalArgumentException.class);
         }
     }
 }

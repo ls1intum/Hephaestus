@@ -30,34 +30,19 @@ class SecurityConfigSharedMatcherTest extends BaseUnitTest {
     void cookieSecureFalseUnderProd_failsClosedAtConstruction() {
         MockEnvironment prod = new MockEnvironment();
         prod.setActiveProfiles("prod");
-        assertThatThrownBy(() ->
-            new SecurityConfig(
-                new CorsProperties(List.of("https://example.com")),
-                prod,
-                false,
-                false,
-                false,
-                "HEPHAESTUS_AT"
-            )
-        )
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("cookie-secure");
+        assertThatThrownBy(() -> new SecurityConfig(
+                        new CorsProperties(List.of("https://example.com")), prod, false, false, false, "HEPHAESTUS_AT"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("cookie-secure");
     }
 
     @Test
     void cookieSecureFalseOutsideProd_constructs() {
         MockEnvironment dev = new MockEnvironment();
         dev.setActiveProfiles("dev", "e2e");
-        assertThat(
-            new SecurityConfig(
-                new CorsProperties(List.of("https://example.com")),
-                dev,
-                false,
-                false,
-                false,
-                "HEPHAESTUS_AT"
-            )
-        ).isNotNull();
+        assertThat(new SecurityConfig(
+                        new CorsProperties(List.of("https://example.com")), dev, false, false, false, "HEPHAESTUS_AT"))
+                .isNotNull();
     }
 
     @Test

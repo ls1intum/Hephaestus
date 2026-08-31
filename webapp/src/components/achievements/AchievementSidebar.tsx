@@ -16,6 +16,7 @@ import {
 	ZoomOut,
 } from "lucide-react";
 import { type ElementType, useEffect, useState } from "react";
+
 import {
 	categoryMeta,
 	rarityAccentBackgrounds,

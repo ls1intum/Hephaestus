@@ -48,11 +48,7 @@ class ConnectionConfigJsonRoundTripIntegrationTest extends BaseIntegrationTest {
     @Test
     void gitHubAppConfig_roundTrips() {
         ConnectionConfig.GitHubAppConfig original = new ConnectionConfig.GitHubAppConfig(
-            42L,
-            "acme-org",
-            "https://ghes.example.com",
-            Set.of("issues", "pulls")
-        );
+                42L, "acme-org", "https://ghes.example.com", Set.of("issues", "pulls"));
         Long id = persistAndClear(IntegrationKind.GITHUB, "installation-42", original);
 
         Connection reloaded = connectionRepository.findById(id).orElseThrow();
@@ -68,11 +64,8 @@ class ConnectionConfigJsonRoundTripIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void gitHubPatConfig_roundTrips() {
-        ConnectionConfig.GitHubPatConfig original = new ConnectionConfig.GitHubPatConfig(
-            "acme-org",
-            null,
-            Set.of("repos")
-        );
+        ConnectionConfig.GitHubPatConfig original =
+                new ConnectionConfig.GitHubPatConfig("acme-org", null, Set.of("repos"));
         Long id = persistAndClear(IntegrationKind.GITHUB, "pat", original);
 
         Connection reloaded = connectionRepository.findById(id).orElseThrow();
@@ -88,12 +81,11 @@ class ConnectionConfigJsonRoundTripIntegrationTest extends BaseIntegrationTest {
     @Test
     void gitLabConfig_plaintext_roundTrips() {
         ConnectionConfig.GitLabConfig original = new ConnectionConfig.GitLabConfig(
-            "https://gitlab.example.com",
-            1234L,
-            5678L,
-            ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
-            Set.of("merge_requests")
-        );
+                "https://gitlab.example.com",
+                1234L,
+                5678L,
+                ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
+                Set.of("merge_requests"));
         Long id = persistAndClear(IntegrationKind.GITLAB, "https://gitlab.example.com", original);
 
         Connection reloaded = connectionRepository.findById(id).orElseThrow();
@@ -111,12 +103,7 @@ class ConnectionConfigJsonRoundTripIntegrationTest extends BaseIntegrationTest {
     @Test
     void gitLabConfig_whsec_roundTrips() {
         ConnectionConfig.GitLabConfig original = new ConnectionConfig.GitLabConfig(
-            "https://gitlab.example.com",
-            null,
-            null,
-            ConnectionConfig.GitLabConfig.SigningMode.WHSEC,
-            Set.of()
-        );
+                "https://gitlab.example.com", null, null, ConnectionConfig.GitLabConfig.SigningMode.WHSEC, Set.of());
         Long id = persistAndClear(IntegrationKind.GITLAB, "https://gitlab.example.com/whsec", original);
 
         Connection reloaded = connectionRepository.findById(id).orElseThrow();
@@ -127,13 +114,7 @@ class ConnectionConfigJsonRoundTripIntegrationTest extends BaseIntegrationTest {
     @Test
     void slackConfig_roundTrips() {
         ConnectionConfig.SlackConfig original = new ConnectionConfig.SlackConfig(
-            "T123",
-            "Acme Slack",
-            "C456",
-            "Engineering",
-            /* retentionDays */ null,
-            Set.of("leaderboard")
-        );
+                "T123", "Acme Slack", "C456", "Engineering", /* retentionDays */ null, Set.of("leaderboard"));
         Long id = persistAndClear(IntegrationKind.SLACK, "T123", original);
 
         Connection reloaded = connectionRepository.findById(id).orElseThrow();
@@ -157,11 +138,7 @@ class ConnectionConfigJsonRoundTripIntegrationTest extends BaseIntegrationTest {
     @Test
     void outlineConfig_roundTrips_includingTheWebhookSecret() {
         ConnectionConfig.OutlineConfig original = new ConnectionConfig.OutlineConfig(
-            "https://outline.example.com",
-            "sub-abc",
-            "ENC:v2:ciphertext",
-            Set.of("documents")
-        );
+                "https://outline.example.com", "sub-abc", "ENC:v2:ciphertext", Set.of("documents"));
         Long id = persistAndClear(IntegrationKind.OUTLINE, "https://outline.example.com", original);
 
         Connection reloaded = connectionRepository.findById(id).orElseThrow();
@@ -202,33 +179,34 @@ class ConnectionConfigJsonRoundTripIntegrationTest extends BaseIntegrationTest {
         assertThat(b.getFirst().getSigningSecret()).isEqualTo("secret-b");
 
         // A forged id matches nothing: the delivery is rejected before any HMAC comparison.
-        assertThat(connectionRepository.findOutlineSubscriptionsBySubscriptionId("forged")).isEmpty();
+        assertThat(connectionRepository.findOutlineSubscriptionsBySubscriptionId("forged"))
+                .isEmpty();
     }
 
     /** A non-ACTIVE row is invisible to the webhook resolver: a suspended workspace stops verifying. */
     @Test
     void outlineSubscriptionLookup_ignoresNonActiveConnections() {
         Connection suspended = new Connection(
-            workspace,
-            IntegrationKind.OUTLINE,
-            "https://outline.example.com/suspended",
-            new ConnectionConfig.OutlineConfig("https://outline.example.com", "sub-suspended", "secret-x", Set.of())
-        );
+                workspace,
+                IntegrationKind.OUTLINE,
+                "https://outline.example.com/suspended",
+                new ConnectionConfig.OutlineConfig(
+                        "https://outline.example.com", "sub-suspended", "secret-x", Set.of()));
         suspended.setState(IntegrationState.SUSPENDED);
         connectionRepository.save(suspended);
         entityManager.flush();
         entityManager.clear();
 
-        assertThat(connectionRepository.findOutlineSubscriptionsBySubscriptionId("sub-suspended")).isEmpty();
+        assertThat(connectionRepository.findOutlineSubscriptionsBySubscriptionId("sub-suspended"))
+                .isEmpty();
     }
 
     private void persistActiveOutline(Workspace ws, String subscriptionId, String secret) {
         Connection conn = new Connection(
-            ws,
-            IntegrationKind.OUTLINE,
-            "https://outline.example.com/" + subscriptionId,
-            new ConnectionConfig.OutlineConfig("https://outline.example.com", subscriptionId, secret, Set.of())
-        );
+                ws,
+                IntegrationKind.OUTLINE,
+                "https://outline.example.com/" + subscriptionId,
+                new ConnectionConfig.OutlineConfig("https://outline.example.com", subscriptionId, secret, Set.of()));
         conn.setState(IntegrationState.ACTIVE);
         connectionRepository.save(conn);
     }
@@ -239,22 +217,21 @@ class ConnectionConfigJsonRoundTripIntegrationTest extends BaseIntegrationTest {
         Connection bad = new Connection(workspace, IntegrationKind.GITLAB, "instance-x", wrong);
         // Spring wraps the @PrePersist IllegalStateException in InvalidDataAccessApiUsageException.
         assertThatThrownBy(() -> {
-            connectionRepository.save(bad);
-            entityManager.flush();
-        })
-            .hasRootCauseInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("GITLAB")
-            .hasMessageContaining("GitHubAppConfig");
+                    connectionRepository.save(bad);
+                    entityManager.flush();
+                })
+                .hasRootCauseInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("GITLAB")
+                .hasMessageContaining("GitHubAppConfig");
     }
 
     @Test
     void version_incrementsOnUpdate() {
         Connection conn = new Connection(
-            workspace,
-            IntegrationKind.GITHUB,
-            "v-test",
-            new ConnectionConfig.GitHubPatConfig("acme", null, Set.of())
-        );
+                workspace,
+                IntegrationKind.GITHUB,
+                "v-test",
+                new ConnectionConfig.GitHubPatConfig("acme", null, Set.of()));
         Connection saved = connectionRepository.save(conn);
         entityManager.flush();
         Long v0 = saved.getVersion();
@@ -277,13 +254,15 @@ class ConnectionConfigJsonRoundTripIntegrationTest extends BaseIntegrationTest {
         // workspace_id predicate satisfies the tenancy statement inspector on the
         // workspace-scoped `connection` table.
         String json = (String) entityManager
-            .createNativeQuery("SELECT config::text FROM connection WHERE id = :id AND workspace_id = :wsId")
-            .setParameter("id", id)
-            .setParameter("wsId", workspace.getId())
-            .getSingleResult();
+                .createNativeQuery("SELECT config::text FROM connection WHERE id = :id AND workspace_id = :wsId")
+                .setParameter("id", id)
+                .setParameter("wsId", workspace.getId())
+                .getSingleResult();
         try {
             JsonNode tree = objectMapper.readTree(json);
-            assertThat(tree.has("type")).as("JSONB column must carry 'type' discriminator").isTrue();
+            assertThat(tree.has("type"))
+                    .as("JSONB column must carry 'type' discriminator")
+                    .isTrue();
             assertThat(tree.get("type").asText()).isEqualTo(expectedType);
         } catch (Exception e) {
             throw new AssertionError("Failed parsing JSONB column for connection " + id, e);

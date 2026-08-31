@@ -29,8 +29,8 @@ public class WorkspaceScopedWebMvcConfiguration implements WebMvcRegistrations {
             RequestMappingInfo effective = mapping;
             if (mapping != null && isWorkspaceScoped(method.getDeclaringClass())) {
                 RequestMappingInfo workspacePrefix = RequestMappingInfo.paths(WORKSPACE_PREFIX)
-                    .options(getBuilderConfiguration())
-                    .build();
+                        .options(getBuilderConfiguration())
+                        .build();
 
                 effective = normalizePaths(workspacePrefix.combine(mapping));
             }

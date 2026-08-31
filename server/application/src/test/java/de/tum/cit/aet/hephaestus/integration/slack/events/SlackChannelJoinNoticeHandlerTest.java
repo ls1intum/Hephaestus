@@ -62,13 +62,7 @@ class SlackChannelJoinNoticeHandlerTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         handler = new SlackChannelJoinNoticeHandler(
-            workspaceResolver,
-            consentGate,
-            participantConsentGate,
-            messageService,
-            uiLinks,
-            consentService
-        );
+                workspaceResolver, consentGate, participantConsentGate, messageService, uiLinks, consentService);
         Mockito.lenient().when(uiLinks.workspaceHomeUrl(WORKSPACE_ID)).thenReturn("https://heph.example/w/team");
     }
 
@@ -90,13 +84,13 @@ class SlackChannelJoinNoticeHandlerTest extends BaseUnitTest {
 
         handler.onMemberJoined(TEAM, joinEvent(JOINER, CHANNEL), true);
 
-        verify(messageService).sendEphemeralForWorkspace(
-            eq(WORKSPACE_ID),
-            eq(CHANNEL),
-            eq(JOINER),
-            anyList(),
-            eq(SlackConsentBlocks.lateJoinFallbackText("https://heph.example/w/team"))
-        );
+        verify(messageService)
+                .sendEphemeralForWorkspace(
+                        eq(WORKSPACE_ID),
+                        eq(CHANNEL),
+                        eq(JOINER),
+                        anyList(),
+                        eq(SlackConsentBlocks.lateJoinFallbackText("https://heph.example/w/team")));
     }
 
     @Test
@@ -109,13 +103,13 @@ class SlackChannelJoinNoticeHandlerTest extends BaseUnitTest {
         handler.onMemberJoined(TEAM, joinEvent(JOINER, CHANNEL), true);
 
         verify(messageService).resolveBotUserId(WORKSPACE_ID);
-        verify(messageService, never()).sendEphemeralForWorkspace(
-            ArgumentMatchers.anyLong(),
-            ArgumentMatchers.anyString(),
-            ArgumentMatchers.anyString(),
-            anyList(),
-            ArgumentMatchers.anyString()
-        );
+        verify(messageService, never())
+                .sendEphemeralForWorkspace(
+                        ArgumentMatchers.anyLong(),
+                        ArgumentMatchers.anyString(),
+                        ArgumentMatchers.anyString(),
+                        anyList(),
+                        ArgumentMatchers.anyString());
     }
 
     @Test
@@ -126,13 +120,13 @@ class SlackChannelJoinNoticeHandlerTest extends BaseUnitTest {
         handler.onMemberJoined(TEAM, joinEvent(JOINER, CHANNEL), true);
 
         verify(messageService).resolveBotUserId(WORKSPACE_ID);
-        verify(messageService, never()).sendEphemeralForWorkspace(
-            ArgumentMatchers.anyLong(),
-            ArgumentMatchers.anyString(),
-            ArgumentMatchers.anyString(),
-            anyList(),
-            ArgumentMatchers.anyString()
-        );
+        verify(messageService, never())
+                .sendEphemeralForWorkspace(
+                        ArgumentMatchers.anyLong(),
+                        ArgumentMatchers.anyString(),
+                        ArgumentMatchers.anyString(),
+                        anyList(),
+                        ArgumentMatchers.anyString());
     }
 
     @Test
@@ -144,13 +138,13 @@ class SlackChannelJoinNoticeHandlerTest extends BaseUnitTest {
 
         verify(consentService).register(WORKSPACE_ID, CHANNEL, null);
         verify(consentGate, never()).ingestAllowed(WORKSPACE_ID, CHANNEL);
-        verify(messageService, never()).sendEphemeralForWorkspace(
-            ArgumentMatchers.anyLong(),
-            ArgumentMatchers.anyString(),
-            ArgumentMatchers.anyString(),
-            anyList(),
-            ArgumentMatchers.anyString()
-        );
+        verify(messageService, never())
+                .sendEphemeralForWorkspace(
+                        ArgumentMatchers.anyLong(),
+                        ArgumentMatchers.anyString(),
+                        ArgumentMatchers.anyString(),
+                        anyList(),
+                        ArgumentMatchers.anyString());
     }
 
     @Test

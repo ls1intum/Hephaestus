@@ -15,10 +15,10 @@ import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntry;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeGroup;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -55,20 +55,16 @@ class PracticeGroupServiceTest extends BaseUnitTest {
     @InjectMocks
     private PracticeGroupService service;
 
-    private static final WorkspaceContext CTX = new WorkspaceContext(
-        1L,
-        "acme",
-        "Acme",
-        AccountType.ORG,
-        null,
-        false,
-        false,
-        Set.of()
-    );
+    private Workspace workspace;
+
+    private static final WorkspaceContext CTX =
+            new WorkspaceContext(1L, "acme", "Acme", AccountType.ORG, null, false, false, Set.of());
 
     @BeforeEach
     void mockWorkspaceLock() {
-        lenient().when(workspaceRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(new Workspace()));
+        workspace = new Workspace();
+        workspace.setId(1L);
+        lenient().when(workspaceRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(workspace));
         PracticeRevision revision = mock(PracticeRevision.class);
         lenient().when(revision.getRevisionNumber()).thenReturn(1);
         lenient().when(practiceRevisionService.append(any())).thenReturn(revision);
@@ -76,14 +72,14 @@ class PracticeGroupServiceTest extends BaseUnitTest {
 
     @Test
     void createGroup_persistsWithFields() {
-        when(practiceGroupRepository.existsByWorkspaceIdAndSlug(1L, "review-comms")).thenReturn(false);
+        when(practiceGroupRepository.existsByWorkspaceIdAndSlug(1L, "review-comms"))
+                .thenReturn(false);
         when(practiceGroupRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         PracticeGroup created = service.createGroup(
-            CTX,
-            "review-comms",
-            new GroupAttributes("Effective review communication", "blurb", 0, "MessageSquareReply", "cyan")
-        );
+                CTX,
+                "review-comms",
+                new GroupAttributes("Effective review communication", "blurb", 0, "MessageSquareReply", "cyan"));
 
         assertThat(created.getSlug()).isEqualTo("review-comms");
         assertThat(created.getName()).isEqualTo("Effective review communication");
@@ -109,18 +105,17 @@ class PracticeGroupServiceTest extends BaseUnitTest {
         assertThat(entry.entityId()).isEqualTo("9");
         assertThat(entry.workspaceId()).isEqualTo(1L);
         assertThat(entry.before()).isNull();
-        assertThat(entry.after()).isEqualTo(
-            new PracticeGroupSnapshot("review-comms", "Review communication", null, true, null, null, null)
-        );
+        assertThat(entry.after())
+                .isEqualTo(new PracticeGroupSnapshot(
+                        "review-comms", "Review communication", null, true, null, null, null));
     }
 
     @Test
     void createGroup_duplicateSlug_throwsConflict() {
         when(practiceGroupRepository.existsByWorkspaceIdAndSlug(1L, "dup")).thenReturn(true);
 
-        assertThatExceptionOfType(PracticeGroupSlugConflictException.class).isThrownBy(() ->
-            service.createGroup(CTX, "dup", new GroupAttributes("Dup", null, 0, null, null))
-        );
+        assertThatExceptionOfType(PracticeGroupSlugConflictException.class)
+                .isThrownBy(() -> service.createGroup(CTX, "dup", new GroupAttributes("Dup", null, 0, null, null)));
         verify(practiceGroupRepository, never()).save(any());
     }
 
@@ -129,11 +124,8 @@ class PracticeGroupServiceTest extends BaseUnitTest {
         when(practiceGroupRepository.findMaxDisplayOrder(1L)).thenReturn(3);
         when(practiceGroupRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        PracticeGroup created = service.createGroup(
-            CTX,
-            "new-group",
-            new GroupAttributes("New group", null, null, null, null)
-        );
+        PracticeGroup created =
+                service.createGroup(CTX, "new-group", new GroupAttributes("New group", null, null, null, null));
 
         assertThat(created.getDisplayOrder()).isEqualTo(4);
     }
@@ -172,12 +164,10 @@ class PracticeGroupServiceTest extends BaseUnitTest {
 
         ConfigAuditEntry entry = capturedAuditEntry();
         assertThat(entry.entityType()).isEqualTo(ConfigAuditEntityType.PRACTICE_GROUP);
-        assertThat(entry.before()).isEqualTo(
-            new PracticeGroupSnapshot("guidance", "Old", null, true, null, null, null)
-        );
-        assertThat(entry.after()).isEqualTo(
-            new PracticeGroupSnapshot("guidance", "New", null, false, null, null, null)
-        );
+        assertThat(entry.before())
+                .isEqualTo(new PracticeGroupSnapshot("guidance", "Old", null, true, null, null, null));
+        assertThat(entry.after())
+                .isEqualTo(new PracticeGroupSnapshot("guidance", "New", null, false, null, null, null));
     }
 
     @Test
@@ -191,14 +181,53 @@ class PracticeGroupServiceTest extends BaseUnitTest {
         second.setId(2L);
         when(practiceGroupRepository.findByWorkspaceIdAndSlug(1L, "g")).thenReturn(Optional.of(group));
         when(practiceGroupRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-        when(practiceRepository.findByWorkspaceIdAndGroupIdOrderByDisplayOrderAscNameAsc(1L, 7L)).thenReturn(
-            List.of(first, second)
-        );
+        when(practiceRepository.findByWorkspaceIdAndGroupIdOrderByDisplayOrderAscNameAsc(1L, 7L))
+                .thenReturn(List.of(first, second));
 
         service.updateGroup(CTX, "g", new GroupAttributes("New", null, null, null, null));
 
         verify(practiceRevisionService).append(first);
         verify(practiceRevisionService).append(second);
+    }
+
+    @Test
+    void changingInheritedAuthorityBumpsTheRolloutRevisionOnce() {
+        PracticeGroup group = group("g");
+        group.setId(7L);
+        group.setAutonomy(PracticeAutonomy.HUMAN_APPROVAL);
+        Practice first = practice("first");
+        first.setId(1L);
+        first.setGroup(group);
+        Practice second = practice("second");
+        second.setId(2L);
+        second.setGroup(group);
+        when(practiceGroupRepository.findByWorkspaceIdAndSlug(1L, "g")).thenReturn(Optional.of(group));
+        when(practiceGroupRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(practiceRepository.findByWorkspaceIdAndGroupIdOrderByDisplayOrderAscNameAsc(1L, 7L))
+                .thenReturn(List.of(first, second));
+
+        service.setAutonomy(CTX, "g", PracticeAutonomy.AUTOMATIC);
+
+        assertThat(workspace.getReviewSettings().getRolloutRevision()).isEqualTo(1);
+    }
+
+    @Test
+    void changingAGroupDoesNotBumpWhenPracticesOverrideIt() {
+        PracticeGroup group = group("g");
+        group.setId(7L);
+        group.setAutonomy(PracticeAutonomy.HUMAN_APPROVAL);
+        Practice practice = practice("p");
+        practice.setId(1L);
+        practice.setGroup(group);
+        practice.setAutonomy(PracticeAutonomy.AUTOMATIC);
+        when(practiceGroupRepository.findByWorkspaceIdAndSlug(1L, "g")).thenReturn(Optional.of(group));
+        when(practiceGroupRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(practiceRepository.findByWorkspaceIdAndGroupIdOrderByDisplayOrderAscNameAsc(1L, 7L))
+                .thenReturn(List.of(practice));
+
+        service.setAutonomy(CTX, "g", PracticeAutonomy.OFF);
+
+        assertThat(workspace.getReviewSettings().getRolloutRevision()).isZero();
     }
 
     @Test
@@ -213,13 +242,16 @@ class PracticeGroupServiceTest extends BaseUnitTest {
         destination.setId(20L);
         Practice moved = practice("moved");
         when(practiceRepository.findByWorkspaceIdAndSlug(1L, "moved")).thenReturn(Optional.of(moved));
-        when(practiceGroupRepository.findByWorkspaceIdAndSlug(1L, "destination")).thenReturn(Optional.of(destination));
+        when(practiceGroupRepository.findByWorkspaceIdAndSlug(1L, "destination"))
+                .thenReturn(Optional.of(destination));
         when(practiceRepository.findMaxDisplayOrder(1L, 20L)).thenReturn(4);
         when(practiceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         Practice bound = service.bindPractice(CTX, "moved", "destination");
 
-        assertThat(bound).extracting(Practice::getGroup, Practice::getDisplayOrder).containsExactly(destination, 5);
+        assertThat(bound)
+                .extracting(Practice::getGroup, Practice::getDisplayOrder)
+                .containsExactly(destination, 5);
         verify(practiceRevisionService).append(bound);
     }
 
@@ -235,7 +267,9 @@ class PracticeGroupServiceTest extends BaseUnitTest {
 
         Practice unbound = service.bindPractice(CTX, "p", null);
 
-        assertThat(unbound).extracting(Practice::getGroup, Practice::getDisplayOrder).containsExactly(null, 7);
+        assertThat(unbound)
+                .extracting(Practice::getGroup, Practice::getDisplayOrder)
+                .containsExactly(null, 7);
         verify(practiceRevisionService).append(unbound);
     }
 
@@ -262,9 +296,8 @@ class PracticeGroupServiceTest extends BaseUnitTest {
         when(practiceRepository.findByWorkspaceIdAndSlug(1L, "p")).thenReturn(Optional.of(practice("p")));
         when(practiceGroupRepository.findByWorkspaceIdAndSlug(1L, "foreign")).thenReturn(Optional.empty());
 
-        assertThatExceptionOfType(EntityNotFoundException.class).isThrownBy(() ->
-            service.bindPractice(CTX, "p", "foreign")
-        );
+        assertThatExceptionOfType(EntityNotFoundException.class)
+                .isThrownBy(() -> service.bindPractice(CTX, "p", "foreign"));
         verify(practiceRepository, never()).save(any());
     }
 
@@ -280,15 +313,14 @@ class PracticeGroupServiceTest extends BaseUnitTest {
         second.setGroup(group);
         when(practiceGroupRepository.findByWorkspaceIdAndSlug(1L, "deleted")).thenReturn(Optional.of(group));
         when(practiceRepository.findMaxDisplayOrder(1L, null)).thenReturn(3);
-        when(practiceRepository.findByWorkspaceIdAndGroupIdOrderByDisplayOrderAscNameAsc(1L, 20L)).thenReturn(
-            List.of(first, second)
-        );
+        when(practiceRepository.findByWorkspaceIdAndGroupIdOrderByDisplayOrderAscNameAsc(1L, 20L))
+                .thenReturn(List.of(first, second));
 
         service.deleteGroup(CTX, "deleted");
 
         assertThat(List.of(first, second))
-            .extracting(Practice::getGroup, Practice::getDisplayOrder)
-            .containsExactly(tuple(null, 4), tuple(null, 5));
+                .extracting(Practice::getGroup, Practice::getDisplayOrder)
+                .containsExactly(tuple(null, 4), tuple(null, 5));
         verify(practiceRevisionService).append(first);
         verify(practiceRevisionService).append(second);
         verify(practiceGroupRepository).delete(group);
@@ -305,9 +337,8 @@ class PracticeGroupServiceTest extends BaseUnitTest {
         second.setId(2L);
         second.setGroup(group);
         when(practiceGroupRepository.findByWorkspaceIdAndSlug(1L, "deleted")).thenReturn(Optional.of(group));
-        when(practiceRepository.findByWorkspaceIdAndGroupIdOrderByDisplayOrderAscNameAsc(1L, 20L)).thenReturn(
-            List.of(first, second)
-        );
+        when(practiceRepository.findByWorkspaceIdAndGroupIdOrderByDisplayOrderAscNameAsc(1L, 20L))
+                .thenReturn(List.of(first, second));
 
         service.deleteGroup(CTX, "deleted", true);
 
@@ -330,9 +361,8 @@ class PracticeGroupServiceTest extends BaseUnitTest {
 
         ConfigAuditEntry entry = capturedAuditEntry();
         assertThat(entry.entityType()).isEqualTo(ConfigAuditEntityType.PRACTICE_GROUP);
-        assertThat(entry.before()).isEqualTo(
-            new PracticeGroupSnapshot("deleted", "Deleted", null, true, null, null, null)
-        );
+        assertThat(entry.before())
+                .isEqualTo(new PracticeGroupSnapshot("deleted", "Deleted", null, true, null, null, null));
         assertThat(entry.after()).isNull();
     }
 
@@ -364,7 +394,8 @@ class PracticeGroupServiceTest extends BaseUnitTest {
         PracticeGroup a = group("a");
         PracticeGroup b = group("b");
         PracticeGroup c = group("c");
-        when(practiceGroupRepository.findByWorkspaceIdOrderByDisplayOrderAscNameAsc(1L)).thenReturn(List.of(a, b, c));
+        when(practiceGroupRepository.findByWorkspaceIdOrderByDisplayOrderAscNameAsc(1L))
+                .thenReturn(List.of(a, b, c));
 
         service.reorder(CTX, List.of("c", "a", "b"));
 
@@ -376,33 +407,28 @@ class PracticeGroupServiceTest extends BaseUnitTest {
 
     @Test
     void reorder_unknownSlug_throws() {
-        when(practiceGroupRepository.findByWorkspaceIdOrderByDisplayOrderAscNameAsc(1L)).thenReturn(
-            List.of(group("a"), group("b"))
-        );
+        when(practiceGroupRepository.findByWorkspaceIdOrderByDisplayOrderAscNameAsc(1L))
+                .thenReturn(List.of(group("a"), group("b")));
 
-        assertThatExceptionOfType(EntityNotFoundException.class).isThrownBy(() ->
-            service.reorder(CTX, List.of("ghost", "a", "b"))
-        );
+        assertThatExceptionOfType(EntityNotFoundException.class)
+                .isThrownBy(() -> service.reorder(CTX, List.of("ghost", "a", "b")));
         verify(practiceGroupRepository, never()).save(any());
     }
 
     @Test
     void reorder_duplicateSlug_throwsAndWritesNothing() {
-        assertThatExceptionOfType(IllegalArgumentException.class).isThrownBy(() ->
-            service.reorder(CTX, List.of("a", "a"))
-        );
+        assertThatExceptionOfType(IllegalArgumentException.class)
+                .isThrownBy(() -> service.reorder(CTX, List.of("a", "a")));
         verify(practiceGroupRepository, never()).save(any());
     }
 
     @Test
     void reorder_partialList_rejectsAndWritesNothing() {
-        when(practiceGroupRepository.findByWorkspaceIdOrderByDisplayOrderAscNameAsc(1L)).thenReturn(
-            List.of(group("a"), group("b"), group("c"))
-        );
+        when(practiceGroupRepository.findByWorkspaceIdOrderByDisplayOrderAscNameAsc(1L))
+                .thenReturn(List.of(group("a"), group("b"), group("c")));
 
-        assertThatExceptionOfType(IllegalArgumentException.class).isThrownBy(() ->
-            service.reorder(CTX, List.of("a", "b"))
-        );
+        assertThatExceptionOfType(IllegalArgumentException.class)
+                .isThrownBy(() -> service.reorder(CTX, List.of("a", "b")));
         verify(practiceGroupRepository, never()).save(any());
     }
 }

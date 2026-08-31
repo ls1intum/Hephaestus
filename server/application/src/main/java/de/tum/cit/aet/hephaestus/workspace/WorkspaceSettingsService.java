@@ -93,20 +93,12 @@ public class WorkspaceSettingsService {
      */
     @Transactional
     public Workspace updateNotifications(
-        Long workspaceId,
-        @Nullable Boolean enabled,
-        @Nullable String team,
-        @Nullable String channelId
-    ) {
+            Long workspaceId, @Nullable Boolean enabled, @Nullable String team, @Nullable String channelId) {
         return updateNotificationsInTransaction(workspaceId, enabled, team, channelId);
     }
 
     private Workspace updateNotificationsInTransaction(
-        Long workspaceId,
-        @Nullable Boolean enabled,
-        @Nullable String team,
-        @Nullable String channelId
-    ) {
+            Long workspaceId, @Nullable Boolean enabled, @Nullable String team, @Nullable String channelId) {
         Workspace workspace = requireWorkspace(workspaceId);
 
         if (enabled != null) {
@@ -122,19 +114,17 @@ public class WorkspaceSettingsService {
             Optional<?> updated = connectionService.updateConfig(workspaceId, IntegrationKind.SLACK, cfg -> {
                 ConnectionConfig.SlackConfig slack = (ConnectionConfig.SlackConfig) cfg;
                 return new ConnectionConfig.SlackConfig(
-                    slack.teamId(),
-                    slack.teamName(),
-                    channelId != null ? channelId : slack.notificationChannelId(),
-                    team != null ? team : slack.teamLabel(),
-                    slack.retentionDays(),
-                    slack.enabledStreams()
-                );
+                        slack.teamId(),
+                        slack.teamName(),
+                        channelId != null ? channelId : slack.notificationChannelId(),
+                        team != null ? team : slack.teamLabel(),
+                        slack.retentionDays(),
+                        slack.enabledStreams());
             });
             if (updated.isEmpty()) {
                 throw new ResponseStatusException(
-                    HttpStatus.CONFLICT,
-                    "No active Slack Connection — reconnect via the admin panel before changing channel/team."
-                );
+                        HttpStatus.CONFLICT,
+                        "No active Slack Connection — reconnect via the admin panel before changing channel/team.");
             }
         }
 
@@ -145,13 +135,12 @@ public class WorkspaceSettingsService {
     /** Updates the weekly digest schedule and notification settings atomically. */
     @Transactional
     public Workspace updateLeaderboardDigest(
-        Long workspaceId,
-        Integer day,
-        String time,
-        Boolean enabled,
-        @Nullable String team,
-        @Nullable String channelId
-    ) {
+            Long workspaceId,
+            Integer day,
+            String time,
+            Boolean enabled,
+            @Nullable String team,
+            @Nullable String channelId) {
         updateScheduleInTransaction(workspaceId, day, time);
         return updateNotificationsInTransaction(workspaceId, enabled, team, channelId);
     }
@@ -166,29 +155,22 @@ public class WorkspaceSettingsService {
     public Workspace updateToken(Long workspaceId, String token) {
         Workspace workspace = requireWorkspace(workspaceId);
         IntegrationKind kind = connectionService
-            .findActiveProviderKind(workspaceId)
-            .filter(k -> k == IntegrationKind.GITHUB || k == IntegrationKind.GITLAB)
-            .orElseThrow(() ->
-                new IllegalStateException(
-                    "Cannot rotate PAT for workspace " +
-                        workspaceId +
-                        ": no active GitHub or GitLab Connection. Bind a provider first."
-                )
-            );
-        boolean hadToken = connectionService.findActiveBearerToken(workspaceId, kind).isPresent();
+                .findActiveProviderKind(workspaceId)
+                .filter(k -> k == IntegrationKind.GITHUB || k == IntegrationKind.GITLAB)
+                .orElseThrow(() -> new IllegalStateException("Cannot rotate PAT for workspace " + workspaceId
+                        + ": no active GitHub or GitLab Connection. Bind a provider first."));
+        boolean hadToken =
+                connectionService.findActiveBearerToken(workspaceId, kind).isPresent();
         connectionService.rotateBearerToken(workspaceId, kind, new BearerToken(token, null));
         // rotatedAt is what makes this row exist at all: rotating an already-set token leaves every
         // other component identical, and ConfigAuditRecorder drops an UPDATE whose diff is empty — so
         // a presence-only snapshot would silently record nothing for the most sensitive change here.
-        configAudit.record(
-            ConfigAuditEntry.updated(
+        configAudit.record(ConfigAuditEntry.updated(
                 ConfigAuditEntityType.WORKSPACE_TOKEN,
                 workspaceId,
                 workspaceId,
                 new WorkspaceAuditSnapshots.TokenSnapshot(hadToken, kind.name(), null),
-                new WorkspaceAuditSnapshots.TokenSnapshot(true, kind.name(), clock.instant())
-            )
-        );
+                new WorkspaceAuditSnapshots.TokenSnapshot(true, kind.name(), clock.instant())));
         log.info("Updated workspace PAT: workspaceId={}, kind={}", workspaceId, kind);
         return workspace;
     }
@@ -205,15 +187,12 @@ public class WorkspaceSettingsService {
         Workspace workspace = requireWorkspace(workspaceId);
         var beforeVis = new WorkspaceAuditSnapshots.VisibilitySnapshot(workspace.getIsPubliclyViewable());
         workspace.setIsPubliclyViewable(isPubliclyViewable);
-        configAudit.record(
-            ConfigAuditEntry.updated(
+        configAudit.record(ConfigAuditEntry.updated(
                 ConfigAuditEntityType.WORKSPACE_VISIBILITY,
                 workspaceId,
                 workspaceId,
                 beforeVis,
-                new WorkspaceAuditSnapshots.VisibilitySnapshot(isPubliclyViewable)
-            )
-        );
+                new WorkspaceAuditSnapshots.VisibilitySnapshot(isPubliclyViewable)));
         log.info("Updated workspace visibility: workspaceId={}, isPublic={}", workspaceId, isPubliclyViewable);
         return workspaceRepository.save(workspace);
     }
@@ -231,32 +210,28 @@ public class WorkspaceSettingsService {
         Workspace workspace = requireWorkspace(workspaceId);
         var before = WorkspaceAuditSnapshots.FeaturesSnapshot.of(workspace.getFeatures());
         workspace.getFeatures().applyPatch(request);
-        configAudit.record(
-            ConfigAuditEntry.updated(
+        configAudit.record(ConfigAuditEntry.updated(
                 ConfigAuditEntityType.WORKSPACE_FEATURES,
                 workspaceId,
                 workspaceId,
                 before,
-                WorkspaceAuditSnapshots.FeaturesSnapshot.of(workspace.getFeatures())
-            )
-        );
+                WorkspaceAuditSnapshots.FeaturesSnapshot.of(workspace.getFeatures())));
 
         log.info(
-            "Updated workspace features: workspaceId={}, practices={}, achievements={}, leaderboard={}, progression={}, leagues={}",
-            workspaceId,
-            request.practicesEnabled(),
-            request.achievementsEnabled(),
-            request.leaderboardEnabled(),
-            request.progressionEnabled(),
-            request.leaguesEnabled()
-        );
+                "Updated workspace features: workspaceId={}, practices={}, achievements={}, leaderboard={}, progression={}, leagues={}",
+                workspaceId,
+                request.practicesEnabled(),
+                request.achievementsEnabled(),
+                request.leaderboardEnabled(),
+                request.progressionEnabled(),
+                request.leaguesEnabled());
         return workspaceRepository.save(workspace);
     }
 
     private Workspace requireWorkspace(Long workspaceId) {
         return workspaceRepository
-            .findById(workspaceId)
-            .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceId.toString()));
+                .findById(workspaceId)
+                .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceId.toString()));
     }
 
     private void validateTimeFormat(String time) {

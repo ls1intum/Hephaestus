@@ -15,14 +15,13 @@ import org.springframework.stereotype.Repository;
 @Repository
 @WorkspaceAgnostic("Permissions scoped through team_id -> team.workspace_id")
 public interface TeamRepositoryPermissionRepository
-    extends JpaRepository<TeamRepositoryPermission, TeamRepositoryPermission.Id>
-{
+        extends JpaRepository<TeamRepositoryPermission, TeamRepositoryPermission.Id> {
     Optional<TeamRepositoryPermission> findByTeam_IdAndRepository_Id(Long teamId, Long repositoryId);
 
     /**
      * Find permission by team and repository IDs with the team eagerly loaded.
      * This is needed for authorization checks that access the team's organization.
      */
-    @EntityGraph(attributePaths = { "team" })
+    @EntityGraph(attributePaths = {"team"})
     Optional<TeamRepositoryPermission> findWithTeamByTeam_IdAndRepository_Id(Long teamId, Long repositoryId);
 }

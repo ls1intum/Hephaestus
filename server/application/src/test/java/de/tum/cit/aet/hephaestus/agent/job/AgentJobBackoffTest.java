@@ -65,8 +65,8 @@ class AgentJobBackoffTest extends BaseUnitTest {
     @DisplayName("the cap is applied after jitter, so even maximum positive jitter cannot exceed 15 minutes")
     void capIsAppliedAfterJitterSoMaximumPositiveJitterNeverExceedsIt() {
         assertThat(AgentJobBackoff.compute(100, MAX_POSITIVE_JITTER))
-            .as("no wait may exceed the cap, whichever way the jitter goes")
-            .isLessThanOrEqualTo(Duration.ofMinutes(15));
+                .as("no wait may exceed the cap, whichever way the jitter goes")
+                .isLessThanOrEqualTo(Duration.ofMinutes(15));
     }
 
     @Test
@@ -76,14 +76,10 @@ class AgentJobBackoffTest extends BaseUnitTest {
         Duration maxUp = AgentJobBackoff.compute(3, MAX_POSITIVE_JITTER);
         Duration maxDown = AgentJobBackoff.compute(3, MAX_NEGATIVE_JITTER);
 
-        assertThat(maxUp.getSeconds()).isCloseTo(
-            (long) (base.getSeconds() * 1.10),
-            org.assertj.core.data.Offset.offset(1L)
-        );
-        assertThat(maxDown.getSeconds()).isCloseTo(
-            (long) (base.getSeconds() * 0.90),
-            org.assertj.core.data.Offset.offset(1L)
-        );
+        assertThat(maxUp.getSeconds())
+                .isCloseTo((long) (base.getSeconds() * 1.10), org.assertj.core.data.Offset.offset(1L));
+        assertThat(maxDown.getSeconds())
+                .isCloseTo((long) (base.getSeconds() * 0.90), org.assertj.core.data.Offset.offset(1L));
     }
 
     /**
@@ -104,9 +100,8 @@ class AgentJobBackoffTest extends BaseUnitTest {
         for (int attempt = 0; attempt <= 10; attempt++) {
             Duration d = AgentJobBackoff.compute(attempt);
             assertThat(d).isPositive();
-            assertThat(d).isLessThanOrEqualTo(
-                AgentJobBackoff.CAP.plusSeconds(AgentJobBackoff.CAP.toSeconds() / 10 + 1)
-            );
+            assertThat(d)
+                    .isLessThanOrEqualTo(AgentJobBackoff.CAP.plusSeconds(AgentJobBackoff.CAP.toSeconds() / 10 + 1));
         }
     }
 }

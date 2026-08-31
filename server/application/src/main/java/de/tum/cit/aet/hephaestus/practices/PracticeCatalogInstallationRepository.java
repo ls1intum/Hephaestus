@@ -15,13 +15,11 @@ public interface PracticeCatalogInstallationRepository extends Repository<Practi
 
     boolean existsById(Long workspaceId);
 
-    @Query(
-        """
+    @Query("""
         SELECT i.workspaceId
         FROM PracticeCatalogInstallation i
         WHERE i.provenanceLinkedAt IS NULL
-        """
-    )
+        """)
     List<Long> findWorkspaceIdsAwaitingProvenanceLink();
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

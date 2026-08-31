@@ -46,11 +46,10 @@ class SlackConnectionSyncStateProviderTest extends BaseUnitTest {
 
     private SlackConnectionSyncStateProvider providerWith(String cron) {
         return new SlackConnectionSyncStateProvider(
-            monitoredChannelRepository,
-            messageRepository,
-            new SlackSyncProperties(cron, 10, 15, Duration.ZERO, true, 5, true),
-            rateLimitTracker
-        );
+                monitoredChannelRepository,
+                messageRepository,
+                new SlackSyncProperties(cron, 10, 15, Duration.ZERO, true, 5, true),
+                rateLimitTracker);
     }
 
     private void setUpDefault() {
@@ -152,9 +151,8 @@ class SlackConnectionSyncStateProviderTest extends BaseUnitTest {
         channel.setConsentState(ConsentState.ACTIVE);
         channel.setLastHistorySyncedTs(SlackTs.ofInstant(syncedAt));
 
-        when(monitoredChannelRepository.findByWorkspaceIdAndConsentStateNot(WS, ConsentState.REVOKED)).thenReturn(
-            List.of(channel)
-        );
+        when(monitoredChannelRepository.findByWorkspaceIdAndConsentStateNot(WS, ConsentState.REVOKED))
+                .thenReturn(List.of(channel));
         when(messageRepository.countGroupedByChannelId(WS)).thenReturn(List.of(channelCount("C1", 42L)));
 
         List<SyncResourceState> resources = provider.resources(REF, CONNECTION_ID);
@@ -182,9 +180,8 @@ class SlackConnectionSyncStateProviderTest extends BaseUnitTest {
         channel.setSlackChannelId("C2");
         channel.setConsentState(ConsentState.PENDING);
 
-        when(monitoredChannelRepository.findByWorkspaceIdAndConsentStateNot(WS, ConsentState.REVOKED)).thenReturn(
-            List.of(channel)
-        );
+        when(monitoredChannelRepository.findByWorkspaceIdAndConsentStateNot(WS, ConsentState.REVOKED))
+                .thenReturn(List.of(channel));
         when(messageRepository.countGroupedByChannelId(WS)).thenReturn(List.of());
 
         List<SyncResourceState> resources = provider.resources(REF, CONNECTION_ID);

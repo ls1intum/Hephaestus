@@ -15,15 +15,12 @@ public class TestUserConfig {
 
     @Bean
     public ApplicationRunner seedTestUsers(
-        UserRepository userRepository,
-        IdentityProviderRepository gitProviderRepository
-    ) {
+            UserRepository userRepository, IdentityProviderRepository gitProviderRepository) {
         return args -> {
             IdentityProvider provider = gitProviderRepository
-                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-                .orElseGet(() ->
-                    gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
-                );
+                    .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                    .orElseGet(() -> gitProviderRepository.save(
+                            new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
             seed(userRepository, "testuser", 1, provider);
             seed(userRepository, "mentor", 2, provider);
             seed(userRepository, "admin", 3, provider);

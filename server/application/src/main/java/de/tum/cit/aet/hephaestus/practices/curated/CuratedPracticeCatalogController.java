@@ -27,18 +27,14 @@ public class CuratedPracticeCatalogController {
 
     @GetMapping("/practices/{slug}")
     @Operation(
-        summary = "Read the instance's definition of a practice",
-        description = "The current instance-catalog definition for comparison with a workspace copy.",
-        operationId = "getCuratedPracticeCatalogEntry"
-    )
+            summary = "Read the instance's definition of a practice",
+            description = "The current instance-catalog definition for comparison with a workspace copy.",
+            operationId = "getCuratedPracticeCatalogEntry")
     public ResponseEntity<CuratedPracticeDTO> get(WorkspaceContext workspaceContext, @PathVariable String slug) {
-        CatalogEntry<PracticeDefinition> entry = service
-            .catalog()
-            .installablePractices()
-            .stream()
-            .filter(candidate -> candidate.slug().equals(slug))
-            .findFirst()
-            .orElseThrow(() -> new EntityNotFoundException("Catalog practice", slug));
+        CatalogEntry<PracticeDefinition> entry = service.catalog().installablePractices().stream()
+                .filter(candidate -> candidate.slug().equals(slug))
+                .findFirst()
+                .orElseThrow(() -> new EntityNotFoundException("Catalog practice", slug));
         return ResponseEntity.ok(CuratedPracticeDTO.from(entry));
     }
 }

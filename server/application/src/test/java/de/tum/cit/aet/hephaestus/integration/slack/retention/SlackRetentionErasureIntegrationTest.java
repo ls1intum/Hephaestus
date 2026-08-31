@@ -101,13 +101,11 @@ class SlackRetentionErasureIntegrationTest extends BaseIntegrationTest {
         databaseTestUtils.cleanDatabase();
         // Add the raw-JDBC-only participant_member_ids column — see SlackConversationTestSupport.
         jdbcTemplate.execute(
-            "ALTER TABLE slack_thread ADD COLUMN IF NOT EXISTS participant_member_ids BIGINT[] NOT NULL DEFAULT '{}'"
-        );
+                "ALTER TABLE slack_thread ADD COLUMN IF NOT EXISTS participant_member_ids BIGINT[] NOT NULL DEFAULT '{}'");
         IdentityProvider provider = identityProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-            .orElseGet(() ->
-                identityProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseGet(() -> identityProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
         workspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("slack-retain-erase"));
         practice = savePractice(workspace);
         recipient = userRepository.save(TestUserFactory.createUser(100L, "retain-recipient", provider));
@@ -116,8 +114,7 @@ class SlackRetentionErasureIntegrationTest extends BaseIntegrationTest {
 
     @Test
     @DisplayName(
-        "retention erases the aged thread's derived CONVERSATION rows + drops the aggregate; fresh thread + PR survive"
-    )
+            "retention erases the aged thread's derived CONVERSATION rows + drops the aggregate; fresh thread + PR survive")
     void retentionErasesAgedThreadDerivedDataAndDropsAggregate() {
         Instant now = Instant.now();
         // No Slack Connection → falls back to the default retention window. The aged thread is well past
@@ -149,12 +146,12 @@ class SlackRetentionErasureIntegrationTest extends BaseIntegrationTest {
 
         assertThat(observationRepository.findById(prObs)).isPresent();
 
-        assertThat(
-            jdbcTemplate.queryForObject("SELECT count(*) FROM slack_message WHERE slack_ts = 'agedmsg.1'", Long.class)
-        ).isZero();
-        assertThat(
-            jdbcTemplate.queryForObject("SELECT count(*) FROM slack_message WHERE slack_ts = 'freshmsg.1'", Long.class)
-        ).isEqualTo(1L);
+        assertThat(jdbcTemplate.queryForObject(
+                        "SELECT count(*) FROM slack_message WHERE slack_ts = 'agedmsg.1'", Long.class))
+                .isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                        "SELECT count(*) FROM slack_message WHERE slack_ts = 'freshmsg.1'", Long.class))
+                .isEqualTo(1L);
     }
 
     @Test
@@ -171,7 +168,8 @@ class SlackRetentionErasureIntegrationTest extends BaseIntegrationTest {
         // The other tenant's identical member id is untouched.
         assertThat(participantIds(threadB)).containsExactlyInAnyOrder(100L, 300L);
         // Idempotent: removing a member no thread references is a no-op.
-        assertThat(slackThreadRepository.pruneParticipant(workspace.getId(), 999L)).isZero();
+        assertThat(slackThreadRepository.pruneParticipant(workspace.getId(), 999L))
+                .isZero();
     }
 
     private UUID lastFeedbackId = UUID.randomUUID();
@@ -202,51 +200,46 @@ class SlackRetentionErasureIntegrationTest extends BaseIntegrationTest {
         }
         arr.append('}');
         jdbcTemplate.update(
-            "INSERT INTO slack_thread (workspace_id, slack_channel_id, slack_thread_ts, first_ts, last_ts, message_count, participant_member_ids, created_at) " +
-                "VALUES (?, ?, ?, ?, ?, 1, ?::bigint[], now())",
-            workspaceId,
-            channelId,
-            threadTs,
-            "1700000000.000000",
-            "1700000000.000000",
-            arr.toString()
-        );
+                "INSERT INTO slack_thread (workspace_id, slack_channel_id, slack_thread_ts, first_ts, last_ts, message_count, participant_member_ids, created_at) "
+                        + "VALUES (?, ?, ?, ?, ?, 1, ?::bigint[], now())",
+                workspaceId,
+                channelId,
+                threadTs,
+                "1700000000.000000",
+                "1700000000.000000",
+                arr.toString());
         Long id = jdbcTemplate.queryForObject(
-            "SELECT id FROM slack_thread WHERE workspace_id = ? AND slack_channel_id = ? AND slack_thread_ts = ?",
-            Long.class,
-            workspaceId,
-            channelId,
-            threadTs
-        );
+                "SELECT id FROM slack_thread WHERE workspace_id = ? AND slack_channel_id = ? AND slack_thread_ts = ?",
+                Long.class,
+                workspaceId,
+                channelId,
+                threadTs);
         assertNotNull(id);
         return id;
     }
 
     private List<Long> participantIds(long threadId) {
         Long[] ids = jdbcTemplate.queryForObject(
-            "SELECT participant_member_ids FROM slack_thread WHERE id = ?",
-            (rs, n) -> (Long[]) rs.getArray(1).getArray(),
-            threadId
-        );
+                "SELECT participant_member_ids FROM slack_thread WHERE id = ?",
+                (rs, n) -> (Long[]) rs.getArray(1).getArray(),
+                threadId);
         return List.of(ids);
     }
 
     private void insertMessage(String slackTs, String slackThreadTs, Instant ingestedAt) {
         jdbcTemplate.update(
-            "INSERT INTO slack_message (workspace_id, slack_team_id, slack_channel_id, slack_ts, slack_thread_ts, ingested_at) VALUES (?, ?, ?, ?, ?, ?)",
-            workspace.getId(),
-            "T1",
-            "C1",
-            slackTs,
-            slackThreadTs,
-            Timestamp.from(ingestedAt)
-        );
+                "INSERT INTO slack_message (workspace_id, slack_team_id, slack_channel_id, slack_ts, slack_thread_ts, ingested_at) VALUES (?, ?, ?, ?, ?, ?)",
+                workspace.getId(),
+                "T1",
+                "C1",
+                slackTs,
+                slackThreadTs,
+                Timestamp.from(ingestedAt));
     }
 
     private UUID seedBoundConversation(long threadId) {
         UUID observationId = seedObservation(ArtifactKinds.CONVERSATION_THREAD, threadId);
-        Feedback feedback = feedbackRepository.save(
-            Feedback.builder()
+        Feedback feedback = feedbackRepository.save(Feedback.builder()
                 .agentJobId(job.getId())
                 .workspaceId(workspace.getId())
                 .artifactKind(ArtifactKinds.CONVERSATION_THREAD)
@@ -258,8 +251,7 @@ class SlackRetentionErasureIntegrationTest extends BaseIntegrationTest {
                 .deliveryState(FeedbackDeliveryState.PREPARED)
                 .source(FeedbackSource.AGENT)
                 .createdAt(Instant.now())
-                .build()
-        );
+                .build());
         lastFeedbackId = feedback.getId();
         feedbackObservationRepository.insertIfAbsent(feedback.getId(), observationId, EvidenceRole.PRIMARY.name(), 0);
         return observationId;
@@ -268,24 +260,24 @@ class SlackRetentionErasureIntegrationTest extends BaseIntegrationTest {
     private UUID seedObservation(ArtifactKind artifactKind, long artifactId) {
         UUID observationId = UUID.randomUUID();
         observationRepository.insertIfAbsent(
-            observationId,
-            "occ-" + observationId,
-            job.getId(),
-            practice.getId(),
-            null,
-            artifactKind.value(),
-            artifactId,
-            recipient.getId(),
-            "Observation title",
-            "ABSENT",
-            "BAD",
-            "MAJOR",
-            null,
-            null,
-            null,
-            Instant.now(),
-            "LIVE"
-        );
+                observationId,
+                "occ-" + observationId,
+                job.getId(),
+                job.getWorkspace().getId(),
+                practice.getId(),
+                null,
+                artifactKind.value(),
+                artifactId,
+                recipient.getId(),
+                "Observation title",
+                "ABSENT",
+                "BAD",
+                "MAJOR",
+                null,
+                null,
+                null,
+                Instant.now(),
+                "LIVE");
         return observationId;
     }
 

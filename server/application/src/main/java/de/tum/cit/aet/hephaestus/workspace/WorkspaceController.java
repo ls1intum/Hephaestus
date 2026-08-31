@@ -47,31 +47,27 @@ public class WorkspaceController {
     @GetMapping
     @Operation(summary = "Fetch a workspace by slug")
     @ApiResponse(
-        responseCode = "200",
-        description = "Workspace returned",
-        content = @Content(schema = @Schema(implementation = WorkspaceDTO.class))
-    )
+            responseCode = "200",
+            description = "Workspace returned",
+            content = @Content(schema = @Schema(implementation = WorkspaceDTO.class)))
     @SecurityRequirements
     public ResponseEntity<WorkspaceDTO> getWorkspace(WorkspaceContext workspaceContext) {
         Workspace workspace = workspaceService
-            .getWorkspaceBySlug(workspaceContext.slug())
-            .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceContext.slug()));
+                .getWorkspaceBySlug(workspaceContext.slug())
+                .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceContext.slug()));
         return ResponseEntity.ok(workspaceQueryService.toWorkspaceDTO(workspace));
     }
 
     @PatchMapping("/status")
     @Operation(summary = "Update workspace lifecycle status")
     @ApiResponse(
-        responseCode = "200",
-        description = "Workspace updated",
-        content = @Content(schema = @Schema(implementation = WorkspaceDTO.class))
-    )
+            responseCode = "200",
+            description = "Workspace updated",
+            content = @Content(schema = @Schema(implementation = WorkspaceDTO.class)))
     @RequireAtLeastWorkspaceAdmin
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "WORKSPACE_STATUS")
     public ResponseEntity<WorkspaceDTO> updateStatus(
-        WorkspaceContext workspaceContext,
-        @Valid @RequestBody UpdateWorkspaceStatusRequestDTO request
-    ) {
+            WorkspaceContext workspaceContext, @Valid @RequestBody UpdateWorkspaceStatusRequestDTO request) {
         Workspace workspace = workspaceLifecycleService.updateStatus(workspaceContext, request.status());
         return ResponseEntity.ok(workspaceQueryService.toWorkspaceDTO(workspace));
     }
@@ -89,16 +85,13 @@ public class WorkspaceController {
     @PatchMapping("/schedule")
     @Operation(summary = "Update leaderboard schedule configuration")
     @ApiResponse(
-        responseCode = "200",
-        description = "Workspace updated",
-        content = @Content(schema = @Schema(implementation = WorkspaceDTO.class))
-    )
+            responseCode = "200",
+            description = "Workspace updated",
+            content = @Content(schema = @Schema(implementation = WorkspaceDTO.class)))
     @RequireAtLeastWorkspaceAdmin
     @AuditExempt(reason = "leaderboard delivery preference; changes no access or AI behaviour")
     public ResponseEntity<WorkspaceDTO> updateSchedule(
-        WorkspaceContext workspaceContext,
-        @Valid @RequestBody UpdateWorkspaceScheduleRequestDTO request
-    ) {
+            WorkspaceContext workspaceContext, @Valid @RequestBody UpdateWorkspaceScheduleRequestDTO request) {
         Workspace workspace = workspaceService.updateSchedule(workspaceContext, request.day(), request.time());
         return ResponseEntity.ok(workspaceQueryService.toWorkspaceDTO(workspace));
     }
@@ -106,62 +99,48 @@ public class WorkspaceController {
     @PatchMapping("/notifications")
     @Operation(summary = "Update leaderboard notification preferences")
     @ApiResponse(
-        responseCode = "200",
-        description = "Workspace updated",
-        content = @Content(schema = @Schema(implementation = WorkspaceDTO.class))
-    )
+            responseCode = "200",
+            description = "Workspace updated",
+            content = @Content(schema = @Schema(implementation = WorkspaceDTO.class)))
     @RequireAtLeastWorkspaceAdmin
     @AuditExempt(reason = "notification delivery preference; changes no access or AI behaviour")
     public ResponseEntity<WorkspaceDTO> updateNotifications(
-        WorkspaceContext workspaceContext,
-        @Valid @RequestBody UpdateWorkspaceNotificationsRequestDTO request
-    ) {
+            WorkspaceContext workspaceContext, @Valid @RequestBody UpdateWorkspaceNotificationsRequestDTO request) {
         Workspace workspace = workspaceService.updateNotifications(
-            workspaceContext,
-            request.enabled(),
-            request.team(),
-            request.channelId()
-        );
+                workspaceContext, request.enabled(), request.team(), request.channelId());
         return ResponseEntity.ok(workspaceQueryService.toWorkspaceDTO(workspace));
     }
 
     @PatchMapping("/leaderboard-digest")
     @Operation(summary = "Update the whole weekly leaderboard digest config (schedule + notifications) atomically")
     @ApiResponse(
-        responseCode = "200",
-        description = "Workspace updated",
-        content = @Content(schema = @Schema(implementation = WorkspaceDTO.class))
-    )
+            responseCode = "200",
+            description = "Workspace updated",
+            content = @Content(schema = @Schema(implementation = WorkspaceDTO.class)))
     @RequireAtLeastWorkspaceAdmin
     @AuditExempt(reason = "digest delivery preference; changes no access or AI behaviour")
     public ResponseEntity<WorkspaceDTO> updateLeaderboardDigest(
-        WorkspaceContext workspaceContext,
-        @Valid @RequestBody UpdateLeaderboardDigestRequestDTO request
-    ) {
+            WorkspaceContext workspaceContext, @Valid @RequestBody UpdateLeaderboardDigestRequestDTO request) {
         Workspace workspace = workspaceService.updateLeaderboardDigest(
-            workspaceContext,
-            request.day(),
-            request.time(),
-            request.enabled(),
-            request.team(),
-            request.channelId()
-        );
+                workspaceContext,
+                request.day(),
+                request.time(),
+                request.enabled(),
+                request.team(),
+                request.channelId());
         return ResponseEntity.ok(workspaceQueryService.toWorkspaceDTO(workspace));
     }
 
     @PatchMapping("/token")
     @Operation(summary = "Update workspace Personal Access Token")
     @ApiResponse(
-        responseCode = "200",
-        description = "Workspace updated",
-        content = @Content(schema = @Schema(implementation = WorkspaceDTO.class))
-    )
+            responseCode = "200",
+            description = "Workspace updated",
+            content = @Content(schema = @Schema(implementation = WorkspaceDTO.class)))
     @RequireAtLeastWorkspaceAdmin
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "WORKSPACE_TOKEN")
     public ResponseEntity<WorkspaceDTO> updateToken(
-        WorkspaceContext workspaceContext,
-        @Valid @RequestBody UpdateWorkspaceTokenRequestDTO request
-    ) {
+            WorkspaceContext workspaceContext, @Valid @RequestBody UpdateWorkspaceTokenRequestDTO request) {
         Workspace workspace = workspaceService.updateToken(workspaceContext, request.personalAccessToken());
         return ResponseEntity.ok(workspaceQueryService.toWorkspaceDTO(workspace));
     }
@@ -169,16 +148,13 @@ public class WorkspaceController {
     @PatchMapping("/public-visibility")
     @Operation(summary = "Toggle public visibility for a workspace")
     @ApiResponse(
-        responseCode = "200",
-        description = "Workspace updated",
-        content = @Content(schema = @Schema(implementation = WorkspaceDTO.class))
-    )
+            responseCode = "200",
+            description = "Workspace updated",
+            content = @Content(schema = @Schema(implementation = WorkspaceDTO.class)))
     @RequireAtLeastWorkspaceAdmin
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "WORKSPACE_VISIBILITY")
     public ResponseEntity<WorkspaceDTO> updatePublicVisibility(
-        WorkspaceContext workspaceContext,
-        @Valid @RequestBody UpdateWorkspacePublicVisibilityRequestDTO request
-    ) {
+            WorkspaceContext workspaceContext, @Valid @RequestBody UpdateWorkspacePublicVisibilityRequestDTO request) {
         Workspace workspace = workspaceService.updatePublicVisibility(workspaceContext, request.isPubliclyViewable());
         return ResponseEntity.ok(workspaceQueryService.toWorkspaceDTO(workspace));
     }
@@ -186,16 +162,13 @@ public class WorkspaceController {
     @PatchMapping("/features")
     @Operation(summary = "Update workspace feature flags")
     @ApiResponse(
-        responseCode = "200",
-        description = "Workspace updated",
-        content = @Content(schema = @Schema(implementation = WorkspaceDTO.class))
-    )
+            responseCode = "200",
+            description = "Workspace updated",
+            content = @Content(schema = @Schema(implementation = WorkspaceDTO.class)))
     @RequireAtLeastWorkspaceAdmin
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "WORKSPACE_FEATURES")
     public ResponseEntity<WorkspaceDTO> updateFeatures(
-        WorkspaceContext workspaceContext,
-        @Valid @RequestBody UpdateWorkspaceFeaturesRequestDTO request
-    ) {
+            WorkspaceContext workspaceContext, @Valid @RequestBody UpdateWorkspaceFeaturesRequestDTO request) {
         Workspace workspace = workspaceService.updateFeatures(workspaceContext, request);
         return ResponseEntity.ok(workspaceQueryService.toWorkspaceDTO(workspace));
     }
@@ -203,16 +176,13 @@ public class WorkspaceController {
     @PatchMapping("/slug")
     @Operation(summary = "Rename workspace slug and create redirect")
     @ApiResponse(
-        responseCode = "200",
-        description = "Workspace renamed",
-        content = @Content(schema = @Schema(implementation = WorkspaceDTO.class))
-    )
+            responseCode = "200",
+            description = "Workspace renamed",
+            content = @Content(schema = @Schema(implementation = WorkspaceDTO.class)))
     @RequireWorkspaceOwner
     @AuditExempt(reason = "renames are unattributed: workspace_slug_history keeps old slugs redirecting, with no actor")
     public ResponseEntity<WorkspaceDTO> renameSlug(
-        WorkspaceContext workspaceContext,
-        @Valid @RequestBody RenameWorkspaceSlugRequestDTO request
-    ) {
+            WorkspaceContext workspaceContext, @Valid @RequestBody RenameWorkspaceSlugRequestDTO request) {
         Workspace workspace = workspaceService.renameSlug(workspaceContext, request.newSlug());
         return ResponseEntity.ok(workspaceQueryService.toWorkspaceDTO(workspace));
     }
@@ -220,17 +190,14 @@ public class WorkspaceController {
     @GetMapping("/repositories")
     @Operation(summary = "List repositories monitored by a workspace")
     @ApiResponse(
-        responseCode = "200",
-        description = "Repository list",
-        content = @Content(array = @ArraySchema(schema = @Schema(implementation = String.class)))
-    )
+            responseCode = "200",
+            description = "Repository list",
+            content = @Content(array = @ArraySchema(schema = @Schema(implementation = String.class))))
     @SecurityRequirements
     public ResponseEntity<List<String>> getRepositoriesToMonitor(WorkspaceContext workspaceContext) {
-        var repositories = workspaceRepositoryMonitorService
-            .getMonitoredRepositories(workspaceContext)
-            .stream()
-            .sorted()
-            .toList();
+        var repositories = workspaceRepositoryMonitorService.getMonitoredRepositories(workspaceContext).stream()
+                .sorted()
+                .toList();
         return ResponseEntity.ok(repositories);
     }
 
@@ -238,12 +205,10 @@ public class WorkspaceController {
     @Operation(summary = "Add a repository to a workspace monitor list")
     @RequireAtLeastWorkspaceAdmin
     @AuditExempt(
-        reason = "which repositories are synced is ingestion scope, not a control that gates delivery; not recorded"
-    )
+            reason =
+                    "which repositories are synced is ingestion scope, not a control that gates delivery; not recorded")
     public ResponseEntity<Void> addRepositoryToMonitor(
-        WorkspaceContext workspaceContext,
-        @RequestParam String nameWithOwner
-    ) {
+            WorkspaceContext workspaceContext, @RequestParam String nameWithOwner) {
         workspaceRepositoryMonitorService.addRepositoryToMonitor(workspaceContext, nameWithOwner);
         URI location = ServletUriComponentsBuilder.fromCurrentRequest().build().toUri();
         return ResponseEntity.created(location).build();
@@ -253,12 +218,10 @@ public class WorkspaceController {
     @Operation(summary = "Remove a repository from a workspace monitor list")
     @RequireAtLeastWorkspaceAdmin
     @AuditExempt(
-        reason = "which repositories are synced is ingestion scope, not a control that gates delivery; not recorded"
-    )
+            reason =
+                    "which repositories are synced is ingestion scope, not a control that gates delivery; not recorded")
     public ResponseEntity<Void> removeRepositoryToMonitor(
-        WorkspaceContext workspaceContext,
-        @RequestParam String nameWithOwner
-    ) {
+            WorkspaceContext workspaceContext, @RequestParam String nameWithOwner) {
         workspaceRepositoryMonitorService.removeRepositoryFromMonitor(workspaceContext, nameWithOwner);
         return ResponseEntity.noContent().build();
     }
@@ -275,15 +238,14 @@ public class WorkspaceController {
     @RequireAtLeastWorkspaceAdmin
     @AuditExempt(reason = "team label filter is a reporting view, not configuration that gates delivery")
     public ResponseEntity<TeamInfoDTO> addLabelToTeam(
-        WorkspaceContext workspaceContext,
-        @PathVariable Long teamId,
-        @PathVariable Long repositoryId,
-        @PathVariable String label
-    ) {
+            WorkspaceContext workspaceContext,
+            @PathVariable Long teamId,
+            @PathVariable Long repositoryId,
+            @PathVariable String label) {
         return workspaceTeamLabelService
-            .addLabelToTeam(workspaceContext, teamId, repositoryId, label)
-            .map(ResponseEntity::ok)
-            .orElseGet(() -> ResponseEntity.notFound().build());
+                .addLabelToTeam(workspaceContext, teamId, repositoryId, label)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @DeleteMapping("/teams/{teamId}/labels/{labelId}")
@@ -291,14 +253,11 @@ public class WorkspaceController {
     @RequireAtLeastWorkspaceAdmin
     @AuditExempt(reason = "team label filter is a reporting view, not configuration that gates delivery")
     public ResponseEntity<TeamInfoDTO> removeLabelFromTeam(
-        WorkspaceContext workspaceContext,
-        @PathVariable Long teamId,
-        @PathVariable Long labelId
-    ) {
+            WorkspaceContext workspaceContext, @PathVariable Long teamId, @PathVariable Long labelId) {
         return workspaceTeamLabelService
-            .removeLabelFromTeam(workspaceContext, teamId, labelId)
-            .map(ResponseEntity::ok)
-            .orElseGet(() -> ResponseEntity.notFound().build());
+                .removeLabelFromTeam(workspaceContext, teamId, labelId)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @PutMapping("/league/reset")

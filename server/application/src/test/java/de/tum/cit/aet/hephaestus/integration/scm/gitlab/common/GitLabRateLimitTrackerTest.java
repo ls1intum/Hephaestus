@@ -132,21 +132,24 @@ class GitLabRateLimitTrackerTest extends BaseUnitTest {
         @Test
         void shouldReturnTrueWhenBelowCriticalThreshold() {
             Long scopeId = 1L;
-            tracker.updateFromHeaders(scopeId, createHeaders(3, 100, Instant.now().plusSeconds(60), 10));
+            tracker.updateFromHeaders(
+                    scopeId, createHeaders(3, 100, Instant.now().plusSeconds(60), 10));
             assertThat(tracker.isCritical(scopeId)).isTrue();
         }
 
         @Test
         void shouldReturnFalseWhenAtCriticalThreshold() {
             Long scopeId = 1L;
-            tracker.updateFromHeaders(scopeId, createHeaders(5, 100, Instant.now().plusSeconds(60), 10));
+            tracker.updateFromHeaders(
+                    scopeId, createHeaders(5, 100, Instant.now().plusSeconds(60), 10));
             assertThat(tracker.isCritical(scopeId)).isFalse();
         }
 
         @Test
         void shouldReturnFalseWhenAboveCriticalThreshold() {
             Long scopeId = 1L;
-            tracker.updateFromHeaders(scopeId, createHeaders(80, 100, Instant.now().plusSeconds(60), 5));
+            tracker.updateFromHeaders(
+                    scopeId, createHeaders(80, 100, Instant.now().plusSeconds(60), 5));
             assertThat(tracker.isCritical(scopeId)).isFalse();
         }
 
@@ -162,14 +165,16 @@ class GitLabRateLimitTrackerTest extends BaseUnitTest {
         @Test
         void shouldReturnTrueWhenBelowLowThreshold() {
             Long scopeId = 1L;
-            tracker.updateFromHeaders(scopeId, createHeaders(10, 100, Instant.now().plusSeconds(60), 5));
+            tracker.updateFromHeaders(
+                    scopeId, createHeaders(10, 100, Instant.now().plusSeconds(60), 5));
             assertThat(tracker.isLow(scopeId)).isTrue();
         }
 
         @Test
         void shouldReturnFalseWhenAtLowThreshold() {
             Long scopeId = 1L;
-            tracker.updateFromHeaders(scopeId, createHeaders(15, 100, Instant.now().plusSeconds(60), 5));
+            tracker.updateFromHeaders(
+                    scopeId, createHeaders(15, 100, Instant.now().plusSeconds(60), 5));
             assertThat(tracker.isLow(scopeId)).isFalse();
         }
 
@@ -185,14 +190,16 @@ class GitLabRateLimitTrackerTest extends BaseUnitTest {
         @Test
         void shouldNotWaitWhenAboveLowThreshold() throws InterruptedException {
             Long scopeId = 1L;
-            tracker.updateFromHeaders(scopeId, createHeaders(80, 100, Instant.now().plusSeconds(60), 5));
+            tracker.updateFromHeaders(
+                    scopeId, createHeaders(80, 100, Instant.now().plusSeconds(60), 5));
             assertThat(tracker.waitIfNeeded(scopeId)).isFalse();
         }
 
         @Test
         void shouldNotWaitWhenBetweenCriticalAndLow() throws InterruptedException {
             Long scopeId = 1L;
-            tracker.updateFromHeaders(scopeId, createHeaders(10, 100, Instant.now().plusSeconds(60), 5));
+            tracker.updateFromHeaders(
+                    scopeId, createHeaders(10, 100, Instant.now().plusSeconds(60), 5));
             assertThat(tracker.waitIfNeeded(scopeId)).isFalse();
         }
 
@@ -211,21 +218,24 @@ class GitLabRateLimitTrackerTest extends BaseUnitTest {
         @Test
         void shouldReturnZeroWhenAboveLowThreshold() {
             Long scopeId = 1L;
-            tracker.updateFromHeaders(scopeId, createHeaders(80, 100, Instant.now().plusSeconds(60), 5));
+            tracker.updateFromHeaders(
+                    scopeId, createHeaders(80, 100, Instant.now().plusSeconds(60), 5));
             assertThat(tracker.getRecommendedDelay(scopeId)).isEqualTo(Duration.ZERO);
         }
 
         @Test
         void shouldReturnZeroWhenResetTimeInPast() {
             Long scopeId = 1L;
-            tracker.updateFromHeaders(scopeId, createHeaders(10, 100, Instant.now().minusSeconds(30), 5));
+            tracker.updateFromHeaders(
+                    scopeId, createHeaders(10, 100, Instant.now().minusSeconds(30), 5));
             assertThat(tracker.getRecommendedDelay(scopeId)).isEqualTo(Duration.ZERO);
         }
 
         @Test
         void shouldReturnPositiveDelayWhenLow() {
             Long scopeId = 1L;
-            tracker.updateFromHeaders(scopeId, createHeaders(10, 100, Instant.now().plusSeconds(30), 5));
+            tracker.updateFromHeaders(
+                    scopeId, createHeaders(10, 100, Instant.now().plusSeconds(30), 5));
             assertThat(tracker.getRecommendedDelay(scopeId)).isPositive();
         }
 
@@ -241,23 +251,34 @@ class GitLabRateLimitTrackerTest extends BaseUnitTest {
         @Test
         void shouldRegisterMetricsOnFirstUpdate() {
             Long scopeId = 1L;
-            tracker.updateFromHeaders(scopeId, createHeaders(80, 100, Instant.now().plusSeconds(60), 5));
+            tracker.updateFromHeaders(
+                    scopeId, createHeaders(80, 100, Instant.now().plusSeconds(60), 5));
 
-            assertThat(
-                meterRegistry.find("gitlab.graphql.ratelimit.points.remaining").tag("scope_id", "1").gauge()
-            ).isNotNull();
-            assertThat(
-                meterRegistry.find("gitlab.graphql.ratelimit.points.limit").tag("scope_id", "1").gauge()
-            ).isNotNull();
-            assertThat(
-                meterRegistry.find("gitlab.graphql.ratelimit.points.used").tag("scope_id", "1").gauge()
-            ).isNotNull();
-            assertThat(
-                meterRegistry.find("gitlab.graphql.ratelimit.last_query_cost").tag("scope_id", "1").gauge()
-            ).isNotNull();
-            assertThat(
-                meterRegistry.find("gitlab.graphql.ratelimit.seconds_until_reset").tag("scope_id", "1").gauge()
-            ).isNotNull();
+            assertThat(meterRegistry
+                            .find("gitlab.graphql.ratelimit.points.remaining")
+                            .tag("scope_id", "1")
+                            .gauge())
+                    .isNotNull();
+            assertThat(meterRegistry
+                            .find("gitlab.graphql.ratelimit.points.limit")
+                            .tag("scope_id", "1")
+                            .gauge())
+                    .isNotNull();
+            assertThat(meterRegistry
+                            .find("gitlab.graphql.ratelimit.points.used")
+                            .tag("scope_id", "1")
+                            .gauge())
+                    .isNotNull();
+            assertThat(meterRegistry
+                            .find("gitlab.graphql.ratelimit.last_query_cost")
+                            .tag("scope_id", "1")
+                            .gauge())
+                    .isNotNull();
+            assertThat(meterRegistry
+                            .find("gitlab.graphql.ratelimit.seconds_until_reset")
+                            .tag("scope_id", "1")
+                            .gauge())
+                    .isNotNull();
         }
 
         /**
@@ -278,7 +299,10 @@ class GitLabRateLimitTrackerTest extends BaseUnitTest {
             tracker.getRecommendedDelay(scopeId);
             assertThatNoException().isThrownBy(() -> tracker.waitIfNeeded(scopeId));
 
-            var gauge0 = meterRegistry.find("gitlab.graphql.ratelimit.points.remaining").tag("scope_id", "1").gauge();
+            var gauge0 = meterRegistry
+                    .find("gitlab.graphql.ratelimit.points.remaining")
+                    .tag("scope_id", "1")
+                    .gauge();
             assertNotNull(gauge0);
             assertThat(gauge0.value()).isEqualTo(2.0);
         }
@@ -286,15 +310,25 @@ class GitLabRateLimitTrackerTest extends BaseUnitTest {
         @Test
         void shouldReflectUpdatedValuesInGauges() {
             Long scopeId = 1L;
-            tracker.updateFromHeaders(scopeId, createHeaders(80, 100, Instant.now().plusSeconds(60), 5));
+            tracker.updateFromHeaders(
+                    scopeId, createHeaders(80, 100, Instant.now().plusSeconds(60), 5));
 
-            var gauge1 = meterRegistry.find("gitlab.graphql.ratelimit.points.remaining").tag("scope_id", "1").gauge();
+            var gauge1 = meterRegistry
+                    .find("gitlab.graphql.ratelimit.points.remaining")
+                    .tag("scope_id", "1")
+                    .gauge();
             assertNotNull(gauge1);
             assertThat(gauge1.value()).isEqualTo(80.0);
-            var gauge2 = meterRegistry.find("gitlab.graphql.ratelimit.points.limit").tag("scope_id", "1").gauge();
+            var gauge2 = meterRegistry
+                    .find("gitlab.graphql.ratelimit.points.limit")
+                    .tag("scope_id", "1")
+                    .gauge();
             assertNotNull(gauge2);
             assertThat(gauge2.value()).isEqualTo(100.0);
-            var gauge3 = meterRegistry.find("gitlab.graphql.ratelimit.points.used").tag("scope_id", "1").gauge();
+            var gauge3 = meterRegistry
+                    .find("gitlab.graphql.ratelimit.points.used")
+                    .tag("scope_id", "1")
+                    .gauge();
             assertNotNull(gauge3);
             assertThat(gauge3.value()).isEqualTo(20.0);
         }

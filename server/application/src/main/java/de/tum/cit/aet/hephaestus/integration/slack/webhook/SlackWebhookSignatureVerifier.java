@@ -38,11 +38,10 @@ public class SlackWebhookSignatureVerifier implements WebhookSignatureVerifier {
     @Override
     public VerificationResult verify(WebhookRequest request) {
         SlackSignatureVerifier.Verification verification = signatureVerifier.check(
-            header(request.headers(), HEADER_TIMESTAMP),
-            header(request.headers(), HEADER_SIGNATURE),
-            request.body(),
-            Instant.now().getEpochSecond()
-        );
+                header(request.headers(), HEADER_TIMESTAMP),
+                header(request.headers(), HEADER_SIGNATURE),
+                request.body(),
+                Instant.now().getEpochSecond());
         return switch (verification.status()) {
             case VALID -> verifiedEnvelope(request.body());
             case MISSING_SIGNATURE -> new VerificationResult.MissingSignature();
@@ -60,10 +59,9 @@ public class SlackWebhookSignatureVerifier implements WebhookSignatureVerifier {
         }
         if ("url_verification".equals(root.path("type").asString(""))) {
             return new VerificationResult.RespondImmediately(
-                200,
-                "text/plain; charset=utf-8",
-                root.path("challenge").asString("").getBytes(StandardCharsets.UTF_8)
-            );
+                    200,
+                    "text/plain; charset=utf-8",
+                    root.path("challenge").asString("").getBytes(StandardCharsets.UTF_8));
         }
         return new VerificationResult.Verified();
     }

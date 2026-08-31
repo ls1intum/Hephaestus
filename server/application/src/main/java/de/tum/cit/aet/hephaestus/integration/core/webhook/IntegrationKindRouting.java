@@ -16,15 +16,14 @@ import org.springframework.stereotype.Component;
 public class IntegrationKindRouting {
 
     private static final Map<String, IntegrationKind> ROUTES = Map.of(
-        "github",
-        IntegrationKind.GITHUB,
-        "gitlab",
-        IntegrationKind.GITLAB,
-        "slack",
-        IntegrationKind.SLACK,
-        "outline",
-        IntegrationKind.OUTLINE
-    );
+            "github",
+            IntegrationKind.GITHUB,
+            "gitlab",
+            IntegrationKind.GITLAB,
+            "slack",
+            IntegrationKind.SLACK,
+            "outline",
+            IntegrationKind.OUTLINE);
 
     public Optional<IntegrationKind> resolve(@org.jspecify.annotations.Nullable String pathSegment) {
         if (pathSegment == null) return Optional.empty();

@@ -18,11 +18,10 @@ public class DummyEvaluator implements AchievementEvaluator {
     public boolean updateProgress(UserAchievement userAchievement, ActivitySavedEvent event) {
         var user = userAchievement.getUser();
         log.debug(
-            "Evaluation of achievement: {} for user: {} for event: {} skipped by DummyEvaluator! No corresponding Evaluator available yet!",
-            userAchievement.getAchievementId(),
-            LoggingUtils.sanitizeForLog(user.getLogin()),
-            event.eventType()
-        );
+                "Evaluation of achievement: {} for user: {} for event: {} skipped by DummyEvaluator! No corresponding Evaluator available yet!",
+                userAchievement.getAchievementId(),
+                LoggingUtils.sanitizeForLog(user.getLogin()),
+                event.eventType());
         return false;
     }
 }

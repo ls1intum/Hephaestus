@@ -42,13 +42,12 @@ into them by absolute GitHub URL rather than a relative path.
 pnpm run docs:dev       # Start dev server at http://localhost:3000/Hephaestus/
 
 # Or from docs directory
-cd docs && pnpm start
+cd docs && pnpm run start
 ```
 
 ## Prerequisites
 
-- Node.js as pinned in `.node-version`
-- pnpm as pinned by the root `packageManager` field
+- Node.js and pnpm as pinned by the root `package.json`
 
 Install dependencies from the repo root — the docs site is a workspace package, so a root
 `pnpm install` covers it:

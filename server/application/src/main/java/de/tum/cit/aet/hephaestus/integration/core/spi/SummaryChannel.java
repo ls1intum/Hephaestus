@@ -58,9 +58,18 @@ public interface SummaryChannel {
         return repoFullName + "#" + issueNumber;
     }
 
-    record FeedbackTarget(IntegrationRef ref, String subjectExternalId, @Nullable String resourceUrl) {}
+    record FeedbackTarget(
+            IntegrationRef ref,
+            String subjectExternalId,
+            @Nullable String resourceUrl) {}
 
-    record FeedbackContent(String body, String marker) {}
+    record FeedbackContent(String body, String marker) {
+        public String externalBody() {
+            return marker == null || marker.isBlank()
+                    ? body
+                    : body.replace(marker, "").stripTrailing() + "\n\n" + marker;
+        }
+    }
 
     /** Vendor-side post identifier recorded on {@code FeedbackPlacement.external_ref} for edit-in-place (ADR 0021). */
     record SummaryHandle(String externalId) {}
@@ -90,7 +99,10 @@ public interface SummaryChannel {
      * The outcome of an {@link #updateSummary} attempt. {@code TRANSIENT} is the load-bearing case: the caller
      * must NOT create-fallback on it (that double-posts), only on {@code GONE}/{@code UNSUPPORTED}.
      */
-    record UpdateOutcome(Kind kind, @Nullable SummaryHandle handle, @Nullable String reason) {
+    record UpdateOutcome(
+            Kind kind,
+            @Nullable SummaryHandle handle,
+            @Nullable String reason) {
         public enum Kind {
             EDITED,
             GONE,

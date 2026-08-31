@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
 import de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionResultParser;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
+import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFeedbackChannel;
@@ -38,13 +39,12 @@ public class JobTypeHandlerConfiguration {
     private final FeedbackResponseSuppressionFilter feedbackResponseSuppressionFilter;
 
     JobTypeHandlerConfiguration(
-        JsonMapper objectMapper,
-        ContentAddressedStore contentAddressedStore,
-        PracticeReviewProperties reviewProperties,
-        WorkspaceContextBuilder workspaceContextBuilder,
-        TaskEnvelopeWriter taskEnvelopeWriter,
-        FeedbackResponseSuppressionFilter feedbackResponseSuppressionFilter
-    ) {
+            JsonMapper objectMapper,
+            ContentAddressedStore contentAddressedStore,
+            PracticeReviewProperties reviewProperties,
+            WorkspaceContextBuilder workspaceContextBuilder,
+            TaskEnvelopeWriter taskEnvelopeWriter,
+            FeedbackResponseSuppressionFilter feedbackResponseSuppressionFilter) {
         this.objectMapper = objectMapper;
         this.contentAddressedStore = contentAddressedStore;
         this.reviewProperties = reviewProperties;
@@ -65,38 +65,35 @@ public class JobTypeHandlerConfiguration {
 
     @Bean
     DiffNotePoster diffNotePoster(
-        PullRequestCommentPoster commentPoster,
-        PracticeFeedbackCommentFormatter commentFormatter,
-        List<InlineFeedbackChannel> inlineFeedbackChannels
-    ) {
+            PullRequestCommentPoster commentPoster,
+            PracticeFeedbackCommentFormatter commentFormatter,
+            List<InlineFeedbackChannel> inlineFeedbackChannels) {
         return new DiffNotePoster(commentPoster, commentFormatter, inlineFeedbackChannels);
     }
 
     @Bean
     FeedbackDeliveryService feedbackDeliveryService(
-        PullRequestCommentPoster commentPoster,
-        DiffNotePoster diffNotePoster,
-        PracticeFeedbackDeliveryPolicy deliveryPolicy,
-        FeedbackLedgerRecorder feedbackLedgerRecorder,
-        ObservationTrendService observationTrendService,
-        PracticeFeedbackCommentFormatter commentFormatter
-    ) {
+            PullRequestCommentPoster commentPoster,
+            PracticeFeedbackDeliveryPolicy deliveryPolicy,
+            FeedbackLedgerRecorder feedbackLedgerRecorder,
+            ObservationTrendService observationTrendService,
+            PracticeFeedbackCommentFormatter commentFormatter,
+            PracticeFeedbackDispatchService dispatchService,
+            AgentJobRepository agentJobRepository) {
         return new FeedbackDeliveryService(
-            commentPoster,
-            diffNotePoster,
-            deliveryPolicy,
-            reviewProperties,
-            feedbackLedgerRecorder,
-            observationTrendService,
-            commentFormatter
-        );
+                commentPoster,
+                deliveryPolicy,
+                reviewProperties,
+                feedbackLedgerRecorder,
+                observationTrendService,
+                commentFormatter,
+                dispatchService,
+                agentJobRepository);
     }
 
     @Bean
     PracticeCatalogInjector practiceCatalogInjector(
-        PracticeRepository practiceRepository,
-        WorkspaceReviewDefaultsProvider workspaceDefaults
-    ) {
+            PracticeRepository practiceRepository, WorkspaceReviewDefaultsProvider workspaceDefaults) {
         return new PracticeCatalogInjector(objectMapper, practiceRepository, workspaceDefaults);
     }
 
@@ -107,96 +104,94 @@ public class JobTypeHandlerConfiguration {
 
     @Bean
     PullRequestReviewHandler pullRequestReviewHandler(
-        PracticeCatalogInjector practiceCatalogInjector,
-        PracticeDetectionResultParser resultParser,
-        FeedbackCompositionResultParser compositionResultParser,
-        PracticeDetectionDeliveryService deliveryService,
-        FeedbackDeliveryService feedbackService,
-        SecretDiffScanner secretDiffScanner,
-        InContextDeliveryGate inContextDeliveryGate,
-        ObservationRepository observationRepository
-    ) {
+            PracticeCatalogInjector practiceCatalogInjector,
+            PracticeDetectionResultParser resultParser,
+            FeedbackCompositionResultParser compositionResultParser,
+            PracticeDetectionDeliveryService deliveryService,
+            FeedbackDeliveryService feedbackService,
+            SecretDiffScanner secretDiffScanner,
+            InContextDeliveryGate inContextDeliveryGate,
+            ObservationRepository observationRepository) {
         return new PullRequestReviewHandler(
-            objectMapper,
-            contentAddressedStore,
-            practiceCatalogInjector,
-            workspaceContextBuilder,
-            taskEnvelopeWriter,
-            resultParser,
-            compositionResultParser,
-            deliveryService,
-            feedbackService,
-            secretDiffScanner,
-            feedbackResponseSuppressionFilter,
-            inContextDeliveryGate,
-            observationRepository
-        );
+                objectMapper,
+                contentAddressedStore,
+                practiceCatalogInjector,
+                workspaceContextBuilder,
+                taskEnvelopeWriter,
+                resultParser,
+                compositionResultParser,
+                deliveryService,
+                feedbackService,
+                secretDiffScanner,
+                feedbackResponseSuppressionFilter,
+                inContextDeliveryGate,
+                observationRepository);
     }
 
     @Bean
     IssueReviewHandler issueReviewHandler(
-        PracticeCatalogInjector practiceCatalogInjector,
-        PracticeDetectionResultParser resultParser,
-        FeedbackCompositionResultParser compositionResultParser,
-        PracticeDetectionDeliveryService deliveryService,
-        InContextDeliveryGate inContextDeliveryGate,
-        PullRequestCommentPoster commentPoster,
-        FeedbackLedgerRecorder feedbackLedgerRecorder,
-        PracticeFeedbackDeliveryPolicy deliveryPolicy,
-        PracticeFeedbackCommentFormatter commentFormatter,
-        ObservationRepository observationRepository
-    ) {
+            PracticeCatalogInjector practiceCatalogInjector,
+            PracticeDetectionResultParser resultParser,
+            FeedbackCompositionResultParser compositionResultParser,
+            PracticeDetectionDeliveryService deliveryService,
+            InContextDeliveryGate inContextDeliveryGate,
+            PullRequestCommentPoster commentPoster,
+            FeedbackLedgerRecorder feedbackLedgerRecorder,
+            PracticeFeedbackDeliveryPolicy deliveryPolicy,
+            PracticeFeedbackCommentFormatter commentFormatter,
+            FeedbackResponseSuppressionFilter feedbackResponseSuppressionFilter,
+            ObservationRepository observationRepository,
+            PracticeFeedbackDispatchService dispatchService,
+            FeedbackDeliveryService feedbackDeliveryService) {
         return new IssueReviewHandler(
-            objectMapper,
-            workspaceContextBuilder,
-            taskEnvelopeWriter,
-            practiceCatalogInjector,
-            resultParser,
-            compositionResultParser,
-            deliveryService,
-            inContextDeliveryGate,
-            commentPoster,
-            feedbackLedgerRecorder,
-            deliveryPolicy,
-            commentFormatter,
-            observationRepository
-        );
+                objectMapper,
+                workspaceContextBuilder,
+                taskEnvelopeWriter,
+                practiceCatalogInjector,
+                resultParser,
+                compositionResultParser,
+                deliveryService,
+                inContextDeliveryGate,
+                commentPoster,
+                feedbackLedgerRecorder,
+                deliveryPolicy,
+                commentFormatter,
+                feedbackResponseSuppressionFilter,
+                observationRepository,
+                dispatchService,
+                feedbackDeliveryService);
     }
 
     @Bean
     JobTypeHandler conversationReviewHandler(
-        PracticeCatalogInjector practiceCatalogInjector,
-        PracticeDetectionResultParser resultParser,
-        PracticeDetectionDeliveryService deliveryService,
-        ApplicationEventPublisher eventPublisher,
-        TransactionTemplate transactionTemplate
-    ) {
+            PracticeCatalogInjector practiceCatalogInjector,
+            PracticeDetectionResultParser resultParser,
+            PracticeDetectionDeliveryService deliveryService,
+            ApplicationEventPublisher eventPublisher,
+            TransactionTemplate transactionTemplate) {
         return new ConversationReviewHandler(
-            objectMapper,
-            workspaceContextBuilder,
-            taskEnvelopeWriter,
-            practiceCatalogInjector,
-            resultParser,
-            deliveryService,
-            eventPublisher,
-            transactionTemplate
-        );
+                objectMapper,
+                workspaceContextBuilder,
+                taskEnvelopeWriter,
+                practiceCatalogInjector,
+                resultParser,
+                deliveryService,
+                eventPublisher,
+                transactionTemplate);
     }
 
     @Bean
     JobTypeHandler documentReviewHandler(
-        PracticeCatalogInjector practiceCatalogInjector,
-        PracticeDetectionResultParser resultParser,
-        PracticeDetectionDeliveryService deliveryService
-    ) {
+            PracticeCatalogInjector practiceCatalogInjector,
+            PracticeDetectionResultParser resultParser,
+            PracticeDetectionDeliveryService deliveryService) {
         return new DocumentReviewHandler(
-            objectMapper,
-            workspaceContextBuilder,
-            taskEnvelopeWriter,
-            practiceCatalogInjector,
-            resultParser,
-            deliveryService
-        );
+                objectMapper,
+                workspaceContextBuilder,
+                taskEnvelopeWriter,
+                practiceCatalogInjector,
+                resultParser,
+                deliveryService);
     }
 
     @Bean

@@ -59,16 +59,15 @@ public class LeaderboardService {
     private final WorkspaceTeamScopeResolver workspaceTeamScopeResolver;
 
     public LeaderboardService(
-        UserRepository userRepository,
-        LeaderboardReviewQueryRepository leaderboardReviewQueryRepository,
-        LeaderboardXpQueryService leaderboardXpQueryService,
-        TeamRepository teamRepository,
-        TeamPathResolver teamPathResolver,
-        LeaguePointsService leaguePointsService,
-        WorkspaceMembershipService workspaceMembershipService,
-        WorkspaceTeamSettingsService workspaceTeamSettingsService,
-        WorkspaceTeamScopeResolver workspaceTeamScopeResolver
-    ) {
+            UserRepository userRepository,
+            LeaderboardReviewQueryRepository leaderboardReviewQueryRepository,
+            LeaderboardXpQueryService leaderboardXpQueryService,
+            TeamRepository teamRepository,
+            TeamPathResolver teamPathResolver,
+            LeaguePointsService leaguePointsService,
+            WorkspaceMembershipService workspaceMembershipService,
+            WorkspaceTeamSettingsService workspaceTeamSettingsService,
+            WorkspaceTeamScopeResolver workspaceTeamScopeResolver) {
         this.userRepository = userRepository;
         this.leaderboardReviewQueryRepository = leaderboardReviewQueryRepository;
         this.leaderboardXpQueryService = leaderboardXpQueryService;
@@ -82,28 +81,25 @@ public class LeaderboardService {
 
     @Transactional(readOnly = true)
     public List<LeaderboardEntryDTO> createLeaderboard(
-        Workspace workspace,
-        Instant after,
-        Instant before,
-        String team,
-        LeaderboardSortType sort,
-        LeaderboardMode mode
-    ) {
+            Workspace workspace,
+            Instant after,
+            Instant before,
+            String team,
+            LeaderboardSortType sort,
+            LeaderboardMode mode) {
         return buildLeaderboard(workspace, after, before, team, sort, mode);
     }
 
     private List<LeaderboardEntryDTO> buildLeaderboard(
-        Workspace workspace,
-        Instant after,
-        Instant before,
-        String team,
-        LeaderboardSortType sort,
-        LeaderboardMode mode
-    ) {
+            Workspace workspace,
+            Instant after,
+            Instant before,
+            String team,
+            LeaderboardSortType sort,
+            LeaderboardMode mode) {
         if (mode == LeaderboardMode.INDIVIDUAL) {
-            Optional<Team> resolvedTeam = "all".equals(team)
-                ? Optional.empty()
-                : teamPathResolver.resolveByPath(workspace, team);
+            Optional<Team> resolvedTeam =
+                    "all".equals(team) ? Optional.empty() : teamPathResolver.resolveByPath(workspace, team);
             return createIndividualLeaderboard(workspace, after, before, resolvedTeam, sort);
         }
 
@@ -112,52 +108,40 @@ public class LeaderboardService {
     }
 
     private List<LeaderboardEntryDTO> createIndividualLeaderboard(
-        Workspace workspace,
-        Instant after,
-        Instant before,
-        Optional<Team> team,
-        LeaderboardSortType sort
-    ) {
+            Workspace workspace, Instant after, Instant before, Optional<Team> team, LeaderboardSortType sort) {
         return createIndividualLeaderboard(workspace, after, before, team, sort, null);
     }
 
     private List<LeaderboardEntryDTO> createIndividualLeaderboard(
-        Workspace workspace,
-        Instant after,
-        Instant before,
-        Optional<Team> team,
-        LeaderboardSortType sort,
-        @Nullable Map<Long, List<Team>> teamHierarchy
-    ) {
+            Workspace workspace,
+            Instant after,
+            Instant before,
+            Optional<Team> team,
+            LeaderboardSortType sort,
+            @Nullable Map<Long, List<Team>> teamHierarchy) {
         if (workspace == null || workspace.getId() == null) {
             log.warn("Skipped leaderboard creation: reason=missingWorkspaceId");
             return Collections.emptyList();
         }
 
         log.debug(
-            "Prepared leaderboard query: workspaceId={}, after={}, before={}, team={}",
-            workspace.getId(),
-            after,
-            before,
-            team.isEmpty() ? "all" : team.get().getName()
-        );
+                "Prepared leaderboard query: workspaceId={}, after={}, before={}, team={}",
+                workspace.getId(),
+                after,
+                before,
+                team.isEmpty() ? "all" : team.get().getName());
 
         Long workspaceId = workspace.getId();
 
         // Collect team IDs for filtering (if team specified)
-        Set<Long> teamIds = team
-            .map(t ->
-                teamPathResolver.collectDescendantIds(
-                    t,
-                    Objects.requireNonNullElseGet(teamHierarchy, () -> teamPathResolver.buildHierarchy(workspace))
-                )
-            )
-            .orElse(Collections.emptySet());
+        Set<Long> teamIds = team.map(t -> teamPathResolver.collectDescendantIds(
+                        t,
+                        Objects.requireNonNullElseGet(teamHierarchy, () -> teamPathResolver.buildHierarchy(workspace))))
+                .orElse(Collections.emptySet());
 
         // XP and breakdown from activity events (source of truth)
-        Map<Long, LeaderboardUserXp> activityData = new HashMap<>(
-            leaderboardXpQueryService.getLeaderboardData(workspaceId, after, before, teamIds)
-        );
+        Map<Long, LeaderboardUserXp> activityData =
+                new HashMap<>(leaderboardXpQueryService.getLeaderboardData(workspaceId, after, before, teamIds));
 
         // Pad with zero-activity members, enumerated by workspace membership rather than the org-login
         // string (which leaks between workspaces sharing an account_login).
@@ -172,9 +156,7 @@ public class LeaderboardService {
         for (User member : allTeamMembers) {
             if (member.getId() != null && !activityData.containsKey(member.getId())) {
                 activityData.put(
-                    member.getId(),
-                    new LeaderboardUserXp(member, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
-                );
+                        member.getId(), new LeaderboardUserXp(member, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0));
             }
         }
 
@@ -195,36 +177,30 @@ public class LeaderboardService {
             reviews = Collections.emptyList();
         } else if (team.isPresent() && !teamIds.isEmpty()) {
             reviews = leaderboardReviewQueryRepository.findAllInTimeframeByActorsOfTeams(
-                after,
-                before,
-                actorIds,
-                teamIds,
-                workspaceId
-            );
+                    after, before, actorIds, teamIds, workspaceId);
         } else {
             reviews = leaderboardReviewQueryRepository.findAllInTimeframeByActors(after, before, actorIds, workspaceId);
         }
 
-        Map<Long, List<PullRequestReview>> reviewsByUserId = reviews
-            .stream()
-            .filter(r -> r.getAuthor() != null && r.getAuthor().getId() != null)
-            .collect(Collectors.groupingBy(r -> r.getAuthor().getId()));
+        Map<Long, List<PullRequestReview>> reviewsByUserId = reviews.stream()
+                .filter(r -> r.getAuthor() != null && r.getAuthor().getId() != null)
+                .collect(Collectors.groupingBy(r -> r.getAuthor().getId()));
 
         // Get league points for ranking
-        Collection<User> users = activityData.values().stream().map(LeaderboardUserXp::user).toList();
+        Collection<User> users =
+                activityData.values().stream().map(LeaderboardUserXp::user).toList();
 
-        Map<Long, Integer> leaguePointsByUserId = workspaceMembershipService.getLeaguePointsSnapshot(
-            users,
-            workspaceId
-        );
+        Map<Long, Integer> leaguePointsByUserId =
+                workspaceMembershipService.getLeaguePointsSnapshot(users, workspaceId);
 
         // Sort by specified criteria
-        Comparator<Map.Entry<Long, LeaderboardUserXp>> comparator = comparatorForActivityData(
-            sort,
-            leaguePointsByUserId
-        );
+        Comparator<Map.Entry<Long, LeaderboardUserXp>> comparator =
+                comparatorForActivityData(sort, leaguePointsByUserId);
 
-        List<Long> ranking = activityData.entrySet().stream().sorted(comparator).map(Map.Entry::getKey).toList();
+        List<Long> ranking = activityData.entrySet().stream()
+                .sorted(comparator)
+                .map(Map.Entry::getKey)
+                .toList();
 
         // Build DTOs
         List<LeaderboardEntryDTO> result = new ArrayList<>();
@@ -243,37 +219,36 @@ public class LeaderboardService {
             List<PullRequestReview> userReviews = reviewsByUserId.getOrDefault(userId, Collections.emptyList());
 
             // Extract reviewed PRs for display popover
-            List<PullRequestInfoDTO> reviewedPullRequests = userReviews
-                .stream()
-                .map(PullRequestReview::getPullRequest)
-                .filter(Objects::nonNull)
-                .filter(pr -> pr.getAuthor() == null || !Objects.equals(pr.getAuthor().getId(), userId))
-                .collect(Collectors.toMap(PullRequest::getId, pr -> pr, (a, b) -> a))
-                .values()
-                .stream()
-                .map(PullRequestInfoDTO::fromPullRequest)
-                .collect(Collectors.toList());
+            List<PullRequestInfoDTO> reviewedPullRequests = userReviews.stream()
+                    .map(PullRequestReview::getPullRequest)
+                    .filter(Objects::nonNull)
+                    .filter(pr -> pr.getAuthor() == null
+                            || !Objects.equals(pr.getAuthor().getId(), userId))
+                    .collect(Collectors.toMap(PullRequest::getId, pr -> pr, (a, b) -> a))
+                    .values()
+                    .stream()
+                    .map(PullRequestInfoDTO::fromPullRequest)
+                    .collect(Collectors.toList());
 
             // Stats come from activity events (pre-computed, not recalculated)
             LeaderboardEntryDTO entry = new LeaderboardEntryDTO(
-                index + 1,
-                score,
-                userDto,
-                null,
-                reviewedPullRequests,
-                data.reviewedPrCount(),
-                data.approvals(),
-                data.changeRequests(),
-                data.comments(),
-                data.unknowns(),
-                data.codeComments(),
-                data.ownReplies(),
-                data.openPullRequests(),
-                data.mergedPullRequests(),
-                data.closedPullRequests(),
-                data.openedIssues(),
-                data.closedIssues()
-            );
+                    index + 1,
+                    score,
+                    userDto,
+                    null,
+                    reviewedPullRequests,
+                    data.reviewedPrCount(),
+                    data.approvals(),
+                    data.changeRequests(),
+                    data.comments(),
+                    data.unknowns(),
+                    data.codeComments(),
+                    data.ownReplies(),
+                    data.openPullRequests(),
+                    data.mergedPullRequests(),
+                    data.closedPullRequests(),
+                    data.openedIssues(),
+                    data.closedIssues());
             result.add(entry);
         }
 
@@ -284,9 +259,7 @@ public class LeaderboardService {
      * Comparator for activity-based leaderboard data.
      */
     private Comparator<Map.Entry<Long, LeaderboardUserXp>> comparatorForActivityData(
-        LeaderboardSortType sort,
-        Map<Long, Integer> leaguePointsByUserId
-    ) {
+            LeaderboardSortType sort, Map<Long, Integer> leaguePointsByUserId) {
         return (a, b) -> {
             LeaderboardUserXp dataA = a.getValue();
             LeaderboardUserXp dataB = b.getValue();
@@ -308,85 +281,63 @@ public class LeaderboardService {
     }
 
     private List<LeaderboardEntryDTO> createTeamLeaderboard(
-        Workspace workspace,
-        Instant after,
-        Instant before,
-        LeaderboardSortType sort
-    ) {
+            Workspace workspace, Instant after, Instant before, LeaderboardSortType sort) {
         log.debug(
-            "Prepared team leaderboard query: workspaceId={}, after={}, before={}",
-            workspace.getId(),
-            after,
-            before
-        );
+                "Prepared team leaderboard query: workspaceId={}, after={}, before={}",
+                workspace.getId(),
+                after,
+                before);
 
         Map<Long, List<Team>> teamHierarchy = teamPathResolver.buildHierarchy(workspace);
         // Use workspace-scoped hidden settings instead of deprecated Team.hidden field
         Set<Long> hiddenTeamIds = workspaceTeamSettingsService.getHiddenTeamIds(workspace.getId());
         WorkspaceTeamScope scope = workspaceTeamScopeResolver.resolve(workspace).orElse(null);
-        List<Team> targetTeams =
-            scope == null
+        List<Team> targetTeams = scope == null
                 ? List.of()
                 : teamRepository
-                      .findAllByOrganizationIgnoreCaseAndProviderId(scope.accountLogin(), scope.providerId())
-                      .stream()
-                      .filter(team -> team.getId() != null && !hiddenTeamIds.contains(team.getId()))
-                      .toList();
+                        .findAllByOrganizationIgnoreCaseAndProviderId(scope.accountLogin(), scope.providerId())
+                        .stream()
+                        .filter(team -> team.getId() != null && !hiddenTeamIds.contains(team.getId()))
+                        .toList();
 
         if (targetTeams.isEmpty()) {
             log.debug("Found no teams for team leaderboard: workspaceId={}", workspace.getId());
             return Collections.emptyList();
         }
 
-        Map<Team, TeamStats> teamStatsById = targetTeams
-            .stream()
-            .collect(
-                Collectors.toMap(identity(), teamEntity -> {
-                    List<LeaderboardEntryDTO> entries = createIndividualLeaderboard(
-                        workspace,
-                        after,
-                        before,
-                        Optional.of(teamEntity),
-                        LeaderboardSortType.SCORE,
-                        teamHierarchy
-                    );
-                    return aggregateTeamStats(entries);
-                })
-            );
+        Map<Team, TeamStats> teamStatsById = targetTeams.stream().collect(Collectors.toMap(identity(), teamEntity -> {
+            List<LeaderboardEntryDTO> entries = createIndividualLeaderboard(
+                    workspace, after, before, Optional.of(teamEntity), LeaderboardSortType.SCORE, teamHierarchy);
+            return aggregateTeamStats(entries);
+        }));
 
-        List<Map.Entry<Team, TeamStats>> sorted = teamStatsById
-            .entrySet()
-            .stream()
-            .sorted((e1, e2) -> {
-                int cmp;
-                if (sort == LeaderboardSortType.SCORE) {
-                    cmp = Integer.compare(e2.getValue().score(), e1.getValue().score());
-                } else {
-                    cmp = Integer.compare(e2.getValue().leaguePoints(), e1.getValue().leaguePoints());
-                }
-                if (cmp != 0) {
-                    return cmp;
-                }
-                return e1.getKey().getName().compareTo(e2.getKey().getName());
-            })
-            .toList();
+        List<Map.Entry<Team, TeamStats>> sorted = teamStatsById.entrySet().stream()
+                .sorted((e1, e2) -> {
+                    int cmp;
+                    if (sort == LeaderboardSortType.SCORE) {
+                        cmp = Integer.compare(
+                                e2.getValue().score(), e1.getValue().score());
+                    } else {
+                        cmp = Integer.compare(
+                                e2.getValue().leaguePoints(), e1.getValue().leaguePoints());
+                    }
+                    if (cmp != 0) {
+                        return cmp;
+                    }
+                    return e1.getKey().getName().compareTo(e2.getKey().getName());
+                })
+                .toList();
 
         List<LeaderboardEntryDTO> result = new ArrayList<>();
         Long workspaceId = workspace.getId();
 
         // Batch fetch all team settings to avoid N+1 queries
-        Set<Long> allTeamIds = sorted
-            .stream()
-            .map(entry -> entry.getKey().getId())
-            .collect(Collectors.toSet());
-        Map<Long, Set<Label>> labelFiltersByTeam = workspaceTeamSettingsService.getTeamLabelFiltersForTeams(
-            workspaceId,
-            allTeamIds
-        );
-        Map<Long, Set<Long>> hiddenRepoIdsByTeam = workspaceTeamSettingsService.getHiddenRepositoryIdsByTeamsMap(
-            workspaceId,
-            allTeamIds
-        );
+        Set<Long> allTeamIds =
+                sorted.stream().map(entry -> entry.getKey().getId()).collect(Collectors.toSet());
+        Map<Long, Set<Label>> labelFiltersByTeam =
+                workspaceTeamSettingsService.getTeamLabelFiltersForTeams(workspaceId, allTeamIds);
+        Map<Long, Set<Long>> hiddenRepoIdsByTeam =
+                workspaceTeamSettingsService.getHiddenRepositoryIdsByTeamsMap(workspaceId, allTeamIds);
         Set<Long> hiddenMemberIds = workspaceMembershipService.getHiddenMemberIds(workspaceId);
 
         for (int i = 0; i < sorted.size(); i++) {
@@ -400,30 +351,24 @@ public class LeaderboardService {
             Set<Long> hiddenRepoIds = hiddenRepoIdsByTeam.getOrDefault(teamEntity.getId(), Set.of());
 
             LeaderboardEntryDTO entry = new LeaderboardEntryDTO(
-                i + 1,
-                score,
-                null,
-                TeamInfoDTO.fromTeamWithScopeSettings(
-                    teamEntity,
-                    isHiddenInWorkspace,
-                    workspaceLabels,
-                    hiddenRepoIds,
-                    hiddenMemberIds
-                ),
-                stats.reviewedPullRequests(),
-                stats.numberOfReviewedPRs(),
-                stats.numberOfApprovals(),
-                stats.numberOfChangeRequests(),
-                stats.numberOfComments(),
-                stats.numberOfUnknowns(),
-                stats.numberOfCodeComments(),
-                stats.numberOfOwnReplies(),
-                stats.numberOfOpenPullRequests(),
-                stats.numberOfMergedPullRequests(),
-                stats.numberOfClosedPullRequests(),
-                stats.numberOfOpenedIssues(),
-                stats.numberOfClosedIssues()
-            );
+                    i + 1,
+                    score,
+                    null,
+                    TeamInfoDTO.fromTeamWithScopeSettings(
+                            teamEntity, isHiddenInWorkspace, workspaceLabels, hiddenRepoIds, hiddenMemberIds),
+                    stats.reviewedPullRequests(),
+                    stats.numberOfReviewedPRs(),
+                    stats.numberOfApprovals(),
+                    stats.numberOfChangeRequests(),
+                    stats.numberOfComments(),
+                    stats.numberOfUnknowns(),
+                    stats.numberOfCodeComments(),
+                    stats.numberOfOwnReplies(),
+                    stats.numberOfOpenPullRequests(),
+                    stats.numberOfMergedPullRequests(),
+                    stats.numberOfClosedPullRequests(),
+                    stats.numberOfOpenedIssues(),
+                    stats.numberOfClosedIssues());
             result.add(entry);
         }
         return result;
@@ -446,8 +391,8 @@ public class LeaderboardService {
     @Transactional(readOnly = true)
     public LeagueChangeDTO computeUserLeagueStats(Workspace workspace, String login, Instant after, Instant before) {
         User user = userRepository
-            .findByLoginWithEagerMergedPullRequests(login)
-            .orElseThrow(() -> new EntityNotFoundException("User", login));
+                .findByLoginWithEagerMergedPullRequests(login)
+                .orElseThrow(() -> new EntityNotFoundException("User", login));
 
         if (workspace == null || workspace.getId() == null) {
             throw new IllegalStateException("Workspace context is required to compute league stats");
@@ -458,19 +403,12 @@ public class LeaderboardService {
         // Always use the GLOBAL leaderboard (team = "all") so that league points are
         // independent of any team filter the caller might be viewing.
         List<LeaderboardEntryDTO> globalLeaderboard = buildLeaderboard(
-            workspace,
-            after,
-            before,
-            "all",
-            LeaderboardSortType.SCORE,
-            LeaderboardMode.INDIVIDUAL
-        );
+                workspace, after, before, "all", LeaderboardSortType.SCORE, LeaderboardMode.INDIVIDUAL);
 
-        LeaderboardEntryDTO entry = globalLeaderboard
-            .stream()
-            .filter(e -> e.user() != null && login.equalsIgnoreCase(e.user().login()))
-            .findFirst()
-            .orElse(null);
+        LeaderboardEntryDTO entry = globalLeaderboard.stream()
+                .filter(e -> e.user() != null && login.equalsIgnoreCase(e.user().login()))
+                .findFirst()
+                .orElse(null);
 
         if (entry == null) {
             // User has no activity in this timeframe — no projected change
@@ -483,72 +421,82 @@ public class LeaderboardService {
     }
 
     private TeamStats aggregateTeamStats(List<LeaderboardEntryDTO> entries) {
-        List<PullRequestInfoDTO> reviewedPullRequests = new ArrayList<>(
-            entries
-                .stream()
+        List<PullRequestInfoDTO> reviewedPullRequests = new ArrayList<>(entries.stream()
                 .flatMap(e -> e.reviewedPullRequests().stream())
                 .collect(Collectors.toMap(PullRequestInfoDTO::id, p -> p, (a, b) -> a))
-                .values()
-        );
+                .values());
 
         int score = entries.stream().mapToInt(LeaderboardEntryDTO::score).sum();
-        int leaguePoints = entries
-            .stream()
-            .mapToInt(e -> e.user() == null ? 0 : e.user().leaguePoints())
-            .sum();
-        int numberOfReviewedPRs = entries.stream().mapToInt(LeaderboardEntryDTO::numberOfReviewedPRs).sum();
-        int numberOfApprovals = entries.stream().mapToInt(LeaderboardEntryDTO::numberOfApprovals).sum();
-        int numberOfChangeRequests = entries.stream().mapToInt(LeaderboardEntryDTO::numberOfChangeRequests).sum();
-        int numberOfComments = entries.stream().mapToInt(LeaderboardEntryDTO::numberOfComments).sum();
-        int numberOfUnknowns = entries.stream().mapToInt(LeaderboardEntryDTO::numberOfUnknowns).sum();
-        int numberOfCodeComments = entries.stream().mapToInt(LeaderboardEntryDTO::numberOfCodeComments).sum();
-        int numberOfOwnReplies = entries.stream().mapToInt(LeaderboardEntryDTO::numberOfOwnReplies).sum();
-        int numberOfOpenPullRequests = entries.stream().mapToInt(LeaderboardEntryDTO::numberOfOpenPullRequests).sum();
-        int numberOfMergedPullRequests = entries
-            .stream()
-            .mapToInt(LeaderboardEntryDTO::numberOfMergedPullRequests)
-            .sum();
-        int numberOfClosedPullRequests = entries
-            .stream()
-            .mapToInt(LeaderboardEntryDTO::numberOfClosedPullRequests)
-            .sum();
-        int numberOfOpenedIssues = entries.stream().mapToInt(LeaderboardEntryDTO::numberOfOpenedIssues).sum();
-        int numberOfClosedIssues = entries.stream().mapToInt(LeaderboardEntryDTO::numberOfClosedIssues).sum();
+        int leaguePoints = entries.stream()
+                .mapToInt(e -> e.user() == null ? 0 : e.user().leaguePoints())
+                .sum();
+        int numberOfReviewedPRs = entries.stream()
+                .mapToInt(LeaderboardEntryDTO::numberOfReviewedPRs)
+                .sum();
+        int numberOfApprovals = entries.stream()
+                .mapToInt(LeaderboardEntryDTO::numberOfApprovals)
+                .sum();
+        int numberOfChangeRequests = entries.stream()
+                .mapToInt(LeaderboardEntryDTO::numberOfChangeRequests)
+                .sum();
+        int numberOfComments =
+                entries.stream().mapToInt(LeaderboardEntryDTO::numberOfComments).sum();
+        int numberOfUnknowns =
+                entries.stream().mapToInt(LeaderboardEntryDTO::numberOfUnknowns).sum();
+        int numberOfCodeComments = entries.stream()
+                .mapToInt(LeaderboardEntryDTO::numberOfCodeComments)
+                .sum();
+        int numberOfOwnReplies = entries.stream()
+                .mapToInt(LeaderboardEntryDTO::numberOfOwnReplies)
+                .sum();
+        int numberOfOpenPullRequests = entries.stream()
+                .mapToInt(LeaderboardEntryDTO::numberOfOpenPullRequests)
+                .sum();
+        int numberOfMergedPullRequests = entries.stream()
+                .mapToInt(LeaderboardEntryDTO::numberOfMergedPullRequests)
+                .sum();
+        int numberOfClosedPullRequests = entries.stream()
+                .mapToInt(LeaderboardEntryDTO::numberOfClosedPullRequests)
+                .sum();
+        int numberOfOpenedIssues = entries.stream()
+                .mapToInt(LeaderboardEntryDTO::numberOfOpenedIssues)
+                .sum();
+        int numberOfClosedIssues = entries.stream()
+                .mapToInt(LeaderboardEntryDTO::numberOfClosedIssues)
+                .sum();
 
         return new TeamStats(
-            score,
-            leaguePoints,
-            reviewedPullRequests,
-            numberOfReviewedPRs,
-            numberOfApprovals,
-            numberOfChangeRequests,
-            numberOfComments,
-            numberOfUnknowns,
-            numberOfCodeComments,
-            numberOfOwnReplies,
-            numberOfOpenPullRequests,
-            numberOfMergedPullRequests,
-            numberOfClosedPullRequests,
-            numberOfOpenedIssues,
-            numberOfClosedIssues
-        );
+                score,
+                leaguePoints,
+                reviewedPullRequests,
+                numberOfReviewedPRs,
+                numberOfApprovals,
+                numberOfChangeRequests,
+                numberOfComments,
+                numberOfUnknowns,
+                numberOfCodeComments,
+                numberOfOwnReplies,
+                numberOfOpenPullRequests,
+                numberOfMergedPullRequests,
+                numberOfClosedPullRequests,
+                numberOfOpenedIssues,
+                numberOfClosedIssues);
     }
 
     private record TeamStats(
-        int score,
-        int leaguePoints,
-        List<PullRequestInfoDTO> reviewedPullRequests,
-        int numberOfReviewedPRs,
-        int numberOfApprovals,
-        int numberOfChangeRequests,
-        int numberOfComments,
-        int numberOfUnknowns,
-        int numberOfCodeComments,
-        int numberOfOwnReplies,
-        int numberOfOpenPullRequests,
-        int numberOfMergedPullRequests,
-        int numberOfClosedPullRequests,
-        int numberOfOpenedIssues,
-        int numberOfClosedIssues
-    ) {}
+            int score,
+            int leaguePoints,
+            List<PullRequestInfoDTO> reviewedPullRequests,
+            int numberOfReviewedPRs,
+            int numberOfApprovals,
+            int numberOfChangeRequests,
+            int numberOfComments,
+            int numberOfUnknowns,
+            int numberOfCodeComments,
+            int numberOfOwnReplies,
+            int numberOfOpenPullRequests,
+            int numberOfMergedPullRequests,
+            int numberOfClosedPullRequests,
+            int numberOfOpenedIssues,
+            int numberOfClosedIssues) {}
 }

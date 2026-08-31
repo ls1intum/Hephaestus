@@ -20,9 +20,8 @@ public class SilentModeGraphQlInterceptor implements GraphQlClientInterceptor {
     private static final Object MUTATION_OPERATION = new Object();
 
     private final OutboundEgressGuard egressGuard;
-    private final Cache<String, List<OperationDefinition>> operationsByDocument = Caffeine.newBuilder()
-        .maximumSize(256)
-        .build();
+    private final Cache<String, List<OperationDefinition>> operationsByDocument =
+            Caffeine.newBuilder().maximumSize(256).build();
 
     public SilentModeGraphQlInterceptor(OutboundEgressGuard egressGuard) {
         this.egressGuard = egressGuard;
@@ -39,19 +38,17 @@ public class SilentModeGraphQlInterceptor implements GraphQlClientInterceptor {
     }
 
     ExchangeFilterFunction httpAttemptFilter() {
-        return (request, next) ->
-            Mono.deferContextual(context -> {
-                if (context.hasKey(MUTATION_OPERATION)) {
-                    egressGuard.requireDeliveryAllowed("scm.graphql." + context.get(MUTATION_OPERATION));
-                }
-                return next.exchange(request);
-            });
+        return (request, next) -> Mono.deferContextual(context -> {
+            if (context.hasKey(MUTATION_OPERATION)) {
+                egressGuard.requireDeliveryAllowed("scm.graphql." + context.get(MUTATION_OPERATION));
+            }
+            return next.exchange(request);
+        });
     }
 
     private boolean isMutation(String document, @Nullable String operationName) {
-        List<OperationDefinition> operations = operationsByDocument.get(document, source ->
-            Parser.parse(source).getDefinitionsOfType(OperationDefinition.class)
-        );
+        List<OperationDefinition> operations = operationsByDocument.get(
+                document, source -> Parser.parse(source).getDefinitionsOfType(OperationDefinition.class));
         if (operationName != null) {
             for (OperationDefinition operation : operations) {
                 if (operationName.equals(operation.getName())) {
@@ -59,8 +56,7 @@ public class SilentModeGraphQlInterceptor implements GraphQlClientInterceptor {
                 }
             }
         }
-        return operations
-            .stream()
-            .anyMatch(operation -> operation.getOperation() == OperationDefinition.Operation.MUTATION);
+        return operations.stream()
+                .anyMatch(operation -> operation.getOperation() == OperationDefinition.Operation.MUTATION);
     }
 }

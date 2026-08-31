@@ -62,10 +62,7 @@ public final class GitHubGraphQlErrorUtils {
      * @return true if a matching error is found
      */
     public static boolean hasErrorType(
-        @Nullable ClientGraphQlResponse response,
-        String errorType,
-        @Nullable String pathPrefix
-    ) {
+            @Nullable ClientGraphQlResponse response, String errorType, @Nullable String pathPrefix) {
         if (response == null) {
             return false;
         }
@@ -207,23 +204,19 @@ public final class GitHubGraphQlErrorUtils {
 
             // GitHub timeout responses - these come back as HTTP 200 with error in body
             // Examples: "couldn't respond in time", "Something went wrong while executing your query"
-            if (
-                lowerMessage.contains("couldn't respond in time") ||
-                lowerMessage.contains("could not respond in time") ||
-                lowerMessage.contains("something went wrong while executing") ||
-                lowerMessage.contains("timedout") ||
-                lowerMessage.contains("timed out")
-            ) {
+            if (lowerMessage.contains("couldn't respond in time")
+                    || lowerMessage.contains("could not respond in time")
+                    || lowerMessage.contains("something went wrong while executing")
+                    || lowerMessage.contains("timedout")
+                    || lowerMessage.contains("timed out")) {
                 return new TransientError(TransientErrorType.TIMEOUT, message);
             }
 
             // Rate limit errors in GraphQL
-            if (
-                lowerMessage.contains("rate limit") ||
-                lowerMessage.contains("ratelimit") ||
-                lowerMessage.contains("abuse detection") ||
-                lowerMessage.contains("secondary rate")
-            ) {
+            if (lowerMessage.contains("rate limit")
+                    || lowerMessage.contains("ratelimit")
+                    || lowerMessage.contains("abuse detection")
+                    || lowerMessage.contains("secondary rate")) {
                 return new TransientError(TransientErrorType.RATE_LIMIT, message);
             }
 

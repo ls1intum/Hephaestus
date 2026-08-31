@@ -46,139 +46,126 @@ public class CatalogAdoptionController {
     @Operation(summary = "List practices available for adoption", operationId = "listAdoptablePractices")
     @ApiResponse(responseCode = "200", description = "Available practices returned")
     @ApiResponse(
-        responseCode = "403",
-        description = "Workspace administrator access is required",
-        content = @Content(
-            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-            schema = @Schema(implementation = ProblemDetail.class)
-        )
-    )
+            responseCode = "403",
+            description = "Workspace administrator access is required",
+            content =
+                    @Content(
+                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetail.class)))
     public ResponseEntity<List<CatalogPracticeSummaryDTO>> list(WorkspaceContext context) {
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore().cachePrivate()).body(service.list(context));
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore().cachePrivate())
+                .body(service.list(context));
     }
 
     @GetMapping("/{slug}")
     @Operation(summary = "Get a practice adoption preview", operationId = "previewPracticeAdoption")
     @ApiResponse(
-        responseCode = "200",
-        description = "Adoption preview returned",
-        headers = @Header(name = HttpHeaders.ETAG, description = "Strong validator for If-Match")
-    )
+            responseCode = "200",
+            description = "Adoption preview returned",
+            headers = @Header(name = HttpHeaders.ETAG, description = "Strong validator for If-Match"))
     @ApiResponse(
-        responseCode = "404",
-        description = "Practice is not offered",
-        content = @Content(
-            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-            schema = @Schema(implementation = ProblemDetail.class)
-        )
-    )
+            responseCode = "404",
+            description = "Practice is not offered",
+            content =
+                    @Content(
+                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetail.class)))
     @ApiResponse(
-        responseCode = "403",
-        description = "Workspace administrator access is required",
-        content = @Content(
-            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-            schema = @Schema(implementation = ProblemDetail.class)
-        )
-    )
+            responseCode = "403",
+            description = "Workspace administrator access is required",
+            content =
+                    @Content(
+                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetail.class)))
     public ResponseEntity<CatalogPracticePreviewDTO> preview(WorkspaceContext context, @PathVariable String slug) {
         CatalogAdoptionPlan plan = service.preview(context, slug);
         return ResponseEntity.ok()
-            .cacheControl(CacheControl.noStore().cachePrivate())
-            .eTag(CatalogAdoptionService.formatted(plan.etag()))
-            .body(plan.preview());
+                .cacheControl(CacheControl.noStore().cachePrivate())
+                .eTag(CatalogAdoptionService.formatted(plan.etag()))
+                .body(plan.preview());
     }
 
     @GetMapping("/groups/{slug}")
     @Operation(summary = "Preview adoption of a catalog group and its practices", operationId = "previewGroupAdoption")
     public ResponseEntity<CatalogGroupAdoptionPreviewDTO> previewGroup(
-        WorkspaceContext context,
-        @PathVariable String slug
-    ) {
+            WorkspaceContext context, @PathVariable String slug) {
         CatalogGroupAdoptionPlan plan = service.previewGroup(context, slug);
         return ResponseEntity.ok()
-            .cacheControl(CacheControl.noStore().cachePrivate())
-            .eTag(CatalogAdoptionService.formatted(plan.etag()))
-            .body(plan.preview());
+                .cacheControl(CacheControl.noStore().cachePrivate())
+                .eTag(CatalogAdoptionService.formatted(plan.etag()))
+                .body(plan.preview());
     }
 
     @PostMapping("/{slug}")
     @Operation(summary = "Adopt a catalog practice", operationId = "adoptPractice")
     @ApiResponse(responseCode = "201", description = "Practice adopted")
     @ApiResponse(
-        responseCode = "409",
-        description = "The practice slug already exists in the workspace",
-        content = @Content(
-            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-            schema = @Schema(implementation = ProblemDetail.class)
-        )
-    )
+            responseCode = "409",
+            description = "The practice slug already exists in the workspace",
+            content =
+                    @Content(
+                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetail.class)))
     @ApiResponse(
-        responseCode = "412",
-        description = "Catalog or workspace state changed since preview",
-        content = @Content(
-            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-            schema = @Schema(implementation = ProblemDetail.class)
-        )
-    )
+            responseCode = "412",
+            description = "Catalog or workspace state changed since preview",
+            content =
+                    @Content(
+                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetail.class)))
     @ApiResponse(
-        responseCode = "428",
-        description = "The If-Match preview validator is required",
-        content = @Content(
-            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-            schema = @Schema(implementation = ProblemDetail.class)
-        )
-    )
+            responseCode = "428",
+            description = "The If-Match preview validator is required",
+            content =
+                    @Content(
+                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetail.class)))
     @ApiResponse(
-        responseCode = "403",
-        description = "Workspace administrator access is required",
-        content = @Content(
-            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-            schema = @Schema(implementation = ProblemDetail.class)
-        )
-    )
+            responseCode = "403",
+            description = "Workspace administrator access is required",
+            content =
+                    @Content(
+                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetail.class)))
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_DEFINITION")
     public ResponseEntity<PracticeDTO> adopt(
-        WorkspaceContext context,
-        @PathVariable String slug,
-        @RequestHeader(value = HttpHeaders.IF_MATCH, required = false) @Nullable String ifMatch
-    ) {
+            WorkspaceContext context,
+            @PathVariable String slug,
+            @RequestHeader(value = HttpHeaders.IF_MATCH, required = false) @Nullable String ifMatch) {
         if (ifMatch == null || ifMatch.isBlank()) {
             throw new CatalogAdoptionPreconditionRequiredException();
         }
         Practice adopted = service.adopt(context, slug, ifMatch);
         URI location = ServletUriComponentsBuilder.fromCurrentContextPath()
-            .path("/workspaces/{workspaceSlug}/practices/{practiceSlug}")
-            .buildAndExpand(context.slug(), adopted.getSlug())
-            .toUri();
+                .path("/workspaces/{workspaceSlug}/practices/{practiceSlug}")
+                .buildAndExpand(context.slug(), adopted.getSlug())
+                .toUri();
         return ResponseEntity.created(location)
-            .cacheControl(CacheControl.noStore().cachePrivate())
-            .body(presenter.present(context.id(), adopted));
+                .cacheControl(CacheControl.noStore().cachePrivate())
+                .body(presenter.present(context.id(), adopted));
     }
 
     @PostMapping("/groups/{slug}")
     @Operation(summary = "Adopt all available practices in a catalog group", operationId = "adoptGroup")
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_DEFINITION")
     public ResponseEntity<CatalogGroupAdoptionResultDTO> adoptGroup(
-        WorkspaceContext context,
-        @PathVariable String slug,
-        @RequestHeader(value = HttpHeaders.IF_MATCH, required = false) @Nullable String ifMatch
-    ) {
+            WorkspaceContext context,
+            @PathVariable String slug,
+            @RequestHeader(value = HttpHeaders.IF_MATCH, required = false) @Nullable String ifMatch) {
         if (ifMatch == null || ifMatch.isBlank()) {
             throw new CatalogAdoptionPreconditionRequiredException();
         }
         CatalogAdoptionService.CatalogGroupAdoptionResult result = service.adoptGroup(context, slug, ifMatch);
         CatalogGroupAdoptionResultDTO response = new CatalogGroupAdoptionResultDTO(
-            result
-                .added()
-                .stream()
-                .map(practice -> presenter.present(context.id(), practice))
-                .toList(),
-            result
-                .moved()
-                .stream()
-                .map(practice -> presenter.present(context.id(), practice))
-                .toList()
-        );
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore().cachePrivate()).body(response);
+                result.added().stream()
+                        .map(practice -> presenter.present(context.id(), practice))
+                        .toList(),
+                result.moved().stream()
+                        .map(practice -> presenter.present(context.id(), practice))
+                        .toList());
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore().cachePrivate())
+                .body(response);
     }
 }

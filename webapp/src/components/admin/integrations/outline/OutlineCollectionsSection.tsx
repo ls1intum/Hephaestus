@@ -1,5 +1,6 @@
 import { LibraryIcon, PlusIcon } from "lucide-react";
 import { useState } from "react";
+
 import type { OutlineCollection } from "@/api/types.gen";
 import { IntegrationCardHeading } from "@/components/admin/integrations/IntegrationCardHeading";
 import { swallow } from "@/components/admin/integrations/swallow";
@@ -16,6 +17,7 @@ import {
 	EmptyTitle,
 } from "@/components/ui/empty";
 import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+
 import { AddCollectionDialog } from "./AddCollectionDialog";
 import { OutlineCollectionRow, type OutlineMirrorState } from "./OutlineCollectionRow";
 import { RemoveCollectionAlertDialog } from "./RemoveCollectionAlertDialog";

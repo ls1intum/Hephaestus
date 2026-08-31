@@ -22,69 +22,52 @@ final class GroupTrendAggregator {
     private GroupTrendAggregator() {}
 
     static PracticeTrend aggregate(
-        String groupSlug,
-        Collection<String> eligiblePracticeSlugs,
-        Collection<PracticeTrend> practiceTrends,
-        TrendProperties properties
-    ) {
-        List<PracticeTrend> comparable = practiceTrends
-            .stream()
-            .filter(trend -> trend.difference() != null)
-            .toList();
+            String groupSlug,
+            Collection<String> eligiblePracticeSlugs,
+            Collection<PracticeTrend> practiceTrends,
+            TrendProperties properties) {
+        List<PracticeTrend> comparable = practiceTrends.stream()
+                .filter(trend -> trend.difference() != null)
+                .toList();
         List<EvidenceOpportunity> trail = mergedTrail(practiceTrends, properties.getBundleSize());
         if (comparable.isEmpty()) {
             int current = distinctOpportunityCount(practiceTrends, TrendBundle.CURRENT);
             int previous = distinctOpportunityCount(practiceTrends, TrendBundle.PREVIOUS);
-            int missing = practiceTrends
-                .stream()
-                .mapToInt(trend -> trend.support().opportunitiesUntilComparable())
-                .min()
-                .orElse(properties.getMinBundleSize());
+            int missing = practiceTrends.stream()
+                    .mapToInt(trend -> trend.support().opportunitiesUntilComparable())
+                    .min()
+                    .orElse(properties.getMinBundleSize());
             return new PracticeTrend(
-                groupSlug,
-                TrendScope.GROUP,
-                TrendDirection.INSUFFICIENT_EVIDENCE,
-                TrendSupportFactory.forGroup(
-                    properties,
-                    current,
-                    previous,
-                    missing,
-                    0,
-                    eligiblePracticeSlugs.size(),
-                    trail
-                ),
-                null,
-                null,
-                trail,
-                null
-            );
+                    groupSlug,
+                    TrendScope.GROUP,
+                    TrendDirection.INSUFFICIENT_EVIDENCE,
+                    TrendSupportFactory.forGroup(
+                            properties, current, previous, missing, 0, eligiblePracticeSlugs.size(), trail),
+                    null,
+                    null,
+                    trail,
+                    null);
         }
 
         Pooled pooled = pool(comparable);
         TrendDirection direction = classifyNormal(
-            pooled.mean(),
-            pooled.variance(),
-            properties.getRopeHalfWidth(),
-            properties.getCredibilityThreshold()
-        );
+                pooled.mean(), pooled.variance(), properties.getRopeHalfWidth(), properties.getCredibilityThreshold());
         return new PracticeTrend(
-            groupSlug,
-            TrendScope.GROUP,
-            direction,
-            TrendSupportFactory.forGroup(
-                properties,
-                distinctOpportunityCount(comparable, TrendBundle.CURRENT),
-                distinctOpportunityCount(comparable, TrendBundle.PREVIOUS),
-                0,
-                comparable.size(),
-                eligiblePracticeSlugs.size(),
-                trail
-            ),
-            summed(comparable, PracticeTrend::currentOutcomes),
-            summed(comparable, PracticeTrend::previousOutcomes),
-            trail,
-            null
-        );
+                groupSlug,
+                TrendScope.GROUP,
+                direction,
+                TrendSupportFactory.forGroup(
+                        properties,
+                        distinctOpportunityCount(comparable, TrendBundle.CURRENT),
+                        distinctOpportunityCount(comparable, TrendBundle.PREVIOUS),
+                        0,
+                        comparable.size(),
+                        eligiblePracticeSlugs.size(),
+                        trail),
+                summed(comparable, PracticeTrend::currentOutcomes),
+                summed(comparable, PracticeTrend::previousOutcomes),
+                trail,
+                null);
     }
 
     private record Pooled(double mean, double variance) {}
@@ -107,9 +90,7 @@ final class GroupTrendAggregator {
     }
 
     private static OutcomeVector summed(
-        List<PracticeTrend> trends,
-        Function<PracticeTrend, @Nullable OutcomeVector> axis
-    ) {
+            List<PracticeTrend> trends, Function<PracticeTrend, @Nullable OutcomeVector> axis) {
         return trends.stream().map(axis).filter(Objects::nonNull).reduce(OutcomeVector.EMPTY, OutcomeVector::plus);
     }
 
@@ -128,7 +109,7 @@ final class GroupTrendAggregator {
         double x = Math.abs(value) / Math.sqrt(2.0);
         double t = 1.0 / (1.0 + 0.3275911 * x);
         double polynomial =
-            (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t;
+                (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t;
         double erf = sign * (1.0 - polynomial * Math.exp(-x * x));
         return 0.5 * (1.0 + erf);
     }
@@ -146,24 +127,19 @@ final class GroupTrendAggregator {
         for (PracticeTrend trend : trends) {
             for (EvidenceOpportunity opportunity : trend.opportunities()) {
                 combined.merge(
-                    new Key(opportunity.artifactKind(), opportunity.artifactId()),
-                    opportunity,
-                    (left, right) ->
-                        new EvidenceOpportunity(
-                            left.artifactKind(),
-                            left.artifactId(),
-                            left.occurredAt().isAfter(right.occurredAt()) ? left.occurredAt() : right.occurredAt(),
-                            left.outcomes().plus(right.outcomes()),
-                            strongerBundle(left.bundle(), right.bundle())
-                        )
-                );
+                        new Key(opportunity.artifactKind(), opportunity.artifactId()),
+                        opportunity,
+                        (left, right) -> new EvidenceOpportunity(
+                                left.artifactKind(),
+                                left.artifactId(),
+                                left.occurredAt().isAfter(right.occurredAt()) ? left.occurredAt() : right.occurredAt(),
+                                left.outcomes().plus(right.outcomes()),
+                                strongerBundle(left.bundle(), right.bundle())));
             }
         }
-        List<EvidenceOpportunity> sorted = combined
-            .values()
-            .stream()
-            .sorted(Comparator.comparing(EvidenceOpportunity::occurredAt))
-            .toList();
+        List<EvidenceOpportunity> sorted = combined.values().stream()
+                .sorted(Comparator.comparing(EvidenceOpportunity::occurredAt))
+                .toList();
         return OpportunityBundler.cappedTrail(sorted, bundleSize);
     }
 
@@ -175,12 +151,11 @@ final class GroupTrendAggregator {
 
     private static int distinctOpportunityCount(Collection<PracticeTrend> trends, TrendBundle bundle) {
         record Key(ArtifactKind type, long id) {}
-        return (int) trends
-            .stream()
-            .flatMap(trend -> trend.opportunities().stream())
-            .filter(opportunity -> opportunity.bundle() == bundle)
-            .map(opportunity -> new Key(opportunity.artifactKind(), opportunity.artifactId()))
-            .distinct()
-            .count();
+        return (int) trends.stream()
+                .flatMap(trend -> trend.opportunities().stream())
+                .filter(opportunity -> opportunity.bundle() == bundle)
+                .map(opportunity -> new Key(opportunity.artifactKind(), opportunity.artifactId()))
+                .distinct()
+                .count();
     }
 }

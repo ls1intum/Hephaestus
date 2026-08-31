@@ -38,13 +38,12 @@ class MentorTurnPersistenceDeliveryOutcomeTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         persistence = new MentorTurnPersistence(
-            mock(ChatThreadRepository.class),
-            chatMessageRepository,
-            mock(WorkspaceRepository.class),
-            reconciler,
-            mock(LlmUsageRecorder.class),
-            transactionManager
-        );
+                mock(ChatThreadRepository.class),
+                chatMessageRepository,
+                mock(WorkspaceRepository.class),
+                reconciler,
+                mock(LlmUsageRecorder.class),
+                transactionManager);
     }
 
     @Test
@@ -53,11 +52,7 @@ class MentorTurnPersistenceDeliveryOutcomeTest extends BaseUnitTest {
         Fixture fixture = fixture();
 
         persistence.finalise(
-            fixture.cookie(),
-            fixture.state(),
-            finish(),
-            MentorChannel.DeliveryOutcome.INSTANCE_SILENCED
-        );
+                fixture.cookie(), fixture.state(), finish(), MentorChannel.DeliveryOutcome.INSTANCE_SILENCED);
 
         verify(reconciler).suppressForSilentMode(1L, 2L, List.of(fixture.observationId()));
         verify(reconciler, never()).reconcile(anyLong(), anyLong(), any(), any());
@@ -114,18 +109,14 @@ class MentorTurnPersistenceDeliveryOutcomeTest extends BaseUnitTest {
 
     private static MentorTurnPersistence.TurnPersistenceCookie cookie(UUID assistantId) {
         return new MentorTurnPersistence.TurnPersistenceCookie(
-            UUID.randomUUID(),
-            UUID.randomUUID(),
-            assistantId,
-            Instant.now(),
-            "model",
-            mock(LlmPriceSnapshot.class)
-        );
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                assistantId,
+                Instant.now(),
+                "model",
+                mock(LlmPriceSnapshot.class));
     }
 
     private record Fixture(
-        MentorTurnPersistence.TurnPersistenceCookie cookie,
-        TranslatorState state,
-        UUID observationId
-    ) {}
+            MentorTurnPersistence.TurnPersistenceCookie cookie, TranslatorState state, UUID observationId) {}
 }

@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
+import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import io.micrometer.core.instrument.Counter;
@@ -42,20 +43,19 @@ public class AgentJobRetentionService {
     private final Counter deleted;
 
     public AgentJobRetentionService(
-        AgentJobRepository jobRepository,
-        AgentProperties agentProperties,
-        TransactionTemplate transactionTemplate,
-        MeterRegistry meterRegistry
-    ) {
+            AgentJobRepository jobRepository,
+            AgentProperties agentProperties,
+            TransactionTemplate transactionTemplate,
+            MeterRegistry meterRegistry) {
         this.jobRepository = jobRepository;
         this.agentProperties = agentProperties;
         this.transactionTemplate = transactionTemplate;
-        this.stripped = Counter.builder("agent.job.retention.stripped")
-            .description("Terminal agent_job rows whose heavy payload columns were stripped to NULL")
-            .register(meterRegistry);
-        this.deleted = Counter.builder("agent.job.retention.deleted")
-            .description("Terminal agent_job rows deleted by the retention sweep")
-            .register(meterRegistry);
+        this.stripped = Counter.builder(AgentMetrics.AGENT_JOB_RETENTION_STRIPPED)
+                .description("Terminal agent_job rows whose heavy payload columns were stripped to NULL")
+                .register(meterRegistry);
+        this.deleted = Counter.builder(AgentMetrics.AGENT_JOB_RETENTION_DELETED)
+                .description("Terminal agent_job rows deleted by the retention sweep")
+                .register(meterRegistry);
     }
 
     /**
@@ -76,9 +76,8 @@ public class AgentJobRetentionService {
         int total = 0;
         int batchUpdated;
         do {
-            Integer result = transactionTemplate.execute(status ->
-                jobRepository.stripTerminalPayloads(cutoff, BATCH_SIZE)
-            );
+            Integer result =
+                    transactionTemplate.execute(status -> jobRepository.stripTerminalPayloads(cutoff, BATCH_SIZE));
             batchUpdated = result != null ? result : 0;
             total += batchUpdated;
             if (batchUpdated > 0) {
@@ -86,18 +85,16 @@ public class AgentJobRetentionService {
             }
             if (batchUpdated == BATCH_SIZE && Instant.now().isAfter(deadline)) {
                 log.warn(
-                    "Retention: strip pass hit its {} time budget with backlog remaining — resuming next run",
-                    MAX_PASS_DURATION
-                );
+                        "Retention: strip pass hit its {} time budget with backlog remaining — resuming next run",
+                        MAX_PASS_DURATION);
                 break;
             }
         } while (batchUpdated == BATCH_SIZE);
         if (total > 0) {
             log.info(
-                "Retention: stripped payloads from {} terminal agent_job row(s) completed before {}",
-                total,
-                cutoff
-            );
+                    "Retention: stripped payloads from {} terminal agent_job row(s) completed before {}",
+                    total,
+                    cutoff);
         }
     }
 
@@ -107,9 +104,8 @@ public class AgentJobRetentionService {
         int total = 0;
         int batchDeleted;
         do {
-            Integer result = transactionTemplate.execute(status ->
-                jobRepository.deleteUnreferencedTerminalRowsOlderThan(cutoff, BATCH_SIZE)
-            );
+            Integer result = transactionTemplate.execute(
+                    status -> jobRepository.deleteUnreferencedTerminalRowsOlderThan(cutoff, BATCH_SIZE));
             batchDeleted = result != null ? result : 0;
             total += batchDeleted;
             if (batchDeleted > 0) {
@@ -117,9 +113,8 @@ public class AgentJobRetentionService {
             }
             if (batchDeleted == BATCH_SIZE && Instant.now().isAfter(deadline)) {
                 log.warn(
-                    "Retention: delete pass hit its {} time budget with backlog remaining — resuming next run",
-                    MAX_PASS_DURATION
-                );
+                        "Retention: delete pass hit its {} time budget with backlog remaining — resuming next run",
+                        MAX_PASS_DURATION);
                 break;
             }
         } while (batchDeleted == BATCH_SIZE);

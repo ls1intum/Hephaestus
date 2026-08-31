@@ -6,12 +6,11 @@ import java.util.List;
 import java.util.Objects;
 
 public record ArtifactSourceManifest(
-    SourceContractVersion contractVersion,
-    String catalogDigest,
-    String artifactKind,
-    Instant capturedAt,
-    List<SourceCapture> sources
-) {
+        SourceContractVersion contractVersion,
+        String catalogDigest,
+        String artifactKind,
+        Instant capturedAt,
+        List<SourceCapture> sources) {
     public ArtifactSourceManifest {
         Objects.requireNonNull(contractVersion, "contractVersion");
         Objects.requireNonNull(catalogDigest, "catalogDigest");

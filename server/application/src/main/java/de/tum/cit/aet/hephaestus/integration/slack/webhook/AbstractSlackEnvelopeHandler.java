@@ -36,9 +36,7 @@ abstract class AbstractSlackEnvelopeHandler implements IntegrationMessageHandler
             root = deserializer.deserialize(msg, JsonNode.class);
         } catch (IOException e) {
             throw new PayloadParsingException(
-                "Payload parsing failed for Slack subject: " + sanitizeForLog(msg.getSubject()),
-                e
-            );
+                    "Payload parsing failed for Slack subject: " + sanitizeForLog(msg.getSubject()), e);
         }
         handleEnvelope(root);
     }

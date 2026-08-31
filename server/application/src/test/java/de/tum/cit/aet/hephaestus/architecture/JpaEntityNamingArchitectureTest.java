@@ -19,12 +19,12 @@ class JpaEntityNamingArchitectureTest extends HephaestusArchitectureTest {
     @Test
     void uniqueConstraintsMustBeNamed() {
         ArchRule rule = classes()
-            .that()
-            .resideInAPackage(BASE_PACKAGE + "..")
-            .and()
-            .areAnnotatedWith(Table.class)
-            .should(haveNamedUniqueConstraintsOnly())
-            .because("explicit name= required so Hibernate's implicit naming can't drift from Liquibase");
+                .that()
+                .resideInAPackage(BASE_PACKAGE + "..")
+                .and()
+                .areAnnotatedWith(Table.class)
+                .should(haveNamedUniqueConstraintsOnly())
+                .because("explicit name= required so Hibernate's implicit naming can't drift from Liquibase");
 
         rule.check(classes);
     }
@@ -36,15 +36,10 @@ class JpaEntityNamingArchitectureTest extends HephaestusArchitectureTest {
                 Table table = entityClass.getAnnotationOfType(Table.class);
                 for (UniqueConstraint uc : table.uniqueConstraints()) {
                     if (uc.name().isBlank()) {
-                        events.add(
-                            SimpleConditionEvent.violated(
+                        events.add(SimpleConditionEvent.violated(
                                 entityClass,
-                                "%s declares an unnamed @UniqueConstraint(columnNames=%s); add name=\"uq_<table>_<cols>\"".formatted(
-                                    entityClass.getName(),
-                                    Arrays.toString(uc.columnNames())
-                                )
-                            )
-                        );
+                                "%s declares an unnamed @UniqueConstraint(columnNames=%s); add name=\"uq_<table>_<cols>\""
+                                        .formatted(entityClass.getName(), Arrays.toString(uc.columnNames()))));
                     }
                 }
             }

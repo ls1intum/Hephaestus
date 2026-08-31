@@ -28,7 +28,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Token-bucket rate limiter for the hot auth endpoints (ADR 0017 hardening). Sits on the
+ * Token-bucket rate limiter for sensitive and resource-intensive endpoints. Sits on the
  * resource-server chain (covers {@code /auth/refresh}, {@code /auth/impersonate}, {@code DELETE
  * /user}) and the oauth2Login chain (covers {@code GET /oauth2/authorization/*}); registered after
  * authentication so the account principal is resolvable from the {@link SecurityContextHolder}.
@@ -53,11 +53,10 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
     private final AuthMetrics metrics;
 
     public AuthRateLimitFilter(
-        AuthRateLimitProperties properties,
-        BucketResolver bucketResolver,
-        ObjectMapper objectMapper,
-        AuthMetrics metrics
-    ) {
+            AuthRateLimitProperties properties,
+            BucketResolver bucketResolver,
+            ObjectMapper objectMapper,
+            AuthMetrics metrics) {
         this.properties = properties;
         this.bucketResolver = bucketResolver;
         this.objectMapper = objectMapper;
@@ -66,27 +65,33 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
 
     /** Identifies which configured limit (if any) applies to a request, and how to key it. */
     private enum Endpoint {
-        OAUTH_AUTHORIZATION("oauth-authz", false),
-        REFRESH("refresh", true),
-        IMPERSONATE("impersonate", true),
-        DELETE_USER("delete-user", true),
+        OAUTH_AUTHORIZATION("oauth-authz", false, true),
+        REFRESH("refresh", true, true),
+        IMPERSONATE("impersonate", true, true),
+        DELETE_USER("delete-user", true, true),
         // GDPR Art. 20 export: cap POST /user/exports (the async assembly). Account-scoped (JWT sub)
         // with IP fallback — the route requires isAuthenticated(), so sub is normally present.
-        EXPORT("export", true);
+        EXPORT("export", true, false),
+        MENTOR_CHAT("mentor-chat", true, false),
+        REVIEW_REQUEST("review-request", true, false),
+        SYNC_TRIGGER("sync-trigger", true, false);
 
         private final String namespace;
         /** Whether the limit keys by account (with IP fallback) vs. always by IP. */
         private final boolean accountScoped;
 
-        Endpoint(String namespace, boolean accountScoped) {
+        private final boolean failOpen;
+
+        Endpoint(String namespace, boolean accountScoped, boolean failOpen) {
             this.namespace = namespace;
             this.accountScoped = accountScoped;
+            this.failOpen = failOpen;
         }
     }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
-        throws ServletException, IOException {
+            throws ServletException, IOException {
         if (!properties.enabled()) {
             chain.doFilter(request, response);
             return;
@@ -105,13 +110,13 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
             Bucket bucket = bucketResolver.resolve(key, configFor(limit));
             probe = bucket.tryConsumeAndReturnRemaining(1);
         } catch (RuntimeException e) {
-            // Fail OPEN, deliberately. The bucket store (Postgres-backed in prod) can blip — a DB
-            // hiccup or lock-timeout must not turn the auth endpoints into a hard outage, and worse,
-            // failing closed here would let an attacker DoS auth by driving the limiter into contention.
-            // We surface the degradation as a metric + WARN so it is not silent.
             metrics.recordRateLimitBackendError();
-            log.warn("Auth rate limit backend error (failing open): endpoint={} key={}", endpoint, key, e);
-            chain.doFilter(request, response);
+            log.warn("Rate limit backend error: endpoint={} key={}", endpoint, key, e);
+            if (endpoint.failOpen) {
+                chain.doFilter(request, response);
+            } else {
+                writeServiceUnavailable(request, response);
+            }
             return;
         }
 
@@ -120,9 +125,10 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
             return;
         }
 
-        long retryAfterSeconds = Math.max(1, Duration.ofNanos(probe.getNanosToWaitForRefill()).toSeconds());
+        long retryAfterSeconds =
+                Math.max(1, Duration.ofNanos(probe.getNanosToWaitForRefill()).toSeconds());
         // key is namespaced (no raw account-id PII beyond what already exists in auth logs); safe at WARN.
-        log.warn("Auth rate limit exceeded: endpoint={} key={} retryAfterSeconds={}", endpoint, key, retryAfterSeconds);
+        log.warn("Rate limit exceeded: endpoint={} key={} retryAfterSeconds={}", endpoint, key, retryAfterSeconds);
         // Tag by bucket namespace (oauth-authz/refresh/impersonate/delete-user) — bounded, no PII.
         metrics.recordRateLimitBlocked(endpoint.namespace);
         writeTooManyRequests(request, response, retryAfterSeconds);
@@ -162,6 +168,15 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
         if ("POST".equals(method) && path.equals("/user/exports")) {
             return Endpoint.EXPORT;
         }
+        if ("POST".equals(method) && path.matches("/workspaces/[^/]+/mentor/chat")) {
+            return Endpoint.MENTOR_CHAT;
+        }
+        if ("POST".equals(method) && path.matches("/workspaces/[^/]+/practices/review-requests")) {
+            return Endpoint.REVIEW_REQUEST;
+        }
+        if ("POST".equals(method) && path.matches("/workspaces/[^/]+/connections/[^/]+/sync/jobs")) {
+            return Endpoint.SYNC_TRIGGER;
+        }
         return null;
     }
 
@@ -172,6 +187,9 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
             case IMPERSONATE -> properties.impersonate();
             case DELETE_USER -> properties.deleteUser();
             case EXPORT -> properties.export();
+            case MENTOR_CHAT -> properties.mentorChat();
+            case REVIEW_REQUEST -> properties.reviewRequest();
+            case SYNC_TRIGGER -> properties.syncTrigger();
         };
     }
 
@@ -219,11 +237,9 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
     }
 
     private void writeTooManyRequests(HttpServletRequest request, HttpServletResponse response, long retryAfterSeconds)
-        throws IOException {
+            throws IOException {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
-            HttpStatus.TOO_MANY_REQUESTS,
-            "Rate limit exceeded. Retry after " + retryAfterSeconds + " seconds."
-        );
+                HttpStatus.TOO_MANY_REQUESTS, "Rate limit exceeded. Retry after " + retryAfterSeconds + " seconds.");
         problem.setTitle("Too Many Requests");
         problem.setProperty("retryAfterSeconds", retryAfterSeconds);
         problem.setInstance(java.net.URI.create(request.getRequestURI()));
@@ -231,6 +247,16 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
         response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
         response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
         response.setHeader(HttpHeaders.RETRY_AFTER, Long.toString(retryAfterSeconds));
+        response.getWriter().write(objectMapper.writeValueAsString(problem));
+    }
+
+    private void writeServiceUnavailable(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.SERVICE_UNAVAILABLE, "Rate limiting is temporarily unavailable.");
+        problem.setTitle("Service Unavailable");
+        problem.setInstance(java.net.URI.create(request.getRequestURI()));
+        response.setStatus(HttpStatus.SERVICE_UNAVAILABLE.value());
+        response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
         response.getWriter().write(objectMapper.writeValueAsString(problem));
     }
 }

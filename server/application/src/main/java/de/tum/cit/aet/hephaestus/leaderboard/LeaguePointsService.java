@@ -61,16 +61,15 @@ public class LeaguePointsService {
         int newPoints = Math.max(1, effectivePoints + pointChange);
 
         log.debug(
-            "Calculated league points: userLogin={}, oldPoints={}, kFactor={}, decay={}, performanceBonus={}, placementBonus={}, pointChange={}, newPoints={}",
-            user.getLogin(),
-            effectivePoints,
-            kFactor,
-            decay,
-            performanceBonus,
-            placementBonus,
-            pointChange,
-            newPoints
-        );
+                "Calculated league points: userLogin={}, oldPoints={}, kFactor={}, decay={}, performanceBonus={}, placementBonus={}, pointChange={}, newPoints={}",
+                user.getLogin(),
+                effectivePoints,
+                kFactor,
+                decay,
+                performanceBonus,
+                placementBonus,
+                pointChange,
+                newPoints);
 
         return newPoints;
     }
@@ -90,14 +89,12 @@ public class LeaguePointsService {
 
     private boolean isNewPlayer(User user) {
         Instant thresholdTime = Instant.now().minusSeconds(NEW_PLAYER_THRESHOLD_SECONDS);
-        return user
-            .getMergedPullRequests()
-            .stream()
-            .filter(Objects::nonNull)
-            .filter(PullRequest::isMerged)
-            .map(PullRequest::getMergedAt)
-            .filter(Objects::nonNull)
-            .noneMatch(mergedAt -> mergedAt.isBefore(thresholdTime));
+        return user.getMergedPullRequests().stream()
+                .filter(Objects::nonNull)
+                .filter(PullRequest::isMerged)
+                .map(PullRequest::getMergedAt)
+                .filter(Objects::nonNull)
+                .noneMatch(mergedAt -> mergedAt.isBefore(thresholdTime));
     }
 
     private int calculateDecay(int currentPoints) {

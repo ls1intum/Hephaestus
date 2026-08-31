@@ -1,4 +1,5 @@
 import { useState } from "react";
+
 import type { SlackUserWorkspacePreferences } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { SlackIcon } from "@/components/icons/brand";

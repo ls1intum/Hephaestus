@@ -1,5 +1,6 @@
 import { ChevronDownIcon, DatabaseIcon, GaugeIcon, WebhookIcon, ZapOffIcon } from "lucide-react";
 import { Fragment, type ReactElement, type ReactNode } from "react";
+
 import type { ConnectionSyncStatus, RateLimitSnapshot } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { RelativeTime } from "@/components/common/RelativeTime";
@@ -18,10 +19,10 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { asDate } from "@/lib/dates";
+
 import { ActiveJobProgress } from "./ActiveJobProgress";
 import { ConnectionHealthBadge } from "./ConnectionHealthBadge";
 import { IntegrationCardHeading } from "./IntegrationCardHeading";
-import { SyncNowButton } from "./SyncNowButton";
 import {
 	freshnessTone,
 	nextRunLabel,
@@ -29,6 +30,7 @@ import {
 	type SyncTriggerType,
 	stateLabel,
 } from "./sync-format";
+import { SyncNowButton } from "./SyncNowButton";
 
 /** Under this share of the budget a rate limit is a thing that will break the next sync, not a stat. */
 const RATE_LIMIT_WARNING_FRACTION = 0.1;

@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * A setting must reach a container that can actually read it.
  *

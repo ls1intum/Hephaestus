@@ -1,7 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, screen, userEvent } from "storybook/test";
+
 import type { AvailableLlmModel } from "@/api/types.gen";
 import { Label } from "@/components/ui/label";
+
 import { ModelPicker } from "./ModelPicker";
 
 const mockModels: AvailableLlmModel[] = [

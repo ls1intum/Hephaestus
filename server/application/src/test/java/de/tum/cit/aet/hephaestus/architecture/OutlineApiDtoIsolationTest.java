@@ -2,6 +2,8 @@ package de.tum.cit.aet.hephaestus.architecture;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 
+import com.tngtech.archunit.core.domain.JavaClasses;
+import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.lang.ArchRule;
 import org.junit.jupiter.api.Test;
 
@@ -17,30 +19,28 @@ import org.junit.jupiter.api.Test;
  */
 class OutlineApiDtoIsolationTest extends HephaestusArchitectureTest {
 
+    private static final JavaClasses OUTLINE_CLASSES =
+            new ClassFileImporter().importPackages("de.tum.cit.aet.hephaestus.integration.outline");
+
     @Test
     void outlineWireModelsStayOnTheExtractSeam() {
         ArchRule rule = classes()
-            .that()
-            .resideInAPackage("..integration.outline.client.model..")
-            .should()
-            .onlyBeAccessed()
-            .byClassesThat()
-            .resideInAnyPackage(
-                "..integration.outline.client..",
-                "..integration.outline.sync..",
-                "..integration.outline.collection..",
-                "..integration.outline.lifecycle..",
-                "..integration.outline.webhook.."
-            )
-            .because(
-                "Outline wire models are an implementation detail of the client and its sync, collection-admin, " +
-                    "lifecycle-registrar, and webhook consumers on the extract seam; they must not leak into the " +
-                    "agent read path or any other module"
-            )
-            // Never allow this guard to pass vacuously: the generated models MUST be present in the
-            // imported set (they are — the base importer no longer excludes them), so an empty subject
-            // set here means the package moved/renamed and the boundary is no longer being checked.
-            .allowEmptyShould(false);
-        rule.check(classes);
+                .that()
+                .resideInAPackage("..integration.outline.client.model..")
+                .should()
+                .onlyBeAccessed()
+                .byClassesThat()
+                .resideInAnyPackage(
+                        "..integration.outline.client..",
+                        "..integration.outline.sync..",
+                        "..integration.outline.collection..",
+                        "..integration.outline.lifecycle..",
+                        "..integration.outline.webhook..")
+                .because(
+                        "Outline wire models are an implementation detail of the client and its sync, collection-admin, "
+                                + "lifecycle-registrar, and webhook consumers on the extract seam; they must not leak into the "
+                                + "agent read path or any other module")
+                .allowEmptyShould(false);
+        rule.check(OUTLINE_CLASSES);
     }
 }

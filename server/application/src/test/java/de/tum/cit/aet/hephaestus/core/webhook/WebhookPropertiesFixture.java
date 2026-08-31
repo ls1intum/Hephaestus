@@ -18,16 +18,15 @@ public final class WebhookPropertiesFixture {
 
     public static WebhookProperties.Stream stream() {
         return new WebhookProperties.Stream(
-            Duration.ofMinutes(10),
-            Duration.ofDays(180),
-            Map.of(),
-            gibibytes(1),
-            Map.of(),
-            gibibytes(12),
-            false,
-            Duration.ofMinutes(5),
-            Duration.ofSeconds(60)
-        );
+                Duration.ofMinutes(10),
+                Duration.ofDays(180),
+                Map.of(),
+                gibibytes(1),
+                Map.of(),
+                gibibytes(12),
+                false,
+                Duration.ofMinutes(5),
+                Duration.ofSeconds(60));
     }
 
     public static WebhookProperties properties() {
@@ -36,13 +35,12 @@ public final class WebhookPropertiesFixture {
 
     public static WebhookProperties with(WebhookProperties.Stream stream) {
         return new WebhookProperties(
-            null,
-            null,
-            new WebhookProperties.TokenRotation(7, 90),
-            new WebhookProperties.Publish(Duration.ofSeconds(9), 5, Duration.ofMillis(200)),
-            stream,
-            new WebhookProperties.Shutdown(Duration.ofSeconds(15)),
-            new WebhookProperties.Http(26_214_400L)
-        );
+                null,
+                null,
+                new WebhookProperties.TokenRotation(7, 90),
+                new WebhookProperties.Publish(Duration.ofSeconds(9), 5, Duration.ofMillis(200)),
+                stream,
+                new WebhookProperties.Shutdown(Duration.ofSeconds(15)),
+                new WebhookProperties.Http(26_214_400L));
     }
 }

@@ -52,7 +52,8 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
 
         @Test
         void shouldBacktickEscapeAtMentions() {
-            assertThat(PullRequestCommentPoster.sanitize("Hello @user123 please review")).contains("`@user123`");
+            assertThat(PullRequestCommentPoster.sanitize("Hello @user123 please review"))
+                    .contains("`@user123`");
         }
 
         @Test
@@ -71,29 +72,29 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
             String result = PullRequestCommentPoster.sanitize("Looks fine <!-- and the rest is hidden");
 
             assertThat(result)
-                .as("an unterminated opener runs to end of document and hides everything below it")
-                .doesNotContain("<!--")
-                .contains("and the rest is hidden");
+                    .as("an unterminated opener runs to end of document and hides everything below it")
+                    .doesNotContain("<!--")
+                    .contains("and the rest is hidden");
         }
 
         @Test
         void shouldCloseAFenceTheBodyLeavesOpen() {
-            assertThat(PullRequestCommentPoster.sanitize("Body.\n```java\nint x = 1;")).endsWith("\n```");
-            assertThat(PullRequestCommentPoster.sanitize("Body.\n~~~\nint x = 1;")).endsWith("\n~~~");
-            assertThat(PullRequestCommentPoster.sanitize("Body.\n````\nint x = 1;\n```\nstill code")).endsWith(
-                "\n````"
-            );
+            assertThat(PullRequestCommentPoster.sanitize("Body.\n```java\nint x = 1;"))
+                    .endsWith("\n```");
+            assertThat(PullRequestCommentPoster.sanitize("Body.\n~~~\nint x = 1;"))
+                    .endsWith("\n~~~");
+            assertThat(PullRequestCommentPoster.sanitize("Body.\n````\nint x = 1;\n```\nstill code"))
+                    .endsWith("\n````");
         }
 
         @Test
         void shouldLeaveABalancedBodyAlone() {
-            assertThat(PullRequestCommentPoster.sanitize("Body.\n```java\nint x = 1;\n```")).doesNotEndWith("```\n```");
-            assertThat(PullRequestCommentPoster.sanitize("Write ``` to open a block.")).isEqualTo(
-                "Write ``` to open a block."
-            );
-            assertThat(PullRequestCommentPoster.sanitize("Body.\n    ```\nindented, not a fence")).doesNotEndWith(
-                "\n```"
-            );
+            assertThat(PullRequestCommentPoster.sanitize("Body.\n```java\nint x = 1;\n```"))
+                    .doesNotEndWith("```\n```");
+            assertThat(PullRequestCommentPoster.sanitize("Write ``` to open a block."))
+                    .isEqualTo("Write ``` to open a block.");
+            assertThat(PullRequestCommentPoster.sanitize("Body.\n    ```\nindented, not a fence"))
+                    .doesNotEndWith("\n```");
         }
 
         @Test
@@ -101,8 +102,8 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
             String result = PullRequestCommentPoster.sanitize("````\n```bash\npnpm run check\n```\n");
 
             assertThat(result)
-                .as("the inner block is quoted content, so the outer one is still open")
-                .endsWith("\n````");
+                    .as("the inner block is quoted content, so the outer one is still open")
+                    .endsWith("\n````");
         }
 
         @Test
@@ -113,9 +114,8 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
 
         @Test
         void shouldStripMarkdownImages() {
-            assertThat(
-                PullRequestCommentPoster.sanitize("Look at ![screenshot](https://evil.com/track.png)")
-            ).doesNotContain("![");
+            assertThat(PullRequestCommentPoster.sanitize("Look at ![screenshot](https://evil.com/track.png)"))
+                    .doesNotContain("![");
         }
 
         @Test
@@ -144,16 +144,18 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
 
         @Test
         void shouldStripIframeTags() {
-            assertThat(PullRequestCommentPoster.sanitize("<iframe src='evil.com'></iframe>")).doesNotContain("<iframe");
+            assertThat(PullRequestCommentPoster.sanitize("<iframe src='evil.com'></iframe>"))
+                    .doesNotContain("<iframe");
         }
 
         @Test
         void shouldStripSvgAndOtherTags() {
-            assertThat(PullRequestCommentPoster.sanitize("<svg onload=alert(1)>")).doesNotContain("<svg");
-            assertThat(PullRequestCommentPoster.sanitize("<video onloadstart=alert(1)>")).doesNotContain("<video");
-            assertThat(PullRequestCommentPoster.sanitize("<a href='javascript:alert(1)'>click</a>")).doesNotContain(
-                "<a "
-            );
+            assertThat(PullRequestCommentPoster.sanitize("<svg onload=alert(1)>"))
+                    .doesNotContain("<svg");
+            assertThat(PullRequestCommentPoster.sanitize("<video onloadstart=alert(1)>"))
+                    .doesNotContain("<video");
+            assertThat(PullRequestCommentPoster.sanitize("<a href='javascript:alert(1)'>click</a>"))
+                    .doesNotContain("<a ");
         }
 
         @Test
@@ -226,8 +228,7 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
         void shouldRemoveAnUnclosableFenceWithoutExceedingTheProviderLimit() {
             String opener = "`".repeat(1_000);
             String result = PullRequestCommentPoster.sanitize(
-                opener + " java\n" + "x".repeat(PullRequestCommentPoster.MAX_BODY_LENGTH)
-            );
+                    opener + " java\n" + "x".repeat(PullRequestCommentPoster.MAX_BODY_LENGTH));
 
             assertThat(result).hasSizeLessThanOrEqualTo(PullRequestCommentPoster.MAX_BODY_LENGTH);
             assertThat(result).doesNotStartWith(opener);
@@ -363,9 +364,8 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
         @Test
         void resolvesGitlabChannelByJobIntegrationKind() {
             AgentJob job = createTestJob(IntegrationKind.GITLAB);
-            when(gitlabChannel.postSummary(any(), any())).thenReturn(
-                new SummaryChannel.SummaryHandle("gid://gitlab/Note/123")
-            );
+            when(gitlabChannel.postSummary(any(), any()))
+                    .thenReturn(new SummaryChannel.SummaryHandle("gid://gitlab/Note/123"));
 
             String noteId = poster.postFormattedBody(job, "Formatted review");
 
@@ -378,8 +378,8 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
             AgentJob job = createTestJob(null);
 
             assertThatThrownBy(() -> poster.postFormattedBody(job, "Formatted review"))
-                .isInstanceOf(JobDeliveryException.class)
-                .hasMessageContaining("integrationKind is null");
+                    .isInstanceOf(JobDeliveryException.class)
+                    .hasMessageContaining("integrationKind is null");
         }
 
         @Test
@@ -388,8 +388,8 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
             PullRequestCommentPoster githubOnly = new PullRequestCommentPoster(List.of(githubChannel));
 
             assertThatThrownBy(() -> githubOnly.postFormattedBody(job, "Formatted review"))
-                .isInstanceOf(JobDeliveryException.class)
-                .hasMessageContaining("No SummaryChannel wired for kind GITLAB");
+                    .isInstanceOf(JobDeliveryException.class)
+                    .hasMessageContaining("No SummaryChannel wired for kind GITLAB");
         }
 
         @Test
@@ -398,36 +398,31 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
             job.setMetadata(objectMapper.createObjectNode());
 
             assertThatThrownBy(() -> poster.postFormattedBody(job, "Formatted review"))
-                .isInstanceOf(JobDeliveryException.class)
-                .hasMessageContaining("Missing required metadata field");
+                    .isInstanceOf(JobDeliveryException.class)
+                    .hasMessageContaining("Missing required metadata field");
         }
 
         @Test
         void postIssueFormattedBody_throwsWhenIntegrationKindMissing() {
             AgentJob job = createTestJob(null);
-            ObjectNode metadata = org.junit.jupiter.api.Assertions.assertInstanceOf(
-                ObjectNode.class,
-                job.getMetadata()
-            );
+            ObjectNode metadata =
+                    org.junit.jupiter.api.Assertions.assertInstanceOf(ObjectNode.class, job.getMetadata());
             metadata.put("issue_number", 7);
 
             assertThatThrownBy(() -> poster.postIssueFormattedBody(job, "Formatted issue note"))
-                .isInstanceOf(JobDeliveryException.class)
-                .hasMessageContaining("integrationKind is null");
+                    .isInstanceOf(JobDeliveryException.class)
+                    .hasMessageContaining("integrationKind is null");
         }
 
         @Test
         void postIssueFormattedBody_resolvesIssueSubjectAndPosts() {
             AgentJob job = createTestJob(IntegrationKind.GITLAB);
-            ObjectNode metadata = org.junit.jupiter.api.Assertions.assertInstanceOf(
-                ObjectNode.class,
-                job.getMetadata()
-            );
+            ObjectNode metadata =
+                    org.junit.jupiter.api.Assertions.assertInstanceOf(ObjectNode.class, job.getMetadata());
             metadata.put("issue_number", 7);
             when(gitlabChannel.formatIssueSubjectId("owner/repo", 7)).thenReturn("owner/repo#7");
-            when(gitlabChannel.postSummary(any(), any())).thenReturn(
-                new SummaryChannel.SummaryHandle("gid://gitlab/Note/77")
-            );
+            when(gitlabChannel.postSummary(any(), any()))
+                    .thenReturn(new SummaryChannel.SummaryHandle("gid://gitlab/Note/77"));
 
             String commentId = poster.postIssueFormattedBody(job, "Formatted issue note");
 
@@ -440,13 +435,12 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
         @DisplayName("should throw JobDeliveryException when channel raises FeedbackDeliveryException")
         void wrapsChannelFailures() {
             AgentJob job = createTestJob(IntegrationKind.GITHUB);
-            when(githubChannel.postSummary(any(), any())).thenThrow(
-                new FeedbackDeliveryException("rate limit critical")
-            );
+            when(githubChannel.postSummary(any(), any()))
+                    .thenThrow(new FeedbackDeliveryException("rate limit critical"));
 
             assertThatThrownBy(() -> poster.postFormattedBody(job, "Formatted review"))
-                .isInstanceOf(JobDeliveryException.class)
-                .hasMessageContaining("rate limit critical");
+                    .isInstanceOf(JobDeliveryException.class)
+                    .hasMessageContaining("rate limit critical");
         }
 
         @Test
@@ -456,8 +450,8 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
             lenient().when(anotherGithub.kind()).thenReturn(IntegrationKind.GITHUB);
 
             assertThatThrownBy(() -> new PullRequestCommentPoster(List.of(githubChannel, anotherGithub)))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("Duplicate SummaryChannel for kind GITHUB");
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("Duplicate SummaryChannel for kind GITHUB");
         }
 
         @Test
@@ -468,13 +462,13 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
             metadata.put("pr_number", 42);
             job.setMetadata(metadata);
 
-            when(githubChannel.formatPullRequestSubjectId("repo-without-owner", 42)).thenThrow(
-                new IllegalArgumentException("GitHub repoFullName must be 'owner/repo': repo-without-owner")
-            );
+            when(githubChannel.formatPullRequestSubjectId("repo-without-owner", 42))
+                    .thenThrow(new IllegalArgumentException(
+                            "GitHub repoFullName must be 'owner/repo': repo-without-owner"));
 
             assertThatThrownBy(() -> poster.postFormattedBody(job, "Formatted review"))
-                .isInstanceOf(JobDeliveryException.class)
-                .hasMessageContaining("'owner/repo'");
+                    .isInstanceOf(JobDeliveryException.class)
+                    .hasMessageContaining("'owner/repo'");
         }
     }
 

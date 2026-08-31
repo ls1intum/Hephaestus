@@ -43,22 +43,15 @@ public class ObservationTrendService {
     @Transactional(readOnly = true)
     public Optional<TrendDelta> computeForTarget(ArtifactKind artifactKind, Long artifactId, Long workspaceId) {
         List<RunRef> runs = observationRepository.findRecentRunRefsForTarget(
-            artifactKind,
-            artifactId,
-            workspaceId,
-            PageRequest.of(0, 2)
-        );
+                artifactKind, artifactId, workspaceId, PageRequest.of(0, 2));
         if (runs.size() < 2) {
             return Optional.empty();
         }
         RunRef curr = runs.get(0);
         RunRef prev = runs.get(1);
-        Map<UUID, List<LocusObservation>> byJob = lociByJob(
-            List.of(curr.getAgentJobId(), prev.getAgentJobId()),
-            workspaceId
-        );
-        return Optional.of(
-            new TrendDelta(
+        Map<UUID, List<LocusObservation>> byJob =
+                lociByJob(List.of(curr.getAgentJobId(), prev.getAgentJobId()), workspaceId);
+        return Optional.of(new TrendDelta(
                 artifactKind,
                 artifactId,
                 curr.getAgentJobId(),
@@ -66,11 +59,8 @@ public class ObservationTrendService {
                 curr.getRunAt(),
                 prev.getRunAt(),
                 classify(
-                    byJob.getOrDefault(prev.getAgentJobId(), List.of()),
-                    byJob.getOrDefault(curr.getAgentJobId(), List.of())
-                )
-            )
-        );
+                        byJob.getOrDefault(prev.getAgentJobId(), List.of()),
+                        byJob.getOrDefault(curr.getAgentJobId(), List.of()))));
     }
 
     private Map<UUID, List<LocusObservation>> lociByJob(List<UUID> jobIds, Long workspaceId) {
@@ -123,30 +113,28 @@ public class ObservationTrendService {
                 transitions.add(transition(key, status, curr, prior.getAssessment(), curr.getAssessment()));
             }
         }
-        transitions.sort(
-            Comparator.comparingInt((LocusTransition t) -> statusOrder(t.status()))
-                .thenComparing(t -> t.currentSeverity() == null ? Integer.MAX_VALUE : t.currentSeverity().ordinal())
-                .thenComparing(LocusTransition::recurrenceKey)
-        );
+        transitions.sort(Comparator.comparingInt((LocusTransition t) -> statusOrder(t.status()))
+                .thenComparing(t -> t.currentSeverity() == null
+                        ? Integer.MAX_VALUE
+                        : t.currentSeverity().ordinal())
+                .thenComparing(LocusTransition::recurrenceKey));
         return transitions;
     }
 
     private static LocusTransition transition(
-        String key,
-        TransitionStatus status,
-        LocusObservation represent,
-        @Nullable Assessment priorAssessment,
-        @Nullable Assessment currentAssessment
-    ) {
+            String key,
+            TransitionStatus status,
+            LocusObservation represent,
+            @Nullable Assessment priorAssessment,
+            @Nullable Assessment currentAssessment) {
         return new LocusTransition(
-            key,
-            status,
-            represent.getPracticeSlug(),
-            represent.getSummary(),
-            priorAssessment,
-            currentAssessment,
-            represent.getSeverity()
-        );
+                key,
+                status,
+                represent.getPracticeSlug(),
+                represent.getSummary(),
+                priorAssessment,
+                currentAssessment,
+                represent.getSeverity());
     }
 
     /** Collapse a run to one representative observation per recurrence_key (worst severity, then first). */

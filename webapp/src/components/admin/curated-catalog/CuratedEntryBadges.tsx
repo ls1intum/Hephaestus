@@ -1,5 +1,6 @@
 import type { CatalogEntryStatus } from "@/api/types.gen";
 import { Badge } from "@/components/ui/badge";
+
 import { curatedEntryCopy, isOrdinary } from "./curated-entry-state";
 
 const TONE_VARIANT = { neutral: "outline", info: "secondary", attention: "warning" } as const;

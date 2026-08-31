@@ -77,9 +77,7 @@ public class JwtSigningKeySealer {
      */
     @Autowired
     public JwtSigningKeySealer(
-        SecurityProperties securityProperties,
-        @Value("${spring.profiles.active:}") String activeProfiles
-    ) {
+            SecurityProperties securityProperties, @Value("${spring.profiles.active:}") String activeProfiles) {
         this(securityProperties.encryptionKey(), activeProfiles);
     }
 
@@ -90,21 +88,16 @@ public class JwtSigningKeySealer {
     public JwtSigningKeySealer(@Nullable String encryptionKey, @Nullable String activeProfiles) {
         if (encryptionKey == null || encryptionKey.isBlank()) {
             if (activeProfiles != null && activeProfiles.contains("prod")) {
-                throw new IllegalStateException(
-                    "Encryption key is required in production to seal JWT signing keys! " +
-                        "Set hephaestus.security.encryption-key"
-                );
+                throw new IllegalStateException("Encryption key is required in production to seal JWT signing keys! "
+                        + "Set hephaestus.security.encryption-key");
             }
-            log.warn(
-                "Skipped JWT signing-key sealing: reason=missing_key, " +
-                    "action=set_hephaestus_security_encryption_key_in_production"
-            );
+            log.warn("Skipped JWT signing-key sealing: reason=missing_key, "
+                    + "action=set_hephaestus_security_encryption_key_in_production");
             this.secretKey = null;
             this.enabled = false;
         } else if (encryptionKey.length() != 32) {
             throw new IllegalArgumentException(
-                "Encryption key must be exactly 32 characters (256 bits). Got: " + encryptionKey.length()
-            );
+                    "Encryption key must be exactly 32 characters (256 bits). Got: " + encryptionKey.length());
         } else {
             this.secretKey = new SecretKeySpec(encryptionKey.getBytes(StandardCharsets.UTF_8), "AES");
             this.enabled = true;
@@ -170,13 +163,11 @@ public class JwtSigningKeySealer {
         byte version = sealed[0];
         if (version != FORMAT_VERSION_V1) {
             throw new EncryptionException(
-                "Unsupported sealed JWT key version: 0x" + Integer.toHexString(version & 0xFF)
-            );
+                    "Unsupported sealed JWT key version: 0x" + Integer.toHexString(version & 0xFF));
         }
         if (sealed.length < 1 + GCM_IV_LENGTH + 1) {
             throw new EncryptionException(
-                "Sealed JWT key too short: " + sealed.length + " bytes (need > " + (1 + GCM_IV_LENGTH) + ")"
-            );
+                    "Sealed JWT key too short: " + sealed.length + " bytes (need > " + (1 + GCM_IV_LENGTH) + ")");
         }
         try {
             byte[] iv = new byte[GCM_IV_LENGTH];
@@ -198,8 +189,7 @@ public class JwtSigningKeySealer {
     private void requireEnabled(String op) {
         if (!enabled) {
             throw new EncryptionException(
-                "JwtSigningKeySealer is not enabled; cannot " + op + " without a configured key"
-            );
+                    "JwtSigningKeySealer is not enabled; cannot " + op + " without a configured key");
         }
     }
 }

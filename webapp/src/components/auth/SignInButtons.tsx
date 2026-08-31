@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { LogInIcon } from "lucide-react";
 import type { ComponentPropsWithoutRef, SVGAttributes } from "react";
+
 import { listIdentityProvidersOptions } from "@/api/@tanstack/react-query.gen";
 import type { IdentityProviderView } from "@/api/types.gen";
 import { DevSignInForm } from "@/components/auth/DevSignInForm";

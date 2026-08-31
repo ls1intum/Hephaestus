@@ -37,37 +37,37 @@ public final class SlackConsentBlocks {
     private static final String ACTIVATION_LINE_1 = "*Hephaestus is now active in this channel.*";
 
     private static final String ACTIVATION_LINE_2 =
-        "Starting now, Hephaestus may use new messages and thread replies here as context for private mentoring " +
-        "about software practices: code reviews, tests, issues, questions, and collaboration.";
+            "Starting now, Hephaestus may use new messages and thread replies here as context for private mentoring "
+                    + "about software practices: code reviews, tests, issues, questions, and collaboration.";
 
     private static final String SHARED_LINE =
-        "It does not read earlier history and will not reply in this channel. You can stop use of your own channel " +
-        "messages at any time. This also deletes your already collected channel-message data.";
+            "It does not read earlier history and will not reply in this channel. You can stop use of your own channel "
+                    + "messages at any time. This also deletes your already collected channel-message data.";
 
     private static final String LATE_JOIN_LINE_1 = "*You joined a channel where Hephaestus is active.*";
 
     private static final String LATE_JOIN_LINE_2 =
-        "From now on, your new messages and thread replies here may be used as context for private mentoring " +
-        "about software practices. Hephaestus does not read earlier history or reply in this channel. Manage this " +
-        "anytime from App Home.";
+            "From now on, your new messages and thread replies here may be used as context for private mentoring "
+                    + "about software practices. Hephaestus does not read earlier history or reply in this channel. Manage this "
+                    + "anytime from App Home.";
 
     /** Plain-text fallback for the notice (no mrkdwn), shown in notifications + by accessibility tools. */
     private static final String FALLBACK_TEXT =
-        "Hephaestus is now active in this channel. Starting now, Hephaestus may use new messages and thread " +
-        "replies here as context for private mentoring about software practices: code reviews, tests, issues, " +
-        "questions, and collaboration. It does not read earlier history and will not reply in this channel. You can " +
-        "stop use of your own channel messages at any time with Do not use my channel messages. This also deletes " +
-        "your already collected channel-message data.";
+            "Hephaestus is now active in this channel. Starting now, Hephaestus may use new messages and thread "
+                    + "replies here as context for private mentoring about software practices: code reviews, tests, issues, "
+                    + "questions, and collaboration. It does not read earlier history and will not reply in this channel. You can "
+                    + "stop use of your own channel messages at any time with Do not use my channel messages. This also deletes "
+                    + "your already collected channel-message data.";
 
     private static final String LATE_JOIN_FALLBACK_TEXT =
-        "You joined a Hephaestus-monitored channel. From now on, your new messages and thread replies here may be " +
-        "used as context for private mentoring about software practices. Hephaestus does not read earlier history " +
-        "or reply in this channel. Manage this anytime from App Home.";
+            "You joined a Hephaestus-monitored channel. From now on, your new messages and thread replies here may be "
+                    + "used as context for private mentoring about software practices. Hephaestus does not read earlier history "
+                    + "or reply in this channel. Manage this anytime from App Home.";
 
     /** Ephemeral confirmation shown to a member right after they opt out via the in-message button. */
     private static final String CONFIRMATION_TEXT =
-        "Done. Hephaestus will not use your channel messages. Any channel-message data already collected from you " +
-        "has been deleted.";
+            "Done. Hephaestus will not use your channel messages. Any channel-message data already collected from you "
+                    + "has been deleted.";
 
     private SlackConsentBlocks() {}
 
@@ -93,9 +93,8 @@ public final class SlackConsentBlocks {
     }
 
     private static LayoutBlock noticeText(String line1, String line2, String hephaestusUrl) {
-        return section(s ->
-            s.text(markdownText(line1 + "\n\n" + line2 + "\n\n" + SHARED_LINE + uiLinkLine(hephaestusUrl)))
-        );
+        return section(
+                s -> s.text(markdownText(line1 + "\n\n" + line2 + "\n\n" + SHARED_LINE + uiLinkLine(hephaestusUrl))));
     }
 
     private static String uiLinkLine(String hephaestusUrl) {
@@ -103,19 +102,10 @@ public final class SlackConsentBlocks {
     }
 
     private static LayoutBlock optOutAction() {
-        return actions(a ->
-            a.elements(
-                asElements(
-                    button(b ->
-                        b
-                            .text(plainText("Do not use my channel messages"))
-                            .actionId(ACTION_PARTICIPANT_OPT_OUT)
-                            .style("danger")
-                            .confirm(channelMessageOptOutConfirm())
-                    )
-                )
-            )
-        );
+        return actions(a -> a.elements(asElements(button(b -> b.text(plainText("Do not use my channel messages"))
+                .actionId(ACTION_PARTICIPANT_OPT_OUT)
+                .style("danger")
+                .confirm(channelMessageOptOutConfirm())))));
     }
 
     public static String fallbackText() {
@@ -154,16 +144,13 @@ public final class SlackConsentBlocks {
     /** The confirm dialog on the opt-out button — spells out the consequence before the irreversible erase. */
     public static ConfirmationDialogObject channelMessageOptOutConfirm() {
         return ConfirmationDialogObject.builder()
-            .title(plainText("Stop using your channel messages?"))
-            .text(
-                plainText(
-                    "This stops Hephaestus from using your messages in monitored channels and deletes any channel " +
-                        "message data already collected from you. Mentor DMs are not affected."
-                )
-            )
-            .confirm(plainText("Do not use my messages"))
-            .deny(plainText("Cancel"))
-            .style("danger")
-            .build();
+                .title(plainText("Stop using your channel messages?"))
+                .text(plainText(
+                        "This stops Hephaestus from using your messages in monitored channels and deletes any channel "
+                                + "message data already collected from you. Mentor DMs are not affected."))
+                .confirm(plainText("Do not use my messages"))
+                .deny(plainText("Cancel"))
+                .style("danger")
+                .build();
     }
 }

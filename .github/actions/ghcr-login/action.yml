@@ -1,0 +1,17 @@
+name: Log in to GHCR
+description: Authenticate Docker to ghcr.io
+inputs:
+  username:
+    description: GitHub actor or registry username
+    required: true
+  password:
+    description: Token passed to Docker login
+    required: true
+runs:
+  using: composite
+  steps:
+    - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+      with:
+        registry: ghcr.io
+        username: ${{ inputs.username }}
+        password: ${{ inputs.password }}

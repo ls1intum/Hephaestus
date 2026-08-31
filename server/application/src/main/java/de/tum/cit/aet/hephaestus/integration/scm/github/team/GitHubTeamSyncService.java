@@ -94,17 +94,16 @@ public class GitHubTeamSyncService {
     private static final int MAX_RETRY_ATTEMPTS = 3;
 
     public GitHubTeamSyncService(
-        TeamRepository teamRepository,
-        TeamMembershipRepository teamMembershipRepository,
-        RepositoryRepository repositoryRepository,
-        OrganizationRepository organizationRepository,
-        GitHubGraphQlClientProvider graphQlClientProvider,
-        GitHubTeamProcessor teamProcessor,
-        GitHubUserProcessor userProcessor,
-        GitHubSyncProperties syncProperties,
-        GitHubExceptionClassifier exceptionClassifier,
-        GitHubGraphQlSyncCoordinator graphQlSyncHelper
-    ) {
+            TeamRepository teamRepository,
+            TeamMembershipRepository teamMembershipRepository,
+            RepositoryRepository repositoryRepository,
+            OrganizationRepository organizationRepository,
+            GitHubGraphQlClientProvider graphQlClientProvider,
+            GitHubTeamProcessor teamProcessor,
+            GitHubUserProcessor userProcessor,
+            GitHubSyncProperties syncProperties,
+            GitHubExceptionClassifier exceptionClassifier,
+            GitHubGraphQlSyncCoordinator graphQlSyncHelper) {
         this.teamRepository = teamRepository;
         this.teamMembershipRepository = teamMembershipRepository;
         this.repositoryRepository = repositoryRepository;
@@ -138,8 +137,8 @@ public class GitHubTeamSyncService {
         // Resolve the organization's provider for ProcessingContext (within @Transactional).
         // Provider-type-scoped so a same-login GitLab org cannot collide (ADR-0012).
         Organization organization = organizationRepository
-            .findByLoginIgnoreCaseAndProvider_Type(organizationLogin, IdentityProviderType.GITHUB)
-            .orElse(null);
+                .findByLoginIgnoreCaseAndProvider_Type(organizationLogin, IdentityProviderType.GITHUB)
+                .orElse(null);
         if (organization == null) {
             log.warn("Skipped team sync: reason=organizationNotFound, orgLogin={}", safeOrgLogin);
             return 0;
@@ -170,70 +169,56 @@ public class GitHubTeamSyncService {
                 pageCount++;
                 if (pageCount >= MAX_PAGINATION_PAGES) {
                     log.warn(
-                        "Reached maximum pagination limit for teams: orgLogin={}, limit={}",
-                        safeOrgLogin,
-                        MAX_PAGINATION_PAGES
-                    );
+                            "Reached maximum pagination limit for teams: orgLogin={}, limit={}",
+                            safeOrgLogin,
+                            MAX_PAGINATION_PAGES);
                     break;
                 }
 
                 final String currentCursor = cursor;
                 final int currentPage = pageCount;
 
-                ClientGraphQlResponse graphQlResponse = Mono.defer(() ->
-                    client
-                        .documentName(GET_ORGANIZATION_TEAMS_DOCUMENT)
-                        .variable("login", organizationLogin)
-                        .variable(
-                            "first",
-                            adaptPageSize(LARGE_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId))
-                        )
-                        .variable("after", currentCursor)
-                        .execute()
-                )
-                    .retryWhen(
-                        Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
-                            .maxBackoff(TRANSPORT_MAX_BACKOFF)
-                            .jitter(JITTER_FACTOR)
-                            .filter(ScmTransportErrors::isTransportError)
-                            .doBeforeRetry(signal ->
-                                log.warn(
-                                    "Retrying team sync after transport error: orgLogin={}, page={}, attempt={}, error={}",
-                                    safeOrgLogin,
-                                    currentPage,
-                                    signal.totalRetries() + 1,
-                                    signal.failure().getMessage()
-                                )
-                            )
-                    )
-                    .block(syncProperties.graphqlTimeout());
+                ClientGraphQlResponse graphQlResponse = Mono.defer(() -> client.documentName(
+                                        GET_ORGANIZATION_TEAMS_DOCUMENT)
+                                .variable("login", organizationLogin)
+                                .variable(
+                                        "first",
+                                        adaptPageSize(
+                                                LARGE_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId)))
+                                .variable("after", currentCursor)
+                                .execute())
+                        .retryWhen(Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
+                                .maxBackoff(TRANSPORT_MAX_BACKOFF)
+                                .jitter(JITTER_FACTOR)
+                                .filter(ScmTransportErrors::isTransportError)
+                                .doBeforeRetry(signal -> log.warn(
+                                        "Retrying team sync after transport error: orgLogin={}, page={}, attempt={}, error={}",
+                                        safeOrgLogin,
+                                        currentPage,
+                                        signal.totalRetries() + 1,
+                                        signal.failure().getMessage())))
+                        .block(syncProperties.graphqlTimeout());
 
                 if (graphQlResponse == null || !graphQlResponse.isValid()) {
                     ClassificationResult classification = graphQlSyncHelper.classifyGraphQlErrors(graphQlResponse);
                     if (classification != null) {
-                        if (
-                            graphQlSyncHelper.handleGraphQlClassification(
-                                new GraphQlClassificationContext(
-                                    classification,
-                                    retryAttempt,
-                                    MAX_RETRY_ATTEMPTS,
-                                    "team sync",
-                                    "orgLogin",
-                                    safeOrgLogin,
-                                    log
-                                )
-                            )
-                        ) {
+                        if (graphQlSyncHelper.handleGraphQlClassification(new GraphQlClassificationContext(
+                                classification,
+                                retryAttempt,
+                                MAX_RETRY_ATTEMPTS,
+                                "team sync",
+                                "orgLogin",
+                                safeOrgLogin,
+                                log))) {
                             retryAttempt++;
                             continue;
                         }
                         break;
                     }
                     log.warn(
-                        "Received invalid GraphQL response: orgLogin={}, errors={}",
-                        safeOrgLogin,
-                        graphQlResponse != null ? graphQlResponse.getErrors() : "null"
-                    );
+                            "Received invalid GraphQL response: orgLogin={}, errors={}",
+                            safeOrgLogin,
+                            graphQlResponse != null ? graphQlResponse.getErrors() : "null");
                     break;
                 }
 
@@ -242,16 +227,14 @@ public class GitHubTeamSyncService {
 
                 // Check if we should pause due to rate limiting
                 if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
-                    if (
-                        !graphQlSyncHelper.waitForRateLimitIfNeeded(scopeId, "team sync", "orgLogin", safeOrgLogin, log)
-                    ) {
+                    if (!graphQlSyncHelper.waitForRateLimitIfNeeded(
+                            scopeId, "team sync", "orgLogin", safeOrgLogin, log)) {
                         break;
                     }
                 }
 
-                GHTeamConnection response = graphQlResponse
-                    .field("organization.teams")
-                    .toEntity(GHTeamConnection.class);
+                GHTeamConnection response =
+                        graphQlResponse.field("organization.teams").toEntity(GHTeamConnection.class);
 
                 if (response == null || response.getNodes() == null) {
                     break;
@@ -269,23 +252,16 @@ public class GitHubTeamSyncService {
                         syncedTeamsByNativeId.put(team.getNativeId(), team);
 
                         // Collect parent mapping for deferred resolution
-                        if (
-                            graphQlTeam.getParentTeam() != null && graphQlTeam.getParentTeam().getDatabaseId() != null
-                        ) {
+                        if (graphQlTeam.getParentTeam() != null
+                                && graphQlTeam.getParentTeam().getDatabaseId() != null) {
                             parentNativeIdByChildNativeId.put(
-                                team.getNativeId(),
-                                graphQlTeam.getParentTeam().getDatabaseId().longValue()
-                            );
+                                    team.getNativeId(),
+                                    graphQlTeam.getParentTeam().getDatabaseId().longValue());
                         }
 
                         syncTeamMemberships(client, team, graphQlTeam, organizationLogin, scopeId);
-                        totalPermissions += syncTeamRepoPermissions(
-                            client,
-                            team,
-                            graphQlTeam,
-                            organizationLogin,
-                            scopeId
-                        );
+                        totalPermissions +=
+                                syncTeamRepoPermissions(client, team, graphQlTeam, organizationLogin, scopeId);
                         totalSynced++;
                     }
                 }
@@ -299,12 +275,7 @@ public class GitHubTeamSyncService {
             // Raw nodes received vs teams.totalCount (totalSynced is post-filter).
             if (reportedTotalCount >= 0) {
                 GraphQlConnectionOverflowDetector.checkPaginated(
-                    "teams",
-                    teamsReceived,
-                    reportedTotalCount,
-                    hasNextPage,
-                    "orgLogin=" + safeOrgLogin
-                );
+                        "teams", teamsReceived, reportedTotalCount, hasNextPage, "orgLogin=" + safeOrgLogin);
             }
 
             // Mark sync as completed normally if we exhausted all pages
@@ -322,39 +293,26 @@ public class GitHubTeamSyncService {
                 removeDeletedTeams(organizationLogin, syncedTeamIds, context);
             } else {
                 log.warn(
-                    "Skipped stale team removal: reason=incompleteSync, orgLogin={}, pagesProcessed={}",
-                    safeOrgLogin,
-                    pageCount
-                );
+                        "Skipped stale team removal: reason=incompleteSync, orgLogin={}, pagesProcessed={}",
+                        safeOrgLogin,
+                        pageCount);
             }
 
             log.info(
-                "Completed team sync: orgLogin={}, teamCount={}, permissionCount={}, complete={}, scopeId={}",
-                safeOrgLogin,
-                totalSynced,
-                totalPermissions,
-                syncCompletedNormally,
-                scopeId
-            );
+                    "Completed team sync: orgLogin={}, teamCount={}, permissionCount={}, complete={}, scopeId={}",
+                    safeOrgLogin,
+                    totalSynced,
+                    totalPermissions,
+                    syncCompletedNormally,
+                    scopeId);
             return totalSynced;
         } catch (InstallationNotFoundException e) {
             // Re-throw to abort the entire sync operation
             throw e;
         } catch (Exception e) {
             ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
-            if (
-                !graphQlSyncHelper.handleGraphQlClassification(
-                    new GraphQlClassificationContext(
-                        classification,
-                        0,
-                        MAX_RETRY_ATTEMPTS,
-                        "team sync",
-                        "orgLogin",
-                        safeOrgLogin,
-                        log
-                    )
-                )
-            ) {
+            if (!graphQlSyncHelper.handleGraphQlClassification(new GraphQlClassificationContext(
+                    classification, 0, MAX_RETRY_ATTEMPTS, "team sync", "orgLogin", safeOrgLogin, log))) {
                 return 0;
             }
             return 0;
@@ -400,10 +358,7 @@ public class GitHubTeamSyncService {
      * @param safeOrgLogin                  sanitized org login for logging
      */
     private void resolveParentReferences(
-        Map<Long, Team> syncedTeamsByNativeId,
-        Map<Long, Long> parentNativeIdByChildNativeId,
-        String safeOrgLogin
-    ) {
+            Map<Long, Team> syncedTeamsByNativeId, Map<Long, Long> parentNativeIdByChildNativeId, String safeOrgLogin) {
         List<Team> changed = new ArrayList<>();
 
         for (Map.Entry<Long, Team> entry : syncedTeamsByNativeId.entrySet()) {
@@ -418,11 +373,10 @@ public class GitHubTeamSyncService {
                     correctParentId = parent.getId();
                 } else {
                     log.warn(
-                        "Parent team not found in current sync: child={}, parentNativeId={}, orgLogin={}",
-                        child.getName(),
-                        parentNativeId,
-                        safeOrgLogin
-                    );
+                            "Parent team not found in current sync: child={}, parentNativeId={}, orgLogin={}",
+                            child.getName(),
+                            parentNativeId,
+                            safeOrgLogin);
                 }
             }
 
@@ -452,12 +406,7 @@ public class GitHubTeamSyncService {
      * @param organizationLogin the organization login for pagination queries
      */
     private void syncTeamMemberships(
-        HttpGraphQlClient client,
-        Team team,
-        GHTeam graphQlTeam,
-        String organizationLogin,
-        Long scopeId
-    ) {
+            HttpGraphQlClient client, Team team, GHTeam graphQlTeam, String organizationLogin, Long scopeId) {
         var membersConnection = graphQlTeam.getMembers();
         if (membersConnection == null || membersConnection.getEdges() == null) {
             return;
@@ -469,30 +418,24 @@ public class GitHubTeamSyncService {
 
         if (membersPageInfo != null && Boolean.TRUE.equals(membersPageInfo.getHasNextPage())) {
             log.debug(
-                "Fetching additional team members: teamSlug={}, totalCount={}",
-                sanitizeForLog(graphQlTeam.getSlug()),
-                membersConnection.getTotalCount()
-            );
+                    "Fetching additional team members: teamSlug={}, totalCount={}",
+                    sanitizeForLog(graphQlTeam.getSlug()),
+                    membersConnection.getTotalCount());
             List<GHTeamMemberEdge> additionalMemberEdges = fetchAllTeamMemberEdges(
-                client,
-                organizationLogin,
-                graphQlTeam.getSlug(),
-                membersPageInfo.getEndCursor(),
-                scopeId
-            );
+                    client, organizationLogin, graphQlTeam.getSlug(), membersPageInfo.getEndCursor(), scopeId);
             allMemberEdges.addAll(additionalMemberEdges);
         }
 
         // Build existing memberships map for efficient lookup and role update
-        Map<Long, TeamMembership> existingMemberships = team
-            .getMemberships()
-            .stream()
-            .collect(Collectors.toMap(tm -> tm.getUser().getId(), tm -> tm));
+        Map<Long, TeamMembership> existingMemberships = team.getMemberships().stream()
+                .collect(Collectors.toMap(tm -> tm.getUser().getId(), tm -> tm));
 
         Set<Long> syncedMemberIds = new HashSet<>();
 
         for (var memberEdge : allMemberEdges) {
-            if (memberEdge == null || memberEdge.getNode() == null || memberEdge.getNode().getDatabaseId() == null) {
+            if (memberEdge == null
+                    || memberEdge.getNode() == null
+                    || memberEdge.getNode().getDatabaseId() == null) {
                 continue;
             }
 
@@ -501,12 +444,13 @@ public class GitHubTeamSyncService {
 
             // Convert GraphQL role to TeamMembership.Role
             TeamMembership.Role role = (graphQlRole == GHTeamMemberRole.MAINTAINER)
-                ? TeamMembership.Role.MAINTAINER
-                : TeamMembership.Role.MEMBER;
+                    ? TeamMembership.Role.MAINTAINER
+                    : TeamMembership.Role.MEMBER;
 
             // Convert GraphQL User to GitHubUserDTO and ensure user exists
             GitHubUserDTO userDTO = convertUserToDTO(graphQlUser);
-            User user = userProcessor.ensureExists(userDTO, Objects.requireNonNull(team.getProvider().getId()));
+            User user = userProcessor.ensureExists(
+                    userDTO, Objects.requireNonNull(team.getProvider().getId()));
 
             if (user != null) {
                 syncedMemberIds.add(user.getId());
@@ -516,12 +460,11 @@ public class GitHubTeamSyncService {
                     // Update role if changed
                     if (existingMembership.getRole() != role) {
                         log.debug(
-                            "Updated team membership role: userLogin={}, teamName={}, oldRole={}, newRole={}",
-                            sanitizeForLog(user.getLogin()),
-                            sanitizeForLog(team.getName()),
-                            existingMembership.getRole(),
-                            role
-                        );
+                                "Updated team membership role: userLogin={}, teamName={}, oldRole={}, newRole={}",
+                                sanitizeForLog(user.getLogin()),
+                                sanitizeForLog(team.getName()),
+                                existingMembership.getRole(),
+                                role);
                         existingMembership.setRole(role);
                         teamMembershipRepository.save(existingMembership);
                     }
@@ -530,11 +473,10 @@ public class GitHubTeamSyncService {
                     TeamMembership membership = new TeamMembership(team, user, role);
                     teamMembershipRepository.save(membership);
                     log.debug(
-                        "Created team membership: userLogin={}, teamName={}, role={}",
-                        sanitizeForLog(user.getLogin()),
-                        sanitizeForLog(team.getName()),
-                        role
-                    );
+                            "Created team membership: userLogin={}, teamName={}, role={}",
+                            sanitizeForLog(user.getLogin()),
+                            sanitizeForLog(team.getName()),
+                            role);
                 }
             }
         }
@@ -556,28 +498,21 @@ public class GitHubTeamSyncService {
      * @return number of permissions synced for monitored repositories
      */
     private int syncTeamRepoPermissions(
-        HttpGraphQlClient client,
-        Team team,
-        GHTeam graphQlTeam,
-        String organizationLogin,
-        Long scopeId
-    ) {
+            HttpGraphQlClient client, Team team, GHTeam graphQlTeam, String organizationLogin, Long scopeId) {
         var reposConnection = graphQlTeam.getRepositories();
         if (reposConnection == null || reposConnection.getEdges() == null) {
             log.debug(
-                "No repositories connection for team: teamName={}, connection={}",
-                sanitizeForLog(team.getName()),
-                reposConnection == null ? "null" : "edges=null"
-            );
+                    "No repositories connection for team: teamName={}, connection={}",
+                    sanitizeForLog(team.getName()),
+                    reposConnection == null ? "null" : "edges=null");
             return 0;
         }
 
         log.debug(
-            "Processing team repositories: teamName={}, totalCount={}, edgesCount={}",
-            sanitizeForLog(team.getName()),
-            reposConnection.getTotalCount(),
-            reposConnection.getEdges().size()
-        );
+                "Processing team repositories: teamName={}, totalCount={}, edgesCount={}",
+                sanitizeForLog(team.getName()),
+                reposConnection.getTotalCount(),
+                reposConnection.getEdges().size());
 
         // Collect all repository edges - paginate if needed
         List<GHTeamRepositoryEdge> allRepoEdges = new ArrayList<>(reposConnection.getEdges());
@@ -585,17 +520,11 @@ public class GitHubTeamSyncService {
 
         if (reposPageInfo != null && Boolean.TRUE.equals(reposPageInfo.getHasNextPage())) {
             log.debug(
-                "Fetching additional team repositories: teamSlug={}, totalCount={}",
-                sanitizeForLog(graphQlTeam.getSlug()),
-                reposConnection.getTotalCount()
-            );
+                    "Fetching additional team repositories: teamSlug={}, totalCount={}",
+                    sanitizeForLog(graphQlTeam.getSlug()),
+                    reposConnection.getTotalCount());
             List<GHTeamRepositoryEdge> additionalRepoEdges = fetchAllTeamRepositoryEdges(
-                client,
-                organizationLogin,
-                graphQlTeam.getSlug(),
-                reposPageInfo.getEndCursor(),
-                scopeId
-            );
+                    client, organizationLogin, graphQlTeam.getSlug(), reposPageInfo.getEndCursor(), scopeId);
             allRepoEdges.addAll(additionalRepoEdges);
         }
 
@@ -603,7 +532,9 @@ public class GitHubTeamSyncService {
         Long providerId = Objects.requireNonNull(team.getProvider().getId());
 
         for (var repoEdge : allRepoEdges) {
-            if (repoEdge == null || repoEdge.getNode() == null || repoEdge.getNode().getDatabaseId() == null) {
+            if (repoEdge == null
+                    || repoEdge.getNode() == null
+                    || repoEdge.getNode().getDatabaseId() == null) {
                 continue;
             }
 
@@ -616,33 +547,29 @@ public class GitHubTeamSyncService {
             var repoOpt = repositoryRepository.findByNativeIdAndProviderId(repoNativeId, providerId);
             if (repoOpt.isEmpty()) {
                 log.trace(
-                    "Skipping unmonitored repository: teamName={}, repoNativeId={}, repoName={}",
-                    sanitizeForLog(team.getName()),
-                    repoNativeId,
-                    sanitizeForLog(repoName)
-                );
+                        "Skipping unmonitored repository: teamName={}, repoNativeId={}, repoName={}",
+                        sanitizeForLog(team.getName()),
+                        repoNativeId,
+                        sanitizeForLog(repoName));
                 continue;
             }
 
             Repository repo = repoOpt.get();
             log.trace(
-                "Found monitored repository for team: teamName={}, repoNativeId={}, internalId={}, repoName={}",
-                sanitizeForLog(team.getName()),
-                repoNativeId,
-                repo.getId(),
-                sanitizeForLog(repoName)
-            );
+                    "Found monitored repository for team: teamName={}, repoNativeId={}, internalId={}, repoName={}",
+                    sanitizeForLog(team.getName()),
+                    repoNativeId,
+                    repo.getId(),
+                    sanitizeForLog(repoName));
 
             TeamRepositoryPermission.PermissionLevel level = convertPermission(repoEdge.getPermission());
 
             // Find existing permission or create new (compare by internal repository ID)
             final Long internalRepoId = repo.getId();
-            TeamRepositoryPermission permission = team
-                .getRepoPermissions()
-                .stream()
-                .filter(existing -> Objects.equals(existing.getRepository().getId(), internalRepoId))
-                .findFirst()
-                .orElseGet(() -> new TeamRepositoryPermission(team, repo, level));
+            TeamRepositoryPermission permission = team.getRepoPermissions().stream()
+                    .filter(existing -> Objects.equals(existing.getRepository().getId(), internalRepoId))
+                    .findFirst()
+                    .orElseGet(() -> new TeamRepositoryPermission(team, repo, level));
 
             permission.setPermission(level);
             freshPermissions.add(permission);
@@ -652,11 +579,10 @@ public class GitHubTeamSyncService {
         int existingCount = team.getRepoPermissions().size();
         team.clearAndAddRepoPermissions(freshPermissions);
         log.debug(
-            "Synced team repository permissions: teamName={}, existingCount={}, newCount={}",
-            sanitizeForLog(team.getName()),
-            existingCount,
-            freshPermissions.size()
-        );
+                "Synced team repository permissions: teamName={}, existingCount={}, newCount={}",
+                sanitizeForLog(team.getName()),
+                existingCount,
+                freshPermissions.size());
 
         // Explicitly save team to persist cascaded permissions
         teamRepository.save(team);
@@ -689,12 +615,7 @@ public class GitHubTeamSyncService {
      * @return list of all remaining member edges with roles
      */
     private List<GHTeamMemberEdge> fetchAllTeamMemberEdges(
-        HttpGraphQlClient client,
-        String organizationLogin,
-        String teamSlug,
-        String startCursor,
-        Long scopeId
-    ) {
+            HttpGraphQlClient client, String organizationLogin, String teamSlug, String startCursor, Long scopeId) {
         List<GHTeamMemberEdge> allMemberEdges = new ArrayList<>();
         String cursor = startCursor;
         boolean hasNextPage = true;
@@ -706,71 +627,56 @@ public class GitHubTeamSyncService {
             pageCount++;
             if (pageCount >= MAX_PAGINATION_PAGES) {
                 log.warn(
-                    "Reached maximum pagination limit for team members: teamSlug={}, limit={}",
-                    teamSlug,
-                    MAX_PAGINATION_PAGES
-                );
+                        "Reached maximum pagination limit for team members: teamSlug={}, limit={}",
+                        teamSlug,
+                        MAX_PAGINATION_PAGES);
                 break;
             }
 
             final String currentCursor = cursor;
             final int currentPage = pageCount;
 
-            ClientGraphQlResponse graphQlResponse = Mono.defer(() ->
-                client
-                    .documentName(GET_TEAM_MEMBERS_DOCUMENT)
-                    .variable("orgLogin", organizationLogin)
-                    .variable("teamSlug", teamSlug)
-                    .variable(
-                        "first",
-                        adaptPageSize(LARGE_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId))
-                    )
-                    .variable("after", currentCursor)
-                    .execute()
-            )
-                .retryWhen(
-                    Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
-                        .maxBackoff(TRANSPORT_MAX_BACKOFF)
-                        .jitter(JITTER_FACTOR)
-                        .filter(ScmTransportErrors::isTransportError)
-                        .doBeforeRetry(signal ->
-                            log.warn(
-                                "Retrying team members fetch after transport error: teamSlug={}, page={}, attempt={}, error={}",
-                                teamSlug,
-                                currentPage,
-                                signal.totalRetries() + 1,
-                                signal.failure().getMessage()
-                            )
-                        )
-                )
-                .block(syncProperties.graphqlTimeout());
+            ClientGraphQlResponse graphQlResponse = Mono.defer(() -> client.documentName(GET_TEAM_MEMBERS_DOCUMENT)
+                            .variable("orgLogin", organizationLogin)
+                            .variable("teamSlug", teamSlug)
+                            .variable(
+                                    "first",
+                                    adaptPageSize(
+                                            LARGE_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId)))
+                            .variable("after", currentCursor)
+                            .execute())
+                    .retryWhen(Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
+                            .maxBackoff(TRANSPORT_MAX_BACKOFF)
+                            .jitter(JITTER_FACTOR)
+                            .filter(ScmTransportErrors::isTransportError)
+                            .doBeforeRetry(signal -> log.warn(
+                                    "Retrying team members fetch after transport error: teamSlug={}, page={}, attempt={}, error={}",
+                                    teamSlug,
+                                    currentPage,
+                                    signal.totalRetries() + 1,
+                                    signal.failure().getMessage())))
+                    .block(syncProperties.graphqlTimeout());
 
             if (graphQlResponse == null || !graphQlResponse.isValid()) {
                 ClassificationResult classification = graphQlSyncHelper.classifyGraphQlErrors(graphQlResponse);
                 if (classification != null) {
-                    if (
-                        graphQlSyncHelper.handleGraphQlClassification(
-                            new GraphQlClassificationContext(
-                                classification,
-                                retryAttempt,
-                                MAX_RETRY_ATTEMPTS,
-                                "team members fetch",
-                                "teamSlug",
-                                teamSlug,
-                                log
-                            )
-                        )
-                    ) {
+                    if (graphQlSyncHelper.handleGraphQlClassification(new GraphQlClassificationContext(
+                            classification,
+                            retryAttempt,
+                            MAX_RETRY_ATTEMPTS,
+                            "team members fetch",
+                            "teamSlug",
+                            teamSlug,
+                            log))) {
                         retryAttempt++;
                         continue;
                     }
                     break;
                 }
                 log.warn(
-                    "Received invalid GraphQL response for team members: teamSlug={}, errors={}",
-                    teamSlug,
-                    graphQlResponse != null ? graphQlResponse.getErrors() : "null"
-                );
+                        "Received invalid GraphQL response for team members: teamSlug={}, errors={}",
+                        teamSlug,
+                        graphQlResponse != null ? graphQlResponse.getErrors() : "null");
                 break;
             }
 
@@ -779,22 +685,14 @@ public class GitHubTeamSyncService {
 
             // Check if we should pause due to rate limiting
             if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
-                if (
-                    !graphQlSyncHelper.waitForRateLimitIfNeeded(
-                        scopeId,
-                        "team members fetch",
-                        "teamSlug",
-                        teamSlug,
-                        log
-                    )
-                ) {
+                if (!graphQlSyncHelper.waitForRateLimitIfNeeded(
+                        scopeId, "team members fetch", "teamSlug", teamSlug, log)) {
                     break;
                 }
             }
 
-            GHTeamMemberConnection response = graphQlResponse
-                .field("organization.team.members")
-                .toEntity(GHTeamMemberConnection.class);
+            GHTeamMemberConnection response =
+                    graphQlResponse.field("organization.team.members").toEntity(GHTeamMemberConnection.class);
 
             if (response == null || response.getEdges() == null) {
                 break;
@@ -816,12 +714,7 @@ public class GitHubTeamSyncService {
         // so a gap after full pagination (hasNextPage==false) is benign.
         if (reportedTotalCount >= 0) {
             GraphQlConnectionOverflowDetector.checkPaginated(
-                "teamMembers",
-                allMemberEdges.size(),
-                reportedTotalCount,
-                hasNextPage,
-                "teamSlug=" + teamSlug
-            );
+                    "teamMembers", allMemberEdges.size(), reportedTotalCount, hasNextPage, "teamSlug=" + teamSlug);
         }
 
         return allMemberEdges;
@@ -837,12 +730,7 @@ public class GitHubTeamSyncService {
      * @return list of all remaining repository edges with permissions
      */
     private List<GHTeamRepositoryEdge> fetchAllTeamRepositoryEdges(
-        HttpGraphQlClient client,
-        String organizationLogin,
-        String teamSlug,
-        String startCursor,
-        Long scopeId
-    ) {
+            HttpGraphQlClient client, String organizationLogin, String teamSlug, String startCursor, Long scopeId) {
         List<GHTeamRepositoryEdge> allEdges = new ArrayList<>();
         String cursor = startCursor;
         boolean hasNextPage = true;
@@ -854,71 +742,56 @@ public class GitHubTeamSyncService {
             pageCount++;
             if (pageCount >= MAX_PAGINATION_PAGES) {
                 log.warn(
-                    "Reached maximum pagination limit for team repositories: teamSlug={}, limit={}",
-                    teamSlug,
-                    MAX_PAGINATION_PAGES
-                );
+                        "Reached maximum pagination limit for team repositories: teamSlug={}, limit={}",
+                        teamSlug,
+                        MAX_PAGINATION_PAGES);
                 break;
             }
 
             final String currentCursor = cursor;
             final int currentPage = pageCount;
 
-            ClientGraphQlResponse graphQlResponse = Mono.defer(() ->
-                client
-                    .documentName(GET_TEAM_REPOSITORIES_DOCUMENT)
-                    .variable("orgLogin", organizationLogin)
-                    .variable("teamSlug", teamSlug)
-                    .variable(
-                        "first",
-                        adaptPageSize(LARGE_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId))
-                    )
-                    .variable("after", currentCursor)
-                    .execute()
-            )
-                .retryWhen(
-                    Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
-                        .maxBackoff(TRANSPORT_MAX_BACKOFF)
-                        .jitter(JITTER_FACTOR)
-                        .filter(ScmTransportErrors::isTransportError)
-                        .doBeforeRetry(signal ->
-                            log.warn(
-                                "Retrying team repositories fetch after transport error: teamSlug={}, page={}, attempt={}, error={}",
-                                teamSlug,
-                                currentPage,
-                                signal.totalRetries() + 1,
-                                signal.failure().getMessage()
-                            )
-                        )
-                )
-                .block(syncProperties.graphqlTimeout());
+            ClientGraphQlResponse graphQlResponse = Mono.defer(() -> client.documentName(GET_TEAM_REPOSITORIES_DOCUMENT)
+                            .variable("orgLogin", organizationLogin)
+                            .variable("teamSlug", teamSlug)
+                            .variable(
+                                    "first",
+                                    adaptPageSize(
+                                            LARGE_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId)))
+                            .variable("after", currentCursor)
+                            .execute())
+                    .retryWhen(Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
+                            .maxBackoff(TRANSPORT_MAX_BACKOFF)
+                            .jitter(JITTER_FACTOR)
+                            .filter(ScmTransportErrors::isTransportError)
+                            .doBeforeRetry(signal -> log.warn(
+                                    "Retrying team repositories fetch after transport error: teamSlug={}, page={}, attempt={}, error={}",
+                                    teamSlug,
+                                    currentPage,
+                                    signal.totalRetries() + 1,
+                                    signal.failure().getMessage())))
+                    .block(syncProperties.graphqlTimeout());
 
             if (graphQlResponse == null || !graphQlResponse.isValid()) {
                 ClassificationResult classification = graphQlSyncHelper.classifyGraphQlErrors(graphQlResponse);
                 if (classification != null) {
-                    if (
-                        graphQlSyncHelper.handleGraphQlClassification(
-                            new GraphQlClassificationContext(
-                                classification,
-                                retryAttempt,
-                                MAX_RETRY_ATTEMPTS,
-                                "team repositories fetch",
-                                "teamSlug",
-                                teamSlug,
-                                log
-                            )
-                        )
-                    ) {
+                    if (graphQlSyncHelper.handleGraphQlClassification(new GraphQlClassificationContext(
+                            classification,
+                            retryAttempt,
+                            MAX_RETRY_ATTEMPTS,
+                            "team repositories fetch",
+                            "teamSlug",
+                            teamSlug,
+                            log))) {
                         retryAttempt++;
                         continue;
                     }
                     break;
                 }
                 log.warn(
-                    "Received invalid GraphQL response for team repositories: teamSlug={}, errors={}",
-                    teamSlug,
-                    graphQlResponse != null ? graphQlResponse.getErrors() : "null"
-                );
+                        "Received invalid GraphQL response for team repositories: teamSlug={}, errors={}",
+                        teamSlug,
+                        graphQlResponse != null ? graphQlResponse.getErrors() : "null");
                 break;
             }
 
@@ -927,22 +800,14 @@ public class GitHubTeamSyncService {
 
             // Check if we should pause due to rate limiting
             if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
-                if (
-                    !graphQlSyncHelper.waitForRateLimitIfNeeded(
-                        scopeId,
-                        "team repositories fetch",
-                        "teamSlug",
-                        teamSlug,
-                        log
-                    )
-                ) {
+                if (!graphQlSyncHelper.waitForRateLimitIfNeeded(
+                        scopeId, "team repositories fetch", "teamSlug", teamSlug, log)) {
                     break;
                 }
             }
 
-            GHTeamRepositoryConnection response = graphQlResponse
-                .field("organization.team.repositories")
-                .toEntity(GHTeamRepositoryConnection.class);
+            GHTeamRepositoryConnection response =
+                    graphQlResponse.field("organization.team.repositories").toEntity(GHTeamRepositoryConnection.class);
 
             if (response == null || response.getEdges() == null) {
                 break;
@@ -962,12 +827,7 @@ public class GitHubTeamSyncService {
 
         if (reportedTotalCount >= 0) {
             GraphQlConnectionOverflowDetector.checkPaginated(
-                "teamRepositories",
-                allEdges.size(),
-                reportedTotalCount,
-                hasNextPage,
-                "teamSlug=" + teamSlug
-            );
+                    "teamRepositories", allEdges.size(), reportedTotalCount, hasNextPage, "teamSlug=" + teamSlug);
         }
 
         return allEdges;
@@ -1010,11 +870,9 @@ public class GitHubTeamSyncService {
 
         for (Team team : existingTeams) {
             // Only delete teams on this provider — a same-login GitLab group must not be swept by a GitHub sync.
-            if (
-                team.getProvider() != null &&
-                Objects.requireNonNull(team.getProvider().getId()).equals(providerId) &&
-                !syncedTeamIds.contains(team.getNativeId())
-            ) {
+            if (team.getProvider() != null
+                    && Objects.requireNonNull(team.getProvider().getId()).equals(providerId)
+                    && !syncedTeamIds.contains(team.getNativeId())) {
                 teamProcessor.delete(team.getNativeId(), context);
                 removed++;
             }
@@ -1032,25 +890,28 @@ public class GitHubTeamSyncService {
      * @return the DTO for use with GitHubTeamProcessor
      */
     private GitHubTeamEventDTO.GitHubTeamDTO convertToDTO(GHTeam graphQlTeam) {
-        Long databaseId = graphQlTeam.getDatabaseId() != null ? graphQlTeam.getDatabaseId().longValue() : null;
+        Long databaseId = graphQlTeam.getDatabaseId() != null
+                ? graphQlTeam.getDatabaseId().longValue()
+                : null;
 
         String privacy = mapPrivacy(graphQlTeam.getPrivacy());
         String htmlUrl = graphQlTeam.getUrl() != null ? graphQlTeam.getUrl().toString() : null;
-        Instant createdAt = graphQlTeam.getCreatedAt() != null ? graphQlTeam.getCreatedAt().toInstant() : null;
-        Instant updatedAt = graphQlTeam.getUpdatedAt() != null ? graphQlTeam.getUpdatedAt().toInstant() : null;
+        Instant createdAt =
+                graphQlTeam.getCreatedAt() != null ? graphQlTeam.getCreatedAt().toInstant() : null;
+        Instant updatedAt =
+                graphQlTeam.getUpdatedAt() != null ? graphQlTeam.getUpdatedAt().toInstant() : null;
 
         return new GitHubTeamEventDTO.GitHubTeamDTO(
-            databaseId,
-            graphQlTeam.getId(),
-            graphQlTeam.getName(),
-            graphQlTeam.getSlug(),
-            graphQlTeam.getDescription(),
-            privacy,
-            null, // permission - not available in team query
-            htmlUrl,
-            createdAt,
-            updatedAt
-        );
+                databaseId,
+                graphQlTeam.getId(),
+                graphQlTeam.getName(),
+                graphQlTeam.getSlug(),
+                graphQlTeam.getDescription(),
+                privacy,
+                null, // permission - not available in team query
+                htmlUrl,
+                createdAt,
+                updatedAt);
     }
 
     /**
@@ -1060,19 +921,22 @@ public class GitHubTeamSyncService {
      * @return the DTO for use with GitHubUserProcessor
      */
     private GitHubUserDTO convertUserToDTO(GHUser graphQlUser) {
-        Long databaseId = graphQlUser.getDatabaseId() != null ? graphQlUser.getDatabaseId().longValue() : null;
+        Long databaseId = graphQlUser.getDatabaseId() != null
+                ? graphQlUser.getDatabaseId().longValue()
+                : null;
 
-        String avatarUrl = graphQlUser.getAvatarUrl() != null ? graphQlUser.getAvatarUrl().toString() : null;
+        String avatarUrl =
+                graphQlUser.getAvatarUrl() != null ? graphQlUser.getAvatarUrl().toString() : null;
 
         return new GitHubUserDTO(
-            databaseId,
-            databaseId,
-            graphQlUser.getLogin(),
-            avatarUrl,
-            null, // htmlUrl - not fetched in the query
-            graphQlUser.getName(),
-            null // email - not fetched in the query
-        );
+                databaseId,
+                databaseId,
+                graphQlUser.getLogin(),
+                avatarUrl,
+                null, // htmlUrl - not fetched in the query
+                graphQlUser.getName(),
+                null // email - not fetched in the query
+                );
     }
 
     /**

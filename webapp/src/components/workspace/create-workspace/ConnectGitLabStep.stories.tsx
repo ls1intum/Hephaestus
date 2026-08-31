@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
+
 import { ConnectGitLabStep } from "./ConnectGitLabStep";
 import { withWizardState } from "./stories-utils";
 

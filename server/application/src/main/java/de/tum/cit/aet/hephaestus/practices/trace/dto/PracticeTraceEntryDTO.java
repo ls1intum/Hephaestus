@@ -21,31 +21,44 @@ import org.jspecify.annotations.Nullable;
  */
 @Schema(description = "What became of one practice on this artifact, and whether anyone heard about it")
 public record PracticeTraceEntryDTO(
-    @NonNull String practiceSlug,
-    @NonNull String practiceName,
-    @NonNull
-    @Schema(description = "How much autonomy the workspace currently gives this practice, after inheritance")
-    PracticeAutonomy autonomy,
-    @NonNull PracticeTraceOutcome outcome,
-    @NonNull @Schema(description = "The outcome in a sentence, phrased as what would change it") String explanation,
-    @NonNull @Schema(description = "The signals this practice watches") List<SignalName> watches,
-    @Schema(description = "The occurrence this answer is about; null when nothing it watches happened")
-    @Nullable
-    SignalName occasionedBy,
-    @Schema(
-        description = "That occurrence's id in this trace's signals list. The name alone cannot identify " +
-            "it — the same signal recurs on every revision — so this is what a link should follow."
-    )
-    @Nullable
-    UUID occasionedById,
-    @Schema(description = "When the answer was settled") @Nullable Instant decidedAt,
-    @Schema(description = "The review this answer came from, when one ran") @Nullable UUID reviewId,
-    @NonNull @Schema(description = "Measurements this practice produced on this artifact") Integer observationCount,
-    @NonNull @Schema(description = "Interventions actually delivered to a person") Integer deliveredCount,
-    @NonNull
-    @Schema(
-        description = "Why prepared feedback was withheld. Non-empty with observations present means we " +
-            "measured and deliberately said nothing."
-    )
-    List<FeedbackSuppressionReason> withheldReasons
-) {}
+        @NonNull String practiceSlug,
+        @NonNull String practiceName,
+
+        @NonNull
+        @Schema(description = "How much autonomy the workspace currently gives this practice, after inheritance")
+        PracticeAutonomy autonomy,
+
+        @NonNull PracticeTraceOutcome outcome,
+
+        @NonNull @Schema(description = "The outcome in a sentence, phrased as what would change it")
+        String explanation,
+
+        @NonNull @Schema(description = "The signals this practice watches")
+        List<SignalName> watches,
+
+        @Schema(description = "The occurrence this answer is about; null when nothing it watches happened") @Nullable
+        SignalName occasionedBy,
+
+        @Schema(
+                description = "That occurrence's id in this trace's signals list. The name alone cannot identify "
+                        + "it — the same signal recurs on every revision — so this is what a link should follow.")
+        @Nullable
+        UUID occasionedById,
+
+        @Schema(description = "When the answer was settled") @Nullable
+        Instant decidedAt,
+
+        @Schema(description = "The review this answer came from, when one ran") @Nullable
+        UUID reviewId,
+
+        @NonNull @Schema(description = "Measurements this practice produced on this artifact")
+        Integer observationCount,
+
+        @NonNull @Schema(description = "Interventions actually delivered to a person")
+        Integer deliveredCount,
+
+        @NonNull
+        @Schema(
+                description = "Why prepared feedback was withheld. Non-empty with observations present means we "
+                        + "measured and deliberately said nothing.")
+        List<FeedbackSuppressionReason> withheldReasons) {}

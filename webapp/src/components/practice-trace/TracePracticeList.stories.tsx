@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, within } from "storybook/test";
+
 import { practiceTraceEntries, tracedSignals } from "./story-mock-data";
 import { TracePracticeList } from "./TracePracticeList";
 
@@ -28,6 +29,8 @@ type Story = StoryObj<typeof meta>;
 /** One row per outcome the server can send, plus the measured-but-deliberately-silent case. */
 export const EveryOutcome: Story = {
 	play: async ({ canvas }) => {
+		await expect(canvas.getByText("Not reached")).toBeVisible();
+		await expect(canvas.getByText("The review ended before reaching this practice.")).toBeVisible();
 		await expect(canvas.getByText("2 measurements, none sent")).toBeVisible();
 		await expect(
 			canvas.getByText("This feedback is waiting for a person to approve it."),

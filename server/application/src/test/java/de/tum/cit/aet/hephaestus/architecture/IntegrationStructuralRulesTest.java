@@ -32,44 +32,43 @@ class IntegrationStructuralRulesTest extends HephaestusArchitectureTest {
     @Test
     void scmDomainDoesNotDependOnVendorAdapters() {
         ArchRule rule = noClasses()
-            .that()
-            .resideInAPackage("..integration.scm.domain..")
-            .should()
-            .dependOnClassesThat()
-            .resideInAnyPackage("..integration.scm.github..", "..integration.scm.gitlab..")
-            .because("SCM shared kernel must remain vendor-neutral.");
+                .that()
+                .resideInAPackage("..integration.scm.domain..")
+                .should()
+                .dependOnClassesThat()
+                .resideInAnyPackage("..integration.scm.github..", "..integration.scm.gitlab..")
+                .because("SCM shared kernel must remain vendor-neutral.");
         rule.check(classes);
     }
 
     @Test
     void spiHasNoVendorLiteralIdentifiers() {
         ArchRule rule = classes()
-            .that()
-            .resideInAPackage("..integration.core.spi..")
-            .should(hasNoVendorLiteralIn("simple class name", JavaClass::getSimpleName))
-            .because("Unified SPI must be vendor-neutral by name.");
+                .that()
+                .resideInAPackage("..integration.core.spi..")
+                .should(hasNoVendorLiteralIn("simple class name", JavaClass::getSimpleName))
+                .because("Unified SPI must be vendor-neutral by name.");
         rule.check(classes);
     }
 
     @Test
     void coreConsumerHasNoVendorLiteralIdentifiers() {
         ArchRule classRule = classes()
-            .that()
-            .resideInAPackage("..integration.core.consumer..")
-            .should(hasNoVendorLiteralIn("simple class name", JavaClass::getSimpleName))
-            .because("Consumer wiring must be vendor-neutral.");
-        ArchRule fieldRule = fields()
-            .that()
-            .areDeclaredInClassesThat()
-            .resideInAPackage("..integration.core.consumer..")
-            .should(hasNoVendorLiteralIn("field name", JavaField::getName))
-            .because("Vendor-literal field names re-pin the consumer to a specific provider.");
+                .that()
+                .resideInAPackage("..integration.core.consumer..")
+                .should(hasNoVendorLiteralIn("simple class name", JavaClass::getSimpleName))
+                .because("Consumer wiring must be vendor-neutral.");
+        ArchRule fieldRule = fields().that()
+                .areDeclaredInClassesThat()
+                .resideInAPackage("..integration.core.consumer..")
+                .should(hasNoVendorLiteralIn("field name", JavaField::getName))
+                .because("Vendor-literal field names re-pin the consumer to a specific provider.");
         ArchRule methodRule = methods()
-            .that()
-            .areDeclaredInClassesThat()
-            .resideInAPackage("..integration.core.consumer..")
-            .should(hasNoVendorLiteralIn("method name", JavaMethod::getName))
-            .because("Vendor-literal method names re-pin the consumer to a specific provider.");
+                .that()
+                .areDeclaredInClassesThat()
+                .resideInAPackage("..integration.core.consumer..")
+                .should(hasNoVendorLiteralIn("method name", JavaMethod::getName))
+                .because("Vendor-literal method names re-pin the consumer to a specific provider.");
         classRule.check(classes);
         fieldRule.check(classes);
         methodRule.check(classes);
@@ -88,8 +87,8 @@ class IntegrationStructuralRulesTest extends HephaestusArchitectureTest {
             // re-introduce the core ↔ scm-data-platform cycle.
             Set<String> expected = Set.of("core", "scm", "slack", "identity", "outline", "package-info.java");
             assertThat(actual)
-                .as("Integration top-level sub-roots: {core, scm, slack, identity, outline} (ADR 0017 OIDC login).")
-                .isEqualTo(expected);
+                    .as("Integration top-level sub-roots: {core, scm, slack, identity, outline} (ADR 0017 OIDC login).")
+                    .isEqualTo(expected);
         }
     }
 
@@ -100,12 +99,8 @@ class IntegrationStructuralRulesTest extends HephaestusArchitectureTest {
                 String name = identifier.apply(item);
                 String literal = findVendorLiteral(name);
                 if (literal != null) {
-                    events.add(
-                        SimpleConditionEvent.violated(
-                            item,
-                            what + " '" + name + "' contains vendor literal '" + literal + "'"
-                        )
-                    );
+                    events.add(SimpleConditionEvent.violated(
+                            item, what + " '" + name + "' contains vendor literal '" + literal + "'"));
                 }
             }
         };
@@ -125,9 +120,8 @@ class IntegrationStructuralRulesTest extends HephaestusArchitectureTest {
         Path serverDir = Paths.get(System.getProperty("user.dir")).toAbsolutePath();
         Path integrationDir = serverDir.resolve("src/main/java/de/tum/cit/aet/hephaestus/integration");
         if (!Files.isDirectory(integrationDir)) {
-            integrationDir = serverDir.resolve(
-                "server/application/src/main/java/de/tum/cit/aet/hephaestus/integration"
-            );
+            integrationDir =
+                    serverDir.resolve("server/application/src/main/java/de/tum/cit/aet/hephaestus/integration");
         }
         if (!Files.isDirectory(integrationDir)) {
             throw new IllegalStateException("Could not locate integration/ source root from user.dir=" + serverDir);

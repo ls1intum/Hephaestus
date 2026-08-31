@@ -43,17 +43,17 @@ class WorkspaceSlugRenameIntegrationTest extends AbstractWorkspaceIntegrationTes
         RenameWorkspaceSlugRequestDTO request = new RenameWorkspaceSlugRequestDTO("new-slug");
 
         Workspace updated = webTestClient
-            .patch()
-            .uri("/workspaces/{workspaceSlug}/slug", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(request)
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody(Workspace.class)
-            .returnResult()
-            .getResponseBody();
+                .patch()
+                .uri("/workspaces/{workspaceSlug}/slug", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(Workspace.class)
+                .returnResult()
+                .getResponseBody();
 
         Workspace persisted = workspaceRepository.findById(workspace.getId()).orElseThrow();
 
@@ -61,9 +61,8 @@ class WorkspaceSlugRenameIntegrationTest extends AbstractWorkspaceIntegrationTes
         assertThat(updated.getWorkspaceSlug()).isEqualTo("new-slug");
         assertThat(persisted.getWorkspaceSlug()).isEqualTo("new-slug");
 
-        List<WorkspaceSlugHistory> history = workspaceSlugHistoryRepository.findByWorkspaceOrderByChangedAtDesc(
-            persisted
-        );
+        List<WorkspaceSlugHistory> history =
+                workspaceSlugHistoryRepository.findByWorkspaceOrderByChangedAtDesc(persisted);
         assertThat(history).hasSize(1);
         assertThat(history.getFirst().getOldSlug()).isEqualTo("old-slug");
         assertThat(history.getFirst().getNewSlug()).isEqualTo("new-slug");
@@ -82,22 +81,21 @@ class WorkspaceSlugRenameIntegrationTest extends AbstractWorkspaceIntegrationTes
             RenameWorkspaceSlugRequestDTO request = new RenameWorkspaceSlugRequestDTO(nextSlug);
 
             webTestClient
-                .patch()
-                .uri("/workspaces/{workspaceSlug}/slug", currentSlug)
-                .headers(TestAuthUtils.withCurrentUser())
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(request)
-                .exchange()
-                .expectStatus()
-                .isOk();
+                    .patch()
+                    .uri("/workspaces/{workspaceSlug}/slug", currentSlug)
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(request)
+                    .exchange()
+                    .expectStatus()
+                    .isOk();
 
             currentSlug = nextSlug;
         }
 
         Workspace persisted = workspaceRepository.findById(workspace.getId()).orElseThrow();
-        List<WorkspaceSlugHistory> history = workspaceSlugHistoryRepository.findByWorkspaceOrderByChangedAtDesc(
-            persisted
-        );
+        List<WorkspaceSlugHistory> history =
+                workspaceSlugHistoryRepository.findByWorkspaceOrderByChangedAtDesc(persisted);
 
         assertThat(history).hasSize(5);
         assertThat(history.getFirst().getNewSlug()).isEqualTo("slug-6");
@@ -122,16 +120,16 @@ class WorkspaceSlugRenameIntegrationTest extends AbstractWorkspaceIntegrationTes
         RenameWorkspaceSlugRequestDTO request = new RenameWorkspaceSlugRequestDTO("beta");
 
         webTestClient
-            .patch()
-            .uri("/workspaces/{workspaceSlug}/slug", workspaceA.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(request)
-            .exchange()
-            .expectStatus()
-            .isEqualTo(HttpStatus.CONFLICT)
-            .expectBody(ProblemDetail.class)
-            .value(problem -> assertThat(problem.getTitle()).containsIgnoringCase("conflict"));
+                .patch()
+                .uri("/workspaces/{workspaceSlug}/slug", workspaceA.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .exchange()
+                .expectStatus()
+                .isEqualTo(HttpStatus.CONFLICT)
+                .expectBody(ProblemDetail.class)
+                .value(problem -> assertThat(problem.getTitle()).containsIgnoringCase("conflict"));
     }
 
     @Test
@@ -147,25 +145,24 @@ class WorkspaceSlugRenameIntegrationTest extends AbstractWorkspaceIntegrationTes
         workspaceService.renameSlug(workspaceA.getId(), "history-alpha-renamed");
 
         CreateWorkspaceRequestDTO request = new CreateWorkspaceRequestDTO(
-            "history-alpha",
-            "Beta",
-            "beta-account",
-            AccountType.ORG,
-            ownerB.getId(),
-            IntegrationKind.GITHUB,
-            "ghp_dummy_token_for_test",
-            null
-        );
+                "history-alpha",
+                "Beta",
+                "beta-account",
+                AccountType.ORG,
+                ownerB.getId(),
+                IntegrationKind.GITHUB,
+                "ghp_dummy_token_for_test",
+                null);
 
         webTestClient
-            .post()
-            .uri("/workspaces")
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(request)
-            .exchange()
-            .expectStatus()
-            .isEqualTo(HttpStatus.CONFLICT);
+                .post()
+                .uri("/workspaces")
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .exchange()
+                .expectStatus()
+                .isEqualTo(HttpStatus.CONFLICT);
     }
 
     @Test
@@ -179,19 +176,16 @@ class WorkspaceSlugRenameIntegrationTest extends AbstractWorkspaceIntegrationTes
 
         workspaceService.renameSlug(workspace.getId(), "install-alpha-renamed");
 
-        Workspace created = githubLifecycleListener.createOrUpdateFromInstallation(
-            999L,
-            "install-alpha",
-            RepositorySelection.ALL
-        );
+        Workspace created =
+                githubLifecycleListener.createOrUpdateFromInstallation(999L, "install-alpha", RepositorySelection.ALL);
 
         assertThat(created).as("workspace should be created with fallback slug").isNotNull();
         assertThat(created.getWorkspaceSlug()).isNotEqualTo("install-alpha");
         assertThat(created.getWorkspaceSlug()).startsWith("install-alpha".substring(0, 3));
         // provider mode lives on the Connection registry now, not on Workspace.
         assertThat(connectionService.findActiveGitHubAppConfig(created.getId()))
-            .as("GitHub App Connection should be active after createOrUpdateFromInstallation")
-            .isPresent();
+                .as("GitHub App Connection should be active after createOrUpdateFromInstallation")
+                .isPresent();
     }
 
     @Test
@@ -204,16 +198,14 @@ class WorkspaceSlugRenameIntegrationTest extends AbstractWorkspaceIntegrationTes
         persistUser("install-owner-collision");
         persistUser("collision");
 
-        Workspace linked = githubLifecycleListener.createOrUpdateFromInstallation(
-            1111L,
-            "collision",
-            RepositorySelection.ALL
-        );
+        Workspace linked =
+                githubLifecycleListener.createOrUpdateFromInstallation(1111L, "collision", RepositorySelection.ALL);
 
         assertThat(linked).isNotNull();
         assertThat(linked.getId()).isEqualTo(existing.getId());
         assertThat(linked.getWorkspaceSlug()).isEqualTo("collision");
-        assertThat(workspaceSlugHistoryRepository.findByWorkspaceOrderByChangedAtDesc(existing)).isEmpty();
+        assertThat(workspaceSlugHistoryRepository.findByWorkspaceOrderByChangedAtDesc(existing))
+                .isEmpty();
     }
 
     @Test
@@ -226,8 +218,8 @@ class WorkspaceSlugRenameIntegrationTest extends AbstractWorkspaceIntegrationTes
         workspaceService.renameSlug(workspace.getId(), "ttl-new");
 
         WorkspaceSlugHistory history = workspaceSlugHistoryRepository
-            .findFirstByOldSlugOrderByChangedAtDesc("ttl-old")
-            .orElseThrow();
+                .findFirstByOldSlugOrderByChangedAtDesc("ttl-old")
+                .orElseThrow();
         history.setRedirectExpiresAt(Instant.now().minus(2, ChronoUnit.DAYS));
         workspaceSlugHistoryRepository.save(history);
 

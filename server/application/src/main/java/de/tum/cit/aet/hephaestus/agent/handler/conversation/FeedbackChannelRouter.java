@@ -39,10 +39,9 @@ public class FeedbackChannelRouter {
     private final WorkspaceReviewDefaultsProvider workspaceDefaults;
 
     public FeedbackChannelRouter(
-        FeedbackRepository feedbackRepository,
-        ObservationRepository observationRepository,
-        WorkspaceReviewDefaultsProvider workspaceDefaults
-    ) {
+            FeedbackRepository feedbackRepository,
+            ObservationRepository observationRepository,
+            WorkspaceReviewDefaultsProvider workspaceDefaults) {
         this.feedbackRepository = feedbackRepository;
         this.observationRepository = observationRepository;
         this.workspaceDefaults = workspaceDefaults;
@@ -50,18 +49,12 @@ public class FeedbackChannelRouter {
 
     public List<Observation> admit(List<Observation> observations, long workspaceId, RoutingContext context) {
         WorkspaceReviewDefaults defaults = workspaceDefaults.forWorkspace(workspaceId);
-        Map<UUID, PracticeAutonomy> autonomyByPracticeId = autonomyByPracticeId(
-            observations,
-            defaults.defaultAutonomy()
-        );
+        Map<UUID, PracticeAutonomy> autonomyByPracticeId =
+                autonomyByPracticeId(observations, workspaceId, defaults.defaultAutonomy());
         List<Observation> admitted = new ArrayList<>();
         for (Observation observation : observations) {
-            ConversationRoutingDecision decision = route(
-                observation,
-                autonomyByPracticeId.get(observation.getId()),
-                workspaceId,
-                context
-            );
+            ConversationRoutingDecision decision =
+                    route(observation, autonomyByPracticeId.get(observation.getId()), workspaceId, context);
             if (decision == ConversationRoutingDecision.ADMIT) {
                 admitted.add(observation);
             }
@@ -70,15 +63,11 @@ public class FeedbackChannelRouter {
     }
 
     public ConversationRoutingDecision route(
-        Observation observation,
-        @Nullable PracticeAutonomy autonomy,
-        long workspaceId,
-        RoutingContext context
-    ) {
+            Observation observation, @Nullable PracticeAutonomy autonomy, long workspaceId, RoutingContext context) {
         if (!PracticeAutonomyPolicy.delivers(observation.getOrigin(), autonomy, FeedbackChannel.IN_CHAT)) {
             return observation.getOrigin().delivers(FeedbackChannel.IN_CHAT)
-                ? ConversationRoutingDecision.PRACTICE_REQUIRES_APPROVAL
-                : ConversationRoutingDecision.BACKFILL_QUIET;
+                    ? ConversationRoutingDecision.PRACTICE_REQUIRES_APPROVAL
+                    : ConversationRoutingDecision.BACKFILL_QUIET;
         }
         if (context.recipientRole() != RecipientRole.AUTHOR) {
             return ConversationRoutingDecision.REVIEWER_DEFERRED;
@@ -90,37 +79,30 @@ public class FeedbackChannelRouter {
             return ConversationRoutingDecision.HAS_INLINE_ANCHOR;
         }
         String recurrenceKey = observation.getRecurrenceKey();
-        if (
-            recurrenceKey != null &&
-            feedbackRepository.existsDeliveredInContextForRecurrenceKey(
-                workspaceId,
-                observation.getAboutUserId(),
-                recurrenceKey
-            )
-        ) {
+        if (recurrenceKey != null
+                && feedbackRepository.existsDeliveredInContextForRecurrenceKey(
+                        workspaceId, observation.getAboutUserId(), recurrenceKey)) {
             return ConversationRoutingDecision.ALREADY_DELIVERED_IN_CONTEXT;
         }
         return ConversationRoutingDecision.ADMIT;
     }
 
     private Map<UUID, PracticeAutonomy> autonomyByPracticeId(
-        List<Observation> observations,
-        PracticeAutonomy workspaceDefault
-    ) {
-        List<UUID> ids = observations.stream().map(Observation::getId).filter(Objects::nonNull).toList();
+            List<Observation> observations, long workspaceId, PracticeAutonomy workspaceDefault) {
+        List<UUID> ids = observations.stream()
+                .map(Observation::getId)
+                .filter(Objects::nonNull)
+                .toList();
         if (ids.isEmpty()) {
             return Map.of();
         }
         Map<UUID, PracticeAutonomy> autonomyByPracticeId = new HashMap<>();
-        for (var row : observationRepository.findPracticeAutonomyFor(ids)) {
+        for (var row : observationRepository.findPracticeAutonomyFor(ids, workspaceId)) {
             autonomyByPracticeId.put(
-                row.getObservationId(),
-                AutonomyResolver.resolvePractice(
-                    row.getPracticeAutonomy(),
-                    row.getGroupAutonomy(),
-                    workspaceDefault
-                ).autonomy()
-            );
+                    row.getObservationId(),
+                    AutonomyResolver.resolvePractice(
+                                    row.getPracticeAutonomy(), row.getGroupAutonomy(), workspaceDefault)
+                            .autonomy());
         }
         return autonomyByPracticeId;
     }

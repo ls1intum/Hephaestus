@@ -15,12 +15,11 @@ import org.jspecify.annotations.Nullable;
  * @param after      state after the change; {@code null} for {@link ConfigAuditAction#DELETED}
  */
 public record ConfigAuditEntry(
-    ConfigAuditEntityType entityType,
-    String entityId,
-    @Nullable Long workspaceId,
-    @Nullable ConfigAuditSnapshot before,
-    @Nullable ConfigAuditSnapshot after
-) {
+        ConfigAuditEntityType entityType,
+        String entityId,
+        @Nullable Long workspaceId,
+        @Nullable ConfigAuditSnapshot before,
+        @Nullable ConfigAuditSnapshot after) {
     public ConfigAuditEntry {
         if (before == null && after == null) {
             throw new IllegalArgumentException("config audit entry needs at least one of before/after");
@@ -28,75 +27,55 @@ public record ConfigAuditEntry(
     }
 
     public static ConfigAuditEntry created(
-        ConfigAuditEntityType entityType,
-        Object entityId,
-        Long workspaceId,
-        ConfigAuditSnapshot after
-    ) {
+            ConfigAuditEntityType entityType, Object entityId, Long workspaceId, ConfigAuditSnapshot after) {
         return new ConfigAuditEntry(
-            entityType,
-            String.valueOf(entityId),
-            Objects.requireNonNull(workspaceId, "workspaceId"),
-            null,
-            requireSnapshot(after, "after")
-        );
+                entityType,
+                String.valueOf(entityId),
+                Objects.requireNonNull(workspaceId, "workspaceId"),
+                null,
+                requireSnapshot(after, "after"));
     }
 
     public static ConfigAuditEntry updated(
-        ConfigAuditEntityType entityType,
-        Object entityId,
-        Long workspaceId,
-        ConfigAuditSnapshot before,
-        ConfigAuditSnapshot after
-    ) {
+            ConfigAuditEntityType entityType,
+            Object entityId,
+            Long workspaceId,
+            ConfigAuditSnapshot before,
+            ConfigAuditSnapshot after) {
         // Both sides are required: jspecify nullness is not enforced at runtime, so a producer that
         // captured `before` after the mutation (or not at all) would otherwise silently downgrade an
         // UPDATE to a CREATED row with no prior state — and skip no-op suppression while doing it.
         return new ConfigAuditEntry(
-            entityType,
-            String.valueOf(entityId),
-            Objects.requireNonNull(workspaceId, "workspaceId"),
-            requireSnapshot(before, "before"),
-            requireSnapshot(after, "after")
-        );
+                entityType,
+                String.valueOf(entityId),
+                Objects.requireNonNull(workspaceId, "workspaceId"),
+                requireSnapshot(before, "before"),
+                requireSnapshot(after, "after"));
     }
 
     public static ConfigAuditEntry deleted(
-        ConfigAuditEntityType entityType,
-        Object entityId,
-        Long workspaceId,
-        ConfigAuditSnapshot before
-    ) {
+            ConfigAuditEntityType entityType, Object entityId, Long workspaceId, ConfigAuditSnapshot before) {
         return new ConfigAuditEntry(
-            entityType,
-            String.valueOf(entityId),
-            Objects.requireNonNull(workspaceId, "workspaceId"),
-            requireSnapshot(before, "before"),
-            null
-        );
+                entityType,
+                String.valueOf(entityId),
+                Objects.requireNonNull(workspaceId, "workspaceId"),
+                requireSnapshot(before, "before"),
+                null);
     }
 
     public static ConfigAuditEntry instanceCreated(
-        ConfigAuditEntityType entityType,
-        Object entityId,
-        ConfigAuditSnapshot after
-    ) {
+            ConfigAuditEntityType entityType, Object entityId, ConfigAuditSnapshot after) {
         return new ConfigAuditEntry(entityType, String.valueOf(entityId), null, null, requireSnapshot(after, "after"));
     }
 
     public static ConfigAuditEntry instanceUpdated(
-        ConfigAuditEntityType entityType,
-        Object entityId,
-        ConfigAuditSnapshot before,
-        ConfigAuditSnapshot after
-    ) {
+            ConfigAuditEntityType entityType, Object entityId, ConfigAuditSnapshot before, ConfigAuditSnapshot after) {
         return new ConfigAuditEntry(
-            entityType,
-            String.valueOf(entityId),
-            null,
-            requireSnapshot(before, "before"),
-            requireSnapshot(after, "after")
-        );
+                entityType,
+                String.valueOf(entityId),
+                null,
+                requireSnapshot(before, "before"),
+                requireSnapshot(after, "after"));
     }
 
     private static ConfigAuditSnapshot requireSnapshot(@Nullable ConfigAuditSnapshot snapshot, String side) {

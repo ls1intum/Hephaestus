@@ -32,12 +32,11 @@ import org.jspecify.annotations.Nullable;
  */
 @Entity
 @Table(
-    name = "outline_collection",
-    uniqueConstraints = @UniqueConstraint(
-        name = "uk_outline_collection",
-        columnNames = { "workspace_id", "connection_id", "collection_id" }
-    )
-)
+        name = "outline_collection",
+        uniqueConstraints =
+                @UniqueConstraint(
+                        name = "uk_outline_collection",
+                        columnNames = {"workspace_id", "connection_id", "collection_id"}))
 @Getter
 @Setter
 @NoArgsConstructor

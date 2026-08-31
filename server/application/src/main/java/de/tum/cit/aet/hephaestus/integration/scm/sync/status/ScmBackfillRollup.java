@@ -51,9 +51,8 @@ public final class ScmBackfillRollup {
         for (RepoBackfillProgress rtm : monitors) {
             anyInitialized = anyInitialized || rtm.initialized();
             allComplete = allComplete && rtm.complete();
-            int highWaterMark =
-                (rtm.issueHighWaterMark() != null ? rtm.issueHighWaterMark() : 0) +
-                (rtm.pullRequestHighWaterMark() != null ? rtm.pullRequestHighWaterMark() : 0);
+            int highWaterMark = (rtm.issueHighWaterMark() != null ? rtm.issueHighWaterMark() : 0)
+                    + (rtm.pullRequestHighWaterMark() != null ? rtm.pullRequestHighWaterMark() : 0);
             totalItems += highWaterMark;
             doneItems += Math.max(0, highWaterMark - rtm.remaining());
         }

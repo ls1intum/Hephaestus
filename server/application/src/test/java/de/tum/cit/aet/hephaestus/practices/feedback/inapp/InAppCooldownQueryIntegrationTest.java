@@ -82,19 +82,17 @@ class InAppCooldownQueryIntegrationTest extends BaseIntegrationTest {
         workspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("in-app-cooldown"));
         otherWorkspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("in-app-cooldown-other"));
         IdentityProvider provider = identityProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-            .orElseGet(() ->
-                identityProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseGet(() -> identityProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
         recipient = userRepository.save(TestUserFactory.createUser(9_149_600L, "cooldown-recipient", provider));
     }
 
     @Test
     @DisplayName("nothing said yet is an empty answer, not a failure")
     void answersEmptyWhenNothingWasEverSurfaced() {
-        assertThat(
-            feedbackRepository.lastInAppSurfacedAt(workspace.getId(), recipient.getId(), PRACTICE_SLUG)
-        ).isEmpty();
+        assertThat(feedbackRepository.lastInAppSurfacedAt(workspace.getId(), recipient.getId(), PRACTICE_SLUG))
+                .isEmpty();
     }
 
     @Test
@@ -108,25 +106,24 @@ class InAppCooldownQueryIntegrationTest extends BaseIntegrationTest {
         // silence this workspace's lane.
         surfaced(otherWorkspace, Instant.parse("2026-03-01T00:00:00Z"));
 
-        assertThat(
-            feedbackRepository.lastInAppSurfacedAt(workspace.getId(), recipient.getId(), PRACTICE_SLUG)
-        ).contains(newer);
+        assertThat(feedbackRepository.lastInAppSurfacedAt(workspace.getId(), recipient.getId(), PRACTICE_SLUG))
+                .contains(newer);
     }
 
     /** One IN_APP unit about {@link #PRACTICE_SLUG}, written for {@link #recipient} in this workspace. */
     private void surfaced(Workspace ws, Instant createdAt) {
         Practice practice = practiceRepository
-            .findByWorkspaceIdAndSlug(ws.getId(), PRACTICE_SLUG)
-            .orElseGet(() -> {
-                Practice created = new Practice();
-                created.setWorkspace(ws);
-                created.setSlug(PRACTICE_SLUG);
-                created.setName("Ships Tests With Changes");
-                created.setCriteria("Criteria");
-                created.setAutomatedReviewPolicy(PracticeTestEvidence.pullRequest());
-                created.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
-                return practiceRepository.saveAndFlush(created);
-            });
+                .findByWorkspaceIdAndSlug(ws.getId(), PRACTICE_SLUG)
+                .orElseGet(() -> {
+                    Practice created = new Practice();
+                    created.setWorkspace(ws);
+                    created.setSlug(PRACTICE_SLUG);
+                    created.setName("Ships Tests With Changes");
+                    created.setCriteria("Criteria");
+                    created.setAutomatedReviewPolicy(PracticeTestEvidence.pullRequest());
+                    created.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
+                    return practiceRepository.saveAndFlush(created);
+                });
 
         AgentJob job = new AgentJob();
         job.setWorkspace(ws);
@@ -136,27 +133,26 @@ class InAppCooldownQueryIntegrationTest extends BaseIntegrationTest {
 
         UUID observationId = UUID.randomUUID();
         observationRepository.insertIfAbsent(
-            observationId,
-            "occ-" + observationId,
-            job.getId(),
-            practice.getId(),
-            null,
-            "scm.pull_request",
-            42L,
-            recipient.getId(),
-            "Observation title",
-            "ABSENT",
-            "BAD",
-            "MAJOR",
-            null,
-            "reasoning",
-            null,
-            createdAt,
-            "LIVE"
-        );
+                observationId,
+                "occ-" + observationId,
+                job.getId(),
+                job.getWorkspace().getId(),
+                practice.getId(),
+                null,
+                "scm.pull_request",
+                42L,
+                recipient.getId(),
+                "Observation title",
+                "ABSENT",
+                "BAD",
+                "MAJOR",
+                null,
+                "reasoning",
+                null,
+                createdAt,
+                "LIVE");
 
-        Feedback unit = feedbackRepository.save(
-            Feedback.builder()
+        Feedback unit = feedbackRepository.save(Feedback.builder()
                 .agentJobId(job.getId())
                 .workspaceId(ws.getId())
                 .recipientUserId(recipient.getId())
@@ -167,8 +163,7 @@ class InAppCooldownQueryIntegrationTest extends BaseIntegrationTest {
                 .body("### A habit\n\nWhat keeps happening.\n\n**Try next:** Something.")
                 .source(FeedbackSource.AGENT)
                 .createdAt(createdAt)
-                .build()
-        );
+                .build());
         feedbackObservationRepository.insertIfAbsent(unit.getId(), observationId, "PRIMARY", 0);
     }
 }

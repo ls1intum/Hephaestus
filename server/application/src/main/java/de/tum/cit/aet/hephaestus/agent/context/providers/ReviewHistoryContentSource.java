@@ -105,14 +105,13 @@ public class ReviewHistoryContentSource implements EvidenceSource {
     private final ObjectMapper objectMapper;
 
     public ReviewHistoryContentSource(
-        ObservationRepository observationRepository,
-        FeedbackRepository feedbackRepository,
-        ObservationVisibilityPolicy visibilityPolicy,
-        PullRequestRepository pullRequestRepository,
-        IssueRepository issueRepository,
-        StagedArtifactNames artifactNames,
-        ObjectMapper objectMapper
-    ) {
+            ObservationRepository observationRepository,
+            FeedbackRepository feedbackRepository,
+            ObservationVisibilityPolicy visibilityPolicy,
+            PullRequestRepository pullRequestRepository,
+            IssueRepository issueRepository,
+            StagedArtifactNames artifactNames,
+            ObjectMapper objectMapper) {
         this.observationRepository = observationRepository;
         this.feedbackRepository = feedbackRepository;
         this.visibilityPolicy = visibilityPolicy;
@@ -192,104 +191,76 @@ public class ReviewHistoryContentSource implements EvidenceSource {
         int preparedCount = -1;
 
         if (selectedKinds.contains(OBSERVATION_HISTORY)) {
-            List<Observation> observations = visibleObservations(
-                workspaceId,
-                subjectUserId,
-                since,
-                sourceJobExcludedFromHistory(job)
-            );
+            List<Observation> observations =
+                    visibleObservations(workspaceId, subjectUserId, since, sourceJobExcludedFromHistory(job));
             observationCount = observations.size();
             files.put(
-                OBSERVATIONS_FILE,
-                serialize(observationsPayload(workspaceId, observations, since), OBSERVATIONS_FILE)
-            );
+                    OBSERVATIONS_FILE,
+                    serialize(observationsPayload(workspaceId, observations, since), OBSERVATIONS_FILE));
             // Arithmetic over exactly the observations staged above, from the same read: a second query
             // could only make the delta and the record it summarises disagree.
-            ObservationDelta delta = ObservationDelta.classify(observations.stream().map(this::locusOf).toList());
+            ObservationDelta delta = ObservationDelta.classify(
+                    observations.stream().map(this::locusOf).toList());
             files.put(DELTA_FILE, serialize(deltaPayload(delta, since), DELTA_FILE));
             completeness.put(OBSERVATION_HISTORY, SourceCompleteness.PARTIAL);
             // Reported explicitly rather than inferred from file presence: the file is always written,
             // so "there is a file" would wrongly answer NON_EMPTY for a person with no history.
             contentStates.put(
-                OBSERVATION_HISTORY,
-                observations.isEmpty() ? SourceContentState.EMPTY : SourceContentState.NON_EMPTY
-            );
+                    OBSERVATION_HISTORY,
+                    observations.isEmpty() ? SourceContentState.EMPTY : SourceContentState.NON_EMPTY);
         }
 
         if (selectedKinds.contains(FEEDBACK_HISTORY)) {
             List<Feedback> delivered = feedbackRepository.findRecentDeliveredForRecipient(
-                workspaceId,
-                subjectUserId,
-                since,
-                PageRequest.of(0, MAX_FEEDBACK)
-            );
+                    workspaceId, subjectUserId, since, PageRequest.of(0, MAX_FEEDBACK));
             feedbackCount = delivered.size();
             files.put(FEEDBACK_FILE, serialize(feedbackPayload(workspaceId, delivered, since), FEEDBACK_FILE));
             List<Feedback> queued = feedbackRepository.findPreparedForRecipient(
-                workspaceId,
-                subjectUserId,
-                PageRequest.of(0, MAX_PREPARED)
-            );
+                    workspaceId, subjectUserId, PageRequest.of(0, MAX_PREPARED));
             preparedCount = queued.size();
             files.put(PREPARED_FILE, serialize(preparedPayload(workspaceId, queued), PREPARED_FILE));
             completeness.put(FEEDBACK_HISTORY, SourceCompleteness.PARTIAL);
             // Reported off what has been delivered, not off the queue: the kind is "what was said to this
             // person", and a full queue with nothing delivered is still an empty record of having spoken.
             contentStates.put(
-                FEEDBACK_HISTORY,
-                delivered.isEmpty() ? SourceContentState.EMPTY : SourceContentState.NON_EMPTY
-            );
+                    FEEDBACK_HISTORY, delivered.isEmpty() ? SourceContentState.EMPTY : SourceContentState.NON_EMPTY);
         }
 
         log.debug(
-            "Review history: workspaceId={}, subjectUserId={}, observations={}, feedback={}, prepared={}",
-            workspaceId,
-            subjectUserId,
-            observationCount,
-            feedbackCount,
-            preparedCount
-        );
+                "Review history: workspaceId={}, subjectUserId={}, observations={}, feedback={}, prepared={}",
+                workspaceId,
+                subjectUserId,
+                observationCount,
+                feedbackCount,
+                preparedCount);
         return new EvidenceContribution(
-            files,
-            Map.copyOf(completeness),
-            Map.of(),
-            Map.of(),
-            Map.of(),
-            Map.copyOf(contentStates)
-        );
+                files, Map.copyOf(completeness), Map.of(), Map.of(), Map.of(), Map.copyOf(contentStates));
     }
 
     private List<Observation> visibleObservations(
-        long workspaceId,
-        Long subjectUserId,
-        Instant since,
-        @Nullable UUID excludedJobId
-    ) {
+            long workspaceId, Long subjectUserId, Instant since, @Nullable UUID excludedJobId) {
         List<Observation> recent = observationRepository.findRecentByDeveloperAndWorkspace(
-            subjectUserId,
-            workspaceId,
-            since,
-            // Verdicts only: a run that produced none is nothing this context can quote, and it would spend
-            // the page budget burying the rows that can be.
-            true,
-            PageRequest.of(0, MAX_OBSERVATIONS)
-        );
-        Set<UUID> visible = visibilityPolicy.permitsAll(
-            workspaceId,
-            recent,
-            SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW
-        );
-        return recent
-            .stream()
-            .filter(o -> visible.contains(o.getId()))
-            // Composition receives the current observations separately, with durable ids. Counting them
-            // again as history would turn a first occurrence into an apparent recurrence.
-            .filter(o -> excludedJobId == null || !excludedJobId.equals(o.getAgentJobId()))
-            .toList();
+                subjectUserId,
+                workspaceId,
+                since,
+                // Verdicts only: a run that produced none is nothing this context can quote, and it would spend
+                // the page budget burying the rows that can be.
+                true,
+                PageRequest.of(0, MAX_OBSERVATIONS));
+        Set<UUID> visible =
+                visibilityPolicy.permitsAll(workspaceId, recent, SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW);
+        return recent.stream()
+                .filter(o -> visible.contains(o.getId()))
+                // Composition receives the current observations separately, with durable ids. Counting them
+                // again as history would turn a first occurrence into an apparent recurrence.
+                .filter(o -> excludedJobId == null || !excludedJobId.equals(o.getAgentJobId()))
+                .toList();
     }
 
     private static @Nullable UUID sourceJobExcludedFromHistory(AgentJob job) {
-        String raw = job.getMetadata() == null ? "" : job.getMetadata().path("source_job_id").asString();
+        String raw = job.getMetadata() == null
+                ? ""
+                : job.getMetadata().path("source_job_id").asString();
         if (raw.isBlank()) return null;
         try {
             return UUID.fromString(raw);
@@ -300,15 +271,16 @@ public class ReviewHistoryContentSource implements EvidenceSource {
 
     private ObservationDelta.Locus locusOf(Observation observation) {
         return new ObservationDelta.Locus(
-            observation.getRecurrenceKey(),
-            observation.getPractice() == null ? "" : observation.getPractice().getSlug(),
-            observation.getArtifactKind(),
-            observation.getArtifactId(),
-            observation.getAgentJobId(),
-            observation.getObservedAt(),
-            observation.getAssessment(),
-            observation.getSeverity()
-        );
+                observation.getRecurrenceKey(),
+                observation.getPractice() == null
+                        ? ""
+                        : observation.getPractice().getSlug(),
+                observation.getArtifactKind(),
+                observation.getArtifactId(),
+                observation.getAgentJobId(),
+                observation.getObservedAt(),
+                observation.getAssessment(),
+                observation.getSeverity());
     }
 
     /**
@@ -321,20 +293,31 @@ public class ReviewHistoryContentSource implements EvidenceSource {
         root.put("window", "how each measured locus moved, over runs since " + since);
         root.put("count", delta.loci().size());
         root.put(
-            "completeness",
-            "PARTIAL: computed over the staged observation window only. A locus first measured before the " +
-                "window looks NEW here, and a run before it is invisible."
-        );
+                "completeness",
+                "PARTIAL: computed over the staged observation window only. A locus first measured before the "
+                        + "window looks NEW here, and a run before it is invisible.");
         ArrayNode items = root.putArray("loci");
         for (ObservationDelta.LocusChange change : delta.loci()) {
             ObjectNode node = items.addObject();
             node.put("practiceSlug", change.practiceSlug());
             node.put("status", change.status().name());
             node.put("runsSeen", change.runsSeen());
-            node.put("firstSeenAt", change.firstSeenAt() == null ? null : change.firstSeenAt().toString());
-            node.put("lastSeenAt", change.lastSeenAt() == null ? null : change.lastSeenAt().toString());
-            node.put("assessment", change.latestAssessment() == null ? null : change.latestAssessment().name());
-            node.put("severity", change.latestSeverity() == null ? null : change.latestSeverity().name());
+            node.put(
+                    "firstSeenAt",
+                    change.firstSeenAt() == null ? null : change.firstSeenAt().toString());
+            node.put(
+                    "lastSeenAt",
+                    change.lastSeenAt() == null ? null : change.lastSeenAt().toString());
+            node.put(
+                    "assessment",
+                    change.latestAssessment() == null
+                            ? null
+                            : change.latestAssessment().name());
+            node.put(
+                    "severity",
+                    change.latestSeverity() == null
+                            ? null
+                            : change.latestSeverity().name());
         }
         return root;
     }
@@ -354,28 +337,25 @@ public class ReviewHistoryContentSource implements EvidenceSource {
         root.put("window", "composed for this developer and not yet received, newest first");
         root.put("count", queued.size());
         root.put(
-            "completeness",
-            "PARTIAL: the most recent " + MAX_PREPARED + " queued items. Absence here is not proof nothing is queued."
-        );
+                "completeness",
+                "PARTIAL: the most recent " + MAX_PREPARED
+                        + " queued items. Absence here is not proof nothing is queued.");
         StagedArtifactNames.Resolved names = artifactNames.resolve(
-            workspaceId,
-            queued
-                .stream()
-                .map(f -> new StagedArtifactNames.Reference(f.getArtifactKind(), f.getArtifactId()))
-                .toList()
-        );
+                workspaceId,
+                queued.stream()
+                        .map(f -> new StagedArtifactNames.Reference(f.getArtifactKind(), f.getArtifactId()))
+                        .toList());
         Map<UUID, String> practices = queued.isEmpty()
-            ? Map.of()
-            : feedbackRepository
-                  .findHeadlinePractices(workspaceId, queued.stream().map(Feedback::getId).toList())
-                  .stream()
-                  .collect(
-                      Collectors.toMap(
-                          FeedbackRepository.HeadlinePracticeRow::getFeedbackId,
-                          FeedbackRepository.HeadlinePracticeRow::getPracticeSlug,
-                          (first, second) -> first
-                      )
-                  );
+                ? Map.of()
+                : feedbackRepository
+                        .findHeadlinePractices(
+                                workspaceId,
+                                queued.stream().map(Feedback::getId).toList())
+                        .stream()
+                        .collect(Collectors.toMap(
+                                FeedbackRepository.HeadlinePracticeRow::getFeedbackId,
+                                FeedbackRepository.HeadlinePracticeRow::getPracticeSlug,
+                                (first, second) -> first));
         ArrayNode items = root.putArray("prepared");
         for (Feedback f : queued) {
             ObjectNode node = items.addObject();
@@ -383,9 +363,12 @@ public class ReviewHistoryContentSource implements EvidenceSource {
             node.put("practiceSlug", practices.get(f.getId()));
             node.put("channel", f.getChannel() == null ? null : f.getChannel().name());
             names.stageInto(node, f.getArtifactKind(), f.getArtifactId());
-            node.put("preparedAt", f.getCreatedAt() == null ? null : f.getCreatedAt().toString());
+            node.put(
+                    "preparedAt",
+                    f.getCreatedAt() == null ? null : f.getCreatedAt().toString());
             // Notes to the mentor on the conversation lane, never the mentor's words: that lane stores the
-            // situation, coaching goal, evidence summary and success signal, and the turn itself is still written live. Null when the run that queued it composed nothing,
+            // situation, coaching goal, evidence summary and success signal, and the turn itself is still written live.
+            // Null when the run that queued it composed nothing,
             // which leaves only the fact that something is queued.
             node.put("body", DeveloperTextSanitizer.sanitize(f.getBody()));
         }
@@ -399,29 +382,33 @@ public class ReviewHistoryContentSource implements EvidenceSource {
         // Stated in the file itself, which the model reads directly, so an empty list can't be read as
         // "never happened".
         root.put(
-            "completeness",
-            "PARTIAL: the most recent " +
-                MAX_OBSERVATIONS +
-                " observations within the window. An observation absent here may still have been recorded."
-        );
+                "completeness",
+                "PARTIAL: the most recent " + MAX_OBSERVATIONS
+                        + " observations within the window. An observation absent here may still have been recorded.");
         StagedArtifactNames.Resolved names = artifactNames.resolve(
-            workspaceId,
-            observations
-                .stream()
-                .map(o -> new StagedArtifactNames.Reference(o.getArtifactKind(), o.getArtifactId()))
-                .toList()
-        );
+                workspaceId,
+                observations.stream()
+                        .map(o -> new StagedArtifactNames.Reference(o.getArtifactKind(), o.getArtifactId()))
+                        .toList());
         ArrayNode items = root.putArray("observations");
         for (Observation o : observations) {
             ObjectNode node = items.addObject();
-            node.put("practiceSlug", o.getPractice() == null ? null : o.getPractice().getSlug());
+            node.put(
+                    "practiceSlug",
+                    o.getPractice() == null ? null : o.getPractice().getSlug());
             node.put("recurrenceKey", o.getRecurrenceKey());
             node.put("summary", o.getSummary());
-            node.put("presence", o.getPresence() == null ? null : o.getPresence().name());
-            node.put("assessment", o.getAssessment() == null ? null : o.getAssessment().name());
-            node.put("severity", o.getSeverity() == null ? null : o.getSeverity().name());
+            node.put(
+                    "presence", o.getPresence() == null ? null : o.getPresence().name());
+            node.put(
+                    "assessment",
+                    o.getAssessment() == null ? null : o.getAssessment().name());
+            node.put(
+                    "severity", o.getSeverity() == null ? null : o.getSeverity().name());
             names.stageInto(node, o.getArtifactKind(), o.getArtifactId());
-            node.put("observedAt", o.getObservedAt() == null ? null : o.getObservedAt().toString());
+            node.put(
+                    "observedAt",
+                    o.getObservedAt() == null ? null : o.getObservedAt().toString());
             node.put("evidenceRationale", DeveloperTextSanitizer.sanitize(o.getEvidenceRationale()));
         }
         return root;
@@ -432,24 +419,22 @@ public class ReviewHistoryContentSource implements EvidenceSource {
         root.put("window", "feedback delivered since " + since + ", newest first");
         root.put("count", delivered.size());
         root.put(
-            "completeness",
-            "PARTIAL: the most recent " +
-                MAX_FEEDBACK +
-                " delivered items within the window. Feedback absent here may still have been delivered."
-        );
+                "completeness",
+                "PARTIAL: the most recent " + MAX_FEEDBACK
+                        + " delivered items within the window. Feedback absent here may still have been delivered.");
         StagedArtifactNames.Resolved names = artifactNames.resolve(
-            workspaceId,
-            delivered
-                .stream()
-                .map(f -> new StagedArtifactNames.Reference(f.getArtifactKind(), f.getArtifactId()))
-                .toList()
-        );
+                workspaceId,
+                delivered.stream()
+                        .map(f -> new StagedArtifactNames.Reference(f.getArtifactKind(), f.getArtifactId()))
+                        .toList());
         ArrayNode items = root.putArray("feedback");
         for (Feedback f : delivered) {
             ObjectNode node = items.addObject();
             node.put("channel", f.getChannel() == null ? null : f.getChannel().name());
             names.stageInto(node, f.getArtifactKind(), f.getArtifactId());
-            node.put("deliveredAt", f.getDeliveredAt() == null ? null : f.getDeliveredAt().toString());
+            node.put(
+                    "deliveredAt",
+                    f.getDeliveredAt() == null ? null : f.getDeliveredAt().toString());
             node.put("body", DeveloperTextSanitizer.sanitize(f.getBody()));
         }
         return root;
@@ -474,20 +459,20 @@ public class ReviewHistoryContentSource implements EvidenceSource {
         Long id = metadataLong(job, "pull_request_id");
         if (id == null) return null;
         return pullRequestRepository
-            .findByIdWithAuthorAndRepository(id)
-            .map(PullRequest::getAuthor)
-            .map(author -> author.getId())
-            .orElse(null);
+                .findByIdWithAuthorAndRepository(id)
+                .map(PullRequest::getAuthor)
+                .map(author -> author.getId())
+                .orElse(null);
     }
 
     private @Nullable Long authorOfIssue(AgentJob job) {
         Long id = metadataLong(job, "issue_id");
         if (id == null) return null;
         return issueRepository
-            .findByIdWithAuthorAndRepository(id)
-            .map(Issue::getAuthor)
-            .map(author -> author.getId())
-            .orElse(null);
+                .findByIdWithAuthorAndRepository(id)
+                .map(Issue::getAuthor)
+                .map(author -> author.getId())
+                .orElse(null);
     }
 
     private @Nullable Long metadataSubject(AgentJob job) {

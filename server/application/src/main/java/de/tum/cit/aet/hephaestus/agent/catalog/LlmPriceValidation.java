@@ -23,21 +23,19 @@ final class LlmPriceValidation {
     private LlmPriceValidation() {}
 
     static void validate(
-        PricingMode pricingMode,
-        @Nullable BigDecimal per1mInputUsd,
-        @Nullable BigDecimal per1mOutputUsd,
-        @Nullable BigDecimal per1mCacheReadUsd,
-        @Nullable BigDecimal per1mCacheWriteUsd,
-        @Nullable String note
-    ) {
+            PricingMode pricingMode,
+            @Nullable BigDecimal per1mInputUsd,
+            @Nullable BigDecimal per1mOutputUsd,
+            @Nullable BigDecimal per1mCacheReadUsd,
+            @Nullable BigDecimal per1mCacheWriteUsd,
+            @Nullable String note) {
         List<BigDecimal> rates = Arrays.asList(per1mInputUsd, per1mOutputUsd, per1mCacheReadUsd, per1mCacheWriteUsd);
         boolean anyRatePresent = rates.stream().anyMatch(rate -> rate != null);
 
         if (pricingMode == PricingMode.PRICED) {
             if (per1mInputUsd == null || per1mOutputUsd == null) {
                 throw new IllegalArgumentException(
-                    "A price requires at least an input rate and an output rate (per 1M tokens)."
-                );
+                        "A price requires at least an input rate and an output rate (per 1M tokens).");
             }
             boolean anyNegative = rates.stream().anyMatch(rate -> rate != null && rate.signum() < 0);
             if (anyNegative) {
@@ -46,27 +44,22 @@ final class LlmPriceValidation {
             boolean anyPositive = rates.stream().anyMatch(rate -> rate != null && rate.signum() > 0);
             if (!anyPositive) {
                 throw new IllegalArgumentException(
-                    "A price requires at least one rate greater than zero. For a free model, choose Free instead."
-                );
+                        "A price requires at least one rate greater than zero. For a free model, choose Free instead.");
             }
-            boolean anyTooLarge = rates
-                .stream()
-                .anyMatch(rate -> rate != null && rate.compareTo(MAX_RATE_EXCLUSIVE) >= 0);
+            boolean anyTooLarge =
+                    rates.stream().anyMatch(rate -> rate != null && rate.compareTo(MAX_RATE_EXCLUSIVE) >= 0);
             if (anyTooLarge) {
                 throw new IllegalArgumentException(
-                    "Rates must be below " + MAX_RATE_EXCLUSIVE.toPlainString() + " per 1M tokens."
-                );
+                        "Rates must be below " + MAX_RATE_EXCLUSIVE.toPlainString() + " per 1M tokens.");
             }
         } else {
             if (anyRatePresent) {
                 throw new IllegalArgumentException(
-                    "Rates can only be set when the model has a price; clear them or set a price first."
-                );
+                        "Rates can only be set when the model has a price; clear them or set a price first.");
             }
             if (pricingMode == PricingMode.NO_CHARGE && !StringUtils.hasText(note)) {
                 throw new IllegalArgumentException(
-                    "A note explaining why this model is free (e.g. self-hosted, no cost) is required."
-                );
+                        "A note explaining why this model is free (e.g. self-hosted, no cost) is required.");
             }
         }
     }

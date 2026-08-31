@@ -10,15 +10,15 @@ are not here: write code that reads like the file you are editing.
 
 ## Local development loop
 
-`pnpm dev` from the repo root launches `mprocs` with server and webapp in separate panes and brings up
-the Postgres container. For plain terminals: `pnpm dev:server` and `pnpm dev:webapp`.
+`pnpm run dev` from the repo root launches `mprocs` with server and webapp in separate panes and brings up
+the Postgres container. For plain terminals: `pnpm run dev:server` and `pnpm run dev:webapp`.
 
 - **No devtools.** Hot reload is JVM HotSwap via the IDE — IntelliJ's Spring Boot run config with
   *Update Classes and Resources* on save. Method-body edits reload; signature changes, new methods and
   `@Configuration` edits need a full restart
   ([ref](https://docs.spring.io/spring-boot/how-to/hotswapping.html)).
 - **`ddl-auto: validate`** locally — Liquibase owns DDL. If the validator fails on boot your DB has
-  drifted: `pnpm dev:reset`. The Postgres folder is **bind-mounted**, so `docker compose down -v` alone
+  drifted: `pnpm run dev:reset`. The Postgres folder is **bind-mounted**, so `docker compose down -v` alone
   does not clear it.
 - **`BufferingApplicationStartup`** is wired in `Application.main()`. With `app.profiles=local`,
   `GET /actuator/startup` returns the timeline; `StartupBudgetIntegrationTest` catches per-step
@@ -29,15 +29,15 @@ the Postgres container. For plain terminals: `pnpm dev:server` and `pnpm dev:web
 Each of these can leave you with the wrong result.
 
 - **Use the reactor.** `server/generated-clients` owns every GraphQL and Outline generator and
-  `server/application` consumes its JAR. From `server/`, `./mvnw test` runs the default unit suite;
-  use it after a fresh checkout or generated-client input change. For the repeated application-edit
-  loop, use `./mvnw -f application/pom.xml test` (and `-Dtest=ClassName` to focus a test) so Maven does
-  not restore the generated module and invalidate application incremental compilation.
+  `server/application` consumes its JAR. From the repository root, use
+  `pnpm run test:server:unit` after a fresh checkout or generated-client input change. For the repeated
+  application-edit loop, use `./mvnw -f application/pom.xml test` from `server/` (and
+  `-Dtest=ClassName` to focus a test) so Maven does not restore the generated module and invalidate
+  application incremental compilation.
 - **`-Dgroups=architecture` silently runs the unit suite instead.** `pom.xml` sets Surefire's `<groups>`
   to `${surefire.includedGroups}`, and a POM element beats the `-Dgroups` user property — so the flag is
-  discarded and the default (`unit`) runs. The tag is selected by profile, never by `-Dgroups`:
-  `./mvnw test -Parchitecture-tests`. CI is unaffected; it passes `-Dsurefire.includedGroups`,
-  which is the property the POM actually reads.
+  discarded and the default (`unit`) runs. Use `pnpm run test:server:architecture`; CI passes the
+  `${surefire.includedGroups}` property that the POM reads.
 - **`clean` does not guarantee a cold build.** It removes workspace outputs, but Maven Build Cache can
   restore them. The repository enables the cache for `generated-clients`; Maven logs `Found cached
   build` on a hit. Pass `-Dmaven.build.cache.enabled=false` when measuring a cold build. Schema,
@@ -80,16 +80,16 @@ excluded. Every new package needs a `package-info.java` containing
 `NullAway` suppressions. Use `@Nullable` only for genuine absence and place it on the precise type:
 `List<@Nullable String>` permits null elements; `String @Nullable []` permits a null array reference.
 Fix violations at the contract or implementation boundary. In tests, refine a nullable result once
-before using it rather than adding duplicate assertions. Run `./mvnw test` after changing a
-nullness contract.
+before using it rather than adding duplicate assertions. Run `pnpm run test:server:unit` after changing
+a nullness contract.
 
 ## Test tiers
 
 | Tag | Runs | Command |
 |---|---|---|
-| `unit` | no Spring context | `./mvnw test` |
-| `architecture` | ArchUnit + Modulith verification | `./mvnw test -Parchitecture-tests` |
-| `integration` | unit tests, then full context + Testcontainers | `./mvnw verify` |
+| `unit` | no Spring context | `pnpm run test:server:unit` |
+| `architecture` | ArchUnit + Modulith verification | `pnpm run test:server:architecture` |
+| `integration` | full context + Testcontainers | `pnpm run test:server:integration` |
 | `live` | real GitHub API | `./mvnw test -Plive-tests` |
 
 Live tests need GitHub App credentials in `application-live-local.yml` (gitignored); the Maven profile
@@ -130,7 +130,6 @@ or on "the only" result, and never write cleanup that another test depends on ha
 - **`EntityManager` is injected as a `@PersistenceContext` field**, not through the constructor
   (`WorkspaceMembershipService`, `GitHubUserProcessor`). Everything else is constructor injection via
   `@RequiredArgsConstructor`.
-- **Optional integrations are `ObjectProvider<T>`, not `@Autowired(required=false)`.** `PosthogClient`
   is gated by `@ConditionalOnProperty`; tolerant consumers (`AccountService`,
   `LeaderboardTaskScheduler`) take `ObjectProvider`. A bean that is not gated the same way will
   crash-loop the `worker` and `webhook` runtimes, which start a different slice of the context.

@@ -1,19 +1,18 @@
 ---
 id: backup-restore
-sidebar_position: 3
 title: Backup & Restore
 description: What to back up on a self-hosted instance, and how to restore it.
 ---
 
-For the [self-host compose stack](./install). PostgreSQL holds the application state. The Context Fabric holds
-bounded evidence copies that may no longer be reproducible after upstream content changes or is erased.
+For the [self-host compose stack](./install). PostgreSQL holds application state. The Context Fabric
+holds bounded evidence copies that may become irreproducible after upstream content changes or erasure.
 
 ## What to back up
 
 | Data | Where | Priority |
 | --- | --- | --- |
-| PostgreSQL database | `postgresql-data` volume | **Everything.** Accounts, workspaces, observations, feedback, encrypted provider tokens, JWT signing keys. |
-| `.env` | `/opt/hephaestus/docker/self-host/.env` | **Equal priority.** `HEPHAESTUS_SECURITY_ENCRYPTION_KEY` encrypts the tokens *inside* the database backup — a database backup without the key is partially unreadable (all stored provider credentials are lost, and all sessions invalidate). |
+| PostgreSQL volume | Compose-managed volume mounted by `postgres` | **Everything.** Accounts, workspaces, observations, feedback, encrypted provider tokens, JWT signing keys. |
+| `.env` | `/opt/hephaestus/docker/self-host/.env` | **Equal priority.** Its encryption keys protect values inside the database backup. Without them, provider credentials and signing material are unreadable. |
 | TLS certificates | `./letsencrypt/` | Optional — Let's Encrypt re-issues on first boot (rate limits permitting). |
 | Context Fabric | `git-repos` volume | Back up when replayable evidence is required. Skipping it discards repository clones and bounded replay/CAS content; durable job provenance remains in PostgreSQL, but the exact source bytes may be unrecoverable. |
 | NATS JetStream | `nats-data` volume | Skip — a transient event buffer, not a source of truth. |
@@ -24,7 +23,8 @@ Logical dump while everything runs (safe — Postgres MVCC gives a consistent sn
 
 ```bash
 cd /opt/hephaestus/docker/self-host
-docker compose exec -T postgres pg_dump -U root -Fc hephaestus \
+dc() { docker compose --env-file .env --env-file release-lock.env "$@"; }
+dc exec -T postgres pg_dump -U root -Fc hephaestus \
   > hephaestus-$(date +%F).dump
 cp .env hephaestus-$(date +%F).env
 ```
@@ -34,23 +34,83 @@ Ship both files **off the host**, encrypted. Cron it daily; test-restore it at l
 ## Restore
 
 On a fresh host, complete install steps 1–2 first, restoring the saved `.env` (same
-`POSTGRES_PASSWORD`, same `HEPHAESTUS_SECURITY_ENCRYPTION_KEY` — non-negotiable). Then:
+`POSTGRES_PASSWORD` and both `HEPHAESTUS_SECURITY_*ENCRYPTION_KEY` values). Then:
 
 ```bash
 cd /opt/hephaestus/docker/self-host
-docker compose up -d postgres                      # database only
-docker compose stop application-server webhook-server 2>/dev/null || true
+dc() { docker compose --env-file .env --env-file release-lock.env "$@"; }
+dc up -d postgres
+dc stop application-server application-worker webhook-server 2>/dev/null || true
 
-docker compose exec -T postgres dropdb   -U root --if-exists hephaestus
-docker compose exec -T postgres createdb -U root hephaestus
-docker compose exec -T postgres pg_restore -U root -d hephaestus --no-owner \
+test -s hephaestus-YYYY-MM-DD.dump
+dc exec -T postgres pg_restore --list < hephaestus-YYYY-MM-DD.dump >/dev/null
+dc exec -T postgres dropdb -U root --if-exists hephaestus
+dc exec -T postgres createdb -U root hephaestus
+dc exec -T postgres pg_restore -U root -d hephaestus --no-owner --no-acl --single-transaction \
   < hephaestus-YYYY-MM-DD.dump
 
-docker compose up -d                               # full stack
+dc up -d --wait
 ```
 
 Verify: sign in, open a workspace, check recent activity is present up to the backup
 timestamp.
+
+## PostgreSQL 17 to 18
+
+PostgreSQL major-version data directories are not binary compatible. The PostgreSQL 18 image stores
+`PGDATA` under `/var/lib/postgresql/18/docker`.
+Do **not** point the PostgreSQL 18 container at the old PostgreSQL 17 volume and do not delete the
+old volume until the restored instance passes verification.
+
+From the PostgreSQL 17 release, stop application writes, make a logical dump, and record the exact
+Compose volume name:
+
+```bash
+cd /opt/hephaestus/docker/self-host
+dc() { docker compose --env-file .env --env-file release-lock.env "$@"; }
+dc stop application-server application-worker webhook-server
+dc exec -T postgres pg_dump -U root -Fc hephaestus > /var/tmp/hephaestus-pg17.dump
+test -s /var/tmp/hephaestus-pg17.dump
+dc exec -T postgres pg_restore --list < /var/tmp/hephaestus-pg17.dump >/dev/null
+sha256sum /var/tmp/hephaestus-pg17.dump > /var/tmp/hephaestus-pg17.dump.sha256
+PG17_VOLUME=$(docker inspect "$(dc ps -q postgres)" \
+  --format '{{range .Mounts}}{{if eq .Destination "/var/lib/postgresql/data"}}{{.Name}}{{end}}{{end}}')
+test -n "$PG17_VOLUME"
+dc down
+printf 'Preserved PostgreSQL 17 volume: %s\n' "$PG17_VOLUME"
+```
+
+Check out the new release and prepare its signed release lock as described in [Upgrades](./install#upgrades).
+The supported self-host stack creates no custom roles or tablespaces; operators who added either must
+migrate those cluster-global objects separately. Restore into the new PostgreSQL 18 volume:
+
+```bash
+dc() { docker compose --env-file .env --env-file release-lock.env "$@"; }
+dc up -d postgres
+until dc exec -T postgres pg_isready -U root -d hephaestus; do sleep 2; done
+test "$(dc exec -T postgres psql -U root -d hephaestus -Atc \
+  "SELECT current_setting('server_version_num')::int / 10000 || ':' || (to_regclass('public.databasechangelog') IS NULL)")" = "18:true"
+sha256sum -c /var/tmp/hephaestus-pg17.dump.sha256
+dc exec -T postgres dropdb -U root hephaestus
+dc exec -T postgres createdb -U root hephaestus
+dc exec -T postgres pg_restore -U root -d hephaestus --no-owner --no-acl \
+  --single-transaction < /var/tmp/hephaestus-pg17.dump
+dc exec -T postgres psql -U root -d hephaestus -v ON_ERROR_STOP=1 \
+  -c 'ALTER EXTENSION pg_partman UPDATE'
+dc up -d --wait
+```
+
+Verify application health, sign in, and inspect recent workspace activity. Then verify the database
+major, extension, and partition policy:
+
+```bash
+dc exec -T postgres psql -U root -d hephaestus -Atc \
+  "SELECT current_setting('server_version_num')::int / 10000 = 18; SELECT extversion = '5.5.0' FROM pg_extension WHERE extname = 'pg_partman'; SELECT count(*) = 1 FROM partman.part_config WHERE parent_table = 'public.auth_event';"
+```
+
+Keep the dump and PostgreSQL 17 volume until acceptance checks pass and backup policy permits their
+deletion. Rollback means stopping PostgreSQL 18 and starting the prior release against the preserved
+volume; never run the prior application against the PostgreSQL 18 database.
 
 ### After a point-in-time restore
 
@@ -65,5 +125,4 @@ timestamp.
   after a restore from an old backup: `docker compose down`,
   `docker volume rm hephaestus_nats-data`, `docker compose up -d` — events in the gap are
   re-fetched by the scheduled sync.
-- **Restore into an older app version:** don't. Restore with the same `IMAGE_TAG` the
-  backup was taken from, then upgrade.
+- **Restore into an older app version:** don't. Restore with the same signed release lock the backup was taken from, then upgrade.

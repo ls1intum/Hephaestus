@@ -1,0 +1,303 @@
+import assert from "node:assert/strict";
+import { glob, readFile } from "node:fs/promises";
+import { describe, test } from "node:test";
+
+function job(source: string, name: string): string {
+	const match = source.match(
+		new RegExp(`^  ${name}:\\n([\\s\\S]*?)(?=^  [A-Za-z][\\w-]*:\\s*$|(?![\\s\\S]))`, "m"),
+	);
+	assert.ok(match, `Missing ${name} job`);
+	return match[0];
+}
+
+function pathFilter(source: string, name: string): string {
+	const match = source.match(
+		new RegExp(`^            ${name}:\\n([\\s\\S]*?)(?=^            [\\w-]+:\\s*$)`, "m"),
+	);
+	assert.ok(match, `Missing ${name} path filter`);
+	return match[0];
+}
+
+async function workflowSources(): Promise<Map<string, string>> {
+	const files = (await Array.fromAsync(glob(".github/workflows/*.{yml,yaml}"))).toSorted();
+	return readSources(files);
+}
+
+async function readSources(files: string[]): Promise<Map<string, string>> {
+	return new Map(
+		await Promise.all(files.map(async (file) => [file, await readFile(file, "utf8")] as const)),
+	);
+}
+
+function escapeRegExp(value: string): string {
+	return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+void describe("CI contract", () => {
+	void test("references every top-level check leg from a workflow", async () => {
+		const packageJson: unknown = JSON.parse(await readFile("package.json", "utf8"));
+		assert.ok(packageJson && typeof packageJson === "object" && "scripts" in packageJson);
+		const rawScripts: unknown = packageJson.scripts;
+		assert.ok(rawScripts && typeof rawScripts === "object");
+		const scripts: Record<string, string> = {};
+		for (const [name, command] of Object.entries(rawScripts)) {
+			if (typeof command !== "string")
+				throw new TypeError(`package.json#scripts.${name} must be a string`);
+			scripts[name] = command;
+		}
+		const checkScript = scripts.check;
+		assert.ok(checkScript);
+		const checkLegs = checkScript.split(/\s+/).filter((token) => scripts[token]);
+		const reachable = new Set<string>();
+		const dependencies = (name: string): string[] => {
+			const command = scripts[name];
+			if (!command) return [];
+			const viaRun = Object.keys(scripts).filter((candidate) =>
+				new RegExp(`(?:node|npm|pnpm) run ${escapeRegExp(candidate)}(?:\\s|$)`).test(command),
+			);
+			// run-s chains package scripts by name, so every named token is an edge.
+			const viaRunS = /(?:^|[;&|]\s*)run-s(?:\s|$)/.test(command)
+				? command.split(/\s+/).filter((token) => scripts[token])
+				: [];
+			return [...new Set([...viaRun, ...viaRunS])];
+		};
+		const visit = (name: string): void => {
+			if (reachable.has(name)) return;
+			reachable.add(name);
+			for (const dependency of dependencies(name)) visit(dependency);
+		};
+		// A workflow that runs a script file directly on Node covers every package script built on it.
+		const scriptsByFile = new Map<string, string[]>();
+		for (const [name, command] of Object.entries(scripts)) {
+			for (const file of command.match(/scripts\/[\w./-]+\.ts/g) ?? []) {
+				scriptsByFile.set(file, [...(scriptsByFile.get(file) ?? []), name]);
+			}
+		}
+		for (const source of (await workflowSources()).values()) {
+			for (const line of source.split("\n")) {
+				const invocation = line.match(/^\s*(?:run:\s+)?(?:\(cd \.\. && )?pnpm run ([\w:-]+)/)?.[1];
+				if (invocation && scripts[invocation]) visit(invocation);
+				const file = line.match(/(?:^|\s)node (?:--test )?(?:\.\.\/)?(scripts\/[\w./-]+\.ts)/)?.[1];
+				for (const name of file ? (scriptsByFile.get(file) ?? []) : []) visit(name);
+			}
+		}
+
+		assert.deepEqual(
+			checkLegs.filter((leg) => !reachable.has(leg)),
+			[],
+			"Every package.json#check leg must be covered by at least one workflow",
+		);
+	});
+
+	void test("passes only cache types accepted by setup-caches", async () => {
+		const action = await readFile(".github/actions/setup-caches/action.yml", "utf8");
+		assert.match(action, /steps:\s+- name: Validate cache type/);
+		const validation = action.match(/case "\$CACHE_TYPE" in\s+([^\n]+)\) ;;/);
+		assert.ok(validation, "setup-caches must explicitly validate cache-type");
+		assert.match(action, /\*\) [^\n]*exit 1 ;;\s+esac/);
+		const acceptedValues = validation[1];
+		assert.ok(acceptedValues);
+		const accepted = new Set(acceptedValues.split("|"));
+		const implementation = action.replace(validation[0], "");
+		for (const cacheType of accepted) {
+			assert.ok(
+				implementation.includes(`'${cacheType}'`) ||
+					implementation.includes(`"${cacheType}"`) ||
+					(cacheType.startsWith("application-server-") &&
+						implementation.includes("startsWith(inputs.cache-type, 'application-server-')")),
+				`setup-caches accepts ${cacheType} but no step handles it`,
+			);
+		}
+		const rejected: string[] = [];
+
+		for (const [file, source] of await workflowSources()) {
+			for (const match of source.matchAll(/^\s+cache-type:\s+(.+)$/gm)) {
+				const rawValue = match[1];
+				assert.ok(rawValue);
+				const value = rawValue.trim();
+				if (!value.startsWith("${{")) {
+					if (!accepted.has(value)) rejected.push(`${file}: ${value}`);
+					continue;
+				}
+				const key = value.match(/matrix\.([\w-]+)/)?.[1];
+				assert.ok(key, `${file}: cache-type expression must resolve from a matrix key`);
+				const values = [...source.matchAll(new RegExp(`^\\s+- ${key}: (.+)$`, "gm"))].map(
+					(item) => {
+						const matrixValue = item[1];
+						assert.ok(matrixValue);
+						return matrixValue.trim();
+					},
+				);
+				assert.notEqual(values.length, 0, `${file}: matrix.${key} has no static values`);
+				for (const matrixValue of values) {
+					if (!accepted.has(matrixValue)) rejected.push(`${file}: ${matrixValue}`);
+				}
+			}
+		}
+		assert.deepEqual(rejected, [], "Workflows may only request recognised cache types");
+	});
+
+	void test("runs server integration independently and reuses the server build for E2E", async () => {
+		const source = await readFile(".github/workflows/ci-tests.yml", "utf8");
+		const build = job(source, "server-build");
+		const integration = job(source, "server-integration");
+		const e2e = job(source, "webapp-e2e");
+		assert.equal((build.match(/actions\/upload-artifact@/g) ?? []).length, 1);
+		assert.match(build, /name: \${{ env\.SERVER_REACTOR_ARTIFACT }}/);
+		assert.doesNotMatch(integration, /^ {4}needs:/m);
+		assert.doesNotMatch(integration, /actions\/download-artifact@/);
+		assert.match(integration, /pnpm run test:server:integration/);
+		assert.match(e2e, /needs: server-build/);
+		assert.equal((e2e.match(/actions\/download-artifact@/g) ?? []).length, 1);
+		assert.match(e2e, /name: \${{ env\.SERVER_REACTOR_ARTIFACT }}/);
+	});
+
+	void test("builds Storybook once and gives its TurboSnap stats to Chromatic", async () => {
+		const storybook = job(
+			await readFile(".github/workflows/ci-tests.yml", "utf8"),
+			"webapp-storybook",
+		);
+		assert.equal((storybook.match(/pnpm --filter webapp run build-storybook/g) ?? []).length, 1);
+		assert.match(storybook, /test -s webapp\/storybook-static\/preview-stats\.json/);
+		assert.match(storybook, /storybookBuildDir: storybook-static/);
+		assert.match(storybook, /onlyChanged: true/);
+		assert.match(storybook, /surge \.\/webapp\/storybook-static/);
+	});
+
+	void test("routes tooling-only changes away from server infrastructure", async () => {
+		const source = await readFile(".github/workflows/cicd.yml", "utf8");
+		const detection = job(source, "detect-changes");
+		const tooling = pathFilter(detection, "tooling");
+		for (const pattern of ["docs/**", ".vscode/settings.json", "**/AGENTS.md", "**/CLAUDE.md"]) {
+			assert.match(tooling, new RegExp(`- '${escapeRegExp(pattern)}'`));
+		}
+		assert.doesNotMatch(pathFilter(detection, "application-server"), /- 'docs\/\*\*'/);
+		assert.match(pathFilter(detection, "postgres-image"), /- 'docker\/postgres\/\*\*'/);
+		assert.match(pathFilter(detection, "webapp-image"), /- 'patches\/\*\*'/);
+	});
+
+	void test("pins every external action to a full commit SHA with a version comment", async () => {
+		const invalid: string[] = [];
+		const files = await Array.fromAsync(glob(".github/{actions,workflows}/**/*.{yml,yaml}"));
+		for (const [file, source] of await readSources(files)) {
+			for (const [index, line] of source.split("\n").entries()) {
+				const uses = line.match(/^\s+(?:- )?uses:\s+(\S+)(.*)$/);
+				if (!uses) continue;
+				const reference = uses[1];
+				const comment = uses[2];
+				assert.ok(reference && comment !== undefined);
+				if (reference.startsWith("./")) continue;
+				if (!/@[0-9a-f]{40}$/.test(reference) || !/^ # v\S+(?:\s.*)?$/.test(comment)) {
+					invalid.push(`${file}:${index + 1}: ${reference}`);
+				}
+			}
+		}
+		assert.deepEqual(invalid, [], "External uses must match @<40 lowercase hex> # v...");
+	});
+
+	void test("centralises dependency installation and browser setup", async () => {
+		const sources = await workflowSources();
+		for (const [file, source] of sources) {
+			assert.doesNotMatch(
+				source,
+				/pnpm install --frozen-lockfile/,
+				`${file} must install through setup-node-pnpm`,
+			);
+			const setupCalls = source.match(/uses: \.\/\.github\/actions\/setup-node-pnpm/g) ?? [];
+			const explicitModes =
+				source.match(
+					/uses: \.\/\.github\/actions\/setup-node-pnpm\n\s+with:\n\s+install: "(?:none|frozen|hardened)"/g,
+				) ?? [];
+			assert.equal(
+				explicitModes.length,
+				setupCalls.length,
+				`${file} must select an explicit setup-node-pnpm install mode`,
+			);
+		}
+		const tests = await readFile(".github/workflows/ci-tests.yml", "utf8");
+		assert.equal((tests.match(/uses: \.\/\.github\/actions\/setup-browsers/g) ?? []).length, 2);
+		assert.doesNotMatch(tests, /playwright install chromium/);
+	});
+
+	void test("runs release evidence verification through tested TypeScript", async () => {
+		const release = await readFile(".github/workflows/release.yml", "utf8");
+		const rescan = await readFile(".github/workflows/rescan-release-images.yml", "utf8");
+		assert.match(rescan, /node scripts\/verify-release-evidence\.ts release-evidence/);
+		assert.doesNotMatch(rescan, /node scripts\/check-release-sbom\.ts/);
+		assert.equal((release.match(/node scripts\/verify-release-evidence\.ts/g) ?? []).length, 3);
+		assert.doesNotMatch(release, /node scripts\/check-release-(?:sbom|vulnerabilities)\.ts/);
+	});
+
+	void test("never invokes a repository-local action before checkout", async () => {
+		for (const [file, source] of await workflowSources()) {
+			for (const jobSource of source.split(/^ {2}(?=[A-Za-z][\w-]*:\s*$)/m).slice(1)) {
+				const firstLocalAction = jobSource.indexOf("uses: ./.github/actions/");
+				if (firstLocalAction < 0) continue;
+				const checkout = jobSource.indexOf("uses: actions/checkout@");
+				assert.ok(
+					checkout >= 0 && checkout < firstLocalAction,
+					`${file} invokes a local action before checking it out`,
+				);
+			}
+		}
+	});
+});
+
+void test("CI and package scripts enter the Vite+ task graph", async () => {
+	const manifest: unknown = JSON.parse(await readFile("package.json", "utf8"));
+	assert.ok(
+		manifest &&
+			typeof manifest === "object" &&
+			"scripts" in manifest &&
+			"devDependencies" in manifest,
+	);
+	const scripts: unknown = manifest.scripts;
+	const devDependencies: unknown = manifest.devDependencies;
+	assert.ok(scripts && typeof scripts === "object");
+	assert.ok(devDependencies && typeof devDependencies === "object");
+	assert.ok("check" in scripts && "verify" in scripts);
+	assert.equal(scripts.check, "vp run quality");
+	assert.equal(scripts.verify, "vp run verification");
+	assert.equal("npm-run-all2" in devDependencies, false);
+
+	const graph = await readFile("vite.config.ts", "utf8");
+	for (const entry of [
+		"quality",
+		"verification",
+		"gate:server",
+		"gate:env",
+		"gate:lint-contract",
+	]) {
+		assert.match(graph, new RegExp(`(?:^|\\s)"?${escapeRegExp(entry)}"?:`));
+	}
+	for (const entry of [
+		"gate:package-manager",
+		"gate:java-nullness",
+		"gate:server",
+		"gate:lint-contract",
+		"gate:agents",
+		"gate:agent-tests",
+		"gate:preview-stack",
+		"gate:env",
+		"gate:contracts",
+		"gate:instructions",
+		"gate:docs",
+		"gate:webapp-tests",
+		"gate:webapp-build",
+		"gate:load-syntax",
+		"gate:verify:storybook-tests",
+		"gate:verify:webapp-build",
+		"gate:verify:storybook-build",
+		"gate:verify:docs-build",
+		"gate:verify:server",
+	])
+		assert.match(graph, new RegExp(`"${escapeRegExp(entry)}": uncached\\(`));
+
+	for (const [file, source] of await workflowSources()) {
+		assert.doesNotMatch(
+			source,
+			/^\s*(?:run:\s*)?(?:pnpm exec )?(?:vite|vitest|oxlint|oxfmt)(?:\s|$)/m,
+			`${file} bypasses the pinned Vite+ interface`,
+		);
+	}
+});

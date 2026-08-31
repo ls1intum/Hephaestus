@@ -13,7 +13,7 @@ import type { AgentSession } from "@earendil-works/pi-coding-agent";
  * The SDK's own message and state types, reached through the one entry point this repo depends on.
  *
  * <p>They are declared in @earendil-works/pi-agent-core and /pi-ai, which pi-coding-agent depends on but
- * does not re-export, and which pnpm's strict layout does not put on our resolution path. Reading them
+ * does not re-export, and which pnpm's isolated layout does not put on our resolution path. Reading them
  * off AgentSession is therefore not a shortcut around a missing import — it is the only way to name them
  * without adding a phantom dependency on a package we do not declare.
  */

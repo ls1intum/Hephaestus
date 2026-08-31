@@ -2,21 +2,23 @@
 id: ci-cd
 sidebar_position: 4
 title: CI/CD Architecture
-description: High-performance trunk-based CI/CD with automatic staging and gated production.
+description: High-performance trunk-based CI/CD with release-gated staging and production.
 ---
 
 # CI/CD Architecture
 
-Hephaestus uses trunk-based continuous deployment powered by GitHub Actions. Every merge to `main` triggers automatic staging deployment, with production requiring manual approval.
+Hephaestus uses trunk-based delivery powered by GitHub Actions. Every merge to `main` is verified; signed releases deploy automatically to staging, with production requiring manual approval.
 
 ## 🏗️ Architecture Overview
 
 ```mermaid
 flowchart TD
     accTitle: Pull request delivery pipeline
-    accDescr: An approved pull request merges to main, runs continuous integration and deployment, builds images, and deploys the application.
-    PR[Pull Request] --> Review{Code Review}
-    Review -->|Approved| Merge[Merge to main]
+    accDescr: A pull request satisfies review policy, passes projected-main CI in the merge queue, and becomes a signed release that deploys to staging before production approval.
+    PR[Pull Request] --> Policy{Review policy}
+    Policy --> Queue[Merge queue]
+    Queue --> MG[Projected-main CI]
+    MG --> Merge[Merge to main]
     Merge --> CI[CI/CD Pipeline]
 
     subgraph CI/CD
@@ -29,16 +31,12 @@ flowchart TD
     T --> Pass
     D --> Pass
 
-    Pass -->|Yes| Staging[Deploy Staging]
     Pass -->|Yes| VP[changesets action updates Version PR]
-    VP -->|Maintainer merges Version PR| Tag[Create Tag vX.Y.Z + GitHub Release]
-
-    Tag --> Verify{Verify OK?}
-    Verify -->|Approve| Prod[Deploy Production]
+    VP -->|Maintainer merges Version PR| Release[Build evidence and signed lock]
+    Release --> Verify{Verify release}
+    Verify -->|Pass| Staging[Deploy complete topology to staging]
+    Staging -->|Approve| Prod[Deploy complete topology to production]
 ```
-
-Staging tracks `main` HEAD and production tracks the last released tag, so the two are deliberately
-not the same commit.
 
 ## 🚀 Release Flow
 
@@ -55,11 +53,34 @@ Before any release, code must pass:
 | Migration chain + drift (`Database`) | Liquibase | Full chain applies empty → head, then schema is diffed against JPA entities |
 | Changelog immutability (`Migrations`) | git diff | Released changesets + `master.xml` are append-only |
 | OpenAPI sync    | Diff check  | Client ↔ Server sync |
-| Java formatting | Prettier (`prettier-plugin-java`) | Code style |
+| Java formatting | Spotless + Palantir Java Format | Code style |
 | Java lint       | PMD         | Static analysis      |
-| Webapp TypeScript | oxlint + Biome (`webapp/biome.jsonc`) + tsc | Lint + format + typecheck |
-| Everything else TypeScript | oxlint (`.oxlintrc.json`) + Biome (`biome.jsonc`) + tsc | oxlint reaches the Bun runtime, its specs, both precompute trees, `scripts/**`, `docs/` and the repo-root config files; Biome formats all of those except `docs/`, which has its own config (`docs/.oxlintrc.json`) and no formatter |
-| Agent runtime   | Bun         | Runner and precompute specs, on the Bun the sandbox ships — CI reads `ARG BUN_VERSION` out of `docker/agents/pi/Dockerfile` rather than hard-coding it, and fails closed if that line is missing |
+| Java nullness policy | NullAway policy scanner | Rejects suppressed analysis and empty source discovery |
+| Changeset policy | Node test runner + Changesets | Tests release-note and version synchronization rules |
+| Webapp TypeScript | oxlint + oxfmt (`.oxfmtrc.json`) + tsc | Lint + format + typecheck |
+| Agent and repository-tooling files | oxlint + oxfmt + tsc | Lint, format, and typecheck where applicable |
+| Docs code and configuration | oxfmt | Format JavaScript, TypeScript, JSON/JSONC, and CSS |
+| Agent runtime   | Node         | Runner and precompute specs on the version pinned by `package.json`; the package-manager contract rejects Docker image drift |
+| Workflow syntax and shell correctness | Actionlint + ShellCheck | Rejects invalid Actions configuration and warning-level shell defects |
+| Workflow security | Zizmor | Uploads SARIF and rejects medium-or-higher-confidence findings |
+
+### Merge policy
+
+Pull requests targeting `main` merge through GitHub's merge queue after these GitHub
+Actions contexts pass: `CI Status Gate`, `Actionlint`, `Zizmor`, and `review-policy`. The queue runs
+the same checks against the projected `main` commit through the `merge_group` event. Each required
+context is bound to the GitHub Actions integration rather than accepting a same-named external status.
+
+`review-policy` accepts an author listed in the comma-separated repository variable
+`REVIEW_POLICY_MAINTAINERS`. Every other author needs an approval from a non-author who currently
+has write access; the approval must cover the current head commit. Repository administrators own the
+allow-list. Native required approvals remain zero because GitHub cannot combine an author's
+self-authored change, a mandatory approval, and the merge queue without bypassing the queue.
+
+The changesets Version PR is the temporary exception: updates made with `GITHUB_TOKEN` do not trigger
+the required workflows, so release automation uses the ruleset bypass. The release workflow still
+requires successful CI on the resulting `main` commit before it publishes anything. Move the Version
+PR to a machine identity that triggers workflows before removing this exception.
 
 ## 🔒 Security
 
@@ -83,66 +104,149 @@ This is more efficient than a custom workflow and doesn't consume CI minutes.
 
 ## 📦 Environments
 
-| Environment       | Protection        | Deploys On     |
-| ----------------- | ----------------- | -------------- |
-| Preview (Coolify) | None              | Every PR       |
-| Staging           | None              | Every green commit on `main` (app services only) |
-| Production        | Approval required | Tag + approval |
-
-Staging deploys the app services only. NATS/webhook (`core`) and the proxy are stateful and
-disruptive to recreate, so they are never auto-deployed; when their compose changes, CD flags it and
-an operator runs the staging deploy manually with the core/proxy switches on.
+| Environment       | Eligibility | Deploys on |
+| ----------------- | ----------- | ---------- |
+| Preview (Coolify) | Same-repository PR with the `preview` label | Every push; waits for its images, never for tests |
+| Staging           | `main` | Verified signed release |
+| Production        | Required reviewer | The same verified signed release |
 
 ### GitHub Environment Setup
 
 1. **Settings → Environments → New environment**
-2. Create `staging` (no rules)
-3. Create `production` with **Required reviewers**
+2. Create `Staging` (no rules)
+3. Create `Production` with **Required reviewers**
+
+Preview environments do not need to be created in advance. The preview workflow registers
+`preview/pr-N` as a transient GitHub environment when Coolify accepts the first deployment.
 
 ## 🔄 Preview Deployments
 
-Coolify handles PR previews:
+Previews are opt-in and self-service. Add the **`preview`** label to your pull request — no review,
+no ceremony, and you can label your own PR. Every push redeploys, and **a preview never waits for
+your tests to pass**: it is most useful exactly when they do not.
 
-- Built directly on server (fast!)
-- URL: `pr-{number}.preview.hephaestus.cit.tum.de`
-- Auto-cleanup on PR close
+A preview runs the images CI published for your commit — the same artifacts staging and production
+run. It waits for those images, which CI builds in parallel with the tests, and never for the tests
+themselves. How long that takes is how long CI needs to publish the images your change actually
+rebuilds: a docs-only change re-tags unchanged images and is quick; touching the webapp or the server
+means waiting for that image to build.
+
+That is deliberate: a preview built a second way could start cleanly when the released image would
+not, which is the one thing a preview of a Spring Boot service is well placed to catch.
+
+A sticky comment carries the URL, and GitHub records each accepted update as the transient
+environment `preview/pr-N`, so the pull request's **View deployment** link opens it too.
+
+Remove the `preview` label to tear the stack down and free the slot. Closing, merging, or converting
+the pull request back to draft does the same thing.
+
+Deployments are serialized, never parallel, and each one deploys the pull request's *current* head.
+A burst of pushes therefore produces one deployment of the newest commit rather than one per commit.
+If you push while a deployment is in flight, that run stands down rather than deploying a commit that
+is no longer the head; the new push starts the next deployment and nothing needs re-labelling.
+
+### What is in a preview
+
+Each preview starts from a copy of staging's database, so workspaces, synced work and the
+leaderboard are already there — which is what makes a preview worth looking at. The copy is silenced
+before the application server boots: review triggers, agent bindings and sweep schedules are off,
+queued jobs are cancelled, and the instance identity is dropped so the preview signs its own tokens.
+The application server also reads staging's event stream, on a durable of its own. Agent runs and
+inbound webhooks stay off. Sign-in works only if the preview-only GitHub OAuth app is configured, and
+the accounts in the preview application's `HEPHAESTUS_AUTH_BOOTSTRAP_ADMINS` come up as admins.
+
+Each stack keeps its own PostgreSQL, preview-only credentials, and signed commit-addressed CI images.
+No container holds the Docker socket: the seed loader reads staging over the network as a role that
+can only read.
+
+Preview controllers run only for pull requests targeting `main`; this keeps privileged
+`pull_request_target` workflows anchored to the protected branch. A stacked layer becomes eligible
+after it is retargeted to `main`.
+
+### When the comment says nothing deployed
+
+| Comment says | What to do |
+| --- | --- |
+| does not carry the `preview` label | Add the label |
+| is a draft | Mark it ready for review |
+| comes from a fork | Push the branch to this repository |
+| was opened by a … , not a repository collaborator | Nothing; previews need push access |
+| changes trusted deployment policy | Land that change first — a preview never runs a pull request's own edits to `.github/workflows/**`, `.github/actions/**` or `docker/preview/**` |
+| changes too many files for one comparison | Split the pull request, or land it without a preview |
+
+### When the preview failed
+
+| Comment says | What it means |
+| --- | --- |
+| CI never published images for this commit | An image build failed, or was still running when the deploy gave up. Check the CI run; the next push retries. |
+| Coolify reported a failed preview deployment | The stack did not start. Open the deployment log link in the comment. |
+| Coolify finished, but the preview did not return HTTP 2xx | Containers started but the app never became healthy — usually a migration or a missing setting. |
+| Timed out waiting for Coolify … | The deploy outlasted its budget. The next push retries; if it keeps happening the host is likely saturated. |
+| The preview host is full (n/m) | Drop the label from one of the named pull requests |
+
+Cleanup sends a signed close event and then marks the deployment inactive; the nightly repair
+repeats Coolify cleanup before retiring that record. Failed cleanup stays blocking, and the repair
+starts from the host inventory rather than an arbitrary date window.
+
+Operator configuration, host capacity and secret scopes live in
+[`docker/preview/README.md`](https://github.com/ls1intum/Hephaestus/blob/main/docker/preview/README.md);
+why the label is the authority, and which alternatives were priced and declined, is
+[ADR 0035](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0035-pull-request-previews-are-label-gated.md).
 
 ## ⚙️ Key Workflows
 
 | Workflow               | Trigger               | Purpose                                            |
 | ---------------------- | --------------------- | -------------------------------------------------- |
-| `cicd.yml`             | Push to main, PRs     | Orchestrator: change detection + workflow dispatch |
+| `cicd.yml`             | Push to main, PRs, merge queue | Orchestrator: change detection + workflow dispatch |
+| `review-policy.yml`    | PR and review events, merge queue | Enforces author allow-list or current-head write-access approval |
 | `ci-quality-gates.yml` | Called by cicd.yml    | Code quality, formatting, schema validation        |
 | `ci-tests.yml`         | Called by cicd.yml    | Unit, integration, visual tests                    |
 | `ci-docker-build.yml`  | Called by cicd.yml    | Docker image builds per component                  |
 | `ci-security-scan.yml` | Called by cicd.yml    | Dependency scanning (Trivy), secret detection      |
 | `ci-profile.yml` | Weekly, manual | Profiles server integration tests and Spring contexts |
 | `ci-server-clean-reference.yml` | Weekly, manual | Records cold server phases and compares generated JARs |
-| `verify-changesets.yml`| PRs                   | Fails shipped-code PRs that carry no changeset     |
+| `verify-changesets.yml`| Called by cicd.yml    | Tests changeset/version-sync policy and enforces release-note presence |
 | `ci-compose-validate.yml` | PRs, push to main  | Renders the reference and self-host compose stacks so an interpolation or merge break is a red check, not a stranger's bad first boot |
+| `deploy-preview.yml` | `preview` label added, or a push, reopen or ready-for-review on a labelled PR | Waits for this commit's attested CI images, deploys them, and registers the native GitHub deployment |
+| `cleanup-preview.yml` | Label removed, PR closed or drafted | Removes and verifies resources, then retains a cleanup tombstone |
+| `reconcile-previews.yml` | Nightly, manual | Re-sends teardown for any preview environment whose pull request is closed, drafted or unlabelled |
 | `version-pr.yml`       | Push to main          | Maintains the accumulating Version PR (changesets) |
-| `release.yml`          | On CI/CD Success      | Cuts a release when the Version PR merged: tag + GitHub Release, gates production |
-| `cd-staging.yml`       | On CI/CD Success on `main` | Deploys that commit's immutable image to staging |
-| `deploy-staging.yml`   | Called by cd-staging.yml and manual dispatch | Deploys to staging |
-| `deploy-prod.yml`      | workflow_dispatch     | Deploys to production (manual trigger)             |
+| `release.yml`          | Successful CI/CD push on `main` | Publishes the release and promotes it through the Staging and Production environment gates |
+| `deploy-staging.yml`   | Called by `release.yml` or manual dispatch | Deploys a verified release lock to staging |
+| `deploy-prod.yml`      | Called by `release.yml` or manual dispatch | Deploys the staging-verified release to production |
+
+### Shared setup actions
+
+| Action | Contract |
+| --- | --- |
+| `setup-node-pnpm` | Installs the versions pinned in `package.json`; `install` must be `none`, `frozen`, or `hardened` |
+| `setup-caches` | Restores Maven and generated-client caches for one validated `cache-type` |
+| `setup-browsers` | Restores the exact Playwright browser version and installs Chromium system dependencies |
+| `setup-release-security-tools` | Installs Cosign, Trivy, and optionally Syft for release-evidence jobs |
+| `ghcr-login` | Authenticates Docker to GHCR |
+
+Repository-local actions require checkout first. Jobs without checkout use the external SHA-pinned
+action directly rather than checking out the repository only to reach a wrapper.
 
 ### Workflow Architecture
 
 ```mermaid
 flowchart LR
     accTitle: Continuous integration job dependencies
-    accDescr: Change detection selects quality and test jobs, whose results feed the final continuous integration status gate.
+    accDescr: Required quality, test, changeset, image, and security jobs feed the final continuous integration status gate.
     subgraph cicd.yml
         DC[Detect Changes] --> QG[Quality Gates]
         DC --> TS[Test Suite]
         DC --> DB[Docker Build]
         DC --> SS[Security Scan]
+        CS[Changesets]
     end
 
     QG --> Gate[CI Status Gate]
     TS --> Gate
     DB --> Gate
     SS --> Gate
+    CS --> Gate
 
     Gate -->|All Pass| Release[release.yml]
 ```
@@ -150,7 +254,7 @@ flowchart LR
 The `cicd.yml` workflow:
 
 1. **Detects changes** using `dorny/paths-filter`
-2. **Dispatches sub-workflows** with component-specific flags
+2. **Dispatches required sub-workflows**, using component-specific flags where applicable
 3. **Aggregates results** in the CI Status Gate job
 
 ## 🎯 Performance Optimizations
@@ -161,10 +265,9 @@ CI only runs jobs for components that actually changed:
 
 | Component            | Triggers On                                                   |
 | -------------------- | ------------------------------------------------------------- |
-| Webapp               | `webapp/**`, `docs/images/readme/**`, `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `.npmrc`, `.node-version` |
-| Application Server   | `server/**`, `scripts/**` (includes webhook receiver — ADR 0008), `docker/agents/**`, `tsconfig.agents.json`, `biome.jsonc`, `package.json`, `pnpm-lock.yaml` |
+| Webapp               | `webapp/**`, `docs/images/readme/**`, `.oxlintrc.json`, `.oxfmtrc.json`, and root package configuration |
+| Application Server   | `server/**`, `scripts/**`, `docker/agents/**`, `docs/**`, root lint, format, TypeScript, and package configuration |
 | Agent images         | `docker/agents/**`                                            |
-| Docs                 | `docs/**`                                                     |
 | CI Config            | `.github/workflows/**`, `.github/actions/**` → runs all jobs  |
 
 The whole of `scripts/` counts as application-server change, not just the database helper: the
@@ -172,11 +275,6 @@ contract validator and the changelog-immutability guard live there, and a PR edi
 would otherwise skip the workflow that runs it. `docker/agents/**` appears twice for the same reason
 — it builds the agent images, and `test:agents` and `typecheck:agents` cover the precompute tree
 inside it, so a PR editing only a precompute script must still run those gates.
-
-`.oxlintrc.json`, `biome.jsonc`, `tsconfig.json`, `package.json` and `pnpm-lock.yaml` are listed
-because they decide the verdict of the App Server leg's lint and format step: the two rule sets, the
-project the type-aware rules resolve against, the `:agents` scripts that invoke them, and the binary
-versions. A gate whose own configuration can change without re-running it is not a gate.
 
 ### Docker Layer Caching
 
@@ -201,7 +299,7 @@ therefore subject to the registry's anonymous rate limit.
 ### Parallel Execution
 
 - Test legs run in parallel across the app server and the webapp. Webhook reception is part of the app-server test surface since ADR 0008.
-- Quality-gate legs (App Server, Webapp, OpenAPI, Database, Migrations) run in parallel, plus a legacy-cleanup guard
+- Quality-gate legs (App Server, Tooling and Docs, Webapp, OpenAPI, Database, Migrations) run in parallel, plus a legacy-cleanup guard
 - Docker images build for both architectures (amd64 + arm64)
 - `fail-fast: false` ensures all jobs complete for full feedback
 
@@ -257,25 +355,25 @@ workflow remains authoritative for its hosted jobs.
 
 ```bash
 # Webapp
-pnpm run check:webapp          # Biome format check, then oxlint
+pnpm run check:webapp          # oxfmt format check, then oxlint
 pnpm run check:webapp:fix      # Same, applying every safe fix
 pnpm run typecheck:webapp      # A separate leg — check:webapp does not run it
 pnpm run test:webapp           # Unit tests
 
 # Application Server (Java) — includes the integration.core.webhook receiver
 pnpm run format:java:check     # Check formatting
-cd server && ./mvnw test       # Unit tests, including required reactor dependencies
+pnpm run test:server:unit      # Unit tests
 
-# Agent runtime (Bun) — the Pi runner and the practice precompute scripts
+# Agent runtime (Node) — the Pi runner and the practice precompute scripts
 pnpm run test:agents           # Runner + precompute specs
-pnpm run check:agents          # Biome format, then oxlint, then both typechecks
+pnpm run check:agents          # oxfmt check, then oxlint, then both typechecks
 pnpm run check:agents:fix      # Same, applying every safe fix
 pnpm run typecheck:agents      # Agent + precompute TypeScript
 ```
 
-`check:agents` covers every TypeScript tree outside the webapp — the runtime, its specs, both
-precompute trees and `scripts/**`. Its rules and path roots live in `biome.jsonc`; CI runs the same
-thing as `pnpm run ci:agents`, which reports findings as inline annotations on the diff.
+`check:agents` formats the agent and tooling TypeScript trees, docs code, and selected repository
+configuration; it also lints and type-checks the non-webapp TypeScript trees. CI invokes the same
+commands.
 
 ### Common Issues
 
@@ -320,121 +418,20 @@ This helps identify bottlenecks and optimization opportunities.
 
 ## 🆕 Adding a New Service
 
-When adding a new service to the monorepo, update CI configuration in this order:
+Extend the pipeline at the ownership boundary that changed; do not copy an existing job wholesale.
 
-### Step 1: Path Detection (`cicd.yml`)
+1. Add the service's paths to `detect-changes` in `cicd.yml`, including the shared files that can
+   affect it. Expose the result as a reusable-workflow input.
+2. Add purpose-named jobs to `ci-quality-gates.yml` and `ci-tests.yml`. Declare `needs` only when a
+   job consumes another job's artifact, and give every runnable job a timeout and least-privilege
+   permissions.
+3. Use `setup-node-pnpm` with an explicit install mode. Java jobs use a validated `setup-caches`
+   type; browser jobs use `setup-browsers`.
+4. Add image builds through `reusable-docker-build.yml`. Keep image metadata, immutable tags,
+   attestations, and signing in that workflow rather than reproducing them in the caller.
+5. Pass the change-detection output from `cicd.yml` to every reusable workflow that needs it.
 
-Add a path filter and output for the new service:
-
-```yaml
-# In detect-changes job outputs:
-outputs:
-  new-service: ${{ steps.filter.outputs.new-service }}
-
-# In paths-filter step:
-filters: |
-  new-service:
-    - 'server/new-service/**'
-    - 'package.json'
-    - 'pnpm-lock.yaml'
-    - 'pnpm-workspace.yaml'
-```
-
-Update the `any-code` aggregate output to include the new service.
-
-### Step 2: Quality Gates (`ci-quality-gates.yml`)
-
-1. **Add to matrix:**
-
-```yaml
-matrix:
-  check: [
-      # ... existing checks
-      new-service-quality,
-    ]
-```
-
-1. **Add case statement** in "Determine if check should run":
-
-```yaml
-"new-service-quality")
-  echo "run=${{ inputs.new_service_changed }}" >> $GITHUB_OUTPUT
-  ;;
-```
-
-1. **Add quality check step** with the appropriate linting/type checking commands.
-
-### Step 3: Tests (`ci-tests.yml`)
-
-1. **Add to matrix:**
-
-```yaml
-matrix:
-  test-type: [
-      # ... existing tests
-      new-service-unit,
-      new-service-integration, # if applicable
-    ]
-```
-
-1. **Add case statement** in "Determine if test should run":
-
-```yaml
-"new-service-unit"|"new-service-integration")
-  echo "run=${{ inputs.new_service_changed }}" >> $GITHUB_OUTPUT
-  ;;
-```
-
-1. **Add test execution step** with the test commands.
-
-2. **Add test result upload** for JUnit reporting.
-
-### Step 4: Docker Build (`ci-docker-build.yml`)
-
-Add a new build job:
-
-```yaml
-new-service-build:
-  name: "Docker: new-service"
-  if: inputs.should_skip != 'true' && inputs.new_service_changed == 'true'
-  uses: ls1intum/.github/.github/workflows/build-and-push-docker-image.yml@main
-  with:
-    image-name: "ls1intum/hephaestus/new-service"
-    docker-file: "./server/new-service/Dockerfile"
-    docker-context: "./server/new-service"
-    # ... rest of config
-```
-
-### Step 5: Caching (`setup-caches/action.yml`)
-
-Add the new service's cache-types to the appropriate conditions:
-
-```yaml
-# For Node.js services:
-- name: Cache Node.js dependencies
-  if: contains(fromJSON('["...", "new-service-quality", "new-service-unit"]'), inputs.cache-type)
-
-# For Java services:
-- name: Cache Maven dependencies
-  if: contains(fromJSON('["...", "new-service-unit"]'), inputs.cache-type)
-```
-
-### Step 6: Update Workflow Inputs
-
-In `cicd.yml`, add the new input to workflow calls:
-
-```yaml
-with:
-  new_service_changed: ${{ (needs.detect-changes.outputs.new-service == 'true' || ...) && 'true' || 'false' }}
-```
-
-### Verification Checklist
-
-After adding a new service, verify:
-
-- [ ] Path filter correctly detects changes to new service
-- [ ] Quality gates run only when new service changes
-- [ ] Tests run only when new service changes
-- [ ] Docker build runs only when new service changes
-- [ ] CI config changes trigger all jobs (safety net)
-- [ ] JUnit reports appear in Test Results tab
+Before opening the pull request, verify that tooling-only changes skip the service, shared inputs
+select it, its JUnit or diagnostic artifacts are uploaded, and CI configuration changes exercise its
+safety-net path. `scripts/ci-contract.test.ts` owns the repository-wide workflow invariants; extend it
+when the new service introduces another invariant rather than relying on prose.

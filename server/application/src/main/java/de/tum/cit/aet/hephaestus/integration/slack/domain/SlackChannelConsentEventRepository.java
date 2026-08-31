@@ -18,7 +18,5 @@ public interface SlackChannelConsentEventRepository extends Repository<SlackChan
 
     /** The full transition history of one channel, oldest first — the admin audit listing. */
     List<SlackChannelConsentEvent> findByWorkspaceIdAndSlackChannelIdOrderByCreatedAtAscIdAsc(
-        Long workspaceId,
-        String slackChannelId
-    );
+            Long workspaceId, String slackChannelId);
 }

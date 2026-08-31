@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { getTeamAvatarUrl, getWorkspaceAvatarUrl } from "@/lib/provider/avatar";
 
 describe("getWorkspaceAvatarUrl", () => {

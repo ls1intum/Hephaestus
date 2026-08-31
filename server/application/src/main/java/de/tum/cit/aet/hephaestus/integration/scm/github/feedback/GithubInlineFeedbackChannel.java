@@ -86,10 +86,9 @@ public class GithubInlineFeedbackChannel implements InlineFeedbackChannel {
     private final OutboundEgressGuard egressGuard;
 
     public GithubInlineFeedbackChannel(
-        GitHubGraphQlClientProvider gitHubProvider,
-        GithubPrNodeIdResolver prNodeIdResolver,
-        OutboundEgressGuard egressGuard
-    ) {
+            GitHubGraphQlClientProvider gitHubProvider,
+            GithubPrNodeIdResolver prNodeIdResolver,
+            OutboundEgressGuard egressGuard) {
         this.gitHubProvider = gitHubProvider;
         this.prNodeIdResolver = prNodeIdResolver;
         this.egressGuard = egressGuard;
@@ -102,25 +101,32 @@ public class GithubInlineFeedbackChannel implements InlineFeedbackChannel {
 
     @Override
     public InlineResult postInlineFeedback(SummaryChannel.FeedbackTarget target, List<InlineFeedback> feedbackItems) {
+        return postInlineFeedback(target, feedbackItems, false);
+    }
+
+    @Override
+    public InlineResult postImmutablePackage(SummaryChannel.FeedbackTarget target, List<InlineFeedback> feedbackItems) {
+        return postInlineFeedback(target, feedbackItems, true);
+    }
+
+    private InlineResult postInlineFeedback(
+            SummaryChannel.FeedbackTarget target, List<InlineFeedback> feedbackItems, boolean immutablePackage) {
         if (feedbackItems == null || feedbackItems.isEmpty()) {
             return InlineResult.counts(0, 0);
         }
         long scopeId = target.ref().workspaceId();
         if (gitHubProvider.isRateLimitCritical(scopeId)) {
             log.warn(
-                "GitHub rate limit critical — skipping {} inline feedbackItems: workspaceId={}",
-                feedbackItems.size(),
-                scopeId
-            );
+                    "GitHub rate limit critical — skipping {} inline feedbackItems: workspaceId={}",
+                    feedbackItems.size(),
+                    scopeId);
             return InlineResult.counts(0, feedbackItems.size());
         }
 
         PrCoordinates pr = GithubSummaryChannel.parseSubjectExternalId(target.subjectExternalId());
 
-        // Index this reviewer's prior threads by correlation key so a finding that still holds is preserved
-        // instead of re-posted (GitHub reviews are append-only — a duplicate cannot be edited away). Best-effort:
-        // a failed read yields an empty index, degrading to a fresh post (still keyed) rather than blocking.
-        Map<String, PriorThread> priorByKey = indexPriorThreads(scopeId, pr);
+        String marker = immutablePackage ? feedbackItems.get(0).marker() : null;
+        Map<String, PriorThread> priorByKey = indexPriorThreads(scopeId, pr, marker);
 
         // Partition feedbackItems: those whose key already has a live prior thread are preserved; the rest are posted.
         List<InlineFeedback> toPost = new ArrayList<>(feedbackItems.size());
@@ -135,8 +141,7 @@ public class GithubInlineFeedbackChannel implements InlineFeedbackChannel {
             if (!(finding.anchor() instanceof FeedbackAnchor.DiffAnchor diff)) {
                 log.warn("Skipping non-diff anchor on GitHub inline feedback: anchor={}", finding.anchor());
                 unsupportedSignals.add(
-                    new DeliveredSignal(finding.recurrenceKey(), finding.anchor(), Disposition.FAILED, null, null)
-                );
+                        new DeliveredSignal(finding.recurrenceKey(), finding.anchor(), Disposition.FAILED, null, null));
                 continue;
             }
             // Register the key as seen BEFORE the blank-body guard: a finding whose key is still present this run
@@ -152,9 +157,8 @@ public class GithubInlineFeedbackChannel implements InlineFeedbackChannel {
             PriorThread prior = key == null ? null : priorByKey.get(key);
             if (prior != null && !prior.outdated()) {
                 // The finding still holds and already has a live thread — leave it, don't duplicate.
-                preservedSignals.add(
-                    new DeliveredSignal(key, diff, Disposition.PRESERVED_EXISTING, prior.commentId(), prior.threadId())
-                );
+                preservedSignals.add(new DeliveredSignal(
+                        key, diff, Disposition.PRESERVED_EXISTING, prior.commentId(), prior.threadId()));
                 continue;
             }
             toPost.add(finding);
@@ -166,11 +170,10 @@ public class GithubInlineFeedbackChannel implements InlineFeedbackChannel {
             // retire them here too (this is the most common partial re-review: all survivors are preserved).
             int minimized = minimizeVanishedThreads(scopeId, priorByKey.values(), seenKeys);
             log.debug(
-                "All GitHub inline feedbackItems preserved or skipped (none to post): workspaceId={}, preserved={}, minimized={}",
-                scopeId,
-                preservedSignals.size(),
-                minimized
-            );
+                    "All GitHub inline feedbackItems preserved or skipped (none to post): workspaceId={}, preserved={}, minimized={}",
+                    scopeId,
+                    preservedSignals.size(),
+                    minimized);
             List<DeliveredSignal> all = new ArrayList<>(preservedSignals);
             all.addAll(unsupportedSignals);
             return new InlineResult(preservedSignals.size(), unsupportedAnchorCount, List.copyOf(all));
@@ -189,7 +192,8 @@ public class GithubInlineFeedbackChannel implements InlineFeedbackChannel {
         List<String> postedKeys = new ArrayList<>(toPost.size());
         for (InlineFeedback finding : toPost) {
             FeedbackAnchor.DiffAnchor diff = (FeedbackAnchor.DiffAnchor) finding.anchor();
-            threads.add(buildThread(diff, appendCorrelationTag(finding.body(), finding.recurrenceKey())));
+            String body = immutablePackage ? appendMarker(finding.body(), finding.marker()) : finding.body();
+            threads.add(buildThread(diff, appendCorrelationTag(body, finding.recurrenceKey())));
             postedAnchors.add(diff);
             postedKeys.add(finding.recurrenceKey());
         }
@@ -201,14 +205,14 @@ public class GithubInlineFeedbackChannel implements InlineFeedbackChannel {
         try {
             egressGuard.requireDeliveryAllowed("github.post-inline-feedbackItems");
             ClientGraphQlResponse response = gitHubProvider
-                .forScope(scopeId)
-                .documentName("AddPullRequestReviewWithThreads")
-                .variable("pullRequestId", prNodeId)
-                .variable("event", "COMMENT")
-                .variable("commitOID", commitOid)
-                .variable("threads", threads)
-                .execute()
-                .block(GRAPHQL_TIMEOUT);
+                    .forScope(scopeId)
+                    .documentName("AddPullRequestReviewWithThreads")
+                    .variable("pullRequestId", prNodeId)
+                    .variable("event", "COMMENT")
+                    .variable("commitOID", commitOid)
+                    .variable("threads", threads)
+                    .execute()
+                    .block(GRAPHQL_TIMEOUT);
 
             if (response == null) {
                 throw new FeedbackDeliveryException("Null response from AddPullRequestReviewWithThreads");
@@ -217,18 +221,18 @@ public class GithubInlineFeedbackChannel implements InlineFeedbackChannel {
 
             if (response.getErrors() != null && !response.getErrors().isEmpty()) {
                 log.warn(
-                    "GitHub addPullRequestReview with threads failed: workspaceId={}, errors={}, threadCount={}",
-                    scopeId,
-                    response.getErrors(),
-                    threads.size()
-                );
+                        "GitHub addPullRequestReview with threads failed: workspaceId={}, errors={}, threadCount={}",
+                        scopeId,
+                        response.getErrors(),
+                        threads.size());
                 List<DeliveredSignal> failed = failedSignals(postedAnchors, postedKeys);
                 failed.addAll(preservedSignals);
                 failed.addAll(unsupportedSignals);
                 return new InlineResult(preservedSignals.size(), threads.size() + unsupportedAnchorCount, failed);
             }
 
-            String reviewId = response.field("addPullRequestReview.pullRequestReview.id").getValue();
+            String reviewId =
+                    response.field("addPullRequestReview.pullRequestReview.id").getValue();
             List<DeliveredSignal> postedSignals = buildPostedSignals(response, reviewId, postedAnchors, postedKeys);
             postedBeforeSuppression += postedSignals.size();
             signalsBeforeSuppression.addAll(0, postedSignals);
@@ -237,35 +241,28 @@ public class GithubInlineFeedbackChannel implements InlineFeedbackChannel {
             int minimized = minimizeVanishedThreads(scopeId, priorByKey.values(), seenKeys);
 
             log.info(
-                "Posted {} GitHub inline feedbackItems as single review: workspaceId={}, prNodeId={}, preserved={}, minimized={}",
-                threads.size(),
-                scopeId,
-                prNodeId,
-                preservedSignals.size(),
-                minimized
-            );
+                    "Posted {} GitHub inline feedbackItems as single review: workspaceId={}, prNodeId={}, preserved={}, minimized={}",
+                    threads.size(),
+                    scopeId,
+                    prNodeId,
+                    preservedSignals.size(),
+                    minimized);
             List<DeliveredSignal> all = new ArrayList<>(postedSignals);
             all.addAll(preservedSignals);
             all.addAll(unsupportedSignals);
             return new InlineResult(threads.size() + preservedSignals.size(), unsupportedAnchorCount, List.copyOf(all));
         } catch (OutboundEgressSuppressedException e) {
-            Set<String> completedKeys = signalsBeforeSuppression
-                .stream()
-                .map(DeliveredSignal::recurrenceKey)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet());
-            List<String> suppressedKeys = toPost
-                .stream()
-                .map(InlineFeedback::recurrenceKey)
-                .filter(Objects::nonNull)
-                .filter(key -> !completedKeys.contains(key))
-                .toList();
+            Set<String> completedKeys = signalsBeforeSuppression.stream()
+                    .map(DeliveredSignal::recurrenceKey)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+            List<String> suppressedKeys = toPost.stream()
+                    .map(InlineFeedback::recurrenceKey)
+                    .filter(Objects::nonNull)
+                    .filter(key -> !completedKeys.contains(key))
+                    .toList();
             return InlineResult.suppressed(
-                postedBeforeSuppression,
-                unsupportedAnchorCount,
-                signalsBeforeSuppression,
-                suppressedKeys
-            );
+                    postedBeforeSuppression, unsupportedAnchorCount, signalsBeforeSuppression, suppressedKeys);
         } catch (FeedbackDeliveryException e) {
             throw e;
         } catch (Exception e) {
@@ -287,11 +284,10 @@ public class GithubInlineFeedbackChannel implements InlineFeedbackChannel {
     public void clearStaleFeedback(SummaryChannel.FeedbackTarget target, String marker) {
         long scopeId = target.ref().workspaceId();
         if (gitHubProvider.isRateLimitCritical(scopeId)) {
-            log.warn("GitHub rate limit critical — skipping stale inline-thread minimize: workspaceId={}", scopeId);
-            return;
+            throw new FeedbackDeliveryException("GitHub rate limit is too low to reconcile stale inline threads");
         }
         PrCoordinates pr = GithubSummaryChannel.parseSubjectExternalId(target.subjectExternalId());
-        Map<String, PriorThread> priorByKey = indexPriorThreads(scopeId, pr);
+        Map<String, PriorThread> priorByKey = indexPriorThreads(scopeId, pr, null);
         int minimized = minimizeVanishedThreads(scopeId, priorByKey.values(), Set.of());
         if (minimized > 0) {
             log.info("Minimized {} stale GitHub inline threads: workspaceId={}", minimized, scopeId);
@@ -307,16 +303,14 @@ public class GithubInlineFeedbackChannel implements InlineFeedbackChannel {
      * Falls back to path:line only for a comment whose body carries no parseable tag (pre-correlation feedbackItems).
      */
     private static List<DeliveredSignal> buildPostedSignals(
-        ClientGraphQlResponse response,
-        @Nullable String reviewId,
-        List<FeedbackAnchor.DiffAnchor> anchors,
-        List<String> keys
-    ) {
+            ClientGraphQlResponse response,
+            @Nullable String reviewId,
+            List<FeedbackAnchor.DiffAnchor> anchors,
+            List<String> keys) {
         Map<String, String> commentIdByCk = new HashMap<>();
         Map<String, String> commentIdByPathLine = new HashMap<>();
-        List<Map<String, Object>> comments = response
-            .field("addPullRequestReview.pullRequestReview.comments.nodes")
-            .getValue();
+        List<Map<String, Object>> comments = response.field("addPullRequestReview.pullRequestReview.comments.nodes")
+                .getValue();
         if (comments != null) {
             for (Map<String, Object> comment : comments) {
                 String id = (String) comment.get("id");
@@ -357,61 +351,65 @@ public class GithubInlineFeedbackChannel implements InlineFeedbackChannel {
         return signals;
     }
 
-    /**
-     * Reads the PR's review threads (paginated) and indexes this reviewer's own prior threads by the correlation
-     * key embedded in each thread's first comment. Best-effort: any failure yields an empty index so delivery
-     * degrades to fresh keyed posts rather than blocking.
-     */
-    private Map<String, PriorThread> indexPriorThreads(long scopeId, PrCoordinates pr) {
+    private static String appendMarker(String body, String marker) {
+        return body.contains(marker) ? body : body + "\n\n" + marker;
+    }
+
+    private Map<String, PriorThread> indexPriorThreads(long scopeId, PrCoordinates pr, @Nullable String marker) {
         Map<String, PriorThread> byKey = new LinkedHashMap<>();
         String after = null;
         try {
             for (int page = 0; page < MAX_THREAD_PAGES; page++) {
                 ClientGraphQlResponse response = gitHubProvider
-                    .forScope(scopeId)
-                    .documentName("GetPullRequestReviewThreads")
-                    .variable("owner", pr.owner())
-                    .variable("name", pr.name())
-                    .variable("number", pr.number())
-                    .variable("first", THREADS_PAGE_SIZE)
-                    .variable("after", after)
-                    .execute()
-                    .block(GRAPHQL_TIMEOUT);
+                        .forScope(scopeId)
+                        .documentName("GetPullRequestReviewThreads")
+                        .variable("owner", pr.owner())
+                        .variable("name", pr.name())
+                        .variable("number", pr.number())
+                        .variable("first", THREADS_PAGE_SIZE)
+                        .variable("after", after)
+                        .execute()
+                        .block(GRAPHQL_TIMEOUT);
 
                 if (response == null) {
-                    break;
+                    throw new FeedbackDeliveryException("GitHub review-thread lookup returned no response");
+                }
+                if (response.getErrors() != null && !response.getErrors().isEmpty()) {
+                    throw new FeedbackDeliveryException("GitHub review-thread lookup returned errors");
                 }
                 gitHubProvider.trackRateLimit(scopeId, response);
 
-                List<Map<String, Object>> nodes = response
-                    .field("repository.pullRequest.reviewThreads.nodes")
-                    .getValue();
+                List<Map<String, Object>> nodes = response.field("repository.pullRequest.reviewThreads.nodes")
+                        .getValue();
                 if (nodes != null) {
                     for (Map<String, Object> thread : nodes) {
-                        indexThread(thread, byKey);
+                        indexThread(thread, marker, byKey);
                     }
                 }
 
-                Boolean hasNext = response
-                    .field("repository.pullRequest.reviewThreads.pageInfo.hasNextPage")
-                    .getValue();
+                Boolean hasNext = response.field("repository.pullRequest.reviewThreads.pageInfo.hasNextPage")
+                        .getValue();
                 if (!Boolean.TRUE.equals(hasNext)) {
                     break;
                 }
-                after = response.field("repository.pullRequest.reviewThreads.pageInfo.endCursor").getValue();
+                after = response.field("repository.pullRequest.reviewThreads.pageInfo.endCursor")
+                        .getValue();
                 if (after == null) {
-                    break;
+                    throw new FeedbackDeliveryException("GitHub review-thread pagination lost its cursor");
                 }
             }
+        } catch (FeedbackDeliveryException e) {
+            throw e;
         } catch (Exception e) {
-            log.debug("Failed to read PR review threads for correlation reconcile: workspaceId={}", scopeId, e);
+            throw new FeedbackDeliveryException("GitHub review-thread lookup was inconclusive", e);
         }
         return byKey;
     }
 
     /** Indexes one review thread under the correlation key parsed from its first comment, if it is one of ours. */
     @SuppressWarnings("unchecked")
-    private static void indexThread(Map<String, Object> thread, Map<String, PriorThread> byKey) {
+    private static void indexThread(
+            Map<String, Object> thread, @Nullable String marker, Map<String, PriorThread> byKey) {
         String threadId = (String) thread.get("id");
         if (threadId == null) {
             return;
@@ -427,7 +425,7 @@ public class GithubInlineFeedbackChannel implements InlineFeedbackChannel {
         Map<String, Object> firstComment = ((List<Map<String, Object>>) nodes).get(0);
         String body = (String) firstComment.get("body");
         String commentId = (String) firstComment.get("id");
-        if (body == null || commentId == null) {
+        if (body == null || commentId == null || (marker != null && !body.contains(marker))) {
             return;
         }
         String key = parseObservationFingerprint(body);
@@ -435,14 +433,10 @@ public class GithubInlineFeedbackChannel implements InlineFeedbackChannel {
             return; // human thread or a legacy bot note posted before keys existed — not ours to reconcile
         }
         boolean outdated =
-            Boolean.TRUE.equals(thread.get("isOutdated")) || Boolean.TRUE.equals(thread.get("isResolved"));
+                Boolean.TRUE.equals(thread.get("isOutdated")) || Boolean.TRUE.equals(thread.get("isResolved"));
         byKey.put(key, new PriorThread(key, threadId, commentId, outdated));
     }
 
-    /**
-     * Minimizes the prior bot threads whose key is absent from {@code seenKeys} and that are not already
-     * outdated/resolved — the feedbackItems that genuinely went away. Returns the number minimized. Best-effort.
-     */
     private int minimizeVanishedThreads(long scopeId, Iterable<PriorThread> priorThreads, Set<String> seenKeys) {
         int minimized = 0;
         for (PriorThread prior : priorThreads) {
@@ -460,30 +454,26 @@ public class GithubInlineFeedbackChannel implements InlineFeedbackChannel {
         try {
             egressGuard.requireDeliveryAllowed("github.minimize-inline-finding");
             ClientGraphQlResponse response = gitHubProvider
-                .forScope(scopeId)
-                .documentName("MinimizeComment")
-                .variable("subjectId", commentId)
-                .variable("classifier", OUTDATED_CLASSIFIER)
-                .execute()
-                .block(GRAPHQL_TIMEOUT);
+                    .forScope(scopeId)
+                    .documentName("MinimizeComment")
+                    .variable("subjectId", commentId)
+                    .variable("classifier", OUTDATED_CLASSIFIER)
+                    .execute()
+                    .block(GRAPHQL_TIMEOUT);
 
             if (response == null) {
-                return false;
+                throw new FeedbackDeliveryException("GitHub stale-thread minimize returned no response");
             }
             if (response.getErrors() != null && !response.getErrors().isEmpty()) {
-                log.debug(
-                    "Failed to minimize stale review comment: commentId={}, errors={}",
-                    commentId,
-                    response.getErrors()
-                );
-                return false;
+                throw new FeedbackDeliveryException("GitHub stale-thread minimize returned errors");
             }
             return true;
         } catch (OutboundEgressSuppressedException e) {
             throw e;
+        } catch (FeedbackDeliveryException e) {
+            throw e;
         } catch (Exception e) {
-            log.debug("Failed to minimize stale review comment: commentId={}", commentId, e);
-            return false;
+            throw new FeedbackDeliveryException("GitHub stale-thread minimize was inconclusive", e);
         }
     }
 

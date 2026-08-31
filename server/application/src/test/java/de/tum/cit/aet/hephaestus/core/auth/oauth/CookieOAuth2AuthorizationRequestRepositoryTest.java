@@ -35,18 +35,18 @@ class CookieOAuth2AuthorizationRequestRepositoryTest extends BaseUnitTest {
 
     private static OAuth2AuthorizationRequest sampleRequest() {
         return OAuth2AuthorizationRequest.authorizationCode()
-            .authorizationUri("https://idp.example.test/authorize")
-            .clientId("client-123")
-            .redirectUri("https://app.example.test/login/oauth2/code/github")
-            .scopes(Set.of("read:user"))
-            .state("state-xyz")
-            .attributes(attrs -> {
-                attrs.put(OAuth2ParameterNames.REGISTRATION_ID, "github");
-                attrs.put(PkceParameterNames.CODE_VERIFIER, "verifier-abc-123");
-            })
-            .additionalParameters(params -> params.put("prompt", "consent"))
-            .authorizationRequestUri("https://idp.example.test/authorize?response_type=code&client_id=client-123")
-            .build();
+                .authorizationUri("https://idp.example.test/authorize")
+                .clientId("client-123")
+                .redirectUri("https://app.example.test/login/oauth2/code/github")
+                .scopes(Set.of("read:user"))
+                .state("state-xyz")
+                .attributes(attrs -> {
+                    attrs.put(OAuth2ParameterNames.REGISTRATION_ID, "github");
+                    attrs.put(PkceParameterNames.CODE_VERIFIER, "verifier-abc-123");
+                })
+                .additionalParameters(params -> params.put("prompt", "consent"))
+                .authorizationRequestUri("https://idp.example.test/authorize?response_type=code&client_id=client-123")
+                .build();
     }
 
     private Cookie saveAndExtractCookie(CookieOAuth2AuthorizationRequestRepository repository) {
@@ -61,6 +61,12 @@ class CookieOAuth2AuthorizationRequestRepositoryTest extends BaseUnitTest {
     @Test
     void roundTripsAValidRequest() {
         Cookie cookie = saveAndExtractCookie(repo);
+
+        assertThat(cookie.isHttpOnly()).isTrue();
+        assertThat(cookie.getSecure()).isTrue();
+        assertThat(cookie.getPath()).isEqualTo("/");
+        assertThat(cookie.getMaxAge()).isPositive();
+        assertThat(cookie.getAttribute("SameSite")).isEqualTo("Lax");
 
         MockHttpServletRequest load = new MockHttpServletRequest();
         load.setCookies(cookie);
@@ -83,7 +89,8 @@ class CookieOAuth2AuthorizationRequestRepositoryTest extends BaseUnitTest {
         assertThat(loaded).isNotNull();
         // The token-exchange leg reads the verifier from getAttributes(); losing it breaks login.
         assertThat(loaded.getAttributes().get(PkceParameterNames.CODE_VERIFIER)).isEqualTo("verifier-abc-123");
-        assertThat(loaded.getAttributes().get(OAuth2ParameterNames.REGISTRATION_ID)).isEqualTo("github");
+        assertThat(loaded.getAttributes().get(OAuth2ParameterNames.REGISTRATION_ID))
+                .isEqualTo("github");
         assertThat(loaded.getAdditionalParameters()).containsEntry("prompt", "consent");
         assertThat(loaded.getGrantType()).isEqualTo(AuthorizationGrantType.AUTHORIZATION_CODE);
         assertThat(loaded.getScopes()).containsExactly("read:user");
@@ -121,8 +128,7 @@ class CookieOAuth2AuthorizationRequestRepositoryTest extends BaseUnitTest {
     void rejectsGarbageCookieValue() {
         MockHttpServletRequest load = new MockHttpServletRequest();
         load.setCookies(
-            new Cookie(CookieOAuth2AuthorizationRequestRepository.COOKIE_NAME, "not-base64-or-encrypted-$$$")
-        );
+                new Cookie(CookieOAuth2AuthorizationRequestRepository.COOKIE_NAME, "not-base64-or-encrypted-$$$"));
 
         assertThat(repo.loadAuthorizationRequest(load)).isNull();
     }
@@ -154,12 +160,32 @@ class CookieOAuth2AuthorizationRequestRepositoryTest extends BaseUnitTest {
         Cookie cleared = res.getCookie(CookieOAuth2AuthorizationRequestRepository.COOKIE_NAME);
         assertThat(cleared).isNotNull();
         assertThat(cleared.getMaxAge()).isZero();
+        assertThat(cleared.isHttpOnly()).isTrue();
+        assertThat(cleared.getSecure()).isTrue();
+        assertThat(cleared.getPath()).isEqualTo("/");
+        assertThat(cleared.getAttribute("SameSite")).isEqualTo("Lax");
+    }
+
+    @Test
+    void usesFreshCiphertextForEachAuthorizationRequest() {
+        assertThat(saveAndExtractCookie(repo).getValue())
+                .isNotEqualTo(saveAndExtractCookie(repo).getValue());
+    }
+
+    @Test
+    void savingNullClearsTheAuthorizationCookie() {
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        repo.saveAuthorizationRequest(null, new MockHttpServletRequest(), response);
+
+        Cookie cookie = response.getCookie(CookieOAuth2AuthorizationRequestRepository.COOKIE_NAME);
+        assertThat(cookie).isNotNull();
+        assertThat(cookie.getMaxAge()).isZero();
     }
 
     @Test
     void rejectsNonThirtyTwoByteKey() {
-        Assertions.assertThrows(IllegalArgumentException.class, () ->
-            new CookieOAuth2AuthorizationRequestRepository(new byte[16])
-        );
+        Assertions.assertThrows(
+                IllegalArgumentException.class, () -> new CookieOAuth2AuthorizationRequestRepository(new byte[16]));
     }
 }

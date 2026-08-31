@@ -47,6 +47,8 @@ class OpenApiOutlineOperationIdLintTest extends BaseUnitTest {
                 offenders.add(currentPath + " → " + m.group(1));
             }
         }
-        assertThat(offenders).as("operations on /outline paths without 'Outline' in their operationId").isEmpty();
+        assertThat(offenders)
+                .as("operations on /outline paths without 'Outline' in their operationId")
+                .isEmpty();
     }
 }

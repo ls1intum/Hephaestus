@@ -64,27 +64,25 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
     private final ApplicationEventPublisher eventPublisher;
 
     public GitLabMergeRequestProcessor(
-        GitLabUserService gitLabUserService,
-        PullRequestRepository pullRequestRepository,
-        PullRequestReviewRepository reviewRepository,
-        MilestoneRepository milestoneRepository,
-        UserRepository userRepository,
-        LabelRepository labelRepository,
-        RepositoryRepository repositoryRepository,
-        ScopeIdResolver scopeIdResolver,
-        RepositoryScopeFilter repositoryScopeFilter,
-        GitLabProperties gitLabProperties,
-        ApplicationEventPublisher eventPublisher
-    ) {
+            GitLabUserService gitLabUserService,
+            PullRequestRepository pullRequestRepository,
+            PullRequestReviewRepository reviewRepository,
+            MilestoneRepository milestoneRepository,
+            UserRepository userRepository,
+            LabelRepository labelRepository,
+            RepositoryRepository repositoryRepository,
+            ScopeIdResolver scopeIdResolver,
+            RepositoryScopeFilter repositoryScopeFilter,
+            GitLabProperties gitLabProperties,
+            ApplicationEventPublisher eventPublisher) {
         super(
-            gitLabUserService,
-            userRepository,
-            labelRepository,
-            repositoryRepository,
-            scopeIdResolver,
-            repositoryScopeFilter,
-            gitLabProperties
-        );
+                gitLabUserService,
+                userRepository,
+                labelRepository,
+                repositoryRepository,
+                scopeIdResolver,
+                repositoryScopeFilter,
+                gitLabProperties);
         this.pullRequestRepository = pullRequestRepository;
         this.reviewRepository = reviewRepository;
         this.milestoneRepository = milestoneRepository;
@@ -93,63 +91,64 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
 
     // Sync Data Records
 
-    public record SyncLabelData(@Nullable String globalId, @Nullable String title, @Nullable String color) {}
+    public record SyncLabelData(
+            @Nullable String globalId,
+            @Nullable String title,
+            @Nullable String color) {}
 
     /** Shared record for user references in sync data (assignees, reviewers, approvers). */
     public record SyncUserData(
-        @Nullable String globalId,
-        @Nullable String username,
-        @Nullable String name,
-        @Nullable String avatarUrl,
-        @Nullable String webUrl,
-        @Nullable String publicEmail
-    ) {}
+            @Nullable String globalId,
+            @Nullable String username,
+            @Nullable String name,
+            @Nullable String avatarUrl,
+            @Nullable String webUrl,
+            @Nullable String publicEmail) {}
 
     public record SyncMergeRequestData(
-        @Nullable String globalId,
-        @Nullable String iid,
-        @Nullable String title,
-        @Nullable String description,
-        @Nullable String state,
-        boolean draft,
-        @Nullable Boolean mergeable,
-        @Nullable String detailedMergeStatus,
-        boolean approved,
-        @Nullable String webUrl,
-        @Nullable String createdAt,
-        @Nullable String updatedAt,
-        @Nullable String closedAt,
-        @Nullable String mergedAt,
-        int commitCount,
-        int additions,
-        int deletions,
-        int fileCount,
-        @Nullable String sourceBranch,
-        @Nullable String targetBranch,
-        @Nullable String diffHeadSha,
-        @Nullable String baseSha,
-        @Nullable String mergeCommitSha,
-        boolean discussionLocked,
-        int commentsCount,
-        @Nullable String authorGlobalId,
-        @Nullable String authorUsername,
-        @Nullable String authorName,
-        @Nullable String authorAvatarUrl,
-        @Nullable String authorWebUrl,
-        @Nullable String authorPublicEmail,
-        @Nullable String mergeUserGlobalId,
-        @Nullable String mergeUserUsername,
-        @Nullable String mergeUserName,
-        @Nullable String mergeUserAvatarUrl,
-        @Nullable String mergeUserWebUrl,
-        @Nullable String mergeUserPublicEmail,
-        @Nullable List<SyncLabelData> syncLabels,
-        @Nullable List<SyncUserData> syncAssignees,
-        @Nullable List<SyncUserData> syncReviewers,
-        @Nullable List<SyncUserData> syncApprovers,
-        @Nullable List<SyncUserData> syncParticipants,
-        @Nullable Integer milestoneIid
-    ) {}
+            @Nullable String globalId,
+            @Nullable String iid,
+            @Nullable String title,
+            @Nullable String description,
+            @Nullable String state,
+            boolean draft,
+            @Nullable Boolean mergeable,
+            @Nullable String detailedMergeStatus,
+            boolean approved,
+            @Nullable String webUrl,
+            @Nullable String createdAt,
+            @Nullable String updatedAt,
+            @Nullable String closedAt,
+            @Nullable String mergedAt,
+            int commitCount,
+            int additions,
+            int deletions,
+            int fileCount,
+            @Nullable String sourceBranch,
+            @Nullable String targetBranch,
+            @Nullable String diffHeadSha,
+            @Nullable String baseSha,
+            @Nullable String mergeCommitSha,
+            boolean discussionLocked,
+            int commentsCount,
+            @Nullable String authorGlobalId,
+            @Nullable String authorUsername,
+            @Nullable String authorName,
+            @Nullable String authorAvatarUrl,
+            @Nullable String authorWebUrl,
+            @Nullable String authorPublicEmail,
+            @Nullable String mergeUserGlobalId,
+            @Nullable String mergeUserUsername,
+            @Nullable String mergeUserName,
+            @Nullable String mergeUserAvatarUrl,
+            @Nullable String mergeUserWebUrl,
+            @Nullable String mergeUserPublicEmail,
+            @Nullable List<SyncLabelData> syncLabels,
+            @Nullable List<SyncUserData> syncAssignees,
+            @Nullable List<SyncUserData> syncReviewers,
+            @Nullable List<SyncUserData> syncApprovers,
+            @Nullable List<SyncUserData> syncParticipants,
+            @Nullable Integer milestoneIid) {}
 
     // Webhook Processing
 
@@ -192,25 +191,20 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         Boolean wasDraft = null;
         if (attrs.iid() != null) {
             Optional<PullRequest> existingOpt = pullRequestRepository.findByRepositoryIdAndNumber(
-                Objects.requireNonNull(context.repository()).getId(),
-                attrs.iid()
-            );
+                    Objects.requireNonNull(context.repository()).getId(), attrs.iid());
             if (existingOpt.isPresent()) {
                 isNew = false;
                 PullRequest existing = existingOpt.get();
                 wasDraft = existing.isDraft();
                 Instant eventUpdatedAt = parseGitLabTimestamp(attrs.updatedAt());
-                if (
-                    existing.getUpdatedAt() != null &&
-                    eventUpdatedAt != null &&
-                    !eventUpdatedAt.isAfter(existing.getUpdatedAt())
-                ) {
+                if (existing.getUpdatedAt() != null
+                        && eventUpdatedAt != null
+                        && !eventUpdatedAt.isAfter(existing.getUpdatedAt())) {
                     log.debug(
-                        "Skipped stale MR webhook: nativeId={}, existingUpdatedAt={}, eventUpdatedAt={}",
-                        attrs.id(),
-                        existing.getUpdatedAt(),
-                        eventUpdatedAt
-                    );
+                            "Skipped stale MR webhook: nativeId={}, existingUpdatedAt={}, eventUpdatedAt={}",
+                            attrs.id(),
+                            existing.getUpdatedAt(),
+                            eventUpdatedAt);
                     return existing;
                 }
             }
@@ -219,44 +213,41 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         User author = resolveWebhookAuthor(event, Objects.requireNonNull(context.providerId()));
         User mergedBy = resolveWebhookMergeUser(event, Objects.requireNonNull(context.providerId()));
         Long milestoneId = resolveWebhookMilestoneId(
-            attrs.milestoneId(),
-            Objects.requireNonNull(Objects.requireNonNull(context.repository()).getProvider().getId())
-        );
+                attrs.milestoneId(),
+                Objects.requireNonNull(Objects.requireNonNull(context.repository())
+                        .getProvider()
+                        .getId()));
 
         String headRefOid = attrs.lastCommit() != null ? attrs.lastCommit().id() : null;
 
         PullRequest pr = upsertMergeRequest(
-            attrs.id(),
-            attrs.iid(),
-            attrs.title(),
-            attrs.description(),
-            attrs.state(),
-            attrs.sourceBranch(),
-            attrs.targetBranch(),
-            headRefOid,
-            attrs.draft(),
-            attrs.url(),
-            attrs.createdAt(),
-            attrs.updatedAt(),
-            attrs.closedAt(),
-            attrs.mergedAt(),
-            author,
-            mergedBy,
-            milestoneId,
-            Objects.requireNonNull(context.repository()),
-            context,
-            isNew
-        );
+                attrs.id(),
+                attrs.iid(),
+                attrs.title(),
+                attrs.description(),
+                attrs.state(),
+                attrs.sourceBranch(),
+                attrs.targetBranch(),
+                headRefOid,
+                attrs.draft(),
+                attrs.url(),
+                attrs.createdAt(),
+                attrs.updatedAt(),
+                attrs.closedAt(),
+                attrs.mergedAt(),
+                author,
+                mergedBy,
+                milestoneId,
+                Objects.requireNonNull(context.repository()),
+                context,
+                isNew);
 
         if (pr == null) return null;
 
         boolean changed = updateLabels(event.labels(), pr.getLabels(), Objects.requireNonNull(context.repository()));
         changed |= updateAssignees(event.assignees(), pr.getAssignees(), Objects.requireNonNull(context.providerId()));
         changed |= updateRequestedReviewers(
-            event.reviewers(),
-            pr.getRequestedReviewers(),
-            Objects.requireNonNull(context.providerId())
-        );
+                event.reviewers(), pr.getRequestedReviewers(), Objects.requireNonNull(context.providerId()));
         if (changed) {
             pr = pullRequestRepository.save(pr);
         }
@@ -291,13 +282,8 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         Issue.State before = getExistingState(event, context);
         PullRequest pr = processInternal(event, context);
         if (pr != null && before != Issue.State.CLOSED && before != Issue.State.MERGED) {
-            eventPublisher.publishEvent(
-                new ScmDomainEvent.PullRequestClosed(
-                    ScmEventPayload.PullRequestData.from(pr),
-                    false,
-                    EventContext.from(context)
-                )
-            );
+            eventPublisher.publishEvent(new ScmDomainEvent.PullRequestClosed(
+                    ScmEventPayload.PullRequestData.from(pr), false, EventContext.from(context)));
             log.debug("Closed merge request: prId={}", pr.getId());
         }
         return pr;
@@ -312,12 +298,8 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         Issue.State before = getExistingState(event, context);
         PullRequest pr = processInternal(event, context);
         if (pr != null && before != Issue.State.OPEN) {
-            eventPublisher.publishEvent(
-                new ScmDomainEvent.PullRequestReopened(
-                    ScmEventPayload.PullRequestData.from(pr),
-                    EventContext.from(context)
-                )
-            );
+            eventPublisher.publishEvent(new ScmDomainEvent.PullRequestReopened(
+                    ScmEventPayload.PullRequestData.from(pr), EventContext.from(context)));
             log.debug("Reopened merge request: prId={}", pr.getId());
         }
         return pr;
@@ -335,8 +317,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             var prData = ScmEventPayload.PullRequestData.from(pr);
             if (before != Issue.State.CLOSED) {
                 eventPublisher.publishEvent(
-                    new ScmDomainEvent.PullRequestClosed(prData, true, EventContext.from(context))
-                );
+                        new ScmDomainEvent.PullRequestClosed(prData, true, EventContext.from(context)));
             }
             eventPublisher.publishEvent(new ScmDomainEvent.PullRequestMerged(prData, EventContext.from(context)));
             log.debug("Merged merge request: prId={}", pr.getId());
@@ -361,9 +342,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
 
         long approvalNativeId = generateApprovalNativeId(pr.getNativeId(), approver.getNativeId());
         var existingReview = reviewRepository.findByNativeIdAndProviderId(
-            approvalNativeId,
-            Objects.requireNonNull(context.providerId())
-        );
+                approvalNativeId, Objects.requireNonNull(context.providerId()));
 
         if (existingReview.isPresent()) {
             // Re-approval: update existing review (may be DISMISSED from unapproval or CHANGES_REQUESTED)
@@ -374,11 +353,9 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
                 review.setUpdatedAt(Instant.now());
                 reviewRepository.save(review);
 
-                ScmEventPayload.ReviewData.from(review).ifPresent(reviewData ->
-                    eventPublisher.publishEvent(
-                        new ScmDomainEvent.ReviewSubmitted(reviewData, EventContext.from(context))
-                    )
-                );
+                ScmEventPayload.ReviewData.from(review)
+                        .ifPresent(reviewData -> eventPublisher.publishEvent(
+                                new ScmDomainEvent.ReviewSubmitted(reviewData, EventContext.from(context))));
                 log.debug("Updated review to APPROVED: prId={}, reviewerId={}", pr.getId(), approver.getLogin());
             }
         } else {
@@ -387,9 +364,9 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             reviewRepository.save(review);
             pr.addReview(review);
 
-            ScmEventPayload.ReviewData.from(review).ifPresent(reviewData ->
-                eventPublisher.publishEvent(new ScmDomainEvent.ReviewSubmitted(reviewData, EventContext.from(context)))
-            );
+            ScmEventPayload.ReviewData.from(review)
+                    .ifPresent(reviewData -> eventPublisher.publishEvent(
+                            new ScmDomainEvent.ReviewSubmitted(reviewData, EventContext.from(context))));
             log.debug("Created approval review: prId={}, reviewerId={}", pr.getId(), approver.getLogin());
         }
 
@@ -421,28 +398,25 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
 
         long approvalNativeId = generateApprovalNativeId(pr.getNativeId(), approver.getNativeId());
         reviewRepository
-            .findByNativeIdAndProviderId(approvalNativeId, Objects.requireNonNull(context.providerId()))
-            .ifPresent(review -> {
-                if (review.getState() == PullRequestReview.State.DISMISSED) {
-                    log.debug(
-                        "Review already DISMISSED, skipping: prId={}, reviewerId={}",
-                        pr.getId(),
-                        approver.getLogin()
-                    );
-                    return;
-                }
-                review.setState(PullRequestReview.State.DISMISSED);
-                review.setDismissed(true);
-                review.setUpdatedAt(Instant.now());
-                reviewRepository.save(review);
+                .findByNativeIdAndProviderId(approvalNativeId, Objects.requireNonNull(context.providerId()))
+                .ifPresent(review -> {
+                    if (review.getState() == PullRequestReview.State.DISMISSED) {
+                        log.debug(
+                                "Review already DISMISSED, skipping: prId={}, reviewerId={}",
+                                pr.getId(),
+                                approver.getLogin());
+                        return;
+                    }
+                    review.setState(PullRequestReview.State.DISMISSED);
+                    review.setDismissed(true);
+                    review.setUpdatedAt(Instant.now());
+                    reviewRepository.save(review);
 
-                ScmEventPayload.ReviewData.from(review).ifPresent(reviewData ->
-                    eventPublisher.publishEvent(
-                        new ScmDomainEvent.ReviewDismissed(reviewData, EventContext.from(context))
-                    )
-                );
-                log.debug("Dismissed review (unapproval): prId={}, reviewerId={}", pr.getId(), approver.getLogin());
-            });
+                    ScmEventPayload.ReviewData.from(review)
+                            .ifPresent(reviewData -> eventPublisher.publishEvent(
+                                    new ScmDomainEvent.ReviewDismissed(reviewData, EventContext.from(context))));
+                    log.debug("Dismissed review (unapproval): prId={}, reviewerId={}", pr.getId(), approver.getLogin());
+                });
 
         return pr;
     }
@@ -472,28 +446,24 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
 
         long approvalNativeId = generateApprovalNativeId(pr.getNativeId(), reviewer.getNativeId());
         var existingReview = reviewRepository.findByNativeIdAndProviderId(
-            approvalNativeId,
-            Objects.requireNonNull(context.providerId())
-        );
+                approvalNativeId, Objects.requireNonNull(context.providerId()));
 
         if (existingReview.isEmpty()) {
             // No existing review for this reviewer — cannot safely attribute from note signal.
             // The sync path will create the review with correct attribution.
             log.debug(
-                "No existing review to update from note signal, deferring to sync: prId={}, reviewer={}",
-                pr.getId(),
-                reviewer.getLogin()
-            );
+                    "No existing review to update from note signal, deferring to sync: prId={}, reviewer={}",
+                    pr.getId(),
+                    reviewer.getLogin());
             return;
         }
 
         PullRequestReview review = existingReview.get();
         if (review.getState() == PullRequestReview.State.CHANGES_REQUESTED) {
             log.debug(
-                "Review already CHANGES_REQUESTED from note signal: prId={}, reviewer={}",
-                pr.getId(),
-                reviewer.getLogin()
-            );
+                    "Review already CHANGES_REQUESTED from note signal: prId={}, reviewer={}",
+                    pr.getId(),
+                    reviewer.getLogin());
             return;
         }
         review.setState(PullRequestReview.State.CHANGES_REQUESTED);
@@ -501,14 +471,13 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         review.setUpdatedAt(Instant.now());
         reviewRepository.save(review);
 
-        ScmEventPayload.ReviewData.from(review).ifPresent(reviewData ->
-            eventPublisher.publishEvent(new ScmDomainEvent.ReviewSubmitted(reviewData, EventContext.from(context)))
-        );
+        ScmEventPayload.ReviewData.from(review)
+                .ifPresent(reviewData -> eventPublisher.publishEvent(
+                        new ScmDomainEvent.ReviewSubmitted(reviewData, EventContext.from(context))));
         log.info(
-            "Updated review to CHANGES_REQUESTED (from note signal): prId={}, reviewer={}",
-            pr.getId(),
-            reviewer.getLogin()
-        );
+                "Updated review to CHANGES_REQUESTED (from note signal): prId={}, reviewer={}",
+                pr.getId(),
+                reviewer.getLogin());
     }
 
     // Sync Processing
@@ -522,12 +491,11 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             return null;
         }
         return pullRequestRepository
-            .findByRepositoryIdAndNumber(
-                Objects.requireNonNull(context.repository()).getId(),
-                event.objectAttributes().iid()
-            )
-            .map(PullRequest::getState)
-            .orElse(null);
+                .findByRepositoryIdAndNumber(
+                        Objects.requireNonNull(context.repository()).getId(),
+                        event.objectAttributes().iid())
+                .map(PullRequest::getState)
+                .orElse(null);
     }
 
     /**
@@ -558,37 +526,31 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
 
         Long providerId = Objects.requireNonNull(repository.getProvider().getId());
 
-        Optional<PullRequest> existingOpt = pullRequestRepository.findByRepositoryIdAndNumber(
-            repository.getId(),
-            mrNumber
-        );
+        Optional<PullRequest> existingOpt =
+                pullRequestRepository.findByRepositoryIdAndNumber(repository.getId(), mrNumber);
         boolean isNew = existingOpt.isEmpty();
         // Read before the upsert below overwrites the row; it's the only place the prior draft state survives.
         Boolean wasDraft = existingOpt.map(PullRequest::isDraft).orElse(null);
 
         User author = findOrCreateUser(
-            new GitLabUserLookup(
-                data.authorGlobalId(),
-                data.authorUsername(),
-                data.authorName(),
-                data.authorAvatarUrl(),
-                data.authorWebUrl(),
-                data.authorPublicEmail()
-            ),
-            providerId
-        );
+                new GitLabUserLookup(
+                        data.authorGlobalId(),
+                        data.authorUsername(),
+                        data.authorName(),
+                        data.authorAvatarUrl(),
+                        data.authorWebUrl(),
+                        data.authorPublicEmail()),
+                providerId);
 
         User mergeUser = findOrCreateUser(
-            new GitLabUserLookup(
-                data.mergeUserGlobalId(),
-                data.mergeUserUsername(),
-                data.mergeUserName(),
-                data.mergeUserAvatarUrl(),
-                data.mergeUserWebUrl(),
-                data.mergeUserPublicEmail()
-            ),
-            providerId
-        );
+                new GitLabUserLookup(
+                        data.mergeUserGlobalId(),
+                        data.mergeUserUsername(),
+                        data.mergeUserName(),
+                        data.mergeUserAvatarUrl(),
+                        data.mergeUserWebUrl(),
+                        data.mergeUserPublicEmail()),
+                providerId);
 
         // Identity harvest: seed User rows for anyone who has interacted with the MR so later
         // events (notes, reviews, approvals) do not need to create identities on the hot path.
@@ -596,16 +558,14 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         if (data.syncParticipants() != null) {
             for (SyncUserData participant : data.syncParticipants()) {
                 findOrCreateUser(
-                    new GitLabUserLookup(
-                        participant.globalId(),
-                        participant.username(),
-                        participant.name(),
-                        participant.avatarUrl(),
-                        participant.webUrl(),
-                        participant.publicEmail()
-                    ),
-                    providerId
-                );
+                        new GitLabUserLookup(
+                                participant.globalId(),
+                                participant.username(),
+                                participant.name(),
+                                participant.avatarUrl(),
+                                participant.webUrl(),
+                                participant.publicEmail()),
+                        providerId);
             }
         }
 
@@ -618,9 +578,9 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         Long milestoneId = null;
         if (data.milestoneIid() != null) {
             milestoneId = milestoneRepository
-                .findByNumberAndRepositoryId(data.milestoneIid(), repository.getId())
-                .map(Milestone::getId)
-                .orElse(null);
+                    .findByNumberAndRepositoryId(data.milestoneIid(), repository.getId())
+                    .map(Milestone::getId)
+                    .orElse(null);
         }
 
         Instant now = Instant.now();
@@ -632,48 +592,44 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             closedAtTimestamp = mergedAtTimestamp;
         }
         pullRequestRepository.upsertCore(
-            nativeId,
-            providerId,
-            mrNumber,
-            Objects.requireNonNullElse(sanitize(data.title()), ""),
-            sanitize(data.description()),
-            mrState.name(),
-            null, // stateReason
-            data.webUrl(),
-            data.discussionLocked(),
-            closedAtTimestamp,
-            data.commentsCount(),
-            now,
-            parseGitLabTimestamp(data.createdAt()),
-            parseGitLabTimestamp(data.updatedAt()),
-            author != null ? author.getId() : null,
-            repository.getId(),
-            milestoneId,
-            mergedAtTimestamp,
-            data.draft(),
-            isMerged,
-            data.commitCount(),
-            data.additions(),
-            data.deletions(),
-            data.fileCount(),
-            reviewDecision,
-            mergeStateStatus,
-            data.mergeable(),
-            data.sourceBranch(),
-            data.targetBranch(),
-            data.diffHeadSha(),
-            data.baseSha(),
-            mergeUser != null ? mergeUser.getId() : null,
-            data.mergeCommitSha()
-        );
+                nativeId,
+                providerId,
+                mrNumber,
+                Objects.requireNonNullElse(sanitize(data.title()), ""),
+                sanitize(data.description()),
+                mrState.name(),
+                null, // stateReason
+                data.webUrl(),
+                data.discussionLocked(),
+                closedAtTimestamp,
+                data.commentsCount(),
+                now,
+                parseGitLabTimestamp(data.createdAt()),
+                parseGitLabTimestamp(data.updatedAt()),
+                author != null ? author.getId() : null,
+                repository.getId(),
+                milestoneId,
+                mergedAtTimestamp,
+                data.draft(),
+                isMerged,
+                data.commitCount(),
+                data.additions(),
+                data.deletions(),
+                data.fileCount(),
+                reviewDecision,
+                mergeStateStatus,
+                data.mergeable(),
+                data.sourceBranch(),
+                data.targetBranch(),
+                data.diffHeadSha(),
+                data.baseSha(),
+                mergeUser != null ? mergeUser.getId() : null,
+                data.mergeCommitSha());
 
         PullRequest pr = pullRequestRepository
-            .findByRepositoryIdAndNumber(repository.getId(), mrNumber)
-            .orElseThrow(() ->
-                new IllegalStateException(
-                    "PullRequest not found after upsert: nativeId=" + nativeId + ", iid=" + data.iid()
-                )
-            );
+                .findByRepositoryIdAndNumber(repository.getId(), mrNumber)
+                .orElseThrow(() -> new IllegalStateException(
+                        "PullRequest not found after upsert: nativeId=" + nativeId + ", iid=" + data.iid()));
 
         pr.setProvider(repository.getProvider());
 
@@ -738,7 +694,9 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
 
         // Otherwise, look up by authorId if available
         if (authorId != null) {
-            return userRepository.findByNativeIdAndProviderId(authorId, providerId).orElse(null);
+            return userRepository
+                    .findByNativeIdAndProviderId(authorId, providerId)
+                    .orElse(null);
         }
 
         // Fallback: try the event user
@@ -756,7 +714,9 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             return findOrCreateUser(event.user(), providerId);
         }
 
-        return userRepository.findByNativeIdAndProviderId(mergeUserId, providerId).orElse(null);
+        return userRepository
+                .findByNativeIdAndProviderId(mergeUserId, providerId)
+                .orElse(null);
     }
 
     @Nullable
@@ -765,34 +725,33 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             return null;
         }
         return milestoneRepository
-            .findByNativeIdAndProviderId(gitlabMilestoneId, providerId)
-            .map(Milestone::getId)
-            .orElse(null);
+                .findByNativeIdAndProviderId(gitlabMilestoneId, providerId)
+                .map(Milestone::getId)
+                .orElse(null);
     }
 
     @Nullable
     private PullRequest upsertMergeRequest(
-        Long rawId,
-        Integer iid,
-        @Nullable String title,
-        @Nullable String description,
-        @Nullable String state,
-        @Nullable String sourceBranch,
-        @Nullable String targetBranch,
-        @Nullable String headRefOid,
-        boolean draft,
-        @Nullable String htmlUrl,
-        @Nullable String createdAt,
-        @Nullable String updatedAt,
-        @Nullable String closedAt,
-        @Nullable String mergedAt,
-        @Nullable User author,
-        @Nullable User mergedBy,
-        @Nullable Long milestoneId,
-        Repository repository,
-        ProcessingContext context,
-        boolean isNew
-    ) {
+            Long rawId,
+            Integer iid,
+            @Nullable String title,
+            @Nullable String description,
+            @Nullable String state,
+            @Nullable String sourceBranch,
+            @Nullable String targetBranch,
+            @Nullable String headRefOid,
+            boolean draft,
+            @Nullable String htmlUrl,
+            @Nullable String createdAt,
+            @Nullable String updatedAt,
+            @Nullable String closedAt,
+            @Nullable String mergedAt,
+            @Nullable User author,
+            @Nullable User mergedBy,
+            @Nullable Long milestoneId,
+            Repository repository,
+            ProcessingContext context,
+            boolean isNew) {
         if (rawId == null || iid == null) {
             log.warn("Skipped MR processing: reason=missingIdOrIid");
             return null;
@@ -813,67 +772,55 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             closedAtTimestamp = mergedAtTimestamp;
         }
         pullRequestRepository.upsertCore(
-            nativeId,
-            providerId,
-            mrNumber,
-            Objects.requireNonNullElse(sanitize(title), ""),
-            sanitize(description),
-            mrState.name(),
-            null,
-            htmlUrl,
-            null, // isLocked: not in webhook — null lets COALESCE preserve existing or default
-            closedAtTimestamp,
-            null, // commentsCount: not in webhook — null lets COALESCE preserve existing or default
-            now, // lastSyncAt
-            parseGitLabTimestamp(createdAt),
-            parseGitLabTimestamp(updatedAt),
-            author != null ? author.getId() : null,
-            repository.getId(),
-            milestoneId,
-            mergedAtTimestamp,
-            draft,
-            isMerged,
-            null,
-            null,
-            null,
-            null, // commits, additions, deletions, changedFiles — not in webhook, null preserves existing
-            null,
-            null,
-            null, // reviewDecision, mergeStateStatus, mergeable — not in webhook
-            sourceBranch,
-            targetBranch,
-            headRefOid,
-            null, // baseRefOid — not in webhook, null preserves existing
-            mergedBy != null ? mergedBy.getId() : null,
-            null // mergeCommitSha — not in webhook, null preserves existing
-        );
+                nativeId,
+                providerId,
+                mrNumber,
+                Objects.requireNonNullElse(sanitize(title), ""),
+                sanitize(description),
+                mrState.name(),
+                null,
+                htmlUrl,
+                null, // isLocked: not in webhook — null lets COALESCE preserve existing or default
+                closedAtTimestamp,
+                null, // commentsCount: not in webhook — null lets COALESCE preserve existing or default
+                now, // lastSyncAt
+                parseGitLabTimestamp(createdAt),
+                parseGitLabTimestamp(updatedAt),
+                author != null ? author.getId() : null,
+                repository.getId(),
+                milestoneId,
+                mergedAtTimestamp,
+                draft,
+                isMerged,
+                null,
+                null,
+                null,
+                null, // commits, additions, deletions, changedFiles — not in webhook, null preserves existing
+                null,
+                null,
+                null, // reviewDecision, mergeStateStatus, mergeable — not in webhook
+                sourceBranch,
+                targetBranch,
+                headRefOid,
+                null, // baseRefOid — not in webhook, null preserves existing
+                mergedBy != null ? mergedBy.getId() : null,
+                null // mergeCommitSha — not in webhook, null preserves existing
+                );
 
         PullRequest pr = pullRequestRepository
-            .findByRepositoryIdAndNumber(repository.getId(), mrNumber)
-            .orElseThrow(() ->
-                new IllegalStateException(
-                    "PullRequest not found after upsert: nativeId=" + nativeId + ", number=" + mrNumber
-                )
-            );
+                .findByRepositoryIdAndNumber(repository.getId(), mrNumber)
+                .orElseThrow(() -> new IllegalStateException(
+                        "PullRequest not found after upsert: nativeId=" + nativeId + ", number=" + mrNumber));
 
         pr.setProvider(repository.getProvider());
 
         if (isNew) {
-            eventPublisher.publishEvent(
-                new ScmDomainEvent.PullRequestCreated(
-                    ScmEventPayload.PullRequestData.from(pr),
-                    EventContext.from(context)
-                )
-            );
+            eventPublisher.publishEvent(new ScmDomainEvent.PullRequestCreated(
+                    ScmEventPayload.PullRequestData.from(pr), EventContext.from(context)));
             log.debug("Created merge request: nativeId={}, iid={}", nativeId, mrNumber);
         } else {
-            eventPublisher.publishEvent(
-                new ScmDomainEvent.PullRequestUpdated(
-                    ScmEventPayload.PullRequestData.from(pr),
-                    Set.of(),
-                    EventContext.from(context)
-                )
-            );
+            eventPublisher.publishEvent(new ScmDomainEvent.PullRequestUpdated(
+                    ScmEventPayload.PullRequestData.from(pr), Set.of(), EventContext.from(context)));
             log.debug("Updated merge request: nativeId={}, iid={}", nativeId, mrNumber);
         }
 
@@ -939,10 +886,9 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
     static long generateApprovalNativeId(long mrNativeId, long userNativeId) {
         if (mrNativeId > Integer.MAX_VALUE || userNativeId > Integer.MAX_VALUE) {
             log.warn(
-                "Native IDs exceed safe range, review nativeId may collide: mrNativeId={}, userNativeId={}",
-                mrNativeId,
-                userNativeId
-            );
+                    "Native IDs exceed safe range, review nativeId may collide: mrNativeId={}, userNativeId={}",
+                    mrNativeId,
+                    userNativeId);
         }
         long combined = ((mrNativeId & 0xFFFFFFFFL) << 32) | (userNativeId & 0xFFFFFFFFL);
         return combined & Long.MAX_VALUE; // ensure positive
@@ -998,34 +944,30 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
     }
 
     private void reconcileApprovals(
-        @Nullable List<SyncUserData> syncApprovers,
-        PullRequest pr,
-        Long providerId,
-        @Nullable ProcessingContext ctx
-    ) {
+            @Nullable List<SyncUserData> syncApprovers,
+            PullRequest pr,
+            Long providerId,
+            @Nullable ProcessingContext ctx) {
         if (syncApprovers == null) return;
 
         Set<Long> expectedNativeIds = new HashSet<>();
 
         // Map existing reviews by nativeId for efficient lookup
-        Map<Long, PullRequestReview> existingReviewsByNativeId = pr
-            .getReviews()
-            .stream()
-            .filter(r -> r.getProvider() != null && Objects.requireNonNull(r.getProvider().getId()).equals(providerId))
-            .collect(Collectors.toMap(PullRequestReview::getNativeId, r -> r, (a, b) -> a));
+        Map<Long, PullRequestReview> existingReviewsByNativeId = pr.getReviews().stream()
+                .filter(r -> r.getProvider() != null
+                        && Objects.requireNonNull(r.getProvider().getId()).equals(providerId))
+                .collect(Collectors.toMap(PullRequestReview::getNativeId, r -> r, (a, b) -> a));
 
         for (SyncUserData approver : syncApprovers) {
             User user = findOrCreateUser(
-                new GitLabUserLookup(
-                    approver.globalId(),
-                    approver.username(),
-                    approver.name(),
-                    approver.avatarUrl(),
-                    approver.webUrl(),
-                    approver.publicEmail()
-                ),
-                providerId
-            );
+                    new GitLabUserLookup(
+                            approver.globalId(),
+                            approver.username(),
+                            approver.name(),
+                            approver.avatarUrl(),
+                            approver.webUrl(),
+                            approver.publicEmail()),
+                    providerId);
             if (user == null) continue;
 
             long approvalNativeId = generateApprovalNativeId(pr.getNativeId(), user.getNativeId());
@@ -1042,10 +984,9 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
                     existingReview.setUpdatedAt(approvalInstant);
                     changed = true;
                     log.debug(
-                        "Updated review to APPROVED from sync: prId={}, reviewerId={}",
-                        pr.getId(),
-                        user.getLogin()
-                    );
+                            "Updated review to APPROVED from sync: prId={}, reviewerId={}",
+                            pr.getId(),
+                            user.getLogin());
                 }
                 // Backfill commit SHA on legacy rows that were created before we anchored
                 // approvals to a commit.
@@ -1060,11 +1001,9 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
                     reviewRepository.save(existingReview);
 
                     if (ctx != null) {
-                        ScmEventPayload.ReviewData.from(existingReview).ifPresent(reviewData ->
-                            eventPublisher.publishEvent(
-                                new ScmDomainEvent.ReviewSubmitted(reviewData, EventContext.from(ctx))
-                            )
-                        );
+                        ScmEventPayload.ReviewData.from(existingReview)
+                                .ifPresent(reviewData -> eventPublisher.publishEvent(
+                                        new ScmDomainEvent.ReviewSubmitted(reviewData, EventContext.from(ctx))));
                     }
                 }
             } else {
@@ -1075,24 +1014,21 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
                 log.debug("Created approval review from sync: prId={}, reviewerId={}", pr.getId(), user.getLogin());
 
                 if (ctx != null) {
-                    ScmEventPayload.ReviewData.from(review).ifPresent(reviewData ->
-                        eventPublisher.publishEvent(
-                            new ScmDomainEvent.ReviewSubmitted(reviewData, EventContext.from(ctx))
-                        )
-                    );
+                    ScmEventPayload.ReviewData.from(review)
+                            .ifPresent(reviewData -> eventPublisher.publishEvent(
+                                    new ScmDomainEvent.ReviewSubmitted(reviewData, EventContext.from(ctx))));
                 }
             }
         }
 
         // Dismiss stale approval reviews (user no longer in approvedBy — approval was revoked)
         // Only target reviews from this provider with APPROVED state
-        Set<PullRequestReview> staleReviews = pr
-            .getReviews()
-            .stream()
-            .filter(r -> r.getState() == PullRequestReview.State.APPROVED)
-            .filter(r -> r.getProvider() != null && Objects.requireNonNull(r.getProvider().getId()).equals(providerId))
-            .filter(r -> !expectedNativeIds.contains(r.getNativeId()))
-            .collect(Collectors.toSet());
+        Set<PullRequestReview> staleReviews = pr.getReviews().stream()
+                .filter(r -> r.getState() == PullRequestReview.State.APPROVED)
+                .filter(r -> r.getProvider() != null
+                        && Objects.requireNonNull(r.getProvider().getId()).equals(providerId))
+                .filter(r -> !expectedNativeIds.contains(r.getNativeId()))
+                .collect(Collectors.toSet());
 
         for (PullRequestReview stale : staleReviews) {
             stale.setState(PullRequestReview.State.DISMISSED);
@@ -1102,18 +1038,15 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             log.debug("Dismissed stale review from sync: prId={}, nativeId={}", pr.getId(), stale.getNativeId());
 
             if (ctx != null) {
-                ScmEventPayload.ReviewData.from(stale).ifPresent(reviewData ->
-                    eventPublisher.publishEvent(new ScmDomainEvent.ReviewDismissed(reviewData, EventContext.from(ctx)))
-                );
+                ScmEventPayload.ReviewData.from(stale)
+                        .ifPresent(reviewData -> eventPublisher.publishEvent(
+                                new ScmDomainEvent.ReviewDismissed(reviewData, EventContext.from(ctx))));
             }
         }
     }
 
     private boolean updateRequestedReviewers(
-        @Nullable List<GitLabWebhookUser> reviewerDtos,
-        Set<User> currentReviewers,
-        Long providerId
-    ) {
+            @Nullable List<GitLabWebhookUser> reviewerDtos, Set<User> currentReviewers, Long providerId) {
         if (reviewerDtos == null) return false;
 
         Set<User> newReviewers = new HashSet<>();
@@ -1131,10 +1064,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
     }
 
     private boolean updateSyncLabels(
-        @Nullable List<SyncLabelData> syncLabels,
-        Collection<Label> currentLabels,
-        Repository repository
-    ) {
+            @Nullable List<SyncLabelData> syncLabels, Collection<Label> currentLabels, Repository repository) {
         if (syncLabels == null) return false;
 
         Set<Label> newLabels = new HashSet<>();
@@ -1152,25 +1082,20 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
     }
 
     private boolean updateSyncAssignees(
-        @Nullable List<SyncUserData> syncAssignees,
-        Set<User> currentAssignees,
-        Long providerId
-    ) {
+            @Nullable List<SyncUserData> syncAssignees, Set<User> currentAssignees, Long providerId) {
         if (syncAssignees == null) return false;
 
         Set<User> newAssignees = new HashSet<>();
         for (SyncUserData data : syncAssignees) {
             User user = findOrCreateUser(
-                new GitLabUserLookup(
-                    data.globalId(),
-                    data.username(),
-                    data.name(),
-                    data.avatarUrl(),
-                    data.webUrl(),
-                    data.publicEmail()
-                ),
-                providerId
-            );
+                    new GitLabUserLookup(
+                            data.globalId(),
+                            data.username(),
+                            data.name(),
+                            data.avatarUrl(),
+                            data.webUrl(),
+                            data.publicEmail()),
+                    providerId);
             if (user != null) newAssignees.add(user);
         }
 
@@ -1183,25 +1108,20 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
     }
 
     private boolean updateSyncReviewers(
-        @Nullable List<SyncUserData> syncReviewers,
-        Set<User> currentReviewers,
-        Long providerId
-    ) {
+            @Nullable List<SyncUserData> syncReviewers, Set<User> currentReviewers, Long providerId) {
         if (syncReviewers == null) return false;
 
         Set<User> newReviewers = new HashSet<>();
         for (SyncUserData data : syncReviewers) {
             User user = findOrCreateUser(
-                new GitLabUserLookup(
-                    data.globalId(),
-                    data.username(),
-                    data.name(),
-                    data.avatarUrl(),
-                    data.webUrl(),
-                    data.publicEmail()
-                ),
-                providerId
-            );
+                    new GitLabUserLookup(
+                            data.globalId(),
+                            data.username(),
+                            data.name(),
+                            data.avatarUrl(),
+                            data.webUrl(),
+                            data.publicEmail()),
+                    providerId);
             if (user != null) newReviewers.add(user);
         }
 

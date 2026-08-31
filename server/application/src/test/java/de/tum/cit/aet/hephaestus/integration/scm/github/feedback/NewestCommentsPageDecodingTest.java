@@ -34,9 +34,9 @@ class NewestCommentsPageDecodingTest extends BaseUnitTest {
     /** Mirrors the {@code spring.jackson.deserialization.*} settings the GitHub codecs inherit. */
     private static JsonMapper productionMapper() {
         JsonMapper base = JsonMapper.builder()
-            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
-            .disable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
-            .build();
+                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+                .disable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
+                .build();
         return GitHubGraphQlConfig.gitHubGraphQlObjectMapper(base);
     }
 
@@ -47,11 +47,9 @@ class NewestCommentsPageDecodingTest extends BaseUnitTest {
         assertThat(connection.getPageInfo()).isNotNull();
         assertThat(connection.getPageInfo().getHasPreviousPage()).isTrue();
         assertThat(connection.getPageInfo().getStartCursor()).isEqualTo("Y3Vyc29yOnYyOpHPAAAAASmmmdk=");
-        assertThat(connection.getNodes())
-            .singleElement()
-            .satisfies(node -> {
-                assertThat(node.getId()).isEqualTo("IC_kwDOL-LvAM8AAAABKaaZ2Q");
-                assertThat(node.getBody()).isEqualTo("a comment body");
-            });
+        assertThat(connection.getNodes()).singleElement().satisfies(node -> {
+            assertThat(node.getId()).isEqualTo("IC_kwDOL-LvAM8AAAABKaaZ2Q");
+            assertThat(node.getBody()).isEqualTo("a comment body");
+        });
     }
 }

@@ -47,36 +47,33 @@ public class SlackInteractivityHandler {
 
     @Autowired
     public SlackInteractivityHandler(
-        SlackWorkspaceResolver workspaceResolver,
-        SlackMentorIdentityResolver identityResolver,
-        ResearchParticipationCommand researchParticipationCommand,
-        SlackAppHomeService appHomeService,
-        SlackParticipantConsentService participantConsentService,
-        SlackPersonErasureService personErasureService,
-        SlackMessageService messageService
-    ) {
+            SlackWorkspaceResolver workspaceResolver,
+            SlackMentorIdentityResolver identityResolver,
+            ResearchParticipationCommand researchParticipationCommand,
+            SlackAppHomeService appHomeService,
+            SlackParticipantConsentService participantConsentService,
+            SlackPersonErasureService personErasureService,
+            SlackMessageService messageService) {
         this(
-            workspaceResolver,
-            identityResolver,
-            researchParticipationCommand,
-            appHomeService,
-            participantConsentService,
-            personErasureService,
-            messageService,
-            Executors.newVirtualThreadPerTaskExecutor()
-        );
+                workspaceResolver,
+                identityResolver,
+                researchParticipationCommand,
+                appHomeService,
+                participantConsentService,
+                personErasureService,
+                messageService,
+                Executors.newVirtualThreadPerTaskExecutor());
     }
 
     SlackInteractivityHandler(
-        SlackWorkspaceResolver workspaceResolver,
-        SlackMentorIdentityResolver identityResolver,
-        ResearchParticipationCommand researchParticipationCommand,
-        SlackAppHomeService appHomeService,
-        SlackParticipantConsentService participantConsentService,
-        SlackPersonErasureService personErasureService,
-        SlackMessageService messageService,
-        ExecutorService followUpExecutor
-    ) {
+            SlackWorkspaceResolver workspaceResolver,
+            SlackMentorIdentityResolver identityResolver,
+            ResearchParticipationCommand researchParticipationCommand,
+            SlackAppHomeService appHomeService,
+            SlackParticipantConsentService participantConsentService,
+            SlackPersonErasureService personErasureService,
+            SlackMessageService messageService,
+            ExecutorService followUpExecutor) {
         this.workspaceResolver = workspaceResolver;
         this.identityResolver = identityResolver;
         this.researchParticipationCommand = researchParticipationCommand;
@@ -100,37 +97,16 @@ public class SlackInteractivityHandler {
         for (JsonNode action : payload.path("actions")) {
             String actionId = action.path("action_id").asString("");
             switch (actionId) {
-                case SlackAppHomeService.ACTION_CHANNEL_MESSAGES_OPT_OUT -> handleChannelMessageOptOut(
-                    workspaceId,
-                    teamId,
-                    slackUserId,
-                    channelId,
-                    true
-                );
-                case SlackAppHomeService.ACTION_CHANNEL_MESSAGES_OPT_IN -> handleChannelMessageOptIn(
-                    workspaceId,
-                    teamId,
-                    slackUserId
-                );
-                case SlackAppHomeService.ACTION_RESEARCH_OPT_OUT -> handleResearchToggle(
-                    workspaceId,
-                    teamId,
-                    slackUserId,
-                    false
-                );
-                case SlackAppHomeService.ACTION_RESEARCH_OPT_IN -> handleResearchToggle(
-                    workspaceId,
-                    teamId,
-                    slackUserId,
-                    true
-                );
-                case SlackConsentBlocks.ACTION_PARTICIPANT_OPT_OUT -> handleChannelMessageOptOut(
-                    workspaceId,
-                    teamId,
-                    slackUserId,
-                    channelId,
-                    false
-                );
+                case SlackAppHomeService.ACTION_CHANNEL_MESSAGES_OPT_OUT ->
+                    handleChannelMessageOptOut(workspaceId, teamId, slackUserId, channelId, true);
+                case SlackAppHomeService.ACTION_CHANNEL_MESSAGES_OPT_IN ->
+                    handleChannelMessageOptIn(workspaceId, teamId, slackUserId);
+                case SlackAppHomeService.ACTION_RESEARCH_OPT_OUT ->
+                    handleResearchToggle(workspaceId, teamId, slackUserId, false);
+                case SlackAppHomeService.ACTION_RESEARCH_OPT_IN ->
+                    handleResearchToggle(workspaceId, teamId, slackUserId, true);
+                case SlackConsentBlocks.ACTION_PARTICIPANT_OPT_OUT ->
+                    handleChannelMessageOptOut(workspaceId, teamId, slackUserId, channelId, false);
                 default -> log.debug("slack.interactivity: unhandled action_id {}", actionId);
             }
         }
@@ -142,32 +118,27 @@ public class SlackInteractivityHandler {
     }
 
     private void handleChannelMessageOptOut(
-        long workspaceId,
-        String teamId,
-        String slackUserId,
-        String channelId,
-        boolean refreshHome
-    ) {
+            long workspaceId, String teamId, String slackUserId, String channelId, boolean refreshHome) {
         participantConsentService.recordChannelMessageOptOut(workspaceId, slackUserId);
-        Long memberId = identityResolver.resolveMemberId(workspaceId, teamId, slackUserId).orElse(null);
+        Long memberId = identityResolver
+                .resolveMemberId(workspaceId, teamId, slackUserId)
+                .orElse(null);
         personErasureService.erasePerson(workspaceId, memberId, slackUserId);
         followUpExecutor.execute(() -> {
             if (channelId != null && !channelId.isBlank()) {
                 try {
                     messageService.sendEphemeralForWorkspace(
-                        workspaceId,
-                        channelId,
-                        slackUserId,
-                        SlackConsentBlocks.optOutConfirmation(),
-                        SlackConsentBlocks.confirmationText()
-                    );
+                            workspaceId,
+                            channelId,
+                            slackUserId,
+                            SlackConsentBlocks.optOutConfirmation(),
+                            SlackConsentBlocks.confirmationText());
                 } catch (SlackSendException e) {
                     log.debug(
-                        "slack.interactivity: opt-out confirmation ephemeral failed for user {} in channel {}: {}",
-                        slackUserId,
-                        channelId,
-                        e.slackError()
-                    );
+                            "slack.interactivity: opt-out confirmation ephemeral failed for user {} in channel {}: {}",
+                            slackUserId,
+                            channelId,
+                            e.slackError());
                 }
             }
             if (refreshHome) {
@@ -185,10 +156,9 @@ public class SlackInteractivityHandler {
         Optional<String> login = identityResolver.resolveDeveloperLogin(workspaceId, teamId, slackUserId);
         if (login.isEmpty()) {
             log.debug(
-                "slack.interactivity: research consent toggle from unlinked Slack user {} in team {} — skipping",
-                slackUserId,
-                teamId
-            );
+                    "slack.interactivity: research consent toggle from unlinked Slack user {} in team {} — skipping",
+                    slackUserId,
+                    teamId);
             return;
         }
         researchParticipationCommand.setForLogin(login.get(), participate, ConsentSource.SLACK_APP_HOME);
@@ -214,11 +184,10 @@ public class SlackInteractivityHandler {
             appHomeService.onHomeOpened(teamId, slackUserId);
         } catch (SlackSendException e) {
             log.debug(
-                "slack.interactivity: app home refresh failed for user {} in team {}: {}",
-                slackUserId,
-                teamId,
-                e.slackError()
-            );
+                    "slack.interactivity: app home refresh failed for user {} in team {}: {}",
+                    slackUserId,
+                    teamId,
+                    e.slackError());
         }
     }
 }

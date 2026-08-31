@@ -39,6 +39,7 @@ public abstract class AbstractIntegrationMessageHandler<T> implements Integratio
      * subject itself never carries the tier prefix.
      */
     private final String subjectEventToken;
+
     private final Class<T> payloadType;
     private final NatsMessageDeserializer deserializer;
     private final TransactionTemplate transactionTemplate;
@@ -56,12 +57,11 @@ public abstract class AbstractIntegrationMessageHandler<T> implements Integratio
      *                            handler runs DB writes; we need a real tx boundary).
      */
     protected AbstractIntegrationMessageHandler(
-        @org.jspecify.annotations.Nullable IntegrationKind kind,
-        String eventType,
-        Class<T> payloadType,
-        NatsMessageDeserializer deserializer,
-        TransactionTemplate transactionTemplate
-    ) {
+            @org.jspecify.annotations.Nullable IntegrationKind kind,
+            String eventType,
+            Class<T> payloadType,
+            NatsMessageDeserializer deserializer,
+            TransactionTemplate transactionTemplate) {
         if (kind == null) {
             throw new IllegalArgumentException("kind must not be null");
         }
@@ -81,8 +81,7 @@ public abstract class AbstractIntegrationMessageHandler<T> implements Integratio
         this.subjectEventToken = lastDot >= 0 ? eventType.substring(lastDot + 1) : eventType;
         if (this.subjectEventToken.isEmpty()) {
             throw new IllegalArgumentException(
-                "eventType last segment must not be empty (eventType=" + eventType + ")"
-            );
+                    "eventType last segment must not be empty (eventType=" + eventType + ")");
         }
         this.payloadType = payloadType;
         this.deserializer = deserializer;
@@ -102,10 +101,9 @@ public abstract class AbstractIntegrationMessageHandler<T> implements Integratio
         String safeSubject = sanitizeForLog(subject);
         if (!subjectMatchesExpectedEvent(subject)) {
             log.error(
-                "Rejected message: reason=unexpectedSubject, subject={}, expectedEventType={}",
-                safeSubject,
-                eventType
-            );
+                    "Rejected message: reason=unexpectedSubject, subject={}, expectedEventType={}",
+                    safeSubject,
+                    eventType);
             return;
         }
 

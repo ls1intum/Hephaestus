@@ -1,3 +1,8 @@
+---
+title: API error handling
+description: How the server reports errors and how the generated client surfaces them.
+---
+
 # API Error Handling Guidelines
 
 Every REST error this server returns is an RFC-7807 `application/problem+json` body produced by a

@@ -23,19 +23,18 @@ class AuthPropertiesTest extends BaseUnitTest {
 
     @ParameterizedTest
     @CsvSource(
-        value = {
-            "/api | /api",
-            "api | /api",
-            "//api | /api",
-            "/api/ | /api",
-            "/api/v2/ | /api/v2",
-            "'' | ''",
-            "/ | ''",
-            "'  /api/  ' | /api",
-        },
-        delimiterString = "|",
-        emptyValue = ""
-    )
+            value = {
+                "/api | /api",
+                "api | /api",
+                "//api | /api",
+                "/api/ | /api",
+                "/api/v2/ | /api/v2",
+                "'' | ''",
+                "/ | ''",
+                "'  /api/  ' | /api",
+            },
+            delimiterString = "|",
+            emptyValue = "")
     void apiBasePath_isNormalizedToLeadingSlashNoTrailingSlash(String raw, String expected) {
         assertThat(AuthPropertiesFixture.withApiBasePath(raw).apiBasePath()).isEqualTo(expected);
     }

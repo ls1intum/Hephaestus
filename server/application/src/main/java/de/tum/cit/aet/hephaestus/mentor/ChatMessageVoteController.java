@@ -35,24 +35,19 @@ public class ChatMessageVoteController {
     @Operation(summary = "Upsert a vote on an assistant message")
     @ApiResponse(responseCode = "200", description = "Vote recorded")
     @ApiResponse(
-        responseCode = "404",
-        description = "Thread or message not found (or not owned by current user)",
-        content = @Content(schema = @Schema(hidden = true))
-    )
+            responseCode = "404",
+            description = "Thread or message not found (or not owned by current user)",
+            content = @Content(schema = @Schema(hidden = true)))
     @PreAuthorize("@workspaceSecure.isMember()")
     public ResponseEntity<ChatMessageVoteDTO> vote(
-        WorkspaceContext workspaceContext,
-        @PathVariable UUID threadId,
-        @PathVariable UUID messageId,
-        @Valid @RequestBody ChatMessageVoteRequestDTO body
-    ) {
+            WorkspaceContext workspaceContext,
+            @PathVariable UUID threadId,
+            @PathVariable UUID messageId,
+            @Valid @RequestBody ChatMessageVoteRequestDTO body) {
         // Ownership: thread must be owned by current user before any vote write is permitted.
         chatThreadService.getOwnedThread(workspaceContext.id(), threadId);
-        ChatMessageVote vote = chatMessageVoteService.upsert(
-            threadId,
-            messageId,
-            Boolean.TRUE.equals(body.isUpvoted())
-        );
+        ChatMessageVote vote =
+                chatMessageVoteService.upsert(threadId, messageId, Boolean.TRUE.equals(body.isUpvoted()));
         return ResponseEntity.ok(ChatMessageVoteDTO.from(vote));
     }
 
@@ -60,16 +55,12 @@ public class ChatMessageVoteController {
     @Operation(summary = "Remove a vote on an assistant message (idempotent)")
     @ApiResponse(responseCode = "204", description = "Vote removed or did not exist")
     @ApiResponse(
-        responseCode = "404",
-        description = "Thread or message not found (or not owned by current user)",
-        content = @Content(schema = @Schema(hidden = true))
-    )
+            responseCode = "404",
+            description = "Thread or message not found (or not owned by current user)",
+            content = @Content(schema = @Schema(hidden = true)))
     @PreAuthorize("@workspaceSecure.isMember()")
     public ResponseEntity<Void> removeVote(
-        WorkspaceContext workspaceContext,
-        @PathVariable UUID threadId,
-        @PathVariable UUID messageId
-    ) {
+            WorkspaceContext workspaceContext, @PathVariable UUID threadId, @PathVariable UUID messageId) {
         chatThreadService.getOwnedThread(workspaceContext.id(), threadId);
         chatMessageVoteService.delete(threadId, messageId);
         return ResponseEntity.noContent().build();

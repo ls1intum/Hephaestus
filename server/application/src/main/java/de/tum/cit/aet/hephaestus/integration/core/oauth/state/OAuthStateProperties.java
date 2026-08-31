@@ -26,10 +26,9 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "hephaestus.integration.oauth-state")
 public record OAuthStateProperties(
-    @Nullable String secret,
-    @DefaultValue("PT10M") Duration ttl,
-    @DefaultValue("P7D") Duration nonceRetention
-) {
+        @Nullable String secret,
+        @DefaultValue("PT10M") Duration ttl,
+        @DefaultValue("P7D") Duration nonceRetention) {
     public OAuthStateProperties {
         if (ttl == null) {
             ttl = Duration.ofMinutes(10);

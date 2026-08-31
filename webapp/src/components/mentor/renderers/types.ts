@@ -1,26 +1,11 @@
+import type { ToolUIPart } from "ai";
 import type React from "react";
+
 import type { ChatMessage, ChatTools } from "@/lib/types";
 export type ToolKey = keyof ChatTools;
 export type ToolType<T extends ToolKey = ToolKey> = `tool-${T}`;
 
-/**
- * All possible tool part states in AI SDK v6.
- * - 'input-streaming': Tool input is being streamed
- * - 'input-available': Tool input is complete, waiting for execution
- * - 'approval-requested': Tool needs user approval
- * - 'approval-responded': User responded to approval
- * - 'output-available': Tool has completed with output
- * - 'output-error': Tool execution failed
- * - 'output-denied': Tool execution was denied
- */
-export type ToolPartState =
-	| "input-streaming"
-	| "input-available"
-	| "approval-requested"
-	| "approval-responded"
-	| "output-available"
-	| "output-error"
-	| "output-denied";
+export type ToolPartState = ToolUIPart<ChatTools>["state"];
 
 export type ToolPart<T extends ToolKey = ToolKey> = {
 	type: ToolType<T>;

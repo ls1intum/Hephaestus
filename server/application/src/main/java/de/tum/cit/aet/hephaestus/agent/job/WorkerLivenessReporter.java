@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
+import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.agent.runtime.worker.WorkerProperties;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
@@ -33,8 +34,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @Component
 @ConditionalOnExpression(
-    "${" + RuntimeRole.AGENT_ENABLED_PROPERTY + ":false} and ${" + RuntimeRole.WORKER_PROPERTY + ":true}"
-)
+        "${" + RuntimeRole.AGENT_ENABLED_PROPERTY + ":false} and ${" + RuntimeRole.WORKER_PROPERTY + ":true}")
 @WorkspaceAgnostic("Fleet-wide worker liveness; not workspace-scoped.")
 public class WorkerLivenessReporter {
 
@@ -50,19 +50,18 @@ public class WorkerLivenessReporter {
     private @Nullable ScheduledExecutorService scheduler;
 
     public WorkerLivenessReporter(
-        WorkerRegistryRepository repository,
-        TransactionTemplate transactionTemplate,
-        AgentProperties agentProperties,
-        WorkerProperties workerProperties,
-        MeterRegistry meterRegistry
-    ) {
+            WorkerRegistryRepository repository,
+            TransactionTemplate transactionTemplate,
+            AgentProperties agentProperties,
+            WorkerProperties workerProperties,
+            MeterRegistry meterRegistry) {
         this.repository = repository;
         this.transactionTemplate = transactionTemplate;
         this.interval = agentProperties.heartbeatInterval();
         this.workerId = workerProperties.resolvedWorkerId();
-        this.heartbeatFailures = Counter.builder("worker.liveness.heartbeat.failures")
-            .description("Failed worker_registry heartbeat writes (a stalled reporter risks false orphaning)")
-            .register(meterRegistry);
+        this.heartbeatFailures = Counter.builder(AgentMetrics.WORKER_LIVENESS_HEARTBEAT_FAILURES)
+                .description("Failed worker_registry heartbeat writes (a stalled reporter risks false orphaning)")
+                .register(meterRegistry);
     }
 
     /** Must stay ordered ahead of {@code AgentJobExecutor.start()}, or its first claim looks orphaned. */
@@ -84,10 +83,9 @@ public class WorkerLivenessReporter {
             transactionTemplate.executeWithoutResult(s -> repository.heartbeat(workerId));
             if (consecutiveFailures > 0) {
                 log.info(
-                    "Worker liveness heartbeat recovered after {} failure(s): workerId={}",
-                    consecutiveFailures,
-                    workerId
-                );
+                        "Worker liveness heartbeat recovered after {} failure(s): workerId={}",
+                        consecutiveFailures,
+                        workerId);
                 consecutiveFailures = 0;
             }
         } catch (Exception e) {
@@ -96,11 +94,10 @@ public class WorkerLivenessReporter {
             heartbeatFailures.increment();
             consecutiveFailures++;
             log.warn(
-                "Worker liveness heartbeat failed (consecutive={}): workerId={}, error={}",
-                consecutiveFailures,
-                workerId,
-                e.getClass().getSimpleName()
-            );
+                    "Worker liveness heartbeat failed (consecutive={}): workerId={}, error={}",
+                    consecutiveFailures,
+                    workerId,
+                    e.getClass().getSimpleName());
         }
     }
 

@@ -89,23 +89,32 @@ class AccountHardDeleteSweeperIntegrationTest extends BaseIntegrationTest {
         // deleted_at = now - (cooldown + 1h) → strictly older than the cutoff → must be swept.
         markDeleting(id, clock.instant().minus(authProperties.deleteCooldown()).minus(Duration.ofHours(1)));
 
-        assertThat(childRowCounts(id)).as("precondition: all four child tables seeded").containsExactly(1, 1, 1, 1);
+        assertThat(childRowCounts(id))
+                .as("precondition: all four child tables seeded")
+                .containsExactly(1, 1, 1, 1);
 
         // Act
         int purged = sweeper.sweepNow();
 
         // Assert: return count + every observable side effect.
-        assertThat(purged).as("exactly one account past the cooldown was purged").isEqualTo(1);
+        assertThat(purged)
+                .as("exactly one account past the cooldown was purged")
+                .isEqualTo(1);
 
         Account tombstone = accountRepository.findById(id).orElseThrow();
-        assertThat(tombstone.getStatus()).as("status flipped to terminal DELETED").isEqualTo(Account.Status.DELETED);
+        assertThat(tombstone.getStatus())
+                .as("status flipped to terminal DELETED")
+                .isEqualTo(Account.Status.DELETED);
         assertThat(tombstone.getDisplayName()).as("display_name tombstoned").isEqualTo(TOMBSTONE_DISPLAY_NAME);
         assertThat(tombstone.getPrimaryEmail()).as("primary_email PII cleared").isNull();
-        assertThat(tombstone.getPrimaryEmailVerifiedAt()).as("email-verified PII cleared").isNull();
+        assertThat(tombstone.getPrimaryEmailVerifiedAt())
+                .as("email-verified PII cleared")
+                .isNull();
 
         assertThat(childRowCounts(id))
-            .as("all personal/auth child rows are gone (account_feature, identity_link, issued_jwt, account_export)")
-            .containsExactly(0, 0, 0, 0);
+                .as(
+                        "all personal/auth child rows are gone (account_feature, identity_link, issued_jwt, account_export)")
+                .containsExactly(0, 0, 0, 0);
     }
 
     // ── Case 2: account still inside the cooldown is left untouched ───────────────────────────
@@ -120,14 +129,20 @@ class AccountHardDeleteSweeperIntegrationTest extends BaseIntegrationTest {
 
         int purged = sweeper.sweepNow();
 
-        assertThat(purged).as("an account still in cooldown is excluded from the count").isZero();
+        assertThat(purged)
+                .as("an account still in cooldown is excluded from the count")
+                .isZero();
 
         Account stillDeleting = accountRepository.findById(id).orElseThrow();
         assertThat(stillDeleting.getStatus()).as("status stays DELETING").isEqualTo(Account.Status.DELETING);
         assertThat(stillDeleting.getDisplayName()).as("display_name untouched").isEqualTo("Grace Hopper");
-        assertThat(stillDeleting.getPrimaryEmail()).as("primary_email untouched").isEqualTo("grace@example.com");
+        assertThat(stillDeleting.getPrimaryEmail())
+                .as("primary_email untouched")
+                .isEqualTo("grace@example.com");
 
-        assertThat(childRowCounts(id)).as("child rows are intact while in cooldown").containsExactly(1, 1, 1, 1);
+        assertThat(childRowCounts(id))
+                .as("child rows are intact while in cooldown")
+                .containsExactly(1, 1, 1, 1);
     }
 
     // ── Case 3: terminal DELETED is never re-selected; the sweep is idempotent ────────────────
@@ -146,7 +161,9 @@ class AccountHardDeleteSweeperIntegrationTest extends BaseIntegrationTest {
         // Second sweep: the DELETED tombstone is no longer DELETING, so it is not re-selected.
         int second = sweeper.sweepNow();
 
-        assertThat(second).as("re-running the sweep over a DELETED tombstone is a no-op").isZero();
+        assertThat(second)
+                .as("re-running the sweep over a DELETED tombstone is a no-op")
+                .isZero();
         // The tombstone is unchanged and its children stay gone.
         Account tombstone = accountRepository.findById(id).orElseThrow();
         assertThat(tombstone.getStatus()).isEqualTo(Account.Status.DELETED);
@@ -161,17 +178,22 @@ class AccountHardDeleteSweeperIntegrationTest extends BaseIntegrationTest {
         // One account is just past the configured cooldown and one is just inside it.
         Account past = newAccount("Past Cutoff", "past@example.com");
         Long pastId = persistedId(past.getId());
-        markDeleting(pastId, clock.instant().minus(authProperties.deleteCooldown()).minus(Duration.ofMinutes(5)));
+        markDeleting(
+                pastId, clock.instant().minus(authProperties.deleteCooldown()).minus(Duration.ofMinutes(5)));
 
         Account inside = newAccount("Inside Cutoff", "inside@example.com");
         Long insideId = persistedId(inside.getId());
-        markDeleting(insideId, clock.instant().minus(authProperties.deleteCooldown()).plus(Duration.ofMinutes(5)));
+        markDeleting(
+                insideId, clock.instant().minus(authProperties.deleteCooldown()).plus(Duration.ofMinutes(5)));
 
         int purged = sweeper.sweepNow();
 
-        assertThat(purged).as("only the account older than the cooldown is swept").isEqualTo(1);
+        assertThat(purged)
+                .as("only the account older than the cooldown is swept")
+                .isEqualTo(1);
         assertThat(accountRepository.findById(pastId).orElseThrow().getStatus()).isEqualTo(Account.Status.DELETED);
-        assertThat(accountRepository.findById(insideId).orElseThrow().getStatus()).isEqualTo(Account.Status.DELETING);
+        assertThat(accountRepository.findById(insideId).orElseThrow().getStatus())
+                .isEqualTo(Account.Status.DELETING);
     }
 
     // ── Case 5: GDPR erasure anonymizes the subject's retained audit rows ─────────────────────
@@ -184,24 +206,17 @@ class AccountHardDeleteSweeperIntegrationTest extends BaseIntegrationTest {
         // (acting_account_id) of an event about a different account → both must be redacted.
         seedAuthEvent(9001L, erasedId, null, "LOGIN", "203.0.113.7", "UA-A", "{\"x\":1}");
         seedAuthEvent(
-            9002L,
-            88_888L,
-            erasedId,
-            "IMPERSONATION_BEGIN",
-            "198.51.100.9",
-            "UA-B",
-            "{\"reason\":\"abuse\"}"
-        );
-        markDeleting(erasedId, clock.instant().minus(authProperties.deleteCooldown()).minus(Duration.ofHours(1)));
+                9002L, 88_888L, erasedId, "IMPERSONATION_BEGIN", "198.51.100.9", "UA-B", "{\"reason\":\"abuse\"}");
+        markDeleting(
+                erasedId, clock.instant().minus(authProperties.deleteCooldown()).minus(Duration.ofHours(1)));
 
         sweeper.sweepNow();
 
         var rows = jdbcTemplate.queryForList(
-            "SELECT event_type, result, ip_inet, user_agent, details FROM auth_event " +
-                "WHERE account_id = ? OR acting_account_id = ? ORDER BY id",
-            erasedId,
-            erasedId
-        );
+                "SELECT event_type, result, ip_inet, user_agent, details FROM auth_event "
+                        + "WHERE account_id = ? OR acting_account_id = ? ORDER BY id",
+                erasedId,
+                erasedId);
         assertThat(rows).hasSize(2);
         assertThat(rows).allSatisfy(r -> {
             assertThat(r.get("ip_inet")).as("IP redacted").isNull();
@@ -215,26 +230,24 @@ class AccountHardDeleteSweeperIntegrationTest extends BaseIntegrationTest {
     // ── Fixtures ──────────────────────────────────────────────────────────────────────────────
 
     private void seedAuthEvent(
-        long id,
-        Long accountId,
-        @Nullable Long actingAccountId,
-        String eventType,
-        String ip,
-        String userAgent,
-        String details
-    ) {
+            long id,
+            Long accountId,
+            @Nullable Long actingAccountId,
+            String eventType,
+            String ip,
+            String userAgent,
+            String details) {
         jdbcTemplate.update(
-            "INSERT INTO auth_event " +
-                "(id, occurred_at, account_id, acting_account_id, event_type, result, ip_inet, user_agent, details) " +
-                "VALUES (?, now(), ?, ?, ?, 'SUCCESS', CAST(? AS inet), ?, CAST(? AS jsonb))",
-            id,
-            accountId,
-            actingAccountId,
-            eventType,
-            ip,
-            userAgent,
-            details
-        );
+                "INSERT INTO auth_event "
+                        + "(id, occurred_at, account_id, acting_account_id, event_type, result, ip_inet, user_agent, details) "
+                        + "VALUES (?, now(), ?, ?, ?, 'SUCCESS', CAST(? AS inet), ?, CAST(? AS jsonb))",
+                id,
+                accountId,
+                actingAccountId,
+                eventType,
+                ip,
+                userAgent,
+                details);
     }
 
     /** Persists a real ACTIVE account via the production repository. */
@@ -257,7 +270,8 @@ class AccountHardDeleteSweeperIntegrationTest extends BaseIntegrationTest {
         link.setUsernameAtSignup("user" + accountId);
         identityLinkRepository.save(link);
 
-        IssuedJwt jwt = new IssuedJwt(UUID.randomUUID(), accountId, clock.instant().plus(Duration.ofHours(1)));
+        IssuedJwt jwt =
+                new IssuedJwt(UUID.randomUUID(), accountId, clock.instant().plus(Duration.ofHours(1)));
         issuedJwtRepository.save(jwt);
 
         accountExportRepository.save(new AccountExport(accountId));
@@ -282,19 +296,15 @@ class AccountHardDeleteSweeperIntegrationTest extends BaseIntegrationTest {
      */
     private List<Integer> childRowCounts(Long accountId) {
         return List.of(
-            count("account_feature", accountId),
-            count("identity_link", accountId),
-            count("issued_jwt", accountId),
-            count("account_export", accountId)
-        );
+                count("account_feature", accountId),
+                count("identity_link", accountId),
+                count("issued_jwt", accountId),
+                count("account_export", accountId));
     }
 
     private int count(String table, Long accountId) {
         Integer n = jdbcTemplate.queryForObject(
-            "SELECT COUNT(*) FROM " + table + " WHERE account_id = ?",
-            Integer.class,
-            accountId
-        );
+                "SELECT COUNT(*) FROM " + table + " WHERE account_id = ?", Integer.class, accountId);
         return n == null ? 0 : n;
     }
 

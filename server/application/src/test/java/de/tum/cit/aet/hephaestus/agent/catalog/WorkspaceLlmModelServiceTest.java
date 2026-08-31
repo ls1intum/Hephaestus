@@ -64,15 +64,7 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         workspaceContext = new WorkspaceContext(
-            1L,
-            "test-workspace",
-            "Test Workspace",
-            AccountType.ORG,
-            null,
-            false,
-            false,
-            Set.of()
-        );
+                1L, "test-workspace", "Test Workspace", AccountType.ORG, null, false, false, Set.of());
     }
 
     private void byoEnabled(boolean enabled) {
@@ -97,42 +89,27 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
 
     private CreateWorkspaceLlmModelRequestDTO enabledUnpricedCreateRequest() {
         return new CreateWorkspaceLlmModelRequestDTO(
-            "gpt-5",
-            "GPT-5",
-            "gpt-5",
-            null,
-            null,
-            null,
-            true,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null
-        );
+                "gpt-5", "GPT-5", "gpt-5", null, null, null, true, null, null, null, null, null, null);
     }
 
     private CreateWorkspaceLlmModelRequestDTO createRequest(
-        @Nullable PricingMode pricingMode,
-        @Nullable BigDecimal per1mInputUsd,
-        @Nullable BigDecimal per1mOutputUsd
-    ) {
+            @Nullable PricingMode pricingMode,
+            @Nullable BigDecimal per1mInputUsd,
+            @Nullable BigDecimal per1mOutputUsd) {
         return new CreateWorkspaceLlmModelRequestDTO(
-            "gpt-5",
-            "GPT-5",
-            "gpt-5",
-            null,
-            null,
-            null,
-            null,
-            pricingMode,
-            per1mInputUsd,
-            per1mOutputUsd,
-            null,
-            null,
-            null
-        );
+                "gpt-5",
+                "GPT-5",
+                "gpt-5",
+                null,
+                null,
+                null,
+                null,
+                pricingMode,
+                per1mInputUsd,
+                per1mOutputUsd,
+                null,
+                null,
+                null);
     }
 
     @Nested
@@ -142,9 +119,8 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
         void createIsRejectedWhenWorkspaceConnectionsAreDisabled() {
             byoEnabled(false);
 
-            assertThatThrownBy(() -> modelService.create(workspaceContext, 50L, unpricedCreateRequest())).isInstanceOf(
-                AccessForbiddenException.class
-            );
+            assertThatThrownBy(() -> modelService.create(workspaceContext, 50L, unpricedCreateRequest()))
+                    .isInstanceOf(AccessForbiddenException.class);
             verify(modelRepository, never()).saveAndFlush(any());
         }
 
@@ -170,22 +146,19 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
             byoEnabled(true);
             when(connectionRepository.findByIdAndWorkspaceId(50L, 1L)).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> modelService.create(workspaceContext, 50L, unpricedCreateRequest())).isInstanceOf(
-                EntityNotFoundException.class
-            );
+            assertThatThrownBy(() -> modelService.create(workspaceContext, 50L, unpricedCreateRequest()))
+                    .isInstanceOf(EntityNotFoundException.class);
         }
 
         @Test
         void rejectsDuplicateSlugInTheSameWorkspace() {
             byoEnabled(true);
             when(connectionRepository.findByIdAndWorkspaceId(50L, 1L)).thenReturn(Optional.of(connection()));
-            when(modelRepository.findByWorkspaceIdAndSlug(1L, "gpt-5")).thenReturn(
-                Optional.of(new WorkspaceLlmModel())
-            );
+            when(modelRepository.findByWorkspaceIdAndSlug(1L, "gpt-5"))
+                    .thenReturn(Optional.of(new WorkspaceLlmModel()));
 
-            assertThatThrownBy(() -> modelService.create(workspaceContext, 50L, unpricedCreateRequest())).isInstanceOf(
-                LlmModelSlugConflictException.class
-            );
+            assertThatThrownBy(() -> modelService.create(workspaceContext, 50L, unpricedCreateRequest()))
+                    .isInstanceOf(LlmModelSlugConflictException.class);
             verify(modelRepository, never()).saveAndFlush(any());
         }
 
@@ -216,8 +189,8 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
             CreateWorkspaceLlmModelRequestDTO request = createRequest(PricingMode.PRICED, new BigDecimal("3.00"), null);
 
             assertThatThrownBy(() -> modelService.create(workspaceContext, 50L, request))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("an input rate and an output rate");
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("an input rate and an output rate");
             verify(modelRepository, never()).saveAndFlush(any());
         }
 
@@ -232,8 +205,8 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
             when(modelRepository.findByWorkspaceIdAndSlug(1L, "gpt-5")).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> modelService.create(workspaceContext, 50L, enabledUnpricedCreateRequest()))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("configure a price before activating the model");
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("configure a price before activating the model");
             verify(modelRepository, never()).saveAndFlush(any());
             verifyNoInteractions(configAudit);
         }
@@ -248,24 +221,23 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
             when(modelRepository.findByWorkspaceIdAndSlug(1L, "gpt-5")).thenReturn(Optional.empty());
 
             CreateWorkspaceLlmModelRequestDTO pricedButOffline = new CreateWorkspaceLlmModelRequestDTO(
-                "gpt-5",
-                "GPT-5",
-                "gpt-5",
-                null,
-                null,
-                null,
-                true,
-                PricingMode.PRICED,
-                new BigDecimal("3.00"),
-                new BigDecimal("6.00"),
-                null,
-                null,
-                null
-            );
+                    "gpt-5",
+                    "GPT-5",
+                    "gpt-5",
+                    null,
+                    null,
+                    null,
+                    true,
+                    PricingMode.PRICED,
+                    new BigDecimal("3.00"),
+                    new BigDecimal("6.00"),
+                    null,
+                    null,
+                    null);
 
             assertThatThrownBy(() -> modelService.create(workspaceContext, 50L, pricedButOffline))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Activate the connection");
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("Activate the connection");
             verify(modelRepository, never()).saveAndFlush(any());
         }
     }
@@ -285,18 +257,7 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
             when(modelRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
 
             UpdateWorkspaceLlmModelRequestDTO request = new UpdateWorkspaceLlmModelRequestDTO(
-                "New name",
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null
-            );
+                    "New name", null, null, null, null, null, null, null, null, null, null);
 
             WorkspaceLlmModel result = modelService.update(workspaceContext, 7L, request);
 
@@ -313,11 +274,11 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
             byoEnabled(true);
             when(connectionRepository.findByIdAndWorkspaceId(50L, 1L)).thenReturn(Optional.of(connection()));
             when(modelRepository.findByWorkspaceIdAndSlug(1L, "gpt-5")).thenReturn(Optional.empty());
-            when(modelRepository.existsByConnectionIdAndUpstreamModelId(50L, "gpt-5")).thenReturn(true);
+            when(modelRepository.existsByConnectionIdAndUpstreamModelId(50L, "gpt-5"))
+                    .thenReturn(true);
 
-            assertThatThrownBy(() -> modelService.create(workspaceContext, 50L, unpricedCreateRequest())).isInstanceOf(
-                LlmModelUpstreamIdConflictException.class
-            );
+            assertThatThrownBy(() -> modelService.create(workspaceContext, 50L, unpricedCreateRequest()))
+                    .isInstanceOf(LlmModelUpstreamIdConflictException.class);
             verify(modelRepository, never()).saveAndFlush(any());
         }
 
@@ -326,7 +287,8 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
             byoEnabled(true);
             when(connectionRepository.findByIdAndWorkspaceId(50L, 1L)).thenReturn(Optional.of(connection()));
             when(modelRepository.findByWorkspaceIdAndSlug(1L, "gpt-5")).thenReturn(Optional.empty());
-            when(modelRepository.existsByConnectionIdAndUpstreamModelId(50L, "gpt-5")).thenReturn(false);
+            when(modelRepository.existsByConnectionIdAndUpstreamModelId(50L, "gpt-5"))
+                    .thenReturn(false);
             when(modelRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
 
             WorkspaceLlmModel result = modelService.create(workspaceContext, 50L, unpricedCreateRequest());
@@ -346,18 +308,7 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
             when(modelRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
 
             UpdateWorkspaceLlmModelRequestDTO request = new UpdateWorkspaceLlmModelRequestDTO(
-                "Renamed",
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null
-            );
+                    "Renamed", null, null, null, null, null, null, null, null, null, null);
 
             WorkspaceLlmModel result = modelService.update(workspaceContext, 7L, request);
 
@@ -374,21 +325,18 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
             byoEnabled(true);
             when(connectionRepository.findByIdAndWorkspaceId(50L, 1L)).thenReturn(Optional.of(connection()));
             when(modelRepository.findByWorkspaceIdAndSlug(1L, "gpt-5")).thenReturn(Optional.empty());
-            when(modelRepository.existsByConnectionIdAndUpstreamModelId(50L, "gpt-5")).thenReturn(false);
+            when(modelRepository.existsByConnectionIdAndUpstreamModelId(50L, "gpt-5"))
+                    .thenReturn(false);
             when(modelRepository.saveAndFlush(any())).thenThrow(upstreamIdConstraintViolation());
 
-            assertThatThrownBy(() -> modelService.create(workspaceContext, 50L, unpricedCreateRequest())).isInstanceOf(
-                LlmModelUpstreamIdConflictException.class
-            );
+            assertThatThrownBy(() -> modelService.create(workspaceContext, 50L, unpricedCreateRequest()))
+                    .isInstanceOf(LlmModelUpstreamIdConflictException.class);
         }
 
         private DataIntegrityViolationException upstreamIdConstraintViolation() {
             org.hibernate.exception.ConstraintViolationException cve =
-                new org.hibernate.exception.ConstraintViolationException(
-                    "duplicate",
-                    null,
-                    "ux_ws_llm_model_connection_upstream"
-                );
+                    new org.hibernate.exception.ConstraintViolationException(
+                            "duplicate", new java.sql.SQLException("duplicate"), "ux_ws_llm_model_connection_upstream");
             return new DataIntegrityViolationException("duplicate", cve);
         }
     }
@@ -402,11 +350,11 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
             WorkspaceLlmModel model = new WorkspaceLlmModel();
             model.setId(7L);
             when(modelRepository.findByIdAndWorkspaceIdWithConnection(7L, 1L)).thenReturn(Optional.of(model));
-            when(agentBindingRepository.existsByWorkspaceModelIdAndWorkspaceId(7L, 1L)).thenReturn(true);
+            when(agentBindingRepository.existsByWorkspaceModelIdAndWorkspaceId(7L, 1L))
+                    .thenReturn(true);
 
-            assertThatThrownBy(() -> modelService.delete(workspaceContext, 7L)).isInstanceOf(
-                LlmModelInUseException.class
-            );
+            assertThatThrownBy(() -> modelService.delete(workspaceContext, 7L))
+                    .isInstanceOf(LlmModelInUseException.class);
             verify(modelRepository, never()).delete(any());
         }
 
@@ -416,7 +364,8 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
             WorkspaceLlmModel model = new WorkspaceLlmModel();
             model.setId(7L);
             when(modelRepository.findByIdAndWorkspaceIdWithConnection(7L, 1L)).thenReturn(Optional.of(model));
-            when(agentBindingRepository.existsByWorkspaceModelIdAndWorkspaceId(7L, 1L)).thenReturn(false);
+            when(agentBindingRepository.existsByWorkspaceModelIdAndWorkspaceId(7L, 1L))
+                    .thenReturn(false);
 
             modelService.delete(workspaceContext, 7L);
 
@@ -448,7 +397,8 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
             price.setPricingMode(PricingMode.PRICED);
             price.setPer1mInputUsd(new BigDecimal("3.00"));
             price.setPer1mOutputUsd(new BigDecimal("9.00"));
-            when(instancePriceRepository.findByModelIdInAndEffectiveToIsNull(List.of(1L))).thenReturn(List.of(price));
+            when(instancePriceRepository.findByModelIdInAndEffectiveToIsNull(List.of(1L)))
+                    .thenReturn(List.of(price));
 
             WorkspaceLlmModel byoModel = new WorkspaceLlmModel();
             byoModel.setId(9L);
@@ -460,21 +410,19 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
             List<AvailableLlmModelDTO> result = modelService.availableModels(workspaceContext);
 
             assertThat(result).hasSize(2);
-            AvailableLlmModelDTO shared = result
-                .stream()
-                .filter(dto -> dto.scope() == LlmModelScope.SHARED)
-                .findFirst()
-                .orElseThrow();
+            AvailableLlmModelDTO shared = result.stream()
+                    .filter(dto -> dto.scope() == LlmModelScope.SHARED)
+                    .findFirst()
+                    .orElseThrow();
             assertThat(shared.id()).isEqualTo(1L);
             assertThat(shared.connectionDisplayName()).isEqualTo("Shared Provider");
             assertThat(shared.pricingMode()).isEqualTo(PricingMode.PRICED);
             assertThat(shared.per1mInputUsd()).isEqualByComparingTo("3.00");
 
-            AvailableLlmModelDTO own = result
-                .stream()
-                .filter(dto -> dto.scope() == LlmModelScope.WORKSPACE)
-                .findFirst()
-                .orElseThrow();
+            AvailableLlmModelDTO own = result.stream()
+                    .filter(dto -> dto.scope() == LlmModelScope.WORKSPACE)
+                    .findFirst()
+                    .orElseThrow();
             assertThat(own.id()).isEqualTo(9L);
             assertThat(own.connectionDisplayName()).isEqualTo("My Provider");
         }

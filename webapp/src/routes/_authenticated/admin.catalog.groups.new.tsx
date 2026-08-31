@@ -1,4 +1,5 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
+
 import {
 	curatedCatalogSearchSchema,
 	curatedGroupLevel,

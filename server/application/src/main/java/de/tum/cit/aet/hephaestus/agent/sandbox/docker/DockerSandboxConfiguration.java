@@ -52,7 +52,7 @@ import tools.jackson.databind.ObjectMapper;
 @Configuration
 @ConditionalOnProperty(name = RuntimeRole.WORKER_PROPERTY, havingValue = "true", matchIfMissing = true)
 @ConditionalOnClass(DockerClient.class)
-@EnableConfigurationProperties({ SandboxProperties.class, InteractiveSandboxProperties.class })
+@EnableConfigurationProperties({SandboxProperties.class, InteractiveSandboxProperties.class})
 public class DockerSandboxConfiguration {
 
     private static final Logger log = LoggerFactory.getLogger(DockerSandboxConfiguration.class);
@@ -83,32 +83,23 @@ public class DockerSandboxConfiguration {
     @Bean(name = "dockerStreamingClient", destroyMethod = "close")
     public DockerClient dockerStreamingClient(SandboxProperties properties) {
         return buildClient(
-            properties,
-            HTTP_STREAMING_RESPONSE_TIMEOUT,
-            properties.maxConcurrentContainers(),
-            "streaming"
-        );
+                properties, HTTP_STREAMING_RESPONSE_TIMEOUT, properties.maxConcurrentContainers(), "streaming");
     }
 
     @Bean(destroyMethod = "close")
     public DockerClient dockerClient(SandboxProperties properties) {
         return buildClient(
-            properties,
-            HTTP_RESPONSE_TIMEOUT,
-            properties.maxConcurrentContainers() * RPC_CONNECTIONS_PER_CONTAINER,
-            "rpc"
-        );
+                properties,
+                HTTP_RESPONSE_TIMEOUT,
+                properties.maxConcurrentContainers() * RPC_CONNECTIONS_PER_CONTAINER,
+                "rpc");
     }
 
     private DockerClient buildClient(
-        SandboxProperties properties,
-        Duration responseTimeout,
-        int maxConnections,
-        String kind
-    ) {
+            SandboxProperties properties, Duration responseTimeout, int maxConnections, String kind) {
         var configBuilder = DefaultDockerClientConfig.createDefaultConfigBuilder()
-            .withDockerHost(properties.dockerHost())
-            .withDockerTlsVerify(properties.tlsVerify());
+                .withDockerHost(properties.dockerHost())
+                .withDockerTlsVerify(properties.tlsVerify());
 
         if (properties.certPath() != null) {
             configBuilder.withDockerCertPath(properties.certPath());
@@ -117,31 +108,28 @@ public class DockerSandboxConfiguration {
         var config = configBuilder.build();
 
         var httpClient = new ApacheDockerHttpClient.Builder()
-            .dockerHost(config.getDockerHost())
-            .sslConfig(config.getSSLConfig())
-            .maxConnections(maxConnections)
-            .connectionTimeout(HTTP_CONNECTION_TIMEOUT)
-            .responseTimeout(responseTimeout)
-            .build();
+                .dockerHost(config.getDockerHost())
+                .sslConfig(config.getSSLConfig())
+                .maxConnections(maxConnections)
+                .connectionTimeout(HTTP_CONNECTION_TIMEOUT)
+                .responseTimeout(responseTimeout)
+                .build();
 
         DockerClient client = DockerClientImpl.getInstance(config, httpClient);
         log.info(
-            "Docker sandbox client configured: kind={}, host={}, tlsVerify={}, responseTimeout={}, maxConnections={}",
-            kind,
-            properties.dockerHost(),
-            properties.tlsVerify(),
-            responseTimeout,
-            maxConnections
-        );
+                "Docker sandbox client configured: kind={}, host={}, tlsVerify={}, responseTimeout={}, maxConnections={}",
+                kind,
+                properties.dockerHost(),
+                properties.tlsVerify(),
+                responseTimeout,
+                maxConnections);
 
         return client;
     }
 
     @Bean
     public DockerClientOperations dockerClientOperations(
-        DockerClient dockerClient,
-        @Qualifier("dockerStreamingClient") DockerClient dockerStreamingClient
-    ) {
+            DockerClient dockerClient, @Qualifier("dockerStreamingClient") DockerClient dockerStreamingClient) {
         return new DockerClientOperations(dockerClient, dockerStreamingClient);
     }
 
@@ -159,12 +147,11 @@ public class DockerSandboxConfiguration {
     @Bean
     public SandboxWorkspaceManager sandboxWorkspaceManager(DockerClientOperations ops, SandboxProperties properties) {
         return new SandboxWorkspaceManager(
-            ops,
-            SandboxWorkspaceManager.MAX_OUTPUT_BYTES,
-            SandboxWorkspaceManager.MAX_SINGLE_FILE_BYTES,
-            properties.maxDirectoryBytes(),
-            properties.maxDirectoryEntries()
-        );
+                ops,
+                SandboxWorkspaceManager.MAX_OUTPUT_BYTES,
+                SandboxWorkspaceManager.MAX_SINGLE_FILE_BYTES,
+                properties.maxDirectoryBytes(),
+                properties.maxDirectoryEntries());
     }
 
     /**
@@ -176,75 +163,58 @@ public class DockerSandboxConfiguration {
     @Bean(destroyMethod = "shutdownNow")
     public ExecutorService dockerWaitExecutor(SandboxProperties properties) {
         return Executors.newFixedThreadPool(
-            properties.maxConcurrentContainers(),
-            Thread.ofPlatform().name("docker-wait-", 0).daemon(true).factory()
-        );
+                properties.maxConcurrentContainers(),
+                Thread.ofPlatform().name("docker-wait-", 0).daemon(true).factory());
     }
 
     @Bean
     public SandboxImageGuard sandboxImageGuard(
-        DockerClientOperations ops,
-        AgentImageProperties agentImageProperties,
-        MeterRegistry meterRegistry
-    ) {
-        return image ->
-            ImagePullBootstrapperSupport.applyPolicy(
-                image,
-                agentImageProperties.pullPolicy(),
-                ops,
-                "sandbox.image.pull",
-                meterRegistry,
-                log
-            );
+            DockerClientOperations ops, AgentImageProperties agentImageProperties, MeterRegistry meterRegistry) {
+        return image -> ImagePullBootstrapperSupport.applyPolicy(
+                image, agentImageProperties.pullPolicy(), ops, "sandbox.image.pull", meterRegistry, log);
     }
 
     @Bean
     public SandboxContainerManager sandboxContainerManager(
-        DockerClientOperations ops,
-        SandboxImageGuard imageGuard,
-        SandboxProperties properties,
-        ExecutorService dockerWaitExecutor
-    ) {
+            DockerClientOperations ops,
+            SandboxImageGuard imageGuard,
+            SandboxProperties properties,
+            ExecutorService dockerWaitExecutor) {
         return new SandboxContainerManager(ops, imageGuard, properties, dockerWaitExecutor);
     }
 
     @Bean
     public SandboxManager dockerSandboxAdapter(
-        SandboxNetworkManager networkManager,
-        SandboxWorkspaceManager workspaceManager,
-        SandboxContainerManager containerManager,
-        ContainerSecurityPolicy securityPolicy,
-        SandboxProperties properties,
-        @Value("${server.port:8080}") int serverPort,
-        MeterRegistry meterRegistry
-    ) {
+            SandboxNetworkManager networkManager,
+            SandboxWorkspaceManager workspaceManager,
+            SandboxContainerManager containerManager,
+            ContainerSecurityPolicy securityPolicy,
+            SandboxProperties properties,
+            @Value("${server.port:8080}") int serverPort,
+            MeterRegistry meterRegistry) {
         return new DockerSandboxAdapter(
-            networkManager,
-            workspaceManager,
-            containerManager,
-            securityPolicy,
-            properties,
-            serverPort,
-            meterRegistry
-        );
+                networkManager,
+                workspaceManager,
+                containerManager,
+                securityPolicy,
+                properties,
+                serverPort,
+                meterRegistry);
     }
 
     @Bean
     public SandboxReconciler sandboxReconciler(
-        AgentJobRepository jobRepository,
-        SandboxContainerManager containerManager,
-        SandboxNetworkManager networkManager,
-        MeterRegistry meterRegistry,
-        Clock clock
-    ) {
+            AgentJobRepository jobRepository,
+            SandboxContainerManager containerManager,
+            SandboxNetworkManager networkManager,
+            MeterRegistry meterRegistry,
+            Clock clock) {
         return new SandboxReconciler(jobRepository, containerManager, networkManager, meterRegistry, clock);
     }
 
     @Bean
     public DockerHealthIndicator dockerHealthIndicator(
-        SandboxContainerManager containerManager,
-        SandboxProperties properties
-    ) {
+            SandboxContainerManager containerManager, SandboxProperties properties) {
         return new DockerHealthIndicator(containerManager, properties);
     }
 
@@ -262,48 +232,45 @@ public class DockerSandboxConfiguration {
 
     @Bean
     public InteractiveSandboxRegistry interactiveSandboxRegistry(
-        InteractiveSandboxProperties properties,
-        SandboxContainerManager containerManager,
-        InteractiveSandboxMetrics metrics,
-        StdinWriteWatchdog watchdog,
-        MeterRegistry meterRegistry
-    ) {
+            InteractiveSandboxProperties properties,
+            SandboxContainerManager containerManager,
+            InteractiveSandboxMetrics metrics,
+            StdinWriteWatchdog watchdog,
+            MeterRegistry meterRegistry) {
         return new InteractiveSandboxRegistry(properties, containerManager, metrics, watchdog, meterRegistry);
     }
 
     @Bean
     public InteractiveSandboxService dockerInteractiveSandboxAdapter(
-        InteractiveSandboxProperties interactiveProperties,
-        SandboxProperties sandboxProperties,
-        SandboxNetworkManager networkManager,
-        SandboxWorkspaceManager workspaceManager,
-        SandboxContainerManager containerManager,
-        ContainerSecurityPolicy securityPolicy,
-        InteractiveSandboxRegistry registry,
-        InteractiveSandboxMetrics metrics,
-        ObjectMapper mapper,
-        // Shared platform-thread executor (declared above for the sync sandbox); the interactive
-        // adapter runs runClose() here too — docker-java sync calls pin virtual carriers on JDK 21.
-        ExecutorService dockerWaitExecutor,
-        @Value("${hephaestus.mentor.docker-cli:docker}") String dockerCli,
-        @Value("${server.port:8080}") int serverPort,
-        MentorProxyCredentialRegistry mentorProxyCredentialRegistry
-    ) {
+            InteractiveSandboxProperties interactiveProperties,
+            SandboxProperties sandboxProperties,
+            SandboxNetworkManager networkManager,
+            SandboxWorkspaceManager workspaceManager,
+            SandboxContainerManager containerManager,
+            ContainerSecurityPolicy securityPolicy,
+            InteractiveSandboxRegistry registry,
+            InteractiveSandboxMetrics metrics,
+            ObjectMapper mapper,
+            // Shared platform-thread executor (declared above for the sync sandbox); the interactive
+            // adapter runs runClose() here too — docker-java sync calls pin virtual carriers on JDK 21.
+            ExecutorService dockerWaitExecutor,
+            @Value("${hephaestus.mentor.docker-cli:docker}") String dockerCli,
+            @Value("${server.port:8080}") int serverPort,
+            MentorProxyCredentialRegistry mentorProxyCredentialRegistry) {
         return new DockerInteractiveSandboxAdapter(
-            interactiveProperties,
-            sandboxProperties,
-            networkManager,
-            workspaceManager,
-            containerManager,
-            securityPolicy,
-            registry,
-            metrics,
-            mapper,
-            dockerWaitExecutor,
-            dockerCli,
-            serverPort,
-            mentorProxyCredentialRegistry
-        );
+                interactiveProperties,
+                sandboxProperties,
+                networkManager,
+                workspaceManager,
+                containerManager,
+                securityPolicy,
+                registry,
+                metrics,
+                mapper,
+                dockerWaitExecutor,
+                dockerCli,
+                serverPort,
+                mentorProxyCredentialRegistry);
     }
 
     /**
@@ -345,11 +312,8 @@ public class DockerSandboxConfiguration {
         try {
             var resource = new ClassPathResource(resourcePath);
             if (!resource.exists()) {
-                throw new SandboxException(
-                    "Required seccomp profile not found on classpath: " +
-                        resourcePath +
-                        ". Sandbox cannot start without a seccomp profile."
-                );
+                throw new SandboxException("Required seccomp profile not found on classpath: " + resourcePath
+                        + ". Sandbox cannot start without a seccomp profile.");
             }
             try (var is = resource.getInputStream()) {
                 String json = new String(is.readAllBytes(), StandardCharsets.UTF_8);

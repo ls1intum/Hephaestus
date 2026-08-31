@@ -1,0 +1,91 @@
+name: Review policy
+
+on:
+  pull_request_target: # zizmor: ignore[dangerous-triggers] API reads only; no pull-request code is executed.
+    branches: [main]
+    types: [opened, reopened, synchronize, ready_for_review]
+  pull_request_review:
+    types: [submitted, dismissed]
+  merge_group:
+
+permissions: {}
+
+concurrency:
+  group: review-policy-${{ github.event.pull_request.number || github.ref }}
+  # Never cancel: a cancelled check run on the required `review-policy` context is evaluated
+  # by the ruleset as the context's state and silently blocks merge-queue entry (observed on
+  # PRs #1655/#1664, 2026-08-31). The job takes seconds; queueing duplicates is cheap.
+  cancel-in-progress: false
+
+jobs:
+  review-policy:
+    name: review-policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Enforce review policy
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          MAINTAINERS: ${{ vars.REVIEW_POLICY_MAINTAINERS }}
+        with:
+          script: |
+            if (context.eventName === 'merge_group') {
+              return;
+            }
+
+            const { data: pull } = await github.rest.pulls.get({
+              ...context.repo,
+              pull_number: context.payload.pull_request.number,
+            });
+            // pull_request_review supports no base-branch filter, so guard here: the
+            // policy applies to pull requests that target main only.
+            if (pull.base.ref !== 'main') {
+              core.info(`The review policy does not apply to base branch ${pull.base.ref}.`);
+              return;
+            }
+            const author = pull.user.login.toLowerCase();
+            const maintainers = new Set(
+              (process.env.MAINTAINERS || '')
+                .split(',')
+                .map((login) => login.trim().toLowerCase())
+                .filter(Boolean),
+            );
+            if (maintainers.has(author)) {
+              core.info(`${pull.user.login} is in REVIEW_POLICY_MAINTAINERS.`);
+              return;
+            }
+
+            const reviews = await github.paginate(github.rest.pulls.listReviews, {
+              ...context.repo,
+              pull_number: pull.number,
+              per_page: 100,
+            });
+            const latestByReviewer = new Map();
+            for (const review of reviews.sort((left, right) => left.id - right.id)) {
+              if (
+                review.user &&
+                review.user.login.toLowerCase() !== author &&
+                ['APPROVED', 'CHANGES_REQUESTED', 'DISMISSED'].includes(review.state)
+              ) {
+                latestByReviewer.set(review.user.login.toLowerCase(), review);
+              }
+            }
+
+            for (const [login, review] of latestByReviewer) {
+              if (review.state !== 'APPROVED' || review.commit_id !== pull.head.sha) continue;
+              const { data } = await github.rest.repos.getCollaboratorPermissionLevel({
+                ...context.repo,
+                username: login,
+              });
+              if (['admin', 'maintain', 'write'].includes(data.permission)) {
+                core.info(`Approved by ${login}, who has ${data.permission} access.`);
+                return;
+              }
+            }
+
+            core.setFailed(
+              'This contributor pull request needs an approving review from a non-author with write access.',
+            );

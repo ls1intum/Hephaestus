@@ -66,20 +66,19 @@ class SlackAppHomeServiceTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         service = new SlackAppHomeService(
-            workspaceResolver,
-            identityResolver,
-            preferencesQuery,
-            participantConsentRepository,
-            monitoredChannelRepository,
-            mentorReadinessQuery,
-            messageService,
-            onboardingService,
-            uiLinks
-        );
+                workspaceResolver,
+                identityResolver,
+                preferencesQuery,
+                participantConsentRepository,
+                monitoredChannelRepository,
+                mentorReadinessQuery,
+                messageService,
+                onboardingService,
+                uiLinks);
         Mockito.lenient().when(mentorReadinessQuery.isReady(7L)).thenReturn(true);
         Mockito.lenient()
-            .when(monitoredChannelRepository.countByWorkspaceIdAndConsentState(7L, ConsentState.ACTIVE))
-            .thenReturn(1L);
+                .when(monitoredChannelRepository.countByWorkspaceIdAndConsentState(7L, ConsentState.ACTIVE))
+                .thenReturn(1L);
         Mockito.lenient().when(uiLinks.workspaceHomeUrl(7L)).thenReturn("https://heph.example/w/team");
         Mockito.lenient().when(uiLinks.userSettingsUrl()).thenReturn("https://heph.example/settings");
     }
@@ -144,9 +143,8 @@ class SlackAppHomeServiceTest extends BaseUnitTest {
 
     @Test
     void optedOutMember_rendersChannelMessageOptIn() {
-        when(
-            participantConsentRepository.existsByWorkspaceIdAndSlackUserIdAndIngestionOptedOutTrue(7L, "U1")
-        ).thenReturn(true);
+        when(participantConsentRepository.existsByWorkspaceIdAndSlackUserIdAndIngestionOptedOutTrue(7L, "U1"))
+                .thenReturn(true);
         when(identityResolver.resolveDeveloperLogin(7L, "T1", "U1")).thenReturn(Optional.empty());
         when(onboardingService.linkCtaBlocks()).thenReturn(List.of(section(s -> s.text(markdownText("LINK")))));
 

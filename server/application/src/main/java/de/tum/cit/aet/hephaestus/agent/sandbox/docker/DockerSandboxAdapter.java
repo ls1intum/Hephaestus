@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.sandbox.docker;
 
+import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.agent.sandbox.SandboxProperties;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxCancelledException;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxException;
@@ -7,6 +8,7 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxManager;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxResult;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxSpec;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SecurityProfile;
+import de.tum.cit.aet.hephaestus.observability.StructuredLogKeys;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
@@ -74,18 +76,17 @@ public class DockerSandboxAdapter implements SandboxManager {
      * @see <a href="https://git-scm.com/docs/git-config#_environment">git-config environment</a>
      */
     static final List<Map.Entry<String, String>> GIT_SECURITY_CONFIGS = List.of(
-        Map.entry("core.hooksPath", "/nonexistent"),
-        Map.entry("core.fsmonitor", "false"),
-        Map.entry("core.sshCommand", ""),
-        Map.entry("core.askPass", ""),
-        Map.entry("core.editor", ""),
-        Map.entry("core.pager", "cat"),
-        Map.entry("core.gitProxy", ""),
-        Map.entry("sequence.editor", ""),
-        Map.entry("credential.helper", ""),
-        Map.entry("diff.external", ""),
-        Map.entry("protocol.ext.allow", "never")
-    );
+            Map.entry("core.hooksPath", "/nonexistent"),
+            Map.entry("core.fsmonitor", "false"),
+            Map.entry("core.sshCommand", ""),
+            Map.entry("core.askPass", ""),
+            Map.entry("core.editor", ""),
+            Map.entry("core.pager", "cat"),
+            Map.entry("core.gitProxy", ""),
+            Map.entry("sequence.editor", ""),
+            Map.entry("credential.helper", ""),
+            Map.entry("diff.external", ""),
+            Map.entry("protocol.ext.allow", "never"));
 
     private final SandboxNetworkManager networkManager;
     private final SandboxWorkspaceManager workspaceManager;
@@ -109,14 +110,13 @@ public class DockerSandboxAdapter implements SandboxManager {
     private final ConcurrentHashMap<UUID, String> activeContainers = new ConcurrentHashMap<>();
 
     public DockerSandboxAdapter(
-        SandboxNetworkManager networkManager,
-        SandboxWorkspaceManager workspaceManager,
-        SandboxContainerManager containerManager,
-        ContainerSecurityPolicy securityPolicy,
-        SandboxProperties properties,
-        int serverPort,
-        MeterRegistry meterRegistry
-    ) {
+            SandboxNetworkManager networkManager,
+            SandboxWorkspaceManager workspaceManager,
+            SandboxContainerManager containerManager,
+            ContainerSecurityPolicy securityPolicy,
+            SandboxProperties properties,
+            int serverPort,
+            MeterRegistry meterRegistry) {
         this.networkManager = networkManager;
         this.workspaceManager = workspaceManager;
         this.containerManager = containerManager;
@@ -124,26 +124,26 @@ public class DockerSandboxAdapter implements SandboxManager {
         this.properties = properties;
         this.serverPort = serverPort;
 
-        this.executionsSuccess = Counter.builder("sandbox.executions")
-            .tag("outcome", "success")
-            .description("Successful sandbox executions")
-            .register(meterRegistry);
-        this.executionsFailed = Counter.builder("sandbox.executions")
-            .tag("outcome", "failure")
-            .description("Failed sandbox executions")
-            .register(meterRegistry);
-        this.executionsTimedOut = Counter.builder("sandbox.executions")
-            .tag("outcome", "timeout")
-            .description("Timed-out sandbox executions")
-            .register(meterRegistry);
-        this.executionsCancelled = Counter.builder("sandbox.executions")
-            .tag("outcome", "cancelled")
-            .description("Cancelled sandbox executions")
-            .register(meterRegistry);
+        this.executionsSuccess = Counter.builder(AgentMetrics.SANDBOX_EXECUTIONS)
+                .tag("outcome", "success")
+                .description("Successful sandbox executions")
+                .register(meterRegistry);
+        this.executionsFailed = Counter.builder(AgentMetrics.SANDBOX_EXECUTIONS)
+                .tag("outcome", "failure")
+                .description("Failed sandbox executions")
+                .register(meterRegistry);
+        this.executionsTimedOut = Counter.builder(AgentMetrics.SANDBOX_EXECUTIONS)
+                .tag("outcome", "timeout")
+                .description("Timed-out sandbox executions")
+                .register(meterRegistry);
+        this.executionsCancelled = Counter.builder(AgentMetrics.SANDBOX_EXECUTIONS)
+                .tag("outcome", "cancelled")
+                .description("Cancelled sandbox executions")
+                .register(meterRegistry);
         this.meterRegistry = meterRegistry;
-        this.executionDuration = Timer.builder("sandbox.execution.duration")
-            .description("Duration of sandbox executions")
-            .register(meterRegistry);
+        this.executionDuration = Timer.builder(AgentMetrics.SANDBOX_EXECUTION_DURATION)
+                .description("Duration of sandbox executions")
+                .register(meterRegistry);
 
         // Gauge for active containers
         meterRegistry.gaugeMapSize("sandbox.containers.active", Tags.empty(), this.activeContainers);
@@ -170,7 +170,8 @@ public class DockerSandboxAdapter implements SandboxManager {
             checkCancelled(cancelled, jobId);
 
             // Create isolated network
-            boolean allowInternet = spec.networkPolicy() != null && spec.networkPolicy().internetAccess();
+            boolean allowInternet =
+                    spec.networkPolicy() != null && spec.networkPolicy().internetAccess();
             networkId = networkManager.createJobNetwork(jobId, allowInternet);
 
             // Connect app-server to the job network (multi-homing) and get its IP.
@@ -182,9 +183,8 @@ public class DockerSandboxAdapter implements SandboxManager {
                 // Requires allowInternet=true (non-internal network) so the container can reach the host.
                 if (!allowInternet) {
                     throw new SandboxException(
-                        "App-server is not in Docker and network is internal (allowInternet=false). " +
-                            "Set allow_internet=true on the agent config, or run the app-server in Docker."
-                    );
+                            "App-server is not in Docker and network is internal (allowInternet=false). "
+                                    + "Set allow_internet=true on the agent config, or run the app-server in Docker.");
                 }
                 appServerIp = "host.docker.internal";
                 extraHosts = List.of("host.docker.internal:host-gateway");
@@ -198,24 +198,20 @@ public class DockerSandboxAdapter implements SandboxManager {
 
             // Build container spec with security hardening
             var secProfile = spec.securityProfile() != null ? spec.securityProfile() : SecurityProfile.DEFAULT;
-            DockerOperations.HostConfigSpec hostConfig = securityPolicy.buildHostConfig(
-                secProfile,
-                spec.resourceLimits(),
-                spec.networkPolicy()
-            );
+            DockerOperations.HostConfigSpec hostConfig =
+                    securityPolicy.buildHostConfig(secProfile, spec.resourceLimits(), spec.networkPolicy());
             Map<String, String> labels = securityPolicy.buildLabels(jobId);
 
             DockerOperations.ContainerSpec containerSpec = new DockerOperations.ContainerSpec(
-                spec.image(),
-                spec.command(),
-                environment,
-                networkId,
-                CONTAINER_HOSTNAME,
-                CONTAINER_USER,
-                labels,
-                hostConfig,
-                extraHosts
-            );
+                    spec.image(),
+                    spec.command(),
+                    environment,
+                    networkId,
+                    CONTAINER_HOSTNAME,
+                    CONTAINER_USER,
+                    labels,
+                    hostConfig,
+                    extraHosts);
 
             containerId = containerManager.createContainer(containerSpec);
             activeContainers.put(jobId, containerId);
@@ -237,7 +233,9 @@ public class DockerSandboxAdapter implements SandboxManager {
             // Inject host directories via docker cp (works with local and remote Docker daemons)
             if (spec.volumeMounts() != null && !spec.volumeMounts().isEmpty()) {
                 workspaceManager.injectDirectories(containerId, spec.volumeMounts());
-                log.debug("Injected {} directories into container", spec.volumeMounts().size());
+                log.debug(
+                        "Injected {} directories into container",
+                        spec.volumeMounts().size());
             }
 
             // PHASE 2: EXECUTE
@@ -267,12 +265,11 @@ public class DockerSandboxAdapter implements SandboxManager {
 
             Duration duration = Duration.between(startTime, Instant.now());
             log.info(
-                "Sandbox execution complete: exitCode={}, timedOut={}, outputFiles={}, duration={}",
-                waitOutcome.exitCode(),
-                waitOutcome.timedOut(),
-                outputFiles.size(),
-                duration
-            );
+                    "Sandbox execution complete: exitCode={}, timedOut={}, outputFiles={}, duration={}",
+                    waitOutcome.exitCode(),
+                    waitOutcome.timedOut(),
+                    outputFiles.size(),
+                    duration);
 
             return new SandboxResult(waitOutcome.exitCode(), outputFiles, logs, waitOutcome.timedOut(), duration);
         } catch (SandboxCancelledException e) {
@@ -350,6 +347,7 @@ public class DockerSandboxAdapter implements SandboxManager {
                 env.put(entry.getKey(), entry.getValue());
             }
         }
+        addTraceEnvironment(env);
 
         // Git security
         // Env-based config has HIGHEST precedence in git — overrides .git/config in any repo
@@ -386,9 +384,8 @@ public class DockerSandboxAdapter implements SandboxManager {
                 // One route for every provider: the proxy identifies the connection from the
                 // authenticated job token, not the URL.
                 env.put(
-                    "LLM_PROXY_URL",
-                    "http://" + appServerIp + ":" + properties.resolvedLlmProxyPort(serverPort) + "/internal/llm"
-                );
+                        "LLM_PROXY_URL",
+                        "http://" + appServerIp + ":" + properties.resolvedLlmProxyPort(serverPort) + "/internal/llm");
             }
 
             if (spec.networkPolicy().llmProxyToken() != null) {
@@ -397,6 +394,15 @@ public class DockerSandboxAdapter implements SandboxManager {
         }
 
         return env;
+    }
+
+    private static void addTraceEnvironment(Map<String, String> env) {
+        String traceId = MDC.get(StructuredLogKeys.TRACE_ID);
+        String spanId = MDC.get(StructuredLogKeys.SPAN_ID);
+        if (traceId != null && spanId != null) {
+            env.put("TRACE_ID", traceId);
+            env.put("TRACEPARENT", "00-" + traceId + "-" + spanId + "-00");
+        }
     }
 
     /**
@@ -411,12 +417,10 @@ public class DockerSandboxAdapter implements SandboxManager {
             String logs = containerManager.getLogs(containerId, LOG_TAIL_LINES);
             if (logs != null && !logs.isEmpty()) {
                 // Truncate to prevent log aggregator overflow from large container output
-                String truncated =
-                    logs.length() > MAX_LOG_EVENT_BYTES
-                        ? logs.substring(0, MAX_LOG_EVENT_BYTES) +
-                          "\n... [truncated, " +
-                          logs.length() +
-                          " bytes total]"
+                String truncated = logs.length() > MAX_LOG_EVENT_BYTES
+                        ? logs.substring(0, MAX_LOG_EVENT_BYTES) + "\n... [truncated, "
+                                + logs.length()
+                                + " bytes total]"
                         : logs;
                 log.warn("Container logs before cleanup:\n{}", truncated);
             }

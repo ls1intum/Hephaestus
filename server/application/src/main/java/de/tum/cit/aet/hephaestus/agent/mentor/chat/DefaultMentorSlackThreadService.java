@@ -37,11 +37,11 @@ class DefaultMentorSlackThreadService implements MentorSlackThreadService {
             }
         }
         User user = userRepository
-            .findByLogin(developerLogin)
-            .orElseThrow(() -> new EntityNotFoundException("User", developerLogin));
+                .findByLogin(developerLogin)
+                .orElseThrow(() -> new EntityNotFoundException("User", developerLogin));
         Workspace workspace = workspaceRepository
-            .findById(workspaceId)
-            .orElseThrow(() -> new EntityNotFoundException("Workspace", String.valueOf(workspaceId)));
+                .findById(workspaceId)
+                .orElseThrow(() -> new EntityNotFoundException("Workspace", String.valueOf(workspaceId)));
         ChatThread thread = new ChatThread();
         thread.setId(chatThreadId != null ? chatThreadId : UUID.randomUUID());
         thread.setUser(user);

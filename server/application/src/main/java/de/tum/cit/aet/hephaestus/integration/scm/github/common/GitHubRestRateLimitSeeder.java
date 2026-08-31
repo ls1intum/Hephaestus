@@ -60,11 +60,11 @@ public class GitHubRestRateLimitSeeder {
         this.rateLimitTracker = rateLimitTracker;
         HttpClient httpClient = HttpClient.create().resolver(DefaultAddressResolverGroup.INSTANCE);
         this.webClient = WebClient.builder()
-            .clientConnector(new ReactorClientHttpConnector(httpClient))
-            .baseUrl(GITHUB_API_BASE_URL)
-            .defaultHeader(HttpHeaders.ACCEPT, "application/vnd.github+json")
-            .defaultHeader("X-GitHub-Api-Version", "2022-11-28")
-            .build();
+                .clientConnector(new ReactorClientHttpConnector(httpClient))
+                .baseUrl(GITHUB_API_BASE_URL)
+                .defaultHeader(HttpHeaders.ACCEPT, "application/vnd.github+json")
+                .defaultHeader("X-GitHub-Api-Version", "2022-11-28")
+                .build();
     }
 
     /**
@@ -82,21 +82,18 @@ public class GitHubRestRateLimitSeeder {
             return;
         }
         webClient
-            .get()
-            .uri("/rate_limit")
-            .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-            .retrieve()
-            .bodyToMono(RateLimitStatusResponse.class)
-            .timeout(PROBE_TIMEOUT)
-            .subscribe(
-                response -> apply(scopeId, response),
-                error ->
-                    log.debug(
-                        "GitHub REST rate-limit probe failed; staying unreported for scope {}: {}",
-                        scopeId,
-                        error.toString()
-                    )
-            );
+                .get()
+                .uri("/rate_limit")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .retrieve()
+                .bodyToMono(RateLimitStatusResponse.class)
+                .timeout(PROBE_TIMEOUT)
+                .subscribe(
+                        response -> apply(scopeId, response),
+                        error -> log.debug(
+                                "GitHub REST rate-limit probe failed; staying unreported for scope {}: {}",
+                                scopeId,
+                                error.toString()));
     }
 
     /** True if this call won the right to probe now — one in-flight probe per scope per backoff window. */
@@ -108,14 +105,15 @@ public class GitHubRestRateLimitSeeder {
             return false;
         }
         return lastAttemptByScope
-            .merge(scopeId, now, (existing, candidate) -> existing.isAfter(threshold) ? existing : candidate)
-            .equals(now);
+                .merge(scopeId, now, (existing, candidate) -> existing.isAfter(threshold) ? existing : candidate)
+                .equals(now);
     }
 
     private void apply(Long scopeId, @Nullable RateLimitStatusResponse response) {
         Instant observedAt = Instant.now();
-        RateLimitResource graphql =
-            response == null || response.resources() == null ? null : response.resources().get("graphql");
+        RateLimitResource graphql = response == null || response.resources() == null
+                ? null
+                : response.resources().get("graphql");
         if (graphql == null || graphql.limit() == null || graphql.remaining() == null) {
             // Nothing measured — record nothing. GitHub Enterprise Server builds without a graphql
             // resource entry land here, and "not reported" is the correct display for them.

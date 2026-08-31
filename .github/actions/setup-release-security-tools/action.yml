@@ -1,0 +1,47 @@
+name: Setup release security tools
+description: Install release security tools
+inputs:
+  install-syft:
+    description: Install Syft; Cosign and Trivy are always installed
+    default: "true"
+runs:
+  using: composite
+  steps:
+    - name: Validate options
+      shell: bash
+      env:
+        INSTALL_SYFT: ${{ inputs.install-syft }}
+      run: |
+        case "$INSTALL_SYFT" in
+          true|false) ;;
+          *) echo "::error::install-syft must be true or false"; exit 1 ;;
+        esac
+    - name: Install Cosign
+      uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+    - name: Install Syft and Trivy
+      shell: bash
+      env:
+        INSTALL_SYFT: ${{ inputs.install-syft }}
+        # renovate: datasource=github-releases depName=anchore/syft
+        SYFT_VERSION: 1.51.1
+        # renovate: datasource=github-releases depName=aquasecurity/trivy
+        TRIVY_VERSION: 0.74.0
+      run: |
+        set -euo pipefail
+        curl_args=(-fsSL --proto =https --retry 5 --retry-all-errors --retry-delay 2 --retry-max-time 300 --connect-timeout 15 --max-time 120)
+        if [ "$INSTALL_SYFT" = true ]; then
+          syft_archive="syft_${SYFT_VERSION}_linux_amd64.tar.gz"
+          syft_base="https://github.com/anchore/syft/releases/download/v${SYFT_VERSION}"
+          curl "${curl_args[@]}" -o "/tmp/$syft_archive" "$syft_base/$syft_archive"
+          curl "${curl_args[@]}" -o /tmp/syft-checksums "$syft_base/syft_${SYFT_VERSION}_checksums.txt"
+          (cd /tmp && grep " $syft_archive$" syft-checksums | sha256sum -c -)
+          tar -xzf "/tmp/$syft_archive" -C /usr/local/bin syft
+          syft version
+        fi
+        trivy_archive="trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+        trivy_base="https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}"
+        curl "${curl_args[@]}" -o "/tmp/$trivy_archive" "$trivy_base/$trivy_archive"
+        curl "${curl_args[@]}" -o /tmp/trivy-checksums "$trivy_base/trivy_${TRIVY_VERSION}_checksums.txt"
+        (cd /tmp && grep " $trivy_archive$" trivy-checksums | sha256sum -c -)
+        tar -xzf "/tmp/$trivy_archive" -C /usr/local/bin trivy
+        trivy --version

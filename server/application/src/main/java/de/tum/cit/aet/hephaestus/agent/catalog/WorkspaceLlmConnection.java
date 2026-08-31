@@ -33,12 +33,15 @@ import org.jspecify.annotations.Nullable;
  */
 @Entity
 @Table(
-    name = "workspace_llm_connection",
-    uniqueConstraints = {
-        @UniqueConstraint(name = "ux_ws_llm_connection_ws_slug", columnNames = { "workspace_id", "slug" }),
-        @UniqueConstraint(name = "ux_ws_llm_connection_id_ws", columnNames = { "id", "workspace_id" }),
-    }
-)
+        name = "workspace_llm_connection",
+        uniqueConstraints = {
+            @UniqueConstraint(
+                    name = "ux_ws_llm_connection_ws_slug",
+                    columnNames = {"workspace_id", "slug"}),
+            @UniqueConstraint(
+                    name = "ux_ws_llm_connection_id_ws",
+                    columnNames = {"id", "workspace_id"}),
+        })
 @Getter
 @Setter
 @NoArgsConstructor
@@ -53,10 +56,9 @@ public class WorkspaceLlmConnection {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(
-        name = "workspace_id",
-        nullable = false,
-        foreignKey = @ForeignKey(name = "fk_ws_llm_connection_workspace")
-    )
+            name = "workspace_id",
+            nullable = false,
+            foreignKey = @ForeignKey(name = "fk_ws_llm_connection_workspace"))
     @ToString.Exclude
     private Workspace workspace;
 

@@ -1,5 +1,6 @@
 import { Bot, Pencil, Plus, ShieldCheck, Trash2 } from "lucide-react";
 import { useState } from "react";
+
 import type { LlmModel } from "@/api/types.gen";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +23,7 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { priceFieldsOf, priceLabel } from "@/lib/llm-pricing";
+
 import type { WorkspaceOption } from "./workspace-options";
 
 export interface AdminLlmModelsSectionProps {

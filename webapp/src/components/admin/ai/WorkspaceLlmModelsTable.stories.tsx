@@ -1,6 +1,8 @@
 import type { Meta, StoryContext, StoryObj } from "@storybook/react";
 import { fn, screen, userEvent, within } from "storybook/test";
+
 import type { WorkspaceLlmModel } from "@/api/types.gen";
+
 import { WorkspaceLlmModelsTable } from "./WorkspaceLlmModelsTable";
 
 async function openDeleteConfirm(canvas: StoryContext["canvas"], name: RegExp) {

@@ -1,19 +1,18 @@
 import {
-	type ColumnDef,
-	flexRender,
+	type ColumnVisibilityState,
+	createColumnHelper,
+	FlexRender,
 	functionalUpdate,
-	getCoreRowModel,
-	getFilteredRowModel,
-	getPaginationRowModel,
-	getSortedRowModel,
 	type SortingState,
-	useReactTable,
-	type VisibilityState,
+	useTable,
 } from "@tanstack/react-table";
-import { ArrowUpDown, ChevronDown, EyeIcon, EyeOffIcon, Filter, Search, Users } from "lucide-react";
-// oxlint-disable-next-line no-restricted-imports -- The compiler skips this component (see `useReactTable` below), so the memos on `columns` and `filteredData` are written by hand.
+import { ChevronDown, EyeIcon, EyeOffIcon, Filter, Search, Users } from "lucide-react";
+// oxlint-disable-next-line no-restricted-imports -- TanStack Table keys its caches on identity, which the compiler memoises as an optimisation rather than promises; each `useMemo` below says what breaks without it.
 import { type ComponentProps, type ReactElement, useEffect, useMemo, useState } from "react";
+
 import type { TeamInfo } from "@/api/types.gen";
+import { type DataTableFeatures, dataTableFeatures } from "@/components/common/data-table";
+import { DataTableHeader } from "@/components/common/DataTableHeader";
 import { TablePagination } from "@/components/common/TablePagination";
 import { Button } from "@/components/ui/button";
 import {
@@ -33,15 +32,11 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
-import {
-	Table,
-	TableBody,
-	TableCell,
-	TableHead,
-	TableHeader,
-	TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
+
 import type { ExtendedUserTeams } from "./types";
+
+const columnHelper = createColumnHelper<DataTableFeatures, ExtendedUserTeams>();
 
 interface UsersTableProps {
 	users: ExtendedUserTeams[];
@@ -71,74 +66,60 @@ export function UsersTable({
 	onViewChange,
 	renderPageLink,
 }: UsersTableProps) {
-	const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
-	const sorting: SortingState = [{ id: view.sort, desc: view.desc }];
+	const [columnVisibility, setColumnVisibility] = useState<ColumnVisibilityState>({});
+	// Identity matters as much as the value: `useTable` republishes controlled state on every render,
+	// so a fresh array here writes the sorting atom every time the parent re-renders.
+	const sorting = useMemo<SortingState>(
+		() => [{ id: view.sort, desc: view.desc }],
+		[view.sort, view.desc],
+	);
 
 	// TanStack Table caches its column model — and every row model derived from it — against the
 	// identity of this array, so a fresh one each render rebuilds all of them.
-	const columns = useMemo<ColumnDef<ExtendedUserTeams>[]>(
-		() => [
-			{
-				id: "name",
-				accessorFn: (row) => row.user.name,
-				header: ({ column }) => {
-					return (
-						<Button
-							variant="ghost"
-							onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-							className="h-auto p-0 font-semibold"
-						>
-							Name
-							<ArrowUpDown className="ml-2 h-4 w-4" />
-						</Button>
-					);
-				},
-				cell: ({ row }) => <div className="font-medium">{row.original.user.name}</div>,
-			},
-			{
-				id: "username",
-				accessorFn: (row) => row.user.login,
-				header: ({ column }) => {
-					return (
-						<Button
-							variant="ghost"
-							onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-							className="h-auto p-0 font-semibold"
-						>
-							Username
-							<ArrowUpDown className="ml-2 h-4 w-4" />
-						</Button>
-					);
-				},
-				cell: ({ row }) => <div className="text-muted-foreground">{row.original.user.login}</div>,
-			},
-			...(onToggleHidden
-				? [
-						{
-							id: "visibility",
-							header: () => <span className="font-semibold">Visible</span>,
-							cell: ({ row }: { row: { original: ExtendedUserTeams } }) => (
-								<Button
-									variant="ghost"
-									size="icon-xs"
-									onClick={() => onToggleHidden(Number(row.original.user.id), !row.original.hidden)}
-									aria-label={
-										row.original.hidden
-											? `Show ${row.original.user.name}`
-											: `Hide ${row.original.user.name}`
-									}
-								>
-									{row.original.hidden ? (
-										<EyeOffIcon className="size-4 text-muted-foreground" />
-									) : (
-										<EyeIcon className="size-4" />
-									)}
-								</Button>
-							),
-						} satisfies ColumnDef<ExtendedUserTeams>,
-					]
-				: []),
-		],
+	const columns = useMemo(
+		() =>
+			columnHelper.columns([
+				columnHelper.accessor((row) => row.user.name, {
+					id: "name",
+					header: "Name",
+					cell: ({ row }) => <div className="font-medium">{row.original.user.name}</div>,
+				}),
+				columnHelper.accessor((row) => row.user.login, {
+					id: "username",
+					header: "Username",
+					cell: ({ row }) => <div className="text-muted-foreground">{row.original.user.login}</div>,
+				}),
+				...(onToggleHidden
+					? [
+							columnHelper.display({
+								id: "visibility",
+								// Hiding a row's own controls is not a useful affordance.
+								enableHiding: false,
+								header: () => "Visible",
+								cell: ({ row }) => (
+									<Button
+										variant="ghost"
+										size="icon-xs"
+										onClick={() =>
+											onToggleHidden(Number(row.original.user.id), !row.original.hidden)
+										}
+										aria-label={
+											row.original.hidden
+												? `Show ${row.original.user.name}`
+												: `Hide ${row.original.user.name}`
+										}
+									>
+										{row.original.hidden ? (
+											<EyeOffIcon className="size-4 text-muted-foreground" />
+										) : (
+											<EyeIcon className="size-4" />
+										)}
+									</Button>
+								),
+							}),
+						]
+					: []),
+			]),
 		[onToggleHidden],
 	);
 
@@ -165,8 +146,11 @@ export function UsersTable({
 		label: `${size}`,
 	}));
 
-	// oxlint-disable-next-line react/incompatible-library -- TanStack Table is a deliberate dependency; the compiler bail-out it causes is why `columns` and `filteredData` above are memoised by hand.
-	const table = useReactTable({
+	// Every controlled slice gets its own change handler: v9 republishes `options.state` on each
+	// render, so a slice supplied without one is frozen — the table's setter writes it, the next
+	// render overwrites it.
+	const table = useTable({
+		features: dataTableFeatures,
 		data: filteredData,
 		columns,
 		autoResetPageIndex: false,
@@ -178,12 +162,13 @@ export function UsersTable({
 				page: 0,
 			});
 		},
-		getCoreRowModel: getCoreRowModel(),
-		getPaginationRowModel: getPaginationRowModel(),
-		getSortedRowModel: getSortedRowModel(),
-		getFilteredRowModel: getFilteredRowModel(),
 		onColumnVisibilityChange: setColumnVisibility,
-		globalFilterFn: "includesString",
+		onGlobalFilterChange: (updater) => {
+			// The library types `globalFilter` as `any`, so the value is narrowed on the way back out
+			// rather than trusted into a typed search param.
+			const next: unknown = functionalUpdate(updater, view.q.trim());
+			onViewChange({ q: typeof next === "string" ? next : "", page: 0 });
+		},
 		onPaginationChange: (updater) => {
 			const next = functionalUpdate(updater, { pageIndex: view.page, pageSize: view.size });
 			if (next.pageIndex !== view.page || next.pageSize !== view.size) {
@@ -288,25 +273,14 @@ export function UsersTable({
 
 			<div className="rounded-md border">
 				<Table>
-					<TableHeader>
-						{table.getHeaderGroups().map((headerGroup) => (
-							<TableRow key={headerGroup.id}>
-								{headerGroup.headers.map((header) => {
-									return (
-										<TableHead key={header.id}>
-											{header.isPlaceholder
-												? null
-												: flexRender(header.column.columnDef.header, header.getContext())}
-										</TableHead>
-									);
-								})}
-							</TableRow>
-						))}
-					</TableHeader>
+					<DataTableHeader table={table} />
 					<TableBody>
 						{isLoading ? (
 							<TableRow>
-								<TableCell colSpan={columns.length} className="h-32 text-center">
+								<TableCell
+									colSpan={table.getVisibleLeafColumns().length}
+									className="h-32 text-center"
+								>
 									<div className="flex flex-col items-center justify-center space-y-2">
 										<Spinner />
 										<p className="text-sm text-muted-foreground">Loading users...</p>
@@ -315,21 +289,20 @@ export function UsersTable({
 							</TableRow>
 						) : table.getRowModel().rows.length > 0 ? (
 							table.getRowModel().rows.map((row) => (
-								<TableRow
-									key={row.id}
-									data-state={row.getIsSelected() && "selected"}
-									className="hover:bg-muted/50 transition-colors"
-								>
+								<TableRow key={row.id} className="hover:bg-muted/50 transition-colors">
 									{row.getVisibleCells().map((cell) => (
 										<TableCell key={cell.id}>
-											{flexRender(cell.column.columnDef.cell, cell.getContext())}
+											<FlexRender cell={cell} />
 										</TableCell>
 									))}
 								</TableRow>
 							))
 						) : (
 							<TableRow>
-								<TableCell colSpan={columns.length} className="h-32 text-center">
+								<TableCell
+									colSpan={table.getVisibleLeafColumns().length}
+									className="h-32 text-center"
+								>
 									<div className="flex flex-col items-center justify-center space-y-2">
 										<Users className="h-8 w-8 text-muted-foreground" />
 										<p className="text-sm font-medium">No users found</p>
@@ -350,7 +323,7 @@ export function UsersTable({
 				<div className="flex-1 text-sm text-muted-foreground order-2 sm:order-1">
 					<div className="flex flex-col sm:flex-row gap-1 sm:gap-4">
 						<span>
-							Showing {table.getRowModel().rows.length} of {filteredData.length} users
+							Showing {table.getRowModel().rows.length} of {table.getRowCount()} users
 						</span>
 					</div>
 				</div>
@@ -364,7 +337,7 @@ export function UsersTable({
 							Rows per page
 						</Label>
 						<Select
-							value={`${table.getState().pagination.pageSize}`}
+							value={`${table.state.pagination.pageSize}`}
 							onValueChange={(value) => {
 								table.setPageSize(Number(value));
 							}}
@@ -384,7 +357,7 @@ export function UsersTable({
 					</div>
 
 					<TablePagination
-						page={table.getState().pagination.pageIndex}
+						page={table.state.pagination.pageIndex}
 						totalPages={table.getPageCount()}
 						{...(renderPageLink
 							? { renderPageLink }

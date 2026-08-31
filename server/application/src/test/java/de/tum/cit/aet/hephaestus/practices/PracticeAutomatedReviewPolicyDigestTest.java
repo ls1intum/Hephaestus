@@ -32,39 +32,30 @@ class PracticeAutomatedReviewPolicyDigestTest extends BaseUnitTest {
      */
     @Test
     void shouldChangeWhenAKnownLimitationChanges() {
-        assertThat(PracticeAutomatedReviewPolicyDigest.digest(policy())).isNotEqualTo(
-            PracticeAutomatedReviewPolicyDigest.digest(
-                new PracticeAutomatedReviewPolicy(
-                    new SourceContractVersion("1.0.0"),
-                    capability(
-                        PracticeAutomatedReviewMode.LANGUAGE_MODEL,
-                        PracticeEvidenceSufficiency.SUFFICIENT_WHEN_REQUIREMENTS_MET
-                    ),
-                    PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,
-                    List.of(new PracticeEvidenceLimitation("RUNTIME_NOT_OBSERVED", "Something else entirely.")),
-                    null
-                )
-            )
-        );
+        assertThat(PracticeAutomatedReviewPolicyDigest.digest(policy()))
+                .isNotEqualTo(PracticeAutomatedReviewPolicyDigest.digest(new PracticeAutomatedReviewPolicy(
+                        new SourceContractVersion("1.0.0"),
+                        capability(
+                                PracticeAutomatedReviewMode.LANGUAGE_MODEL,
+                                PracticeEvidenceSufficiency.SUFFICIENT_WHEN_REQUIREMENTS_MET),
+                        PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,
+                        List.of(new PracticeEvidenceLimitation("RUNTIME_NOT_OBSERVED", "Something else entirely.")),
+                        null)));
     }
 
     private static PracticeAutomatedReviewPolicy policy() {
         return new PracticeAutomatedReviewPolicy(
-            new SourceContractVersion("1.0.0"),
-            capability(
-                PracticeAutomatedReviewMode.LANGUAGE_MODEL,
-                PracticeEvidenceSufficiency.SUFFICIENT_WHEN_REQUIREMENTS_MET
-            ),
-            PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,
-            List.of(new PracticeEvidenceLimitation("RUNTIME_NOT_OBSERVED", "Runtime behavior is outside scope.")),
-            null
-        );
+                new SourceContractVersion("1.0.0"),
+                capability(
+                        PracticeAutomatedReviewMode.LANGUAGE_MODEL,
+                        PracticeEvidenceSufficiency.SUFFICIENT_WHEN_REQUIREMENTS_MET),
+                PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,
+                List.of(new PracticeEvidenceLimitation("RUNTIME_NOT_OBSERVED", "Runtime behavior is outside scope.")),
+                null);
     }
 
     private static PracticeAutomatedReview capability(
-        PracticeAutomatedReviewMode method,
-        PracticeEvidenceSufficiency coverage
-    ) {
+            PracticeAutomatedReviewMode method, PracticeEvidenceSufficiency coverage) {
         return new PracticeAutomatedReview(method, coverage);
     }
 }

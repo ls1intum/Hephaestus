@@ -8,25 +8,23 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 public record CuratedPracticeSummaryDTO(
-    @NonNull String slug,
-    @NonNull String name,
-    @NonNull ArtifactKind artifactKind,
-    @NonNull PracticeAutomatedReview automatedReview,
-    @Nullable String groupSlug,
-    @NonNull Integer position,
-    @NonNull Boolean effectivelyOffered,
-    @NonNull CatalogEntryStatusDTO status
-) {
+        @NonNull String slug,
+        @NonNull String name,
+        @NonNull ArtifactKind artifactKind,
+        @NonNull PracticeAutomatedReview automatedReview,
+        @Nullable String groupSlug,
+        @NonNull Integer position,
+        @NonNull Boolean effectivelyOffered,
+        @NonNull CatalogEntryStatusDTO status) {
     public static CuratedPracticeSummaryDTO from(CatalogEntry<PracticeDefinition> entry, boolean effectivelyOffered) {
         return new CuratedPracticeSummaryDTO(
-            entry.slug(),
-            entry.effective().name(),
-            entry.effective().artifactKind(),
-            entry.effective().automatedReviewPolicy().automatedReview(),
-            entry.effective().groupSlug(),
-            entry.position(),
-            effectivelyOffered,
-            CatalogEntryStatusDTO.from(entry)
-        );
+                entry.slug(),
+                entry.effective().name(),
+                entry.effective().artifactKind(),
+                entry.effective().automatedReviewPolicy().automatedReview(),
+                entry.effective().groupSlug(),
+                entry.position(),
+                effectivelyOffered,
+                CatalogEntryStatusDTO.from(entry));
     }
 }

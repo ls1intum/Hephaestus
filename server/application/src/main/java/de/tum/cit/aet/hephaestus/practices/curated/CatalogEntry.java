@@ -8,15 +8,14 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 public record CatalogEntry<D extends CatalogDefinition>(
-    String slug,
-    D effective,
-    @Nullable D shipped,
-    @Nullable D overridden,
-    @Nullable String acceptedBundledDigest,
-    boolean retired,
-    int position,
-    @Nullable Instant updatedAt
-) {
+        String slug,
+        D effective,
+        @Nullable D shipped,
+        @Nullable D overridden,
+        @Nullable String acceptedBundledDigest,
+        boolean retired,
+        int position,
+        @Nullable Instant updatedAt) {
     public CatalogEntry {
         Objects.requireNonNull(slug, "slug");
         Objects.requireNonNull(effective, "effective");
@@ -37,8 +36,8 @@ public record CatalogEntry<D extends CatalogDefinition>(
             return CatalogEntryState.EDITED_HERE;
         }
         return CuratedDefinitionDigest.of(slug, shipped).equals(acceptedBundledDigest)
-            ? CatalogEntryState.EDITED_HERE
-            : CatalogEntryState.UPDATE_WAITING;
+                ? CatalogEntryState.EDITED_HERE
+                : CatalogEntryState.UPDATE_WAITING;
     }
 
     /** Classifies the consequence of applying the bundled definition, not the cause of the difference. */
@@ -53,8 +52,8 @@ public record CatalogEntry<D extends CatalogDefinition>(
             return CatalogChangeKind.PRESENTATION;
         }
         return shipped.provenanceFingerprint(slug).equals(overridden.provenanceFingerprint(slug))
-            ? CatalogChangeKind.WORDING
-            : CatalogChangeKind.DETECTION;
+                ? CatalogChangeKind.WORDING
+                : CatalogChangeKind.DETECTION;
     }
 
     public boolean offered() {
@@ -63,13 +62,13 @@ public record CatalogEntry<D extends CatalogDefinition>(
 
     public String etag() {
         return new CanonicalDigest()
-            .add(slug)
-            .add(CuratedDefinitionDigest.of(slug, effective))
-            .addNullable(shipped == null ? null : CuratedDefinitionDigest.of(slug, shipped))
-            .addNullable(acceptedBundledDigest)
-            .add(state().name())
-            .add(changeKind().name())
-            .addInt(retired ? 1 : 0)
-            .hex();
+                .add(slug)
+                .add(CuratedDefinitionDigest.of(slug, effective))
+                .addNullable(shipped == null ? null : CuratedDefinitionDigest.of(slug, shipped))
+                .addNullable(acceptedBundledDigest)
+                .add(state().name())
+                .add(changeKind().name())
+                .addInt(retired ? 1 : 0)
+                .hex();
     }
 }

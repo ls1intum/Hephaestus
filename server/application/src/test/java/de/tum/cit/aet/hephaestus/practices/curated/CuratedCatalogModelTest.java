@@ -20,16 +20,10 @@ class CuratedCatalogModelTest extends BaseUnitTest {
         BundledPracticeCatalog first = catalog(entry("a", "A", 0), entry("b", "B", 1));
         BundledPracticeCatalog reordered = catalog(entry("b", "B", 0), entry("a", "A", 1));
 
-        assertThat(slugs(CuratedCatalogModel.compose(first, List.of(custom), List.of()))).containsExactly(
-            "a",
-            "b",
-            "custom"
-        );
-        assertThat(slugs(CuratedCatalogModel.compose(reordered, List.of(custom), List.of()))).containsExactly(
-            "b",
-            "a",
-            "custom"
-        );
+        assertThat(slugs(CuratedCatalogModel.compose(first, List.of(custom), List.of())))
+                .containsExactly("a", "b", "custom");
+        assertThat(slugs(CuratedCatalogModel.compose(reordered, List.of(custom), List.of())))
+                .containsExactly("b", "a", "custom");
     }
 
     @Test
@@ -37,10 +31,8 @@ class CuratedCatalogModelTest extends BaseUnitTest {
         CuratedGroupOverride second = customGroup("z-second", "Same name");
         CuratedGroupOverride first = customGroup("a-first", "Same name");
 
-        assertThat(slugs(CuratedCatalogModel.compose(catalog(), List.of(second, first), List.of()))).containsExactly(
-            "a-first",
-            "z-second"
-        );
+        assertThat(slugs(CuratedCatalogModel.compose(catalog(), List.of(second, first), List.of())))
+                .containsExactly("a-first", "z-second");
     }
 
     private static CuratedGroupOverride customGroup(String slug, String name) {

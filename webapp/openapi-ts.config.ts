@@ -1,10 +1,10 @@
-import { defaultPlugins, defineConfig } from "@hey-api/openapi-ts";
+import { defineConfig } from "@hey-api/openapi-ts";
 
 export default defineConfig({
 	input: "../server/openapi.yaml",
 	output: "src/api",
 	plugins: [
-		...defaultPlugins,
+		"@hey-api/typescript",
 		"@hey-api/client-fetch",
 		{
 			name: "@tanstack/react-query",
@@ -15,16 +15,13 @@ export default defineConfig({
 			bigInt: false,
 			name: "@hey-api/transformers",
 		},
-		// The transformers plugin only *emits* `transformers.gen.ts`; the SDK ignores it unless asked.
-		// Without this the generated types promise `Date` while the fetch client hands back the raw
-		// ISO string, so anything typed against the client (`.toLocaleDateString()`) throws on the
-		// first real response while every `new Date(…)` fixture stays green.
+		// Apply generated date transformers so SDK values match their Date types.
 		{
 			name: "@hey-api/sdk",
 			transformer: true,
 		},
 	],
-	// Generated query hooks do not support SSE responses; Mentor uses use-mentor-chat.ts.
+	// SSE operations use the streaming client rather than generated query hooks.
 	parser: {
 		filters: {
 			operations: {

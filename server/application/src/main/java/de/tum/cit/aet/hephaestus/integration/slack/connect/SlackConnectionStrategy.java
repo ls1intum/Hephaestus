@@ -39,16 +39,15 @@ public class SlackConnectionStrategy implements ConnectionStrategy {
     // Exact Slack bot scopes used by current code and subscribed events. Channel reading still requires
     // workspace-admin channel activation and the per-member opt-out firewall.
     static final Set<String> DEFAULT_SCOPES = Set.of(
-        "chat:write",
-        "assistant:write",
-        "im:history",
-        "channels:history",
-        "groups:history",
-        "channels:read",
-        "channels:join",
-        "groups:read",
-        "users:read"
-    );
+            "chat:write",
+            "assistant:write",
+            "im:history",
+            "channels:history",
+            "groups:history",
+            "channels:read",
+            "channels:join",
+            "groups:read",
+            "users:read");
 
     private final OAuthStateService oauthStateService;
     private final ConnectionService connectionService;
@@ -60,14 +59,13 @@ public class SlackConnectionStrategy implements ConnectionStrategy {
     private final String redirectUri;
 
     public SlackConnectionStrategy(
-        OAuthStateService oauthStateService,
-        ConnectionService connectionService,
-        SlackOAuthClient oauthClient,
-        SlackCredentialProvider credentialProvider,
-        SlackWorkspaceContentEraser workspaceContentEraser,
-        @Value("${hephaestus.integration.slack.client-id:}") String clientId,
-        @Value("${hephaestus.integration.slack.redirect-uri:}") String redirectUri
-    ) {
+            OAuthStateService oauthStateService,
+            ConnectionService connectionService,
+            SlackOAuthClient oauthClient,
+            SlackCredentialProvider credentialProvider,
+            SlackWorkspaceContentEraser workspaceContentEraser,
+            @Value("${hephaestus.integration.slack.client-id:}") String clientId,
+            @Value("${hephaestus.integration.slack.redirect-uri:}") String redirectUri) {
         this.oauthStateService = oauthStateService;
         this.connectionService = connectionService;
         this.oauthClient = oauthClient;
@@ -90,13 +88,13 @@ public class SlackConnectionStrategy implements ConnectionStrategy {
         }
         String state = oauthStateService.issue(request.workspaceId(), IntegrationKind.SLACK, request.actorRef());
         StringBuilder url = new StringBuilder(AUTHORIZE_URL)
-            .append('?')
-            .append("client_id=")
-            .append(enc(clientId))
-            .append("&scope=")
-            .append(enc(scopes))
-            .append("&state=")
-            .append(enc(state));
+                .append('?')
+                .append("client_id=")
+                .append(enc(clientId))
+                .append("&scope=")
+                .append(enc(scopes))
+                .append("&state=")
+                .append(enc(state));
         url.append("&redirect_uri=").append(enc(redirectUri));
         return new ConnectInitiation.RedirectToVendor(URI.create(url.toString()), state);
     }
@@ -127,19 +125,14 @@ public class SlackConnectionStrategy implements ConnectionStrategy {
             return new ConnectFinalization.Failed("oauth response missing access_token");
         }
         ConnectionConfig.SlackConfig config = new ConnectionConfig.SlackConfig(
-            r.team().id(),
-            r.team().name(),
-            /* notificationChannelId */ null,
-            /* teamLabel */ null,
-            /* retentionDays */ null,
-            Set.of()
-        );
+                r.team().id(),
+                r.team().name(),
+                /* notificationChannelId */ null,
+                /* teamLabel */ null,
+                /* retentionDays */ null,
+                Set.of());
         return new ConnectFinalization.Completed(
-            r.team().id(),
-            new BearerToken(r.accessToken(), null),
-            r.team().name(),
-            config
-        );
+                r.team().id(), new BearerToken(r.accessToken(), null), r.team().name(), config);
     }
 
     /**
@@ -164,9 +157,8 @@ public class SlackConnectionStrategy implements ConnectionStrategy {
         }
         workspaceContentEraser.eraseWorkspace(ref.workspaceId());
         log.info(
-            "slack.audit: revoke erase — cleared ingested Slack content + consent for workspace={}",
-            ref.workspaceId()
-        );
+                "slack.audit: revoke erase — cleared ingested Slack content + consent for workspace={}",
+                ref.workspaceId());
     }
 
     @Override
@@ -180,10 +172,10 @@ public class SlackConnectionStrategy implements ConnectionStrategy {
             return;
         }
         BearerToken token = credentialProvider
-            .resolve(ref)
-            .filter(BearerToken.class::isInstance)
-            .map(BearerToken.class::cast)
-            .orElseThrow(() -> new IllegalStateException("Slack bot token is unavailable"));
+                .resolve(ref)
+                .filter(BearerToken.class::isInstance)
+                .map(BearerToken.class::cast)
+                .orElseThrow(() -> new IllegalStateException("Slack bot token is unavailable"));
         oauthClient.revokeStrict(token.token());
         // Token revocation does not remove the team-level Slack app installation.
     }

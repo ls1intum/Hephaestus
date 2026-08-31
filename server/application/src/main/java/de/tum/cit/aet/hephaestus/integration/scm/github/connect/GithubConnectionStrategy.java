@@ -39,15 +39,14 @@ public class GithubConnectionStrategy implements ConnectionStrategy {
     private final ScmWorkspaceContentEraser contentEraser;
 
     public GithubConnectionStrategy(
-        @Value(
-            "${hephaestus.integration.github.app.installation-url:${hephaestus.integration.github.app.install-url:}}"
-        ) String installUrl,
-        @Value("${hephaestus.integration.github.app.id:}") String appId,
-        OAuthStateService oauthStateService,
-        ConnectionService connectionService,
-        GitHubAppTokenService appTokenService,
-        ScmWorkspaceContentEraser contentEraser
-    ) {
+            @Value(
+                            "${hephaestus.integration.github.app.installation-url:${hephaestus.integration.github.app.install-url:}}")
+                    String installUrl,
+            @Value("${hephaestus.integration.github.app.id:}") String appId,
+            OAuthStateService oauthStateService,
+            ConnectionService connectionService,
+            GitHubAppTokenService appTokenService,
+            ScmWorkspaceContentEraser contentEraser) {
         this.installUrl = installUrl == null ? "" : installUrl.trim();
         this.appId = appId == null ? "" : appId.trim();
         this.oauthStateService = oauthStateService;
@@ -65,14 +64,12 @@ public class GithubConnectionStrategy implements ConnectionStrategy {
     public ConnectInitiation initiate(InitiateRequest request) {
         if (installUrl.isEmpty()) {
             throw new IllegalStateException(
-                "hephaestus.integration.github.app.installation-url is not configured — cannot initiate GitHub App install"
-            );
+                    "hephaestus.integration.github.app.installation-url is not configured — cannot initiate GitHub App install");
         }
         String state = oauthStateService.issue(request.workspaceId(), IntegrationKind.GITHUB, request.actorRef());
         String separator = installUrl.contains("?") ? "&" : "?";
         URI vendorUrl = URI.create(
-            installUrl + separator + CALLBACK_PARAM_STATE + "=" + URLEncoder.encode(state, StandardCharsets.UTF_8)
-        );
+                installUrl + separator + CALLBACK_PARAM_STATE + "=" + URLEncoder.encode(state, StandardCharsets.UTF_8));
         return new ConnectInitiation.RedirectToVendor(vendorUrl, state);
     }
 
@@ -121,12 +118,8 @@ public class GithubConnectionStrategy implements ConnectionStrategy {
             return;
         }
         var connection = connectionOpt.get();
-        var resolvedRef = new IntegrationRef(
-            ref.kind(),
-            ref.workspaceId(),
-            connection.getInstanceKey(),
-            connection.getId()
-        );
+        var resolvedRef =
+                new IntegrationRef(ref.kind(), ref.workspaceId(), connection.getInstanceKey(), connection.getId());
         if (connectionService.hasOtherInstalledConnection(resolvedRef)) {
             return;
         }

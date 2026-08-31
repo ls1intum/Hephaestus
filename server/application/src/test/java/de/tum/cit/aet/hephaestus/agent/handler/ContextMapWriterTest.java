@@ -19,12 +19,11 @@ class ContextMapWriterTest {
     @DisplayName("points at the neighbours, the test counterpart, and what else mentions a changed file")
     void mapsTheNeighbourhoodOfEachChangedFile() {
         Map<String, byte[]> files = staged(
-            "src/app/Depth.java",
-            "src/app/Encoder.java",
-            "src/app/Other.java",
-            "src/test/DepthTest.java",
-            "docs/Depth.md"
-        );
+                "src/app/Depth.java",
+                "src/app/Encoder.java",
+                "src/app/Other.java",
+                "src/test/DepthTest.java",
+                "docs/Depth.md");
 
         ContextMapWriter.write(files);
 
@@ -68,9 +67,9 @@ class ContextMapWriterTest {
     private static Map<String, byte[]> staged(String changed, String... treeOnly) {
         Map<String, byte[]> files = new LinkedHashMap<>();
         files.put(SandboxLayout.CONTEXT_PREFIX + "diff.patch", diff(changed));
-        files.put(SandboxLayout.REPO_MOUNT_RELATIVE + changed, new byte[] { 1 });
+        files.put(SandboxLayout.REPO_MOUNT_RELATIVE + changed, new byte[] {1});
         for (String path : treeOnly) {
-            files.put(SandboxLayout.REPO_MOUNT_RELATIVE + path, new byte[] { 1 });
+            files.put(SandboxLayout.REPO_MOUNT_RELATIVE + path, new byte[] {1});
         }
         return files;
     }

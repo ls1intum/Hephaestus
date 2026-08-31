@@ -32,7 +32,13 @@ sequenceDiagram
     M->>VP: changesets action folds pending changesets into the accumulating Version PR
     Note over VP: CHANGELOG.md + version bump preview
     VP->>M: Maintainer merges when the release is ready
-    M->>R: Tag vX.Y.Z, GitHub Release with curated notes,<br/>docker images X.Y.Z / X.Y / latest
+    M->>R: Create draft vX.Y.Z release
+    R->>R: Generate and verify digest-bound evidence
+    R->>R: Upgrade seeded data from the previous stable release
+    R->>R: Qualify supported hosts
+    R->>R: Promote X.Y.Z / X.Y / latest image tags
+    R->>R: Publish release and deploy staging
+    Note over R: Production still requires approval
 ```
 
 1. **Every user-facing PR carries a changeset.** `pnpm changeset` asks for the bump type and an
@@ -45,15 +51,68 @@ sequenceDiagram
    titled `chore(release): version packages` that previews the next version and the assembled
    `CHANGELOG.md` section. It is safe to leave open — it updates itself. It is opened by
    `github-actions[bot]` and deliberately runs **no CI**: it only bumps a version string and
-   rewrites the changelog, and it is re-pushed on every merge to `main`, so running the full matrix
-   on it would burn CI without validating anything. Validation happens after the merge — `main` runs
-   the full suite and a release is only cut if that run succeeds. Maintainers bypass the branch
-   ruleset, so the absent required checks don't block the merge. Versioning also moves any
-   `### Next release` section in `MIGRATION.md` under the version being cut.
-3. **Merging the Version PR cuts the release.** The release workflow tags `vX.Y.Z` at the merge
-   commit, creates the GitHub Release from the new changelog section, retags the CI-built Docker
-   images as `X.Y.Z`, `X.Y`, and `latest`, publishes the signed release-pin asset, and starts the
-   deploy chain (staging automatically, production after approval).
+   rewrites the changelog. `GITHUB_TOKEN` updates do not trigger the required workflows, so release
+   automation uses the ruleset bypass. Validation happens after the merge: `main` runs the full suite
+   and a release is only cut if that run succeeds. Versioning also moves any
+   migration fragments at the existing `### Next release` anchor in `MIGRATION.md`, creates the
+   versioned section beneath it, and consumes the fragments.
+3. **Merging the Version PR cuts the release.** The workflow creates a draft release at the merge
+   commit. After its evidence, seeded-upgrade, and supported-host gates pass, it promotes the CI-built images to
+   `X.Y.Z`, `X.Y`, and `latest`, publishes the release, deploys staging, and requests production
+   approval.
+
+## Supported-host qualification
+
+Every release boots its signed, immutable image lock through the self-hosted topology on native Ubuntu
+24.04 `amd64` and `arm64` hosts. The gate enforces the [published support matrix](../admin/install#supported-host-matrix),
+waits for stack readiness, and exercises HTTPS ingress. Either cell can block publication.
+
+Each cell's status record is attached to the immutable GitHub release. This qualification covers a
+clean boot; the seeded-upgrade gate separately proves the supported migration path.
+
+## Supply-chain evidence
+
+A release remains a draft until every first-party and upstream production image in
+`security/release-images.json` has passed the evidence
+gate. The gate resolves each image index and its `linux/amd64` and `linux/arm64` manifests to immutable
+digests. It generates a lossless Syft inventory plus SPDX and CycloneDX SBOMs for each deployed platform.
+The gate proves that the Syft source metadata identifies the exact digest and architecture, checks that
+every discovered package survives both standard-format conversions, and records packages whose license
+could not be detected. It also scans each platform manifest with Trivy, signs its SPDX predicate as an OCI
+attestation, and verifies the image signature and build provenance. The SBOMs, license reports, scan
+reports, applied policy, checksums, and `manifest.json` are GitHub Release assets, so they outlive Actions
+artifact retention. Publication requires every artifact to be present, well formed, and bound to its
+recorded digest.
+
+Upstream NATS, Traefik, nginx, and Alpine images are versioned and digest-pinned in the production
+Compose topology. They receive the same per-platform SBOM, license, vulnerability, and index-membership
+evidence as first-party images. Hephaestus requires its own signatures and build provenance only for
+images it builds; it does not misrepresent observed upstream images as Hephaestus-built artifacts.
+
+The version-controlled policy rejects every HIGH or CRITICAL finding. A residual finding requires an
+exception scoped to its image, vulnerability, package, and installed version, with an owner, justification,
+evidence URL, and expiry no more than 90 days away. Each exception and policy report records the scanned
+platform and digest.
+
+The latest release is rescanned weekly. A policy violation or scan failure is reported on
+[the vulnerability response issue](https://github.com/ls1intum/Hephaestus/issues/1369); scanner failure
+is never treated as no findings.
+
+## Browser source maps
+
+Image builds upload hidden source maps through Sentry's debug-ID integration when the repository
+secrets `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, and `SENTRY_PROJECT` are all configured. The token must be
+authorized to upload artifacts to that project. Builds reject a partial configuration, pass the
+values as BuildKit secrets to the `amd64` build outside pull requests, and remove maps before creating
+either nginx image. The runtime release remains the same version the application server receives
+from the verified release lock.
+
+### Operator verification
+
+The [release image lock](../admin/release-image-lock) is the canonical verification procedure. It
+verifies the lock signer and release identity before Compose consumes any digest. The remaining
+release assets provide the per-platform SBOM, vulnerability, license, and index-membership evidence;
+`SHA256SUMS` covers that evidence set.
 
 ## Writing changesets
 
@@ -69,21 +128,23 @@ A changeset summary becomes the `CHANGELOG.md` entry **verbatim** — write it i
 - **Don't mention automatic migrations** — the release notes get an automatic "back up before
   upgrading" banner whenever a release touches `server/application/src/main/resources/db/changelog/`, so the
   changeset stays user-facing. Only a migration that requires operator action belongs in the summary
-  (`**Operators:** …` + [`MIGRATION.md`](https://github.com/ls1intum/Hephaestus/blob/main/MIGRATION.md)).
+  (`**Operators:** …` plus a `.migration/<changeset-slug>.md` fragment).
 - **Bump = the operator's upgrade cost**, not code semantics:
   - `patch` — upgrade needs no action (bug fix, internal change, additive auto-applied migration).
   - `minor` — new capability, still zero-action; note any new *optional* env var / flag in the summary.
   - `major` — operator must act first (required new env var, removed/renamed config, destructive/manual
-    migration, dropped API); state the action and update [`MIGRATION.md`](https://github.com/ls1intum/Hephaestus/blob/main/MIGRATION.md).
+    migration, dropped API); state the action and add a `.migration` fragment.
 
 No TTY (agents, CI)? `pnpm changeset` is interactive — write the file by hand instead: create
 `.changeset/<slug>.md` with frontmatter `"hephaestus": <bump>` and the summary as the body (see
-`.changeset/README.md`). Never hand-edit `CHANGELOG.md`.
+`.changeset/README.md`). When action is required, add `.migration/<slug>.md` with the complete
+`#### 🔴 …` guide entry. CI requires the matching slug and `**Operators:**` marker. Never hand-edit
+`CHANGELOG.md` or `MIGRATION.md`; versioning generates both.
 
 :::caution Pre-1.0
 Never pick a `major` bump while the version is `0.x` — it would cut 1.0.0, and CI rejects it. Breaking
 changes ride in `minor` instead, so a pre-1.0 `minor` is **not** guaranteed zero-action: if the operator
-must act, say so in the summary and update `MIGRATION.md` exactly as a `major` would. The 1.0.0 release
+must act, say so in the summary and add a migration fragment exactly as a `major` would. The 1.0.0 release
 ships deliberately with the [1.0 milestone](https://github.com/ls1intum/Hephaestus/issues/1378) via a
 single sanctioned major changeset.
 :::
@@ -95,9 +156,9 @@ The whole app is versioned as one product: changesets target the root `hephaestu
 
 | Environment | Trigger | Approval | URL |
 | --- | --- | --- | --- |
-| Staging | Release cut | None (auto) | https://staging.hephaestus.cit.tum.de |
-| Production | Release cut | Required reviewer | https://hephaestus.cit.tum.de |
-| PR previews | Coolify per PR (opt-in) | — | — |
+| Staging | Green commit on `main` | None (auto) | https://staging.hephaestus.aet.cit.tum.de |
+| Production | Release cut | Required reviewer | https://hephaestus.aet.cit.tum.de |
+| PR previews | `preview` label on a same-repo PR | None (push access) | PR deployment link |
 
 Verify staging before approving production. Hotfixes have no separate process: PR → changeset →
 merge → merge the Version PR.
@@ -106,15 +167,19 @@ merge → merge the Version PR.
 
 Version numbers in source manifests stay at their placeholders (`webapp/package.json` and `server/pom.xml`
 are `0.0.0-development`) — the **release version**
-lives in the root `package.json` and is bumped only by the Version PR. At deploy time,
-`APP_VERSION` is set from the image tag via Docker Compose; the application server exposes it as
-`spring.application.version`.
+lives in the root `package.json` and is bumped only by the Version PR. At deploy time, the verified release lock supplies `APP_VERSION`; the application server exposes it
+as `spring.application.version`.
 
 Check the current release: `git describe --tags --abbrev=0` or
 [GitHub Releases](https://github.com/ls1intum/Hephaestus/releases).
 
 ## Dependency management
 
-Dependencies are updated via [Renovate Bot](https://docs.renovatebot.com/) (Monday mornings;
-patches/minors automerge after 3 days, majors need review). Bot PRs are exempt from the changeset
-check — when a dependency bump is user-facing, a maintainer adds the changeset.
+Routine dependency updates require approval through the
+[Renovate Dependency Dashboard](https://docs.renovatebot.com/key-concepts/dashboard/) and observe
+the configured schedule and release age. Vulnerability-fix pull requests bypass those controls but
+still require review. Bot PRs are exempt from the changeset check — when a dependency bump is
+user-facing, a maintainer adds the changeset.
+
+Exact pins remain exact during Renovate updates. Formatter upgrades must include and separately review
+any resulting mechanical formatting changes.

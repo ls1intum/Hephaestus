@@ -53,11 +53,10 @@ class SlackMessageServiceLiveTest {
         // Real per-row AES-GCM encryption (same converter the app wires), AAD-bound to this row.
         CredentialBundleConverter converter = new CredentialBundleConverter("a".repeat(32), "live");
         Connection connection = new Connection(
-            workspace,
-            IntegrationKind.SLACK,
-            "T-live-e2e",
-            new ConnectionConfig.SlackConfig("T-live-e2e", "hephaestus-test", channelId, null, null, Set.of())
-        );
+                workspace,
+                IntegrationKind.SLACK,
+                "T-live-e2e",
+                new ConnectionConfig.SlackConfig("T-live-e2e", "hephaestus-test", channelId, null, null, Set.of()));
         connection.setState(IntegrationState.ACTIVE);
         connection.setCredentials(new BearerToken(botToken, null), converter);
         // Prove the round-trip before we ever hit Slack: the stored blob decrypts back to the token.
@@ -68,27 +67,20 @@ class SlackMessageServiceLiveTest {
 
         SlackCredentialProvider credentialProvider = new SlackCredentialProvider(connectionService, converter);
         SlackMessageService service = new SlackMessageService(
-            credentialProvider,
-            new SlackRateLimitTracker(new SimpleMeterRegistry()),
-            new OutboundEgressGuard(() -> false)
-        );
+                credentialProvider,
+                new SlackRateLimitTracker(new SimpleMeterRegistry()),
+                new OutboundEgressGuard(() -> false));
 
         // The real send: block-kit payload through the app's SlackMessageService to the live channel.
-        assertThatCode(() ->
-            service.sendForWorkspace(
-                workspaceId,
-                channelId,
-                asBlocks(
-                    section(s ->
-                        s.text(
-                            markdownText(
-                                ":white_check_mark: Hephaestus #1198 Slack E2E — posted via the app's SlackMessageService (encrypted Connection → decrypt → chat.postMessage)."
-                            )
-                        )
-                    )
-                ),
-                "Hephaestus #1198 Slack E2E"
-            )
-        ).doesNotThrowAnyException();
+        assertThatCode(() -> service.sendForWorkspace(
+                        workspaceId,
+                        channelId,
+                        asBlocks(
+                                section(
+                                        s -> s.text(
+                                                markdownText(
+                                                        ":white_check_mark: Hephaestus #1198 Slack E2E — posted via the app's SlackMessageService (encrypted Connection → decrypt → chat.postMessage).")))),
+                        "Hephaestus #1198 Slack E2E"))
+                .doesNotThrowAnyException();
     }
 }

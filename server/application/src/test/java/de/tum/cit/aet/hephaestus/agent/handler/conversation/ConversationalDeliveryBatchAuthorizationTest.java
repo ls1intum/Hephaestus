@@ -74,7 +74,9 @@ class ConversationalDeliveryBatchAuthorizationTest extends BaseUnitTest {
      * "refused" fails here instead of passing quietly.
      */
     @ParameterizedTest
-    @EnumSource(value = DeliveryOutcome.class, names = { "DELIVERED", "INSTANCE_SILENCED" })
+    @EnumSource(
+            value = DeliveryOutcome.class,
+            names = {"DELIVERED", "INSTANCE_SILENCED"})
     void actsOnlyOnTheLinkedObservationEveryConjunctStillAdmits(DeliveryOutcome ending) {
         FeedbackRepository feedbackRepository = mock(FeedbackRepository.class);
         FeedbackObservationRepository feedbackObservations = mock(FeedbackObservationRepository.class);
@@ -89,18 +91,16 @@ class ConversationalDeliveryBatchAuthorizationTest extends BaseUnitTest {
         Observation staleClaim = observation(PERMITTED_KIND, false);
         Observation deliverable = observation(PERMITTED_KIND, true);
         List<UUID> linked = List.of(
-            deniedSource.getId(),
-            unreadable.getId(),
-            runWithoutRow.getId(),
-            staleClaim.getId(),
-            deliverable.getId()
-        );
+                deniedSource.getId(),
+                unreadable.getId(),
+                runWithoutRow.getId(),
+                staleClaim.getId(),
+                deliverable.getId());
 
         // Everything but `unreadable`: an id the workspace-scoped read does not return is the same absence
         // the single-id findByIdAndWorkspaceId reported as an empty Optional.
-        when(observations.findAllByIdInAndWorkspaceId(any(), eq(WS))).thenReturn(
-            List.of(deniedSource, runWithoutRow, staleClaim, deliverable)
-        );
+        when(observations.findAllByIdInAndWorkspaceId(any(), eq(WS)))
+                .thenReturn(List.of(deniedSource, runWithoutRow, staleClaim, deliverable));
         List<UUID> authorizationAskedAbout = new ArrayList<>();
         when(jobs.findEvidenceContractVersions(eq(WS), any())).thenAnswer(invocation -> {
             Collection<UUID> jobIds = invocation.getArgument(1);
@@ -108,29 +108,23 @@ class ConversationalDeliveryBatchAuthorizationTest extends BaseUnitTest {
             // No row for runWithoutRow — a run this workspace does not own, or one that recorded no
             // snapshot. The single-row form answered both with an empty Optional.
             return List.of(
-                new ContractRow(deniedSource.getAgentJobId(), "1.0.0"),
-                new ContractRow(deliverable.getAgentJobId(), "1.0.0")
-            );
+                    new ContractRow(deniedSource.getAgentJobId(), "1.0.0"),
+                    new ContractRow(deliverable.getAgentJobId(), "1.0.0"));
         });
-        when(
-            catalogs.isSourceUsePermitted(
-                new SourceContractVersion("1.0.0"),
-                new SourceKind(PERMITTED_KIND),
-                SourceUsePurpose.CONVERSATIONAL_MENTORING
-            )
-        ).thenReturn(true);
-        when(
-            catalogs.isSourceUsePermitted(
-                new SourceContractVersion("1.0.0"),
-                new SourceKind(DENIED_KIND),
-                SourceUsePurpose.CONVERSATIONAL_MENTORING
-            )
-        ).thenReturn(false);
+        when(catalogs.isSourceUsePermitted(
+                        new SourceContractVersion("1.0.0"),
+                        new SourceKind(PERMITTED_KIND),
+                        SourceUsePurpose.CONVERSATIONAL_MENTORING))
+                .thenReturn(true);
+        when(catalogs.isSourceUsePermitted(
+                        new SourceContractVersion("1.0.0"),
+                        new SourceKind(DENIED_KIND),
+                        SourceUsePurpose.CONVERSATIONAL_MENTORING))
+                .thenReturn(false);
 
         UUID deliverableUnit = UUID.randomUUID();
-        when(
-            feedbackObservations.findPreparedConversationFeedbackIdsByObservation(WS, RECIPIENT, deliverable.getId())
-        ).thenReturn(List.of(deliverableUnit));
+        when(feedbackObservations.findPreparedConversationFeedbackIdsByObservation(WS, RECIPIENT, deliverable.getId()))
+                .thenReturn(List.of(deliverableUnit));
         // Lenient on purpose: neither ending may reach these lookups, and if one does, the unit it finds is
         // what the assertion below catches it acting on.
         UUID deniedSourceUnit = trapUnit(feedbackObservations, deniedSource);
@@ -140,55 +134,58 @@ class ConversationalDeliveryBatchAuthorizationTest extends BaseUnitTest {
         // Answered for any unit, not just the deliverable one: a wrongly-admitted observation must fail on the
         // assertion below, which names the unit it acted on, rather than on a stubbing mismatch.
         Feedback deliveredRow = mock(Feedback.class);
-        lenient().when(feedbackRepository.markConversationDelivered(any(), any())).thenReturn(1);
-        lenient().when(feedbackRepository.markConversationSuppressedBySilentMode(any())).thenReturn(1);
+        lenient()
+                .when(feedbackRepository.markConversationDelivered(any(), any()))
+                .thenReturn(1);
+        lenient()
+                .when(feedbackRepository.markConversationSuppressedBySilentMode(any()))
+                .thenReturn(1);
         lenient().when(feedbackRepository.getReferenceById(any())).thenReturn(deliveredRow);
 
         ConversationalDeliveryReconciler reconciler = new ConversationalDeliveryReconciler(
-            feedbackRepository,
-            feedbackObservations,
-            placements,
-            observations,
-            new ObservationVisibilityPolicy(new EvidenceDeliveryAuthorization(jobs, catalogs))
-        );
+                feedbackRepository,
+                feedbackObservations,
+                placements,
+                observations,
+                new ObservationVisibilityPolicy(new EvidenceDeliveryAuthorization(jobs, catalogs)));
 
-        UUID actedOn = switch (ending) {
-            case DELIVERED -> {
-                assertThat(reconciler.reconcile(WS, RECIPIENT, UUID.randomUUID(), linked)).isEqualTo(1);
-                ArgumentCaptor<UUID> flipped = ArgumentCaptor.forClass(UUID.class);
-                verify(feedbackRepository, times(1)).markConversationDelivered(flipped.capture(), any(Instant.class));
-                verify(feedbackRepository, never()).markConversationSuppressedBySilentMode(any());
-                verify(placements, times(1)).save(any());
-                yield flipped.getValue();
-            }
-            case INSTANCE_SILENCED -> {
-                assertThat(reconciler.suppressForSilentMode(WS, RECIPIENT, linked)).isEqualTo(1);
-                ArgumentCaptor<UUID> burned = ArgumentCaptor.forClass(UUID.class);
-                verify(feedbackRepository, times(1)).markConversationSuppressedBySilentMode(burned.capture());
-                verify(feedbackRepository, never()).markConversationDelivered(any(), any());
-                // Nothing was said, so nothing was placed.
-                verify(placements, never()).save(any());
-                yield burned.getValue();
-            }
-            case NOT_DELIVERED -> throw new AssertionError("NOT_DELIVERED writes no unit; @EnumSource excludes it");
-        };
+        UUID actedOn =
+                switch (ending) {
+                    case DELIVERED -> {
+                        assertThat(reconciler.reconcile(WS, RECIPIENT, UUID.randomUUID(), linked))
+                                .isEqualTo(1);
+                        ArgumentCaptor<UUID> flipped = ArgumentCaptor.forClass(UUID.class);
+                        verify(feedbackRepository, times(1))
+                                .markConversationDelivered(flipped.capture(), any(Instant.class));
+                        verify(feedbackRepository, never()).markConversationSuppressedBySilentMode(any());
+                        verify(placements, times(1)).save(any());
+                        yield flipped.getValue();
+                    }
+                    case INSTANCE_SILENCED -> {
+                        assertThat(reconciler.suppressForSilentMode(WS, RECIPIENT, linked))
+                                .isEqualTo(1);
+                        ArgumentCaptor<UUID> burned = ArgumentCaptor.forClass(UUID.class);
+                        verify(feedbackRepository, times(1)).markConversationSuppressedBySilentMode(burned.capture());
+                        verify(feedbackRepository, never()).markConversationDelivered(any(), any());
+                        // Nothing was said, so nothing was placed.
+                        verify(placements, never()).save(any());
+                        yield burned.getValue();
+                    }
+                    case NOT_DELIVERED ->
+                        throw new AssertionError("NOT_DELIVERED writes no unit; @EnumSource excludes it");
+                };
 
         assertThat(actedOn)
-            .as(
-                "unit acted on for %s: denied=%s unreadable=%s noRun=%s stale=%s",
-                ending,
-                deniedSourceUnit,
-                unreadableUnit,
-                runWithoutRowUnit,
-                staleClaimUnit
-            )
-            .isEqualTo(deliverableUnit);
+                .as(
+                        "unit acted on for %s: denied=%s unreadable=%s noRun=%s stale=%s",
+                        ending, deniedSourceUnit, unreadableUnit, runWithoutRowUnit, staleClaimUnit)
+                .isEqualTo(deliverableUnit);
 
         // Currentness is decided first, so a superseded claim never reaches an evidence read — and can never
         // be readmitted by an authorization answer given about the batch it happened to be in.
         assertThat(authorizationAskedAbout)
-            .doesNotContain(staleClaim.getAgentJobId())
-            .contains(deniedSource.getAgentJobId(), runWithoutRow.getAgentJobId(), deliverable.getAgentJobId());
+                .doesNotContain(staleClaim.getAgentJobId())
+                .contains(deniedSource.getAgentJobId(), runWithoutRow.getAgentJobId(), deliverable.getAgentJobId());
         // One read of each kind for the whole turn, however many observations the mentor linked.
         verify(observations, times(1)).findAllByIdInAndWorkspaceId(any(), eq(WS));
         verify(jobs, times(1)).findEvidenceContractVersions(eq(WS), any());
@@ -197,14 +194,9 @@ class ConversationalDeliveryBatchAuthorizationTest extends BaseUnitTest {
     private static UUID trapUnit(FeedbackObservationRepository feedbackObservations, Observation observation) {
         UUID feedbackId = UUID.randomUUID();
         lenient()
-            .when(
-                feedbackObservations.findPreparedConversationFeedbackIdsByObservation(
-                    WS,
-                    RECIPIENT,
-                    observation.getId()
-                )
-            )
-            .thenReturn(List.of(feedbackId));
+                .when(feedbackObservations.findPreparedConversationFeedbackIdsByObservation(
+                        WS, RECIPIENT, observation.getId()))
+                .thenReturn(List.of(feedbackId));
         return feedbackId;
     }
 
@@ -217,18 +209,16 @@ class ConversationalDeliveryBatchAuthorizationTest extends BaseUnitTest {
         lenient().when(currentRevision.getReviewRuleFingerprint()).thenReturn("fingerprint");
         lenient().when(practice.getCurrentRevision()).thenReturn(currentRevision);
         return Observation.builder()
-            .id(UUID.randomUUID())
-            .agentJobId(UUID.randomUUID())
-            .practice(practice)
-            .practiceRevision(evaluated)
-            .evidence(MAPPER.readTree("{\"citations\":[{\"sourceKind\":\"" + sourceKind + "\"}]}"))
-            .build();
+                .id(UUID.randomUUID())
+                .agentJobId(UUID.randomUUID())
+                .practice(practice)
+                .practiceRevision(evaluated)
+                .evidence(MAPPER.readTree("{\"citations\":[{\"sourceKind\":\"" + sourceKind + "\"}]}"))
+                .build();
     }
 
-    private record ContractRow(
-        UUID id,
-        @Nullable String contractVersion
-    ) implements AgentJobRepository.EvidenceContractVersionRow {
+    private record ContractRow(UUID id, @Nullable String contractVersion)
+            implements AgentJobRepository.EvidenceContractVersionRow {
         @Override
         public UUID getId() {
             return id;

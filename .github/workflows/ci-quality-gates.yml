@@ -18,6 +18,21 @@ on:
         required: false
         type: string
         default: "true"
+      tooling_changed:
+        description: "Whether repository tooling, docs, or instruction files changed"
+        required: false
+        type: string
+        default: "true"
+      postgres_image_changed:
+        description: "Whether the PostgreSQL image inputs changed"
+        required: false
+        type: string
+        default: "false"
+      contracts_changed:
+        description: "Whether server contracts or their PostgreSQL image changed"
+        required: false
+        type: string
+        default: "true"
       pmd_canary:
         description: "Whether PMD wiring inputs changed"
         required: false
@@ -39,6 +54,8 @@ jobs:
         include:
           - check: application-server-quality
             display-name: "App Server"
+          - check: tooling-quality
+            display-name: "Tooling and Docs"
           - check: webapp-quality
             display-name: "Webapp"
           - check: server-contracts
@@ -49,10 +66,16 @@ jobs:
         run: |
           case "${{ matrix.check }}" in
             "webapp-quality")
-              echo "run=${{ inputs.webapp_changed }}" >> $GITHUB_OUTPUT
+              echo "run=${INPUTS_WEBAPP_CHANGED}" >> $GITHUB_OUTPUT
               ;;
-            "application-server-quality"|"server-contracts")
-              echo "run=${{ inputs.application_server_changed }}" >> $GITHUB_OUTPUT
+            "application-server-quality")
+              echo "run=${INPUTS_APPLICATION_SERVER_CHANGED}" >> $GITHUB_OUTPUT
+              ;;
+            "server-contracts")
+              echo "run=${INPUTS_CONTRACTS_CHANGED}" >> $GITHUB_OUTPUT
+              ;;
+            "tooling-quality")
+              echo "run=${INPUTS_TOOLING_CHANGED}" >> $GITHUB_OUTPUT
               ;;
             *)
               echo "::error::Unknown check type '${{ matrix.check }}' in ci-quality-gates.yml matrix."
@@ -61,6 +84,11 @@ jobs:
               exit 1
               ;;
           esac
+        env:
+          INPUTS_WEBAPP_CHANGED: ${{ inputs.webapp_changed }}
+          INPUTS_APPLICATION_SERVER_CHANGED: ${{ inputs.application_server_changed }}
+          INPUTS_CONTRACTS_CHANGED: ${{ inputs.contracts_changed }}
+          INPUTS_TOOLING_CHANGED: ${{ inputs.tooling_changed }}
 
       - name: Skip notification
         if: steps.should_run.outputs.run != 'true'
@@ -75,149 +103,115 @@ jobs:
           fetch-depth: ${{ matrix.check == 'application-server-quality' && '0' || '1' }}
           persist-credentials: false
 
-      - name: Setup pnpm + Node.js
+      - name: Setup JavaScript toolchain
         if: steps.should_run.outputs.run == 'true'
-        uses: ./.github/actions/setup-pnpm-node
-
-      # The agent runtime is Bun, so its tests and typecheck must run on the Bun the sandbox ships.
-      # The image pins the version alongside the per-arch digests that are only valid for it.
-      - name: Resolve the agent image's Bun version
-        id: bun
-        if: steps.should_run.outputs.run == 'true' && matrix.check == 'application-server-quality'
-        run: |
-          # Fail closed: an empty output would make setup-bun fall back to `latest`, which is the
-          # unpinned install this job exists to avoid.
-          version=$(sed -nE 's/^ARG[[:space:]]+BUN_VERSION=["'"'"']?([^"'"'"'[:space:]]+).*/\1/p' docker/agents/pi/Dockerfile | head -1)
-          if [ -z "$version" ]; then
-            echo "::error::No ARG BUN_VERSION in docker/agents/pi/Dockerfile — refusing to install an unpinned Bun."
-            exit 1
-          fi
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-
-      - name: Setup Bun
-        if: steps.should_run.outputs.run == 'true' && matrix.check == 'application-server-quality'
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        uses: ./.github/actions/setup-node-pnpm
         with:
-          bun-version: ${{ steps.bun.outputs.version }}
+          install: "frozen"
 
-      - name: Setup caches
-        if: steps.should_run.outputs.run == 'true'
+      - name: Restore Vite Task cache
+        if: steps.should_run.outputs.run == 'true' && matrix.check != 'server-contracts'
+        id: vite-task-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: node_modules/.vite/task-cache
+          key: vite-task-${{ runner.os }}-${{ runner.arch }}-${{ matrix.check }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            vite-task-${{ runner.os }}-${{ runner.arch }}-${{ matrix.check }}-
+
+      - name: Setup application-server caches
+        if: steps.should_run.outputs.run == 'true' && matrix.check == 'application-server-quality'
         uses: ./.github/actions/setup-caches
         with:
-          cache-type: ${{ matrix.check }}
+          cache-type: application-server-quality
           os: ${{ runner.os }}
 
-      - name: Application-server formatting + agent runtime + contracts
+      - name: Setup server-contract caches
+        if: steps.should_run.outputs.run == 'true' && matrix.check == 'server-contracts'
+        uses: ./.github/actions/setup-caches
+        with:
+          cache-type: server-contracts
+          os: ${{ runner.os }}
+
+      - name: Application-server quality
         if: steps.should_run.outputs.run == 'true' && matrix.check == 'application-server-quality'
         run: |
-          pnpm install --frozen-lockfile
-
-          # Every gate below is also in `pnpm run check`, which the pre-push hook runs and
-          # `--no-verify` skips. This step is the only place they are mandatory.
           ISSUES_FOUND=()
-          FMT_OK=true; PMD_OK=true; LINT_OK=true; PIN_OK=true; TESTS_OK=true; TYPES_OK=true; SCRIPT_TYPES_OK=true; CONTRACTS_OK=true; ENV_OK=true; DOCS_OK=true; DIAGRAMS_OK=true; INSTRUCTIONS_OK=true
+          SERVER_OK=true; PMD_CANARY_OK=true; NULLNESS_OK=true; CONTRACTS_OK=true; ENV_OK=true
 
-          pnpm run format:java:check || { FMT_OK=false; ISSUES_FOUND+=("Java formatting failed. Run: pnpm run format:java"); }
-          pnpm run lint:java || { PMD_OK=false; ISSUES_FOUND+=("PMD found violations. Run: pnpm run lint:java:report"); }
-          if [ "$PMD_OK" = "true" ] && [ "${{ inputs.pmd_canary }}" = "true" ]; then
+          vp run gate:server || { SERVER_OK=false; ISSUES_FOUND+=("Server formatting or PMD failed. Run: pnpm run check:server"); }
+          vp run gate:java-nullness \
+            || { NULLNESS_OK=false; ISSUES_FOUND+=("Java nullness policy failed. Run: pnpm run check:java-nullness"); }
+          if [ "$SERVER_OK" = "true" ] && [ "${INPUTS_PMD_CANARY}" = "true" ]; then
             PMD_CANARY=server/application/src/main/java/de/tum/cit/aet/hephaestus/Application.java
             cp "$PMD_CANARY" "$RUNNER_TEMP/Application.java"
             trap 'cp "$RUNNER_TEMP/Application.java" "$PMD_CANARY"' EXIT
             sed -i '/public class Application {/a\    private int deliberatelyUnusedPmdCanary;' "$PMD_CANARY"
             if pnpm run lint:java; then
-              PMD_OK=false
+              PMD_CANARY_OK=false
               ISSUES_FOUND+=("PMD accepted a planted UnusedPrivateField violation; the gate is not analyzing current main sources")
             fi
             cp "$RUNNER_TEMP/Application.java" "$PMD_CANARY"
             trap - EXIT
           fi
-          # Runs before the Biome step so a version skew is reported as a version skew rather than
-          # as a wall of formatting diffs from the wrong release.
-          pnpm run check:biome-pin \
-            || { PIN_OK=false; ISSUES_FOUND+=("Biome version skew between package.json, node_modules and the \$schema URLs."); }
-          # `ci:agents` rather than `check:agents`: its Biome and oxlint reporters emit GitHub
-          # annotations, so findings land on the diff instead of only in this log. It runs no
-          # typecheck — those are the two separate legs below.
-          pnpm run ci:agents \
-            || { LINT_OK=false; ISSUES_FOUND+=("Lint or formatting failed outside the webapp. Run: pnpm run check:agents:fix"); }
-          pnpm run test:agents \
-            || { TESTS_OK=false; ISSUES_FOUND+=("Agent runtime test(s) failed. Run: pnpm run test:agents"); }
-          pnpm run typecheck:agents \
-            || { TYPES_OK=false; ISSUES_FOUND+=("Agent TypeScript errors. Run: pnpm run typecheck:agents"); }
-          pnpm run typecheck:scripts \
-            || { SCRIPT_TYPES_OK=false; ISSUES_FOUND+=("scripts/ TypeScript errors. Run: pnpm run typecheck:scripts"); }
-          pnpm run check:contracts || { CONTRACTS_OK=false; ISSUES_FOUND+=("Artifact-source contract validation failed. Run: pnpm run check:contracts"); }
-          # Reads server/application.yml against docker/compose.{app,core}.yaml — the deployment that
-          # has to deliver each setting. Both sides are behind this job's path filter.
-          pnpm run check:env || { ENV_OK=false; ISSUES_FOUND+=("A setting does not reach a container that can read it. Run: pnpm run check:env"); }
-          # An AGENTS.md no CLAUDE.md imports is loaded by every agent except Claude Code, and nothing
-          # about the file says so — this is the only place that reads the wiring end to end.
-          pnpm run check:instructions \
-            || { INSTRUCTIONS_OK=false; ISSUES_FOUND+=("An agent instruction file reaches no agent, or exists in two copies. Run: pnpm run check:instructions"); }
-          # docs/decisions/ and docs/runbooks/ are mounted by no Docusaurus plugin, so the site build
-          # never compiles or link-checks them. Markdown lint is the only gate they have.
-          pnpm run docs:lint || { DOCS_OK=false; ISSUES_FOUND+=("docs/ markdown or typecheck failed. Run: pnpm run docs:lint"); }
-          # Docusaurus renders mermaid in the browser, so a diagram it cannot parse builds green and
-          # publishes as an error box — the docs deployment can never be the gate for it. This leg
-          # owns the check because docs/** is behind this job's path filter and no other job's.
-          pnpm run check:diagrams \
-            || { DIAGRAMS_OK=false; ISSUES_FOUND+=("A committed Mermaid diagram does not parse. Run: pnpm run check:diagrams"); }
+          vp run gate:contracts || { CONTRACTS_OK=false; ISSUES_FOUND+=("Artifact-source contract validation failed. Run: pnpm run check:contracts"); }
+          vp run gate:env || { ENV_OK=false; ISSUES_FOUND+=("A setting does not reach a container that can read it. Run: pnpm run check:env"); }
 
           if [ ${#ISSUES_FOUND[@]} -gt 0 ]; then
             echo "### App Server Quality" >> $GITHUB_STEP_SUMMARY
             echo "| Check | Status | Fix |" >> $GITHUB_STEP_SUMMARY
             echo "|-------|--------|-----|" >> $GITHUB_STEP_SUMMARY
-            [[ "$FMT_OK" == "false" ]] && echo "| Java formatting | :x: Failed | \`pnpm run format:java\` |" >> $GITHUB_STEP_SUMMARY
-            [[ "$PMD_OK" == "false" ]] && echo "| Java lint (PMD) | :x: Failed | \`pnpm run lint:java:report\` |" >> $GITHUB_STEP_SUMMARY
-            [[ "$PIN_OK" == "false" ]] && echo "| Biome version pin | :x: Failed | \`pnpm run check:biome-pin\` |" >> $GITHUB_STEP_SUMMARY
-            [[ "$LINT_OK" == "false" ]] && echo "| Lint + format (outside webapp) | :x: Failed | \`pnpm run check:agents:fix\` |" >> $GITHUB_STEP_SUMMARY
-            [[ "$TESTS_OK" == "false" ]] && echo "| Agent runtime tests | :x: Failed | \`pnpm run test:agents\` |" >> $GITHUB_STEP_SUMMARY
-            [[ "$TYPES_OK" == "false" ]] && echo "| Agent typecheck | :x: Failed | \`pnpm run typecheck:agents\` |" >> $GITHUB_STEP_SUMMARY
-            [[ "$SCRIPT_TYPES_OK" == "false" ]] && echo "| scripts/ typecheck | :x: Failed | \`pnpm run typecheck:scripts\` |" >> $GITHUB_STEP_SUMMARY
+            [[ "$SERVER_OK" == "false" ]] && echo "| Server formatting and PMD | :x: Failed | \`pnpm run check:server\` |" >> $GITHUB_STEP_SUMMARY
+            [[ "$PMD_CANARY_OK" == "false" ]] && echo "| PMD canary | :x: Failed | Inspect the planted-violation check |" >> $GITHUB_STEP_SUMMARY
+            [[ "$NULLNESS_OK" == "false" ]] && echo "| Java nullness policy | :x: Failed | \`pnpm run check:java-nullness\` |" >> $GITHUB_STEP_SUMMARY
             [[ "$CONTRACTS_OK" == "false" ]] && echo "| Artifact-source contracts | :x: Failed | \`pnpm run check:contracts\` |" >> $GITHUB_STEP_SUMMARY
             [[ "$ENV_OK" == "false" ]] && echo "| Env delivery by runtime role | :x: Failed | \`pnpm run check:env\` |" >> $GITHUB_STEP_SUMMARY
-            [[ "$INSTRUCTIONS_OK" == "false" ]] && echo "| Agent instruction wiring | :x: Failed | \`pnpm run check:instructions\` |" >> $GITHUB_STEP_SUMMARY
-            [[ "$DOCS_OK" == "false" ]] && echo "| Docs lint + typecheck | :x: Failed | \`pnpm run docs:lint\` |" >> $GITHUB_STEP_SUMMARY
-            [[ "$DIAGRAMS_OK" == "false" ]] && echo "| Mermaid diagrams | :x: Failed | \`pnpm run check:diagrams\` |" >> $GITHUB_STEP_SUMMARY
             for issue in "${ISSUES_FOUND[@]}"; do echo "::error::$issue"; done
             exit 1
           fi
+        env:
+          INPUTS_PMD_CANARY: ${{ inputs.pmd_canary }}
+
+      - name: Tooling and docs quality
+        if: steps.should_run.outputs.run == 'true' && matrix.check == 'tooling-quality'
+        run: |
+          vp run gate:package-manager
+          vp run gate:agent-runtime-pins
+          vp run gate:agents
+          vp run gate:load-format
+          vp run gate:load-syntax
+          vp run gate:agent-tests
+          vp run gate:instructions
+          vp run gate:docs
+          vp run gate:diagrams
 
       - name: Webapp quality
         if: steps.should_run.outputs.run == 'true' && matrix.check == 'webapp-quality'
-        working-directory: ./webapp
         run: |
-          cd ..
-          pnpm install --frozen-lockfile
-          cd webapp
-
-          # These gates also run in `pnpm run check`, which the pre-push hook runs and `--no-verify`
-          # skips — except the Vite build and the routeTree comparison, which run only here.
           ISSUES_FOUND=()
-          LINT_OK=true
-          TYPES_OK=true
+          CLIENT_OK=true
           COMPONENTS_OK=true
           STORIES_OK=true
           SORT_OK=true
+          TOKENS_OK=true
           BUILD_OK=true
           ROUTES_OK=true
           TESTS_OK=true
 
-          pnpm run check || { LINT_OK=false; ISSUES_FOUND+=("Lint or formatting failed. Run: cd webapp && pnpm run check:fix"); }
-          pnpm run typecheck || { TYPES_OK=false; ISSUES_FOUND+=("TypeScript errors found. Run: cd webapp && pnpm run typecheck"); }
-          node ../scripts/check-presentational-components.ts || { COMPONENTS_OK=false; ISSUES_FOUND+=("Components must take data as props. Run: pnpm run check:components"); }
-          node ../scripts/check-story-prose.ts || { STORIES_OK=false; ISSUES_FOUND+=("Story prose renders HTML paragraphs. Run: pnpm run check:stories"); }
-          node ../scripts/check-story-sort.ts || { SORT_OK=false; ISSUES_FOUND+=("Storybook sidebar order is stale. Run: pnpm run check:story-sort"); }
-          timeout --kill-after=30s 10m pnpm run test \
+          vp run gate:webapp || {
+            CLIENT_OK=false
+            ISSUES_FOUND+=("Webapp lint, formatting, or typecheck failed. Run: pnpm run check:client")
+          }
+          vp run gate:components || { COMPONENTS_OK=false; ISSUES_FOUND+=("Components must take data as props. Run: pnpm run check:components"); }
+          vp run gate:stories || { STORIES_OK=false; ISSUES_FOUND+=("Story prose renders HTML paragraphs. Run: pnpm run check:stories"); }
+          vp run gate:story-sort || { SORT_OK=false; ISSUES_FOUND+=("Storybook sidebar order is stale. Run: pnpm run check:story-sort"); }
+          vp run gate:docs-tokens || { TOKENS_OK=false; ISSUES_FOUND+=("The docs site copies a web app colour that has since changed. Run: pnpm run check:docs-tokens"); }
+          timeout --kill-after=30s 10m vp run gate:webapp-tests \
             || { TESTS_OK=false; ISSUES_FOUND+=("Unit tests failed. Run: cd webapp && pnpm run test"); }
 
-          # src/routeTree.gen.ts is written by the TanStack Router Vite plugin, so a build is the
-          # only thing that can say whether the committed copy is current. The webapp image build
-          # regenerates it too but has nothing to compare it against, and it is skipped whenever
-          # webapp/ itself did not change. A stale tree type-checks and tests green; the route it is
-          # missing simply 404s.
-          pnpm exec vite build || { BUILD_OK=false; ISSUES_FOUND+=("The webapp does not build. Run: cd webapp && pnpm run build"); }
-          if [ "$BUILD_OK" = "true" ] && ! git diff --exit-code -- src/routeTree.gen.ts; then
+          # Vite generates src/routeTree.gen.ts; compare it with the committed copy after building.
+          vp run gate:webapp-build || { BUILD_OK=false; ISSUES_FOUND+=("The webapp does not build. Run: cd webapp && pnpm run build"); }
+          if [ "$BUILD_OK" = "true" ] && ! git diff --exit-code -- webapp/src/routeTree.gen.ts; then
             ROUTES_OK=false
             ISSUES_FOUND+=("routeTree.gen.ts is stale. Run: cd webapp && pnpm run build, then commit the result")
           fi
@@ -226,11 +220,11 @@ jobs:
             echo "### Webapp Quality" >> $GITHUB_STEP_SUMMARY
             echo "| Check | Status | Fix |" >> $GITHUB_STEP_SUMMARY
             echo "|-------|--------|-----|" >> $GITHUB_STEP_SUMMARY
-            [[ "$LINT_OK" == "false" ]] && echo "| Lint + format (oxlint + Biome) | :x: Failed | \`cd webapp && pnpm run check:fix\` |" >> $GITHUB_STEP_SUMMARY
-            [[ "$TYPES_OK" == "false" ]] && echo "| TypeScript | :x: Failed | \`cd webapp && pnpm run typecheck\` |" >> $GITHUB_STEP_SUMMARY
+            [[ "$CLIENT_OK" == "false" ]] && echo "| Lint, format, and TypeScript | :x: Failed | \`pnpm run check:client\` |" >> $GITHUB_STEP_SUMMARY
             [[ "$COMPONENTS_OK" == "false" ]] && echo "| Presentational components | :x: Failed | \`pnpm run check:components\` |" >> $GITHUB_STEP_SUMMARY
             [[ "$STORIES_OK" == "false" ]] && echo "| Story prose | :x: Failed | \`pnpm run check:stories\` |" >> $GITHUB_STEP_SUMMARY
             [[ "$SORT_OK" == "false" ]] && echo "| Storybook sidebar order | :x: Failed | \`pnpm run check:story-sort\` |" >> $GITHUB_STEP_SUMMARY
+            [[ "$TOKENS_OK" == "false" ]] && echo "| Docs colour tokens | :x: Failed | \`pnpm run check:docs-tokens\` |" >> $GITHUB_STEP_SUMMARY
             [[ "$BUILD_OK" == "false" ]] && echo "| Vite build | :x: Failed | \`cd webapp && pnpm run build\` |" >> $GITHUB_STEP_SUMMARY
             [[ "$ROUTES_OK" == "false" ]] && echo "| routeTree.gen.ts up to date | :x: Stale | \`cd webapp && pnpm run build\` and commit |" >> $GITHUB_STEP_SUMMARY
             [[ "$TESTS_OK" == "false" ]] && echo "| Unit tests | :x: Failed | \`cd webapp && pnpm run test\` |" >> $GITHUB_STEP_SUMMARY
@@ -269,7 +263,6 @@ jobs:
           DATABASE_URL: postgresql://fake:fake@localhost:5432/fake
           MODEL_NAME: fake:model
         run: |
-          pnpm install --frozen-lockfile
           pnpm run generate:api
           git add .
           if ! git diff --cached --quiet; then
@@ -286,10 +279,13 @@ jobs:
         continue-on-error: true
         if: steps.should_run.outputs.run == 'true' && matrix.check == 'server-contracts' && always()
         run: |
-          # The pg_partman image, not stock Postgres: the auth_event changeset that calls
-          # partman.create_parent is preconditioned onFail="MARK_RAN" on the extension being
-          # available, so on a stock image the chain replays with that changeset never executed.
-          docker build -t hephaestus-postgres:ci docker/postgres
+          # The base image may still be publishing; build the same Dockerfile as fallback.
+          if [[ "${INPUTS_POSTGRES_IMAGE_CHANGED}" == "true" ]] ||
+            ! docker pull ghcr.io/ls1intum/hephaestus/postgres:${{ github.event.pull_request.base.sha || github.sha }}; then
+            docker build -t hephaestus-postgres:ci docker/postgres
+          else
+            docker tag ghcr.io/ls1intum/hephaestus/postgres:${{ github.event.pull_request.base.sha || github.sha }} hephaestus-postgres:ci
+          fi
           docker run -d --name postgres-db \
             -e POSTGRES_DB=hephaestus -e POSTGRES_PASSWORD=root -e POSTGRES_USER=root \
             -p 5432:5432 hephaestus-postgres:ci
@@ -309,19 +305,21 @@ jobs:
             exit 1
           fi
 
+          pnpm run test:postgres-upgrade
+
           ISSUES_FOUND=()
 
           # draft-changelog first applies the full master.xml chain to the empty DB via
           # liquibase:update — so this step is ALSO the empty→head migration-chain replay gate (a
           # changelog that doesn't apply fails here). Keep that apply intact.
-          scripts/db-utils.sh draft-changelog || ISSUES_FOUND+=("Schema check / migration-chain apply failed. Run: pnpm run db:draft-changelog")
+          pnpm run db:draft-changelog || ISSUES_FOUND+=("Schema check / migration-chain apply failed. Run: pnpm run db:draft-changelog")
           if [ -f "server/application/src/main/resources/db/changelog_new.xml" ]; then
             echo "::error::Schema drift detected. Run: pnpm run db:draft-changelog"
             cat server/application/src/main/resources/db/changelog_new.xml
             ISSUES_FOUND+=("Schema drift detected")
           fi
 
-          scripts/db-utils.sh generate-erd || ISSUES_FOUND+=("ERD generation failed. Run: pnpm run db:generate-erd-docs")
+          pnpm run db:generate-erd-docs || ISSUES_FOUND+=("ERD generation failed. Run: pnpm run db:generate-erd-docs")
           git add docs/contributor/erd/schema.mmd
           if ! git diff --cached --quiet docs/contributor/erd/schema.mmd; then
             echo "::error::ERD outdated. Run: pnpm run db:generate-erd-docs"
@@ -342,6 +340,8 @@ jobs:
             done
             exit 1
           fi
+        env:
+          INPUTS_POSTGRES_IMAGE_CHANGED: ${{ inputs.postgres_image_changed }}
 
       - name: Evaluate API and database contracts
         if: steps.should_run.outputs.run == 'true' && matrix.check == 'server-contracts' && always()
@@ -353,3 +353,10 @@ jobs:
             echo "::error::OpenAPI or database validation failed; review both independently reported steps."
             exit 1
           fi
+
+      - name: Save Vite Task cache
+        if: steps.should_run.outputs.run == 'true' && matrix.check != 'server-contracts' && success()
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: node_modules/.vite/task-cache
+          key: ${{ steps.vite-task-cache.outputs.cache-primary-key }}

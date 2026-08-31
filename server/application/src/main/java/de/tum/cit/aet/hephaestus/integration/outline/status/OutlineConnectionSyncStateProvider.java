@@ -39,12 +39,11 @@ public class OutlineConnectionSyncStateProvider implements ConnectionSyncStatePr
     private final String syncCron;
 
     public OutlineConnectionSyncStateProvider(
-        ConnectionRepository connectionRepository,
-        OutlineCollectionRepository collectionRepository,
-        OutlineDocumentRepository documentRepository,
-        ObjectProvider<OutlineRateLimitTracker> rateLimitTrackerProvider,
-        @Value("${hephaestus.integration.outline.sync.cron:0 0 */6 * * *}") String syncCron
-    ) {
+            ConnectionRepository connectionRepository,
+            OutlineCollectionRepository collectionRepository,
+            OutlineDocumentRepository documentRepository,
+            ObjectProvider<OutlineRateLimitTracker> rateLimitTrackerProvider,
+            @Value("${hephaestus.integration.outline.sync.cron:0 0 */6 * * *}") String syncCron) {
         this.connectionRepository = connectionRepository;
         this.collectionRepository = collectionRepository;
         this.documentRepository = documentRepository;
@@ -60,76 +59,66 @@ public class OutlineConnectionSyncStateProvider implements ConnectionSyncStatePr
     @Override
     public ConnectionSyncDetails describe(IntegrationRef ref, long connectionId) {
         Optional<ConnectionConfig.OutlineConfig> config = connectionRepository
-            .findById(connectionId)
-            .map(Connection::getConfig)
-            .filter(ConnectionConfig.OutlineConfig.class::isInstance)
-            .map(ConnectionConfig.OutlineConfig.class::cast);
+                .findById(connectionId)
+                .map(Connection::getConfig)
+                .filter(ConnectionConfig.OutlineConfig.class::isInstance)
+                .map(ConnectionConfig.OutlineConfig.class::cast);
 
-        Boolean webhookRegistered = config
-            .map(c -> c.webhookSubscriptionId() != null && !c.webhookSubscriptionId().isBlank())
-            .orElse(null);
+        Boolean webhookRegistered = config.map(c -> c.webhookSubscriptionId() != null
+                        && !c.webhookSubscriptionId().isBlank())
+                .orElse(null);
 
         // Rate-limit budget observed on the connection's Outline host, or null until the first API call
         // since restart (the UI renders that as "–"). Keyed by server origin — see OutlineRateLimitTracker.
         OutlineRateLimitTracker tracker = rateLimitTrackerProvider.getIfAvailable();
-        RateLimitSnapshot rateLimit =
-            tracker == null
+        RateLimitSnapshot rateLimit = tracker == null
                 ? null
-                : config.map(c -> tracker.snapshot(OutlineRateLimitTracker.scopeOf(c.serverUrl()))).orElse(null);
+                : config.map(c -> tracker.snapshot(OutlineRateLimitTracker.scopeOf(c.serverUrl())))
+                        .orElse(null);
 
         return new ConnectionSyncDetails(
-            webhookRegistered,
-            CronSchedules.nextRun(syncCron),
-            CronSchedules.interval(syncCron),
-            rateLimit,
-            null,
-            false
-        );
+                webhookRegistered,
+                CronSchedules.nextRun(syncCron),
+                CronSchedules.interval(syncCron),
+                rateLimit,
+                null,
+                false);
     }
 
     @Override
     public List<SyncResourceState> resources(IntegrationRef ref, long connectionId) {
         long workspaceId = ref.workspaceId();
-        Map<String, Long> itemCountByCollectionId = documentRepository
-            .countLiveByCollection(workspaceId, connectionId)
-            .stream()
-            .collect(Collectors.toMap(row -> (String) row[0], row -> (Long) row[1]));
+        Map<String, Long> itemCountByCollectionId =
+                documentRepository.countLiveByCollection(workspaceId, connectionId).stream()
+                        .collect(Collectors.toMap(row -> (String) row[0], row -> (Long) row[1]));
 
-        return collectionRepository
-            .findByWorkspaceIdAndConnectionId(workspaceId, connectionId)
-            .stream()
-            .map(collection -> toResourceState(collection, itemCountByCollectionId))
-            .toList();
+        return collectionRepository.findByWorkspaceIdAndConnectionId(workspaceId, connectionId).stream()
+                .map(collection -> toResourceState(collection, itemCountByCollectionId))
+                .toList();
     }
 
     private SyncResourceState toResourceState(OutlineCollection collection, Map<String, Long> itemCountByCollectionId) {
         long itemCount = itemCountByCollectionId.getOrDefault(collection.getCollectionId(), 0L);
-        String name =
-            collection.getName() != null && !collection.getName().isBlank()
+        String name = collection.getName() != null && !collection.getName().isBlank()
                 ? collection.getName()
                 : collection.getCollectionId();
         return new SyncResourceState(
-            collection.getId(),
-            collection.getCollectionId(),
-            name,
-            SyncResourceState.Type.COLLECTION,
-            resourceState(collection),
-            collection.getDocumentsSyncedAt(),
-            itemCount,
-            // One count class per collection; its watermark is the documents' own last-synced time.
-            List.of(
-                new SyncResourceCount(
-                    SyncResourceCount.KEY_DOCUMENTS,
-                    "Documents",
-                    itemCount,
-                    collection.getDocumentsSyncedAt()
-                )
-            ),
-            collection.getDocumentsUpstream() == null ? null : collection.getDocumentsUpstream().longValue(),
-            collection.getLastSyncError(),
-            null,
-            null
-        );
+                collection.getId(),
+                collection.getCollectionId(),
+                name,
+                SyncResourceState.Type.COLLECTION,
+                resourceState(collection),
+                collection.getDocumentsSyncedAt(),
+                itemCount,
+                // One count class per collection; its watermark is the documents' own last-synced time.
+                List.of(new SyncResourceCount(
+                        SyncResourceCount.KEY_DOCUMENTS, "Documents", itemCount, collection.getDocumentsSyncedAt())),
+                collection.getDocumentsUpstream() == null
+                        ? null
+                        : collection.getDocumentsUpstream().longValue(),
+                collection.getLastSyncError(),
+                null,
+                null);
     }
 
     /** {@code PAUSED} takes priority — a frozen collection's stale sync status would otherwise be misleading. */

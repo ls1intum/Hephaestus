@@ -33,8 +33,9 @@ public class EgressPolicy {
      * to map the internal network. The specific cause is chained onto the exception for the log only.
      */
     private static final String NOT_PUBLIC_HTTPS = "Provider host must be a public HTTPS URL";
+
     private static final String NO_CREDENTIALS_OR_QUERY =
-        "Provider URLs must not contain credentials or query parameters.";
+            "Provider URLs must not contain credentials or query parameters.";
     private static final Set<String> LOCAL_DEV_HOSTS = Set.of("localhost", "127.0.0.1", "::1", "[::1]");
 
     private final InstanceLlmSettingsRepository settingsRepository;
@@ -109,10 +110,10 @@ public class EgressPolicy {
             return;
         }
         Set<String> allowed = Arrays.stream(allowlist.split("[,\\n\\r]+"))
-            .map(String::trim)
-            .filter(s -> !s.isEmpty())
-            .map(s -> s.toLowerCase(Locale.ROOT))
-            .collect(Collectors.toUnmodifiableSet());
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .map(s -> s.toLowerCase(Locale.ROOT))
+                .collect(Collectors.toUnmodifiableSet());
         if (!allowed.contains(host)) {
             throw new IllegalArgumentException("Provider host " + host + " is not in the allowed list");
         }

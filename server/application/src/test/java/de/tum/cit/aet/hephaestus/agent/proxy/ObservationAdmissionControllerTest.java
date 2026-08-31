@@ -25,9 +25,9 @@ class ObservationAdmissionControllerTest {
 
     @Test
     void malformedRequestIsBadRequest() {
-        assertStatus(HttpStatus.BAD_REQUEST, () ->
-            controller.admit(mapper.createObjectNode(), new TestingAuthenticationToken("x", "x"))
-        );
+        assertStatus(
+                HttpStatus.BAD_REQUEST,
+                () -> controller.admit(mapper.createObjectNode(), new TestingAuthenticationToken("x", "x")));
     }
 
     @Test
@@ -44,18 +44,18 @@ class ObservationAdmissionControllerTest {
 
     @Test
     void unexpectedPrincipalCannotAdmitObservations() {
-        assertStatus(HttpStatus.FORBIDDEN, () ->
-            controller.admit(validRequest(), new TestingAuthenticationToken("unexpected", "[REDACTED]"))
-        );
+        assertStatus(
+                HttpStatus.FORBIDDEN,
+                () -> controller.admit(validRequest(), new TestingAuthenticationToken("unexpected", "[REDACTED]")));
         verifyNoInteractions(service);
     }
 
     @Test
     void mentorCredentialCannotAdmitAgentObservations() {
         UUID id = UUID.randomUUID();
-        assertStatus(HttpStatus.FORBIDDEN, () ->
-            controller.admit(validRequest(), authentication(LlmUsageSourceType.MENTOR_TURN, id))
-        );
+        assertStatus(
+                HttpStatus.FORBIDDEN,
+                () -> controller.admit(validRequest(), authentication(LlmUsageSourceType.MENTOR_TURN, id)));
         verifyNoInteractions(service);
     }
 
@@ -67,21 +67,21 @@ class ObservationAdmissionControllerTest {
 
     private static TestingAuthenticationToken authentication(LlmUsageSourceType sourceType, UUID sourceId) {
         ProxyRouting routing = new ProxyRouting(
-            "agent",
-            "responses",
-            "http://model",
-            null,
-            null,
-            null,
-            1L,
-            new ProxyRouting.BilledAttempt(sourceType, sourceId, 0, BigDecimal.ZERO)
-        );
+                "agent",
+                "responses",
+                "http://model",
+                null,
+                null,
+                null,
+                1L,
+                new ProxyRouting.BilledAttempt(sourceType, sourceId, 0, BigDecimal.ZERO));
         return new TestingAuthenticationToken(routing, "[REDACTED]");
     }
 
     private static void assertStatus(HttpStatus status, Runnable call) {
-        assertThatThrownBy(call::run).isInstanceOfSatisfying(ResponseStatusException.class, e ->
-            assertThat(e.getStatusCode()).isEqualTo(status)
-        );
+        assertThatThrownBy(call::run)
+                .isInstanceOfSatisfying(
+                        ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode()).isEqualTo(status));
     }
 }

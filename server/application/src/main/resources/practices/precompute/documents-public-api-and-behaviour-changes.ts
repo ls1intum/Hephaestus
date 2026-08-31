@@ -8,8 +8,8 @@
 // Treating modifier-less Swift as public on an app-only repo yields false assessment=BAD findings, so the
 // export-status table classifies it as internal. The table is keyed off file extension: adding a language =
 // one row, no engine change.
-import { findFiles, readFileLines } from "../lib/grep";
-import type { DiffFile, Hint, PullRequestMetadata } from "../lib/types";
+import { findFiles, readFileLines } from "../lib/grep.ts";
+import type { DiffFile, Hint, PullRequestMetadata } from "../lib/types.ts";
 
 // ── (1) Public-product manifest scan ──────────────────────────────────────────────────────────────────────
 // Each manifest filename maps to a predicate over its raw text that answers "does this declare a consumable

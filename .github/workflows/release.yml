@@ -5,22 +5,22 @@ name: Release
 # after CI/CD succeeds so the Docker images for the commit already exist.
 #
 # A release: tags vX.Y.Z at the version-bump commit, creates the GitHub Release
-# from that version's CHANGELOG.md section (flagging schema migrations), retags
-# the CI-built images (X.Y.Z, X.Y, latest), and starts the deploy chain
+# from that version's CHANGELOG.md section (flagging schema migrations), verifies
+# a seeded previous-release upgrade before publication, retags the CI-built
+# images (X.Y.Z, X.Y, latest), and starts the deploy chain
 # (staging automatically, production after environment approval).
 #
 # Versioning contract: docs/admin/compatibility-policy.mdx
 
 on:
-  workflow_run:
+  workflow_run: # zizmor: ignore[dangerous-triggers] The guard authenticates the completed run before privileged jobs start.
     workflows: ["CI/CD"]
     types: [completed]
     branches: [main]
 
-# Key per commit so distinct releases queue independently — a global group would
-# let a newer run cancel an older release that is still pending.
+# Serialize promotion of the moving series and latest tags.
 concurrency:
-  group: release-${{ github.event.workflow_run.head_sha }}
+  group: release
   cancel-in-progress: false
 
 permissions: {}
@@ -34,6 +34,7 @@ jobs:
       ${{ github.event.workflow_run.conclusion == 'success'
         && github.event.workflow_run.event == 'push'
         && github.event.workflow_run.head_repository.full_name == github.repository }}
+    timeout-minutes: 15
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -43,6 +44,7 @@ jobs:
       major: ${{ steps.cut.outputs.major }}
       minor: ${{ steps.cut.outputs.minor }}
       tag_name: ${{ steps.cut.outputs.tag_name }}
+      previous_version: ${{ steps.cut.outputs.previous_version }}
       sha: ${{ steps.cut.outputs.sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -73,18 +75,24 @@ jobs:
             echo "released=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          # Idempotent: if the Release already exists, this version is done. (A
-          # release whose downstream jobs half-failed is recovered by deleting the
-          # Release + its tag and re-running — not by silently re-releasing an old
-          # version, which would re-deploy it.)
-          if gh release view "$TAG" --repo "${{ github.repository }}" > /dev/null 2>&1; then
-            echo "Release $TAG already exists — nothing to cut."
-            echo "released=false" >> "$GITHUB_OUTPUT"
-            exit 0
+          RESUME=false
+          if existing=$(gh release view "$TAG" --repo "${{ github.repository }}" --json isDraft,targetCommitish 2>/dev/null); then
+            if [ "$(jq -r .isDraft <<< "$existing")" != true ]; then
+              echo "Release $TAG is already published."
+              echo "released=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            [ "$(jq -r .targetCommitish <<< "$existing")" = "$SHA" ] || {
+              echo "::error::Draft $TAG targets a different commit"; exit 1; }
+            RESUME=true
           fi
           echo "Cutting $TAG at $SHA (was $PARENT_VERSION)"
 
-          PREV_TAG=$(git tag --list 'v*' --sort=-v:refname | head -1)
+          PREV_TAG="v$PARENT_VERSION"
+          previous=$(gh release view "$PREV_TAG" --repo "${{ github.repository }}" --json isDraft,isPrerelease 2>/dev/null) || {
+            echo "::error::Previous package version $PARENT_VERSION is not a published release"; exit 1; }
+          jq -e '.isDraft == false and .isPrerelease == false' <<< "$previous" >/dev/null || {
+            echo "::error::$PREV_TAG is not a stable published release"; exit 1; }
 
           # Release notes = this version's CHANGELOG.md section (the assembled
           # changeset entries), with a first-class migration warning when the
@@ -97,26 +105,21 @@ jobs:
               echo ""
             } >> "$NOTES"
           fi
-          # Slice the `## <version>` section: stop at the next release header or
-          # the footer's `---` fence. Exact-string header compare is regex-safe
-          # against the dots in the version. (A literal `---` inside a changeset
-          # body would truncate notes — our entries are short prose, so this is
-          # accepted over more fragile parsing.)
           git show "$SHA:CHANGELOG.md" \
             | awk -v ver="## $VERSION" '
                 $0 == ver { on=1; next }
-                on && (/^## / || /^---$/) { exit }
+                on && /^## / { exit }
                 on { print }
               ' >> "$NOTES"
           echo "----- release notes -----"; cat "$NOTES"; echo "-------------------------"
 
-          # Creates the tag at $SHA and the Release atomically (no separate
-          # push, so there is no tag-without-Release window on a mid-step failure).
-          gh release create "$TAG" \
-            --title "$TAG" \
-            --notes-file "$NOTES" \
-            --target "$SHA" \
-            --repo "${{ github.repository }}"
+          if [ "$RESUME" = false ]; then
+            gh release create "$TAG" --draft \
+              --title "$TAG" \
+              --notes-file "$NOTES" \
+              --target "$SHA" \
+              --repo "${{ github.repository }}"
+          fi
 
           {
             echo "released=true"
@@ -125,62 +128,65 @@ jobs:
             MINOR="${VERSION#*.}"; echo "minor=${MINOR%%.*}"
             echo "tag_name=$TAG"
             echo "sha=$SHA"
+            echo "previous_version=$PARENT_VERSION"
           } >> "$GITHUB_OUTPUT"
 
       - name: Summary
         if: steps.cut.outputs.released == 'true'
         run: |
-          echo "## 🚀 Released ${{ steps.cut.outputs.tag_name }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Staging**: Deploying automatically" >> $GITHUB_STEP_SUMMARY
-          echo "- **Production**: Waiting for approval" >> $GITHUB_STEP_SUMMARY
+          echo "## Preparing ${{ steps.cut.outputs.tag_name }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Evidence verification is in progress." >> "$GITHUB_STEP_SUMMARY"
 
   tag-images:
     needs: release
     if: needs.release.outputs.released == 'true'
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     permissions:
       packages: write
       id-token: write
       attestations: write
-      contents: write # gh release upload (release pin asset)
+      contents: write # gh release upload (release image lock)
     outputs:
       agent-pi-digest: ${{ steps.retag.outputs.agent-pi-digest }}
       application-server-digest: ${{ steps.retag.outputs.application-server-digest }}
+      postgres-digest: ${{ steps.retag.outputs.postgres-digest }}
     steps:
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+      - name: Check out the released tree
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          registry: ghcr.io
+          ref: ${{ needs.release.outputs.sha }}
+          fetch-depth: 1
+
+      - name: Log in to GitHub Container Registry
+        uses: ./.github/actions/ghcr-login
+        with:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Retag images and capture digests
+      - name: Capture release image digests
         id: retag
         env:
-          VERSION: ${{ needs.release.outputs.version }}
-          # The `major.minor` series tag: it moves onto every patch release in the line, exactly as
-          # `latest` moves onto every release. Both are channel tags; only the spelling differs, and
-          # naming this one `CHANNEL` made them look like different things. ADR 0031.
-          SERIES: ${{ needs.release.outputs.major }}.${{ needs.release.outputs.minor }}
           SHA: ${{ needs.release.outputs.sha }}
         run: |
           set -euo pipefail
 
-          # Authoritative registry-side digest of the manifest list.
-          manifest_digest() {
-            docker buildx imagetools inspect "$1" --format '{{json .Manifest}}' | jq -r '.digest'
-          }
+          mapfile -t IMAGES < <(jq -er '.images[]' security/release-images.json)
+          [ "${#IMAGES[@]}" -gt 0 ] || { echo "::error::Release image inventory is empty"; exit 1; }
+          declare -A DIGESTS=()
+          : > release-images.tsv
 
-          IMAGES=("webapp" "application-server" "agent-pi" "release-pin-fetcher" "postgres")
-
-          # Probe all images first; refuse to partial-publish if any is missing.
+          # Resolve every source digest before publishing any release tag.
           for img in "${IMAGES[@]}"; do
             FULL_IMAGE="ghcr.io/ls1intum/hephaestus/$img"
             for i in $(seq 1 24); do
-              if docker buildx imagetools inspect "$FULL_IMAGE:$SHA" > /dev/null 2>&1; then break; fi
+              digest=$(docker buildx imagetools inspect "$FULL_IMAGE:$SHA" --format '{{json .Manifest}}' 2>/dev/null | jq -er '.digest' 2>/dev/null) || true
+              if [[ "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]; then
+                DIGESTS[$img]=$digest
+                break
+              fi
               if [ "$i" -ge 24 ]; then
-                echo "::error::Image $FULL_IMAGE:$SHA not found after 120 s"
+                echo "::error::Could not resolve a valid digest for $FULL_IMAGE:$SHA after 120 s"
                 exit 1
               fi
               sleep 5
@@ -191,42 +197,19 @@ jobs:
             FULL_IMAGE="ghcr.io/ls1intum/hephaestus/$img"
             echo "::group::$img"
 
-            SRC_DIGEST=$(manifest_digest "$FULL_IMAGE:$SHA")
-            [[ "$SRC_DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]] || {
-              echo "::error::$img source digest is malformed: ${SRC_DIGEST:-<empty>}"; exit 1; }
+            SRC_DIGEST=${DIGESTS[$img]}
             echo "$img source digest: $SRC_DIGEST"
-
-            docker buildx imagetools create \
-              -t "$FULL_IMAGE:$VERSION" \
-              -t "$FULL_IMAGE:$SERIES" \
-              -t "$FULL_IMAGE:latest" \
-              "$FULL_IMAGE:$SHA"
-
-            for tag in "$VERSION" "$SERIES" "latest"; do
-              DST_DIGEST=$(manifest_digest "$FULL_IMAGE:$tag")
-              if [[ "$SRC_DIGEST" != "$DST_DIGEST" ]]; then
-                echo "::error::Retag changed the digest for $img:$tag — refusing to publish."
-                exit 1
-              fi
-            done
+            printf '%s\t%s\n' "$img" "$SRC_DIGEST" >> release-images.tsv
 
             case "$img" in
               agent-pi)            echo "agent-pi-digest=$SRC_DIGEST" >> "$GITHUB_OUTPUT" ;;
               application-server)  echo "application-server-digest=$SRC_DIGEST" >> "$GITHUB_OUTPUT" ;;
+              postgres)            echo "postgres-digest=$SRC_DIGEST" >> "$GITHUB_OUTPUT" ;;
             esac
             echo "::endgroup::"
           done
 
-      - name: Check out the released tree
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ needs.release.outputs.sha }}
-          fetch-depth: 1
-
-      # The pin asset below tells every production deploy to run THIS agent image, so this is the
-      # last point at which an image the released server cannot drive is still catchable. The
-      # sandbox is Bun-only (ADR 0030), so `node` must be absent, not present.
-      - name: Smoke-test agent-pi
+      - name: Verify Node-only agent-pi sandbox
         env:
           IMAGE: ghcr.io/ls1intum/hephaestus/agent-pi@${{ steps.retag.outputs.agent-pi-digest }}
           LAYOUT: server/application/src/main/java/de/tum/cit/aet/hephaestus/agent/runtime/SandboxLayout.java
@@ -234,7 +217,7 @@ jobs:
           set -euo pipefail
           docker pull "$IMAGE"
           docker run --rm --entrypoint /bin/sh "$IMAGE" -c \
-            'bun --version && ! command -v node >/dev/null 2>&1'
+            'node --version && for runtime in npm npx corepack yarn yarnpkg pnpm pnpx; do ! command -v "$runtime" || exit 1; done'
 
           expected=$(grep -oE 'RUNTIME_CONTRACT_VERSION = [0-9]+' "$LAYOUT" | grep -oE '[0-9]+$')
           [ -n "$expected" ] || { echo "::error::Could not read RUNTIME_CONTRACT_VERSION from $LAYOUT"; exit 1; }
@@ -245,55 +228,133 @@ jobs:
           fi
           echo "agent-pi implements runtime contract v${expected}"
 
-      - name: Write release pin asset
+      - uses: ./.github/actions/setup-release-security-tools
+
+      - uses: ./.github/actions/setup-node-pnpm
+        with:
+          install: "none"
+
+      - name: Generate and enforce release evidence
+        env:
+          TRIVY_USERNAME: ${{ github.actor }}
+          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          : > release-platforms.tsv
+          started=$SECONDS
+          for attempt in 1 2 3; do
+            trivy image --timeout 90s --download-db-only && break
+            if [ "$attempt" -eq 3 ]; then
+              echo "::error::Trivy database download failed after $attempt attempts"
+              exit 1
+            fi
+            sleep $((attempt * 5))
+          done
+          db_metadata="${TRIVY_CACHE_DIR:-$HOME/.cache/trivy}/db/metadata.json"
+          jq -e '(.UpdatedAt | sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601) as $updated |
+            ((now - $updated) >= 0) and ((now - $updated) <= 86400)' \
+            "$db_metadata" >/dev/null
+          cp "$db_metadata" evidence/trivy-db.json
+          jq -n --arg syft "$(syft version -o json | jq -r .version)" \
+            --arg trivy "$(trivy version --format json | jq -r .Version)" \
+            --arg cosign "$(cosign version --json | jq -r .gitVersion)" \
+            '{syft: $syft, trivy: $trivy, cosign: $cosign}' > evidence/tool-versions.json
+          generate_evidence() {
+            local image=$1 repository=$2 digest=$3 provenance=$4
+            local ref="$repository@$digest"
+            for platform in linux/amd64 linux/arm64; do
+              suffix=${platform//\//-}
+              architecture=${platform#*/}
+              platform_digest=$(docker buildx imagetools inspect "$ref" --raw | jq -er \
+                --arg architecture "$architecture" \
+                '.manifests[] | select(.platform.os == "linux" and .platform.architecture == $architecture) | .digest')
+              [[ "$platform_digest" =~ ^sha256:[a-f0-9]{64}$ ]] || { echo "::error::$image $platform digest is malformed"; exit 1; }
+              platform_ref="$repository@$platform_digest"
+              printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$image" "$platform" "$digest" "$platform_digest" "$repository" "$provenance" >> release-platforms.tsv
+              syft "$platform_ref" --scope squashed \
+                -o "syft-json=evidence/$image-$suffix.syft.json" \
+                -o "spdx-json=evidence/$image-$suffix.spdx.json" \
+                -o "cyclonedx-json=evidence/$image-$suffix.cdx.json"
+              trivy image --skip-db-update --scanners vuln --format json --output "evidence/$image-$suffix.trivy.json" "$platform_ref"
+              trivy image --skip-db-update --scanners license --format json --output "evidence/$image-$suffix.license.json" "$platform_ref"
+            done
+          }
+          while IFS=$'\t' read -r image digest; do
+            generate_evidence "$image" "ghcr.io/ls1intum/hephaestus/$image" "$digest" first-party
+          done < release-images.tsv
+          jq -r '.upstream[] | [.name, .repository, .digest] | @tsv' security/release-images.json |
+          while IFS=$'\t' read -r image repository digest; do
+            generate_evidence "$image" "$repository" "$digest" upstream
+          done
+          duration=$((SECONDS - started))
+          jq -n \
+            --arg schemaVersion "1" \
+            --arg generatedAt "$(date -u +%FT%TZ)" \
+            --arg release "${{ needs.release.outputs.tag_name }}" \
+            --arg commit "${{ needs.release.outputs.sha }}" \
+            --argjson durationSeconds "$duration" \
+            --rawfile subjects release-platforms.tsv \
+            '{schemaVersion: ($schemaVersion | tonumber), release: $release, commit: $commit,
+              generatedAt: $generatedAt, durationSeconds: $durationSeconds,
+              subjects: ($subjects | split("\n") | map(select(length > 0) | split("\t") |
+                {image: .[0], platform: .[1], indexDigest: .[2], digest: .[3], repository: .[4], provenance: .[5]}))}' \
+            > evidence/manifest.json
+          cp security/vulnerability-policy.json evidence/vulnerability-policy.json
+          cp security/release-images.json evidence/release-images.json
+          node scripts/verify-release-evidence.ts evidence --write-validation
+          jq -er '.subjects[] | select(.provenance == "first-party") | [.repository, .digest, .image, .platform] | @tsv' evidence/manifest.json |
+          while IFS=$'\t' read -r repository digest image platform; do
+            suffix=${platform//\//-}
+            cosign attest --yes --type spdxjson --predicate "evidence/$image-$suffix.spdx.json" "$repository@$digest"
+          done
+          (cd evidence && sha256sum -- * > SHA256SUMS)
+
+      - name: Verify evidence from registry subjects
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/verify-release-evidence.ts evidence --verify-signatures
+
+      - name: Write release image lock
         id: pin
         env:
           VERSION: ${{ needs.release.outputs.version }}
-          AGENT_DIGEST: ${{ steps.retag.outputs.agent-pi-digest }}
         run: |
           set -euo pipefail
-          ASSET="release-v${VERSION}.yaml"
-          cat > "$ASSET" <<EOF
-          hephaestus:
-            agent:
-              image:
-                reference: ghcr.io/ls1intum/hephaestus/agent-pi@${AGENT_DIGEST}
-          EOF
+          ASSET="release-v${VERSION}.json"
+          jq '{schemaVersion, release, commit,
+            images: [.subjects[]]
+              | group_by(.image)
+              | map({image: .[0].image, repository: .[0].repository, provenance: .[0].provenance,
+                  indexDigest: .[0].indexDigest,
+                  platforms: (map({key: .platform, value: .digest}) | from_entries)})}' \
+            evidence/manifest.json > "$ASSET"
+          node scripts/release-image-lock.ts "$ASSET" evidence/manifest.json \
+            "v${VERSION}" /tmp/release-lock.env
           echo "asset-path=$ASSET" >> "$GITHUB_OUTPUT"
-          cat "$ASSET"
+          jq . "$ASSET"
 
       - name: Generate subject checksums
         id: subjects
         env:
           ASSET: ${{ steps.pin.outputs.asset-path }}
-          APP_DIGEST: ${{ steps.retag.outputs.application-server-digest }}
-          AGENT_DIGEST: ${{ steps.retag.outputs.agent-pi-digest }}
         run: |
-          # shasum-format: '<hex>  <name>'. Names must be plain identifiers
-          # (no URL chars) — actions/attest forwards them verbatim into the
-          # in-toto subject.name field.
           set -euo pipefail
-          {
-            printf '%s  %s\n' "${APP_DIGEST#sha256:}"   "application-server"
-            printf '%s  %s\n' "${AGENT_DIGEST#sha256:}" "agent-pi"
-            printf '%s  %s\n' "$(sha256sum "$ASSET" | awk '{print $1}')" "$ASSET"
-          } > subjects.sha256
+          while IFS=$'\t' read -r image digest; do
+            printf '%s  %s\n' "${digest#sha256:}" "$image"
+          done < release-images.tsv > subjects.sha256
+          sha256sum "$ASSET" >> subjects.sha256
           cat subjects.sha256
 
-      - name: Attest release pin
-        # Version belongs inside the purl, not as a top-level field.
-        # https://github.com/in-toto/attestation/blob/main/spec/predicates/release.md
-        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+      - name: Attest release image lock
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-checksums: subjects.sha256
           predicate-type: https://in-toto.io/attestation/release/v0.1
           predicate: |
             { "purl": "pkg:github/ls1intum/hephaestus@${{ needs.release.outputs.tag_name }}" }
 
-      - name: Install cosign
-        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
-
-      - name: Sign release pin asset
+      - name: Sign release image lock
         env:
           ASSET: ${{ steps.pin.outputs.asset-path }}
         run: |
@@ -301,11 +362,6 @@ jobs:
           cosign sign-blob --yes --bundle "${ASSET}.sigstore.json" "$ASSET"
 
       - name: Verify signature with the deploy-side identity (fail fast)
-        # Assert here, at build time, exactly what docker/compose.app.yaml's
-        # release-pin-fetcher asserts at deploy time. A mismatch (e.g. the OIDC
-        # ref drifts) fails the release loudly instead of silently hanging every
-        # production deploy on `cosign verify-blob`. Keep this identity in sync
-        # with docker/compose.app.yaml.
         env:
           ASSET: ${{ steps.pin.outputs.asset-path }}
         run: |
@@ -316,64 +372,269 @@ jobs:
             --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
             "$ASSET"
 
-      - name: Upload release pin asset to GitHub Release
+      - name: Upload release image lock to GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG_NAME: ${{ needs.release.outputs.tag_name }}
           ASSET: ${{ steps.pin.outputs.asset-path }}
         run: |
           set -euo pipefail
-          # Release assets are immutable: no --clobber, fail loud on re-run.
           gh release upload "$TAG_NAME" \
-            "$ASSET" "${ASSET}.sigstore.json" \
+            "$ASSET" "${ASSET}.sigstore.json" evidence/* \
             --repo "${{ github.repository }}"
 
-  deploy-staging:
+  upgrade-test:
     needs: [release, tag-images]
     if: needs.release.outputs.released == 'true'
-    uses: ./.github/workflows/deploy-staging.yml
-    # The called org workflow (ls1intum/.github deploy-docker-compose.yml@main)
-    # requires these. With the top-level `permissions: {}`, omitting them makes
-    # workflow COMPILATION fail ("requesting 'contents: read' but only allowed
-    # 'none'") — a startup_failure that killed every release since June 2026.
+    uses: ./.github/workflows/release-upgrade.yml
     permissions:
       contents: read
       packages: read
     with:
-      image-tag: ${{ needs.release.outputs.version }}
-      deploy-app: true
-      deploy-core: false
-      deploy-proxy: false
-    secrets: inherit
+      previous-application-image: ghcr.io/ls1intum/hephaestus/application-server:${{ needs.release.outputs.previous_version }}
+      candidate-application-image: ghcr.io/ls1intum/hephaestus/application-server@${{ needs.tag-images.outputs.application-server-digest }}
+      postgres-image: ghcr.io/ls1intum/hephaestus/postgres@${{ needs.tag-images.outputs.postgres-digest }}
+      candidate-source-sha: ${{ needs.release.outputs.sha }}
+
+  supported-host-smoke:
+    needs: [release, tag-images]
+    if: needs.release.outputs.released == 'true'
+    name: Host smoke (${{ matrix.architecture }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: amd64
+            runner: ubuntu-24.04
+          - architecture: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    permissions:
+      # The release is still a draft here, and draft releases are visible only to tokens with push
+      # access, so `gh release download` in prepare-release-lock.ts needs contents: write.
+      contents: write
+      packages: read
+    steps:
+      - name: Check out the released tree
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.release.outputs.sha }}
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-node-pnpm
+        with:
+          install: "none"
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Log in to GitHub Container Registry
+        uses: ./.github/actions/ghcr-login
+        with:
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Smoke-test the blessed install
+        env:
+          ARCHITECTURE: ${{ matrix.architecture }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_SHA: ${{ needs.release.outputs.sha }}
+          TAG_NAME: ${{ needs.release.outputs.tag_name }}
+        run: |
+          set -euo pipefail
+          cd docker/self-host
+          cleanup() {
+            status=$?
+            if [ "$status" -ne 0 ]; then
+              docker compose --env-file .env --env-file release-lock.env logs --no-color || true
+            fi
+            docker compose --env-file .env --env-file release-lock.env down -v --remove-orphans || true
+            exit "$status"
+          }
+          trap cleanup EXIT
+
+          actual_arch=$(docker version --format '{{.Server.Arch}}')
+          [ "$actual_arch" = "$ARCHITECTURE" ] || { echo "::error::Expected native $ARCHITECTURE, got $actual_arch"; exit 1; }
+          . /etc/os-release
+          [ "$ID" = ubuntu ] && [ "$VERSION_ID" = 24.04 ] || { echo "::error::Ubuntu 24.04 is required"; exit 1; }
+          docker_major=$(docker version --format '{{.Server.Version}}' | cut -d. -f1)
+          [ "$docker_major" -ge 28 ] || { echo "::error::Docker Engine 28 or newer is required"; exit 1; }
+          compose_version=$(docker compose version --short)
+          [ "$(printf '%s\n' 2.24.4 "$compose_version" | sort -V | head -n1)" = 2.24.4 ] || {
+            echo "::error::Docker Compose 2.24.4 or newer is required"; exit 1; }
+
+          ./setup.sh
+          sed -i \
+            -e 's/^APP_HOSTNAME=$/APP_HOSTNAME=hephaestus-smoke.invalid/' \
+            -e 's/^ACME_EMAIL=$/ACME_EMAIL=release-smoke@example.invalid/' \
+            -e 's/^GH_OAUTH_CLIENT_ID=$/GH_OAUTH_CLIENT_ID=release-smoke/' \
+            -e 's/^GH_OAUTH_CLIENT_SECRET=$/GH_OAUTH_CLIENT_SECRET=release-smoke-secret/' \
+            -e 's/^HEPHAESTUS_AUTH_BOOTSTRAP_ADMINS=$/HEPHAESTUS_AUTH_BOOTSTRAP_ADMINS=github:1/' \
+            .env
+          node ../../scripts/prepare-release-lock.ts "$TAG_NAME"
+          docker compose --env-file .env --env-file release-lock.env config --quiet
+          docker compose --env-file .env --env-file release-lock.env up -d --wait --wait-timeout 600
+          curl --fail --insecure --silent --show-error --max-time 10 --noproxy '*' \
+            --resolve hephaestus-smoke.invalid:443:127.0.0.1 \
+            https://hephaestus-smoke.invalid/ >/dev/null
+
+          jq -n \
+            --arg schemaVersion "1" \
+            --arg release "$TAG_NAME" \
+            --arg commit "$RELEASE_SHA" \
+            --arg testedAt "$(date -u +%FT%TZ)" \
+            --arg os "$(. /etc/os-release; printf '%s %s' "$NAME" "$VERSION_ID")" \
+            --arg architecture "$actual_arch" \
+            --arg dockerEngine "$(docker version --format '{{.Server.Version}}')" \
+            --arg dockerCompose "$compose_version" \
+            --argjson services "$(docker compose --env-file .env --env-file release-lock.env ps --all --format json | jq -s 'map({service: .Service, state: .State, health: .Health, exitCode: .ExitCode}) | sort_by(.service)')" \
+            '{schemaVersion: ($schemaVersion | tonumber), release: $release, commit: $commit,
+              testedAt: $testedAt, host: {os: $os, architecture: $architecture,
+              dockerEngine: $dockerEngine, dockerCompose: $dockerCompose}, services: $services}' \
+            > "../../host-smoke-$ARCHITECTURE.json"
+
+      - name: Upload smoke-test record
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: host-smoke-${{ matrix.architecture }}
+          path: host-smoke-${{ matrix.architecture }}.json
+          if-no-files-found: error
+
+  publish-release:
+    needs: [release, tag-images, upgrade-test, supported-host-smoke]
+    if: needs.release.outputs.released == 'true'
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+      attestations: read
+    steps:
+      - name: Checkout release verifier
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.release.outputs.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-node-pnpm
+        with:
+          install: "none"
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Log in to GitHub Container Registry
+        uses: ./.github/actions/ghcr-login
+        with:
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download supported-host smoke records
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: host-smoke-*
+          path: host-smoke
+          merge-multiple: true
+
+      - name: Verify supported-host smoke records
+        env:
+          RELEASE_SHA: ${{ needs.release.outputs.sha }}
+          TAG_NAME: ${{ needs.release.outputs.tag_name }}
+        run: |
+          set -euo pipefail
+          jq -s -e --arg release "$TAG_NAME" --arg commit "$RELEASE_SHA" '
+            length == 2 and
+            ([.[].host.architecture] | sort) == ["amd64", "arm64"] and
+            all(.[];
+              .schemaVersion == 1 and .release == $release and .commit == $commit and
+              (.testedAt | fromdateiso8601) and
+              .host.os == "Ubuntu 24.04" and
+              (.host.dockerEngine | type) == "string" and
+              (.host.dockerCompose | type) == "string" and
+              (.services | length) > 0 and
+              ([.services[].service] | length) == ([.services[].service] | unique | length) and
+              all(.services[];
+                if .state == "exited" then .exitCode == 0
+                else .state == "running" and .health == "healthy" end))' host-smoke/*.json >/dev/null
+
+      - name: Verify durable assets from a clean environment
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ needs.release.outputs.tag_name }}
+        run: |
+          set -euo pipefail
+          mkdir evidence
+          gh release download "$TAG_NAME" --repo "${{ github.repository }}" --dir evidence
+          (cd evidence && sha256sum -c SHA256SUMS)
+          lock="release-${TAG_NAME}.json"
+          cosign verify-blob \
+            --bundle "evidence/$lock.sigstore.json" \
+            --certificate-identity 'https://github.com/ls1intum/Hephaestus/.github/workflows/release.yml@refs/heads/main' \
+            --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+            "evidence/$lock"
+          node scripts/release-image-lock.ts "evidence/$lock" evidence/manifest.json \
+            "$TAG_NAME" /tmp/release-lock.env
+          node scripts/verify-release-evidence.ts evidence --verify-signatures
+          asset="evidence/release-${TAG_NAME}.json"
+          cosign verify-blob --bundle "${asset}.sigstore.json" \
+            --certificate-identity 'https://github.com/ls1intum/Hephaestus/.github/workflows/release.yml@refs/heads/main' \
+            --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' "$asset" >/dev/null
+
+      - name: Promote verified image digests
+        env:
+          VERSION: ${{ needs.release.outputs.version }}
+          SERIES: ${{ needs.release.outputs.major }}.${{ needs.release.outputs.minor }}
+        run: |
+          set -euo pipefail
+          jq -er '[.subjects[] | select(.provenance == "first-party") | [.repository, .indexDigest]] | unique[] | @tsv' evidence/manifest.json |
+          while IFS=$'\t' read -r ref digest; do
+            docker buildx imagetools create -t "$ref:$VERSION" "$ref@$digest"
+            promoted=$(docker buildx imagetools inspect "$ref:$VERSION" --format '{{json .Manifest}}' | jq -r .digest)
+            [ "$promoted" = "$digest" ] || { echo "::error::Promotion changed $ref:$VERSION digest"; exit 1; }
+          done
+          jq -er '[.subjects[] | select(.provenance == "first-party") | [.repository, .indexDigest]] | unique[] | @tsv' evidence/manifest.json |
+          while IFS=$'\t' read -r ref digest; do
+            docker buildx imagetools create -t "$ref:$SERIES" -t "$ref:latest" "$ref@$digest"
+            for tag in "$SERIES" latest; do
+              promoted=$(docker buildx imagetools inspect "$ref:$tag" --format '{{json .Manifest}}' | jq -r .digest)
+              [ "$promoted" = "$digest" ] || { echo "::error::Promotion changed $ref:$tag digest"; exit 1; }
+            done
+          done
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ needs.release.outputs.tag_name }}
+        run: |
+          set -euo pipefail
+          gh release upload "$TAG_NAME" host-smoke/*.json --repo "${{ github.repository }}"
+          gh release edit "$TAG_NAME" --repo "${{ github.repository }}" --draft=false
+          [ "$(gh release view "$TAG_NAME" --repo "${{ github.repository }}" --json isImmutable --jq .isImmutable)" = true ] || {
+            echo "::error::Repository immutable releases must be enabled before publishing"; exit 1; }
+
+  deploy-staging:
+    needs: [release, tag-images, publish-release]
+    if: needs.release.outputs.released == 'true'
+    uses: ./.github/workflows/deploy-staging.yml
+    permissions:
+      contents: read
+      packages: read
+    with:
+      image-tag: ${{ needs.release.outputs.tag_name }}
+    # Deploy credentials include organization secrets, which reach nested reusable
+    # workflows only through inheritance — environment secrets alone do not cover them.
+    secrets: inherit # zizmor: ignore[secrets-inherit]
 
   deploy-production:
     needs: [release, deploy-staging]
     if: needs.release.outputs.released == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Trigger Production Deploy
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        with:
-          github-token: ${{ secrets.GH_PAT }}
-          script: |
-            await github.rest.actions.createWorkflowDispatch({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              workflow_id: 'deploy-prod.yml',
-              ref: 'main',
-              inputs: {
-                'image-tag': '${{ needs.release.outputs.version }}',
-                'deploy-app': 'true',
-                'deploy-core': 'false',
-                'deploy-proxy': 'false'
-              }
-            });
-            console.log('✅ Production deployment triggered for ${{ needs.release.outputs.tag_name }}');
-
-      - name: Summary
-        run: |
-          echo "## 🚀 Production Deployment Triggered" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Version **${{ needs.release.outputs.tag_name }}** deployment to production has been triggered." >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "⏳ Waiting for approval in the [Deploy to Production](https://github.com/${{ github.repository }}/actions/workflows/deploy-prod.yml) workflow." >> $GITHUB_STEP_SUMMARY
+    uses: ./.github/workflows/deploy-prod.yml
+    permissions:
+      contents: read
+    with:
+      image-tag: ${{ needs.release.outputs.tag_name }}
+    # Deploy credentials include organization secrets, which reach nested reusable
+    # workflows only through inheritance — environment secrets alone do not cover them.
+    secrets: inherit # zizmor: ignore[secrets-inherit]

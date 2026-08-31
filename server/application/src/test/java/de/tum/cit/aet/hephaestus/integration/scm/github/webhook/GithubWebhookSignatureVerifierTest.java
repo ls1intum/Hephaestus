@@ -53,9 +53,8 @@ class GithubWebhookSignatureVerifierTest extends BaseUnitTest {
     void wrongAlgorithmPrefixInvalid() {
         // SHA-1 path (legacy X-Hub-Signature) must NOT be accepted via the new header name.
         byte[] body = body("{}");
-        VerificationResult result = newVerifier(SECRET).verify(
-            req(body, header("X-Hub-Signature-256", "sha1=deadbeef"))
-        );
+        VerificationResult result =
+                newVerifier(SECRET).verify(req(body, header("X-Hub-Signature-256", "sha1=deadbeef")));
 
         assertThat(result).isInstanceOf(VerificationResult.Invalid.class);
         assertThat(((VerificationResult.Invalid) result).reason()).isEqualTo("unsupported-signature-algo");
@@ -126,14 +125,13 @@ class GithubWebhookSignatureVerifierTest extends BaseUnitTest {
     /** Builds a fully-populated WebhookProperties (record requires all components). */
     private static WebhookProperties propsWithSecret(@Nullable String secret) {
         return new WebhookProperties(
-            /* externalUrl */ null,
-            secret,
-            new WebhookProperties.TokenRotation(7, 90),
-            new WebhookProperties.Publish(Duration.ofSeconds(9), 5, Duration.ofMillis(200)),
-            WebhookPropertiesFixture.stream(),
-            new WebhookProperties.Shutdown(Duration.ofSeconds(15)),
-            new WebhookProperties.Http(26_214_400L)
-        );
+                /* externalUrl */ null,
+                secret,
+                new WebhookProperties.TokenRotation(7, 90),
+                new WebhookProperties.Publish(Duration.ofSeconds(9), 5, Duration.ofMillis(200)),
+                WebhookPropertiesFixture.stream(),
+                new WebhookProperties.Shutdown(Duration.ofSeconds(15)),
+                new WebhookProperties.Http(26_214_400L));
     }
 
     private static String hmacHex(byte[] body) {

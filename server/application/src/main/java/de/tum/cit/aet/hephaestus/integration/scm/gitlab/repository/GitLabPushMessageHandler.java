@@ -83,29 +83,27 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
     private final GitLabCommitMergeRequestLinker commitMergeRequestLinker;
 
     GitLabPushMessageHandler(
-        GitLabProjectProcessor projectProcessor,
-        OrganizationRepository organizationRepository,
-        RepositoryRepository repositoryRepository,
-        CommitRepository commitRepository,
-        IdentityProviderRepository gitProviderRepository,
-        GitLabProperties gitLabProperties,
-        GitRepositoryManager gitRepositoryManager,
-        GitLabTokenService tokenService,
-        CommitAuthorResolver authorResolver,
-        ScopeIdResolver scopeIdResolver,
-        SyncTargetProvider syncTargetProvider,
-        ApplicationEventPublisher eventPublisher,
-        GitLabCommitMergeRequestLinker commitMergeRequestLinker,
-        NatsMessageDeserializer deserializer,
-        TransactionTemplate transactionTemplate
-    ) {
+            GitLabProjectProcessor projectProcessor,
+            OrganizationRepository organizationRepository,
+            RepositoryRepository repositoryRepository,
+            CommitRepository commitRepository,
+            IdentityProviderRepository gitProviderRepository,
+            GitLabProperties gitLabProperties,
+            GitRepositoryManager gitRepositoryManager,
+            GitLabTokenService tokenService,
+            CommitAuthorResolver authorResolver,
+            ScopeIdResolver scopeIdResolver,
+            SyncTargetProvider syncTargetProvider,
+            ApplicationEventPublisher eventPublisher,
+            GitLabCommitMergeRequestLinker commitMergeRequestLinker,
+            NatsMessageDeserializer deserializer,
+            TransactionTemplate transactionTemplate) {
         super(
-            IntegrationKind.GITLAB,
-            GitLabEventType.PUSH.getValue(),
-            GitLabPushEventDTO.class,
-            deserializer,
-            transactionTemplate
-        );
+                IntegrationKind.GITLAB,
+                GitLabEventType.PUSH.getValue(),
+                GitLabPushEventDTO.class,
+                deserializer,
+                transactionTemplate);
         this.projectProcessor = projectProcessor;
         this.organizationRepository = organizationRepository;
         this.repositoryRepository = repositoryRepository;
@@ -142,28 +140,21 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
 
         String safeRef = sanitizeForLog(event.ref());
         log.debug(
-            "Received push event: projectPath={}, ref={}, commits={}",
-            safeProjectPath,
-            safeRef,
-            event.totalCommitsCount()
-        );
+                "Received push event: projectPath={}, ref={}, commits={}",
+                safeProjectPath,
+                safeRef,
+                event.totalCommitsCount());
 
         // Upsert the project as a Repository entity from the webhook payload.
         IdentityProvider provider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITLAB, gitLabProperties.defaultServerUrl())
-            .orElseThrow(() ->
-                new IllegalStateException(
-                    "IdentityProvider not found for type=GITLAB, serverUrl=" + gitLabProperties.defaultServerUrl()
-                )
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITLAB, gitLabProperties.defaultServerUrl())
+                .orElseThrow(() -> new IllegalStateException("IdentityProvider not found for type=GITLAB, serverUrl="
+                        + gitLabProperties.defaultServerUrl()));
         var repository = projectProcessor.processPushEvent(event.project(), provider);
 
         if (repository != null) {
             log.debug(
-                "Upserted project from push event: projectPath={}, repoId={}",
-                safeProjectPath,
-                repository.getId()
-            );
+                    "Upserted project from push event: projectPath={}, repoId={}", safeProjectPath, repository.getId());
             ensureOrganizationLinked(repository, projectPath, provider);
 
             Long scopeId = resolveScopeId(repository);
@@ -207,7 +198,8 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
             return;
         }
         try {
-            commitMergeRequestLinker.linkCommits(scopeId, repository, OffsetDateTime.now().minusHours(1));
+            commitMergeRequestLinker.linkCommits(
+                    scopeId, repository, OffsetDateTime.now().minusHours(1));
         } catch (Exception e) {
             log.debug("Push-time commit→MR link failed: repoId={}, error={}", repository.getId(), e.getMessage());
         }
@@ -229,16 +221,14 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
             String cloneUrl = serverUrl + "/" + repository.getNameWithOwner() + ".git";
             gitRepositoryManager.ensureRepository(repository.getId(), cloneUrl, token);
             log.debug(
-                "Fetched non-default branch push: ref={}, repo={}",
-                sanitizeForLog(event.ref()),
-                sanitizeForLog(repository.getNameWithOwner())
-            );
+                    "Fetched non-default branch push: ref={}, repo={}",
+                    sanitizeForLog(event.ref()),
+                    sanitizeForLog(repository.getNameWithOwner()));
         } catch (Exception e) {
             log.warn(
-                "Non-default branch fetch failed: repo={}, error={}",
-                sanitizeForLog(repository.getNameWithOwner()),
-                e.getMessage()
-            );
+                    "Non-default branch fetch failed: repo={}, error={}",
+                    sanitizeForLog(repository.getNameWithOwner()),
+                    e.getMessage());
         }
     }
 
@@ -267,10 +257,7 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
 
             // Walk commits from before→after using JGit
             List<GitRepositoryManager.CommitInfo> commitInfos = gitRepositoryManager.walkCommits(
-                repository.getId(),
-                isInitialPush(beforeSha) ? null : beforeSha,
-                afterSha
-            );
+                    repository.getId(), isInitialPush(beforeSha) ? null : beforeSha, afterSha);
 
             int processed = 0;
             for (GitRepositoryManager.CommitInfo info : commitInfos) {
@@ -280,17 +267,15 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
             }
 
             log.info(
-                "Processed push commits via local git: processed={}, total={}, repoName={}",
-                processed,
-                commitInfos.size(),
-                repoName
-            );
+                    "Processed push commits via local git: processed={}, total={}, repoName={}",
+                    processed,
+                    commitInfos.size(),
+                    repoName);
         } catch (Exception e) {
             log.error(
-                "Failed to process commits via local git, falling back to webhook: repoName={}, error={}",
-                repoName,
-                e.getMessage()
-            );
+                    "Failed to process commits via local git, falling back to webhook: repoName={}, error={}",
+                    repoName,
+                    e.getMessage());
             processCommitsViaWebhook(event, repository, true);
         }
     }
@@ -299,10 +284,7 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
      * Process a single commit from local git info with full diff statistics.
      */
     private boolean processLocalGitCommit(
-        GitRepositoryManager.CommitInfo info,
-        Repository repository,
-        String serverUrl
-    ) {
+            GitRepositoryManager.CommitInfo info, Repository repository, String serverUrl) {
         // Fast-path: skip if already persisted
         if (commitRepository.existsByShaAndRepositoryId(info.sha(), repository.getId())) {
             return false;
@@ -316,26 +298,27 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
         String htmlUrl = CommitUtils.buildGitLabCommitUrl(serverUrl, repository.getNameWithOwner(), info.sha());
 
         commitRepository.upsertCommit(
-            info.sha(),
-            message,
-            info.messageBody(),
-            htmlUrl,
-            info.authoredAt(),
-            info.committedAt(),
-            info.additions(),
-            info.deletions(),
-            info.changedFiles(),
-            Instant.now(),
-            repository.getId(),
-            authorId,
-            committerId,
-            info.authorEmail(),
-            info.committerEmail()
-        );
+                info.sha(),
+                message,
+                info.messageBody(),
+                htmlUrl,
+                info.authoredAt(),
+                info.committedAt(),
+                info.additions(),
+                info.deletions(),
+                info.changedFiles(),
+                Instant.now(),
+                repository.getId(),
+                authorId,
+                committerId,
+                info.authorEmail(),
+                info.committerEmail());
 
         // Attach file changes with line-level stats
         if (!info.fileChanges().isEmpty()) {
-            Commit commit = commitRepository.findByShaAndRepositoryId(info.sha(), repository.getId()).orElse(null);
+            Commit commit = commitRepository
+                    .findByShaAndRepositoryId(info.sha(), repository.getId())
+                    .orElse(null);
             if (commit != null) {
                 for (GitRepositoryManager.FileChange fc : info.fileChanges()) {
                     CommitFileChange fileChange = new CommitFileChange();
@@ -387,22 +370,21 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
                 String authorEmail = commit.author() != null ? commit.author().email() : null;
 
                 commitRepository.upsertCommit(
-                    sha,
-                    message,
-                    messageBody,
-                    htmlUrl,
-                    authoredAt,
-                    authoredAt,
-                    asFallback ? null : 0, // additions: null preserves local-git data
-                    asFallback ? null : 0, // deletions: null preserves local-git data
-                    asFallback ? null : (changedFiles > 0 ? changedFiles : null),
-                    Instant.now(),
-                    repository.getId(),
-                    null,
-                    null,
-                    authorEmail,
-                    authorEmail
-                );
+                        sha,
+                        message,
+                        messageBody,
+                        htmlUrl,
+                        authoredAt,
+                        authoredAt,
+                        asFallback ? null : 0, // additions: null preserves local-git data
+                        asFallback ? null : 0, // deletions: null preserves local-git data
+                        asFallback ? null : (changedFiles > 0 ? changedFiles : null),
+                        Instant.now(),
+                        repository.getId(),
+                        null,
+                        null,
+                        authorEmail,
+                        authorEmail);
 
                 // Only persist webhook file changes when NOT a fallback
                 // (fallback should preserve richer local-git file changes)
@@ -414,22 +396,20 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
                 created++;
             } catch (Exception e) {
                 log.warn(
-                    "Failed to upsert commit: sha={}, repoId={}, error={}",
-                    commit.id(),
-                    repository.getId(),
-                    e.getMessage()
-                );
+                        "Failed to upsert commit: sha={}, repoId={}, error={}",
+                        commit.id(),
+                        repository.getId(),
+                        e.getMessage());
             }
         }
 
         if (created > 0) {
             log.info(
-                "Created commits from push event: repoId={}, created={}, total={}, fallback={}",
-                repository.getId(),
-                created,
-                commits.size(),
-                asFallback
-            );
+                    "Created commits from push event: repoId={}, created={}, total={}, fallback={}",
+                    repository.getId(),
+                    created,
+                    commits.size(),
+                    asFallback);
         }
     }
 
@@ -437,16 +417,17 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
      * Persists file changes from webhook payload (filenames + change type, no line stats).
      */
     private void persistWebhookFileChanges(String sha, CommitInfo commitInfo, Repository repository) {
-        boolean hasFiles =
-            (commitInfo.added() != null && !commitInfo.added().isEmpty()) ||
-            (commitInfo.modified() != null && !commitInfo.modified().isEmpty()) ||
-            (commitInfo.removed() != null && !commitInfo.removed().isEmpty());
+        boolean hasFiles = (commitInfo.added() != null && !commitInfo.added().isEmpty())
+                || (commitInfo.modified() != null && !commitInfo.modified().isEmpty())
+                || (commitInfo.removed() != null && !commitInfo.removed().isEmpty());
 
         if (!hasFiles) {
             return;
         }
 
-        Commit commitEntity = commitRepository.findByShaAndRepositoryId(sha, repository.getId()).orElse(null);
+        Commit commitEntity = commitRepository
+                .findByShaAndRepositoryId(sha, repository.getId())
+                .orElse(null);
         if (commitEntity == null) {
             return;
         }
@@ -461,7 +442,9 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
     // Domain event publishing
 
     private void publishCommitCreated(String sha, Repository repository) {
-        Commit commit = commitRepository.findByShaAndRepositoryId(sha, repository.getId()).orElse(null);
+        Commit commit = commitRepository
+                .findByShaAndRepositoryId(sha, repository.getId())
+                .orElse(null);
         if (commit == null) {
             return;
         }
@@ -470,15 +453,14 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
 
         ScmEventPayload.CommitData commitData = ScmEventPayload.CommitData.from(commit);
         EventContext context = new EventContext(
-            UUID.randomUUID(),
-            Instant.now(),
-            scopeId,
-            Objects.requireNonNull(RepositoryRef.from(repository)),
-            DataSource.WEBHOOK,
-            null,
-            UUID.randomUUID().toString(),
-            IdentityProviderType.GITLAB
-        );
+                UUID.randomUUID(),
+                Instant.now(),
+                scopeId,
+                Objects.requireNonNull(RepositoryRef.from(repository)),
+                DataSource.WEBHOOK,
+                null,
+                UUID.randomUUID().toString(),
+                IdentityProviderType.GITLAB);
 
         eventPublisher.publishEvent(new ScmDomainEvent.CommitCreated(commitData, context));
     }
@@ -494,7 +476,9 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
                 return scopeId;
             }
         }
-        return scopeIdResolver.findScopeIdByRepositoryName(repository.getNameWithOwner()).orElse(null);
+        return scopeIdResolver
+                .findScopeIdByRepositoryName(repository.getNameWithOwner())
+                .orElse(null);
     }
 
     // Organization linking
@@ -510,17 +494,14 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
         }
 
         Organization org = organizationRepository
-            .findByLoginIgnoreCaseAndProviderId(groupPath, Objects.requireNonNull(provider.getId()))
-            .orElse(null);
+                .findByLoginIgnoreCaseAndProviderId(groupPath, Objects.requireNonNull(provider.getId()))
+                .orElse(null);
 
         if (org != null) {
             repository.setOrganization(org);
             repositoryRepository.save(repository);
             log.debug(
-                "Linked org to repository: repoId={}, orgLogin={}",
-                repository.getId(),
-                sanitizeForLog(groupPath)
-            );
+                    "Linked org to repository: repoId={}, orgLogin={}", repository.getId(), sanitizeForLog(groupPath));
         } else {
             log.debug("Organization not yet synced: groupPath={}", sanitizeForLog(groupPath));
         }
@@ -562,10 +543,7 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
     }
 
     private static void addFileChanges(
-        Commit commit,
-        @Nullable List<String> filenames,
-        CommitFileChange.ChangeType changeType
-    ) {
+            Commit commit, @Nullable List<String> filenames, CommitFileChange.ChangeType changeType) {
         if (filenames == null) return;
         for (String filename : filenames) {
             if (filename == null || filename.isBlank()) continue;

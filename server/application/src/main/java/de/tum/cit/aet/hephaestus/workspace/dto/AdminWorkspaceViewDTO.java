@@ -14,14 +14,13 @@ import org.jspecify.annotations.Nullable;
  */
 @Schema(description = "Metadata-only workspace summary for the instance-admin overview")
 public record AdminWorkspaceViewDTO(
-    @NonNull Long id,
-    @NonNull String workspaceSlug,
-    @NonNull String displayName,
-    @NonNull String status,
-    @NonNull String accountLogin,
-    @Nullable IdentityProviderType providerType,
-    @Nullable String ownerLogin,
-    @Nullable Long ownerAccountId,
-    @NonNull Long memberCount,
-    @NonNull Instant createdAt
-) {}
+        @NonNull Long id,
+        @NonNull String workspaceSlug,
+        @NonNull String displayName,
+        @NonNull String status,
+        @NonNull String accountLogin,
+        @Nullable IdentityProviderType providerType,
+        @Nullable String ownerLogin,
+        @Nullable Long ownerAccountId,
+        @NonNull Long memberCount,
+        @NonNull Instant createdAt) {}

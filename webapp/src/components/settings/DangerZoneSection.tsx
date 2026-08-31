@@ -1,6 +1,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
+
 import {
 	deleteCurrentUserMutation,
 	getDataExportStatusOptions,
@@ -22,8 +23,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
-import { useAuth } from "@/integrations/auth/AuthContext";
 import { ACCOUNT_DELETED_NOTICE_KEY } from "@/integrations/auth/account-deleted-notice";
+import { useAuth } from "@/integrations/auth/AuthContext";
 
 const DELETE_CONFIRM_PHRASE = "delete my account";
 

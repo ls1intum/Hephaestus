@@ -15,12 +15,9 @@ public class WebhookHttpConfiguration {
 
     @Bean
     FilterRegistrationBean<WebhookPayloadSizeFilter> webhookPayloadSizeFilter(
-        WebhookProperties properties,
-        MeterRegistry meterRegistry
-    ) {
-        FilterRegistrationBean<WebhookPayloadSizeFilter> registration = new FilterRegistrationBean<>(
-            new WebhookPayloadSizeFilter(properties, meterRegistry)
-        );
+            WebhookProperties properties, MeterRegistry meterRegistry) {
+        FilterRegistrationBean<WebhookPayloadSizeFilter> registration =
+                new FilterRegistrationBean<>(new WebhookPayloadSizeFilter(properties, meterRegistry));
         registration.addUrlPatterns("/webhooks/*");
         registration.setOrder(Ordered.HIGHEST_PRECEDENCE);
         return registration;

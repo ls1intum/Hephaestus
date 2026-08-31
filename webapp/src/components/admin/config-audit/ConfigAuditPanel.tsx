@@ -3,6 +3,7 @@ import {
 	type UseInfiniteQueryResult,
 	useInfiniteQuery,
 } from "@tanstack/react-query";
+
 import {
 	adminListConfigAuditEventsInfiniteOptions,
 	listWorkspaceConfigAuditEventsInfiniteOptions,
@@ -16,11 +17,11 @@ import {
 	toDateRange,
 } from "@/components/admin/audit-shared/audit-search";
 import { nameForRef } from "@/components/admin/audit-shared/name-for-ref";
-import { ConfigAuditTable } from "@/components/admin/config-audit/ConfigAuditTable";
 import {
 	ACTION_LABELS,
 	ENTITY_TYPE_LABELS,
 } from "@/components/admin/config-audit/config-audit-format";
+import { ConfigAuditTable } from "@/components/admin/config-audit/ConfigAuditTable";
 import { DateRangeFacet } from "@/components/common/DateRangeFacet";
 import { FacetMultiSelect, toFacetOptions } from "@/components/common/FacetMultiSelect";
 import { FilterToolbar } from "@/components/common/FilterToolbar";

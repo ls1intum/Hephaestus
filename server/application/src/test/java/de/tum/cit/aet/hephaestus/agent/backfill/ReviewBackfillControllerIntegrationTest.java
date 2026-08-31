@@ -63,33 +63,31 @@ class ReviewBackfillControllerIntegrationTest extends AbstractWorkspaceIntegrati
         Workspace workspace = setupWorkspace("backfill-preflight");
 
         webTestClient
-            .post()
-            .uri("/workspaces/{slug}/practices/backfill-runs", workspace.getWorkspaceSlug())
-            .headers(asAdminAccount())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(window())
-            .exchange()
-            .expectStatus()
-            .isCreated()
-            .expectBody()
-            .jsonPath("$.status")
-            .isEqualTo("AWAITING_CONFIRMATION")
-            .jsonPath("$.estimatedArtifacts")
-            .isEqualTo(0)
-            .jsonPath("$.submittedCount")
-            .isEqualTo(0)
-            .jsonPath("$.confirmedByAccountId")
-            .doesNotExist()
-            .jsonPath("$.startedAt")
-            .doesNotExist();
+                .post()
+                .uri("/workspaces/{slug}/practices/backfill-runs", workspace.getWorkspaceSlug())
+                .headers(asAdminAccount())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(window())
+                .exchange()
+                .expectStatus()
+                .isCreated()
+                .expectBody()
+                .jsonPath("$.status")
+                .isEqualTo("AWAITING_CONFIRMATION")
+                .jsonPath("$.estimatedArtifacts")
+                .isEqualTo(0)
+                .jsonPath("$.submittedCount")
+                .isEqualTo(0)
+                .jsonPath("$.confirmedByAccountId")
+                .doesNotExist()
+                .jsonPath("$.startedAt")
+                .doesNotExist();
 
-        assertThat(runRepository.findAll())
-            .singleElement()
-            .satisfies(run -> {
-                assertThat(run.getStatus()).isEqualTo(ReviewBackfillStatus.AWAITING_CONFIRMATION);
-                assertThat(run.getConfirmedByAccountId()).isNull();
-                assertThat(run.getCursorArtifactId()).isNull();
-            });
+        assertThat(runRepository.findAll()).singleElement().satisfies(run -> {
+            assertThat(run.getStatus()).isEqualTo(ReviewBackfillStatus.AWAITING_CONFIRMATION);
+            assertThat(run.getConfirmedByAccountId()).isNull();
+            assertThat(run.getCursorArtifactId()).isNull();
+        });
     }
 
     @Test
@@ -99,21 +97,21 @@ class ReviewBackfillControllerIntegrationTest extends AbstractWorkspaceIntegrati
         String runId = preflight(workspace);
 
         webTestClient
-            .patch()
-            .uri("/workspaces/{slug}/practices/backfill-runs/{runId}/status", workspace.getWorkspaceSlug(), runId)
-            .headers(asAdminAccount())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(Map.of("status", "RUNNING"))
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.status")
-            .isEqualTo("RUNNING")
-            .jsonPath("$.confirmedByAccountId")
-            .exists()
-            .jsonPath("$.startedAt")
-            .exists();
+                .patch()
+                .uri("/workspaces/{slug}/practices/backfill-runs/{runId}/status", workspace.getWorkspaceSlug(), runId)
+                .headers(asAdminAccount())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of("status", "RUNNING"))
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.status")
+                .isEqualTo("RUNNING")
+                .jsonPath("$.confirmedByAccountId")
+                .exists()
+                .jsonPath("$.startedAt")
+                .exists();
     }
 
     @Test
@@ -138,16 +136,16 @@ class ReviewBackfillControllerIntegrationTest extends AbstractWorkspaceIntegrati
         patchStatus(workspace, runId, "RUNNING").expectStatus().isOk();
 
         webTestClient
-            .post()
-            .uri("/workspaces/{slug}/practices/backfill-runs", workspace.getWorkspaceSlug())
-            .headers(asAdminAccount())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(window())
-            .exchange()
-            .expectStatus()
-            .isEqualTo(409)
-            .expectHeader()
-            .contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON);
+                .post()
+                .uri("/workspaces/{slug}/practices/backfill-runs", workspace.getWorkspaceSlug())
+                .headers(asAdminAccount())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(window())
+                .exchange()
+                .expectStatus()
+                .isEqualTo(409)
+                .expectHeader()
+                .contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON);
     }
 
     /** Told at preflight, so the admin narrows the window instead of discovering the limit later. */
@@ -157,16 +155,16 @@ class ReviewBackfillControllerIntegrationTest extends AbstractWorkspaceIntegrati
         Workspace workspace = setupWorkspace("backfill-window");
 
         webTestClient
-            .post()
-            .uri("/workspaces/{slug}/practices/backfill-runs", workspace.getWorkspaceSlug())
-            .headers(asAdminAccount())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(Map.of("artifactKind", "scm.pull_request", "fromAt", TO.toString(), "toAt", FROM.toString()))
-            .exchange()
-            .expectStatus()
-            .isBadRequest()
-            .expectHeader()
-            .contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON);
+                .post()
+                .uri("/workspaces/{slug}/practices/backfill-runs", workspace.getWorkspaceSlug())
+                .headers(asAdminAccount())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of("artifactKind", "scm.pull_request", "fromAt", TO.toString(), "toAt", FROM.toString()))
+                .exchange()
+                .expectStatus()
+                .isBadRequest()
+                .expectHeader()
+                .contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON);
     }
 
     @Test
@@ -175,16 +173,15 @@ class ReviewBackfillControllerIntegrationTest extends AbstractWorkspaceIntegrati
         Workspace workspace = setupWorkspace("backfill-kind");
 
         webTestClient
-            .post()
-            .uri("/workspaces/{slug}/practices/backfill-runs", workspace.getWorkspaceSlug())
-            .headers(asAdminAccount())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(
-                Map.of("artifactKind", "chat.conversation_thread", "fromAt", FROM.toString(), "toAt", TO.toString())
-            )
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+                .post()
+                .uri("/workspaces/{slug}/practices/backfill-runs", workspace.getWorkspaceSlug())
+                .headers(asAdminAccount())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of(
+                        "artifactKind", "chat.conversation_thread", "fromAt", FROM.toString(), "toAt", TO.toString()))
+                .exchange()
+                .expectStatus()
+                .isBadRequest();
     }
 
     /** A campaign can spend a workspace's whole monthly AI budget, so a plain member cannot start one. */
@@ -197,22 +194,22 @@ class ReviewBackfillControllerIntegrationTest extends AbstractWorkspaceIntegrati
         String slug = workspace.getWorkspaceSlug();
 
         webTestClient
-            .get()
-            .uri("/workspaces/{slug}/practices/backfill-runs", slug)
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isForbidden();
+                .get()
+                .uri("/workspaces/{slug}/practices/backfill-runs", slug)
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isForbidden();
 
         webTestClient
-            .post()
-            .uri("/workspaces/{slug}/practices/backfill-runs", slug)
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(window())
-            .exchange()
-            .expectStatus()
-            .isForbidden();
+                .post()
+                .uri("/workspaces/{slug}/practices/backfill-runs", slug)
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(window())
+                .exchange()
+                .expectStatus()
+                .isForbidden();
     }
 
     @Test
@@ -223,45 +220,43 @@ class ReviewBackfillControllerIntegrationTest extends AbstractWorkspaceIntegrati
         String runId = preflight(first);
 
         webTestClient
-            .get()
-            .uri("/workspaces/{slug}/practices/backfill-runs/{runId}", second.getWorkspaceSlug(), runId)
-            .headers(asAdminAccount())
-            .exchange()
-            .expectStatus()
-            .isNotFound();
+                .get()
+                .uri("/workspaces/{slug}/practices/backfill-runs/{runId}", second.getWorkspaceSlug(), runId)
+                .headers(asAdminAccount())
+                .exchange()
+                .expectStatus()
+                .isNotFound();
     }
 
     private String preflight(Workspace workspace) {
         byte[] body = webTestClient
-            .post()
-            .uri("/workspaces/{slug}/practices/backfill-runs", workspace.getWorkspaceSlug())
-            .headers(asAdminAccount())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(window())
-            .exchange()
-            .expectStatus()
-            .isCreated()
-            .expectBody()
-            .returnResult()
-            .getResponseBody();
+                .post()
+                .uri("/workspaces/{slug}/practices/backfill-runs", workspace.getWorkspaceSlug())
+                .headers(asAdminAccount())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(window())
+                .exchange()
+                .expectStatus()
+                .isCreated()
+                .expectBody()
+                .returnResult()
+                .getResponseBody();
         assertThat(body).isNotNull();
         return runRepository
-            .findByWorkspaceIdOrderByCreatedAtDesc(
-                workspace.getId(),
-                org.springframework.data.domain.PageRequest.ofSize(1)
-            )
-            .getFirst()
-            .getId()
-            .toString();
+                .findByWorkspaceIdOrderByCreatedAtDesc(
+                        workspace.getId(), org.springframework.data.domain.PageRequest.ofSize(1))
+                .getFirst()
+                .getId()
+                .toString();
     }
 
     private WebTestClient.ResponseSpec patchStatus(Workspace workspace, String runId, String status) {
         return webTestClient
-            .patch()
-            .uri("/workspaces/{slug}/practices/backfill-runs/{runId}/status", workspace.getWorkspaceSlug(), runId)
-            .headers(asAdminAccount())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(Map.of("status", status))
-            .exchange();
+                .patch()
+                .uri("/workspaces/{slug}/practices/backfill-runs/{runId}/status", workspace.getWorkspaceSlug(), runId)
+                .headers(asAdminAccount())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of("status", status))
+                .exchange();
     }
 }

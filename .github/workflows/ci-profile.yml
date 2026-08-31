@@ -21,7 +21,9 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: ./.github/actions/setup-pnpm-node
+      - uses: ./.github/actions/setup-node-pnpm
+        with:
+          install: "none"
 
       - uses: ./.github/actions/setup-caches
         with:

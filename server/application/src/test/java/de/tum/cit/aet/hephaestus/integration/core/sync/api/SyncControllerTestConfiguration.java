@@ -26,22 +26,20 @@ public class SyncControllerTestConfiguration {
     @Bean
     @Primary
     SyncStatusService testSyncStatusService(
-        ConnectionAdminService connectionAdminService,
-        SyncJobService syncJobService,
-        SyncJobRepository syncJobRepository,
-        ConnectionActivityRepository connectionActivityRepository,
-        @Qualifier("syncJobExecutor") AsyncTaskExecutor taskExecutor,
-        SyncControllerTestDriver driver
-    ) {
+            ConnectionAdminService connectionAdminService,
+            SyncJobService syncJobService,
+            SyncJobRepository syncJobRepository,
+            ConnectionActivityRepository connectionActivityRepository,
+            @Qualifier("syncJobExecutor") AsyncTaskExecutor taskExecutor,
+            SyncControllerTestDriver driver) {
         return new SyncStatusService(
-            connectionAdminService,
-            syncJobService,
-            syncJobRepository,
-            connectionActivityRepository,
-            taskExecutor,
-            List.of(driver.stateProvider()),
-            List.of(driver.runner())
-        );
+                connectionAdminService,
+                syncJobService,
+                syncJobRepository,
+                connectionActivityRepository,
+                taskExecutor,
+                List.of(driver.stateProvider()),
+                List.of(driver.runner()));
     }
 
     public record SyncControllerTestDriver(ConnectionSyncStateProvider stateProvider, IntegrationSyncRunner runner) {}

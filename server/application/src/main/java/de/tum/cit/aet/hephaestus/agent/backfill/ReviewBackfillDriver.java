@@ -47,13 +47,12 @@ public class ReviewBackfillDriver {
     private final ReviewBackfillProperties properties;
 
     public ReviewBackfillDriver(
-        ReviewBackfillRunRepository runRepository,
-        ReviewBackfillScopeRepository scopeRepository,
-        ReviewBackfillSubmitter submitter,
-        WorkspaceAgentBindingRepository bindingRepository,
-        LlmBudgetService llmBudgetService,
-        ReviewBackfillProperties properties
-    ) {
+            ReviewBackfillRunRepository runRepository,
+            ReviewBackfillScopeRepository scopeRepository,
+            ReviewBackfillSubmitter submitter,
+            WorkspaceAgentBindingRepository bindingRepository,
+            LlmBudgetService llmBudgetService,
+            ReviewBackfillProperties properties) {
         this.runRepository = runRepository;
         this.scopeRepository = scopeRepository;
         this.submitter = submitter;
@@ -67,9 +66,8 @@ public class ReviewBackfillDriver {
     @WorkspaceAgnostic("Sweeps campaigns across every workspace")
     public void tick() {
         List<ReviewBackfillRun> active = runRepository.findByStatusIn(
-            List.of(ReviewBackfillStatus.RUNNING, ReviewBackfillStatus.PAUSED),
-            PageRequest.ofSize(MAX_RUNS_PER_TICK)
-        );
+                List.of(ReviewBackfillStatus.RUNNING, ReviewBackfillStatus.PAUSED),
+                PageRequest.ofSize(MAX_RUNS_PER_TICK));
         for (ReviewBackfillRun run : active) {
             try {
                 advance(run);
@@ -110,12 +108,11 @@ public class ReviewBackfillDriver {
         List<Long> batch = nextBatch(run);
         if (batch.isEmpty()) {
             log.info(
-                "Review backfill complete: runId={}, submitted={}, passed={}, failed={}",
-                run.getId(),
-                run.getSubmittedCount(),
-                run.getPassedCount(),
-                run.getFailedCount()
-            );
+                    "Review backfill complete: runId={}, submitted={}, passed={}, failed={}",
+                    run.getId(),
+                    run.getSubmittedCount(),
+                    run.getPassedCount(),
+                    run.getFailedCount());
             run.transitionTo(ReviewBackfillStatus.COMPLETED, null);
             runRepository.save(run);
             return;
@@ -135,11 +132,10 @@ public class ReviewBackfillDriver {
                 // separately from passes, so it can never let submitted + passed reach the estimate and report
                 // COMPLETED over a baseline with a hole in it.
                 log.warn(
-                    "Review backfill artifact failed, walking past it: runId={}, artifactId={}",
-                    run.getId(),
-                    artifactId,
-                    e
-                );
+                        "Review backfill artifact failed, walking past it: runId={}, artifactId={}",
+                        run.getId(),
+                        artifactId,
+                        e);
                 failed++;
             }
             if (outcome == ReviewBackfillSubmitter.Outcome.SUBMITTED) {
@@ -156,13 +152,12 @@ public class ReviewBackfillDriver {
         run.setUpdatedAt(java.time.Instant.now());
         runRepository.save(run);
         log.info(
-            "Review backfill batch: runId={}, submitted={}, passed={}, failed={}, cursor={}",
-            run.getId(),
-            submitted,
-            passed,
-            failed,
-            cursor
-        );
+                "Review backfill batch: runId={}, submitted={}, passed={}, failed={}, cursor={}",
+                run.getId(),
+                submitted,
+                passed,
+                failed,
+                cursor);
     }
 
     /**
@@ -179,9 +174,9 @@ public class ReviewBackfillDriver {
             return ReviewBackfillPauseReason.WORKSPACE_UNAVAILABLE;
         }
         WorkspaceAgentBinding binding = bindingRepository
-            .findByWorkspaceIdAndPurposeWithModels(workspace.getId(), AgentPurpose.PRACTICE_REVIEW)
-            .filter(WorkspaceAgentBinding::isEnabled)
-            .orElse(null);
+                .findByWorkspaceIdAndPurposeWithModels(workspace.getId(), AgentPurpose.PRACTICE_REVIEW)
+                .filter(WorkspaceAgentBinding::isEnabled)
+                .orElse(null);
         if (binding == null) {
             return ReviewBackfillPauseReason.REVIEW_MODEL_UNBOUND;
         }
@@ -195,13 +190,8 @@ public class ReviewBackfillDriver {
         long after = run.getCursorArtifactId() == null ? 0L : run.getCursorArtifactId();
         var page = PageRequest.ofSize(properties.batchSize());
         return ArtifactKinds.PULL_REQUEST.equals(run.kind())
-            ? scopeRepository.findPullRequestIds(
-                  run.getWorkspace().getId(),
-                  run.getFromAt(),
-                  run.getToAt(),
-                  after,
-                  page
-              )
-            : scopeRepository.findIssueIds(run.getWorkspace().getId(), run.getFromAt(), run.getToAt(), after, page);
+                ? scopeRepository.findPullRequestIds(
+                        run.getWorkspace().getId(), run.getFromAt(), run.getToAt(), after, page)
+                : scopeRepository.findIssueIds(run.getWorkspace().getId(), run.getFromAt(), run.getToAt(), after, page);
     }
 }

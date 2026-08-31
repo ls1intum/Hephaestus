@@ -35,15 +35,16 @@ class FeedbackCompositionCapsTest extends BaseUnitTest {
         Map<String, byte[]> files = new LinkedHashMap<>();
         FeedbackCompositionInputs.stage(files, ObservationOrigin.LIVE);
         request = objectMapper.readTree(
-            new String(files.get(SandboxLayout.FEEDBACK_COMPOSITION_PATH), StandardCharsets.UTF_8)
-        );
+                new String(files.get(SandboxLayout.FEEDBACK_COMPOSITION_PATH), StandardCharsets.UTF_8));
     }
 
     @Test
     void theInAppCapTheComposerIsToldIsTheCapThePreparerEnforces() {
-        assertThat(request.get("channels").get(FeedbackChannel.IN_APP.name()).get("maxUnits").asInt()).isEqualTo(
-            InAppFeedbackPreparer.TOP_N_PER_RECIPIENT
-        );
+        assertThat(request.get("channels")
+                        .get(FeedbackChannel.IN_APP.name())
+                        .get("maxUnits")
+                        .asInt())
+                .isEqualTo(InAppFeedbackPreparer.TOP_N_PER_RECIPIENT);
     }
 
     @Test

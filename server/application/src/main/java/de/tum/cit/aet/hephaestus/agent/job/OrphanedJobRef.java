@@ -8,7 +8,9 @@ import java.util.UUID;
  */
 public interface OrphanedJobRef {
     UUID getJobId();
+
     Long getWorkspaceId();
+
     int getRetryCount();
 
     /**

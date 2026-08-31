@@ -1,6 +1,8 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
+
 import { getCurrentUserOptions, getCurrentUserQueryKey } from "@/api/@tanstack/react-query.gen";
+
 import { refreshAccessToken } from "./session-refresh";
 
 /**

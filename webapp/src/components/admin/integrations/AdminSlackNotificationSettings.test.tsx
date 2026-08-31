@@ -2,7 +2,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
+
 import type { SlackChannelCandidate } from "@/api/types.gen";
+
 import { AdminSlackNotificationSettings } from "./AdminSlackNotificationSettings";
 
 function renderWithClient(node: ReactNode) {

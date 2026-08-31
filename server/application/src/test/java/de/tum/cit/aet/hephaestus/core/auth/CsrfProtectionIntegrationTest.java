@@ -50,12 +50,12 @@ class CsrfProtectionIntegrationTest extends BaseIntegrationTest {
         String token = TestAuthUtils.fetchCsrfToken(webTestClient);
 
         webTestClient
-            .post()
-            .uri("/auth/logout")
-            .headers(TestAuthUtils.withCsrf(token))
-            .exchange()
-            .expectStatus()
-            .isUnauthorized();
+                .post()
+                .uri("/auth/logout")
+                .headers(TestAuthUtils.withCsrf(token))
+                .exchange()
+                .expectStatus()
+                .isUnauthorized();
     }
 
     @Test
@@ -63,12 +63,12 @@ class CsrfProtectionIntegrationTest extends BaseIntegrationTest {
         String token = TestAuthUtils.fetchCsrfToken(webTestClient);
 
         webTestClient
-            .post()
-            .uri("/auth/logout")
-            .header(HttpHeaders.COOKIE, XSRF_COOKIE + "=" + token)
-            .header(XSRF_HEADER, "totally-different-value")
-            .exchange()
-            .expectStatus()
-            .isForbidden();
+                .post()
+                .uri("/auth/logout")
+                .header(HttpHeaders.COOKIE, XSRF_COOKIE + "=" + token)
+                .header(XSRF_HEADER, "totally-different-value")
+                .exchange()
+                .expectStatus()
+                .isForbidden();
     }
 }

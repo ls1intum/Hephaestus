@@ -1,8 +1,10 @@
 import { ChevronLeftIcon } from "@primer/octicons-react";
+
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { ProviderType } from "@/lib/provider";
 import { cn } from "@/lib/utils";
+
 import {
 	type ActivityBadgeKey,
 	type ActivityBadgeMetadata,

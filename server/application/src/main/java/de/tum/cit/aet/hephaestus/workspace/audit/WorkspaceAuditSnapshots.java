@@ -15,26 +15,25 @@ public final class WorkspaceAuditSnapshots {
     private WorkspaceAuditSnapshots() {}
 
     public record FeaturesSnapshot(
-        @Nullable Boolean practicesEnabled,
-        @Nullable Boolean mentorEnabled,
-        @Nullable Boolean achievementsEnabled,
-        @Nullable Boolean leaderboardEnabled,
-        @Nullable Boolean progressionEnabled,
-        @Nullable Boolean leaguesEnabled,
-        @Nullable Boolean practiceReviewAutoTriggerEnabled,
-        @Nullable Boolean practiceReviewManualTriggerEnabled
-    ) implements ConfigAuditSnapshot {
+            @Nullable Boolean practicesEnabled,
+            @Nullable Boolean mentorEnabled,
+            @Nullable Boolean achievementsEnabled,
+            @Nullable Boolean leaderboardEnabled,
+            @Nullable Boolean progressionEnabled,
+            @Nullable Boolean leaguesEnabled,
+            @Nullable Boolean practiceReviewAutoTriggerEnabled,
+            @Nullable Boolean practiceReviewManualTriggerEnabled)
+            implements ConfigAuditSnapshot {
         public static FeaturesSnapshot of(WorkspaceFeatures f) {
             return new FeaturesSnapshot(
-                f.getPracticesEnabled(),
-                f.getMentorEnabled(),
-                f.getAchievementsEnabled(),
-                f.getLeaderboardEnabled(),
-                f.getProgressionEnabled(),
-                f.getLeaguesEnabled(),
-                f.getPracticeReviewAutoTriggerEnabled(),
-                f.getPracticeReviewManualTriggerEnabled()
-            );
+                    f.getPracticesEnabled(),
+                    f.getMentorEnabled(),
+                    f.getAchievementsEnabled(),
+                    f.getLeaderboardEnabled(),
+                    f.getProgressionEnabled(),
+                    f.getLeaguesEnabled(),
+                    f.getPracticeReviewAutoTriggerEnabled(),
+                    f.getPracticeReviewManualTriggerEnabled());
         }
     }
 
@@ -42,16 +41,16 @@ public final class WorkspaceAuditSnapshots {
 
     /** Presence of a stored SCM token — never the token itself. */
     public record TokenSnapshot(
-        boolean tokenSet,
-        @Nullable String providerKind,
-        @Nullable Instant rotatedAt
-    ) implements ConfigAuditSnapshot {}
+            boolean tokenSet,
+            @Nullable String providerKind,
+            @Nullable Instant rotatedAt) implements ConfigAuditSnapshot {}
 
     public record RoleSnapshot(@Nullable String role, boolean hidden) implements ConfigAuditSnapshot {}
 
     public record StatusSnapshot(@Nullable String status) implements ConfigAuditSnapshot {
         public static StatusSnapshot of(Workspace w) {
-            return new StatusSnapshot(w.getStatus() == null ? null : w.getStatus().name());
+            return new StatusSnapshot(
+                    w.getStatus() == null ? null : w.getStatus().name());
         }
     }
 }

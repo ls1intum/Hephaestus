@@ -17,25 +17,24 @@ class PullRequestReviewSubmissionRequestTest extends BaseUnitTest {
 
     private ScmEventPayload.PullRequestData samplePullRequestData() {
         return new ScmEventPayload.PullRequestData(
-            456L,
-            42,
-            "Fix bug",
-            "Body",
-            Issue.State.OPEN,
-            false,
-            false,
-            10,
-            5,
-            3,
-            "https://github.com/owner/repo/pull/42",
-            new RepositoryRef(123L, "owner/repo", "main"),
-            789L,
-            Instant.now(),
-            Instant.now(),
-            null,
-            null,
-            null
-        );
+                456L,
+                42,
+                "Fix bug",
+                "Body",
+                Issue.State.OPEN,
+                false,
+                false,
+                10,
+                5,
+                3,
+                "https://github.com/owner/repo/pull/42",
+                new RepositoryRef(123L, "owner/repo", "main"),
+                789L,
+                Instant.now(),
+                Instant.now(),
+                null,
+                null,
+                null);
     }
 
     @Nested
@@ -43,12 +42,8 @@ class PullRequestReviewSubmissionRequestTest extends BaseUnitTest {
 
         @Test
         void shouldAcceptValidInput() {
-            var request = new PullRequestReviewSubmissionRequest(
-                samplePullRequestData(),
-                "feature/x",
-                "abc123",
-                "main"
-            );
+            var request =
+                    new PullRequestReviewSubmissionRequest(samplePullRequestData(), "feature/x", "abc123", "main");
 
             assertThat(request.pullRequest()).isNotNull();
             assertThat(request.headRefName()).isEqualTo("feature/x");
@@ -58,29 +53,26 @@ class PullRequestReviewSubmissionRequestTest extends BaseUnitTest {
 
         @Test
         void shouldRejectBlankHeadRefName() {
-            assertThatThrownBy(() ->
-                new PullRequestReviewSubmissionRequest(samplePullRequestData(), "  ", "sha", "main")
-            )
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("headRefName");
+            assertThatThrownBy(
+                            () -> new PullRequestReviewSubmissionRequest(samplePullRequestData(), "  ", "sha", "main"))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("headRefName");
         }
 
         @Test
         void shouldRejectBlankHeadRefOid() {
             assertThatThrownBy(() ->
-                new PullRequestReviewSubmissionRequest(samplePullRequestData(), "branch", " ", "main")
-            )
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("headRefOid");
+                            new PullRequestReviewSubmissionRequest(samplePullRequestData(), "branch", " ", "main"))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("headRefOid");
         }
 
         @Test
         void shouldRejectBlankBaseRefName() {
             assertThatThrownBy(() ->
-                new PullRequestReviewSubmissionRequest(samplePullRequestData(), "branch", "sha", "  ")
-            )
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("baseRefName");
+                            new PullRequestReviewSubmissionRequest(samplePullRequestData(), "branch", "sha", "  "))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("baseRefName");
         }
     }
 
@@ -90,12 +82,7 @@ class PullRequestReviewSubmissionRequestTest extends BaseUnitTest {
         @Test
         void aLifecycleEventPutsTheRunInTheUnbiasedPopulation() {
             var request = new PullRequestReviewSubmissionRequest(
-                samplePullRequestData(),
-                "branch",
-                "sha",
-                "main",
-                ScmSignals.PULL_REQUEST_READY
-            );
+                    samplePullRequestData(), "branch", "sha", "main", ScmSignals.PULL_REQUEST_READY);
 
             assertThat(request.observationOrigin()).isEqualTo(ObservationOrigin.LIVE);
         }

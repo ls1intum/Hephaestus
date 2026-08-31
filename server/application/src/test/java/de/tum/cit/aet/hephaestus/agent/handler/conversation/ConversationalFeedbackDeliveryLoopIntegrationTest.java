@@ -16,7 +16,6 @@ import de.tum.cit.aet.hephaestus.core.settings.InstanceSettingsService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
@@ -117,11 +116,7 @@ class ConversationalFeedbackDeliveryLoopIntegrationTest extends BaseIntegrationT
         databaseTestUtils.cleanDatabase();
         var settings = instanceSettingsService.get();
         instanceSettingsService.updateSilentMode(
-            false,
-            null,
-            null,
-            EntityTagPrecondition.parse("\"" + settings.getVersion() + "\"")
-        );
+                false, null, null, EntityTagPrecondition.parse("\"" + settings.getVersion() + "\""));
         workspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("conv-delivery-test"));
         practice = new Practice();
         practice.setBindings(PracticeTestEvidence.bindings(ArtifactKinds.PULL_REQUEST));
@@ -137,10 +132,9 @@ class ConversationalFeedbackDeliveryLoopIntegrationTest extends BaseIntegrationT
         practice.setCurrentRevision(revision);
         practice = practiceRepository.saveAndFlush(practice);
         IdentityProvider provider = identityProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-            .orElseGet(() ->
-                identityProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseGet(() -> identityProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
         recipient = userRepository.save(TestUserFactory.createUser(100L, "recipient", provider));
     }
 
@@ -155,10 +149,7 @@ class ConversationalFeedbackDeliveryLoopIntegrationTest extends BaseIntegrationT
         prepareFor(job2);
 
         List<Feedback> prepared = feedbackRepository.findRecentPreparedConversationForRecipient(
-            workspace.getId(),
-            recipient.getId(),
-            PageRequest.of(0, 10)
-        );
+                workspace.getId(), recipient.getId(), PageRequest.of(0, 10));
         assertThat(prepared).hasSize(2);
         assertThat(prepared).allSatisfy(f -> {
             assertThat(f.getChannel()).isEqualTo(FeedbackChannel.IN_CHAT);
@@ -178,11 +169,7 @@ class ConversationalFeedbackDeliveryLoopIntegrationTest extends BaseIntegrationT
 
         UUID chatMessageId = persistAssistantMessage();
         int flips = reconciler.reconcile(
-            workspace.getId(),
-            recipient.getId(),
-            chatMessageId,
-            List.of(a.getId(), b.getId(), c.getId())
-        );
+                workspace.getId(), recipient.getId(), chatMessageId, List.of(a.getId(), b.getId(), c.getId()));
 
         assertThat(flips).isEqualTo(1);
         assertThat(deliveredCount()).isEqualTo(1);
@@ -198,8 +185,8 @@ class ConversationalFeedbackDeliveryLoopIntegrationTest extends BaseIntegrationT
         assertThat(feedbackPlacementRepository.findAll()).hasSize(1);
 
         assertThat(conversationUnits())
-            .singleElement()
-            .satisfies(f -> assertThat(f.getBody()).contains("\"kind\":\"conversation-brief\""));
+                .singleElement()
+                .satisfies(f -> assertThat(f.getBody()).contains("\"kind\":\"conversation-brief\""));
     }
 
     @Test
@@ -211,88 +198,77 @@ class ConversationalFeedbackDeliveryLoopIntegrationTest extends BaseIntegrationT
         TranslatorState state = new TranslatorState(assistant.getId());
         state.recordDataObservation(observation.getId());
         MentorTurnPersistence.TurnPersistenceCookie cookie = new MentorTurnPersistence.TurnPersistenceCookie(
-            assistant.getThread().getId(),
-            UUID.randomUUID(),
-            assistant.getId(),
-            Instant.now(),
-            "test-model",
-            org.mockito.Mockito.mock(LlmPriceSnapshot.class)
-        );
+                assistant.getThread().getId(),
+                UUID.randomUUID(),
+                assistant.getId(),
+                Instant.now(),
+                "test-model",
+                org.mockito.Mockito.mock(LlmPriceSnapshot.class));
 
         mentorTurnPersistence.finalise(
-            cookie,
-            state,
-            new UIMessageChunk.Finish(UIMessageChunk.FinishReason.STOP, null),
-            MentorChannel.DeliveryOutcome.INSTANCE_SILENCED
-        );
+                cookie,
+                state,
+                new UIMessageChunk.Finish(UIMessageChunk.FinishReason.STOP, null),
+                MentorChannel.DeliveryOutcome.INSTANCE_SILENCED);
 
-        assertThat(
-            reconciler.suppressForSilentMode(workspace.getId(), recipient.getId(), List.of(observation.getId()))
-        ).isZero();
-        assertThat(chatMessageRepository.findById(assistant.getId()).orElseThrow().getStatus()).isEqualTo(
-            ChatMessage.Status.completed
-        );
-        assertThat(conversationUnits())
-            .singleElement()
-            .satisfies(feedback -> {
-                assertThat(feedback.getDeliveryState()).isEqualTo(FeedbackDeliveryState.SUPPRESSED);
-                assertThat(feedback.getSuppressionReason()).isEqualTo(FeedbackSuppressionReason.INSTANCE_SILENCED);
-            });
+        assertThat(reconciler.suppressForSilentMode(workspace.getId(), recipient.getId(), List.of(observation.getId())))
+                .isZero();
+        assertThat(chatMessageRepository
+                        .findById(assistant.getId())
+                        .orElseThrow()
+                        .getStatus())
+                .isEqualTo(ChatMessage.Status.completed);
+        assertThat(conversationUnits()).singleElement().satisfies(feedback -> {
+            assertThat(feedback.getDeliveryState()).isEqualTo(FeedbackDeliveryState.SUPPRESSED);
+            assertThat(feedback.getSuppressionReason()).isEqualTo(FeedbackSuppressionReason.INSTANCE_SILENCED);
+        });
         assertThat(preparedCount()).isZero();
         assertThat(feedbackPlacementRepository.findAll()).isEmpty();
     }
 
     private void prepareFor(AgentJob job) {
-        List<Observation> observations = observationRepository.findByAgentJobId(job.getId());
+        List<Observation> observations = observationRepository.findByAgentJobId(
+                job.getId(), job.getWorkspace().getId());
         List<Observation> admitted = router.admit(observations, workspace.getId(), RoutingContext.author());
         preparer.prepare(job.getId(), workspace.getId(), admitted, List.of(conversationUnit(admitted)));
     }
 
     private ComposedFeedbackUnit conversationUnit(List<Observation> observations) {
         return new ComposedFeedbackUnit(
-            FeedbackChannel.IN_CHAT,
-            practice.getSlug(),
-            observations
-                .stream()
-                .map(o -> o.getId().toString())
-                .toList(),
-            ComposedFeedbackUnit.Action.NEW,
-            null,
-            null,
-            "Test practice",
-            null,
-            null,
-            new ComposedFeedbackUnit.ConversationBrief(
-                "The practice recurred.",
-                "Recognize the decision point.",
-                "The observations show the same pattern.",
-                "They can explain the decision in their own words.",
-                null
-            ),
-            null
-        );
+                FeedbackChannel.IN_CHAT,
+                practice.getSlug(),
+                observations.stream().map(o -> o.getId().toString()).toList(),
+                ComposedFeedbackUnit.Action.NEW,
+                null,
+                null,
+                "Test practice",
+                null,
+                null,
+                new ComposedFeedbackUnit.ConversationBrief(
+                        "The practice recurred.",
+                        "Recognize the decision point.",
+                        "The observations show the same pattern.",
+                        "They can explain the decision in their own words.",
+                        null),
+                null);
     }
 
     private List<Feedback> conversationUnits() {
-        return feedbackRepository
-            .findAll()
-            .stream()
-            .filter(f -> f.getChannel() == FeedbackChannel.IN_CHAT)
-            .toList();
+        return feedbackRepository.findAll().stream()
+                .filter(f -> f.getChannel() == FeedbackChannel.IN_CHAT)
+                .toList();
     }
 
     private long preparedCount() {
-        return conversationUnits()
-            .stream()
-            .filter(f -> f.getDeliveryState() == FeedbackDeliveryState.PREPARED)
-            .count();
+        return conversationUnits().stream()
+                .filter(f -> f.getDeliveryState() == FeedbackDeliveryState.PREPARED)
+                .count();
     }
 
     private long deliveredCount() {
-        return conversationUnits()
-            .stream()
-            .filter(f -> f.getDeliveryState() == FeedbackDeliveryState.DELIVERED)
-            .count();
+        return conversationUnits().stream()
+                .filter(f -> f.getDeliveryState() == FeedbackDeliveryState.DELIVERED)
+                .count();
     }
 
     private AgentJob newJob() {
@@ -307,24 +283,24 @@ class ConversationalFeedbackDeliveryLoopIntegrationTest extends BaseIntegrationT
     private Observation saveObservation(AgentJob job, String occurrenceKey) {
         UUID id = UUID.randomUUID();
         observationRepository.insertIfAbsent(
-            id,
-            occurrenceKey,
-            job.getId(),
-            practice.getId(),
-            practice.getCurrentRevision().getId(),
-            "scm.pull_request",
-            42L,
-            recipient.getId(),
-            "Observation title",
-            "ABSENT",
-            "BAD",
-            "MAJOR",
-            "{\"citations\":[{\"sourceKind\":\"scm.pull-request.core\",\"artifactPath\":\"inputs/context/metadata.json\",\"path\":\"metadata.json\",\"startLine\":1,\"endLine\":1,\"quote\":\"example\",\"quoteRedacted\":false}]}",
-            null,
-            null,
-            Instant.now(),
-            "LIVE"
-        );
+                id,
+                occurrenceKey,
+                job.getId(),
+                job.getWorkspace().getId(),
+                practice.getId(),
+                practice.getCurrentRevision().getId(),
+                "scm.pull_request",
+                42L,
+                recipient.getId(),
+                "Observation title",
+                "ABSENT",
+                "BAD",
+                "MAJOR",
+                "{\"citations\":[{\"sourceKind\":\"scm.pull-request.core\",\"artifactPath\":\"inputs/context/metadata.json\",\"path\":\"metadata.json\",\"startLine\":1,\"endLine\":1,\"quote\":\"example\",\"quoteRedacted\":false}]}",
+                null,
+                null,
+                Instant.now(),
+                "LIVE");
         return observationRepository.findById(id).orElseThrow();
     }
 

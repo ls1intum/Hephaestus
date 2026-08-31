@@ -18,21 +18,16 @@ final class MentorTurnPromptFactory {
     private static final String SLACK_DM_SUFFIX;
 
     static {
-        String template = new String(
-            PiRuntimeFactory.loadClasspathResource(SLACK_DM_TEMPLATE_RESOURCE),
-            StandardCharsets.UTF_8
-        );
+        String template =
+                new String(PiRuntimeFactory.loadClasspathResource(SLACK_DM_TEMPLATE_RESOURCE), StandardCharsets.UTF_8);
         int userIdx = template.indexOf(USER_MESSAGE_PLACEHOLDER);
         int historyIdx = template.indexOf(THREAD_HISTORY_PLACEHOLDER);
         if (userIdx < 0 || historyIdx < 0 || historyIdx < userIdx) {
-            throw new IllegalStateException(
-                "Malformed " +
-                    SLACK_DM_TEMPLATE_RESOURCE +
-                    ": expected " +
-                    USER_MESSAGE_PLACEHOLDER +
-                    " followed by " +
-                    THREAD_HISTORY_PLACEHOLDER
-            );
+            throw new IllegalStateException("Malformed " + SLACK_DM_TEMPLATE_RESOURCE
+                    + ": expected "
+                    + USER_MESSAGE_PLACEHOLDER
+                    + " followed by "
+                    + THREAD_HISTORY_PLACEHOLDER);
         }
         SLACK_DM_PREFIX = template.substring(0, userIdx);
         SLACK_DM_MIDDLE = template.substring(userIdx + USER_MESSAGE_PLACEHOLDER.length(), historyIdx);
@@ -45,13 +40,11 @@ final class MentorTurnPromptFactory {
         if (request.surface() != ThreadSurface.SLACK_DM) {
             return request.userMessage();
         }
-        return (
-            SLACK_DM_PREFIX +
-            request.userMessage() +
-            SLACK_DM_MIDDLE +
-            visibleThreadHistory(contextInputs) +
-            SLACK_DM_SUFFIX
-        );
+        return (SLACK_DM_PREFIX
+                + request.userMessage()
+                + SLACK_DM_MIDDLE
+                + visibleThreadHistory(contextInputs)
+                + SLACK_DM_SUFFIX);
     }
 
     private static String visibleThreadHistory(Map<String, byte[]> contextInputs) {

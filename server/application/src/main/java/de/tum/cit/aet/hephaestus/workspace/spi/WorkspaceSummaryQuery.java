@@ -6,5 +6,6 @@ import org.jspecify.annotations.NonNull;
 public interface WorkspaceSummaryQuery {
     Optional<WorkspaceSummary> findById(long workspaceId);
 
-    record WorkspaceSummary(long id, @NonNull String slug, @NonNull String displayName) {}
+    record WorkspaceSummary(
+            long id, @NonNull String slug, @NonNull String displayName) {}
 }

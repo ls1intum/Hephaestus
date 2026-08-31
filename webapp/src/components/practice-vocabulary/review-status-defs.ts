@@ -6,7 +6,9 @@ import {
 	LoaderIcon,
 	TimerOffIcon,
 } from "lucide-react";
+
 import type { AgentJob } from "@/api/types.gen";
+
 import type { StatusDefs } from "./status-def";
 
 export type ReviewStatus = AgentJob["status"];

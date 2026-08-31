@@ -46,97 +46,81 @@ public class ObservationController {
 
     @GetMapping
     @Operation(
-        summary = "List observations for current user",
-        description = "Paginated observations for the authenticated developer with optional filters"
-    )
+            summary = "List observations for current user",
+            description = "Paginated observations for the authenticated developer with optional filters")
     @ApiResponse(responseCode = "200", description = "Paginated observations returned")
     public ResponseEntity<Page<ObservationListDTO>> listObservations(
-        WorkspaceContext workspaceContext,
-        @Valid @ParameterObject ObservationFeedFilterParams filter
-    ) {
+            WorkspaceContext workspaceContext, @Valid @ParameterObject ObservationFeedFilterParams filter) {
         Pageable pageable = filter.pageable();
 
         Page<ObservationListDTO> observations = observationService
-            .getObservations(workspaceContext.id(), filter.toQuery(), pageable)
-            .map(ObservationListDTO::from);
+                .getObservations(workspaceContext.id(), filter.toQuery(), pageable)
+                .map(ObservationListDTO::from);
         return ResponseEntity.ok(observations);
     }
 
     @GetMapping("/summary")
     @Operation(
-        summary = "Per-practice summary for current user",
-        description = "Aggregated observation counts per practice for dashboard cards"
-    )
+            summary = "Per-practice summary for current user",
+            description = "Aggregated observation counts per practice for dashboard cards")
     @ApiResponse(
-        responseCode = "200",
-        description = "Practice summaries returned",
-        content = @Content(array = @ArraySchema(schema = @Schema(implementation = DeveloperPracticeSummaryDTO.class)))
-    )
+            responseCode = "200",
+            description = "Practice summaries returned",
+            content =
+                    @Content(
+                            array = @ArraySchema(schema = @Schema(implementation = DeveloperPracticeSummaryDTO.class))))
     public ResponseEntity<List<DeveloperPracticeSummaryDTO>> getSummary(WorkspaceContext workspaceContext) {
-        List<DeveloperPracticeSummaryDTO> summaries = observationService
-            .getSummary(workspaceContext.id())
-            .stream()
-            .map(DeveloperPracticeSummaryDTO::from)
-            .toList();
+        List<DeveloperPracticeSummaryDTO> summaries = observationService.getSummary(workspaceContext.id()).stream()
+                .map(DeveloperPracticeSummaryDTO::from)
+                .toList();
         return ResponseEntity.ok(summaries);
     }
 
     @GetMapping("/{observationId}")
     @Operation(summary = "Get observation detail")
     @ApiResponse(
-        responseCode = "200",
-        description = "Observation detail returned",
-        content = @Content(schema = @Schema(implementation = ObservationDetailDTO.class))
-    )
+            responseCode = "200",
+            description = "Observation detail returned",
+            content = @Content(schema = @Schema(implementation = ObservationDetailDTO.class)))
     @ApiResponse(
-        responseCode = "404",
-        description = "Observation not found or not owned by current user",
-        content = @Content(schema = @Schema(hidden = true))
-    )
+            responseCode = "404",
+            description = "Observation not found or not owned by current user",
+            content = @Content(schema = @Schema(hidden = true)))
     public ResponseEntity<ObservationDetailDTO> getObservation(
-        WorkspaceContext workspaceContext,
-        @PathVariable UUID observationId
-    ) {
+            WorkspaceContext workspaceContext, @PathVariable UUID observationId) {
         var observation = observationService.getObservation(workspaceContext.id(), observationId);
         String deliveredFeedback = observationService
-            .getDeliveredGuidance(workspaceContext.id(), observationId)
-            .orElse(null);
-        String artifactUrl = observationService.getArtifactUrl(workspaceContext.id(), observation).orElse(null);
+                .getDeliveredGuidance(workspaceContext.id(), observationId)
+                .orElse(null);
+        String artifactUrl = observationService
+                .getArtifactUrl(workspaceContext.id(), observation)
+                .orElse(null);
         boolean includeEvidence = evidenceAuthorization.permits(
-            workspaceContext.id(),
-            observation,
-            SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY
-        );
+                workspaceContext.id(), observation, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY);
         return ResponseEntity.ok(
-            ObservationDetailDTO.from(observation, deliveredFeedback, artifactUrl, includeEvidence)
-        );
+                ObservationDetailDTO.from(observation, deliveredFeedback, artifactUrl, includeEvidence));
     }
 
     @GetMapping("/pull-request/{prId}")
     @Operation(
-        summary = "List observations for a pull request",
-        description = "All observations for a specific pull request within the workspace"
-    )
+            summary = "List observations for a pull request",
+            description = "All observations for a specific pull request within the workspace")
     @ApiResponse(
-        responseCode = "200",
-        description = "PR observations returned",
-        content = @Content(array = @ArraySchema(schema = @Schema(implementation = ObservationListDTO.class)))
-    )
+            responseCode = "200",
+            description = "PR observations returned",
+            content = @Content(array = @ArraySchema(schema = @Schema(implementation = ObservationListDTO.class))))
     public ResponseEntity<List<ObservationListDTO>> getObservationsForPullRequest(
-        WorkspaceContext workspaceContext,
-        @PathVariable Long prId
-    ) {
+            WorkspaceContext workspaceContext, @PathVariable Long prId) {
         // Unlike the per-developer endpoints, this returns EVERY developer's BAD/ABSENT observations on the PR,
         // unscoped to the caller. On a public-read workspace an anonymous (membership-less) request would
         // otherwise expose them — require workspace membership.
         if (!workspaceContext.hasMembership()) {
             throw new AccessForbiddenException("Workspace membership is required to view pull-request observations");
         }
-        List<ObservationListDTO> observations = observationService
-            .getObservationsForPullRequest(workspaceContext.id(), prId)
-            .stream()
-            .map(ObservationListDTO::from)
-            .toList();
+        List<ObservationListDTO> observations =
+                observationService.getObservationsForPullRequest(workspaceContext.id(), prId).stream()
+                        .map(ObservationListDTO::from)
+                        .toList();
         return ResponseEntity.ok(observations);
     }
 }

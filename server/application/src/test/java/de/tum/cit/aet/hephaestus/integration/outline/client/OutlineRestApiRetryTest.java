@@ -46,10 +46,7 @@ class OutlineRestApiRetryTest extends BaseUnitTest {
         Supplier<String> supplier = () -> {
             if (attempts.getAndIncrement() == 0) {
                 throw new OutlineApiException(
-                    "Outline /x failed (HTTP 503)",
-                    new RuntimeException(),
-                    /* retryable */ true
-                );
+                        "Outline /x failed (HTTP 503)", new RuntimeException(), /* retryable */ true);
             }
             return "ok";
         };

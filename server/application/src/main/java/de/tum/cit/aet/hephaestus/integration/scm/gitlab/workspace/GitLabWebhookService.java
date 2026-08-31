@@ -55,13 +55,12 @@ public class GitLabWebhookService {
     private final ConnectionService connectionService;
 
     public GitLabWebhookService(
-        ObjectProvider<GitLabWebhookClient> webhookClientProvider,
-        ObjectProvider<GitLabTokenRotationClient> rotationClientProvider,
-        ObjectProvider<GitLabTokenService> tokenServiceProvider,
-        WebhookProperties webhookProperties,
-        WorkspaceRepository workspaceRepository,
-        ConnectionService connectionService
-    ) {
+            ObjectProvider<GitLabWebhookClient> webhookClientProvider,
+            ObjectProvider<GitLabTokenRotationClient> rotationClientProvider,
+            ObjectProvider<GitLabTokenService> tokenServiceProvider,
+            WebhookProperties webhookProperties,
+            WorkspaceRepository workspaceRepository,
+            ConnectionService connectionService) {
         this.webhookClientProvider = webhookClientProvider;
         this.rotationClientProvider = rotationClientProvider;
         this.tokenServiceProvider = tokenServiceProvider;
@@ -106,25 +105,22 @@ public class GitLabWebhookService {
             LocalDate threshold = LocalDate.now().plusDays(thresholdDays);
             if (tokenInfo.expiresAt().isAfter(threshold)) {
                 log.debug(
-                    "Token not expiring soon: workspaceId={}, expiresAt={}, threshold={}",
-                    workspace.getId(),
-                    tokenInfo.expiresAt(),
-                    threshold
-                );
+                        "Token not expiring soon: workspaceId={}, expiresAt={}, threshold={}",
+                        workspace.getId(),
+                        tokenInfo.expiresAt(),
+                        threshold);
                 return;
             }
 
-            LocalDate newExpiry = LocalDate.now().plusDays(webhookProperties.tokenRotation().validityDays());
+            LocalDate newExpiry =
+                    LocalDate.now().plusDays(webhookProperties.tokenRotation().validityDays());
             var rotatedToken = rotationClient.rotateToken(workspace.getId(), newExpiry);
 
             // Persist new token immediately — old token is already revoked. The token lives on the
             // GitLab Connection's credential blob; rotateBearerToken re-encrypts with the per-row AAD
             // so cross-row substitution is prevented.
             connectionService.rotateBearerToken(
-                workspace.getId(),
-                IntegrationKind.GITLAB,
-                new BearerToken(rotatedToken.token(), null)
-            );
+                    workspace.getId(), IntegrationKind.GITLAB, new BearerToken(rotatedToken.token(), null));
 
             // Invalidate token cache so subsequent calls use the new token
             var tokenService = tokenServiceProvider.getIfAvailable();
@@ -133,11 +129,10 @@ public class GitLabWebhookService {
             }
 
             log.info(
-                "Rotated GitLab PAT: workspaceId={}, oldExpiry={}, newExpiry={}",
-                workspace.getId(),
-                tokenInfo.expiresAt(),
-                rotatedToken.expiresAt()
-            );
+                    "Rotated GitLab PAT: workspaceId={}, oldExpiry={}, newExpiry={}",
+                    workspace.getId(),
+                    tokenInfo.expiresAt(),
+                    rotatedToken.expiresAt());
         } catch (WebClientResponseException | IllegalStateException e) {
             // Token rotation failure is non-fatal — the token still works until actual expiry
             log.warn("Token rotation failed: workspaceId={}, error={}", workspace.getId(), e.getMessage());
@@ -146,9 +141,9 @@ public class GitLabWebhookService {
 
     private boolean isGitLabWorkspace(Workspace workspace) {
         return connectionService
-            .findActiveProviderKind(workspace.getId())
-            .map(k -> k == IntegrationKind.GITLAB)
-            .orElse(false);
+                .findActiveProviderKind(workspace.getId())
+                .map(k -> k == IntegrationKind.GITLAB)
+                .orElse(false);
     }
 
     private Optional<GitLabConfig> gitLabConfig(Workspace workspace) {
@@ -182,8 +177,7 @@ public class GitLabWebhookService {
         var client = webhookClientProvider.getIfAvailable();
         if (client == null) {
             return WebhookSetupResult.skipped(
-                "GitLab webhook client unavailable (hephaestus.integration.gitlab.enabled=false)"
-            );
+                    "GitLab webhook client unavailable (hephaestus.integration.gitlab.enabled=false)");
         }
 
         Long scopeId = workspace.getId();
@@ -208,10 +202,9 @@ public class GitLabWebhookService {
                 }
                 // Webhook was deleted externally — clear local id and re-register
                 log.info(
-                    "Stored webhook no longer exists on GitLab, re-registering: workspaceId={}, webhookId={}",
-                    scopeId,
-                    currentWebhookId
-                );
+                        "Stored webhook no longer exists on GitLab, re-registering: workspaceId={}, webhookId={}",
+                        scopeId,
+                        currentWebhookId);
                 updateGitLabConfig(scopeId, cfg -> cfg.withGitlabWebhookId(null));
                 currentWebhookId = null;
             }
@@ -229,70 +222,64 @@ public class GitLabWebhookService {
 
             // Step 3: Check if a webhook with our URL already exists (adopt it)
             List<WebhookInfo> existingHooks = client.listGroupWebhooks(scopeId, groupId);
-            Optional<WebhookInfo> matchingHook = existingHooks
-                .stream()
-                .filter(hook -> webhookUrl.equals(hook.url()))
-                .findFirst();
+            Optional<WebhookInfo> matchingHook = existingHooks.stream()
+                    .filter(hook -> webhookUrl.equals(hook.url()))
+                    .findFirst();
 
             if (matchingHook.isPresent()) {
                 long adoptedId = matchingHook.get().id();
                 updateGitLabConfig(scopeId, cfg -> cfg.withGitlabWebhookId(adoptedId));
                 log.info(
-                    "Adopted existing webhook: workspaceId={}, groupId={}, webhookId={}",
-                    scopeId,
-                    groupId,
-                    adoptedId
-                );
+                        "Adopted existing webhook: workspaceId={}, groupId={}, webhookId={}",
+                        scopeId,
+                        groupId,
+                        adoptedId);
                 return WebhookSetupResult.success(adoptedId, groupId);
             }
 
             // Step 4: Register new webhook
             WebhookConfig webhookConfig = new WebhookConfig(
-                webhookUrl,
-                Objects.requireNonNull(webhookProperties.secret()),
-                true, // merge_requests_events
-                true, // issues_events
-                true, // confidential_issues_events
-                true, // note_events
-                true, // confidential_note_events
-                true, // push_events
-                true, // tag_push_events
-                false, // pipeline_events
-                true, // milestone_events
-                true, // member_events
-                true, // subgroup_events
-                true, // project_events
-                true // enable_ssl_verification
-            );
+                    webhookUrl,
+                    Objects.requireNonNull(webhookProperties.secret()),
+                    true, // merge_requests_events
+                    true, // issues_events
+                    true, // confidential_issues_events
+                    true, // note_events
+                    true, // confidential_note_events
+                    true, // push_events
+                    true, // tag_push_events
+                    false, // pipeline_events
+                    true, // milestone_events
+                    true, // member_events
+                    true, // subgroup_events
+                    true, // project_events
+                    true // enable_ssl_verification
+                    );
 
             WebhookInfo registered = client.registerGroupWebhook(scopeId, groupId, webhookConfig);
             updateGitLabConfig(scopeId, cfg -> cfg.withGitlabWebhookId(registered.id()));
 
             log.info(
-                "Registered new webhook: workspaceId={}, groupId={}, webhookId={}",
-                scopeId,
-                groupId,
-                registered.id()
-            );
+                    "Registered new webhook: workspaceId={}, groupId={}, webhookId={}",
+                    scopeId,
+                    groupId,
+                    registered.id());
             return WebhookSetupResult.success(registered.id(), groupId);
         } catch (WebClientResponseException e) {
             if (GitLabWebhookClient.isPermissionOrNotFoundError(e.getStatusCode())) {
                 String reason = String.format(
-                    "Insufficient permissions (HTTP %d). Requires Owner role on GitLab group '%s' with Premium tier.",
-                    e.getStatusCode().value(),
-                    workspace.getAccountLogin()
-                );
+                        "Insufficient permissions (HTTP %d). Requires Owner role on GitLab group '%s' with Premium tier.",
+                        e.getStatusCode().value(), workspace.getAccountLogin());
                 log.info("Webhook registration failed: workspaceId={}, reason={}", scopeId, reason);
                 return WebhookSetupResult.failed(reason);
             }
             int status = e.getStatusCode().value();
             String apiReason = String.format("GitLab API error: %d", status);
             log.warn(
-                "Webhook registration failed: workspaceId={}, reason={}, body={}",
-                scopeId,
-                apiReason,
-                e.getResponseBodyAsString()
-            );
+                    "Webhook registration failed: workspaceId={}, reason={}, body={}",
+                    scopeId,
+                    apiReason,
+                    e.getResponseBodyAsString());
             return WebhookSetupResult.failed(apiReason);
         }
     }
@@ -305,9 +292,8 @@ public class GitLabWebhookService {
     private void updateGitLabConfig(long workspaceId, UnaryOperator<GitLabConfig> mutator) {
         connectionService.updateConfig(workspaceId, IntegrationKind.GITLAB, cfg -> {
             if (!(cfg instanceof GitLabConfig gitLabCfg)) {
-                throw new IllegalStateException(
-                    "Expected GitLabConfig on workspace=" + workspaceId + " but got " + cfg.getClass().getSimpleName()
-                );
+                throw new IllegalStateException("Expected GitLabConfig on workspace=" + workspaceId + " but got "
+                        + cfg.getClass().getSimpleName());
             }
             return mutator.apply(gitLabCfg);
         });
@@ -341,11 +327,10 @@ public class GitLabWebhookService {
         } catch (Exception e) {
             // Best-effort: log and continue. 401/403 = GitLab auto-disables failing webhooks.
             log.warn(
-                "Webhook deregistration failed (best-effort): workspaceId={}, webhookId={}, error={}",
-                workspace.getId(),
-                config.gitlabWebhookId(),
-                e.getMessage()
-            );
+                    "Webhook deregistration failed (best-effort): workspaceId={}, webhookId={}, error={}",
+                    workspace.getId(),
+                    config.gitlabWebhookId(),
+                    e.getMessage());
         }
 
         clearWebhookFields(workspace);
@@ -388,11 +373,10 @@ public class GitLabWebhookService {
         } catch (Exception e) {
             // Best-effort: log and continue so the local UNINSTALLED transition still proceeds.
             log.warn(
-                "Webhook deregistration failed (best-effort): workspaceId={}, webhookId={}, error={}",
-                workspaceId,
-                config.gitlabWebhookId(),
-                e.getMessage()
-            );
+                    "Webhook deregistration failed (best-effort): workspaceId={}, webhookId={}, error={}",
+                    workspaceId,
+                    config.gitlabWebhookId(),
+                    e.getMessage());
         }
     }
 
@@ -403,11 +387,10 @@ public class GitLabWebhookService {
             deregisterWebhookForConnectionInternal(workspaceId, connectionId);
         } catch (RuntimeException e) {
             log.info(
-                "Webhook deregistration at deactivation was a no-op (best-effort): workspaceId={}, connectionId={}, reason={}",
-                workspaceId,
-                connectionId,
-                e.getMessage()
-            );
+                    "Webhook deregistration at deactivation was a no-op (best-effort): workspaceId={}, connectionId={}, reason={}",
+                    workspaceId,
+                    connectionId,
+                    e.getMessage());
         }
     }
 
@@ -418,10 +401,10 @@ public class GitLabWebhookService {
 
     private void deregisterWebhookForConnectionInternal(long workspaceId, long connectionId) {
         Optional<GitLabConfig> configOpt = connectionService
-            .findInWorkspace(workspaceId, connectionId)
-            .map(c -> c.getConfig())
-            .filter(cfg -> cfg instanceof GitLabConfig)
-            .map(cfg -> (GitLabConfig) cfg);
+                .findInWorkspace(workspaceId, connectionId)
+                .map(c -> c.getConfig())
+                .filter(cfg -> cfg instanceof GitLabConfig)
+                .map(cfg -> (GitLabConfig) cfg);
         if (configOpt.isEmpty()) {
             return;
         }
@@ -438,17 +421,12 @@ public class GitLabWebhookService {
             throw new IllegalStateException("GitLab webhook client is unavailable");
         }
         client.deregisterGroupWebhookWithCredentials(
-            config.serverUrl(),
-            bearer.get().token(),
-            config.gitlabGroupId(),
-            config.gitlabWebhookId()
-        );
+                config.serverUrl(), bearer.get().token(), config.gitlabGroupId(), config.gitlabWebhookId());
         log.info(
-            "Deregistered GitLab webhook for deactivated connection: workspaceId={}, connectionId={}, webhookId={}",
-            workspaceId,
-            connectionId,
-            config.gitlabWebhookId()
-        );
+                "Deregistered GitLab webhook for deactivated connection: workspaceId={}, connectionId={}, webhookId={}",
+                workspaceId,
+                connectionId,
+                config.gitlabWebhookId());
     }
 
     /**
@@ -484,31 +462,29 @@ public class GitLabWebhookService {
 
         record GitLabHealthCandidate(Workspace workspace, Long groupId, Long webhookId) {}
 
-        List<GitLabHealthCandidate> gitLabWorkspaces = workspaceRepository
-            .findByStatus(Workspace.WorkspaceStatus.ACTIVE)
-            .stream()
-            .map(ws -> {
-                Optional<GitLabConfig> cfg = gitLabConfig(ws);
-                if (cfg.isEmpty() || cfg.get().gitlabWebhookId() == null || cfg.get().gitlabGroupId() == null) {
-                    return null;
-                }
-                return new GitLabHealthCandidate(ws, cfg.get().gitlabGroupId(), cfg.get().gitlabWebhookId());
-            })
-            .filter(Objects::nonNull)
-            .toList();
+        List<GitLabHealthCandidate> gitLabWorkspaces =
+                workspaceRepository.findByStatus(Workspace.WorkspaceStatus.ACTIVE).stream()
+                        .map(ws -> {
+                            Optional<GitLabConfig> cfg = gitLabConfig(ws);
+                            if (cfg.isEmpty()
+                                    || cfg.get().gitlabWebhookId() == null
+                                    || cfg.get().gitlabGroupId() == null) {
+                                return null;
+                            }
+                            return new GitLabHealthCandidate(
+                                    ws, cfg.get().gitlabGroupId(), cfg.get().gitlabWebhookId());
+                        })
+                        .filter(Objects::nonNull)
+                        .toList();
 
         if (gitLabWorkspaces.isEmpty()) return;
 
-        int checked = 0,
-            reregistered = 0;
+        int checked = 0, reregistered = 0;
         for (GitLabHealthCandidate candidate : gitLabWorkspaces) {
             Workspace workspace = candidate.workspace();
             try {
-                Optional<WebhookInfo> existing = client.getGroupWebhook(
-                    workspace.getId(),
-                    candidate.groupId(),
-                    candidate.webhookId()
-                );
+                Optional<WebhookInfo> existing =
+                        client.getGroupWebhook(workspace.getId(), candidate.groupId(), candidate.webhookId());
                 checked++;
 
                 boolean missing = existing.isEmpty();
@@ -523,25 +499,22 @@ public class GitLabWebhookService {
                     // adopts by URL, which would re-adopt this same disabled hook — so delete it first,
                     // best-effort, then let registerWebhook create a clean one.
                     log.warn(
-                        "Webhook auto-disabled (alert_status=disabled), re-registering: workspaceId={}, webhookId={}",
-                        workspace.getId(),
-                        candidate.webhookId()
-                    );
+                            "Webhook auto-disabled (alert_status=disabled), re-registering: workspaceId={}, webhookId={}",
+                            workspace.getId(),
+                            candidate.webhookId());
                     try {
                         client.deregisterGroupWebhook(workspace.getId(), candidate.groupId(), candidate.webhookId());
                     } catch (Exception e) {
                         log.debug(
-                            "Failed to delete disabled webhook before re-register (will retry next cycle): workspaceId={}",
-                            workspace.getId(),
-                            e
-                        );
+                                "Failed to delete disabled webhook before re-register (will retry next cycle): workspaceId={}",
+                                workspace.getId(),
+                                e);
                     }
                 } else {
                     log.warn(
-                        "Webhook missing (deleted externally), re-registering: workspaceId={}, webhookId={}",
-                        workspace.getId(),
-                        candidate.webhookId()
-                    );
+                            "Webhook missing (deleted externally), re-registering: workspaceId={}, webhookId={}",
+                            workspace.getId(),
+                            candidate.webhookId());
                 }
 
                 // Clear stored ID so registerWebhook creates a new one
@@ -551,16 +524,14 @@ public class GitLabWebhookService {
                 if (result.registered()) {
                     reregistered++;
                     log.info(
-                        "Re-registered webhook: workspaceId={}, newWebhookId={}",
-                        workspace.getId(),
-                        result.webhookId()
-                    );
+                            "Re-registered webhook: workspaceId={}, newWebhookId={}",
+                            workspace.getId(),
+                            result.webhookId());
                 } else {
                     log.warn(
-                        "Failed to re-register webhook: workspaceId={}, reason={}",
-                        workspace.getId(),
-                        result.failureReason()
-                    );
+                            "Failed to re-register webhook: workspaceId={}, reason={}",
+                            workspace.getId(),
+                            result.failureReason());
                 }
             } catch (Exception e) {
                 log.debug("Webhook health check failed: workspaceId={}", workspace.getId(), e);
@@ -573,6 +544,7 @@ public class GitLabWebhookService {
     }
 
     private void clearWebhookFields(Workspace workspace) {
-        updateGitLabConfig(workspace.getId(), cfg -> cfg.withGitlabWebhookId(null).withGitlabGroupId(null));
+        updateGitLabConfig(
+                workspace.getId(), cfg -> cfg.withGitlabWebhookId(null).withGitlabGroupId(null));
     }
 }

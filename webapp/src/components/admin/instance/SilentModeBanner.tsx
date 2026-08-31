@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { VolumeX } from "lucide-react";
+
 import type { InstanceSettings } from "@/api/types.gen";
 import { RelativeTime } from "@/components/common/RelativeTime";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert";

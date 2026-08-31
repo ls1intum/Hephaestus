@@ -42,9 +42,7 @@ public class GitLabPullRequestReviewCommentProcessor {
     private final ApplicationEventPublisher eventPublisher;
 
     public GitLabPullRequestReviewCommentProcessor(
-        PullRequestReviewCommentRepository commentRepository,
-        ApplicationEventPublisher eventPublisher
-    ) {
+            PullRequestReviewCommentRepository commentRepository, ApplicationEventPublisher eventPublisher) {
         this.commentRepository = commentRepository;
         this.eventPublisher = eventPublisher;
     }
@@ -57,25 +55,6 @@ public class GitLabPullRequestReviewCommentProcessor {
      * for diff lines, and {@code head_sha}/{@code base_sha}/{@code start_sha} for diff refs.
      */
     public record DiffNoteData(
-        String noteGlobalId,
-        @Nullable String body,
-        @Nullable String url,
-        @Nullable String filePath,
-        @Nullable Integer newLine,
-        @Nullable Integer oldLine,
-        @Nullable String newPath,
-        @Nullable String oldPath,
-        @Nullable String headSha,
-        @Nullable String baseSha,
-        @Nullable String startSha,
-        @Nullable Instant createdAt,
-        @Nullable Instant updatedAt
-    ) {
-        /**
-         * Backward-compatible constructor for callers that don't carry {@code startSha}
-         * (e.g., older webhook paths). Passes {@code null} for the new field.
-         */
-        public DiffNoteData(
             String noteGlobalId,
             @Nullable String body,
             @Nullable String url,
@@ -86,24 +65,40 @@ public class GitLabPullRequestReviewCommentProcessor {
             @Nullable String oldPath,
             @Nullable String headSha,
             @Nullable String baseSha,
+            @Nullable String startSha,
             @Nullable Instant createdAt,
-            @Nullable Instant updatedAt
-        ) {
+            @Nullable Instant updatedAt) {
+        /**
+         * Backward-compatible constructor for callers that don't carry {@code startSha}
+         * (e.g., older webhook paths). Passes {@code null} for the new field.
+         */
+        public DiffNoteData(
+                String noteGlobalId,
+                @Nullable String body,
+                @Nullable String url,
+                @Nullable String filePath,
+                @Nullable Integer newLine,
+                @Nullable Integer oldLine,
+                @Nullable String newPath,
+                @Nullable String oldPath,
+                @Nullable String headSha,
+                @Nullable String baseSha,
+                @Nullable Instant createdAt,
+                @Nullable Instant updatedAt) {
             this(
-                noteGlobalId,
-                body,
-                url,
-                filePath,
-                newLine,
-                oldLine,
-                newPath,
-                oldPath,
-                headSha,
-                baseSha,
-                null,
-                createdAt,
-                updatedAt
-            );
+                    noteGlobalId,
+                    body,
+                    url,
+                    filePath,
+                    newLine,
+                    oldLine,
+                    newPath,
+                    oldPath,
+                    headSha,
+                    baseSha,
+                    null,
+                    createdAt,
+                    updatedAt);
         }
     }
 
@@ -111,14 +106,13 @@ public class GitLabPullRequestReviewCommentProcessor {
      * Groups the contextual parameters needed to find or create a review comment.
      */
     public record CommentContext(
-        PullRequestReviewThread thread,
-        PullRequest pr,
-        @Nullable User author,
-        IdentityProvider provider,
-        @Nullable PullRequestReviewComment inReplyTo,
-        @Nullable PullRequestReview review,
-        Long scopeId
-    ) {}
+            PullRequestReviewThread thread,
+            PullRequest pr,
+            @Nullable User author,
+            IdentityProvider provider,
+            @Nullable PullRequestReviewComment inReplyTo,
+            @Nullable PullRequestReview review,
+            Long scopeId) {}
 
     /**
      * Finds or creates a review comment from a GitLab diff note.
@@ -138,19 +132,17 @@ public class GitLabPullRequestReviewCommentProcessor {
             return null;
         }
 
-        Long providerId = Objects.requireNonNull(Objects.requireNonNull(context.provider()).getId());
+        Long providerId = Objects.requireNonNull(
+                Objects.requireNonNull(context.provider()).getId());
 
         return commentRepository
-            .findByNativeIdAndProviderId(nativeId, providerId)
-            .map(existing -> updateComment(existing, data, context))
-            .orElseGet(() -> createComment(nativeId, data, context));
+                .findByNativeIdAndProviderId(nativeId, providerId)
+                .map(existing -> updateComment(existing, data, context))
+                .orElseGet(() -> createComment(nativeId, data, context));
     }
 
     private PullRequestReviewComment updateComment(
-        PullRequestReviewComment existing,
-        DiffNoteData data,
-        CommentContext context
-    ) {
+            PullRequestReviewComment existing, DiffNoteData data, CommentContext context) {
         PullRequestReviewThread thread = context.thread();
         PullRequest pr = context.pr();
         Long scopeId = Objects.requireNonNull(context.scopeId());
@@ -180,14 +172,11 @@ public class GitLabPullRequestReviewCommentProcessor {
         PullRequestReviewComment saved = commentRepository.save(existing);
         log.debug("Updated diff note: nativeId={}", saved.getNativeId());
 
-        eventPublisher.publishEvent(
-            new ScmDomainEvent.ReviewCommentEdited(
+        eventPublisher.publishEvent(new ScmDomainEvent.ReviewCommentEdited(
                 ScmEventPayload.ReviewCommentData.from(saved),
                 pr.getId(),
                 changedFields,
-                createSyncContext(pr, scopeId)
-            )
-        );
+                createSyncContext(pr, scopeId)));
         return saved;
     }
 
@@ -252,20 +241,17 @@ public class GitLabPullRequestReviewCommentProcessor {
         PullRequestReviewComment saved = commentRepository.save(comment);
         log.debug("Created diff note: nativeId={}, path={}, line={}", nativeId, path, data.newLine());
 
-        eventPublisher.publishEvent(
-            new ScmDomainEvent.ReviewCommentCreated(
+        eventPublisher.publishEvent(new ScmDomainEvent.ReviewCommentCreated(
                 ScmEventPayload.ReviewCommentData.from(saved),
                 context.pr().getId(),
-                createSyncContext(context.pr(), Objects.requireNonNull(context.scopeId()))
-            )
-        );
+                createSyncContext(context.pr(), Objects.requireNonNull(context.scopeId()))));
 
         return saved;
     }
 
     private static EventContext createSyncContext(PullRequest pr, Long scopeId) {
         RepositoryRef repoRef =
-            pr.getRepository() != null ? Objects.requireNonNull(RepositoryRef.from(pr.getRepository())) : null;
+                pr.getRepository() != null ? Objects.requireNonNull(RepositoryRef.from(pr.getRepository())) : null;
         return EventContext.forSync(scopeId, Objects.requireNonNull(repoRef), IdentityProviderType.GITLAB);
     }
 

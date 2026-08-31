@@ -124,12 +124,11 @@ public class GitHubDeletionSweepService {
     private final GitHubSyncProperties syncProperties;
 
     public GitHubDeletionSweepService(
-        IssueRepository issueRepository,
-        RepositoryRepository repositoryRepository,
-        GitHubGraphQlClientProvider graphQlClientProvider,
-        GitHubGraphQlSyncCoordinator graphQlSyncHelper,
-        GitHubSyncProperties syncProperties
-    ) {
+            IssueRepository issueRepository,
+            RepositoryRepository repositoryRepository,
+            GitHubGraphQlClientProvider graphQlClientProvider,
+            GitHubGraphQlSyncCoordinator graphQlSyncHelper,
+            GitHubSyncProperties syncProperties) {
         this.issueRepository = issueRepository;
         this.repositoryRepository = repositoryRepository;
         this.graphQlClientProvider = graphQlClientProvider;
@@ -177,7 +176,10 @@ public class GitHubDeletionSweepService {
      * @param complete whether the listing is provably the entire upstream set
      * @param reason   why the listing is incomplete; {@code null} when {@code complete}
      */
-    record UpstreamListing(Set<Integer> numbers, boolean complete, @Nullable String reason) {
+    record UpstreamListing(
+            Set<Integer> numbers,
+            boolean complete,
+            @Nullable String reason) {
         static UpstreamListing complete(Set<Integer> numbers) {
             return new UpstreamListing(numbers, true, null);
         }
@@ -229,20 +231,18 @@ public class GitHubDeletionSweepService {
         for (Repository repository : repositories) {
             if (isCancelled(handle)) {
                 log.info(
-                    "Deletion sweep cancelled between repositories: scopeId={}, reposSwept={}, reposRemaining={}",
-                    scopeId,
-                    done,
-                    total - done
-                );
+                        "Deletion sweep cancelled between repositories: scopeId={}, reposSwept={}, reposRemaining={}",
+                        scopeId,
+                        done,
+                        total - done);
                 break;
             }
             report(
-                handle,
-                done,
-                total,
-                "Checking " + repository.getNameWithOwner() + " for deleted items",
-                repository.getNameWithOwner()
-            );
+                    handle,
+                    done,
+                    total,
+                    "Checking " + repository.getNameWithOwner() + " for deleted items",
+                    repository.getNameWithOwner());
 
             SweepOutcome outcome;
             try {
@@ -251,11 +251,10 @@ public class GitHubDeletionSweepService {
                 // sweepRepository is not expected to throw, but a sweep failure must never abort the
                 // reconciliation job — this is drift repair, not the sync itself.
                 log.warn(
-                    "Deletion sweep failed for repository, continuing: repoName={}, scopeId={}, message={}",
-                    sanitizeForLog(repository.getNameWithOwner()),
-                    scopeId,
-                    e.toString()
-                );
+                        "Deletion sweep failed for repository, continuing: repoName={}, scopeId={}, message={}",
+                        sanitizeForLog(repository.getNameWithOwner()),
+                        scopeId,
+                        e.toString());
                 skipped = true;
                 done++;
                 continue;
@@ -270,13 +269,12 @@ public class GitHubDeletionSweepService {
         SweepOutcome scopeOutcome = new SweepOutcome(issues, pullRequests, skipped);
         report(handle, done, total, sweepSummary(scopeOutcome), null);
         log.info(
-            "Deletion sweep finished: scopeId={}, reposSwept={}, issuesTombstoned={}, pullRequestsTombstoned={}, degraded={}",
-            scopeId,
-            done,
-            issues,
-            pullRequests,
-            skipped
-        );
+                "Deletion sweep finished: scopeId={}, reposSwept={}, issuesTombstoned={}, pullRequestsTombstoned={}, degraded={}",
+                scopeId,
+                done,
+                issues,
+                pullRequests,
+                skipped);
         return scopeOutcome;
     }
 
@@ -284,19 +282,14 @@ public class GitHubDeletionSweepService {
     static String sweepSummary(SweepOutcome outcome) {
         if (outcome.total() == 0) {
             return outcome.skipped()
-                ? "Checked for deleted items — some repositories could not be verified"
-                : "Checked for deleted items — none found";
+                    ? "Checked for deleted items — some repositories could not be verified"
+                    : "Checked for deleted items — none found";
         }
         return "Retired " + outcome.total() + " item" + (outcome.total() == 1 ? "" : "s") + " deleted upstream";
     }
 
     private static void report(
-        @Nullable SyncExecutionHandle handle,
-        int done,
-        int total,
-        String step,
-        @Nullable String repositoryName
-    ) {
+            @Nullable SyncExecutionHandle handle, int done, int total, String step, @Nullable String repositoryName) {
         if (handle != null) {
             handle.progress(done, total, SyncProgress.ofResource(SyncPhase.SWEEP, step, repositoryName, done, total));
         }
@@ -361,21 +354,15 @@ public class GitHubDeletionSweepService {
             if (!listing.complete()) {
                 skipped = true;
                 log.warn(
-                    "Skipped deletion sweep, deleted nothing: reason={}, entity={}, repoName={}, scopeId={}",
-                    listing.reason(),
-                    entity.plural,
-                    safeNameWithOwner,
-                    scopeId
-                );
+                        "Skipped deletion sweep, deleted nothing: reason={}, entity={}, repoName={}, scopeId={}",
+                        listing.reason(),
+                        entity.plural,
+                        safeNameWithOwner,
+                        scopeId);
                 continue;
             }
             int tombstoned = tombstoneMissing(
-                repository.getId(),
-                entity,
-                localBeforeListing,
-                listing.numbers(),
-                safeNameWithOwner
-            );
+                    repository.getId(), entity, localBeforeListing, listing.numbers(), safeNameWithOwner);
             if (entity == SweptEntity.ISSUE) {
                 issuesTombstoned = tombstoned;
             } else {
@@ -389,8 +376,8 @@ public class GitHubDeletionSweepService {
     /** The live local numbers for one entity class of one repository. */
     private List<Integer> localLiveNumbers(Long repositoryId, SweptEntity entity) {
         return entity == SweptEntity.ISSUE
-            ? issueRepository.findLiveIssueNumbersByRepositoryId(repositoryId)
-            : issueRepository.findLivePullRequestNumbersByRepositoryId(repositoryId);
+                ? issueRepository.findLiveIssueNumbersByRepositoryId(repositoryId)
+                : issueRepository.findLivePullRequestNumbersByRepositoryId(repositoryId);
     }
 
     /**
@@ -402,24 +389,20 @@ public class GitHubDeletionSweepService {
      * @param local the local live numbers as of before the upstream listing started
      */
     private int tombstoneMissing(
-        Long repositoryId,
-        SweptEntity entity,
-        List<Integer> local,
-        Set<Integer> upstream,
-        String safeNameWithOwner
-    ) {
-        List<Integer> missing = local
-            .stream()
-            .filter(number -> !upstream.contains(number))
-            .toList();
+            Long repositoryId,
+            SweptEntity entity,
+            List<Integer> local,
+            Set<Integer> upstream,
+            String safeNameWithOwner) {
+        List<Integer> missing =
+                local.stream().filter(number -> !upstream.contains(number)).toList();
         if (missing.isEmpty()) {
             log.debug(
-                "Deletion sweep found no drift: entity={}, repoName={}, localCount={}, upstreamCount={}",
-                entity.plural,
-                safeNameWithOwner,
-                local.size(),
-                upstream.size()
-            );
+                    "Deletion sweep found no drift: entity={}, repoName={}, localCount={}, upstreamCount={}",
+                    entity.plural,
+                    safeNameWithOwner,
+                    local.size(),
+                    upstream.size());
             return 0;
         }
 
@@ -427,19 +410,17 @@ public class GitHubDeletionSweepService {
         // type-blind UPDATE keyed on (repository_id, number) would tombstone the wrong discriminator when
         // the two share a number. GitHub's numbers are shared across the namespace, but the write must
         // still target the class it just proved complete — never the other one. See IssueRepository.
-        int tombstoned =
-            entity == SweptEntity.ISSUE
+        int tombstoned = entity == SweptEntity.ISSUE
                 ? issueRepository.tombstoneIssuesByRepositoryIdAndNumbers(repositoryId, missing, Instant.now())
                 : issueRepository.tombstonePullRequestsByRepositoryIdAndNumbers(repositoryId, missing, Instant.now());
         log.info(
-            "Deletion sweep tombstoned upstream-deleted items: entity={}, repoName={}, repoId={}, tombstoned={}, localCount={}, upstreamCount={}",
-            entity.plural,
-            safeNameWithOwner,
-            repositoryId,
-            tombstoned,
-            local.size(),
-            upstream.size()
-        );
+                "Deletion sweep tombstoned upstream-deleted items: entity={}, repoName={}, repoId={}, tombstoned={}, localCount={}, upstreamCount={}",
+                entity.plural,
+                safeNameWithOwner,
+                repositoryId,
+                tombstoned,
+                local.size(),
+                upstream.size());
         return tombstoned;
     }
 
@@ -451,12 +432,11 @@ public class GitHubDeletionSweepService {
      * new failure mode and forgets about it fails safe by default rather than authorizing a deletion.
      */
     private UpstreamListing listUpstreamNumbers(
-        Long scopeId,
-        RepositoryOwnerAndName ownerAndName,
-        SweptEntity entity,
-        String safeNameWithOwner,
-        @Nullable SyncExecutionHandle handle
-    ) {
+            Long scopeId,
+            RepositoryOwnerAndName ownerAndName,
+            SweptEntity entity,
+            String safeNameWithOwner,
+            @Nullable SyncExecutionHandle handle) {
         HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
         Duration timeout = syncProperties.graphqlTimeout();
 
@@ -480,51 +460,40 @@ public class GitHubDeletionSweepService {
             ClientGraphQlResponse response;
             String currentCursor = cursor;
             try {
-                response = Mono.defer(() ->
-                    client
-                        .documentName(entity.document)
-                        .variable("owner", ownerAndName.owner())
-                        .variable("name", ownerAndName.name())
-                        .variable("first", SWEEP_PAGE_SIZE)
-                        .variable("after", currentCursor)
-                        .execute()
-                )
-                    .retryWhen(
-                        Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
-                            .maxBackoff(TRANSPORT_MAX_BACKOFF)
-                            .jitter(JITTER_FACTOR)
-                            .filter(ScmTransportErrors::isTransportError)
-                    )
-                    .block(timeout);
+                response = Mono.defer(() -> client.documentName(entity.document)
+                                .variable("owner", ownerAndName.owner())
+                                .variable("name", ownerAndName.name())
+                                .variable("first", SWEEP_PAGE_SIZE)
+                                .variable("after", currentCursor)
+                                .execute())
+                        .retryWhen(Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
+                                .maxBackoff(TRANSPORT_MAX_BACKOFF)
+                                .jitter(JITTER_FACTOR)
+                                .filter(ScmTransportErrors::isTransportError))
+                        .block(timeout);
             } catch (RuntimeException e) {
                 // Includes the transport retries being exhausted and the block() timeout. Whatever the
                 // cause, the set is short — refuse it.
                 log.warn(
-                    "Deletion sweep listing failed: entity={}, repoName={}, page={}, message={}",
-                    entity.plural,
-                    safeNameWithOwner,
-                    pageCount,
-                    e.toString()
-                );
+                        "Deletion sweep listing failed: entity={}, repoName={}, page={}, message={}",
+                        entity.plural,
+                        safeNameWithOwner,
+                        pageCount,
+                        e.toString());
                 return UpstreamListing.incomplete("listingThrew");
             }
 
             if (response == null || !response.isValid()) {
                 var classification = graphQlSyncHelper.classifyGraphQlErrors(response);
-                if (
-                    classification != null &&
-                    graphQlSyncHelper.handleGraphQlClassification(
-                        new GraphQlClassificationContext(
-                            classification,
-                            retryAttempt,
-                            MAX_RETRY_ATTEMPTS,
-                            "deletion sweep",
-                            "repoName",
-                            safeNameWithOwner,
-                            log
-                        )
-                    )
-                ) {
+                if (classification != null
+                        && graphQlSyncHelper.handleGraphQlClassification(new GraphQlClassificationContext(
+                                classification,
+                                retryAttempt,
+                                MAX_RETRY_ATTEMPTS,
+                                "deletion sweep",
+                                "repoName",
+                                safeNameWithOwner,
+                                log))) {
                     // The coordinator already slept; retry the SAME cursor so no page is skipped.
                     retryAttempt++;
                     pageCount--;
@@ -540,16 +509,13 @@ public class GitHubDeletionSweepService {
             // from "this repository has no issues" and would tombstone the entire mirrored set. Only an
             // explicit `false` aborts: a null (field unselected, restricted, or undecodable) leaves the
             // decision to the emptiness guard rather than blocking every sweep.
-            if (
-                entity.featureFlagPath != null &&
-                Boolean.FALSE.equals(readBooleanField(response, entity.featureFlagPath))
-            ) {
+            if (entity.featureFlagPath != null
+                    && Boolean.FALSE.equals(readBooleanField(response, entity.featureFlagPath))) {
                 log.warn(
-                    "Deletion sweep listing refused, feature disabled upstream: entity={}, repoName={}, flag={}",
-                    entity.plural,
-                    safeNameWithOwner,
-                    entity.featureFlagPath
-                );
+                        "Deletion sweep listing refused, feature disabled upstream: entity={}, repoName={}, flag={}",
+                        entity.plural,
+                        safeNameWithOwner,
+                        entity.featureFlagPath);
                 return UpstreamListing.incomplete("featureDisabled");
             }
 
@@ -564,33 +530,26 @@ public class GitHubDeletionSweepService {
                     }
                     pageInfo = connection.getPageInfo();
                     pageTotalCount = connection.getTotalCount();
-                    pageNumbers =
-                        connection.getNodes() == null
+                    pageNumbers = connection.getNodes() == null
                             ? List.of()
-                            : connection
-                                  .getNodes()
-                                  .stream()
-                                  .filter(node -> node != null)
-                                  .map(node -> node.getNumber())
-                                  .toList();
+                            : connection.getNodes().stream()
+                                    .filter(node -> node != null)
+                                    .map(node -> node.getNumber())
+                                    .toList();
                 } else {
-                    GHPullRequestConnection connection = response
-                        .field(entity.field)
-                        .toEntity(GHPullRequestConnection.class);
+                    GHPullRequestConnection connection =
+                            response.field(entity.field).toEntity(GHPullRequestConnection.class);
                     if (connection == null) {
                         return UpstreamListing.incomplete("nullConnection");
                     }
                     pageInfo = connection.getPageInfo();
                     pageTotalCount = connection.getTotalCount();
-                    pageNumbers =
-                        connection.getNodes() == null
+                    pageNumbers = connection.getNodes() == null
                             ? List.of()
-                            : connection
-                                  .getNodes()
-                                  .stream()
-                                  .filter(node -> node != null)
-                                  .map(node -> node.getNumber())
-                                  .toList();
+                            : connection.getNodes().stream()
+                                    .filter(node -> node != null)
+                                    .map(node -> node.getNumber())
+                                    .toList();
                 }
             } catch (RuntimeException e) {
                 // Log the root cause, not just e.toString(): Spring wraps every decode failure in a
@@ -599,13 +558,12 @@ public class GitHubDeletionSweepService {
                 // wrapper alone would make a client-side Jackson error indistinguishable from an
                 // upstream GraphQL error behind the fail-closed skip.
                 log.warn(
-                    "Deletion sweep decode failed: entity={}, repoName={}, page={}, message={}, cause={}",
-                    entity.plural,
-                    safeNameWithOwner,
-                    pageCount,
-                    e.toString(),
-                    rootCauseOf(e).toString()
-                );
+                        "Deletion sweep decode failed: entity={}, repoName={}, page={}, message={}, cause={}",
+                        entity.plural,
+                        safeNameWithOwner,
+                        pageCount,
+                        e.toString(),
+                        rootCauseOf(e).toString());
                 return UpstreamListing.incomplete("decodeFailed");
             }
 
@@ -630,12 +588,11 @@ public class GitHubDeletionSweepService {
         // small repository and would otherwise authorize deleting everything past the cut.
         if (reportedTotalCount >= 0 && numbers.size() != reportedTotalCount) {
             log.warn(
-                "Deletion sweep listing did not reconcile with upstream totalCount, deleting nothing: entity={}, repoName={}, received={}, totalCount={}",
-                entity.plural,
-                safeNameWithOwner,
-                numbers.size(),
-                reportedTotalCount
-            );
+                    "Deletion sweep listing did not reconcile with upstream totalCount, deleting nothing: entity={}, repoName={}, received={}, totalCount={}",
+                    entity.plural,
+                    safeNameWithOwner,
+                    numbers.size(),
+                    reportedTotalCount);
             return UpstreamListing.incomplete("totalCountMismatch");
         }
 

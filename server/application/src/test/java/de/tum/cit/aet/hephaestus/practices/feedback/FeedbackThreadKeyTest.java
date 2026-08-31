@@ -32,17 +32,17 @@ class FeedbackThreadKeyTest extends BaseUnitTest {
     void axesDiscriminate() {
         String base = FeedbackThreadKey.compute(TYPE, 42L, 7L, FeedbackChannel.IN_CONTEXT);
         assertThat(FeedbackThreadKey.compute("scm.issue", 42L, 7L, FeedbackChannel.IN_CONTEXT))
-            .as("a different artifact type is a different thread")
-            .isNotEqualTo(base);
+                .as("a different artifact type is a different thread")
+                .isNotEqualTo(base);
         assertThat(FeedbackThreadKey.compute(TYPE, 99L, 7L, FeedbackChannel.IN_CONTEXT))
-            .as("a different artifact id is a different thread")
-            .isNotEqualTo(base);
+                .as("a different artifact id is a different thread")
+                .isNotEqualTo(base);
         assertThat(FeedbackThreadKey.compute(TYPE, 42L, 8L, FeedbackChannel.IN_CONTEXT))
-            .as("a different recipient is a different thread (two authors never collapse)")
-            .isNotEqualTo(base);
+                .as("a different recipient is a different thread (two authors never collapse)")
+                .isNotEqualTo(base);
         assertThat(FeedbackThreadKey.compute(TYPE, 42L, 7L, FeedbackChannel.IN_CHAT))
-            .as("a different surface is a different thread (in-context vs conversation)")
-            .isNotEqualTo(base);
+                .as("a different surface is a different thread (in-context vs conversation)")
+                .isNotEqualTo(base);
     }
 
     @Test
@@ -52,8 +52,8 @@ class FeedbackThreadKeyTest extends BaseUnitTest {
         String n2 = FeedbackThreadKey.compute("", null, 7L, FeedbackChannel.IN_APP);
         assertThat(n1).isEqualTo(n2).hasSize(64);
         assertThat(n1)
-            .as("an in-app digest is distinct from an in-context unit")
-            .isNotEqualTo(FeedbackThreadKey.compute("", null, 7L, FeedbackChannel.IN_CONTEXT));
+                .as("an in-app digest is distinct from an in-context unit")
+                .isNotEqualTo(FeedbackThreadKey.compute("", null, 7L, FeedbackChannel.IN_CONTEXT));
     }
 
     /**
@@ -80,14 +80,14 @@ class FeedbackThreadKeyTest extends BaseUnitTest {
         void axesDiscriminate() {
             String base = FeedbackThreadKey.forPractice("ships-tests", 7L, FeedbackChannel.IN_APP);
             assertThat(FeedbackThreadKey.forPractice("small-changes", 7L, FeedbackChannel.IN_APP))
-                .as("a card about another habit stands beside this one, it does not replace it")
-                .isNotEqualTo(base);
+                    .as("a card about another habit stands beside this one, it does not replace it")
+                    .isNotEqualTo(base);
             assertThat(FeedbackThreadKey.forPractice("ships-tests", 8L, FeedbackChannel.IN_APP))
-                .as("two people's pages never collapse onto one thread")
-                .isNotEqualTo(base);
+                    .as("two people's pages never collapse onto one thread")
+                    .isNotEqualTo(base);
             assertThat(FeedbackThreadKey.forPractice("ships-tests", 7L, FeedbackChannel.IN_CHAT))
-                .as("a queued mentor unit is not the card on the page")
-                .isNotEqualTo(base);
+                    .as("a queued mentor unit is not the card on the page")
+                    .isNotEqualTo(base);
         }
 
         /**
@@ -100,11 +100,11 @@ class FeedbackThreadKeyTest extends BaseUnitTest {
         @DisplayName("a habit thread never collides with an artifact thread, whatever the practice is called")
         void neverCollidesWithAnArtifactThread() {
             assertThat(FeedbackThreadKey.forPractice("42", 7L, FeedbackChannel.IN_APP))
-                .as("a practice slugged like an id is still not that artifact")
-                .isNotEqualTo(FeedbackThreadKey.compute("", 42L, 7L, FeedbackChannel.IN_APP));
+                    .as("a practice slugged like an id is still not that artifact")
+                    .isNotEqualTo(FeedbackThreadKey.compute("", 42L, 7L, FeedbackChannel.IN_APP));
             assertThat(FeedbackThreadKey.forPractice(TYPE, 7L, FeedbackChannel.IN_APP))
-                .as("a practice slugged like an artifact kind is still not that artifact")
-                .isNotEqualTo(FeedbackThreadKey.compute(TYPE, null, 7L, FeedbackChannel.IN_APP));
+                    .as("a practice slugged like an artifact kind is still not that artifact")
+                    .isNotEqualTo(FeedbackThreadKey.compute(TYPE, null, 7L, FeedbackChannel.IN_APP));
         }
 
         /**
@@ -114,17 +114,15 @@ class FeedbackThreadKeyTest extends BaseUnitTest {
         @Test
         @DisplayName("a blank practice is refused rather than collapsing every habit onto one thread")
         void blankPracticeIsRefused() {
-            assertThatThrownBy(() -> FeedbackThreadKey.forPractice(" ", 7L, FeedbackChannel.IN_APP)).isInstanceOf(
-                IllegalArgumentException.class
-            );
+            assertThatThrownBy(() -> FeedbackThreadKey.forPractice(" ", 7L, FeedbackChannel.IN_APP))
+                    .isInstanceOf(IllegalArgumentException.class);
         }
 
         @Test
         @DisplayName("golden vector: the habit digest is pinned so a queued card stays findable")
         void goldenVector() {
-            assertThat(FeedbackThreadKey.forPractice("ships-tests", 7L, FeedbackChannel.IN_APP)).isEqualTo(
-                "214edb3230788fc4d0a5147bffff8a4964ffa5f2320c6c7a867d0e351c149b0c"
-            );
+            assertThat(FeedbackThreadKey.forPractice("ships-tests", 7L, FeedbackChannel.IN_APP))
+                    .isEqualTo("214edb3230788fc4d0a5147bffff8a4964ffa5f2320c6c7a867d0e351c149b0c");
         }
     }
 
@@ -133,9 +131,8 @@ class FeedbackThreadKeyTest extends BaseUnitTest {
     void goldenVectors() {
         // The key digests the artifact kind, so re-spelling a kind orphans every thread opened under the
         // old spelling. The second vector names no kind, which is what isolates that axis.
-        assertThat(FeedbackThreadKey.compute(TYPE, 42L, 7L, FeedbackChannel.IN_CONTEXT)).isEqualTo(
-            "a94dab8733d9b5e1ae7933969116e27e717b88f43e06ee63c23cf905d1b3fc96"
-        );
+        assertThat(FeedbackThreadKey.compute(TYPE, 42L, 7L, FeedbackChannel.IN_CONTEXT))
+                .isEqualTo("a94dab8733d9b5e1ae7933969116e27e717b88f43e06ee63c23cf905d1b3fc96");
         // Re-pinned twice: PROFILE → REFLECTION, then REFLECTION → IN_APP. The digest takes the channel's
         // name, so each rename moved this vector.
         //
@@ -147,8 +144,7 @@ class FeedbackThreadKeyTest extends BaseUnitTest {
         //
         // A future rename of a channel that has shipped feedback costs the same thing again. Price it
         // before spelling it, which is why FeedbackChannel's javadoc says this is the last one.
-        assertThat(FeedbackThreadKey.compute("", null, 7L, FeedbackChannel.IN_APP)).isEqualTo(
-            "0c836a48c322ea6d9e8da6266798b250473edc75a20113fc907d10b90429c033"
-        );
+        assertThat(FeedbackThreadKey.compute("", null, 7L, FeedbackChannel.IN_APP))
+                .isEqualTo("0c836a48c322ea6d9e8da6266798b250473edc75a20113fc907d10b90429c033");
     }
 }

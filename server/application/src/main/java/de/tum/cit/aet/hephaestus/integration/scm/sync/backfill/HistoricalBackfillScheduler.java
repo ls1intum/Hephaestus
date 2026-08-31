@@ -42,11 +42,9 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 @ConditionalOnProperty(name = "hephaestus.sync.backfill.enabled", havingValue = "true")
-@WorkspaceAgnostic(
-    "Workspace iteration is owned by the per-vendor backfill services " +
-        "(GitHubHistoricalBackfillService.runBackfillCycle and GitLabHistoricalBackfillService.runBackfillCycle); " +
-        "the scheduler is a thin trigger."
-)
+@WorkspaceAgnostic("Workspace iteration is owned by the per-vendor backfill services "
+        + "(GitHubHistoricalBackfillService.runBackfillCycle and GitLabHistoricalBackfillService.runBackfillCycle); "
+        + "the scheduler is a thin trigger.")
 public class HistoricalBackfillScheduler {
 
     private final GitHubHistoricalBackfillService backfillService;
@@ -56,11 +54,10 @@ public class HistoricalBackfillScheduler {
     @jakarta.annotation.PostConstruct
     void logInitialization() {
         log.info(
-            "Historical backfill scheduler initialized: batchSize={}, rateLimitThreshold={}, intervalSeconds={}",
-            syncSchedulerProperties.backfill().batchSize(),
-            syncSchedulerProperties.backfill().rateLimitThreshold(),
-            syncSchedulerProperties.backfill().intervalSeconds()
-        );
+                "Historical backfill scheduler initialized: batchSize={}, rateLimitThreshold={}, intervalSeconds={}",
+                syncSchedulerProperties.backfill().batchSize(),
+                syncSchedulerProperties.backfill().rateLimitThreshold(),
+                syncSchedulerProperties.backfill().intervalSeconds());
     }
 
     /**
@@ -83,10 +80,9 @@ public class HistoricalBackfillScheduler {
             } else if (result.pendingRepositories() > 0) {
                 // There are repos that need backfill but were skipped (rate limit, cooldown, etc.)
                 log.debug(
-                    "Backfill cycle complete: no work performed, pendingRepos={}, reason={}",
-                    result.pendingRepositories(),
-                    result.skipReason()
-                );
+                        "Backfill cycle complete: no work performed, pendingRepos={}, reason={}",
+                        result.pendingRepositories(),
+                        result.skipReason());
             }
             // If pendingRepositories == 0, all backfill is complete - stay silent (TRACE only)
         } catch (Exception e) {

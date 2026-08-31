@@ -79,7 +79,6 @@ htmlcov/
 .hypothesis/
 #.idea/
 **/.idea/artifacts
-**/.idea/**/biome.xml
 **/.idea/compiler.xml
 **/.idea/**/contentModel.xml
 **/.idea/**/copilot.data.migration.*.xml
@@ -128,6 +127,7 @@ lib64/
 # local .env backups (deploy scratch) — must never be committed
 local_settings.py
 *.log
+/load-results/
 *.manifest
 MANIFEST
 MISSION.md
@@ -154,8 +154,6 @@ pip-delete-this-directory.txt
 # pipenv
 #Pipfile.lock
 pip-log.txt
-# pnpm's content-addressable store when store-dir resolves inside the repo
-.pnpm-store/
 # poetry
 #poetry.lock
 postgres-data-temp-*/

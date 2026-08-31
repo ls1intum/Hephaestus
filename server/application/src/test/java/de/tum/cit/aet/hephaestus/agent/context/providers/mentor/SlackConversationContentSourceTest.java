@@ -28,14 +28,17 @@ class SlackConversationContentSourceTest extends BaseUnitTest {
         SlackConversationContentSource source = new SlackConversationContentSource(projection, objectMapper);
 
         assertThat(source.required()).isFalse();
-        assertThat(source.supports(new ContextRequest.MentorChatRequest(1L, 2L, UUID.randomUUID()))).isTrue();
-        assertThat(source.supports(new ContextRequest.PracticeReviewRequest(new AgentJob()))).isFalse();
+        assertThat(source.supports(new ContextRequest.MentorChatRequest(1L, 2L, UUID.randomUUID())))
+                .isTrue();
+        assertThat(source.supports(new ContextRequest.PracticeReviewRequest(new AgentJob())))
+                .isFalse();
     }
 
     @Test
     void contributesProjectedDeveloperConversationPayload() throws Exception {
         SlackConversationContentSource source = new SlackConversationContentSource(projection, objectMapper);
-        when(projection.buildPayload(11L, 22L)).thenReturn(objectMapper.createObjectNode().put("source", "slack"));
+        when(projection.buildPayload(11L, 22L))
+                .thenReturn(objectMapper.createObjectNode().put("source", "slack"));
 
         Map<String, byte[]> files = new HashMap<>();
         source.contribute(new ContextRequest.MentorChatRequest(11L, 22L, UUID.randomUUID()), files);

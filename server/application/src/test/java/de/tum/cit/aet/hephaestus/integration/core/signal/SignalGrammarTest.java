@@ -31,9 +31,8 @@ class SignalGrammarTest extends BaseUnitTest {
 
         @Test
         void shouldRejectAVendorPrefixedThreeSegmentKind() {
-            assertThatThrownBy(() -> ArtifactKind.of("github.scm.pull_request")).isInstanceOf(
-                IllegalArgumentException.class
-            );
+            assertThatThrownBy(() -> ArtifactKind.of("github.scm.pull_request"))
+                    .isInstanceOf(IllegalArgumentException.class);
         }
 
         @Test
@@ -47,9 +46,8 @@ class SignalGrammarTest extends BaseUnitTest {
 
         @Test
         void shouldDeriveTheArtifactKindFromTheNamePrefix() {
-            assertThat(SignalName.of("scm.pull_request.merged").artifactKind()).isEqualTo(
-                ArtifactKind.of("scm.pull_request")
-            );
+            assertThat(SignalName.of("scm.pull_request.merged").artifactKind())
+                    .isEqualTo(ArtifactKind.of("scm.pull_request"));
         }
 
         @Test
@@ -59,9 +57,8 @@ class SignalGrammarTest extends BaseUnitTest {
 
         @Test
         void shouldRejectAColon() {
-            assertThatThrownBy(() -> SignalName.of("scm.pull_request:merged")).isInstanceOf(
-                IllegalArgumentException.class
-            );
+            assertThatThrownBy(() -> SignalName.of("scm.pull_request:merged"))
+                    .isInstanceOf(IllegalArgumentException.class);
         }
     }
 
@@ -80,32 +77,28 @@ class SignalGrammarTest extends BaseUnitTest {
 
         @Test
         void shouldProduceTheSameDigestForTheSameContent() {
-            assertThat(SignalRevision.ofContentDigest("title", "body")).isEqualTo(
-                SignalRevision.ofContentDigest("title", "body")
-            );
+            assertThat(SignalRevision.ofContentDigest("title", "body"))
+                    .isEqualTo(SignalRevision.ofContentDigest("title", "body"));
         }
 
         @Test
         void shouldSeparatePartsSoAdjacentFieldsCannotImpersonateEachOther() {
-            assertThat(SignalRevision.ofContentDigest("ab", "c")).isNotEqualTo(
-                SignalRevision.ofContentDigest("a", "bc")
-            );
+            assertThat(SignalRevision.ofContentDigest("ab", "c"))
+                    .isNotEqualTo(SignalRevision.ofContentDigest("a", "bc"));
         }
 
         @Test
         void shouldTreatAnEmptyBodyAsDifferentFromAnAbsentOne() {
-            assertThat(SignalRevision.ofContentDigest("title", "")).isNotEqualTo(
-                SignalRevision.ofContentDigest("title", (String) null)
-            );
+            assertThat(SignalRevision.ofContentDigest("title", ""))
+                    .isNotEqualTo(SignalRevision.ofContentDigest("title", (String) null));
         }
 
         @Test
         void shouldNeverCollideAcrossSchemes() {
             String sameSubject = "MERGED";
 
-            assertThat(SignalRevision.ofTerminalState(sameSubject)).isNotEqualTo(
-                SignalRevision.ofHeadCommit(sameSubject)
-            );
+            assertThat(SignalRevision.ofTerminalState(sameSubject))
+                    .isNotEqualTo(SignalRevision.ofHeadCommit(sameSubject));
         }
 
         @Test
@@ -118,9 +111,8 @@ class SignalGrammarTest extends BaseUnitTest {
 
         @Test
         void shouldGiveEveryRequestedRunItsOwnIdentity() {
-            assertThat(SignalRevision.ofRunId(UUID.randomUUID())).isNotEqualTo(
-                SignalRevision.ofRunId(UUID.randomUUID())
-            );
+            assertThat(SignalRevision.ofRunId(UUID.randomUUID()))
+                    .isNotEqualTo(SignalRevision.ofRunId(UUID.randomUUID()));
         }
 
         @Test
@@ -130,8 +122,10 @@ class SignalGrammarTest extends BaseUnitTest {
 
         @Test
         void shouldFitTheLedgerColumn() {
-            assertThat(SignalRevision.ofRunId(UUID.randomUUID()).value().length()).isLessThanOrEqualTo(128);
-            assertThat(SignalRevision.ofContentDigest("a", "b").value().length()).isLessThanOrEqualTo(128);
+            assertThat(SignalRevision.ofRunId(UUID.randomUUID()).value().length())
+                    .isLessThanOrEqualTo(128);
+            assertThat(SignalRevision.ofContentDigest("a", "b").value().length())
+                    .isLessThanOrEqualTo(128);
         }
     }
 
@@ -140,12 +134,8 @@ class SignalGrammarTest extends BaseUnitTest {
 
         @Test
         void shouldReadTheArtifactKindOffTheSignalSoTheTwoCannotDisagree() {
-            SignalKey key = new SignalKey(
-                7L,
-                42L,
-                SignalName.of("scm.issue.opened"),
-                SignalRevision.ofContentDigest("t", "b")
-            );
+            SignalKey key =
+                    new SignalKey(7L, 42L, SignalName.of("scm.issue.opened"), SignalRevision.ofContentDigest("t", "b"));
 
             assertThat(key.artifactKind()).isEqualTo(ArtifactKind.of("scm.issue"));
         }

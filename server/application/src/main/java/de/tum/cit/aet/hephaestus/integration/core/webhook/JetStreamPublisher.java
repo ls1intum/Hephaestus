@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.core.webhook;
 
 import de.tum.cit.aet.hephaestus.core.webhook.WebhookProperties;
+import de.tum.cit.aet.hephaestus.integration.core.metrics.IntegrationCoreMetrics;
 import io.github.resilience4j.retry.Retry;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -42,23 +43,29 @@ public class JetStreamPublisher {
         this.jetStream = jetStream;
         this.retry = retry;
         this.properties = properties;
-        this.successCounter = Counter.builder("webhook.publish").tag("outcome", "success").register(meterRegistry);
-        this.failureCounter = Counter.builder("webhook.publish").tag("outcome", "failure").register(meterRegistry);
-        this.retryCounter = Counter.builder("webhook.publish.retry").register(meterRegistry);
+        this.successCounter = Counter.builder(IntegrationCoreMetrics.WEBHOOK_PUBLISH)
+                .tag("outcome", "success")
+                .register(meterRegistry);
+        this.failureCounter = Counter.builder(IntegrationCoreMetrics.WEBHOOK_PUBLISH)
+                .tag("outcome", "failure")
+                .register(meterRegistry);
+        this.retryCounter =
+                Counter.builder(IntegrationCoreMetrics.WEBHOOK_PUBLISH_RETRY).register(meterRegistry);
         retry.getEventPublisher().onRetry(event -> retryCounter.increment());
     }
 
     public void publish(PublishRequest request) {
         inFlight.register();
         try {
-            Retry.decorateCallable(retry, () -> publishOnce(request, properties.publish().timeout())).call();
+            Retry.decorateCallable(
+                            retry,
+                            () -> publishOnce(request, properties.publish().timeout()))
+                    .call();
             successCounter.increment();
         } catch (Exception e) {
             failureCounter.increment();
             throw new PublishFailedException(
-                "Failed to publish webhook to NATS after retries: subject=" + request.subject(),
-                e
-            );
+                    "Failed to publish webhook to NATS after retries: subject=" + request.subject(), e);
         } finally {
             inFlight.arriveAndDeregister();
         }
@@ -78,18 +85,18 @@ public class JetStreamPublisher {
     }
 
     private PublishAck publishOnce(PublishRequest request, Duration timeout)
-        throws IOException, JetStreamApiException, InterruptedException, ExecutionException, TimeoutException {
+            throws IOException, JetStreamApiException, InterruptedException, ExecutionException, TimeoutException {
         Headers headers = new Headers();
         for (Map.Entry<String, String> entry : request.headers().entrySet()) {
             headers.add(entry.getKey(), entry.getValue());
         }
         PublishOptions options = PublishOptions.builder()
-            .messageId(request.dedupId())
-            .expectedStream(streamFor(request.subject()))
-            .build();
+                .messageId(request.dedupId())
+                .expectedStream(streamFor(request.subject()))
+                .build();
         return jetStream
-            .publishAsync(request.subject(), headers, request.body(), options)
-            .get(timeout.toMillis(), TimeUnit.MILLISECONDS);
+                .publishAsync(request.subject(), headers, request.body(), options)
+                .get(timeout.toMillis(), TimeUnit.MILLISECONDS);
     }
 
     /**

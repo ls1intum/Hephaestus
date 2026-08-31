@@ -77,6 +77,8 @@ tags:
   name: o-auth-callback-controller
 - description: Recurring reviews of recent work
   name: Practice Review Sweep
+- description: Redacted production configuration facts
+  name: Configuration Readiness
 - description: Identity provider discovery (public)
   name: Auth discovery
 - description: Global contributor information
@@ -105,6 +107,8 @@ tags:
   name: Practice Group Standings
 - description: Asking for a review of a piece of work by hand
   name: Practice review requests
+- description: Current account transparency and research consent
+  name: Consent
 - description: Read-only access to practice evaluation observations
   name: Practice Observations
 - description: Adopt instance catalog practices into a workspace
@@ -439,6 +443,21 @@ paths:
         \ first)"
       tags:
       - Admin
+  /admin/configuration-readiness:
+    get:
+      operationId: adminGetConfigurationReadiness
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ConfigurationFact"
+          description: OK
+      summary: Get redacted configuration readiness
+      tags:
+      - Configuration Readiness
   /admin/llm/connections:
     get:
       operationId: adminListLlmConnections
@@ -1423,6 +1442,143 @@ paths:
       summary: "Exclude a practice from new workspaces, or include it again"
       tags:
       - Admin Practice Catalog
+  /admin/product-feedback:
+    get:
+      operationId: adminListProductFeedback
+      parameters:
+      - description: Zero-based page index (0..N)
+        in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          default: 0
+          minimum: 0
+      - description: The size of the page to be returned
+        in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          default: 50
+          minimum: 1
+      - description: "Sorting criteria in the format: property,(asc|desc). Default\
+          \ sort order is ascending. Multiple sort criteria are supported."
+        in: query
+        name: sort
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedModelFeedbackItem"
+          description: OK
+      summary: List recent free-text product feedback
+      tags:
+      - feedback-admin
+  /admin/product-feedback/responses:
+    get:
+      operationId: adminListProductSurveyResponses
+      parameters:
+      - description: Zero-based page index (0..N)
+        in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          default: 0
+          minimum: 0
+      - description: The size of the page to be returned
+        in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          default: 50
+          minimum: 1
+      - description: "Sorting criteria in the format: property,(asc|desc). Default\
+          \ sort order is ascending. Multiple sort criteria are supported."
+        in: query
+        name: sort
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedModelSubmission"
+          description: OK
+      summary: List recent survey responses
+      tags:
+      - feedback-admin
+  /admin/product-feedback/surveys:
+    get:
+      operationId: adminListProductSurveys
+      parameters:
+      - description: Zero-based page index (0..N)
+        in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          default: 0
+          minimum: 0
+      - description: The size of the page to be returned
+        in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          default: 50
+          minimum: 1
+      - description: "Sorting criteria in the format: property,(asc|desc). Default\
+          \ sort order is ascending. Multiple sort criteria are supported."
+        in: query
+        name: sort
+        required: false
+        schema:
+          type: array
+          default:
+          - "createdAt,DESC"
+          items:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedModelSurvey"
+          description: OK
+      summary: List authored product surveys
+      tags:
+      - feedback-admin
+    post:
+      operationId: adminCreateProductSurvey
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSurvey"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Survey"
+          description: OK
+      summary: Publish a product survey
+      tags:
+      - feedback-admin
   /admin/settings:
     get:
       operationId: adminGetInstanceSettings
@@ -1739,6 +1895,21 @@ paths:
           description: OK
       tags:
       - o-auth-callback
+  /product-feedback:
+    post:
+      operationId: submitInstanceProductFeedback
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FeedbackRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+      summary: Send instance-scoped product feedback
+      tags:
+      - instance-feedback
   /user:
     delete:
       operationId: deleteCurrentUser
@@ -1766,6 +1937,56 @@ paths:
       summary: Get the current user
       tags:
       - Account
+  /user/consent:
+    get:
+      operationId: getConsentStatus
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsentStatus"
+          description: OK
+      summary: Get the current consent notice and status
+      tags:
+      - Consent
+    put:
+      operationId: completeFirstLoginConsent
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FirstLoginConsent"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsentStatus"
+          description: OK
+      summary: Complete the first-login transparency step
+      tags:
+      - Consent
+  /user/consent/research:
+    put:
+      operationId: updateResearchConsent
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResearchConsent"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsentStatus"
+          description: OK
+      summary: Grant or withdraw research consent
+      tags:
+      - Consent
   /user/exports:
     post:
       operationId: requestDataExport
@@ -5304,6 +5525,11 @@ paths:
         schema:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: header
+        name: If-Match
+        required: false
+        schema:
+          type: string
       requestBody:
         content:
           application/json:
@@ -5318,6 +5544,33 @@ paths:
                 $ref: "#/components/schemas/PracticeReviewSettings"
           description: Policy updated
       summary: Update the workspace's practice-review policy
+      tags:
+      - Practice Review Settings
+  /workspaces/{workspaceSlug}/practices/review-settings/coverage-preview:
+    post:
+      operationId: previewCoverage
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkspaceReviewScope"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PracticeReviewCoveragePreview"
+          description: OK
+      summary: Preview the effective counts for proposed practice-review coverage
       tags:
       - Practice Review Settings
   /workspaces/{workspaceSlug}/practices/reviewed:
@@ -5481,6 +5734,8 @@ paths:
             enum:
             - AWAITING_APPROVAL
             - PREPARED
+            - PARTIALLY_DELIVERED
+            - PARTIALLY_FAILED
             - DELIVERED
             - SUPERSEDED
             - SUPPRESSED
@@ -5507,6 +5762,9 @@ paths:
             - EMPTY_AFTER_SANITIZE
             - INSTANCE_SILENCED
             - WORKSPACE_DISABLED
+            - WORKSPACE_DELIVERY_PAUSED
+            - STALE_ROLLOUT_REVISION
+            - OUTSIDE_CURRENT_COVERAGE
             - APPROVAL_STALE
             - APPROVAL_NO_LONGER_ELIGIBLE
             - PRACTICE_REQUIRES_APPROVAL
@@ -6355,6 +6613,104 @@ paths:
       summary: Place a practice in the catalog
       tags:
       - Practice Catalog
+  /workspaces/{workspaceSlug}/product-feedback:
+    post:
+      operationId: submitWorkspaceProductFeedback
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FeedbackRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+      summary: Send product feedback to instance administrators
+      tags:
+      - feedback
+  /workspaces/{workspaceSlug}/product-feedback/surveys:
+    get:
+      operationId: listAvailableProductSurveys
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Survey"
+          description: OK
+      summary: List surveys not yet handled by the current account
+      tags:
+      - feedback
+  /workspaces/{workspaceSlug}/product-feedback/surveys/{surveyId}/dismissal:
+    put:
+      operationId: dismissProductSurvey
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: surveyId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+      summary: Permanently dismiss a survey for the current account
+      tags:
+      - feedback
+  /workspaces/{workspaceSlug}/product-feedback/surveys/{surveyId}/responses:
+    post:
+      operationId: submitProductSurveyResponse
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: surveyId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitSurvey"
+        required: true
+      responses:
+        "200":
+          description: OK
+      summary: Submit a survey response once
+      tags:
+      - feedback
   /workspaces/{workspaceSlug}/profile/{login}:
     get:
       description: "Returns user profile with workspace-scoped activity data including\
@@ -8470,6 +8826,46 @@ components:
         workspaceId:
           type: integer
           format: int64
+    ConfigurationFact:
+      type: object
+      properties:
+        documentationUrl:
+          type: string
+        explanation:
+          type: string
+        id:
+          type: string
+        requirement:
+          type: string
+          enum:
+          - REQUIRED
+          - RECOMMENDED
+          - OPTIONAL
+        roles:
+          type: array
+          items:
+            type: string
+            enum:
+            - SERVER
+            - WORKER
+            - WEBHOOK
+        status:
+          type: string
+          enum:
+          - SATISFIED
+          - ACTION_REQUIRED
+          - NOT_CONFIGURED
+          - NOT_APPLICABLE
+        subject:
+          type: string
+      required:
+      - documentationUrl
+      - explanation
+      - id
+      - requirement
+      - roles
+      - status
+      - subject
     ConnectionAuditEntry:
       type: object
       description: |-
@@ -8717,6 +9113,22 @@ components:
       - health
       - kind
       - resourceCounts
+    ConsentStatus:
+      type: object
+      properties:
+        completed:
+          type: boolean
+        noticeText:
+          type: string
+        noticeVersion:
+          type: string
+        participateInResearch:
+          type: boolean
+      required:
+      - completed
+      - noticeText
+      - noticeVersion
+      - participateInResearch
     Contributor:
       type: object
       description: Information about a contributor to the Hephaestus project
@@ -8757,6 +9169,9 @@ components:
         slug:
           type: string
           example: reviewing-work
+          maxLength: 64
+          minLength: 3
+          pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"
       required:
       - definition
       - slug
@@ -8769,6 +9184,9 @@ components:
         slug:
           type: string
           example: pr-description-quality
+          maxLength: 64
+          minLength: 3
+          pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"
       required:
       - definition
       - slug
@@ -8821,6 +9239,7 @@ components:
           type: integer
           format: int32
           description: Context window in tokens
+          minimum: 1
         displayName:
           type: string
           description: Human-readable name
@@ -8833,6 +9252,7 @@ components:
           type: integer
           format: int32
           description: Maximum output tokens
+          minimum: 1
         slug:
           type: string
           description: Optional internal slug; generated from displayName when omitted
@@ -8907,6 +9327,7 @@ components:
           format: int32
           description: Sort order within the workspace. Appended when omitted.
           example: 1
+          minimum: 0
         icon:
           type: string
           description: Optional lucide icon name giving the group a glanceable identity
@@ -8965,7 +9386,7 @@ components:
           minLength: 3
         precomputeScript:
           type: string
-          description: TypeScript/Bun static analysis run before automated review
+          description: TypeScript/Node static analysis run before automated review
           maxLength: 100000
           minLength: 0
         slug:
@@ -9025,6 +9446,7 @@ components:
           format: int64
           description: "The artifact's internal id, as the trace and review listings\
             \ report it"
+          minimum: 0
         artifactKind:
           type: string
           description: "The artifact kind's wire id, e.g. scm.pull_request. A raw\
@@ -9072,6 +9494,37 @@ components:
       - artifactKind
       - cadence
       - lookbackDays
+    CreateSurvey:
+      type: object
+      properties:
+        description:
+          type: string
+          maxLength: 500
+          minLength: 0
+        endsAt:
+          type: string
+          format: date-time
+        questions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Question"
+          maxItems: 20
+          minItems: 0
+        startsAt:
+          type: string
+          format: date-time
+        title:
+          type: string
+          maxLength: 160
+          minLength: 0
+        workspaceId:
+          type: integer
+          format: int64
+      required:
+      - description
+      - questions
+      - startsAt
+      - title
     CreateWorkspaceLlmConnectionRequest:
       type: object
       description: Connect your own AI provider
@@ -9121,6 +9574,7 @@ components:
           type: integer
           format: int32
           description: Context window in tokens
+          minimum: 1
         displayName:
           type: string
           description: Human-readable name
@@ -9133,6 +9587,7 @@ components:
           type: integer
           format: int32
           description: Maximum output tokens
+          minimum: 1
         per1mCacheReadUsd:
           type: number
           format: decimal
@@ -9532,6 +9987,149 @@ components:
           - OTHER
       required:
       - decision
+    DeliveryPolicyFactsSnapshot:
+      type: object
+      properties:
+        artifactKind:
+          type: string
+        baseBranch:
+          type: string
+        branchMatched:
+          type: boolean
+        contributingPractices:
+          type: array
+          items:
+            $ref: "#/components/schemas/PracticeFact"
+        deliveryStatus:
+          type: string
+          enum:
+          - ACTIVE
+          - PAUSED
+        personMatched:
+          type: boolean
+        personMode:
+          type: string
+          enum:
+          - ALL_ELIGIBLE
+          - SELECTED
+        recipientConsent:
+          type: boolean
+        repository:
+          type: string
+        repositoryMatched:
+          type: boolean
+        repositoryMode:
+          type: string
+          enum:
+          - ALL_MONITORED
+          - SELECTED
+        subject:
+          type: string
+          enum:
+          - RESOLVED_LINKED_HUMAN
+          - MISSING
+          - NON_HUMAN
+          - UNLINKED
+        triggerMode:
+          type: string
+          enum:
+          - AUTO
+          - MANUAL
+    DeliveryPolicyTrace:
+      type: object
+      properties:
+        admittedRevision:
+          type: integer
+          format: int64
+        allowed:
+          type: boolean
+        checks:
+          type: array
+          items:
+            $ref: "#/components/schemas/DeliveryPolicyTraceCheck"
+        decisiveReason:
+          type: string
+          enum:
+          - VOLUME_CAPPED
+          - COMPOSER_DEDUPED
+          - REACTED_DISPUTED
+          - REACTED_NOT_APPLICABLE
+          - CONVERSATION_EXPIRED
+          - ARTIFACT_GONE
+          - ARTIFACT_CLOSED
+          - ARTIFACT_MERGED
+          - ARTIFACT_DRAFT
+          - RECIPIENT_OPTED_OUT
+          - EMPTY_AFTER_SANITIZE
+          - INSTANCE_SILENCED
+          - WORKSPACE_DISABLED
+          - WORKSPACE_DELIVERY_PAUSED
+          - STALE_ROLLOUT_REVISION
+          - OUTSIDE_CURRENT_COVERAGE
+          - APPROVAL_STALE
+          - APPROVAL_NO_LONGER_ELIGIBLE
+          - PRACTICE_REQUIRES_APPROVAL
+          - BACKFILL_QUIET
+        evaluatedAt:
+          type: string
+          format: date-time
+        evaluatedRevision:
+          type: integer
+          format: int64
+        facts:
+          $ref: "#/components/schemas/DeliveryPolicyFactsSnapshot"
+        resolverVersion:
+          type: string
+        reviewId:
+          type: string
+          format: uuid
+        stage:
+          type: string
+          enum:
+          - COMPOSITION
+          - AUTOMATIC
+          - APPROVED
+          - EGRESS
+        surface:
+          type: string
+          enum:
+          - ARTIFACT
+          - IN_APP
+          - CONVERSATION
+      required:
+      - admittedRevision
+      - allowed
+      - checks
+      - evaluatedAt
+      - facts
+      - resolverVersion
+      - reviewId
+      - stage
+      - surface
+    DeliveryPolicyTraceCheck:
+      type: object
+      properties:
+        check:
+          type: string
+          enum:
+          - INSTANCE_SILENT_MODE
+          - WORKSPACE_ENABLED
+          - ROLLOUT_REVISION
+          - WORKSPACE_DELIVERY
+          - CURRENT_COVERAGE
+          - PRACTICE_AUTHORITY
+          - RECIPIENT_CONSENT
+          - ARTIFACT_ELIGIBILITY
+        status:
+          type: string
+          enum:
+          - PASSED
+          - DENIED
+          - NOT_APPLICABLE
+          - NOT_REACHED
+      required:
+      - check
+      - status
     DeveloperPracticeSummary:
       type: object
       description: Per-practice observation summary for a developer
@@ -9668,6 +10266,54 @@ components:
           - DUPLICATE
           - INAPPROPRIATE_PLACEMENT
           - OTHER
+    FeedbackItem:
+      type: object
+      properties:
+        accountId:
+          type: integer
+          format: int64
+        createdAt:
+          type: string
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum:
+          - FEEDBACK
+          - BUG
+        message:
+          type: string
+        pagePath:
+          type: string
+        workspaceId:
+          type: integer
+          format: int64
+      required:
+      - accountId
+      - id
+      - kind
+      - message
+    FeedbackRequest:
+      type: object
+      properties:
+        kind:
+          type: string
+          enum:
+          - FEEDBACK
+          - BUG
+        message:
+          type: string
+          maxLength: 5000
+          minLength: 0
+        pagePath:
+          type: string
+          maxLength: 500
+          minLength: 0
+      required:
+      - kind
+      - message
     FeedbackResolutionCounts:
       type: object
       description: Feedback resolution counts for the current developer
@@ -9743,6 +10389,19 @@ components:
       required:
       - count
       - workKind
+    FirstLoginConsent:
+      type: object
+      properties:
+        noticeVersion:
+          type: string
+        participateInResearch:
+          type: boolean
+        termsAccepted:
+          type: boolean
+      required:
+      - noticeVersion
+      - participateInResearch
+      - termsAccepted
     FxRateInfo:
       type: object
       description: "Display-only currency conversion for the USD amounts in this response.\
@@ -10287,9 +10946,11 @@ components:
           current:
             type: integer
             format: int32
+            minimum: 0
           target:
             type: integer
             format: int32
+            minimum: 0
       description: Linear progress with current and target counts
       required:
       - current
@@ -11159,6 +11820,15 @@ components:
           $ref: "#/components/schemas/SortObject"
         unpaged:
           type: boolean
+    PagedModelFeedbackItem:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/FeedbackItem"
+        page:
+          $ref: "#/components/schemas/PageMetadata"
     PagedModelReviewFeedback:
       type: object
       properties:
@@ -11184,6 +11854,24 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ReviewRunSummary"
+        page:
+          $ref: "#/components/schemas/PageMetadata"
+    PagedModelSubmission:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/Submission"
+        page:
+          $ref: "#/components/schemas/PageMetadata"
+    PagedModelSurvey:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/Survey"
         page:
           $ref: "#/components/schemas/PageMetadata"
     PagedModelTracedArtifact:
@@ -11259,7 +11947,7 @@ components:
           description: Human-readable name
         precomputeScript:
           type: string
-          description: TypeScript/Bun precompute script for static analysis before
+          description: TypeScript/Node precompute script for static analysis before
             AI review
         slug:
           type: string
@@ -11544,6 +12232,17 @@ components:
       - selectionScope
       - sourceKind
       - supportsExhaustiveEvidence
+    PracticeFact:
+      type: object
+      properties:
+        autonomy:
+          type: string
+          enum:
+          - "OFF"
+          - HUMAN_APPROVAL
+          - AUTOMATIC
+        slug:
+          type: string
     PracticeGroup:
       type: object
       description: A practice group grouping related practices into a learning objective
@@ -11819,6 +12518,59 @@ components:
       required:
       - displayName
       - signal
+    PracticeReviewCoveragePreview:
+      type: object
+      properties:
+        current:
+          $ref: "#/components/schemas/PracticeReviewCoverageSummary"
+          description: Effective coverage before the proposed change
+        proposed:
+          $ref: "#/components/schemas/PracticeReviewCoverageSummary"
+          description: Effective coverage if the proposed change is applied
+        widens:
+          type: boolean
+          description: "Whether the proposal admits any repository, branch, or person\
+            \ excluded now"
+      required:
+      - current
+      - proposed
+      - widens
+    PracticeReviewCoverageSummary:
+      type: object
+      properties:
+        coveredPeople:
+          type: integer
+          format: int32
+          description: Eligible linked members admitted by the people coverage axis
+        coveredRepositories:
+          type: integer
+          format: int32
+          description: Monitored repositories admitted by the repository coverage
+            axis
+        eligiblePeople:
+          type: integer
+          format: int32
+          description: Eligible linked human members in the workspace
+        estimateWindowDays:
+          type: integer
+          format: int32
+          description: Number of days included in recentReviewVolume
+        monitoredRepositories:
+          type: integer
+          format: int32
+          description: Repositories currently monitored by the workspace
+        recentReviewVolume:
+          type: integer
+          format: int32
+          description: Workspace-wide practice-review jobs created during the estimate
+            window
+      required:
+      - coveredPeople
+      - coveredRepositories
+      - eligiblePeople
+      - estimateWindowDays
+      - monitoredRepositories
+      - recentReviewVolume
     PracticeReviewSettings:
       type: object
       description: "A workspace's practice-review policy: effective values plus raw\
@@ -11832,6 +12584,8 @@ components:
           type: integer
           format: int32
           description: Raw override; null = inheriting the fleet default
+        coverageSummary:
+          $ref: "#/components/schemas/PracticeReviewCoverageSummary"
         defaultAutonomy:
           type: string
           description: "Effective: how much autonomy the system has over practices\
@@ -11855,17 +12609,33 @@ components:
         deliverToMergedOverride:
           type: boolean
           description: Raw override; null = inheriting the fleet default
+        deliveryStatus:
+          type: string
+          description: Whether new external practice feedback may be sent
+          enum:
+          - ACTIVE
+          - PAUSED
+        etag:
+          type: string
+          description: Strong entity tag to send in If-Match when updating this rollout
         reviewScope:
           $ref: "#/components/schemas/WorkspaceReviewScope"
-          description: "Which work is reviewed at all, ANDed onto every practice binding.\
-            \ Empty lists mean no restriction on that axis. Exact names only — no\
-            \ patterns, and no path scope (changed paths are not known where the decision\
-            \ is made)."
+          description: Explicit all-or-selected repository and person coverage. Selected-empty
+            means nobody.
+        revision:
+          type: integer
+          format: int64
+          description: Monotonic rollout revision carried by automatically admitted
+            review jobs
       required:
       - cooldownMinutes
+      - coverageSummary
       - defaultAutonomy
       - deliverToMerged
+      - deliveryStatus
+      - etag
       - reviewScope
+      - revision
     PracticeSignalOption:
       type: object
       description: A signal a practice can start an automated review on
@@ -12089,6 +12859,7 @@ components:
           - RUNNING
           - PENDING
           - SKIPPED
+          - NOT_REACHED
           - NOT_ASSESSABLE
           - TURNED_OFF
           - NOT_OCCASIONED
@@ -12128,6 +12899,9 @@ components:
             - EMPTY_AFTER_SANITIZE
             - INSTANCE_SILENCED
             - WORKSPACE_DISABLED
+            - WORKSPACE_DELIVERY_PAUSED
+            - STALE_ROLLOUT_REVISION
+            - OUTSIDE_CURRENT_COVERAGE
             - APPROVAL_STALE
             - APPROVAL_NO_LONGER_ELIGIBLE
             - PRACTICE_REQUIRES_APPROVAL
@@ -12630,6 +13404,39 @@ components:
       - number
       - state
       - title
+    Question:
+      type: object
+      properties:
+        id:
+          type: string
+          maxLength: 80
+          minLength: 0
+          pattern: "[A-Za-z0-9_-]+"
+        options:
+          type: array
+          items:
+            type: string
+            maxLength: 200
+            minLength: 0
+          maxItems: 20
+          minItems: 0
+        prompt:
+          type: string
+          maxLength: 300
+          minLength: 0
+        required:
+          type: boolean
+        type:
+          type: string
+          enum:
+          - TEXT
+          - SINGLE_CHOICE
+          - RATING
+      required:
+      - id
+      - options
+      - prompt
+      - type
     RateLimitSnapshot:
       type: object
       description: "Vendor API rate-limit observation, read from in-memory trackers\
@@ -12776,6 +13583,13 @@ components:
       - id
       - name
       - nameWithOwner
+    ResearchConsent:
+      type: object
+      properties:
+        granted:
+          type: boolean
+      required:
+      - granted
     ResourceCounts:
       type: object
       description: Resource-level rollup for the connection overview badge
@@ -12967,6 +13781,8 @@ components:
           enum:
           - AWAITING_APPROVAL
           - PREPARED
+          - PARTIALLY_DELIVERED
+          - PARTIALLY_FAILED
           - DELIVERED
           - SUPERSEDED
           - SUPPRESSED
@@ -12983,7 +13799,8 @@ components:
           - SUPPORTING
         suppressionReason:
           type: string
-          description: Why the message was withheld; null unless the state is SUPPRESSED
+          description: Why delivery stopped; set on withheld or terminally partial
+            feedback
           enum:
           - VOLUME_CAPPED
           - COMPOSER_DEDUPED
@@ -12998,6 +13815,9 @@ components:
           - EMPTY_AFTER_SANITIZE
           - INSTANCE_SILENCED
           - WORKSPACE_DISABLED
+          - WORKSPACE_DELIVERY_PAUSED
+          - STALE_ROLLOUT_REVISION
+          - OUTSIDE_CURRENT_COVERAGE
           - APPROVAL_STALE
           - APPROVAL_NO_LONGER_ELIGIBLE
           - PRACTICE_REQUIRES_APPROVAL
@@ -13110,6 +13930,8 @@ components:
           enum:
           - AWAITING_APPROVAL
           - PREPARED
+          - PARTIALLY_DELIVERED
+          - PARTIALLY_FAILED
           - DELIVERED
           - SUPERSEDED
           - SUPPRESSED
@@ -13135,7 +13957,8 @@ components:
           description: Whose work the feedback addresses; may equal the recipient
         suppressionReason:
           type: string
-          description: Why the feedback was withheld; null unless the state is SUPPRESSED
+          description: Why delivery stopped; set on withheld or terminally partial
+            feedback
           enum:
           - VOLUME_CAPPED
           - COMPOSER_DEDUPED
@@ -13150,6 +13973,9 @@ components:
           - EMPTY_AFTER_SANITIZE
           - INSTANCE_SILENCED
           - WORKSPACE_DISABLED
+          - WORKSPACE_DELIVERY_PAUSED
+          - STALE_ROLLOUT_REVISION
+          - OUTSIDE_CURRENT_COVERAGE
           - APPROVAL_STALE
           - APPROVAL_NO_LONGER_ELIGIBLE
           - PRACTICE_REQUIRES_APPROVAL
@@ -13194,6 +14020,10 @@ components:
         agentJobId:
           type: string
           format: uuid
+        approval:
+          $ref: "#/components/schemas/FeedbackApproval"
+          description: "Immutable human decision for this proposal, when one has been\
+            \ made"
         artifact:
           $ref: "#/components/schemas/ReviewArtifact"
           description: Work item the feedback targets; null when it is unanchored
@@ -13201,7 +14031,7 @@ components:
           type: string
           description: "Stored composed body; null when none was produced, and always\
             \ null on the IN_APP and IN_CHAT channels — neither the developer's practice\
-            \ pages nor the mentor's queued move is readable by an operator"
+            \ pages nor the mentor's prepared context is readable by an operator"
         channel:
           type: string
           enum:
@@ -13215,11 +14045,18 @@ components:
           type: string
           format: date-time
           description: When the feedback was placed; null if it was not delivered
+        deliveryPolicy:
+          type: array
+          description: Ordered delivery-policy evaluations for this feedback's review
+          items:
+            $ref: "#/components/schemas/DeliveryPolicyTrace"
         deliveryState:
           type: string
           enum:
           - AWAITING_APPROVAL
           - PREPARED
+          - PARTIALLY_DELIVERED
+          - PARTIALLY_FAILED
           - DELIVERED
           - SUPERSEDED
           - SUPPRESSED
@@ -13238,6 +14075,12 @@ components:
           description: Recorded placements; empty when none
           items:
             $ref: "#/components/schemas/ReviewPlacement"
+        proposedPlacements:
+          type: array
+          description: Exact ordered summary and inline messages covered by the approval
+            decision
+          items:
+            $ref: "#/components/schemas/ReviewProposedPlacement"
         recipient:
           $ref: "#/components/schemas/ReviewSubject"
           description: Who the feedback is addressed to; null when the identity is
@@ -13246,12 +14089,16 @@ components:
           type: string
           format: uuid
           description: The feedback this one replaced; null on a first delivery
+        reviewedRevision:
+          type: string
+          description: Reviewed source revision for an immutable approval package
         subject:
           $ref: "#/components/schemas/ReviewSubject"
           description: Whose work the feedback addresses; may equal the recipient
         suppressionReason:
           type: string
-          description: Why the feedback was withheld; null unless the state is SUPPRESSED
+          description: Why delivery stopped; set on withheld or terminally partial
+            feedback
           enum:
           - VOLUME_CAPPED
           - COMPOSER_DEDUPED
@@ -13266,6 +14113,9 @@ components:
           - EMPTY_AFTER_SANITIZE
           - INSTANCE_SILENCED
           - WORKSPACE_DISABLED
+          - WORKSPACE_DELIVERY_PAUSED
+          - STALE_ROLLOUT_REVISION
+          - OUTSIDE_CURRENT_COVERAGE
           - APPROVAL_STALE
           - APPROVAL_NO_LONGER_ELIGIBLE
           - PRACTICE_REQUIRES_APPROVAL
@@ -13277,10 +14127,12 @@ components:
       - agentJobId
       - channel
       - createdAt
+      - deliveryPolicy
       - deliveryState
       - id
       - observations
       - placements
+      - proposedPlacements
     ReviewFeedbackDisposition:
       type: object
       description: Counts of feedback by delivery state
@@ -13568,6 +14420,49 @@ components:
       required:
       - name
       - slug
+    ReviewProposedPlacement:
+      type: object
+      description: One exact provider message included in a review awaiting approval
+      properties:
+        body:
+          type: string
+        endLine:
+          type: integer
+          format: int32
+          description: Last 1-based line; null for a single-line comment or summary
+        path:
+          type: string
+          description: Head-side file path; null for the summary
+        startLine:
+          type: integer
+          format: int32
+          description: First 1-based line; null for the summary
+        type:
+          type: string
+          enum:
+          - SUMMARY
+          - INLINE
+          - CONVERSATION_TURN
+      required:
+      - body
+      - type
+    ReviewRepositoryTarget:
+      type: object
+      properties:
+        baseBranches:
+          type: array
+          description: Exact pull-request base branches to cover; empty covers every
+            base branch
+          items:
+            type: string
+        nameWithOwner:
+          type: string
+          description: "Exact provider repository name, including its owner"
+          maxLength: 255
+          minLength: 0
+      required:
+      - baseBranches
+      - nameWithOwner
     ReviewRequestOutcome:
       type: object
       description: What came of asking for a review
@@ -13587,6 +14482,7 @@ components:
           - REQUESTER_QUOTA_EXHAUSTED
           - CONCURRENT_DUPLICATE
           - OUT_OF_REVIEW_SCOPE
+          - STALE_ROLLOUT_REVISION
           - WORKSPACE_INACTIVE
           - PRACTICES_DISABLED
           - NO_ACTIVE_PRACTICE
@@ -13971,6 +14867,90 @@ components:
           type: boolean
         unsorted:
           type: boolean
+    Submission:
+      type: object
+      properties:
+        accountId:
+          type: integer
+          format: int64
+        answers:
+          type: object
+          additionalProperties:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+        disposition:
+          type: string
+          enum:
+          - RESPONDED
+          - DISMISSED
+        id:
+          type: string
+          format: uuid
+        questions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Question"
+        surveyId:
+          type: string
+          format: uuid
+        surveyTitle:
+          type: string
+        workspaceId:
+          type: integer
+          format: int64
+      required:
+      - accountId
+      - disposition
+      - id
+      - questions
+      - surveyId
+      - surveyTitle
+    SubmitSurvey:
+      type: object
+      properties:
+        answers:
+          type: object
+          additionalProperties:
+            type: string
+      required:
+      - answers
+    Survey:
+      type: object
+      properties:
+        active:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        description:
+          type: string
+        endsAt:
+          type: string
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        questions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Question"
+        startsAt:
+          type: string
+          format: date-time
+        title:
+          type: string
+        workspaceId:
+          type: integer
+          format: int64
+      required:
+      - active
+      - description
+      - id
+      - questions
+      - startsAt
+      - title
     SyncJob:
       type: object
       description: One sync_job row — a single INITIAL/RECONCILIATION/BACKFILL pass
@@ -14345,6 +15325,7 @@ components:
           - REQUESTER_QUOTA_EXHAUSTED
           - CONCURRENT_DUPLICATE
           - OUT_OF_REVIEW_SCOPE
+          - STALE_ROLLOUT_REVISION
           - WORKSPACE_INACTIVE
           - PRACTICES_DISABLED
           - NO_ACTIVE_PRACTICE
@@ -14603,6 +15584,7 @@ components:
           type: integer
           format: int32
           description: Context window in tokens
+          minimum: 1
         displayName:
           type: string
           description: Human-readable name
@@ -14615,6 +15597,7 @@ components:
           type: integer
           format: int32
           description: Maximum output tokens
+          minimum: 1
         supportsReasoning:
           type: boolean
           description: Whether the model supports a reasoning mode
@@ -14699,6 +15682,7 @@ components:
           type: integer
           format: int32
           description: Sort order within the workspace
+          minimum: 0
         icon:
           type: string
           description: Optional lucide icon name giving the group a glanceable identity
@@ -14759,7 +15743,7 @@ components:
           pattern: .*\S.*
         precomputeScript:
           type: string
-          description: TypeScript/Bun static analysis run before automated review
+          description: TypeScript/Node static analysis run before automated review
           maxLength: 100000
           minLength: 0
         whatGoodLooksLike:
@@ -14799,6 +15783,13 @@ components:
         deliverToMerged:
           type: boolean
           description: Deliver feedback to already-merged PRs/MRs
+        deliveryStatus:
+          type: string
+          description: Pause or activate external feedback. Resume never releases
+            work from an older revision.
+          enum:
+          - ACTIVE
+          - PAUSED
         reset:
           type: array
           description: Fields to reset back to inherit
@@ -14813,9 +15804,8 @@ components:
           uniqueItems: true
         reviewScope:
           $ref: "#/components/schemas/WorkspaceReviewScope"
-          description: "Replaces the review scope wholesale (the lists ARE the setting,\
-            \ so a merge could only ever add). Null leaves it unchanged; two empty\
-            \ lists clear it back to unrestricted."
+          description: Replaces repository and person coverage wholesale. Null leaves
+            it unchanged.
     UpdateRepositorySettingsRequest:
       type: object
       description: Request to update repository contribution visibility settings in
@@ -14985,6 +15975,7 @@ components:
           type: integer
           format: int32
           description: Context window in tokens
+          minimum: 1
         displayName:
           type: string
           description: Human-readable name
@@ -14997,6 +15988,7 @@ components:
           type: integer
           format: int32
           description: Maximum output tokens
+          minimum: 1
         per1mCacheReadUsd:
           type: number
           format: decimal
@@ -15640,6 +16632,10 @@ components:
           type: string
           format: date-time
           description: Timestamp when the membership was created
+        eligibleForPracticeReview:
+          type: boolean
+          description: Whether this linked human member can be selected for practice-review
+            coverage
         hidden:
           type: boolean
           description: Whether the member is hidden from the leaderboard
@@ -15684,43 +16680,33 @@ components:
           description: "GitLab workspace provider config, null if not available"
     WorkspaceReviewScope:
       type: object
-      description: |-
-        The workspace's answer to "which of our work is reviewed at all", ANDed onto every practice binding.
-         It exists because a binding says <code>scm.pull_request.merged</code> and cannot say <em>merged into
-         what</em>: a trunk is named <code>main</code> here and <code>develop</code> there, which is a deployment fact
-         about one workspace that a centrally curated catalogue cannot carry.
-
-         <p>The scope only ever narrows, never widens: an empty or absent list means "no restriction on this
-         axis".
-
-         <h2>What this cannot express, and why</h2>
-
-         <ul>
-           <li><strong>Changed paths.</strong> Not decidable here: the detection gate holds the
-               <code>PullRequest</code> row, not the diff, and changed paths do not exist until the evidence stage,
-               by which point the review has been admitted and paid for. A path axis here would be a predicate
-               that quietly never narrows anything.
-           <li><strong>Branch patterns.</strong> Exact names only; adding globs later stays backward
-               compatible, taking them away would not.
-           <li><strong>Any third key.</strong> The vocabulary is closed at the column
-               (<code>chk_workspace_review_scope</code>), not by this type: a reader configured to ignore unknown
-               fields would drop the key in silence, leaving a workspace believing a restriction was in force.
-         </ul>
+      description: Selecting specific repositories or people with an empty selection
+        admits nobody. A selected repository without branches admits all its branches.
       properties:
+        personMode:
+          type: string
+          enum:
+          - ALL_ELIGIBLE
+          - SELECTED
+        personUserIds:
+          type: array
+          items:
+            type: integer
+            format: int64
         repositories:
           type: array
-          description: |-
-            exact <code>owner/name</code> repository identifiers. Empty = every monitored
-                 repository. This narrows <em>review</em> within the set the workspace already syncs; it never
-                 adds one.
           items:
-            type: string
-        targetBranches:
-          type: array
-          description: exact target-branch names (a PR's base ref). Empty = every
-            branch.
-          items:
-            type: string
+            $ref: "#/components/schemas/ReviewRepositoryTarget"
+        repositoryMode:
+          type: string
+          enum:
+          - ALL_MONITORED
+          - SELECTED
+      required:
+      - personMode
+      - personUserIds
+      - repositories
+      - repositoryMode
     WorkspaceTeamRepositorySettings:
       type: object
       description: Repository contribution visibility settings for a specific team

@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { ReactFlowProvider } from "@xyflow/react";
+
 import { CategoryLabelNode } from "@/components/achievements/CategoryLabels";
 
 const meta = {

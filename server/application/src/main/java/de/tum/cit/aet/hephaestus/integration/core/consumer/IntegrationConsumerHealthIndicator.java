@@ -27,10 +27,9 @@ public class IntegrationConsumerHealthIndicator implements HealthIndicator {
     private final IntegrationMessageDispatcher dispatcher;
 
     public IntegrationConsumerHealthIndicator(
-        IntegrationConsumerStats stats,
-        IntegrationMessageHandlerRegistry handlerRegistry,
-        IntegrationMessageDispatcher dispatcher
-    ) {
+            IntegrationConsumerStats stats,
+            IntegrationMessageHandlerRegistry handlerRegistry,
+            IntegrationMessageDispatcher dispatcher) {
         this.stats = stats;
         this.handlerRegistry = handlerRegistry;
         this.dispatcher = dispatcher;
@@ -40,10 +39,10 @@ public class IntegrationConsumerHealthIndicator implements HealthIndicator {
     public Health health() {
         if (stats.natsConnectionStatus().isEmpty()) {
             return Health.outOfService()
-                .withDetail("reason", "no integration consumer initialised on this runtime role")
-                .withDetail("handlerCount", handlerRegistry.handlerCount())
-                .withDetail("parserCount", dispatcher.parserCount())
-                .build();
+                    .withDetail("reason", "no integration consumer initialised on this runtime role")
+                    .withDetail("handlerCount", handlerRegistry.handlerCount())
+                    .withDetail("parserCount", dispatcher.parserCount())
+                    .build();
         }
 
         String connectionStatus = stats.natsConnectionStatus().orElseThrow();
@@ -52,21 +51,14 @@ public class IntegrationConsumerHealthIndicator implements HealthIndicator {
         boolean healthy = disabled || connected;
         Health.Builder builder = healthy ? Health.up() : Health.down();
 
-        builder
-            .withDetail("natsConnectionStatus", connectionStatus)
-            .withDetail("activeScopeConsumers", stats.activeScopeConsumerCount())
-            .withDetail("installationConsumerActive", stats.installationConsumerActive())
-            .withDetail("handlerCount", handlerRegistry.handlerCount())
-            .withDetail("parserCount", dispatcher.parserCount());
+        builder.withDetail("natsConnectionStatus", connectionStatus)
+                .withDetail("activeScopeConsumers", stats.activeScopeConsumerCount())
+                .withDetail("installationConsumerActive", stats.installationConsumerActive())
+                .withDetail("handlerCount", handlerRegistry.handlerCount())
+                .withDetail("parserCount", dispatcher.parserCount());
 
-        stats
-            .lastDispatchAt()
-            .map(Instant::toString)
-            .ifPresent(ts -> builder.withDetail("lastDispatchAt", ts));
-        stats
-            .lastNakAt()
-            .map(Instant::toString)
-            .ifPresent(ts -> builder.withDetail("lastNakAt", ts));
+        stats.lastDispatchAt().map(Instant::toString).ifPresent(ts -> builder.withDetail("lastDispatchAt", ts));
+        stats.lastNakAt().map(Instant::toString).ifPresent(ts -> builder.withDetail("lastNakAt", ts));
 
         return builder.build();
     }

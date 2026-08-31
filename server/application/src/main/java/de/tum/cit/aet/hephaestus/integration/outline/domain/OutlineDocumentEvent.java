@@ -64,13 +64,12 @@ public class OutlineDocumentEvent {
     private @Nullable Instant createdAt;
 
     public OutlineDocumentEvent(
-        Long workspaceId,
-        Long connectionId,
-        String documentId,
-        String eventName,
-        @Nullable String actorSubject,
-        @Nullable Instant occurredAt
-    ) {
+            Long workspaceId,
+            Long connectionId,
+            String documentId,
+            String eventName,
+            @Nullable String actorSubject,
+            @Nullable Instant occurredAt) {
         this.workspaceId = workspaceId;
         this.connectionId = connectionId;
         this.documentId = documentId;

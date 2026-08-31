@@ -30,16 +30,14 @@ public interface WorkspaceContributionQueryRepository extends JpaRepository<Pull
      * @param userId the user ID
      * @return the earliest creation instant, or null if no PRs exist
      */
-    @Query(
-        """
+    @Query("""
         SELECT MIN(p.createdAt)
         FROM PullRequest p
         JOIN p.repository r
         JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = r.nameWithOwner
         WHERE p.author.id = :userId
             AND rtm.workspace.id = :workspaceId
-        """
-    )
+        """)
     @Nullable
     Instant findEarliestPullRequestCreatedAt(@Param("workspaceId") Long workspaceId, @Param("userId") Long userId);
 
@@ -50,8 +48,7 @@ public interface WorkspaceContributionQueryRepository extends JpaRepository<Pull
      * @param userId the user ID
      * @return the earliest submission instant, or null if no reviews exist
      */
-    @Query(
-        """
+    @Query("""
         SELECT MIN(r.submittedAt)
         FROM PullRequestReview r
         JOIN r.pullRequest p
@@ -59,8 +56,7 @@ public interface WorkspaceContributionQueryRepository extends JpaRepository<Pull
         JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = repo.nameWithOwner
         WHERE r.author.id = :userId
             AND rtm.workspace.id = :workspaceId
-        """
-    )
+        """)
     @Nullable
     Instant findEarliestReviewSubmittedAt(@Param("workspaceId") Long workspaceId, @Param("userId") Long userId);
 
@@ -71,8 +67,7 @@ public interface WorkspaceContributionQueryRepository extends JpaRepository<Pull
      * @param userId the user ID
      * @return the earliest creation instant, or null if no comments exist
      */
-    @Query(
-        """
+    @Query("""
         SELECT MIN(c.createdAt)
         FROM IssueComment c
         JOIN c.issue i
@@ -80,8 +75,7 @@ public interface WorkspaceContributionQueryRepository extends JpaRepository<Pull
         JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = r.nameWithOwner
         WHERE c.author.id = :userId
             AND rtm.workspace.id = :workspaceId
-        """
-    )
+        """)
     @Nullable
     Instant findEarliestCommentCreatedAt(@Param("workspaceId") Long workspaceId, @Param("userId") Long userId);
 }

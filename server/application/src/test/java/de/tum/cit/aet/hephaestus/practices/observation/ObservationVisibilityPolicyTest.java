@@ -26,19 +26,15 @@ class ObservationVisibilityPolicyTest extends BaseUnitTest {
      * says, passed through unchanged in both directions.
      */
     @ParameterizedTest
-    @ValueSource(booleans = { true, false })
+    @ValueSource(booleans = {true, false})
     void answersWhatEvidenceAuthorizationAnswersForACurrentObservation(boolean authorized) {
         EvidenceAuthorization authorization = mock(EvidenceAuthorization.class);
         Observation observation = observation("fingerprint", "fingerprint");
-        when(
-            authorization.permitsAll(7L, List.of(observation), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY)
-        ).thenReturn(authorized ? Set.of(observation.getId()) : Set.<UUID>of());
+        when(authorization.permitsAll(7L, List.of(observation), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
+                .thenReturn(authorized ? Set.of(observation.getId()) : Set.<UUID>of());
 
-        Set<UUID> permitted = new ObservationVisibilityPolicy(authorization).permitsAll(
-            7L,
-            List.of(observation),
-            SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY
-        );
+        Set<UUID> permitted = new ObservationVisibilityPolicy(authorization)
+                .permitsAll(7L, List.of(observation), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY);
 
         assertThat(permitted.contains(observation.getId())).isEqualTo(authorized);
         verify(authorization).permitsAll(7L, List.of(observation), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY);
@@ -53,30 +49,24 @@ class ObservationVisibilityPolicyTest extends BaseUnitTest {
         EvidenceAuthorization authorization = mock(EvidenceAuthorization.class);
         Observation current = observation("fingerprint", "fingerprint");
         Observation stale = observation("old", "current");
-        when(authorization.permitsAll(7L, List.of(current), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY)).thenReturn(
-            Set.of(current.getId())
-        );
+        when(authorization.permitsAll(7L, List.of(current), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
+                .thenReturn(Set.of(current.getId()));
 
-        assertThat(
-            new ObservationVisibilityPolicy(authorization).permitsAll(
-                7L,
-                List.of(current, stale),
-                SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY
-            )
-        ).containsExactly(current.getId());
+        assertThat(new ObservationVisibilityPolicy(authorization)
+                        .permitsAll(7L, List.of(current, stale), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
+                .containsExactly(current.getId());
     }
 
     @Test
     void asksNothingOfEvidenceAuthorizationWhenEveryObservationIsStale() {
         EvidenceAuthorization authorization = mock(EvidenceAuthorization.class);
 
-        assertThat(
-            new ObservationVisibilityPolicy(authorization).permitsAll(
-                7L,
-                List.of(observation("old", "current")),
-                SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY
-            )
-        ).isEmpty();
+        assertThat(new ObservationVisibilityPolicy(authorization)
+                        .permitsAll(
+                                7L,
+                                List.of(observation("old", "current")),
+                                SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
+                .isEmpty();
         verifyNoInteractions(authorization);
     }
 
@@ -88,10 +78,10 @@ class ObservationVisibilityPolicyTest extends BaseUnitTest {
         when(current.getReviewRuleFingerprint()).thenReturn(currentFingerprint);
         when(practice.getCurrentRevision()).thenReturn(current);
         return Observation.builder()
-            .id(UUID.randomUUID())
-            .agentJobId(UUID.randomUUID())
-            .practice(practice)
-            .practiceRevision(evaluated)
-            .build();
+                .id(UUID.randomUUID())
+                .agentJobId(UUID.randomUUID())
+                .practice(practice)
+                .practiceRevision(evaluated)
+                .build();
     }
 }

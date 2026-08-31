@@ -54,13 +54,12 @@ public class GitLabCollaboratorSyncService {
     private final GitLabProperties gitLabProperties;
 
     public GitLabCollaboratorSyncService(
-        RepositoryRepository repositoryRepository,
-        RepositoryCollaboratorRepository collaboratorRepository,
-        GitLabGraphQlClientProvider graphQlClientProvider,
-        GitLabGraphQlResponseHandler responseHandler,
-        GitLabUserService userService,
-        GitLabProperties gitLabProperties
-    ) {
+            RepositoryRepository repositoryRepository,
+            RepositoryCollaboratorRepository collaboratorRepository,
+            GitLabGraphQlClientProvider graphQlClientProvider,
+            GitLabGraphQlResponseHandler responseHandler,
+            GitLabUserService userService,
+            GitLabProperties gitLabProperties) {
         this.repositoryRepository = repositoryRepository;
         this.collaboratorRepository = collaboratorRepository;
         this.graphQlClientProvider = graphQlClientProvider;
@@ -99,13 +98,12 @@ public class GitLabCollaboratorSyncService {
                 int pageSize = adaptPageSize(LARGE_PAGE_SIZE, remaining);
 
                 HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
-                ClientGraphQlResponse response = client
-                    .documentName(GET_PROJECT_MEMBERS_DOCUMENT)
-                    .variable("fullPath", projectPath)
-                    .variable("first", pageSize)
-                    .variable("after", cursor)
-                    .execute()
-                    .block(gitLabProperties.graphqlTimeout());
+                ClientGraphQlResponse response = client.documentName(GET_PROJECT_MEMBERS_DOCUMENT)
+                        .variable("fullPath", projectPath)
+                        .variable("first", pageSize)
+                        .variable("after", cursor)
+                        .execute()
+                        .block(gitLabProperties.graphqlTimeout());
 
                 var handleResult = responseHandler.handle(response, "collaborators for " + safeProjectPath, log);
                 if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.RETRY) {
@@ -113,8 +111,7 @@ public class GitLabCollaboratorSyncService {
                 }
                 if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.ABORT) {
                     graphQlClientProvider.recordFailure(
-                        new GitLabSyncException("Invalid response for project members")
-                    );
+                            new GitLabSyncException("Invalid response for project members"));
                     errorAborted = true;
                     break;
                 }
@@ -122,14 +119,16 @@ public class GitLabCollaboratorSyncService {
 
                 @SuppressWarnings("unchecked")
                 List<Map<String, Object>> nodes = (List<Map<String, Object>>) (List<?>) Objects.requireNonNull(response)
-                    .field("project.projectMembers.nodes")
-                    .toEntityList(Map.class);
+                        .field("project.projectMembers.nodes")
+                        .toEntityList(Map.class);
 
                 if (nodes == null || nodes.isEmpty()) break;
 
                 Long providerId = Objects.requireNonNull(
-                    repository.getProvider() != null ? Objects.requireNonNull(repository.getProvider().getId()) : null
-                );
+                        repository.getProvider() != null
+                                ? Objects.requireNonNull(
+                                        repository.getProvider().getId())
+                                : null);
 
                 for (Map<String, Object> node : nodes) {
                     processCollaboratorNode(node, repository, providerId, syncedUserIds);
@@ -137,17 +136,11 @@ public class GitLabCollaboratorSyncService {
                 }
 
                 GitLabPageInfo pageInfo = Objects.requireNonNull(response)
-                    .field("project.projectMembers.pageInfo")
-                    .toEntity(GitLabPageInfo.class);
+                        .field("project.projectMembers.pageInfo")
+                        .toEntity(GitLabPageInfo.class);
                 cursor = pageInfo != null ? pageInfo.endCursor() : null;
-                if (
-                    responseHandler.isPaginationLoop(
-                        cursor,
-                        previousCursor,
-                        "collaborators for " + safeProjectPath,
-                        log
-                    )
-                ) {
+                if (responseHandler.isPaginationLoop(
+                        cursor, previousCursor, "collaborators for " + safeProjectPath, log)) {
                     errorAborted = true;
                     break;
                 }
@@ -177,11 +170,7 @@ public class GitLabCollaboratorSyncService {
 
     @SuppressWarnings("unchecked")
     private void processCollaboratorNode(
-        Map<String, Object> node,
-        Repository repository,
-        @Nullable Long providerId,
-        Set<Long> syncedUserIds
-    ) {
+            Map<String, Object> node, Repository repository, @Nullable Long providerId, Set<Long> syncedUserIds) {
         Map<String, Object> userMap = (Map<String, Object>) node.get("user");
         Map<String, Object> accessLevel = (Map<String, Object>) node.get("accessLevel");
 
@@ -196,9 +185,7 @@ public class GitLabCollaboratorSyncService {
         if (globalId == null || username == null) return;
 
         User user = userService.findOrCreateUser(
-            GitLabUserLookup.of(globalId, username, name, avatarUrl, webUrl),
-            Objects.requireNonNull(providerId)
-        );
+                GitLabUserLookup.of(globalId, username, name, avatarUrl, webUrl), Objects.requireNonNull(providerId));
         if (user == null) return;
 
         syncedUserIds.add(user.getId());
@@ -214,8 +201,8 @@ public class GitLabCollaboratorSyncService {
 
         // Upsert collaborator
         RepositoryCollaborator collab = collaboratorRepository
-            .findByRepositoryIdAndUserId(repository.getId(), user.getId())
-            .orElse(null);
+                .findByRepositoryIdAndUserId(repository.getId(), user.getId())
+                .orElse(null);
 
         if (collab == null) {
             collab = new RepositoryCollaborator(repository, user, permission);

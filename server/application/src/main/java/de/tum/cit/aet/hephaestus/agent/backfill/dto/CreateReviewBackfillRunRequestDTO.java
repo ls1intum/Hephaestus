@@ -15,17 +15,16 @@ import org.jspecify.annotations.NonNull;
 // @NonNull states intent to static analysis; @NotNull is what @Valid enforces at the request boundary —
 // together a missing field is a 400 naming the field, not an NPE surfacing as an undocumented 500.
 public record CreateReviewBackfillRunRequestDTO(
-    @NonNull
-    @NotNull
-    @Schema(
-        description = "Kind of work to review",
-        example = "scm.pull_request",
-        allowableValues = { "scm.pull_request", "scm.issue" }
-    )
-    ArtifactKind artifactKind,
-    @NonNull
-    @NotNull
-    @Schema(description = "Window start, inclusive, over the artifact's creation time")
-    Instant fromAt,
-    @NonNull @NotNull @Schema(description = "Window end, exclusive") Instant toAt
-) {}
+        @NonNull
+        @NotNull
+        @Schema(
+                description = "Kind of work to review",
+                example = "scm.pull_request",
+                allowableValues = {"scm.pull_request", "scm.issue"})
+        ArtifactKind artifactKind,
+
+        @NonNull @NotNull @Schema(description = "Window start, inclusive, over the artifact's creation time")
+        Instant fromAt,
+
+        @NonNull @NotNull @Schema(description = "Window end, exclusive")
+        Instant toAt) {}

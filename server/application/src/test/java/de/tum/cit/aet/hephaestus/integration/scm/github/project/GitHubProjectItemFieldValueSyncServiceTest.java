@@ -23,10 +23,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHPageInfo
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2Field;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2ItemFieldTextValue;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2ItemFieldValueConnection;
-import de.tum.cit.aet.hephaestus.integration.scm.github.project.ProjectField;
-import de.tum.cit.aet.hephaestus.integration.scm.github.project.ProjectFieldRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.github.project.ProjectFieldValueRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.github.project.ProjectItemRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.project.dto.GitHubProjectFieldDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.project.dto.GitHubProjectFieldValueDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -93,18 +89,17 @@ class GitHubProjectItemFieldValueSyncServiceTest extends BaseUnitTest {
     void setUp() {
         // Default exception classifier stub to prevent NPEs on unexpected exceptions
         lenient()
-            .when(exceptionClassifier.classifyWithDetails(any()))
-            .thenReturn(ClassificationResult.of(Category.UNKNOWN, "test error"));
+                .when(exceptionClassifier.classifyWithDetails(any()))
+                .thenReturn(ClassificationResult.of(Category.UNKNOWN, "test error"));
 
         service = new GitHubProjectItemFieldValueSyncService(
-            projectFieldRepository,
-            projectFieldValueRepository,
-            projectItemRepository,
-            graphQlClientProvider,
-            syncProperties,
-            transactionTemplate,
-            exceptionClassifier
-        );
+                projectFieldRepository,
+                projectFieldValueRepository,
+                projectItemRepository,
+                graphQlClientProvider,
+                syncProperties,
+                transactionTemplate,
+                exceptionClassifier);
     }
 
     // processFieldValues tests
@@ -145,166 +140,105 @@ class GitHubProjectItemFieldValueSyncServiceTest extends BaseUnitTest {
 
         @Test
         void shouldUpsertSingleTextFieldValueAndReturnFieldId() {
-            GitHubProjectFieldValueDTO dto = new GitHubProjectFieldValueDTO(
-                "field-1",
-                "TEXT",
-                "hello world",
-                null,
-                null,
-                null,
-                null
-            );
+            GitHubProjectFieldValueDTO dto =
+                    new GitHubProjectFieldValueDTO("field-1", "TEXT", "hello world", null, null, null, null);
             when(projectFieldRepository.existsById("field-1")).thenReturn(true);
 
             List<String> result = service.processFieldValues(42L, List.of(dto), false, null);
 
             assertThat(result).containsExactly("field-1");
-            verify(projectFieldValueRepository).upsertCore(
-                eq(42L),
-                eq("field-1"),
-                eq("hello world"),
-                isNull(),
-                isNull(),
-                isNull(),
-                isNull(),
-                any(Instant.class)
-            );
+            verify(projectFieldValueRepository)
+                    .upsertCore(
+                            eq(42L),
+                            eq("field-1"),
+                            eq("hello world"),
+                            isNull(),
+                            isNull(),
+                            isNull(),
+                            isNull(),
+                            any(Instant.class));
         }
 
         @Test
         void shouldUpsertMultipleFieldValuesOfDifferentTypes() {
-            GitHubProjectFieldValueDTO textDto = new GitHubProjectFieldValueDTO(
-                "field-text",
-                "TEXT",
-                "some text",
-                null,
-                null,
-                null,
-                null
-            );
-            GitHubProjectFieldValueDTO numberDto = new GitHubProjectFieldValueDTO(
-                "field-number",
-                "NUMBER",
-                null,
-                42.5,
-                null,
-                null,
-                null
-            );
+            GitHubProjectFieldValueDTO textDto =
+                    new GitHubProjectFieldValueDTO("field-text", "TEXT", "some text", null, null, null, null);
+            GitHubProjectFieldValueDTO numberDto =
+                    new GitHubProjectFieldValueDTO("field-number", "NUMBER", null, 42.5, null, null, null);
             GitHubProjectFieldValueDTO dateDto = new GitHubProjectFieldValueDTO(
-                "field-date",
-                "DATE",
-                null,
-                null,
-                LocalDate.of(2025, 6, 15),
-                null,
-                null
-            );
-            GitHubProjectFieldValueDTO singleSelectDto = new GitHubProjectFieldValueDTO(
-                "field-ss",
-                "SINGLE_SELECT",
-                null,
-                null,
-                null,
-                "option-abc",
-                null
-            );
-            GitHubProjectFieldValueDTO iterationDto = new GitHubProjectFieldValueDTO(
-                "field-iter",
-                "ITERATION",
-                null,
-                null,
-                null,
-                null,
-                "iteration-xyz"
-            );
+                    "field-date", "DATE", null, null, LocalDate.of(2025, 6, 15), null, null);
+            GitHubProjectFieldValueDTO singleSelectDto =
+                    new GitHubProjectFieldValueDTO("field-ss", "SINGLE_SELECT", null, null, null, "option-abc", null);
+            GitHubProjectFieldValueDTO iterationDto =
+                    new GitHubProjectFieldValueDTO("field-iter", "ITERATION", null, null, null, null, "iteration-xyz");
 
             when(projectFieldRepository.existsById(anyString())).thenReturn(true);
 
-            List<GitHubProjectFieldValueDTO> fieldValues = List.of(
-                textDto,
-                numberDto,
-                dateDto,
-                singleSelectDto,
-                iterationDto
-            );
+            List<GitHubProjectFieldValueDTO> fieldValues =
+                    List.of(textDto, numberDto, dateDto, singleSelectDto, iterationDto);
 
             List<String> result = service.processFieldValues(42L, fieldValues, false, null);
 
             assertThat(result).containsExactly("field-text", "field-number", "field-date", "field-ss", "field-iter");
 
-            verify(projectFieldValueRepository).upsertCore(
-                eq(42L),
-                eq("field-text"),
-                eq("some text"),
-                isNull(),
-                isNull(),
-                isNull(),
-                isNull(),
-                any(Instant.class)
-            );
-            verify(projectFieldValueRepository).upsertCore(
-                eq(42L),
-                eq("field-number"),
-                isNull(),
-                eq(42.5),
-                isNull(),
-                isNull(),
-                isNull(),
-                any(Instant.class)
-            );
-            verify(projectFieldValueRepository).upsertCore(
-                eq(42L),
-                eq("field-date"),
-                isNull(),
-                isNull(),
-                eq(LocalDate.of(2025, 6, 15)),
-                isNull(),
-                isNull(),
-                any(Instant.class)
-            );
-            verify(projectFieldValueRepository).upsertCore(
-                eq(42L),
-                eq("field-ss"),
-                isNull(),
-                isNull(),
-                isNull(),
-                eq("option-abc"),
-                isNull(),
-                any(Instant.class)
-            );
-            verify(projectFieldValueRepository).upsertCore(
-                eq(42L),
-                eq("field-iter"),
-                isNull(),
-                isNull(),
-                isNull(),
-                isNull(),
-                eq("iteration-xyz"),
-                any(Instant.class)
-            );
+            verify(projectFieldValueRepository)
+                    .upsertCore(
+                            eq(42L),
+                            eq("field-text"),
+                            eq("some text"),
+                            isNull(),
+                            isNull(),
+                            isNull(),
+                            isNull(),
+                            any(Instant.class));
+            verify(projectFieldValueRepository)
+                    .upsertCore(
+                            eq(42L),
+                            eq("field-number"),
+                            isNull(),
+                            eq(42.5),
+                            isNull(),
+                            isNull(),
+                            isNull(),
+                            any(Instant.class));
+            verify(projectFieldValueRepository)
+                    .upsertCore(
+                            eq(42L),
+                            eq("field-date"),
+                            isNull(),
+                            isNull(),
+                            eq(LocalDate.of(2025, 6, 15)),
+                            isNull(),
+                            isNull(),
+                            any(Instant.class));
+            verify(projectFieldValueRepository)
+                    .upsertCore(
+                            eq(42L),
+                            eq("field-ss"),
+                            isNull(),
+                            isNull(),
+                            isNull(),
+                            eq("option-abc"),
+                            isNull(),
+                            any(Instant.class));
+            verify(projectFieldValueRepository)
+                    .upsertCore(
+                            eq(42L),
+                            eq("field-iter"),
+                            isNull(),
+                            isNull(),
+                            isNull(),
+                            isNull(),
+                            eq("iteration-xyz"),
+                            any(Instant.class));
         }
 
         @Test
         void shouldSkipFieldValueWhenFieldNotFoundInRepository() {
-            GitHubProjectFieldValueDTO knownField = new GitHubProjectFieldValueDTO(
-                "field-known",
-                "TEXT",
-                "value",
-                null,
-                null,
-                null,
-                null
-            );
-            GitHubProjectFieldValueDTO unknownField = new GitHubProjectFieldValueDTO(
-                "field-unknown",
-                "TEXT",
-                "value",
-                null,
-                null,
-                null,
-                null
-            );
+            GitHubProjectFieldValueDTO knownField =
+                    new GitHubProjectFieldValueDTO("field-known", "TEXT", "value", null, null, null, null);
+            GitHubProjectFieldValueDTO unknownField =
+                    new GitHubProjectFieldValueDTO("field-unknown", "TEXT", "value", null, null, null, null);
 
             when(projectFieldRepository.existsById("field-known")).thenReturn(true);
             when(projectFieldRepository.existsById("field-unknown")).thenReturn(false);
@@ -312,40 +246,25 @@ class GitHubProjectItemFieldValueSyncServiceTest extends BaseUnitTest {
             List<String> result = service.processFieldValues(42L, List.of(knownField, unknownField), false, null);
 
             assertThat(result).containsExactly("field-known");
-            verify(projectFieldValueRepository).upsertCore(
-                eq(42L),
-                eq("field-known"),
-                eq("value"),
-                isNull(),
-                isNull(),
-                isNull(),
-                isNull(),
-                any(Instant.class)
-            );
+            verify(projectFieldValueRepository)
+                    .upsertCore(
+                            eq(42L),
+                            eq("field-known"),
+                            eq("value"),
+                            isNull(),
+                            isNull(),
+                            isNull(),
+                            isNull(),
+                            any(Instant.class));
             // Should NOT upsert the unknown field
-            verify(projectFieldValueRepository, never()).upsertCore(
-                eq(42L),
-                eq("field-unknown"),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any()
-            );
+            verify(projectFieldValueRepository, never())
+                    .upsertCore(eq(42L), eq("field-unknown"), any(), any(), any(), any(), any(), any());
         }
 
         @Test
         void shouldSkipNullFieldValuesInList() {
-            GitHubProjectFieldValueDTO validDto = new GitHubProjectFieldValueDTO(
-                "field-1",
-                "TEXT",
-                "value",
-                null,
-                null,
-                null,
-                null
-            );
+            GitHubProjectFieldValueDTO validDto =
+                    new GitHubProjectFieldValueDTO("field-1", "TEXT", "value", null, null, null, null);
             when(projectFieldRepository.existsById("field-1")).thenReturn(true);
 
             List<GitHubProjectFieldValueDTO> fieldValues = new ArrayList<>();
@@ -360,15 +279,8 @@ class GitHubProjectItemFieldValueSyncServiceTest extends BaseUnitTest {
 
         @Test
         void shouldNotDeleteFieldValuesWhenTruncated() {
-            GitHubProjectFieldValueDTO dto = new GitHubProjectFieldValueDTO(
-                "field-1",
-                "TEXT",
-                "value",
-                null,
-                null,
-                null,
-                null
-            );
+            GitHubProjectFieldValueDTO dto =
+                    new GitHubProjectFieldValueDTO("field-1", "TEXT", "value", null, null, null, null);
             when(projectFieldRepository.existsById("field-1")).thenReturn(true);
 
             service.processFieldValues(42L, List.of(dto), true, "cursor");
@@ -379,15 +291,8 @@ class GitHubProjectItemFieldValueSyncServiceTest extends BaseUnitTest {
 
         @Test
         void shouldRemoveStaleFieldValuesWhenNotTruncated() {
-            GitHubProjectFieldValueDTO dto = new GitHubProjectFieldValueDTO(
-                "field-1",
-                "TEXT",
-                "value",
-                null,
-                null,
-                null,
-                null
-            );
+            GitHubProjectFieldValueDTO dto =
+                    new GitHubProjectFieldValueDTO("field-1", "TEXT", "value", null, null, null, null);
             when(projectFieldRepository.existsById("field-1")).thenReturn(true);
 
             service.processFieldValues(42L, List.of(dto), false, null);
@@ -399,58 +304,44 @@ class GitHubProjectItemFieldValueSyncServiceTest extends BaseUnitTest {
         void shouldProcessLabelsFieldValueWithJsonText() {
             // Arrange — labels are serialized as JSON text
             GitHubProjectFieldValueDTO labelsDto = new GitHubProjectFieldValueDTO(
-                "field-labels",
-                "LABELS",
-                "[\"bug\",\"enhancement\"]",
-                null,
-                null,
-                null,
-                null
-            );
+                    "field-labels", "LABELS", "[\"bug\",\"enhancement\"]", null, null, null, null);
             when(projectFieldRepository.existsById("field-labels")).thenReturn(true);
 
             List<String> result = service.processFieldValues(42L, List.of(labelsDto), false, null);
 
             assertThat(result).containsExactly("field-labels");
-            verify(projectFieldValueRepository).upsertCore(
-                eq(42L),
-                eq("field-labels"),
-                eq("[\"bug\",\"enhancement\"]"),
-                isNull(),
-                isNull(),
-                isNull(),
-                isNull(),
-                any(Instant.class)
-            );
+            verify(projectFieldValueRepository)
+                    .upsertCore(
+                            eq(42L),
+                            eq("field-labels"),
+                            eq("[\"bug\",\"enhancement\"]"),
+                            isNull(),
+                            isNull(),
+                            isNull(),
+                            isNull(),
+                            any(Instant.class));
         }
 
         @Test
         void shouldProcessReviewersFieldValueWithJsonText() {
             // Arrange — reviewers are serialized as JSON text
             GitHubProjectFieldValueDTO reviewersDto = new GitHubProjectFieldValueDTO(
-                "field-reviewers",
-                "REVIEWERS",
-                "[\"user1\",\"team-alpha\"]",
-                null,
-                null,
-                null,
-                null
-            );
+                    "field-reviewers", "REVIEWERS", "[\"user1\",\"team-alpha\"]", null, null, null, null);
             when(projectFieldRepository.existsById("field-reviewers")).thenReturn(true);
 
             List<String> result = service.processFieldValues(42L, List.of(reviewersDto), false, null);
 
             assertThat(result).containsExactly("field-reviewers");
-            verify(projectFieldValueRepository).upsertCore(
-                eq(42L),
-                eq("field-reviewers"),
-                eq("[\"user1\",\"team-alpha\"]"),
-                isNull(),
-                isNull(),
-                isNull(),
-                isNull(),
-                any(Instant.class)
-            );
+            verify(projectFieldValueRepository)
+                    .upsertCore(
+                            eq(42L),
+                            eq("field-reviewers"),
+                            eq("[\"user1\",\"team-alpha\"]"),
+                            isNull(),
+                            isNull(),
+                            isNull(),
+                            isNull(),
+                            any(Instant.class));
         }
     }
 
@@ -464,128 +355,106 @@ class GitHubProjectItemFieldValueSyncServiceTest extends BaseUnitTest {
             Instant createdAt = Instant.parse("2025-01-01T00:00:00Z");
             Instant updatedAt = Instant.parse("2025-06-15T12:00:00Z");
             GitHubProjectFieldDTO fieldDto = new GitHubProjectFieldDTO(
-                "PVTF_field1",
-                "Status",
-                "SINGLE_SELECT",
-                List.of(
-                    new GitHubProjectFieldDTO.Option("opt-1", "Todo", "GREEN", "Not started"),
-                    new GitHubProjectFieldDTO.Option("opt-2", "Done", "PURPLE", "Completed")
-                ),
-                createdAt,
-                updatedAt
-            );
+                    "PVTF_field1",
+                    "Status",
+                    "SINGLE_SELECT",
+                    List.of(
+                            new GitHubProjectFieldDTO.Option("opt-1", "Todo", "GREEN", "Not started"),
+                            new GitHubProjectFieldDTO.Option("opt-2", "Done", "PURPLE", "Completed")),
+                    createdAt,
+                    updatedAt);
 
             service.upsertFieldDefinition(fieldDto, 10L);
 
-            verify(projectFieldRepository).upsertCore(
-                eq("PVTF_field1"),
-                eq(10L),
-                eq("Status"),
-                eq("SINGLE_SELECT"),
-                argThat(json -> json != null && json.contains("opt-1") && json.contains("Todo")),
-                eq(createdAt),
-                eq(updatedAt)
-            );
+            verify(projectFieldRepository)
+                    .upsertCore(
+                            eq("PVTF_field1"),
+                            eq(10L),
+                            eq("Status"),
+                            eq("SINGLE_SELECT"),
+                            argThat(json -> json != null && json.contains("opt-1") && json.contains("Todo")),
+                            eq(createdAt),
+                            eq(updatedAt));
         }
 
         @Test
         void shouldDefaultToTextDataTypeWhenNull() {
             GitHubProjectFieldDTO fieldDto = new GitHubProjectFieldDTO(
-                "PVTF_field2",
-                "Custom Field",
-                null,
-                Collections.emptyList(),
-                Instant.now(),
-                Instant.now()
-            );
+                    "PVTF_field2", "Custom Field", null, Collections.emptyList(), Instant.now(), Instant.now());
 
             service.upsertFieldDefinition(fieldDto, 10L);
 
-            verify(projectFieldRepository).upsertCore(
-                eq("PVTF_field2"),
-                eq(10L),
-                eq("Custom Field"),
-                eq("TEXT"),
-                isNull(),
-                any(Instant.class),
-                any(Instant.class)
-            );
+            verify(projectFieldRepository)
+                    .upsertCore(
+                            eq("PVTF_field2"),
+                            eq(10L),
+                            eq("Custom Field"),
+                            eq("TEXT"),
+                            isNull(),
+                            any(Instant.class),
+                            any(Instant.class));
         }
 
         @Test
         void shouldUseCurrentTimeWhenTimestampsAreNull() {
             Instant before = Instant.now();
-            GitHubProjectFieldDTO fieldDto = new GitHubProjectFieldDTO(
-                "PVTF_field3",
-                "Priority",
-                "NUMBER",
-                Collections.emptyList(),
-                null,
-                null
-            );
+            GitHubProjectFieldDTO fieldDto =
+                    new GitHubProjectFieldDTO("PVTF_field3", "Priority", "NUMBER", Collections.emptyList(), null, null);
 
             service.upsertFieldDefinition(fieldDto, 10L);
 
-            verify(projectFieldRepository).upsertCore(
-                eq("PVTF_field3"),
-                eq(10L),
-                eq("Priority"),
-                eq("NUMBER"),
-                isNull(),
-                argThat(instant -> !instant.isBefore(before)),
-                argThat(instant -> !instant.isBefore(before))
-            );
+            verify(projectFieldRepository)
+                    .upsertCore(
+                            eq("PVTF_field3"),
+                            eq(10L),
+                            eq("Priority"),
+                            eq("NUMBER"),
+                            isNull(),
+                            argThat(instant -> !instant.isBefore(before)),
+                            argThat(instant -> !instant.isBefore(before)));
         }
 
         @Test
         void shouldPassNullOptionsWhenEmptyList() {
             GitHubProjectFieldDTO fieldDto = new GitHubProjectFieldDTO(
-                "PVTF_field4",
-                "Notes",
-                "TEXT",
-                Collections.emptyList(),
-                Instant.now(),
-                Instant.now()
-            );
+                    "PVTF_field4", "Notes", "TEXT", Collections.emptyList(), Instant.now(), Instant.now());
 
             service.upsertFieldDefinition(fieldDto, 10L);
 
-            verify(projectFieldRepository).upsertCore(
-                eq("PVTF_field4"),
-                eq(10L),
-                eq("Notes"),
-                eq("TEXT"),
-                isNull(),
-                any(Instant.class),
-                any(Instant.class)
-            );
+            verify(projectFieldRepository)
+                    .upsertCore(
+                            eq("PVTF_field4"),
+                            eq(10L),
+                            eq("Notes"),
+                            eq("TEXT"),
+                            isNull(),
+                            any(Instant.class),
+                            any(Instant.class));
         }
 
         @Test
         void shouldHandleIterationFieldTypeWithOptions() {
             GitHubProjectFieldDTO fieldDto = new GitHubProjectFieldDTO(
-                "PVTF_iter",
-                "Sprint",
-                "ITERATION",
-                List.of(
-                    new GitHubProjectFieldDTO.Option("iter-1", "Sprint 1", null, null),
-                    new GitHubProjectFieldDTO.Option("iter-2", "Sprint 2", null, null)
-                ),
-                Instant.now(),
-                Instant.now()
-            );
+                    "PVTF_iter",
+                    "Sprint",
+                    "ITERATION",
+                    List.of(
+                            new GitHubProjectFieldDTO.Option("iter-1", "Sprint 1", null, null),
+                            new GitHubProjectFieldDTO.Option("iter-2", "Sprint 2", null, null)),
+                    Instant.now(),
+                    Instant.now());
 
             service.upsertFieldDefinition(fieldDto, 10L);
 
-            verify(projectFieldRepository).upsertCore(
-                eq("PVTF_iter"),
-                eq(10L),
-                eq("Sprint"),
-                eq("ITERATION"),
-                argThat(json -> json != null && json.contains("iter-1") && json.contains("Sprint 1")),
-                any(Instant.class),
-                any(Instant.class)
-            );
+            verify(projectFieldRepository)
+                    .upsertCore(
+                            eq("PVTF_iter"),
+                            eq(10L),
+                            eq("Sprint"),
+                            eq("ITERATION"),
+                            argThat(json -> json != null && json.contains("iter-1") && json.contains("Sprint 1")),
+                            any(Instant.class),
+                            any(Instant.class));
         }
 
         @Test
@@ -594,25 +463,24 @@ class GitHubProjectItemFieldValueSyncServiceTest extends BaseUnitTest {
             // calling it twice with the same ID simulates an update
             Instant updatedAt = Instant.parse("2025-07-01T00:00:00Z");
             GitHubProjectFieldDTO fieldDto = new GitHubProjectFieldDTO(
-                "PVTF_existing",
-                "Renamed Field",
-                "DATE",
-                Collections.emptyList(),
-                Instant.parse("2025-01-01T00:00:00Z"),
-                updatedAt
-            );
+                    "PVTF_existing",
+                    "Renamed Field",
+                    "DATE",
+                    Collections.emptyList(),
+                    Instant.parse("2025-01-01T00:00:00Z"),
+                    updatedAt);
 
             service.upsertFieldDefinition(fieldDto, 10L);
 
-            verify(projectFieldRepository).upsertCore(
-                eq("PVTF_existing"),
-                eq(10L),
-                eq("Renamed Field"),
-                eq("DATE"),
-                isNull(),
-                eq(Instant.parse("2025-01-01T00:00:00Z")),
-                eq(updatedAt)
-            );
+            verify(projectFieldRepository)
+                    .upsertCore(
+                            eq("PVTF_existing"),
+                            eq(10L),
+                            eq("Renamed Field"),
+                            eq("DATE"),
+                            isNull(),
+                            eq(Instant.parse("2025-01-01T00:00:00Z")),
+                            eq(updatedAt));
         }
     }
 
@@ -623,7 +491,8 @@ class GitHubProjectItemFieldValueSyncServiceTest extends BaseUnitTest {
 
         @Test
         void shouldRemoveFieldsNotSeenDuringSync() {
-            when(projectFieldRepository.deleteByProjectIdAndIdNotIn(eq(10L), any())).thenReturn(3);
+            when(projectFieldRepository.deleteByProjectIdAndIdNotIn(eq(10L), any()))
+                    .thenReturn(3);
 
             int removed = service.removeStaleFieldDefinitions(10L, List.of("field-a", "field-b"));
 
@@ -633,15 +502,14 @@ class GitHubProjectItemFieldValueSyncServiceTest extends BaseUnitTest {
 
         @Test
         void shouldReturnZeroWhenAllFieldsStillPresent() {
-            when(projectFieldRepository.deleteByProjectIdAndIdNotIn(eq(10L), any())).thenReturn(0);
+            when(projectFieldRepository.deleteByProjectIdAndIdNotIn(eq(10L), any()))
+                    .thenReturn(0);
 
             int removed = service.removeStaleFieldDefinitions(10L, List.of("field-a", "field-b", "field-c"));
 
             assertThat(removed).isZero();
-            verify(projectFieldRepository).deleteByProjectIdAndIdNotIn(
-                eq(10L),
-                eq(List.of("field-a", "field-b", "field-c"))
-            );
+            verify(projectFieldRepository)
+                    .deleteByProjectIdAndIdNotIn(eq(10L), eq(List.of("field-a", "field-b", "field-c")));
         }
     }
 
@@ -686,15 +554,16 @@ class GitHubProjectItemFieldValueSyncServiceTest extends BaseUnitTest {
             GHProjectV2ItemFieldValueConnection connection = new GHProjectV2ItemFieldValueConnection();
             connection.setNodes(List.of());
             connection.setPageInfo(new GHPageInfo());
-            when(fieldValuesField.toEntity(GHProjectV2ItemFieldValueConnection.class)).thenReturn(connection);
+            when(fieldValuesField.toEntity(GHProjectV2ItemFieldValueConnection.class))
+                    .thenReturn(connection);
 
             doAnswer(invocation -> {
-                Consumer<TransactionStatus> action = invocation.getArgument(0);
-                action.accept(null);
-                return null;
-            })
-                .when(transactionTemplate)
-                .executeWithoutResult(any());
+                        Consumer<TransactionStatus> action = invocation.getArgument(0);
+                        action.accept(null);
+                        return null;
+                    })
+                    .when(transactionTemplate)
+                    .executeWithoutResult(any());
 
             service.syncRemainingFieldValues(123L, "item-node", 42L, null, List.of("field-1"));
 
@@ -756,24 +625,22 @@ class GitHubProjectItemFieldValueSyncServiceTest extends BaseUnitTest {
             when(projectFieldRepository.existsById(anyString())).thenReturn(true);
 
             doAnswer(invocation -> {
-                Consumer<TransactionStatus> action = invocation.getArgument(0);
-                action.accept(null);
-                return null;
-            })
-                .when(transactionTemplate)
-                .executeWithoutResult(any());
+                        Consumer<TransactionStatus> action = invocation.getArgument(0);
+                        action.accept(null);
+                        return null;
+                    })
+                    .when(transactionTemplate)
+                    .executeWithoutResult(any());
 
             service.syncRemainingFieldValues(123L, "item-node", 42L, null, List.of());
 
             // Assert — verify stale cleanup receives accumulated field IDs from BOTH pages
-            verify(projectFieldValueRepository).deleteByItemIdAndFieldIdNotIn(
-                eq(42L),
-                argThat(
-                    fieldIds ->
-                        fieldIds.containsAll(List.of("field-1", "field-2", "field-3", "field-4")) &&
-                        fieldIds.size() == 4
-                )
-            );
+            verify(projectFieldValueRepository)
+                    .deleteByItemIdAndFieldIdNotIn(
+                            eq(42L),
+                            argThat(fieldIds ->
+                                    fieldIds.containsAll(List.of("field-1", "field-2", "field-3", "field-4"))
+                                            && fieldIds.size() == 4));
         }
 
         @Test
@@ -818,34 +685,27 @@ class GitHubProjectItemFieldValueSyncServiceTest extends BaseUnitTest {
             ClientResponseField responseField = mock(ClientResponseField.class);
             when(response.isValid()).thenReturn(true);
             when(response.field("node.fieldValues")).thenReturn(responseField);
-            when(responseField.toEntity(GHProjectV2ItemFieldValueConnection.class)).thenReturn(connection);
+            when(responseField.toEntity(GHProjectV2ItemFieldValueConnection.class))
+                    .thenReturn(connection);
             when(requestSpec.execute()).thenReturn(Mono.just(response));
 
             // Item does not exist in DB
             when(projectItemRepository.existsById(42L)).thenReturn(false);
 
             doAnswer(invocation -> {
-                Consumer<TransactionStatus> action = invocation.getArgument(0);
-                action.accept(null);
-                return null;
-            })
-                .when(transactionTemplate)
-                .executeWithoutResult(any());
+                        Consumer<TransactionStatus> action = invocation.getArgument(0);
+                        action.accept(null);
+                        return null;
+                    })
+                    .when(transactionTemplate)
+                    .executeWithoutResult(any());
 
             int result = service.syncRemainingFieldValues(123L, "item-node", 42L, null, List.of());
 
             // Assert — node count is still added but no upsert happens
             assertThat(result).isEqualTo(1);
-            verify(projectFieldValueRepository, never()).upsertCore(
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any()
-            );
+            verify(projectFieldValueRepository, never())
+                    .upsertCore(any(), any(), any(), any(), any(), any(), any(), any());
         }
 
         @Test
@@ -862,16 +722,8 @@ class GitHubProjectItemFieldValueSyncServiceTest extends BaseUnitTest {
             int result = service.syncRemainingFieldValues(123L, "item-node", 42L, null, List.of("field-1"));
 
             assertThat(result).isZero();
-            verify(projectFieldValueRepository, never()).upsertCore(
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any()
-            );
+            verify(projectFieldValueRepository, never())
+                    .upsertCore(any(), any(), any(), any(), any(), any(), any(), any());
             // Should NOT clean up stale values since pagination didn't complete
             verify(projectFieldValueRepository, never()).deleteByItemIdAndFieldIdNotIn(any(), any());
         }

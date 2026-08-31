@@ -12,13 +12,13 @@ import org.jspecify.annotations.Nullable;
  */
 @Schema(description = "Share with: all workspaces, or a selected set")
 public record UpdateLlmModelSharingRequestDTO(
-    @NonNull
-    @NotNull
-    @Schema(description = "Share with all workspaces (PUBLIC) or only the selected ones (GRANTED)")
-    ModelVisibility visibility,
-    @Nullable
-    @Schema(
-        description = "Workspace ids to share with when visibility is GRANTED; empty or omitted stages the model without workspace access"
-    )
-    List<Long> workspaceIds
-) {}
+        @NonNull
+        @NotNull
+        @Schema(description = "Share with all workspaces (PUBLIC) or only the selected ones (GRANTED)")
+        ModelVisibility visibility,
+
+        @Nullable
+        @Schema(
+                description =
+                        "Workspace ids to share with when visibility is GRANTED; empty or omitted stages the model without workspace access")
+        List<Long> workspaceIds) {}

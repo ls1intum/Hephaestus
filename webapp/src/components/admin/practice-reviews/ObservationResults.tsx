@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { ScanSearchIcon } from "lucide-react";
+
 import type { Practice, ReviewObservation } from "@/api/types.gen";
 import { RelativeTime } from "@/components/common/RelativeTime";
 import { observationResult } from "@/components/practice-vocabulary/observation-result";
@@ -12,6 +13,8 @@ import {
 	EmptyMedia,
 	EmptyTitle,
 } from "@/components/ui/empty";
+
+import { REVIEW_PAGE_SIZE, type ReviewScopeSearch } from "./review-search";
 import { ReviewArtifactLabel } from "./ReviewArtifact";
 import {
 	ClaimCurrentnessBadge,
@@ -23,7 +26,6 @@ import { ReviewPerson } from "./ReviewPerson";
 import { ReviewPracticeLink } from "./ReviewPracticeLink";
 import { ReviewResultsSkeleton } from "./ReviewResultsSkeleton";
 import { ReviewRow, ReviewRowList, ReviewRowMeta } from "./ReviewRow";
-import { REVIEW_PAGE_SIZE, type ReviewScopeSearch } from "./review-search";
 
 export type ObservationResultsState =
 	| { status: "loading" }

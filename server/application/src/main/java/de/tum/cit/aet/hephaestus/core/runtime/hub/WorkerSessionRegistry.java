@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.core.runtime.hub;
 
+import de.tum.cit.aet.hephaestus.core.metrics.CoreMetrics;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.ForceReconnect;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -11,7 +12,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.web.server.context.WebServerGracefulShutdownLifecycle;
+import org.springframework.boot.web.server.context.WebServerApplicationContext;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.SmartLifecycle;
 import org.springframework.web.socket.CloseStatus;
@@ -32,9 +33,9 @@ public class WorkerSessionRegistry implements SmartLifecycle {
 
     public WorkerSessionRegistry(ApplicationEventPublisher events, MeterRegistry meterRegistry) {
         this.events = events;
-        Gauge.builder("worker.hub.sessions.active", byWorkerId, ConcurrentHashMap::size)
-            .description("Active worker WSS connections registered on this app-pod")
-            .register(meterRegistry);
+        Gauge.builder(CoreMetrics.WORKER_HUB_SESSIONS_ACTIVE, byWorkerId, ConcurrentHashMap::size)
+                .description("Active worker WSS connections registered on this app-pod")
+                .register(meterRegistry);
     }
 
     /**
@@ -55,16 +56,14 @@ public class WorkerSessionRegistry implements SmartLifecycle {
         WorkerSession loser = evicted.get();
         if (loser != null) {
             log.info(
-                "Evicting duplicate worker session: workerId={}, oldSession={}, newSession={}",
-                incoming.workerId(),
-                loser.sessionId(),
-                incoming.sessionId()
-            );
+                    "Evicting duplicate worker session: workerId={}, oldSession={}, newSession={}",
+                    incoming.workerId(),
+                    loser.sessionId(),
+                    incoming.sessionId());
             // Close after swap so any in-flight forwarder reading byWorkerId can't pick the loser.
             loser.close(CloseStatus.NORMAL);
-            events.publishEvent(
-                new WorkerDisconnectedEvent(incoming.workerId(), loser.sessionId(), "duplicate-evicted", Instant.now())
-            );
+            events.publishEvent(new WorkerDisconnectedEvent(
+                    incoming.workerId(), loser.sessionId(), "duplicate-evicted", Instant.now()));
         }
         return result;
     }
@@ -77,8 +76,7 @@ public class WorkerSessionRegistry implements SmartLifecycle {
         boolean removed = byWorkerId.remove(session.workerId(), session);
         if (removed) {
             events.publishEvent(
-                new WorkerDisconnectedEvent(session.workerId(), session.sessionId(), reason, Instant.now())
-            );
+                    new WorkerDisconnectedEvent(session.workerId(), session.sessionId(), reason, Instant.now()));
         }
     }
 
@@ -111,9 +109,8 @@ public class WorkerSessionRegistry implements SmartLifecycle {
         for (WorkerSession session : byWorkerId.values()) {
             session.send(new ForceReconnect("hub draining"));
             session.close(CloseStatus.GOING_AWAY);
-            events.publishEvent(
-                new WorkerDisconnectedEvent(session.workerId(), session.sessionId(), "hub-draining", Instant.now())
-            );
+            events.publishEvent(new WorkerDisconnectedEvent(
+                    session.workerId(), session.sessionId(), "hub-draining", Instant.now()));
         }
         byWorkerId.clear();
         log.info("WorkerSessionRegistry drained on shutdown");
@@ -122,8 +119,8 @@ public class WorkerSessionRegistry implements SmartLifecycle {
     @Override
     public int getPhase() {
         // SmartLifecycle stops in DESCENDING phase order — higher phase stops first. A phase
-        // greater than WebServerGracefulShutdownLifecycle.SMART_LIFECYCLE_PHASE makes the WS
+        // greater than WebServerApplicationContext.GRACEFUL_SHUTDOWN_PHASE makes the WS
         // registry drain BEFORE the embedded server stops accepting traffic.
-        return WebServerGracefulShutdownLifecycle.SMART_LIFECYCLE_PHASE + 1;
+        return WebServerApplicationContext.GRACEFUL_SHUTDOWN_PHASE + 1;
     }
 }

@@ -125,8 +125,8 @@ class GitHubPullRequestSyncServiceTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         lenient()
-            .when(exceptionClassifier.classifyWithDetails(any()))
-            .thenReturn(ClassificationResult.of(Category.UNKNOWN, "test error"));
+                .when(exceptionClassifier.classifyWithDetails(any()))
+                .thenReturn(ClassificationResult.of(Category.UNKNOWN, "test error"));
 
         // Full sync (not incremental) keeps the cheap latest-update probe out of the path.
         lenient().when(syncProperties.incrementalSyncEnabled()).thenReturn(false);
@@ -138,39 +138,35 @@ class GitHubPullRequestSyncServiceTest extends BaseUnitTest {
         lenient().when(graphQlClientProvider.isRateLimitCritical(SCOPE_ID)).thenReturn(false);
 
         // Run transaction callbacks inline so page processing actually executes.
-        lenient()
-            .when(transactionTemplate.execute(any()))
-            .thenAnswer(invocation -> {
-                TransactionCallback<?> callback = invocation.getArgument(0);
-                return callback.doInTransaction(mock(org.springframework.transaction.TransactionStatus.class));
-            });
+        lenient().when(transactionTemplate.execute(any())).thenAnswer(invocation -> {
+            TransactionCallback<?> callback = invocation.getArgument(0);
+            return callback.doInTransaction(mock(org.springframework.transaction.TransactionStatus.class));
+        });
 
         service = new GitHubPullRequestSyncService(
-            repositoryRepository,
-            pullRequestRepository,
-            graphQlClientProvider,
-            pullRequestProcessor,
-            reviewSyncService,
-            reviewCommentSyncService,
-            issueCommentProcessor,
-            issueCommentSyncService,
-            projectItemSyncService,
-            backfillStateProvider,
-            transactionTemplate,
-            syncProperties,
-            new SyncSchedulerProperties(
-                true,
-                7,
-                "0 0 3 * * *",
-                15,
-                null,
-                null,
-                null,
-                new SyncSchedulerProperties.ProjectsProperties(true)
-            ),
-            exceptionClassifier,
-            graphQlSyncHelper
-        );
+                repositoryRepository,
+                pullRequestRepository,
+                graphQlClientProvider,
+                pullRequestProcessor,
+                reviewSyncService,
+                reviewCommentSyncService,
+                issueCommentProcessor,
+                issueCommentSyncService,
+                projectItemSyncService,
+                backfillStateProvider,
+                transactionTemplate,
+                syncProperties,
+                new SyncSchedulerProperties(
+                        true,
+                        7,
+                        "0 0 3 * * *",
+                        15,
+                        null,
+                        null,
+                        null,
+                        new SyncSchedulerProperties.ProjectsProperties(true)),
+                exceptionClassifier,
+                graphQlSyncHelper);
     }
 
     private Repository createRepository() {
@@ -198,11 +194,7 @@ class GitHubPullRequestSyncServiceTest extends BaseUnitTest {
     }
 
     private GHIssueCommentConnection createCommentConnection(
-        List<GHIssueComment> comments,
-        int totalCount,
-        boolean hasNextPage,
-        @Nullable String endCursor
-    ) {
+            List<GHIssueComment> comments, int totalCount, boolean hasNextPage, @Nullable String endCursor) {
         GHIssueCommentConnection connection = new GHIssueCommentConnection();
         connection.setNodes(comments);
         connection.setTotalCount(totalCount);
@@ -256,11 +248,10 @@ class GitHubPullRequestSyncServiceTest extends BaseUnitTest {
             when(issueCommentProcessor.process(any(), eq(PR_NUMBER), any())).thenReturn(new IssueComment());
 
             GHIssueCommentConnection comments = createCommentConnection(
-                List.of(createGHComment(1001L, "first conversation comment"), createGHComment(1002L, "second")),
-                2,
-                false,
-                "cursor-end"
-            );
+                    List.of(createGHComment(1001L, "first conversation comment"), createGHComment(1002L, "second")),
+                    2,
+                    false,
+                    "cursor-end");
             stubSinglePrPage(createGHPullRequest(comments));
 
             service.syncForRepository(SCOPE_ID, REPO_ID);
@@ -268,15 +259,12 @@ class GitHubPullRequestSyncServiceTest extends BaseUnitTest {
             // Routed through the same processor (and therefore the same issue_comment table) that issue
             // comments use, keyed by the PR's number.
             ArgumentCaptor<GitHubCommentDTO> captor = ArgumentCaptor.forClass(GitHubCommentDTO.class);
-            verify(issueCommentProcessor, org.mockito.Mockito.times(2)).process(
-                captor.capture(),
-                eq(PR_NUMBER),
-                any(ProcessingContext.class)
-            );
+            verify(issueCommentProcessor, org.mockito.Mockito.times(2))
+                    .process(captor.capture(), eq(PR_NUMBER), any(ProcessingContext.class));
             assertThat(captor.getAllValues()).extracting(GitHubCommentDTO::id).containsExactly(1001L, 1002L);
             assertThat(captor.getAllValues())
-                .extracting(GitHubCommentDTO::body)
-                .containsExactly("first conversation comment", "second");
+                    .extracting(GitHubCommentDTO::body)
+                    .containsExactly("first conversation comment", "second");
         }
 
         @Test
@@ -287,11 +275,10 @@ class GitHubPullRequestSyncServiceTest extends BaseUnitTest {
             when(pullRequestRepository.findByIdWithRepository(PR_ID)).thenReturn(Optional.of(entity));
 
             GHIssueCommentConnection comments = createCommentConnection(
-                List.of(createGHComment(1001L, "embedded")),
-                25, // more than the embedded page of 10
-                true,
-                "cursor-page-1"
-            );
+                    List.of(createGHComment(1001L, "embedded")),
+                    25, // more than the embedded page of 10
+                    true,
+                    "cursor-page-1");
             stubSinglePrPage(createGHPullRequest(comments));
 
             service.syncForRepository(SCOPE_ID, REPO_ID);
@@ -307,12 +294,8 @@ class GitHubPullRequestSyncServiceTest extends BaseUnitTest {
             when(pullRequestProcessor.process(any(), any())).thenReturn(entity);
             when(issueCommentProcessor.process(any(), eq(PR_NUMBER), any())).thenReturn(new IssueComment());
 
-            GHIssueCommentConnection comments = createCommentConnection(
-                List.of(createGHComment(1001L, "only comment")),
-                1,
-                false,
-                "cursor-end"
-            );
+            GHIssueCommentConnection comments =
+                    createCommentConnection(List.of(createGHComment(1001L, "only comment")), 1, false, "cursor-end");
             stubSinglePrPage(createGHPullRequest(comments));
 
             service.syncForRepository(SCOPE_ID, REPO_ID);

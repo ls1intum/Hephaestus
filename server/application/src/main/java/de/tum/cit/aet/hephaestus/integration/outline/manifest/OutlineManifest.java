@@ -49,12 +49,13 @@ public class OutlineManifest implements IntegrationManifest {
     @Override
     public ReviewContribution reviewContribution() {
         return new ReviewContribution(
-            Set.of(DocsSignals.DOCUMENT),
-            Map.of(
-                DocsSignals.DOCUMENT,
-                Set.of(DocsSignals.DOCUMENT_PUBLISHED, DocsSignals.DOCUMENT_UPDATED, DocsSignals.DOCUMENT_ARCHIVED)
-            ),
-            Map.of()
-        );
+                Set.of(DocsSignals.DOCUMENT),
+                Map.of(
+                        DocsSignals.DOCUMENT,
+                        Set.of(
+                                DocsSignals.DOCUMENT_PUBLISHED,
+                                DocsSignals.DOCUMENT_UPDATED,
+                                DocsSignals.DOCUMENT_ARCHIVED)),
+                Map.of());
     }
 }

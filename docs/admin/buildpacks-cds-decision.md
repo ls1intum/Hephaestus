@@ -1,7 +1,6 @@
 ---
 id: buildpacks-cds-decision
 title: Server image build via Paketo Buildpacks + Application CDS
-sidebar_position: 4
 description: How and why the application-server image is built with Paketo Cloud Native Buildpacks + Application CDS, and the Java 25 + JEP 483 migration path.
 ---
 
@@ -21,7 +20,9 @@ The training run boots under the `cds-training` profile (`application-cds-traini
 
 ## Why not Spring AOT processing (`spring.aot.enabled=true`)
 
-AOT processing evaluates `@Conditional` at **build time**, baking the build-time environment into the image ([reference](https://docs.spring.io/spring-boot/reference/packaging/aot.html)). The codebase has ~70 `@ConditionalOn*` sites (Sentry, Slack, PostHog, Resilience4j, etc.) that depend on env vars intentionally absent in CI — enabling AOT now would silently drop those beans from the production image. Revisit when the JDK move to Java 25 LTS lands (epic #1096); [JEP 483 AOT cache](https://openjdk.org/jeps/483) then supersedes CDS via `BP_JVM_AOTCACHE_ENABLED=true`.
+AOT evaluates conditional bean registration at build time. Hephaestus selects integrations and runtime roles from
+deployment configuration, so an image built in CI cannot safely fix those choices without omitting beans needed in
+production. CDS preserves runtime configuration while improving startup.
 
 ## Why not GraalVM Native Image
 
@@ -64,8 +65,6 @@ Revert `.github/workflows/ci-docker-build.yml` (the `use-buildpacks: true` line)
 
 - **Coolify graceful shutdown** — `application.yml` sets `SHUTDOWN_TIMEOUT:20s`. Coolify's default container stop-grace is 10s; bump it to ≥25s in the deploy substrate so SIGTERM has time to drain in-flight requests. The Paketo launcher `exec`s the JVM; signal forwarding is native, no `tini`.
 - **JVM memory** — do NOT set `MaxRAMPercentage`, `-Xmx`, or `-Xss` in Coolify env. Paketo's memory calculator handles them. Override only `BPL_JVM_HEAD_ROOM` if needed.
-- **SBOM** — Paketo emits Syft + SPDX + CycloneDX at `/layers/sbom/`. CI extracts via `pack sbom download` and uploads as a 90-day artifact.
-- **CVE scan** — Trivy runs on every PR and uploads SARIF to GitHub Security. Until the baseline is clean, results are non-blocking; flip `--exit-code 1` in the workflow once HIGH+ is at zero.
 - **CI build time** — expect +60–120s per build vs the prior Dockerfile baseline (CDS training run dominates).
 
 ## Sources

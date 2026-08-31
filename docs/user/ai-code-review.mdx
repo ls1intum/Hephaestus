@@ -1,6 +1,5 @@
 ---
 id: ai-code-review
-sidebar_position: 4
 title: Practice feedback
 description: How Hephaestus reviews pull requests, merge requests, and issues for engineering practices.
 ---
@@ -52,6 +51,10 @@ When the review produces a public summary, it can include:
 - an explanation of why the practice matters and what to try next
 
 When Hephaestus finds a clear positive practice, the summary can name it. This is feedback on the practice, not an approval of the change.
+
+If new commits trigger another review, Hephaestus posts a new summary that can describe what was resolved,
+what remains, and what is new. The earlier review stays unchanged, so the conversation keeps an honest
+history instead of rewriting feedback people may already have read or answered.
 
 ### Read inline comments
 

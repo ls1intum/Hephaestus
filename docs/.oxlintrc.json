@@ -5,15 +5,7 @@
 	// and a Docusaurus site is not held to them.
 	"jsPlugins": ["../webapp/tools/oxlint/index.ts"],
 
-	"plugins": [
-		"typescript",
-		"unicorn",
-		"oxc",
-		"import",
-		"react",
-		"jsx-a11y",
-		"promise"
-	],
+	"plugins": ["typescript", "unicorn", "oxc", "import", "react", "jsx-a11y", "promise"],
 	"categories": {
 		"correctness": "error",
 		"suspicious": "error",
@@ -32,10 +24,7 @@
 			"version": "19.2"
 		}
 	},
-	"ignorePatterns": [
-		"build/**",
-		".docusaurus/**"
-	],
+	"ignorePatterns": ["build/**", ".docusaurus/**"],
 	"rules": {
 		"no-else-return": "error",
 		"prefer-const": "error",
@@ -286,9 +275,7 @@
 		"import/no-unassigned-import": [
 			"error",
 			{
-				"allow": [
-					"**/*.css"
-				]
+				"allow": ["**/*.css"]
 			}
 		],
 		"no-unused-vars": [

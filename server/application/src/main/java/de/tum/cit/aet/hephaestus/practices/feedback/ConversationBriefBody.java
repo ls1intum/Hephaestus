@@ -28,22 +28,20 @@ public final class ConversationBriefBody {
      * @param alreadySaid where this has already been put to the developer, and what has moved without help
      */
     public record Brief(
-        String title,
-        String situation,
-        String capability,
-        String evidenceSummary,
-        String inConversationSignal,
-        @Nullable String alreadySaid
-    ) {}
+            String title,
+            String situation,
+            String capability,
+            String evidenceSummary,
+            String inConversationSignal,
+            @Nullable String alreadySaid) {}
 
     public static String render(
-        String title,
-        String situation,
-        String capability,
-        String evidenceSummary,
-        String inConversationSignal,
-        @Nullable String alreadySaid
-    ) {
+            String title,
+            String situation,
+            String capability,
+            String evidenceSummary,
+            String inConversationSignal,
+            @Nullable String alreadySaid) {
         ObjectNode node = MAPPER.createObjectNode();
         node.put("kind", KIND);
         node.put("title", title);
@@ -69,23 +67,15 @@ public final class ConversationBriefBody {
         String capability = text(node, "capability");
         String evidenceSummary = text(node, "evidenceSummary");
         String inConversationSignal = text(node, "inConversationSignal");
-        if (
-            title == null ||
-            situation == null ||
-            capability == null ||
-            evidenceSummary == null ||
-            inConversationSignal == null
-        ) {
+        if (title == null
+                || situation == null
+                || capability == null
+                || evidenceSummary == null
+                || inConversationSignal == null) {
             return null;
         }
         return new Brief(
-            title,
-            situation,
-            capability,
-            evidenceSummary,
-            inConversationSignal,
-            text(node, "alreadySaid")
-        );
+                title, situation, capability, evidenceSummary, inConversationSignal, text(node, "alreadySaid"));
     }
 
     public static boolean isBrief(@Nullable String body) {

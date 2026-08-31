@@ -5,22 +5,21 @@ import org.jspecify.annotations.NonNull;
 
 /** Immutable leaderboard XP + activity breakdown for a single user. Use {@link Builder} to hydrate from multiple projections. */
 public record LeaderboardUserXp(
-    @NonNull User user,
-    int totalScore,
-    int eventCount,
-    int approvals,
-    int changeRequests,
-    int comments,
-    int unknowns,
-    int codeComments,
-    int reviewedPrCount,
-    int ownReplies,
-    int openPullRequests,
-    int mergedPullRequests,
-    int closedPullRequests,
-    int openedIssues,
-    int closedIssues
-) {
+        @NonNull User user,
+        int totalScore,
+        int eventCount,
+        int approvals,
+        int changeRequests,
+        int comments,
+        int unknowns,
+        int codeComments,
+        int reviewedPrCount,
+        int ownReplies,
+        int openPullRequests,
+        int mergedPullRequests,
+        int closedPullRequests,
+        int openedIssues,
+        int closedIssues) {
     public static final class Builder {
 
         private final User user;
@@ -107,22 +106,21 @@ public record LeaderboardUserXp(
 
         public LeaderboardUserXp build() {
             return new LeaderboardUserXp(
-                user,
-                totalScore,
-                eventCount,
-                approvals,
-                changeRequests,
-                comments,
-                unknowns,
-                codeComments,
-                reviewedPrCount,
-                ownReplies,
-                openPullRequests,
-                mergedPullRequests,
-                closedPullRequests,
-                openedIssues,
-                closedIssues
-            );
+                    user,
+                    totalScore,
+                    eventCount,
+                    approvals,
+                    changeRequests,
+                    comments,
+                    unknowns,
+                    codeComments,
+                    reviewedPrCount,
+                    ownReplies,
+                    openPullRequests,
+                    mergedPullRequests,
+                    closedPullRequests,
+                    openedIssues,
+                    closedIssues);
         }
     }
 }

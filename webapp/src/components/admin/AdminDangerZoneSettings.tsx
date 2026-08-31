@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
+
 import { listWorkspacesQueryKey, purgeWorkspaceMutation } from "@/api/@tanstack/react-query.gen";
 import type { ListWorkspacesResponse } from "@/api/types.gen";
 import { Button } from "@/components/ui/button";
@@ -9,6 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { workspaceMembershipQueryOptions } from "@/integrations/auth/guard";
 import { problemDetailOf } from "@/lib/problem-detail";
+
 import { DeleteWorkspaceAlertDialog } from "./DeleteWorkspaceAlertDialog";
 
 export interface AdminDangerZoneSettingsProps {

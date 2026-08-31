@@ -56,15 +56,17 @@ public class PiRuntimeFactory {
 
         inputFiles.put(SandboxLayout.PI_AGENT_PREFIX + "settings.json", buildPiSettingsJson(spec.upstreamModelId()));
         inputFiles.put(SandboxLayout.PROVIDER_CONFIG_FILENAME, buildProviderConfigJson(spec));
+        inputFiles.put(
+                SandboxLayout.NODE_PACKAGE_JSON_FILENAME,
+                "{\"type\":\"module\"}\n".getBytes(java.nio.charset.StandardCharsets.UTF_8));
 
         // Digested as the run's prompt version, so settings.json and pi-provider.json stay out: they
         // vary by model, which the job's config snapshot already pins.
         Map<String, byte[]> promptScaffolding = new LinkedHashMap<>();
         promptScaffolding.put(SandboxLayout.ORCHESTRATOR_PATH, loadClasspathResource("pi-orchestrator.md"));
         promptScaffolding.put(
-            SandboxLayout.RUNNER_SCRIPT_FILENAME,
-            loadClasspathResource(spec.runnerProfile().runnerScript())
-        );
+                SandboxLayout.RUNNER_SCRIPT_FILENAME,
+                loadClasspathResource(spec.runnerProfile().runnerScript()));
         for (String sidecar : spec.runnerProfile().sidecarScripts()) {
             promptScaffolding.put(sidecar, loadClasspathResource(sidecar));
         }
@@ -93,39 +95,32 @@ public class PiRuntimeFactory {
         if (precomputeStep == null || jobToken == null) {
             throw new IllegalStateException("validated Pi plan contains null fields");
         }
-        String command =
-            "mkdir -p " +
-            SandboxLayout.OUTPUT_PATH +
-            " /home/agent/.config /home/agent/.local/tmp && " +
-            // The runner imports the Pi SDK by bare specifier, which resolves from <workspace>/node_modules,
-            // so the SDK the image exposes at /opt/pi-sdk must be symlinked into place.
-            "ln -sf /opt/pi-sdk/node_modules " +
-            workspaceRoot +
-            "/node_modules && " +
-            precomputeStep +
-            runtimeEnvFragment +
-            "bun " +
-            runtimeFlagsFragment +
-            workspaceRoot +
-            "/" +
-            SandboxLayout.RUNNER_SCRIPT_FILENAME;
+        String command = "mkdir -p " + SandboxLayout.OUTPUT_PATH
+                + " /home/agent/.config /home/agent/.local/tmp && "
+                +
+                // The runner imports the Pi SDK by bare specifier, which resolves from <workspace>/node_modules,
+                // so the SDK the image exposes at /opt/pi-sdk must be symlinked into place.
+                "ln -sf /opt/pi-sdk/node_modules "
+                + workspaceRoot
+                + "/node_modules && "
+                + precomputeStep
+                + runtimeEnvFragment
+                + "node "
+                + runtimeFlagsFragment
+                + workspaceRoot
+                + "/"
+                + SandboxLayout.RUNNER_SCRIPT_FILENAME;
 
         NetworkPolicy networkPolicy = buildNetworkPolicy(jobToken, spec.allowInternet());
 
         log.debug(
-            "Built Pi plan: timeout={}s, apiProtocol={}, model={}, files={}",
-            spec.timeoutSeconds(),
-            spec.apiProtocol(),
-            spec.upstreamModelId(),
-            inputFiles.size()
-        );
+                "Built Pi plan: timeout={}s, apiProtocol={}, model={}, files={}",
+                spec.timeoutSeconds(),
+                spec.apiProtocol(),
+                spec.upstreamModelId(),
+                inputFiles.size());
         return new PiPlan(
-            List.of("sh", "-c", command),
-            Map.copyOf(env),
-            Map.copyOf(inputFiles),
-            networkPolicy,
-            promptDigest
-        );
+                List.of("sh", "-c", command), Map.copyOf(env), Map.copyOf(inputFiles), networkPolicy, promptDigest);
     }
 
     private static String renderRuntimeFlags(List<String> flags) {
@@ -213,12 +208,11 @@ public class PiRuntimeFactory {
      * @param promptDigest digest of the prompt scaffolding — the run's prompt version
      */
     public record PiPlan(
-        List<String> command,
-        Map<String, String> environment,
-        Map<String, byte[]> inputFiles,
-        NetworkPolicy networkPolicy,
-        String promptDigest
-    ) {
+            List<String> command,
+            Map<String, String> environment,
+            Map<String, byte[]> inputFiles,
+            NetworkPolicy networkPolicy,
+            String promptDigest) {
         public PiPlan {
             command = List.copyOf(Objects.requireNonNull(command, "command"));
             environment = Map.copyOf(Objects.requireNonNull(environment, "environment"));

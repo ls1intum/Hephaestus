@@ -2,7 +2,6 @@ package de.tum.cit.aet.hephaestus.agent.job;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
@@ -66,12 +65,11 @@ class PracticeReviewSummaryControllerIntegrationTest extends AbstractWorkspaceIn
     @BeforeEach
     void setUpWorkspaces() {
         workspace = createWorkspace(
-            "review-summary",
-            "Review summary",
-            "review-summary-org",
-            AccountType.ORG,
-            persistUser("review-summary-owner")
-        );
+                "review-summary",
+                "Review summary",
+                "review-summary-org",
+                AccountType.ORG,
+                persistUser("review-summary-owner"));
         ensureAdminMembership(workspace);
         ensureWorkspaceMembership(workspace, persistUser("testuser"), WorkspaceMembership.WorkspaceRole.MEMBER);
         subject = persistUser("review-summary-subject");
@@ -80,12 +78,11 @@ class PracticeReviewSummaryControllerIntegrationTest extends AbstractWorkspaceIn
         job = persistJob(workspace, AgentPurpose.PRACTICE_REVIEW);
 
         otherWorkspace = createWorkspace(
-            "other-review-summary",
-            "Other review summary",
-            "other-review-summary-org",
-            AccountType.ORG,
-            persistUser("other-review-summary-owner")
-        );
+                "other-review-summary",
+                "Other review summary",
+                "other-review-summary-org",
+                AccountType.ORG,
+                persistUser("other-review-summary-owner"));
     }
 
     @Test
@@ -93,22 +90,17 @@ class PracticeReviewSummaryControllerIntegrationTest extends AbstractWorkspaceIn
     void summarizesOnlyCompletedPracticeReviewsFromTheRequestedWorkspace() {
         job.setStatus(AgentJobStatus.COMPLETED);
         job.setIntegrationKind(IntegrationKind.GITHUB);
-        job.setMetadata(
-            objectMapper.valueToTree(
-                Map.of(
-                    "pull_request_id",
-                    7,
-                    "pr_number",
-                    42,
-                    "title",
-                    "Make review output visible",
-                    "repository_full_name",
-                    "review-summary-org/review-ui",
-                    "pr_url",
-                    "https://github.com/review-summary-org/review-ui/pull/42"
-                )
-            )
-        );
+        job.setMetadata(objectMapper.valueToTree(Map.of(
+                "pull_request_id",
+                7,
+                "pr_number",
+                42,
+                "title",
+                "Make review output visible",
+                "repository_full_name",
+                "review-summary-org/review-ui",
+                "pr_url",
+                "https://github.com/review-summary-org/review-ui/pull/42")));
         jobRepository.save(job);
         persistJob(workspace, AgentPurpose.PRACTICE_REVIEW);
         AgentJob mentorJob = persistJob(workspace, AgentPurpose.MENTOR);
@@ -128,47 +120,47 @@ class PracticeReviewSummaryControllerIntegrationTest extends AbstractWorkspaceIn
         persistFeedback(4, FeedbackDeliveryState.FAILED, null, "Failed");
 
         webTestClient
-            .get()
-            .uri("/workspaces/{slug}/practices/reviews?status=COMPLETED&size=1", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.page.totalElements")
-            .isEqualTo(1)
-            .jsonPath("$.content[0].id")
-            .isEqualTo(job.getId().toString())
-            .jsonPath("$.content[0].target.type")
-            .isEqualTo("scm.pull_request")
-            .jsonPath("$.content[0].target.id")
-            .isEqualTo(7)
-            .jsonPath("$.content[0].target.provider")
-            .isEqualTo("GITHUB")
-            .jsonPath("$.content[0].target.number")
-            .isEqualTo(42)
-            .jsonPath("$.content[0].target.title")
-            .isEqualTo("Make review output visible")
-            .jsonPath("$.content[0].target.repositoryName")
-            .isEqualTo("review-summary-org/review-ui")
-            .jsonPath("$.content[0].target.url")
-            .isEqualTo("https://github.com/review-summary-org/review-ui/pull/42")
-            .jsonPath("$.content[0].observations.strengths")
-            .isEqualTo(1)
-            .jsonPath("$.content[0].observations.problems")
-            .isEqualTo(1)
-            .jsonPath("$.content[0].observations.notApplicable")
-            .isEqualTo(1)
-            .jsonPath("$.content[0].feedback.prepared")
-            .isEqualTo(1)
-            .jsonPath("$.content[0].feedback.delivered")
-            .isEqualTo(1)
-            .jsonPath("$.content[0].feedback.superseded")
-            .isEqualTo(1)
-            .jsonPath("$.content[0].feedback.suppressed")
-            .isEqualTo(1)
-            .jsonPath("$.content[0].feedback.failed")
-            .isEqualTo(1);
+                .get()
+                .uri("/workspaces/{slug}/practices/reviews?status=COMPLETED&size=1", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.page.totalElements")
+                .isEqualTo(1)
+                .jsonPath("$.content[0].id")
+                .isEqualTo(job.getId().toString())
+                .jsonPath("$.content[0].target.type")
+                .isEqualTo("scm.pull_request")
+                .jsonPath("$.content[0].target.id")
+                .isEqualTo(7)
+                .jsonPath("$.content[0].target.provider")
+                .isEqualTo("GITHUB")
+                .jsonPath("$.content[0].target.number")
+                .isEqualTo(42)
+                .jsonPath("$.content[0].target.title")
+                .isEqualTo("Make review output visible")
+                .jsonPath("$.content[0].target.repositoryName")
+                .isEqualTo("review-summary-org/review-ui")
+                .jsonPath("$.content[0].target.url")
+                .isEqualTo("https://github.com/review-summary-org/review-ui/pull/42")
+                .jsonPath("$.content[0].observations.strengths")
+                .isEqualTo(1)
+                .jsonPath("$.content[0].observations.problems")
+                .isEqualTo(1)
+                .jsonPath("$.content[0].observations.notApplicable")
+                .isEqualTo(1)
+                .jsonPath("$.content[0].feedback.prepared")
+                .isEqualTo(1)
+                .jsonPath("$.content[0].feedback.delivered")
+                .isEqualTo(1)
+                .jsonPath("$.content[0].feedback.superseded")
+                .isEqualTo(1)
+                .jsonPath("$.content[0].feedback.suppressed")
+                .isEqualTo(1)
+                .jsonPath("$.content[0].feedback.failed")
+                .isEqualTo(1);
     }
 
     @Test
@@ -186,44 +178,41 @@ class PracticeReviewSummaryControllerIntegrationTest extends AbstractWorkspaceIn
         jobRepository.save(elsewhere);
 
         webTestClient
-            .get()
-            .uri("/workspaces/{slug}/practices/reviews/evidence-outcomes", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.length()")
-            .isEqualTo(1)
-            .jsonPath("$[0].practiceSlug")
-            .isEqualTo(practice.getSlug())
-            .jsonPath("$[0].consideredReviews")
-            .isEqualTo(2)
-            .jsonPath("$[0].reviewedCount")
-            .isEqualTo(1)
-            .jsonPath("$[0].blockersObserved[0].sourceKind")
-            .isEqualTo("scm.pull-request.diff")
-            .jsonPath("$[0].blockersObserved[0].reasonCode")
-            .isEqualTo("SOURCE_EMPTY")
-            .jsonPath("$[0].blockersObserved[0].reviewsAffected")
-            .isEqualTo(1);
+                .get()
+                .uri("/workspaces/{slug}/practices/reviews/evidence-outcomes", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.length()")
+                .isEqualTo(1)
+                .jsonPath("$[0].practiceSlug")
+                .isEqualTo(practice.getSlug())
+                .jsonPath("$[0].consideredReviews")
+                .isEqualTo(2)
+                .jsonPath("$[0].reviewedCount")
+                .isEqualTo(1)
+                .jsonPath("$[0].blockersObserved[0].sourceKind")
+                .isEqualTo("scm.pull-request.diff")
+                .jsonPath("$[0].blockersObserved[0].reasonCode")
+                .isEqualTo("SOURCE_EMPTY")
+                .jsonPath("$[0].blockersObserved[0].reviewsAffected")
+                .isEqualTo(1);
     }
 
     /** One readiness report as the executor records it, for one practice, ready or skipped. */
     private tools.jackson.databind.JsonNode readinessSnapshot(boolean ready) {
         Map<String, Object> check = Map.of(
-            "sourceKind",
-            "scm.pull-request.diff",
-            "meetsRequirements",
-            ready,
-            "reasonCodes",
-            ready ? List.of() : List.of("SOURCE_EMPTY")
-        );
-        return objectMapper.valueToTree(
-            Map.of(
+                "sourceKind",
+                "scm.pull-request.diff",
+                "meetsRequirements",
+                ready,
+                "reasonCodes",
+                ready ? List.of() : List.of("SOURCE_EMPTY"));
+        return objectMapper.valueToTree(Map.of(
                 "decisions",
-                List.of(
-                    Map.of(
+                List.of(Map.of(
                         "practiceSlug",
                         practice.getSlug(),
                         "ready",
@@ -231,11 +220,7 @@ class PracticeReviewSummaryControllerIntegrationTest extends AbstractWorkspaceIn
                         "reasonCodes",
                         List.of(),
                         "sourceChecks",
-                        List.of(check)
-                    )
-                )
-            )
-        );
+                        List.of(check)))));
     }
 
     /**
@@ -259,34 +244,34 @@ class PracticeReviewSummaryControllerIntegrationTest extends AbstractWorkspaceIn
         listReviews("").jsonPath("$.page.totalElements").isEqualTo(4);
 
         listReviews("?from=2026-03-10T00:00:00Z&to=2026-03-12T00:00:00Z")
-            .jsonPath("$.page.totalElements")
-            .isEqualTo(2)
-            .jsonPath("$.content[0].id")
-            .isEqualTo(insideButFailed.getId().toString())
-            .jsonPath("$.content[1].id")
-            .isEqualTo(onLowerBound.getId().toString());
+                .jsonPath("$.page.totalElements")
+                .isEqualTo(2)
+                .jsonPath("$.content[0].id")
+                .isEqualTo(insideButFailed.getId().toString())
+                .jsonPath("$.content[1].id")
+                .isEqualTo(onLowerBound.getId().toString());
 
         listReviews("?status=COMPLETED&from=2026-03-10T00:00:00Z&to=2026-03-12T00:00:00Z")
-            .jsonPath("$.page.totalElements")
-            .isEqualTo(1)
-            .jsonPath("$.content[0].id")
-            .isEqualTo(onLowerBound.getId().toString());
+                .jsonPath("$.page.totalElements")
+                .isEqualTo(1)
+                .jsonPath("$.content[0].id")
+                .isEqualTo(onLowerBound.getId().toString());
 
         listReviews("?from=2026-03-10T00:00:00Z")
-            .jsonPath("$.page.totalElements")
-            .isEqualTo(3)
-            .jsonPath("$.content[0].id")
-            .isEqualTo(onUpperBound.getId().toString())
-            .jsonPath("$.content[2].id")
-            .isEqualTo(onLowerBound.getId().toString());
+                .jsonPath("$.page.totalElements")
+                .isEqualTo(3)
+                .jsonPath("$.content[0].id")
+                .isEqualTo(onUpperBound.getId().toString())
+                .jsonPath("$.content[2].id")
+                .isEqualTo(onLowerBound.getId().toString());
 
         listReviews("?to=2026-03-12T00:00:00Z")
-            .jsonPath("$.page.totalElements")
-            .isEqualTo(3)
-            .jsonPath("$.content[0].id")
-            .isEqualTo(insideButFailed.getId().toString())
-            .jsonPath("$.content[2].id")
-            .isEqualTo(justBefore.getId().toString());
+                .jsonPath("$.page.totalElements")
+                .isEqualTo(3)
+                .jsonPath("$.content[0].id")
+                .isEqualTo(insideButFailed.getId().toString())
+                .jsonPath("$.content[2].id")
+                .isEqualTo(justBefore.getId().toString());
     }
 
     /** A backwards window is a mistake, not an empty page — the siblings answer it the same way. */
@@ -294,33 +279,32 @@ class PracticeReviewSummaryControllerIntegrationTest extends AbstractWorkspaceIn
     @WithAdminUser
     void rejectsAWindowThatEndsBeforeItStarts() {
         webTestClient
-            .get()
-            .uri(
-                "/workspaces/{slug}/practices/reviews?from=2026-03-12T00:00:00Z&to=2026-03-10T00:00:00Z",
-                workspace.getWorkspaceSlug()
-            )
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isBadRequest()
-            .expectHeader()
-            .contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON)
-            .expectBody()
-            .jsonPath("$.status")
-            .isEqualTo(400)
-            .jsonPath("$.detail")
-            .isEqualTo("from must not be after to");
+                .get()
+                .uri(
+                        "/workspaces/{slug}/practices/reviews?from=2026-03-12T00:00:00Z&to=2026-03-10T00:00:00Z",
+                        workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isBadRequest()
+                .expectHeader()
+                .contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON)
+                .expectBody()
+                .jsonPath("$.status")
+                .isEqualTo(400)
+                .jsonPath("$.detail")
+                .isEqualTo("from must not be after to");
     }
 
     private WebTestClient.BodyContentSpec listReviews(String query) {
         return webTestClient
-            .get()
-            .uri("/workspaces/{slug}/practices/reviews" + query, workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody();
+                .get()
+                .uri("/workspaces/{slug}/practices/reviews" + query, workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody();
     }
 
     /** {@code createdAt} is only defaulted when unset, so a review can be seeded at a chosen instant. */
@@ -339,12 +323,12 @@ class PracticeReviewSummaryControllerIntegrationTest extends AbstractWorkspaceIn
     @WithUser
     void rejectsAWorkspaceMember() {
         webTestClient
-            .get()
-            .uri("/workspaces/{slug}/practices/reviews", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isForbidden();
+                .get()
+                .uri("/workspaces/{slug}/practices/reviews", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isForbidden();
     }
 
     private Practice persistPractice(Workspace targetWorkspace) {
@@ -369,41 +353,35 @@ class PracticeReviewSummaryControllerIntegrationTest extends AbstractWorkspaceIn
     }
 
     private void insertObservation(
-        String title,
-        String presence,
-        @Nullable String assessment,
-        @Nullable String severity
-    ) {
+            String title, String presence, @Nullable String assessment, @Nullable String severity) {
         UUID id = UUID.randomUUID();
         observationRepository.insertIfAbsent(
-            id,
-            "summary-" + id,
-            job.getId(),
-            practice.getId(),
-            null,
-            ArtifactKinds.PULL_REQUEST.value(),
-            7L,
-            subject.getId(),
-            title,
-            presence,
-            assessment,
-            severity,
-            "{}",
-            "Reasoning",
-            "summary-" + title,
-            Instant.now(),
-            "LIVE"
-        );
+                id,
+                "summary-" + id,
+                job.getId(),
+                job.getWorkspace().getId(),
+                practice.getId(),
+                null,
+                ArtifactKinds.PULL_REQUEST.value(),
+                7L,
+                subject.getId(),
+                title,
+                presence,
+                assessment,
+                severity,
+                "{}",
+                "Reasoning",
+                "summary-" + title,
+                Instant.now(),
+                "LIVE");
     }
 
     private void persistFeedback(
-        int position,
-        FeedbackDeliveryState state,
-        @Nullable FeedbackSuppressionReason reason,
-        @Nullable String body
-    ) {
-        feedbackRepository.save(
-            Feedback.builder()
+            int position,
+            FeedbackDeliveryState state,
+            @Nullable FeedbackSuppressionReason reason,
+            @Nullable String body) {
+        feedbackRepository.save(Feedback.builder()
                 .agentJobId(job.getId())
                 .workspaceId(workspace.getId())
                 .artifactKind(ArtifactKinds.PULL_REQUEST)
@@ -418,11 +396,9 @@ class PracticeReviewSummaryControllerIntegrationTest extends AbstractWorkspaceIn
                 .source(FeedbackSource.AGENT)
                 .createdAt(Instant.now())
                 .deliveredAt(
-                    state == FeedbackDeliveryState.DELIVERED || state == FeedbackDeliveryState.SUPERSEDED
-                        ? Instant.now()
-                        : null
-                )
-                .build()
-        );
+                        state == FeedbackDeliveryState.DELIVERED || state == FeedbackDeliveryState.SUPERSEDED
+                                ? Instant.now()
+                                : null)
+                .build());
     }
 }

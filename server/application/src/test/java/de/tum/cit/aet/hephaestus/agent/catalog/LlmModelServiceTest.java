@@ -82,12 +82,10 @@ class LlmModelServiceTest extends BaseUnitTest {
     private void stubModelSavePassthrough() {
         // create()/update() flush synchronously; updateSharing() never touches upstream_model_id and
         // still calls plain save().
+        lenient().when(modelRepository.save(any(LlmModel.class))).thenAnswer(invocation -> invocation.getArgument(0));
         lenient()
-            .when(modelRepository.save(any(LlmModel.class)))
-            .thenAnswer(invocation -> invocation.getArgument(0));
-        lenient()
-            .when(modelRepository.saveAndFlush(any(LlmModel.class)))
-            .thenAnswer(invocation -> invocation.getArgument(0));
+                .when(modelRepository.saveAndFlush(any(LlmModel.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
     }
 
     private static @org.jspecify.annotations.Nullable BigDecimal rate(@org.jspecify.annotations.Nullable String value) {
@@ -96,13 +94,7 @@ class LlmModelServiceTest extends BaseUnitTest {
 
     private UpdateLlmModelPriceRequestDTO pricedRequest(String input, String output) {
         return new UpdateLlmModelPriceRequestDTO(
-            PricingMode.PRICED,
-            new BigDecimal(input),
-            new BigDecimal(output),
-            null,
-            null,
-            null
-        );
+                PricingMode.PRICED, new BigDecimal(input), new BigDecimal(output), null, null, null);
     }
 
     @Nested
@@ -134,9 +126,8 @@ class LlmModelServiceTest extends BaseUnitTest {
             open.setPer1mInputUsd(new BigDecimal("1.00"));
             open.setPer1mOutputUsd(new BigDecimal("2.00"));
             when(priceRepository.findByModelIdAndEffectiveToIsNull(7L)).thenReturn(Optional.of(open));
-            when(priceRepository.saveAndFlush(any(LlmModelPrice.class))).thenAnswer(invocation ->
-                invocation.getArgument(0)
-            );
+            when(priceRepository.saveAndFlush(any(LlmModelPrice.class)))
+                    .thenAnswer(invocation -> invocation.getArgument(0));
             when(priceRepository.save(any(LlmModelPrice.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
             modelService.updatePrice(7L, pricedRequest("3.00", "9.00"));
@@ -163,36 +154,28 @@ class LlmModelServiceTest extends BaseUnitTest {
 
         @ParameterizedTest(name = "{5}")
         @CsvSource(
-            nullValues = "NULL",
-            value = {
-                "PRICED, 3.00, NULL, NULL, an input rate and an output rate, a price missing its output rate",
-                "PRICED, -1.00, 2.00, NULL, zero or greater, a negative rate",
-                "PRICED, 0, 0, NULL, choose Free instead, an all-zero price that would bill as verified $0 forever",
-                "NO_CHARGE, NULL, NULL, NULL, note, a free model with no explanation",
-                "UNPRICED, 1.00, NULL, NULL, clear them or set a price, rates carried by a model with no price",
-            }
-        )
+                nullValues = "NULL",
+                value = {
+                    "PRICED, 3.00, NULL, NULL, an input rate and an output rate, a price missing its output rate",
+                    "PRICED, -1.00, 2.00, NULL, zero or greater, a negative rate",
+                    "PRICED, 0, 0, NULL, choose Free instead, an all-zero price that would bill as verified $0 forever",
+                    "NO_CHARGE, NULL, NULL, NULL, note, a free model with no explanation",
+                    "UNPRICED, 1.00, NULL, NULL, clear them or set a price, rates carried by a model with no price",
+                })
         void updatePriceRejectsAnInvalidRateCombination(
-            PricingMode pricingMode,
-            String per1mInputUsd,
-            String per1mOutputUsd,
-            String priceNote,
-            String expectedMessage,
-            String why
-        ) {
+                PricingMode pricingMode,
+                String per1mInputUsd,
+                String per1mOutputUsd,
+                String priceNote,
+                String expectedMessage,
+                String why) {
             UpdateLlmModelPriceRequestDTO request = new UpdateLlmModelPriceRequestDTO(
-                pricingMode,
-                rate(per1mInputUsd),
-                rate(per1mOutputUsd),
-                null,
-                null,
-                priceNote
-            );
+                    pricingMode, rate(per1mInputUsd), rate(per1mOutputUsd), null, null, priceNote);
 
             assertThatThrownBy(() -> modelService.updatePrice(7L, request))
-                .as(why)
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining(expectedMessage);
+                    .as(why)
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining(expectedMessage);
             verify(priceRepository, never()).save(any());
         }
 
@@ -201,13 +184,7 @@ class LlmModelServiceTest extends BaseUnitTest {
             when(priceRepository.findByModelIdAndEffectiveToIsNull(7L)).thenReturn(Optional.empty());
             when(priceRepository.save(any(LlmModelPrice.class))).thenAnswer(invocation -> invocation.getArgument(0));
             UpdateLlmModelPriceRequestDTO request = new UpdateLlmModelPriceRequestDTO(
-                PricingMode.PRICED,
-                BigDecimal.ZERO,
-                new BigDecimal("9.00"),
-                null,
-                null,
-                null
-            );
+                    PricingMode.PRICED, BigDecimal.ZERO, new BigDecimal("9.00"), null, null, null);
 
             LlmModelPrice result = modelService.updatePrice(7L, request);
 
@@ -219,13 +196,7 @@ class LlmModelServiceTest extends BaseUnitTest {
             when(priceRepository.findByModelIdAndEffectiveToIsNull(7L)).thenReturn(Optional.empty());
             when(priceRepository.save(any(LlmModelPrice.class))).thenAnswer(invocation -> invocation.getArgument(0));
             UpdateLlmModelPriceRequestDTO request = new UpdateLlmModelPriceRequestDTO(
-                PricingMode.NO_CHARGE,
-                null,
-                null,
-                null,
-                null,
-                "Self-hosted, internally funded"
-            );
+                    PricingMode.NO_CHARGE, null, null, null, null, "Self-hosted, internally funded");
 
             LlmModelPrice result = modelService.updatePrice(7L, request);
 
@@ -236,18 +207,12 @@ class LlmModelServiceTest extends BaseUnitTest {
         @Test
         void enabledModelCannotBeRepricedToUnpricedAndExistingPriceStaysOpen() {
             model.setEnabled(true);
-            UpdateLlmModelPriceRequestDTO request = new UpdateLlmModelPriceRequestDTO(
-                PricingMode.UNPRICED,
-                null,
-                null,
-                null,
-                null,
-                null
-            );
+            UpdateLlmModelPriceRequestDTO request =
+                    new UpdateLlmModelPriceRequestDTO(PricingMode.UNPRICED, null, null, null, null, null);
 
             assertThatThrownBy(() -> modelService.updatePrice(7L, request))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Disable the model");
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("Disable the model");
 
             verifyNoInteractions(priceRepository);
         }
@@ -256,9 +221,8 @@ class LlmModelServiceTest extends BaseUnitTest {
         void unknownModelRaisesNotFound() {
             when(modelRepository.findByIdForUpdate(404L)).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> modelService.updatePrice(404L, pricedRequest("1.00", "2.00"))).isInstanceOf(
-                EntityNotFoundException.class
-            );
+            assertThatThrownBy(() -> modelService.updatePrice(404L, pricedRequest("1.00", "2.00")))
+                    .isInstanceOf(EntityNotFoundException.class);
         }
     }
 
@@ -281,15 +245,15 @@ class LlmModelServiceTest extends BaseUnitTest {
             when(grantRepository.findByIdModelId(7L)).thenReturn(List.of());
 
             LlmModel result = modelService.updateSharing(
-                7L,
-                new UpdateLlmModelSharingRequestDTO(ModelVisibility.GRANTED, List.of())
-            );
+                    7L, new UpdateLlmModelSharingRequestDTO(ModelVisibility.GRANTED, List.of()));
 
-            assertThat(result).as("the row that was mutated and saved must be the write-locked one").isSameAs(model);
+            assertThat(result)
+                    .as("the row that was mutated and saved must be the write-locked one")
+                    .isSameAs(model);
             assertThat(model.getVisibility()).isEqualTo(ModelVisibility.GRANTED);
             assertThat(unlockedCopy.getVisibility())
-                .as("the unlocked read must not be the one that gets written")
-                .isEqualTo(ModelVisibility.PUBLIC);
+                    .as("the unlocked read must not be the one that gets written")
+                    .isEqualTo(ModelVisibility.PUBLIC);
         }
 
         @Test
@@ -298,10 +262,8 @@ class LlmModelServiceTest extends BaseUnitTest {
             LlmModelWorkspaceGrant existing = new LlmModelWorkspaceGrant(7L, 1L);
             when(grantRepository.findByIdModelId(7L)).thenReturn(List.of(existing));
 
-            LlmModel result = modelService.updateSharing(
-                7L,
-                new UpdateLlmModelSharingRequestDTO(ModelVisibility.PUBLIC, null)
-            );
+            LlmModel result =
+                    modelService.updateSharing(7L, new UpdateLlmModelSharingRequestDTO(ModelVisibility.PUBLIC, null));
 
             verify(grantRepository).deleteAll(List.of(existing));
             verify(grantRepository, never()).saveAll(anyCollection());
@@ -315,14 +277,12 @@ class LlmModelServiceTest extends BaseUnitTest {
             when(grantRepository.findByIdModelId(7L)).thenReturn(List.of());
             when(workspaceRepository.findAllById(Set.of(1L, 2L))).thenReturn(List.of(workspaceWithId(1L)));
 
-            UpdateLlmModelSharingRequestDTO request = new UpdateLlmModelSharingRequestDTO(
-                ModelVisibility.GRANTED,
-                List.of(1L, 2L)
-            );
+            UpdateLlmModelSharingRequestDTO request =
+                    new UpdateLlmModelSharingRequestDTO(ModelVisibility.GRANTED, List.of(1L, 2L));
 
             assertThatThrownBy(() -> modelService.updateSharing(7L, request))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("2");
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("2");
             verify(grantRepository, never()).deleteAll(anyCollection());
             verify(grantRepository, never()).saveAll(anyCollection());
         }
@@ -333,14 +293,11 @@ class LlmModelServiceTest extends BaseUnitTest {
             LlmModelWorkspaceGrant keep = new LlmModelWorkspaceGrant(7L, 1L);
             LlmModelWorkspaceGrant remove = new LlmModelWorkspaceGrant(7L, 2L);
             when(grantRepository.findByIdModelId(7L)).thenReturn(List.of(keep, remove));
-            when(workspaceRepository.findAllById(Set.of(1L, 3L))).thenReturn(
-                List.of(workspaceWithId(1L), workspaceWithId(3L))
-            );
+            when(workspaceRepository.findAllById(Set.of(1L, 3L)))
+                    .thenReturn(List.of(workspaceWithId(1L), workspaceWithId(3L)));
 
-            UpdateLlmModelSharingRequestDTO request = new UpdateLlmModelSharingRequestDTO(
-                ModelVisibility.GRANTED,
-                List.of(1L, 3L)
-            );
+            UpdateLlmModelSharingRequestDTO request =
+                    new UpdateLlmModelSharingRequestDTO(ModelVisibility.GRANTED, List.of(1L, 3L));
 
             LlmModel result = modelService.updateSharing(7L, request);
 
@@ -353,8 +310,8 @@ class LlmModelServiceTest extends BaseUnitTest {
             ArgumentCaptor<List<LlmModelWorkspaceGrant>> addCaptor = ArgumentCaptor.forClass(List.class);
             verify(grantRepository).saveAll(addCaptor.capture());
             assertThat(addCaptor.getValue())
-                .extracting(grant -> grant.getId().getWorkspaceId())
-                .containsExactly(3L);
+                    .extracting(grant -> grant.getId().getWorkspaceId())
+                    .containsExactly(3L);
 
             assertThat(result.getVisibility()).isEqualTo(ModelVisibility.GRANTED);
         }
@@ -366,13 +323,11 @@ class LlmModelServiceTest extends BaseUnitTest {
             when(grantRepository.findByIdModelId(7L)).thenReturn(List.of(existing));
 
             LlmModel result = modelService.updateSharing(
-                7L,
-                new UpdateLlmModelSharingRequestDTO(ModelVisibility.GRANTED, List.of())
-            );
+                    7L, new UpdateLlmModelSharingRequestDTO(ModelVisibility.GRANTED, List.of()));
 
             assertThat(result.getVisibility())
-                .as("an empty grant list still means GRANTED — shared with nobody, not made public")
-                .isEqualTo(ModelVisibility.GRANTED);
+                    .as("an empty grant list still means GRANTED — shared with nobody, not made public")
+                    .isEqualTo(ModelVisibility.GRANTED);
             verify(workspaceRepository, never()).findAllById(anyCollection());
             verify(grantRepository).deleteAll(List.of(existing));
             verify(grantRepository, never()).saveAll(anyCollection());
@@ -394,8 +349,8 @@ class LlmModelServiceTest extends BaseUnitTest {
             UpdateLlmModelRequestDTO request = new UpdateLlmModelRequestDTO("Renamed", null, null, null, null);
 
             assertThatThrownBy(() -> modelService.update(7L, request))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("configure a price");
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("configure a price");
             verify(modelRepository, never()).saveAndFlush(any());
         }
 
@@ -405,7 +360,8 @@ class LlmModelServiceTest extends BaseUnitTest {
             connection.setId(3L);
             when(connectionRepository.findById(3L)).thenReturn(Optional.of(connection));
             when(modelRepository.findByConnectionIdAndSlug(3L, "gpt-5-eu")).thenReturn(Optional.empty());
-            when(modelRepository.existsByConnectionIdAndUpstreamModelId(3L, "gpt-5")).thenReturn(false);
+            when(modelRepository.existsByConnectionIdAndUpstreamModelId(3L, "gpt-5"))
+                    .thenReturn(false);
             stubModelSavePassthrough();
 
             LlmModel result = modelService.create(3L, createRequest("gpt-5"));
@@ -427,19 +383,12 @@ class LlmModelServiceTest extends BaseUnitTest {
 
         @Test
         void refusesToCreateAModelThatIsAlreadyActive() {
-            CreateLlmModelRequestDTO active = new CreateLlmModelRequestDTO(
-                "gpt-5-eu",
-                "GPT-5 EU",
-                "gpt-5",
-                null,
-                null,
-                null,
-                true
-            );
+            CreateLlmModelRequestDTO active =
+                    new CreateLlmModelRequestDTO("gpt-5-eu", "GPT-5 EU", "gpt-5", null, null, null, true);
 
             assertThatThrownBy(() -> modelService.create(3L, active))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Create the model disabled, set its price, then activate it.");
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("Create the model disabled, set its price, then activate it.");
 
             verify(connectionRepository, never()).findById(any());
             verify(modelRepository, never()).saveAndFlush(any());
@@ -459,21 +408,18 @@ class LlmModelServiceTest extends BaseUnitTest {
             connection.setId(3L);
             when(connectionRepository.findById(3L)).thenReturn(Optional.of(connection));
             when(modelRepository.findByConnectionIdAndSlug(3L, "gpt-5-eu")).thenReturn(Optional.empty());
-            when(modelRepository.existsByConnectionIdAndUpstreamModelId(3L, "gpt-5")).thenReturn(false);
+            when(modelRepository.existsByConnectionIdAndUpstreamModelId(3L, "gpt-5"))
+                    .thenReturn(false);
             when(modelRepository.saveAndFlush(any(LlmModel.class))).thenThrow(upstreamIdConstraintViolation());
 
-            assertThatThrownBy(() -> modelService.create(3L, createRequest("gpt-5"))).isInstanceOf(
-                LlmModelUpstreamIdConflictException.class
-            );
+            assertThatThrownBy(() -> modelService.create(3L, createRequest("gpt-5")))
+                    .isInstanceOf(LlmModelUpstreamIdConflictException.class);
         }
 
         private DataIntegrityViolationException upstreamIdConstraintViolation() {
             org.hibernate.exception.ConstraintViolationException cve =
-                new org.hibernate.exception.ConstraintViolationException(
-                    "duplicate",
-                    null,
-                    "ux_llm_model_connection_upstream"
-                );
+                    new org.hibernate.exception.ConstraintViolationException(
+                            "duplicate", new java.sql.SQLException("duplicate"), "ux_llm_model_connection_upstream");
             return new DataIntegrityViolationException("duplicate", cve);
         }
     }

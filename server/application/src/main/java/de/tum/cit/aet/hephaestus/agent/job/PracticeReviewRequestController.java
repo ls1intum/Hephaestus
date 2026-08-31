@@ -59,44 +59,37 @@ public class PracticeReviewRequestController {
     @PostMapping
     @PreAuthorize("@workspaceSecure.isMember()")
     @Operation(
-        summary = "Ask for a review of a piece of work now",
-        description = "Answers 200 both when a review starts and when one deliberately does not; the " +
-            "body says which, and why. 403 only when the caller has no standing on the artifact.",
-        operationId = "requestPracticeReview"
-    )
+            summary = "Ask for a review of a piece of work now",
+            description = "Answers 200 both when a review starts and when one deliberately does not; the "
+                    + "body says which, and why. 403 only when the caller has no standing on the artifact.",
+            operationId = "requestPracticeReview")
     @ApiResponse(
-        responseCode = "200",
-        description = "The ask was understood: a review is running, or the body names what stopped it",
-        content = @Content(schema = @Schema(implementation = ReviewRequestOutcomeDTO.class))
-    )
+            responseCode = "200",
+            description = "The ask was understood: a review is running, or the body names what stopped it",
+            content = @Content(schema = @Schema(implementation = ReviewRequestOutcomeDTO.class)))
     @ApiResponse(
-        responseCode = "400",
-        description = "The artifact kind is not one that can be asked for",
-        content = @Content(
-            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-            schema = @Schema(implementation = ProblemDetail.class)
-        )
-    )
+            responseCode = "400",
+            description = "The artifact kind is not one that can be asked for",
+            content =
+                    @Content(
+                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetail.class)))
     @ApiResponse(
-        responseCode = "403",
-        description = "The caller is neither the work's author or assignee nor a workspace admin",
-        content = @Content(
-            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-            schema = @Schema(implementation = ProblemDetail.class)
-        )
-    )
+            responseCode = "403",
+            description = "The caller is neither the work's author or assignee nor a workspace admin",
+            content =
+                    @Content(
+                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetail.class)))
     @ApiResponse(
-        responseCode = "404",
-        description = "No such artifact in this workspace",
-        content = @Content(
-            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-            schema = @Schema(implementation = ProblemDetail.class)
-        )
-    )
+            responseCode = "404",
+            description = "No such artifact in this workspace",
+            content =
+                    @Content(
+                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetail.class)))
     public ResponseEntity<ReviewRequestOutcomeDTO> requestReview(
-        WorkspaceContext workspaceContext,
-        @Valid @RequestBody CreateReviewRequestDTO request
-    ) {
+            WorkspaceContext workspaceContext, @Valid @RequestBody CreateReviewRequestDTO request) {
         Workspace workspace = workspaceContextResolver.requireWorkspace(workspaceContext);
         // Every identity of the account, not just the session's: membership is keyed on the SCM user, so
         // an admin on GitLab who signed in via GitHub would otherwise be refused as "two people".
@@ -106,8 +99,7 @@ public class PracticeReviewRequestController {
             // Same sentence whether there's no such requester or the requester lacks standing: telling
             // them apart would let a caller enumerate who is on a team.
             throw new AccessForbiddenException(
-                "Only the work's author or assignees, or a workspace admin, can ask for a review of it."
-            );
+                    "Only the work's author or assignees, or a workspace admin, can ask for a review of it.");
         }
         return ResponseEntity.ok(ReviewRequestOutcomeDTO.from(outcome));
     }
@@ -121,14 +113,14 @@ public class PracticeReviewRequestController {
         ArtifactKind kind = parseKind(request.artifactKind());
         if (ScmSignals.PULL_REQUEST.equals(kind)) {
             PullRequest pullRequest = artifactLoader
-                .findPullRequestForGate(workspace.getId(), request.artifactId())
-                .orElseThrow(() -> notFound(request));
+                    .findPullRequestForGate(workspace.getId(), request.artifactId())
+                    .orElseThrow(() -> notFound(request));
             return manualReviewRequests.requestPullRequestReview(workspace, pullRequest, requesters);
         }
         if (ScmSignals.ISSUE.equals(kind)) {
             Issue issue = artifactLoader
-                .findIssueForGate(workspace.getId(), request.artifactId())
-                .orElseThrow(() -> notFound(request));
+                    .findIssueForGate(workspace.getId(), request.artifactId())
+                    .orElseThrow(() -> notFound(request));
             return manualReviewRequests.requestIssueReview(workspace, issue, requesters);
         }
         // A kind that exists but has no front door here: a chat thread or document is reviewed on the

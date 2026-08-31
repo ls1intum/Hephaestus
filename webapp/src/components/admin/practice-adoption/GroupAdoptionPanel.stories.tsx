@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, userEvent } from "storybook/test";
+
 import type { CatalogGroupAdoptionPreview } from "@/api/types.gen";
 import { DetailDrawerStack } from "@/components/core/detail-drawer/DetailDrawerStack";
 import {
@@ -12,6 +13,7 @@ import { Stateful } from "@/stories/stateful";
 import { expectGenuinelyDisabled } from "@/test/controls";
 import { expectSettledVisible, settledDrawerPanel } from "@/test/overlay";
 import { expectNoPanelOverflow } from "@/test/reflow";
+
 import { GroupAdoptionPanel } from "./GroupAdoptionPanel";
 
 const practice = {

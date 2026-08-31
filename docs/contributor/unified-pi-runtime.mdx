@@ -14,7 +14,7 @@ Traefik pins workspace traffic to the originating replica via a cookie scoped to
 - Cookie: `__Secure-hep_workspace_aff` — `Secure`, `HttpOnly`, `SameSite=Lax`, `maxAge` matches `hephaestus.mentor.idle-ttl-seconds` (300s default) so the cookie expires when the sandbox is reaped.
 - Response header: `X-Hephaestus-Replica: <container-id-prefix>` — emitted by `ReplicaIdentityFilter` from `$HOSTNAME`, CORS-exposed for the webapp.
 
-Labels are HTTPS-only; the HTTP router redirects to HTTPS, so pinning it would just double-issue cookies. The `cookie.path` attribute requires Traefik >= 3.3 (the proxy is pinned to v3.7.4 in `docker/compose.proxy.yaml`). Previews (`docker/preview/compose.app.yaml`) are single-replica and omit the labels.
+Labels are HTTPS-only; the HTTP router redirects to HTTPS, so pinning it would just double-issue cookies. The `cookie.path` attribute requires Traefik >= 3.3. Previews (`docker/preview/compose.app.yaml`) are single-replica and omit the labels.
 
 ## Known limitations
 

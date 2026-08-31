@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.time.Clock;
+import java.time.Instant;
 import java.util.Base64;
 import javax.crypto.Cipher;
 import javax.crypto.spec.GCMParameterSpec;
@@ -68,12 +69,11 @@ public class AuthIntentCookie {
      * existed deserializes with {@code issuedAt == 0L} and is rejected as stale.
      */
     public record Intent(
-        @Nullable String workspaceSlug,
-        @Nullable String returnTo,
-        Mode mode,
-        @Nullable Long linkingAccountId,
-        long issuedAt
-    ) {
+            @Nullable String workspaceSlug,
+            @Nullable String returnTo,
+            Mode mode,
+            @Nullable Long linkingAccountId,
+            long issuedAt) {
         public enum Mode {
             /** Fresh login — JIT-create Account on first IdP subject we've never seen. */
             LOGIN,
@@ -119,12 +119,10 @@ public class AuthIntentCookie {
                     byte[] decoded = Base64.getUrlDecoder().decode(c.getValue());
                     byte[] plain = decrypt(decoded);
                     Intent intent = MAPPER.readValue(plain, Intent.class);
-                    long ageSeconds = (clock.millis() - intent.issuedAt()) / 1000L;
-                    if (ageSeconds < 0 || ageSeconds > MAX_COOKIE_AGE_SECONDS) {
-                        // Authoritative server-side freshness gate — the cookie Max-Age is
-                        // client-controlled and cannot be trusted. Negative age = future-dated
-                        // (skew/forgery); over-TTL = replay of an expired intent. Either way: absent.
-                        log.warn("auth.oauth: rejecting stale/future auth-intent cookie (ageSeconds={})", ageSeconds);
+                    Instant issuedAt = Instant.ofEpochMilli(intent.issuedAt());
+                    Instant now = clock.instant();
+                    if (issuedAt.isAfter(now) || issuedAt.isBefore(now.minusSeconds(MAX_COOKIE_AGE_SECONDS))) {
+                        log.warn("auth.oauth: rejecting stale/future auth-intent cookie");
                         return null;
                     }
                     return intent;

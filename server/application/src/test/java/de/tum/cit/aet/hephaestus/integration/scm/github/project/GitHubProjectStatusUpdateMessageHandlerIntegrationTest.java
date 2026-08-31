@@ -6,16 +6,9 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventType;
 import de.tum.cit.aet.hephaestus.integration.scm.github.events.GitHubProjectEvent;
-import de.tum.cit.aet.hephaestus.integration.scm.github.events.GitHubProjectEventPayload;
-import de.tum.cit.aet.hephaestus.integration.scm.github.project.Project;
-import de.tum.cit.aet.hephaestus.integration.scm.github.project.ProjectRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.github.project.ProjectStatusUpdate;
-import de.tum.cit.aet.hephaestus.integration.scm.github.project.ProjectStatusUpdateRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.project.dto.GitHubProjectStatusUpdateEventDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.RecordingScmEventListener;
@@ -91,25 +84,29 @@ class GitHubProjectStatusUpdateMessageHandlerIntegrationTest extends BaseIntegra
 
         handler.handleEvent(createdEvent);
 
-        assertThat(statusUpdateRepository.findByNodeId(createdEvent.statusUpdate().nodeId()))
-            .isPresent()
-            .get()
-            .satisfies(update -> {
-                assertThat(update.getNativeId()).isEqualTo(FIXTURE_STATUS_UPDATE_ID);
-                assertThat(update.getNodeId()).isEqualTo(FIXTURE_STATUS_UPDATE_NODE_ID);
-                assertNotNull(update.getProject());
-                assertThat(update.getProject().getId()).isEqualTo(testProject.getId());
-                assertThat(update.getBody()).isEqualTo(FIXTURE_CREATED_BODY);
-                assertThat(update.getStatus()).isEqualTo(ProjectStatusUpdate.Status.ON_TRACK);
-                assertThat(update.getStartDate()).isNull();
-                assertThat(update.getTargetDate()).isNull();
-            });
+        assertThat(statusUpdateRepository.findByNodeId(
+                        createdEvent.statusUpdate().nodeId()))
+                .isPresent()
+                .get()
+                .satisfies(update -> {
+                    assertThat(update.getNativeId()).isEqualTo(FIXTURE_STATUS_UPDATE_ID);
+                    assertThat(update.getNodeId()).isEqualTo(FIXTURE_STATUS_UPDATE_NODE_ID);
+                    assertNotNull(update.getProject());
+                    assertThat(update.getProject().getId()).isEqualTo(testProject.getId());
+                    assertThat(update.getBody()).isEqualTo(FIXTURE_CREATED_BODY);
+                    assertThat(update.getStatus()).isEqualTo(ProjectStatusUpdate.Status.ON_TRACK);
+                    assertThat(update.getStartDate()).isNull();
+                    assertThat(update.getTargetDate()).isNull();
+                });
 
         // Verify domain event
-        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectStatusUpdateCreated.class)).hasSize(1);
-        assertThat(
-            eventListener.ofType(GitHubProjectEvent.ProjectStatusUpdateCreated.class).getFirst().projectId()
-        ).isEqualTo(testProject.getId());
+        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectStatusUpdateCreated.class))
+                .hasSize(1);
+        assertThat(eventListener
+                        .ofType(GitHubProjectEvent.ProjectStatusUpdateCreated.class)
+                        .getFirst()
+                        .projectId())
+                .isEqualTo(testProject.getId());
     }
 
     @Test
@@ -121,21 +118,26 @@ class GitHubProjectStatusUpdateMessageHandlerIntegrationTest extends BaseIntegra
         GitHubProjectStatusUpdateEventDTO editedEvent = loadPayload("projects_v2_status_update.edited");
         handler.handleEvent(editedEvent);
 
-        assertThat(statusUpdateRepository.findByNodeId(editedEvent.statusUpdate().nodeId()))
-            .isPresent()
-            .get()
-            .satisfies(update -> {
-                assertThat(update.getBody()).isEqualTo(FIXTURE_EDITED_BODY);
-                assertThat(update.getStatus()).isEqualTo(ProjectStatusUpdate.Status.AT_RISK);
-                assertThat(update.getUpdatedAt()).isEqualTo(Instant.parse("2025-11-02T00:05:24Z"));
-            });
+        assertThat(statusUpdateRepository.findByNodeId(
+                        editedEvent.statusUpdate().nodeId()))
+                .isPresent()
+                .get()
+                .satisfies(update -> {
+                    assertThat(update.getBody()).isEqualTo(FIXTURE_EDITED_BODY);
+                    assertThat(update.getStatus()).isEqualTo(ProjectStatusUpdate.Status.AT_RISK);
+                    assertThat(update.getUpdatedAt()).isEqualTo(Instant.parse("2025-11-02T00:05:24Z"));
+                });
 
         // Verify ProjectStatusUpdateUpdated event (not Created)
-        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectStatusUpdateCreated.class)).isEmpty();
-        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectStatusUpdateUpdated.class)).hasSize(1);
-        assertThat(
-            eventListener.ofType(GitHubProjectEvent.ProjectStatusUpdateUpdated.class).getFirst().projectId()
-        ).isEqualTo(testProject.getId());
+        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectStatusUpdateCreated.class))
+                .isEmpty();
+        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectStatusUpdateUpdated.class))
+                .hasSize(1);
+        assertThat(eventListener
+                        .ofType(GitHubProjectEvent.ProjectStatusUpdateUpdated.class)
+                        .getFirst()
+                        .projectId())
+                .isEqualTo(testProject.getId());
     }
 
     @Test
@@ -147,16 +149,23 @@ class GitHubProjectStatusUpdateMessageHandlerIntegrationTest extends BaseIntegra
         GitHubProjectStatusUpdateEventDTO deletedEvent = loadPayload("projects_v2_status_update.deleted");
         handler.handleEvent(deletedEvent);
 
-        assertThat(statusUpdateRepository.findByNodeId(deletedEvent.statusUpdate().nodeId())).isEmpty();
+        assertThat(statusUpdateRepository.findByNodeId(
+                        deletedEvent.statusUpdate().nodeId()))
+                .isEmpty();
 
         // Verify domain event (statusUpdateId is the synthetic PK, not native ID)
-        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectStatusUpdateDeleted.class)).hasSize(1);
-        assertThat(
-            eventListener.ofType(GitHubProjectEvent.ProjectStatusUpdateDeleted.class).getFirst().projectId()
-        ).isEqualTo(testProject.getId());
-        assertThat(
-            eventListener.ofType(GitHubProjectEvent.ProjectStatusUpdateDeleted.class).getFirst().statusUpdateId()
-        ).isNotNull();
+        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectStatusUpdateDeleted.class))
+                .hasSize(1);
+        assertThat(eventListener
+                        .ofType(GitHubProjectEvent.ProjectStatusUpdateDeleted.class)
+                        .getFirst()
+                        .projectId())
+                .isEqualTo(testProject.getId());
+        assertThat(eventListener
+                        .ofType(GitHubProjectEvent.ProjectStatusUpdateDeleted.class)
+                        .getFirst()
+                        .statusUpdateId())
+                .isNotNull();
     }
 
     @Test
@@ -171,7 +180,8 @@ class GitHubProjectStatusUpdateMessageHandlerIntegrationTest extends BaseIntegra
 
         // Then — no status update should be created
         assertThat(statusUpdateRepository.count()).isZero();
-        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectStatusUpdateCreated.class)).isEmpty();
+        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectStatusUpdateCreated.class))
+                .isEmpty();
     }
 
     @Test
@@ -187,7 +197,8 @@ class GitHubProjectStatusUpdateMessageHandlerIntegrationTest extends BaseIntegra
 
         // Then — no status update should be created
         assertThat(statusUpdateRepository.count()).isZero();
-        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectStatusUpdateCreated.class)).isEmpty();
+        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectStatusUpdateCreated.class))
+                .isEmpty();
     }
 
     @Test
@@ -199,20 +210,22 @@ class GitHubProjectStatusUpdateMessageHandlerIntegrationTest extends BaseIntegra
         handler.handleEvent(event);
 
         // Then — only one status update should exist
-        assertThat(statusUpdateRepository.findByNodeId(event.statusUpdate().nodeId())).isPresent();
+        assertThat(statusUpdateRepository.findByNodeId(event.statusUpdate().nodeId()))
+                .isPresent();
 
         // First call publishes Created, second publishes Updated
-        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectStatusUpdateCreated.class)).hasSize(1);
-        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectStatusUpdateUpdated.class)).hasSize(1);
+        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectStatusUpdateCreated.class))
+                .hasSize(1);
+        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectStatusUpdateUpdated.class))
+                .hasSize(1);
     }
 
     private void setupTestData() {
         // Create GitHub provider
         IdentityProvider gitProvider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-            .orElseGet(() ->
-                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseGet(() -> gitProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
 
         testOrganization = new Organization();
         testOrganization.setNativeId(215361191L);

@@ -13,7 +13,7 @@ import org.junit.jupiter.api.parallel.ExecutionMode;
  * Live test that hits a real GitLab instance. Gated by {@code HEPHAESTUS_LIVE_GITLAB_TOKEN}.
  * Reserved for future GitLab-side replay/live-sync tests — not yet used by any test in tree.
  */
-@Target({ ElementType.TYPE, ElementType.METHOD })
+@Target({ElementType.TYPE, ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)
 @Tag("live")
 @EnabledIfEnvironmentVariable(named = "HEPHAESTUS_LIVE_GITLAB_TOKEN", matches = ".+")

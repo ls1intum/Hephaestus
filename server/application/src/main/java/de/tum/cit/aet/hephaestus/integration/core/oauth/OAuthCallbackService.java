@@ -51,11 +51,10 @@ public class OAuthCallbackService {
     private final CredentialBundleConverter credentialBundleConverter;
 
     public OAuthCallbackService(
-        ConnectionRepository connectionRepository,
-        ConnectionService connectionService,
-        WorkspaceRepository workspaceRepository,
-        CredentialBundleConverter credentialBundleConverter
-    ) {
+            ConnectionRepository connectionRepository,
+            ConnectionService connectionService,
+            WorkspaceRepository workspaceRepository,
+            CredentialBundleConverter credentialBundleConverter) {
         this.connectionRepository = connectionRepository;
         this.connectionService = connectionService;
         this.workspaceRepository = workspaceRepository;
@@ -71,24 +70,18 @@ public class OAuthCallbackService {
     @Transactional
     public Connection findOrCreatePendingConnection(long workspaceId, IntegrationKind kind) {
         Optional<Connection> pending = connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
-            workspaceId,
-            kind,
-            IntegrationState.PENDING
-        );
+                workspaceId, kind, IntegrationState.PENDING);
         if (pending.isPresent()) {
             return pending.get();
         }
         Optional<Connection> active = connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
-            workspaceId,
-            kind,
-            IntegrationState.ACTIVE
-        );
+                workspaceId, kind, IntegrationState.ACTIVE);
         if (active.isPresent()) {
             return active.get();
         }
         Workspace workspace = workspaceRepository
-            .findById(workspaceId)
-            .orElseThrow(() -> new EntityNotFoundException("Workspace not found: id=" + workspaceId));
+                .findById(workspaceId)
+                .orElseThrow(() -> new EntityNotFoundException("Workspace not found: id=" + workspaceId));
         Connection fresh = new Connection(workspace, kind, /* instanceKey */ null, defaultConfig(kind));
         return connectionRepository.save(fresh);
     }
@@ -104,10 +97,7 @@ public class OAuthCallbackService {
      */
     @Transactional
     public Connection completeConnection(
-        Connection pending,
-        ConnectFinalization.Completed completed,
-        @Nullable String actorRef
-    ) {
+            Connection pending, ConnectFinalization.Completed completed, @Nullable String actorRef) {
         Connection connection = resolveSlackCompletionTarget(pending, completed);
         deleteSupersededPending(pending, connection);
         applyVendorMetadata(connection, completed);
@@ -117,24 +107,21 @@ public class OAuthCallbackService {
         String actor = actorRef != null ? actorRef : ACTOR_FALLBACK;
         String correlationId = "oauth-" + completed.instanceKey() + "-" + UUID.randomUUID();
         connection = connectionService.transition(
-            connection,
-            new TransitionRequest(
-                IntegrationState.ACTIVE,
-                "OAUTH_COMPLETE",
-                "USER",
-                actor,
-                correlationId,
-                completed.displayName()
-            )
-        );
+                connection,
+                new TransitionRequest(
+                        IntegrationState.ACTIVE,
+                        "OAUTH_COMPLETE",
+                        "USER",
+                        actor,
+                        correlationId,
+                        completed.displayName()));
         log.info(
-            "OAuth complete: kind={} workspace={} connection={} instanceKey={} actor={}",
-            connection.getKind(),
-            connection.getWorkspace().getId(),
-            connection.getId(),
-            sanitizeForLog(completed.instanceKey()),
-            sanitizeForLog(actor)
-        );
+                "OAuth complete: kind={} workspace={} connection={} instanceKey={} actor={}",
+                connection.getKind(),
+                connection.getWorkspace().getId(),
+                connection.getId(),
+                sanitizeForLog(completed.instanceKey()),
+                sanitizeForLog(actor));
         return connection;
     }
 
@@ -147,30 +134,23 @@ public class OAuthCallbackService {
             return connection;
         }
         Optional<Connection> active = connectionRepository.findFirstByKindAndInstanceKeyAndState(
-            IntegrationKind.SLACK,
-            instanceKey,
-            IntegrationState.ACTIVE
-        );
+                IntegrationKind.SLACK, instanceKey, IntegrationState.ACTIVE);
         if (active.isEmpty() || Objects.equals(active.get().getId(), connection.getId())) {
             return connectionRepository
-                .findByWorkspaceIdAndKindAndInstanceKey(
-                    connection.getWorkspace().getId(),
-                    IntegrationKind.SLACK,
-                    instanceKey
-                )
-                .filter(existing -> !Objects.equals(existing.getId(), connection.getId()))
-                .orElse(connection);
+                    .findByWorkspaceIdAndKindAndInstanceKey(
+                            connection.getWorkspace().getId(), IntegrationKind.SLACK, instanceKey)
+                    .filter(existing -> !Objects.equals(existing.getId(), connection.getId()))
+                    .orElse(connection);
         }
         Connection existing = active.get();
-        if (Objects.equals(existing.getWorkspace().getId(), connection.getWorkspace().getId())) {
+        if (Objects.equals(
+                existing.getWorkspace().getId(), connection.getWorkspace().getId())) {
             return existing;
         }
-        throw new IllegalStateException(
-            "Slack team is already connected to workspace " +
-                existing.getWorkspace().getId() +
-                "; disconnect it before connecting it to workspace " +
-                connection.getWorkspace().getId()
-        );
+        throw new IllegalStateException("Slack team is already connected to workspace "
+                + existing.getWorkspace().getId()
+                + "; disconnect it before connecting it to workspace "
+                + connection.getWorkspace().getId());
     }
 
     private void deleteSupersededPending(Connection original, Connection target) {
@@ -191,13 +171,13 @@ public class OAuthCallbackService {
     private static ConnectionConfig defaultConfig(IntegrationKind kind) {
         return switch (kind) {
             case GITHUB -> new ConnectionConfig.GitHubAppConfig(null, null, null, new HashSet<>());
-            case GITLAB -> new ConnectionConfig.GitLabConfig(
-                "https://gitlab.com",
-                null,
-                null,
-                ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
-                new HashSet<>()
-            );
+            case GITLAB ->
+                new ConnectionConfig.GitLabConfig(
+                        "https://gitlab.com",
+                        null,
+                        null,
+                        ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
+                        new HashSet<>());
             case SLACK -> new ConnectionConfig.SlackConfig(null, null, null, null, null, new HashSet<>());
             case OUTLINE -> new ConnectionConfig.OutlineConfig(null, null, null, new HashSet<>());
         };

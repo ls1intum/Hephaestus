@@ -143,12 +143,7 @@ public class AuthEvent {
      * directly.
      */
     public static AuthEvent create(
-        AuthEventData data,
-        Long id,
-        Instant occurredAt,
-        @Nullable String ipInet,
-        @Nullable String userAgent
-    ) {
+            AuthEventData data, Long id, Instant occurredAt, @Nullable String ipInet, @Nullable String userAgent) {
         AuthEvent e = new AuthEvent();
         e.id = new Id(id, occurredAt);
         e.eventType = data.type();

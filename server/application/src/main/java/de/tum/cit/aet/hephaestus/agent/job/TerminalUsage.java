@@ -45,15 +45,14 @@ import org.jspecify.annotations.Nullable;
  *     from either source's own
  */
 record TerminalUsage(
-    long inputTokens,
-    long outputTokens,
-    long cacheReadTokens,
-    long cacheWriteTokens,
-    long reasoningTokens,
-    int totalCalls,
-    boolean verifiable,
-    UsageProvenance provenance
-) {
+        long inputTokens,
+        long outputTokens,
+        long cacheReadTokens,
+        long cacheWriteTokens,
+        long reasoningTokens,
+        int totalCalls,
+        boolean verifiable,
+        UsageProvenance provenance) {
     /**
      * @param runnerUsage what the agent runner reported, or {@code null} when it never produced one
      * @param proxyCounts the {@code agent_job} row's proxy accumulators, read BEFORE any requeue
@@ -65,29 +64,25 @@ record TerminalUsage(
         if (!fromRunner && !fromProxy) {
             // Neither record has tokens: keep whichever call count exists as telemetry, but report the
             // spend as unknown.
-            int calls =
-                runnerUsage != null && runnerUsage.totalCalls() > 0
+            int calls = runnerUsage != null && runnerUsage.totalCalls() > 0
                     ? runnerUsage.totalCalls()
-                    : proxyCounts != null
-                        ? Math.max(0, proxyCounts.totalCalls())
-                        : 0;
+                    : proxyCounts != null ? Math.max(0, proxyCounts.totalCalls()) : 0;
             return new TerminalUsage(0L, 0L, 0L, 0L, 0L, calls, false, UsageProvenance.NONE);
         }
 
         Buckets runner = fromRunner ? Buckets.of(Objects.requireNonNull(runnerUsage)) : Buckets.NONE;
         Buckets proxy = fromProxy ? Buckets.of(Objects.requireNonNull(proxyCounts)) : Buckets.NONE;
         return new TerminalUsage(
-            Math.max(runner.input, proxy.input),
-            Math.max(runner.output, proxy.output),
-            Math.max(runner.cacheRead, proxy.cacheRead),
-            Math.max(runner.cacheWrite, proxy.cacheWrite),
-            Math.max(runner.reasoning, proxy.reasoning),
-            // Clamped rather than cast: the call count is an int on the row, and a runner that reports
-            // an absurd figure should bill the ceiling rather than wrap to a negative one.
-            (int) Math.min(Integer.MAX_VALUE, Math.max(runner.calls, proxy.calls)),
-            true,
-            provenanceOf(runner, proxy)
-        );
+                Math.max(runner.input, proxy.input),
+                Math.max(runner.output, proxy.output),
+                Math.max(runner.cacheRead, proxy.cacheRead),
+                Math.max(runner.cacheWrite, proxy.cacheWrite),
+                Math.max(runner.reasoning, proxy.reasoning),
+                // Clamped rather than cast: the call count is an int on the row, and a runner that reports
+                // an absurd figure should bill the ceiling rather than wrap to a negative one.
+                (int) Math.min(Integer.MAX_VALUE, Math.max(runner.calls, proxy.calls)),
+                true,
+                provenanceOf(runner, proxy));
     }
 
     /**
@@ -120,28 +115,26 @@ record TerminalUsage(
      * @return true when the attempt was billed at its frozen price, false when it was appended UNPRICED
      */
     boolean appendTo(
-        LlmUsageRecorder recorder,
-        Long workspaceId,
-        AgentJob job,
-        @Nullable String upstreamModelId,
-        LlmPriceSnapshot price
-    ) {
+            LlmUsageRecorder recorder,
+            Long workspaceId,
+            AgentJob job,
+            @Nullable String upstreamModelId,
+            LlmPriceSnapshot price) {
         LlmUsageRecorder.LlmUsageSample sample = new LlmUsageRecorder.LlmUsageSample(
-            LlmUsageJobType.from(job.getJobType()),
-            LlmUsageSourceType.AGENT_JOB,
-            job.getId(),
-            job.getRetryCount(),
-            upstreamModelId,
-            inputTokens,
-            outputTokens,
-            cacheReadTokens,
-            cacheWriteTokens,
-            reasoningTokens,
-            totalCalls,
-            price,
-            provenance,
-            Instant.now()
-        );
+                LlmUsageJobType.from(job.getJobType()),
+                LlmUsageSourceType.AGENT_JOB,
+                job.getId(),
+                job.getRetryCount(),
+                upstreamModelId,
+                inputTokens,
+                outputTokens,
+                cacheReadTokens,
+                cacheWriteTokens,
+                reasoningTokens,
+                totalCalls,
+                price,
+                provenance,
+                Instant.now());
         if (verifiable && price.pricingState() != PricingState.UNPRICED) {
             recorder.record(workspaceId, sample);
             return true;
@@ -152,15 +145,13 @@ record TerminalUsage(
 
     /** A report is evidence only if it claims a call AND a non-zero token bucket; calls alone cannot be priced. */
     private static boolean hasTokens(@Nullable LlmUsage usage) {
-        return (
-            usage != null &&
-            usage.totalCalls() > 0 &&
-            (nullToZero(usage.inputTokens()) > 0 ||
-                nullToZero(usage.outputTokens()) > 0 ||
-                nullToZero(usage.cacheReadTokens()) > 0 ||
-                nullToZero(usage.cacheWriteTokens()) > 0 ||
-                nullToZero(usage.reasoningTokens()) > 0)
-        );
+        return (usage != null
+                && usage.totalCalls() > 0
+                && (nullToZero(usage.inputTokens()) > 0
+                        || nullToZero(usage.outputTokens()) > 0
+                        || nullToZero(usage.cacheReadTokens()) > 0
+                        || nullToZero(usage.cacheWriteTokens()) > 0
+                        || nullToZero(usage.reasoningTokens()) > 0));
     }
 
     private static long nullToZero(@Nullable Integer value) {
@@ -173,36 +164,32 @@ record TerminalUsage(
 
         static Buckets of(LlmUsage usage) {
             return new Buckets(
-                nullToZero(usage.inputTokens()),
-                nullToZero(usage.outputTokens()),
-                nullToZero(usage.cacheReadTokens()),
-                nullToZero(usage.cacheWriteTokens()),
-                nullToZero(usage.reasoningTokens()),
-                Math.max(0, usage.totalCalls())
-            );
+                    nullToZero(usage.inputTokens()),
+                    nullToZero(usage.outputTokens()),
+                    nullToZero(usage.cacheReadTokens()),
+                    nullToZero(usage.cacheWriteTokens()),
+                    nullToZero(usage.reasoningTokens()),
+                    Math.max(0, usage.totalCalls()));
         }
 
         static Buckets of(AgentJobLlmUsage counts) {
             return new Buckets(
-                counts.inputTokens(),
-                counts.outputTokens(),
-                counts.cacheReadTokens(),
-                counts.cacheWriteTokens(),
-                counts.reasoningTokens(),
-                Math.max(0, counts.totalCalls())
-            );
+                    counts.inputTokens(),
+                    counts.outputTokens(),
+                    counts.cacheReadTokens(),
+                    counts.cacheWriteTokens(),
+                    counts.reasoningTokens(),
+                    Math.max(0, counts.totalCalls()));
         }
 
         /** True when this source saw more than {@code other} in at least one bucket. */
         boolean exceedsAnyOf(Buckets other) {
-            return (
-                input > other.input ||
-                output > other.output ||
-                cacheRead > other.cacheRead ||
-                cacheWrite > other.cacheWrite ||
-                reasoning > other.reasoning ||
-                calls > other.calls
-            );
+            return (input > other.input
+                    || output > other.output
+                    || cacheRead > other.cacheRead
+                    || cacheWrite > other.cacheWrite
+                    || reasoning > other.reasoning
+                    || calls > other.calls);
         }
     }
 }

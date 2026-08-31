@@ -1,5 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
+
 import { SidebarProvider } from "@/components/ui/sidebar";
+
 import { NavDashboards } from "./NavDashboards";
 
 const meta = {

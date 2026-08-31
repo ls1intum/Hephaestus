@@ -42,7 +42,11 @@ public interface OAuthStateService {
      * <p>{@code actorRef} is the authenticated account id of the user that initiated the OAuth
      * flow; {@code null} for tokens issued via the no-actor overload.
      */
-    record StateBinding(long workspaceId, IntegrationKind kind, Instant issuedAt, @Nullable String actorRef) {
+    record StateBinding(
+            long workspaceId,
+            IntegrationKind kind,
+            Instant issuedAt,
+            @Nullable String actorRef) {
         /** Convenience constructor that defaults actorRef to null. */
         public StateBinding(long workspaceId, IntegrationKind kind, Instant issuedAt) {
             this(workspaceId, kind, issuedAt, null);

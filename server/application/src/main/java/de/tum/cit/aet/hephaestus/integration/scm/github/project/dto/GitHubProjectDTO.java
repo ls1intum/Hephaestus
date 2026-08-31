@@ -21,22 +21,21 @@ import org.jspecify.annotations.Nullable;
 @JsonIgnoreProperties(ignoreUnknown = true)
 @Slf4j
 public record GitHubProjectDTO(
-    @JsonProperty("id") @Nullable Long id,
-    @JsonProperty("database_id") @Nullable Long databaseId,
-    @JsonProperty("node_id") String nodeId,
-    @JsonProperty("number") int number,
-    @JsonProperty("title") String title,
-    @JsonProperty("short_description") @Nullable String shortDescription,
-    @JsonProperty("readme") @Nullable String readme,
-    @JsonProperty("template") boolean template,
-    @JsonProperty("url") @Nullable String url,
-    @JsonProperty("closed") boolean closed,
-    @JsonProperty("closed_at") @Nullable Instant closedAt,
-    @JsonProperty("public") boolean isPublic,
-    @JsonProperty("creator") @Nullable GitHubUserDTO creator,
-    @JsonProperty("created_at") @Nullable Instant createdAt,
-    @JsonProperty("updated_at") @Nullable Instant updatedAt
-) {
+        @JsonProperty("id") @Nullable Long id,
+        @JsonProperty("database_id") @Nullable Long databaseId,
+        @JsonProperty("node_id") String nodeId,
+        @JsonProperty("number") int number,
+        @JsonProperty("title") String title,
+        @JsonProperty("short_description") @Nullable String shortDescription,
+        @JsonProperty("readme") @Nullable String readme,
+        @JsonProperty("template") boolean template,
+        @JsonProperty("url") @Nullable String url,
+        @JsonProperty("closed") boolean closed,
+        @JsonProperty("closed_at") @Nullable Instant closedAt,
+        @JsonProperty("public") boolean isPublic,
+        @JsonProperty("creator") @Nullable GitHubUserDTO creator,
+        @JsonProperty("created_at") @Nullable Instant createdAt,
+        @JsonProperty("updated_at") @Nullable Instant updatedAt) {
     /**
      * Get the database ID, preferring databaseId over id for GraphQL responses.
      */
@@ -71,22 +70,21 @@ public record GitHubProjectDTO(
         }
 
         return new GitHubProjectDTO(
-            null,
-            toLong(project.getFullDatabaseId()),
-            project.getId(),
-            project.getNumber(),
-            project.getTitle(),
-            project.getShortDescription(),
-            project.getReadme(),
-            project.getTemplate(),
-            uriToString(project.getUrl()),
-            project.getClosed(),
-            toInstant(project.getClosedAt()),
-            project.getPublic(),
-            GitHubUserDTO.fromActor(project.getCreator()),
-            toInstant(project.getCreatedAt()),
-            toInstant(project.getUpdatedAt())
-        );
+                null,
+                toLong(project.getFullDatabaseId()),
+                project.getId(),
+                project.getNumber(),
+                project.getTitle(),
+                project.getShortDescription(),
+                project.getReadme(),
+                project.getTemplate(),
+                uriToString(project.getUrl()),
+                project.getClosed(),
+                toInstant(project.getClosedAt()),
+                project.getPublic(),
+                GitHubUserDTO.fromActor(project.getCreator()),
+                toInstant(project.getCreatedAt()),
+                toInstant(project.getUpdatedAt()));
     }
 
     // CONVERSION HELPERS

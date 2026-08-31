@@ -75,9 +75,8 @@ public class GitlabSubjectKeyDeriver implements SubjectKeyDeriver {
         }
 
         String pathWithNs = firstNonBlank(
-            textOrEmpty(payload.path("project"), "path_with_namespace"),
-            textOrEmpty(payload, "path_with_namespace")
-        );
+                textOrEmpty(payload.path("project"), "path_with_namespace"),
+                textOrEmpty(payload, "path_with_namespace"));
 
         String namespace = PLACEHOLDER;
         String project = PLACEHOLDER;
@@ -163,11 +162,9 @@ public class GitlabSubjectKeyDeriver implements SubjectKeyDeriver {
     }
 
     private static boolean isGroupTierEvent(String event) {
-        return (
-            GitLabEventType.PROJECT.getValue().equals(event) ||
-            GitLabEventType.SUBGROUP.getValue().equals(event) ||
-            GitLabEventType.MEMBER.getValue().equals(event)
-        );
+        return (GitLabEventType.PROJECT.getValue().equals(event)
+                || GitLabEventType.SUBGROUP.getValue().equals(event)
+                || GitLabEventType.MEMBER.getValue().equals(event));
     }
 
     /**
@@ -186,13 +183,12 @@ public class GitlabSubjectKeyDeriver implements SubjectKeyDeriver {
      */
     private static String rootGroupToken(JsonNode payload) {
         String path = firstNonBlank(
-            textOrEmpty(payload.path("project"), "path_with_namespace"),
-            textOrEmpty(payload, "path_with_namespace"),
-            textOrEmpty(payload.path("group"), "full_path"),
-            textOrEmpty(payload, "full_path"),
-            textOrEmpty(payload, "parent_full_path"),
-            textOrEmpty(payload, "group_path")
-        );
+                textOrEmpty(payload.path("project"), "path_with_namespace"),
+                textOrEmpty(payload, "path_with_namespace"),
+                textOrEmpty(payload.path("group"), "full_path"),
+                textOrEmpty(payload, "full_path"),
+                textOrEmpty(payload, "parent_full_path"),
+                textOrEmpty(payload, "group_path"));
         if (path == null) {
             return PLACEHOLDER;
         }

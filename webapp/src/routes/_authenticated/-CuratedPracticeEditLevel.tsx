@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
+
 import {
 	adminDeleteCuratedPracticeOverrideMutation,
 	adminGetCuratedCatalogOptions,
@@ -169,7 +170,7 @@ function LoadedCuratedPracticeEditor({
 				exact: true,
 				refetchType: "none",
 			});
-			const latest: CuratedPractice = await queryClient.fetchQuery(detailOptions);
+			const latest: CuratedPractice = await queryClient.query(detailOptions);
 			setBasePractice(latest);
 			setConflict(false);
 		} catch (error) {

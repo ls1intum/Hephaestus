@@ -27,15 +27,14 @@ public class PracticeStandingController {
 
     @GetMapping
     @Operation(
-        operationId = "listPracticeStandings",
-        summary = "List the current developer's practice standings",
-        description = "Returns each practice's standing, direction, supporting observations, and developer guidance."
-    )
+            operationId = "listPracticeStandings",
+            summary = "List the current developer's practice standings",
+            description =
+                    "Returns each practice's standing, direction, supporting observations, and developer guidance.")
     @ApiResponse(
-        responseCode = "200",
-        description = "Practice standings returned",
-        content = @Content(array = @ArraySchema(schema = @Schema(implementation = PracticeStandingDTO.class)))
-    )
+            responseCode = "200",
+            description = "Practice standings returned",
+            content = @Content(array = @ArraySchema(schema = @Schema(implementation = PracticeStandingDTO.class))))
     public ResponseEntity<List<PracticeStandingDTO>> listPracticeStandings(WorkspaceContext workspaceContext) {
         return ResponseEntity.ok(practiceStandingService.getStandings(workspaceContext.id()));
     }

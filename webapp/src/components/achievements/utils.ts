@@ -6,8 +6,8 @@ import type { CategoryLabelNode } from "@/components/achievements/CategoryLabels
 import rawCoordinatesData from "@/components/achievements/coordinates.json";
 import { ACHIEVEMENT_REGISTRY } from "@/components/achievements/definitions";
 import type { EqualizerEdge } from "@/components/achievements/EqualizerEdge";
-import type { SynthwaveEdge } from "@/components/achievements/SynthwaveEdge";
 import { categoryMeta } from "@/components/achievements/styles";
+import type { SynthwaveEdge } from "@/components/achievements/SynthwaveEdge";
 import {
 	type AchievementCategory,
 	rarityWeights,

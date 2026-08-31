@@ -1,9 +1,14 @@
 package de.tum.cit.aet.hephaestus.config;
 
+import de.tum.cit.aet.hephaestus.observability.StructuredLogKeys;
+import io.sentry.EventProcessor;
+import io.sentry.Hint;
 import io.sentry.Sentry;
+import io.sentry.SentryEvent;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.context.annotation.Configuration;
@@ -22,10 +27,9 @@ public class SentryConfiguration {
     private final SentryProperties sentryProperties;
 
     public SentryConfiguration(
-        Environment environment,
-        @Value("${spring.application.version}") String hephaestusVersion,
-        SentryProperties sentryProperties
-    ) {
+            Environment environment,
+            @Value("${spring.application.version}") String hephaestusVersion,
+            SentryProperties sentryProperties) {
         this.environment = environment;
         this.hephaestusVersion = hephaestusVersion;
         this.sentryProperties = sentryProperties;
@@ -43,10 +47,25 @@ public class SentryConfiguration {
 
             Sentry.init(options -> {
                 options.setDsn(dsn);
-                options.setSendDefaultPii(true);
+                options.setSendDefaultPii(false);
+                options.setBeforeSend((event, hint) -> {
+                    event.setUser(null);
+                    event.setRequest(null);
+                    event.setBreadcrumbs(null);
+                    return event;
+                });
                 options.setEnvironment(getEnvironment());
                 options.setRelease(hephaestusVersion);
-                options.setTracesSampleRate(getTracesSampleRate());
+                // Links a Sentry event to its JSON log lines; the tag survives the beforeSend scrub,
+                // which removes only user, request, and breadcrumb context.
+                options.addEventProcessor(new EventProcessor() {
+                    @Override
+                    public SentryEvent process(SentryEvent event, Hint hint) {
+                        String traceId = MDC.get(StructuredLogKeys.TRACE_ID);
+                        if (traceId != null) event.setTag(StructuredLogKeys.TRACE_ID, traceId);
+                        return event;
+                    }
+                });
             });
 
             log.info("Initialized Sentry");
@@ -63,13 +82,5 @@ public class SentryConfiguration {
         } else {
             return "local";
         }
-    }
-
-    private double getTracesSampleRate() {
-        return switch (getEnvironment()) {
-            case "test" -> 1.0;
-            case "prod" -> 0.2;
-            default -> 0.0;
-        };
     }
 }

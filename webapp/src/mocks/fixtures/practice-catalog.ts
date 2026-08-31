@@ -1,4 +1,5 @@
 import type { CuratedPracticeDefinition } from "@/api/types.gen";
+
 import {
 	mockAuthorDeclaredEvidenceValidation,
 	mockDocumentBinding,

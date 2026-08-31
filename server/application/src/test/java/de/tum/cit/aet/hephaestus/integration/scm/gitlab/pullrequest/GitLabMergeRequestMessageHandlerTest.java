@@ -12,7 +12,6 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
-import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabEventType;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabWebhookContextResolver;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.dto.GitLabWebhookLabel;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.dto.GitLabWebhookProject;
@@ -53,26 +52,22 @@ class GitLabMergeRequestMessageHandlerTest extends BaseUnitTest {
     void setUp() {
         transactionTemplate = mock(TransactionTemplate.class);
         lenient()
-            .doAnswer(invocation -> {
-                @SuppressWarnings("unchecked")
-                Consumer<TransactionStatus> callback = invocation.getArgument(0);
-                callback.accept(null);
-                return null;
-            })
-            .when(transactionTemplate)
-            .executeWithoutResult(any());
+                .doAnswer(invocation -> {
+                    @SuppressWarnings("unchecked")
+                    Consumer<TransactionStatus> callback = invocation.getArgument(0);
+                    callback.accept(null);
+                    return null;
+                })
+                .when(transactionTemplate)
+                .executeWithoutResult(any());
 
         handler = new GitLabMergeRequestMessageHandler(
-            mergeRequestProcessor,
-            contextResolver,
-            deserializer,
-            transactionTemplate
-        );
+                mergeRequestProcessor, contextResolver, deserializer, transactionTemplate);
 
         // Default: context resolver returns a valid context
         lenient()
-            .when(contextResolver.resolve(eq(PROJECT_PATH), any(), any()))
-            .thenReturn(ProcessingContext.forWebhook(1L, setupRepository(), "open"));
+                .when(contextResolver.resolve(eq(PROJECT_PATH), any(), any()))
+                .thenReturn(ProcessingContext.forWebhook(1L, setupRepository(), "open"));
     }
 
     @Test
@@ -229,36 +224,34 @@ class GitLabMergeRequestMessageHandlerTest extends BaseUnitTest {
         @Test
         void confidentialMergeRequest_skipsProcessing() throws IOException {
             var attrs = new GitLabMergeRequestEventDTO.ObjectAttributes(
-                999555L,
-                5,
-                "Secret MR",
-                "Confidential desc",
-                "opened",
-                "open",
-                "feature/secret",
-                "main",
-                false,
-                12345L,
-                null,
-                null,
-                "2024-01-15T10:00:00Z",
-                "2024-01-15T10:00:00Z",
-                null,
-                null,
-                "https://gitlab.com/gitlab-org/gitlab/-/merge_requests/5",
-                null,
-                null
-            );
+                    999555L,
+                    5,
+                    "Secret MR",
+                    "Confidential desc",
+                    "opened",
+                    "open",
+                    "feature/secret",
+                    "main",
+                    false,
+                    12345L,
+                    null,
+                    null,
+                    "2024-01-15T10:00:00Z",
+                    "2024-01-15T10:00:00Z",
+                    null,
+                    null,
+                    "https://gitlab.com/gitlab-org/gitlab/-/merge_requests/5",
+                    null,
+                    null);
             GitLabMergeRequestEventDTO event = new GitLabMergeRequestEventDTO(
-                "merge_request",
-                "confidential_merge_request",
-                createUser(),
-                createProject(),
-                attrs,
-                null,
-                null,
-                null
-            );
+                    "merge_request",
+                    "confidential_merge_request",
+                    createUser(),
+                    createProject(),
+                    attrs,
+                    null,
+                    null,
+                    null);
 
             Message msg = mockMessage(event);
             handler.onMessage(msg);
@@ -280,15 +273,7 @@ class GitLabMergeRequestMessageHandlerTest extends BaseUnitTest {
         @Test
         void missingObjectAttributes_skipsProcessing() throws IOException {
             GitLabMergeRequestEventDTO event = new GitLabMergeRequestEventDTO(
-                "merge_request",
-                "merge_request",
-                createUser(),
-                createProject(),
-                null,
-                null,
-                null,
-                null
-            );
+                    "merge_request", "merge_request", createUser(), createProject(), null, null, null, null);
 
             Message msg = mockMessage(event);
             handler.onMessage(msg);
@@ -299,36 +284,27 @@ class GitLabMergeRequestMessageHandlerTest extends BaseUnitTest {
         @Test
         void missingProject_skipsProcessing() throws IOException {
             var attrs = new GitLabMergeRequestEventDTO.ObjectAttributes(
-                999555L,
-                5,
-                "Title",
-                "desc",
-                "opened",
-                "open",
-                "feature/branch",
-                "main",
-                false,
-                12345L,
-                null,
-                null,
-                "2024-01-15T10:00:00Z",
-                "2024-01-15T10:00:00Z",
-                null,
-                null,
-                "https://example.com",
-                null,
-                null
-            );
+                    999555L,
+                    5,
+                    "Title",
+                    "desc",
+                    "opened",
+                    "open",
+                    "feature/branch",
+                    "main",
+                    false,
+                    12345L,
+                    null,
+                    null,
+                    "2024-01-15T10:00:00Z",
+                    "2024-01-15T10:00:00Z",
+                    null,
+                    null,
+                    "https://example.com",
+                    null,
+                    null);
             GitLabMergeRequestEventDTO event = new GitLabMergeRequestEventDTO(
-                "merge_request",
-                "merge_request",
-                createUser(),
-                null,
-                attrs,
-                null,
-                null,
-                null
-            );
+                    "merge_request", "merge_request", createUser(), null, attrs, null, null, null);
 
             Message msg = mockMessage(event);
             handler.onMessage(msg);
@@ -376,46 +352,43 @@ class GitLabMergeRequestMessageHandlerTest extends BaseUnitTest {
 
     private GitLabMergeRequestEventDTO createEvent(String action, String state, boolean confidential) {
         var attrs = new GitLabMergeRequestEventDTO.ObjectAttributes(
-            999555L,
-            5,
-            "Add awesome feature",
-            "This MR adds an awesome feature",
-            state,
-            action,
-            "feature/awesome-feature",
-            "main",
-            false,
-            12345L,
-            null,
-            null,
-            "2024-01-15T10:00:00Z",
-            "2024-01-15T10:00:00Z",
-            null,
-            null,
-            "https://gitlab.com/gitlab-org/gitlab/-/merge_requests/5",
-            null,
-            null
-        );
+                999555L,
+                5,
+                "Add awesome feature",
+                "This MR adds an awesome feature",
+                state,
+                action,
+                "feature/awesome-feature",
+                "main",
+                false,
+                12345L,
+                null,
+                null,
+                "2024-01-15T10:00:00Z",
+                "2024-01-15T10:00:00Z",
+                null,
+                null,
+                "https://gitlab.com/gitlab-org/gitlab/-/merge_requests/5",
+                null,
+                null);
         return new GitLabMergeRequestEventDTO(
-            "merge_request",
-            confidential ? "confidential_merge_request" : "merge_request",
-            createUser(),
-            createProject(),
-            attrs,
-            List.of(new GitLabWebhookLabel(101L, "feature", "#0075ca")),
-            null,
-            null
-        );
+                "merge_request",
+                confidential ? "confidential_merge_request" : "merge_request",
+                createUser(),
+                createProject(),
+                attrs,
+                List.of(new GitLabWebhookLabel(101L, "feature", "#0075ca")),
+                null,
+                null);
     }
 
     private GitLabWebhookUser createUser() {
         return new GitLabWebhookUser(
-            12345L,
-            "testuser",
-            "Test User",
-            "https://gitlab.com/uploads/-/system/user/avatar/12345/avatar.png",
-            null
-        );
+                12345L,
+                "testuser",
+                "Test User",
+                "https://gitlab.com/uploads/-/system/user/avatar/12345/avatar.png",
+                null);
     }
 
     private GitLabWebhookProject createProject() {

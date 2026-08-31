@@ -39,7 +39,9 @@ class AgentQueueHealthSamplerTest extends BaseUnitTest {
         sampler.sample();
 
         assertThat(gauge("agent.queue.depth")).isZero();
-        assertThat(gauge("agent.queue.held")).as("12 jobs are parked on a cap, not absent").isEqualTo(12);
+        assertThat(gauge("agent.queue.held"))
+                .as("12 jobs are parked on a cap, not absent")
+                .isEqualTo(12);
     }
 
     @Test
@@ -55,14 +57,15 @@ class AgentQueueHealthSamplerTest extends BaseUnitTest {
     @Test
     void keepsTheLastGoodHeldValueWhenTheSampleFails() {
         when(jobRepository.queueHealthSnapshot(any()))
-            .thenReturn(snapshot(0, null, 7, 0))
-            .thenThrow(new IllegalStateException("connection reset"));
+                .thenReturn(snapshot(0, null, 7, 0))
+                .thenThrow(new IllegalStateException("connection reset"));
 
         sampler.sample();
         sampler.sample();
 
         assertThat(gauge("agent.queue.held")).isEqualTo(7);
-        assertThat(registry.get("agent.queue.health.sampler.failures").counter().count()).isEqualTo(1);
+        assertThat(registry.get("agent.queue.health.sampler.failures").counter().count())
+                .isEqualTo(1);
     }
 
     private double gauge(String name) {
@@ -70,11 +73,7 @@ class AgentQueueHealthSamplerTest extends BaseUnitTest {
     }
 
     private static AgentJobRepository.QueueHealthSnapshot snapshot(
-        long depth,
-        @org.jspecify.annotations.Nullable Instant oldestAvailableAt,
-        long held,
-        long running
-    ) {
+            long depth, @org.jspecify.annotations.Nullable Instant oldestAvailableAt, long held, long running) {
         return new AgentJobRepository.QueueHealthSnapshot() {
             @Override
             public long getDepth() {

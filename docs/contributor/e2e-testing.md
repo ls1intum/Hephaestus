@@ -1,3 +1,8 @@
+---
+title: End-to-end testing
+description: How the Playwright suite is structured and how to run it locally.
+---
+
 # Live practice-review E2E
 
 This setup runs the complete local path: workspace creation, SCM sync, job execution in Docker, LLM
@@ -14,7 +19,7 @@ The opt-in `e2e` profile enables these local-only capabilities:
 | Dev review trigger | `hephaestus.dev.trigger-enabled=true` |
 | PostgreSQL job executor | `hephaestus.agent.enabled=true` |
 
-`pnpm dev:server:e2e` starts Postgres and NATS before activating the profile.
+`pnpm run dev:server:e2e` starts Postgres and NATS before activating the profile.
 
 Do not expose this profile outside a trusted development machine: it enables passwordless app-admin
 login. The setup script accepts only loopback application and database URLs. The application server
@@ -25,10 +30,10 @@ the host firewall or an isolated development network.
 
 ```bash
 # Terminal 1
-pnpm dev:server:e2e
+pnpm run dev:server:e2e
 
 # Terminal 2
-pnpm dev:webapp
+pnpm run dev:webapp
 
 # Terminal 3: read secrets without placing them in shell history.
 read -rsp "SCM PAT: " E2E_GITLAB_PAT && echo && export E2E_GITLAB_PAT
@@ -36,7 +41,7 @@ read -rsp "LLM key: " E2E_LLM_KEY && echo && export E2E_LLM_KEY
 export E2E_LLM_PRICING_MODE=PRICED
 export E2E_LLM_INPUT_USD="$YOUR_CONTRACT_INPUT_RATE_PER_1M"
 export E2E_LLM_OUTPUT_USD="$YOUR_CONTRACT_OUTPUT_RATE_PER_1M"
-scripts/e2e-setup.sh \
+pnpm run e2e:setup -- \
   --account-login group/subgroup \
   --repo group/subgroup/project \
   --llm-base-url https://llm.example/v1 \
@@ -56,7 +61,8 @@ Existing resources are reused only when their immutable SCM and model-routing fi
 
 ## Running the review
 
-The script prints the dev-trigger command after sync has produced a suitable artifact:
+The setup output identifies the workspace and, when one has synced, the selected artifact. Use those
+IDs with the dev trigger:
 
 ```bash
 JWT="$(curl -fsS -i -X POST http://localhost:8080/auth/dev-login \

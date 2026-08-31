@@ -21,45 +21,39 @@ class ReviewArtifactResolver {
 
     /** Fallback labels for an artifact whose job row no longer resolves; the job's own title wins. */
     private static final Map<ArtifactKind, String> TITLES = Map.of(
-        ArtifactKinds.PULL_REQUEST,
-        "Pull request",
-        ArtifactKinds.ISSUE,
-        "Issue",
-        ArtifactKinds.CONVERSATION_THREAD,
-        "Conversation"
-    );
+            ArtifactKinds.PULL_REQUEST,
+            "Pull request",
+            ArtifactKinds.ISSUE,
+            "Issue",
+            ArtifactKinds.CONVERSATION_THREAD,
+            "Conversation");
 
     private final ReviewRunTargetLookup targetLookup;
 
     Map<ArtifactRef, ReviewArtifactDTO> resolve(Long workspaceId, Collection<ArtifactRef> refs) {
         Map<UUID, Target> targets = targetLookup.findByJobIds(
-            workspaceId,
-            refs.stream().map(ArtifactRef::jobId).distinct().toList()
-        );
-        return refs
-            .stream()
-            .distinct()
-            .collect(Collectors.toUnmodifiableMap(Function.identity(), ref -> resolve(ref, targets.get(ref.jobId()))));
+                workspaceId, refs.stream().map(ArtifactRef::jobId).distinct().toList());
+        return refs.stream()
+                .distinct()
+                .collect(Collectors.toUnmodifiableMap(
+                        Function.identity(), ref -> resolve(ref, targets.get(ref.jobId()))));
     }
 
     private static ReviewArtifactDTO resolve(ArtifactRef ref, @Nullable Target target) {
-        if (
-            target == null ||
-            !target.type().equals(ref.type()) ||
-            (target.id() != null && !target.id().equals(ref.id()))
-        ) {
+        if (target == null
+                || !target.type().equals(ref.type())
+                || (target.id() != null && !target.id().equals(ref.id()))) {
             return unresolved(ref);
         }
         return new ReviewArtifactDTO(
-            ref.type(),
-            ref.id(),
-            target.provider(),
-            target.number(),
-            target.title(),
-            target.repositoryName(),
-            target.channelName(),
-            target.url()
-        );
+                ref.type(),
+                ref.id(),
+                target.provider(),
+                target.number(),
+                target.title(),
+                target.repositoryName(),
+                target.channelName(),
+                target.url());
     }
 
     private static ReviewArtifactDTO unresolved(ArtifactRef ref) {

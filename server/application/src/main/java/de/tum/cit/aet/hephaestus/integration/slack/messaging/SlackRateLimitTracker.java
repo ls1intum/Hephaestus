@@ -80,11 +80,10 @@ public class SlackRateLimitTracker {
         state.throttledUntil.set(observedAt.plusMillis(retryAfterMillis));
         state.throttleCount.incrementAndGet();
         log.debug(
-            "slack.ratelimit: observed 429: workspaceId={}, retryAfterMs={}, throttledUntil={}",
-            workspaceId,
-            retryAfterMillis,
-            state.throttledUntil.get()
-        );
+                "slack.ratelimit: observed 429: workspaceId={}, retryAfterMs={}, throttledUntil={}",
+                workspaceId,
+                retryAfterMillis,
+                state.throttledUntil.get());
     }
 
     /**
@@ -140,34 +139,30 @@ public class SlackRateLimitTracker {
     private void registerMetrics(long workspaceId, WorkspaceThrottleState state) {
         Tags tags = Tags.of("workspace_id", String.valueOf(workspaceId));
         Gauge.builder(METRIC_PREFIX + ".throttles", state, s -> s.throttleCount.doubleValue())
-            .tags(tags)
-            .description("Number of Slack API throttle (429) responses observed for this workspace")
-            .register(meterRegistry);
+                .tags(tags)
+                .description("Number of Slack API throttle (429) responses observed for this workspace")
+                .register(meterRegistry);
         Gauge.builder(METRIC_PREFIX + ".throttled_until_seconds", state, s -> {
-            Instant until = s.throttledUntil.get();
-            if (until == null) {
-                return 0.0;
-            }
-            return Math.max(0, Duration.between(Instant.now(), until).getSeconds());
-        })
-            .tags(tags)
-            .description("Seconds remaining on the last Slack Retry-After back-off for this workspace")
-            .register(meterRegistry);
+                    Instant until = s.throttledUntil.get();
+                    if (until == null) {
+                        return 0.0;
+                    }
+                    return Math.max(0, Duration.between(Instant.now(), until).getSeconds());
+                })
+                .tags(tags)
+                .description("Seconds remaining on the last Slack Retry-After back-off for this workspace")
+                .register(meterRegistry);
     }
 
     private void deregisterMetrics(long workspaceId) {
         String workspaceTag = String.valueOf(workspaceId);
         List<Meter.Id> toRemove = new ArrayList<>();
-        meterRegistry
-            .getMeters()
-            .forEach(meter -> {
-                if (
-                    meter.getId().getName().startsWith(METRIC_PREFIX) &&
-                    workspaceTag.equals(meter.getId().getTag("workspace_id"))
-                ) {
-                    toRemove.add(meter.getId());
-                }
-            });
+        meterRegistry.getMeters().forEach(meter -> {
+            if (meter.getId().getName().startsWith(METRIC_PREFIX)
+                    && workspaceTag.equals(meter.getId().getTag("workspace_id"))) {
+                toRemove.add(meter.getId());
+            }
+        });
         for (Meter.Id id : toRemove) {
             meterRegistry.remove(id);
         }

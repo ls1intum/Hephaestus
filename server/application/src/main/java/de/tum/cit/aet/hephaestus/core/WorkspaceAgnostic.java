@@ -29,7 +29,7 @@ import java.lang.annotation.Target;
  * a workspace-scoped table causes {@code TenancyViolationException} under
  * {@code hephaestus.tenancy.enforcement=throw}.
  */
-@Target({ ElementType.TYPE, ElementType.METHOD })
+@Target({ElementType.TYPE, ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 public @interface WorkspaceAgnostic {

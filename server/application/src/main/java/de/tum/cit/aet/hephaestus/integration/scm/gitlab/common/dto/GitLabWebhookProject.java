@@ -15,8 +15,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitLabWebhookProject(
-    Long id,
-    String name,
-    @JsonProperty("web_url") String webUrl,
-    @JsonProperty("path_with_namespace") String pathWithNamespace
-) {}
+        Long id,
+        String name,
+        @JsonProperty("web_url") String webUrl,
+        @JsonProperty("path_with_namespace") String pathWithNamespace) {}

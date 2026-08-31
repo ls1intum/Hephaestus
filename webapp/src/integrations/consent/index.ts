@@ -1,49 +1,24 @@
-/**
- * Cookie/tracking consent store.
- *
- * Essential cookies (session, CSRF, OAuth-state) are always on and not represented here. The two
- * optional categories are opt-in: `analytics` → PostHog, `errorMonitoring` → Sentry. Until a
- * decision is stored the banner is shown and both stay disabled.
- */
 import { useSyncExternalStore } from "react";
 import { z } from "zod";
-import { isPosthogEnabled } from "@/integrations/posthog/config";
+
 import { isSentryConfigured } from "@/integrations/sentry/config";
 
 export const CONSENT_STORAGE_KEY = "hephaestus-cookie-consent";
 
-/**
- * Configured in THIS deployment. PostHog and Sentry are the only non-essential cookie consumers, and
- * an unconfigured one can never set a cookie because it never initialises.
- */
-export const analyticsConfigured = isPosthogEnabled;
 export const errorMonitoringConfigured = isSentryConfigured;
 
-/**
- * When false the app uses essential cookies only, which need no consent under ePrivacy Art. 5(3) /
- * German TDDDG §25, so the whole consent surface is suppressed. A decision stored while an
- * integration WAS configured is inert and deliberately not cleared, so it is honoured again if that
- * integration ever returns.
- */
-export const optionalIntegrationsAvailable = analyticsConfigured || errorMonitoringConfigured;
+export const optionalIntegrationsAvailable = errorMonitoringConfigured;
 
-/**
- * Bump when the cookie categories or privacy policy change. A stored decision with a missing or
- * lower version is treated as "no decision" so existing users are re-prompted (GDPR Art. 7 — consent
- * must be informed and specific; a changed policy invalidates the prior, narrower consent).
- */
-export const CONSENT_VERSION = 1;
+/** Increment when the consent categories or their purposes change. */
+export const CONSENT_VERSION = 2;
 
 export interface CookieConsent {
-	analytics: boolean;
 	errorMonitoring: boolean;
 	decidedAt: string;
-	/** The {@link CONSENT_VERSION} this decision was made against. */
 	version: number;
 }
 
-/** The opt-in choices a user can toggle (essential cookies are always on, not represented here). */
-export type ConsentChoice = Pick<CookieConsent, "analytics" | "errorMonitoring">;
+export type ConsentChoice = Pick<CookieConsent, "errorMonitoring">;
 
 type ConsentListener = () => void;
 
@@ -59,10 +34,9 @@ function emitChange() {
 // value, so the parsed object is memoised by the raw string it was parsed from.
 let cachedRaw: string | null = null;
 let cachedConsent: CookieConsent | null = null;
+let cacheInitialized = false;
 
-/** Shape-checked rather than asserted: this value comes from localStorage, which anything can write. */
 const storedConsentSchema = z.object({
-	analytics: z.boolean(),
 	errorMonitoring: z.boolean(),
 	decidedAt: z.string().optional(),
 	version: z.number(),
@@ -80,7 +54,6 @@ function parseConsent(raw: string): CookieConsent | null {
 		return null;
 	}
 	return {
-		analytics: parsed.data.analytics,
 		errorMonitoring: parsed.data.errorMonitoring,
 		decidedAt: parsed.data.decidedAt ?? new Date().toISOString(),
 		version: CONSENT_VERSION,
@@ -97,9 +70,10 @@ export function getStoredConsent(): CookieConsent | null {
 	} catch {
 		return null;
 	}
-	if (raw === cachedRaw) {
+	if (cacheInitialized && raw === cachedRaw) {
 		return cachedConsent;
 	}
+	cacheInitialized = true;
 	cachedRaw = raw;
 	cachedConsent = raw ? parseConsent(raw) : null;
 	return cachedConsent;
@@ -110,7 +84,6 @@ export function setStoredConsent(consent: ConsentChoice) {
 		return;
 	}
 	const value: CookieConsent = {
-		analytics: consent.analytics,
 		errorMonitoring: consent.errorMonitoring,
 		decidedAt: new Date().toISOString(),
 		version: CONSENT_VERSION,
@@ -118,19 +91,15 @@ export function setStoredConsent(consent: ConsentChoice) {
 	try {
 		window.localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify(value));
 	} catch {
-		// localStorage may be unavailable (private mode / disabled); fall back to in-memory only.
+		// localStorage may be unavailable (private mode / disabled); fall through so the banner
+		// still closes and subscribers re-read — the decision is simply not persisted.
 	}
 	closeConsentReopen();
 	emitChange();
 }
 
-// Set while the banner is showing because the user asked for it, not because no decision exists yet.
 let reopenRequested = false;
 
-/**
- * Re-open the consent banner in edit mode. Satisfies GDPR Art. 7(3) — withdrawing consent is as easy
- * as giving it — without destroying the prior decision, which a passive revisit must not do.
- */
 export function requestConsentReopen() {
 	reopenRequested = true;
 	emitChange();

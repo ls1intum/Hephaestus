@@ -50,12 +50,12 @@ class OutlineConnectionStateListenerTest extends BaseUnitTest {
     private void runJobsSynchronously(SyncJobHandle handle) {
         // SyncJobService always passes a non-null handle (started.handle()); the body reads it to honor cancel.
         doAnswer(invocation -> {
-            Consumer<SyncJobHandle> body = invocation.getArgument(1);
-            body.accept(handle);
-            return null;
-        })
-            .when(syncJobService)
-            .run(any(SyncJobRequest.class), any());
+                    Consumer<SyncJobHandle> body = invocation.getArgument(1);
+                    body.accept(handle);
+                    return null;
+                })
+                .when(syncJobService)
+                .run(any(SyncJobRequest.class), any());
     }
 
     @Test
@@ -109,13 +109,10 @@ class OutlineConnectionStateListenerTest extends BaseUnitTest {
         doThrow(new SyncJobConflictException(activeJob)).when(syncJobService).run(any(), any());
 
         assertThatCode(() ->
-            listener.onActivated(new ConnectionLifecycleEvent.Activated(42L, 5L, IntegrationKind.OUTLINE))
-        ).doesNotThrowAnyException();
-        verify(syncScheduler, never()).syncWorkspaceNow(
-            eq(5L),
-            any(SyncExecutionHandle.class),
-            eq(SyncJobType.INITIAL)
-        );
+                        listener.onActivated(new ConnectionLifecycleEvent.Activated(42L, 5L, IntegrationKind.OUTLINE)))
+                .doesNotThrowAnyException();
+        verify(syncScheduler, never())
+                .syncWorkspaceNow(eq(5L), any(SyncExecutionHandle.class), eq(SyncJobType.INITIAL));
     }
 
     @Test
@@ -135,11 +132,13 @@ class OutlineConnectionStateListenerTest extends BaseUnitTest {
 
     @Test
     void connectTimeFailure_neverPropagatesOffTheAsyncThread() {
-        doThrow(new IllegalStateException("outline is down")).when(webhookRegistrar).ensureSubscription(5L);
+        doThrow(new IllegalStateException("outline is down"))
+                .when(webhookRegistrar)
+                .ensureSubscription(5L);
 
         assertThatCode(() ->
-            listener.onActivated(new ConnectionLifecycleEvent.Activated(42L, 5L, IntegrationKind.OUTLINE))
-        ).doesNotThrowAnyException();
+                        listener.onActivated(new ConnectionLifecycleEvent.Activated(42L, 5L, IntegrationKind.OUTLINE)))
+                .doesNotThrowAnyException();
         verify(syncJobService, times(0)).run(any(), any());
     }
 }

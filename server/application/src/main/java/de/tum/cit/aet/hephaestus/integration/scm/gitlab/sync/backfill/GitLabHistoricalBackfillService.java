@@ -64,12 +64,11 @@ public class GitLabHistoricalBackfillService {
     private final Map<Long, Cooldown> repositoryCooldowns = new ConcurrentHashMap<>();
 
     public GitLabHistoricalBackfillService(
-        SyncTargetProvider syncTargetProvider,
-        RepositoryRepository repositoryRepository,
-        OrganizationRepository organizationRepository,
-        ObjectProvider<GitLabSyncServiceHolder> syncServiceHolderProvider,
-        SyncSchedulerProperties syncSchedulerProperties
-    ) {
+            SyncTargetProvider syncTargetProvider,
+            RepositoryRepository repositoryRepository,
+            OrganizationRepository organizationRepository,
+            ObjectProvider<GitLabSyncServiceHolder> syncServiceHolderProvider,
+            SyncSchedulerProperties syncSchedulerProperties) {
         this.syncTargetProvider = syncTargetProvider;
         this.repositoryRepository = repositoryRepository;
         this.organizationRepository = organizationRepository;
@@ -112,11 +111,9 @@ public class GitLabHistoricalBackfillService {
         GitLabMergeRequestSyncService mrSync = services.getMergeRequestSyncService();
         if (issueSync == null && mrSync == null) return 0;
 
-        List<SyncSession> sessions = syncTargetProvider
-            .getSyncSessions(IntegrationKind.GITLAB)
-            .stream()
-            .filter(session -> scopeFilter == null || scopeFilter.equals(session.scopeId()))
-            .toList();
+        List<SyncSession> sessions = syncTargetProvider.getSyncSessions(IntegrationKind.GITLAB).stream()
+                .filter(session -> scopeFilter == null || scopeFilter.equals(session.scopeId()))
+                .toList();
         if (sessions.isEmpty()) return 0;
 
         int batchSize = syncSchedulerProperties.backfill().batchSize();
@@ -132,11 +129,9 @@ public class GitLabHistoricalBackfillService {
             // Scoped per session because that is the grain the refresh below can re-read cheaply. Only
             // the handle-driven path reports at all, and it always filters to exactly one session.
             BackfillTally tally = new BackfillTally(session.syncTargets());
-            int reposTotal = (int) session
-                .syncTargets()
-                .stream()
-                .filter(t -> !t.isBackfillComplete())
-                .count();
+            int reposTotal = (int) session.syncTargets().stream()
+                    .filter(t -> !t.isBackfillComplete())
+                    .count();
             int reposDone = 0;
 
             for (SyncTarget target : session.syncTargets()) {
@@ -151,12 +146,9 @@ public class GitLabHistoricalBackfillService {
                     continue;
                 }
 
-                Optional<Repository> repoOpt =
-                    providerId != null
+                Optional<Repository> repoOpt = providerId != null
                         ? repositoryRepository.findByNameWithOwnerAndProviderId(
-                              target.repositoryNameWithOwner(),
-                              providerId
-                          )
+                                target.repositoryNameWithOwner(), providerId)
                         : repositoryRepository.findByNameWithOwner(target.repositoryNameWithOwner());
 
                 if (repoOpt.isEmpty()) continue;
@@ -176,16 +168,15 @@ public class GitLabHistoricalBackfillService {
                     // 25-page GitHub batch takes.
                     tally.refresh(syncTargetProvider.getSyncTargetsForScope(session.scopeId()));
                     handle.progress(
-                        tally.itemsProcessed(),
-                        tally.itemsTotal(),
-                        SyncProgress.ofResource(
-                            SyncPhase.REPOSITORIES,
-                            "Backfilled " + target.repositoryNameWithOwner() + " — " + reposDone + " of " + reposTotal,
-                            target.repositoryNameWithOwner(),
-                            reposDone,
-                            reposTotal
-                        )
-                    );
+                            tally.itemsProcessed(),
+                            tally.itemsTotal(),
+                            SyncProgress.ofResource(
+                                    SyncPhase.REPOSITORIES,
+                                    "Backfilled " + target.repositoryNameWithOwner() + " — " + reposDone + " of "
+                                            + reposTotal,
+                                    target.repositoryNameWithOwner(),
+                                    reposDone,
+                                    reposTotal));
                 }
             }
         }
@@ -194,25 +185,20 @@ public class GitLabHistoricalBackfillService {
     }
 
     private boolean backfillRepository(
-        Long scopeId,
-        Repository repo,
-        SyncTarget target,
-        @Nullable GitLabIssueSyncService issueSync,
-        @Nullable GitLabMergeRequestSyncService mrSync,
-        int batchSize
-    ) {
+            Long scopeId,
+            Repository repo,
+            SyncTarget target,
+            @Nullable GitLabIssueSyncService issueSync,
+            @Nullable GitLabMergeRequestSyncService mrSync,
+            int batchSize) {
         String safeName = sanitizeForLog(repo.getNameWithOwner());
         boolean didWork = false;
 
         // Backfill issues
         if (issueSync != null && !target.isIssueBackfillComplete()) {
             try {
-                BackfillBatchResult result = issueSync.backfillIssues(
-                    scopeId,
-                    repo,
-                    target.issueSyncCursor(),
-                    batchSize
-                );
+                BackfillBatchResult result =
+                        issueSync.backfillIssues(scopeId, repo, target.issueSyncCursor(), batchSize);
 
                 if (result.aborted()) {
                     repositoryCooldowns.put(target.id(), Cooldown.afterError(COOLDOWN_ERROR));
@@ -238,12 +224,8 @@ public class GitLabHistoricalBackfillService {
         // Backfill merge requests
         if (mrSync != null && !target.isPullRequestBackfillComplete()) {
             try {
-                BackfillBatchResult result = mrSync.backfillMergeRequests(
-                    scopeId,
-                    repo,
-                    target.pullRequestSyncCursor(),
-                    batchSize
-                );
+                BackfillBatchResult result =
+                        mrSync.backfillMergeRequests(scopeId, repo, target.pullRequestSyncCursor(), batchSize);
 
                 if (result.aborted()) {
                     repositoryCooldowns.put(target.id(), Cooldown.afterError(COOLDOWN_ERROR));
@@ -349,8 +331,8 @@ public class GitLabHistoricalBackfillService {
      */
     private @Nullable Long getGitLabProviderId(String accountLogin) {
         return organizationRepository
-            .findByLoginIgnoreCaseAndProvider_Type(accountLogin, IdentityProviderType.GITLAB)
-            .map(org -> org.getProvider() != null ? org.getProvider().getId() : null)
-            .orElse(null);
+                .findByLoginIgnoreCaseAndProvider_Type(accountLogin, IdentityProviderType.GITLAB)
+                .map(org -> org.getProvider() != null ? org.getProvider().getId() : null)
+                .orElse(null);
     }
 }

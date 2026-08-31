@@ -25,10 +25,8 @@ class MentorContextKeysRunnerMirrorTest {
 
     private static final Path RUNNER = Path.of("src", "main", "resources", "agent", "pi-mentor-runner.ts");
     private static final Path SYSTEM_PROMPT = Path.of("src", "main", "resources", "agent", "mentor", "system.md");
-    private static final Pattern ALLOWED_BLOCK = Pattern.compile(
-        "const FETCH_CONTEXT_ALLOWED = new Set\\(\\[(.*?)\\]\\);",
-        Pattern.DOTALL
-    );
+    private static final Pattern ALLOWED_BLOCK =
+            Pattern.compile("const FETCH_CONTEXT_ALLOWED = new Set\\(\\[(.*?)\\]\\);", Pattern.DOTALL);
     private static final Pattern STRING_LITERAL = Pattern.compile("\"([^\"]+)\"");
 
     @Test
@@ -36,32 +34,32 @@ class MentorContextKeysRunnerMirrorTest {
     void runnerWhitelistMirrorsJavaSource() throws IOException {
         String source = Files.readString(RUNNER, StandardCharsets.UTF_8);
         Matcher block = ALLOWED_BLOCK.matcher(source);
-        assertThat(block.find()).as("FETCH_CONTEXT_ALLOWED block present in pi-mentor-runner.ts").isTrue();
+        assertThat(block.find())
+                .as("FETCH_CONTEXT_ALLOWED block present in pi-mentor-runner.ts")
+                .isTrue();
 
-        Set<String> jsKeys = STRING_LITERAL.matcher(block.group(1))
-            .results()
-            .map(m -> m.group(1))
-            .collect(Collectors.toSet());
+        Set<String> jsKeys = STRING_LITERAL
+                .matcher(block.group(1))
+                .results()
+                .map(m -> m.group(1))
+                .collect(Collectors.toSet());
 
         assertThat(jsKeys)
-            .as("runner JS whitelist must equal the Java context output keys")
-            .isEqualTo(MentorContextKeys.ALLOWED_OUTPUT_KEYS);
+                .as("runner JS whitelist must equal the Java context output keys")
+                .isEqualTo(MentorContextKeys.ALLOWED_OUTPUT_KEYS);
     }
 
     @Test
     @DisplayName("system prompt lists every mentor context file path")
     void systemPromptListsContextBasenames() throws IOException {
         String prompt = Files.readString(SYSTEM_PROMPT, StandardCharsets.UTF_8);
-        String perTurnInputSection = prompt.substring(
-            prompt.indexOf("## Per-turn input"),
-            prompt.indexOf("## When to use tools")
-        );
+        String perTurnInputSection =
+                prompt.substring(prompt.indexOf("## Per-turn input"), prompt.indexOf("## When to use tools"));
 
-        assertThat(MentorContextKeys.ALLOWED_OUTPUT_KEYS).allSatisfy(key ->
-            assertThat(perTurnInputSection)
-                .as("system prompt should document context file %s in the per-turn input list", key)
-                .contains("`" + key + "`")
-        );
+        assertThat(MentorContextKeys.ALLOWED_OUTPUT_KEYS)
+                .allSatisfy(key -> assertThat(perTurnInputSection)
+                        .as("system prompt should document context file %s in the per-turn input list", key)
+                        .contains("`" + key + "`"));
     }
 
     @Test
@@ -70,8 +68,8 @@ class MentorContextKeysRunnerMirrorTest {
         String source = Files.readString(RUNNER, StandardCharsets.UTF_8);
 
         assertThat(source)
-            .contains("tools: [...MENTOR_TOOL_NAMES]")
-            .contains("\"inputs/context/recent_authored_work.json\"")
-            .doesNotContain("tools: [\"fetch_context\", \"link_observation\", \"read\", \"bash\", \"grep\"]");
+                .contains("tools: [...MENTOR_TOOL_NAMES]")
+                .contains("\"inputs/context/recent_authored_work.json\"")
+                .doesNotContain("tools: [\"fetch_context\", \"link_observation\", \"read\", \"bash\", \"grep\"]");
     }
 }

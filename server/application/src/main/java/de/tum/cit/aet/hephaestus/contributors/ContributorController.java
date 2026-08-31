@@ -31,9 +31,8 @@ public class ContributorController {
      */
     @GetMapping
     @Operation(
-        summary = "List global contributors",
-        description = "Returns contributors to the Hephaestus project (for the About page)"
-    )
+            summary = "List global contributors",
+            description = "Returns contributors to the Hephaestus project (for the About page)")
     @SecurityRequirements
     public ResponseEntity<List<ContributorDTO>> listGlobalContributors() {
         return ResponseEntity.ok(contributorService.getGlobalContributors());

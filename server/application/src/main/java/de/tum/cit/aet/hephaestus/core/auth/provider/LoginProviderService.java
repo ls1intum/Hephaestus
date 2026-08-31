@@ -76,13 +76,12 @@ public class LoginProviderService {
     private final OutlineOriginPolicy outlineOriginPolicy;
 
     public LoginProviderService(
-        LoginProviderRepository repository,
-        LoginProviderClientRegistrationRepository registrationCache,
-        AuthProperties authProperties,
-        AuthEventLogger authEventLogger,
-        ObjectMapper objectMapper,
-        OutlineOriginPolicy outlineOriginPolicy
-    ) {
+            LoginProviderRepository repository,
+            LoginProviderClientRegistrationRepository registrationCache,
+            AuthProperties authProperties,
+            AuthEventLogger authEventLogger,
+            ObjectMapper objectMapper,
+            OutlineOriginPolicy outlineOriginPolicy) {
         this.repository = repository;
         this.registrationCache = registrationCache;
         this.authProperties = authProperties;
@@ -94,7 +93,9 @@ public class LoginProviderService {
     /** Enabled providers for the login page / discovery, stable order. */
     @Transactional(readOnly = true)
     public List<LoginProvider> listEnabled() {
-        return repository.findByEnabledTrueOrderByDisplayNameAsc().stream().filter(this::isApproved).toList();
+        return repository.findByEnabledTrueOrderByDisplayNameAsc().stream()
+                .filter(this::isApproved)
+                .toList();
     }
 
     /** All providers (incl. disabled) for the admin UI, stable order. */
@@ -111,9 +112,9 @@ public class LoginProviderService {
     @Transactional(readOnly = true)
     public java.util.Optional<LoginProvider> findEnabled(String registrationId) {
         return repository
-            .findByRegistrationId(registrationId)
-            .filter(LoginProvider::isEnabled)
-            .filter(this::isApproved);
+                .findByRegistrationId(registrationId)
+                .filter(LoginProvider::isEnabled)
+                .filter(this::isApproved);
     }
 
     @Transactional(readOnly = true)
@@ -123,27 +124,24 @@ public class LoginProviderService {
 
     private LoginProvider loadRequired(String registrationId) {
         return repository
-            .findByRegistrationId(registrationId)
-            .orElseThrow(() ->
-                new ResponseStatusException(HttpStatus.NOT_FOUND, "no login provider: " + registrationId)
-            );
+                .findByRegistrationId(registrationId)
+                .orElseThrow(() ->
+                        new ResponseStatusException(HttpStatus.NOT_FOUND, "no login provider: " + registrationId));
     }
 
     /** Create a new login provider (instance admin). The client secret is sealed at rest. */
     @Transactional
     public LoginProvider create(Draft draft) {
-        String registrationId = draft.registrationId() == null ? "" : draft.registrationId().trim();
+        String registrationId =
+                draft.registrationId() == null ? "" : draft.registrationId().trim();
         if (!registrationId.matches("^[a-z][a-z0-9-]{1,62}$")) {
             throw new ResponseStatusException(
-                HttpStatus.UNPROCESSABLE_ENTITY,
-                "registrationId must be 2-63 chars: lowercase letter then lowercase letters, digits, or hyphens"
-            );
+                    HttpStatus.UNPROCESSABLE_ENTITY,
+                    "registrationId must be 2-63 chars: lowercase letter then lowercase letters, digits, or hyphens");
         }
         if (repository.existsByRegistrationId(registrationId)) {
             throw new ResponseStatusException(
-                HttpStatus.CONFLICT,
-                "a login provider '" + registrationId + "' already exists"
-            );
+                    HttpStatus.CONFLICT, "a login provider '" + registrationId + "' already exists");
         }
         LoginProvider provider = new LoginProvider();
         provider.setRegistrationId(registrationId);
@@ -229,10 +227,10 @@ public class LoginProviderService {
             details.put("changed", changed);
         }
         authEventLogger
-            .event(type, AuthEvent.Result.SUCCESS)
-            .actingAccount(SecurityUtils.getCurrentAccountId().orElse(null))
-            .details(objectMapper.writeValueAsString(details))
-            .record();
+                .event(type, AuthEvent.Result.SUCCESS)
+                .actingAccount(SecurityUtils.getCurrentAccountId().orElse(null))
+                .details(objectMapper.writeValueAsString(details))
+                .record();
     }
 
     /**
@@ -259,12 +257,11 @@ public class LoginProviderService {
                 // Half a credential: seeding it would offer an ENABLED provider whose every OAuth exchange
                 // 401s at the IdP with an opaque error. Skip it — and say exactly which env var is missing.
                 log.error(
-                    "auth.login-provider: NOT seeding '{}' — it is half-configured: {} is blank. " +
-                        "Set {}, or clear the other half to disable this provider entirely.",
-                    id,
-                    seed.missingCredentialField(),
-                    envKnobFor(id, seed.missingCredentialField())
-                );
+                        "auth.login-provider: NOT seeding '{}' — it is half-configured: {} is blank. "
+                                + "Set {}, or clear the other half to disable this provider entirely.",
+                        id,
+                        seed.missingCredentialField(),
+                        envKnobFor(id, seed.missingCredentialField()));
                 return;
             }
             if (!seed.configured()) {
@@ -272,10 +269,9 @@ public class LoginProviderService {
             }
             if (!id.matches("^[a-z][a-z0-9-]{1,62}$")) {
                 log.error(
-                    "auth.login-provider: NOT seeding '{}' — invalid registration id. It must be 2-63 chars: " +
-                        "a lowercase letter followed by lowercase letters, digits, or hyphens (e.g. 'gitlab-lrz').",
-                    registrationId
-                );
+                        "auth.login-provider: NOT seeding '{}' — invalid registration id. It must be 2-63 chars: "
+                                + "a lowercase letter followed by lowercase letters, digits, or hyphens (e.g. 'gitlab-lrz').",
+                        registrationId);
                 return;
             }
             if (repository.existsByRegistrationId(id)) {
@@ -288,39 +284,35 @@ public class LoginProviderService {
                 // The common self-hosted-Outline / self-hosted-GitLab trip-wire: credentials set, base URL
                 // blank, http://, or a private/internal address (rejected by the SSRF guard).
                 log.error(
-                    "auth.login-provider: NOT seeding '{}' ({}) — its base URL is unusable: {}. " +
-                        "Set {} to the instance's public HTTPS origin (e.g. https://wiki.example.com).",
-                    id,
-                    seed.type(),
-                    e.getReason(),
-                    envKnobFor(id, "base-url")
-                );
+                        "auth.login-provider: NOT seeding '{}' ({}) — its base URL is unusable: {}. "
+                                + "Set {} to the instance's public HTTPS origin (e.g. https://wiki.example.com).",
+                        id,
+                        seed.type(),
+                        e.getReason(),
+                        envKnobFor(id, "base-url"));
                 return;
             }
             // One login app per SCM instance (uq on type+base_url): skip a duplicate so a misconfiguration
             // can't crash startup on a constraint violation.
-            if (
-                !seededInstances.add(seed.type() + "|" + baseUrl) ||
-                repository.existsByTypeAndBaseUrl(seed.type(), baseUrl)
-            ) {
+            if (!seededInstances.add(seed.type() + "|" + baseUrl)
+                    || repository.existsByTypeAndBaseUrl(seed.type(), baseUrl)) {
                 log.warn(
-                    "auth.login-provider: skipping seed '{}' — a {} provider for {} already exists",
-                    id,
-                    seed.type(),
-                    baseUrl
-                );
+                        "auth.login-provider: skipping seed '{}' — a {} provider for {} already exists",
+                        id,
+                        seed.type(),
+                        baseUrl);
                 return;
             }
-            String displayName = seed.displayName().isBlank() ? id : seed.displayName().trim();
+            String displayName =
+                    seed.displayName().isBlank() ? id : seed.displayName().trim();
             seed(
-                id,
-                seed.type(),
-                displayName,
-                baseUrl,
-                seed.clientId().trim(),
-                seed.clientSecret(),
-                resolveScopes(seed.type(), null)
-            );
+                    id,
+                    seed.type(),
+                    displayName,
+                    baseUrl,
+                    seed.clientId().trim(),
+                    seed.clientSecret(),
+                    resolveScopes(seed.type(), null));
             log.info("auth.login-provider: seeded '{}' ({} {}) from env", id, seed.type(), baseUrl);
         });
     }
@@ -333,15 +325,7 @@ public class LoginProviderService {
      * {@code hephaestus.auth.login-providers} block.
      */
     private static final Map<String, String> SHIPPED_SLOT_ENV_PREFIX = Map.of(
-        "github",
-        "GITHUB_OAUTH",
-        "gitlab",
-        "GITLAB_OAUTH",
-        "slack",
-        "SLACK_OAUTH",
-        "outline",
-        "OUTLINE_OAUTH"
-    );
+            "github", "GITHUB_OAUTH", "gitlab", "GITLAB_OAUTH", "slack", "SLACK_OAUTH", "outline", "OUTLINE_OAUTH");
 
     private static String envKnobFor(String registrationId, String field) {
         String prefix = SHIPPED_SLOT_ENV_PREFIX.get(registrationId);
@@ -352,14 +336,13 @@ public class LoginProviderService {
     }
 
     private void seed(
-        String registrationId,
-        LoginProvider.ProviderType type,
-        String displayName,
-        String baseUrl,
-        String clientId,
-        String clientSecret,
-        String scopes
-    ) {
+            String registrationId,
+            LoginProvider.ProviderType type,
+            String displayName,
+            String baseUrl,
+            String clientId,
+            String clientSecret,
+            String scopes) {
         LoginProvider provider = new LoginProvider();
         provider.setRegistrationId(registrationId);
         provider.setType(type);
@@ -397,25 +380,18 @@ public class LoginProviderService {
             ServerUrlValidator.validate(value);
         } catch (IllegalArgumentException e) {
             throw new ResponseStatusException(
-                HttpStatus.UNPROCESSABLE_ENTITY,
-                "invalid base URL: " + e.getMessage(),
-                e
-            );
+                    HttpStatus.UNPROCESSABLE_ENTITY, "invalid base URL: " + e.getMessage(), e);
         }
         if (type == LoginProvider.ProviderType.OUTLINE && !outlineOriginPolicy.allows(value)) {
             throw new ResponseStatusException(
-                HttpStatus.UNPROCESSABLE_ENTITY,
-                "Outline origin is not approved by the instance operator"
-            );
+                    HttpStatus.UNPROCESSABLE_ENTITY, "Outline origin is not approved by the instance operator");
         }
         return value;
     }
 
     private boolean isApproved(LoginProvider provider) {
-        return (
-            provider.getType() != LoginProvider.ProviderType.OUTLINE ||
-            outlineOriginPolicy.allows(provider.getBaseUrl())
-        );
+        return (provider.getType() != LoginProvider.ProviderType.OUTLINE
+                || outlineOriginPolicy.allows(provider.getBaseUrl()));
     }
 
     private static String resolveScopes(LoginProvider.ProviderType type, @Nullable String scopes) {
@@ -444,12 +420,10 @@ public class LoginProviderService {
             for (String scope : trimmed.split("\\s+")) {
                 if (scope.equalsIgnoreCase("openid")) {
                     throw new ResponseStatusException(
-                        HttpStatus.UNPROCESSABLE_ENTITY,
-                        type +
-                            " login uses the plain OAuth2 flow — the scope must not contain 'openid' (use " +
-                            replacement +
-                            ")"
-                    );
+                            HttpStatus.UNPROCESSABLE_ENTITY,
+                            type + " login uses the plain OAuth2 flow — the scope must not contain 'openid' (use "
+                                    + replacement
+                                    + ")");
                 }
             }
         }
@@ -465,17 +439,14 @@ public class LoginProviderService {
      * non-empty "enabled" list and wave it through. Both fall out once the count is sign-in-capable only.
      */
     private void requireNotLastEnabled(String registrationId, String verb) {
-        List<LoginProvider> enabled = repository
-            .findByEnabledTrueOrderByDisplayNameAsc()
-            .stream()
-            .filter(p -> p.getType() != null && !p.getType().isLinkOnly())
-            .toList();
+        List<LoginProvider> enabled = repository.findByEnabledTrueOrderByDisplayNameAsc().stream()
+                .filter(p -> p.getType() != null && !p.getType().isLinkOnly())
+                .toList();
         boolean isLast = enabled.stream().allMatch(p -> p.getRegistrationId().equals(registrationId));
         if (!enabled.isEmpty() && isLast) {
             throw new ResponseStatusException(
-                HttpStatus.CONFLICT,
-                "cannot " + verb + " the last enabled login provider — users would be unable to sign in"
-            );
+                    HttpStatus.CONFLICT,
+                    "cannot " + verb + " the last enabled login provider — users would be unable to sign in");
         }
     }
 
@@ -492,22 +463,20 @@ public class LoginProviderService {
 
     /** Create command (instance admin). {@code scopes} may be null → defaulted by {@code type}. */
     public record Draft(
-        String registrationId,
-        LoginProvider.ProviderType type,
-        @Nullable String displayName,
-        @Nullable String baseUrl,
-        String clientId,
-        String clientSecret,
-        @Nullable String scopes
-    ) {}
+            String registrationId,
+            LoginProvider.ProviderType type,
+            @Nullable String displayName,
+            @Nullable String baseUrl,
+            String clientId,
+            String clientSecret,
+            @Nullable String scopes) {}
 
     /** Partial-update command; every field null = leave unchanged. */
     public record Patch(
-        @Nullable String displayName,
-        @Nullable String baseUrl,
-        @Nullable String clientId,
-        @Nullable String clientSecret,
-        @Nullable String scopes,
-        @Nullable Boolean enabled
-    ) {}
+            @Nullable String displayName,
+            @Nullable String baseUrl,
+            @Nullable String clientId,
+            @Nullable String clientSecret,
+            @Nullable String scopes,
+            @Nullable Boolean enabled) {}
 }

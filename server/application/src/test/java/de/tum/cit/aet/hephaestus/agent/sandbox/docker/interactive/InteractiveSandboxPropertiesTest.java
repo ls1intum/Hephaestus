@@ -23,18 +23,15 @@ class InteractiveSandboxPropertiesTest extends BaseUnitTest {
         assertThat(defaults.maxSessionsPerUser()).isEqualTo(3);
         assertThat(defaults.maxFrameChars()).isEqualTo(1_048_576);
 
-        InteractiveSandboxProperties overridden = bind(
-            Map.of("hephaestus.mentor.idle-ttl-seconds", "60", "hephaestus.mentor.max-frame-chars", "16384")
-        );
+        InteractiveSandboxProperties overridden =
+                bind(Map.of("hephaestus.mentor.idle-ttl-seconds", "60", "hephaestus.mentor.max-frame-chars", "16384"));
         assertThat(overridden.idleTtlSeconds()).isEqualTo(60);
         assertThat(overridden.maxFrameChars()).isEqualTo(16_384);
         assertThat(overridden.ringBufferFrames()).isEqualTo(512); // unspecified → default holds
     }
 
     private static InteractiveSandboxProperties bind(Map<String, String> source) {
-        return new Binder(new MapConfigurationPropertySource(source)).bindOrCreate(
-            "hephaestus.mentor",
-            InteractiveSandboxProperties.class
-        );
+        return new Binder(new MapConfigurationPropertySource(source))
+                .bindOrCreate("hephaestus.mentor", InteractiveSandboxProperties.class);
     }
 }

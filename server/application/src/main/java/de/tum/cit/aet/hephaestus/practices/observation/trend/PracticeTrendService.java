@@ -22,35 +22,26 @@ public class PracticeTrendService {
         Map<String, PracticeTrend> trends = new LinkedHashMap<>();
         var cutoff = clock.instant().minus(properties.getHorizonDays(), ChronoUnit.DAYS);
         evidenceByPractice.forEach((slug, evidence) ->
-            trends.put(slug, PracticeTrendCalculator.calculatePractice(slug, evidence, cutoff, properties))
-        );
+                trends.put(slug, PracticeTrendCalculator.calculatePractice(slug, evidence, cutoff, properties)));
         return trends;
     }
 
     public PracticeTrend calculateGroup(
-        String groupSlug,
-        Collection<String> eligiblePracticeSlugs,
-        Collection<PracticeTrend> practiceTrends
-    ) {
+            String groupSlug, Collection<String> eligiblePracticeSlugs, Collection<PracticeTrend> practiceTrends) {
         return GroupTrendAggregator.aggregate(groupSlug, eligiblePracticeSlugs, practiceTrends, properties);
     }
 
     public PracticeGroupTrendDTO detail(
-        String groupSlug,
-        Collection<String> eligiblePracticeSlugs,
-        Map<String, List<Observation>> evidenceByPractice
-    ) {
+            String groupSlug,
+            Collection<String> eligiblePracticeSlugs,
+            Map<String, List<Observation>> evidenceByPractice) {
         Map<String, PracticeTrend> all = calculatePractices(evidenceByPractice);
-        List<PracticeTrend> practices = eligiblePracticeSlugs
-            .stream()
-            .map(slug ->
-                all.getOrDefault(
-                    slug,
-                    PracticeTrendCalculator.calculatePractice(slug, List.of(), clock.instant(), properties)
-                )
-            )
-            .toList();
+        List<PracticeTrend> practices = eligiblePracticeSlugs.stream()
+                .map(slug -> all.getOrDefault(
+                        slug, PracticeTrendCalculator.calculatePractice(slug, List.of(), clock.instant(), properties)))
+                .toList();
         PracticeTrend group = calculateGroup(groupSlug, eligiblePracticeSlugs, practices);
-        return new PracticeGroupTrendDTO(group.toDto(), practices.stream().map(PracticeTrend::toDto).toList());
+        return new PracticeGroupTrendDTO(
+                group.toDto(), practices.stream().map(PracticeTrend::toDto).toList());
     }
 }

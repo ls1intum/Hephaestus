@@ -68,8 +68,7 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = false)
 @WorkspaceAgnostic(
-    "System-wide rate-limit tracking — records Outline API limits per server origin across all workspaces"
-)
+        "System-wide rate-limit tracking — records Outline API limits per server origin across all workspaces")
 public class OutlineRateLimitTracker {
 
     static final String HEADER_LIMIT = "RateLimit-Limit";
@@ -157,12 +156,11 @@ public class OutlineRateLimitTracker {
         state.lastUpdated.set(observedAt);
         state.throttleCount.incrementAndGet();
         log.warn(
-            "outline.ratelimit: throttled by Outline: scope={}, remaining={}, limit={}, retryAfter={}",
-            scope,
-            remaining,
-            limit,
-            retryAfter
-        );
+                "outline.ratelimit: throttled by Outline: scope={}, remaining={}, limit={}, retryAfter={}",
+                scope,
+                remaining,
+                limit,
+                retryAfter);
     }
 
     /**
@@ -188,12 +186,7 @@ public class OutlineRateLimitTracker {
             return null;
         }
         return RateLimitSnapshot.observed(
-            state.limit.get(),
-            state.remaining.get(),
-            state.resetAt.get(),
-            observedAt,
-            state.throttledUntil.get()
-        );
+                state.limit.get(), state.remaining.get(), state.resetAt.get(), observedAt, state.throttledUntil.get());
     }
 
     /** Number of tracked scopes (monitoring/debugging). */
@@ -254,38 +247,37 @@ public class OutlineRateLimitTracker {
         Tags tags = Tags.of("scope", scope);
         // NaN, not 0, while unobserved: a gauge is a measurement too, and 0 would read as "exhausted".
         Gauge.builder(METRIC_PREFIX + ".remaining", state, s -> asDouble(s.remaining.get()))
-            .tags(tags)
-            .description("Outline API rate-limit requests remaining, as reported by the last 429")
-            .register(meterRegistry);
+                .tags(tags)
+                .description("Outline API rate-limit requests remaining, as reported by the last 429")
+                .register(meterRegistry);
         Gauge.builder(METRIC_PREFIX + ".limit", state, s -> asDouble(s.limit.get()))
-            .tags(tags)
-            .description("Outline API rate-limit requests allowed per window, as reported by the last 429")
-            .register(meterRegistry);
+                .tags(tags)
+                .description("Outline API rate-limit requests allowed per window, as reported by the last 429")
+                .register(meterRegistry);
         Gauge.builder(METRIC_PREFIX + ".seconds_until_reset", state, s -> {
-            Instant reset = s.resetAt.get();
-            if (reset == null) {
-                return 0.0;
-            }
-            return Math.max(0, Duration.between(Instant.now(), reset).getSeconds());
-        })
-            .tags(tags)
-            .description("Seconds until the Outline API rate-limit window resets")
-            .register(meterRegistry);
+                    Instant reset = s.resetAt.get();
+                    if (reset == null) {
+                        return 0.0;
+                    }
+                    return Math.max(0, Duration.between(Instant.now(), reset).getSeconds());
+                })
+                .tags(tags)
+                .description("Seconds until the Outline API rate-limit window resets")
+                .register(meterRegistry);
         Gauge.builder(METRIC_PREFIX + ".throttles", state, s -> s.throttleCount.doubleValue())
-            .tags(tags)
-            .description("Number of Outline API throttle (429) responses observed for this scope")
-            .register(meterRegistry);
+                .tags(tags)
+                .description("Number of Outline API throttle (429) responses observed for this scope")
+                .register(meterRegistry);
     }
 
     private void deregisterMetrics(String scope) {
         List<Meter.Id> toRemove = new ArrayList<>();
-        meterRegistry
-            .getMeters()
-            .forEach(meter -> {
-                if (meter.getId().getName().startsWith(METRIC_PREFIX) && scope.equals(meter.getId().getTag("scope"))) {
-                    toRemove.add(meter.getId());
-                }
-            });
+        meterRegistry.getMeters().forEach(meter -> {
+            if (meter.getId().getName().startsWith(METRIC_PREFIX)
+                    && scope.equals(meter.getId().getTag("scope"))) {
+                toRemove.add(meter.getId());
+            }
+        });
         for (Meter.Id id : toRemove) {
             meterRegistry.remove(id);
         }

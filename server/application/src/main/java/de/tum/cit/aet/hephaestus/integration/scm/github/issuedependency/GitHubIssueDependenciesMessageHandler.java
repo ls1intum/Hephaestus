@@ -54,8 +54,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @Component
 public class GitHubIssueDependenciesMessageHandler
-    extends AbstractIntegrationMessageHandler<GitHubIssueDependenciesEventDTO>
-{
+        extends AbstractIntegrationMessageHandler<GitHubIssueDependenciesEventDTO> {
 
     private static final Logger log = LoggerFactory.getLogger(GitHubIssueDependenciesMessageHandler.class);
 
@@ -64,19 +63,17 @@ public class GitHubIssueDependenciesMessageHandler
     private final GitHubIssueDependencySyncService issueDependencySyncService;
 
     GitHubIssueDependenciesMessageHandler(
-        ProcessingContextFactory contextFactory,
-        GitHubIssueProcessor issueProcessor,
-        GitHubIssueDependencySyncService issueDependencySyncService,
-        NatsMessageDeserializer deserializer,
-        TransactionTemplate transactionTemplate
-    ) {
+            ProcessingContextFactory contextFactory,
+            GitHubIssueProcessor issueProcessor,
+            GitHubIssueDependencySyncService issueDependencySyncService,
+            NatsMessageDeserializer deserializer,
+            TransactionTemplate transactionTemplate) {
         super(
-            IntegrationKind.GITHUB,
-            "repository." + GitHubEventType.ISSUE_DEPENDENCIES.getValue(),
-            GitHubIssueDependenciesEventDTO.class,
-            deserializer,
-            transactionTemplate
-        );
+                IntegrationKind.GITHUB,
+                "repository." + GitHubEventType.ISSUE_DEPENDENCIES.getValue(),
+                GitHubIssueDependenciesEventDTO.class,
+                deserializer,
+                transactionTemplate);
         this.contextFactory = contextFactory;
         this.issueProcessor = issueProcessor;
         this.issueDependencySyncService = issueDependencySyncService;
@@ -93,12 +90,11 @@ public class GitHubIssueDependenciesMessageHandler
         }
 
         log.debug(
-            "Received issue_dependencies event: action={}, blockedIssueNumber={}, blockingIssueNumber={}, repoName={}",
-            event.action(),
-            blockedIssueDto.number(),
-            blockingIssueDto.number(),
-            event.repository() != null ? sanitizeForLog(event.repository().fullName()) : "unknown"
-        );
+                "Received issue_dependencies event: action={}, blockedIssueNumber={}, blockingIssueNumber={}, repoName={}",
+                event.action(),
+                blockedIssueDto.number(),
+                blockingIssueDto.number(),
+                event.repository() != null ? sanitizeForLog(event.repository().fullName()) : "unknown");
 
         ProcessingContext context = contextFactory.forWebhookEvent(event).orElse(null);
         if (context == null) {
@@ -118,16 +114,10 @@ public class GitHubIssueDependenciesMessageHandler
         }
 
         switch (event.actionType()) {
-            case GitHubEventAction.IssueDependency.ADDED -> issueDependencySyncService.processIssueDependencyEvent(
-                blockedIssueId,
-                blockingIssueId,
-                true
-            );
-            case GitHubEventAction.IssueDependency.REMOVED -> issueDependencySyncService.processIssueDependencyEvent(
-                blockedIssueId,
-                blockingIssueId,
-                false
-            );
+            case GitHubEventAction.IssueDependency.ADDED ->
+                issueDependencySyncService.processIssueDependencyEvent(blockedIssueId, blockingIssueId, true);
+            case GitHubEventAction.IssueDependency.REMOVED ->
+                issueDependencySyncService.processIssueDependencyEvent(blockedIssueId, blockingIssueId, false);
             default -> log.debug("Skipped issue_dependencies event: reason=unhandledAction, action={}", event.action());
         }
     }

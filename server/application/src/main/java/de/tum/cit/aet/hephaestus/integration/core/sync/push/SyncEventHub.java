@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.core.sync.push;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.integration.core.metrics.IntegrationCoreMetrics;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -43,6 +44,7 @@ public class SyncEventHub {
 
     /** Limits credentialed cross-origin connection exhaustion; CORS does not prevent opening SSE streams. */
     private static final int MAX_EMITTERS_PER_WORKSPACE = 20;
+
     private static final String EVENT_NAME = "sync";
     private static final long HEARTBEAT_INTERVAL_MS = 20_000L;
     private static final Duration DEFAULT_COALESCE_WINDOW = Duration.ofSeconds(1);
@@ -78,11 +80,10 @@ public class SyncEventHub {
     }
 
     SyncEventHub(
-        ObjectMapper objectMapper,
-        MeterRegistry meterRegistry,
-        Duration coalesceWindow,
-        Supplier<SseEmitter> emitterFactory
-    ) {
+            ObjectMapper objectMapper,
+            MeterRegistry meterRegistry,
+            Duration coalesceWindow,
+            Supplier<SseEmitter> emitterFactory) {
         this.objectMapper = objectMapper;
         this.coalesceWindow = coalesceWindow;
         this.emitterFactory = emitterFactory;
@@ -92,9 +93,9 @@ public class SyncEventHub {
         this.eventsDelivered = counter(meterRegistry, "integration.sync.sse.events", "delivered");
         this.eventsDropped = counter(meterRegistry, "integration.sync.sse.events", "dropped");
         this.eventsFailed = counter(meterRegistry, "integration.sync.sse.events", "error");
-        Gauge.builder("integration.sync.sse.subscribers", this, SyncEventHub::totalSubscriberCount)
-            .description("Currently active sync-observability SSE subscribers on this server replica")
-            .register(meterRegistry);
+        Gauge.builder(IntegrationCoreMetrics.INTEGRATION_SYNC_SSE_SUBSCRIBERS, this, SyncEventHub::totalSubscriberCount)
+                .description("Currently active sync-observability SSE subscribers on this server replica")
+                .register(meterRegistry);
     }
 
     public SseEmitter subscribe(long workspaceId) {
@@ -109,15 +110,13 @@ public class SyncEventHub {
         emitter.onError(throwable -> deregister(subscriber));
 
         synchronized (subscribersByWorkspace) {
-            Set<Subscriber> subscribers = subscribersByWorkspace.computeIfAbsent(workspaceId, key ->
-                ConcurrentHashMap.newKeySet()
-            );
+            Set<Subscriber> subscribers =
+                    subscribersByWorkspace.computeIfAbsent(workspaceId, key -> ConcurrentHashMap.newKeySet());
             if (subscribers.size() >= MAX_EMITTERS_PER_WORKSPACE) {
                 if (capWarned.compareAndSet(false, true)) {
                     log.warn(
-                        "Sync SSE emitter cap ({}) reached for a workspace; rejecting new stream",
-                        MAX_EMITTERS_PER_WORKSPACE
-                    );
+                            "Sync SSE emitter cap ({}) reached for a workspace; rejecting new stream",
+                            MAX_EMITTERS_PER_WORKSPACE);
                 }
                 subscriptionsRejected.increment();
                 throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many live sync streams");
@@ -301,7 +300,8 @@ public class SyncEventHub {
     private static void safeComplete(SseEmitter emitter) {
         try {
             emitter.complete();
-        } catch (RuntimeException ignored) {}
+        } catch (RuntimeException ignored) {
+        }
     }
 
     @PreDestroy
@@ -335,9 +335,9 @@ public class SyncEventHub {
 
     private static Counter counter(MeterRegistry meterRegistry, String name, String outcome) {
         return Counter.builder(name)
-            .description("Sync-observability SSE transport outcomes")
-            .tag("outcome", outcome)
-            .register(meterRegistry);
+                .description("Sync-observability SSE transport outcomes")
+                .tag("outcome", outcome)
+                .register(meterRegistry);
     }
 
     private record CoalesceKey(long workspaceId, Long connectionId, String scope) {}

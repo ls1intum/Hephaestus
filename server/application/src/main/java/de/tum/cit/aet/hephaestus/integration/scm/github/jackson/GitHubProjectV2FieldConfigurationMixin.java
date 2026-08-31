@@ -23,17 +23,14 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV
  * @see <a href="https://docs.github.com/en/graphql/reference/unions#projectv2fieldconfiguration">GitHub GraphQL API - ProjectV2FieldConfiguration</a>
  */
 @JsonTypeInfo(
-    use = JsonTypeInfo.Id.NAME,
-    include = JsonTypeInfo.As.PROPERTY,
-    property = "__typename",
-    visible = true,
-    defaultImpl = GHProjectV2Field.class
-)
-@JsonSubTypes(
-    {
-        @JsonSubTypes.Type(value = GHProjectV2Field.class, name = "ProjectV2Field"),
-        @JsonSubTypes.Type(value = GHProjectV2SingleSelectField.class, name = "ProjectV2SingleSelectField"),
-        @JsonSubTypes.Type(value = GHProjectV2IterationField.class, name = "ProjectV2IterationField"),
-    }
-)
+        use = JsonTypeInfo.Id.NAME,
+        include = JsonTypeInfo.As.PROPERTY,
+        property = "__typename",
+        visible = true,
+        defaultImpl = GHProjectV2Field.class)
+@JsonSubTypes({
+    @JsonSubTypes.Type(value = GHProjectV2Field.class, name = "ProjectV2Field"),
+    @JsonSubTypes.Type(value = GHProjectV2SingleSelectField.class, name = "ProjectV2SingleSelectField"),
+    @JsonSubTypes.Type(value = GHProjectV2IterationField.class, name = "ProjectV2IterationField"),
+})
 public abstract class GitHubProjectV2FieldConfigurationMixin {}

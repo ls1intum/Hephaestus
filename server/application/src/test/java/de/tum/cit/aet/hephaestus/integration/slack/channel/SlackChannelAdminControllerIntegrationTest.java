@@ -56,10 +56,10 @@ import org.springframework.test.web.reactive.server.WebTestClient;
  * revoke erases raw + derived data; the audit trail lists chronologically; and another workspace's channel is 404.
  */
 @TestPropertySource(
-    properties = {
-        "hephaestus.integration.slack.enabled=true", "hephaestus.integration.slack.signing-secret=test-signing-secret",
-    }
-)
+        properties = {
+            "hephaestus.integration.slack.enabled=true",
+            "hephaestus.integration.slack.signing-secret=test-signing-secret",
+        })
 class SlackChannelAdminControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired
@@ -108,12 +108,7 @@ class SlackChannelAdminControllerIntegrationTest extends AbstractWorkspaceIntegr
         reset(slackMessageService);
         owner = persistUser("slack-chan-owner-" + System.nanoTime());
         workspace = createWorkspace(
-            "slack-chan-" + System.nanoTime(),
-            "Slack Channel Test",
-            "slack-chan-org",
-            AccountType.ORG,
-            owner
-        );
+                "slack-chan-" + System.nanoTime(), "Slack Channel Test", "slack-chan-org", AccountType.ORG, owner);
     }
 
     @Test
@@ -124,11 +119,11 @@ class SlackChannelAdminControllerIntegrationTest extends AbstractWorkspaceIntegr
         seedChannel(workspace.getId(), "C1", ConsentState.PENDING, null);
 
         SlackMonitoredChannelDTO result = patchConsent("C1", ConsentState.ACTIVE, "pilot go")
-            .expectStatus()
-            .isOk()
-            .expectBody(SlackMonitoredChannelDTO.class)
-            .returnResult()
-            .getResponseBody();
+                .expectStatus()
+                .isOk()
+                .expectBody(SlackMonitoredChannelDTO.class)
+                .returnResult()
+                .getResponseBody();
 
         assertThat(result).isNotNull();
         assertThat(result.consentState()).isEqualTo(ConsentState.ACTIVE);
@@ -139,16 +134,14 @@ class SlackChannelAdminControllerIntegrationTest extends AbstractWorkspaceIntegr
 
         // Persisted state: ACTIVE + stamped.
         SlackMonitoredChannel stored = monitoredChannelRepository
-            .findByWorkspaceIdAndSlackChannelId(workspace.getId(), "C1")
-            .orElseThrow();
+                .findByWorkspaceIdAndSlackChannelId(workspace.getId(), "C1")
+                .orElseThrow();
         assertThat(stored.getConsentState()).isEqualTo(ConsentState.ACTIVE);
         assertThat(stored.getConsentAnnouncedAt()).isNotNull();
 
         // Audit row: PENDING → ACTIVE by the admin.
         var events = consentEventRepository.findByWorkspaceIdAndSlackChannelIdOrderByCreatedAtAscIdAsc(
-            workspace.getId(),
-            "C1"
-        );
+                workspace.getId(), "C1");
         assertThat(events).hasSize(1);
         assertThat(events.get(0).getFromState()).isEqualTo(ConsentState.PENDING);
         assertThat(events.get(0).getToState()).isEqualTo(ConsentState.ACTIVE);
@@ -166,12 +159,11 @@ class SlackChannelAdminControllerIntegrationTest extends AbstractWorkspaceIntegr
 
         patchConsent("C1", ConsentState.ACTIVE, null).expectStatus().isForbidden();
 
-        assertThat(
-            monitoredChannelRepository
-                .findByWorkspaceIdAndSlackChannelId(workspace.getId(), "C1")
-                .orElseThrow()
-                .getConsentState()
-        ).isEqualTo(ConsentState.PENDING);
+        assertThat(monitoredChannelRepository
+                        .findByWorkspaceIdAndSlackChannelId(workspace.getId(), "C1")
+                        .orElseThrow()
+                        .getConsentState())
+                .isEqualTo(ConsentState.PENDING);
         verify(slackMessageService, never()).sendForWorkspace(any(Long.class), any(), anyList(), any());
     }
 
@@ -184,9 +176,9 @@ class SlackChannelAdminControllerIntegrationTest extends AbstractWorkspaceIntegr
 
         patchConsent("C1", ConsentState.PAUSED, null).expectStatus().isEqualTo(409);
 
-        assertThat(
-            consentEventRepository.findByWorkspaceIdAndSlackChannelIdOrderByCreatedAtAscIdAsc(workspace.getId(), "C1")
-        ).isEmpty();
+        assertThat(consentEventRepository.findByWorkspaceIdAndSlackChannelIdOrderByCreatedAtAscIdAsc(
+                        workspace.getId(), "C1"))
+                .isEmpty();
     }
 
     @Test
@@ -209,9 +201,8 @@ class SlackChannelAdminControllerIntegrationTest extends AbstractWorkspaceIntegr
         // Channel flipped to REVOKED (row survives as the terminal record) …
         assertThat(currentState("C1")).isEqualTo(ConsentState.REVOKED);
         // … raw content gone …
-        assertThat(
-            messageRepository.existsByWorkspaceIdAndSlackChannelIdAndSlackTs(workspace.getId(), "C1", "100.1")
-        ).isFalse();
+        assertThat(messageRepository.existsByWorkspaceIdAndSlackChannelIdAndSlackTs(workspace.getId(), "C1", "100.1"))
+                .isFalse();
         assertThat(threadRepository.findById(threadId)).isEmpty();
         // … derived feedback + observation gone.
         assertThat(feedbackRepository.findById(feedbackId)).isEmpty();
@@ -221,12 +212,8 @@ class SlackChannelAdminControllerIntegrationTest extends AbstractWorkspaceIntegr
         // NOT swept with the content (a future broad-purge that added slack_channel_consent_event to the erase set
         // would make this vanish).
         var events = consentEventRepository.findByWorkspaceIdAndSlackChannelIdOrderByCreatedAtAscIdAsc(
-            workspace.getId(),
-            "C1"
-        );
-        assertThat(events)
-            .extracting(e -> e.getToState())
-            .containsExactly(ConsentState.REVOKED);
+                workspace.getId(), "C1");
+        assertThat(events).extracting(e -> e.getToState()).containsExactly(ConsentState.REVOKED);
     }
 
     @Test
@@ -237,23 +224,25 @@ class SlackChannelAdminControllerIntegrationTest extends AbstractWorkspaceIntegr
         seedChannel(workspace.getId(), "C1", ConsentState.PENDING, null);
 
         patchConsent("C1", ConsentState.ACTIVE, "go").expectStatus().isOk();
-        patchConsent("C1", ConsentState.PAUSED, "pause for review").expectStatus().isOk();
+        patchConsent("C1", ConsentState.PAUSED, "pause for review")
+                .expectStatus()
+                .isOk();
 
         List<SlackChannelConsentEventDTO> events = webTestClient
-            .get()
-            .uri("/workspaces/{slug}/slack/channels/{c}/consent-events", workspace.getWorkspaceSlug(), "C1")
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBodyList(SlackChannelConsentEventDTO.class)
-            .returnResult()
-            .getResponseBody();
+                .get()
+                .uri("/workspaces/{slug}/slack/channels/{c}/consent-events", workspace.getWorkspaceSlug(), "C1")
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBodyList(SlackChannelConsentEventDTO.class)
+                .returnResult()
+                .getResponseBody();
 
         assertThat(events).hasSize(2);
         assertThat(events)
-            .extracting(SlackChannelConsentEventDTO::toState)
-            .containsExactly(ConsentState.ACTIVE, ConsentState.PAUSED);
+                .extracting(SlackChannelConsentEventDTO::toState)
+                .containsExactly(ConsentState.ACTIVE, ConsentState.PAUSED);
         assertThat(events.get(0).actorUserId()).isEqualTo(adminUserId());
     }
 
@@ -263,51 +252,49 @@ class SlackChannelAdminControllerIntegrationTest extends AbstractWorkspaceIntegr
     void workspaceIsolation() {
         ensureAdminMembership(workspace);
         Workspace other = createWorkspace(
-            "slack-other-" + System.nanoTime(),
-            "Other",
-            "other-org",
-            AccountType.ORG,
-            persistUser("other-owner-" + System.nanoTime())
-        );
+                "slack-other-" + System.nanoTime(),
+                "Other",
+                "other-org",
+                AccountType.ORG,
+                persistUser("other-owner-" + System.nanoTime()));
         seedChannel(other.getId(), "C-OTHER", ConsentState.PENDING, null);
 
         // Reaching the other workspace's channel through THIS workspace's URL resolves to nothing → 404.
         patchConsent("C-OTHER", ConsentState.ACTIVE, null).expectStatus().isNotFound();
 
         webTestClient
-            .get()
-            .uri("/workspaces/{slug}/slack/channels/{c}/consent-events", workspace.getWorkspaceSlug(), "C-OTHER")
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isNotFound();
+                .get()
+                .uri("/workspaces/{slug}/slack/channels/{c}/consent-events", workspace.getWorkspaceSlug(), "C-OTHER")
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isNotFound();
 
         // The other workspace's channel is untouched.
-        assertThat(
-            monitoredChannelRepository
-                .findByWorkspaceIdAndSlackChannelId(other.getId(), "C-OTHER")
-                .orElseThrow()
-                .getConsentState()
-        ).isEqualTo(ConsentState.PENDING);
+        assertThat(monitoredChannelRepository
+                        .findByWorkspaceIdAndSlackChannelId(other.getId(), "C-OTHER")
+                        .orElseThrow()
+                        .getConsentState())
+                .isEqualTo(ConsentState.PENDING);
     }
 
     // --- helpers ---
 
     private WebTestClient.ResponseSpec patchConsent(String channelId, ConsentState target, @Nullable String reason) {
         return webTestClient
-            .patch()
-            .uri("/workspaces/{slug}/slack/channels/{c}", workspace.getWorkspaceSlug(), channelId)
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(new UpdateSlackChannelConsentRequestDTO(target, reason))
-            .exchange();
+                .patch()
+                .uri("/workspaces/{slug}/slack/channels/{c}", workspace.getWorkspaceSlug(), channelId)
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(new UpdateSlackChannelConsentRequestDTO(target, reason))
+                .exchange();
     }
 
     private ConsentState currentState(String channelId) {
         return monitoredChannelRepository
-            .findByWorkspaceIdAndSlackChannelId(workspace.getId(), channelId)
-            .orElseThrow()
-            .getConsentState();
+                .findByWorkspaceIdAndSlackChannelId(workspace.getId(), channelId)
+                .orElseThrow()
+                .getConsentState();
     }
 
     private Long adminUserId() {
@@ -339,14 +326,13 @@ class SlackChannelAdminControllerIntegrationTest extends AbstractWorkspaceIntegr
         Practice practice = SlackConversationTestSupport.newPractice(practiceRepository, workspace, "chan-practice");
         AgentJob job = SlackConversationTestSupport.newConversationReviewJob(agentJobRepository, workspace);
         return SlackConversationTestSupport.seedBoundConversation(
-            observationRepository,
-            feedbackRepository,
-            feedbackObservationRepository,
-            workspace.getId(),
-            job.getId(),
-            practice.getId(),
-            threadId,
-            owner.getId()
-        );
+                observationRepository,
+                feedbackRepository,
+                feedbackObservationRepository,
+                workspace.getId(),
+                job.getId(),
+                practice.getId(),
+                threadId,
+                owner.getId());
     }
 }

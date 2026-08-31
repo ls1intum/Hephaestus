@@ -46,21 +46,19 @@ public class GitHubProjectMessageHandler extends AbstractIntegrationMessageHandl
     private final SyncSchedulerProperties syncSchedulerProperties;
 
     GitHubProjectMessageHandler(
-        GitHubProjectProcessor projectProcessor,
-        ProjectRepository projectRepository,
-        ScopeIdResolver scopeIdResolver,
-        IdentityProviderRepository gitProviderRepository,
-        SyncSchedulerProperties syncSchedulerProperties,
-        NatsMessageDeserializer deserializer,
-        TransactionTemplate transactionTemplate
-    ) {
+            GitHubProjectProcessor projectProcessor,
+            ProjectRepository projectRepository,
+            ScopeIdResolver scopeIdResolver,
+            IdentityProviderRepository gitProviderRepository,
+            SyncSchedulerProperties syncSchedulerProperties,
+            NatsMessageDeserializer deserializer,
+            TransactionTemplate transactionTemplate) {
         super(
-            IntegrationKind.GITHUB,
-            "organization." + GitHubEventType.PROJECTS_V2.getValue(),
-            GitHubProjectEventDTO.class,
-            deserializer,
-            transactionTemplate
-        );
+                IntegrationKind.GITHUB,
+                "organization." + GitHubEventType.PROJECTS_V2.getValue(),
+                GitHubProjectEventDTO.class,
+                deserializer,
+                transactionTemplate);
         this.projectProcessor = projectProcessor;
         this.projectRepository = projectRepository;
         this.scopeIdResolver = scopeIdResolver;
@@ -91,37 +89,34 @@ public class GitHubProjectMessageHandler extends AbstractIntegrationMessageHandl
         Long ownerId = event.getOwnerId();
 
         log.debug(
-            "Received projects_v2 event: action={}, projectNumber={}, ownerType={}, owner={}",
-            event.action(),
-            projectDto.number(),
-            ownerType,
-            ownerIdentifier != null ? sanitizeForLog(ownerIdentifier) : "unknown"
-        );
+                "Received projects_v2 event: action={}, projectNumber={}, ownerType={}, owner={}",
+                event.action(),
+                projectDto.number(),
+                ownerType,
+                ownerIdentifier != null ? sanitizeForLog(ownerIdentifier) : "unknown");
 
         // Resolve scope based on owner type
         Long scopeId = resolveScopeId(event, ownerType);
         if (scopeId == null) {
             log.debug(
-                "Skipped projects_v2 event: reason=noAssociatedScope, ownerType={}, owner={}",
-                ownerType,
-                sanitizeForLog(ownerIdentifier)
-            );
+                    "Skipped projects_v2 event: reason=noAssociatedScope, ownerType={}, owner={}",
+                    ownerType,
+                    sanitizeForLog(ownerIdentifier));
             return;
         }
 
         // Validate owner ID is available
         if (ownerId == null) {
             log.warn(
-                "Skipped projects_v2 event: reason=missingOwnerId, ownerType={}, owner={}",
-                ownerType,
-                sanitizeForLog(ownerIdentifier)
-            );
+                    "Skipped projects_v2 event: reason=missingOwnerId, ownerType={}, owner={}",
+                    ownerType,
+                    sanitizeForLog(ownerIdentifier));
             return;
         }
 
         IdentityProvider gitHubProvider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-            .orElseThrow(() -> new IllegalStateException("GitHub provider not configured"));
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseThrow(() -> new IllegalStateException("GitHub provider not configured"));
         ProcessingContext context = ProcessingContext.forWebhook(scopeId, gitHubProvider, event.action());
 
         // Extract the actor (sender) ID from the webhook event
@@ -134,8 +129,8 @@ public class GitHubProjectMessageHandler extends AbstractIntegrationMessageHandl
                 String nodeId = projectDto.nodeId();
                 if (nodeId != null) {
                     projectRepository
-                        .findByNodeId(nodeId)
-                        .ifPresent(project -> projectProcessor.delete(project.getId(), context));
+                            .findByNodeId(nodeId)
+                            .ifPresent(project -> projectProcessor.delete(project.getId(), context));
                 }
             }
             case CLOSED -> projectProcessor.processClosed(projectDto, ownerType, ownerId, context, actorId);
@@ -162,14 +157,16 @@ public class GitHubProjectMessageHandler extends AbstractIntegrationMessageHandl
     private @Nullable Long resolveScopeId(GitHubProjectEventDTO event, Project.OwnerType ownerType) {
         return switch (ownerType) {
             case ORGANIZATION -> {
-                String orgLogin = event.organization() != null ? event.organization().login() : null;
+                String orgLogin =
+                        event.organization() != null ? event.organization().login() : null;
                 if (orgLogin == null) {
                     yield null;
                 }
                 yield scopeIdResolver.findScopeIdByOrgLogin(orgLogin).orElse(null);
             }
             case REPOSITORY -> {
-                String repoFullName = event.repository() != null ? event.repository().fullName() : null;
+                String repoFullName =
+                        event.repository() != null ? event.repository().fullName() : null;
                 if (repoFullName == null) {
                     yield null;
                 }
@@ -179,9 +176,8 @@ public class GitHubProjectMessageHandler extends AbstractIntegrationMessageHandl
                 // User-level projects are not associated with a monitored workspace
                 // Log at info level since this is a known limitation
                 log.info(
-                    "User-owned project detected - not currently supported: sender={}",
-                    event.sender() != null ? sanitizeForLog(event.sender().login()) : "unknown"
-                );
+                        "User-owned project detected - not currently supported: sender={}",
+                        event.sender() != null ? sanitizeForLog(event.sender().login()) : "unknown");
                 yield null;
             }
         };

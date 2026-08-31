@@ -18,13 +18,12 @@ import org.jspecify.annotations.Nullable;
  * @param updatedAt   ISO-8601 timestamp from GraphQL
  */
 public record GitLabLabelDTO(
-    @Nullable String globalId,
-    String title,
-    @Nullable String color,
-    @Nullable String description,
-    @Nullable String createdAt,
-    @Nullable String updatedAt
-) {
+        @Nullable String globalId,
+        String title,
+        @Nullable String color,
+        @Nullable String description,
+        @Nullable String createdAt,
+        @Nullable String updatedAt) {
     /**
      * Creates a DTO from a GraphQL response node map.
      *
@@ -41,12 +40,11 @@ public record GitLabLabelDTO(
             return null;
         }
         return new GitLabLabelDTO(
-            (String) node.get("id"),
-            title,
-            (String) node.get("color"),
-            (String) node.get("description"),
-            node.get("createdAt") != null ? node.get("createdAt").toString() : null,
-            node.get("updatedAt") != null ? node.get("updatedAt").toString() : null
-        );
+                (String) node.get("id"),
+                title,
+                (String) node.get("color"),
+                (String) node.get("description"),
+                node.get("createdAt") != null ? node.get("createdAt").toString() : null,
+                node.get("updatedAt") != null ? node.get("updatedAt").toString() : null);
     }
 }

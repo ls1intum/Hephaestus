@@ -76,23 +76,20 @@ class ConnectionServiceTest extends BaseUnitTest {
         // enough to let the template execute, and it lets us assert the propagation it asked for.
         Mockito.lenient().when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
         service = new ConnectionService(
-            connectionRepository,
-            auditRepository,
-            credentialConverter,
-            eventPublisher,
-            syncJobService,
-            transactionManager
-        );
+                connectionRepository,
+                auditRepository,
+                credentialConverter,
+                eventPublisher,
+                syncJobService,
+                transactionManager);
         // Default: the connection is free. Only the disconnect fence ever asks.
         Mockito.lenient()
-            .when(syncJobService.requestCancelForTeardown(anyLong()))
-            .thenReturn(java.util.Optional.empty());
+                .when(syncJobService.requestCancelForTeardown(anyLong()))
+                .thenReturn(java.util.Optional.empty());
         workspace = new Workspace();
         workspace.setId(7L);
         // transition() returns the saved entity; echo it back so callers see the mutated row.
-        Mockito.lenient()
-            .when(connectionRepository.save(any(Connection.class)))
-            .thenAnswer(inv -> inv.getArgument(0));
+        Mockito.lenient().when(connectionRepository.save(any(Connection.class))).thenAnswer(inv -> inv.getArgument(0));
     }
 
     @Test
@@ -100,16 +97,9 @@ class ConnectionServiceTest extends BaseUnitTest {
         Connection connection = pendingConnection();
 
         Connection result = service.transition(
-            connection,
-            new TransitionRequest(
-                IntegrationState.ACTIVE,
-                "INSTALL_BIND",
-                "GITHUB_WEBHOOK",
-                "actor-1",
-                "corr-1",
-                "linked"
-            )
-        );
+                connection,
+                new TransitionRequest(
+                        IntegrationState.ACTIVE, "INSTALL_BIND", "GITHUB_WEBHOOK", "actor-1", "corr-1", "linked"));
 
         assertThat(result.getState()).isEqualTo(IntegrationState.ACTIVE);
         assertThat(result.getStateReason()).isEqualTo("linked");
@@ -127,16 +117,13 @@ class ConnectionServiceTest extends BaseUnitTest {
     void transition_illegalUninstalledToActive_throwsAndWritesNoAuditRowAndKeepsState() {
         Connection connection = connectionInState(IntegrationState.UNINSTALLED);
 
-        assertThatThrownBy(() ->
-            service.transition(
-                connection,
-                new TransitionRequest(IntegrationState.ACTIVE, "REVIVE", "ADMIN", "actor-1", "corr-x", "nope")
-            )
-        )
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("Illegal transition")
-            .hasMessageContaining("UNINSTALLED")
-            .hasMessageContaining("ACTIVE");
+        assertThatThrownBy(() -> service.transition(
+                        connection,
+                        new TransitionRequest(IntegrationState.ACTIVE, "REVIVE", "ADMIN", "actor-1", "corr-x", "nope")))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Illegal transition")
+                .hasMessageContaining("UNINSTALLED")
+                .hasMessageContaining("ACTIVE");
 
         assertThat(connection.getState()).isEqualTo(IntegrationState.UNINSTALLED);
         verify(auditRepository, never()).save(any());
@@ -146,21 +133,19 @@ class ConnectionServiceTest extends BaseUnitTest {
     @Test
     void transition_slackOAuthReconnectFromUninstalled_writesAuditRowAndReactivates() {
         Connection connection = new Connection(
-            workspace,
-            IntegrationKind.SLACK,
-            "T1",
-            new ConnectionConfig.SlackConfig("T1", "Acme", null, null, null, Set.of())
-        );
+                workspace,
+                IntegrationKind.SLACK,
+                "T1",
+                new ConnectionConfig.SlackConfig("T1", "Acme", null, null, null, Set.of()));
         setId(connection, 55L);
         connection.setState(IntegrationState.UNINSTALLED);
-        when(connectionRepository.findByIdAndWorkspaceId(connection.getId(), workspace.getId())).thenReturn(
-            java.util.Optional.of(connection)
-        );
+        when(connectionRepository.findByIdAndWorkspaceId(connection.getId(), workspace.getId()))
+                .thenReturn(java.util.Optional.of(connection));
 
         Connection result = service.transition(
-            connection,
-            new TransitionRequest(IntegrationState.ACTIVE, "OAUTH_COMPLETE", "USER", "actor-1", "corr-x", "reconnected")
-        );
+                connection,
+                new TransitionRequest(
+                        IntegrationState.ACTIVE, "OAUTH_COMPLETE", "USER", "actor-1", "corr-x", "reconnected"));
 
         assertThat(result.getState()).isEqualTo(IntegrationState.ACTIVE);
         assertThat(result.getStateReason()).isEqualTo("reconnected");
@@ -177,15 +162,13 @@ class ConnectionServiceTest extends BaseUnitTest {
     void transition_illegalSuspendedToPending_throwsAndWritesNoAuditRow() {
         Connection connection = connectionInState(IntegrationState.SUSPENDED);
 
-        assertThatThrownBy(() ->
-            service.transition(
-                connection,
-                new TransitionRequest(IntegrationState.PENDING, "REWIND", "ADMIN", "actor-1", "corr-y", "nope")
-            )
-        )
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("SUSPENDED")
-            .hasMessageContaining("PENDING");
+        assertThatThrownBy(() -> service.transition(
+                        connection,
+                        new TransitionRequest(
+                                IntegrationState.PENDING, "REWIND", "ADMIN", "actor-1", "corr-y", "nope")))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("SUSPENDED")
+                .hasMessageContaining("PENDING");
 
         assertThat(connection.getState()).isEqualTo(IntegrationState.SUSPENDED);
         verify(auditRepository, never()).save(any());
@@ -197,16 +180,9 @@ class ConnectionServiceTest extends BaseUnitTest {
         Connection connection = connectionInState(IntegrationState.ACTIVE);
 
         Connection result = service.transition(
-            connection,
-            new TransitionRequest(
-                IntegrationState.ACTIVE,
-                "INSTALL_BIND",
-                "GITHUB_WEBHOOK",
-                "actor-1",
-                "corr-1",
-                "again"
-            )
-        );
+                connection,
+                new TransitionRequest(
+                        IntegrationState.ACTIVE, "INSTALL_BIND", "GITHUB_WEBHOOK", "actor-1", "corr-1", "again"));
 
         // Same-state no-op must NOT overwrite stateReason.
         assertThat(result).isSameAs(connection);
@@ -220,26 +196,21 @@ class ConnectionServiceTest extends BaseUnitTest {
     void transition_staleSnapshotCannotOverwriteStateReadUnderLifecycleLock() {
         Connection stale = connectionInState(IntegrationState.ACTIVE);
         Connection authoritative = connectionInState(IntegrationState.UNINSTALLED);
-        when(connectionRepository.findByIdAndWorkspaceId(stale.getId(), workspace.getId())).thenReturn(
-            java.util.Optional.of(authoritative)
-        );
+        when(connectionRepository.findByIdAndWorkspaceId(stale.getId(), workspace.getId()))
+                .thenReturn(java.util.Optional.of(authoritative));
 
-        assertThatThrownBy(() ->
-            service.transition(
-                stale,
-                new TransitionRequest(
-                    IntegrationState.SUSPENDED,
-                    "SUSPEND",
-                    "ADMIN",
-                    "actor-1",
-                    "corr-stale",
-                    "stale request"
-                )
-            )
-        )
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("UNINSTALLED")
-            .hasMessageContaining("SUSPENDED");
+        assertThatThrownBy(() -> service.transition(
+                        stale,
+                        new TransitionRequest(
+                                IntegrationState.SUSPENDED,
+                                "SUSPEND",
+                                "ADMIN",
+                                "actor-1",
+                                "corr-stale",
+                                "stale request")))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("UNINSTALLED")
+                .hasMessageContaining("SUSPENDED");
 
         assertThat(stale.getState()).isEqualTo(IntegrationState.ACTIVE);
         assertThat(authoritative.getState()).isEqualTo(IntegrationState.UNINSTALLED);
@@ -255,16 +226,9 @@ class ConnectionServiceTest extends BaseUnitTest {
         assertThat(connection.getCredentialsAlg()).isEqualTo(CredentialBundleConverter.ALGORITHM_TAG);
 
         Connection result = service.transition(
-            connection,
-            new TransitionRequest(
-                IntegrationState.UNINSTALLED,
-                "UNINSTALL",
-                "GITHUB_WEBHOOK",
-                "actor-1",
-                "corr-9",
-                "removed"
-            )
-        );
+                connection,
+                new TransitionRequest(
+                        IntegrationState.UNINSTALLED, "UNINSTALL", "GITHUB_WEBHOOK", "actor-1", "corr-9", "removed"));
 
         assertThat(result.getState()).isEqualTo(IntegrationState.UNINSTALLED);
         assertThat(result.getCredentialsEncrypted()).isNull();
@@ -278,19 +242,12 @@ class ConnectionServiceTest extends BaseUnitTest {
     @Test
     void transition_toUninstalled_clearsProviderWebhookConfig() {
         Connection gitLab = connection(
-            IntegrationKind.GITLAB,
-            new ConnectionConfig.GitLabConfig(
-                "https://gitlab.example",
-                12L,
-                34L,
-                ConnectionConfig.GitLabConfig.SigningMode.WHSEC,
-                Set.of()
-            )
-        );
+                IntegrationKind.GITLAB,
+                new ConnectionConfig.GitLabConfig(
+                        "https://gitlab.example", 12L, 34L, ConnectionConfig.GitLabConfig.SigningMode.WHSEC, Set.of()));
         Connection outline = connection(
-            IntegrationKind.OUTLINE,
-            new ConnectionConfig.OutlineConfig("https://outline.example", "subscription-1", "secret-1", Set.of())
-        );
+                IntegrationKind.OUTLINE,
+                new ConnectionConfig.OutlineConfig("https://outline.example", "subscription-1", "secret-1", Set.of()));
 
         service.transition(gitLab, uninstallRequest("gitlab"));
         service.transition(outline, uninstallRequest("outline"));
@@ -307,16 +264,10 @@ class ConnectionServiceTest extends BaseUnitTest {
     @Test
     void findReferenced_resolvesAnExplicitSuspendedConnection() {
         Connection connection = connection(
-            IntegrationKind.SLACK,
-            new ConnectionConfig.SlackConfig("team-1", "Acme", null, null, null, Set.of())
-        );
+                IntegrationKind.SLACK, new ConnectionConfig.SlackConfig("team-1", "Acme", null, null, null, Set.of()));
         connection.setState(IntegrationState.SUSPENDED);
         IntegrationRef ref = new IntegrationRef(
-            IntegrationKind.SLACK,
-            workspace.getId(),
-            connection.getInstanceKey(),
-            connection.getId()
-        );
+                IntegrationKind.SLACK, workspace.getId(), connection.getInstanceKey(), connection.getId());
 
         assertThat(service.findReferenced(ref)).contains(connection);
     }
@@ -330,9 +281,9 @@ class ConnectionServiceTest extends BaseUnitTest {
         connection.setCredentials(new BearerToken("ghp-secret", null), credentialConverter);
 
         service.transition(
-            connection,
-            new TransitionRequest(IntegrationState.UNINSTALLED, "WORKSPACE_PURGED", "SYSTEM", "purge", "corr-p", "gone")
-        );
+                connection,
+                new TransitionRequest(
+                        IntegrationState.UNINSTALLED, "WORKSPACE_PURGED", "SYSTEM", "purge", "corr-p", "gone"));
 
         assertThat(connection.getState()).isEqualTo(IntegrationState.UNINSTALLED);
         assertThat(connection.getCredentialsEncrypted()).isNull();
@@ -346,17 +297,10 @@ class ConnectionServiceTest extends BaseUnitTest {
         InOrder order = Mockito.inOrder(connectionRepository, syncJobService, revoke);
 
         service.disconnect(
-            connection,
-            new TransitionRequest(
-                IntegrationState.UNINSTALLED,
-                "DISCONNECT",
-                "ADMIN",
-                "actor-1",
-                "corr-disconnect",
-                "removed"
-            ),
-            revoke
-        );
+                connection,
+                new TransitionRequest(
+                        IntegrationState.UNINSTALLED, "DISCONNECT", "ADMIN", "actor-1", "corr-disconnect", "removed"),
+                revoke);
 
         // The fence must read the job state under the row lock, or a job could start in the window
         // between the check and the state write.
@@ -380,9 +324,8 @@ class ConnectionServiceTest extends BaseUnitTest {
 
         ArgumentCaptor<TransactionDefinition> definition = ArgumentCaptor.forClass(TransactionDefinition.class);
         verify(transactionManager).getTransaction(definition.capture());
-        assertThat(definition.getValue().getPropagationBehavior()).isEqualTo(
-            TransactionDefinition.PROPAGATION_REQUIRES_NEW
-        );
+        assertThat(definition.getValue().getPropagationBehavior())
+                .isEqualTo(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
     @Test
@@ -397,7 +340,9 @@ class ConnectionServiceTest extends BaseUnitTest {
         Connection result = service.disconnect(connection, disconnectRequest(), revoke);
 
         assertThat(result.getState()).isEqualTo(IntegrationState.UNINSTALLED);
-        assertThat(result.getCredentialsEncrypted()).as("credentials are still purged").isNull();
+        assertThat(result.getCredentialsEncrypted())
+                .as("credentials are still purged")
+                .isNull();
         verify(auditRepository).save(any(ConnectionAudit.class));
         verify(connectionRepository).save(any(Connection.class));
     }
@@ -411,8 +356,8 @@ class ConnectionServiceTest extends BaseUnitTest {
     void disconnect_revokeSwallowsFailureAndNestedCommitRollsBack_isStillAbsorbed() {
         Connection connection = connectionInState(IntegrationState.ACTIVE);
         Mockito.doThrow(new UnexpectedRollbackException("Transaction silently rolled back"))
-            .when(transactionManager)
-            .commit(any());
+                .when(transactionManager)
+                .commit(any());
 
         Connection result = service.disconnect(connection, disconnectRequest(), () -> {
             /* callback catches its own failure */
@@ -427,24 +372,20 @@ class ConnectionServiceTest extends BaseUnitTest {
         when(syncJobService.requestCancelForTeardown(connection.getId())).thenReturn(java.util.Optional.of(99L));
         Runnable revoke = Mockito.mock(Runnable.class);
 
-        assertThatThrownBy(() ->
-            service.disconnect(
-                connection,
-                new TransitionRequest(
-                    IntegrationState.UNINSTALLED,
-                    "DISCONNECT",
-                    "ADMIN",
-                    "actor-1",
-                    "corr-disconnect",
-                    "removed"
-                ),
-                revoke
-            )
-        )
-            .isInstanceOf(ConnectionBusyException.class)
-            // The 409 names the job and promises a retry, because the fence already asked it to stop.
-            .hasMessageContaining("active sync job 99")
-            .hasMessageContaining("retry");
+        assertThatThrownBy(() -> service.disconnect(
+                        connection,
+                        new TransitionRequest(
+                                IntegrationState.UNINSTALLED,
+                                "DISCONNECT",
+                                "ADMIN",
+                                "actor-1",
+                                "corr-disconnect",
+                                "removed"),
+                        revoke))
+                .isInstanceOf(ConnectionBusyException.class)
+                // The 409 names the job and promises a retry, because the fence already asked it to stop.
+                .hasMessageContaining("active sync job 99")
+                .hasMessageContaining("retry");
 
         verify(revoke, never()).run();
         assertThat(connection.getState()).isEqualTo(IntegrationState.ACTIVE);
@@ -456,21 +397,13 @@ class ConnectionServiceTest extends BaseUnitTest {
     void transition_duplicateCorrelationId_shortCircuitsWithoutMutatingState() {
         Connection connection = pendingConnection();
         // Conflicting INSERT on the idempotency index → the conflicting redelivery is dropped.
-        when(auditRepository.save(any(ConnectionAudit.class))).thenThrow(
-            new DataIntegrityViolationException("uq_connection_audit_idempotency")
-        );
+        when(auditRepository.save(any(ConnectionAudit.class)))
+                .thenThrow(new DataIntegrityViolationException("uq_connection_audit_idempotency"));
 
         Connection result = service.transition(
-            connection,
-            new TransitionRequest(
-                IntegrationState.ACTIVE,
-                "INSTALL_BIND",
-                "GITHUB_WEBHOOK",
-                "actor-1",
-                "corr-dup",
-                "linked"
-            )
-        );
+                connection,
+                new TransitionRequest(
+                        IntegrationState.ACTIVE, "INSTALL_BIND", "GITHUB_WEBHOOK", "actor-1", "corr-dup", "linked"));
 
         assertThat(result).isSameAs(connection);
         assertThat(result.getState()).isEqualTo(IntegrationState.PENDING);
@@ -492,9 +425,7 @@ class ConnectionServiceTest extends BaseUnitTest {
          * {@code UnfinishedStubbingException}.
          */
         private ConnectionRepository.OutlineSubscriptionProjection projection(
-            Long workspaceId,
-            @org.jspecify.annotations.Nullable String secret
-        ) {
+                Long workspaceId, @org.jspecify.annotations.Nullable String secret) {
             return new ConnectionRepository.OutlineSubscriptionProjection() {
                 @Override
                 public Long getWorkspaceId() {
@@ -515,9 +446,8 @@ class ConnectionServiceTest extends BaseUnitTest {
 
         @Test
         void resolvesTheMatchingSubscriptionToItsWorkspaceAndSecret() {
-            when(connectionRepository.findOutlineSubscriptionsBySubscriptionId("sub-b")).thenReturn(
-                java.util.List.of(projection(2L, "secret-b"))
-            );
+            when(connectionRepository.findOutlineSubscriptionsBySubscriptionId("sub-b"))
+                    .thenReturn(java.util.List.of(projection(2L, "secret-b")));
 
             var resolved = service.findOutlineSubscription("sub-b");
 
@@ -529,27 +459,22 @@ class ConnectionServiceTest extends BaseUnitTest {
 
         @Test
         void resolvesWithASingleIndexedLookupAndNeverEnumeratesTheFleet() {
-            when(connectionRepository.findOutlineSubscriptionsBySubscriptionId("sub-b")).thenReturn(
-                java.util.List.of(projection(2L, "secret-b"))
-            );
+            when(connectionRepository.findOutlineSubscriptionsBySubscriptionId("sub-b"))
+                    .thenReturn(java.util.List.of(projection(2L, "secret-b")));
 
             service.findOutlineSubscription("sub-b");
 
             verify(connectionRepository, times(1)).findOutlineSubscriptionsBySubscriptionId("sub-b");
             // Never the 1+N amplifier: fleet enumeration + a per-workspace config fetch.
             verify(connectionRepository, never()).findWorkspaceIdsByKindAndState(any(), any());
-            verify(connectionRepository, never()).findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
-                anyLong(),
-                any(),
-                any()
-            );
+            verify(connectionRepository, never())
+                    .findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(anyLong(), any(), any());
         }
 
         @Test
         void aForgedSubscriptionIdResolvesToNoSecret() {
-            when(connectionRepository.findOutlineSubscriptionsBySubscriptionId("forged")).thenReturn(
-                java.util.List.of()
-            );
+            when(connectionRepository.findOutlineSubscriptionsBySubscriptionId("forged"))
+                    .thenReturn(java.util.List.of());
 
             assertThat(service.findOutlineSubscription("forged")).isEmpty();
         }
@@ -557,12 +482,10 @@ class ConnectionServiceTest extends BaseUnitTest {
         @Test
         void aDeliveryForWorkspaceANeverSelectsWorkspaceBsSecret() {
             // The query is keyed on the subscription id, so B's row is simply not in the result set.
-            when(connectionRepository.findOutlineSubscriptionsBySubscriptionId("sub-a")).thenReturn(
-                java.util.List.of(projection(1L, "secret-a"))
-            );
-            when(connectionRepository.findOutlineSubscriptionsBySubscriptionId("sub-b")).thenReturn(
-                java.util.List.of(projection(2L, "secret-b"))
-            );
+            when(connectionRepository.findOutlineSubscriptionsBySubscriptionId("sub-a"))
+                    .thenReturn(java.util.List.of(projection(1L, "secret-a")));
+            when(connectionRepository.findOutlineSubscriptionsBySubscriptionId("sub-b"))
+                    .thenReturn(java.util.List.of(projection(2L, "secret-b")));
 
             var a = service.findOutlineSubscription("sub-a").orElseThrow();
             var b = service.findOutlineSubscription("sub-b").orElseThrow();
@@ -575,18 +498,16 @@ class ConnectionServiceTest extends BaseUnitTest {
 
         @Test
         void failsClosedWhenTwoActiveConnectionsClaimTheSameSubscriptionId() {
-            when(connectionRepository.findOutlineSubscriptionsBySubscriptionId("sub-dup")).thenReturn(
-                java.util.List.of(projection(1L, "secret-a"), projection(2L, "secret-b"))
-            );
+            when(connectionRepository.findOutlineSubscriptionsBySubscriptionId("sub-dup"))
+                    .thenReturn(java.util.List.of(projection(1L, "secret-a"), projection(2L, "secret-b")));
 
             assertThat(service.findOutlineSubscription("sub-dup")).isEmpty();
         }
 
         @Test
         void isEmptyWhenTheSubscriptionMatchesButNoSecretIsStored() {
-            when(connectionRepository.findOutlineSubscriptionsBySubscriptionId("sub-a")).thenReturn(
-                java.util.List.of(projection(1L, null))
-            );
+            when(connectionRepository.findOutlineSubscriptionsBySubscriptionId("sub-a"))
+                    .thenReturn(java.util.List.of(projection(1L, null)));
 
             assertThat(service.findOutlineSubscription("sub-a")).isEmpty();
         }
@@ -612,13 +533,12 @@ class ConnectionServiceTest extends BaseUnitTest {
             Connection connection = pendingConnection();
 
             service.transition(
-                connection,
-                new TransitionRequest(IntegrationState.ACTIVE, "INSTALL_BIND", "SYSTEM", "actor-1", "corr-1", "linked")
-            );
+                    connection,
+                    new TransitionRequest(
+                            IntegrationState.ACTIVE, "INSTALL_BIND", "SYSTEM", "actor-1", "corr-1", "linked"));
 
-            verify(eventPublisher).publishEvent(
-                new ConnectionLifecycleEvent.Activated(55L, 7L, IntegrationKind.GITHUB)
-            );
+            verify(eventPublisher)
+                    .publishEvent(new ConnectionLifecycleEvent.Activated(55L, 7L, IntegrationKind.GITHUB));
         }
 
         @Test
@@ -626,13 +546,12 @@ class ConnectionServiceTest extends BaseUnitTest {
             Connection connection = connectionInState(IntegrationState.ACTIVE);
 
             service.transition(
-                connection,
-                new TransitionRequest(IntegrationState.SUSPENDED, "SUSPEND", "ADMIN", "actor-1", "corr-2", "paused")
-            );
+                    connection,
+                    new TransitionRequest(
+                            IntegrationState.SUSPENDED, "SUSPEND", "ADMIN", "actor-1", "corr-2", "paused"));
 
-            verify(eventPublisher).publishEvent(
-                new ConnectionLifecycleEvent.Deactivated(55L, 7L, IntegrationKind.GITHUB)
-            );
+            verify(eventPublisher)
+                    .publishEvent(new ConnectionLifecycleEvent.Deactivated(55L, 7L, IntegrationKind.GITHUB));
         }
 
         @Test
@@ -640,9 +559,9 @@ class ConnectionServiceTest extends BaseUnitTest {
             Connection connection = connectionInState(IntegrationState.ACTIVE);
 
             service.transition(
-                connection,
-                new TransitionRequest(IntegrationState.ACTIVE, "INSTALL_BIND", "SYSTEM", "actor-1", "corr-3", "again")
-            );
+                    connection,
+                    new TransitionRequest(
+                            IntegrationState.ACTIVE, "INSTALL_BIND", "SYSTEM", "actor-1", "corr-3", "again"));
 
             Mockito.verifyNoInteractions(eventPublisher);
         }
@@ -650,21 +569,13 @@ class ConnectionServiceTest extends BaseUnitTest {
         @Test
         void duplicateCorrelationId_publishesNothing() {
             Connection connection = pendingConnection();
-            when(auditRepository.save(any(ConnectionAudit.class))).thenThrow(
-                new DataIntegrityViolationException("uq_connection_audit_idempotency")
-            );
+            when(auditRepository.save(any(ConnectionAudit.class)))
+                    .thenThrow(new DataIntegrityViolationException("uq_connection_audit_idempotency"));
 
             service.transition(
-                connection,
-                new TransitionRequest(
-                    IntegrationState.ACTIVE,
-                    "INSTALL_BIND",
-                    "SYSTEM",
-                    "actor-1",
-                    "corr-dup",
-                    "linked"
-                )
-            );
+                    connection,
+                    new TransitionRequest(
+                            IntegrationState.ACTIVE, "INSTALL_BIND", "SYSTEM", "actor-1", "corr-dup", "linked"));
 
             Mockito.verifyNoInteractions(eventPublisher);
         }
@@ -676,17 +587,16 @@ class ConnectionServiceTest extends BaseUnitTest {
 
     private Connection connectionInState(IntegrationState state) {
         Connection connection = new Connection(
-            workspace,
-            IntegrationKind.GITHUB,
-            "100",
-            new ConnectionConfig.GitHubAppConfig(100L, null, null, Set.of())
-        );
+                workspace,
+                IntegrationKind.GITHUB,
+                "100",
+                new ConnectionConfig.GitHubAppConfig(100L, null, null, Set.of()));
         // Lifecycle events carry the connection id; persisted rows always have one.
         setId(connection, 55L);
         connection.setState(state);
         Mockito.lenient()
-            .when(connectionRepository.findByIdAndWorkspaceId(connection.getId(), workspace.getId()))
-            .thenReturn(java.util.Optional.of(connection));
+                .when(connectionRepository.findByIdAndWorkspaceId(connection.getId(), workspace.getId()))
+                .thenReturn(java.util.Optional.of(connection));
         return connection;
     }
 
@@ -695,31 +605,19 @@ class ConnectionServiceTest extends BaseUnitTest {
         setId(connection, 55L + kind.ordinal());
         connection.setState(IntegrationState.ACTIVE);
         Mockito.lenient()
-            .when(connectionRepository.findByIdAndWorkspaceId(connection.getId(), workspace.getId()))
-            .thenReturn(java.util.Optional.of(connection));
+                .when(connectionRepository.findByIdAndWorkspaceId(connection.getId(), workspace.getId()))
+                .thenReturn(java.util.Optional.of(connection));
         return connection;
     }
 
     private static TransitionRequest uninstallRequest(String correlationId) {
         return new TransitionRequest(
-            IntegrationState.UNINSTALLED,
-            "UNINSTALL",
-            "SYSTEM",
-            "system",
-            correlationId,
-            "removed"
-        );
+                IntegrationState.UNINSTALLED, "UNINSTALL", "SYSTEM", "system", correlationId, "removed");
     }
 
     private static TransitionRequest disconnectRequest() {
         return new TransitionRequest(
-            IntegrationState.UNINSTALLED,
-            "DISCONNECT",
-            "ADMIN",
-            "actor-1",
-            "corr-disconnect",
-            "removed"
-        );
+                IntegrationState.UNINSTALLED, "DISCONNECT", "ADMIN", "actor-1", "corr-disconnect", "removed");
     }
 
     private static void setId(Connection connection, long id) {

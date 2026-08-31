@@ -27,9 +27,8 @@ public class MentorSlackThreadLinker {
     private final MentorSlackThreadService mentorSlackThreadService;
 
     public MentorSlackThreadLinker(
-        MentorSlackThreadRepository mentorSlackThreadRepository,
-        MentorSlackThreadService mentorSlackThreadService
-    ) {
+            MentorSlackThreadRepository mentorSlackThreadRepository,
+            MentorSlackThreadService mentorSlackThreadService) {
         this.mentorSlackThreadRepository = mentorSlackThreadRepository;
         this.mentorSlackThreadService = mentorSlackThreadService;
     }
@@ -37,28 +36,27 @@ public class MentorSlackThreadLinker {
     /** Find (or lazily create) the mentor {@code chat_thread} that backs this Slack DM. */
     @Transactional
     public UUID findOrCreateThread(
-        long workspaceId,
-        String teamId,
-        String channelId,
-        String threadTs,
-        String slackUserId,
-        String developerLogin
-    ) {
+            long workspaceId,
+            String teamId,
+            String channelId,
+            String threadTs,
+            String slackUserId,
+            String developerLogin) {
         return mentorSlackThreadRepository
-            .findByWorkspaceIdAndSlackChannelIdAndSlackThreadTs(workspaceId, channelId, threadTs)
-            .map(MentorSlackThread::getChatThreadId)
-            .orElseGet(() -> {
-                UUID chatThreadId = mentorSlackThreadService.ensureSlackThread(workspaceId, null, developerLogin);
-                MentorSlackThread mapping = new MentorSlackThread();
-                mapping.setId(UUID.randomUUID());
-                mapping.setWorkspaceId(workspaceId);
-                mapping.setChatThreadId(chatThreadId);
-                mapping.setSlackTeamId(teamId);
-                mapping.setSlackChannelId(channelId);
-                mapping.setSlackThreadTs(threadTs);
-                mapping.setSlackUserId(slackUserId);
-                mentorSlackThreadRepository.save(mapping);
-                return chatThreadId;
-            });
+                .findByWorkspaceIdAndSlackChannelIdAndSlackThreadTs(workspaceId, channelId, threadTs)
+                .map(MentorSlackThread::getChatThreadId)
+                .orElseGet(() -> {
+                    UUID chatThreadId = mentorSlackThreadService.ensureSlackThread(workspaceId, null, developerLogin);
+                    MentorSlackThread mapping = new MentorSlackThread();
+                    mapping.setId(UUID.randomUUID());
+                    mapping.setWorkspaceId(workspaceId);
+                    mapping.setChatThreadId(chatThreadId);
+                    mapping.setSlackTeamId(teamId);
+                    mapping.setSlackChannelId(channelId);
+                    mapping.setSlackThreadTs(threadTs);
+                    mapping.setSlackUserId(slackUserId);
+                    mentorSlackThreadRepository.save(mapping);
+                    return chatThreadId;
+                });
     }
 }

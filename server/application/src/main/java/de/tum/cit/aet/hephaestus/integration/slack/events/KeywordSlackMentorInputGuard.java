@@ -7,38 +7,30 @@ import java.util.Locale;
 public class KeywordSlackMentorInputGuard implements SlackMentorInputGuard {
 
     private static final List<String> SELF_HARM_CUES = List.of(
-        "kill myself",
-        "killing myself",
-        "suicide",
-        "suicidal",
-        "end my life",
-        "want to die",
-        "kill me",
-        "hurt myself",
-        "harming myself",
-        "self harm",
-        "self-harm",
-        "no reason to live"
-    );
+            "kill myself",
+            "killing myself",
+            "suicide",
+            "suicidal",
+            "end my life",
+            "want to die",
+            "kill me",
+            "hurt myself",
+            "harming myself",
+            "self harm",
+            "self-harm",
+            "no reason to live");
 
     private static final List<String> HARASSMENT_CUES = List.of(
-        "kill you",
-        "kys",
-        "i hate you",
-        "you're worthless",
-        "you are worthless",
-        "shut up you",
-        "stupid bot"
-    );
+            "kill you", "kys", "i hate you", "you're worthless", "you are worthless", "shut up you", "stupid bot");
 
     static final String SELF_HARM_RESPONSE =
-        "It sounds like you may be going through something really hard, and I'm not the right kind of help for " +
-        "this. I'm just a coding-practice mentor. Please reach out to someone who can support you right now. In " +
-        "many countries you can call or text a crisis line (for example 988 in the US/Canada), or contact your " +
-        "local emergency services. You deserve real support, and it's okay to ask for it.";
+            "It sounds like you may be going through something really hard, and I'm not the right kind of help for "
+                    + "this. I'm just a coding-practice mentor. Please reach out to someone who can support you right now. In "
+                    + "many countries you can call or text a crisis line (for example 988 in the US/Canada), or contact your "
+                    + "local emergency services. You deserve real support, and it's okay to ask for it.";
 
     static final String THREADING_RESPONSE =
-        "I reply in this DM thread. Hephaestus mentors in DM and uses channel messages only as allowed context.";
+            "I reply in this DM thread. Hephaestus mentors in DM and uses channel messages only as allowed context.";
 
     @Override
     public Verdict decide(String text) {
@@ -59,14 +51,12 @@ public class KeywordSlackMentorInputGuard implements SlackMentorInputGuard {
     }
 
     private static boolean isSlackThreadingQuestion(String normalized) {
-        return (
-            normalized.contains("chat thread") ||
-            normalized.contains("dm thread") ||
-            normalized.contains("main chat") ||
-            normalized.contains("channel repl") ||
-            normalized.contains("reply in thread") ||
-            normalized.contains("reply in a thread")
-        );
+        return (normalized.contains("chat thread")
+                || normalized.contains("dm thread")
+                || normalized.contains("main chat")
+                || normalized.contains("channel repl")
+                || normalized.contains("reply in thread")
+                || normalized.contains("reply in a thread"));
     }
 
     private static boolean containsAny(String haystack, List<String> needles) {

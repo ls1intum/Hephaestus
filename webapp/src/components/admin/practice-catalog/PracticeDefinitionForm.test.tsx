@@ -1,8 +1,10 @@
 import { Link } from "@tanstack/react-router";
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+
 import { mockPracticeDefinitionOptions } from "@/mocks/fixtures/practice";
 import { renderWithRouter } from "@/test/router-harness";
+
 import { PracticeDefinitionForm, type PracticeDefinitionValue } from "./PracticeDefinitionForm";
 
 vi.mock("@/components/shared/CodeEditor", () => ({
@@ -102,8 +104,12 @@ describe("the unsaved-changes guard around a save", () => {
 		fillValidDraft();
 
 		fireEvent.click(screen.getByRole("button", { name: "Create practice" }));
-		refuse?.();
-		await failed.catch(() => undefined);
+		// The guard re-arms from `track`'s rejection handler, so the click below has to wait for
+		// React to have processed it.
+		await act(async () => {
+			refuse?.();
+			await failed.catch(() => undefined);
+		});
 		fireEvent.click(screen.getByRole("link", { name: "Cancel" }));
 
 		// The draft is still the only copy of this practice, so leaving has to be a decision again.

@@ -62,11 +62,10 @@ Each leg's annotation names its own command; this table is only what the annotat
 
 | Failure | What it actually means |
 |---|---|
-| `routeTree.gen.ts is stale` | Only a Vite build writes it. `cd webapp && pnpm run build`, then commit the file. |
+| `routeTree.gen.ts is stale` | A Vite build writes it. `cd webapp && pnpm run build`, then commit the file. |
 | `README images are stale` | The storybook job runs `export:readme-assets` *after* `test:storybook`, so the job goes red having printed a clean pass line. Run `pnpm --filter webapp run export:readme-assets` and commit `docs/images/readme`. |
-| Biome version skew | `check:biome-pin` compares `package.json`, `node_modules` and the `$schema` URLs in both `biome.jsonc` files. Fix the pin; do not reformat. |
 | Migrations gate | A changelog that reached `main` was edited, renamed or deleted, or a `master.xml` `<include>` was not appended at the end. Fix forward with a new changeset; never edit the released file. |
-| `verify-changesets` | The PR touches shipped code with no `.changeset/*.md`. `/land-pr` step 9 has the rules. |
+| `verify-changesets` | The PR touches shipped code with no `.changeset/*.md`. `/land-pr` step 7 has the rules. |
 | App Server leg red on a docs-only PR | Expected, not a misconfiguration: `docs/**` is inside the `application-server` paths filter, because `docs:lint` and `check:diagrams` run on that leg. |
 
 ## 4. Reproduce locally before pushing

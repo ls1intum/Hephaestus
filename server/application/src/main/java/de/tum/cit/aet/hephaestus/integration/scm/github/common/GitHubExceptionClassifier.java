@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.common;
 
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.exception.InstallationSuspendedException;
+import de.tum.cit.aet.hephaestus.integration.scm.github.metrics.GithubMetrics;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.io.IOException;
@@ -104,11 +105,10 @@ public class GitHubExceptionClassifier {
      * Result of exception classification including optional rate limit reset time.
      */
     public record ClassificationResult(
-        Category category,
-        @Nullable Instant rateLimitResetAt,
-        @Nullable Duration suggestedWait,
-        String message
-    ) {
+            Category category,
+            @Nullable Instant rateLimitResetAt,
+            @Nullable Duration suggestedWait,
+            String message) {
         public static ClassificationResult of(Category category, String message) {
             return new ClassificationResult(category, null, null, message);
         }
@@ -123,11 +123,7 @@ public class GitHubExceptionClassifier {
 
         public static ClassificationResult rateLimited(Duration suggestedWait, String message) {
             return new ClassificationResult(
-                Category.RATE_LIMITED,
-                Instant.now().plus(suggestedWait),
-                suggestedWait,
-                message
-            );
+                    Category.RATE_LIMITED, Instant.now().plus(suggestedWait), suggestedWait, message);
         }
     }
 
@@ -139,36 +135,35 @@ public class GitHubExceptionClassifier {
     private final Counter unknownCounter;
 
     public GitHubExceptionClassifier(MeterRegistry meterRegistry) {
-        // Register counters for each error category
-        this.retryableCounter = Counter.builder("github.sync.errors.total")
-            .description("Total GitHub sync errors by category")
-            .tag("category", "retryable")
-            .register(meterRegistry);
+        this.retryableCounter = Counter.builder(GithubMetrics.GITHUB_SYNC_ERRORS_TOTAL)
+                .description("Total GitHub sync errors by category")
+                .tag("category", "retryable")
+                .register(meterRegistry);
 
-        this.rateLimitedCounter = Counter.builder("github.sync.errors.total")
-            .description("Total GitHub sync errors by category")
-            .tag("category", "rate_limited")
-            .register(meterRegistry);
+        this.rateLimitedCounter = Counter.builder(GithubMetrics.GITHUB_SYNC_ERRORS_TOTAL)
+                .description("Total GitHub sync errors by category")
+                .tag("category", "rate_limited")
+                .register(meterRegistry);
 
-        this.notFoundCounter = Counter.builder("github.sync.errors.total")
-            .description("Total GitHub sync errors by category")
-            .tag("category", "not_found")
-            .register(meterRegistry);
+        this.notFoundCounter = Counter.builder(GithubMetrics.GITHUB_SYNC_ERRORS_TOTAL)
+                .description("Total GitHub sync errors by category")
+                .tag("category", "not_found")
+                .register(meterRegistry);
 
-        this.authErrorCounter = Counter.builder("github.sync.errors.total")
-            .description("Total GitHub sync errors by category")
-            .tag("category", "auth_error")
-            .register(meterRegistry);
+        this.authErrorCounter = Counter.builder(GithubMetrics.GITHUB_SYNC_ERRORS_TOTAL)
+                .description("Total GitHub sync errors by category")
+                .tag("category", "auth_error")
+                .register(meterRegistry);
 
-        this.clientErrorCounter = Counter.builder("github.sync.errors.total")
-            .description("Total GitHub sync errors by category")
-            .tag("category", "client_error")
-            .register(meterRegistry);
+        this.clientErrorCounter = Counter.builder(GithubMetrics.GITHUB_SYNC_ERRORS_TOTAL)
+                .description("Total GitHub sync errors by category")
+                .tag("category", "client_error")
+                .register(meterRegistry);
 
-        this.unknownCounter = Counter.builder("github.sync.errors.total")
-            .description("Total GitHub sync errors by category")
-            .tag("category", "unknown")
-            .register(meterRegistry);
+        this.unknownCounter = Counter.builder(GithubMetrics.GITHUB_SYNC_ERRORS_TOTAL)
+                .description("Total GitHub sync errors by category")
+                .tag("category", "unknown")
+                .register(meterRegistry);
     }
 
     /**
@@ -195,11 +190,10 @@ public class GitHubExceptionClassifier {
 
         if (log.isDebugEnabled()) {
             log.debug(
-                "Classified exception: category={}, type={}, message={}",
-                result.category(),
-                e != null ? e.getClass().getSimpleName() : "null",
-                result.message()
-            );
+                    "Classified exception: category={}, type={}, message={}",
+                    result.category(),
+                    e != null ? e.getClass().getSimpleName() : "null",
+                    result.message());
         }
 
         return result;
@@ -225,7 +219,9 @@ public class GitHubExceptionClassifier {
      */
     @Nullable
     public ClassificationResult classifyGraphQlResponse(@Nullable ClientGraphQlResponse response) {
-        if (response == null || response.getErrors() == null || response.getErrors().isEmpty()) {
+        if (response == null
+                || response.getErrors() == null
+                || response.getErrors().isEmpty()) {
             return null;
         }
 
@@ -252,9 +248,7 @@ public class GitHubExceptionClassifier {
                 case "RATE_LIMIT", "RATE_LIMITED" -> {
                     rateLimitedCounter.increment();
                     return ClassificationResult.rateLimited(
-                        Duration.ofMinutes(1),
-                        "GraphQL rate limit: " + error.getMessage()
-                    );
+                            Duration.ofMinutes(1), "GraphQL rate limit: " + error.getMessage());
                 }
                 case "FORBIDDEN" -> {
                     // Check if it's a rate limit error
@@ -262,9 +256,7 @@ public class GitHubExceptionClassifier {
                     if (message != null && message.toLowerCase().contains("rate limit")) {
                         rateLimitedCounter.increment();
                         return ClassificationResult.rateLimited(
-                            Duration.ofMinutes(1),
-                            "GraphQL rate limit: " + message
-                        );
+                                Duration.ofMinutes(1), "GraphQL rate limit: " + message);
                     }
                     authErrorCounter.increment();
                     return ClassificationResult.of(Category.AUTH_ERROR, "GraphQL FORBIDDEN: " + message);
@@ -276,9 +268,7 @@ public class GitHubExceptionClassifier {
                 case "MAX_NODE_LIMIT_EXCEEDED", "RESOURCE_LIMITS_EXCEEDED" -> {
                     clientErrorCounter.increment();
                     return ClassificationResult.of(
-                        Category.CLIENT_ERROR,
-                        "GraphQL resource limit: " + error.getMessage()
-                    );
+                            Category.CLIENT_ERROR, "GraphQL resource limit: " + error.getMessage());
                 }
                 default -> {
                     // Continue checking other errors
@@ -297,7 +287,8 @@ public class GitHubExceptionClassifier {
 
         // Default for unrecognized errors
         unknownCounter.increment();
-        return ClassificationResult.of(Category.UNKNOWN, "Unclassified GraphQL error: " + errors.get(0).getMessage());
+        return ClassificationResult.of(
+                Category.UNKNOWN, "Unclassified GraphQL error: " + errors.get(0).getMessage());
     }
 
     /**
@@ -310,39 +301,31 @@ public class GitHubExceptionClassifier {
 
         // Unwrap common wrapper exceptions
         Throwable cause = e;
-        if (
-            e.getCause() != null &&
-            (e instanceof RuntimeException ||
-                e.getClass().getName().contains("CompletionException") ||
-                e.getClass().getName().contains("ExecutionException"))
-        ) {
+        if (e.getCause() != null
+                && (e instanceof RuntimeException
+                        || e.getClass().getName().contains("CompletionException")
+                        || e.getClass().getName().contains("ExecutionException"))) {
             cause = e.getCause();
         }
 
         // Suspended installation - this is an auth error, not retryable
         if (cause instanceof InstallationSuspendedException suspended) {
             return ClassificationResult.of(
-                Category.AUTH_ERROR,
-                "Installation " + suspended.getInstallationId() + " is suspended"
-            );
+                    Category.AUTH_ERROR, "Installation " + suspended.getInstallationId() + " is suspended");
         }
 
         // Database deadlocks are transient and should be retried with backoff
         // These occur when multiple threads try to upsert the same user concurrently
         if (isDeadlockException(cause)) {
             return ClassificationResult.of(
-                Category.RETRYABLE,
-                "Database deadlock detected - will retry: " + cause.getMessage()
-            );
+                    Category.RETRYABLE, "Database deadlock detected - will retry: " + cause.getMessage());
         }
 
         // UnexpectedRollbackException is transient — typically caused by a nested
         // transaction that was rolled back (e.g., deadlock in a sub-transaction)
         if (cause instanceof UnexpectedRollbackException) {
             return ClassificationResult.of(
-                Category.RETRYABLE,
-                "Transaction rollback detected - will retry: " + cause.getMessage()
-            );
+                    Category.RETRYABLE, "Transaction rollback detected - will retry: " + cause.getMessage());
         }
 
         // Check for WebClient response exceptions (HTTP errors)
@@ -390,9 +373,7 @@ public class GitHubExceptionClassifier {
 
         // Default: unknown
         return ClassificationResult.of(
-            Category.UNKNOWN,
-            "Unclassified: " + cause.getClass().getSimpleName() + " - " + cause.getMessage()
-        );
+                Category.UNKNOWN, "Unclassified: " + cause.getClass().getSimpleName() + " - " + cause.getMessage());
     }
 
     /**
@@ -476,11 +457,9 @@ public class GitHubExceptionClassifier {
             String message = current.getMessage();
 
             // Spring/Hibernate deadlock exceptions
-            if (
-                className.contains("CannotAcquireLockException") ||
-                className.contains("LockAcquisitionException") ||
-                className.contains("DeadlockLoserDataAccessException")
-            ) {
+            if (className.contains("CannotAcquireLockException")
+                    || className.contains("LockAcquisitionException")
+                    || className.contains("DeadlockLoserDataAccessException")) {
                 return true;
             }
 
@@ -510,11 +489,9 @@ public class GitHubExceptionClassifier {
         }
         // Check for reactor/netty timeout exceptions
         String className = e.getClass().getName();
-        return (
-            className.contains("TimeoutException") ||
-            className.contains("ReadTimeoutException") ||
-            className.contains("WriteTimeoutException")
-        );
+        return (className.contains("TimeoutException")
+                || className.contains("ReadTimeoutException")
+                || className.contains("WriteTimeoutException"));
     }
 
     /**
@@ -535,12 +512,10 @@ public class GitHubExceptionClassifier {
         String className = e.getClass().getName();
 
         // Check for reactor-netty transport errors (PrematureCloseException, etc.)
-        if (
-            className.contains("PrematureCloseException") ||
-            className.contains("AbortedException") ||
-            className.contains("ConnectionException") ||
-            className.contains("ConnectionReset")
-        ) {
+        if (className.contains("PrematureCloseException")
+                || className.contains("AbortedException")
+                || className.contains("ConnectionException")
+                || className.contains("ConnectionReset")) {
             return true;
         }
 
@@ -569,12 +544,10 @@ public class GitHubExceptionClassifier {
         String body = e.getResponseBodyAsString();
         if (body != null) {
             String lowerBody = body.toLowerCase();
-            return (
-                lowerBody.contains("rate limit") ||
-                lowerBody.contains("ratelimit") ||
-                lowerBody.contains("abuse") ||
-                lowerBody.contains("secondary rate")
-            );
+            return (lowerBody.contains("rate limit")
+                    || lowerBody.contains("ratelimit")
+                    || lowerBody.contains("abuse")
+                    || lowerBody.contains("secondary rate"));
         }
 
         return false;

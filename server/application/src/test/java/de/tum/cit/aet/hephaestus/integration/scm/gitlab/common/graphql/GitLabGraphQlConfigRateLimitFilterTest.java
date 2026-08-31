@@ -64,8 +64,10 @@ class GitLabGraphQlConfigRateLimitFilterTest extends BaseUnitTest {
 
     @Test
     void shouldNotRecordWhenScopeIdAttributeMissing() {
-        ClientRequest request = ClientRequest.create(HttpMethod.POST, GRAPHQL_URI).build();
-        ClientResponse response = responseWithRateLimitHeaders(80, 100, Instant.now().plusSeconds(60), 5);
+        ClientRequest request =
+                ClientRequest.create(HttpMethod.POST, GRAPHQL_URI).build();
+        ClientResponse response =
+                responseWithRateLimitHeaders(80, 100, Instant.now().plusSeconds(60), 5);
 
         filter.filter(request, req -> Mono.just(response)).block();
 
@@ -79,7 +81,8 @@ class GitLabGraphQlConfigRateLimitFilterTest extends BaseUnitTest {
         // Reproduces the gitlab.lrz.de reality: authenticated API responses carry no RateLimit-*
         // headers, so there is nothing to capture and the snapshot must remain null.
         ClientRequest request = requestForScope(7L);
-        ClientResponse response = ClientResponse.create(HttpStatus.OK, ExchangeStrategies.withDefaults()).build();
+        ClientResponse response = ClientResponse.create(HttpStatus.OK, ExchangeStrategies.withDefaults())
+                .build();
 
         filter.filter(request, req -> Mono.just(response)).block();
 
@@ -88,16 +91,16 @@ class GitLabGraphQlConfigRateLimitFilterTest extends BaseUnitTest {
 
     private ClientRequest requestForScope(long scopeId) {
         return ClientRequest.create(HttpMethod.POST, GRAPHQL_URI)
-            .attribute(GitLabGraphQlClientProvider.SCOPE_ID_ATTRIBUTE, scopeId)
-            .build();
+                .attribute(GitLabGraphQlClientProvider.SCOPE_ID_ATTRIBUTE, scopeId)
+                .build();
     }
 
     private ClientResponse responseWithRateLimitHeaders(int remaining, int limit, Instant resetAt, int observed) {
         return ClientResponse.create(HttpStatus.OK, ExchangeStrategies.withDefaults())
-            .header(HEADER_RATE_LIMIT_REMAINING, String.valueOf(remaining))
-            .header(HEADER_RATE_LIMIT_LIMIT, String.valueOf(limit))
-            .header(HEADER_RATE_LIMIT_RESET, String.valueOf(resetAt.getEpochSecond()))
-            .header(HEADER_RATE_LIMIT_OBSERVED, String.valueOf(observed))
-            .build();
+                .header(HEADER_RATE_LIMIT_REMAINING, String.valueOf(remaining))
+                .header(HEADER_RATE_LIMIT_LIMIT, String.valueOf(limit))
+                .header(HEADER_RATE_LIMIT_RESET, String.valueOf(resetAt.getEpochSecond()))
+                .header(HEADER_RATE_LIMIT_OBSERVED, String.valueOf(observed))
+                .build();
     }
 }

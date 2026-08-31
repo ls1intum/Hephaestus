@@ -44,9 +44,8 @@ class LlmPriceWidthTest extends BaseUnitTest {
     private static final BigDecimal FIRST_UNSAFE_RATE = LlmPriceValidation.MAX_RATE_EXCLUSIVE.setScale(RATE_SCALE);
 
     /** One unit in the last place below it: the widest rate an admin can actually set. */
-    private static final BigDecimal WIDEST_SAFE_RATE = FIRST_UNSAFE_RATE.subtract(
-        BigDecimal.ONE.movePointLeft(RATE_SCALE)
-    );
+    private static final BigDecimal WIDEST_SAFE_RATE =
+            FIRST_UNSAFE_RATE.subtract(BigDecimal.ONE.movePointLeft(RATE_SCALE));
 
     private static ValidatorFactory factory;
     private static Validator validator;
@@ -65,9 +64,8 @@ class LlmPriceWidthTest extends BaseUnitTest {
     @Test
     @DisplayName("the widest rate that survives the wire is accepted")
     void shouldAcceptTheWidestSafeRate() {
-        Set<ConstraintViolation<UpdateLlmModelPriceRequestDTO>> violations = validator.validate(
-            priceRequest(WIDEST_SAFE_RATE)
-        );
+        Set<ConstraintViolation<UpdateLlmModelPriceRequestDTO>> violations =
+                validator.validate(priceRequest(WIDEST_SAFE_RATE));
 
         assertThat(violations).as("the bound must be usable, not merely safe").isEmpty();
         assertThatCode(() -> validate(WIDEST_SAFE_RATE)).doesNotThrowAnyException();
@@ -76,38 +74,37 @@ class LlmPriceWidthTest extends BaseUnitTest {
     @Test
     @DisplayName("a rate the browser would round is refused by the request validator")
     void shouldRejectARateWiderThanBinary64() {
-        Set<ConstraintViolation<UpdateLlmModelPriceRequestDTO>> violations = validator.validate(
-            priceRequest(FIRST_UNSAFE_RATE)
-        );
+        Set<ConstraintViolation<UpdateLlmModelPriceRequestDTO>> violations =
+                validator.validate(priceRequest(FIRST_UNSAFE_RATE));
 
-        assertThat(violations).as("@Digits is what stops a rate the API cannot quote back accurately").isNotEmpty();
-        assertThat(violations).allSatisfy(violation ->
-            assertThat(violation.getPropertyPath().toString()).isEqualTo("per1mInputUsd")
-        );
+        assertThat(violations)
+                .as("@Digits is what stops a rate the API cannot quote back accurately")
+                .isNotEmpty();
+        assertThat(violations)
+                .allSatisfy(violation ->
+                        assertThat(violation.getPropertyPath().toString()).isEqualTo("per1mInputUsd"));
     }
 
     @Test
     @DisplayName("the shared validator holds the same bound for every entry point")
     void shouldRejectAnOversizedRateInTheSharedValidator() {
         assertThatThrownBy(() -> validate(FIRST_UNSAFE_RATE))
-            .isInstanceOf(IllegalArgumentException.class)
-            // The admin has to be told which ceiling they hit, so the bound itself is in the message.
-            .hasMessageContaining(LlmPriceValidation.MAX_RATE_EXCLUSIVE.toPlainString());
+                .isInstanceOf(IllegalArgumentException.class)
+                // The admin has to be told which ceiling they hit, so the bound itself is in the message.
+                .hasMessageContaining(LlmPriceValidation.MAX_RATE_EXCLUSIVE.toPlainString());
     }
 
     @Test
     @DisplayName("an oversized cache rate is caught too, not just the required two")
     void shouldRejectAnOversizedOptionalRate() {
-        assertThatThrownBy(() ->
-            LlmPriceValidation.validate(
-                PricingMode.PRICED,
-                new BigDecimal("1.00"),
-                new BigDecimal("2.00"),
-                FIRST_UNSAFE_RATE,
-                null,
-                null
-            )
-        ).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> LlmPriceValidation.validate(
+                        PricingMode.PRICED,
+                        new BigDecimal("1.00"),
+                        new BigDecimal("2.00"),
+                        FIRST_UNSAFE_RATE,
+                        null,
+                        null))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     private static void validate(BigDecimal inputRate) {
@@ -116,12 +113,6 @@ class LlmPriceWidthTest extends BaseUnitTest {
 
     private static UpdateLlmModelPriceRequestDTO priceRequest(BigDecimal inputRate) {
         return new UpdateLlmModelPriceRequestDTO(
-            PricingMode.PRICED,
-            inputRate,
-            new BigDecimal("2.00"),
-            null,
-            null,
-            null
-        );
+                PricingMode.PRICED, inputRate, new BigDecimal("2.00"), null, null, null);
     }
 }

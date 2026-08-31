@@ -50,18 +50,15 @@ class BetaPosteriorTest {
         BetaPosterior.Difference difference = BetaPosterior.from(9, 6.0).differenceFrom(BetaPosterior.from(9, 6.0));
 
         assertThat(difference.mean()).isCloseTo(0.0, org.assertj.core.data.Offset.offset(1.0e-12));
-        assertThat(difference.probabilityAbove(0.0)).isCloseTo(
-            difference.probabilityBelow(0.0),
-            org.assertj.core.data.Offset.offset(1.0e-12)
-        );
-        assertThat(difference.probabilityAbove(0.15)).isCloseTo(
-            difference.probabilityBelow(-0.15),
-            org.assertj.core.data.Offset.offset(1.0e-12)
-        );
+        assertThat(difference.probabilityAbove(0.0))
+                .isCloseTo(difference.probabilityBelow(0.0), org.assertj.core.data.Offset.offset(1.0e-12));
+        assertThat(difference.probabilityAbove(0.15))
+                .isCloseTo(difference.probabilityBelow(-0.15), org.assertj.core.data.Offset.offset(1.0e-12));
         double tails = difference.probabilityAbove(0.15) + difference.probabilityBelow(-0.15);
         assertThat(tails).isBetween(0.0, 1.0);
         assertThat(1.0 - tails).isGreaterThan(0.0);
-        assertThat(1.0 - difference.probabilityAbove(0.0) - difference.probabilityBelow(0.0)).isLessThan(0.01);
+        assertThat(1.0 - difference.probabilityAbove(0.0) - difference.probabilityBelow(0.0))
+                .isLessThan(0.01);
     }
 
     @Test

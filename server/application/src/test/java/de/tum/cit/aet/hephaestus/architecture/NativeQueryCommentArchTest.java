@@ -51,9 +51,7 @@ class NativeQueryCommentArchTest extends HephaestusArchitectureTest {
      * carries is raw SQL that may contain {@code --} comments.
      */
     private static final Set<String> QUERY_ANNOTATIONS = Set.of(
-        "org.springframework.data.jpa.repository.Query",
-        "org.springframework.data.jpa.repository.NativeQuery"
-    );
+            "org.springframework.data.jpa.repository.Query", "org.springframework.data.jpa.repository.NativeQuery");
 
     /**
      * The attributes of those annotations that hold a query string. {@code countQuery} is a real
@@ -67,16 +65,13 @@ class NativeQueryCommentArchTest extends HephaestusArchitectureTest {
     @Test
     void noApostrophesInSqlLineCommentsOfQueries() {
         ArchRule rule = methods()
-            .that(
-                new DescribedPredicate<JavaMethod>("are annotated with @Query or @NativeQuery") {
+                .that(new DescribedPredicate<JavaMethod>("are annotated with @Query or @NativeQuery") {
                     @Override
                     public boolean test(JavaMethod method) {
                         return !queryStrings(method).isEmpty();
                     }
-                }
-            )
-            .should(
-                new ArchCondition<JavaMethod>("not contain an apostrophe in any -- SQL comment") {
+                })
+                .should(new ArchCondition<JavaMethod>("not contain an apostrophe in any -- SQL comment") {
                     @Override
                     public void check(JavaMethod method, ConditionEvents events) {
                         queryStrings(method).forEach((attribute, query) -> {
@@ -89,24 +84,19 @@ class NativeQueryCommentArchTest extends HephaestusArchitectureTest {
                                 if (comment.indexOf('\'') < 0) {
                                     continue;
                                 }
-                                events.add(
-                                    SimpleConditionEvent.violated(
+                                events.add(SimpleConditionEvent.violated(
                                         method,
-                                        "Apostrophe in a SQL line comment of the '" +
-                                            attribute +
-                                            "' query on " +
-                                            method.getFullName() +
-                                            " — Hibernate reads it as an unterminated quoted range and the " +
-                                            "ApplicationContext will fail to start. Reword the comment. Offending line: " +
-                                            line.trim()
-                                    )
-                                );
+                                        "Apostrophe in a SQL line comment of the '" + attribute
+                                                + "' query on "
+                                                + method.getFullName()
+                                                + " — Hibernate reads it as an unterminated quoted range and the "
+                                                + "ApplicationContext will fail to start. Reword the comment. Offending line: "
+                                                + line.trim()));
                             }
                         });
                     }
-                }
-            )
-            .allowEmptyShould(true);
+                })
+                .allowEmptyShould(true);
 
         rule.check(classes);
     }
@@ -118,20 +108,19 @@ class NativeQueryCommentArchTest extends HephaestusArchitectureTest {
      */
     private static Map<String, String> queryStrings(JavaMethod method) {
         Map<String, String> found = new LinkedHashMap<>();
-        method
-            .getAnnotations()
-            .stream()
-            .filter(annotation -> QUERY_ANNOTATIONS.contains(annotation.getRawType().getName()))
-            .forEach(annotation -> {
-                for (String attribute : QUERY_ATTRIBUTES) {
-                    annotation
-                        .get(attribute)
-                        .filter(String.class::isInstance)
-                        .map(String.class::cast)
-                        .filter(query -> !query.isBlank())
-                        .ifPresent(query -> found.put(attribute, query));
-                }
-            });
+        method.getAnnotations().stream()
+                .filter(annotation ->
+                        QUERY_ANNOTATIONS.contains(annotation.getRawType().getName()))
+                .forEach(annotation -> {
+                    for (String attribute : QUERY_ATTRIBUTES) {
+                        annotation
+                                .get(attribute)
+                                .filter(String.class::isInstance)
+                                .map(String.class::cast)
+                                .filter(query -> !query.isBlank())
+                                .ifPresent(query -> found.put(attribute, query));
+                    }
+                });
         return found;
     }
 }

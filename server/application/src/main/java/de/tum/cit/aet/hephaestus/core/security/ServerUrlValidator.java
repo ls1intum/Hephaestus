@@ -32,19 +32,11 @@ public final class ServerUrlValidator {
 
     private ServerUrlValidator() {}
 
-    private static final Set<String> BLOCKED_HOSTNAMES = Set.of(
-        "localhost",
-        "metadata.google.internal",
-        "metadata.goog"
-    );
+    private static final Set<String> BLOCKED_HOSTNAMES =
+            Set.of("localhost", "metadata.google.internal", "metadata.goog");
 
-    private static final Set<String> BLOCKED_IPS = Set.of(
-        "127.0.0.1",
-        "0.0.0.0",
-        "::1",
-        "0:0:0:0:0:0:0:1",
-        "169.254.169.254"
-    );
+    private static final Set<String> BLOCKED_IPS =
+            Set.of("127.0.0.1", "0.0.0.0", "::1", "0:0:0:0:0:0:0:1", "169.254.169.254");
 
     private static final Set<String> BLOCKED_TLDS = Set.of(".internal", ".local", ".localhost");
 

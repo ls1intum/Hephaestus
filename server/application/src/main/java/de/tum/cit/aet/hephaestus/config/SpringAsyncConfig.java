@@ -9,6 +9,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.Ordered;
 import org.springframework.core.task.AsyncTaskExecutor;
+import org.springframework.core.task.support.ContextPropagatingTaskDecorator;
 import org.springframework.core.task.support.TaskExecutorAdapter;
 import org.springframework.scheduling.annotation.AsyncConfigurer;
 import org.springframework.scheduling.annotation.EnableAsync;
@@ -40,6 +41,7 @@ public class SpringAsyncConfig implements AsyncConfigurer {
         executor.setMaxPoolSize(16);
         executor.setQueueCapacity(500);
         executor.setThreadNamePrefix("async-");
+        executor.setTaskDecorator(new ContextPropagatingTaskDecorator());
         // Let in-flight async DB work finish before the EntityManagerFactory closes on shutdown.
         executor.setWaitForTasksToCompleteOnShutdown(true);
         executor.setAwaitTerminationSeconds(30);
@@ -67,6 +69,7 @@ public class SpringAsyncConfig implements AsyncConfigurer {
         executor.setMaxPoolSize(4);
         executor.setQueueCapacity(1000);
         executor.setThreadNamePrefix("feedback-lane-");
+        executor.setTaskDecorator(new ContextPropagatingTaskDecorator());
         // Same reason as applicationTaskExecutor: let in-flight DB work finish before the
         // EntityManagerFactory closes.
         executor.setWaitForTasksToCompleteOnShutdown(true);
@@ -82,6 +85,7 @@ public class SpringAsyncConfig implements AsyncConfigurer {
         executor.setMaxPoolSize(4);
         executor.setQueueCapacity(0);
         executor.setThreadNamePrefix("sync-job-");
+        executor.setTaskDecorator(new ContextPropagatingTaskDecorator());
         // SyncJobService (a lifecycle phase above) records cooperative cancellation first; runners
         // observe it and unwind on their own. shutdownNow is the backstop that bounds context close
         // rather than leaking this non-daemon pool — it must never be the primary mechanism, since an
@@ -101,6 +105,8 @@ public class SpringAsyncConfig implements AsyncConfigurer {
     @Bean(name = "monitoringExecutor")
     @ConditionalOnMissingBean(name = "monitoringExecutor")
     public AsyncTaskExecutor monitoringExecutor() {
-        return new TaskExecutorAdapter(Executors.newVirtualThreadPerTaskExecutor());
+        TaskExecutorAdapter executor = new TaskExecutorAdapter(Executors.newVirtualThreadPerTaskExecutor());
+        executor.setTaskDecorator(new ContextPropagatingTaskDecorator());
+        return executor;
     }
 }

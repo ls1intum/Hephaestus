@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.core.webhook;
 
 import de.tum.cit.aet.hephaestus.core.webhook.WebhookProperties;
+import de.tum.cit.aet.hephaestus.integration.core.metrics.IntegrationCoreMetrics;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.FilterChain;
@@ -48,7 +49,7 @@ public class WebhookPayloadSizeFilter extends OncePerRequestFilter {
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
-        throws ServletException, IOException {
+            throws ServletException, IOException {
         long contentLength = request.getContentLengthLong();
         String provider = providerTag(request.getRequestURI());
         if (contentLength < 0) {
@@ -73,12 +74,12 @@ public class WebhookPayloadSizeFilter extends OncePerRequestFilter {
 
     private void rejected(String provider, String reason) {
         rejectionCounters
-            .computeIfAbsent(provider + ":" + reason, key ->
-                Counter.builder("webhook.rejected")
-                    .tag("provider", provider)
-                    .tag("reason", reason)
-                    .register(meterRegistry)
-            )
-            .increment();
+                .computeIfAbsent(
+                        provider + ":" + reason,
+                        key -> Counter.builder(IntegrationCoreMetrics.WEBHOOK_REJECTED)
+                                .tag("provider", provider)
+                                .tag("reason", reason)
+                                .register(meterRegistry))
+                .increment();
     }
 }

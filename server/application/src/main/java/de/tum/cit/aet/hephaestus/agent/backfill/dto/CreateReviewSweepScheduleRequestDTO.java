@@ -22,19 +22,16 @@ import org.jspecify.annotations.NonNull;
  *     is one somebody chose in hindsight, which is a backfill campaign and records itself as one.
  */
 public record CreateReviewSweepScheduleRequestDTO(
-    @NonNull
-    @NotNull
-    @Schema(
-        description = "Kind of work to sweep",
-        example = "scm.pull_request",
-        allowableValues = { "scm.pull_request", "scm.issue" }
-    )
-    ArtifactKind artifactKind,
-    @NonNull @NotNull @Schema(description = "How often the sweep runs") ReviewSweepCadence cadence,
-    @NonNull
-    @NotNull
-    @Min(1)
-    @Max(7)
-    @Schema(description = "How far back each sweep looks, in days", example = "2")
-    Integer lookbackDays
-) {}
+        @NonNull
+        @NotNull
+        @Schema(
+                description = "Kind of work to sweep",
+                example = "scm.pull_request",
+                allowableValues = {"scm.pull_request", "scm.issue"})
+        ArtifactKind artifactKind,
+
+        @NonNull @NotNull @Schema(description = "How often the sweep runs")
+        ReviewSweepCadence cadence,
+
+        @NonNull @NotNull @Min(1) @Max(7) @Schema(description = "How far back each sweep looks, in days", example = "2")
+        Integer lookbackDays) {}

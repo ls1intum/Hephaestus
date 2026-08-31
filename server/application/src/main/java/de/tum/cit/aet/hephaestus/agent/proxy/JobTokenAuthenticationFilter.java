@@ -6,6 +6,9 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageSourceType;
+import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.JobJwt;
+import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtInvalidException;
+import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtVerifier;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -14,7 +17,6 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.security.MessageDigest;
 import java.util.Optional;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.Nullable;
@@ -36,28 +38,28 @@ public class JobTokenAuthenticationFilter extends OncePerRequestFilter {
 
     private static final Logger log = LoggerFactory.getLogger(JobTokenAuthenticationFilter.class);
 
-    /** Base64-URL characters (no padding). */
-    private static final Pattern BASE64_URL_PATTERN = Pattern.compile("^[A-Za-z0-9_-]+$");
-
     private static final String BEARER_PREFIX = "Bearer ";
+    private static final String LLM_PROXY_SCOPE = "llm_proxy";
 
     private final AgentJobRepository agentJobRepository;
+    private final WorkerJwtVerifier jwtVerifier;
     private final MentorProxyCredentialRegistry mentorRegistry;
     private final ObjectMapper objectMapper;
 
     JobTokenAuthenticationFilter(
-        AgentJobRepository agentJobRepository,
-        MentorProxyCredentialRegistry mentorRegistry,
-        ObjectMapper objectMapper
-    ) {
+            AgentJobRepository agentJobRepository,
+            WorkerJwtVerifier jwtVerifier,
+            MentorProxyCredentialRegistry mentorRegistry,
+            ObjectMapper objectMapper) {
         this.agentJobRepository = agentJobRepository;
+        this.jwtVerifier = jwtVerifier;
         this.mentorRegistry = mentorRegistry;
         this.objectMapper = objectMapper;
     }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
-        throws ServletException, IOException {
+            throws ServletException, IOException {
         if (!isPrivateIp(request.getRemoteAddr())) {
             log.warn("LLM proxy request from non-private IP: {}", request.getRemoteAddr());
             response.sendError(HttpServletResponse.SC_FORBIDDEN, "Forbidden");
@@ -70,12 +72,25 @@ public class JobTokenAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
-        if (!BASE64_URL_PATTERN.matcher(token).matches()) {
-            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid token format");
-            return;
+        Optional<ProxyRouting> routing = mentorRegistry.validate(token);
+        if (routing.isEmpty()) {
+            JobJwt jwt;
+            try {
+                if (!(jwtVerifier.verify(token) instanceof JobJwt jobJwt)) {
+                    response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid or expired token");
+                    return;
+                }
+                jwt = jobJwt;
+            } catch (WorkerJwtInvalidException e) {
+                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid or expired token");
+                return;
+            }
+            if (!jwt.scopes().contains(LLM_PROXY_SCOPE)) {
+                response.sendError(HttpServletResponse.SC_FORBIDDEN, "Insufficient token scope");
+                return;
+            }
+            routing = resolveJobRouting(jwt);
         }
-
-        Optional<ProxyRouting> routing = resolveJobRouting(token).or(() -> mentorRegistry.validate(token));
         if (routing.isEmpty()) {
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid or expired token");
             return;
@@ -89,20 +104,15 @@ public class JobTokenAuthenticationFilter extends OncePerRequestFilter {
         }
     }
 
-    /**
-     * Look up an {@code AgentJob} by token and translate its frozen {@link ConfigSnapshot} into routing.
-     * The attempt's identity and spend-so-far are read here because the row and snapshot already loaded
-     * carry both, so the budget gate costs no extra query.
-     */
-    private Optional<ProxyRouting> resolveJobRouting(String token) {
-        String hash = AgentJob.computeTokenHash(token);
-        Optional<AgentJob> optionalJob = agentJobRepository.findByJobTokenHashAndStatus(hash, AgentJobStatus.RUNNING);
+    private Optional<ProxyRouting> resolveJobRouting(JobJwt jwt) {
+        Optional<AgentJob> optionalJob = agentJobRepository.findByIdWithWorkspace(jwt.jobId());
         if (optionalJob.isEmpty()) {
             return Optional.empty();
         }
         AgentJob job = optionalJob.get();
-        if (!MessageDigest.isEqual(token.getBytes(), job.getJobToken().getBytes())) {
-            log.warn("Token hash matched but constant-time comparison failed — possible collision");
+        if (job.getStatus() != AgentJobStatus.RUNNING
+                || !job.getWorkspace().getId().equals(jwt.workspaceId())
+                || job.getRetryCount() != jwt.attempt()) {
             return Optional.empty();
         }
         if (job.getConfigSnapshot() == null) {
@@ -116,8 +126,7 @@ public class JobTokenAuthenticationFilter extends OncePerRequestFilter {
             log.warn("Failed to parse config snapshot for job {}: {}", job.getId(), e.getMessage());
             return Optional.empty();
         }
-        return Optional.of(
-            new ProxyRouting(
+        return Optional.of(new ProxyRouting(
                 "job:" + job.getId(),
                 snapshot.apiProtocol(),
                 snapshot.baseUrl(),
@@ -126,13 +135,7 @@ public class JobTokenAuthenticationFilter extends OncePerRequestFilter {
                 snapshot.modelId(),
                 job.getWorkspace().getId(),
                 new ProxyRouting.BilledAttempt(
-                    LlmUsageSourceType.AGENT_JOB,
-                    job.getId(),
-                    job.getRetryCount(),
-                    spentSoFarUsd(job, snapshot)
-                )
-            )
-        );
+                        LlmUsageSourceType.AGENT_JOB, job.getId(), job.getRetryCount(), spentSoFarUsd(job, snapshot))));
     }
 
     /**
@@ -145,14 +148,12 @@ public class JobTokenAuthenticationFilter extends OncePerRequestFilter {
         if (price == null) {
             return BigDecimal.ZERO;
         }
-        BigDecimal cost = price
-            .calculateCost(
-                zeroIfNull(job.getLlmTotalInputTokens()),
-                zeroIfNull(job.getLlmTotalOutputTokens()),
-                zeroIfNull(job.getLlmCacheReadTokens()),
-                zeroIfNull(job.getLlmCacheWriteTokens())
-            )
-            .usd();
+        BigDecimal cost = price.calculateCost(
+                        zeroIfNull(job.getLlmTotalInputTokens()),
+                        zeroIfNull(job.getLlmTotalOutputTokens()),
+                        zeroIfNull(job.getLlmCacheReadTokens()),
+                        zeroIfNull(job.getLlmCacheWriteTokens()))
+                .usd();
         return cost != null ? cost : BigDecimal.ZERO;
     }
 

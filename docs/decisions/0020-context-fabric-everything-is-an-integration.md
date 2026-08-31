@@ -374,3 +374,20 @@ limitation and protection by default.
 Triggers §3 and §8 have fired and are answered. Still live: a cross-context link that needs to be
 *asserted* rather than hinted (`entity_node`/`entity_edge`, §5), and ADR 0004's counter reading clean
 for a calendar week so prod can flip to `throw` and fold RLS in (§9).
+
+## Update — 2026-08-30 (issue #1636)
+
+[ADR 0039](0039-git-and-postgresql-own-evidence.md) supersedes §1/§2's realised filesystem CAS and
+the “Filesystem layout” subsection of the 2026-08-04 update. The statement that SQL is authoritative
+still holds for manifests, references, captured API payloads, liveness, retention and erasure. Its
+application to repository bytes is now more precise: Git owns the commit/tree/blob object closure
+pinned by a live job keep-ref, while PostgreSQL owns the root set. Temporary worktrees and payload
+materializations remain disposable projections.
+
+There is no filesystem content-addressed evidence store in the 1.0 target. ADR 0039 supersedes the
+`cas/sha256/**` and `jobs/**` replay layout, manifest-walking garbage collection, independent CAS
+retention clock, and shared-fabric deployment contract above.
+
+The 2026-08-04 update's "bounded residual windows" consequence for the CAS and replay cache remains
+accurate for pre-cutover releases only; in the 1.0 target ADR 0039's SQL-root-set collection replaces
+it, and selective erasure stops being a deployment-approval consideration tied to a filesystem cache.

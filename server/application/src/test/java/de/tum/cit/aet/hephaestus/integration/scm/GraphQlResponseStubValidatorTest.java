@@ -30,9 +30,9 @@ class GraphQlResponseStubValidatorTest extends BaseUnitTest {
         Map<String, Object> node = Map.of("iid", "42", "approved", true);
 
         assertThatThrownBy(() -> assertVendorCouldReturn(GITLAB, LINK_COMMITS, MERGE_REQUEST_NODES, List.of(node)))
-            .isInstanceOf(AssertionError.class)
-            .hasMessageContaining("project.mergeRequests.nodes[0].approved")
-            .hasMessageContaining("is not selected by " + LINK_COMMITS);
+                .isInstanceOf(AssertionError.class)
+                .hasMessageContaining("project.mergeRequests.nodes[0].approved")
+                .hasMessageContaining("is not selected by " + LINK_COMMITS);
     }
 
     @Test
@@ -41,40 +41,34 @@ class GraphQlResponseStubValidatorTest extends BaseUnitTest {
         Map<String, Object> node = Map.of("iid", 42);
 
         assertThatThrownBy(() -> assertVendorCouldReturn(GITLAB, LINK_COMMITS, MERGE_REQUEST_NODES, List.of(node)))
-            .isInstanceOf(AssertionError.class)
-            .hasMessageContaining("project.mergeRequests.nodes[0].iid")
-            .hasMessageContaining("String!")
-            .hasMessageContaining("Integer");
+                .isInstanceOf(AssertionError.class)
+                .hasMessageContaining("project.mergeRequests.nodes[0].iid")
+                .hasMessageContaining("String!")
+                .hasMessageContaining("Integer");
     }
 
     @Test
     void acceptsTheCorrectedStub() {
         Map<String, Object> node = Map.of(
-            "iid",
-            "42",
-            "state",
-            "merged",
-            "commitsWithoutMergeCommits",
-            Map.of(
-                "nodes",
-                List.of(
-                    Map.of(
-                        "sha",
-                        "abc123",
-                        "authorEmail",
-                        "dev@example.com",
-                        "author",
-                        Map.of("id", "gid://gitlab/User/1", "username", "dev")
-                    )
-                ),
-                "pageInfo",
-                Map.of("hasNextPage", false)
-            )
-        );
+                "iid",
+                "42",
+                "state",
+                "merged",
+                "commitsWithoutMergeCommits",
+                Map.of(
+                        "nodes",
+                        List.of(Map.of(
+                                "sha",
+                                "abc123",
+                                "authorEmail",
+                                "dev@example.com",
+                                "author",
+                                Map.of("id", "gid://gitlab/User/1", "username", "dev"))),
+                        "pageInfo",
+                        Map.of("hasNextPage", false)));
 
-        assertThatCode(() ->
-            assertVendorCouldReturn(GITLAB, LINK_COMMITS, MERGE_REQUEST_NODES, List.of(node))
-        ).doesNotThrowAnyException();
+        assertThatCode(() -> assertVendorCouldReturn(GITLAB, LINK_COMMITS, MERGE_REQUEST_NODES, List.of(node)))
+                .doesNotThrowAnyException();
     }
 
     @Test
@@ -82,46 +76,36 @@ class GraphQlResponseStubValidatorTest extends BaseUnitTest {
         Map<String, Object> node = Map.of("commitsWithoutMergeCommits", Map.of("nodes", Map.of("sha", "abc123")));
 
         assertThatThrownBy(() -> assertVendorCouldReturn(GITLAB, LINK_COMMITS, MERGE_REQUEST_NODES, List.of(node)))
-            .isInstanceOf(AssertionError.class)
-            .hasMessageContaining("commitsWithoutMergeCommits.nodes")
-            .hasMessageContaining("needs a List");
+                .isInstanceOf(AssertionError.class)
+                .hasMessageContaining("commitsWithoutMergeCommits.nodes")
+                .hasMessageContaining("needs a List");
     }
 
     @Test
     void followsFragmentSpreads() {
         // `username` reaches the stub only through ...GitLabUserFields; a validator that ignored spreads
         // would reject this correct fixture.
-        Map<String, Object> discussion = Map.of(
-            "id",
-            "gid://gitlab/Discussion/1",
-            "resolvedBy",
-            Map.of("username", "dev")
-        );
+        Map<String, Object> discussion =
+                Map.of("id", "gid://gitlab/Discussion/1", "resolvedBy", Map.of("username", "dev"));
 
-        assertThatCode(() ->
-            assertVendorCouldReturn(
-                GITLAB,
-                "GetMergeRequestDiscussions",
-                "project.mergeRequest.discussions.nodes",
-                List.of(discussion)
-            )
-        ).doesNotThrowAnyException();
+        assertThatCode(() -> assertVendorCouldReturn(
+                        GITLAB,
+                        "GetMergeRequestDiscussions",
+                        "project.mergeRequest.discussions.nodes",
+                        List.of(discussion)))
+                .doesNotThrowAnyException();
     }
 
     @Test
     void followsInlineFragments() {
         // `parent` exists only inside `... on WorkItemWidgetHierarchy`, never on the WorkItemWidget interface.
         Map<String, Object> widget = Map.of(
-            "type",
-            "HIERARCHY",
-            "parent",
-            Map.of("iid", "10", "namespace", Map.of("fullPath", "acme/widgets"))
-        );
+                "type", "HIERARCHY", "parent", Map.of("iid", "10", "namespace", Map.of("fullPath", "acme/widgets")));
         Map<String, Object> workItem = Map.of("iid", "5", "widgets", List.of(widget));
 
-        assertThatCode(() ->
-            assertVendorCouldReturn(GITLAB, "GetProjectWorkItemHierarchy", "project.workItems.nodes", List.of(workItem))
-        ).doesNotThrowAnyException();
+        assertThatCode(() -> assertVendorCouldReturn(
+                        GITLAB, "GetProjectWorkItemHierarchy", "project.workItems.nodes", List.of(workItem)))
+                .doesNotThrowAnyException();
     }
 
     @Test
@@ -131,14 +115,12 @@ class GraphQlResponseStubValidatorTest extends BaseUnitTest {
         Map<String, Object> discussion = new HashMap<>();
         discussion.put("id", null);
 
-        assertThatCode(() ->
-            assertVendorCouldReturn(
-                GITLAB,
-                "GetMergeRequestDiscussions",
-                "project.mergeRequest.discussions.nodes",
-                List.of(discussion)
-            )
-        ).doesNotThrowAnyException();
+        assertThatCode(() -> assertVendorCouldReturn(
+                        GITLAB,
+                        "GetMergeRequestDiscussions",
+                        "project.mergeRequest.discussions.nodes",
+                        List.of(discussion)))
+                .doesNotThrowAnyException();
     }
 
     @Test
@@ -146,11 +128,11 @@ class GraphQlResponseStubValidatorTest extends BaseUnitTest {
         String document = "GetRepositoryIssueNumbers";
         String path = "repository.issues.nodes";
 
-        assertThatCode(() ->
-            assertVendorCouldReturn(GITHUB, document, path, List.of(Map.of("__typename", "Issue", "number", 7)))
-        ).doesNotThrowAnyException();
+        assertThatCode(() -> assertVendorCouldReturn(
+                        GITHUB, document, path, List.of(Map.of("__typename", "Issue", "number", 7))))
+                .doesNotThrowAnyException();
         assertThatThrownBy(() -> assertVendorCouldReturn(GITHUB, document, path, List.of(Map.of("number", "7"))))
-            .isInstanceOf(AssertionError.class)
-            .hasMessageContaining("Int!");
+                .isInstanceOf(AssertionError.class)
+                .hasMessageContaining("Int!");
     }
 }

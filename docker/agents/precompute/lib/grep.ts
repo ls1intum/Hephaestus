@@ -1,6 +1,12 @@
+import { spawn } from "node:child_process";
+import { readFile } from "node:fs/promises";
 import { join, relative } from "node:path";
-import { isInDiff } from "./diff-parser";
-import type { DiffFile, Hint } from "./types";
+import { createInterface } from "node:readline";
+
+import { globFilesSync } from "./files.ts";
+
+import { isInDiff } from "./diff-parser.ts";
+import type { DiffFile, Hint } from "./types.ts";
 
 export interface GrepMatch {
 	file: string;
@@ -36,55 +42,36 @@ async function collectGrepMatches(
 	dir: string,
 	maxResults: number,
 ): Promise<GrepMatch[]> {
-	const child = Bun.spawn(args, {
-		stdout: "pipe",
-		stderr: "ignore",
+	const [command, ...commandArgs] = args;
+	if (!command) throw new Error("grep command is empty");
+	const child = spawn(command, commandArgs, {
+		stdio: ["ignore", "pipe", "ignore"],
 	});
-
-	const reader = child.stdout.getReader();
-	const decoder = new TextDecoder();
+	let stoppedEarly = false;
+	const completed = new Promise<void>((resolve, reject) => {
+		child.once("error", reject);
+		child.once("close", (code) => {
+			if (stoppedEarly || code === 0 || code === 1) resolve();
+			else reject(new Error(`grep exited with status ${String(code)}`));
+		});
+	});
 	const matches: GrepMatch[] = [];
-	let buffer = "";
+	const lines = createInterface({ input: child.stdout, crlfDelay: Infinity });
 
 	try {
-		while (matches.length < maxResults) {
-			const { done, value } = await reader.read();
-			if (done) {
+		for await (const line of lines) {
+			const match = parseGrepLine(line, dir);
+			if (!match) continue;
+			matches.push(match);
+			if (matches.length >= maxResults) {
+				stoppedEarly = true;
+				child.kill();
 				break;
-			}
-
-			buffer += decoder.decode(value, { stream: true });
-			const lines = buffer.split("\n");
-			buffer = lines.pop() ?? "";
-
-			for (const line of lines) {
-				if (!line.trim()) {
-					continue;
-				}
-
-				const match = parseGrepLine(line, dir);
-				if (!match) {
-					continue;
-				}
-
-				matches.push(match);
-				if (matches.length >= maxResults) {
-					child.kill();
-					break;
-				}
-			}
-		}
-
-		buffer += decoder.decode();
-		if (buffer.trim() && matches.length < maxResults) {
-			const match = parseGrepLine(buffer, dir);
-			if (match) {
-				matches.push(match);
 			}
 		}
 	} finally {
-		reader.releaseLock();
-		await child.exited;
+		lines.close();
+		await completed;
 	}
 
 	return matches.slice(0, maxResults);
@@ -97,11 +84,10 @@ async function collectMatchesForGlob(
 	glob: string,
 	maxResults: number,
 ): Promise<GrepMatch[]> {
-	const matcher = new Bun.Glob(glob);
 	const matches: GrepMatch[] = [];
 	let batch: string[] = [];
 
-	for (const file of matcher.scanSync(dir)) {
+	for (const file of globFilesSync(glob, dir)) {
 		batch.push(join(dir, file));
 		if (batch.length < GLOB_GREP_BATCH_SIZE) {
 			continue;
@@ -161,8 +147,7 @@ export async function grep(
 	const grepArgs = fixedString ? ["grep", "-H", "-n", "-F"] : ["grep", "-H", "-n", "-E"];
 
 	if (glob) {
-		// Basename-only globs (e.g. "*.swift") need recursive matching like grep --include.
-		// Bun.Glob("*.swift") only matches in the root dir; prepend "**/" for recursion.
+		// A basename-only glob matches only the root dir; prepend "**/" for recursion.
 		const recursiveGlob = glob.includes("/") ? glob : `**/${glob}`;
 		return collectMatchesForGlob(pattern, dir, grepArgs, recursiveGlob, maxResults);
 	}
@@ -174,9 +159,6 @@ export async function grep(
 	);
 }
 
-/**
- * Convert grep matches to Hints with diff awareness and context flags.
- */
 export function matchesToHints(
 	matches: GrepMatch[],
 	pattern: string,
@@ -193,12 +175,9 @@ export function matchesToHints(
 	}));
 }
 
-/**
- * Read a file and return its lines (1-indexed Map).
- */
 export async function readFileLines(path: string): Promise<Map<number, string>> {
 	try {
-		const content = await Bun.file(path).text();
+		const content = await readFile(path, "utf8");
 		const lines = new Map<number, string>();
 		content.split("\n").forEach((line: string, i: number) => {
 			lines.set(i + 1, line);
@@ -210,14 +189,9 @@ export async function readFileLines(path: string): Promise<Map<number, string>> 
 	}
 }
 
-/**
- * Find all files matching a given extension in a directory. The walk is synchronous, so a caller that
- * scans several extensions pays for them in sequence; awaiting the result is harmless and still works.
- */
 export function findFiles(dir: string, extension: string): string[] {
 	const pattern = `**/*.${extension}`;
-	const matcher = new Bun.Glob(pattern);
-	return [...matcher.scanSync(dir)]
+	return globFilesSync(pattern, dir)
 		.filter((path) => shouldIncludeDiscoveredFile(path))
 		.map((path) => join(dir, path));
 }

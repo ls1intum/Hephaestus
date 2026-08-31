@@ -1,6 +1,7 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
 import { describe, expect, it, vi } from "vitest";
+
 import type { LlmConnection, LlmModel } from "@/api/types.gen";
 import { server } from "@/mocks/server";
 import { ROUTE_RENDER_WAIT, renderRouteAt } from "@/test/router-harness";

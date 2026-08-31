@@ -12,21 +12,21 @@ import org.junit.jupiter.params.provider.ValueSource;
 class GitLabTeamSyncServiceMappingTest {
 
     @ParameterizedTest
-    @ValueSource(strings = { "GUEST", "PLANNER", "REPORTER", "DEVELOPER", "guest", "Developer" })
+    @ValueSource(strings = {"GUEST", "PLANNER", "REPORTER", "DEVELOPER", "guest", "Developer"})
     @DisplayName("member-level access maps to MEMBER")
     void memberLevels_mapToMember(String level) {
         assertThat(GitLabTeamSyncService.mapAccessLevel(level)).isEqualTo(TeamMembership.Role.MEMBER);
     }
 
     @ParameterizedTest
-    @ValueSource(strings = { "MAINTAINER", "OWNER", "ADMIN", "maintainer", "owner" })
+    @ValueSource(strings = {"MAINTAINER", "OWNER", "ADMIN", "maintainer", "owner"})
     @DisplayName("maintainer-level access maps to MAINTAINER")
     void maintainerLevels_mapToMaintainer(String level) {
         assertThat(GitLabTeamSyncService.mapAccessLevel(level)).isEqualTo(TeamMembership.Role.MAINTAINER);
     }
 
     @ParameterizedTest
-    @ValueSource(strings = { "NO_ACCESS", "MINIMAL_ACCESS" })
+    @ValueSource(strings = {"NO_ACCESS", "MINIMAL_ACCESS"})
     void subGuestLevels_areSkipped(String level) {
         assertThat(GitLabTeamSyncService.mapAccessLevel(level)).isNull();
     }

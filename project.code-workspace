@@ -2,89 +2,78 @@
 	"folders": [
 		{
 			"name": "Hephaestus",
-			"path": "./"
+			"path": "./",
 		},
 		{
 			"name": "webapp",
-			"path": "./webapp"
+			"path": "./webapp",
 		},
 		{
 			"name": "server",
-			"path": "./server"
+			"path": "./server",
 		},
 		{
 			"name": "docs",
-			"path": "./docs"
-		}
+			"path": "./docs",
+		},
 	],
 	"settings": {
 		"java.compile.nullAnalysis.mode": "automatic",
 		"java.configuration.updateBuildConfiguration": "automatic",
-		"java.completion.importOrder": [
-			"#"
-		],
+		"java.completion.importOrder": ["#"],
 		"java.debug.settings.onBuildFailureProceed": true,
 		"java.import.exclusions": [
 			"**/node_modules/**",
 			"**/.metadata/**",
 			"**/archetype-resources/**",
 			"**/META-INF/maven/**",
-			"**/target/**"
+			"**/target/**",
 		],
 		"files.exclude": {
-			"**/target": true
+			"**/target": true,
 		},
 		"scm.defaultViewMode": "tree",
 		"diffEditor.renderSideBySide": false,
 		"files.associations": {
 			"*.graphql": "graphql",
-			"*.graphqls": "graphql"
-		},
-		"[java]": {
-			"editor.defaultFormatter": "esbenp.prettier-vscode",
-			"editor.formatOnSave": true
+			"*.graphqls": "graphql",
 		},
 		"[typescript]": {
-			"editor.defaultFormatter": "biomejs.biome",
-			"editor.formatOnSave": true
+			"editor.defaultFormatter": "oxc.oxc-vscode",
+			"editor.formatOnSave": true,
 		},
 		"[typescriptreact]": {
-			"editor.defaultFormatter": "biomejs.biome",
-			"editor.formatOnSave": true
+			"editor.defaultFormatter": "oxc.oxc-vscode",
+			"editor.formatOnSave": true,
 		},
 		"[javascript]": {
-			"editor.defaultFormatter": "biomejs.biome",
-			"editor.formatOnSave": true
+			"editor.defaultFormatter": "oxc.oxc-vscode",
+			"editor.formatOnSave": true,
 		},
 		"[javascriptreact]": {
-			"editor.defaultFormatter": "biomejs.biome",
-			"editor.formatOnSave": true
+			"editor.defaultFormatter": "oxc.oxc-vscode",
+			"editor.formatOnSave": true,
 		},
 		"[json]": {
-			"editor.defaultFormatter": "biomejs.biome",
-			"editor.formatOnSave": true
+			"editor.defaultFormatter": "oxc.oxc-vscode",
+			"editor.formatOnSave": true,
 		},
 		"[jsonc]": {
-			"editor.defaultFormatter": "biomejs.biome",
-			"editor.formatOnSave": true
+			"editor.defaultFormatter": "oxc.oxc-vscode",
+			"editor.formatOnSave": true,
 		},
 		"[graphql]": {
 			"editor.formatOnSave": true,
-			"editor.tabSize": 2
-		},
-		"editor.codeActionsOnSave": {
-			"source.organizeImports.biome": "explicit"
+			"editor.tabSize": 2,
 		},
 		"yaml.validate": true,
 		"yaml.schemas": {
-			"https://json.schemastore.org/liquibase-3.2.json": "**/db/changelog/*.yaml"
-		}
+			"https://json.schemastore.org/liquibase-3.2.json": "**/db/changelog/*.yaml",
+		},
 	},
 	"extensions": {
 		"recommendations": [
-			"biomejs.biome",
 			"oxc.oxc-vscode",
-			"esbenp.prettier-vscode",
 			"editorconfig.editorconfig",
 			"vscjava.vscode-java-pack",
 			"redhat.java",
@@ -95,7 +84,7 @@
 			"streetsidesoftware.code-spell-checker",
 			"formulahendry.auto-rename-tag",
 			"GraphQL.vscode-graphql",
-			"GraphQL.vscode-graphql-syntax"
-		]
-	}
+			"GraphQL.vscode-graphql-syntax",
+		],
+	},
 }

@@ -28,12 +28,10 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "hephaestus")
 public record ApplicationProperties(
-    @Nullable
-    @URL(message = "Host URL must be a valid URL if provided")
-    @DefaultValue("http://localhost:8080")
-    String hostUrl,
-    @Valid Webapp webapp
-) {
+        @Nullable @URL(message = "Host URL must be a valid URL if provided") @DefaultValue("http://localhost:8080")
+        String hostUrl,
+
+        @Valid Webapp webapp) {
     public ApplicationProperties {
         if (webapp == null) {
             webapp = new Webapp("http://localhost:4200");
@@ -41,9 +39,8 @@ public record ApplicationProperties(
     }
 
     public record Webapp(
-        @NotBlank(message = "Webapp URL must not be blank") @URL(
-            regexp = "^https?://.*$",
-            message = "Webapp URL must be a valid HTTP(S) URL"
-        ) @DefaultValue("http://localhost:4200") String url
-    ) {}
+            @NotBlank(message = "Webapp URL must not be blank")
+            @URL(regexp = "^https?://.*$", message = "Webapp URL must be a valid HTTP(S) URL")
+            @DefaultValue("http://localhost:4200")
+            String url) {}
 }

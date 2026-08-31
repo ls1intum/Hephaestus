@@ -53,15 +53,15 @@ import org.jspecify.annotations.Nullable;
  */
 @Entity
 @Table(
-    name = "repository",
-    uniqueConstraints = {
-        @UniqueConstraint(
-            name = "uq_repository_provider_name_with_owner",
-            columnNames = { "provider_id", "name_with_owner" }
-        ),
-        @UniqueConstraint(name = "uq_repository_provider_native_id", columnNames = { "provider_id", "native_id" }),
-    }
-)
+        name = "repository",
+        uniqueConstraints = {
+            @UniqueConstraint(
+                    name = "uq_repository_provider_name_with_owner",
+                    columnNames = {"provider_id", "name_with_owner"}),
+            @UniqueConstraint(
+                    name = "uq_repository_provider_native_id",
+                    columnNames = {"provider_id", "native_id"}),
+        })
 @Getter
 @Setter
 @NoArgsConstructor

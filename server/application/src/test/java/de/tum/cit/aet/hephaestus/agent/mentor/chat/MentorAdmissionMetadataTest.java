@@ -23,15 +23,14 @@ class MentorAdmissionMetadataTest extends BaseUnitTest {
     private static final JsonNodeFactory NODES = JsonNodeFactory.instance;
 
     private static final LlmPriceSnapshot PRICED = new LlmPriceSnapshot(
-        FundingSource.WORKSPACE,
-        PricingState.PRICED,
-        7L,
-        11L,
-        new BigDecimal("3.500000"),
-        new BigDecimal("15.000000"),
-        new BigDecimal("0.300000"),
-        new BigDecimal("3.750000")
-    );
+            FundingSource.WORKSPACE,
+            PricingState.PRICED,
+            7L,
+            11L,
+            new BigDecimal("3.500000"),
+            new BigDecimal("15.000000"),
+            new BigDecimal("0.300000"),
+            new BigDecimal("3.750000"));
 
     @Test
     @DisplayName("a written admission reads back as the same snapshot and model")
@@ -46,8 +45,8 @@ class MentorAdmissionMetadataTest extends BaseUnitTest {
     @DisplayName("rates are written as strings, so the block cannot reach a JSON reader as a double")
     void writesRatesAsStrings() {
         ObjectNode rates = (ObjectNode) MentorAdmissionMetadata.write("gpt-5-mini", PRICED)
-            .path("llmAdmission")
-            .path("price");
+                .path("llmAdmission")
+                .path("price");
 
         assertThat(rates.path("per1mInputUsd").isString()).isTrue();
         assertThat(rates.path("appliedPriceId").isString()).isTrue();
@@ -84,19 +83,18 @@ class MentorAdmissionMetadataTest extends BaseUnitTest {
         rates.put("pricingState", "PRICED");
         rates.put("per1mInputUsd", "2.000000");
 
-        assertThatCode(() -> MentorAdmissionMetadata.readPrice(admissionWith(rates))).doesNotThrowAnyException();
-        assertThat(MentorAdmissionMetadata.readPrice(admissionWith(rates))).isEqualTo(
-            LlmPriceSnapshot.unpricedInstance()
-        );
+        assertThatCode(() -> MentorAdmissionMetadata.readPrice(admissionWith(rates)))
+                .doesNotThrowAnyException();
+        assertThat(MentorAdmissionMetadata.readPrice(admissionWith(rates)))
+                .isEqualTo(LlmPriceSnapshot.unpricedInstance());
     }
 
     @Test
     @DisplayName("a turn with no metadata at all bills unpriced, and names no model")
     void toleratesAMissingAdmission() {
         assertThat(MentorAdmissionMetadata.readPrice(null)).isEqualTo(LlmPriceSnapshot.unpricedInstance());
-        assertThat(MentorAdmissionMetadata.readPrice(NODES.objectNode())).isEqualTo(
-            LlmPriceSnapshot.unpricedInstance()
-        );
+        assertThat(MentorAdmissionMetadata.readPrice(NODES.objectNode()))
+                .isEqualTo(LlmPriceSnapshot.unpricedInstance());
         assertThat(MentorAdmissionMetadata.readModel(null)).isEmpty();
     }
 

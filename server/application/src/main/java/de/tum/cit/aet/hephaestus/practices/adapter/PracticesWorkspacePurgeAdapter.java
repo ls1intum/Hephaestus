@@ -2,6 +2,8 @@ package de.tum.cit.aet.hephaestus.practices.adapter;
 
 import de.tum.cit.aet.hephaestus.practices.PracticeGroupRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyEvaluationRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.workspace.spi.WorkspacePurgeContributor;
@@ -25,17 +27,22 @@ public class PracticesWorkspacePurgeAdapter implements WorkspacePurgeContributor
 
     private static final Logger log = LoggerFactory.getLogger(PracticesWorkspacePurgeAdapter.class);
 
+    private final DeliveryPolicyEvaluationRepository evaluationRepository;
+    private final FeedbackDispatchRepository dispatchRepository;
     private final FeedbackRepository feedbackRepository;
     private final ObservationRepository observationRepository;
     private final PracticeRepository practiceRepository;
     private final PracticeGroupRepository practiceGroupRepository;
 
     public PracticesWorkspacePurgeAdapter(
-        FeedbackRepository feedbackRepository,
-        ObservationRepository observationRepository,
-        PracticeRepository practiceRepository,
-        PracticeGroupRepository practiceGroupRepository
-    ) {
+            DeliveryPolicyEvaluationRepository evaluationRepository,
+            FeedbackDispatchRepository dispatchRepository,
+            FeedbackRepository feedbackRepository,
+            ObservationRepository observationRepository,
+            PracticeRepository practiceRepository,
+            PracticeGroupRepository practiceGroupRepository) {
+        this.evaluationRepository = evaluationRepository;
+        this.dispatchRepository = dispatchRepository;
         this.feedbackRepository = feedbackRepository;
         this.observationRepository = observationRepository;
         this.practiceRepository = practiceRepository;
@@ -44,6 +51,8 @@ public class PracticesWorkspacePurgeAdapter implements WorkspacePurgeContributor
 
     @Override
     public void deleteWorkspaceData(Long workspaceId) {
+        evaluationRepository.deleteAllByWorkspaceId(workspaceId);
+        dispatchRepository.deleteAllByWorkspaceId(workspaceId);
         // Delete feedback first (CASCADE cleans feedback_observation/placement/reaction). The purge is a
         // soft-delete, so the RESTRICT FK on feedback never fires — these rows must be removed explicitly.
         feedbackRepository.deleteAllByWorkspaceId(workspaceId);
@@ -55,7 +64,7 @@ public class PracticesWorkspacePurgeAdapter implements WorkspacePurgeContributor
         // Delete practice groups (unreferenced once practices are gone).
         practiceGroupRepository.deleteAllByWorkspaceId(workspaceId);
 
-        log.info("Deleted feedback, observations, practices and groups for workspace: workspaceId={}", workspaceId);
+        log.info("Deleted practice-review data for workspace: workspaceId={}", workspaceId);
     }
 
     @Override

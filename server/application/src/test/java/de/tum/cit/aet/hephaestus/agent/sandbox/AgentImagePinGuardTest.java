@@ -18,25 +18,24 @@ class AgentImagePinGuardTest extends BaseUnitTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = { "ghcr.io/x/agent-pi:0.73.2", "ghcr.io/x/agent-pi@sha256:abc123" })
+    @ValueSource(strings = {"ghcr.io/x/agent-pi:0.73.2", "ghcr.io/x/agent-pi@sha256:abc123"})
     void shouldFailFastWhenReferenceIsNotDigestPinned(String reference) {
         var props = new AgentImageProperties(reference, ImagePullPolicy.ALWAYS);
         assertThatThrownBy(() -> new AgentImagePinGuard(props))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining(reference)
-            .hasMessageContaining("hephaestus.agent.image.require-digest")
-            .hasMessageContaining("docs/admin/agent-image-digests.md");
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining(reference)
+                .hasMessageContaining("hephaestus.agent.image.require-digest")
+                .hasMessageContaining("docs/admin/release-image-lock.md");
     }
 
     /** The reference carries no compiled-in default, so an unresolved one reaches this guard as null. */
     @Test
     void shouldFailFastWhenNoReferenceResolved() throws ReflectiveOperationException {
-        var props = AgentImageProperties.class.getDeclaredConstructor(String.class, ImagePullPolicy.class).newInstance(
-            null,
-            ImagePullPolicy.ALWAYS
-        );
+        var props = AgentImageProperties.class
+                .getDeclaredConstructor(String.class, ImagePullPolicy.class)
+                .newInstance(null, ImagePullPolicy.ALWAYS);
         assertThatThrownBy(() -> new AgentImagePinGuard(props))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("<not set>");
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("<not set>");
     }
 }

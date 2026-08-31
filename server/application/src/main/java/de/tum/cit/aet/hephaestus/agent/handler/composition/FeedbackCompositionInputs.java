@@ -53,14 +53,8 @@ public final class FeedbackCompositionInputs {
      * what stops them drifting apart. Two of the three are not importable at all: the in-context cap is
      * package-private to the delivery package.
      */
-    private static final Map<FeedbackChannel, Integer> MAX_UNITS = Map.of(
-        FeedbackChannel.IN_CONTEXT,
-        3,
-        FeedbackChannel.IN_APP,
-        2,
-        FeedbackChannel.IN_CHAT,
-        3
-    );
+    private static final Map<FeedbackChannel, Integer> MAX_UNITS =
+            Map.of(FeedbackChannel.IN_CONTEXT, 3, FeedbackChannel.IN_APP, 2, FeedbackChannel.IN_CHAT, 3);
 
     /**
      * Distinct pieces of work a problem must appear on before a message may call it a pattern. Restated
@@ -92,11 +86,10 @@ public final class FeedbackCompositionInputs {
     }
 
     public static void stage(
-        Map<String, byte[]> files,
-        ObservationOrigin origin,
-        Set<FeedbackChannel> channels,
-        Set<InContextPlacementKind> inContextPlacements
-    ) {
+            Map<String, byte[]> files,
+            ObservationOrigin origin,
+            Set<FeedbackChannel> channels,
+            Set<InContextPlacementKind> inContextPlacements) {
         if (origin == ObservationOrigin.BACKFILL || channels.isEmpty()) {
             return;
         }
@@ -113,13 +106,11 @@ public final class FeedbackCompositionInputs {
               }
             }
             """.formatted(
-                MIN_DISTINCT_ARTIFACTS,
-                inContextPlacements
-                    .stream()
-                    .map(kind -> '"' + kind.name() + '"')
-                    .collect(Collectors.joining(", ")),
-                channelBounds(channels)
-            );
+                        MIN_DISTINCT_ARTIFACTS,
+                        inContextPlacements.stream()
+                                .map(kind -> '"' + kind.name() + '"')
+                                .collect(Collectors.joining(", ")),
+                        channelBounds(channels));
         files.put(SandboxLayout.FEEDBACK_COMPOSITION_PATH, request.getBytes(StandardCharsets.UTF_8));
     }
 
@@ -130,15 +121,9 @@ public final class FeedbackCompositionInputs {
      * the work is written elsewhere this time" is unstatable if the note is not mentioned.
      */
     private static String channelBounds(Set<FeedbackChannel> enabled) {
-        return EnumSet.allOf(FeedbackChannel.class)
-            .stream()
-            .map(channel ->
-                "    \"%s\": { \"enabled\": %s, \"maxUnits\": %d }".formatted(
-                    channel.name(),
-                    enabled.contains(channel),
-                    MAX_UNITS.getOrDefault(channel, 1)
-                )
-            )
-            .collect(Collectors.joining(",\n"));
+        return EnumSet.allOf(FeedbackChannel.class).stream()
+                .map(channel -> "    \"%s\": { \"enabled\": %s, \"maxUnits\": %d }"
+                        .formatted(channel.name(), enabled.contains(channel), MAX_UNITS.getOrDefault(channel, 1)))
+                .collect(Collectors.joining(",\n"));
     }
 }

@@ -22,14 +22,14 @@ class ObservationCoherenceTest extends BaseUnitTest {
 
     private static Observation.ObservationBuilder observation(Presence presence, @Nullable Assessment assessment) {
         return Observation.builder()
-            .occurrenceKey("occurrence")
-            .agentJobId(UUID.randomUUID())
-            .artifactKind(ArtifactKinds.PULL_REQUEST)
-            .artifactId(1L)
-            .aboutUserId(2L)
-            .summary("title")
-            .presence(presence)
-            .assessment(assessment);
+                .occurrenceKey("occurrence")
+                .agentJobId(UUID.randomUUID())
+                .artifactKind(ArtifactKinds.PULL_REQUEST)
+                .artifactId(1L)
+                .aboutUserId(2L)
+                .summary("title")
+                .presence(presence)
+                .assessment(assessment);
     }
 
     private static void persist(Observation observation) {
@@ -38,26 +38,26 @@ class ObservationCoherenceTest extends BaseUnitTest {
 
     @Test
     void onlyPresentAndAbsentCarryADirection() {
-        assertThat(EnumSet.allOf(Presence.class).stream().filter(Presence::carriesValence)).containsExactlyInAnyOrder(
-            Presence.PRESENT,
-            Presence.ABSENT
-        );
+        assertThat(EnumSet.allOf(Presence.class).stream().filter(Presence::carriesValence))
+                .containsExactlyInAnyOrder(Presence.PRESENT, Presence.ABSENT);
     }
 
     @ParameterizedTest
     @EnumSource(Presence.class)
     void assessmentIsRequiredExactlyWhenThePresenceCarriesADirection(Presence presence) {
         if (presence.carriesValence()) {
-            assertThatCode(() -> persist(observation(presence, Assessment.GOOD).build())).doesNotThrowAnyException();
+            assertThatCode(() -> persist(observation(presence, Assessment.GOOD).build()))
+                    .doesNotThrowAnyException();
             assertThatThrownBy(() -> persist(observation(presence, null).build()))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("coherence violation");
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("coherence violation");
         } else {
             assertThatCode(() -> persist(observation(presence, null).build())).doesNotThrowAnyException();
-            assertThatThrownBy(() -> persist(observation(presence, Assessment.GOOD).build()))
-                .as("a presence with no direction must not be able to smuggle one out")
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("coherence violation");
+            assertThatThrownBy(
+                            () -> persist(observation(presence, Assessment.GOOD).build()))
+                    .as("a presence with no direction must not be able to smuggle one out")
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("coherence violation");
         }
     }
 
@@ -69,8 +69,8 @@ class ObservationCoherenceTest extends BaseUnitTest {
     void noPresenceValueDescribesTheInstrumentRatherThanTheWork() {
         Set<String> instrumentShaped = Set.of("NOT_ASSESSABLE", "UNAVAILABLE", "ERROR", "SKIPPED", "NOT_COLLECTED");
         assertThat(EnumSet.allOf(Presence.class))
-            .as("coverage failures belong in the readiness record, never in the behaviour series")
-            .noneMatch(presence -> instrumentShaped.contains(presence.name()));
+                .as("coverage failures belong in the readiness record, never in the behaviour series")
+                .noneMatch(presence -> instrumentShaped.contains(presence.name()));
     }
 
     @Test

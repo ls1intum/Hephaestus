@@ -1,5 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
+
 import type { ModelRuntime, ProviderModelConfig } from "@earendil-works/pi-coding-agent";
+
 import { errorText } from "./pi-error-text.ts";
 
 export interface ProviderConfig {
@@ -75,6 +77,7 @@ export function registerHephaestusProvider(
 		baseUrl,
 		apiKey: "$LLM_PROXY_TOKEN",
 		authHeader: true,
+		headers: env.TRACEPARENT ? { traceparent: env.TRACEPARENT } : undefined,
 		api: config.apiProtocol,
 		models: [model],
 	});

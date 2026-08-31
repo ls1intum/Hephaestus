@@ -1,6 +1,5 @@
 import { Button } from "@/components/ui/button";
 import {
-	analyticsConfigured,
 	errorMonitoringConfigured,
 	requestConsentReopen,
 	useCookieConsent,
@@ -16,9 +15,6 @@ export function CookiePreferencesSection() {
 	const consent = useCookieConsent();
 
 	const parts: string[] = [];
-	if (analyticsConfigured) {
-		parts.push(`Usage analytics ${consent?.analytics ? "on" : "off"}`);
-	}
 	if (errorMonitoringConfigured) {
 		parts.push(`Error reports ${consent?.errorMonitoring ? "on" : "off"}`);
 	}

@@ -61,16 +61,13 @@ class ConnectionPurgeContributorTest extends BaseUnitTest {
     void setUp() {
         credentialConverter = new CredentialBundleConverter("a".repeat(32), "dev");
         connectionService = new ConnectionService(
-            connectionRepository,
-            auditRepository,
-            credentialConverter,
-            eventPublisher,
-            syncJobService,
-            transactionManager
-        );
-        Mockito.lenient()
-            .when(connectionRepository.save(any(Connection.class)))
-            .thenAnswer(inv -> inv.getArgument(0));
+                connectionRepository,
+                auditRepository,
+                credentialConverter,
+                eventPublisher,
+                syncJobService,
+                transactionManager);
+        Mockito.lenient().when(connectionRepository.save(any(Connection.class))).thenAnswer(inv -> inv.getArgument(0));
         Mockito.lenient().when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
         Mockito.lenient().when(connectionStrategy.kind()).thenReturn(IntegrationKind.GITHUB);
         workspace = new Workspace();
@@ -83,11 +80,11 @@ class ConnectionPurgeContributorTest extends BaseUnitTest {
         connection.setState(IntegrationState.SUSPENDED);
         when(connectionRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(List.of(connection));
         doAnswer(invocation -> {
-            assertThat(connection.getCredentialsEncrypted()).isNotNull();
-            return null;
-        })
-            .when(connectionStrategy)
-            .revokeProvider(erasureRef(connection));
+                    assertThat(connection.getCredentialsEncrypted()).isNotNull();
+                    return null;
+                })
+                .when(connectionStrategy)
+                .revokeProvider(erasureRef(connection));
 
         contributor(List.of(connectionStrategy)).deleteWorkspaceData(WORKSPACE_ID);
 
@@ -102,14 +99,13 @@ class ConnectionPurgeContributorTest extends BaseUnitTest {
         Connection connection = activeConnectionWithCredentials();
         when(connectionRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(List.of(connection));
         doThrow(new RuntimeException("provider unavailable"))
-            .when(connectionStrategy)
-            .revokeProvider(erasureRef(connection));
+                .when(connectionStrategy)
+                .revokeProvider(erasureRef(connection));
 
         assertThatThrownBy(() -> contributor(List.of(connectionStrategy)).deleteWorkspaceData(WORKSPACE_ID))
-            .isInstanceOf(WorkspacePurgeBlockedException.class)
-            .hasMessage(
-                "Could not confirm disconnecting GitHub. No local data was deleted; retry when the provider is available."
-            );
+                .isInstanceOf(WorkspacePurgeBlockedException.class)
+                .hasMessage(
+                        "Could not confirm disconnecting GitHub. No local data was deleted; retry when the provider is available.");
 
         assertThat(connection.getState()).isEqualTo(IntegrationState.ACTIVE);
         assertThat(connection.getCredentialsEncrypted()).isNotNull();
@@ -144,28 +140,26 @@ class ConnectionPurgeContributorTest extends BaseUnitTest {
 
     private static IntegrationRef erasureRef(Connection connection) {
         return new IntegrationRef(
-            connection.getKind(),
-            connection.getWorkspace().getId(),
-            connection.getInstanceKey(),
-            connection.getId()
-        );
+                connection.getKind(),
+                connection.getWorkspace().getId(),
+                connection.getInstanceKey(),
+                connection.getId());
     }
 
     private Connection activeConnectionWithCredentials() throws Exception {
         Connection connection = new Connection(
-            workspace,
-            IntegrationKind.GITHUB,
-            "100",
-            new ConnectionConfig.GitHubAppConfig(100L, null, null, Set.of())
-        );
+                workspace,
+                IntegrationKind.GITHUB,
+                "100",
+                new ConnectionConfig.GitHubAppConfig(100L, null, null, Set.of()));
         Field id = Connection.class.getDeclaredField("id");
         id.setAccessible(true);
         id.set(connection, 55L);
         connection.setState(IntegrationState.ACTIVE);
         connection.setCredentials(new BearerToken("ghp-secret", null), credentialConverter);
         Mockito.lenient()
-            .when(connectionRepository.findByIdAndWorkspaceId(55L, WORKSPACE_ID))
-            .thenReturn(Optional.of(connection));
+                .when(connectionRepository.findByIdAndWorkspaceId(55L, WORKSPACE_ID))
+                .thenReturn(Optional.of(connection));
         return connection;
     }
 }

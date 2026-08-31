@@ -73,18 +73,17 @@ class SlackChannelHistorySyncServiceTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         service = new SlackChannelHistorySyncService(
-            monitoredChannelRepository,
-            threadRepository,
-            slackMessageService,
-            ingestService,
-            connectionService,
-            new SlackSyncProperties("0 0 4 * * *", 10, 15, Duration.ZERO, true, 5, true),
-            CLOCK
-        );
+                monitoredChannelRepository,
+                threadRepository,
+                slackMessageService,
+                ingestService,
+                connectionService,
+                new SlackSyncProperties("0 0 4 * * *", 10, 15, Duration.ZERO, true, 5, true),
+                CLOCK);
         lenient().when(connectionService.findSlackNotificationConfig(WS)).thenReturn(Optional.empty());
         lenient()
-            .when(monitoredChannelRepository.findConsentState(WS, CHANNEL))
-            .thenReturn(Optional.of(ConsentState.ACTIVE));
+                .when(monitoredChannelRepository.findConsentState(WS, CHANNEL))
+                .thenReturn(Optional.of(ConsentState.ACTIVE));
     }
 
     private SlackMonitoredChannel channel(@Nullable Instant announcedAt, @Nullable String watermark) {
@@ -99,7 +98,8 @@ class SlackChannelHistorySyncServiceTest extends BaseUnitTest {
     }
 
     private void stubChannels(SlackMonitoredChannel... channels) {
-        when(monitoredChannelRepository.findForHistorySync(WS, ConsentState.ACTIVE)).thenReturn(List.of(channels));
+        when(monitoredChannelRepository.findForHistorySync(WS, ConsentState.ACTIVE))
+                .thenReturn(List.of(channels));
     }
 
     private static Message plain(String ts, @Nullable String user, String text) {
@@ -148,9 +148,8 @@ class SlackChannelHistorySyncServiceTest extends BaseUnitTest {
     void fetchFloor_isTheLatestOfAnnouncementAndWatermark() {
         String watermark = WATERMARK_AFTER_ANNOUNCEMENT;
         stubChannels(channel(ANNOUNCED, watermark));
-        when(
-            slackMessageService.fetchHistoryPage(eq(WS), eq(CHANNEL), anyString(), anyString(), any(), anyInt())
-        ).thenReturn(new HistoryPage(List.of(), null));
+        when(slackMessageService.fetchHistoryPage(eq(WS), eq(CHANNEL), anyString(), anyString(), any(), anyInt()))
+                .thenReturn(new HistoryPage(List.of(), null));
 
         service.syncWorkspace(WS);
 
@@ -160,9 +159,8 @@ class SlackChannelHistorySyncServiceTest extends BaseUnitTest {
     @Test
     void cleanWindow_ingestsThroughTheGatedStack_andAdvancesTheWatermark() {
         stubChannels(channel(ANNOUNCED, null));
-        when(
-            slackMessageService.fetchHistoryPage(eq(WS), eq(CHANNEL), anyString(), anyString(), any(), anyInt())
-        ).thenReturn(new HistoryPage(List.of(plain("1783000001.000100", "U1", "hello")), null));
+        when(slackMessageService.fetchHistoryPage(eq(WS), eq(CHANNEL), anyString(), anyString(), any(), anyInt()))
+                .thenReturn(new HistoryPage(List.of(plain("1783000001.000100", "U1", "hello")), null));
 
         var summary = service.syncWorkspace(WS);
 
@@ -188,19 +186,17 @@ class SlackChannelHistorySyncServiceTest extends BaseUnitTest {
     @Test
     void budgetExhaustedMidWindow_doesNotAdvanceTheWatermark() {
         service = new SlackChannelHistorySyncService(
-            monitoredChannelRepository,
-            threadRepository,
-            slackMessageService,
-            ingestService,
-            connectionService,
-            new SlackSyncProperties("0 0 4 * * *", 1, 15, Duration.ZERO, false, 0, true),
-            CLOCK
-        );
+                monitoredChannelRepository,
+                threadRepository,
+                slackMessageService,
+                ingestService,
+                connectionService,
+                new SlackSyncProperties("0 0 4 * * *", 1, 15, Duration.ZERO, false, 0, true),
+                CLOCK);
         stubChannels(channel(ANNOUNCED, null));
         // First page consumed the whole budget and points at a second page.
-        when(
-            slackMessageService.fetchHistoryPage(eq(WS), eq(CHANNEL), anyString(), anyString(), any(), anyInt())
-        ).thenReturn(new HistoryPage(List.of(plain("1783000001.000100", "U1", "one")), "cursor-2"));
+        when(slackMessageService.fetchHistoryPage(eq(WS), eq(CHANNEL), anyString(), anyString(), any(), anyInt()))
+                .thenReturn(new HistoryPage(List.of(plain("1783000001.000100", "U1", "one")), "cursor-2"));
 
         var summary = service.syncWorkspace(WS);
 
@@ -213,9 +209,8 @@ class SlackChannelHistorySyncServiceTest extends BaseUnitTest {
         stubChannels(channel(ANNOUNCED, null));
         Message deleted = plain("1783000002.000000", "U1", "gone");
         deleted.setSubtype("message_deleted");
-        when(
-            slackMessageService.fetchHistoryPage(eq(WS), eq(CHANNEL), anyString(), anyString(), any(), anyInt())
-        ).thenReturn(new HistoryPage(List.of(deleted), null));
+        when(slackMessageService.fetchHistoryPage(eq(WS), eq(CHANNEL), anyString(), anyString(), any(), anyInt()))
+                .thenReturn(new HistoryPage(List.of(deleted), null));
 
         service.syncWorkspace(WS);
 
@@ -233,9 +228,8 @@ class SlackChannelHistorySyncServiceTest extends BaseUnitTest {
         bareUpload.setSubtype("file_share");
         Message joinNoise = plain("1783000005.000000", "U1", "joined");
         joinNoise.setSubtype("channel_join");
-        when(
-            slackMessageService.fetchHistoryPage(eq(WS), eq(CHANNEL), anyString(), anyString(), any(), anyInt())
-        ).thenReturn(new HistoryPage(List.of(bot, bareUpload, joinNoise), null));
+        when(slackMessageService.fetchHistoryPage(eq(WS), eq(CHANNEL), anyString(), anyString(), any(), anyInt()))
+                .thenReturn(new HistoryPage(List.of(bot, bareUpload, joinNoise), null));
 
         service.syncWorkspace(WS);
 
@@ -248,9 +242,8 @@ class SlackChannelHistorySyncServiceTest extends BaseUnitTest {
         stubChannels(channel(ANNOUNCED, null));
         Message edited = plain("1783000006.000000", "U1", "fixed wording");
         edited.setEdited(new Message.Edited());
-        when(
-            slackMessageService.fetchHistoryPage(eq(WS), eq(CHANNEL), anyString(), anyString(), any(), anyInt())
-        ).thenReturn(new HistoryPage(List.of(edited), null));
+        when(slackMessageService.fetchHistoryPage(eq(WS), eq(CHANNEL), anyString(), anyString(), any(), anyInt()))
+                .thenReturn(new HistoryPage(List.of(edited), null));
 
         service.syncWorkspace(WS);
 
@@ -267,24 +260,15 @@ class SlackChannelHistorySyncServiceTest extends BaseUnitTest {
         SlackThread thread = new SlackThread();
         thread.setLastTs("1783000008.000000"); // behind Slack's latest_reply → gap
         thread.setMessageCount(2);
-        when(
-            threadRepository.findByWorkspaceIdAndSlackChannelIdAndSlackThreadTs(WS, CHANNEL, "1783000007.000000")
-        ).thenReturn(Optional.of(thread));
-        when(
-            slackMessageService.fetchHistoryPage(eq(WS), eq(CHANNEL), anyString(), anyString(), any(), anyInt())
-        ).thenReturn(new HistoryPage(List.of(parent), null));
+        when(threadRepository.findByWorkspaceIdAndSlackChannelIdAndSlackThreadTs(WS, CHANNEL, "1783000007.000000"))
+                .thenReturn(Optional.of(thread));
+        when(slackMessageService.fetchHistoryPage(eq(WS), eq(CHANNEL), anyString(), anyString(), any(), anyInt()))
+                .thenReturn(new HistoryPage(List.of(parent), null));
         Message parentEcho = plain("1783000007.000000", "U1", "root");
         Message reply = plain("1783000009.000000", "U2", "late reply");
-        when(
-            slackMessageService.fetchRepliesPage(
-                eq(WS),
-                eq(CHANNEL),
-                eq("1783000007.000000"),
-                anyString(),
-                any(),
-                anyInt()
-            )
-        ).thenReturn(new HistoryPage(List.of(parentEcho, reply), null));
+        when(slackMessageService.fetchRepliesPage(
+                        eq(WS), eq(CHANNEL), eq("1783000007.000000"), anyString(), any(), anyInt()))
+                .thenReturn(new HistoryPage(List.of(parentEcho, reply), null));
 
         service.syncWorkspace(WS);
 
@@ -296,26 +280,23 @@ class SlackChannelHistorySyncServiceTest extends BaseUnitTest {
     @Test
     void repliesBudgetExhaustedMidPagination_doesNotAdvanceChannelWatermark() {
         service = new SlackChannelHistorySyncService(
-            monitoredChannelRepository,
-            threadRepository,
-            slackMessageService,
-            ingestService,
-            connectionService,
-            new SlackSyncProperties("0 0 4 * * *", 10, 15, Duration.ZERO, true, 1, true),
-            CLOCK
-        );
+                monitoredChannelRepository,
+                threadRepository,
+                slackMessageService,
+                ingestService,
+                connectionService,
+                new SlackSyncProperties("0 0 4 * * *", 10, 15, Duration.ZERO, true, 1, true),
+                CLOCK);
         stubChannels(channel(ANNOUNCED, null));
         Message parent = plain("1783000007.000000", "U1", "root");
         parent.setReplyCount(2);
-        when(
-            threadRepository.findByWorkspaceIdAndSlackChannelIdAndSlackThreadTs(WS, CHANNEL, parent.getTs())
-        ).thenReturn(Optional.empty());
-        when(
-            slackMessageService.fetchHistoryPage(eq(WS), eq(CHANNEL), anyString(), anyString(), any(), anyInt())
-        ).thenReturn(new HistoryPage(List.of(parent), null));
-        when(
-            slackMessageService.fetchRepliesPage(eq(WS), eq(CHANNEL), eq(parent.getTs()), anyString(), any(), anyInt())
-        ).thenReturn(new HistoryPage(List.of(), "next"));
+        when(threadRepository.findByWorkspaceIdAndSlackChannelIdAndSlackThreadTs(WS, CHANNEL, parent.getTs()))
+                .thenReturn(Optional.empty());
+        when(slackMessageService.fetchHistoryPage(eq(WS), eq(CHANNEL), anyString(), anyString(), any(), anyInt()))
+                .thenReturn(new HistoryPage(List.of(parent), null));
+        when(slackMessageService.fetchRepliesPage(
+                        eq(WS), eq(CHANNEL), eq(parent.getTs()), anyString(), any(), anyInt()))
+                .thenReturn(new HistoryPage(List.of(), "next"));
 
         var summary = service.syncWorkspace(WS);
 
@@ -333,12 +314,10 @@ class SlackChannelHistorySyncServiceTest extends BaseUnitTest {
         SlackThread thread = new SlackThread();
         thread.setLastTs("1783000011.000000"); // aggregate already caught up
         thread.setMessageCount(2);
-        when(
-            threadRepository.findByWorkspaceIdAndSlackChannelIdAndSlackThreadTs(WS, CHANNEL, "1783000010.000000")
-        ).thenReturn(Optional.of(thread));
-        when(
-            slackMessageService.fetchHistoryPage(eq(WS), eq(CHANNEL), anyString(), anyString(), any(), anyInt())
-        ).thenReturn(new HistoryPage(List.of(parent), null));
+        when(threadRepository.findByWorkspaceIdAndSlackChannelIdAndSlackThreadTs(WS, CHANNEL, "1783000010.000000"))
+                .thenReturn(Optional.of(thread));
+        when(slackMessageService.fetchHistoryPage(eq(WS), eq(CHANNEL), anyString(), anyString(), any(), anyInt()))
+                .thenReturn(new HistoryPage(List.of(parent), null));
 
         service.syncWorkspace(WS);
 

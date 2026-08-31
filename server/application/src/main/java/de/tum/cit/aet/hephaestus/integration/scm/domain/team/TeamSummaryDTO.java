@@ -12,15 +12,27 @@ import org.jspecify.annotations.Nullable;
  */
 @Schema(description = "Lightweight summary of a team without member/repository details")
 public record TeamSummaryDTO(
-    @NonNull @Schema(description = "Unique identifier of the team") Long id,
-    @NonNull @Schema(description = "Name of the team") String name,
-    @Nullable @Schema(description = "ID of the parent team, if this is a sub-team") Long parentId,
-    @Schema(description = "Description of the team") String description,
-    @Schema(description = "Privacy level of the team (SECRET or VISIBLE)") Privacy privacy,
-    @Schema(description = "Organization the team belongs to") String organization,
-    @Schema(description = "URL to the team's page on the git provider") String htmlUrl,
-    @NonNull @Schema(description = "Whether the team is hidden from leaderboard display") Boolean hidden
-) {
+        @NonNull @Schema(description = "Unique identifier of the team")
+        Long id,
+
+        @NonNull @Schema(description = "Name of the team") String name,
+
+        @Nullable @Schema(description = "ID of the parent team, if this is a sub-team")
+        Long parentId,
+
+        @Schema(description = "Description of the team") String description,
+
+        @Schema(description = "Privacy level of the team (SECRET or VISIBLE)")
+        Privacy privacy,
+
+        @Schema(description = "Organization the team belongs to")
+        String organization,
+
+        @Schema(description = "URL to the team's page on the git provider")
+        String htmlUrl,
+
+        @NonNull @Schema(description = "Whether the team is hidden from leaderboard display")
+        Boolean hidden) {
     /**
      * Creates a TeamSummaryDTO from a Team entity using scope-specific settings.
      *
@@ -33,14 +45,13 @@ public record TeamSummaryDTO(
      */
     public static TeamSummaryDTO fromTeamWithScopeSettings(Team team, boolean isHidden) {
         return new TeamSummaryDTO(
-            team.getId(),
-            team.getName(),
-            team.getParentId(),
-            team.getDescription(),
-            team.getPrivacy(),
-            team.getOrganization(),
-            team.getHtmlUrl(),
-            isHidden
-        );
+                team.getId(),
+                team.getName(),
+                team.getParentId(),
+                team.getDescription(),
+                team.getPrivacy(),
+                team.getOrganization(),
+                team.getHtmlUrl(),
+                isHidden);
     }
 }

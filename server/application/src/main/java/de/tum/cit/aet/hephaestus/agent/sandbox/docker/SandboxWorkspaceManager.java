@@ -62,12 +62,11 @@ public class SandboxWorkspaceManager {
 
     /** Package-private constructor for testing with custom limits. */
     SandboxWorkspaceManager(
-        DockerFileOperations fileOps,
-        long maxOutputBytes,
-        long maxSingleFileBytes,
-        long maxDirectoryBytes,
-        int maxDirectoryEntries
-    ) {
+            DockerFileOperations fileOps,
+            long maxOutputBytes,
+            long maxSingleFileBytes,
+            long maxDirectoryBytes,
+            int maxDirectoryEntries) {
         this.fileOps = fileOps;
         this.maxOutputBytes = maxOutputBytes;
         this.maxSingleFileBytes = maxSingleFileBytes;
@@ -99,10 +98,9 @@ public class SandboxWorkspaceManager {
      *     call; callers and test doubles must consume it eagerly rather than retain it.
      */
     public void injectFiles(
-        String containerId,
-        @org.jspecify.annotations.Nullable Map<String, byte[]> files,
-        @org.jspecify.annotations.Nullable Map<String, Path> filesOnDisk
-    ) {
+            String containerId,
+            @org.jspecify.annotations.Nullable Map<String, byte[]> files,
+            @org.jspecify.annotations.Nullable Map<String, Path> filesOnDisk) {
         Map<String, byte[]> inMemory = files == null ? Map.of() : files;
         Map<String, Path> onDisk = filesOnDisk == null ? Map.of() : filesOnDisk;
         if (inMemory.isEmpty() && onDisk.isEmpty()) {
@@ -146,9 +144,7 @@ public class SandboxWorkspaceManager {
      * @param directoryMounts map of host path to container path
      */
     public void injectDirectories(
-        String containerId,
-        @org.jspecify.annotations.Nullable Map<String, String> directoryMounts
-    ) {
+            String containerId, @org.jspecify.annotations.Nullable Map<String, String> directoryMounts) {
         if (directoryMounts == null || directoryMounts.isEmpty()) {
             return;
         }
@@ -195,9 +191,7 @@ public class SandboxWorkspaceManager {
             }
         } catch (IOException e) {
             throw new SandboxInfrastructureException(
-                "Failed to inject directory " + hostPath + " into container " + containerId,
-                e
-            );
+                    "Failed to inject directory " + hostPath + " into container " + containerId, e);
         } finally {
             if (tempTar != null) {
                 try {
@@ -217,14 +211,12 @@ public class SandboxWorkspaceManager {
      * fixed-size buffer rather than loaded entirely into memory.
      */
     private void writeTarToFile(Path tarFile, Path hostDir, String dirName, String hostPath) throws IOException {
-        long[] totalBytes = { 0 };
-        int[] entryCount = { 0 };
+        long[] totalBytes = {0};
+        int[] entryCount = {0};
 
-        try (
-            OutputStream fileOut = new BufferedOutputStream(Files.newOutputStream(tarFile), COPY_BUFFER_SIZE);
-            TarArchiveOutputStream tar = new TarArchiveOutputStream(fileOut);
-            Stream<Path> paths = Files.walk(hostDir, MAX_WALK_DEPTH)
-        ) {
+        try (OutputStream fileOut = new BufferedOutputStream(Files.newOutputStream(tarFile), COPY_BUFFER_SIZE);
+                TarArchiveOutputStream tar = new TarArchiveOutputStream(fileOut);
+                Stream<Path> paths = Files.walk(hostDir, MAX_WALK_DEPTH)) {
             tar.setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
             tar.setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_POSIX);
 
@@ -232,9 +224,8 @@ public class SandboxWorkspaceManager {
                 try {
                     entryCount[0]++;
                     if (entryCount[0] > maxDirectoryEntries) {
-                        throw new SandboxException(
-                            "Directory injection exceeds entry count limit (" + maxDirectoryEntries + "): " + hostPath
-                        );
+                        throw new SandboxException("Directory injection exceeds entry count limit ("
+                                + maxDirectoryEntries + "): " + hostPath);
                     }
 
                     String relativePath = hostDir.relativize(path).toString();
@@ -251,9 +242,8 @@ public class SandboxWorkspaceManager {
                         long fileSize = Files.size(path);
                         totalBytes[0] += fileSize;
                         if (totalBytes[0] > maxDirectoryBytes) {
-                            throw new SandboxException(
-                                "Directory injection exceeds size limit (" + maxDirectoryBytes + " bytes): " + hostPath
-                            );
+                            throw new SandboxException("Directory injection exceeds size limit (" + maxDirectoryBytes
+                                    + " bytes): " + hostPath);
                         }
 
                         TarArchiveEntry fileEntry = new TarArchiveEntry(entryName);
@@ -268,14 +258,11 @@ public class SandboxWorkspaceManager {
                         // concurrent-modification diagnostic rather than an opaque tar size-mismatch at finish().
                         long written = copyExactly(path, tar, fileSize);
                         if (written != fileSize) {
-                            throw new SandboxException(
-                                "Source file changed during injection (declared " +
-                                    fileSize +
-                                    " bytes, read " +
-                                    written +
-                                    "): " +
-                                    path
-                            );
+                            throw new SandboxException("Source file changed during injection (declared " + fileSize
+                                    + " bytes, read "
+                                    + written
+                                    + "): "
+                                    + path);
                         }
                         tar.closeArchiveEntry();
                     }
@@ -364,10 +351,9 @@ public class SandboxWorkspaceManager {
                     }
                     if (totalBytes + entry.getSize() > maxOutputBytes) {
                         log.warn(
-                            "Output size limit exceeded ({} bytes) for container {}, skipping remaining files",
-                            maxOutputBytes,
-                            containerId
-                        );
+                                "Output size limit exceeded ({} bytes) for container {}, skipping remaining files",
+                                maxOutputBytes,
+                                containerId);
                         break;
                     }
                     byte[] content = tar.readNBytes((int) entry.getSize());
@@ -376,12 +362,11 @@ public class SandboxWorkspaceManager {
                 }
             }
             log.debug(
-                "Collected {} output files ({} bytes) from container {} at {}",
-                result.size(),
-                totalBytes,
-                containerId,
-                outputPath
-            );
+                    "Collected {} output files ({} bytes) from container {} at {}",
+                    result.size(),
+                    totalBytes,
+                    containerId,
+                    outputPath);
         } catch (SandboxException e) {
             // docker cp failed — output directory may not exist (agent didn't write output)
             log.warn("Failed to collect output from container {} at {}: {}", containerId, outputPath, e.getMessage());
@@ -395,17 +380,17 @@ public class SandboxWorkspaceManager {
     // Internal helpers
 
     private void writeInputTar(Path tarFile, Map<String, byte[]> files, Map<String, Path> filesOnDisk)
-        throws IOException {
-        try (
-            OutputStream fileOut = new BufferedOutputStream(Files.newOutputStream(tarFile), COPY_BUFFER_SIZE);
-            TarArchiveOutputStream tar = new TarArchiveOutputStream(fileOut)
-        ) {
+            throws IOException {
+        try (OutputStream fileOut = new BufferedOutputStream(Files.newOutputStream(tarFile), COPY_BUFFER_SIZE);
+                TarArchiveOutputStream tar = new TarArchiveOutputStream(fileOut)) {
             tar.setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
             tar.setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_POSIX);
 
             Set<String> allPaths = new LinkedHashSet<>();
             files.keySet().stream().map(SandboxWorkspaceManager::validatePath).forEach(allPaths::add);
-            filesOnDisk.keySet().stream().map(SandboxWorkspaceManager::validatePath).forEach(allPaths::add);
+            filesOnDisk.keySet().stream()
+                    .map(SandboxWorkspaceManager::validatePath)
+                    .forEach(allPaths::add);
             for (String dir : ancestorDirs(allPaths)) {
                 TarArchiveEntry dirEntry = new TarArchiveEntry(dir + "/");
                 dirEntry.setModTime(System.currentTimeMillis());
@@ -431,14 +416,11 @@ public class SandboxWorkspaceManager {
                 tar.putArchiveEntry(tarEntry);
                 long written = copyExactly(source, tar, fileSize);
                 if (written != fileSize) {
-                    throw new SandboxException(
-                        "Source file changed during injection (declared " +
-                            fileSize +
-                            " bytes, read " +
-                            written +
-                            "): " +
-                            source
-                    );
+                    throw new SandboxException("Source file changed during injection (declared " + fileSize
+                            + " bytes, read "
+                            + written
+                            + "): "
+                            + source);
                 }
                 tar.closeArchiveEntry();
             }
@@ -459,12 +441,10 @@ public class SandboxWorkspaceManager {
     }
 
     private static boolean isWritableRegion(String path) {
-        return (
-            path.startsWith(SandboxLayout.WORK_PREFIX) ||
-            path.startsWith(SandboxLayout.PI_AGENT_PREFIX) ||
-            path.startsWith(SandboxLayout.SESSIONS_DIR_PREFIX) ||
-            path.startsWith(SandboxLayout.OUTPUT_PREFIX)
-        );
+        return (path.startsWith(SandboxLayout.WORK_PREFIX)
+                || path.startsWith(SandboxLayout.PI_AGENT_PREFIX)
+                || path.startsWith(SandboxLayout.SESSIONS_DIR_PREFIX)
+                || path.startsWith(SandboxLayout.OUTPUT_PREFIX));
     }
 
     private static SortedSet<String> ancestorDirs(Set<String> keys) {

@@ -28,23 +28,22 @@ import tools.jackson.databind.ObjectMapper;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record ConfigSnapshot(
-    int schemaVersion,
-    String apiProtocol,
-    String baseUrl,
-    String upstreamModelId,
-    // Read-only carry-over from pre-catalog snapshots; from() writes null.
-    @Nullable String modelVersion,
-    @Nullable Integer contextWindow,
-    @Nullable Integer maxOutputTokens,
-    boolean supportsReasoning,
-    @Nullable FundingSource connectionScope,
-    @Nullable Long connectionId,
-    @Nullable Long modelId,
-    @Nullable Long workspaceId,
-    int timeoutSeconds,
-    boolean allowInternet,
-    @Nullable LlmPriceSnapshot priceSnapshot
-) {
+        int schemaVersion,
+        String apiProtocol,
+        String baseUrl,
+        String upstreamModelId,
+        // Read-only carry-over from pre-catalog snapshots; from() writes null.
+        @Nullable String modelVersion,
+        @Nullable Integer contextWindow,
+        @Nullable Integer maxOutputTokens,
+        boolean supportsReasoning,
+        @Nullable FundingSource connectionScope,
+        @Nullable Long connectionId,
+        @Nullable Long modelId,
+        @Nullable Long workspaceId,
+        int timeoutSeconds,
+        boolean allowInternet,
+        @Nullable LlmPriceSnapshot priceSnapshot) {
     /**
      * Bump only for a reshape (field removal, type change, semantic reinterpretation). Adding a
      * nullable field is compatible both ways and needs no bump.
@@ -72,42 +71,40 @@ public record ConfigSnapshot(
         ResolvedLlmModel resolved = resolver.resolve(source);
         LlmModelResolver.ConnectionRef ref = resolver.connectionRef(source);
         return new ConfigSnapshot(
-            SCHEMA_VERSION,
-            resolved.apiProtocol(),
-            resolved.baseUrl(),
-            resolved.upstreamModelId(),
-            null,
-            resolved.contextWindow(),
-            resolved.maxOutputTokens(),
-            resolved.supportsReasoning(),
-            ref.scope(),
-            ref.connectionId(),
-            ref.modelId(),
-            ref.workspaceId(),
-            source.getTimeoutSeconds(),
-            source.isAllowInternet(),
-            null
-        );
+                SCHEMA_VERSION,
+                resolved.apiProtocol(),
+                resolved.baseUrl(),
+                resolved.upstreamModelId(),
+                null,
+                resolved.contextWindow(),
+                resolved.maxOutputTokens(),
+                resolved.supportsReasoning(),
+                ref.scope(),
+                ref.connectionId(),
+                ref.modelId(),
+                ref.workspaceId(),
+                source.getTimeoutSeconds(),
+                source.isAllowInternet(),
+                null);
     }
 
     public ConfigSnapshot withPriceSnapshot(@Nullable LlmPriceSnapshot price) {
         return new ConfigSnapshot(
-            schemaVersion,
-            apiProtocol,
-            baseUrl,
-            upstreamModelId,
-            modelVersion,
-            contextWindow,
-            maxOutputTokens,
-            supportsReasoning,
-            connectionScope,
-            connectionId,
-            modelId,
-            workspaceId,
-            timeoutSeconds,
-            allowInternet,
-            price
-        );
+                schemaVersion,
+                apiProtocol,
+                baseUrl,
+                upstreamModelId,
+                modelVersion,
+                contextWindow,
+                maxOutputTokens,
+                supportsReasoning,
+                connectionScope,
+                connectionId,
+                modelId,
+                workspaceId,
+                timeoutSeconds,
+                allowInternet,
+                price);
     }
 
     public JsonNode toJson(ObjectMapper objectMapper) {
@@ -123,11 +120,8 @@ public record ConfigSnapshot(
         int version = node.path("schemaVersion").asInt(0);
         if (version > SCHEMA_VERSION) {
             throw new IllegalStateException(
-                "ConfigSnapshot schema version %d is newer than supported version %d. Upgrade the application server.".formatted(
-                    version,
-                    SCHEMA_VERSION
-                )
-            );
+                    "ConfigSnapshot schema version %d is newer than supported version %d. Upgrade the application server."
+                            .formatted(version, SCHEMA_VERSION));
         }
         if (version < CATALOG_SHAPE_MIN_VERSION) {
             return fromLegacyJson(node);
@@ -164,21 +158,20 @@ public record ConfigSnapshot(
         int timeoutSeconds = node.path("timeoutSeconds").asInt(600);
         boolean allowInternet = node.path("allowInternet").asBoolean(false);
         return new ConfigSnapshot(
-            node.path("schemaVersion").asInt(0),
-            apiProtocol,
-            baseUrl,
-            modelName != null ? modelName : "",
-            modelVersion,
-            null,
-            null,
-            false,
-            null,
-            null,
-            null,
-            null,
-            timeoutSeconds,
-            allowInternet,
-            null
-        );
+                node.path("schemaVersion").asInt(0),
+                apiProtocol,
+                baseUrl,
+                modelName != null ? modelName : "",
+                modelVersion,
+                null,
+                null,
+                false,
+                null,
+                null,
+                null,
+                null,
+                timeoutSeconds,
+                allowInternet,
+                null);
     }
 }

@@ -22,9 +22,7 @@ import org.junit.jupiter.api.Test;
 class PrecomputeScriptPurityTest extends BaseUnitTest {
 
     private static final Path PRECOMPUTE_DIR = resolveDir(
-        "src/main/resources/practices/precompute",
-        "server/application/src/main/resources/practices/precompute"
-    );
+            "src/main/resources/practices/precompute", "server/application/src/main/resources/practices/precompute");
 
     // The sign-neutral observation vocabulary (ADR 0021, F-6). A precompute script produces hints, never
     // observations, so it must launder none of these. We match on word boundaries (\b) so the reported token
@@ -48,15 +46,15 @@ class PrecomputeScriptPurityTest extends BaseUnitTest {
                 for (String token : OBSERVATION_TOKENS) {
                     // \b would treat the leading "_" / "." as a boundary, so anchor on the surrounding chars
                     // explicitly: the token must not be flanked by another identifier character.
-                    boolean leaks = Pattern.compile("(?<![A-Z_])" + token + "(?![A-Z_])").matcher(line).find();
+                    boolean leaks = Pattern.compile("(?<![A-Z_])" + token + "(?![A-Z_])")
+                            .matcher(line)
+                            .find();
                     assertThat(leaks)
-                        .as(
-                            "%s emits the observation token '%s' in code/directions — precompute surfaces facts, " +
-                                "the LLM decides the observation",
-                            script.getFileName(),
-                            token
-                        )
-                        .isFalse();
+                            .as(
+                                    "%s emits the observation token '%s' in code/directions — precompute surfaces facts, "
+                                            + "the LLM decides the observation",
+                                    script.getFileName(), token)
+                            .isFalse();
                 }
             }
         }

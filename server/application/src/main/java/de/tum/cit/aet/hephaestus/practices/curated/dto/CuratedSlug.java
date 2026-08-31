@@ -13,11 +13,10 @@ import java.lang.annotation.Target;
 @NotBlank(message = "Slug is required")
 @Size(min = 3, max = 64, message = "Slug must be between 3 and 64 characters")
 @Pattern(
-    regexp = "^[a-z0-9]+(?:-[a-z0-9]+)*$",
-    message = "Slug must contain only lowercase alphanumeric characters and hyphens," +
-        " must not start or end with a hyphen, and must not contain consecutive hyphens"
-)
-@Target({ ElementType.FIELD, ElementType.PARAMETER, ElementType.RECORD_COMPONENT })
+        regexp = "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        message = "Slug must contain only lowercase alphanumeric characters and hyphens,"
+                + " must not start or end with a hyphen, and must not contain consecutive hyphens")
+@Target({ElementType.FIELD, ElementType.PARAMETER, ElementType.RECORD_COMPONENT})
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 public @interface CuratedSlug {}

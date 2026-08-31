@@ -12,7 +12,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organizatio
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventType;
 import de.tum.cit.aet.hephaestus.integration.scm.github.subissue.dto.GitHubSubIssuesEventDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
@@ -68,10 +67,9 @@ class GitHubSubIssuesMessageHandlerIntegrationTest extends BaseIntegrationTest {
     private void setupTestData() {
         // Create git provider
         gitProvider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-            .orElseGet(() ->
-                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseGet(() -> gitProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
 
         // Create organization
         Organization org = new Organization();
@@ -134,7 +132,10 @@ class GitHubSubIssuesMessageHandlerIntegrationTest extends BaseIntegrationTest {
         GitHubSubIssuesEventDTO event = loadPayload("sub_issues.sub_issue_added");
 
         // Create parent issue
-        createTestIssue(required(event.parentIssue().getDatabaseId()), event.parentIssue().number(), "Parent Issue");
+        createTestIssue(
+                required(event.parentIssue().getDatabaseId()),
+                event.parentIssue().number(),
+                "Parent Issue");
 
         handler.handleEvent(event);
 
@@ -147,8 +148,12 @@ class GitHubSubIssuesMessageHandlerIntegrationTest extends BaseIntegrationTest {
         GitHubSubIssuesEventDTO event = loadPayload("sub_issues.sub_issue_removed");
 
         // Create parent issue and sub issue
-        createTestIssue(required(event.parentIssue().getDatabaseId()), event.parentIssue().number(), "Parent Issue");
-        createTestIssue(required(event.subIssue().getDatabaseId()), event.subIssue().number(), "Sub Issue");
+        createTestIssue(
+                required(event.parentIssue().getDatabaseId()),
+                event.parentIssue().number(),
+                "Parent Issue");
+        createTestIssue(
+                required(event.subIssue().getDatabaseId()), event.subIssue().number(), "Sub Issue");
 
         handler.handleEvent(event);
 

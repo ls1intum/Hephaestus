@@ -36,6 +36,8 @@ import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembershipService;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Duration;
 import java.time.Instant;
@@ -122,6 +124,9 @@ class ReviewSweepSpendGuardIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private WorkspaceMembershipService workspaceMembershipService;
+
     private Workspace workspace;
     private long pullRequestId;
 
@@ -130,13 +135,12 @@ class ReviewSweepSpendGuardIntegrationTest extends BaseIntegrationTest {
         databaseTestUtils.cleanDatabase();
         ReviewBackfillSubmitter submitter = beanFactory.createBean(ReviewBackfillSubmitter.class);
         driver = new ReviewBackfillDriver(
-            runRepository,
-            scopeRepository,
-            submitter,
-            agentBindingRepository,
-            llmBudgetService,
-            backfillProperties
-        );
+                runRepository,
+                scopeRepository,
+                submitter,
+                agentBindingRepository,
+                llmBudgetService,
+                backfillProperties);
 
         workspace = WorkspaceTestFixtures.activeWorkspace("sweep-guard");
         workspace.setAccountLogin("sweeporg");
@@ -157,8 +161,7 @@ class ReviewSweepSpendGuardIntegrationTest extends BaseIntegrationTest {
 
         LlmConnection connection = llmConnectionRepository.save(LlmCatalogTestFixtures.connection("sweep-guard"));
         LlmModel model = llmModelRepository.save(
-            LlmCatalogTestFixtures.model(connection, "sweep-guard-model", "gpt-sweep-guard")
-        );
+                LlmCatalogTestFixtures.model(connection, "sweep-guard-model", "gpt-sweep-guard"));
         WorkspaceAgentBinding binding = new WorkspaceAgentBinding();
         binding.setWorkspace(workspace);
         binding.setPurpose(AgentPurpose.PRACTICE_REVIEW);
@@ -168,11 +171,12 @@ class ReviewSweepSpendGuardIntegrationTest extends BaseIntegrationTest {
         agentBindingRepository.save(binding);
 
         IdentityProvider provider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-            .orElseGet(() ->
-                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseGet(() -> gitProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
         User author = userRepository.save(TestUserFactory.createUser(5001L, "sweep-author", provider));
+        workspaceMembershipService.createMembership(
+                workspace, author.getId(), WorkspaceMembership.WorkspaceRole.MEMBER);
 
         Repository repository = new Repository();
         repository.setNativeId(5101L);
@@ -200,11 +204,13 @@ class ReviewSweepSpendGuardIntegrationTest extends BaseIntegrationTest {
     void twoConsecutiveSweepsOverAnUnchangedArtifactSubmitExactlyOneReview() {
         createSchedule();
 
-        assertThat(sweepOnce()).as("the first sweep pays for the review nothing had triggered").isEqualTo(1);
+        assertThat(sweepOnce())
+                .as("the first sweep pays for the review nothing had triggered")
+                .isEqualTo(1);
 
         assertThat(sweepOnce())
-            .as("the second sweep finds the occurrence already settled and buys nothing")
-            .isEqualTo(1);
+                .as("the second sweep finds the occurrence already settled and buys nothing")
+                .isEqualTo(1);
 
         // One ledger row, not two: the second sweep produced the identical key and lost the insert.
         List<ArtifactSignal> rows = signalRepository.findAll();
@@ -213,8 +219,8 @@ class ReviewSweepSpendGuardIntegrationTest extends BaseIntegrationTest {
         assertThat(rows.getFirst().getState()).isEqualTo(SignalState.TRIGGERED);
         // Both campaigns really did walk the artifact; the second one just walked past it.
         assertThat(runRepository.findAll())
-            .hasSize(2)
-            .allSatisfy(run -> assertThat(run.getEstimatedArtifacts()).isOne());
+                .hasSize(2)
+                .allSatisfy(run -> assertThat(run.getEstimatedArtifacts()).isOne());
     }
 
     /**
@@ -229,13 +235,13 @@ class ReviewSweepSpendGuardIntegrationTest extends BaseIntegrationTest {
         assertThat(sweepOnce()).isEqualTo(1);
 
         assertThat(signalRepository.findAll())
-            .singleElement()
-            .extracting(ArtifactSignal::getDiscoveredVia)
-            .isEqualTo(DiscoveredVia.SWEEP);
+                .singleElement()
+                .extracting(ArtifactSignal::getDiscoveredVia)
+                .isEqualTo(DiscoveredVia.SWEEP);
         assertThat(runRepository.findAll())
-            .singleElement()
-            .extracting(ReviewBackfillRun::getDiscoveredVia)
-            .isEqualTo(DiscoveredVia.SWEEP);
+                .singleElement()
+                .extracting(ReviewBackfillRun::getDiscoveredVia)
+                .isEqualTo(DiscoveredVia.SWEEP);
     }
 
     /**
@@ -262,9 +268,7 @@ class ReviewSweepSpendGuardIntegrationTest extends BaseIntegrationTest {
     /** Every campaign the driver would pick up on one tick, loaded the way the driver loads them. */
     private void driveActiveCampaigns() {
         for (ReviewBackfillRun run : runRepository.findByStatusIn(
-            List.of(ReviewBackfillStatus.RUNNING, ReviewBackfillStatus.PAUSED),
-            PageRequest.ofSize(5)
-        )) {
+                List.of(ReviewBackfillStatus.RUNNING, ReviewBackfillStatus.PAUSED), PageRequest.ofSize(5))) {
             driver.advance(run);
         }
     }
@@ -286,40 +290,42 @@ class ReviewSweepSpendGuardIntegrationTest extends BaseIntegrationTest {
         Instant now = Instant.now();
         Long providerId = java.util.Objects.requireNonNull(provider.getId());
         pullRequestRepository.upsertCore(
-            5201L,
-            providerId,
-            12,
-            "A change the webhook never announced",
-            "Body",
-            "OPEN",
-            null,
-            "https://github.com/sweeporg/sweep-repo/pull/12",
-            false,
-            null,
-            0,
-            now,
-            now,
-            now,
-            author.getId(),
-            repository.getId(),
-            null,
-            null,
-            false,
-            false,
-            1,
-            10,
-            5,
-            3,
-            null,
-            null,
-            null,
-            "feature/sweep",
-            "main",
-            "sweepheadsha",
-            "sweepbasesha",
-            null,
-            null
-        );
-        return pullRequestRepository.findByRepositoryIdAndNumber(repository.getId(), 12).orElseThrow().getId();
+                5201L,
+                providerId,
+                12,
+                "A change the webhook never announced",
+                "Body",
+                "OPEN",
+                null,
+                "https://github.com/sweeporg/sweep-repo/pull/12",
+                false,
+                null,
+                0,
+                now,
+                now,
+                now,
+                author.getId(),
+                repository.getId(),
+                null,
+                null,
+                false,
+                false,
+                1,
+                10,
+                5,
+                3,
+                null,
+                null,
+                null,
+                "feature/sweep",
+                "main",
+                "sweepheadsha",
+                "sweepbasesha",
+                null,
+                null);
+        return pullRequestRepository
+                .findByRepositoryIdAndNumber(repository.getId(), 12)
+                .orElseThrow()
+                .getId();
     }
 }

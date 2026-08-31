@@ -47,20 +47,14 @@ class IssueTypeRepositoryIntegrationTest extends BaseIntegrationTest {
     @BeforeEach
     void setUp() {
         gitlabProvider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.example.com")
-            .orElseGet(() ->
-                gitProviderRepository.save(
-                    new IdentityProvider(IdentityProviderType.GITLAB, "https://gitlab.example.com")
-                )
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.example.com")
+                .orElseGet(() -> gitProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITLAB, "https://gitlab.example.com")));
 
         otherProvider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://other.gitlab.com")
-            .orElseGet(() ->
-                gitProviderRepository.save(
-                    new IdentityProvider(IdentityProviderType.GITLAB, "https://other.gitlab.com")
-                )
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://other.gitlab.com")
+                .orElseGet(() -> gitProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITLAB, "https://other.gitlab.com")));
 
         rootOrg = persistOrg(gitlabProvider, 1000L, "root-group");
         subgroupOrg = persistOrg(gitlabProvider, 1001L, "root-group/subgroup");
@@ -91,10 +85,8 @@ class IssueTypeRepositoryIntegrationTest extends BaseIntegrationTest {
     void resolvesTypeFromRootWhenSubgroupHasNoSeedRows() {
         persistIssueType("gid://gitlab/WorkItems::Type/1", "Issue", rootOrg);
 
-        Optional<IssueType> resolved = issueTypeRepository.findFirstByProviderIdAndNameIgnoreCase(
-            persistedId(gitlabProvider),
-            "Issue"
-        );
+        Optional<IssueType> resolved =
+                issueTypeRepository.findFirstByProviderIdAndNameIgnoreCase(persistedId(gitlabProvider), "Issue");
 
         assertThat(resolved).isPresent();
         assertThat(resolved.get().getId()).isEqualTo("gid://gitlab/WorkItems::Type/1");
@@ -105,15 +97,12 @@ class IssueTypeRepositoryIntegrationTest extends BaseIntegrationTest {
     void matchIsCaseInsensitive() {
         persistIssueType("gid://gitlab/WorkItems::Type/2", "Task", rootOrg);
 
-        assertThat(
-            issueTypeRepository.findFirstByProviderIdAndNameIgnoreCase(persistedId(gitlabProvider), "task")
-        ).isPresent();
-        assertThat(
-            issueTypeRepository.findFirstByProviderIdAndNameIgnoreCase(persistedId(gitlabProvider), "TASK")
-        ).isPresent();
-        assertThat(
-            issueTypeRepository.findFirstByProviderIdAndNameIgnoreCase(persistedId(gitlabProvider), "tAsK")
-        ).isPresent();
+        assertThat(issueTypeRepository.findFirstByProviderIdAndNameIgnoreCase(persistedId(gitlabProvider), "task"))
+                .isPresent();
+        assertThat(issueTypeRepository.findFirstByProviderIdAndNameIgnoreCase(persistedId(gitlabProvider), "TASK"))
+                .isPresent();
+        assertThat(issueTypeRepository.findFirstByProviderIdAndNameIgnoreCase(persistedId(gitlabProvider), "tAsK"))
+                .isPresent();
     }
 
     @Test
@@ -121,10 +110,8 @@ class IssueTypeRepositoryIntegrationTest extends BaseIntegrationTest {
         Organization otherOrg = persistOrg(otherProvider, 2000L, "other-group");
         persistIssueType("gid://other/WorkItems::Type/99", "Bug", otherOrg);
 
-        Optional<IssueType> resolved = issueTypeRepository.findFirstByProviderIdAndNameIgnoreCase(
-            persistedId(gitlabProvider),
-            "Bug"
-        );
+        Optional<IssueType> resolved =
+                issueTypeRepository.findFirstByProviderIdAndNameIgnoreCase(persistedId(gitlabProvider), "Bug");
 
         assertThat(resolved).isEmpty();
     }
@@ -135,10 +122,8 @@ class IssueTypeRepositoryIntegrationTest extends BaseIntegrationTest {
         disabled.setEnabled(false);
         issueTypeRepository.save(disabled);
 
-        Optional<IssueType> resolved = issueTypeRepository.findFirstByProviderIdAndNameIgnoreCase(
-            persistedId(gitlabProvider),
-            "Incident"
-        );
+        Optional<IssueType> resolved =
+                issueTypeRepository.findFirstByProviderIdAndNameIgnoreCase(persistedId(gitlabProvider), "Incident");
 
         assertThat(resolved).isEmpty();
     }
@@ -148,10 +133,8 @@ class IssueTypeRepositoryIntegrationTest extends BaseIntegrationTest {
         IssueType rootType = persistIssueType("gid://gitlab/WorkItems::Type/10", "Epic", rootOrg);
         persistIssueType("gid://gitlab/WorkItems::Type/11", "Epic", subgroupOrg);
 
-        Optional<IssueType> resolved = issueTypeRepository.findFirstByProviderIdAndNameIgnoreCase(
-            persistedId(gitlabProvider),
-            "Epic"
-        );
+        Optional<IssueType> resolved =
+                issueTypeRepository.findFirstByProviderIdAndNameIgnoreCase(persistedId(gitlabProvider), "Epic");
 
         assertThat(resolved).isPresent();
         assertThat(resolved.get().getId()).isEqualTo(rootType.getId());

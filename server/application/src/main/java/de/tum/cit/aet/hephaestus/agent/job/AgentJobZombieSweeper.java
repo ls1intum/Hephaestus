@@ -1,10 +1,12 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
 import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
+import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.observability.StructuredLogKeys;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
@@ -16,6 +18,7 @@ import java.util.concurrent.TimeUnit;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.domain.PageRequest;
@@ -73,18 +76,19 @@ public class AgentJobZombieSweeper {
     private final Counter orphanFailed;
     private final Counter deliveryRecovered;
     private final Counter snapshotUnreadable;
+    private final AgentJobTelemetry jobTelemetry;
 
     @Autowired
     public AgentJobZombieSweeper(
-        AgentJobRepository jobRepository,
-        WorkerRegistryRepository workerRegistryRepository,
-        AgentProperties agentProperties,
-        ObjectMapper objectMapper,
-        TransactionTemplate transactionTemplate,
-        AgentJobLifecycleService lifecycleService,
-        LlmUsageRecorder usageRecorder,
-        MeterRegistry meterRegistry
-    ) {
+            AgentJobRepository jobRepository,
+            WorkerRegistryRepository workerRegistryRepository,
+            AgentProperties agentProperties,
+            ObjectMapper objectMapper,
+            TransactionTemplate transactionTemplate,
+            AgentJobLifecycleService lifecycleService,
+            LlmUsageRecorder usageRecorder,
+            MeterRegistry meterRegistry,
+            AgentJobTelemetry jobTelemetry) {
         this.jobRepository = jobRepository;
         this.workerRegistryRepository = workerRegistryRepository;
         this.agentProperties = agentProperties;
@@ -92,21 +96,22 @@ public class AgentJobZombieSweeper {
         this.transactionTemplate = transactionTemplate;
         this.lifecycleService = lifecycleService;
         this.usageRecorder = usageRecorder;
-        this.zombieReaped = Counter.builder("agent.job.zombie.reaped")
-            .description("Stale RUNNING jobs marked as TIMED_OUT")
-            .register(meterRegistry);
-        this.orphanRequeued = Counter.builder("agent.job.orphan.requeued")
-            .description("RUNNING jobs whose owning worker was lost, requeued for another worker")
-            .register(meterRegistry);
-        this.orphanFailed = Counter.builder("agent.job.orphan.failed")
-            .description("Orphaned jobs that hit the retry cap and were failed")
-            .register(meterRegistry);
-        this.deliveryRecovered = Counter.builder("agent.job.delivery.recovered")
-            .description("Stuck PENDING deliveries successfully re-attempted by the recovery sweep")
-            .register(meterRegistry);
-        this.snapshotUnreadable = Counter.builder("agent.job.snapshot.unreadable")
-            .description("Terminal accounting events whose config snapshot could not be read; billed UNPRICED")
-            .register(meterRegistry);
+        this.zombieReaped = Counter.builder(AgentMetrics.AGENT_JOB_ZOMBIE_REAPED)
+                .description("Stale RUNNING jobs marked as TIMED_OUT")
+                .register(meterRegistry);
+        this.orphanRequeued = Counter.builder(AgentMetrics.AGENT_JOB_ORPHAN_REQUEUED)
+                .description("RUNNING jobs whose owning worker was lost, requeued for another worker")
+                .register(meterRegistry);
+        this.orphanFailed = Counter.builder(AgentMetrics.AGENT_JOB_ORPHAN_FAILED)
+                .description("Orphaned jobs that hit the retry cap and were failed")
+                .register(meterRegistry);
+        this.deliveryRecovered = Counter.builder(AgentMetrics.AGENT_JOB_DELIVERY_RECOVERED)
+                .description("Stuck PENDING deliveries successfully re-attempted by the recovery sweep")
+                .register(meterRegistry);
+        this.snapshotUnreadable = Counter.builder(AgentMetrics.AGENT_JOB_SNAPSHOT_UNREADABLE)
+                .description("Terminal accounting events whose config snapshot could not be read; billed UNPRICED")
+                .register(meterRegistry);
+        this.jobTelemetry = jobTelemetry;
     }
 
     /**
@@ -126,35 +131,50 @@ public class AgentJobZombieSweeper {
         // the jobs the batch already reaped (and their ledger events) at commit time.
         for (AgentJob job : staleJobs) {
             try {
-                transactionTemplate.executeWithoutResult(status -> reapIfStale(job.getId()));
+                AgentJob reaped = transactionTemplate.execute(status -> reapIfStale(job.getId()));
+                if (reaped != null) {
+                    // The sweeper thread has no ambient trace context; restore the job's own trace ID
+                    // (with a fresh span so no stale scheduler-thread value pairs with it) so the
+                    // terminal event joins the lifecycle it closes.
+                    MDC.put(StructuredLogKeys.TRACE_ID, reaped.getTraceId());
+                    MDC.put(StructuredLogKeys.SPAN_ID, AgentJobExecutor.randomSpanId());
+                    try {
+                        jobTelemetry.terminal(reaped, AgentJobStatus.TIMED_OUT, AgentJobTelemetry.age(reaped));
+                    } finally {
+                        MDC.remove(StructuredLogKeys.TRACE_ID);
+                        MDC.remove(StructuredLogKeys.SPAN_ID);
+                    }
+                }
             } catch (Exception e) {
                 log.warn("Failed to reap stale job: jobId={}, error={}", job.getId(), e.getMessage());
             }
         }
     }
 
-    private void reapIfStale(UUID jobId) {
+    private @Nullable AgentJob reapIfStale(UUID jobId) {
         AgentJob lockedJob = jobRepository.findByIdWithWorkspaceForUpdate(jobId).orElse(null);
-        if (lockedJob == null || lockedJob.getStatus() != AgentJobStatus.RUNNING) return;
+        if (lockedJob == null || lockedJob.getStatus() != AgentJobStatus.RUNNING) return null;
         int timeoutSeconds = getTimeoutFromSnapshot(lockedJob);
         Duration maxLifetime = Duration.ofSeconds(timeoutSeconds).plus(RUNNING_BUFFER);
-        if (lockedJob.getStartedAt() != null && lockedJob.getStartedAt().plus(maxLifetime).isAfter(Instant.now())) {
-            return;
+        if (lockedJob.getStartedAt() != null
+                && lockedJob.getStartedAt().plus(maxLifetime).isAfter(Instant.now())) {
+            return null;
         }
 
         int updated = jobRepository.transitionStatus(
-            jobId,
-            AgentJobStatus.TIMED_OUT,
-            Instant.now(),
-            "Reaped: exceeded timeout (executor may have crashed)",
-            Set.of(AgentJobStatus.RUNNING)
-        );
+                jobId,
+                AgentJobStatus.TIMED_OUT,
+                Instant.now(),
+                "Reaped: exceeded timeout (executor may have crashed)",
+                Set.of(AgentJobStatus.RUNNING));
 
         if (updated > 0) {
             recordUnverifiableUsage(lockedJob);
             zombieReaped.increment();
             log.warn("Reaped stale RUNNING job: jobId={}, startedAt={}", jobId, lockedJob.getStartedAt());
+            return lockedJob;
         }
+        return null;
     }
 
     /**
@@ -164,9 +184,7 @@ public class AgentJobZombieSweeper {
     @Scheduled(fixedDelay = 20, timeUnit = TimeUnit.SECONDS, initialDelay = 30)
     public void recoverOrphanedJobs() {
         List<OrphanedJobRef> orphans = jobRepository.findOrphanedRunningJobs(
-            Instant.now().minus(ORPHAN_STARTUP_GRACE),
-            AgentProperties.WORKER_LEASE_TTL.toSeconds()
-        );
+                Instant.now().minus(ORPHAN_STARTUP_GRACE), AgentProperties.WORKER_LEASE_TTL.toSeconds());
         if (orphans.isEmpty()) {
             return;
         }
@@ -175,25 +193,25 @@ public class AgentJobZombieSweeper {
             try {
                 if (orphan.getRetryCount() >= agentProperties.maxRetries()) {
                     Integer failed = transactionTemplate.execute(s -> {
-                        AgentJob job = jobRepository.findByIdWithWorkspaceForUpdate(orphan.getJobId()).orElse(null);
+                        AgentJob job = jobRepository
+                                .findByIdWithWorkspaceForUpdate(orphan.getJobId())
+                                .orElse(null);
                         if (job == null) return 0;
                         int rows = jobRepository.transitionStatus(
-                            orphan.getJobId(),
-                            AgentJobStatus.FAILED,
-                            Instant.now(),
-                            "Orphaned: owning worker lost and retry limit reached",
-                            Set.of(AgentJobStatus.RUNNING)
-                        );
+                                orphan.getJobId(),
+                                AgentJobStatus.FAILED,
+                                Instant.now(),
+                                "Orphaned: owning worker lost and retry limit reached",
+                                Set.of(AgentJobStatus.RUNNING));
                         if (rows > 0) recordUnverifiableUsage(job);
                         return rows;
                     });
                     if (failed != null && failed > 0) {
                         orphanFailed.increment();
                         log.warn(
-                            "Orphaned job {} hit retry cap ({}); failed",
-                            orphan.getJobId(),
-                            orphan.getRetryCount()
-                        );
+                                "Orphaned job {} hit retry cap ({}); failed",
+                                orphan.getJobId(),
+                                orphan.getRetryCount());
                     }
                     continue;
                 }
@@ -202,21 +220,21 @@ public class AgentJobZombieSweeper {
                 String newToken = AgentJob.generateJobToken();
                 String newTokenHash = AgentJob.computeTokenHash(newToken);
                 Integer requeued = transactionTemplate.execute(s -> {
-                    AgentJob job = jobRepository.findByIdWithWorkspaceForUpdate(orphan.getJobId()).orElse(null);
+                    AgentJob job = jobRepository
+                            .findByIdWithWorkspaceForUpdate(orphan.getJobId())
+                            .orElse(null);
                     if (job == null) return 0;
                     // Read the token counts BEFORE requeuing: requeueOrphan zeroes the row's accumulators.
-                    AgentJobLlmUsage counts =
-                        job.getExecutionStartedAt() != null
+                    AgentJobLlmUsage counts = job.getExecutionStartedAt() != null
                             ? jobRepository.findLlmUsageById(job.getId()).orElse(null)
                             : null;
                     int rows = jobRepository.requeueOrphan(
-                        orphan.getJobId(),
-                        orphan.getWorkerId(),
-                        agentProperties.maxRetries(),
-                        availableAt,
-                        newToken,
-                        newTokenHash
-                    );
+                            orphan.getJobId(),
+                            orphan.getWorkerId(),
+                            agentProperties.maxRetries(),
+                            availableAt,
+                            newToken,
+                            newTokenHash);
                     if (rows > 0) recordUnverifiableUsage(job, counts);
                     return rows;
                 });
@@ -239,10 +257,8 @@ public class AgentJobZombieSweeper {
     @Scheduled(fixedDelay = 5, initialDelay = 3, timeUnit = TimeUnit.MINUTES)
     public void recoverStuckDeliveries() {
         Instant cutoff = Instant.now().minus(DELIVERY_PENDING_STUCK_THRESHOLD);
-        List<AgentJob> stuck = jobRepository.findStuckPendingDeliveries(
-            cutoff,
-            PageRequest.of(0, DELIVERY_RECOVERY_BATCH_SIZE)
-        );
+        List<AgentJob> stuck =
+                jobRepository.findStuckPendingDeliveries(cutoff, PageRequest.of(0, DELIVERY_RECOVERY_BATCH_SIZE));
         if (stuck.isEmpty()) {
             return;
         }
@@ -250,24 +266,17 @@ public class AgentJobZombieSweeper {
         for (AgentJob job : stuck) {
             try {
                 if (job.getDeliveryAttempts() >= MAX_DELIVERY_RECOVERY_ATTEMPTS) {
-                    transactionTemplate.executeWithoutResult(s ->
-                        jobRepository.updateDeliveryStatus(
-                            job.getId(),
-                            DeliveryStatus.FAILED,
-                            job.getDeliveryCommentId()
-                        )
-                    );
+                    transactionTemplate.executeWithoutResult(s -> jobRepository.updateDeliveryStatus(
+                            job.getId(), DeliveryStatus.FAILED, job.getDeliveryCommentId()));
                     log.warn(
-                        "Delivery recovery exhausted after {} attempt(s); marking FAILED: jobId={}",
-                        job.getDeliveryAttempts(),
-                        job.getId()
-                    );
+                            "Delivery recovery exhausted after {} attempt(s); marking FAILED: jobId={}",
+                            job.getDeliveryAttempts(),
+                            job.getId());
                     continue;
                 }
                 short expectedAttempts = job.getDeliveryAttempts();
-                Integer claimed = transactionTemplate.execute(s ->
-                    jobRepository.claimDeliveryRecoveryAttempt(job.getId(), expectedAttempts)
-                );
+                Integer claimed = transactionTemplate.execute(
+                        s -> jobRepository.claimDeliveryRecoveryAttempt(job.getId(), expectedAttempts));
                 if (claimed == null || claimed == 0) {
                     continue; // a concurrent sweeper replica already claimed this pass's attempt
                 }
@@ -290,9 +299,8 @@ public class AgentJobZombieSweeper {
      */
     @Scheduled(fixedDelay = 60, initialDelay = 5, timeUnit = TimeUnit.MINUTES)
     public void purgeStaleWorkerRegistrations() {
-        Integer removed = transactionTemplate.execute(s ->
-            workerRegistryRepository.deleteStale(STALE_REGISTRATION_TTL.toSeconds())
-        );
+        Integer removed = transactionTemplate.execute(
+                s -> workerRegistryRepository.deleteStale(STALE_REGISTRATION_TTL.toSeconds()));
         if (removed != null && removed > 0) {
             log.info("Purged {} stale worker_registry row(s)", removed);
         }
@@ -323,9 +331,10 @@ public class AgentJobZombieSweeper {
 
     private void recordUnverifiableUsage(AgentJob job) {
         recordUnverifiableUsage(
-            job,
-            job.getExecutionStartedAt() != null ? jobRepository.findLlmUsageById(job.getId()).orElse(null) : null
-        );
+                job,
+                job.getExecutionStartedAt() != null
+                        ? jobRepository.findLlmUsageById(job.getId()).orElse(null)
+                        : null);
     }
 
     /**
@@ -342,16 +351,15 @@ public class AgentJobZombieSweeper {
         if (snapshot == null) {
             snapshotUnreadable.increment();
         }
-        LlmPriceSnapshot price =
-            snapshot != null && snapshot.priceSnapshot() != null
+        LlmPriceSnapshot price = snapshot != null && snapshot.priceSnapshot() != null
                 ? snapshot.priceSnapshot()
                 : LlmPriceSnapshot.unpricedInstance();
-        TerminalUsage.resolve(null, counts).appendTo(
-            usageRecorder,
-            job.getWorkspace().getId(),
-            job,
-            snapshot != null ? snapshot.upstreamModelId() : null,
-            price
-        );
+        TerminalUsage.resolve(null, counts)
+                .appendTo(
+                        usageRecorder,
+                        job.getWorkspace().getId(),
+                        job,
+                        snapshot != null ? snapshot.upstreamModelId() : null,
+                        price);
     }
 }

@@ -13,7 +13,6 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedObservation;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackResolution;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
@@ -23,7 +22,6 @@ import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationFingerprint;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.reaction.Reaction;
 import de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionRepository;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -51,22 +49,17 @@ class FeedbackResponseSuppressionFilterTest extends BaseUnitTest {
     private static final String SLUG = "commit-discipline";
     private static final long CONTRIBUTOR = 7L;
     private static final long TARGET = 100L;
-    // The canonical key the filter recomputes for a SLUG observation with no location — the SAME value deliver() persists.
-    private static final String CK = ObservationFingerprint.compute(
-        SLUG,
-        ArtifactKinds.PULL_REQUEST.value(),
-        TARGET,
-        CONTRIBUTOR,
-        null
-    );
+    // The canonical key the filter recomputes for a SLUG observation with no location — the SAME value deliver()
+    // persists.
+    private static final String CK =
+            ObservationFingerprint.compute(SLUG, ArtifactKinds.PULL_REQUEST.value(), TARGET, CONTRIBUTOR, null);
 
     private FeedbackResponseSuppressionFilter filter(boolean enabled) {
         return new FeedbackResponseSuppressionFilter(
-            observationRepository,
-            reactionRepository,
-            feedbackLedgerRecorder,
-            new PracticeReviewProperties(false, 15, 5, false, enabled)
-        );
+                observationRepository,
+                reactionRepository,
+                feedbackLedgerRecorder,
+                new PracticeReviewProperties(false, 15, 5, false, enabled));
     }
 
     private AgentJob job() {
@@ -85,7 +78,7 @@ class FeedbackResponseSuppressionFilterTest extends BaseUnitTest {
 
         assertThat(d.deliverable()).isEqualTo(in);
         assertThat(d.suppressedCount()).isZero();
-        verify(observationRepository, never()).findByAgentJobId(any());
+        verify(observationRepository, never()).findByAgentJobId(any(), org.mockito.ArgumentMatchers.anyLong());
     }
 
     @Test
@@ -96,20 +89,16 @@ class FeedbackResponseSuppressionFilterTest extends BaseUnitTest {
 
         assertThat(d.deliverable()).isEmpty();
         assertThat(d.suppressedCount()).isEqualTo(1);
-        verify(feedbackLedgerRecorder).recordSuppressed(
-            any(),
-            any(),
-            eq(FeedbackSuppressionReason.REACTED_DISPUTED),
-            anyInt()
-        );
+        verify(feedbackLedgerRecorder)
+                .recordSuppressed(any(), any(), eq(FeedbackSuppressionReason.REACTED_DISPUTED), anyInt());
     }
 
     @Test
     void suppression_survivesLedgerWriteFailure() {
         stubPersistedAndReaction(FeedbackResolution.NOT_APPLICABLE);
         doThrow(new RuntimeException("ledger down"))
-            .when(feedbackLedgerRecorder)
-            .recordSuppressed(any(), any(), any(), anyInt());
+                .when(feedbackLedgerRecorder)
+                .recordSuppressed(any(), any(), any(), anyInt());
 
         var filter = filter(true);
         var job = job();
@@ -122,10 +111,10 @@ class FeedbackResponseSuppressionFilterTest extends BaseUnitTest {
     @Test
     void unreactedLocus_isDelivered() {
         var pf = pf(CK);
-        when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(pf));
-        when(reactionRepository.findCurrentResolutionByRecurrenceKeys(any(), eq(CONTRIBUTOR), any())).thenReturn(
-            List.of()
-        );
+        when(observationRepository.findByAgentJobId(any(), org.mockito.ArgumentMatchers.anyLong()))
+                .thenReturn(List.of(pf));
+        when(reactionRepository.findCurrentResolutionByRecurrenceKeys(any(), eq(CONTRIBUTOR), any()))
+                .thenReturn(List.of());
 
         var d = filter(true).evaluate(job(), List.of(vf(SLUG, Presence.ABSENT)));
 
@@ -160,18 +149,17 @@ class FeedbackResponseSuppressionFilterTest extends BaseUnitTest {
     @Test
     void secretBadFinding_isNotSuppressedDespiteDisputedReaction() {
         String secretKey = ObservationFingerprint.compute(
-            "avoids-insecure-defaults-and-over-broad-permissions",
-            ArtifactKinds.PULL_REQUEST.value(),
-            TARGET,
-            CONTRIBUTOR,
-            null
-        );
+                "avoids-insecure-defaults-and-over-broad-permissions",
+                ArtifactKinds.PULL_REQUEST.value(),
+                TARGET,
+                CONTRIBUTOR,
+                null);
         var pf = pf(secretKey);
         var reaction = locus(secretKey, FeedbackResolution.DISPUTED);
-        when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(pf));
-        when(reactionRepository.findCurrentResolutionByRecurrenceKeys(any(), eq(CONTRIBUTOR), any())).thenReturn(
-            List.of(reaction)
-        );
+        when(observationRepository.findByAgentJobId(any(), org.mockito.ArgumentMatchers.anyLong()))
+                .thenReturn(List.of(pf));
+        when(reactionRepository.findCurrentResolutionByRecurrenceKeys(any(), eq(CONTRIBUTOR), any()))
+                .thenReturn(List.of(reaction));
 
         var d = filter(true).evaluate(job(), List.of(secretScannerObservation(secretKey)));
 
@@ -182,18 +170,17 @@ class FeedbackResponseSuppressionFilterTest extends BaseUnitTest {
 
     private static ValidatedObservation secretScannerObservation(@Nullable String recurrenceKey) {
         var evidence = tools.jackson.databind.node.JsonNodeFactory.instance
-            .objectNode()
-            .put("detector", "secret-diff-scanner");
+                .objectNode()
+                .put("detector", "secret-diff-scanner");
         return new ValidatedObservation(
-            "avoids-insecure-defaults-and-over-broad-permissions",
-            "Hardcoded secret on a changed line",
-            Presence.PRESENT,
-            Assessment.BAD,
-            Severity.CRITICAL,
-            evidence,
-            "A credential is committed.",
-            new ObservationKeys("occ-" + recurrenceKey, recurrenceKey)
-        );
+                "avoids-insecure-defaults-and-over-broad-permissions",
+                "Hardcoded secret on a changed line",
+                Presence.PRESENT,
+                Assessment.BAD,
+                Severity.CRITICAL,
+                evidence,
+                "A credential is committed.",
+                new ObservationKeys("occ-" + recurrenceKey, recurrenceKey));
     }
 
     @Test
@@ -201,7 +188,8 @@ class FeedbackResponseSuppressionFilterTest extends BaseUnitTest {
         // A persisted observation may carry a null recurrence_key (a detector that emitted no locatable
         // observations). With no keys to bind, the native IN (:recurrenceKeys) query is skipped entirely.
         var pf = pf(null);
-        when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(pf));
+        when(observationRepository.findByAgentJobId(any(), org.mockito.ArgumentMatchers.anyLong()))
+                .thenReturn(List.of(pf));
 
         var d = filter(true).evaluate(job(), List.of(vf(SLUG, Presence.ABSENT)));
 
@@ -215,10 +203,10 @@ class FeedbackResponseSuppressionFilterTest extends BaseUnitTest {
     private void stubPersistedAndReaction(FeedbackResolution action) {
         var pf = pf(CK);
         var reaction = reaction(action);
-        when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(pf));
-        when(reactionRepository.findCurrentResolutionByRecurrenceKeys(any(), eq(CONTRIBUTOR), any())).thenReturn(
-            List.of(reaction)
-        );
+        when(observationRepository.findByAgentJobId(any(), org.mockito.ArgumentMatchers.anyLong()))
+                .thenReturn(List.of(pf));
+        when(reactionRepository.findCurrentResolutionByRecurrenceKeys(any(), eq(CONTRIBUTOR), any()))
+                .thenReturn(List.of(reaction));
     }
 
     @Test
@@ -234,24 +222,26 @@ class FeedbackResponseSuppressionFilterTest extends BaseUnitTest {
         Observation second = pf(CK, "occ-second");
         List<Observation> persisted = List.of(first, second);
         var disputed = List.of(reaction(FeedbackResolution.DISPUTED));
-        when(observationRepository.findByAgentJobId(any())).thenReturn(persisted);
-        when(reactionRepository.findCurrentResolutionByRecurrenceKeys(any(), eq(CONTRIBUTOR), any())).thenReturn(
-            disputed
-        );
+        when(observationRepository.findByAgentJobId(any(), org.mockito.ArgumentMatchers.anyLong()))
+                .thenReturn(persisted);
+        when(reactionRepository.findCurrentResolutionByRecurrenceKeys(any(), eq(CONTRIBUTOR), any()))
+                .thenReturn(disputed);
 
-        var decision = filter(true).evaluate(
-            job(),
-            List.of(vf(SLUG, Presence.ABSENT, CK, "occ-first"), vf(SLUG, Presence.ABSENT, CK, "occ-second"))
-        );
+        var decision = filter(true)
+                .evaluate(
+                        job(),
+                        List.of(
+                                vf(SLUG, Presence.ABSENT, CK, "occ-first"),
+                                vf(SLUG, Presence.ABSENT, CK, "occ-second")));
 
         assertThat(decision.deliverable()).isEmpty();
         ArgumentCaptor<Observation> ledgered = ArgumentCaptor.forClass(Observation.class);
-        verify(feedbackLedgerRecorder, org.mockito.Mockito.times(2)).recordSuppressed(
-            any(),
-            ledgered.capture(),
-            eq(FeedbackSuppressionReason.REACTED_DISPUTED),
-            org.mockito.ArgumentMatchers.anyInt()
-        );
+        verify(feedbackLedgerRecorder, org.mockito.Mockito.times(2))
+                .recordSuppressed(
+                        any(),
+                        ledgered.capture(),
+                        eq(FeedbackSuppressionReason.REACTED_DISPUTED),
+                        org.mockito.ArgumentMatchers.anyInt());
         assertThat(ledgered.getAllValues()).containsExactlyInAnyOrder(first, second);
     }
 
@@ -260,33 +250,25 @@ class FeedbackResponseSuppressionFilterTest extends BaseUnitTest {
     }
 
     private static ValidatedObservation vf(
-        String slug,
-        Presence presence,
-        @Nullable String recurrenceKey,
-        String occurrenceKey
-    ) {
+            String slug, Presence presence, @Nullable String recurrenceKey, String occurrenceKey) {
         return vf(slug, presence, recurrenceKey).withKeys(new ObservationKeys(occurrenceKey, recurrenceKey));
     }
 
     private static ValidatedObservation vf(String slug, Presence presence, @Nullable String recurrenceKey) {
-        Assessment assessment =
-            presence == Presence.NOT_APPLICABLE
+        Assessment assessment = presence == Presence.NOT_APPLICABLE
                 ? null
-                : presence == Presence.PRESENT
-                    ? Assessment.GOOD
-                    : Assessment.BAD;
+                : presence == Presence.PRESENT ? Assessment.GOOD : Assessment.BAD;
         // The handler stamps the persisted recurrence_key onto each observation before the filter runs; the filter
         // matches reactions on that stamped key (never a recompute), so the test feeds it the same way.
         return new ValidatedObservation(
-            slug,
-            slug + " title",
-            presence,
-            assessment,
-            Severity.MINOR,
-            null,
-            "because reasons",
-            new ObservationKeys("occ-" + recurrenceKey, recurrenceKey)
-        );
+                slug,
+                slug + " title",
+                presence,
+                assessment,
+                Severity.MINOR,
+                null,
+                "because reasons",
+                new ObservationKeys("occ-" + recurrenceKey, recurrenceKey));
     }
 
     private Observation pf(@Nullable String recurrenceKey) {

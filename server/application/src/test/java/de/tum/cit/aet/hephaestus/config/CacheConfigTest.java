@@ -22,15 +22,14 @@ import org.springframework.cache.CacheManager;
 class CacheConfigTest extends BaseUnitTest {
 
     private static final List<String> EXPECTED_NAMES = List.of(
-        "achievementProgress",
-        "auth_jwt_revoked",
-        "contributors",
-        "mentor_authored_work_context",
-        "mentor_practice_context",
-        "mentor_user_context",
-        "mentor_workspace_context",
-        "pullRequestTemplates"
-    );
+            "achievementProgress",
+            "auth_jwt_revoked",
+            "contributors",
+            "mentor_authored_work_context",
+            "mentor_practice_context",
+            "mentor_user_context",
+            "mentor_workspace_context",
+            "pullRequestTemplates");
 
     @Test
     @DisplayName("cacheManager exposes exactly the declared caches by name")
@@ -53,17 +52,16 @@ class CacheConfigTest extends BaseUnitTest {
         // Derive the list from the spec table itself so EVERY mentor_* cache is pinned — adding a
         // new one with a divergent TTL/size can no longer slip past a hand-maintained list.
         List<String> mentorCaches = CacheConfig.SPECS.stream()
-            .map(CacheConfig.CacheSpec::name)
-            .filter(name -> name.startsWith("mentor_"))
-            .toList();
+                .map(CacheConfig.CacheSpec::name)
+                .filter(name -> name.startsWith("mentor_"))
+                .toList();
         assertThat(mentorCaches)
-            .as("expected all four mentor context caches")
-            .containsExactlyInAnyOrder(
-                "mentor_authored_work_context",
-                "mentor_practice_context",
-                "mentor_user_context",
-                "mentor_workspace_context"
-            );
+                .as("expected all four mentor context caches")
+                .containsExactlyInAnyOrder(
+                        "mentor_authored_work_context",
+                        "mentor_practice_context",
+                        "mentor_user_context",
+                        "mentor_workspace_context");
         for (String name : mentorCaches) {
             CacheConfig.CacheSpec spec = findSpec(name);
             assertThat(spec.ttl()).isEqualTo(Duration.ofMinutes(5));
@@ -82,21 +80,18 @@ class CacheConfigTest extends BaseUnitTest {
 
     @Test
     void cacheSpecValidation() {
-        Assertions.assertThatThrownBy(() -> new CacheConfig.CacheSpec("", Duration.ofMinutes(1), 1L)).isInstanceOf(
-            IllegalArgumentException.class
-        );
-        Assertions.assertThatThrownBy(() -> new CacheConfig.CacheSpec("ok", Duration.ZERO, 1L)).isInstanceOf(
-            IllegalArgumentException.class
-        );
-        Assertions.assertThatThrownBy(() -> new CacheConfig.CacheSpec("ok", Duration.ofMinutes(1), 0L)).isInstanceOf(
-            IllegalArgumentException.class
-        );
+        Assertions.assertThatThrownBy(() -> new CacheConfig.CacheSpec("", Duration.ofMinutes(1), 1L))
+                .isInstanceOf(IllegalArgumentException.class);
+        Assertions.assertThatThrownBy(() -> new CacheConfig.CacheSpec("ok", Duration.ZERO, 1L))
+                .isInstanceOf(IllegalArgumentException.class);
+        Assertions.assertThatThrownBy(() -> new CacheConfig.CacheSpec("ok", Duration.ofMinutes(1), 0L))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     private static CacheConfig.CacheSpec findSpec(String name) {
         return CacheConfig.SPECS.stream()
-            .filter(s -> s.name().equals(name))
-            .findFirst()
-            .orElseThrow(() -> new AssertionError("missing spec: " + name));
+                .filter(s -> s.name().equals(name))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("missing spec: " + name));
     }
 }

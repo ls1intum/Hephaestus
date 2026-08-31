@@ -2,6 +2,13 @@ name: Docker
 
 on:
   workflow_call:
+    secrets:
+      SENTRY_AUTH_TOKEN:
+        required: false
+      SENTRY_ORG:
+        required: false
+      SENTRY_PROJECT:
+        required: false
     inputs:
       should_skip:
         description: "Whether to skip the workflow"
@@ -25,11 +32,6 @@ on:
         required: false
         type: string
         default: "true"
-      release_pin_fetcher_changed:
-        description: "Whether release-pin-fetcher image inputs changed"
-        required: false
-        type: string
-        default: "true"
       postgres_image_changed:
         description: "Whether the PostgreSQL image inputs changed"
         required: false
@@ -41,11 +43,22 @@ on:
         description: "Whether an application-server image exists at this commit"
         value: ${{ jobs.application-server-build.outputs.manifest-digest != '' || jobs.tag-unchanged-images.outputs.application-server-published == 'true' }}
 
+permissions: {}
+
 jobs:
   webapp-build:
     name: "Webapp"
     if: inputs.should_skip != 'true' && inputs.webapp_changed == 'true'
     uses: ./.github/workflows/reusable-docker-build.yml
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    secrets:
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+      SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+      SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
     with:
       image-name: "ls1intum/hephaestus/webapp"
       docker-file: "./webapp/Dockerfile"
@@ -53,9 +66,11 @@ jobs:
       registry: "ghcr.io"
       # Bake commit + branch (the Dockerfile's ARGs) so the footer build strip is
       # populated on CI-built deploys; Coolify sets these itself for previews.
+      # head_ref, not ref_name: on a pull request the latter is the merge ref `<n>/merge`, which is
+      # not a branch and does not resolve as one — the footer links it and got a 404.
       build-args: |
         SOURCE_COMMIT=${{ github.sha }}
-        COOLIFY_BRANCH=${{ github.ref_name }}
+        COOLIFY_BRANCH=${{ github.head_ref || github.ref_name }}
       # amd64-only on PRs (main/release build both arches). See reusable-docker-build.yml.
       single-arch: ${{ github.event_name == 'pull_request' }}
       tags: |
@@ -77,6 +92,11 @@ jobs:
       inputs.should_skip != 'true' &&
       (inputs.application_server_changed == 'true' || github.event_name != 'pull_request')
     uses: ./.github/workflows/reusable-docker-build.yml
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
     with:
       image-name: "ls1intum/hephaestus/application-server"
       # Paketo Cloud Native Buildpacks via spring-boot:build-image, with Application CDS.
@@ -110,6 +130,11 @@ jobs:
     name: "Agent: Pi"
     if: inputs.should_skip != 'true' && inputs.agent_images_changed == 'true'
     uses: ./.github/workflows/reusable-docker-build.yml
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
     with:
       image-name: "ls1intum/hephaestus/agent-pi"
       docker-file: "./docker/agents/pi/Dockerfile"
@@ -133,38 +158,17 @@ jobs:
         org.opencontainers.image.licenses=MIT
         hephaestus.component=agent-pi
 
-  release-pin-fetcher-build:
-    name: "Release Pin Fetcher"
-    if: >-
-      inputs.should_skip != 'true' &&
-      (inputs.release_pin_fetcher_changed == 'true' || github.event_name != 'pull_request')
-    uses: ./.github/workflows/reusable-docker-build.yml
-    with:
-      image-name: "ls1intum/hephaestus/release-pin-fetcher"
-      docker-file: "./docker/release-pin-fetcher/Dockerfile"
-      docker-context: "./docker/release-pin-fetcher"
-      registry: "ghcr.io"
-      # amd64-only on PRs (main/release build both arches). See reusable-docker-build.yml.
-      single-arch: ${{ github.event_name == 'pull_request' }}
-      tags: |
-        ${{ github.ref_name }}
-        ${{ github.sha }}
-        ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || '' }}
-        ci-${{ github.run_number }}
-        ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || '' }}
-      labels: |
-        org.opencontainers.image.title=Hephaestus Release Pin Fetcher
-        org.opencontainers.image.description=Init container that downloads + cosign-verifies the signed release pin asset
-        org.opencontainers.image.vendor=AET TUM
-        org.opencontainers.image.licenses=MIT
-        hephaestus.component=release-pin-fetcher
-
   postgres-build:
     name: "Postgres (pg_partman)"
     if: >-
       inputs.should_skip != 'true' &&
       (inputs.postgres_image_changed == 'true' || github.event_name != 'pull_request')
     uses: ./.github/workflows/reusable-docker-build.yml
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
     with:
       image-name: "ls1intum/hephaestus/postgres"
       docker-file: "./docker/postgres/Dockerfile"
@@ -192,8 +196,9 @@ jobs:
     if: >-
       inputs.should_skip != 'true' && github.event_name == 'pull_request' &&
       (inputs.webapp_changed != 'true' || inputs.application_server_changed != 'true' ||
-       inputs.agent_images_changed != 'true' || inputs.release_pin_fetcher_changed != 'true' ||
+       inputs.agent_images_changed != 'true' ||
        inputs.postgres_image_changed != 'true')
+    timeout-minutes: 15
     runs-on: ubuntu-latest
     outputs:
       application-server-published: ${{ steps.tag.outputs.application-server-published }}
@@ -202,6 +207,9 @@ jobs:
       attestations: read
       contents: read
     steps:
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
       - name: Log in to Container Registry
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
@@ -216,10 +224,14 @@ jobs:
           WEBAPP_CHANGED: ${{ inputs.webapp_changed }}
           APPLICATION_SERVER_CHANGED: ${{ inputs.application_server_changed }}
           AGENT_IMAGES_CHANGED: ${{ inputs.agent_images_changed }}
-          RELEASE_PIN_FETCHER_CHANGED: ${{ inputs.release_pin_fetcher_changed }}
           POSTGRES_IMAGE_CHANGED: ${{ inputs.postgres_image_changed }}
           PR_NUMBER: ${{ github.event.number }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          REPOSITORY: ${{ github.repository }}
+          REPOSITORY_OWNER: ${{ github.repository_owner }}
+          CURRENT_SHA: ${{ github.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          RUN_NUMBER: ${{ github.run_number }}
         run: |
           set -euo pipefail
 
@@ -228,18 +240,32 @@ jobs:
             local source="$image:$BASE_SHA"
             local ref_tag="${GITHUB_REF_NAME//\//-}"
             local digest
-            digest=$(docker buildx imagetools inspect --format '{{.Manifest.Digest}}' "$source")
+            digest=$(docker buildx imagetools inspect --format '{{.Manifest.Digest}}' "$source" 2>/dev/null || true)
+            if [[ ! "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]; then
+              local merged_head
+              merged_head=$(gh api "repos/$REPOSITORY/commits/$BASE_SHA/pulls" \
+                --jq '[.[] | select(.merged_at != null)][0].head.sha // empty')
+              if [ -n "$merged_head" ]; then
+                source="$image:$merged_head"
+                digest=$(docker buildx imagetools inspect --format '{{.Manifest.Digest}}' "$source" 2>/dev/null || true)
+              fi
+            fi
             if [[ ! "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]; then
               echo "::error::Invalid digest for $source: ${digest:-<empty>}"
               return 1
             fi
             local verified="$image@$digest"
-            gh attestation verify "oci://$verified" --owner "${{ github.repository_owner }}"
+            cosign verify "$verified" \
+              --certificate-identity-regexp "^https://github\\.com/$REPOSITORY/\\.github/workflows/reusable-docker-build\\.yml@" \
+              --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+              --certificate-github-workflow-repository "$REPOSITORY" \
+              > /dev/null
+            gh attestation verify "oci://$verified" --owner "$REPOSITORY_OWNER"
             docker buildx imagetools create \
               --tag "$image:$ref_tag" \
-              --tag "$image:${{ github.sha }}" \
-              --tag "$image:${{ github.event.pull_request.head.sha }}" \
-              --tag "$image:ci-${{ github.run_number }}" \
+              --tag "$image:$CURRENT_SHA" \
+              --tag "$image:$HEAD_SHA" \
+              --tag "$image:ci-$RUN_NUMBER" \
               --tag "$image:pr-$PR_NUMBER" \
               "$verified"
           }
@@ -250,5 +276,4 @@ jobs:
             echo "application-server-published=true" >> "$GITHUB_OUTPUT"
           fi
           [ "$AGENT_IMAGES_CHANGED" = "true" ] || tag_image agent-pi
-          [ "$RELEASE_PIN_FETCHER_CHANGED" = "true" ] || tag_image release-pin-fetcher
           [ "$POSTGRES_IMAGE_CHANGED" = "true" ] || tag_image postgres

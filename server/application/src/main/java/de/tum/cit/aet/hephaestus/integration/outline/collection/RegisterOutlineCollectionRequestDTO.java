@@ -12,9 +12,8 @@ import org.jspecify.annotations.NonNull;
  */
 @Schema(description = "Register an Outline collection for mirroring (lands ENABLED + PENDING)")
 public record RegisterOutlineCollectionRequestDTO(
-    @NonNull
-    @NotBlank
-    @Size(max = 64)
-    @Schema(description = "Outline collection id (UUID)", requiredMode = Schema.RequiredMode.REQUIRED)
-    String collectionId
-) {}
+        @NonNull
+        @NotBlank
+        @Size(max = 64)
+        @Schema(description = "Outline collection id (UUID)", requiredMode = Schema.RequiredMode.REQUIRED)
+        String collectionId) {}

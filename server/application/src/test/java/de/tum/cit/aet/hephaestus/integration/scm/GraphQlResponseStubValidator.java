@@ -80,18 +80,15 @@ public final class GraphQlResponseStubValidator {
 
     public enum Vendor {
         GITHUB(
-            "graphql/github/schema.github.graphql",
-            "graphql/github/operations/",
-            List.of(
-                GitHubGraphQlFragments.PROJECT_FRAGMENTS_RESOURCE,
-                GitHubGraphQlFragments.COMMIT_ENRICHMENT_FIELDS_RESOURCE
-            )
-        ),
+                "graphql/github/schema.github.graphql",
+                "graphql/github/operations/",
+                List.of(
+                        GitHubGraphQlFragments.PROJECT_FRAGMENTS_RESOURCE,
+                        GitHubGraphQlFragments.COMMIT_ENRICHMENT_FIELDS_RESOURCE)),
         GITLAB(
-            "graphql/gitlab/schema.gitlab.graphql",
-            "graphql/gitlab/operations/",
-            List.of("graphql/gitlab/fragments/GitLabUserFields.graphql")
-        );
+                "graphql/gitlab/schema.gitlab.graphql",
+                "graphql/gitlab/operations/",
+                List.of("graphql/gitlab/fragments/GitLabUserFields.graphql"));
 
         private final String schemaLocation;
         private final String operationsLocation;
@@ -104,10 +101,9 @@ public final class GraphQlResponseStubValidator {
         }
 
         private List<Resource> fragmentResources() {
-            return fragmentLocations
-                .stream()
-                .map(location -> (Resource) new ClassPathResource(location))
-                .toList();
+            return fragmentLocations.stream()
+                    .map(location -> (Resource) new ClassPathResource(location))
+                    .toList();
         }
     }
 
@@ -126,26 +122,21 @@ public final class GraphQlResponseStubValidator {
      * {@code "project.mergeRequests.nodes"}).
      */
     public static void assertVendorCouldReturn(
-        Vendor vendor,
-        String documentName,
-        String fieldPath,
-        @Nullable Object stub
-    ) {
+            Vendor vendor, String documentName, String fieldPath, @Nullable Object stub) {
         GraphQLSchema schema = schema(vendor);
         Document document = document(vendor, documentName);
-        OperationDefinition operation = document.getDefinitionsOfType(OperationDefinition.class).getFirst();
-        Map<String, FragmentDefinition> fragments = document
-            .getDefinitionsOfType(FragmentDefinition.class)
-            .stream()
-            .collect(Collectors.toMap(FragmentDefinition::getName, Function.identity()));
+        OperationDefinition operation =
+                document.getDefinitionsOfType(OperationDefinition.class).getFirst();
+        Map<String, FragmentDefinition> fragments = document.getDefinitionsOfType(FragmentDefinition.class).stream()
+                .collect(Collectors.toMap(FragmentDefinition::getName, Function.identity()));
 
         Walk walk = new Walk(schema, fragments, documentName);
         Selected target = walk.descend(operationRoot(schema, operation), operation.getSelectionSet(), fieldPath);
         walk.validate(fieldPath, target.definition().getType(), target.selectionSet(), stub);
 
         assertThat(walk.problems)
-            .as("this %s stub could never arrive from %s at '%s'", documentName, vendor, fieldPath)
-            .isEmpty();
+                .as("this %s stub could never arrive from %s at '%s'", documentName, vendor, fieldPath)
+                .isEmpty();
     }
 
     private record Selected(GraphQLFieldDefinition definition, SelectionSet selectionSet) {}
@@ -173,13 +164,12 @@ public final class GraphQlResponseStubValidator {
                 Selected next = selectable(type, selectionSet).get(segment);
                 if (next == null) {
                     throw new IllegalArgumentException(
-                        "%s does not select '%s'%s, so no stub for '%s' can be validated against it".formatted(
-                            documentName,
-                            segment,
-                            walked.isEmpty() ? "" : " under '" + walked + "'",
-                            fieldPath
-                        )
-                    );
+                            "%s does not select '%s'%s, so no stub for '%s' can be validated against it"
+                                    .formatted(
+                                            documentName,
+                                            segment,
+                                            walked.isEmpty() ? "" : " under '" + walked + "'",
+                                            fieldPath));
                 }
                 definition = next.definition();
                 type = definition.getType();
@@ -229,13 +219,8 @@ public final class GraphQlResponseStubValidator {
                 }
                 Selected field = selectable.get(key);
                 if (field == null) {
-                    problems.add(
-                        "%s.%s is not selected by %s, so the vendor would never return it".formatted(
-                            path,
-                            key,
-                            documentName
-                        )
-                    );
+                    problems.add("%s.%s is not selected by %s, so the vendor would never return it"
+                            .formatted(path, key, documentName));
                     continue;
                 }
                 validate(path + "." + key, field.definition().getType(), field.selectionSet(), entry.getValue());
@@ -244,13 +229,13 @@ public final class GraphQlResponseStubValidator {
 
         private void validateScalar(String path, GraphQLScalarType scalar, GraphQLType declared, Object value) {
             switch (scalar.getName()) {
-                case "Int" -> require(
-                    path,
-                    declared,
-                    value,
-                    value instanceof Integer || value instanceof Long,
-                    "an Integer or Long"
-                );
+                case "Int" ->
+                    require(
+                            path,
+                            declared,
+                            value,
+                            value instanceof Integer || value instanceof Long,
+                            "an Integer or Long");
                 case "Float" -> require(path, declared, value, value instanceof Number, "a Number");
                 case "String", "ID" -> require(path, declared, value, value instanceof String, "a String");
                 case "Boolean" -> require(path, declared, value, value instanceof Boolean, "a Boolean");
@@ -274,10 +259,7 @@ public final class GraphQlResponseStubValidator {
         }
 
         private void collect(
-            @Nullable GraphQLType parentType,
-            @Nullable SelectionSet selectionSet,
-            Map<String, Selected> into
-        ) {
+                @Nullable GraphQLType parentType, @Nullable SelectionSet selectionSet, Map<String, Selected> into) {
             if (parentType == null || selectionSet == null) {
                 return;
             }
@@ -286,8 +268,7 @@ public final class GraphQlResponseStubValidator {
                 if (selection instanceof Field field) {
                     collectField(type, field, into);
                 } else if (selection instanceof InlineFragment inlineFragment) {
-                    GraphQLType condition =
-                        inlineFragment.getTypeCondition() == null
+                    GraphQLType condition = inlineFragment.getTypeCondition() == null
                             ? type
                             : schema.getType(inlineFragment.getTypeCondition().getName());
                     collect(condition, inlineFragment.getSelectionSet(), into);
@@ -295,10 +276,9 @@ public final class GraphQlResponseStubValidator {
                     FragmentDefinition fragment = fragments.get(spread.getName());
                     if (fragment != null) {
                         collect(
-                            schema.getType(fragment.getTypeCondition().getName()),
-                            fragment.getSelectionSet(),
-                            into
-                        );
+                                schema.getType(fragment.getTypeCondition().getName()),
+                                fragment.getSelectionSet(),
+                                into);
                     }
                 }
             }
@@ -316,13 +296,13 @@ public final class GraphQlResponseStubValidator {
         }
 
         private static String mismatch(String path, GraphQLType declared, Object value, String expected) {
-            return "%s is declared %s and needs %s, but the stub has %s (%s)".formatted(
-                path,
-                GraphQLTypeUtil.simplePrint(declared),
-                expected,
-                value.getClass().getSimpleName(),
-                value
-            );
+            return "%s is declared %s and needs %s, but the stub has %s (%s)"
+                    .formatted(
+                            path,
+                            GraphQLTypeUtil.simplePrint(declared),
+                            expected,
+                            value.getClass().getSimpleName(),
+                            value);
         }
     }
 
@@ -345,29 +325,28 @@ public final class GraphQlResponseStubValidator {
     }
 
     private static Document document(Vendor vendor, String documentName) {
-        return DOCUMENTS.computeIfAbsent(vendor, key -> new ConcurrentHashMap<>()).computeIfAbsent(
-            documentName,
-            name -> {
-                String text = documentSource(vendor).getDocument(name).block();
-                if (text == null) {
-                    throw new IllegalArgumentException("No %s operation document named '%s'".formatted(vendor, name));
-                }
-                return new Parser().parseDocument(text);
-            }
-        );
+        return DOCUMENTS
+                .computeIfAbsent(vendor, key -> new ConcurrentHashMap<>())
+                .computeIfAbsent(documentName, name -> {
+                    String text = documentSource(vendor).getDocument(name).block();
+                    if (text == null) {
+                        throw new IllegalArgumentException(
+                                "No %s operation document named '%s'".formatted(vendor, name));
+                    }
+                    return new Parser().parseDocument(text);
+                });
     }
 
     private static FragmentMergingDocumentSource documentSource(Vendor vendor) {
-        return DOCUMENT_SOURCES.computeIfAbsent(vendor, key ->
-            new FragmentMergingDocumentSource(
-                Stream.concat(
-                    Stream.of((Resource) new ClassPathResource(key.operationsLocation)),
-                    key.fragmentResources().stream()
-                ).toList(),
-                List.of(".graphql", ".gql"),
-                key.fragmentResources()
-            )
-        );
+        return DOCUMENT_SOURCES.computeIfAbsent(
+                vendor,
+                key -> new FragmentMergingDocumentSource(
+                        Stream.concat(
+                                        Stream.of((Resource) new ClassPathResource(key.operationsLocation)),
+                                        key.fragmentResources().stream())
+                                .toList(),
+                        List.of(".graphql", ".gql"),
+                        key.fragmentResources()));
     }
 
     private static String read(Resource resource) {

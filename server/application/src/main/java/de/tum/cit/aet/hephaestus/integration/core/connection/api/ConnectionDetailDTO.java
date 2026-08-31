@@ -35,18 +35,17 @@ import tools.jackson.databind.ObjectMapper;
  * object.
  */
 public record ConnectionDetailDTO(
-    Long id,
-    IntegrationKind kind,
-    IntegrationFamily family,
-    IntegrationState state,
-    @Nullable String instanceKey,
-    @Nullable String displayName,
-    @Nullable String stateReason,
-    Instant createdAt,
-    Instant updatedAt,
-    Set<Capability> capabilities,
-    @Nullable Map<String, Object> config
-) {
+        Long id,
+        IntegrationKind kind,
+        IntegrationFamily family,
+        IntegrationState state,
+        @Nullable String instanceKey,
+        @Nullable String displayName,
+        @Nullable String stateReason,
+        Instant createdAt,
+        Instant updatedAt,
+        Set<Capability> capabilities,
+        @Nullable Map<String, Object> config) {
     /**
      * Config keys whose values are secrets and must never cross the API boundary — matched
      * case-insensitively against the serialized config map.
@@ -65,20 +64,19 @@ public record ConnectionDetailDTO(
     @SuppressWarnings("unchecked")
     public static ConnectionDetailDTO from(Connection c, IntegrationManifestRegistry manifests, ObjectMapper mapper) {
         Map<String, Object> configMap =
-            c.getConfig() == null ? null : redactSensitive(mapper.convertValue(c.getConfig(), Map.class));
+                c.getConfig() == null ? null : redactSensitive(mapper.convertValue(c.getConfig(), Map.class));
         return new ConnectionDetailDTO(
-            c.getId(),
-            c.getKind(),
-            c.getKind().family(),
-            c.getState(),
-            c.getInstanceKey(),
-            c.getDisplayName(),
-            c.getStateReason(),
-            c.getCreatedAt(),
-            c.getUpdatedAt(),
-            manifests.capabilitiesFor(c.getKind()),
-            configMap
-        );
+                c.getId(),
+                c.getKind(),
+                c.getKind().family(),
+                c.getState(),
+                c.getInstanceKey(),
+                c.getDisplayName(),
+                c.getStateReason(),
+                c.getCreatedAt(),
+                c.getUpdatedAt(),
+                manifests.capabilitiesFor(c.getKind()),
+                configMap);
     }
 
     /**

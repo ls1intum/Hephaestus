@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { RefreshCw, Trophy } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+
 import {
 	recalculateUserAchievementsMutation,
 	reloadAchievementsMutation,
@@ -14,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/integrations/auth/AuthContext";
 import { queryOperationId } from "@/lib/query-operation-id";
+
 import { AdminAchievementsTable } from "./AdminAchievementsTable";
 
 interface AdminAchievementsPageProps {

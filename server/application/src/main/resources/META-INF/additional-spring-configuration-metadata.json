@@ -17,10 +17,6 @@
       "description": "GitHub API authentication and App configuration"
     },
     {
-      "name": "hephaestus.posthog",
-      "description": "PostHog analytics integration"
-    },
-    {
       "name": "hephaestus.workspace",
       "description": "Workspace initialization and management settings"
     },
@@ -93,26 +89,6 @@
       "description": "Durable consumer name for JetStream subscriptions (empty for ephemeral)"
     },
     {
-      "name": "hephaestus.posthog.enabled",
-      "type": "java.lang.Boolean",
-      "description": "Whether PostHog analytics is enabled"
-    },
-    {
-      "name": "hephaestus.posthog.api-host",
-      "type": "java.lang.String",
-      "description": "PostHog API host URL"
-    },
-    {
-      "name": "hephaestus.posthog.project-id",
-      "type": "java.lang.String",
-      "description": "PostHog project ID"
-    },
-    {
-      "name": "hephaestus.posthog.personal-api-key",
-      "type": "java.lang.String",
-      "description": "PostHog personal API key (use environment variable in production)"
-    },
-    {
       "name": "hephaestus.webapp.url",
       "type": "java.lang.String",
       "description": "Base URL of the webapp for generating links"
@@ -172,25 +148,40 @@
     {
       "name": "hephaestus.sync.cron",
       "values": [
-        { "value": "0 0 * * * *", "description": "Every hour" },
-        { "value": "0 0 3 * * *", "description": "Daily at 3 AM (default)" },
-        { "value": "0 */15 * * * *", "description": "Every 15 minutes" }
+        {
+          "value": "0 0 * * * *",
+          "description": "Every hour"
+        },
+        {
+          "value": "0 0 3 * * *",
+          "description": "Daily at 3 AM (default)"
+        },
+        {
+          "value": "0 */15 * * * *",
+          "description": "Every 15 minutes"
+        }
       ],
-      "providers": [{ "name": "any" }]
+      "providers": [
+        {
+          "name": "any"
+        }
+      ]
     },
     {
       "name": "hephaestus.sync.timeframe-days",
       "values": [
-        { "value": "7", "description": "One week (default)" },
-        { "value": "14", "description": "Two weeks" },
-        { "value": "30", "description": "One month" }
-      ]
-    },
-    {
-      "name": "hephaestus.posthog.api-host",
-      "values": [
-        { "value": "https://app.posthog.com", "description": "PostHog Cloud (default)" },
-        { "value": "https://eu.posthog.com", "description": "PostHog Cloud EU" }
+        {
+          "value": "7",
+          "description": "One week (default)"
+        },
+        {
+          "value": "14",
+          "description": "Two weeks"
+        },
+        {
+          "value": "30",
+          "description": "One month"
+        }
       ]
     },
     {
@@ -198,11 +189,11 @@
       "values": [
         {
           "value": "ghcr.io/ls1intum/hephaestus/agent-pi:${spring.application.version}",
-          "description": "Default — follows this deployment's own image tag, so the pair always matches."
+          "description": "Default \u2014 follows this deployment's own image tag, so the pair always matches."
         },
         {
           "value": "ghcr.io/ls1intum/hephaestus/agent-pi@sha256:0000000000000000000000000000000000000000000000000000000000000000",
-          "description": "Production — digest-pinned. Imported by spring.config.import from the signed release asset."
+          "description": "Production \u2014 digest-pinned. Imported by spring.config.import from the signed release asset."
         }
       ]
     }

@@ -36,18 +36,12 @@ class DeliveryComposer {
     static final int MAX_DIFF_NOTE_BODY_LENGTH = 2_000;
 
     static final int MAX_IMPROVEMENT_SUGGESTIONS = 3;
-    static final Set<String> NON_INLINABLE_PRACTICES = Set.of(
-        "describe-what-and-why",
-        "commits-are-atomic-and-cohesive",
-        "commit-subjects-explain-each-change"
-    );
-    private static final Set<String> EPIC_STRUCTURE_PRACTICES = Set.of(
-        "issue-scoped-to-single-concern",
-        "issue-has-checkable-outcome"
-    );
-    private static final Map<String, String> CO_OCCURRENCE_REDUNDANT_TO_PREFERRED = Map.ofEntries(
-        Map.entry("ready-and-traceable-handoff", "ships-tests-with-the-change")
-    );
+    static final Set<String> NON_INLINABLE_PRACTICES =
+            Set.of("describe-what-and-why", "commits-are-atomic-and-cohesive", "commit-subjects-explain-each-change");
+    private static final Set<String> EPIC_STRUCTURE_PRACTICES =
+            Set.of("issue-scoped-to-single-concern", "issue-has-checkable-outcome");
+    private static final Map<String, String> CO_OCCURRENCE_REDUNDANT_TO_PREFERRED =
+            Map.ofEntries(Map.entry("ready-and-traceable-handoff", "ships-tests-with-the-change"));
 
     private static String repoRelative(String path) {
         return path.startsWith(REPO_MOUNT_RELATIVE) ? path.substring(REPO_MOUNT_RELATIVE.length()) : path;
@@ -73,51 +67,39 @@ class DeliveryComposer {
 
     @Nullable
     static DeliveryContent compose(
-        @Nullable List<ValidatedObservation> observations,
-        ArtifactKind artifact,
-        Map<String, String> whyBySlug
-    ) {
+            @Nullable List<ValidatedObservation> observations, ArtifactKind artifact, Map<String, String> whyBySlug) {
         return compose(observations, artifact, whyBySlug, GroundingContext.none(), List.of(), null);
     }
 
     @Nullable
     static DeliveryContent compose(
-        @Nullable List<ValidatedObservation> observations,
-        ArtifactKind artifact,
-        Map<String, String> whyBySlug,
-        @Nullable String unifiedDiff
-    ) {
+            @Nullable List<ValidatedObservation> observations,
+            ArtifactKind artifact,
+            Map<String, String> whyBySlug,
+            @Nullable String unifiedDiff) {
         return compose(observations, artifact, whyBySlug, unifiedDiff, List.of(), null);
     }
 
     @Nullable
     static DeliveryContent compose(
-        @Nullable List<ValidatedObservation> observations,
-        ArtifactKind artifact,
-        Map<String, String> whyBySlug,
-        @Nullable String unifiedDiff,
-        List<ComposedFeedbackUnit> composed,
-        @Nullable String lead
-    ) {
+            @Nullable List<ValidatedObservation> observations,
+            ArtifactKind artifact,
+            Map<String, String> whyBySlug,
+            @Nullable String unifiedDiff,
+            List<ComposedFeedbackUnit> composed,
+            @Nullable String lead) {
         return compose(
-            observations,
-            artifact,
-            whyBySlug,
-            GroundingContext.fromDiff(artifact, unifiedDiff),
-            composed,
-            lead
-        );
+                observations, artifact, whyBySlug, GroundingContext.fromDiff(artifact, unifiedDiff), composed, lead);
     }
 
     @Nullable
     private static DeliveryContent compose(
-        @Nullable List<ValidatedObservation> observations,
-        ArtifactKind artifact,
-        Map<String, String> whyBySlug,
-        GroundingContext grounding,
-        List<ComposedFeedbackUnit> composed,
-        @Nullable String lead
-    ) {
+            @Nullable List<ValidatedObservation> observations,
+            ArtifactKind artifact,
+            Map<String, String> whyBySlug,
+            GroundingContext grounding,
+            List<ComposedFeedbackUnit> composed,
+            @Nullable String lead) {
         if (observations == null || observations.isEmpty()) {
             return null;
         }
@@ -128,11 +110,10 @@ class DeliveryComposer {
         List<ValidatedObservation> dedupDropped = new ArrayList<>();
         List<ValidatedObservation> capDropped = new ArrayList<>();
 
-        List<ValidatedObservation> negatives = observations
-            .stream()
-            .filter(DeliveryComposer::isProblem)
-            .sorted(Comparator.comparingInt(f -> severity(f).ordinal()))
-            .toList();
+        List<ValidatedObservation> negatives = observations.stream()
+                .filter(DeliveryComposer::isProblem)
+                .sorted(Comparator.comparingInt(f -> severity(f).ordinal()))
+                .toList();
 
         if (ArtifactKinds.ISSUE.equals(artifact)) {
             List<ValidatedObservation> before = negatives;
@@ -150,10 +131,9 @@ class DeliveryComposer {
         // capImprovementTail). The capped list, not the raw one, flows into the partition and diff notes
         // below, so a dropped nudge leaves no inline comment either.
         int improvementOverflow = 0;
-        long blockingTotal = negatives
-            .stream()
-            .filter(f -> f.severity() == Severity.CRITICAL || f.severity() == Severity.MAJOR)
-            .count();
+        long blockingTotal = negatives.stream()
+                .filter(f -> f.severity() == Severity.CRITICAL || f.severity() == Severity.MAJOR)
+                .count();
         long improvementTotal = negatives.size() - blockingTotal;
         if (improvementTotal > MAX_IMPROVEMENT_SUGGESTIONS) {
             List<ValidatedObservation> before = negatives;
@@ -166,11 +146,10 @@ class DeliveryComposer {
             // Ranked best-attested first, so the strengths that survive the cap are the ones we saw in the
             // most of the work, and so a practice's single composed message is claimed by its widest
             // signal. Strengths carry no severity, so breadth is the only ranking dimension there is here.
-            List<ValidatedObservation> observed = observations
-                .stream()
-                .filter(DeliveryComposer::isStrength)
-                .sorted(ObservationOrder.bestAttestedFirst())
-                .toList();
+            List<ValidatedObservation> observed = observations.stream()
+                    .filter(DeliveryComposer::isStrength)
+                    .sorted(ObservationOrder.bestAttestedFirst())
+                    .toList();
             if (observed.isEmpty()) {
                 // Every observation NOT_APPLICABLE or INCONCLUSIVE: nothing was actually assessed, so deliver
                 // nothing rather than a misleading "nothing to change here" all-clear.
@@ -212,22 +191,16 @@ class DeliveryComposer {
     }
 
     private static boolean hasArtifactPlacement(String practiceSlug, List<ComposedFeedbackUnit> composed) {
-        return composed
-            .stream()
-            .anyMatch(
-                unit ->
-                    unit.channel() == FeedbackChannel.IN_CONTEXT &&
-                    unit.action() != ComposedFeedbackUnit.Action.WITHHOLD &&
-                    unit.practiceSlug().equals(practiceSlug) &&
-                    unit.placement() != null &&
-                    unit.placement().kind() == ComposedFeedbackUnit.InContextPlacement.PlacementKind.ARTIFACT
-            );
+        return composed.stream()
+                .anyMatch(unit -> unit.channel() == FeedbackChannel.IN_CONTEXT
+                        && unit.action() != ComposedFeedbackUnit.Action.WITHHOLD
+                        && unit.practiceSlug().equals(practiceSlug)
+                        && unit.placement() != null
+                        && unit.placement().kind() == ComposedFeedbackUnit.InContextPlacement.PlacementKind.ARTIFACT);
     }
 
     private static List<ValidatedObservation> identityDiff(
-        List<ValidatedObservation> before,
-        List<ValidatedObservation> after
-    ) {
+            List<ValidatedObservation> before, List<ValidatedObservation> after) {
         if (before.size() == after.size()) {
             return List.of();
         }
@@ -243,30 +216,24 @@ class DeliveryComposer {
     }
 
     private static List<PracticeDetectionResultParser.WithheldObservation> withheldObservations(
-        List<ValidatedObservation> dedupDropped,
-        List<ValidatedObservation> capDropped
-    ) {
+            List<ValidatedObservation> dedupDropped, List<ValidatedObservation> capDropped) {
         return Stream.concat(
-            dedupDropped.stream().map(f -> withheld(f, FeedbackSuppressionReason.COMPOSER_DEDUPED)),
-            capDropped.stream().map(f -> withheld(f, FeedbackSuppressionReason.VOLUME_CAPPED))
-        )
-            .filter(Objects::nonNull)
-            .toList();
+                        dedupDropped.stream().map(f -> withheld(f, FeedbackSuppressionReason.COMPOSER_DEDUPED)),
+                        capDropped.stream().map(f -> withheld(f, FeedbackSuppressionReason.VOLUME_CAPPED)))
+                .filter(Objects::nonNull)
+                .toList();
     }
 
     private static PracticeDetectionResultParser.@Nullable WithheldObservation withheld(
-        ValidatedObservation f,
-        FeedbackSuppressionReason reason
-    ) {
+            ValidatedObservation f, FeedbackSuppressionReason reason) {
         String key = f.occurrenceKey();
         return key == null ? null : new PracticeDetectionResultParser.WithheldObservation(key, reason);
     }
 
     private static List<ValidatedObservation> dedupEpicStructure(List<ValidatedObservation> negatives) {
-        long epicCount = negatives
-            .stream()
-            .filter(f -> EPIC_STRUCTURE_PRACTICES.contains(f.practiceSlug()))
-            .count();
+        long epicCount = negatives.stream()
+                .filter(f -> EPIC_STRUCTURE_PRACTICES.contains(f.practiceSlug()))
+                .count();
         if (epicCount < 2) {
             return negatives;
         }
@@ -285,19 +252,18 @@ class DeliveryComposer {
     }
 
     private static List<ValidatedObservation> dedupCoOccurringNegatives(List<ValidatedObservation> negatives) {
-        Set<String> present = negatives.stream().map(ValidatedObservation::practiceSlug).collect(Collectors.toSet());
-        Set<String> toDrop = CO_OCCURRENCE_REDUNDANT_TO_PREFERRED.entrySet()
-            .stream()
-            .filter(e -> present.contains(e.getKey()) && present.contains(e.getValue()))
-            .map(Map.Entry::getKey)
-            .collect(Collectors.toSet());
+        Set<String> present =
+                negatives.stream().map(ValidatedObservation::practiceSlug).collect(Collectors.toSet());
+        Set<String> toDrop = CO_OCCURRENCE_REDUNDANT_TO_PREFERRED.entrySet().stream()
+                .filter(e -> present.contains(e.getKey()) && present.contains(e.getValue()))
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toSet());
         if (toDrop.isEmpty()) {
             return negatives;
         }
-        return negatives
-            .stream()
-            .filter(f -> !toDrop.contains(f.practiceSlug()))
-            .toList();
+        return negatives.stream()
+                .filter(f -> !toDrop.contains(f.practiceSlug()))
+                .toList();
     }
 
     private static List<ValidatedObservation> capImprovementTail(List<ValidatedObservation> negatives) {
@@ -312,11 +278,10 @@ class DeliveryComposer {
         }
         // Identity, not value-equality: ValidatedObservation is a record, so a value-set would collapse two
         // equal observations into one slot and the re-emit below would match both, overshooting the cap.
-        Set<ValidatedObservation> keptImprovements = improvements
-            .stream()
-            .sorted(ObservationOrder.worstFirstUnstored())
-            .limit(MAX_IMPROVEMENT_SUGGESTIONS)
-            .collect(Collectors.toCollection(() -> Collections.newSetFromMap(new IdentityHashMap<>())));
+        Set<ValidatedObservation> keptImprovements = improvements.stream()
+                .sorted(ObservationOrder.worstFirstUnstored())
+                .limit(MAX_IMPROVEMENT_SUGGESTIONS)
+                .collect(Collectors.toCollection(() -> Collections.newSetFromMap(new IdentityHashMap<>())));
 
         List<ValidatedObservation> kept = new ArrayList<>(blocking.size() + keptImprovements.size());
         for (ValidatedObservation f : negatives) {
@@ -339,23 +304,21 @@ class DeliveryComposer {
      * dropped whole, and the note opens on its first finding instead.
      */
     private static final Pattern LEAD_REJECTED = Pattern.compile(
-        "```|~~~|<!--|\\]\\(|\\]\\[|^\\s{0,3}(?:#{1,6}\\s|>|\\||[-+*]\\s|\\d+[.)]\\s|-{3,}|={3,})" +
-            "|\\b(?:lgtm|looks good to me|ship it|good to go|ready to (?:merge|ship)|safe to merge" +
-            "|before merging|(?:this|it) can merge|approv(?:e|es|ed|ing|al))\\b",
-        Pattern.CASE_INSENSITIVE | Pattern.MULTILINE
-    );
+            "```|~~~|<!--|\\]\\(|\\]\\[|^\\s{0,3}(?:#{1,6}\\s|>|\\||[-+*]\\s|\\d+[.)]\\s|-{3,}|={3,})"
+                    + "|\\b(?:lgtm|looks good to me|ship it|good to go|ready to (?:merge|ship)|safe to merge"
+                    + "|before merging|(?:this|it) can merge|approv(?:e|es|ed|ing|al))\\b",
+            Pattern.CASE_INSENSITIVE | Pattern.MULTILINE);
 
     private static String composeNoIssuesNote(List<ValidatedObservation> observed, Rendering rendering) {
         String opening = openingOf(rendering);
         // Already ranked most-certain first by the caller. A strength earns a bullet when there is
         // something to say about it — the composed message where the stage wrote one, and the
         // measurement's own reasoning where it did not.
-        List<ValidatedObservation> withSomethingToSay = observed
-            .stream()
-            .filter(
-                f -> rendering.noteFor(f) != null || (f.evidenceRationale() != null && !f.evidenceRationale().isBlank())
-            )
-            .toList();
+        List<ValidatedObservation> withSomethingToSay = observed.stream()
+                .filter(f -> rendering.noteFor(f) != null
+                        || (f.evidenceRationale() != null
+                                && !f.evidenceRationale().isBlank()))
+                .toList();
 
         if (withSomethingToSay.isEmpty()) {
             return opening + "Reviewed against the active practices \u2014 nothing to change here.\n";
@@ -367,9 +330,7 @@ class DeliveryComposer {
             if (shown >= MAX_STRENGTH_REINFORCEMENTS) break;
             ComposedNote note = rendering.noteFor(f);
             String summary = clampToSentenceBudget(
-                note == null ? sanitizeStudentText(f.evidenceRationale()).strip() : note.title(),
-                STRENGTH_BUDGET
-            );
+                    note == null ? sanitizeStudentText(f.evidenceRationale()).strip() : note.title(), STRENGTH_BUDGET);
             if (summary.isBlank()) {
                 // Reasoning was entirely grading-meta and scrubbed to nothing — skip rather than emit a
                 // bare bullet with no observation behind it.
@@ -491,27 +452,25 @@ class DeliveryComposer {
         appendExpanded(sb, summarised, rendering, false);
 
         if (improvementOverflow > 0) {
-            sb
-                .append(improvementOverflow)
-                .append(improvementOverflow == 1 ? " more minor suggestion is" : " more minor suggestions are")
-                .append(" not shown.\n\n");
+            sb.append(improvementOverflow)
+                    .append(improvementOverflow == 1 ? " more minor suggestion is" : " more minor suggestions are")
+                    .append(" not shown.\n\n");
         }
 
         return sb.toString();
     }
 
     private static void appendExpanded(
-        StringBuilder sb,
-        List<ValidatedObservation> observations,
-        Rendering rendering,
-        boolean separatorAfterLast
-    ) {
+            StringBuilder sb,
+            List<ValidatedObservation> observations,
+            Rendering rendering,
+            boolean separatorAfterLast) {
         for (int i = 0; i < observations.size(); i++) {
             ValidatedObservation f = observations.get(i);
             composeObservation(sb, f, rendering);
             boolean lastWasProse = extractPrimaryLocation(f) == null;
             boolean nextIsProse =
-                i + 1 < observations.size() && extractPrimaryLocation(observations.get(i + 1)) == null;
+                    i + 1 < observations.size() && extractPrimaryLocation(observations.get(i + 1)) == null;
             boolean more = i < observations.size() - 1 || separatorAfterLast;
             if (more && !(lastWasProse && nextIsProse)) {
                 sb.append("---\n\n");
@@ -526,19 +485,21 @@ class DeliveryComposer {
 
     /** The runner bounds the lead too, but that output is the model's; re-apply the bound rather than trust it. */
     private static String openingOf(Rendering rendering) {
-        String lead = clampToSentenceBudget(sanitizeStudentText(rendering.lead()).strip(), LEAD_BUDGET).strip();
+        String lead = clampToSentenceBudget(
+                        sanitizeStudentText(rendering.lead()).strip(), LEAD_BUDGET)
+                .strip();
         return lead.isBlank() || LEAD_REJECTED.matcher(lead).find() ? "" : lead + "\n\n";
     }
 
     private static void appendObservationHeader(
-        StringBuilder sb,
-        ValidatedObservation f,
-        boolean withLocation,
-        Rendering rendering
-    ) {
+            StringBuilder sb, ValidatedObservation f, boolean withLocation, Rendering rendering) {
         ComposedNote note = rendering.noteFor(f);
         String title = note == null || note.title() == null ? f.summary() : note.title();
-        sb.append("**").append(severityEmoji(severity(f))).append(" ").append(title).append("**");
+        sb.append("**")
+                .append(severityEmoji(severity(f)))
+                .append(" ")
+                .append(title)
+                .append("**");
         if (withLocation) {
             String location = extractPrimaryLocation(f);
             if (location != null) {
@@ -567,14 +528,13 @@ class DeliveryComposer {
             if (snippet != null && !containsGraderMechanics(snippet) && extractPrimaryLocation(f) != null) {
                 sb.append("You wrote:\n");
                 String fence = fenceFor(snippet);
-                sb
-                    .append(fence)
-                    .append(detectLanguage(f))
-                    .append("\n")
-                    .append(snippet)
-                    .append("\n")
-                    .append(fence)
-                    .append("\n\n");
+                sb.append(fence)
+                        .append(detectLanguage(f))
+                        .append("\n")
+                        .append(snippet)
+                        .append("\n")
+                        .append(fence)
+                        .append("\n\n");
             }
         }
 
@@ -583,9 +543,9 @@ class DeliveryComposer {
 
     private static void composeArtifactObservation(StringBuilder sb, ValidatedObservation f, Rendering rendering) {
         ComposedNote note = rendering.noteFor(f);
-        String claim = sanitizeStudentText(note == null || note.title() == null ? f.summary() : note.title()).strip();
-        String step =
-            note == null
+        String claim = sanitizeStudentText(note == null || note.title() == null ? f.summary() : note.title())
+                .strip();
+        String step = note == null
                 ? sanitizeStudentText(f.evidenceRationale()).strip()
                 : sanitizeStudentText(note.nextStep()).strip();
         if (claim.isBlank()) {
@@ -628,32 +588,31 @@ class DeliveryComposer {
     }
 
     private static final Map<String, String> EXT_TO_LANG = Map.ofEntries(
-        Map.entry("swift", "swift"),
-        Map.entry("kt", "kotlin"),
-        Map.entry("kts", "kotlin"),
-        Map.entry("java", "java"),
-        Map.entry("py", "python"),
-        Map.entry("js", "javascript"),
-        Map.entry("ts", "typescript"),
-        Map.entry("tsx", "tsx"),
-        Map.entry("jsx", "jsx"),
-        Map.entry("rb", "ruby"),
-        Map.entry("go", "go"),
-        Map.entry("rs", "rust"),
-        Map.entry("c", "c"),
-        Map.entry("cpp", "cpp"),
-        Map.entry("h", "c"),
-        Map.entry("hpp", "cpp"),
-        Map.entry("cs", "csharp"),
-        Map.entry("xml", "xml"),
-        Map.entry("json", "json"),
-        Map.entry("yaml", "yaml"),
-        Map.entry("yml", "yaml"),
-        Map.entry("md", "markdown"),
-        Map.entry("sh", "bash"),
-        Map.entry("html", "html"),
-        Map.entry("css", "css")
-    );
+            Map.entry("swift", "swift"),
+            Map.entry("kt", "kotlin"),
+            Map.entry("kts", "kotlin"),
+            Map.entry("java", "java"),
+            Map.entry("py", "python"),
+            Map.entry("js", "javascript"),
+            Map.entry("ts", "typescript"),
+            Map.entry("tsx", "tsx"),
+            Map.entry("jsx", "jsx"),
+            Map.entry("rb", "ruby"),
+            Map.entry("go", "go"),
+            Map.entry("rs", "rust"),
+            Map.entry("c", "c"),
+            Map.entry("cpp", "cpp"),
+            Map.entry("h", "c"),
+            Map.entry("hpp", "cpp"),
+            Map.entry("cs", "csharp"),
+            Map.entry("xml", "xml"),
+            Map.entry("json", "json"),
+            Map.entry("yaml", "yaml"),
+            Map.entry("yml", "yaml"),
+            Map.entry("md", "markdown"),
+            Map.entry("sh", "bash"),
+            Map.entry("html", "html"),
+            Map.entry("css", "css"));
 
     private static String detectLanguage(ValidatedObservation f) {
         String location = extractPrimaryLocation(f);
@@ -714,10 +673,7 @@ class DeliveryComposer {
     record PlacedNotes(List<DiffNote> notes, List<ValidatedObservation> unplaced) {}
 
     private static PlacedNotes collectDiffNotes(
-        List<ValidatedObservation> negatives,
-        Rendering rendering,
-        GroundingContext grounding
-    ) {
+            List<ValidatedObservation> negatives, Rendering rendering, GroundingContext grounding) {
         List<DiffNote> notes = new ArrayList<>();
         List<ValidatedObservation> unplaced = new ArrayList<>();
 
@@ -739,9 +695,8 @@ class DeliveryComposer {
             }
 
             ComposedNote composed = rendering.noteFor(f);
-            ComposedFeedbackUnit.ResolvedAnchor selected =
-                composed == null ||
-                composed.placement().kind() != ComposedFeedbackUnit.InContextPlacement.PlacementKind.DIFF
+            ComposedFeedbackUnit.ResolvedAnchor selected = composed == null
+                            || composed.placement().kind() != ComposedFeedbackUnit.InContextPlacement.PlacementKind.DIFF
                     ? null
                     : composed.placement().diffAnchor();
             int citationIndex = selected == null ? 0 : selected.citationIndex();
@@ -772,7 +727,7 @@ class DeliveryComposer {
             }
 
             Integer endLine =
-                selected == null ? integerAtLeast(citation.get("endLine"), startLine) : selected.endLine();
+                    selected == null ? integerAtLeast(citation.get("endLine"), startLine) : selected.endLine();
 
             String body = composeDiffNoteBody(f, rendering);
             if (body != null && !body.isBlank()) {
@@ -819,11 +774,10 @@ class DeliveryComposer {
     }
 
     record Rendering(
-        Map<String, String> whyBySlug,
-        Set<String> emittedWhy,
-        ComposedNotes notes,
-        @Nullable String lead
-    ) {
+            Map<String, String> whyBySlug,
+            Set<String> emittedWhy,
+            ComposedNotes notes,
+            @Nullable String lead) {
         @Nullable
         ComposedNote noteFor(ValidatedObservation f) {
             return notes.byObservation().get(f);
@@ -841,10 +795,8 @@ class DeliveryComposer {
             }
             Map<String, ComposedNote> unclaimed = new HashMap<>();
             for (ComposedFeedbackUnit unit : units) {
-                if (
-                    unit.channel() != FeedbackChannel.IN_CONTEXT ||
-                    unit.action() == ComposedFeedbackUnit.Action.WITHHOLD
-                ) {
+                if (unit.channel() != FeedbackChannel.IN_CONTEXT
+                        || unit.action() == ComposedFeedbackUnit.Action.WITHHOLD) {
                     continue;
                 }
                 ComposedNote note = ComposedNote.of(unit);
@@ -869,8 +821,8 @@ class DeliveryComposer {
             String title = clamp(sanitizeStudentText(unit.title()), ComposedFeedbackUnit.MAX_TITLE_LENGTH);
             String nextStep = clamp(sanitizeStudentText(unit.nextStep()), ComposedFeedbackUnit.MAX_NEXT_STEP_LENGTH);
             return title.isBlank() || nextStep.isBlank() || unit.placement() == null
-                ? null
-                : new ComposedNote(title, nextStep, unit.placement());
+                    ? null
+                    : new ComposedNote(title, nextStep, unit.placement());
         }
     }
 
@@ -927,10 +879,9 @@ class DeliveryComposer {
                 // New-side only: skip hunk headers, file markers, and deletions.
                 if (line.startsWith("@@") || line.startsWith("+++") || line.startsWith("---")) continue;
                 if (line.startsWith("+") || line.startsWith(" ")) {
-                    acc
-                        .computeIfAbsent(currentFile, ignored -> new StringBuilder())
-                        .append(normalizeForMatch(line.substring(1)))
-                        .append('\n');
+                    acc.computeIfAbsent(currentFile, ignored -> new StringBuilder())
+                            .append(normalizeForMatch(line.substring(1)))
+                            .append('\n');
                 }
             }
             Map<String, String> out = new HashMap<>(acc.size());

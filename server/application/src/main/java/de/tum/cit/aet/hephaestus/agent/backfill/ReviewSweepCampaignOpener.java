@@ -40,10 +40,8 @@ public class ReviewSweepCampaignOpener {
     private static final Logger log = LoggerFactory.getLogger(ReviewSweepCampaignOpener.class);
 
     /** A campaign is under way while it is in one of these; a second one must not start beside it. */
-    private static final List<ReviewBackfillStatus> UNDER_WAY = List.of(
-        ReviewBackfillStatus.RUNNING,
-        ReviewBackfillStatus.PAUSED
-    );
+    private static final List<ReviewBackfillStatus> UNDER_WAY =
+            List.of(ReviewBackfillStatus.RUNNING, ReviewBackfillStatus.PAUSED);
 
     private final ReviewSweepScheduleRepository scheduleRepository;
     private final ReviewBackfillRunRepository runRepository;
@@ -53,13 +51,12 @@ public class ReviewSweepCampaignOpener {
     private final ConfigAuditPort configAudit;
 
     public ReviewSweepCampaignOpener(
-        ReviewSweepScheduleRepository scheduleRepository,
-        ReviewBackfillRunRepository runRepository,
-        ReviewBackfillScopeRepository scopeRepository,
-        ReviewBackfillCostEstimator costEstimator,
-        ReviewBackfillProperties properties,
-        ConfigAuditPort configAudit
-    ) {
+            ReviewSweepScheduleRepository scheduleRepository,
+            ReviewBackfillRunRepository runRepository,
+            ReviewBackfillScopeRepository scopeRepository,
+            ReviewBackfillCostEstimator costEstimator,
+            ReviewBackfillProperties properties,
+            ConfigAuditPort configAudit) {
         this.scheduleRepository = scheduleRepository;
         this.runRepository = runRepository;
         this.scopeRepository = scopeRepository;
@@ -79,7 +76,8 @@ public class ReviewSweepCampaignOpener {
      */
     @Transactional
     public ReviewSweepOutcome openDueRun(UUID scheduleId, Instant now) {
-        ReviewSweepSchedule schedule = scheduleRepository.findByIdWithWorkspace(scheduleId).orElse(null);
+        ReviewSweepSchedule schedule =
+                scheduleRepository.findByIdWithWorkspace(scheduleId).orElse(null);
         if (schedule == null) {
             // Deleted between selection and action. Nothing to advance, nothing to open.
             return ReviewSweepOutcome.SKIPPED_DISABLED;
@@ -100,12 +98,10 @@ public class ReviewSweepCampaignOpener {
      */
     @Transactional
     public void deferAfterFailure(UUID scheduleId, Instant now) {
-        scheduleRepository
-            .findById(scheduleId)
-            .ifPresent(schedule -> {
-                schedule.advancePast(now);
-                scheduleRepository.save(schedule);
-            });
+        scheduleRepository.findById(scheduleId).ifPresent(schedule -> {
+            schedule.advancePast(now);
+            scheduleRepository.save(schedule);
+        });
     }
 
     private ReviewSweepOutcome open(ReviewSweepSchedule schedule, Instant now) {
@@ -113,10 +109,8 @@ public class ReviewSweepCampaignOpener {
             return ReviewSweepOutcome.SKIPPED_DISABLED;
         }
         Workspace workspace = schedule.getWorkspace();
-        if (
-            workspace.getStatus() != Workspace.WorkspaceStatus.ACTIVE ||
-            !Boolean.TRUE.equals(workspace.getFeatures().getPracticesEnabled())
-        ) {
+        if (workspace.getStatus() != Workspace.WorkspaceStatus.ACTIVE
+                || !Boolean.TRUE.equals(workspace.getFeatures().getPracticesEnabled())) {
             // The driver would pause such a run on its first tick anyway; not opening it keeps a
             // suspended workspace from accumulating one blocked, never-running campaign per night.
             return ReviewSweepOutcome.SKIPPED_WORKSPACE_UNAVAILABLE;
@@ -134,13 +128,12 @@ public class ReviewSweepCampaignOpener {
         }
         if (inScope > properties.maxArtifacts()) {
             log.warn(
-                "Review sweep refused an implausible scope: scheduleId={}, workspaceId={}, kind={}, artifacts={}, limit={}",
-                schedule.getId(),
-                workspace.getId(),
-                kind.value(),
-                inScope,
-                properties.maxArtifacts()
-            );
+                    "Review sweep refused an implausible scope: scheduleId={}, workspaceId={}, kind={}, artifacts={}, limit={}",
+                    schedule.getId(),
+                    workspace.getId(),
+                    kind.value(),
+                    inScope,
+                    properties.maxArtifacts());
             return ReviewSweepOutcome.SKIPPED_SCOPE_TOO_LARGE;
         }
 
@@ -160,31 +153,27 @@ public class ReviewSweepCampaignOpener {
         run.transitionTo(ReviewBackfillStatus.RUNNING, null);
         ReviewBackfillRun saved = runRepository.save(run);
 
-        configAudit.record(
-            ConfigAuditEntry.created(
+        configAudit.record(ConfigAuditEntry.created(
                 ConfigAuditEntityType.REVIEW_BACKFILL_RUN,
                 saved.getId(),
                 workspace.getId(),
-                ReviewBackfillSnapshot.of(saved)
-            )
-        );
+                ReviewBackfillSnapshot.of(saved)));
         log.info(
-            "Review sweep opened: scheduleId={}, runId={}, workspaceId={}, kind={}, from={}, to={}, artifacts={}, estimateUsd={}",
-            schedule.getId(),
-            saved.getId(),
-            workspace.getId(),
-            kind.value(),
-            fromAt,
-            now,
-            inScope,
-            estimate
-        );
+                "Review sweep opened: scheduleId={}, runId={}, workspaceId={}, kind={}, from={}, to={}, artifacts={}, estimateUsd={}",
+                schedule.getId(),
+                saved.getId(),
+                workspace.getId(),
+                kind.value(),
+                fromAt,
+                now,
+                inScope,
+                estimate);
         return ReviewSweepOutcome.OPENED;
     }
 
     private long countScope(Long workspaceId, ArtifactKind kind, Instant fromAt, Instant toAt) {
         return ArtifactKinds.PULL_REQUEST.equals(kind)
-            ? scopeRepository.countPullRequests(workspaceId, fromAt, toAt)
-            : scopeRepository.countIssues(workspaceId, fromAt, toAt);
+                ? scopeRepository.countPullRequests(workspaceId, fromAt, toAt)
+                : scopeRepository.countIssues(workspaceId, fromAt, toAt);
     }
 }

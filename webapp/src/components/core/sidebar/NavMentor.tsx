@@ -1,5 +1,6 @@
 import { Link, useMatchRoute } from "@tanstack/react-router";
 import { ChevronRight, Sparkles } from "lucide-react";
+
 import { MentorIcon } from "@/components/mentor/MentorIcon";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -20,7 +21,7 @@ export function NavMentor({ workspaceSlug }: { workspaceSlug: string }) {
 			<SidebarMenu>
 				<SidebarMenuItem>
 					<SidebarMenuButton
-						tooltip="Heph - AI mentor"
+						tooltip="Heph, AI mentor"
 						isActive={onMentor}
 						render={
 							<Link

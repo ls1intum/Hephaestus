@@ -1,9 +1,7 @@
 name: Verify Changesets
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-    branches: [main]
+  workflow_call:
 
 permissions:
   contents: read
@@ -12,21 +10,23 @@ jobs:
   verify-changesets:
     name: "Verify changesets"
     runs-on: ubuntu-latest
-    # Bots (renovate, dependabot) can't author changesets; maintainers add one
-    # when a dependency bump is user-facing.
-    if: ${{ !github.event.pull_request.draft && github.event.pull_request.user.type != 'Bot' }}
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
 
-      - name: Setup pnpm + Node.js
-        uses: ./.github/actions/setup-pnpm-node
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          install: "hardened"
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Test changeset and version-sync policies
+        run: pnpm run check:changesets
 
-      - name: Check for a changeset
+      - name: Check release-note presence
+        if: ${{ !github.event.pull_request.draft && github.event.pull_request.user.type != 'Bot' }}
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
@@ -44,6 +44,19 @@ jobs:
           mapfile -t changesets_added < <(git diff --diff-filter=A --name-only "$BASE_SHA"...HEAD -- '.changeset/*.md' | grep -v 'README\.md' || true)
           mapfile -t changesets_changed < <(git diff --diff-filter=AM --name-only "$BASE_SHA"...HEAD -- '.changeset/*.md' | grep -v 'README\.md' || true)
           mapfile -t changesets_removed < <(git diff --diff-filter=DR --name-only "$BASE_SHA"...HEAD -- '.changeset/*.md' | grep -v 'README\.md' || true)
+          mapfile -t migration_changed < <(git diff --diff-filter=AM --name-only "$BASE_SHA"...HEAD -- '.migration/*.md' | grep -v 'README\.md' || true)
+          mapfile -t migration_removed < <(git diff --diff-filter=DR --name-only "$BASE_SHA"...HEAD -- '.migration/*.md' | grep -v 'README\.md' || true)
+
+          if git diff --quiet "$BASE_SHA"...HEAD -- MIGRATION.md; then :; else
+            echo "::error::Do not edit MIGRATION.md in a feature PR; add a .migration/<changeset-slug>.md fragment instead."
+            exit 1
+          fi
+
+          if [ "${#migration_removed[@]}" -gt 0 ]; then
+            echo "::error::Pending migration fragments may be edited, but not deleted or renamed:"
+            printf '%s\n' "${migration_removed[@]}"
+            exit 1
+          fi
 
           if [ "${#changesets_removed[@]}" -gt 0 ]; then
             echo "::error::Pending changesets may be edited or converted to explained empty changesets, but not deleted or renamed:"
@@ -55,9 +68,18 @@ jobs:
             pnpm changeset status --since "$BASE_SHA" --output /tmp/changeset-status.json
             node scripts/verify-changesets.ts /tmp/changeset-status.json "${changesets_changed[@]}"
           fi
+          if [ "${#migration_changed[@]}" -gt 0 ]; then
+            # No --since here: a fragment may pair with a pending changeset merged by an earlier
+            # PR, and --since filters those out of the status output. Without --since the
+            # changesets CLI resolves its configured baseBranch by the exact ref name `main`,
+            # which a detached PR merge-ref checkout does not have — give it one.
+            git rev-parse --verify --quiet main >/dev/null || git branch main origin/main
+            pnpm changeset status --output /tmp/pending-changeset-status.json
+            node scripts/verify-changesets.ts /tmp/pending-changeset-status.json --migration "${migration_changed[@]}"
+          fi
 
           if git diff --name-only "$BASE_SHA"...HEAD -- server/application/src/main/resources/db/changelog/ | grep -q .; then
-            echo "::notice::This PR contains Liquibase changesets — the release notes will flag the migration automatically. If the operator must act, say so in your changeset and update MIGRATION.md."
+            echo "::notice::This PR contains Liquibase changesets — the release notes will flag the migration automatically. If the operator must act, add **Operators:** to its changeset and a matching .migration fragment."
           fi
 
           if [ -n "$shipped_changed" ] && [ "${#changesets_added[@]}" -eq 0 ]; then
