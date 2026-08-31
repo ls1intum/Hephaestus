@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.core.runtime.hub;
 
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwt;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtHandshakeInterceptor;
+import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerSessionJwt;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.CancelJob;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.CapacityReport;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.ForceReconnect;
@@ -67,14 +68,17 @@ public class WorkerControlWebSocketHandler extends TextWebSocketHandler {
         WebSocketSession transport = new ConcurrentWebSocketSessionDecorator(
                 rawTransport, (int) HubProperties.SEND_TIME_LIMIT.toMillis(), HubProperties.SEND_BUFFER_SIZE_BYTES);
         String sessionId = UUID.randomUUID().toString();
-        WorkerSession session =
-                new WorkerSession(jwt.workerId(), sessionId, jwt.jti(), jwt.expiresAt(), transport, codec);
+        if (!(jwt instanceof WorkerSessionJwt workerJwt)) {
+            throw new IllegalStateException("job-scoped JWT cannot open a worker control session");
+        }
+        String workerId = workerJwt.workerId();
+        WorkerSession session = new WorkerSession(workerId, sessionId, jwt.jti(), jwt.expiresAt(), transport, codec);
         rawTransport.getAttributes().put(ATTR_WORKER_SESSION, session);
         // Close half-open sessions that authenticate but never send WorkerHello.
         ScheduledFuture<?> helloDeadline = helloTimeoutScheduler.schedule(
                 () -> {
                     if (!rawTransport.isOpen()) return;
-                    log.warn("WorkerHello timeout for workerId={} sessionId={}; closing.", jwt.workerId(), sessionId);
+                    log.warn("WorkerHello timeout for workerId={} sessionId={}; closing.", workerId, sessionId);
                     meterRegistry.counter("worker.hub.hello.timeout").increment();
                     close(rawTransport, CloseStatus.SESSION_NOT_RELIABLE);
                 },
@@ -83,7 +87,7 @@ public class WorkerControlWebSocketHandler extends TextWebSocketHandler {
         session.armHelloDeadline(helloDeadline);
         log.info(
                 "WSS connection opened: workerId={}, sessionId={}, jwtExpiresAt={}",
-                jwt.workerId(),
+                workerId,
                 sessionId,
                 jwt.expiresAt());
     }

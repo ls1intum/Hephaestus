@@ -8,7 +8,11 @@ import com.auth0.jwt.interfaces.JWTVerifier;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 
 public class JavaJwtWorkerJwtVerifier implements WorkerJwtVerifier {
 
@@ -63,8 +67,7 @@ public class JavaJwtWorkerJwtVerifier implements WorkerJwtVerifier {
         } catch (JWTVerificationException e) {
             throw new WorkerJwtInvalidException("decode failed: " + e.getClass().getSimpleName(), "decode", e);
         }
-        // Allowlist alg before key dispatch — guards against future verifier refactors that
-        // could be steered into alg-confusion (RFC 8725 §3.1).
+        // Reject the untrusted header algorithm before selecting a verifier (RFC 8725 §3.1).
         if (!EXPECTED_ALG.equals(decoded.getAlgorithm())) {
             throw new WorkerJwtInvalidException("alg not allowed: " + decoded.getAlgorithm(), "alg");
         }
@@ -82,21 +85,84 @@ public class JavaJwtWorkerJwtVerifier implements WorkerJwtVerifier {
         } catch (JWTVerificationException e) {
             throw new WorkerJwtInvalidException("verify failed: " + e.getClass().getSimpleName(), "sig", e);
         }
+        String tokenType = verified.getType();
+        if (!WorkerJwtIssuer.WORKER_TOKEN_TYPE.equals(tokenType) && !WorkerJwtIssuer.JOB_TOKEN_TYPE.equals(tokenType)) {
+            throw new WorkerJwtInvalidException("token type not allowed", "typ");
+        }
         String workerId = verified.getSubject();
         String jti = verified.getId();
+        Instant issuedAt = verified.getIssuedAtAsInstant();
         Instant expiresAt = verified.getExpiresAtAsInstant();
-        if (workerId == null || workerId.isBlank()) {
-            throw new WorkerJwtInvalidException("missing sub claim", "claim");
-        }
         if (jti == null || jti.isBlank()) {
             throw new WorkerJwtInvalidException("missing jti claim", "claim");
         }
         if (expiresAt == null) {
             throw new WorkerJwtInvalidException("missing exp claim", "claim");
         }
+        if (issuedAt == null) {
+            throw new WorkerJwtInvalidException("missing iat claim", "claim");
+        }
         if (denylist.isRevoked(jti)) {
             throw new WorkerJwtInvalidException("token revoked", "revoked");
         }
-        return new WorkerJwt(workerId, jti, expiresAt);
+        UUID jobId = uuidClaim(verified, "job_id");
+        if (WorkerJwtIssuer.WORKER_TOKEN_TYPE.equals(tokenType)) {
+            if (workerId == null || workerId.isBlank()) {
+                throw new WorkerJwtInvalidException("missing sub claim", "claim");
+            }
+            if (jobId != null || !scopeClaim(verified).isEmpty() || longClaim(verified, "workspace_id") != null) {
+                throw new WorkerJwtInvalidException("worker token contains job claims", "claim");
+            }
+            return new WorkerSessionJwt(workerId, jti, issuedAt, expiresAt);
+        }
+        if (jobId == null) {
+            throw new WorkerJwtInvalidException("missing job_id claim", "claim");
+        }
+        if (workerId != null) {
+            throw new WorkerJwtInvalidException("job token contains sub claim", "claim");
+        }
+        Long workspaceId = longClaim(verified, "workspace_id");
+        Integer attempt = intClaim(verified, "attempt");
+        if (workspaceId == null || attempt == null || attempt < 0) {
+            throw new WorkerJwtInvalidException("missing or invalid job binding claim", "claim");
+        }
+        return new JobJwt(jobId, workspaceId, attempt, scopeClaim(verified), jti, issuedAt, expiresAt);
+    }
+
+    private static @Nullable UUID uuidClaim(DecodedJWT jwt, String name) {
+        try {
+            String value = jwt.getClaim(name).asString();
+            if (value == null) return null;
+            return UUID.fromString(value);
+        } catch (RuntimeException e) {
+            throw new WorkerJwtInvalidException("invalid " + name + " claim", "claim", e);
+        }
+    }
+
+    private static @Nullable Long longClaim(DecodedJWT jwt, String name) {
+        try {
+            Long value = jwt.getClaim(name).asLong();
+            if (value == null || value <= 0) return null;
+            return value;
+        } catch (RuntimeException e) {
+            throw new WorkerJwtInvalidException("invalid " + name + " claim", "claim", e);
+        }
+    }
+
+    private static @Nullable Integer intClaim(DecodedJWT jwt, String name) {
+        try {
+            return jwt.getClaim(name).asInt();
+        } catch (RuntimeException e) {
+            throw new WorkerJwtInvalidException("invalid " + name + " claim", "claim", e);
+        }
+    }
+
+    private static Set<String> scopeClaim(DecodedJWT jwt) {
+        try {
+            List<String> values = jwt.getClaim("scope").asList(String.class);
+            return values == null ? Set.of() : Set.copyOf(values);
+        } catch (RuntimeException e) {
+            throw new WorkerJwtInvalidException("invalid scope claim", "claim", e);
+        }
     }
 }

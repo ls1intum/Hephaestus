@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.proxy;
 
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
+import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtVerifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -14,7 +15,8 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * Separate security filter chain for the internal LLM proxy endpoints, ordered ahead of the main JWT
- * chain so these requests authenticate with proxy-scoped bearer tokens instead of JWTs.
+ * chain so these requests authenticate with proxy-scoped bearer credentials instead of the
+ * application user-authentication chain.
  *
  * <p>Gated on the worker/sandbox capability rather than the practice-job feature flag, because
  * disabling practice reviews must not break mentor turns.
@@ -28,6 +30,7 @@ class LlmProxySecurityConfig {
     SecurityFilterChain llmProxyFilterChain(
             HttpSecurity http,
             AgentJobRepository agentJobRepository,
+            WorkerJwtVerifier jwtVerifier,
             MentorProxyCredentialRegistry mentorRegistry,
             ObjectMapper objectMapper)
             throws Exception {
@@ -36,7 +39,7 @@ class LlmProxySecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
                 .addFilterBefore(
-                        new JobTokenAuthenticationFilter(agentJobRepository, mentorRegistry, objectMapper),
+                        new JobTokenAuthenticationFilter(agentJobRepository, jwtVerifier, mentorRegistry, objectMapper),
                         UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

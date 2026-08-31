@@ -15,6 +15,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Stream;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,12 +48,84 @@ class WorkerJwtTest extends BaseUnitTest {
     @Test
     void issuedTokenVerifiesWithExpectedClaims() {
         WorkerJwtIssuer.IssuedWorkerJwt issued = issuer.issue("worker-1");
-        WorkerJwt jwt = verifier.verify(issued.token());
+        WorkerSessionJwt jwt = (WorkerSessionJwt) verifier.verify(issued.token());
 
         assertThat(jwt.workerId()).isEqualTo("worker-1");
         assertThat(jwt.jti()).isEqualTo(issued.jti());
         assertThat(jwt.expiresAt())
                 .isCloseTo(issued.expiresAt(), Assertions.within(1, java.time.temporal.ChronoUnit.SECONDS));
+    }
+
+    @Test
+    void issuedJobTokenVerifiesWithRequiredClaims() {
+        UUID jobId = UUID.randomUUID();
+
+        JobJwt jwt = (JobJwt) verifier.verify(issuer.issueForJob(jobId, 42L, 0, Duration.ofMinutes(5)));
+
+        assertThat(jwt.jobId()).isEqualTo(jobId);
+        assertThat(jwt.workspaceId()).isEqualTo(42L);
+        assertThat(jwt.scopes()).containsExactly("llm_proxy");
+        assertThat(jwt.issuedAt()).isNotNull();
+        assertThat(jwt.jti()).isNotBlank();
+    }
+
+    @Test
+    void expiredJobTokenRejected() {
+        WorkerSigningKey active = keyRing.active();
+        Instant past = Instant.now().minusSeconds(120);
+        String token = JWT.create()
+                .withHeader(Map.of("kid", active.kid(), "typ", "job+jwt"))
+                .withIssuer("hephaestus-test")
+                .withAudience("hephaestus-worker")
+                .withClaim("job_id", UUID.randomUUID().toString())
+                .withClaim("workspace_id", 42L)
+                .withClaim("attempt", 0)
+                .withClaim("scope", List.of("llm_proxy"))
+                .withJWTId(UUID.randomUUID().toString())
+                .withIssuedAt(past)
+                .withExpiresAt(past.plusSeconds(30))
+                .sign(Algorithm.RSA256(active.publicKey(), active.privateKey()));
+
+        assertThatThrownBy(() -> verifier.verify(token)).isInstanceOf(WorkerJwtInvalidException.class);
+    }
+
+    @Test
+    void legacyTokenWithoutExplicitTypeRejected() {
+        // Tokens minted before the claim-profile migration carry the library default "JWT" header
+        // type; the one-way cut rejects them even when the signature and claims would verify.
+        WorkerSigningKey active = keyRing.active();
+        String token = JWT.create()
+                .withKeyId(active.kid())
+                .withIssuer("hephaestus-test")
+                .withAudience("hephaestus-worker")
+                .withSubject("worker-1")
+                .withJWTId(UUID.randomUUID().toString())
+                .withIssuedAt(Instant.now())
+                .withExpiresAt(Instant.now().plusSeconds(60))
+                .sign(Algorithm.RSA256(active.publicKey(), active.privateKey()));
+
+        assertThatThrownBy(() -> verifier.verify(token))
+                .isInstanceOf(WorkerJwtInvalidException.class)
+                .hasMessageContaining("token type");
+    }
+
+    @Test
+    void workerSessionTokenCarryingJobClaimsRejected() {
+        WorkerSigningKey active = keyRing.active();
+        String token = JWT.create()
+                .withHeader(Map.of("kid", active.kid(), "typ", "worker-session+jwt"))
+                .withIssuer("hephaestus-test")
+                .withAudience("hephaestus-worker")
+                .withSubject("worker-1")
+                .withClaim("job_id", UUID.randomUUID().toString())
+                .withJWTId(UUID.randomUUID().toString())
+                .withIssuedAt(Instant.now())
+                .withExpiresAt(Instant.now().plusSeconds(60))
+                .sign(Algorithm.RSA256(active.publicKey(), active.privateKey()));
+
+        assertThatThrownBy(() -> verifier.verify(token))
+                .isInstanceOf(WorkerJwtInvalidException.class)
+                .hasMessageContaining("job claims");
     }
 
     @Test

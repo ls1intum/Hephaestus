@@ -12,14 +12,7 @@ import org.springframework.http.server.ServerHttpResponse;
 import org.springframework.web.socket.WebSocketHandler;
 import org.springframework.web.socket.server.HandshakeInterceptor;
 
-/**
- * Validates {@code Authorization: Bearer <jwt>} on the WSS upgrade request, stuffs the verified
- * claims into the handshake-attributes map so {@link
- * de.tum.cit.aet.hephaestus.core.runtime.hub.WorkerControlWebSocketHandler} can read them out.
- *
- * <p>Maps every verifier failure to a single 401. Detailed error class name goes to the WARN
- * log; clients see only the status code.
- */
+/** Authenticates worker control-channel WebSocket upgrades. */
 public class WorkerJwtHandshakeInterceptor implements HandshakeInterceptor {
 
     private static final Logger log = LoggerFactory.getLogger(WorkerJwtHandshakeInterceptor.class);
@@ -45,6 +38,11 @@ public class WorkerJwtHandshakeInterceptor implements HandshakeInterceptor {
         }
         try {
             WorkerJwt jwt = verifier.verify(token);
+            if (!(jwt instanceof WorkerSessionJwt)) {
+                log.warn("worker handshake rejected: token is not scoped to a worker session");
+                reject401(response);
+                return false;
+            }
             attributes.put(ATTR_JWT, jwt);
             return true;
         } catch (WorkerJwtInvalidException e) {
@@ -64,9 +62,7 @@ public class WorkerJwtHandshakeInterceptor implements HandshakeInterceptor {
             ServerHttpRequest request,
             ServerHttpResponse response,
             WebSocketHandler wsHandler,
-            @Nullable Exception exception) {
-        // no-op; handler takes over after upgrade
-    }
+            @Nullable Exception exception) {}
 
     private static @Nullable String extractBearer(@Nullable List<String> headers) {
         if (headers == null || headers.isEmpty()) {

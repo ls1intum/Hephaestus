@@ -44,6 +44,7 @@ import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetBlockReason;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetDecision;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetService;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
+import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtIssuer;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceManifest;
 import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessDecision;
 import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessReport;
@@ -111,6 +112,9 @@ class AgentJobExecutorTest extends BaseUnitTest {
     private PracticePiAdapter practiceAgent;
 
     @Mock
+    private WorkerJwtIssuer workerJwtIssuer;
+
+    @Mock
     private SandboxManager sandboxManager;
 
     @Mock
@@ -148,6 +152,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                 bindingRepository,
                 handlerRegistry,
                 practiceAgent,
+                workerJwtIssuer,
                 sandboxManager,
                 sandboxExecutor,
                 transactionTemplate,
@@ -215,6 +220,9 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
         lenient().when(transactionTemplate.getTransactionManager()).thenReturn(transactionManager);
         lenient().when(transactionManager.getTransaction(any())).thenReturn(mock(TransactionStatus.class));
+        lenient()
+                .when(workerJwtIssuer.issueForJob(any(), anyLong(), anyInt(), any()))
+                .thenReturn("job-jwt");
 
         lenient()
                 .doAnswer(inv -> {
@@ -275,6 +283,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                     bindingRepository,
                     handlerRegistry,
                     practiceAgent,
+                    workerJwtIssuer,
                     sandboxManager,
                     sandboxExecutor,
                     transactionTemplate,
@@ -992,6 +1001,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                     bindingRepository,
                     handlerRegistry,
                     practiceAgent,
+                    workerJwtIssuer,
                     sandboxManager,
                     sandboxExecutor,
                     transactionTemplate,
@@ -1054,6 +1064,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                     bindingRepository,
                     handlerRegistry,
                     practiceAgent,
+                    workerJwtIssuer,
                     sandboxManager,
                     sandboxExecutor,
                     transactionTemplate,
@@ -1098,6 +1109,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                     bindingRepository,
                     handlerRegistry,
                     practiceAgent,
+                    workerJwtIssuer,
                     sandboxManager,
                     sandboxExecutor,
                     transactionTemplate,
@@ -1526,15 +1538,15 @@ class AgentJobExecutorTest extends BaseUnitTest {
     class LlmProxyRouting {
 
         @Test
-        @DisplayName(
-                "the practice request carries the snapshot's resolved behaviour + the job's own token — ONE credential path")
-        void requestCarriesSnapshotBehaviourAndJobToken() {
+        @DisplayName("the practice request carries resolved routing and an attempt-scoped job JWT")
+        void passesResolvedRoutingAndJobJwtToSandboxRequest() {
             executor = new AgentJobExecutor(
                     AGENT_PROPS,
                     jobRepository,
                     bindingRepository,
                     handlerRegistry,
                     practiceAgent,
+                    workerJwtIssuer,
                     sandboxManager,
                     sandboxExecutor,
                     transactionTemplate,
@@ -1572,7 +1584,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
             assertThat(request.apiProtocol()).isEqualTo("anthropic-messages");
             assertThat(request.upstreamModelId()).isEqualTo("claude-sonnet-4");
-            assertThat(request.jobToken()).isEqualTo("test-token");
+            assertThat(request.jobToken()).isEqualTo("job-jwt");
         }
     }
 
@@ -1600,6 +1612,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                     bindingRepository,
                     handlerRegistry,
                     practiceAgent,
+                    workerJwtIssuer,
                     sandboxManager,
                     sandboxExecutor,
                     transactionTemplate,
@@ -1649,6 +1662,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                     bindingRepository,
                     handlerRegistry,
                     practiceAgent,
+                    workerJwtIssuer,
                     sandboxManager,
                     sandboxExecutor,
                     transactionTemplate,
@@ -1710,6 +1724,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                         bindingRepository,
                         handlerRegistry,
                         practiceAgent,
+                        workerJwtIssuer,
                         sandboxManager,
                         realPool,
                         transactionTemplate,
@@ -1744,6 +1759,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                     bindingRepository,
                     handlerRegistry,
                     practiceAgent,
+                    workerJwtIssuer,
                     sandboxManager,
                     sandboxExecutor,
                     transactionTemplate,
@@ -1785,6 +1801,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                     bindingRepository,
                     handlerRegistry,
                     practiceAgent,
+                    workerJwtIssuer,
                     sandboxManager,
                     sandboxExecutor,
                     transactionTemplate,
@@ -1843,6 +1860,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                     bindingRepository,
                     handlerRegistry,
                     practiceAgent,
+                    workerJwtIssuer,
                     sandboxManager,
                     sandboxExecutor,
                     transactionTemplate,
@@ -1880,6 +1898,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                     bindingRepository,
                     handlerRegistry,
                     practiceAgent,
+                    workerJwtIssuer,
                     sandboxManager,
                     sandboxExecutor,
                     transactionTemplate,
