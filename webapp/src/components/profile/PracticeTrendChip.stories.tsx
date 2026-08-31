@@ -1,5 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
+import { expect, userEvent } from "storybook/test";
 import type { TrendSupport } from "@/api/types.gen";
+import { settledPopup } from "@/test/overlay";
 import { PracticeTrendChip } from "./PracticeTrendChip";
 
 const wellSupported: TrendSupport = {
@@ -20,6 +22,7 @@ const none: TrendSupport = {
 };
 
 const meta = {
+	title: "Profile/Practice trend chip",
 	component: PracticeTrendChip,
 	parameters: { layout: "centered" },
 	tags: ["autodocs"],
@@ -46,5 +49,14 @@ export const GroupScope: Story = {
 		direction: "IMPROVING",
 		scope: "group",
 		support: { ...wellSupported, comparablePractices: 3, eligiblePractices: 5 },
+	},
+	play: async ({ canvas }) => {
+		// The tooltip is the only reason this chip is focusable, and it is the one place that says a
+		// group trend pools its practices rather than comparing two stretches. It portals, so it is
+		// read off the document and only once the popup has settled.
+		await userEvent.hover(canvas.getByRole("button"));
+		const tooltip = await settledPopup();
+		await expect(tooltip).toHaveTextContent("Across 8 pieces of reviewed work in this group.");
+		await expect(tooltip).not.toHaveTextContent("Compared");
 	},
 };

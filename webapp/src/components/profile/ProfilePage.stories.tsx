@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { endOfISOWeek, formatISO, startOfISOWeek } from "date-fns";
 import { fn } from "storybook/test";
 
+import type { PracticeGroup, PracticeGroupStanding, PracticeStanding } from "@/api/types.gen";
 import { STORY_NOW } from "@/components/common/story-clock";
 import { withStandardPage } from "@/stories/decorators";
 import { expectNoPageOverflow } from "@/test/reflow";
@@ -29,9 +30,58 @@ const baseMonitorArgs = {
 	onActivityMonitorFiltersChange: fn(),
 };
 
+const practiceGroup: PracticeGroup = {
+	id: 1,
+	slug: "review-ready-work",
+	name: "Packaging work for review",
+	description: "Make changes easy to review before asking for feedback.",
+	displayOrder: 0,
+	visibleInPracticeDashboards: true,
+	autonomy: { effective: "AUTOMATIC", inherited: true, source: "WORKSPACE" },
+	icon: "Package",
+	color: "blue",
+	createdAt: new Date("2026-01-01T00:00:00Z"),
+};
+
+const practiceGroupStanding: PracticeGroupStanding = {
+	groupSlug: practiceGroup.slug,
+	groupName: practiceGroup.name,
+	standing: "MIXED",
+	guidance: "Keep changes focused on one concern.",
+	observations: [],
+	sources: [{ workKind: "scm.pull_request", count: 4 }],
+};
+
+const groupPractices: PracticeStanding[] = [
+	{
+		slug: "small-changes",
+		name: "Keep changes focused",
+		standing: "STRENGTH",
+		strengths: [],
+		toWorkOn: [],
+	},
+	{
+		slug: "explain-why",
+		name: "Explain why",
+		standing: "DEVELOPING",
+		strengths: [],
+		toWorkOn: [],
+	},
+];
+
+/** The section a developer sees on their own profile, above the activity monitor. */
+const practiceGroupStandings = {
+	groups: [practiceGroup],
+	standings: { [practiceGroup.slug]: practiceGroupStanding },
+	practicesByGroup: { [practiceGroup.slug]: groupPractices },
+	isLoading: false,
+	onOpenDetails: fn(),
+};
+
 export const Default: Story = {
 	args: {
 		...baseMonitorArgs,
+		practiceGroupStandings,
 		isLoading: false,
 		error: false,
 		username: "johndoe",

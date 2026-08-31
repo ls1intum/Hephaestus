@@ -1,44 +1,5 @@
-import {
-	CircleDashedIcon,
-	CircleHelpIcon,
-	type LucideIcon,
-	TrendingDownIcon,
-	TrendingUpIcon,
-} from "lucide-react";
-import type { PracticeTrend, TrendSupport } from "@/api/types.gen";
-
-export type TrendDirection = PracticeTrend["direction"];
-export type TrendTone = "positive" | "negative" | "neutral" | "muted";
-
-interface TrendPresentation {
-	label: string;
-	Icon: LucideIcon;
-	tone: TrendTone;
-}
-
-/** Exhaustive developer-facing vocabulary for the opportunity-indexed direction. */
-export const PRACTICE_TREND_PRESENTATION = {
-	IMPROVING: {
-		label: "More positive recently",
-		Icon: TrendingUpIcon,
-		tone: "positive",
-	},
-	DECLINING: {
-		label: "More difficulties recently",
-		Icon: TrendingDownIcon,
-		tone: "negative",
-	},
-	UNCERTAIN: {
-		label: "Direction unclear",
-		Icon: CircleHelpIcon,
-		tone: "neutral",
-	},
-	INSUFFICIENT_EVIDENCE: {
-		label: "Not enough to compare yet",
-		Icon: CircleDashedIcon,
-		tone: "muted",
-	},
-} as const satisfies Record<TrendDirection, TrendPresentation>;
+import type { TrendSupport } from "@/api/types.gen";
+import type { TrendDirection } from "@/components/practice-vocabulary/practice-trend-defs";
 
 /** The counted unit is a *piece of reviewed work* — `practice-feedback-language.md` names it. */
 function reviewedWork(count: number): string {
