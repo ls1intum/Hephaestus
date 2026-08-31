@@ -2,10 +2,7 @@ import { PulseIcon } from "@primer/octicons-react";
 import {
 	ArrowLeftIcon,
 	ChevronDownIcon,
-	CircleAlertIcon,
-	CircleCheckIcon,
 	CircleDashedIcon,
-	CircleMinusIcon,
 	InfoIcon,
 	Settings2Icon,
 	XIcon,
@@ -23,7 +20,11 @@ import { getGroupVisual } from "@/components/admin/practice-catalog/group-visual
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { PRACTICE_GROUP_STANDING_DEFS } from "@/components/practice-vocabulary/practice-group-standing-defs";
 import { SEVERITY_DEFS, type Severity } from "@/components/practice-vocabulary/severity-defs";
-import { statusValues } from "@/components/practice-vocabulary/status-def";
+import {
+	type StatusDef,
+	statusToneClass,
+	statusValues,
+} from "@/components/practice-vocabulary/status-def";
 import { StatusBadge } from "@/components/practice-vocabulary/StatusBadge";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Button } from "@/components/ui/button";
@@ -48,51 +49,22 @@ import { ReviewRunTimeline } from "./ReviewRunTimeline";
 type PracticeStandingKey = NonNullable<PracticeStanding["standing"]> | "UNMEASURED";
 
 /**
- * The node's glyph and colour. Its **words** come from the standing registry, so a practice node and
- * the group badge above it can never name the same value differently — they used to disagree on
- * three of five. `UNMEASURED` is the one entry the registry cannot own: it is not a standing the
- * server reports but the client's word for a practice it sent no standing for at all.
+ * A practice node reads its glyph, its words and its colour off the standing registry, so it cannot
+ * drift from the group badge above it — a hand-kept copy here had already lost the slash that tells
+ * `NO_OPPORTUNITY` apart from `NOT_OBSERVED`, leaving the two identical on screen.
+ *
+ * `UNMEASURED` is the one entry the registry cannot own: it is not a standing the server reports but
+ * the client's word for a practice it sent no standing for at all.
  */
-const STANDING_NODE: Record<
-	PracticeStandingKey,
-	{ Icon: typeof CircleCheckIcon; circleClass: string; textClass: string }
-> = {
-	DEVELOPING: {
-		Icon: CircleAlertIcon,
-		circleClass: "border-destructive/50 text-destructive",
-		textClass: "text-destructive",
-	},
-	MIXED: {
-		Icon: CircleMinusIcon,
-		circleClass: "border-warning/60 text-warning",
-		textClass: "text-warning",
-	},
-	STRENGTH: {
-		Icon: CircleCheckIcon,
-		circleClass: "border-success/60 text-success",
-		textClass: "text-success",
-	},
-	NOT_OBSERVED: {
-		Icon: CircleDashedIcon,
-		circleClass: "border-border text-muted-foreground",
-		textClass: "text-muted-foreground",
-	},
-	NO_OPPORTUNITY: {
-		Icon: CircleDashedIcon,
-		circleClass: "border-border text-muted-foreground",
-		textClass: "text-muted-foreground",
-	},
-	UNMEASURED: {
-		Icon: CircleDashedIcon,
-		circleClass: "border-border text-muted-foreground",
-		textClass: "text-muted-foreground",
-	},
-};
+const UNMEASURED_NODE = {
+	label: "Not measured yet",
+	icon: CircleDashedIcon,
+	badgeVariant: "outline",
+	description: "No standing was reported for this practice.",
+} satisfies StatusDef;
 
-function standingNodeLabel(standing: PracticeStandingKey): string {
-	return standing === "UNMEASURED"
-		? "Not measured yet"
-		: PRACTICE_GROUP_STANDING_DEFS[standing].label;
+function standingNode(standing: PracticeStandingKey): StatusDef {
+	return standing === "UNMEASURED" ? UNMEASURED_NODE : PRACTICE_GROUP_STANDING_DEFS[standing];
 }
 
 export type ReviewRunSource = string;
@@ -352,7 +324,9 @@ export function PracticeGroupDetailPage({
 					<ul className="flex flex-col gap-3">
 						{practices.map((practice) => {
 							const practiceStanding = practiceStandings?.[practice.slug] ?? "UNMEASURED";
-							const node = STANDING_NODE[practiceStanding];
+							const node = standingNode(practiceStanding);
+							const NodeIcon = node.icon;
+							const nodeTone = statusToneClass(node.badgeVariant);
 							const practiceTrend = practiceTrends?.[practice.slug];
 							const isSelected = practice.slug === selectedPracticeSlug;
 							const isInfoOpen = practice.slug === openPracticeInfoSlug;
@@ -380,24 +354,24 @@ export function PracticeGroupDetailPage({
 										<div className="grid min-h-16 grid-cols-[auto_1fr_auto] items-start gap-3 p-4">
 											<span
 												className={cn(
-													"mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full border bg-background",
-													node.circleClass,
+													"mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full border border-current/40 bg-background",
+													nodeTone,
 												)}
 											>
-												<node.Icon className="size-4" aria-hidden />
+												<NodeIcon className="size-4" aria-hidden />
 											</span>
 											<div className="flex min-w-0 flex-col gap-1">
 												<span className="text-pretty text-sm font-medium leading-5">
 													{practice.name}
 												</span>
 												<div className="relative z-20 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm leading-5">
-													<span className={node.textClass}>
-														{standingNodeLabel(practiceStanding)}
-													</span>
+													<span className={nodeTone}>{node.label}</span>
 													{practiceTrend && (
 														<PracticeTrendChip
 															direction={practiceTrend.direction}
 															support={practiceTrend.support}
+															// Above this row's own z-10 overlay link.
+															className="relative z-20"
 														/>
 													)}
 												</div>

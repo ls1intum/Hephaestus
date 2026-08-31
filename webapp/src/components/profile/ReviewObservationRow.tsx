@@ -12,6 +12,7 @@ import {
 import type { PracticeGroupReviewObservation } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { SEVERITY_DEFS } from "@/components/practice-vocabulary/severity-defs";
+import { StatusBadge } from "@/components/practice-vocabulary/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -104,9 +105,7 @@ export function ReviewObservationRow({
 					</div>
 					<div className="flex flex-wrap items-center gap-2 sm:justify-end">
 						{observation.assessment === "BAD" && observation.severity && (
-							<span className="text-xs text-muted-foreground">
-								{SEVERITY_DEFS[observation.severity].label}
-							</span>
+							<StatusBadge def={SEVERITY_DEFS[observation.severity]} />
 						)}
 						<span
 							className={cn("inline-flex items-center gap-1 text-xs font-medium", status.className)}

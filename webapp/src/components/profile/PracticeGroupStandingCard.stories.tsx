@@ -38,6 +38,7 @@ const practices: PracticeStanding[] = [
 const meta = {
 	title: "Profile/PracticeGroupStandingCard",
 	component: PracticeGroupStandingCard,
+	tags: ["autodocs"],
 	args: {
 		groups: [group],
 		standings: { [group.slug]: standing },

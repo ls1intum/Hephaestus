@@ -27,6 +27,7 @@ const standing: PracticeGroupStanding = {
 const meta = {
 	title: "Profile/PracticeGroupDetailPage",
 	component: PracticeGroupDetailPage,
+	tags: ["autodocs"],
 	args: {
 		group,
 		standing,

@@ -132,6 +132,9 @@ export function PracticeGroupStandingCard({
 											<PracticeTrendChip
 												direction={groupStanding.direction}
 												support={groupStanding.trendSupport}
+												// Above the whole-card link below: it comes later in the DOM, so without
+												// this it swallows the hover and click that reveal the chip's provenance.
+												className="relative z-10"
 											/>
 										)}
 									</div>

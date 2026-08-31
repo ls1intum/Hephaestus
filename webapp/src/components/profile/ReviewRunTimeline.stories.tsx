@@ -50,6 +50,7 @@ const runs: PracticeGroupReviewRun[] = [
 const meta = {
 	title: "Profile/Review runs/Timeline",
 	component: ReviewRunTimeline,
+	tags: ["autodocs"],
 	parameters: { layout: "padded" },
 } satisfies Meta<typeof ReviewRunTimeline>;
 

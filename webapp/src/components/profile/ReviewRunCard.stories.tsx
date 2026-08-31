@@ -38,6 +38,7 @@ const run: PracticeGroupReviewRun = {
 const meta = {
 	title: "Profile/Review runs/Review run card",
 	component: ReviewRunCard,
+	tags: ["autodocs"],
 	parameters: { layout: "padded" },
 	decorators: [
 		(Story) => (
