@@ -1,4 +1,4 @@
-# ghcr.io/ls1intum/hephaestus/postgres — official PostgreSQL (Debian) + pg_partman, used in every
+# ghcr.io/hephaestus-build/postgres — official PostgreSQL (Debian) + pg_partman, used in every
 # environment (Alpine has no partman package). No shared_preload_libraries: maintenance runs as plain
 # SQL from the app scheduler, so this stays stock Postgres + one extension. See ADR 0018 and ADR 0038.
 ARG PG_MAJOR=18

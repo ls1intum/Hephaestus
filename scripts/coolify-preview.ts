@@ -557,7 +557,7 @@ export function checkImages(
 		throw new Error("GITHUB_REPOSITORY is malformed.");
 	}
 	for (const image of ["application-server", "webapp", "postgres"]) {
-		const repositoryPath = `ghcr.io/ls1intum/hephaestus/${image}`;
+		const repositoryPath = `ghcr.io/hephaestus-build/${image}`;
 		const reference = `${repositoryPath}:${headSha}`;
 		const inspect = runner.run("docker", [
 			"buildx",

@@ -11,10 +11,12 @@ on:
         required: true
       expected-signer-repository:
         description: >-
-          owner/repo whose release workflow signed the lock being deployed. Defaults to
-          this repository. A lock signed before a repository transfer still carries the
-          old owner/repo in its certificate identity, so deploying such a release needs
-          this override pointed at the old slug (issue #1599).
+          owner/repo whose release workflow signed the lock being deployed. Left empty,
+          the identity is resolved per release version from
+          security/release-identities.json, which keeps deploys of releases signed
+          before the repository transfer verifying against the old owner/repo their
+          certificate still carries (issue #1599). Set it only to verify against a
+          repository the map does not know.
         type: string
         required: false
         default: ""
@@ -33,6 +35,10 @@ jobs:
 
       - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
 
+      - uses: ./.github/actions/setup-node-pnpm
+        with:
+          install: "none"
+
       - name: Verify release lock
         id: lock
         env:
@@ -40,15 +46,20 @@ jobs:
           RELEASE: ${{ inputs.release }}
           SERVER_URL: ${{ github.server_url }}
           # The lock's certificate names the repository whose release workflow signed it.
-          # Deriving the default from the run context keeps signing and verification
-          # aligned across a repository transfer — but locks signed *before* the move
-          # still verify against the old owner/repo, which is what the
-          # expected-signer-repository override is for (issue #1599).
-          EXPECTED_SIGNER_REPOSITORY: ${{ inputs.expected-signer-repository || github.repository }}
+          # Locks signed *before* the repository transfer carry the old owner/repo
+          # forever, so the default identity is resolved per release version from
+          # security/release-identities.json; the expected-signer-repository override
+          # remains for repositories the map does not know (issue #1599).
+          EXPECTED_SIGNER_REPOSITORY: ${{ inputs.expected-signer-repository }}
         run: |
           set -euo pipefail
           [[ "$RELEASE" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] || {
             echo "::error::Deploy an immutable vX.Y.Z release, not '$RELEASE'"; exit 1; }
+          if [ -n "$EXPECTED_SIGNER_REPOSITORY" ]; then
+            identity="${SERVER_URL}/${EXPECTED_SIGNER_REPOSITORY}/.github/workflows/release.yml@refs/heads/main"
+          else
+            identity=$(node scripts/resolve-release-identity.ts "$RELEASE" certificate-identity)
+          fi
           asset="release-${RELEASE}.json"
           mkdir "$RUNNER_TEMP/verified-release"
           gh release download "$RELEASE" --repo "${{ github.repository }}" \
@@ -56,8 +67,7 @@ jobs:
             --pattern "$asset.sigstore.json" --pattern manifest.json
           cosign verify-blob \
             --bundle "$RUNNER_TEMP/verified-release/$asset.sigstore.json" \
-            --certificate-identity \
-              "${SERVER_URL}/${EXPECTED_SIGNER_REPOSITORY}/.github/workflows/release.yml@refs/heads/main" \
+            --certificate-identity "$identity" \
             --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
             "$RUNNER_TEMP/verified-release/$asset"
           commit=$(jq -er '.commit | select(test("^[a-f0-9]{40}$"))' \

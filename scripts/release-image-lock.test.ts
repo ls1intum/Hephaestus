@@ -14,7 +14,7 @@ const rawLock = {
 	images: [
 		{
 			image: "webapp",
-			repository: "ghcr.io/ls1intum/hephaestus/webapp",
+			repository: "ghcr.io/hephaestus-build/webapp",
 			provenance: "first-party",
 			indexDigest: digest("b"),
 			platforms: { "linux/amd64": digest("c"), "linux/arm64": digest("d") },

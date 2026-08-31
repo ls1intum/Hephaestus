@@ -16,18 +16,26 @@ identity, release identity, schema, and equality with the release evidence manif
 
 ## Independent verification
 
+The certificate identity is the release's, not necessarily today's repository: a lock signed before
+the `ls1intum` → `hephaestus-build` transfer names the old repository in its Fulcio certificate
+forever. `security/release-identities.json` in the repository maps each version to its signing
+identity and image namespace; the verifier and every workflow resolve it from there. For releases
+before that map's `hephaestus-build` boundary, substitute
+`https://github.com/ls1intum/Hephaestus/.github/workflows/release.yml@refs/heads/main` below and
+`--owner ls1intum` in the attestation check.
+
 ```bash
 VERSION=vX.Y.Z
-gh release download "$VERSION" --repo ls1intum/Hephaestus \
+gh release download "$VERSION" --repo hephaestus-build/Hephaestus \
   --pattern "release-$VERSION.json" \
   --pattern "release-$VERSION.json.sigstore.json"
 cosign verify-blob \
   --bundle "release-$VERSION.json.sigstore.json" \
   --certificate-identity \
-    'https://github.com/ls1intum/Hephaestus/.github/workflows/release.yml@refs/heads/main' \
+    'https://github.com/hephaestus-build/Hephaestus/.github/workflows/release.yml@refs/heads/main' \
   --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
   "release-$VERSION.json"
-gh attestation verify "release-$VERSION.json" --owner ls1intum
+gh attestation verify "release-$VERSION.json" --owner hephaestus-build
 ```
 
 ## Rollback

@@ -21,13 +21,18 @@ await test("deployment uses Compose metadata, waits for readiness, and preserves
 	assert.doesNotMatch(deployment, /docker image prune/);
 });
 
-await test("release publication requires the seeded upgrade gate", () => {
-	const upgrade = readFileSync(".github/workflows/release-upgrade.yml", "utf8");
+const upgrade = readFileSync(".github/workflows/release-upgrade.yml", "utf8");
 
+await test("release publication requires the seeded upgrade gate", () => {
 	assert.match(
 		release,
 		/publish-release:\n\s+needs: \[release, tag-images, upgrade-test, supported-host-smoke\]/,
 	);
+	// The previous release keeps its pre-transfer namespace forever, so the gate passes
+	// the version and lets resolve-release-upgrade-images.ts pick the repository from
+	// security/release-identities.json (issue #1599).
+	assert.match(release, /previous-version: \$\{\{ needs\.release\.outputs\.previous_version \}\}/);
+	assert.match(upgrade, /INPUT_PREVIOUS_VERSION: \$\{\{ inputs\.previous-version \}\}/);
 	assert.match(
 		release,
 		/candidate-application-image: .*@\$\{\{ needs\.tag-images\.outputs\.application-server-digest \}\}/,
@@ -54,25 +59,34 @@ await test("release upgrade runs the server topology without optional infrastruc
 	assert.doesNotMatch(upgradeDrill, /"NATS_ENABLED=false"/);
 });
 
-await test("signing and verification identity derives from the run context", () => {
+await test("verification identity is the release's own: run context now, the map for history", () => {
 	const rescan = readFileSync(".github/workflows/rescan-release-images.yml", "utf8");
 	const prepareLock = readFileSync("scripts/prepare-release-lock.ts", "utf8");
 	const derivedIdentity =
 		/\$\{\{ github\.server_url \}\}\/\$\{\{ github\.repository \}\}\/\.github\/workflows\/release\.yml@refs\/heads\/main/;
 
+	// release.yml verifies only the lock it signed itself, so the run's own identity is right.
 	assert.match(release, derivedIdentity);
-	assert.match(rescan, derivedIdentity);
-	assert.match(prepareLock, /releaseSignerIdentity\(process\.env\)/);
+	// Consumers that verify a *previous* release resolve its identity per version from
+	// security/release-identities.json — a lock signed before the repository transfer
+	// carries the old owner/repo in its certificate forever (issue #1599).
+	assert.match(rescan, /resolve-release-identity\.ts.*certificate-identity/);
+	assert.match(deployment, /resolve-release-identity\.ts.*certificate-identity/);
+	assert.match(prepareLock, /releaseCertificateIdentity\(release, process\.env\)/);
 	assert.match(prepareLock, /releaseSignerRepository\(process\.env\)/);
-	// No verify step may pin a repository slug: after a repository transfer, the run's
-	// own identity is the one the release workflow signs with (issue #1599).
-	for (const contents of [release, deployment, rescan, prepareLock])
+	// No verify step may pin a repository slug outside the identity map.
+	for (const contents of [release, deployment, rescan, prepareLock]) {
 		assert.doesNotMatch(contents, /certificate-identity[^\n]*\n?[^\n]*ls1intum\/Hephaestus/);
-	// Deploys verify locks that may predate a repository transfer, so the expected
-	// signer stays overridable while defaulting to the run's own repository.
+		assert.doesNotMatch(
+			contents,
+			/certificate-identity[^\n]*\n?[^\n]*hephaestus-build\/Hephaestus/,
+		);
+	}
+	// The expected signer stays overridable for repositories the map does not know,
+	// and the override must win over the map.
 	assert.match(
 		deployment,
-		/EXPECTED_SIGNER_REPOSITORY: \$\{\{ inputs\.expected-signer-repository \|\| github\.repository \}\}/,
+		/EXPECTED_SIGNER_REPOSITORY: \$\{\{ inputs\.expected-signer-repository \}\}/,
 	);
 	assert.match(
 		deployment,
@@ -84,18 +98,18 @@ await test("derived signer identity matches today's literals in the canonical re
 	const canonicalRun = {
 		CI: "true",
 		GITHUB_SERVER_URL: "https://github.com",
-		GITHUB_REPOSITORY: "ls1intum/Hephaestus",
+		GITHUB_REPOSITORY: "hephaestus-build/Hephaestus",
 	};
-	assert.equal(releaseSignerRepository(canonicalRun), "ls1intum/Hephaestus");
+	assert.equal(releaseSignerRepository(canonicalRun), "hephaestus-build/Hephaestus");
 	assert.equal(
 		releaseSignerIdentity(canonicalRun),
-		"https://github.com/ls1intum/Hephaestus/.github/workflows/release.yml@refs/heads/main",
+		"https://github.com/hephaestus-build/Hephaestus/.github/workflows/release.yml@refs/heads/main",
 	);
 	// The documented operator flow (docs/admin/install.mdx) runs outside CI and keeps
 	// the canonical fallback…
 	assert.equal(
 		releaseSignerIdentity({}),
-		"https://github.com/ls1intum/Hephaestus/.github/workflows/release.yml@refs/heads/main",
+		"https://github.com/hephaestus-build/Hephaestus/.github/workflows/release.yml@refs/heads/main",
 	);
 	// …but CI must never silently verify against a repository it is not running in.
 	assert.throws(() => releaseSignerRepository({ CI: "true" }), /GITHUB_REPOSITORY/);

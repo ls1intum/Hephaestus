@@ -2,8 +2,15 @@ import { spawnSync } from "node:child_process";
 import { appendFileSync } from "node:fs";
 import process from "node:process";
 
-const applicationRepository = "ghcr.io/ls1intum/hephaestus/application-server";
-const postgresRepository = "ghcr.io/ls1intum/hephaestus/postgres";
+import { currentReleaseIdentity, releaseIdentityFor } from "./lib/release-identities.ts";
+
+// The candidate is built by this repository's CI, so it lives in the current
+// namespace. The previous release keeps the namespace it was published under —
+// GHCR packages do not transfer between organizations (issue #1599) — so its
+// repository is resolved per version from security/release-identities.json.
+const currentNamespace = currentReleaseIdentity().namespace;
+const applicationRepository = `${currentNamespace}/application-server`;
+const postgresRepository = `${currentNamespace}/postgres`;
 
 function command(executable: string, args: string[]): string {
 	const result = spawnSync(executable, args, { encoding: "utf8" });
@@ -39,16 +46,32 @@ function immutable(reference: string, repository: string): string {
 	return `${repository}@${parsed.digest}`;
 }
 
+function previousApplicationReference(version: string): {
+	reference: string;
+	repository: string;
+} {
+	const repository = `${releaseIdentityFor(version).namespace}/application-server`;
+	return { reference: `${repository}:${version}`, repository };
+}
+
 const supplied = [
-	process.env.INPUT_PREVIOUS_APP,
+	process.env.INPUT_PREVIOUS_VERSION,
 	process.env.INPUT_CANDIDATE_APP,
 	process.env.INPUT_POSTGRES,
 ];
 if (supplied.some(Boolean) && !supplied.every(Boolean))
-	throw new Error("Reusable workflow callers must provide all three image references");
+	throw new Error(
+		"Reusable workflow callers must provide the previous version and both image references",
+	);
 
-let [previousApplication, candidateApplication, postgres] = supplied;
-if (!previousApplication || !candidateApplication || !postgres) {
+let previousApplication: { reference: string; repository: string };
+const suppliedPreviousVersion = supplied[0];
+let [, candidateApplication, postgres] = supplied;
+if (suppliedPreviousVersion && candidateApplication && postgres) {
+	if (!/^[0-9]+\.[0-9]+\.[0-9]+$/.test(suppliedPreviousVersion))
+		throw new Error("Previous version must be a stable X.Y.Z version");
+	previousApplication = previousApplicationReference(suppliedPreviousVersion);
+} else {
 	const repository = process.env.GITHUB_REPOSITORY;
 	if (!repository) throw new Error("GITHUB_REPOSITORY is required");
 	const requestedPrevious = nonEmpty(process.env.REQUESTED_PREVIOUS);
@@ -69,7 +92,7 @@ if (!previousApplication || !candidateApplication || !postgres) {
 	const candidate = nonEmpty(process.env.REQUESTED_CANDIDATE) ?? process.env.GITHUB_SHA;
 	if (!candidate || !/^[a-f0-9]{40}$/.test(candidate))
 		throw new Error("Candidate must be a full commit SHA");
-	previousApplication = `${applicationRepository}:${previous.slice(1)}`;
+	previousApplication = previousApplicationReference(previous.slice(1));
 	candidateApplication = `${applicationRepository}:${candidate}`;
 	postgres = `${postgresRepository}:${candidate}`;
 }
@@ -79,7 +102,7 @@ if (!output) throw new Error("GITHUB_OUTPUT is required");
 appendFileSync(
 	output,
 	[
-		`previous-app=${immutable(previousApplication, applicationRepository)}`,
+		`previous-app=${immutable(previousApplication.reference, previousApplication.repository)}`,
 		`candidate-app=${immutable(candidateApplication, applicationRepository)}`,
 		`postgres=${immutable(postgres, postgresRepository)}`,
 		"",

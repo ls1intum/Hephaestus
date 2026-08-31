@@ -11,10 +11,7 @@ await test("repository release builds are covered by the evidence inventory", ()
 
 await test("rejects missing and duplicate inventory entries", () => {
 	assert.deepEqual(
-		validateInventory(
-			{ images: ["server"], upstream: [] },
-			'image-name: "ls1intum/hephaestus/new"',
-		),
+		validateInventory({ images: ["server"], upstream: [] }, 'image-name: "hephaestus-build/new"'),
 		["new"],
 	);
 	assert.throws(

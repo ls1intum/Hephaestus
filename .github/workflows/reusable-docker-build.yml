@@ -13,7 +13,7 @@ on:
       image-name:
         type: string
         required: true
-        description: "Full image name (e.g., ls1intum/hephaestus/webapp)"
+        description: "Full image name (e.g., hephaestus-build/webapp)"
       docker-file:
         type: string
         required: false

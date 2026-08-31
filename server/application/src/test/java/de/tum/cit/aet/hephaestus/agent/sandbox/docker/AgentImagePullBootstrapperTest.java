@@ -22,7 +22,7 @@ import org.mockito.Mockito;
 
 class AgentImagePullBootstrapperTest extends BaseUnitTest {
 
-    private static final String IMAGE = "ghcr.io/ls1intum/hephaestus/agent-pi:0.73.2";
+    private static final String IMAGE = "ghcr.io/hephaestus-build/agent-pi:0.73.2";
 
     @Mock
     private DockerImageOperations imageOps;

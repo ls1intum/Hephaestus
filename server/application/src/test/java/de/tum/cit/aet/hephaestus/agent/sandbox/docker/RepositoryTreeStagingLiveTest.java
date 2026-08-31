@@ -52,8 +52,8 @@ class RepositoryTreeStagingLiveTest {
 
     /** The image under test. A release-channel tag would test some other release's image (ADR 0031);
      * point this at a locally built agent image, or export the reference a deployment would use. */
-    private static final String AGENT_IMAGE = System.getenv()
-            .getOrDefault("HEPHAESTUS_AGENT_IMAGE_REFERENCE", "ghcr.io/ls1intum/hephaestus/agent-pi:dev");
+    private static final String AGENT_IMAGE =
+            System.getenv().getOrDefault("HEPHAESTUS_AGENT_IMAGE_REFERENCE", "ghcr.io/hephaestus-build/agent-pi:dev");
 
     /** A tree large enough that any per-file ceiling would have to reject it. */
     private static final int TREE_FILE_COUNT = 25_000;

@@ -70,7 +70,7 @@ provides no dedicated self-hosted support and expects operators to upgrade regul
 ## Docker image tags
 
 All images (`webapp`, `application-server`, `agent-pi`, `postgres`) under
-`ghcr.io/ls1intum/hephaestus/` are published with:
+`ghcr.io/hephaestus-build/` are published with:
 
 | Tag | Meaning | Stability |
 | --- | --- | --- |
@@ -78,5 +78,10 @@ All images (`webapp`, `application-server`, `agent-pi`, `postgres`) under
 | `X.Y` | Latest patch of a minor release | Moves on every patch release |
 | `latest` | Latest release | Moves on every release |
 | `main`, `<sha>` | Unreleased development builds | **Unsupported** — never deploy these |
+
+Releases published before the `ls1intum` → `hephaestus-build` organization transfer remain under
+`ghcr.io/ls1intum/hephaestus/` — GHCR packages do not transfer between organizations, and their
+signatures name the old repository forever. `security/release-identities.json` in the repository
+records which image namespace and signing identity each release uses.
 
 For digest-pinned release images, see [Release image lock](./release-image-lock.md).

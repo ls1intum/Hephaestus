@@ -22,15 +22,15 @@ class AgentImageReferenceGuardTest extends BaseUnitTest {
     @ParameterizedTest
     @ValueSource(
             strings = {
-                "ghcr.io/ls1intum/hephaestus/agent-pi:0.73.2",
-                "ghcr.io/ls1intum/hephaestus/agent-pi:9a1f0c2e1b7d4a6f8c3e5b2d9a7f4c1e0b8d6a35",
+                "ghcr.io/hephaestus-build/agent-pi:0.73.2",
+                "ghcr.io/hephaestus-build/agent-pi:9a1f0c2e1b7d4a6f8c3e5b2d9a7f4c1e0b8d6a35",
                 // A registry port is not a tag; a reference carrying both must still read the tag.
                 "localhost:5000/agent-pi:0.73.2",
                 // The series rule reaches only version-shaped tags that stop short of a patch, so a
                 // pre-release, a four-part build number and a hand-built dev tag all still name a build.
-                "ghcr.io/ls1intum/hephaestus/agent-pi:0.74.0-rc.1",
-                "ghcr.io/ls1intum/hephaestus/agent-pi:1.2.3.4",
-                "ghcr.io/ls1intum/hephaestus/agent-pi:dev",
+                "ghcr.io/hephaestus-build/agent-pi:0.74.0-rc.1",
+                "ghcr.io/hephaestus-build/agent-pi:1.2.3.4",
+                "ghcr.io/hephaestus-build/agent-pi:dev",
             })
     void shouldAcceptAReferenceThatCanNameAMatchedBuild(String reference) {
         assertThatCode(() -> guardFor(reference)).doesNotThrowAnyException();
@@ -38,17 +38,17 @@ class AgentImageReferenceGuardTest extends BaseUnitTest {
 
     @Test
     void shouldAcceptADigestPin() {
-        assertThatCode(() -> guardFor("ghcr.io/ls1intum/hephaestus/agent-pi@sha256:" + "a".repeat(64)))
+        assertThatCode(() -> guardFor("ghcr.io/hephaestus-build/agent-pi@sha256:" + "a".repeat(64)))
                 .doesNotThrowAnyException();
     }
 
     @ParameterizedTest
     @ValueSource(
             strings = {
-                "ghcr.io/ls1intum/hephaestus/agent-pi:latest",
-                "ghcr.io/ls1intum/hephaestus/agent-pi:stable",
-                "ghcr.io/ls1intum/hephaestus/agent-pi:edge",
-                "ghcr.io/ls1intum/hephaestus/agent-pi:main",
+                "ghcr.io/hephaestus-build/agent-pi:latest",
+                "ghcr.io/hephaestus-build/agent-pi:stable",
+                "ghcr.io/hephaestus-build/agent-pi:edge",
+                "ghcr.io/hephaestus-build/agent-pi:main",
             })
     void shouldRefuseAReleaseChannelBecauseItNamesAnotherReleasesImage(String reference) {
         assertThatThrownBy(() -> guardFor(reference))
@@ -66,9 +66,9 @@ class AgentImageReferenceGuardTest extends BaseUnitTest {
     @ParameterizedTest
     @ValueSource(
             strings = {
-                "ghcr.io/ls1intum/hephaestus/agent-pi:0.73",
-                "ghcr.io/ls1intum/hephaestus/agent-pi:0",
-                "ghcr.io/ls1intum/hephaestus/agent-pi:v1.2",
+                "ghcr.io/hephaestus-build/agent-pi:0.73",
+                "ghcr.io/hephaestus-build/agent-pi:0",
+                "ghcr.io/hephaestus-build/agent-pi:v1.2",
                 "localhost:5000/agent-pi:0.73",
             })
     void shouldRefuseAVersionSeriesBecauseItMovesOnTheNextPatchRelease(String reference) {
@@ -82,7 +82,7 @@ class AgentImageReferenceGuardTest extends BaseUnitTest {
 
     /** Docker resolves an untagged reference to the release channel, so this is the same defect. */
     @ParameterizedTest
-    @ValueSource(strings = {"ghcr.io/ls1intum/hephaestus/agent-pi", "localhost:5000/agent-pi"})
+    @ValueSource(strings = {"ghcr.io/hephaestus-build/agent-pi", "localhost:5000/agent-pi"})
     void shouldRefuseAReferenceThatNamesNoTag(String reference) {
         assertThatThrownBy(() -> guardFor(reference))
                 .isInstanceOf(IllegalStateException.class)
@@ -96,7 +96,7 @@ class AgentImageReferenceGuardTest extends BaseUnitTest {
      * to the empty string leaves the derivation with nothing to append.
      */
     @ParameterizedTest
-    @ValueSource(strings = {"ghcr.io/ls1intum/hephaestus/agent-pi:", "ghcr.io/ls1intum/hephaestus/agent-pi:-bad"})
+    @ValueSource(strings = {"ghcr.io/hephaestus-build/agent-pi:", "ghcr.io/hephaestus-build/agent-pi:-bad"})
     void shouldRefuseAReferenceWhoseTagIsNotUsable(String reference) {
         assertThatThrownBy(() -> guardFor(reference))
                 .isInstanceOf(IllegalStateException.class)
@@ -108,8 +108,8 @@ class AgentImageReferenceGuardTest extends BaseUnitTest {
     @ParameterizedTest
     @ValueSource(
             strings = {
-                "ghcr.io/ls1intum/hephaestus/agent-pi@sha256:abc123",
-                "ghcr.io/ls1intum/hephaestus/agent-pi@sha256:",
+                "ghcr.io/hephaestus-build/agent-pi@sha256:abc123",
+                "ghcr.io/hephaestus-build/agent-pi@sha256:",
             })
     void shouldRefuseAMalformedDigest(String reference) {
         assertThatThrownBy(() -> guardFor(reference))
@@ -129,8 +129,8 @@ class AgentImageReferenceGuardTest extends BaseUnitTest {
 
     @Test
     void shouldAllowStartupWhenTheTagCameFromAnUnsetAppVersion() {
-        assertThatCode(() -> guardFor(
-                        "ghcr.io/ls1intum/hephaestus/agent-pi:" + AgentImageReferenceGuard.DEVELOPMENT_VERSION))
+        assertThatCode(() ->
+                        guardFor("ghcr.io/hephaestus-build/agent-pi:" + AgentImageReferenceGuard.DEVELOPMENT_VERSION))
                 .doesNotThrowAnyException();
     }
 
