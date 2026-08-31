@@ -58,6 +58,11 @@ if (import.meta.main) {
 		!Array.isArray(inventory.upstream)
 	)
 		throw new Error("malformed upstream image inventory");
+	// The release-time validator in verify-release-evidence.ts rejects an inventory
+	// without schemaVersion 1. Assert it here too, where every pull request runs:
+	// otherwise the mismatch only surfaces mid-release, after the tag is cut.
+	if (!("schemaVersion" in inventory) || inventory.schemaVersion !== 1)
+		throw new Error("release image inventory must declare schemaVersion 1");
 	const compose = [
 		"docker/compose.app.yaml",
 		"docker/compose.core.yaml",
