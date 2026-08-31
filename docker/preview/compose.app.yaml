@@ -251,6 +251,8 @@ services:
       # The integration consumer reads staging's JetStream, so a preview sees the events a shared
       # GitHub App delivers there rather than an empty broker.
       NATS_SERVER: ${NATS_SERVER:-nats://nats-server:4222}
+      NATS_USERNAME: ${NATS_USERNAME}
+      NATS_PASSWORD: ${NATS_PASSWORD}
       NATS_ENABLED: "true"
       # Per-deploy durable name, so previews get their own JetStream consumers instead of competing
       # for one and stealing each other's messages.

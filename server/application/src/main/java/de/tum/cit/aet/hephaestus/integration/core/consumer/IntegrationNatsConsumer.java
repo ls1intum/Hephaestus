@@ -828,8 +828,7 @@ public class IntegrationNatsConsumer {
     }
 
     private Options buildOptions() {
-        return Options.builder()
-                .server(connectionProperties.server())
+        return NatsOptions.builder(connectionProperties)
                 .connectionListener((conn, type) -> {
                     if (conn != null && conn.getStatus() != null) {
                         stats.setNatsConnectionStatus(conn.getStatus().name());

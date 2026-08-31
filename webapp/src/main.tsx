@@ -39,6 +39,18 @@ client.setConfig({
 	credentials: "include",
 });
 
+// Register the web-app manifest from here rather than an inline <script> in index.html: the
+// deployed Content-Security-Policy is `script-src 'self'` (webapp/docker/security-headers.conf and
+// the Traefik edge middleware), which blocks inline scripts. Browsers process a manifest <link>
+// whenever it is added, so doing it from the bundle loses nothing.
+{
+	const manifestLink = document.createElement("link");
+	manifestLink.rel = "manifest";
+	manifestLink.href =
+		window.location.hostname === "localhost" ? "/manifest-dev.json" : "/manifest.json";
+	document.head.appendChild(manifestLink);
+}
+
 // Attach the CSRF double-submit header (X-XSRF-TOKEN from the __Host-XSRF-TOKEN cookie) on every
 // state-changing request, plus the impersonation write-allow header when write-mode is on. The pure
 // logic lives in applyStateChangingHeaders (unit-tested); the store read stays here at the wiring edge.

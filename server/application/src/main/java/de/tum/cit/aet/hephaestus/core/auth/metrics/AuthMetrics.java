@@ -104,8 +104,7 @@ public class AuthMetrics {
                 .register(registry);
         this.rateLimitBackendError = Counter.builder(RATELIMIT_BACKEND_ERROR_METRIC)
                 .description(
-                        "Rate-limit backend failures in AuthRateLimitFilter (bucket store unreachable → fail-open). "
-                                + "A spike means the limiter is degraded and auth endpoints are temporarily uncapped.")
+                        "Rate-limit bucket-store failures. Authentication fails open; costly operations fail closed.")
                 .register(registry);
         this.auditWriteFailed = Counter.builder(AUDIT_WRITE_FAILED_METRIC)
                 .description(
@@ -137,7 +136,7 @@ public class AuthMetrics {
      */
     public void recordRateLimitBlocked(String bucket) {
         Counter.builder(RATELIMIT_BLOCKED_METRIC)
-                .description("Auth requests rejected with HTTP 429 by AuthRateLimitFilter, tagged by bucket namespace.")
+                .description("Requests rejected with HTTP 429 by the rate limiter, tagged by bucket namespace.")
                 .tag("bucket", bucket)
                 .register(registry)
                 .increment();
@@ -174,8 +173,7 @@ public class AuthMetrics {
 
     /**
      * Count one rate-limit backend failure ({@code AuthRateLimitFilter} could not reach the bucket
-     * store and failed open). Makes a degraded limiter observable so an operator can react before it
-     * is silently exploited.
+     * store). Makes a degraded limiter observable.
      */
     public void recordRateLimitBackendError() {
         rateLimitBackendError.increment();

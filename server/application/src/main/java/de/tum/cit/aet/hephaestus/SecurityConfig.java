@@ -245,11 +245,7 @@ public class SecurityConfig {
         // X-Content-Type-Options) for the user-facing resource-server chain.
         SecurityHeaders.apply(http);
 
-        // Token-bucket rate limiting on the hot auth endpoints (/auth/refresh, /auth/impersonate,
-        // DELETE /user). Registered after authentication so the account principal is resolvable;
-        // it no-ops on every other path. /oauth2/authorization/* is rate-limited on the oauth2Login
-        // chain (AuthSecurityConfig), which owns that path. Resolved via ObjectProvider: the filter
-        // is server-role-gated, so a non-server pod refreshes this chain without it.
+        // Register after authentication so account-scoped buckets can use the principal.
         AuthRateLimitFilter authRateLimitFilter = authRateLimitFilterProvider.getIfAvailable();
         if (authRateLimitFilter != null) {
             http.addFilterBefore(authRateLimitFilter, AuthorizationFilter.class);
