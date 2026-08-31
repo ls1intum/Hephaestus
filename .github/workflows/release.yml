@@ -105,12 +105,16 @@ jobs:
               echo ""
             } >> "$NOTES"
           fi
-          git show "$SHA:CHANGELOG.md" \
-            | awk -v ver="## $VERSION" '
+          # Materialise the changelog first: awk exits at the next section
+          # heading, which would SIGPIPE (exit 141) the still-writing `git show`
+          # once CHANGELOG.md outgrew the 64 KiB pipe buffer.
+          CHANGELOG_SNAPSHOT=$(mktemp)
+          git show "$SHA:CHANGELOG.md" > "$CHANGELOG_SNAPSHOT"
+          awk -v ver="## $VERSION" '
                 $0 == ver { on=1; next }
                 on && /^## / { exit }
                 on { print }
-              ' >> "$NOTES"
+              ' "$CHANGELOG_SNAPSHOT" >> "$NOTES"
           echo "----- release notes -----"; cat "$NOTES"; echo "-------------------------"
 
           if [ "$RESUME" = false ]; then
