@@ -1,4 +1,4 @@
-import { ChevronDownIcon } from "lucide-react";
+import { ChevronDownIcon, ShieldAlertIcon } from "lucide-react";
 import { useId, useState } from "react";
 import {
 	DIFF_SIDE_LABELS,
@@ -8,8 +8,16 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { type EvidenceLocation, evidenceLineRangeLabel, splitPath } from "./evidence";
 
+/** The one detector the server lets omit a quote, so the reason is knowable when it is the one that ran. */
+const SECRET_SCANNER = "secret-diff-scanner";
+
 interface EvidenceFileBlockProps {
 	location: EvidenceLocation;
+	/**
+	 * Which detector produced the evidence. Only used to explain a withheld quote: for the secret
+	 * scanner the reason can be stated, for anything else the app does not know it and says so.
+	 */
+	detector?: string;
 	defaultOpen?: boolean;
 }
 
@@ -21,7 +29,11 @@ interface EvidenceFileBlockProps {
  * a gutter and a range there would dress a coordinate up as a place the reader could open. The
  * registry in `evidence-source-defs` owns that ruling and the icon that goes with each source.
  */
-export function EvidenceFileBlock({ location, defaultOpen = true }: EvidenceFileBlockProps) {
+export function EvidenceFileBlock({
+	location,
+	detector,
+	defaultOpen = true,
+}: EvidenceFileBlockProps) {
 	const [isOpen, setIsOpen] = useState(defaultOpen);
 	const instanceId = useId();
 	const source = evidenceSourceDef(location.sourceKind);
@@ -60,9 +72,7 @@ export function EvidenceFileBlock({ location, defaultOpen = true }: EvidenceFile
 						{DIFF_SIDE_LABELS[location.side]}
 					</Badge>
 				)}
-				{location.redacted && (
-					<span className="shrink-0 text-xs text-muted-foreground italic">quote withheld</span>
-				)}
+
 				{hasSnippet && (
 					<button
 						type="button"
@@ -78,6 +88,14 @@ export function EvidenceFileBlock({ location, defaultOpen = true }: EvidenceFile
 					</button>
 				)}
 			</figcaption>
+			{location.redacted && (
+				<p className="flex items-start gap-2 border-t p-3 text-sm text-muted-foreground">
+					<ShieldAlertIcon className="mt-0.5 size-4 shrink-0" aria-hidden />
+					{detector === SECRET_SCANNER
+						? "Not quoted. This looked like a credential, so the text was never stored — open the location above to read it."
+						: "Not quoted. The passage was withheld, so only its location was kept."}
+				</p>
+			)}
 			{hasSnippet && isOpen && (
 				<pre
 					id={bodyId}

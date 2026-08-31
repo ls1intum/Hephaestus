@@ -33,6 +33,15 @@ const observations: PracticeGroupReviewObservation[] = [
 		severity: "MAJOR",
 	},
 	{
+		observationId: "00000000-0000-0000-0000-000000000351",
+		practiceSlug: "covers-new-behavior",
+		practiceName: "Cover new behavior with a test",
+		title: "The new branch has no test exercising it",
+		presence: "ABSENT",
+		assessment: "BAD",
+		severity: "CRITICAL",
+	},
+	{
 		observationId: "00000000-0000-0000-0000-000000000401",
 		practiceSlug: "network-timeouts",
 		practiceName: "Document network timeout behavior",

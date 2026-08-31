@@ -76,7 +76,7 @@ export const Collapsed: Story = {
 	},
 };
 
-/** The quote was withheld: the place is still named, and the block says the omission was deliberate. */
+/** The quote was withheld and the app cannot know why: it says only that, and names the place. */
 export const Redacted: Story = {
 	args: {
 		location: {
@@ -86,6 +86,24 @@ export const Redacted: Story = {
 			sourceKind: "scm.pull-request.diff",
 			redacted: true,
 		},
+	},
+};
+
+/**
+ * The secret scanner is the one detector allowed to omit a quote, so here the reason *is* knowable
+ * and gets said — the text was never stored, and the reader is pointed at the line to read it there.
+ */
+export const RedactedBySecretScanner: Story = {
+	args: {
+		location: {
+			path: "server/application/src/main/resources/application-local.yml",
+			startLine: 12,
+			endLine: 12,
+			sourceKind: "scm.pull-request.diff",
+			side: "NEW",
+			redacted: true,
+		},
+		detector: "secret-diff-scanner",
 	},
 };
 

@@ -156,6 +156,7 @@ export function ReviewObservationRow({
 											<EvidenceFileBlock
 												key={`${location.path}-${location.startLine}`}
 												location={location}
+												detector={detail?.evidence?.detector}
 												defaultOpen={index === 0}
 											/>
 										))}
