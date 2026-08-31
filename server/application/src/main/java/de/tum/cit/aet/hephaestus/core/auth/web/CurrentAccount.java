@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpStatus;
+import org.springframework.modulith.NamedInterface;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -19,6 +20,7 @@ import org.springframework.web.server.ResponseStatusException;
  * {@code act} (impersonator id). This is the single place those are parsed so controllers
  * stay declarative.
  */
+@NamedInterface("current-account")
 public final class CurrentAccount {
 
     private CurrentAccount() {}

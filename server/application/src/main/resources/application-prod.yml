@@ -80,11 +80,6 @@ hephaestus:
         # workspace must not be silently elevated (privilege-escalation). Explicit for clarity.
         auto-seed-membership: false
 
-    posthog:
-        enabled: ${POSTHOG_ENABLED:false}
-        api-host: ${POSTHOG_API_HOST:https://app.posthog.com}
-        project-id: ${POSTHOG_PROJECT_ID:}
-        personal-api-key: ${POSTHOG_PERSONAL_API_KEY:}
 
     # ═══════════════════════════════════════════════════════════════════════════
     # SCM + SLACK + OUTLINE INTEGRATION (Production)

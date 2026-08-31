@@ -15,7 +15,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.oauth2.core.oidc.StandardClaimNames;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -70,8 +69,7 @@ public class AccountController {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
             }
         }
-        String subjectId = token != null ? token.getToken().getClaimAsString(StandardClaimNames.SUB) : null;
-        return ResponseEntity.ok(preferencesService.updateUserSettings(user.get(), userSettings, subjectId));
+        return ResponseEntity.ok(preferencesService.updateUserSettings(user.get(), userSettings));
     }
 
     private @Nullable JwtAuthenticationToken resolveAuthentication(@Nullable JwtAuthenticationToken injectedToken) {

@@ -1,36 +1,22 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect } from "storybook/test";
+import { expect, fn } from "storybook/test";
 
-import { ConsentBanner, type ConsentCategory } from "./ConsentBanner";
-
-const analytics: ConsentCategory = {
-	key: "analytics",
-	name: "Usage analytics",
-	description: "Helps us see how the app is used so we can improve it.",
-};
-const errorReports: ConsentCategory = {
-	key: "errorMonitoring",
-	name: "Error reports",
-	description: "Tell us when something breaks so we can fix it.",
-};
+import { ConsentBanner } from "./ConsentBanner";
 
 /**
  * Presentational cookie-consent banner. These stories drive the pure component directly (no store),
- * so every shape is reachable: two configured categories (granular toggles), a single category
- * (simple Allow/Decline), and the re-open edit mode.
+ * so both shapes are reachable: the first-visit prompt and the re-opened edit mode with its Cancel
+ * action (GDPR Art. 7(3) — withdrawing consent must be as easy as granting it).
  */
 const meta = {
 	component: ConsentBanner,
 	parameters: { layout: "fullscreen" },
 	tags: ["autodocs"],
 	args: {
-		values: { analytics: false, errorMonitoring: false },
 		editing: false,
-		onToggle: () => {},
-		onAcceptAll: () => {},
-		onRejectAll: () => {},
-		onSave: () => {},
-		onCancel: () => {},
+		onAllow: fn(),
+		onDecline: fn(),
+		onCancel: fn(),
 		privacyPolicy: (
 			<a href="/privacy" className="underline underline-offset-4 hover:text-foreground">
 				Read our Privacy Policy
@@ -42,40 +28,22 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Both integrations configured: granular toggles + equal-prominence Reject all / Accept all. */
-export const BothCategories: Story = {
-	args: { categories: [analytics, errorReports] },
+/** First visit: a named region with an equal-prominence Decline / Allow pair and no Cancel. */
+export const Default: Story = {
 	play: async ({ canvas }) => {
 		canvas.getByRole("region", { name: /your privacy/i });
-		canvas.getByRole("button", { name: "Reject all" });
-		canvas.getByRole("button", { name: "Accept all" });
-		canvas.getByRole("button", { name: "Save choices" });
-	},
-};
-
-/** Only analytics configured: no granular toggles, just a clear Allow / Decline pair. */
-export const AnalyticsOnly: Story = {
-	args: { categories: [analytics] },
-	play: async ({ canvas }) => {
-		canvas.getByRole("button", { name: "Allow" });
 		canvas.getByRole("button", { name: "Decline" });
-		await expect(canvas.queryByRole("button", { name: "Save choices" })).not.toBeInTheDocument();
+		canvas.getByRole("button", { name: "Allow" });
+		await expect(canvas.queryByRole("button", { name: "Cancel" })).not.toBeInTheDocument();
 	},
 };
 
-/** Only error reporting configured. */
-export const ErrorReportsOnly: Story = {
-	args: { categories: [errorReports] },
-};
-
-/** Re-opened to change an existing decision: toggles are pre-seeded and a Cancel action appears. */
+/** Re-opened to change an existing decision: a Cancel action appears alongside the pair. */
 export const Editing: Story = {
-	args: {
-		categories: [analytics, errorReports],
-		editing: true,
-		values: { analytics: true, errorMonitoring: false },
-	},
+	args: { editing: true },
 	play: async ({ canvas }) => {
 		canvas.getByRole("button", { name: "Cancel" });
+		canvas.getByRole("button", { name: "Decline" });
+		canvas.getByRole("button", { name: "Allow" });
 	},
 };

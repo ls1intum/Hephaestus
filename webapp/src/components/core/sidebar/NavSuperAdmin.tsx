@@ -4,6 +4,7 @@ import {
 	Building2,
 	CircleDollarSign,
 	Gauge,
+	Inbox,
 	KeyRound,
 	LibraryBig,
 	ScrollText,
@@ -26,6 +27,12 @@ const ADMIN_NAV_GROUPS = [
 	{
 		label: "Access",
 		items: [
+			{
+				to: "/admin/feedback",
+				label: "Product feedback",
+				icon: Inbox,
+				tooltip: "Surveys and feedback inbox",
+			},
 			{ to: "/admin/users", label: "Users", icon: Users, tooltip: "Manage accounts" },
 			{ to: "/admin/workspaces", label: "Workspaces", icon: Building2, tooltip: "All workspaces" },
 			{

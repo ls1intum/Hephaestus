@@ -24,7 +24,6 @@ const OWN_IMAGE_PREFIX = "ghcr.io/ls1intum/hephaestus/";
  * added to the reference and not considered here fails the build.
  */
 const DELIBERATELY_OMITTED = new Set([
-	// Integrations a preview never reaches: no GitLab, Outline, Slack or PostHog credentials exist.
 	"GITLAB_DEFAULT_SERVER_URL",
 	"GITLAB_OAUTH_BASE_URL",
 	"GITLAB_OAUTH_CLIENT_ID",
@@ -38,10 +37,6 @@ const DELIBERATELY_OMITTED = new Set([
 	"OUTLINE_OAUTH_CLIENT_ID",
 	"OUTLINE_OAUTH_CLIENT_SECRET",
 	"OUTLINE_OAUTH_DISPLAY_NAME",
-	"POSTHOG_API_HOST",
-	"POSTHOG_ENABLED",
-	"POSTHOG_PERSONAL_API_KEY",
-	"POSTHOG_PROJECT_ID",
 	"GH_APP_INSTALLATION_URL",
 	// The agent sandbox is off, so nothing reads its runtime, limits or image override.
 	"HEPHAESTUS_AGENT_IMAGE_REFERENCE",

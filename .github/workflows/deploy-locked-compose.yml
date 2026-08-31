@@ -76,8 +76,6 @@ jobs:
           SECRET_NATS_USERNAME: ${{ secrets.NATS_USERNAME }}
           SECRET_NATS_PASSWORD: ${{ secrets.NATS_PASSWORD }}
           SECRET_OUTLINE_OAUTH_CLIENT_SECRET: ${{ secrets.OUTLINE_OAUTH_CLIENT_SECRET }}
-          SECRET_POSTHOG_PERSONAL_API_KEY: ${{ secrets.POSTHOG_PERSONAL_API_KEY }}
-          SECRET_POSTHOG_PROJECT_API_KEY: ${{ secrets.POSTHOG_PROJECT_API_KEY }}
           SECRET_SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
           SECRET_WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
         run: |

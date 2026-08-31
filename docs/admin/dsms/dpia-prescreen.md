@@ -73,7 +73,8 @@ They remain mandatory while the determination is pending.
 - **Data-subject rights process** in privacy §7. The delivery setting is not presented as an Art. 21 objection or as a control over review processing.
 - **Workspace-administrator joint-controller notice** in the privacy statement (§10). Structural changes to the shared-responsibility split require an amended record.
 - **No HTTP access log.** Tomcat's access log is disabled in the production profile, the Traefik ingress runs without `--accesslog`, and both nginx containers disable it at the server level, so request-level IP/URL data is never written at any layer. Enabling it at any layer is a material change.
-- **Error telemetry and product analytics remain disabled.** The webapp ships a Sentry integration and a PostHog integration, both disabled in the current production deployment. Activating either is a material change.
+- **Error telemetry remains disabled.** The webapp ships an optional Sentry integration that is disabled in the current production deployment. Activating it is a material change.
+- **First-party product feedback.** Feedback and survey responses stay in the instance database, are visible only to instance administrators, and are not reused for research without the separate research opt-in.
 
 ## 6. Required determination and change freeze
 
@@ -92,7 +93,7 @@ Regardless of the pending determination, a DPIA must be opened or amended before
 - LLM provider is added, changed to a consumer tier, or loses its no-training commitment.
 - Practice-review sandbox gains outbound connectivity beyond the per-job LLM proxy.
 - Observations begin to drive any automated decision within Hephaestus (grading, recognition caps, feature access).
-- The bundled Sentry integration is activated against a SaaS tenant, or the bundled PostHog integration is activated.
+- The bundled Sentry integration is activated against a SaaS tenant.
 - The processing population starts to include data subjects in a category covered by the BayLfD vulnerable-data-subjects criterion.
 - Repository ingestion expands beyond administrator-selected repositories into systematic or large-scale monitoring of public sources.
 - A new artifact source, source combination, private-conversation use, repository-history use, research/evaluation

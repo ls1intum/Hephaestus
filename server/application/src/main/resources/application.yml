@@ -473,11 +473,6 @@ hephaestus:
         pending-lapse-after: ${SIGNAL_LEDGER_PENDING_LAPSE_AFTER:7d}
         sweep-batch-size: ${SIGNAL_LEDGER_SWEEP_BATCH_SIZE:200}
 
-    posthog:
-        enabled: ${POSTHOG_ENABLED:false}
-        api-host: ${POSTHOG_API_HOST:https://app.posthog.com}
-        project-id: ${POSTHOG_PROJECT_ID:}
-        personal-api-key: ${POSTHOG_PERSONAL_API_KEY:}
 
     sandbox:
         # The LLM proxy controller/security chain follows the worker/sandbox capability. It serves

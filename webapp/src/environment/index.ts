@@ -21,9 +21,6 @@ interface RuntimeEnvVars {
 	XSRF_COOKIE_NAME?: string;
 	SENTRY_ENVIRONMENT?: string;
 	SENTRY_DSN?: string;
-	POSTHOG_ENABLED?: string;
-	POSTHOG_PROJECT_API_KEY?: string;
-	POSTHOG_API_HOST?: string;
 	LEGAL_PROFILE?: string;
 	TANSTACK_DEVTOOLS_ENABLED?: string;
 	GIT_BRANCH?: string;
@@ -39,9 +36,6 @@ const defaults: RuntimeEnvVars = {
 	XSRF_COOKIE_NAME: "__Host-XSRF-TOKEN",
 	SENTRY_ENVIRONMENT: "local",
 	SENTRY_DSN: "https://289f1f62feeb4f70a8878dc0101825cd@sentry.ase.in.tum.de/3",
-	POSTHOG_ENABLED: "false",
-	POSTHOG_PROJECT_API_KEY: "",
-	POSTHOG_API_HOST: "",
 	LEGAL_PROFILE: "",
 	TANSTACK_DEVTOOLS_ENABLED: "true",
 	GIT_BRANCH: "",
@@ -82,12 +76,6 @@ const environment = {
 	sentry: {
 		environment: env("SENTRY_ENVIRONMENT"),
 		dsn: env("SENTRY_DSN"),
-	},
-
-	posthog: {
-		enabled: env("POSTHOG_ENABLED") === "true",
-		projectApiKey: env("POSTHOG_PROJECT_API_KEY"),
-		apiHost: env("POSTHOG_API_HOST"),
 	},
 
 	legal: {

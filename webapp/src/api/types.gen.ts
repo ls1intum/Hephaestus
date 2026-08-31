@@ -1091,6 +1091,15 @@ export type CreateReviewSweepScheduleRequest = {
   lookbackDays: number;
 };
 
+export type CreateSurvey = {
+  description: string;
+  endsAt?: Date;
+  questions: Array<Question>;
+  startsAt: Date;
+  title: string;
+  workspaceId?: number;
+};
+
 /**
  * Connect your own AI provider
  */
@@ -1472,6 +1481,22 @@ export type FeedbackApproval = {
   feedbackId?: string;
   rejectionNote?: string;
   rejectionReason?: 'INCORRECT' | 'MISSING_CONTEXT' | 'UNHELPFUL' | 'DUPLICATE' | 'INAPPROPRIATE_PLACEMENT' | 'OTHER';
+};
+
+export type FeedbackItem = {
+  accountId: number;
+  createdAt?: Date;
+  id: string;
+  kind: 'FEEDBACK' | 'BUG';
+  message: string;
+  pagePath?: string;
+  workspaceId?: number;
+};
+
+export type FeedbackRequest = {
+  kind: 'FEEDBACK' | 'BUG';
+  message: string;
+  pagePath?: string;
 };
 
 /**
@@ -2585,6 +2610,11 @@ export type PageableObject = {
   unpaged?: boolean;
 };
 
+export type PagedModelFeedbackItem = {
+  content?: Array<FeedbackItem>;
+  page?: PageMetadata;
+};
+
 export type PagedModelReviewFeedback = {
   content?: Array<ReviewFeedback>;
   page?: PageMetadata;
@@ -2597,6 +2627,16 @@ export type PagedModelReviewObservation = {
 
 export type PagedModelReviewRunSummary = {
   content?: Array<ReviewRunSummary>;
+  page?: PageMetadata;
+};
+
+export type PagedModelSubmission = {
+  content?: Array<Submission>;
+  page?: PageMetadata;
+};
+
+export type PagedModelSurvey = {
+  content?: Array<Survey>;
   page?: PageMetadata;
 };
 
@@ -3673,6 +3713,14 @@ export type PullRequestInfo = {
   updatedAt?: Date;
 };
 
+export type Question = {
+  id: string;
+  options: Array<string>;
+  prompt: string;
+  required?: boolean;
+  type: 'TEXT' | 'SINGLE_CHOICE' | 'RATING';
+};
+
 /**
  * Vendor API rate-limit observation, read from in-memory trackers (not persisted across restarts). Every field except observedAt is present only if the vendor actually reported it.
  */
@@ -4562,6 +4610,38 @@ export type SortObject = {
   empty?: boolean;
   sorted?: boolean;
   unsorted?: boolean;
+};
+
+export type Submission = {
+  accountId: number;
+  answers?: {
+    [key: string]: string;
+  };
+  createdAt?: Date;
+  disposition: 'RESPONDED' | 'DISMISSED';
+  id: string;
+  questions: Array<Question>;
+  surveyId: string;
+  surveyTitle: string;
+  workspaceId?: number;
+};
+
+export type SubmitSurvey = {
+  answers: {
+    [key: string]: string;
+  };
+};
+
+export type Survey = {
+  active: boolean;
+  createdAt?: Date;
+  description: string;
+  endsAt?: Date;
+  id: string;
+  questions: Array<Question>;
+  startsAt: Date;
+  title: string;
+  workspaceId?: number;
 };
 
 /**
@@ -7049,6 +7129,109 @@ export type AdminUpdateCuratedPracticeStatusResponses = {
 
 export type AdminUpdateCuratedPracticeStatusResponse = AdminUpdateCuratedPracticeStatusResponses[keyof AdminUpdateCuratedPracticeStatusResponses];
 
+export type AdminListProductFeedbackData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * Zero-based page index (0..N)
+     */
+    page?: number;
+    /**
+     * The size of the page to be returned
+     */
+    size?: number;
+    /**
+     * Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported.
+     */
+    sort?: Array<string>;
+  };
+  url: '/admin/product-feedback';
+};
+
+export type AdminListProductFeedbackResponses = {
+  /**
+   * OK
+   */
+  200: PagedModelFeedbackItem;
+};
+
+export type AdminListProductFeedbackResponse = AdminListProductFeedbackResponses[keyof AdminListProductFeedbackResponses];
+
+export type AdminListProductSurveyResponsesData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * Zero-based page index (0..N)
+     */
+    page?: number;
+    /**
+     * The size of the page to be returned
+     */
+    size?: number;
+    /**
+     * Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported.
+     */
+    sort?: Array<string>;
+  };
+  url: '/admin/product-feedback/responses';
+};
+
+export type AdminListProductSurveyResponsesResponses = {
+  /**
+   * OK
+   */
+  200: PagedModelSubmission;
+};
+
+export type AdminListProductSurveyResponsesResponse = AdminListProductSurveyResponsesResponses[keyof AdminListProductSurveyResponsesResponses];
+
+export type AdminListProductSurveysData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * Zero-based page index (0..N)
+     */
+    page?: number;
+    /**
+     * The size of the page to be returned
+     */
+    size?: number;
+    /**
+     * Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported.
+     */
+    sort?: Array<string>;
+  };
+  url: '/admin/product-feedback/surveys';
+};
+
+export type AdminListProductSurveysResponses = {
+  /**
+   * OK
+   */
+  200: PagedModelSurvey;
+};
+
+export type AdminListProductSurveysResponse = AdminListProductSurveysResponses[keyof AdminListProductSurveysResponses];
+
+export type AdminCreateProductSurveyData = {
+  body: CreateSurvey;
+  path?: never;
+  query?: never;
+  url: '/admin/product-feedback/surveys';
+};
+
+export type AdminCreateProductSurveyResponses = {
+  /**
+   * OK
+   */
+  200: Survey;
+};
+
+export type AdminCreateProductSurveyResponse = AdminCreateProductSurveyResponses[keyof AdminCreateProductSurveyResponses];
+
 export type AdminGetInstanceSettingsData = {
   body?: never;
   path?: never;
@@ -7330,6 +7513,20 @@ export type CallbackPostResponses = {
 };
 
 export type CallbackPostResponse = CallbackPostResponses[keyof CallbackPostResponses];
+
+export type SubmitInstanceProductFeedbackData = {
+  body: FeedbackRequest;
+  path?: never;
+  query?: never;
+  url: '/product-feedback';
+};
+
+export type SubmitInstanceProductFeedbackResponses = {
+  /**
+   * OK
+   */
+  200: unknown;
+};
 
 export type DeleteCurrentUserData = {
   body?: never;
@@ -11164,6 +11361,86 @@ export type PlacePracticeResponses = {
 };
 
 export type PlacePracticeResponse = PlacePracticeResponses[keyof PlacePracticeResponses];
+
+export type SubmitWorkspaceProductFeedbackData = {
+  body: FeedbackRequest;
+  path: {
+    /**
+     * Workspace slug
+     */
+    workspaceSlug: string;
+  };
+  query?: never;
+  url: '/workspaces/{workspaceSlug}/product-feedback';
+};
+
+export type SubmitWorkspaceProductFeedbackResponses = {
+  /**
+   * OK
+   */
+  200: unknown;
+};
+
+export type ListAvailableProductSurveysData = {
+  body?: never;
+  path: {
+    /**
+     * Workspace slug
+     */
+    workspaceSlug: string;
+  };
+  query?: never;
+  url: '/workspaces/{workspaceSlug}/product-feedback/surveys';
+};
+
+export type ListAvailableProductSurveysResponses = {
+  /**
+   * OK
+   */
+  200: Array<Survey>;
+};
+
+export type ListAvailableProductSurveysResponse = ListAvailableProductSurveysResponses[keyof ListAvailableProductSurveysResponses];
+
+export type DismissProductSurveyData = {
+  body?: never;
+  path: {
+    /**
+     * Workspace slug
+     */
+    workspaceSlug: string;
+    surveyId: string;
+  };
+  query?: never;
+  url: '/workspaces/{workspaceSlug}/product-feedback/surveys/{surveyId}/dismissal';
+};
+
+export type DismissProductSurveyResponses = {
+  /**
+   * OK
+   */
+  200: unknown;
+};
+
+export type SubmitProductSurveyResponseData = {
+  body: SubmitSurvey;
+  path: {
+    /**
+     * Workspace slug
+     */
+    workspaceSlug: string;
+    surveyId: string;
+  };
+  query?: never;
+  url: '/workspaces/{workspaceSlug}/product-feedback/surveys/{surveyId}/responses';
+};
+
+export type SubmitProductSurveyResponseResponses = {
+  /**
+   * OK
+   */
+  200: unknown;
+};
 
 export type GetUserProfileData = {
   body?: never;
