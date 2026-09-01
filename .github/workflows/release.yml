@@ -27,6 +27,9 @@ jobs:
     timeout-minutes: 15
     runs-on: ubuntu-latest
     permissions:
+      # No release is created here — tag-images creates the draft once the evidence gate has
+      # passed. Draft releases are invisible to tokens without push access, so the resume and
+      # parent-version preconditions below still need write.
       contents: write
     outputs:
       released: ${{ steps.cut.outputs.released }}
@@ -36,6 +39,7 @@ jobs:
       tag_name: ${{ steps.cut.outputs.tag_name }}
       previous_version: ${{ steps.cut.outputs.previous_version }}
       sha: ${{ steps.cut.outputs.sha }}
+      migrations: ${{ steps.cut.outputs.migrations }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -44,7 +48,13 @@ jobs:
           ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 0
 
-      - name: Cut release if this commit bumped the version
+      # Decides whether this commit cuts a release, and creates nothing.
+      # The draft is created in tag-images, after the evidence gate, so a gate failure leaves no
+      # release behind: release images are promoted by digest and never rebuilt, so a draft cut at
+      # a commit the gate rejected can never pass, and it would then block the next version too
+      # (the parent-version precondition below). Nothing survives a failed attempt, and the same
+      # version re-cuts from a commit that carries the fix.
+      - name: Plan the release for this commit
         id: cut
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -63,7 +73,8 @@ jobs:
             echo "released=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          RESUME=false
+          # A draft can only exist here if an earlier attempt cleared the evidence gate and failed
+          # later; it is resumed rather than recreated.
           if existing=$(gh release view "$TAG" --repo "${{ github.repository }}" --json isDraft,targetCommitish 2>/dev/null); then
             if [ "$(jq -r .isDraft <<< "$existing")" != true ]; then
               echo "Release $TAG is already published."
@@ -72,7 +83,6 @@ jobs:
             fi
             [ "$(jq -r .targetCommitish <<< "$existing")" = "$SHA" ] || {
               echo "::error::Draft $TAG targets a different commit"; exit 1; }
-            RESUME=true
           fi
           echo "Cutting $TAG at $SHA (was $PARENT_VERSION)"
 
@@ -82,33 +92,17 @@ jobs:
           jq -e '.isDraft == false and .isPrerelease == false' <<< "$previous" >/dev/null || {
             echo "::error::$PREV_TAG is not a stable published release"; exit 1; }
 
-          NOTES=$(mktemp)
-          if [ -n "$PREV_TAG" ] && ! git diff --quiet "$PREV_TAG" "$SHA" -- server/application/src/main/resources/db/changelog/; then
-            {
-              echo "> [!WARNING]"
-              echo "> This release contains **schema migrations**. They run automatically on startup — back up your database before upgrading. See the [migration guide](${{ github.server_url }}/${{ github.repository }}/blob/main/MIGRATION.md)."
-              echo ""
-            } >> "$NOTES"
-          fi
-          # Materialise the changelog first: awk exits at the next section
-          # heading, which would SIGPIPE (exit 141) the still-writing `git show`
-          # once CHANGELOG.md outgrew the 64 KiB pipe buffer.
-          CHANGELOG_SNAPSHOT=$(mktemp)
-          git show "$SHA:CHANGELOG.md" > "$CHANGELOG_SNAPSHOT"
-          awk -v ver="## $VERSION" '
-                $0 == ver { on=1; next }
-                on && /^## / { exit }
-                on { print }
-              ' "$CHANGELOG_SNAPSHOT" >> "$NOTES"
-          echo "----- release notes -----"; cat "$NOTES"; echo "-------------------------"
-
-          if [ "$RESUME" = false ]; then
-            gh release create "$TAG" --draft \
-              --title "$TAG" \
-              --notes-file "$NOTES" \
-              --target "$SHA" \
-              --repo "${{ github.repository }}"
-          fi
+          # The notes are assembled where the draft is created, in tag-images, from the CHANGELOG.md
+          # it checks out. Only this job has the tags to tell whether the release carries schema
+          # migrations, so that one bit travels as an output.
+          status=0
+          git diff --quiet "$PREV_TAG" "$SHA" -- server/application/src/main/resources/db/changelog/ || status=$?
+          case "$status" in
+            0) MIGRATIONS=false ;;
+            1) MIGRATIONS=true ;;
+            # Anything else is git failing, not a verdict — never stamp the warning by accident.
+            *) echo "::error::Could not diff $PREV_TAG..$SHA for schema migrations"; exit 1 ;;
+          esac
 
           {
             echo "released=true"
@@ -118,13 +112,14 @@ jobs:
             echo "tag_name=$TAG"
             echo "sha=$SHA"
             echo "previous_version=$PARENT_VERSION"
+            echo "migrations=$MIGRATIONS"
           } >> "$GITHUB_OUTPUT"
 
       - name: Summary
         if: steps.cut.outputs.released == 'true'
         run: |
           echo "## Preparing ${{ steps.cut.outputs.tag_name }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "Evidence verification is in progress." >> "$GITHUB_STEP_SUMMARY"
+          echo "Evidence verification is in progress; the draft is created once it passes." >> "$GITHUB_STEP_SUMMARY"
 
   tag-images:
     needs: release
@@ -135,7 +130,7 @@ jobs:
       packages: write
       id-token: write
       attestations: write
-      contents: write # gh release upload (release image lock)
+      contents: write # gh release create/upload, once the evidence gate has passed
     outputs:
       agent-pi-digest: ${{ steps.retag.outputs.agent-pi-digest }}
       application-server-digest: ${{ steps.retag.outputs.application-server-digest }}
@@ -368,6 +363,46 @@ jobs:
             --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
             "$ASSET"
 
+      # First and only write to the release surface: every step above fails without creating one,
+      # so a rejected release leaves no draft to delete and no tag — a draft materialises none —
+      # and the version re-cuts unchanged from a commit that carries the fix.
+      - name: Create the draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ needs.release.outputs.tag_name }}
+          VERSION: ${{ needs.release.outputs.version }}
+          SHA: ${{ needs.release.outputs.sha }}
+          MIGRATIONS: ${{ needs.release.outputs.migrations }}
+        run: |
+          set -euo pipefail
+          # The release job has already proved that any existing release is a draft at this commit.
+          if gh release view "$TAG_NAME" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            echo "Resuming the existing draft $TAG_NAME."
+            exit 0
+          fi
+
+          NOTES=$(mktemp)
+          if [ "$MIGRATIONS" = true ]; then
+            {
+              echo "> [!WARNING]"
+              echo "> This release contains **schema migrations**. They run automatically on startup — back up your database before upgrading. See the [migration guide](${{ github.server_url }}/${{ github.repository }}/blob/main/MIGRATION.md)."
+              echo ""
+            } >> "$NOTES"
+          fi
+          # CHANGELOG.md as checked out at the released commit; awk exits at the next section.
+          awk -v ver="## $VERSION" '
+                $0 == ver { on=1; next }
+                on && /^## / { exit }
+                on { print }
+              ' CHANGELOG.md >> "$NOTES"
+          echo "----- release notes -----"; cat "$NOTES"; echo "-------------------------"
+
+          gh release create "$TAG_NAME" --draft \
+            --title "$TAG_NAME" \
+            --notes-file "$NOTES" \
+            --target "$SHA" \
+            --repo "${{ github.repository }}"
+
       - name: Upload release image lock to GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -375,8 +410,11 @@ jobs:
           ASSET: ${{ steps.pin.outputs.asset-path }}
         run: |
           set -euo pipefail
+          # --clobber so a re-run over a resumed draft replaces its assets instead of failing on
+          # every name that already exists.
           gh release upload "$TAG_NAME" \
             "$ASSET" "${ASSET}.sigstore.json" evidence/* \
+            --clobber \
             --repo "${{ github.repository }}"
 
   upgrade-test:
@@ -608,7 +646,7 @@ jobs:
           TAG_NAME: ${{ needs.release.outputs.tag_name }}
         run: |
           set -euo pipefail
-          gh release upload "$TAG_NAME" host-smoke/*.json --repo "${{ github.repository }}"
+          gh release upload "$TAG_NAME" host-smoke/*.json --clobber --repo "${{ github.repository }}"
           gh release edit "$TAG_NAME" --repo "${{ github.repository }}" --draft=false
           [ "$(gh release view "$TAG_NAME" --repo "${{ github.repository }}" --json isImmutable --jq .isImmutable)" = true ] || {
             echo "::error::Repository immutable releases must be enabled before publishing"; exit 1; }
