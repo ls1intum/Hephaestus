@@ -2,8 +2,7 @@ name: Review policy
 
 on:
   pull_request_target: # zizmor: ignore[dangerous-triggers] API reads only; no pull-request code is executed.
-    branches: [main]
-    types: [opened, reopened, synchronize, ready_for_review]
+    types: [opened, reopened, synchronize, ready_for_review, edited]
 
 permissions: {}
 
@@ -20,7 +19,11 @@ jobs:
   # GitHub's own "Review required" state, which blocks merging, merge-queue entry and auto-merge.
   #
   # `synchronize` is load-bearing: the ruleset dismisses stale approvals on push, so every push has
-  # to earn a fresh one.
+  # to earn a fresh one. `edited` is load-bearing for stacked pull requests: merging a lower layer
+  # retargets the upper one onto `main`, which fires no other event here — without it the layer
+  # arrives at the queue unapproved and cannot enter. For the same reason there is no `branches:`
+  # filter: a layer must already hold its approval when it is retargeted, and an approval on a pull
+  # request targeting anything but `main` satisfies no rule and is inert.
   approve:
     name: Approve a maintainer's pull request
     runs-on: ubuntu-latest

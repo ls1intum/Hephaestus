@@ -36,7 +36,6 @@ export interface Review {
 
 export interface PullRequest {
 	readonly number: number;
-	readonly base: { readonly ref: string };
 	readonly head: { readonly sha: string };
 	readonly user: { readonly login: string };
 }
@@ -87,7 +86,12 @@ export interface EnforceInput {
 	readonly core: ActionsCore;
 }
 
-/** The policy guards the branch the ruleset guards. */
+/**
+ * The branch whose ruleset requires the approval this module supplies. Nothing here filters on it:
+ * an approval on a pull request targeting any other branch satisfies no rule and is inert, whereas
+ * filtering strands every stacked pull request — the lower layer merges, GitHub retargets the upper
+ * one onto `main`, and a base-filtered policy has already declined to approve it.
+ */
 export const POLICY_BASE_REF = "main";
 
 /**
@@ -138,24 +142,16 @@ export interface Decision {
 
 export interface DecisionInput {
 	readonly author: string;
-	readonly baseRef: string;
 	readonly headSha: string;
 	readonly maintainers: ReadonlySet<string>;
 	readonly reviews: readonly Review[];
 }
 
 /**
- * What this module should do about one pull request. Purely a function of the author login, the base
- * branch, the head commit and the approvals already on record — never of anything the author wrote.
+ * What this module should do about one pull request. Purely a function of the author login, the head
+ * commit and the approvals already on record — never of anything the author wrote.
  */
 export const decide = (input: DecisionInput): Decision => {
-	if (input.baseRef !== POLICY_BASE_REF) {
-		return {
-			kind: "skip",
-			reason: `The review policy guards pull requests that target ${POLICY_BASE_REF}, not ${input.baseRef}.`,
-		};
-	}
-
 	if (!input.maintainers.has(input.author.toLowerCase())) {
 		return {
 			kind: "skip",
@@ -227,7 +223,6 @@ export const enforce = async ({ github, context, core }: EnforceInput): Promise<
 
 		const decision = decide({
 			author: pull.user.login,
-			baseRef: pull.base.ref,
 			headSha: pull.head.sha,
 			maintainers,
 			reviews,

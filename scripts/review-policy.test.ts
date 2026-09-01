@@ -41,7 +41,6 @@ const theirs = (over: Partial<Review> & Pick<Review, "id">): Review => ({
 
 const pull: PullRequest = {
 	number: 7,
-	base: { ref: "main" },
 	head: { sha: HEAD },
 	user: { login: "MaIntAiner" },
 };
@@ -168,7 +167,6 @@ void describe("review policy", () => {
 	void describe("decide", () => {
 		const base = {
 			author: "MaIntAiner",
-			baseRef: "main",
 			headSha: HEAD,
 			reviews: [] as readonly Review[],
 		};
@@ -223,14 +221,11 @@ void describe("review policy", () => {
 			assert.equal(decision.kind, "approve");
 		});
 
-		void it("stays out of the way of a pull request that does not target main", () => {
-			const decision = decide({
-				...base,
-				baseRef: "release",
-				maintainers: new Set(["maintainer"]),
-			});
-			assert.equal(decision.kind, "skip");
-			assert.match(decision.reason, /release/);
+		void it("approves a stacked pull request that targets another branch", () => {
+			// A layer must already hold its approval when merging the layer below retargets it onto
+			// main: that retarget fires no event that could earn one, so declining here would strand
+			// the stack at the merge queue.
+			assert.equal(decide({ ...base, maintainers: new Set(["maintainer"]) }).kind, "approve");
 		});
 	});
 
@@ -273,13 +268,12 @@ void describe("review policy", () => {
 			assert.deepEqual(submitted, []);
 		});
 
-		void it("submits nothing for a pull request that does not target main", async () => {
-			const { submitted, github } = makeGitHub({
-				resolvedPull: { ...pull, base: { ref: "release" } },
-			});
+		void it("approves a stacked pull request, so it survives being retargeted onto main", async () => {
+			const { submitted, github } = makeGitHub();
 			await enforce({ github, context, core: makeCore() });
 
-			assert.deepEqual(submitted, []);
+			assert.equal(submitted.length, 1);
+			assert.equal(submitted[0]?.event, "APPROVE");
 		});
 
 		void it("warns, and approves nobody, when the allow-list is unset", async () => {
@@ -367,7 +361,13 @@ void describe("review policy", () => {
 		});
 
 		void it("re-runs on every push, because the ruleset dismisses stale approvals", () => {
-			assert.match(workflow, /types: \[opened, reopened, synchronize, ready_for_review\]/);
+			assert.match(workflow, /types: \[opened, reopened, synchronize, ready_for_review, edited\]/);
+		});
+
+		void it("runs for a stacked pull request, whatever branch it targets", () => {
+			// A `branches:` filter would strand every stack: the retarget onto main that follows the
+			// lower layer's merge fires only `edited`, and only on a workflow that runs off main.
+			assert.doesNotMatch(workflow, /^\s+branches:/m);
 		});
 
 		void it("publishes no check run, now that the ruleset requires a native approval", () => {
