@@ -1,6 +1,7 @@
 import { TagIcon } from "@primer/octicons-react";
 import { Link } from "@tanstack/react-router";
 import { LogOut, Settings, User } from "lucide-react";
+import { motion, useReducedMotion } from "motion/react";
 
 import { SignInButtons } from "@/components/auth/SignInButtons";
 import { HephaestusLogo } from "@/components/brand/HephaestusLogo";
@@ -63,6 +64,20 @@ export default function Header({
 	const hasWorkspace = Boolean(workspaceSlug);
 	const hasUsername = Boolean(username);
 	const badge = resolveHeaderBadge(version, environmentName, isProduction);
+	const reduceMotion = useReducedMotion();
+	const logo = (
+		<motion.span
+			className="inline-flex"
+			whileHover={reduceMotion ? undefined : { y: -1, scale: 1.01 }}
+			whileTap={reduceMotion ? undefined : { scale: 0.98 }}
+			transition={{ type: "spring", stiffness: 500, damping: 30, mass: 0.4 }}
+		>
+			<HephaestusLogo
+				markClassName="size-8 origin-center transition-transform duration-200 ease-out group-hover/logo:-rotate-3 group-hover/logo:scale-105 motion-reduce:transform-none"
+				wordmarkClassName="hidden text-xl sm:inline"
+			/>
+		</motion.span>
+	);
 
 	return (
 		<header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 justify-between">
@@ -74,17 +89,17 @@ export default function Header({
 							to="/w/$workspaceSlug"
 							params={{ workspaceSlug: workspaceSlug ?? "" }}
 							aria-label="Hephaestus home"
-							className="flex gap-2 items-center hover:text-muted-foreground"
+							className="group/logo flex items-center gap-2 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
 						>
-							<HephaestusLogo wordmarkClassName="hidden text-xl sm:inline" />
+							{logo}
 						</Link>
 					) : (
 						<Link
 							to="/"
 							aria-label="Hephaestus home"
-							className="flex gap-2 items-center hover:text-muted-foreground"
+							className="group/logo flex items-center gap-2 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
 						>
-							<HephaestusLogo wordmarkClassName="hidden text-xl sm:inline" />
+							{logo}
 						</Link>
 					)}
 					{badge.kind === "release" ? (
