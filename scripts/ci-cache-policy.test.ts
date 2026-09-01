@@ -41,7 +41,15 @@ await describe("CI cache policy", async () => {
 		);
 		assert.doesNotMatch(browserAction, /restore-keys:/);
 		assert.match(browserAction, /playwright install chromium --with-deps/);
-		const workflow = await readFile(".github/workflows/ci-tests.yml", "utf8");
-		assert.equal((workflow.match(/uses: \.\/\.github\/actions\/setup-browsers/g) ?? []).length, 2);
+		for (const file of [
+			".github/workflows/ci-tests.yml",
+			".github/workflows/ci-quality-gates.yml",
+		]) {
+			const workflow = await readFile(file, "utf8");
+			assert.equal(
+				(workflow.match(/uses: \.\/\.github\/actions\/setup-browsers/g) ?? []).length,
+				1,
+			);
+		}
 	});
 });

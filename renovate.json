@@ -127,6 +127,35 @@
 			"versioningTemplate": "semver"
 		},
 		{
+			"description": "Track the pack CLI version",
+			"customType": "regex",
+			"managerFilePatterns": ["/^\\.github/workflows/reusable-docker-build\\.yml$/"],
+			"matchStrings": [
+				"# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\s+pack-version: (?<currentValue>\\S+)"
+			],
+			"extractVersionTemplate": "^v(?<version>.*)$",
+			"versioningTemplate": "semver"
+		},
+		{
+			"description": "Track the buildpacks run image",
+			"customType": "regex",
+			"managerFilePatterns": ["/^\\.github/workflows/ci-build\\.yml$/"],
+			"matchStrings": [
+				"# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\s+run-image: \"[^@\"]+@(?<currentDigest>sha256:[a-f0-9]{64})\""
+			],
+			"currentValueTemplate": "latest"
+		},
+		{
+			"description": "Track the builder and buildpack images in the project descriptor",
+			"customType": "regex",
+			"managerFilePatterns": ["/^server/application/project\\.toml$/"],
+			"matchStrings": [
+				"(?:builder|uri) = \"(?:docker://)?(?<depName>[^@\"]+)@(?<currentDigest>sha256:[a-f0-9]{64})\""
+			],
+			"datasourceTemplate": "docker",
+			"currentValueTemplate": "latest"
+		},
+		{
 			"description": "Track the OpenAPI Generator CLI distribution",
 			"customType": "regex",
 			"managerFilePatterns": ["/^openapitools\\.json$/"],

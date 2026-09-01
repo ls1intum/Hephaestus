@@ -4,9 +4,10 @@ title: Server image build via Paketo Buildpacks + Application CDS
 description: How and why the application-server image is built with Paketo Cloud Native Buildpacks + Application CDS, and the Java 25 + JEP 483 migration path.
 ---
 
-The `application-server` image is built from the `server/application` module with Spring Boot's
-`build-image` goal (Paketo Cloud Native Buildpacks) and Application Class Data Sharing (CDS)
-enabled. The hand-rolled `Dockerfile` was removed. Spring Boot AOT processing is **off** (see below).
+The `application-server` image is built with `pack` (Paketo Cloud Native Buildpacks) from the
+executable JAR that CI packaged and tested, with Application Class Data Sharing (CDS) enabled. The
+recipe is `server/application/project.toml`; there is no `Dockerfile`. Spring Boot AOT processing is
+**off** (see below).
 
 ## Why
 
@@ -30,25 +31,18 @@ production. CDS preserves runtime configuration while improving startup.
 
 ## Builder pinning
 
-`server/application/pom.xml` pins `builder-noble-java-tiny` + `ubuntu-noble-run-tiny` + the `health-checker` buildpack by
-sha256 digest. Refresh:
-
-```shell
-docker buildx imagetools inspect paketobuildpacks/builder-noble-java-tiny:latest --format '{{.Manifest.Digest}}'
-docker buildx imagetools inspect paketobuildpacks/ubuntu-noble-run-tiny:latest    --format '{{.Manifest.Digest}}'
-docker buildx imagetools inspect paketobuildpacks/health-checker:latest           --format '{{.Manifest.Digest}}'
-```
-
-Bump as part of release cycles; the digest is the source of truth.
+`server/application/project.toml` pins `builder-noble-java-tiny` and the `health-checker` buildpack
+by sha256 digest; `.github/workflows/ci-build.yml` pins `ubuntu-noble-run-tiny` the same way, because
+the project descriptor has no run-image key. Renovate follows each image's `latest` tag and proposes
+the digest bumps, so a refresh is a reviewed pull request rather than a hand-edited digest.
 
 ## Container healthcheck on the distroless run image
 
 On Docker Compose the container `HEALTHCHECK` is the only container-level health signal —
 `service_healthy` gating and the `docker compose ps` column both depend on it. `run-tiny` has no
-shell/wget and `builder-noble-java-tiny` bundles no probe, so `server/application/pom.xml` adds an explicit `<buildpacks>`
-order. Specifying `<buildpacks>` **replaces** the builder's default order, so the `java` composite must
-be re-listed (`urn:cnb:builder:paketo-buildpacks/java`) before appending
-`docker://paketobuildpacks/health-checker`; `BP_HEALTH_CHECKER_ENABLED=true` opts it in. It contributes
+shell/wget and `builder-noble-java-tiny` bundles no probe, so `server/application/project.toml` names an explicit buildpack
+group. A named group **replaces** the builder's default order, so the `java` composite must be listed
+(`paketo-buildpacks/java`) before `docker://paketobuildpacks/health-checker`; `BP_HEALTH_CHECKER_ENABLED=true` opts it in. It contributes
 the static, shell-free `thc` binary at `/workspace/health-check`, which the compose services invoke as an
 exec-form `HEALTHCHECK` (`THC_PORT`/`THC_PATH` → actuator liveness/readiness). No `health-check` process
 type is added, so the JVM-spawn-per-probe issue (health-checker#87) does not apply.
@@ -59,17 +53,20 @@ type is added, so the JVM-spawn-per-probe issue (health-checker#87) does not app
 
 ## Rollback
 
-Revert `.github/workflows/ci-docker-build.yml` (the `use-buildpacks: true` line) and re-add a `Dockerfile`. Coolify re-deploys the prior image SHA. Detection: Sentry release-tagged error spike, or Prometheus alert on `application_ready_time_seconds > 15` for three consecutive deploys.
+Switch the `application-server-image` job in `.github/workflows/ci-build.yml` from `use-buildpacks: true` to a `docker-file` that packages the same JAR, and re-add that `Dockerfile`. Coolify re-deploys the prior image SHA. Detection: Sentry release-tagged error spike, or Prometheus alert on `application_ready_time_seconds > 15` for three consecutive deploys.
 
 ## Operational checklist
 
 - **Coolify graceful shutdown** — `application.yml` sets `SHUTDOWN_TIMEOUT:20s`. Coolify's default container stop-grace is 10s; bump it to ≥25s in the deploy substrate so SIGTERM has time to drain in-flight requests. The Paketo launcher `exec`s the JVM; signal forwarding is native, no `tini`.
 - **JVM memory** — do NOT set `MaxRAMPercentage`, `-Xmx`, or `-Xss` in Coolify env. Paketo's memory calculator handles them. Override only `BPL_JVM_HEAD_ROOM` if needed.
-- **CI build time** — expect +60–120s per build vs the prior Dockerfile baseline (CDS training run dominates).
+- **CI build time** — the image job downloads the packaged JAR and spends its time in the CDS training run and the export; nothing is compiled there.
 
 ## Sources
 
-- [Spring Boot 4 — Class Data Sharing how-to](https://docs.spring.io/spring-boot/how-to/class-data-sharing.html)
+- [Spring Boot 4 — AOT cache and CDS how-to](https://docs.spring.io/spring-boot/how-to/aot-cache.html)
+- [Paketo — build an image from a compiled artifact](https://paketo.io/docs/howto/java/)
+- [pack build reference](https://buildpacks.io/docs/for-platform-operators/how-to/integrate-ci/pack/cli/pack_build/)
+- [Project descriptor reference](https://buildpacks.io/docs/reference/config/project-descriptor/)
 - [Spring Boot 4 — Packaging OCI Images](https://docs.spring.io/spring-boot/maven-plugin/build-image.html)
 - [Spring Boot 4 — Ahead-of-Time Processing](https://docs.spring.io/spring-boot/reference/packaging/aot.html)
 - [OpenJDK JEP 483 — Ahead-of-Time Class Loading & Linking](https://openjdk.org/jeps/483)

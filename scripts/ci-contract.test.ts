@@ -100,17 +100,8 @@ void describe("CI contract", () => {
 		const acceptedValues = validation[1];
 		assert.ok(acceptedValues);
 		const accepted = new Set(acceptedValues.split("|"));
-		const implementation = action.replace(validation[0], "");
-		for (const cacheType of accepted) {
-			assert.ok(
-				implementation.includes(`'${cacheType}'`) ||
-					implementation.includes(`"${cacheType}"`) ||
-					(cacheType.startsWith("application-server-") &&
-						implementation.includes("startsWith(inputs.cache-type, 'application-server-')")),
-				`setup-caches accepts ${cacheType} but no step handles it`,
-			);
-		}
 		const rejected: string[] = [];
+		const used = new Set<string>();
 
 		for (const [file, source] of await workflowSources()) {
 			for (const match of source.matchAll(/^\s+cache-type:\s+(.+)$/gm)) {
@@ -119,6 +110,7 @@ void describe("CI contract", () => {
 				const value = rawValue.trim();
 				if (!value.startsWith("${{")) {
 					if (!accepted.has(value)) rejected.push(`${file}: ${value}`);
+					used.add(value);
 					continue;
 				}
 				const key = value.match(/matrix\.([\w-]+)/)?.[1];
@@ -133,31 +125,67 @@ void describe("CI contract", () => {
 				assert.notEqual(values.length, 0, `${file}: matrix.${key} has no static values`);
 				for (const matrixValue of values) {
 					if (!accepted.has(matrixValue)) rejected.push(`${file}: ${matrixValue}`);
+					used.add(matrixValue);
 				}
 			}
 		}
 		assert.deepEqual(rejected, [], "Workflows may only request recognised cache types");
+		assert.deepEqual(used, accepted, "Every accepted cache type is requested by a workflow");
 	});
 
-	void test("runs server integration independently and reuses the server build for E2E", async () => {
-		const source = await readFile(".github/workflows/ci-tests.yml", "utf8");
-		const build = job(source, "server-build");
-		const integration = job(source, "server-integration");
-		const e2e = job(source, "webapp-e2e");
-		assert.equal((build.match(/actions\/upload-artifact@/g) ?? []).length, 1);
-		assert.match(build, /name: \${{ env\.SERVER_REACTOR_ARTIFACT }}/);
-		assert.doesNotMatch(integration, /^ {4}needs:/m);
-		assert.doesNotMatch(integration, /actions\/download-artifact@/);
-		assert.match(integration, /pnpm run test:server:integration/);
-		assert.match(e2e, /needs: server-build/);
+	void test("packages the server once and runs every server gate against that artifact", async () => {
+		const build = await readFile(".github/workflows/ci-build.yml", "utf8");
+		const packageJob = job(build, "server-package");
+		assert.match(packageJob, /mvnw -pl application -am package -DskipTests/);
+		assert.equal((packageJob.match(/actions\/upload-artifact@/g) ?? []).length, 1);
+		assert.match(packageJob, /overwrite: true/);
+		const image = job(build, "application-server-image");
+		assert.match(image, /needs: server-package/);
+		assert.match(image, /application-artifact: \${{ needs\.server-package\.outputs\.artifact }}/);
+
+		const tests = await readFile(".github/workflows/ci-tests.yml", "utf8");
+		for (const name of ["server-verification", "server-integration", "server-contracts"]) {
+			const consumer = job(tests, name);
+			assert.match(consumer, /uses: \.\/\.github\/actions\/restore-server-build/);
+			assert.match(consumer, /artifact: \${{ inputs\.server_artifact }}/);
+			// Goals against the restored classes; a lifecycle phase would compile again.
+			assert.match(
+				consumer,
+				/mvnw -f application\/pom\.xml --batch-mode -Dmaven\.build\.cache\.enabled=false/,
+			);
+			assert.doesNotMatch(
+				consumer,
+				/mvnw[^\n]* (?:compile|test-compile|package|verify|install)(?:\s|$)/,
+			);
+			assert.match(consumer, /surefire:test/);
+		}
+		const e2e = job(tests, "webapp-e2e");
 		assert.equal((e2e.match(/actions\/download-artifact@/g) ?? []).length, 1);
-		assert.match(e2e, /name: \${{ env\.SERVER_REACTOR_ARTIFACT }}/);
+		assert.match(e2e, /name: \${{ inputs\.server_artifact }}/);
+		assert.doesNotMatch(tests, /\bmvnw\b[^\n]*(?:^|\s)-am\b/m);
+
+		const orchestrator = await readFile(".github/workflows/cicd.yml", "utf8");
+		assert.match(job(orchestrator, "Test"), /needs: \[detect-changes, Build\]/);
+		assert.match(
+			job(orchestrator, "Test"),
+			/server_artifact: \${{ needs\.Build\.outputs\.server-artifact }}/,
+		);
+
+		const reusable = await readFile(".github/workflows/reusable-docker-build.yml", "utf8");
+		assert.match(reusable, /pack build "\$PER_ARCH_TAG" --path "\${jars\[0\]}" --descriptor/);
+		for (const [file, source] of await workflowSources()) {
+			assert.doesNotMatch(
+				source,
+				/spring-boot:build-image/,
+				`${file} must build the image from the JAR`,
+			);
+		}
 	});
 
 	void test("builds Storybook once and gives its TurboSnap stats to Chromatic", async () => {
 		const storybook = job(
-			await readFile(".github/workflows/ci-tests.yml", "utf8"),
-			"webapp-storybook",
+			await readFile(".github/workflows/ci-quality-gates.yml", "utf8"),
+			"webapp-stories",
 		);
 		assert.equal((storybook.match(/pnpm --filter webapp run build-storybook/g) ?? []).length, 1);
 		assert.match(storybook, /test -s webapp\/storybook-static\/preview-stats\.json/);
@@ -183,6 +211,7 @@ void describe("CI contract", () => {
 		const detection = job(source, "detect-changes");
 		const expected = new Map([
 			["quality-config", ".github/workflows/ci-quality-gates.yml"],
+			["build-config", ".github/workflows/ci-build.yml"],
 			["test-config", ".github/workflows/ci-tests.yml"],
 			["security-config", ".github/workflows/ci-security-scan.yml"],
 		]);
@@ -204,8 +233,16 @@ void describe("CI contract", () => {
 			job(source, "detect-changes"),
 			/version-bump: \${{ steps\.version_bump\.outputs\.changed }}/,
 		);
-		for (const name of ["workflow-lint", "zizmor", "Quality", "Security", "Test", "Compose"]) {
-			assert.match(job(source, name), /needs: \[detect-changes\]/);
+		for (const name of [
+			"workflow-lint",
+			"zizmor",
+			"Quality",
+			"Build",
+			"Security",
+			"Test",
+			"Compose",
+		]) {
+			assert.match(job(source, name), /needs: \[detect-changes(?:, Build)?\]/);
 			assert.match(
 				job(source, name),
 				/github\.event_name != 'push'.*needs\.detect-changes\.outputs\.version-bump == 'true'/s,
@@ -230,13 +267,13 @@ void describe("CI contract", () => {
 		}
 
 		const docker = await readFile(".github/workflows/ci-docker-build.yml", "utf8");
-		for (const name of [
-			"webapp-build",
-			"application-server-build",
-			"agent-pi-build",
-			"postgres-build",
+		const build = await readFile(".github/workflows/ci-build.yml", "utf8");
+		for (const image of [
+			job(docker, "webapp-build"),
+			job(docker, "agent-pi-build"),
+			job(docker, "postgres-build"),
+			job(build, "application-server-image"),
 		]) {
-			const image = job(docker, name);
 			assert.match(
 				image,
 				/single-arch: \${{ github\.event_name == 'pull_request' \|\| github\.event_name == 'merge_group' }}/,
@@ -456,9 +493,15 @@ void describe("CI contract", () => {
 				`${file} must select an explicit setup-node-pnpm install mode`,
 			);
 		}
-		const tests = await readFile(".github/workflows/ci-tests.yml", "utf8");
-		assert.equal((tests.match(/uses: \.\/\.github\/actions\/setup-browsers/g) ?? []).length, 2);
-		assert.doesNotMatch(tests, /playwright install chromium/);
+		for (const file of [
+			".github/workflows/ci-tests.yml",
+			".github/workflows/ci-quality-gates.yml",
+		]) {
+			const source = sources.get(file);
+			assert.ok(source);
+			assert.equal((source.match(/uses: \.\/\.github\/actions\/setup-browsers/g) ?? []).length, 1);
+			assert.doesNotMatch(source, /playwright install chromium/);
+		}
 	});
 
 	void test("runs release evidence verification through tested TypeScript", async () => {

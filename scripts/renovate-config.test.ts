@@ -51,6 +51,12 @@ void test("every custom manager extracts a dependency from its real source", asy
 			[".github/actions/setup-release-security-tools/action.yml"],
 		],
 		["Track the Zizmor CLI version", [".github/workflows/cicd.yml"]],
+		["Track the pack CLI version", [".github/workflows/reusable-docker-build.yml"]],
+		["Track the buildpacks run image", [".github/workflows/ci-build.yml"]],
+		[
+			"Track the builder and buildpack images in the project descriptor",
+			["server/application/project.toml"],
+		],
 		["Track the OpenAPI Generator CLI distribution", ["openapitools.json"]],
 		["Track release image tags and digests", ["security/release-images.json"]],
 	]);

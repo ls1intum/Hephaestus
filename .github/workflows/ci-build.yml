@@ -1,0 +1,105 @@
+name: Build
+
+on:
+  workflow_call:
+    inputs:
+      should_skip:
+        description: "Whether to skip the workflow"
+        required: false
+        type: string
+        default: "false"
+      server_changed:
+        description: "Whether anything that runs the built server changed"
+        required: false
+        type: string
+        default: "true"
+      server_image_changed:
+        description: "Whether the application-server image inputs changed"
+        required: false
+        type: string
+        default: "true"
+    outputs:
+      server-artifact:
+        description: "Name of the artifact holding the packaged reactor"
+        value: ${{ jobs.server-package.outputs.artifact }}
+
+permissions: {}
+
+env:
+  SERVER_BUILD_ARTIFACT: server-build-${{ github.run_id }}
+
+jobs:
+  # Compiles and packages the reactor exactly once; every server test tier, the browser E2E suite,
+  # the API and database contracts and the application image consume this artifact.
+  server-package:
+    name: "App Server: Package"
+    if: inputs.should_skip != 'true' && (inputs.server_changed == 'true' || inputs.server_image_changed == 'true')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    outputs:
+      artifact: ${{ env.SERVER_BUILD_ARTIFACT }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-caches
+        with:
+          cache-type: application-server-reactor
+          os: ${{ runner.os }}
+      - name: Package the reactor
+        working-directory: server
+        run: ./mvnw -pl application -am package -DskipTests --batch-mode
+      - name: Validate the packaged reactor
+        working-directory: server
+        run: |
+          set -euo pipefail
+          test -d application/target/classes
+          test -d application/target/test-classes
+          mapfile -t jars < <(find application/target -maxdepth 1 -name 'hephaestus-application-*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar')
+          mapfile -t clients < <(find generated-clients/target -maxdepth 1 -name 'hephaestus-generated-clients-*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar')
+          (( ${#jars[@]} == 1 )) && (( ${#clients[@]} == 1 ))
+          unzip -p "${jars[0]}" META-INF/MANIFEST.MF | grep -q '^Main-Class: org.springframework.boot.loader'
+      - name: Upload the packaged reactor
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ env.SERVER_BUILD_ARTIFACT }}
+          path: |
+            server/application/target/classes
+            server/application/target/test-classes
+            server/application/target/hephaestus-application-*.jar
+            server/generated-clients/target/hephaestus-generated-clients-*.jar
+            !server/**/*-sources.jar
+            !server/**/*-javadoc.jar
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+          # A re-run of failed jobs keeps this artifact; a re-run of all jobs replaces it.
+          overwrite: true
+
+  application-server-image:
+    name: "App Server image"
+    needs: server-package
+    if: inputs.should_skip != 'true' && inputs.server_image_changed == 'true'
+    uses: ./.github/workflows/reusable-docker-build.yml
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    with:
+      image-name: "hephaestus-build/application-server"
+      use-buildpacks: true
+      application-artifact: ${{ needs.server-package.outputs.artifact }}
+      project-descriptor: "server/application/project.toml"
+      # renovate: datasource=docker depName=paketobuildpacks/ubuntu-noble-run-tiny
+      run-image: "paketobuildpacks/ubuntu-noble-run-tiny@sha256:c32333227b6dfbc2a4a93b03ee6d3475cfe152468c7d396bf22f06099bb0ecc9"
+      registry: "ghcr.io"
+      single-arch: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
+      labels: |
+        org.opencontainers.image.title=Hephaestus Application Server
+        org.opencontainers.image.description=Spring Boot server for Hephaestus
+        org.opencontainers.image.vendor=AET TUM
+        org.opencontainers.image.licenses=MIT
+        hephaestus.component=application-server

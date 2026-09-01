@@ -21,7 +21,7 @@ on:
         type: string
         default: "true"
       application_server_changed:
-        description: "Whether application-server files changed (or should build for other reasons)"
+        description: "Whether the Build workflow published an application-server image this run"
         required: false
         type: string
         default: "true"
@@ -35,11 +35,6 @@ on:
         required: false
         type: string
         default: "true"
-
-    outputs:
-      application-server-published:
-        description: "Whether an application-server image exists at this commit"
-        value: ${{ jobs.application-server-build.outputs.manifest-digest != '' || jobs.tag-unchanged-images.outputs.application-server-published == 'true' }}
 
 permissions: {}
 
@@ -73,31 +68,6 @@ jobs:
         org.opencontainers.image.vendor=AET TUM
         org.opencontainers.image.licenses=MIT
         hephaestus.component=webapp
-
-  application-server-build:
-    name: "App Server"
-    if: >-
-      inputs.should_skip != 'true' &&
-      (inputs.application_server_changed == 'true' || github.event_name != 'pull_request')
-    uses: ./.github/workflows/reusable-docker-build.yml
-    permissions:
-      contents: read
-      packages: write
-      id-token: write
-      attestations: write
-    with:
-      image-name: "hephaestus-build/application-server"
-      # Application CDS configuration lives in server/application/pom.xml; rationale: docs/admin/buildpacks-cds-decision.md.
-      use-buildpacks: true
-      maven-module: "server/application"
-      registry: "ghcr.io"
-      single-arch: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
-      labels: |
-        org.opencontainers.image.title=Hephaestus Application Server
-        org.opencontainers.image.description=Spring Boot server for Hephaestus
-        org.opencontainers.image.vendor=AET TUM
-        org.opencontainers.image.licenses=MIT
-        hephaestus.component=application-server
 
   agent-pi-build:
     name: "Agent: Pi"
@@ -161,8 +131,6 @@ jobs:
        inputs.postgres_image_changed != 'true')
     timeout-minutes: 15
     runs-on: ubuntu-latest
-    outputs:
-      application-server-published: ${{ steps.tag.outputs.application-server-published }}
     permissions:
       packages: write
       attestations: read
@@ -229,9 +197,6 @@ jobs:
           }
 
           [ "$WEBAPP_CHANGED" = "true" ] || tag_image webapp
-          if [ "$APPLICATION_SERVER_CHANGED" != "true" ]; then
-            tag_image application-server
-            echo "application-server-published=true" >> "$GITHUB_OUTPUT"
-          fi
+          [ "$APPLICATION_SERVER_CHANGED" = "true" ] || tag_image application-server
           [ "$AGENT_IMAGES_CHANGED" = "true" ] || tag_image agent-pi
           [ "$POSTGRES_IMAGE_CHANGED" = "true" ] || tag_image postgres

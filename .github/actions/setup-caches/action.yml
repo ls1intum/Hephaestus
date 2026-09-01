@@ -1,8 +1,8 @@
 name: "Setup CI caches"
-description: "Set up the JDK and cache Maven dependencies and generated clients."
+description: "Set up the JDK and cache Maven dependencies; reactor jobs also restore the generated-client build cache."
 inputs:
   cache-type:
-    description: "Type of cache to setup"
+    description: "application-server-reactor for jobs that run the Maven reactor; application-server-tests for jobs that run goals against the packaged reactor"
     required: true
   os:
     description: "Operating system for cache key"
@@ -18,13 +18,13 @@ runs:
         CACHE_TYPE: ${{ inputs.cache-type }}
       run: |
         case "$CACHE_TYPE" in
-          application-server-quality|application-server-verification|application-server-integration|server-contracts) ;;
+          application-server-reactor|application-server-tests) ;;
           *) echo "::error::Unknown cache type '$CACHE_TYPE'."; exit 1 ;;
         esac
 
     - name: Compute generated-client cache identity
       id: generated-clients-identity
-      if: startsWith(inputs.cache-type, 'application-server-') || inputs.cache-type == 'server-contracts'
+      if: inputs.cache-type == 'application-server-reactor'
       shell: bash
       env:
         DEPENDENCY_HASH: ${{ hashFiles('server/pom.xml', 'server/generated-clients/pom.xml', 'server/.mvn/**', 'server/generated-clients/src/**') }}
@@ -37,7 +37,6 @@ runs:
 
     - name: Set up JDK 21
       id: java
-      if: startsWith(inputs.cache-type, 'application-server-') || inputs.cache-type == 'server-contracts'
       uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
       with:
         distribution: "temurin"
@@ -50,15 +49,16 @@ runs:
         cache-read-only: ${{ github.ref != format('refs/heads/{0}', github.event.repository.default_branch) || !contains(fromJSON('["push", "schedule", "workflow_dispatch"]'), github.event_name) }}
         cache-jdk: false
 
+    # Merge groups branch from main and read its caches like a pull request does.
     - name: Restore generated clients
-      if: github.event_name == 'pull_request' && (startsWith(inputs.cache-type, 'application-server-') || inputs.cache-type == 'server-contracts')
+      if: inputs.cache-type == 'application-server-reactor' && contains(fromJSON('["pull_request", "merge_group"]'), github.event_name)
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/.m2/build-cache
         key: ${{ inputs.os }}-${{ steps.java.outputs.distribution }}-${{ steps.java.outputs.version }}-generated-clients-${{ steps.generated-clients-identity.outputs.hash }}
 
     - name: Cache generated clients
-      if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && contains(fromJSON('["push", "schedule", "workflow_dispatch"]'), github.event_name) && (startsWith(inputs.cache-type, 'application-server-') || inputs.cache-type == 'server-contracts')
+      if: inputs.cache-type == 'application-server-reactor' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && contains(fromJSON('["push", "schedule", "workflow_dispatch"]'), github.event_name)
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/.m2/build-cache

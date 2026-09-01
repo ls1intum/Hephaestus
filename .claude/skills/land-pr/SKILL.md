@@ -62,10 +62,9 @@ pnpm run db:draft-changelog    # entities changed (needs Docker); then prune the
 pnpm run db:generate-erd-docs  # after any changelog change
 ```
 
-`generate:api:application-server:specs` **fails when a port it needs is busy** — HTTP, management, or
-the JMX port it defaults to. It restores the previous spec rather than committing an empty one, so
-the cost is a wasted Maven cycle. Pass free ports; the exact invocation is in `server/AGENTS.md`
-§ OpenAPI generation ports.
+`generate:api:application-server:specs` packages the reactor and boots the executable JAR on ports
+it allocates itself, so nothing needs freeing; `server/AGENTS.md` § OpenAPI generation has the
+`HEPHAESTUS_APPLICATION_JAR` shortcut for a JAR you already built.
 
 ## 5. Run the tests your diff can break
 

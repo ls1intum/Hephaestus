@@ -66,11 +66,15 @@ async function stopPostgres(value: Config): Promise<void> {
 }
 
 async function migrate(value: Config, diff = false, signal?: AbortSignal): Promise<void> {
-	await run(
-		"./mvnw",
-		["-pl", "generated-clients", "-am", "install", "-DskipTests", "--batch-mode"],
-		{ cwd: server, env: value.env, signal },
-	);
+	// The single-module Liquibase run resolves the generated clients from the local repository. CI
+	// installs them from the packaged reactor before calling this; a workstation builds them here.
+	if (!value.ci) {
+		await run(
+			"./mvnw",
+			["-pl", "generated-clients", "-am", "install", "-DskipTests", "--batch-mode"],
+			{ cwd: server, env: value.env, signal },
+		);
+	}
 	await run(
 		"./mvnw",
 		[

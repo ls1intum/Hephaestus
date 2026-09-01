@@ -48,17 +48,12 @@ Each of these can leave you with the wrong result.
   local OAuth variables make environment-sensitive tests fail only on your machine. Run tests with
   `MANAGEMENT_PORT=0 SERVER_PORT=0`.
 
-### OpenAPI generation ports
+### OpenAPI generation
 
-`generate:api:application-server:specs` boots the app to scrape springdoc, so it needs a free HTTP port
-(`openapi.server.port`, default **38090**), a free management port, **and a free JMX port**
-(`openapi.jmx.port`, default **9001**). The root generation command fails and restores the previous
-spec if Maven does not produce a new one. Never stop another service to free a port; override:
-
-```bash
-MANAGEMENT_PORT=0 pnpm run generate:api:application-server:specs -- -Dopenapi.server.port=38111 -Dopenapi.jmx.port=9031
-pnpm run generate:api:application-server:client
-```
+`generate:api:application-server:specs` packages the reactor, boots the executable JAR under the
+`specs` profile on ports it allocates itself, and writes `/v3/api-docs.yaml` verbatim to
+`server/openapi.yaml`. Point `HEPHAESTUS_APPLICATION_JAR` at an already-built JAR to skip the
+packaging step, which is what CI does with the reactor artifact.
 
 ## Boundaries
 
@@ -192,8 +187,9 @@ through `core.webhook.WebhookProperties`, shared with auto-registration in `work
 
 ## Container image
 
-Paketo Cloud Native Buildpacks with Application CDS; `application/pom.xml` `<image>` pins builder and
-run image by digest. There is no `Dockerfile`. From `server/`, run
-`./mvnw -pl generated-clients -am install -DskipTests`, then
-`./mvnw -f application/pom.xml spring-boot:build-image`. See
-`docs/admin/buildpacks-cds-decision.md`.
+Paketo Cloud Native Buildpacks with Application CDS, built from the executable JAR the tests ran.
+`application/project.toml` pins the builder and buildpacks by digest; CI pins the run image beside
+the build. There is no `Dockerfile`. From `server/`, run
+`./mvnw -pl application -am package -DskipTests`, then
+`pack build hephaestus/application-server --path application/target/hephaestus-application-*.jar --descriptor application/project.toml --run-image <digest in project.toml>`.
+See `docs/admin/buildpacks-cds-decision.md`.

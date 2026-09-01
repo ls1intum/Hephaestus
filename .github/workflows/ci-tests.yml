@@ -8,13 +8,17 @@ on:
         required: false
         type: string
         default: "false"
-      webapp_changed:
-        description: "Whether webapp files changed"
+      server_artifact:
+        description: "Name of the packaged-reactor artifact every job here runs against"
+        required: true
+        type: string
+      application_server_changed:
+        description: "Whether application-server files changed"
         required: false
         type: string
         default: "true"
-      application_server_changed:
-        description: "Whether application-server files changed"
+      contracts_changed:
+        description: "Whether the API or database contracts or their PostgreSQL image changed"
         required: false
         type: string
         default: "true"
@@ -28,23 +32,19 @@ on:
         required: false
         type: string
         default: "false"
-    secrets:
-      CHROMATIC_PROJECT_TOKEN:
-        required: false
-      SURGE_TOKEN:
-        required: false
 
 permissions: {}
 
-env:
-  SERVER_REACTOR_ARTIFACT: server-reactor-${{ github.run_id }}-${{ github.run_attempt }}
+# Every job runs Maven goals against the classes the package job compiled; none of them compiles.
+# `-f application/pom.xml` keeps the generated clients out of the reactor, so they resolve from the
+# JAR the restore action installed.
 
 jobs:
-  server-build:
-    name: "App Server: Reactor"
-    if: inputs.should_skip != 'true' && (inputs.application_server_changed == 'true' || inputs.e2e_changed == 'true')
+  server-verification:
+    name: "App Server: Unit and architecture"
+    if: inputs.should_skip != 'true' && inputs.application_server_changed == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
     permissions:
       contents: read
       checks: write
@@ -54,47 +54,19 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup-caches
         with:
-          cache-type: application-server-verification
+          cache-type: application-server-tests
           os: ${{ runner.os }}
-      - name: Build reactor
-        run: |
-          rm -rf server/application/target/surefire-reports/*
-          cd server
-          if [[ "${INPUTS_APPLICATION_SERVER_CHANGED}" == "true" ]]; then
-            ./mvnw -pl application -am package -Parchitecture-tests \
-              -Dsurefire.includedGroups=unit,architecture -DskipCoverage=false --batch-mode
-          else
-            ./mvnw -pl application -am package -DskipTests --batch-mode
-          fi
-        env:
-          INPUTS_APPLICATION_SERVER_CHANGED: ${{ inputs.application_server_changed }}
-      - name: Validate built reactor
-        run: |
-          test -d server/application/target/classes
-          test -d server/application/target/test-classes
-          mapfile -t APPLICATION_JARS < <(find server/application/target -maxdepth 1 -name 'hephaestus-application-*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar')
-          mapfile -t CLIENT_JARS < <(find server/generated-clients/target -maxdepth 1 -name 'hephaestus-generated-clients-*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar')
-          (( ${#APPLICATION_JARS[@]} > 0 ))
-          (( ${#CLIENT_JARS[@]} > 0 ))
-      - name: Upload built reactor
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: ./.github/actions/restore-server-build
         with:
-          name: ${{ env.SERVER_REACTOR_ARTIFACT }}
-          path: |
-            server/application/target/classes
-            server/application/target/test-classes
-            server/application/target/*.jar
-            server/generated-clients/target/classes
-            server/generated-clients/target/*.jar
-            !server/application/target/*-sources.jar
-            !server/application/target/*-javadoc.jar
-            !server/generated-clients/target/*-sources.jar
-            !server/generated-clients/target/*-javadoc.jar
-          if-no-files-found: error
-          retention-days: 1
-          compression-level: 0
+          artifact: ${{ inputs.server_artifact }}
+      - name: Run unit and architecture tests with coverage floors
+        working-directory: server
+        run: |
+          ./mvnw -f application/pom.xml --batch-mode -Dmaven.build.cache.enabled=false -Parchitecture-tests \
+            -Dsurefire.includedGroups=unit,architecture -DskipCoverage=false \
+            jacoco:prepare-agent surefire:test jacoco:report@report jacoco:check@check-coverage
       - name: Upload test results
-        if: always() && inputs.application_server_changed == 'true'
+        if: always()
         uses: dorny/test-reporter@a43b3a5f7366b97d083190328d2c652e1a8b6aa2 # v3.0.0
         with:
           name: "Test Results - App Server Verification"
@@ -114,17 +86,18 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup-node-pnpm
-        with:
-          install: "none"
       - uses: ./.github/actions/setup-caches
         with:
-          cache-type: application-server-integration
+          cache-type: application-server-tests
           os: ${{ runner.os }}
+      - uses: ./.github/actions/restore-server-build
+        with:
+          artifact: ${{ inputs.server_artifact }}
       - name: Run integration tests
+        working-directory: server
         run: |
-          rm -rf server/application/target/surefire-reports/*
-          pnpm run test:server:integration
+          ./mvnw -f application/pom.xml --batch-mode -Dmaven.build.cache.enabled=false \
+            -Dsurefire.includedGroups=integration -Dparallel=none surefire:test
       - name: Upload test results
         if: always()
         uses: dorny/test-reporter@a43b3a5f7366b97d083190328d2c652e1a8b6aa2 # v3.0.0
@@ -134,133 +107,129 @@ jobs:
           reporter: java-junit
           fail-on-error: false
 
-  webapp-storybook:
-    name: "Webapp: Stories"
-    if: inputs.should_skip != 'true' && inputs.webapp_changed == 'true'
+  server-contracts:
+    name: "App Server: API and database"
+    if: inputs.should_skip != 'true' && inputs.contracts_changed == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 25
     permissions:
       contents: read
-      checks: write
-      pull-requests: write
-      statuses: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0
           persist-credentials: false
       - uses: ./.github/actions/setup-node-pnpm
         with:
           install: "frozen"
-      - uses: ./.github/actions/setup-browsers
-      - name: Run story tests and generated-asset check
-        id: tests
+      - uses: ./.github/actions/setup-caches
+        with:
+          cache-type: application-server-tests
+          os: ${{ runner.os }}
+      - uses: ./.github/actions/restore-server-build
+        id: server
+        with:
+          artifact: ${{ inputs.server_artifact }}
+
+      - name: OpenAPI validation
+        id: openapi
         continue-on-error: true
+        env:
+          HEPHAESTUS_APPLICATION_JAR: ${{ steps.server.outputs.executable-jar }}
         run: |
-          timeout --kill-after=30s 15m pnpm --filter webapp run test:storybook
-          pnpm --filter webapp run export:assets
-          BRAND_ASSETS=(webapp/brand webapp/public docs/images/readme docs/static/img/brand docs/static/img/favicon.png docs/static/img/hephaestus-social-card.png docker/compose.proxy.yaml)
-          if [[ -n "$(git status --porcelain --untracked-files=all -- "${BRAND_ASSETS[@]}")" ]]; then
-            echo "::error::Brand assets are stale. Run 'pnpm --filter webapp run export:assets' and commit the result."
-            git status --short --untracked-files=all -- "${BRAND_ASSETS[@]}"
+          pnpm run generate:api
+          git add .
+          if ! git diff --cached --quiet; then
+            echo "::error::OpenAPI out of sync. Run: pnpm run generate:api"
+            echo "### OpenAPI Validation" >> $GITHUB_STEP_SUMMARY
+            echo "| Check | Status | Fix |" >> $GITHUB_STEP_SUMMARY
+            echo "|-------|--------|-----|" >> $GITHUB_STEP_SUMMARY
+            echo "| API specs sync | :x: Out of sync | \`pnpm run generate:api\` |" >> $GITHUB_STEP_SUMMARY
             exit 1
           fi
-      - name: Build Storybook with dependency stats
-        run: |
-          pnpm --filter webapp run build-storybook
-          test -s webapp/storybook-static/preview-stats.json
-      - name: Chromatic visual testing
-        id: chromatic
+
+      - name: Database validation (schema + ERD + models)
+        id: database
         continue-on-error: true
-        if: >-
-          success() &&
-          (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
-        uses: chromaui/action@4cc98810d00b34b8f9e89d454d64a8ac3d088340 # v18.7.1
-        with:
-          projectToken: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
-          workingDir: webapp
-          storybookBuildDir: storybook-static
-          onlyChanged: true
-          zip: true
-          skip: "@(dependabot/**|renovate/**)"
-          autoAcceptChanges: ${{ github.ref == 'refs/heads/main' && 'main' || '' }}
-          exitZeroOnChanges: false
-          logLevel: info
-          junitReport: true
-        env:
-          CHROMATIC_BRANCH: ${{ github.head_ref || github.ref_name }}
-          CHROMATIC_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-      - name: Deploy public Storybook preview
-        id: storybook_preview
-        if: >-
-          github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository &&
-          startsWith(steps.chromatic.outputs.storybookUrl, 'http')
-        env:
-          PREVIEW_URL: ls1intum-hephaestus-storybook-pr-${{ github.event.number }}.surge.sh
-          SURGE_TOKEN: ${{ secrets.SURGE_TOKEN }}
-        run: ./node_modules/.bin/surge ./webapp/storybook-static "$PREVIEW_URL" --token "$SURGE_TOKEN"
-      - name: Add Storybook preview to the pull request
-        if: steps.storybook_preview.outcome == 'success'
-        uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
-        with:
-          header: storybook-preview
-          message: |
-            ## 🧩 Storybook Preview
-
-            Review this pull request's components and interaction states:
-
-            🔗 **[View Storybook Preview](https://ls1intum-hephaestus-storybook-pr-${{ github.event.number }}.surge.sh)**
-
-            <sub>Preview for commit ${{ github.event.pull_request.head.sha }}. Updates automatically on new commits.</sub>
-      - name: Create Storybook status check
-        if: >-
-          always() && startsWith(steps.chromatic.outputs.storybookUrl, 'http') &&
-          (github.event_name != 'pull_request' || steps.storybook_preview.outcome == 'success')
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        with:
-          script: |
-            const storybookUrl = context.payload.pull_request
-              ? 'https://ls1intum-hephaestus-storybook-pr-${{ github.event.number }}.surge.sh'
-              : '${{ steps.chromatic.outputs.storybookUrl }}';
-            await github.rest.repos.createCommitStatus({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              sha: context.payload.pull_request?.head?.sha || context.sha,
-              state: 'success',
-              target_url: storybookUrl,
-              description: 'Click Details to view your Storybook',
-              context: 'Preview / Storybook'
-            });
-      - name: Upload Storybook test results
-        if: always()
-        uses: dorny/test-reporter@a43b3a5f7366b97d083190328d2c652e1a8b6aa2 # v3.0.0
-        with:
-          name: "Test Results - Webapp Stories"
-          path: "webapp/test-results/junit-storybook.xml"
-          reporter: java-junit
-          fail-on-error: false
-      - name: Upload Chromatic test results
-        if: always() && startsWith(steps.chromatic.outputs.storybookUrl, 'http')
-        uses: dorny/test-reporter@a43b3a5f7366b97d083190328d2c652e1a8b6aa2 # v3.0.0
-        with:
-          name: "Test Results - Chromatic"
-          path: "webapp/chromatic-build-*.xml"
-          reporter: java-junit
-          fail-on-error: false
-      - name: Evaluate stories checks
         if: always()
         env:
-          STORYBOOK_TESTS: ${{ steps.tests.outcome }}
-          CHROMATIC: ${{ steps.chromatic.outcome }}
+          INPUTS_POSTGRES_IMAGE_CHANGED: ${{ inputs.postgres_image_changed }}
         run: |
-          if [ "$STORYBOOK_TESTS" != success ] || { [ "$CHROMATIC" != success ] && [ "$CHROMATIC" != skipped ]; }; then
-            echo "::error::Storybook tests or Chromatic failed; review both independently reported steps."
+          # The base image may still be publishing; build the same Dockerfile as fallback.
+          if [[ "${INPUTS_POSTGRES_IMAGE_CHANGED}" == "true" ]] ||
+            ! docker pull ghcr.io/hephaestus-build/postgres:${{ github.event.pull_request.base.sha || github.sha }}; then
+            docker build -t hephaestus-postgres:ci docker/postgres
+          else
+            docker tag ghcr.io/hephaestus-build/postgres:${{ github.event.pull_request.base.sha || github.sha }} hephaestus-postgres:ci
+          fi
+          docker run -d --name postgres-db \
+            -e POSTGRES_DB=hephaestus -e POSTGRES_PASSWORD=root -e POSTGRES_USER=root \
+            -p 5432:5432 hephaestus-postgres:ci
+          trap 'docker stop postgres-db 2>/dev/null; docker rm postgres-db 2>/dev/null' EXIT
+          until docker exec postgres-db pg_isready -U root -d hephaestus; do sleep 2; done
+
+          export SPRING_DATASOURCE_URL="jdbc:postgresql://localhost:5432/hephaestus"
+          export SPRING_DATASOURCE_USERNAME="root"
+          export SPRING_DATASOURCE_PASSWORD="root"
+
+          if ! (cd server && ./mvnw -f application/pom.xml --batch-mode -Dmaven.build.cache.enabled=false --quiet \
+              -Dsurefire.includedGroups=database surefire:test); then
+            echo "::error::Database contract tests failed. Fix the reported error before continuing."
+            echo "### Database Validation" >> $GITHUB_STEP_SUMMARY
+            echo "| Check | Status | Fix |" >> $GITHUB_STEP_SUMMARY
+            echo "|-------|--------|-----|" >> $GITHUB_STEP_SUMMARY
+            echo "| Database contract tests | :x: Failed | Fix the reported test in \`server\` |" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+          pnpm run test:postgres-upgrade
+
+          ISSUES_FOUND=()
+
+          # draft-changelog first applies the full master.xml chain to the empty DB via
+          # liquibase:update — so this step is ALSO the empty→head migration-chain replay gate (a
+          # changelog that doesn't apply fails here). Keep that apply intact.
+          pnpm run db:draft-changelog || ISSUES_FOUND+=("Schema check / migration-chain apply failed. Run: pnpm run db:draft-changelog")
+          if [ -f "server/application/src/main/resources/db/changelog_new.xml" ]; then
+            echo "::error::Schema drift detected. Run: pnpm run db:draft-changelog"
+            cat server/application/src/main/resources/db/changelog_new.xml
+            ISSUES_FOUND+=("Schema drift detected")
+          fi
+
+          pnpm run db:generate-erd-docs || ISSUES_FOUND+=("ERD generation failed. Run: pnpm run db:generate-erd-docs")
+          git add docs/contributor/erd/schema.mmd
+          if ! git diff --cached --quiet docs/contributor/erd/schema.mmd; then
+            echo "::error::ERD outdated. Run: pnpm run db:generate-erd-docs"
+            ISSUES_FOUND+=("ERD outdated")
+          fi
+
+          if [ ${#ISSUES_FOUND[@]} -gt 0 ]; then
+            echo "### Database Validation" >> $GITHUB_STEP_SUMMARY
+            echo "| Check | Status | Fix |" >> $GITHUB_STEP_SUMMARY
+            echo "|-------|--------|-----|" >> $GITHUB_STEP_SUMMARY
+            for issue in "${ISSUES_FOUND[@]}"; do
+              echo "::error::$issue"
+              if [[ "$issue" == *"Run:"* ]]; then
+                echo "| ${issue%%.*} | :x: Failed | \`${issue##*Run: }\` |" >> $GITHUB_STEP_SUMMARY
+              else
+                echo "| $issue | :x: Failed | See logs |" >> $GITHUB_STEP_SUMMARY
+              fi
+            done
+            exit 1
+          fi
+
+      - name: Evaluate API and database contracts
+        if: always()
+        env:
+          OPENAPI: ${{ steps.openapi.outcome }}
+          DATABASE: ${{ steps.database.outcome }}
+        run: |
+          if [ "$OPENAPI" != "success" ] || [ "$DATABASE" != "success" ]; then
+            echo "::error::OpenAPI or database validation failed; review both independently reported steps."
             exit 1
           fi
 
   webapp-e2e:
     name: "Webapp: E2E"
-    needs: server-build
     if: inputs.should_skip != 'true' && inputs.e2e_changed == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -279,10 +248,10 @@ jobs:
           java-version: "21"
           cache-jdk: false
       - uses: ./.github/actions/setup-browsers
-      - name: Download built reactor
+      - name: Download the packaged reactor
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: ${{ env.SERVER_REACTOR_ARTIFACT }}
+          name: ${{ inputs.server_artifact }}
           path: server
       - name: Run end-to-end tests against the built server
         run: |
@@ -310,7 +279,7 @@ jobs:
             docker compose -f server/compose.yaml down -v
           }
           trap cleanup EXIT
-          mapfile -t SERVER_JARS < <(find server/application/target -maxdepth 1 -name 'hephaestus-application-*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar')
+          mapfile -t SERVER_JARS < <(find server/application/target -maxdepth 1 -name 'hephaestus-application-*.jar')
           (( ${#SERVER_JARS[@]} == 1 ))
           SERVER_JAR=${SERVER_JARS[0]}
           SERVER_PORT=8080 MANAGEMENT_PORT=8080 POSTGRES_PORT=5432 \

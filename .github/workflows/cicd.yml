@@ -26,13 +26,14 @@ jobs:
       webapp-image: ${{ steps.filter.outputs.webapp-image == 'true' || steps.webapp_image_source.outputs.webapp-image-source == 'true' }}
       application-server: ${{ steps.filter.outputs.application-server }}
       tooling: ${{ steps.filter.outputs.tooling }}
-      application-server-image: ${{ steps.filter.outputs.application-server-image }}
+      application-server-image: ${{ steps.filter.outputs.application-server-image == 'true' || steps.filter.outputs.docker-config == 'true' || steps.filter.outputs.build-config == 'true' }}
       e2e: ${{ steps.filter.outputs.e2e }}
       agent-images: ${{ steps.filter.outputs.agent-images }}
       postgres-image: ${{ steps.filter.outputs.postgres-image }}
       docs: ${{ steps.filter.outputs.docs }}
       ci-config: ${{ steps.filter.outputs.ci-config }}
       quality-config: ${{ steps.filter.outputs.quality-config }}
+      build-config: ${{ steps.filter.outputs.build-config }}
       test-config: ${{ steps.filter.outputs.test-config }}
       security-config: ${{ steps.filter.outputs.security-config }}
       docker-config: ${{ steps.filter.outputs.docker-config }}
@@ -137,6 +138,7 @@ jobs:
             application-server-image:
               - 'server/application/src/main/**'
               - 'server/application/pom.xml'
+              - 'server/application/project.toml'
               - 'server/generated-clients/**'
               - 'server/pom.xml'
               - 'server/mvnw'
@@ -158,6 +160,7 @@ jobs:
               - 'pnpm-lock.yaml'
               - 'pnpm-workspace.yaml'
               - '.github/workflows/cicd.yml'
+              - '.github/workflows/ci-build.yml'
               - '.github/workflows/ci-tests.yml'
               - '.github/actions/setup-caches/**'
               - '.github/actions/setup-node-pnpm/**'
@@ -176,12 +179,17 @@ jobs:
               - '.github/workflows/ci-quality-gates.yml'
               - '.github/actions/setup-node-pnpm/**'
               - '.github/actions/setup-caches/**'
+            build-config:
+              - '.github/workflows/cicd.yml'
+              - '.github/workflows/ci-build.yml'
+              - '.github/actions/setup-caches/**'
             test-config:
               - '.github/workflows/cicd.yml'
               - '.github/workflows/ci-tests.yml'
               - '.github/actions/setup-node-pnpm/**'
               - '.github/actions/setup-caches/**'
               - '.github/actions/setup-browsers/**'
+              - '.github/actions/restore-server-build/**'
             security-config:
               - '.github/workflows/cicd.yml'
               - '.github/workflows/ci-security-scan.yml'
@@ -269,17 +277,43 @@ jobs:
         needs.detect-changes.outputs.quality-config == 'true' ||
         github.event_name != 'pull_request'
       )
+    secrets:
+      CHROMATIC_PROJECT_TOKEN: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
+      SURGE_TOKEN: ${{ secrets.SURGE_TOKEN }}
     permissions:
       checks: write
       contents: read
+      pull-requests: write
+      statuses: write
     with:
       should_skip: ${{ needs.detect-changes.outputs.should_skip }}
       webapp_changed: ${{ (needs.detect-changes.outputs.webapp == 'true' || needs.detect-changes.outputs.quality-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       application_server_changed: ${{ (needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.quality-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       tooling_changed: ${{ (needs.detect-changes.outputs.tooling == 'true' || needs.detect-changes.outputs.quality-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
-      postgres_image_changed: ${{ (needs.detect-changes.outputs.postgres-image == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
-      contracts_changed: ${{ (needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.postgres-image == 'true' || needs.detect-changes.outputs.quality-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       pmd_canary: ${{ (needs.detect-changes.outputs.pmd-canary == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+
+  # Packages the server once; Test and the application image consume the artifact.
+  Build:
+    uses: ./.github/workflows/ci-build.yml
+    needs: [detect-changes]
+    if: |
+      (github.event_name != 'push' || needs.detect-changes.outputs.version-bump == 'true') &&
+      needs.detect-changes.outputs.should_skip != 'true' && (
+        needs.detect-changes.outputs.any-code == 'true' ||
+        needs.detect-changes.outputs.build-config == 'true' ||
+        needs.detect-changes.outputs.test-config == 'true' ||
+        needs.detect-changes.outputs.application-server-image == 'true' ||
+        github.event_name != 'pull_request'
+      )
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    with:
+      should_skip: ${{ needs.detect-changes.outputs.should_skip }}
+      server_changed: ${{ (needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.e2e == 'true' || needs.detect-changes.outputs.postgres-image == 'true' || needs.detect-changes.outputs.build-config == 'true' || needs.detect-changes.outputs.test-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+      server_image_changed: ${{ (needs.detect-changes.outputs.application-server-image == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
 
   Security:
     uses: ./.github/workflows/ci-security-scan.yml
@@ -297,28 +331,28 @@ jobs:
     with:
       should_skip: ${{ needs.detect-changes.outputs.should_skip }}
 
+  # Every job here runs the artifact Build packaged, so Build's skip is Test's skip.
   Test:
     uses: ./.github/workflows/ci-tests.yml
-    needs: [detect-changes]
+    needs: [detect-changes, Build]
     if: |
       (github.event_name != 'push' || needs.detect-changes.outputs.version-bump == 'true') &&
       needs.detect-changes.outputs.should_skip != 'true' && (
-        needs.detect-changes.outputs.any-code == 'true' ||
+        needs.detect-changes.outputs.application-server == 'true' ||
+        needs.detect-changes.outputs.e2e == 'true' ||
+        needs.detect-changes.outputs.postgres-image == 'true' ||
+        needs.detect-changes.outputs.build-config == 'true' ||
         needs.detect-changes.outputs.test-config == 'true' ||
         github.event_name != 'pull_request'
       )
-    secrets:
-      CHROMATIC_PROJECT_TOKEN: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
-      SURGE_TOKEN: ${{ secrets.SURGE_TOKEN }}
     permissions:
       contents: read
       checks: write
-      pull-requests: write
-      statuses: write
     with:
       should_skip: ${{ needs.detect-changes.outputs.should_skip }}
-      webapp_changed: ${{ (needs.detect-changes.outputs.webapp == 'true' || needs.detect-changes.outputs.test-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
-      application_server_changed: ${{ (needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.test-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+      server_artifact: ${{ needs.Build.outputs.server-artifact }}
+      application_server_changed: ${{ (needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.build-config == 'true' || needs.detect-changes.outputs.test-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+      contracts_changed: ${{ (needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.postgres-image == 'true' || needs.detect-changes.outputs.build-config == 'true' || needs.detect-changes.outputs.test-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       e2e_changed: ${{ (needs.detect-changes.outputs.e2e == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       postgres_image_changed: ${{ (needs.detect-changes.outputs.postgres-image == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
 
@@ -359,7 +393,7 @@ jobs:
     with:
       should_skip: ${{ needs.detect-changes.outputs.should_skip }}
       webapp_changed: ${{ (needs.detect-changes.outputs.webapp-image == 'true' || needs.detect-changes.outputs.docker-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
-      application_server_changed: ${{ (needs.detect-changes.outputs.application-server-image == 'true' || needs.detect-changes.outputs.docker-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+      application_server_changed: ${{ (needs.detect-changes.outputs.application-server-image == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       agent_images_changed: ${{ (needs.detect-changes.outputs.agent-images == 'true' || needs.detect-changes.outputs.docker-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       postgres_image_changed: ${{ (needs.detect-changes.outputs.postgres-image == 'true' || needs.detect-changes.outputs.docker-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
 
@@ -370,7 +404,7 @@ jobs:
     permissions:
       actions: read
       statuses: write
-    needs: [detect-changes, workflow-lint, zizmor, Quality, Security, Test, Changesets, Compose, Docker]
+    needs: [detect-changes, workflow-lint, zizmor, Quality, Build, Security, Test, Changesets, Compose, Docker]
     if: always()
     steps:
       - name: Generate workflow timeline
@@ -424,6 +458,7 @@ jobs:
           echo "workflow-lint: ${{ needs.workflow-lint.result }}"
           echo "zizmor:        ${{ needs.zizmor.result }}"
           echo "Quality:        ${{ needs.Quality.result }}"
+          echo "Build:          ${{ needs.Build.result }}"
           echo "Security:       ${{ needs.Security.result }}"
           echo "Test:           ${{ needs.Test.result }}"
           echo "Changesets:     ${{ needs.Changesets.result }}"
@@ -475,6 +510,7 @@ jobs:
           echo "| Actionlint | $(result_to_emoji '${{ needs.workflow-lint.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| Zizmor | $(result_to_emoji '${{ needs.zizmor.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| Quality | $(result_to_emoji '${{ needs.Quality.result }}') |" >> $GITHUB_STEP_SUMMARY
+          echo "| Build | $(result_to_emoji '${{ needs.Build.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| Test | $(result_to_emoji '${{ needs.Test.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| Changesets | $(result_to_emoji '${{ needs.Changesets.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| Compose | $(result_to_emoji '${{ needs.Compose.result }}') |" >> $GITHUB_STEP_SUMMARY
@@ -574,6 +610,7 @@ jobs:
             echo "" >> $GITHUB_STEP_SUMMARY
             SKIPPED_COUNT=0
             [[ "${{ needs.Quality.result }}" == "skipped" ]] && SKIPPED_COUNT=$((SKIPPED_COUNT + 1)) || true
+            [[ "${{ needs.Build.result }}" == "skipped" ]] && SKIPPED_COUNT=$((SKIPPED_COUNT + 1)) || true
             [[ "${{ needs.Test.result }}" == "skipped" ]] && SKIPPED_COUNT=$((SKIPPED_COUNT + 1)) || true
             [[ "${{ needs.Security.result }}" == "skipped" ]] && SKIPPED_COUNT=$((SKIPPED_COUNT + 1)) || true
             [[ "${{ needs.Docker.result }}" == "skipped" ]] && SKIPPED_COUNT=$((SKIPPED_COUNT + 1)) || true
