@@ -8,8 +8,8 @@ description: High-performance trunk-based CI/CD with release-gated staging and p
 # CI/CD Architecture
 
 Hephaestus uses trunk-based delivery through GitHub's merge queue. Pull requests provide early
-feedback, merge groups validate projected `main`, and pushes to `main` produce release images. Signed
-releases deploy automatically to staging; production requires approval.
+feedback, merge groups validate projected `main`, and pushes to `main` produce release images. Releases
+with signed image locks deploy automatically to staging; production requires approval.
 
 ## 🏗️ Architecture Overview
 
@@ -21,20 +21,27 @@ flowchart TD
     PRCI --> Queue[Merge queue]
     Queue --> MG[Projected-main validation]
     MG --> Main[Merge to main]
-    Main --> Images[Build and attest final-SHA images]
-    Main --> VP[Update Version PR]
-    VP -->|Maintainer merges| ReleaseCI[Validate and build version commit]
-    ReleaseCI --> Release[Build evidence and signed lock]
-    Release --> Verify{Verify release}
-    Verify -->|Pass| Staging[Deploy complete topology to staging]
-    Staging -->|Approve| Prod[Deploy complete topology to production]
+    Main --> Images[Build and attest images for final commit]
+    Main --> VP[Maintain Version PR]
+    VP -->|Maintainer merges| ReleaseCI[Validate version commit]
+    ReleaseCI --> Evidence[Build evidence and sign image lock]
+    Evidence --> Verify{Verify evidence and image lock}
+    Verify -->|Pass| Staging[Deploy to staging]
+    Staging -->|Approve| Prod[Deploy to production]
 ```
 
 ## 🚀 Release Flow
 
-Every merge to `main` produces commit-addressed container images and updates the accumulating **Version
-PR**. Merging the Version PR creates the signed release, promotes versioned image tags, deploys to
-staging, and waits for production approval. Full flow: [Release Management](./release-management.mdx).
+Every merge to `main` produces commit-addressed container images and maintains the accumulating
+**Version PR**. Merging the Version PR creates a release with a signed image lock, promotes versioned
+image tags, deploys to staging, and waits for production approval. Full flow:
+[Release Management](./release-management.mdx).
+
+Pull-request and merge-group jobs build amd64 images for preview and packaging validation. A merge
+group is a [temporary integration candidate](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/configuring-pull-request-merges/managing-a-merge-queue#how-merge-queues-work)
+with its own SHA, so pushes to `main` build and attest multi-architecture images for the final commit.
+Releases promote those images by digest without rebuilding them; see
+[Release Management](./release-management.mdx).
 
 ## 🛡️ Quality Gates
 
@@ -142,14 +149,9 @@ Previews are opt-in and self-service. Add the **`preview`** label to your pull r
 no ceremony, and you can label your own PR. Every push redeploys, and **a preview never waits for
 your tests to pass**: it is most useful exactly when they do not.
 
-A preview runs the images CI published for your commit — the same artifacts staging and production
-run. It waits for those images, which CI builds in parallel with the tests, and never for the tests
-themselves. How long that takes is how long CI needs to publish the images your change actually
-rebuilds: a docs-only change re-tags unchanged images and is quick; touching the webapp or the server
-means waiting for that image to build.
-
-That is deliberate: a preview built a second way could start cleanly when the released image would
-not, which is the one thing a preview of a Spring Boot service is well placed to catch.
+A preview runs the amd64 images that pull-request CI builds in parallel with tests, using the release
+Dockerfiles and buildpack configuration. A docs-only change re-tags unchanged images; changes to the
+webapp or server rebuild the affected image.
 
 A sticky comment carries the URL, and GitHub records each accepted update as the transient
 environment `preview/pr-N`, so the pull request's **View deployment** link opens it too.

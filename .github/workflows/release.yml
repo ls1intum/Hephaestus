@@ -1,15 +1,5 @@
 name: Release
 
-# Cuts a release when a merge to main bumped the root package version — i.e.
-# when the Version PR (maintained by version-pr.yml) has been merged. Triggered
-# after CI/CD succeeds so the Docker images for the commit already exist.
-#
-# A release: tags vX.Y.Z at the version-bump commit, creates the GitHub Release
-# from that version's CHANGELOG.md section (flagging schema migrations), verifies
-# a seeded previous-release upgrade before publication, retags the CI-built
-# images (X.Y.Z, X.Y, latest), and starts the deploy chain
-# (staging automatically, production after environment approval).
-#
 # Versioning contract: docs/admin/compatibility-policy.mdx
 
 on:
@@ -56,8 +46,6 @@ jobs:
 
       - name: Cut release if this commit bumped the version
         id: cut
-        # GITHUB_TOKEN suffices: the tag/Release it creates is not meant to
-        # trigger any workflow (deploys are wired via `needs`/dispatch below).
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SHA: ${{ github.event.workflow_run.head_sha }}
@@ -94,9 +82,6 @@ jobs:
           jq -e '.isDraft == false and .isPrerelease == false' <<< "$previous" >/dev/null || {
             echo "::error::$PREV_TAG is not a stable published release"; exit 1; }
 
-          # Release notes = this version's CHANGELOG.md section (the assembled
-          # changeset entries), with a first-class migration warning when the
-          # release touches the Liquibase changelog.
           NOTES=$(mktemp)
           if [ -n "$PREV_TAG" ] && ! git diff --quiet "$PREV_TAG" "$SHA" -- server/application/src/main/resources/db/changelog/; then
             {
@@ -171,7 +156,7 @@ jobs:
       - name: Capture release image digests
         id: retag
         env:
-          SHA: ${{ needs.release.outputs.sha }}
+          SOURCE_TAG: run-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}
         run: |
           set -euo pipefail
 
@@ -180,17 +165,17 @@ jobs:
           declare -A DIGESTS=()
           : > release-images.tsv
 
-          # Resolve every source digest before publishing any release tag.
+          # Resolve the complete image inventory before generating evidence.
           for img in "${IMAGES[@]}"; do
             FULL_IMAGE="ghcr.io/hephaestus-build/$img"
             for i in $(seq 1 24); do
-              digest=$(docker buildx imagetools inspect "$FULL_IMAGE:$SHA" --format '{{json .Manifest}}' 2>/dev/null | jq -er '.digest' 2>/dev/null) || true
+              digest=$(docker buildx imagetools inspect "$FULL_IMAGE:$SOURCE_TAG" --format '{{json .Manifest}}' 2>/dev/null | jq -er '.digest' 2>/dev/null) || true
               if [[ "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]; then
                 DIGESTS[$img]=$digest
                 break
               fi
               if [ "$i" -ge 24 ]; then
-                echo "::error::Could not resolve a valid digest for $FULL_IMAGE:$SHA after 120 s"
+                echo "::error::Could not resolve a valid digest for $FULL_IMAGE:$SOURCE_TAG after 120 s"
                 exit 1
               fi
               sleep 5
@@ -637,8 +622,6 @@ jobs:
       packages: read
     with:
       image-tag: ${{ needs.release.outputs.tag_name }}
-    # Deploy credentials include organization secrets, which reach nested reusable
-    # workflows only through inheritance — environment secrets alone do not cover them.
     secrets: inherit # zizmor: ignore[secrets-inherit]
 
   deploy-production:

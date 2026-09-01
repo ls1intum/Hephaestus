@@ -15,8 +15,6 @@ on:
         required: false
         type: string
         default: "false"
-      # Path-based change detection for selective Docker builds
-      # These are pre-computed by the caller (cicd.yml) to include CI config fallback
       webapp_changed:
         description: "Whether webapp files changed (or should build for other reasons)"
         required: false
@@ -64,21 +62,11 @@ jobs:
       docker-file: "./webapp/Dockerfile"
       docker-context: "."
       registry: "ghcr.io"
-      # Bake commit + branch (the Dockerfile's ARGs) so the footer build strip is
-      # populated on CI-built deploys; Coolify sets these itself for previews.
-      # head_ref, not ref_name: on a pull request the latter is the merge ref `<n>/merge`, which is
-      # not a branch and does not resolve as one — the footer links it and got a 404.
+      # Use the PR source branch; ref_name identifies GitHub's synthetic merge ref on pull requests.
       build-args: |
         SOURCE_COMMIT=${{ github.sha }}
         COOLIFY_BRANCH=${{ github.head_ref || github.ref_name }}
-      # amd64-only on PRs (main/release build both arches). See reusable-docker-build.yml.
-      single-arch: ${{ github.event_name == 'pull_request' }}
-      tags: |
-        ${{ github.ref_name }}
-        ${{ github.sha }}
-        ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || '' }}
-        ci-${{ github.run_number }}
-        ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || '' }}
+      single-arch: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
       labels: |
         org.opencontainers.image.title=Hephaestus Webapp
         org.opencontainers.image.description=Web client for Hephaestus
@@ -99,32 +87,17 @@ jobs:
       attestations: write
     with:
       image-name: "hephaestus-build/application-server"
-      # Paketo Cloud Native Buildpacks via spring-boot:build-image, with Application CDS.
-      # See docs/admin/buildpacks-cds-decision.md and pom.xml's <image> block.
+      # Application CDS configuration lives in server/application/pom.xml; rationale: docs/admin/buildpacks-cds-decision.md.
       use-buildpacks: true
       maven-module: "server/application"
       registry: "ghcr.io"
-      # amd64-only on PRs (main/release build both arches). See reusable-docker-build.yml.
-      single-arch: ${{ github.event_name == 'pull_request' }}
-      # github.sha is a synthetic merge commit on pull_request. Coolify injects the checked-out PR
-      # head as SOURCE_COMMIT, so publish both immutable identifiers.
-      tags: |
-        ${{ github.ref_name }}
-        ${{ github.sha }}
-        ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || '' }}
-        ci-${{ github.run_number }}
-        ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || '' }}
+      single-arch: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
       labels: |
         org.opencontainers.image.title=Hephaestus Application Server
         org.opencontainers.image.description=Spring Boot server for Hephaestus
         org.opencontainers.image.vendor=AET TUM
         org.opencontainers.image.licenses=MIT
         hephaestus.component=application-server
-
-  # Note: the inbound webhook receiver lives in the application-server image
-  # (integration.core.webhook package) and is deployed as a separate container via
-  # SPRING_PROFILES_ACTIVE=prod,webhook. No separate image build is required. See
-  # docker/compose.core.yaml (webhook-server service) and ADR 0008.
 
   agent-pi-build:
     name: "Agent: Pi"
@@ -140,17 +113,7 @@ jobs:
       docker-file: "./docker/agents/pi/Dockerfile"
       docker-context: "./docker/agents"
       registry: "ghcr.io"
-      # amd64-only on PRs (main/release build both arches). See reusable-docker-build.yml.
-      single-arch: ${{ github.event_name == 'pull_request' }}
-      # The head-SHA tag matters here for the same reason it does on application-server: a preview
-      # runs at SOURCE_COMMIT and derives its agent image from that tag, so without it no preview can
-      # ever resolve a matched pair, however the pull request touched the agent tree (ADR 0031).
-      tags: |
-        ${{ github.ref_name }}
-        ${{ github.sha }}
-        ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || '' }}
-        ci-${{ github.run_number }}
-        ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || '' }}
+      single-arch: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
       labels: |
         org.opencontainers.image.title=Hephaestus Agent - Pi
         org.opencontainers.image.description=Sandboxed Pi coding agent for AI-powered code review
@@ -174,14 +137,7 @@ jobs:
       docker-file: "./docker/postgres/Dockerfile"
       docker-context: "./docker/postgres"
       registry: "ghcr.io"
-      # amd64-only on PRs (main/release build both arches). See reusable-docker-build.yml.
-      single-arch: ${{ github.event_name == 'pull_request' }}
-      tags: |
-        ${{ github.ref_name }}
-        ${{ github.sha }}
-        ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || '' }}
-        ci-${{ github.run_number }}
-        ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || '' }}
+      single-arch: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
       labels: |
         org.opencontainers.image.title=Hephaestus Postgres
         org.opencontainers.image.description=PostgreSQL + pg_partman for all environments (dev/preview/prod)
@@ -189,8 +145,7 @@ jobs:
         org.opencontainers.image.licenses=MIT
         hephaestus.component=postgres
 
-  # Preview stacks use one commit tag for every component. Point unchanged components at their
-  # verified base-commit digest instead of rebuilding identical content under a new name.
+  # Preview stacks resolve every component by PR head SHA; alias verified base digests for unchanged components.
   tag-unchanged-images:
     name: "Tag unchanged images"
     if: >-
@@ -229,16 +184,15 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           REPOSITORY: ${{ github.repository }}
           REPOSITORY_OWNER: ${{ github.repository_owner }}
-          CURRENT_SHA: ${{ github.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          RUN_NUMBER: ${{ github.run_number }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
           set -euo pipefail
 
           tag_image() {
             local image="ghcr.io/hephaestus-build/$1"
             local source="$image:$BASE_SHA"
-            local ref_tag="${GITHUB_REF_NAME//\//-}"
             local digest
             digest=$(docker buildx imagetools inspect --format '{{.Manifest.Digest}}' "$source" 2>/dev/null || true)
             if [[ ! "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]; then
@@ -262,11 +216,9 @@ jobs:
               > /dev/null
             gh attestation verify "oci://$verified" --owner "$REPOSITORY_OWNER"
             docker buildx imagetools create \
-              --tag "$image:$ref_tag" \
-              --tag "$image:$CURRENT_SHA" \
               --tag "$image:$HEAD_SHA" \
-              --tag "$image:ci-$RUN_NUMBER" \
               --tag "$image:pr-$PR_NUMBER" \
+              --tag "$image:run-$RUN_ID-$RUN_ATTEMPT" \
               "$verified"
           }
 
