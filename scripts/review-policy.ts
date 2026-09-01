@@ -61,7 +61,6 @@ export interface ActionsContext {
 	readonly eventName: string;
 	readonly repo: { readonly owner: string; readonly repo: string };
 	readonly payload: {
-		readonly merge_group?: { readonly head_sha: string };
 		readonly pull_request?: {
 			readonly number: number;
 			readonly head?: { readonly sha: string };
@@ -284,21 +283,13 @@ const evaluate = async (
 	});
 };
 
+/**
+ * Publishes the required `review-policy` check run for one pull request event. The merge queue is
+ * deliberately not routed here: the workflow answers `merge_group` inline, so the queue's path
+ * needs neither a checkout nor this module, and a commit added to the queue before this file
+ * reached the default branch still gets its context.
+ */
 export const enforce = async ({ github, context, core }: EnforceInput): Promise<void> => {
-	const mergeGroupSha = context.payload.merge_group?.head_sha;
-	if (mergeGroupSha) {
-		// The queue re-reports the required contexts against the projected commit, and the policy was
-		// already decided on the pull request that entered it.
-		await publish(github, context, core, mergeGroupSha, {
-			kind: "satisfied",
-			title: "Satisfied before this merge group was created",
-			summary:
-				"The review policy is decided on the pull request; entering the merge queue already " +
-				"required it to pass.",
-		});
-		return;
-	}
-
 	const pullRequest = context.payload.pull_request;
 	if (!pullRequest) {
 		core.setFailed(`A ${context.eventName} event carried no pull request to evaluate.`);

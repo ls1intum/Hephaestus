@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, it } from "node:test";
 
 import {
@@ -262,25 +263,6 @@ void describe("review policy", () => {
 			assert.deepEqual(core.failures, []);
 		});
 
-		void it("passes trivially on a merge group without reading the pull request", async () => {
-			const { created, github } = makeGitHub({ failPullWith: new Error("must not be called") });
-			const core = makeCore();
-			await enforce({
-				github,
-				core,
-				context: {
-					eventName: "merge_group",
-					repo: context.repo,
-					payload: { merge_group: { head_sha: OTHER } },
-				},
-			});
-
-			const run = onlyRun(created);
-			assert.equal(run.head_sha, OTHER);
-			assert.equal(run.conclusion, "success");
-			assert.deepEqual(core.failures, []);
-		});
-
 		void it("stays out of the way of a pull request that does not target main", async () => {
 			const { created, github } = makeGitHub({
 				resolvedPull: { ...pull, base: { ref: "release" } },
@@ -327,6 +309,42 @@ void describe("review policy", () => {
 				onlyRun(created).details_url,
 				"https://github.example/owner/repo/actions/runs/42",
 			);
+		});
+	});
+
+	// A mismatch between these and the ruleset's required context deadlocks every pull request,
+	// including the one that would fix it, so the workflow's half of the contract is asserted here.
+	void describe("the workflow that publishes it", () => {
+		const workflow = readFileSync(
+			new URL("../.github/workflows/review-policy.yml", import.meta.url),
+			"utf8",
+		);
+
+		void it("publishes the merge group's verdict under the required name", () => {
+			assert.match(workflow, new RegExp(`name: '${CHECK_NAME}',`));
+			assert.match(workflow, /head_sha: context\.payload\.merge_group\.head_sha/);
+			assert.match(workflow, /conclusion: 'success'/);
+		});
+
+		void it("answers the merge group without a checkout it may not be able to make", () => {
+			// On `merge_group` the workflow comes from the queued commit while the checkout would come
+			// from the default branch, so the queue must never depend on a file that has yet to land.
+			const mergeGroupOnly = workflow.slice(
+				workflow.indexOf("Pass the merge group"),
+				workflow.indexOf("Load the trusted policy evaluator"),
+			);
+			assert.ok(mergeGroupOnly.length > 0);
+			assert.doesNotMatch(mergeGroupOnly, /uses: actions\/checkout|GITHUB_WORKSPACE/);
+		});
+
+		void it("never names the job after the context it publishes", () => {
+			// Two check runs of one name on a commit make which one the ruleset reads a race.
+			assert.doesNotMatch(workflow, new RegExp(`^\\s*name: ${CHECK_NAME}\\s*$`, "m"));
+		});
+
+		void it("keeps the checkout on the base branch's copy of the policy", () => {
+			assert.match(workflow, /ref: \$\{\{ github\.event\.repository\.default_branch \}\}/);
+			assert.doesNotMatch(workflow, /ref: \$\{\{ github\.sha \}\}/);
 		});
 	});
 });
