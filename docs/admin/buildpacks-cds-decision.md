@@ -32,7 +32,7 @@ production. CDS preserves runtime configuration while improving startup.
 ## Builder pinning
 
 `server/application/project.toml` pins `builder-noble-java-tiny` and the `health-checker` buildpack
-by sha256 digest; `.github/workflows/cicd.yml` pins `ubuntu-noble-run-tiny` the same way, because
+by sha256 digest; `.github/workflows/ci-build.yml` pins `ubuntu-noble-run-tiny` the same way, because
 the project descriptor has no run-image key. Renovate follows each image's `latest` tag and proposes
 the digest bumps, so a refresh is a reviewed pull request rather than a hand-edited digest.
 
@@ -53,7 +53,7 @@ type is added, so the JVM-spawn-per-probe issue (health-checker#87) does not app
 
 ## Rollback
 
-Switch the `application-server-image` job in `.github/workflows/cicd.yml` from `use-buildpacks: true` to a `docker-file` that packages the same JAR, and re-add that `Dockerfile`. Coolify re-deploys the prior image SHA. Detection: Sentry release-tagged error spike, or Prometheus alert on `application_ready_time_seconds > 15` for three consecutive deploys.
+Switch the `application-server-image` job in `.github/workflows/ci-build.yml` from `use-buildpacks: true` to a `docker-file` that packages the same JAR, and re-add that `Dockerfile`. Coolify re-deploys the prior image SHA. Detection: Sentry release-tagged error spike, or Prometheus alert on `application_ready_time_seconds > 15` for three consecutive deploys.
 
 ## Operational checklist
 

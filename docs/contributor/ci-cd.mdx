@@ -207,10 +207,10 @@ why the label is the authority, and which alternatives were priced and declined,
 | `cicd.yml`             | PR, merge group, push to main | Validates changes before merge and builds final-SHA images after merge |
 | `review-policy.yml`    | PR opened, reopened, synchronized, ready for review, edited | Approves a listed maintainer's pull request so the ruleset's required approval is met; does nothing for anyone else |
 | `ci-quality-gates.yml` | Called by cicd.yml    | Formatting, lint, type checks, webapp unit and story tests: everything verifiable from source |
-| `ci-build.yml`         | Called by cicd.yml    | Packages the server reactor once; `Test` and the application-server image job consume the artifact |
-| `ci-tests.yml`         | Called by cicd.yml after `Build` | Server unit, architecture, integration, API and database contracts, and browser E2E, all against the packaged reactor |
+| `ci-build.yml`         | Called by cicd.yml    | Packages the server reactor once, then runs the OpenAPI, schema, database and browser E2E gates and the application-server image against that artifact |
+| `ci-tests.yml`         | Called by cicd.yml    | The server unit, architecture and integration suites, compiled from source |
 | `ci-docker-build.yml`  | Called by cicd.yml    | Dockerfile image builds (webapp, agent, PostgreSQL) and aliases for unchanged images |
-| `reusable-docker-build.yml` | Called by cicd.yml for the application-server image and by ci-docker-build.yml | Builds, signs, attests, and blocks on the release vulnerability policy for the `linux/amd64` image |
+| `reusable-docker-build.yml` | Called by ci-build.yml and ci-docker-build.yml | Builds, signs, attests, and blocks on the release vulnerability policy for the `linux/amd64` image |
 | `ci-security-scan.yml` | Called by cicd.yml    | Dependency scanning (Trivy), secret detection      |
 | `rescan-main-images.yml` | Weekly, manual | Rescans main's published images against the release vulnerability policy and keeps one tracking issue in step with the findings |
 | `ci-profile.yml` | Weekly, manual | Profiles server integration tests and Spring contexts |
@@ -230,7 +230,7 @@ why the label is the authority, and which alternatives were priced and declined,
 | Action | Contract |
 | --- | --- |
 | `setup-node-pnpm` | Installs the versions pinned in `package.json`; `install` must be `none`, `frozen`, or `hardened` |
-| `setup-caches` | Sets up the JDK and the Maven dependency cache; `application-server-reactor` jobs also restore the generated-client build cache, `application-server-tests` jobs run goals against the packaged reactor and need no build cache |
+| `setup-caches` | Sets up the JDK and restores the Maven dependency cache with a prefix fallback; `application-server-reactor` jobs also restore the generated-client build cache and are the only jobs that write caches, `application-server-tests` jobs run goals against the packaged reactor |
 | `restore-server-build` | Downloads the packaged reactor and installs its generated-clients JAR so single-module Maven goals resolve it; outputs the executable JAR path |
 | `setup-browsers` | Restores the exact Playwright browser version and installs Chromium system dependencies |
 | `setup-release-security-tools` | Installs Cosign, Trivy, and optionally Syft for release-evidence jobs |
@@ -282,18 +282,21 @@ limit](https://docs.github.com/en/actions/reference/limits).
 
 ### Build once
 
-The server reactor is compiled and packaged exactly once per run, by `Build`. The unit and
-architecture tier, the integration tier, the API and database contracts, the browser E2E suite and
-the application-server image all download that artifact and run Maven goals or `pack` against it;
-none of them compiles. This is the ["only build your binaries
-once"](https://www.informit.com/articles/article.aspx?p=1621865&seqNum=3) rule of the deployment
-pipeline: the JAR the tests ran is the JAR inside the image, and the OpenAPI spec is scraped from
-that same JAR.
+`Build` compiles and packages the server reactor once. The OpenAPI and schema gates, the database
+contract tests, the browser E2E suite and the application-server image all download that artifact
+and run Maven goals or `pack` against it; none of them compiles. This is the ["only build your
+binaries once"](https://www.informit.com/articles/article.aspx?p=1621865&seqNum=3) rule of the
+deployment pipeline: the JAR the E2E suite ran is the JAR inside the image, and the OpenAPI spec is
+scraped from that same JAR.
+
+The unit, architecture and integration suites are the deliberate exception. Each is longer than the
+package job, so waiting for the artifact would delay the longest paths by more than the compile they
+save, and neither suite ships anything. They compile from source in `Test` and start immediately.
 
 ### Parallel Execution
 
 - Quality legs (App Server, Tooling and Docs, Webapp, Stories) start immediately from source.
-- Test legs (unit and architecture, integration, API and database, E2E) start as soon as the reactor is packaged and run in parallel. Webhook reception is part of the app-server test surface since ADR 0008.
+- The unit, architecture and integration suites start immediately from source; the artifact gates (OpenAPI, schema, database, E2E, image) start as soon as the reactor is packaged. Webhook reception is part of the app-server test surface since ADR 0008.
 - Docker images build for both architectures (amd64 + arm64) after a merge; pull requests and merge groups build amd64 only.
 - `fail-fast: false` ensures all jobs complete for full feedback
 

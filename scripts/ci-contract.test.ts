@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { glob, readFile } from "node:fs/promises";
 import { describe, test } from "node:test";
 
-import { isMap, parseDocument } from "yaml";
+import { parseDocument } from "yaml";
 
 function job(source: string, name: string): string {
 	const match = source.match(
@@ -133,49 +133,39 @@ void describe("CI contract", () => {
 		assert.deepEqual(used, accepted, "Every accepted cache type is requested by a workflow");
 	});
 
-	void test("packages the server once and runs every server gate against that artifact", async () => {
+	void test("packages the server once and runs every artifact gate against it", async () => {
 		const build = await readFile(".github/workflows/ci-build.yml", "utf8");
 		const packageJob = job(build, "server-package");
 		assert.match(packageJob, /mvnw -pl application -am package -DskipTests/);
 		assert.equal((packageJob.match(/actions\/upload-artifact@/g) ?? []).length, 1);
 		assert.match(packageJob, /overwrite: true/);
-		const jobs = parseDocument(build).get("jobs");
-		assert.ok(isMap(jobs));
-		assert.deepEqual(
-			jobs.items.map((item) => String(item.key)),
-			["server-package"],
-		);
-
-		const tests = await readFile(".github/workflows/ci-tests.yml", "utf8");
-		for (const name of ["server-verification", "server-integration", "server-contracts"]) {
-			const consumer = job(tests, name);
+		for (const name of ["server-api", "server-database"]) {
+			const consumer = job(build, name);
+			assert.match(consumer, /needs: server-package/);
 			assert.match(consumer, /uses: \.\/\.github\/actions\/restore-server-build/);
-			assert.match(consumer, /artifact: \${{ inputs\.server_artifact }}/);
 			// Goals against the restored classes; a lifecycle phase would compile again.
-			assert.match(
-				consumer,
-				/mvnw -f application\/pom\.xml --batch-mode -Dmaven\.build\.cache\.enabled=false/,
-			);
 			assert.doesNotMatch(
 				consumer,
 				/mvnw[^\n]* (?:compile|test-compile|package|verify|install)(?:\s|$)/,
 			);
-			assert.match(consumer, /surefire:test/);
 		}
-		const e2e = job(tests, "webapp-e2e");
+		assert.match(job(build, "server-database"), /surefire:test/);
+		assert.match(job(build, "server-api"), /HEPHAESTUS_APPLICATION_JAR/);
+		const e2e = job(build, "webapp-e2e");
+		assert.match(e2e, /needs: server-package/);
 		assert.equal((e2e.match(/actions\/download-artifact@/g) ?? []).length, 1);
-		assert.match(e2e, /name: \${{ inputs\.server_artifact }}/);
-		assert.doesNotMatch(tests, /\bmvnw\b[^\n]*(?:^|\s)-am\b/m);
+		const image = job(build, "application-server-image");
+		assert.match(image, /needs: server-package/);
+		assert.match(image, /use-buildpacks: true/);
 
+		// The long suites compile from source and never wait for the package job.
+		const tests = await readFile(".github/workflows/ci-tests.yml", "utf8");
+		assert.doesNotMatch(tests, /needs:|download-artifact|restore-server-build/);
+		assert.match(job(tests, "server-verification"), /pnpm run test:server:verification/);
+		assert.match(job(tests, "server-integration"), /pnpm run test:server:integration/);
 		const orchestrator = await readFile(".github/workflows/cicd.yml", "utf8");
-		assert.match(job(orchestrator, "Test"), /needs: \[detect-changes, Build\]/);
-		const image = job(orchestrator, "application-server-image");
-		assert.match(image, /needs: \[detect-changes, Build\]/);
-		assert.match(image, /application-artifact: \${{ needs\.Build\.outputs\.server-artifact }}/);
-		assert.match(
-			job(orchestrator, "Test"),
-			/server_artifact: \${{ needs\.Build\.outputs\.server-artifact }}/,
-		);
+		assert.match(job(orchestrator, "Test"), /needs: \[detect-changes\]/);
+		assert.match(job(orchestrator, "Build"), /needs: \[detect-changes\]/);
 
 		const reusable = await readFile(".github/workflows/reusable-docker-build.yml", "utf8");
 		assert.match(reusable, /pack build "\$PER_ARCH_TAG" --path "\${jars\[0\]}" --descriptor/);
@@ -239,22 +229,26 @@ void describe("CI contract", () => {
 			job(source, "detect-changes"),
 			/version-bump: \${{ steps\.version_bump\.outputs\.changed }}/,
 		);
-		for (const name of [
-			"workflow-lint",
-			"zizmor",
-			"Quality",
-			"Build",
-			"Security",
-			"Test",
-			"Compose",
-		]) {
-			assert.match(job(source, name), /needs: \[detect-changes(?:, Build)?\]/);
+		for (const name of ["workflow-lint", "zizmor", "Quality", "Security", "Test", "Compose"]) {
+			assert.match(job(source, name), /needs: \[detect-changes\]/);
 			assert.match(
 				job(source, name),
 				/github\.event_name != 'push'.*needs\.detect-changes\.outputs\.version-bump == 'true'/s,
 			);
 		}
+		// Every push to main packages and publishes the final-SHA images; only a version bump
+		// repeats source validation, so the artifact gates inside Build follow the same rule.
 		assert.doesNotMatch(job(source, "Docker"), /version-bump/);
+		const build = job(source, "Build");
+		assert.doesNotMatch(build.slice(0, build.indexOf("with:")), /version-bump/);
+		for (const gate of ["contracts_changed", "e2e_changed"]) {
+			assert.match(
+				build,
+				new RegExp(
+					`${gate}: \\$\\{\\{ \\(github\\.event_name != 'push' \\|\\| needs\\.detect-changes\\.outputs\\.version-bump == 'true'\\)`,
+				),
+			);
+		}
 		assert.match(job(source, "all-ci-passed"), /needs: \[[^\]]*Compose[^\]]*Docker\]/);
 
 		const compose = await readFile(".github/workflows/ci-compose-validate.yml", "utf8");
@@ -273,11 +267,12 @@ void describe("CI contract", () => {
 		}
 
 		const docker = await readFile(".github/workflows/ci-docker-build.yml", "utf8");
+		const build = await readFile(".github/workflows/ci-build.yml", "utf8");
 		for (const image of [
 			job(docker, "webapp-build"),
 			job(docker, "agent-pi-build"),
 			job(docker, "postgres-build"),
-			job(source, "application-server-image"),
+			job(build, "application-server-image"),
 		]) {
 			assert.match(
 				image,
@@ -499,7 +494,7 @@ void describe("CI contract", () => {
 			);
 		}
 		for (const file of [
-			".github/workflows/ci-tests.yml",
+			".github/workflows/ci-build.yml",
 			".github/workflows/ci-quality-gates.yml",
 		]) {
 			const source = sources.get(file);

@@ -9,25 +9,41 @@ on:
         type: string
         default: "false"
       server_changed:
-        description: "Whether anything that runs the built server changed"
+        description: "Whether anything that runs the packaged reactor changed"
         required: false
         type: string
         default: "true"
-    outputs:
-      server-artifact:
-        description: "Name of the artifact holding the packaged reactor"
-        value: ${{ jobs.server-package.outputs.artifact }}
+      contracts_changed:
+        description: "Whether the API or database contracts or their PostgreSQL image changed"
+        required: false
+        type: string
+        default: "true"
+      e2e_changed:
+        description: "Whether browser E2E runtime files changed"
+        required: false
+        type: string
+        default: "true"
+      postgres_image_changed:
+        description: "Whether PostgreSQL image inputs changed"
+        required: false
+        type: string
+        default: "false"
+      server_image_changed:
+        description: "Whether the application-server image inputs changed"
+        required: false
+        type: string
+        default: "true"
 
 permissions: {}
 
 env:
   SERVER_BUILD_ARTIFACT: server-build-${{ github.run_id }}
 
+# One package job, then everything that runs the packaged reactor: the API and database contracts,
+# the browser E2E suite and the application image. They run Maven goals or pack against the
+# restored classes and JAR; none of them compiles. The long unit and integration suites are not
+# here on purpose (ci-tests.yml).
 jobs:
-  # Compiles and packages the reactor exactly once; every server test tier, the browser E2E suite,
-  # the API and database contracts and the application image consume this artifact. This workflow
-  # holds nothing else: a caller's `needs` waits for the whole workflow, so anything added here
-  # delays every consumer.
   server-package:
     name: "App Server: Package"
     if: inputs.should_skip != 'true' && inputs.server_changed == 'true'
@@ -35,8 +51,6 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
-    outputs:
-      artifact: ${{ env.SERVER_BUILD_ARTIFACT }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -74,3 +88,261 @@ jobs:
           compression-level: 0
           # A re-run of failed jobs keeps this artifact; a re-run of all jobs replaces it.
           overwrite: true
+
+  server-api:
+    name: "App Server: Generated artifacts"
+    needs: server-package
+    if: inputs.should_skip != 'true' && inputs.contracts_changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node-pnpm
+        with:
+          install: "frozen"
+      - uses: ./.github/actions/setup-caches
+        with:
+          cache-type: application-server-tests
+          os: ${{ runner.os }}
+      - uses: ./.github/actions/restore-server-build
+        id: server
+        with:
+          artifact: ${{ env.SERVER_BUILD_ARTIFACT }}
+      - name: OpenAPI specification and client
+        id: openapi
+        continue-on-error: true
+        env:
+          HEPHAESTUS_APPLICATION_JAR: ${{ steps.server.outputs.executable-jar }}
+        run: |
+          pnpm run generate:api
+          git add .
+          if ! git diff --cached --quiet; then
+            echo "::error::OpenAPI out of sync. Run: pnpm run generate:api"
+            echo "### OpenAPI Validation" >> $GITHUB_STEP_SUMMARY
+            echo "| Check | Status | Fix |" >> $GITHUB_STEP_SUMMARY
+            echo "|-------|--------|-----|" >> $GITHUB_STEP_SUMMARY
+            echo "| API specs sync | :x: Out of sync | \`pnpm run generate:api\` |" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+      - name: Migration chain, schema drift and ERD
+        id: schema
+        continue-on-error: true
+        if: always()
+        env:
+          INPUTS_POSTGRES_IMAGE_CHANGED: ${{ inputs.postgres_image_changed }}
+        run: |
+          # The base image may still be publishing; build the same Dockerfile as fallback.
+          if [[ "${INPUTS_POSTGRES_IMAGE_CHANGED}" == "true" ]] ||
+            ! docker pull ghcr.io/hephaestus-build/postgres:${{ github.event.pull_request.base.sha || github.sha }}; then
+            docker build -t hephaestus-postgres:ci docker/postgres
+          else
+            docker tag ghcr.io/hephaestus-build/postgres:${{ github.event.pull_request.base.sha || github.sha }} hephaestus-postgres:ci
+          fi
+          docker run -d --name postgres-db \
+            -e POSTGRES_DB=hephaestus -e POSTGRES_PASSWORD=root -e POSTGRES_USER=root \
+            -p 5432:5432 hephaestus-postgres:ci
+          trap 'docker stop postgres-db 2>/dev/null; docker rm postgres-db 2>/dev/null' EXIT
+          until docker exec postgres-db pg_isready -U root -d hephaestus; do sleep 2; done
+
+          ISSUES_FOUND=()
+
+          # draft-changelog first applies the full master.xml chain to the empty DB via
+          # liquibase:update — so this step is ALSO the empty→head migration-chain replay gate (a
+          # changelog that doesn't apply fails here). Keep that apply intact.
+          pnpm run db:draft-changelog || ISSUES_FOUND+=("Schema check / migration-chain apply failed. Run: pnpm run db:draft-changelog")
+          if [ -f "server/application/src/main/resources/db/changelog_new.xml" ]; then
+            echo "::error::Schema drift detected. Run: pnpm run db:draft-changelog"
+            cat server/application/src/main/resources/db/changelog_new.xml
+            ISSUES_FOUND+=("Schema drift detected")
+          fi
+
+          pnpm run db:generate-erd-docs || ISSUES_FOUND+=("ERD generation failed. Run: pnpm run db:generate-erd-docs")
+          git add docs/contributor/erd/schema.mmd
+          if ! git diff --cached --quiet docs/contributor/erd/schema.mmd; then
+            echo "::error::ERD outdated. Run: pnpm run db:generate-erd-docs"
+            ISSUES_FOUND+=("ERD outdated")
+          fi
+
+          if [ ${#ISSUES_FOUND[@]} -gt 0 ]; then
+            echo "### Database Validation" >> $GITHUB_STEP_SUMMARY
+            echo "| Check | Status | Fix |" >> $GITHUB_STEP_SUMMARY
+            echo "|-------|--------|-----|" >> $GITHUB_STEP_SUMMARY
+            for issue in "${ISSUES_FOUND[@]}"; do
+              echo "::error::$issue"
+              if [[ "$issue" == *"Run:"* ]]; then
+                echo "| ${issue%%.*} | :x: Failed | \`${issue##*Run: }\` |" >> $GITHUB_STEP_SUMMARY
+              else
+                echo "| $issue | :x: Failed | See logs |" >> $GITHUB_STEP_SUMMARY
+              fi
+            done
+            exit 1
+          fi
+      - name: Evaluate generated artifacts
+        if: always()
+        env:
+          OPENAPI: ${{ steps.openapi.outcome }}
+          SCHEMA: ${{ steps.schema.outcome }}
+        run: |
+          if [ "$OPENAPI" != "success" ] || [ "$SCHEMA" != "success" ]; then
+            echo "::error::OpenAPI or schema validation failed; review both independently reported steps."
+            exit 1
+          fi
+
+  server-database:
+    name: "App Server: Database"
+    needs: server-package
+    if: inputs.should_skip != 'true' && inputs.contracts_changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      checks: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node-pnpm
+        with:
+          install: "none"
+      - uses: ./.github/actions/setup-caches
+        with:
+          cache-type: application-server-tests
+          os: ${{ runner.os }}
+      - uses: ./.github/actions/restore-server-build
+        with:
+          artifact: ${{ env.SERVER_BUILD_ARTIFACT }}
+      - name: Run database contract tests and the major-upgrade drill
+        env:
+          INPUTS_POSTGRES_IMAGE_CHANGED: ${{ inputs.postgres_image_changed }}
+        run: |
+          # The base image may still be publishing; build the same Dockerfile as fallback.
+          if [[ "${INPUTS_POSTGRES_IMAGE_CHANGED}" == "true" ]] ||
+            ! docker pull ghcr.io/hephaestus-build/postgres:${{ github.event.pull_request.base.sha || github.sha }}; then
+            docker build -t hephaestus-postgres:ci docker/postgres
+          else
+            docker tag ghcr.io/hephaestus-build/postgres:${{ github.event.pull_request.base.sha || github.sha }} hephaestus-postgres:ci
+          fi
+          docker run -d --name postgres-db \
+            -e POSTGRES_DB=hephaestus -e POSTGRES_PASSWORD=root -e POSTGRES_USER=root \
+            -p 5432:5432 hephaestus-postgres:ci
+          trap 'docker stop postgres-db 2>/dev/null; docker rm postgres-db 2>/dev/null' EXIT
+          until docker exec postgres-db pg_isready -U root -d hephaestus; do sleep 2; done
+
+          export SPRING_DATASOURCE_URL="jdbc:postgresql://localhost:5432/hephaestus"
+          export SPRING_DATASOURCE_USERNAME="root"
+          export SPRING_DATASOURCE_PASSWORD="root"
+          (cd server && ./mvnw -f application/pom.xml --batch-mode -Dmaven.build.cache.enabled=false \
+            -Dsurefire.includedGroups=database surefire:test)
+
+          pnpm run test:postgres-upgrade
+      - name: Upload test results
+        if: always()
+        uses: dorny/test-reporter@a43b3a5f7366b97d083190328d2c652e1a8b6aa2 # v3.0.0
+        with:
+          name: "Test Results - App Server Database"
+          path: "server/application/target/surefire-reports/TEST-*.xml"
+          reporter: java-junit
+          fail-on-error: false
+
+  webapp-e2e:
+    name: "Webapp: E2E"
+    needs: server-package
+    if: inputs.should_skip != 'true' && inputs.e2e_changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node-pnpm
+        with:
+          install: "frozen"
+      - uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
+        with:
+          distribution: "temurin"
+          java-version: "21"
+          cache-jdk: false
+      - uses: ./.github/actions/setup-browsers
+      - name: Download the packaged reactor
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ${{ env.SERVER_BUILD_ARTIFACT }}
+          path: server
+      - name: Run end-to-end tests against the built server
+        run: |
+          # The base image may still be publishing; build the same Dockerfile as fallback.
+          if [[ "${INPUTS_POSTGRES_IMAGE_CHANGED}" == "true" ]] ||
+            ! docker pull ghcr.io/hephaestus-build/postgres:${{ github.event.pull_request.base.sha || github.sha }}; then
+            docker build -t ghcr.io/hephaestus-build/postgres:dev docker/postgres
+          else
+            docker tag ghcr.io/hephaestus-build/postgres:${{ github.event.pull_request.base.sha || github.sha }} ghcr.io/hephaestus-build/postgres:dev
+          fi
+          docker compose -f server/compose.yaml up -d --wait --no-build postgres
+          cleanup() {
+            if [[ -n "${SERVER_PID:-}" ]]; then
+              kill -TERM -- "-$SERVER_PID" 2>/dev/null || true
+              (sleep 10; kill -KILL -- "-$SERVER_PID" 2>/dev/null || true) &
+              KILL_WATCHDOG=$!
+              wait "$SERVER_PID" 2>/dev/null || true
+              if kill -0 -- "-$SERVER_PID" 2>/dev/null; then
+                wait "$KILL_WATCHDOG" 2>/dev/null || true
+              else
+                kill "$KILL_WATCHDOG" 2>/dev/null || true
+                wait "$KILL_WATCHDOG" 2>/dev/null || true
+              fi
+            fi
+            docker compose -f server/compose.yaml down -v
+          }
+          trap cleanup EXIT
+          mapfile -t SERVER_JARS < <(find server/application/target -maxdepth 1 -name 'hephaestus-application-*.jar')
+          (( ${#SERVER_JARS[@]} == 1 ))
+          SERVER_JAR=${SERVER_JARS[0]}
+          SERVER_PORT=8080 MANAGEMENT_PORT=8080 POSTGRES_PORT=5432 \
+            SPRING_DOCKER_COMPOSE_ENABLED=false APPLICATION_HOST_URL=http://localhost:4200 \
+            setsid java -jar "$SERVER_JAR" --spring.profiles.active=e2e,playwright > e2e-server.log 2>&1 &
+          SERVER_PID=$!
+          timeout 5m bash -c 'until curl --fail --silent http://localhost:8080/actuator/health/liveness >/dev/null; do kill -0 '"${SERVER_PID}"' || exit 1; sleep 2; done'
+          curl --fail --silent --show-error -X POST http://localhost:8080/auth/dev-login \
+            -H 'content-type: application/json' -d '{"username":"e2e","admin":true}' >/dev/null
+          docker compose -f server/compose.yaml exec -T postgres \
+            psql -v ON_ERROR_STOP=1 -U root -d hephaestus < webapp/e2e/seed.sql
+          timeout --kill-after=30s 10m pnpm --filter webapp run test:e2e
+        env:
+          INPUTS_POSTGRES_IMAGE_CHANGED: ${{ inputs.postgres_image_changed }}
+      - name: Upload diagnostics
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: webapp-e2e-results
+          path: |
+            webapp/test-results
+            e2e-server.log
+          if-no-files-found: warn
+          retention-days: 7
+
+  application-server-image:
+    name: "App Server image"
+    needs: server-package
+    if: inputs.should_skip != 'true' && inputs.server_image_changed == 'true'
+    uses: ./.github/workflows/reusable-docker-build.yml
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    with:
+      image-name: "hephaestus-build/application-server"
+      use-buildpacks: true
+      application-artifact: server-build-${{ github.run_id }}
+      project-descriptor: "server/application/project.toml"
+      # renovate: datasource=docker depName=paketobuildpacks/ubuntu-noble-run-tiny
+      run-image: "paketobuildpacks/ubuntu-noble-run-tiny@sha256:c32333227b6dfbc2a4a93b03ee6d3475cfe152468c7d396bf22f06099bb0ecc9"
+      registry: "ghcr.io"
+      # Buildpacks images carry the lifecycle's own metadata labels; pack accepts no OCI labels.
+      single-arch: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}

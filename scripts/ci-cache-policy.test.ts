@@ -20,17 +20,24 @@ await describe("CI cache policy", async () => {
 		assert.notEqual(cacheKeys.length, 0);
 		for (const key of cacheKeys) {
 			assert.ok(!key.includes("hashFiles("));
-			assert.ok(key.includes("-identity.outputs.hash"));
+			assert.ok(key.includes("steps.identity.outputs."));
 		}
 	});
 
 	await test("Maven caches are limited to Maven build jobs", async () => {
-		const javaSetup = actionStep("Set up JDK 21");
-		assert.ok(javaSetup.includes('cache: "maven"'));
-		assert.ok(javaSetup.includes("cache-read-only:"));
-		assert.ok(javaSetup.includes("cache-jdk: false"));
+		assert.ok(actionStep("Set up JDK 21").includes("cache-jdk: false"));
+		// A pom change must fall back to the newest default-branch cache, not a full download.
+		const restore = actionStep("Restore Maven dependencies");
+		assert.match(restore, /actions\/cache\/restore@/);
+		assert.match(restore, /restore-keys: \|\n\s+\${{ [^\n]*-maven-\n/);
+		assert.match(restore, /if: steps\.identity\.outputs\.save != 'true'/);
+		const save = actionStep("Cache Maven dependencies");
+		assert.match(
+			save,
+			/if: steps\.identity\.outputs\.save == 'true' && inputs\.cache-type == 'application-server-reactor'/,
+		);
 		assert.doesNotMatch(cacheAction, /webapp-e2e/);
-		const workflow = await readFile(".github/workflows/ci-tests.yml", "utf8");
+		const workflow = await readFile(".github/workflows/ci-build.yml", "utf8");
 		assert.match(workflow, /webapp-e2e:[\s\S]*?actions\/setup-java@/);
 	});
 
@@ -42,7 +49,7 @@ await describe("CI cache policy", async () => {
 		assert.doesNotMatch(browserAction, /restore-keys:/);
 		assert.match(browserAction, /playwright install chromium --with-deps/);
 		for (const file of [
-			".github/workflows/ci-tests.yml",
+			".github/workflows/ci-build.yml",
 			".github/workflows/ci-quality-gates.yml",
 		]) {
 			const workflow = await readFile(file, "utf8");
