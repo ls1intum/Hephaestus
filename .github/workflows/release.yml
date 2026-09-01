@@ -276,7 +276,11 @@ jobs:
               [[ "$platform_digest" =~ ^sha256:[a-f0-9]{64}$ ]] || { echo "::error::$image $platform digest is malformed"; exit 1; }
               platform_ref="$repository@$platform_digest"
               printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$image" "$platform" "$digest" "$platform_digest" "$repository" "$provenance" >> release-platforms.tsv
-              syft "$platform_ref" --scope squashed \
+              # Scan the registry artifact, never a daemon copy of it: a daemon pull
+              # re-serializes an OCI manifest as Docker schema 2, so the SBOM would
+              # record a locally computed manifestDigest instead of the released one.
+              # --platform makes Syft fail loudly if the digest is not this platform's.
+              syft --from registry "$platform_ref" --platform "$platform" --scope squashed \
                 -o "syft-json=evidence/$image-$suffix.syft.json" \
                 -o "spdx-json=evidence/$image-$suffix.spdx.json" \
                 -o "cyclonedx-json=evidence/$image-$suffix.cdx.json"

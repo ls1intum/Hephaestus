@@ -221,8 +221,7 @@ export function verifyReleaseEvidence(
 			readJson(`${prefix}.syft.json`),
 			readJson(`${prefix}.spdx.json`),
 			readJson(`${prefix}.cdx.json`),
-			subject.digest,
-			subject.platform,
+			subject,
 		);
 		persistOrVerify(`${prefix}.sbom-validation.json`, sbom, mode === "write-validation");
 		const reference = `${subject.repository}@${subject.digest}`;
