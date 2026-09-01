@@ -308,6 +308,7 @@ jobs:
       )
     permissions:
       contents: read
+      checks: write
       packages: write
       id-token: write
       attestations: write
