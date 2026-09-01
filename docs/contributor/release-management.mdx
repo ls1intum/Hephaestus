@@ -133,6 +133,20 @@ The latest release is rescanned weekly. A policy violation or scan failure is re
 [the vulnerability response issue](https://github.com/ls1intum/Hephaestus/issues/1369); scanner failure
 is never treated as no findings.
 
+`main`'s images are rescanned on the same weekly cadence, by `rescan-main-images.yml`. Container
+vulnerabilities are time-dependent, not commit-dependent: the build gate can only catch a finding some
+change introduced, and the finding that blocked v0.75.0 was published after the code had merged clean.
+The scheduled run resolves each image's `:main` tag to its `linux/amd64` digest and evaluates the same
+policy through the same script, so nothing about the verdict differs from a release.
+
+That run is **not** blocking, and no scheduled run should be. Nobody triggered it, no commit caused the
+finding and no revert removes it — the remedy is to rebuild `main` against a patched base image, which
+the next merge does anyway. So `scripts/report-vulnerability-drift.ts` keeps a single tracking issue in
+step with the findings instead: opened when they appear, edited in place and commented when the set
+changes, silent when it has not, and closed when it clears. It recognises its own issue by an HTML
+marker on the first line of the body, not by the title, so the issue can be retitled and triaged freely;
+delete that line and the next run opens a new one.
+
 ## Browser source maps
 
 Image builds upload hidden source maps through Sentry's debug-ID integration when the repository

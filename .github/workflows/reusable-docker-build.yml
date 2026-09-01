@@ -511,24 +511,9 @@ jobs:
           fi
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
 
-      - name: Download the Trivy database
-        env:
-          # A blocking gate inherits Trivy's database availability as a hard dependency, and
-          # GHCR answers TOOMANYREQUESTS often enough that Harbor, Rancher and New Relic all
-          # override this. Trivy walks the list in order. The `:2` tag is the database schema
-          # version and is pinned to the Trivy version in setup-release-security-tools; a
-          # schema bump fails this step loudly rather than silently fetching the wrong DB.
-          TRIVY_DB_REPOSITORY: ghcr.io/aquasecurity/trivy-db:2,public.ecr.aws/aquasecurity/trivy-db:2
-        run: |
-          set -euo pipefail
-          for attempt in 1 2 3; do
-            trivy image --timeout 90s --download-db-only && break
-            if [ "$attempt" -eq 3 ]; then
-              echo "::error::Trivy database download failed after $attempt attempts"
-              exit 1
-            fi
-            sleep $((attempt * 5))
-          done
+      # A blocking gate inherits Trivy's database availability as a hard dependency, so the
+      # retries and the mirror fallback live in one action rather than in each caller.
+      - uses: ./.github/actions/download-trivy-db
 
       - name: Enforce the release vulnerability policy
         env:

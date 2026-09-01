@@ -268,7 +268,7 @@ void describe("CI contract", () => {
 		assert.doesNotMatch(scan, /linux\/arm64/);
 		// A gate that cannot say what it rejected is not finished.
 		assert.match(scan, /uses: actions\/upload-artifact@/);
-		assert.match(scan, /public\.ecr\.aws\/aquasecurity\/trivy-db/);
+		assert.match(scan, /uses: \.\/\.github\/actions\/download-trivy-db/);
 
 		let callSites = 0;
 		for (const [file, source] of await workflowSources()) {
@@ -283,9 +283,90 @@ void describe("CI contract", () => {
 				);
 			}
 		}
-		// The blocking build gate and the scheduled rescan; the release path goes through
-		// verify-release-evidence.ts, which imports evaluate() directly.
+		// The blocking build gate and the scheduled release rescan; the release path goes through
+		// verify-release-evidence.ts and the main rescan through scan-main-images.ts, both of which
+		// reach the same evaluator without a workflow-level call site.
 		assert.equal(callSites, 2);
+	});
+
+	void test("keeps one release vulnerability policy behind every scan", async () => {
+		// Every path that evaluates the policy — the build gate, the release, the release rescan and
+		// the main rescan — must name this one file. A second copy is the failure the whole effort
+		// removes, and it would be invisible: two policies both pass until they disagree.
+		const files = [
+			...(await Array.fromAsync(glob(".github/workflows/*.{yml,yaml}"))),
+			...(await Array.fromAsync(glob("scripts/*.ts"))),
+		];
+		for (const [file, source] of await readSources(files)) {
+			if (file.endsWith(".test.ts")) continue;
+			for (const reference of source.match(/[\w./-]*vulnerability-polic[\w-]*\.json/g) ?? [])
+				assert.ok(
+					// The evidence bundle carries a copy so a release can be re-audited against the
+					// policy it was cut under; release.yml is asserted below to copy, not author, it.
+					["security/vulnerability-policy.json", "evidence/vulnerability-policy.json"].includes(
+						reference,
+					) || reference === "vulnerability-policy.json",
+					`${file} must evaluate the one release vulnerability policy, not ${reference}`,
+				);
+		}
+		assert.match(
+			await readFile(".github/workflows/release.yml", "utf8"),
+			/cp security\/vulnerability-policy\.json evidence\/vulnerability-policy\.json/,
+		);
+		// One committed policy, so "the same policy" is a fact rather than a convention.
+		assert.deepEqual(await Array.fromAsync(glob("security/*vulnerability*.json")), [
+			"security/vulnerability-policy.json",
+		]);
+	});
+
+	void test("rescans main's images weekly and reports drift to an issue, not a status", async () => {
+		const source = await readFile(".github/workflows/rescan-main-images.yml", "utf8");
+		// Weekly, matching the supported-release rescan: the remedy for drift is a rebuild of main,
+		// which the next merge performs anyway, so a nightly run would report the same finding six
+		// more times before anything could have changed.
+		assert.match(source, /^ {4}- cron: "\d+ \d+ \* \* 1"$/m);
+		assert.match(source, /workflow_dispatch:/);
+		assert.match(source, /group: rescan-main-images/);
+		// Writing an issue is the whole point; nothing else here needs a write.
+		assert.match(source, /issues: write/);
+		assert.doesNotMatch(source, /contents: write|packages: write|id-token: write/);
+		// The scan and the reporting are tested TypeScript, not inline bash: the upsert in
+		// particular has to not open a duplicate every week, which no eyeball review establishes.
+		assert.match(source, /run: node scripts\/scan-main-images\.ts reports/);
+		assert.match(source, /run: node scripts\/report-vulnerability-drift\.ts reports/);
+		assert.match(source, /uses: \.\/\.github\/actions\/download-trivy-db/);
+		assert.match(source, /uses: actions\/upload-artifact@/);
+		// Nothing may turn a finding into a red status: no `continue-on-error` fig leaf, and no
+		// second evaluator inline.
+		assert.doesNotMatch(source, /continue-on-error/);
+		assert.doesNotMatch(source, /trivy image/);
+	});
+
+	void test("fetches the Trivy database through one action", async () => {
+		const action = await readFile(".github/actions/download-trivy-db/action.yml", "utf8");
+		// GHCR answers TOOMANYREQUESTS often enough that a gate needs the mirror; stating it once
+		// is why this action exists at all.
+		assert.match(action, /public\.ecr\.aws\/aquasecurity\/trivy-db/);
+		assert.match(action, /--download-db-only/);
+		for (const [file, source] of await workflowSources())
+			assert.doesNotMatch(
+				source,
+				/--download-db-only/,
+				`${file} must download the Trivy database through .github/actions/download-trivy-db`,
+			);
+		// Everything that signs or publishes a scan result asserts the database is not stale.
+		for (const file of [
+			".github/workflows/release.yml",
+			".github/workflows/rescan-release-images.yml",
+			".github/workflows/rescan-main-images.yml",
+		]) {
+			const source = await readFile(file, "utf8");
+			assert.match(
+				source,
+				/uses: \.\/\.github\/actions\/download-trivy-db\n\s+with:\n\s+max-age-hours: "24"/,
+				`${file} must refuse a stale Trivy database`,
+			);
+		}
 	});
 
 	void test("pins every external action to a full commit SHA with a version comment", async () => {

@@ -218,6 +218,13 @@ jobs:
         with:
           install: "none"
 
+      # The database the whole evidence bundle is scanned against: recorded into the bundle, and
+      # refused if it is over a day old, so a stale mirror cannot be signed as a fresh scan.
+      - uses: ./.github/actions/download-trivy-db
+        with:
+          max-age-hours: "24"
+          metadata-path: evidence/trivy-db.json
+
       - name: Generate and enforce release evidence
         env:
           TRIVY_USERNAME: ${{ github.actor }}
@@ -227,19 +234,6 @@ jobs:
           mkdir -p evidence
           : > release-platforms.tsv
           started=$SECONDS
-          for attempt in 1 2 3; do
-            trivy image --timeout 90s --download-db-only && break
-            if [ "$attempt" -eq 3 ]; then
-              echo "::error::Trivy database download failed after $attempt attempts"
-              exit 1
-            fi
-            sleep $((attempt * 5))
-          done
-          db_metadata="${TRIVY_CACHE_DIR:-$HOME/.cache/trivy}/db/metadata.json"
-          jq -e '(.UpdatedAt | sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601) as $updated |
-            ((now - $updated) >= 0) and ((now - $updated) <= 86400)' \
-            "$db_metadata" >/dev/null
-          cp "$db_metadata" evidence/trivy-db.json
           jq -n --arg syft "$(syft version -o json | jq -r .version)" \
             --arg trivy "$(trivy version --format json | jq -r .Version)" \
             --arg cosign "$(cosign version --json | jq -r .gitVersion)" \

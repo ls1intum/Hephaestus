@@ -1,0 +1,87 @@
+# Rescans the images built from main's HEAD against the release vulnerability policy.
+#
+# The gate in reusable-docker-build.yml runs where an image is built, so it catches a change that
+# introduces a finding and cannot catch a finding that appears with no change at all. That is the
+# common case: v0.75.0 was blocked by CVEs published after the code merged clean, and nothing
+# noticed until the release failed. rescan-release-images.yml already covers published releases on
+# this cadence; this covers what main would release today.
+#
+# Non-blocking by design. Findings go to a tracking issue, updated in place, because a red status on
+# a schedule nobody triggered — for a regression no commit caused and no revert fixes — is how a team
+# learns to ignore the gate.
+name: Rescan main images
+
+on:
+  schedule:
+    # Weekly, twenty minutes after the supported-release rescan, so the two never contend for the
+    # Trivy database. Monday also puts findings in front of the same review Renovate's PRs land for.
+    - cron: "37 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: rescan-main-images
+  cancel-in-progress: false
+
+jobs:
+  rescan:
+    name: Rescan main's images
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      issues: write
+      packages: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-node-pnpm
+        with:
+          install: "none"
+
+      - uses: ./.github/actions/setup-release-security-tools
+        with:
+          install-syft: "false"
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # A day old at most: an older mirror would report last week's drift as this week's.
+      - uses: ./.github/actions/download-trivy-db
+        with:
+          max-age-hours: "24"
+          metadata-path: reports/trivy-db.json
+
+      # Resolves each image's `:main` tag to its linux/amd64 digest, scans it, and evaluates the one
+      # security/vulnerability-policy.json through the one scripts/check-release-vulnerabilities.ts.
+      # A finding does not fail this step; an unreachable registry or a broken scanner does.
+      - name: Scan the images built from main
+        env:
+          TRIVY_USERNAME: ${{ github.actor }}
+          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/scan-main-images.ts reports
+
+      - name: Upload the vulnerability policy results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: main-image-rescan-${{ github.run_id }}
+          path: reports
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Route findings to the tracking issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/report-vulnerability-drift.ts reports

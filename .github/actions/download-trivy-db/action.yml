@@ -1,0 +1,54 @@
+name: Download the Trivy database
+description: >-
+  Fetches the Trivy vulnerability database once, with the retries and registry fallback a gate
+  needs, and optionally asserts its freshness and records its metadata.
+inputs:
+  max-age-hours:
+    description: >-
+      Fail when the downloaded database is older than this many whole hours. Empty skips the
+      assertion; evidence-producing scans set it so a stale mirror cannot be signed as a scan.
+    required: false
+    default: ""
+  metadata-path:
+    description: >-
+      Copy the database metadata to this path, creating parent directories. Empty skips the copy.
+    required: false
+    default: ""
+runs:
+  using: composite
+  steps:
+    - name: Download the Trivy database
+      shell: bash
+      env:
+        MAX_AGE_HOURS: ${{ inputs.max-age-hours }}
+        METADATA_PATH: ${{ inputs.metadata-path }}
+        # GHCR answers TOOMANYREQUESTS often enough that Harbor, Rancher and New Relic all
+        # override this; Trivy walks the list in order. The `:2` tag is the database schema
+        # version, pinned to the Trivy version in setup-release-security-tools, so a schema bump
+        # fails loudly rather than silently fetching the wrong database.
+        TRIVY_DB_REPOSITORY: ghcr.io/aquasecurity/trivy-db:2,public.ecr.aws/aquasecurity/trivy-db:2
+      run: |
+        set -euo pipefail
+        if [ -n "$MAX_AGE_HOURS" ] && ! [[ "$MAX_AGE_HOURS" =~ ^[0-9]+$ ]]; then
+          echo "::error::max-age-hours must be a whole number of hours"
+          exit 1
+        fi
+        for attempt in 1 2 3; do
+          trivy image --timeout 90s --download-db-only && break
+          if [ "$attempt" -eq 3 ]; then
+            echo "::error::Trivy database download failed after $attempt attempts"
+            exit 1
+          fi
+          sleep $((attempt * 5))
+        done
+        db_metadata="${TRIVY_CACHE_DIR:-$HOME/.cache/trivy}/db/metadata.json"
+        if [ -n "$MAX_AGE_HOURS" ]; then
+          jq -e --argjson max "$((MAX_AGE_HOURS * 3600))" \
+            '(.UpdatedAt | sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601) as $updated |
+              ((now - $updated) >= 0) and ((now - $updated) <= $max)' \
+            "$db_metadata" >/dev/null
+        fi
+        if [ -n "$METADATA_PATH" ]; then
+          mkdir -p "$(dirname "$METADATA_PATH")"
+          cp "$db_metadata" "$METADATA_PATH"
+        fi
