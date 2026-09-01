@@ -319,16 +319,12 @@ jobs:
   Docker:
     uses: ./.github/workflows/ci-docker-build.yml
     secrets:
-      SENTRY_AUTH_TOKEN: ${{ github.event_name != 'pull_request' && secrets.SENTRY_AUTH_TOKEN || '' }}
-      SENTRY_ORG: ${{ github.event_name != 'pull_request' && secrets.SENTRY_ORG || '' }}
-      SENTRY_PROJECT: ${{ github.event_name != 'pull_request' && secrets.SENTRY_PROJECT || '' }}
-    # Image builds consume the detected source tree, not Quality outputs. Running both branches at
-    # once keeps image and preview confidence without adding Docker as a second CI stage.
+      SENTRY_AUTH_TOKEN: ${{ github.event_name == 'push' && secrets.SENTRY_AUTH_TOKEN || '' }}
+      SENTRY_ORG: ${{ github.event_name == 'push' && secrets.SENTRY_ORG || '' }}
+      SENTRY_PROJECT: ${{ github.event_name == 'push' && secrets.SENTRY_PROJECT || '' }}
     needs: [detect-changes]
-    # A preview runs the images CI published for its exact head commit, so a same-repository pull
-    # request needs commit-addressed tags even when it touches only docs — `Tag unchanged images`
-    # re-tags rather than rebuilds. The path filters therefore gate fork pull requests only; forks
-    # never receive a preview.
+    # Same-repository previews require every image at the PR head tag; unchanged images are aliased.
+    # Forks cannot preview, so their image builds remain path-filtered.
     if: |
       needs.detect-changes.outputs.should_skip != 'true' && (
         github.event_name != 'pull_request' ||

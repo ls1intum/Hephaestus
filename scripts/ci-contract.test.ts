@@ -200,6 +200,55 @@ void describe("CI contract", () => {
 		assert.match(job(source, "Compose"), /uses: \.\/\.github\/workflows\/ci-compose-validate\.yml/);
 	});
 
+	void test("builds pre-merge candidates on one architecture and final images on both", async () => {
+		const source = await readFile(".github/workflows/cicd.yml", "utf8");
+		const caller = job(source, "Docker");
+		for (const secret of ["SENTRY_AUTH_TOKEN", "SENTRY_ORG", "SENTRY_PROJECT"]) {
+			assert.match(
+				caller,
+				new RegExp(`${secret}: \\$\\{\\{ github\\.event_name == 'push' && secrets\\.${secret}`),
+			);
+		}
+
+		const docker = await readFile(".github/workflows/ci-docker-build.yml", "utf8");
+		for (const name of [
+			"webapp-build",
+			"application-server-build",
+			"agent-pi-build",
+			"postgres-build",
+		]) {
+			const image = job(docker, name);
+			assert.match(
+				image,
+				/single-arch: \${{ github\.event_name == 'pull_request' \|\| github\.event_name == 'merge_group' }}/,
+			);
+			assert.doesNotMatch(image, /^\s+tags:/m);
+		}
+		const inherited = job(docker, "tag-unchanged-images");
+		assert.match(inherited, /HEAD_SHA/);
+		assert.match(inherited, /pr-\$PR_NUMBER/);
+		assert.match(inherited, /run-\$RUN_ID-\$RUN_ATTEMPT/);
+
+		const reusable = await readFile(".github/workflows/reusable-docker-build.yml", "utf8");
+		for (const tag of [
+			/github\.event_name == 'push' && github\.ref_name/,
+			/github\.event_name == 'push' && github\.sha/,
+			/github\.event_name == 'push' && format\('ci-\{0\}', github\.run_number\)/,
+			/github\.event_name == 'pull_request' && github\.event\.pull_request\.head\.sha/,
+			/github\.event_name == 'pull_request' && format\('pr-\{0\}', github\.event\.number\)/,
+			/run-\${{ github\.run_id }}-\${{ github\.run_attempt }}/,
+		]) {
+			assert.match(reusable, tag);
+		}
+		for (const secret of ["SENTRY_AUTH_TOKEN", "SENTRY_ORG", "SENTRY_PROJECT"]) {
+			assert.match(reusable, new RegExp(`github\\.event_name == 'push'.*secrets\\.${secret}`));
+		}
+		assert.match(
+			reusable,
+			/inputs\.single-arch.*linux\/amd64.*ubuntu-24\.04.*linux\/arm64.*ubuntu-24\.04-arm/,
+		);
+	});
+
 	void test("pins every external action to a full commit SHA with a version comment", async () => {
 		const invalid: string[] = [];
 		const files = await Array.fromAsync(glob(".github/{actions,workflows}/**/*.{yml,yaml}"));
@@ -246,6 +295,12 @@ void describe("CI contract", () => {
 	void test("runs release evidence verification through tested TypeScript", async () => {
 		const release = await readFile(".github/workflows/release.yml", "utf8");
 		const rescan = await readFile(".github/workflows/rescan-release-images.yml", "utf8");
+		assert.match(
+			release,
+			/SOURCE_TAG: run-\${{ github\.event\.workflow_run\.id }}-\${{ github\.event\.workflow_run\.run_attempt }}/,
+		);
+		assert.match(release, /imagetools inspect "\$FULL_IMAGE:\$SOURCE_TAG"/);
+		assert.doesNotMatch(release, /imagetools inspect "\$FULL_IMAGE:\$SHA"/);
 		assert.match(rescan, /node scripts\/verify-release-evidence\.ts release-evidence/);
 		assert.doesNotMatch(rescan, /node scripts\/check-release-sbom\.ts/);
 		assert.equal((release.match(/node scripts\/verify-release-evidence\.ts/g) ?? []).length, 3);

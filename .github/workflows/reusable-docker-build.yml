@@ -40,10 +40,6 @@ on:
         type: string
         default: "ghcr.io"
         description: "Container registry"
-      tags:
-        type: string
-        required: false
-        description: "Additional tags (one per line)"
       labels:
         type: string
         required: false
@@ -56,15 +52,20 @@ on:
         type: boolean
         required: false
         default: false
-        description: |
-          Build only linux/amd64. Callers set this on pull requests to halve Docker build
-          wall-clock + cost (the arm64 native build adds ~7 min and PR images are never deployed
-          to production). main + release builds leave this false so release tags and pinned
-          digests stay multi-arch.
+        description: "Build only linux/amd64 instead of the supported multi-architecture set."
     outputs:
       manifest-digest:
-        description: "Published image digest (a multi-architecture manifest-list digest for main and releases)."
+        description: "Published image digest; an index digest for multi-architecture builds."
         value: ${{ inputs.single-arch && jobs.build.outputs.manifest-digest || jobs.merge.outputs.manifest-digest }}
+
+env:
+  STANDARD_IMAGE_TAGS: |
+    ${{ github.event_name == 'push' && github.ref_name || '' }}
+    ${{ github.event_name == 'push' && github.sha || '' }}
+    ${{ github.event_name == 'push' && format('ci-{0}', github.run_number) || '' }}
+    ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || '' }}
+    ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || '' }}
+    run-${{ github.run_id }}-${{ github.run_attempt }}
 
 jobs:
   build:
@@ -88,15 +89,10 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
-      # Note: QEMU is NOT needed because we build natively:
-      # - linux/amd64 builds on ubuntu-24.04 (x86_64)
-      # - linux/arm64 builds on ubuntu-24.04-arm (aarch64)
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
         with:
-          # Use TUM's Docker Hub mirror to avoid rate limits (standard ls1intum approach)
-          # See: https://github.com/ls1intum/.github/blob/main/.github/workflows/build-and-push-docker-image.yml
+          # Avoid anonymous Docker Hub pull limits.
           buildkitd-config-inline: |
             [registry."docker.io"]
               mirrors = ["https://docker-mirror.ase.in.tum.de:8765"]
@@ -114,9 +110,6 @@ jobs:
         run: |
           {
             echo "tags<<EOF"
-            echo "type=ref,event=branch"
-            echo "type=ref,event=pr"
-            echo "type=sha,prefix="
             while IFS= read -r line || [[ -n "$line" ]]; do
               line=$(echo "$line" | xargs)
               [ -z "$line" ] && continue
@@ -129,11 +122,9 @@ jobs:
                   [ -n "$value" ] && echo "type=raw,value=$value"
                 done
               fi
-            done <<< "$INPUT_TAGS"
+            done <<< "$STANDARD_IMAGE_TAGS"
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
-        env:
-          INPUT_TAGS: ${{ inputs.tags }}
 
       - name: Extract metadata
         id: meta
@@ -154,7 +145,6 @@ jobs:
           INPUT_IMAGE_NAME: ${{ inputs.image-name }}
           MATRIX_PLATFORM: ${{ matrix.platform }}
 
-      # Only main may write the shared registry cache.
       - name: Build and push (Dockerfile)
         id: build
         if: ${{ !inputs.use-buildpacks }}
@@ -167,9 +157,9 @@ jobs:
           platforms: ${{ matrix.platform }}
           build-args: ${{ inputs.build-args }}
           secrets: |
-            sentry_auth_token=${{ github.event_name != 'pull_request' && matrix.platform == 'linux/amd64' && secrets.SENTRY_AUTH_TOKEN || '' }}
-            sentry_org=${{ github.event_name != 'pull_request' && matrix.platform == 'linux/amd64' && secrets.SENTRY_ORG || '' }}
-            sentry_project=${{ github.event_name != 'pull_request' && matrix.platform == 'linux/amd64' && secrets.SENTRY_PROJECT || '' }}
+            sentry_auth_token=${{ github.event_name == 'push' && matrix.platform == 'linux/amd64' && secrets.SENTRY_AUTH_TOKEN || '' }}
+            sentry_org=${{ github.event_name == 'push' && matrix.platform == 'linux/amd64' && secrets.SENTRY_ORG || '' }}
+            sentry_project=${{ github.event_name == 'push' && matrix.platform == 'linux/amd64' && secrets.SENTRY_PROJECT || '' }}
           labels: ${{ steps.meta.outputs.labels }}
           tags: ${{ inputs.single-arch && steps.meta.outputs.tags || '' }}
           push: ${{ inputs.single-arch }}
@@ -364,14 +354,8 @@ jobs:
         run: |
           {
             echo "tags<<EOF"
-            # Default tags. Note: `latest` is NOT applied here — it tracks the latest
-            # release and is applied by the release workflow's retag step, together
-            # with the X.Y.Z and X.Y tags.
-            echo "type=ref,event=branch"
-            echo "type=ref,event=pr"
-            echo "type=sha,prefix="
-            if [ -n "${INPUTS_TAGS}" ]; then
-              echo "${INPUTS_TAGS}" | while IFS= read -r line || [[ -n "$line" ]]; do
+            if [ -n "${STANDARD_IMAGE_TAGS}" ]; then
+              echo "${STANDARD_IMAGE_TAGS}" | while IFS= read -r line || [[ -n "$line" ]]; do
                 line=$(echo "$line" | xargs)
                 if [ -n "$line" ]; then
                   if [[ "$line" == *"type="* ]]; then
@@ -390,8 +374,6 @@ jobs:
             fi
             echo "EOF"
           } >> $GITHUB_OUTPUT
-        env:
-          INPUTS_TAGS: ${{ inputs.tags }}
 
       - name: Extract metadata
         id: meta
@@ -449,7 +431,6 @@ jobs:
         run: |
           cosign sign --yes --recursive "$IMAGE_REF"
 
-      # Pin cert SAN to this workflow + cross-check the workflow-repo OID.
       - name: Verify signature + attestation
         env:
           IMAGE_REF: ${{ inputs.registry }}/${{ inputs.image-name }}@${{ steps.digest.outputs.manifest-digest }}
