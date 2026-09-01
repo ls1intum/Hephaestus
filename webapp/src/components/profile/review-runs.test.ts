@@ -1,0 +1,68 @@
+import { describe, expect, it } from "vitest";
+import type { PracticeGroupReviewObservation } from "@/api/types.gen";
+import { feedbackResponseOf, isEmptyFeedbackResponse } from "./review-runs";
+
+const observation = (
+	overrides: Partial<PracticeGroupReviewObservation> = {},
+): PracticeGroupReviewObservation => ({
+	observationId: "00000000-0000-0000-0000-000000000001",
+	practiceSlug: "records-decisions",
+	practiceName: "Record significant decisions",
+	title: "The workspace trade-off is documented",
+	presence: "PRESENT",
+	assessment: "GOOD",
+	...overrides,
+});
+
+describe("feedbackResponseOf", () => {
+	it("reads back every part of a response the server already holds", () => {
+		expect(
+			feedbackResponseOf(
+				observation({
+					feedbackUsefulness: "HELPFUL",
+					feedbackResolution: "ADDRESSED",
+					feedbackResponseComment: "Split into two commits.",
+				}),
+			),
+		).toStrictEqual({
+			usefulness: "HELPFUL",
+			resolution: "ADDRESSED",
+			comment: "Split into two commits.",
+		});
+	});
+
+	it("carries the parts that are missing as undefined rather than dropping them", () => {
+		// The form starts from this shape, and the endpoint replaces what it receives: a key that went
+		// missing here would be sent as "clear this field" the next time any control is used.
+		expect(feedbackResponseOf(observation({ feedbackUsefulness: "UNHELPFUL" }))).toStrictEqual({
+			usefulness: "UNHELPFUL",
+			resolution: undefined,
+			comment: undefined,
+		});
+	});
+});
+
+describe("isEmptyFeedbackResponse", () => {
+	it("treats an answer with nothing left in it as a withdrawal", () => {
+		expect(isEmptyFeedbackResponse({})).toBe(true);
+		expect(
+			isEmptyFeedbackResponse({
+				usefulness: undefined,
+				resolution: undefined,
+				comment: undefined,
+			}),
+		).toBe(true);
+	});
+
+	it("does not mistake a blank comment for something worth storing", () => {
+		// Clearing the textarea leaves an empty string, not undefined. Storing that would keep a
+		// response row that says nothing, which reads on the server as an answer the developer gave.
+		expect(isEmptyFeedbackResponse({ comment: "   " })).toBe(true);
+	});
+
+	it("keeps an answer that still carries any one part", () => {
+		expect(isEmptyFeedbackResponse({ usefulness: "HELPFUL" })).toBe(false);
+		expect(isEmptyFeedbackResponse({ resolution: "NOT_APPLICABLE" })).toBe(false);
+		expect(isEmptyFeedbackResponse({ comment: "Handled in the follow-up." })).toBe(false);
+	});
+});

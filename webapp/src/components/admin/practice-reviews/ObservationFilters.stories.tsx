@@ -27,7 +27,7 @@ const PEOPLE: ReviewPeople = {
 	isLoading: false,
 	isError: false,
 };
-const AREAS: FacetSource = {
+const GROUPS: FacetSource = {
 	options: groupFacetOptions(practiceGroups),
 	isLoading: false,
 	isError: false,
@@ -48,7 +48,7 @@ const meta = {
 		search: { presence: undefined, assessment: undefined, severity: undefined },
 		onPatch: fn(),
 		onReset: fn(),
-		groups: AREAS,
+		groups: GROUPS,
 		practices: PRACTICES,
 		people: PEOPLE,
 		total: 12,

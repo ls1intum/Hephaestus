@@ -6,9 +6,14 @@ import {
 	getActivityMonitorOptions,
 	getUserProfileOptions,
 	getWorkspaceOptions,
+	listGroupsOptions,
+	listPracticeGroupStandingsOptions,
+	listPracticeStandingsOptions,
 } from "@/api/@tanstack/react-query.gen";
+import type { PracticeStanding } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { useNow } from "@/components/common/use-now";
+import { PracticeGroupStandingCard } from "@/components/profile/PracticeGroupStandingCard";
 import { ProfilePage } from "@/components/profile/ProfilePage";
 import { useWorkspaceFeatures } from "@/hooks/use-workspace-features";
 import { useAuth } from "@/integrations/auth/AuthContext";
@@ -99,6 +104,38 @@ function UserProfile() {
 
 	const currUserIsDashboardUser = isCurrentUser(username);
 
+	const groupsQuery = useQuery({
+		...listGroupsOptions({
+			path: { workspaceSlug },
+			query: { visibleInPracticeDashboardsOnly: true },
+		}),
+		enabled: Boolean(workspaceSlug) && currUserIsDashboardUser,
+	});
+	const practiceGroups = groupsQuery.data ?? [];
+	const groupStandingsQuery = useQuery({
+		...listPracticeGroupStandingsOptions({
+			path: { workspaceSlug },
+		}),
+		enabled: Boolean(workspaceSlug) && currUserIsDashboardUser,
+	});
+	const groupStandings = Object.fromEntries(
+		(groupStandingsQuery.data ?? []).map((status) => [status.groupSlug, status]),
+	);
+	const standingsQuery = useQuery({
+		...listPracticeStandingsOptions({ path: { workspaceSlug } }),
+		enabled: Boolean(workspaceSlug) && currUserIsDashboardUser,
+	});
+	const practicesByGroup = (standingsQuery.data ?? []).reduce<Record<string, PracticeStanding[]>>(
+		(grouped, practice) => {
+			if (!practice.groupSlug) return grouped;
+			const forGroup = grouped[practice.groupSlug] ?? [];
+			forGroup.push(practice);
+			grouped[practice.groupSlug] = forGroup;
+			return grouped;
+		},
+		{},
+	);
+
 	const profileQuery = useQuery({
 		...getUserProfileOptions({
 			path: { workspaceSlug, login: username },
@@ -170,7 +207,8 @@ function UserProfile() {
 				workspaceQuery.isPending ||
 				(activityMonitorQuery.isPending && !activityMonitorQuery.data)
 			}
-			error={profileQuery.isError}
+			error={profileQuery.error ?? undefined}
+			onRetry={() => void profileQuery.refetch()}
 			username={username}
 			currUserIsDashboardUser={currUserIsDashboardUser}
 			workspaceSlug={workspaceSlug}
@@ -181,6 +219,32 @@ function UserProfile() {
 			achievementsEnabled={achievementsEnabled === true}
 			progressionEnabled={progressionEnabled === true}
 			leaguesEnabled={leaguesEnabled === true}
+			practiceGroupStandings={
+				currUserIsDashboardUser ? (
+					<PracticeGroupStandingCard
+						groups={practiceGroups}
+						standings={groupStandings}
+						practicesByGroup={practicesByGroup}
+						isLoading={
+							groupsQuery.isPending || groupStandingsQuery.isPending || standingsQuery.isPending
+						}
+						error={
+							groupsQuery.error ?? groupStandingsQuery.error ?? standingsQuery.error ?? undefined
+						}
+						onRetry={() => {
+							if (groupsQuery.isError) void groupsQuery.refetch();
+							if (groupStandingsQuery.isError) void groupStandingsQuery.refetch();
+							if (standingsQuery.isError) void standingsQuery.refetch();
+						}}
+						onOpenDetails={(group) => {
+							void navigate({
+								to: "/w/$workspaceSlug/user/$username/practice-groups/$groupSlug",
+								params: { workspaceSlug, username, groupSlug: group.slug },
+							});
+						}}
+					/>
+				) : undefined
+			}
 		/>
 	);
 }

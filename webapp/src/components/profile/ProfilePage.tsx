@@ -1,7 +1,8 @@
-import { XCircleIcon } from "lucide-react";
+import type { ReactNode } from "react";
 
 import type { Profile, ProfileActivityMonitor } from "@/api/types.gen";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
+import { Separator } from "@/components/ui/separator";
 import type { ActivityMonitorFilters } from "@/lib/activity-monitor";
 import type { ProviderType } from "@/lib/provider";
 import type { LeaderboardSchedule } from "@/lib/timeframe";
@@ -16,18 +17,24 @@ interface ProfileProps {
 	activityMonitorFilters: ActivityMonitorFilters;
 	onActivityMonitorFiltersChange: (filters: ActivityMonitorFilters) => void;
 	isLoading: boolean;
-	error: boolean;
+	/** The failure itself, not a flag: the alert reads the server's own words out of it. */
+	error?: unknown;
+	onRetry?: () => void;
 	username: string;
 	currUserIsDashboardUser: boolean;
 	workspaceSlug: string;
 	after?: string;
 	before?: string;
 	onTimeframeChange?: (afterDate: string, beforeDate?: string) => void;
-	/** Leaderboard schedule for proper week calculations */
 	schedule?: LeaderboardSchedule;
 	achievementsEnabled?: boolean;
 	progressionEnabled?: boolean;
 	leaguesEnabled?: boolean;
+	/**
+	 * The practice-group section, rendered by the route that has its data. A slot rather than that
+	 * component's props, so this page does not carry a type for a section it only places.
+	 */
+	practiceGroupStandings?: ReactNode;
 }
 
 export function ProfilePage({
@@ -38,6 +45,7 @@ export function ProfilePage({
 	onActivityMonitorFiltersChange,
 	isLoading,
 	error,
+	onRetry,
 	username,
 	currUserIsDashboardUser,
 	workspaceSlug,
@@ -48,15 +56,12 @@ export function ProfilePage({
 	achievementsEnabled = true,
 	progressionEnabled = true,
 	leaguesEnabled = true,
+	practiceGroupStandings,
 }: ProfileProps) {
 	if (error) {
 		return (
-			<div className="flex items-center justify-center gap-2">
-				<Alert variant="destructive" className="max-w-xl">
-					<XCircleIcon className="h-4 w-4" />
-					<AlertTitle>Something went wrong...</AlertTitle>
-					<AlertDescription>User couldn't be loaded. Please try again later.</AlertDescription>
-				</Alert>
+			<div className="mx-auto w-full max-w-xl">
+				<QueryErrorAlert error={error} title="Could not load this profile" onRetry={onRetry} />
 			</div>
 		);
 	}
@@ -75,6 +80,12 @@ export function ProfilePage({
 				progressionEnabled={progressionEnabled}
 				leaguesEnabled={leaguesEnabled}
 			/>
+			{practiceGroupStandings && (
+				<>
+					{practiceGroupStandings}
+					<Separator />
+				</>
+			)}
 			<ProfileContent
 				providerType={providerType}
 				activityMonitorData={activityMonitorData}

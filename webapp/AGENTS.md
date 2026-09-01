@@ -460,7 +460,7 @@ page throws the reader back to the top.
 |---|---|---|
 | What an instance offers | **catalog** / instance catalog | library |
 | Availability to workspaces | **include / exclude** | offer, retire |
-| A grouping of practices | **group** (user-facing); `area` stays in code, types and the API | area, section |
+| A grouping of practices | **group**, at every layer — copy, code, types and the API alike | area, section |
 | A practice with no group | **Unassigned** | No area, Not in an area, Belong to no area |
 | Inputs and criteria | **review rules** | review behavior, detection config |
 
