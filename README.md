@@ -3,7 +3,7 @@
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="./docs/static/img/brand/hephaestus-lockup-dark.png">
       <source media="(prefers-color-scheme: light)" srcset="./docs/static/img/brand/hephaestus-lockup-light.png">
-      <img alt="Hephaestus" height="100" src="./docs/static/img/brand/hephaestus-lockup-light.png">
+      <img alt="Hephaestus" width="484" src="./docs/static/img/brand/hephaestus-lockup-light.png">
     </picture>
   </h1>
   <p><strong>Learn from the work you're already doing</strong></p>
