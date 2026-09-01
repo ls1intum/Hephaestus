@@ -5,7 +5,15 @@ FROM node:${NODE_VERSION}-slim@sha256:a9f5f7c91a432850b2a8a7797adf5eadb6c733ceed
 
 # The base digest is pinned, so Debian security updates published after the upstream image was
 # built can reach it only here; Renovate bumps the digest only when upstream republishes one.
-RUN apt-get update -qq && apt-get upgrade -y -qq && \
+#
+# SOURCE_COMMIT is what makes that upgrade actually run. The builder imports the `cache-main`
+# registry cache and nothing else in this layer changes between builds, so without a per-build
+# input BuildKit would replay a weeks-old package set and the upgrade would silently stop
+# happening — the exact failure this layer exists to prevent. webapp/Dockerfile gets the same
+# argument, one instruction ahead of its own upgrade.
+ARG SOURCE_COMMIT
+RUN echo "source commit: ${SOURCE_COMMIT:-<unset — local build>}" && \
+    apt-get update -qq && apt-get upgrade -y -qq && \
     apt-get install -y --no-install-recommends git findutils tree jq ca-certificates grep && \
     rm -rf /var/lib/apt/lists/*
 
