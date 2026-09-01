@@ -66,40 +66,45 @@ Before any release, code must pass:
 ### Merge policy
 
 Pull requests targeting `main` merge through GitHub's merge queue after these GitHub
-Actions contexts pass: `CI Status Gate`, `Actionlint`, `Zizmor`, and `review-policy`. Required
+Actions contexts pass: `CI Status Gate`, `Actionlint`, and `Zizmor`. Required
 workflows run again for the merge group, which includes the current base and queued changes ahead of
 the pull request. Each required context is bound to the GitHub Actions integration rather than
 accepting a same-named external status.
 
-`review-policy` accepts an author listed in the comma-separated repository variable
-`REVIEW_POLICY_MAINTAINERS`. Every other author needs an approval from a non-author who currently
-has write access; the approval must cover the current head commit. Repository administrators own the
-allow-list. Native required approvals remain zero because GitHub cannot combine an author's
-self-authored change, a mandatory approval, and the merge queue without bypassing the queue.
+Review is a *native* requirement, not a status check: the `main` ruleset sets
+`required_approving_review_count: 1` with `dismiss_stale_reviews_on_push`, so a pull request without
+a current approval sits in GitHub's own **Review required** state. That state blocks the merge
+button, blocks entry to the merge queue, and holds an armed auto-merge — and the checks list on a
+healthy pull request stays fully green, because waiting for a reviewer is no longer expressed as a
+yellow check.
 
-`review-policy` is a check run the workflow publishes, not the workflow's own job status — the job
-is `Publish review-policy status` and always succeeds. A job can only pass or fail, so while an
-approval was outstanding the required context was red, and a pull request that was healthy and
-simply waiting for its first review read as broken on the pull request list. The verdict now takes
-three shapes, decided by [`scripts/review-policy.ts`](https://github.com/ls1intum/Hephaestus/blob/main/scripts/review-policy.ts):
+The review requirement is not waived for anyone. It is *satisfied* automatically for the authors
+listed in the comma-separated repository variable `REVIEW_POLICY_MAINTAINERS`:
+[`review-policy.yml`](https://github.com/ls1intum/Hephaestus/blob/main/.github/workflows/review-policy.yml)
+submits an approving review with `GITHUB_TOKEN`, attributed to `github-actions[bot]`, which counts
+toward the required count. Every other author waits for a human with write access. Repository
+administrators own the allow-list.
 
-| Verdict | Check run | Reads as |
-| --- | --- | --- |
-| Waiting for an approval | `in_progress`, no conclusion | Pending — blocks merge and merge-queue entry |
-| Author allow-listed, or approved by a non-author with write access | `success` | Green, naming who satisfied it |
-| `REVIEW_POLICY_MAINTAINERS` unset, or the policy could not be evaluated | `failure` | Red, because that is broken |
+Be honest about what that is: auto-approval encodes exactly the policy the old custom
+`review-policy` check encoded — *a listed maintainer may merge their own work* — and it exists only
+because the repository has a single write-access collaborator, so there is nobody else to ask. It is
+not a review. **The moment a second write-access reviewer exists, delete the workflow and the
+`REVIEW_POLICY_MAINTAINERS` variable and let the native requirement stand on its own.** Nothing else
+has to change; the ruleset already asks for the approval.
 
-A pending required context blocks merging and blocks entry to the merge queue exactly as a failing
-one does, so the enforcement is unchanged. `neutral` and `skipped` are not options: GitHub counts
-both as passing a required check.
+Two settings this depends on, both already in place: the organisation's *Allow GitHub Actions to
+create and approve pull requests*, which governs whether `GITHUB_TOKEN` may approve at all, and
+`dismiss_stale_reviews_on_push`, which is why the workflow runs on `synchronize` as well as
+`opened`, `reopened` and `ready_for_review` — every push has to earn a fresh approval. The approval
+is pinned to the head commit it was decided against, and a run that finds its own approval already
+standing on that commit submits nothing, so re-runs do not stack duplicate reviews.
 
-The merge queue's own pass is written into the workflow rather than routed through the evaluator, so
-that path needs no checkout: on `merge_group` the workflow comes from the queued commit while a
-checkout would come from the default branch, and a merge group that never receives the context sits
-until the queue's timeout drops it.
-
-Renaming the check run means editing the ruleset's required context in the same change. A mismatch
-leaves every pull request waiting on a context nothing reports, which blocks the fix too.
+[`scripts/review-policy.ts`](https://github.com/ls1intum/Hephaestus/blob/main/scripts/review-policy.ts)
+holds the decision, and it reads the author login and nothing else — never the diff, the title or
+the body. That is what makes it safe under `pull_request_target` with `pull-requests: write`: the
+job checks out only `scripts` from the default branch, with `persist-credentials: false`, and runs
+no pull-request code. An empty or unset `REVIEW_POLICY_MAINTAINERS` approves nobody and warns, which
+leaves every pull request needing a human — the safe direction.
 
 The changesets Version PR is the temporary exception: updates made with `GITHUB_TOKEN` do not trigger
 the required workflows, so release automation uses the ruleset bypass. The resulting version bump
@@ -217,7 +222,7 @@ why the label is the authority, and which alternatives were priced and declined,
 | Workflow               | Trigger               | Purpose                                            |
 | ---------------------- | --------------------- | -------------------------------------------------- |
 | `cicd.yml`             | PR, merge group, push to main | Validates changes before merge and builds final-SHA images after merge |
-| `review-policy.yml`    | PR and review events, merge queue | Publishes the `review-policy` check: author allow-list or current-head write-access approval |
+| `review-policy.yml`    | PR opened, reopened, synchronized, ready for review | Approves a listed maintainer's pull request so the ruleset's required approval is met; does nothing for anyone else |
 | `ci-quality-gates.yml` | Called by cicd.yml    | Code quality, formatting, schema validation        |
 | `ci-tests.yml`         | Called by cicd.yml    | Unit, integration, visual tests                    |
 | `ci-docker-build.yml`  | Called by cicd.yml    | Docker image builds per component                  |

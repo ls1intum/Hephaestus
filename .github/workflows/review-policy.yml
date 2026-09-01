@@ -4,72 +4,44 @@ on:
   pull_request_target: # zizmor: ignore[dangerous-triggers] API reads only; no pull-request code is executed.
     branches: [main]
     types: [opened, reopened, synchronize, ready_for_review]
-  pull_request_review:
-    types: [submitted, dismissed]
-  merge_group:
 
 permissions: {}
 
 concurrency:
-  # Never cancel: runs in a group are serialised, so the newest event's verdict is the one that
-  # lands, and a cancelled run publishes nothing rather than a half-written state.
-  group: review-policy-${{ github.event.pull_request.number || github.ref }}
+  # Never cancel: runs in a group are serialised, so the newest event's decision is the one that
+  # lands, and a cancelled run leaves an approval unsubmitted rather than half-written.
+  group: review-policy-${{ github.event.pull_request.number }}
   cancel-in-progress: false
 
 jobs:
-  # This job is *not* the required context. It publishes one — a check run named `review-policy`,
-  # which the `main` ruleset requires and binds to the GitHub Actions integration that a
-  # `GITHUB_TOKEN`-authenticated check run is attributed to. Reporting the verdict separately is
-  # what lets an unreviewed pull request sit pending instead of red: a job can only pass or fail,
-  # and a failing job made a healthy pull request awaiting its first review look broken on the pull
-  # request list. Renaming this job back to `review-policy` would put two check runs of that name
-  # on the same commit and make which one the ruleset reads a race.
-  publish:
-    name: Publish review-policy status
+  # This job is *not* a required status check, and must never become one. The `main` ruleset requires
+  # one native approving review; all this job does is supply that approval for the authors listed in
+  # `REVIEW_POLICY_MAINTAINERS`. A pull request by anyone else gets no approval here and sits in
+  # GitHub's own "Review required" state, which blocks merging, merge-queue entry and auto-merge.
+  #
+  # `synchronize` is load-bearing: the ruleset dismisses stale approvals on push, so every push has
+  # to earn a fresh one.
+  approve:
+    name: Approve a maintainer's pull request
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
-      checks: write
       contents: read
-      pull-requests: read
+      pull-requests: write
     steps:
-      # The queue re-reports every required context against the projected commit, and the policy was
-      # already decided on the pull request that entered the queue. Written out here rather than
-      # routed through the evaluator so the queue's path needs no checkout and no import: a merge
-      # group that never receives this context sits until the queue's timeout drops it.
-      - name: Pass the merge group
-        if: github.event_name == 'merge_group'
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        with:
-          script: |
-            await github.rest.checks.create({
-              ...context.repo,
-              // Kept equal to CHECK_NAME in scripts/review-policy.ts; a test asserts they agree.
-              name: 'review-policy',
-              head_sha: context.payload.merge_group.head_sha,
-              status: 'completed',
-              conclusion: 'success',
-              output: {
-                title: 'Satisfied before this merge group was created',
-                summary:
-                  'The review policy is decided on the pull request; entering the merge queue ' +
-                  'already required it to pass.',
-              },
-            });
-
-      # The default branch, never `github.sha`: that is the pull request's merge commit on
-      # `pull_request_review`, which contains pull-request code. The base branch's copy of the
-      # policy is the authoritative one.
+      # The default branch, never `github.sha` or the pull request's head: the base branch's copy of
+      # the policy is the authoritative one, and nothing from the pull request is fetched or run.
       - name: Load the trusted policy evaluator
-        if: github.event_name != 'merge_group'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.repository.default_branch }}
           persist-credentials: false
           sparse-checkout: scripts
 
-      - name: Publish the review-policy check run
-        if: github.event_name != 'merge_group'
+      # The review is attributed to `github-actions[bot]`, which counts toward the ruleset's
+      # `required_approving_review_count`. That needs the organisation's "Allow GitHub Actions to
+      # create and approve pull requests" setting left on.
+      - name: Approve when the author is a listed maintainer
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           MAINTAINERS: ${{ vars.REVIEW_POLICY_MAINTAINERS }}
