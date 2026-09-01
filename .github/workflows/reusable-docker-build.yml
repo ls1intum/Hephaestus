@@ -203,13 +203,9 @@ jobs:
           [[ -n "$PROJECT_DESCRIPTOR" && -n "$RUN_IMAGE" ]]
           mapfile -t jars < <(find "$APPLICATION_DIRECTORY" -name 'hephaestus-application-*.jar')
           (( ${#jars[@]} == 1 ))
-          mapfile -t labels < <(jq -r '.labels | to_entries[] | "\(.key)=\(.value)"' <<< "$DOCKER_METADATA_OUTPUT_JSON")
-          label_args=()
-          for label in "${labels[@]}"; do label_args+=(--label "$label"); done
           PER_ARCH_TAG="$INPUT_REGISTRY/$INPUT_IMAGE_NAME:ci-$GITHUB_RUN_ID-$PLATFORM_PAIR"
           pack build "$PER_ARCH_TAG" --path "${jars[0]}" --descriptor "$PROJECT_DESCRIPTOR" \
-            --run-image "$RUN_IMAGE" --platform "$MATRIX_PLATFORM" --publish --trust-builder \
-            "${label_args[@]}"
+            --run-image "$RUN_IMAGE" --platform "$MATRIX_PLATFORM" --publish --trust-builder
           # Buildpacks may wrap one platform in an index; capture its manifest, not the wrapper.
           RAW=$(docker buildx imagetools inspect "$PER_ARCH_TAG" --format '{{json .Manifest}}')
           if echo "$RAW" | jq -e '.manifests' >/dev/null 2>&1; then

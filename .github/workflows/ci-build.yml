@@ -96,10 +96,5 @@ jobs:
       # renovate: datasource=docker depName=paketobuildpacks/ubuntu-noble-run-tiny
       run-image: "paketobuildpacks/ubuntu-noble-run-tiny@sha256:c32333227b6dfbc2a4a93b03ee6d3475cfe152468c7d396bf22f06099bb0ecc9"
       registry: "ghcr.io"
+      # Buildpacks images carry the lifecycle's own metadata labels; pack accepts no OCI labels.
       single-arch: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
-      labels: |
-        org.opencontainers.image.title=Hephaestus Application Server
-        org.opencontainers.image.description=Spring Boot server for Hephaestus
-        org.opencontainers.image.vendor=AET TUM
-        org.opencontainers.image.licenses=MIT
-        hephaestus.component=application-server
