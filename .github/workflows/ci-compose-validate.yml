@@ -1,27 +1,13 @@
 name: Validate Compose
 
-# The self-hosted stack (docker/self-host/) composes the reference deployment's
-# service definitions via `include`, so a change to docker/compose.*.yaml can
-# break a stranger's install without touching a single self-host file. Rendering
-# both stacks here turns interpolation- and merge-level breakage into a red check
-# instead of a bad first boot. (Semantic breakage — a renamed service silently
-# joining the stack, an inherited runtime bug — still needs a real boot.)
-#
-# Runs on every PR (not just docker/ changes) so it can be a required check,
-# matching how verify-changesets.yml is wired. It is cheap: only `docker compose
-# config`, no image pulls.
+# Shared Compose files can break either the reference or self-hosted stack, so
+# render both configurations.
 
 on:
-  pull_request:
-  push:
-    branches: [main]
+  workflow_call:
 
 permissions:
   contents: read
-
-concurrency:
-  group: validate-compose-${{ github.event.pull_request.number || github.run_id }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   validate:
@@ -37,9 +23,7 @@ jobs:
         working-directory: docker/self-host
         run: |
           set -euo pipefail
-          # Fill the required values the way an operator would; `docker compose
-          # config` fails on any variable the stack requires but .env.example
-          # does not carry, which is exactly the drift we want to catch.
+          # Supply required operator values; missing defaults must still fail rendering.
           cp .env.example .env
           sed -i \
             -e 's|^APP_HOSTNAME=$|APP_HOSTNAME=hephaestus.example.com|' \
@@ -66,8 +50,7 @@ jobs:
         working-directory: docker/self-host
         run: |
           set -euo pipefail
-          # `config` only warns about variables missing from .env; a warning here
-          # means .env.example has fallen behind the stack it renders.
+          # `config` warns rather than fails when .env omits a referenced variable.
           if docker compose config 2>&1 >/dev/null | grep "variable is not set"; then
             echo "::error::docker/self-host/.env.example is missing variables the stack references (see warnings above)"
             exit 1
@@ -86,9 +69,7 @@ jobs:
             grep -qx "$required" <<< "$services" || {
               echo "::error::'$required' is missing from the self-hosted stack"; exit 1; }
           done
-          # Compose 2.21-2.23 parse `!override` but silently ignore it, which would
-          # publish the reference's dashboard port and keep the maintainers' ACME
-          # email. Assert the merged result rather than trust the runner's version.
+          # Some Compose releases accept `!override` without applying it.
           rendered=$(docker compose config)
           for required in \
             'entrypoints.https.http.middlewares=security-headers@docker' \

@@ -176,6 +176,30 @@ void describe("CI contract", () => {
 		assert.match(pathFilter(detection, "webapp-image"), /- 'patches\/\*\*'/);
 	});
 
+	void test("separates pre-merge validation from post-merge artifact production", async () => {
+		const source = await readFile(".github/workflows/cicd.yml", "utf8");
+		for (const event of ["workflow_dispatch", "push", "pull_request", "merge_group"]) {
+			assert.match(source, new RegExp(`^ {2}${event}:`, "m"));
+		}
+		assert.match(
+			job(source, "detect-changes"),
+			/version-bump: \${{ steps\.version_bump\.outputs\.changed }}/,
+		);
+		for (const name of ["workflow-lint", "zizmor", "Quality", "Security", "Test", "Compose"]) {
+			assert.match(job(source, name), /needs: \[detect-changes\]/);
+			assert.match(
+				job(source, name),
+				/github\.event_name != 'push'.*needs\.detect-changes\.outputs\.version-bump == 'true'/s,
+			);
+		}
+		assert.doesNotMatch(job(source, "Docker"), /version-bump/);
+		assert.match(job(source, "all-ci-passed"), /needs: \[[^\]]*Compose[^\]]*Docker\]/);
+
+		const compose = await readFile(".github/workflows/ci-compose-validate.yml", "utf8");
+		assert.match(compose, /on:\n {2}workflow_call:\n/);
+		assert.match(job(source, "Compose"), /uses: \.\/\.github\/workflows\/ci-compose-validate\.yml/);
+	});
+
 	void test("pins every external action to a full commit SHA with a version comment", async () => {
 		const invalid: string[] = [];
 		const files = await Array.fromAsync(glob(".github/{actions,workflows}/**/*.{yml,yaml}"));
