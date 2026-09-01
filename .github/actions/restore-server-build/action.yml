@@ -28,7 +28,10 @@ runs:
         mapfile -t jars < <(find application/target -maxdepth 1 -name 'hephaestus-application-*.jar')
         mapfile -t clients < <(find generated-clients/target -maxdepth 1 -name 'hephaestus-generated-clients-*.jar')
         (( ${#jars[@]} == 1 )) && (( ${#clients[@]} == 1 ))
-        # Single-module goals resolve the sibling from the local repository, not from the reactor.
+        # Single-module goals resolve the sibling from the local repository, not from the reactor;
+        # reading its descriptor needs the parent pom there too.
+        ./mvnw --batch-mode --quiet -Dmaven.build.cache.enabled=false install:install-file \
+          -Dfile=pom.xml -DpomFile=pom.xml -Dpackaging=pom
         ./mvnw --batch-mode --quiet -Dmaven.build.cache.enabled=false install:install-file \
           -Dfile="${clients[0]}" -DpomFile=generated-clients/pom.xml
         echo "executable-jar=$PWD/${jars[0]}" >> "$GITHUB_OUTPUT"

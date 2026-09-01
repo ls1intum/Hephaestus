@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { glob, readFile } from "node:fs/promises";
 import { describe, test } from "node:test";
 
-import { parseDocument } from "yaml";
+import { isMap, parseDocument } from "yaml";
 
 function job(source: string, name: string): string {
 	const match = source.match(
@@ -139,9 +139,12 @@ void describe("CI contract", () => {
 		assert.match(packageJob, /mvnw -pl application -am package -DskipTests/);
 		assert.equal((packageJob.match(/actions\/upload-artifact@/g) ?? []).length, 1);
 		assert.match(packageJob, /overwrite: true/);
-		const image = job(build, "application-server-image");
-		assert.match(image, /needs: server-package/);
-		assert.match(image, /application-artifact: \${{ needs\.server-package\.outputs\.artifact }}/);
+		const jobs = parseDocument(build).get("jobs");
+		assert.ok(isMap(jobs));
+		assert.deepEqual(
+			jobs.items.map((item) => String(item.key)),
+			["server-package"],
+		);
 
 		const tests = await readFile(".github/workflows/ci-tests.yml", "utf8");
 		for (const name of ["server-verification", "server-integration", "server-contracts"]) {
@@ -166,6 +169,9 @@ void describe("CI contract", () => {
 
 		const orchestrator = await readFile(".github/workflows/cicd.yml", "utf8");
 		assert.match(job(orchestrator, "Test"), /needs: \[detect-changes, Build\]/);
+		const image = job(orchestrator, "application-server-image");
+		assert.match(image, /needs: \[detect-changes, Build\]/);
+		assert.match(image, /application-artifact: \${{ needs\.Build\.outputs\.server-artifact }}/);
 		assert.match(
 			job(orchestrator, "Test"),
 			/server_artifact: \${{ needs\.Build\.outputs\.server-artifact }}/,
@@ -267,12 +273,11 @@ void describe("CI contract", () => {
 		}
 
 		const docker = await readFile(".github/workflows/ci-docker-build.yml", "utf8");
-		const build = await readFile(".github/workflows/ci-build.yml", "utf8");
 		for (const image of [
 			job(docker, "webapp-build"),
 			job(docker, "agent-pi-build"),
 			job(docker, "postgres-build"),
-			job(build, "application-server-image"),
+			job(source, "application-server-image"),
 		]) {
 			assert.match(
 				image,

@@ -307,13 +307,36 @@ jobs:
       )
     permissions:
       contents: read
+    with:
+      should_skip: ${{ needs.detect-changes.outputs.should_skip }}
+      server_changed: ${{ (needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.e2e == 'true' || needs.detect-changes.outputs.postgres-image == 'true' || needs.detect-changes.outputs.build-config == 'true' || needs.detect-changes.outputs.test-config == 'true' || needs.detect-changes.outputs.application-server-image == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+
+  # Sits beside Test, not inside Build: a caller waits for a whole called workflow, so the image
+  # would otherwise hold every test tier back.
+  application-server-image:
+    name: "App Server image"
+    uses: ./.github/workflows/reusable-docker-build.yml
+    needs: [detect-changes, Build]
+    if: |
+      needs.detect-changes.outputs.should_skip != 'true' && (
+        needs.detect-changes.outputs.application-server-image == 'true' ||
+        github.event_name != 'pull_request'
+      )
+    permissions:
+      contents: read
       packages: write
       id-token: write
       attestations: write
     with:
-      should_skip: ${{ needs.detect-changes.outputs.should_skip }}
-      server_changed: ${{ (needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.e2e == 'true' || needs.detect-changes.outputs.postgres-image == 'true' || needs.detect-changes.outputs.build-config == 'true' || needs.detect-changes.outputs.test-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
-      server_image_changed: ${{ (needs.detect-changes.outputs.application-server-image == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+      image-name: "hephaestus-build/application-server"
+      use-buildpacks: true
+      application-artifact: ${{ needs.Build.outputs.server-artifact }}
+      project-descriptor: "server/application/project.toml"
+      # renovate: datasource=docker depName=paketobuildpacks/ubuntu-noble-run-tiny
+      run-image: "paketobuildpacks/ubuntu-noble-run-tiny@sha256:c32333227b6dfbc2a4a93b03ee6d3475cfe152468c7d396bf22f06099bb0ecc9"
+      registry: "ghcr.io"
+      # Buildpacks images carry the lifecycle's own metadata labels; pack accepts no OCI labels.
+      single-arch: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
 
   Security:
     uses: ./.github/workflows/ci-security-scan.yml
@@ -404,7 +427,7 @@ jobs:
     permissions:
       actions: read
       statuses: write
-    needs: [detect-changes, workflow-lint, zizmor, Quality, Build, Security, Test, Changesets, Compose, Docker]
+    needs: [detect-changes, workflow-lint, zizmor, Quality, Build, application-server-image, Security, Test, Changesets, Compose, Docker]
     if: always()
     steps:
       - name: Generate workflow timeline
@@ -459,6 +482,7 @@ jobs:
           echo "zizmor:        ${{ needs.zizmor.result }}"
           echo "Quality:        ${{ needs.Quality.result }}"
           echo "Build:          ${{ needs.Build.result }}"
+          echo "Server image:   ${{ needs.application-server-image.result }}"
           echo "Security:       ${{ needs.Security.result }}"
           echo "Test:           ${{ needs.Test.result }}"
           echo "Changesets:     ${{ needs.Changesets.result }}"
@@ -511,6 +535,7 @@ jobs:
           echo "| Zizmor | $(result_to_emoji '${{ needs.zizmor.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| Quality | $(result_to_emoji '${{ needs.Quality.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| Build | $(result_to_emoji '${{ needs.Build.result }}') |" >> $GITHUB_STEP_SUMMARY
+          echo "| App Server image | $(result_to_emoji '${{ needs.application-server-image.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| Test | $(result_to_emoji '${{ needs.Test.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| Changesets | $(result_to_emoji '${{ needs.Changesets.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| Compose | $(result_to_emoji '${{ needs.Compose.result }}') |" >> $GITHUB_STEP_SUMMARY

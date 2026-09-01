@@ -52,7 +52,7 @@ void test("every custom manager extracts a dependency from its real source", asy
 		],
 		["Track the Zizmor CLI version", [".github/workflows/cicd.yml"]],
 		["Track the pack CLI version", [".github/workflows/reusable-docker-build.yml"]],
-		["Track the buildpacks run image", [".github/workflows/ci-build.yml"]],
+		["Track the buildpacks run image", [".github/workflows/cicd.yml"]],
 		[
 			"Track the builder and buildpack images in the project descriptor",
 			["server/application/project.toml"],

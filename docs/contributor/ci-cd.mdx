@@ -207,10 +207,10 @@ why the label is the authority, and which alternatives were priced and declined,
 | `cicd.yml`             | PR, merge group, push to main | Validates changes before merge and builds final-SHA images after merge |
 | `review-policy.yml`    | PR opened, reopened, synchronized, ready for review, edited | Approves a listed maintainer's pull request so the ruleset's required approval is met; does nothing for anyone else |
 | `ci-quality-gates.yml` | Called by cicd.yml    | Formatting, lint, type checks, webapp unit and story tests: everything verifiable from source |
-| `ci-build.yml`         | Called by cicd.yml    | Packages the server reactor once and builds the application-server image from that JAR |
+| `ci-build.yml`         | Called by cicd.yml    | Packages the server reactor once; `Test` and the application-server image job consume the artifact |
 | `ci-tests.yml`         | Called by cicd.yml after `Build` | Server unit, architecture, integration, API and database contracts, and browser E2E, all against the packaged reactor |
 | `ci-docker-build.yml`  | Called by cicd.yml    | Dockerfile image builds (webapp, agent, PostgreSQL) and aliases for unchanged images |
-| `reusable-docker-build.yml` | Called by ci-build.yml and ci-docker-build.yml | Builds, signs, attests, and blocks on the release vulnerability policy for the `linux/amd64` image |
+| `reusable-docker-build.yml` | Called by cicd.yml for the application-server image and by ci-docker-build.yml | Builds, signs, attests, and blocks on the release vulnerability policy for the `linux/amd64` image |
 | `ci-security-scan.yml` | Called by cicd.yml    | Dependency scanning (Trivy), secret detection      |
 | `rescan-main-images.yml` | Weekly, manual | Rescans main's published images against the release vulnerability policy and keeps one tracking issue in step with the findings |
 | `ci-profile.yml` | Weekly, manual | Profiles server integration tests and Spring contexts |

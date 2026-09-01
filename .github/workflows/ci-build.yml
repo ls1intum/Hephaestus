@@ -13,11 +13,6 @@ on:
         required: false
         type: string
         default: "true"
-      server_image_changed:
-        description: "Whether the application-server image inputs changed"
-        required: false
-        type: string
-        default: "true"
     outputs:
       server-artifact:
         description: "Name of the artifact holding the packaged reactor"
@@ -30,10 +25,12 @@ env:
 
 jobs:
   # Compiles and packages the reactor exactly once; every server test tier, the browser E2E suite,
-  # the API and database contracts and the application image consume this artifact.
+  # the API and database contracts and the application image consume this artifact. This workflow
+  # holds nothing else: a caller's `needs` waits for the whole workflow, so anything added here
+  # delays every consumer.
   server-package:
     name: "App Server: Package"
-    if: inputs.should_skip != 'true' && (inputs.server_changed == 'true' || inputs.server_image_changed == 'true')
+    if: inputs.should_skip != 'true' && inputs.server_changed == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -77,24 +74,3 @@ jobs:
           compression-level: 0
           # A re-run of failed jobs keeps this artifact; a re-run of all jobs replaces it.
           overwrite: true
-
-  application-server-image:
-    name: "App Server image"
-    needs: server-package
-    if: inputs.should_skip != 'true' && inputs.server_image_changed == 'true'
-    uses: ./.github/workflows/reusable-docker-build.yml
-    permissions:
-      contents: read
-      packages: write
-      id-token: write
-      attestations: write
-    with:
-      image-name: "hephaestus-build/application-server"
-      use-buildpacks: true
-      application-artifact: ${{ needs.server-package.outputs.artifact }}
-      project-descriptor: "server/application/project.toml"
-      # renovate: datasource=docker depName=paketobuildpacks/ubuntu-noble-run-tiny
-      run-image: "paketobuildpacks/ubuntu-noble-run-tiny@sha256:c32333227b6dfbc2a4a93b03ee6d3475cfe152468c7d396bf22f06099bb0ecc9"
-      registry: "ghcr.io"
-      # Buildpacks images carry the lifecycle's own metadata labels; pack accepts no OCI labels.
-      single-arch: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
