@@ -137,7 +137,10 @@ const dockerfile = readFileSync("webapp/Dockerfile", "utf8");
 if (!dockerfile.includes(`ghcr.io/pnpm/pnpm:${version}@sha256:`)) {
 	throw new Error(`webapp/Dockerfile must use the digest-pinned pnpm ${version} image`);
 }
-if (!dockerfile.includes(`pnpm runtime set node ${runtime.version} -g`)) {
+if (
+	!dockerfile.includes(`ARG NODE_VERSION=${runtime.version}`) ||
+	!dockerfile.includes(["pnpm runtime set node $", "{NODE_VERSION} -g"].join(""))
+) {
 	throw new Error(`webapp/Dockerfile must install Node ${runtime.version} through pnpm`);
 }
 

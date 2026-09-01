@@ -98,6 +98,18 @@ source validation.
 | OpenSSF Scorecard | `main`, branch-protection changes, and weekly | posture findings do not extend the pull-request critical path | code scanning and run artifact |
 | Renovate | configured schedule and vulnerability alerts | pull requests require normal review and CI | dependency dashboard |
 
+Renovate opens bounded, independently reviewable update pull requests on weekday mornings; only
+major updates wait for an explicit Dependency Dashboard approval. Vulnerability alerts bypass the
+normal release-age delay and approval gate. Native managers cover package manifests, lockfiles,
+container bases, Maven, and GitHub Actions, while tested regex managers cover version declarations
+that have no native manager. The dashboard is an inventory and decision surface, not a queue that
+maintainers must drain before routine fixes can start.
+
+Renovate is not the supply-chain inventory by itself: it discovers update coordinates in source,
+whereas lockfiles describe resolved package graphs and release SBOMs describe the contents of final
+artifacts. Dependency review, image scanning, signed provenance, scheduled rescans, and the release
+SBOM therefore remain required layers rather than substitutes for dependency updates.
+
 [Vulnerability remediation](./vulnerability-remediation.mdx) owns the blocking and exception policy.
 [Release management](./release-management.mdx#supply-chain-evidence) owns artifact signing, provenance,
 SBOM, and release-verification guarantees.
