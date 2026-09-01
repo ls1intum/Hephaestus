@@ -99,6 +99,13 @@ create and approve pull requests*, which governs whether `GITHUB_TOKEN` may appr
 is pinned to the head commit it was decided against, and a run that finds its own approval already
 standing on that commit submits nothing, so re-runs do not stack duplicate reviews.
 
+The workflow deliberately carries no `branches:` filter, and runs on `edited` too, because of
+stacked pull requests (`CONTRIBUTING.md` § Stacked Pull Requests). Merging a lower layer
+retargets the upper one onto `main`, and that retarget fires no event a base-filtered workflow would
+see — the layer would reach the merge queue unapproved and be refused entry. So every layer earns
+its approval while it still points at the layer below. An approval on a pull request targeting
+anything but `main` satisfies no rule and is inert.
+
 [`scripts/review-policy.ts`](https://github.com/ls1intum/Hephaestus/blob/main/scripts/review-policy.ts)
 holds the decision, and it reads the author login and nothing else — never the diff, the title or
 the body. That is what makes it safe under `pull_request_target` with `pull-requests: write`: the
@@ -222,7 +229,7 @@ why the label is the authority, and which alternatives were priced and declined,
 | Workflow               | Trigger               | Purpose                                            |
 | ---------------------- | --------------------- | -------------------------------------------------- |
 | `cicd.yml`             | PR, merge group, push to main | Validates changes before merge and builds final-SHA images after merge |
-| `review-policy.yml`    | PR opened, reopened, synchronized, ready for review | Approves a listed maintainer's pull request so the ruleset's required approval is met; does nothing for anyone else |
+| `review-policy.yml`    | PR opened, reopened, synchronized, ready for review, edited | Approves a listed maintainer's pull request so the ruleset's required approval is met; does nothing for anyone else |
 | `ci-quality-gates.yml` | Called by cicd.yml    | Code quality, formatting, schema validation        |
 | `ci-tests.yml`         | Called by cicd.yml    | Unit, integration, visual tests                    |
 | `ci-docker-build.yml`  | Called by cicd.yml    | Docker image builds per component                  |
