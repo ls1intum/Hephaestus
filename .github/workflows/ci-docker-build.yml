@@ -113,6 +113,9 @@ jobs:
       docker-file: "./docker/agents/pi/Dockerfile"
       docker-context: "./docker/agents"
       registry: "ghcr.io"
+      # Cache-busts the OS-package upgrade layer; this build imports the `cache-main` registry cache.
+      build-args: |
+        SOURCE_COMMIT=${{ github.sha }}
       single-arch: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
       labels: |
         org.opencontainers.image.title=Hephaestus Agent - Pi
@@ -137,6 +140,9 @@ jobs:
       docker-file: "./docker/postgres/Dockerfile"
       docker-context: "./docker/postgres"
       registry: "ghcr.io"
+      # Cache-busts the OS-package upgrade layer; this build imports the `cache-main` registry cache.
+      build-args: |
+        SOURCE_COMMIT=${{ github.sha }}
       single-arch: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
       labels: |
         org.opencontainers.image.title=Hephaestus Postgres

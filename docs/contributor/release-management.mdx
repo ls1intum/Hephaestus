@@ -32,8 +32,9 @@ sequenceDiagram
     M->>VP: changesets action folds pending changesets into the accumulating Version PR
     Note over VP: CHANGELOG.md + version bump preview
     VP->>M: Maintainer merges when the release is ready
-    M->>R: Create draft vX.Y.Z release
+    M->>R: Plan vX.Y.Z and assemble its notes
     R->>R: Generate and verify digest-bound evidence
+    R->>R: Create the draft vX.Y.Z release and attach its evidence
     R->>R: Upgrade seeded data from the previous stable release
     R->>R: Qualify supported hosts
     R->>R: Promote X.Y.Z / X.Y / latest image tags
@@ -56,10 +57,31 @@ sequenceDiagram
    `main`, and a release is only cut if that run succeeds. Versioning also moves any
    migration fragments at the existing `### Next release` anchor in `MIGRATION.md`, creates the
    versioned section beneath it, and consumes the fragments.
-3. **Merging the Version PR cuts the release.** The workflow creates a draft release at the merge
-   commit. After its evidence, seeded-upgrade, and supported-host gates pass, it promotes the CI-built images to
-   `X.Y.Z`, `X.Y`, and `latest`, publishes the release, deploys staging, and requests production
-   approval.
+3. **Merging the Version PR cuts the release.** The workflow resolves the release image digests and
+   runs the evidence gate first, and only then creates the draft release at the merge commit and
+   attaches the evidence to it. After the seeded-upgrade and supported-host gates pass too, it
+   promotes the CI-built images to `X.Y.Z`, `X.Y`, and `latest`, publishes the release, deploys
+   staging, and requests production approval.
+
+### When a release fails
+
+Release images are promoted **by digest and never rebuilt**, so a commit the evidence gate rejects
+can never pass on a retry — only a new commit can. The gate therefore runs before anything is
+created: a rejected release leaves no draft and no tag behind (a draft materialises no tag), so
+there is nothing to clean up and the version number is not consumed.
+
+Recovering is a revert and a re-cut: revert the version commit, which restores the pending
+changesets, land the fix, and let the Version PR re-cut the same version from a commit that carries
+it. The `verify-changesets` freeze rules — `MIGRATION.md` is not editable in a feature PR, pending
+changesets and migration fragments are not deletable — are lifted for a **verified revert**, which
+`scripts/verify-revert.ts` decides structurally rather than by title: every commit the pull request
+adds must record `This reverts commit <sha>.`, name a commit that is already an ancestor of the
+base, and carry that commit's patch exactly reversed. Anything else leaves the rules in force.
+
+A failure *after* the draft exists — the seeded-upgrade or supported-host gate, or publication
+itself — is the case the resume path covers: re-running the workflow at the same commit reuses the
+existing draft, regenerates the evidence, and replaces its assets. A draft that can never pass is
+deleted by hand, and the version re-cuts from the fixed commit as above.
 
 ## Supported-host qualification
 
@@ -72,9 +94,9 @@ clean boot; the seeded-upgrade gate separately proves the supported migration pa
 
 ## Supply-chain evidence
 
-A release remains a draft until every first-party and upstream production image in
+No release exists at all until every first-party and upstream production image in
 `security/release-images.json` has passed the evidence
-gate. The gate resolves each image index and its `linux/amd64` and `linux/arm64` manifests to immutable
+gate, and it remains a draft until the gates after it pass too. The gate resolves each image index and its `linux/amd64` and `linux/arm64` manifests to immutable
 digests. It generates a lossless Syft inventory plus SPDX and CycloneDX SBOMs for each deployed platform,
 scanning the registry manifest directly rather than a local Docker daemon copy, which would re-serialize
 the manifest and digest to something the release never published. The gate proves that all three documents

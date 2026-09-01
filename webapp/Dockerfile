@@ -25,7 +25,12 @@ FROM nginx:stable-alpine@sha256:97d490c12ba55b4946b01546d1c3ed324e8d41ab1c9fcb2a
 ARG COOLIFY_BRANCH
 ARG SOURCE_COMMIT
 ENV BUILD_GIT_BRANCH=$COOLIFY_BRANCH BUILD_GIT_COMMIT=$SOURCE_COMMIT
-RUN apk add --no-cache bash sed grep curl
+# The base digest is pinned, so Alpine security updates published after the upstream image was
+# built can reach it only here — `nginx:stable-alpine` keeps resolving to the same digest, so
+# Renovate has nothing to bump. `apk add` is already unversioned against the live index, so this
+# costs no reproducibility. nginx itself comes from a one-shot `apk add -X <nginx.org repo>` that
+# the upstream image never persists to /etc/apk/repositories, so this upgrades OS packages only.
+RUN apk upgrade --no-cache && apk add --no-cache bash sed grep curl
 COPY --from=build /repo/webapp/dist /usr/share/nginx/html
 COPY webapp/docker/entrypoint.sh /entrypoint.sh
 COPY webapp/docker/nginx.conf /etc/nginx/conf.d/default.conf

@@ -346,6 +346,39 @@ void describe("CI contract", () => {
 		assert.doesNotMatch(release, /node scripts\/check-release-(?:sbom|vulnerabilities)\.ts/);
 	});
 
+	void test("creates the draft release only once the evidence gate has passed", async () => {
+		const source = await readFile(".github/workflows/release.yml", "utf8");
+		const decide = job(source, "release");
+		const gate = job(source, "tag-images");
+		// Release images are promoted by digest and never rebuilt, so a draft cut before the gate
+		// can never pass at that commit — and it blocks the next version too, because the
+		// precondition below requires the previous version to be published.
+		assert.doesNotMatch(decide, /gh release create/);
+		assert.match(decide, /is not a published release/);
+		assert.match(decide, /is not a stable published release/);
+		const created = gate.indexOf('gh release create "$TAG_NAME"');
+		const gated = gate.lastIndexOf("node scripts/verify-release-evidence.ts");
+		const uploaded = gate.indexOf('gh release upload "$TAG_NAME"');
+		assert.ok(gated >= 0, "tag-images must run the evidence verifier");
+		assert.ok(created > gated, "the draft must be created after the evidence gate");
+		assert.ok(uploaded > created, "release assets need a draft to upload to");
+		// A re-run resumes the draft, so uploads must replace assets instead of failing on names.
+		for (const upload of source.matchAll(/gh release upload[\s\S]*?\n\n/g)) {
+			assert.match(upload[0], /--clobber/);
+		}
+	});
+
+	void test("exempts a verified revert from the changeset freeze rules", async () => {
+		const source = await readFile(".github/workflows/verify-changesets.yml", "utf8");
+		const detect = source.indexOf("- name: Detect a verified revert");
+		const guard = source.indexOf("- name: Check release-note presence");
+		assert.ok(detect >= 0 && guard > detect, "the revert check must precede the freeze guard");
+		assert.match(source, /run: node scripts\/verify-revert\.ts "\$BASE_SHA" HEAD/);
+		assert.match(source, /steps\.revert\.outputs\.verified-revert != 'true'/);
+		// The exemption is structural: a title or branch name is attacker-chosen and never read.
+		assert.doesNotMatch(source, /pull_request\.title|github\.head_ref/);
+	});
+
 	void test("never invokes a repository-local action before checkout", async () => {
 		for (const [file, source] of await workflowSources()) {
 			for (const jobSource of source.split(/^ {2}(?=[A-Za-z][\w-]*:\s*$)/m).slice(1)) {

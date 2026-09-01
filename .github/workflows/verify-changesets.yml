@@ -25,8 +25,22 @@ jobs:
       - name: Test changeset and version-sync policies
         run: pnpm run check:changesets
 
-      - name: Check release-note presence
+      # A revert of a release commit restores MIGRATION.md, the consumed changesets and the pending
+      # migration fragments by construction, so it can never satisfy the rules below — the release
+      # reverts so far each needed an administrator bypass. The exemption is structural, never
+      # lexical: scripts/verify-revert.ts ignores the title and requires every commit the pull
+      # request adds to be the exact inverse, by patch id, of a commit already on the base.
+      - name: Detect a verified revert
+        id: revert
         if: ${{ !github.event.pull_request.draft && github.event.pull_request.user.type != 'Bot' }}
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: node scripts/verify-revert.ts "$BASE_SHA" HEAD
+
+      - name: Check release-note presence
+        if: >-
+          ${{ !github.event.pull_request.draft && github.event.pull_request.user.type != 'Bot'
+            && steps.revert.outputs.verified-revert != 'true' }}
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
