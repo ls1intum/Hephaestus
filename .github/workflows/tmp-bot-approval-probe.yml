@@ -1,0 +1,37 @@
+name: Bot approval probe
+
+# Throwaway experiment: does a review submitted with GITHUB_TOKEN satisfy
+# `required_approving_review_count` for merge-queue entry? Deleted after the run.
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize]
+
+permissions: {}
+
+jobs:
+  approve:
+    name: Approve as github-actions[bot]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Submit an approving review
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const review = await github.rest.pulls.createReview({
+              ...context.repo,
+              pull_number: context.payload.pull_request.number,
+              event: 'APPROVE',
+              body: 'Throwaway probe approval.',
+            });
+            core.info(JSON.stringify({
+              id: review.data.id,
+              state: review.data.state,
+              user: review.data.user?.login,
+              authorAssociation: review.data.author_association,
+              commitId: review.data.commit_id,
+            }));
