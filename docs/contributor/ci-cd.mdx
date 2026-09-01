@@ -77,6 +77,25 @@ has write access; the approval must cover the current head commit. Repository ad
 allow-list. Native required approvals remain zero because GitHub cannot combine an author's
 self-authored change, a mandatory approval, and the merge queue without bypassing the queue.
 
+`review-policy` is a check run the workflow publishes, not the workflow's own job status — the job
+is `Publish review-policy status` and always succeeds. A job can only pass or fail, so while an
+approval was outstanding the required context was red, and a pull request that was healthy and
+simply waiting for its first review read as broken on the pull request list. The verdict now takes
+three shapes, decided by [`scripts/review-policy.ts`](https://github.com/ls1intum/Hephaestus/blob/main/scripts/review-policy.ts):
+
+| Verdict | Check run | Reads as |
+| --- | --- | --- |
+| Waiting for an approval | `in_progress`, no conclusion | Pending — blocks merge and merge-queue entry |
+| Author allow-listed, or approved by a non-author with write access | `success` | Green, naming who satisfied it |
+| `REVIEW_POLICY_MAINTAINERS` unset, or the policy could not be evaluated | `failure` | Red, because that is broken |
+
+A pending required context blocks merging and blocks entry to the merge queue exactly as a failing
+one does, so the enforcement is unchanged. `neutral` and `skipped` are not options: GitHub counts
+both as passing a required check.
+
+Renaming the check run means editing the ruleset's required context in the same change. A mismatch
+leaves every pull request waiting on a context nothing reports, which blocks the fix too.
+
 The changesets Version PR is the temporary exception: updates made with `GITHUB_TOKEN` do not trigger
 the required workflows, so release automation uses the ruleset bypass. The release workflow still
 requires successful CI on the resulting `main` commit before it publishes anything. Move the Version
@@ -198,7 +217,7 @@ why the label is the authority, and which alternatives were priced and declined,
 | Workflow               | Trigger               | Purpose                                            |
 | ---------------------- | --------------------- | -------------------------------------------------- |
 | `cicd.yml`             | Push to main, PRs, merge queue | Orchestrator: change detection + workflow dispatch |
-| `review-policy.yml`    | PR and review events, merge queue | Enforces author allow-list or current-head write-access approval |
+| `review-policy.yml`    | PR and review events, merge queue | Publishes the `review-policy` check run: author allow-list, or current-head write-access approval |
 | `ci-quality-gates.yml` | Called by cicd.yml    | Code quality, formatting, schema validation        |
 | `ci-tests.yml`         | Called by cicd.yml    | Unit, integration, visual tests                    |
 | `ci-docker-build.yml`  | Called by cicd.yml    | Docker image builds per component                  |
