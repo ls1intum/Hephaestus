@@ -92,10 +92,20 @@ Compose topology. They receive the same per-platform SBOM, license, vulnerabilit
 evidence as first-party images. Hephaestus requires its own signatures and build provenance only for
 images it builds; it does not misrepresent observed upstream images as Hephaestus-built artifacts.
 
-The version-controlled policy rejects every HIGH or CRITICAL finding. A residual finding requires an
-exception scoped to its image, vulnerability, package, and installed version, with an owner, justification,
-evidence URL, and expiry no more than 90 days away. Each exception and policy report records the scanned
-platform and digest.
+The version-controlled policy rejects every HIGH or CRITICAL finding **for which upstream has published
+a fix**. An unfixable finding is still counted and still appears in the signed evidence, but it does not
+block: the pinned upstream images cannot be patched at all, so failing on one removes no risk and leaves
+nobody an action. A residual fixable finding requires an exception scoped to its image, platform,
+vulnerability, package, and installed version, with an owner, justification, evidence URL, and expiry no
+more than 90 days away. Each exception and policy report records the scanned digest, but an exception is
+not matched on it — the release digest does not exist until the images are tagged, so a digest-keyed
+exception could only ever be written after the gate had already failed a release.
+
+The same policy runs on every image build, against the `linux/amd64` image the run just pushed, so a
+pull request fails before a release can. The release scans both architectures, where the evidence bundle
+has to be complete. Both call `scripts/check-release-vulnerabilities.ts` with
+`security/vulnerability-policy.json`; there is no second copy of either. A failing gate names the
+rejected CVEs in the run summary and uploads its `.policy.json`.
 
 The latest release is rescanned weekly. A policy violation or scan failure is reported on
 [the vulnerability response issue](https://github.com/ls1intum/Hephaestus/issues/1369); scanner failure

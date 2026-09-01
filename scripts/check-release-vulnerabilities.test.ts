@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { evaluate } from "./check-release-vulnerabilities.ts";
+import { evaluate, renderSummary } from "./check-release-vulnerabilities.ts";
 
 const finding = {
 	FixedVersion: "2",
@@ -19,14 +19,53 @@ await test("rejects a high vulnerability without a disposition", () => {
 	assert.deepEqual(evaluate("server", report, policy).rejected, ["server|CVE-1|lib|1"]);
 });
 
-await test("requires a disposition even when no fixed version exists", () => {
-	assert.deepEqual(
-		evaluate(
-			"server",
-			{ Results: [{ Vulnerabilities: [{ ...finding, FixedVersion: "" }] }] },
-			policy,
-		).rejected,
-		["server|CVE-1|lib|1"],
+await test("reports but does not reject a high vulnerability with no upstream fix", () => {
+	// The four upstream images in security/release-images.json cannot be patched at all, so
+	// an unfixable finding blocks a release without offering anyone an action. It still has
+	// to be counted, because the evidence bundle is signed and must stay complete.
+	for (const unfixable of [
+		{ ...finding, FixedVersion: "" },
+		{ ...finding, FixedVersion: "   " },
+		Object.fromEntries(Object.entries(finding).filter(([field]) => field !== "FixedVersion")),
+	]) {
+		const result = evaluate("server", { Results: [{ Vulnerabilities: [unfixable] }] }, policy);
+		assert.deepEqual(result.rejected, []);
+		assert.deepEqual(result.highCritical, ["server|CVE-1|lib|1"]);
+		assert.deepEqual(result.errors, []);
+	}
+	// A mixed report rejects only the half upstream has published a fix for.
+	const mixed = evaluate(
+		"server",
+		{
+			Results: [
+				{
+					Vulnerabilities: [
+						finding,
+						{ ...finding, PkgName: "other", VulnerabilityID: "CVE-2", FixedVersion: "" },
+						{ ...finding, PkgName: "third", VulnerabilityID: "CVE-3", Severity: "CRITICAL" },
+					],
+				},
+			],
+		},
+		policy,
+	);
+	assert.deepEqual(mixed.rejected, ["server|CVE-1|lib|1", "server|CVE-3|third|1"]);
+	assert.deepEqual(mixed.highCritical, [
+		"server|CVE-1|lib|1",
+		"server|CVE-2|other|1",
+		"server|CVE-3|third|1",
+	]);
+});
+
+await test("rejects a report whose fixed version is not a string", () => {
+	assert.throws(
+		() =>
+			evaluate(
+				"server",
+				{ Results: [{ Vulnerabilities: [{ ...finding, FixedVersion: 2 }] }] },
+				policy,
+			),
+		/FixedVersion must be a string/,
 	);
 });
 
@@ -66,15 +105,56 @@ await test("accepts an owned, justified, unexpired exception", () => {
 		).rejected,
 		["server|CVE-1|lib|1"],
 	);
-	assert.deepEqual(
+});
+
+await test("matches an exception without its digest, but still on every other field", () => {
+	const exception = {
+		digest,
+		evidence: "https://github.com/example/project/issues/1",
+		expires: "2026-10-01T00:00:00Z",
+		image: "server",
+		installedVersion: "1",
+		justification: "not reachable in the deployed configuration",
+		owner: "@security",
+		package: "lib",
+		platform: "linux/amd64",
+		status: "not_affected",
+		vulnerability: "CVE-1",
+	};
+	const rejectedWith = (override: Partial<typeof exception>): string[] =>
 		evaluate(
 			"server",
 			{ ...report, ArtifactName: subject.reference },
-			{ ...policy, exceptions: [{ ...exceptions[0], digest: `sha256:${"b".repeat(64)}` }] },
+			{ ...policy, exceptions: [{ ...exception, ...override }] },
 			now,
 			subject,
-		).rejected,
-		["server|CVE-1|lib|1"],
+		).rejected;
+	// The release digest does not exist until the images are tagged, so matching on it made a
+	// pre-release exception impossible to author. An exception reviewed against one digest now
+	// covers the same package at the same version wherever it is scanned.
+	assert.deepEqual(rejectedWith({ digest: `sha256:${"b".repeat(64)}` }), []);
+	// Every other field still binds.
+	for (const override of [
+		{ image: "other" },
+		{ platform: "linux/arm64" },
+		{ package: "other" },
+		{ installedVersion: "0" },
+		{ vulnerability: "CVE-2" },
+	] satisfies Partial<typeof exception>[])
+		assert.deepEqual(rejectedWith(override), ["server|CVE-1|lib|1"], JSON.stringify(override));
+	// Two exceptions that differ only by digest are now one exception, twice.
+	assert.match(
+		evaluate(
+			"server",
+			{ ...report, ArtifactName: subject.reference },
+			{
+				...policy,
+				exceptions: [exception, { ...exception, digest: `sha256:${"b".repeat(64)}` }],
+			},
+			now,
+			subject,
+		).errors.join("\n"),
+		/duplicate exception: server\|linux\/amd64\|CVE-1\|lib\|1/,
 	);
 });
 
@@ -132,4 +212,32 @@ await test("rejects expired and malformed exceptions", () => {
 		).errors.join("\n"),
 		/Trivy report is for/,
 	);
+});
+
+await test("names the rejected findings in the run summary", () => {
+	const rendered = renderSummary(
+		{ digest, image: "server", platform: "linux/amd64" },
+		evaluate(
+			"server",
+			{
+				Results: [
+					{
+						Vulnerabilities: [finding, { ...finding, VulnerabilityID: "CVE-2", FixedVersion: "" }],
+					},
+				],
+			},
+			policy,
+		),
+	);
+	assert.match(rendered, /server \(linux\/amd64\): fail/);
+	assert.match(rendered, /2 HIGH\/CRITICAL, 1 rejected/);
+	assert.match(rendered, /\| CVE-1 \| lib \| 1 \|/);
+	assert.doesNotMatch(rendered, /\| CVE-2 \|/);
+
+	const clean = renderSummary(
+		{ digest, image: "server", platform: "linux/amd64" },
+		evaluate("server", { Results: [] }, policy),
+	);
+	assert.match(clean, /server \(linux\/amd64\): pass/);
+	assert.doesNotMatch(clean, /\| Vulnerability \|/);
 });

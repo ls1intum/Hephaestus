@@ -249,6 +249,45 @@ void describe("CI contract", () => {
 		);
 	});
 
+	void test("enforces the release vulnerability policy where images are built", async () => {
+		const reusable = await readFile(".github/workflows/reusable-docker-build.yml", "utf8");
+		const scan = job(reusable, "scan");
+		// Blocking, and after the push: it needs both build paths, and a skipped `merge`
+		// (single-architecture builds) must not skip it.
+		assert.match(scan, /needs: \[build, merge\]/);
+		assert.match(scan, /!cancelled\(\)/);
+		assert.match(scan, /needs\.build\.result == 'success'/);
+		// The same script and the same policy file the release and the rescan call. A second
+		// copy of the policy is the failure this gate exists to prevent.
+		assert.match(
+			scan,
+			/node scripts\/check-release-vulnerabilities\.ts[\s\S]*security\/vulnerability-policy\.json/,
+		);
+		assert.match(scan, /run-\${{ github\.run_id }}-\${{ github\.run_attempt }}/);
+		assert.match(scan, /linux\/amd64/);
+		assert.doesNotMatch(scan, /linux\/arm64/);
+		// A gate that cannot say what it rejected is not finished.
+		assert.match(scan, /uses: actions\/upload-artifact@/);
+		assert.match(scan, /public\.ecr\.aws\/aquasecurity\/trivy-db/);
+
+		let callSites = 0;
+		for (const [file, source] of await workflowSources()) {
+			for (const call of source.match(
+				/node scripts\/check-release-vulnerabilities\.ts[\s\S]*?\.policy\.json"/g,
+			) ?? []) {
+				callSites += 1;
+				assert.match(
+					call,
+					/(?<![\w./-])security\/vulnerability-policy\.json/,
+					`${file} must evaluate the one release vulnerability policy`,
+				);
+			}
+		}
+		// The blocking build gate and the scheduled rescan; the release path goes through
+		// verify-release-evidence.ts, which imports evaluate() directly.
+		assert.equal(callSites, 2);
+	});
+
 	void test("pins every external action to a full commit SHA with a version comment", async () => {
 		const invalid: string[] = [];
 		const files = await Array.fromAsync(glob(".github/{actions,workflows}/**/*.{yml,yaml}"));

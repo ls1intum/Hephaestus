@@ -1,12 +1,18 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
 
 type Finding = {
+	FixedVersion?: string;
 	InstalledVersion?: string;
 	PkgName?: string;
 	Severity?: string;
 	VulnerabilityID?: string;
 };
 
+// `digest` is recorded so an exception names the artefact it was reviewed against, but it is
+// deliberately not part of the match key: the release digest does not exist until `tag-images`
+// runs, so a digest-keyed exception could only ever be authored after the gate had already
+// failed a release, and would die on the next rebuild. `installedVersion` already gives the
+// "this exception expires when the package moves" property that digest matching was there for.
 type Exception = {
 	digest: string;
 	evidence: string;
@@ -93,7 +99,7 @@ export function evaluate(
 			);
 			continue;
 		}
-		const key = `${exception.image}|${exception.platform}|${exception.digest}|${exception.vulnerability}|${exception.package}|${exception.installedVersion}`;
+		const key = `${exception.image}|${exception.platform}|${exception.vulnerability}|${exception.package}|${exception.installedVersion}`;
 		if (exceptionKeys.has(key)) errors.push(`duplicate exception: ${key}`);
 		exceptionKeys.add(key);
 		if (!/^sha256:[a-f0-9]{64}$/.test(exception.digest))
@@ -130,7 +136,12 @@ export function evaluate(
 			for (const field of ["InstalledVersion", "PkgName", "Severity", "VulnerabilityID"])
 				if (typeof value[field] !== "string" || value[field].length === 0)
 					throw new Error(`malformed Trivy vulnerability: missing ${field}`);
+			// Trivy omits FixedVersion entirely when upstream has published no fix, so its
+			// absence is data rather than corruption; only a non-string is malformed.
+			if (value.FixedVersion !== undefined && typeof value.FixedVersion !== "string")
+				throw new Error("malformed Trivy vulnerability: FixedVersion must be a string");
 			findings.push({
+				FixedVersion: typeof value.FixedVersion === "string" ? value.FixedVersion : undefined,
 				InstalledVersion:
 					typeof value.InstalledVersion === "string" ? value.InstalledVersion : undefined,
 				PkgName: typeof value.PkgName === "string" ? value.PkgName : undefined,
@@ -143,14 +154,18 @@ export function evaluate(
 	const highCritical = findings.filter(
 		(finding) => finding.Severity === "HIGH" || finding.Severity === "CRITICAL",
 	);
-	const subjectDigest = subject?.digest;
 	const subjectPlatform = subject?.platform;
+	// Only a finding upstream has published a fix for can block: the upstream images in
+	// security/release-images.json cannot be patched at all, so failing on an unfixable
+	// finding removes no risk and leaves nobody an action. The filter lives here rather than
+	// on Trivy's command line (`--ignore-unfixed`) so unfixable findings stay counted in
+	// `highCritical` and visible in the signed evidence bundle.
 	const rejected = highCritical.filter((finding) => {
+		if (!finding.FixedVersion?.trim()) return false;
 		return !policy.exceptions.some(
 			(exception) =>
 				exception.image === image &&
 				exception.platform === subjectPlatform &&
-				exception.digest === subjectDigest &&
 				exception.package === finding.PkgName &&
 				exception.installedVersion === finding.InstalledVersion &&
 				exception.vulnerability === finding.VulnerabilityID &&
@@ -162,6 +177,34 @@ export function evaluate(
 		errors,
 		rejected: rejected.map((finding) => fingerprint(image, finding)),
 	};
+}
+
+export type Evaluation = ReturnType<typeof evaluate>;
+
+/**
+ * A run summary naming what was rejected. The gate used to fail with nothing but
+ * `<image> does not satisfy vulnerability policy`, so diagnosing it meant rebuilding and
+ * rescanning the base image by hand.
+ */
+export function renderSummary(
+	subject: { digest: string; image: string; platform: string },
+	result: Evaluation,
+): string {
+	const status = result.errors.length === 0 && result.rejected.length === 0 ? "pass" : "fail";
+	const lines = [
+		`### Vulnerability policy — ${subject.image} (${subject.platform}): ${status}`,
+		"",
+		`Subject \`${subject.digest}\` — ${result.highCritical.length} HIGH/CRITICAL, ${result.rejected.length} rejected.`,
+	];
+	if (result.rejected.length > 0) {
+		lines.push("", "| Vulnerability | Package | Installed |", "| --- | --- | --- |");
+		for (const finding of result.rejected) {
+			const [, vulnerability = "", packageName = "", installedVersion = ""] = finding.split("|");
+			lines.push(`| ${vulnerability} | ${packageName} | ${installedVersion} |`);
+		}
+	}
+	if (result.errors.length > 0) lines.push("", ...result.errors.map((message) => `- ${message}`));
+	return `${lines.join("\n")}\n`;
 }
 
 if (import.meta.main) {
@@ -183,6 +226,8 @@ if (import.meta.main) {
 		outputPath,
 		`${JSON.stringify({ image, platform, digest, status: result.errors.length === 0 && result.rejected.length === 0 ? "pass" : "fail", ...result }, null, 2)}\n`,
 	);
+	const summaryPath = process.env.GITHUB_STEP_SUMMARY;
+	if (summaryPath) appendFileSync(summaryPath, renderSummary({ digest, image, platform }, result));
 	if (result.errors.length > 0 || result.rejected.length > 0) {
 		for (const message of [
 			...result.errors,

@@ -442,3 +442,117 @@ jobs:
             --certificate-github-workflow-repository "${{ github.repository }}" \
             > /dev/null
           gh attestation verify "oci://$IMAGE_REF" --owner "${{ github.repository_owner }}"
+
+  # The release vulnerability gate, run where the image is built. Until this job existed the
+  # policy's first execution was at `tag-images`, so a release was the first thing it could
+  # fail — a tripwire, not a safety net (issue #1703). It calls the same script and the same
+  # security/vulnerability-policy.json the release and the scheduled rescan call; a second
+  # copy of the policy is precisely the failure this prevents.
+  #
+  # linux/amd64 only: Alpine and Debian ship the same package versions across architectures,
+  # and the release still scans both, where the evidence bundle has to be complete.
+  scan:
+    name: Scan linux/amd64 Image
+    needs: [build, merge]
+    # `merge` is skipped for single-architecture builds, which would skip this job too
+    # without a status-check function to suppress the implicit success() over every need.
+    if: >-
+      ${{ !cancelled() && needs.build.result == 'success' &&
+      needs.merge.result != 'failure' && needs.merge.result != 'cancelled' }}
+    timeout-minutes: 20
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-node-pnpm
+        with:
+          install: "none"
+
+      - uses: ./.github/actions/setup-release-security-tools
+        with:
+          install-syft: "false"
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ${{ inputs.registry }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve the linux/amd64 subject
+        id: subject
+        env:
+          # The run tag both build paths already publish; it names this run's image whether
+          # `build` pushed it directly or `merge` assembled an index from the per-arch pushes.
+          IMAGE_REF: ${{ inputs.registry }}/${{ inputs.image-name }}:run-${{ github.run_id }}-${{ github.run_attempt }}
+          INPUT_IMAGE_NAME: ${{ inputs.image-name }}
+        run: |
+          set -euo pipefail
+          # First, so the artifact below is still named after the image if the lookup fails.
+          echo "image=${INPUT_IMAGE_NAME##*/}" >> "$GITHUB_OUTPUT"
+          raw=$(docker buildx imagetools inspect "$IMAGE_REF" --raw)
+          if jq -e 'has("manifests")' <<< "$raw" > /dev/null; then
+            digest=$(jq -er 'first(.manifests[]
+              | select(.platform.os == "linux" and .platform.architecture == "amd64")
+              | .digest)' <<< "$raw")
+          else
+            digest=$(docker buildx imagetools inspect --format '{{.Manifest.Digest}}' "$IMAGE_REF")
+          fi
+          if [[ ! "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]; then
+            echo "::error::No linux/amd64 digest for $IMAGE_REF (got: ${digest:-<empty>})"
+            exit 1
+          fi
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+
+      - name: Download the Trivy database
+        env:
+          # A blocking gate inherits Trivy's database availability as a hard dependency, and
+          # GHCR answers TOOMANYREQUESTS often enough that Harbor, Rancher and New Relic all
+          # override this. Trivy walks the list in order. The `:2` tag is the database schema
+          # version and is pinned to the Trivy version in setup-release-security-tools; a
+          # schema bump fails this step loudly rather than silently fetching the wrong DB.
+          TRIVY_DB_REPOSITORY: ghcr.io/aquasecurity/trivy-db:2,public.ecr.aws/aquasecurity/trivy-db:2
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            trivy image --timeout 90s --download-db-only && break
+            if [ "$attempt" -eq 3 ]; then
+              echo "::error::Trivy database download failed after $attempt attempts"
+              exit 1
+            fi
+            sleep $((attempt * 5))
+          done
+
+      - name: Enforce the release vulnerability policy
+        env:
+          IMAGE: ${{ steps.subject.outputs.image }}
+          REPOSITORY: ${{ inputs.registry }}/${{ inputs.image-name }}
+          SUBJECT_DIGEST: ${{ steps.subject.outputs.digest }}
+          TRIVY_USERNAME: ${{ github.actor }}
+          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p reports
+          trivy image --skip-db-update --scanners vuln --format json \
+            --output "reports/$IMAGE-linux-amd64.json" "$REPOSITORY@$SUBJECT_DIGEST"
+          node scripts/check-release-vulnerabilities.ts "$IMAGE" linux/amd64 "$SUBJECT_DIGEST" \
+            "$REPOSITORY" "reports/$IMAGE-linux-amd64.json" security/vulnerability-policy.json \
+            "reports/$IMAGE-linux-amd64.policy.json"
+
+      # The policy result names the CVEs; without it the gate says only that the image failed,
+      # and diagnosing v0.75.0 meant rebuilding and rescanning the base image by hand.
+      - name: Upload the vulnerability policy result
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: vulnerability-policy-${{ steps.subject.outputs.image }}-linux-amd64
+          path: reports
+          if-no-files-found: warn
+          retention-days: 7
