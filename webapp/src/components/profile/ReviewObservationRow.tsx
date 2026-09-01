@@ -1,4 +1,5 @@
 import { ChevronDownIcon } from "lucide-react";
+import { useState } from "react";
 import type { PracticeGroupReviewObservation } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import {
@@ -103,6 +104,7 @@ export function ReviewObservationRow({
 	onRespond,
 	isFeedbackResponsePending = false,
 }: ReviewObservationRowProps) {
+	const [pendingResolution, setPendingResolution] = useState<FeedbackResolution>();
 	const outcome = observationOutcome(observation);
 	const status = OBSERVATION_OUTCOME_PRESENTATION[outcome];
 	const StatusIcon = status.icon;
@@ -124,8 +126,18 @@ export function ReviewObservationRow({
 	/** Pressing the value that is already set withdraws it, which is how a response is undone. */
 	const toggleUsefulness = (usefulness: FeedbackUsefulness) =>
 		respond({ usefulness: recorded.usefulness === usefulness ? undefined : usefulness });
-	const toggleResolution = (resolution: FeedbackResolution) =>
+	const toggleResolution = (resolution: FeedbackResolution) => {
+		if (pendingResolution === resolution) {
+			setPendingResolution(undefined);
+			return;
+		}
+		if (resolution === "DISPUTED" && !recorded.comment?.trim()) {
+			setPendingResolution(resolution);
+			return;
+		}
+		setPendingResolution(undefined);
 		respond({ resolution: recorded.resolution === resolution ? undefined : resolution });
+	};
 
 	return (
 		<li>
@@ -229,7 +241,7 @@ export function ReviewObservationRow({
 										<ResponseChoice
 											legend="What did you do about it?"
 											defs={FEEDBACK_RESOLUTION_DEFS}
-											chosen={recorded.resolution}
+											chosen={pendingResolution ?? recorded.resolution}
 											isPending={isFeedbackResponsePending}
 											onChoose={toggleResolution}
 										/>
@@ -238,9 +250,14 @@ export function ReviewObservationRow({
 										<FeedbackComment
 											key={`${observation.observationId}:${recorded.comment ?? ""}`}
 											comment={recorded.comment}
-											isRequired={recorded.resolution === "DISPUTED"}
+											isRequired={
+												pendingResolution === "DISPUTED" || recorded.resolution === "DISPUTED"
+											}
 											isPending={isFeedbackResponsePending}
-											onSave={(comment) => respond({ comment })}
+											onSave={(comment) => {
+												respond({ comment, resolution: pendingResolution ?? recorded.resolution });
+												setPendingResolution(undefined);
+											}}
 										/>
 									</div>
 								)}

@@ -1,7 +1,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
 import { toast } from "sonner";
+import { z } from "zod";
 import {
 	deleteFeedbackResponseMutation,
 	getObservationOptions,
@@ -29,6 +29,11 @@ import { problemDetailOf } from "@/lib/problem-detail";
 
 const ACTIVITY_PAGE_SIZE = 10;
 
+const practiceGroupDetailSearchSchema = z.object({
+	practice: z.string().optional(),
+	observation: z.string().optional(),
+});
+
 /** The delivered guidance, or the observation's title when it adds something the practice name lacks. */
 function nextStepOf(practiceStanding?: PracticeStanding): string | undefined {
 	const firstAction = practiceStanding?.toWorkOn[0];
@@ -43,6 +48,7 @@ function nextStepOf(practiceStanding?: PracticeStanding): string | undefined {
 export const Route = createFileRoute(
 	"/_authenticated/w/$workspaceSlug/user/$username/practice-groups/$groupSlug",
 )({
+	validateSearch: practiceGroupDetailSearchSchema,
 	/** Own profile only — gated here so another user's URL never mounts the page or its queries. */
 	beforeLoad: async ({ context, params }) => {
 		const user = await resolveCurrentUser(context.queryClient);
@@ -60,10 +66,11 @@ export const Route = createFileRoute(
 
 function PracticeGroupDetail() {
 	const { workspaceSlug, username, groupSlug } = Route.useParams();
-	const navigate = useNavigate();
+	const { practice: selectedPracticeSlug, observation: openObservationId } = Route.useSearch();
+	const navigate = useNavigate({ from: Route.fullPath });
 	const queryClient = useQueryClient();
-	const [openObservationId, setOpenObservationId] = useState<string>();
-	const [selectedPracticeSlug, setSelectedPracticeSlug] = useState<string>();
+	const updateSelection = (search: { practice?: string; observation?: string }) =>
+		void navigate({ search: (previous) => ({ ...previous, ...search }), replace: true });
 
 	const groupsQuery = useQuery({
 		...listGroupsOptions({
@@ -173,15 +180,16 @@ function PracticeGroupDetail() {
 			groupTrend={trendQuery.data?.group}
 			selectedPracticeSlug={selectedPracticeSlug}
 			onSelectPractice={(practiceSlug) => {
-				setSelectedPracticeSlug(practiceSlug);
-				setOpenObservationId(undefined);
+				updateSelection({ practice: practiceSlug, observation: undefined });
 			}}
 			feed={reviewRunFeed}
 			skeletonRows={ACTIVITY_PAGE_SIZE}
 			openObservationId={openObservationId}
 			observationDetail={observationDetail}
 			onToggleObservation={(observationId) =>
-				setOpenObservationId((current) => (current === observationId ? undefined : observationId))
+				updateSelection({
+					observation: openObservationId === observationId ? undefined : observationId,
+				})
 			}
 			onRespond={(observation, response) => {
 				const feedbackId = observation.feedbackId;
@@ -229,6 +237,7 @@ function PracticeGroupDetail() {
 				void navigate({
 					to: "/w/$workspaceSlug/user/$username",
 					params: { workspaceSlug, username },
+					search: {},
 				})
 			}
 		/>
