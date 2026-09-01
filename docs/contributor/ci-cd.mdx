@@ -404,14 +404,15 @@ scanner part of every pull request:
 - Pull requests use GitHub's
   [dependency review](https://docs.github.com/code-security/supply-chain-security/understanding-your-software-supply-chain/about-dependency-review)
   to reject newly introduced high or critical vulnerabilities and report dependency-license
-  changes. This is a diff gate: existing findings remain visible without preventing an unrelated
-  fix from merging.
+  changes. Runtime, development, and unknown-scope dependencies are all covered because build tools
+  execute inside the release trust boundary. This is a diff gate: existing findings remain visible
+  without preventing an unrelated fix from merging.
 - Trivy scans the repository dependency baseline in the required Security leg and publishes SARIF
   to code scanning. Image builds additionally evaluate the documented vulnerability policy against
   the image that was actually produced; weekly rescans detect vulnerability-database drift after a
   clean merge.
 - [OpenSSF Scorecard](https://securityscorecards.dev/) evaluates repository and workflow posture on
-  every push to `main` and weekly (which also catches settings-only drift). It publishes authenticated
+  every push to `main`, after branch-protection changes, and weekly. It publishes authenticated
   results and SARIF without adding another network scanner to the pull-request critical path.
 - CodeQL remains enabled through GitHub default setup. GitHub's
   [recommended configuration](https://docs.github.com/code-security/code-scanning/enabling-code-scanning/configuring-default-setup-for-code-scanning)

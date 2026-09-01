@@ -30,9 +30,12 @@ jobs:
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
           fail-on-severity: high
+          # Build and test tools execute in CI and can compromise release artifacts; unknown scope
+          # is not evidence that a dependency is harmless.
+          fail-on-scopes: runtime, development, unknown
           license-check: true
+          show-patched-versions: true
           vulnerability-check: true
-          show-openssf-scorecard: true
 
   security-scan:
     name: "Dependencies, secrets, and policy"
