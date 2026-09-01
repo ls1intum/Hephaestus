@@ -75,8 +75,11 @@ clean boot; the seeded-upgrade gate separately proves the supported migration pa
 A release remains a draft until every first-party and upstream production image in
 `security/release-images.json` has passed the evidence
 gate. The gate resolves each image index and its `linux/amd64` and `linux/arm64` manifests to immutable
-digests. It generates a lossless Syft inventory plus SPDX and CycloneDX SBOMs for each deployed platform.
-The gate proves that the Syft source metadata identifies the exact digest and architecture, checks that
+digests. It generates a lossless Syft inventory plus SPDX and CycloneDX SBOMs for each deployed platform,
+scanning the registry manifest directly rather than a local Docker daemon copy, which would re-serialize
+the manifest and digest to something the release never published. The gate proves that all three documents
+name the repository, digest, and architecture of that one platform manifest — including the reference Syft
+resolved, so an index-wide scan cannot pass as per-platform evidence — checks that
 every discovered package survives both standard-format conversions, and records packages whose license
 could not be detected. It also scans each platform manifest with Trivy, signs its SPDX predicate as an OCI
 attestation, and verifies the image signature and build provenance. The SBOMs, license reports, scan
