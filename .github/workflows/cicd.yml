@@ -32,6 +32,9 @@ jobs:
       postgres-image: ${{ steps.filter.outputs.postgres-image }}
       docs: ${{ steps.filter.outputs.docs }}
       ci-config: ${{ steps.filter.outputs.ci-config }}
+      quality-config: ${{ steps.filter.outputs.quality-config }}
+      test-config: ${{ steps.filter.outputs.test-config }}
+      security-config: ${{ steps.filter.outputs.security-config }}
       docker-config: ${{ steps.filter.outputs.docker-config }}
       pmd-canary: ${{ steps.filter.outputs.pmd-canary }}
       version-bump: ${{ steps.version_bump.outputs.changed }}
@@ -168,6 +171,20 @@ jobs:
               - '.github/workflows/**'
               - '.github/actions/**'
               - '.github/actionlint.yaml'
+            quality-config:
+              - '.github/workflows/cicd.yml'
+              - '.github/workflows/ci-quality-gates.yml'
+              - '.github/actions/setup-node-pnpm/**'
+              - '.github/actions/setup-caches/**'
+            test-config:
+              - '.github/workflows/cicd.yml'
+              - '.github/workflows/ci-tests.yml'
+              - '.github/actions/setup-node-pnpm/**'
+              - '.github/actions/setup-caches/**'
+              - '.github/actions/setup-browsers/**'
+            security-config:
+              - '.github/workflows/cicd.yml'
+              - '.github/workflows/ci-security-scan.yml'
             docker-config:
               - '.github/workflows/ci-docker-build.yml'
               - '.github/workflows/reusable-docker-build.yml'
@@ -220,7 +237,9 @@ jobs:
     timeout-minutes: 10
     runs-on: ubuntu-latest
     needs: [detect-changes]
-    if: github.event_name != 'push' || needs.detect-changes.outputs.version-bump == 'true'
+    if: |
+      (github.event_name != 'push' || needs.detect-changes.outputs.version-bump == 'true') &&
+      (github.event_name != 'pull_request' || needs.detect-changes.outputs.ci-config == 'true')
     permissions:
       contents: read
       security-events: write
@@ -247,7 +266,7 @@ jobs:
       (github.event_name != 'push' || needs.detect-changes.outputs.version-bump == 'true') &&
       needs.detect-changes.outputs.should_skip != 'true' && (
         needs.detect-changes.outputs.any-code == 'true' ||
-        needs.detect-changes.outputs.ci-config == 'true' ||
+        needs.detect-changes.outputs.quality-config == 'true' ||
         github.event_name != 'pull_request'
       )
     permissions:
@@ -255,11 +274,11 @@ jobs:
       contents: read
     with:
       should_skip: ${{ needs.detect-changes.outputs.should_skip }}
-      webapp_changed: ${{ (needs.detect-changes.outputs.webapp == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
-      application_server_changed: ${{ (needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
-      tooling_changed: ${{ (needs.detect-changes.outputs.tooling == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+      webapp_changed: ${{ (needs.detect-changes.outputs.webapp == 'true' || needs.detect-changes.outputs.quality-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+      application_server_changed: ${{ (needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.quality-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+      tooling_changed: ${{ (needs.detect-changes.outputs.tooling == 'true' || needs.detect-changes.outputs.quality-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       postgres_image_changed: ${{ (needs.detect-changes.outputs.postgres-image == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
-      contracts_changed: ${{ (needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.postgres-image == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+      contracts_changed: ${{ (needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.postgres-image == 'true' || needs.detect-changes.outputs.quality-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       pmd_canary: ${{ (needs.detect-changes.outputs.pmd-canary == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
 
   Security:
@@ -269,7 +288,7 @@ jobs:
       (github.event_name != 'push' || needs.detect-changes.outputs.version-bump == 'true') &&
       needs.detect-changes.outputs.should_skip != 'true' && (
         needs.detect-changes.outputs.any-code == 'true' ||
-        needs.detect-changes.outputs.ci-config == 'true' ||
+        needs.detect-changes.outputs.security-config == 'true' ||
         github.event_name != 'pull_request'
       )
     permissions:
@@ -285,7 +304,7 @@ jobs:
       (github.event_name != 'push' || needs.detect-changes.outputs.version-bump == 'true') &&
       needs.detect-changes.outputs.should_skip != 'true' && (
         needs.detect-changes.outputs.any-code == 'true' ||
-        needs.detect-changes.outputs.ci-config == 'true' ||
+        needs.detect-changes.outputs.test-config == 'true' ||
         github.event_name != 'pull_request'
       )
     secrets:
@@ -298,8 +317,8 @@ jobs:
       statuses: write
     with:
       should_skip: ${{ needs.detect-changes.outputs.should_skip }}
-      webapp_changed: ${{ (needs.detect-changes.outputs.webapp == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
-      application_server_changed: ${{ (needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+      webapp_changed: ${{ (needs.detect-changes.outputs.webapp == 'true' || needs.detect-changes.outputs.test-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+      application_server_changed: ${{ (needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.test-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       e2e_changed: ${{ (needs.detect-changes.outputs.e2e == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       postgres_image_changed: ${{ (needs.detect-changes.outputs.postgres-image == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
 

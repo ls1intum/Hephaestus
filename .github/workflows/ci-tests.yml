@@ -52,9 +52,6 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup-node-pnpm
-        with:
-          install: "none"
       - uses: ./.github/actions/setup-caches
         with:
           cache-type: application-server-verification
@@ -276,10 +273,11 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
         with:
           install: "frozen"
-      - uses: ./.github/actions/setup-caches
+      - uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
         with:
-          cache-type: webapp-e2e
-          os: ${{ runner.os }}
+          distribution: "temurin"
+          java-version: "21"
+          cache-jdk: false
       - uses: ./.github/actions/setup-browsers
       - name: Download built reactor
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1

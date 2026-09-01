@@ -178,6 +178,23 @@ void describe("CI contract", () => {
 		assert.match(pathFilter(detection, "webapp-image"), /- 'patches\/\*\*'/);
 	});
 
+	void test("invalidates CI legs through their owned workflow dependencies", async () => {
+		const source = await readFile(".github/workflows/cicd.yml", "utf8");
+		const detection = job(source, "detect-changes");
+		const expected = new Map([
+			["quality-config", ".github/workflows/ci-quality-gates.yml"],
+			["test-config", ".github/workflows/ci-tests.yml"],
+			["security-config", ".github/workflows/ci-security-scan.yml"],
+		]);
+		for (const [filter, workflow] of expected) {
+			const patterns = pathFilter(detection, filter);
+			assert.match(patterns, new RegExp(`- '${escapeRegExp(workflow)}'`));
+			assert.match(patterns, /- '\.github\/workflows\/cicd\.yml'/);
+			assert.doesNotMatch(patterns, /- '\.github\/workflows\/\*\*'/);
+			assert.match(source, new RegExp(`outputs\\.${escapeRegExp(filter)} == 'true'`));
+		}
+	});
+
 	void test("separates pre-merge validation from post-merge artifact production", async () => {
 		const source = await readFile(".github/workflows/cicd.yml", "utf8");
 		for (const event of ["workflow_dispatch", "push", "pull_request", "merge_group"]) {

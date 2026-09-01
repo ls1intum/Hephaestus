@@ -24,14 +24,14 @@ await describe("CI cache policy", async () => {
 		}
 	});
 
-	await test("Webapp E2E uses the server build caches", () => {
+	await test("Maven caches are limited to Maven build jobs", async () => {
 		const javaSetup = actionStep("Set up JDK 21");
-		assert.ok(javaSetup.includes('"webapp-e2e"'));
 		assert.ok(javaSetup.includes('cache: "maven"'));
 		assert.ok(javaSetup.includes("cache-read-only:"));
 		assert.ok(javaSetup.includes("cache-jdk: false"));
-		assert.ok(actionStep("Restore generated clients").includes('"webapp-e2e"'));
-		assert.ok(actionStep("Cache generated clients").includes('"webapp-e2e"'));
+		assert.doesNotMatch(cacheAction, /webapp-e2e/);
+		const workflow = await readFile(".github/workflows/ci-tests.yml", "utf8");
+		assert.match(workflow, /webapp-e2e:[\s\S]*?actions\/setup-java@/);
 	});
 
 	await test("browser consumers share one cache-and-install action", async () => {
