@@ -25,7 +25,7 @@
 		"chromatic:ci": "chromatic --only-changed",
 		"chromatic:dry-run": "chromatic --dry-run",
 		"test:e2e": "playwright test",
-		"export:brand-assets": "node scripts/export-brand-assets.ts",
+		"export:assets": "node scripts/export-assets.ts",
 		"storybook:dev": "storybook dev -p 6006",
 		"generate:api": "openapi-ts"
 	},
