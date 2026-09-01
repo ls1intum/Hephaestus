@@ -6,7 +6,11 @@ FROM postgres:${PG_MAJOR}-bookworm
 ARG PG_MAJOR=18
 # Pinned for reproducibility (PGDG bookworm pool). Bump deliberately.
 ARG PARTMAN_VERSION=5.5.0-1.pgdg12+1
+# The tag floats, so docker-library rebuilds already carry most OS updates here; the upgrade closes
+# the window between a Debian security publication and the next upstream rebuild. Same posture as
+# webapp/Dockerfile and docker/agents/pi/Dockerfile so no image is the one that blocks a release.
 RUN set -eux; \
     apt-get update; \
+    apt-get upgrade -y; \
     apt-get install -y --no-install-recommends "postgresql-${PG_MAJOR}-partman=${PARTMAN_VERSION}"; \
     rm -rf /var/lib/apt/lists/*

@@ -3,7 +3,10 @@
 ARG NODE_VERSION=24.19.0
 FROM node:${NODE_VERSION}-slim@sha256:a9f5f7c91a432850b2a8a7797adf5eadb6c733ceed61167806cee7ea7fbc29df
 
-RUN apt-get update -qq && apt-get install -y --no-install-recommends git findutils tree jq ca-certificates grep && \
+# The base digest is pinned, so Debian security updates published after the upstream image was
+# built can reach it only here; Renovate bumps the digest only when upstream republishes one.
+RUN apt-get update -qq && apt-get upgrade -y -qq && \
+    apt-get install -y --no-install-recommends git findutils tree jq ca-certificates grep && \
     rm -rf /var/lib/apt/lists/*
 
 RUN groupmod --new-name agent node && \
