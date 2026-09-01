@@ -15,14 +15,14 @@
 
 services:
   postgres:
-    image: ghcr.io/ls1intum/hephaestus/postgres:${SOURCE_COMMIT:?Coolify supplies the deployed commit}
+    image: ghcr.io/hephaestus-build/postgres:${SOURCE_COMMIT:?Coolify supplies the deployed commit}
     restart: unless-stopped
     environment:
       POSTGRES_DB: hephaestus
       POSTGRES_USER: hephaestus
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
-      - postgres-data-v18:/var/lib/postgresql
+      - postgres-data:/var/lib/postgresql
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -56,7 +56,7 @@ services:
   # volume is never mounted. This is the image staging itself runs, so pg_dump always matches the
   # server it reads.
   seed-loader:
-    image: ghcr.io/ls1intum/hephaestus/postgres:${SOURCE_COMMIT:?Coolify supplies the deployed commit}
+    image: ghcr.io/hephaestus-build/postgres:${SOURCE_COMMIT:?Coolify supplies the deployed commit}
     restart: "no"
     depends_on:
       postgres:
@@ -217,7 +217,7 @@ services:
           pids: 128
 
   appserver:
-    image: ghcr.io/ls1intum/hephaestus/application-server:${SOURCE_COMMIT:?Coolify supplies the deployed commit}
+    image: ghcr.io/hephaestus-build/application-server:${SOURCE_COMMIT:?Coolify supplies the deployed commit}
     restart: unless-stopped
     expose:
       - "8080"
@@ -322,7 +322,7 @@ services:
           memory: 2G
           pids: 512
   webapp:
-    image: ghcr.io/ls1intum/hephaestus/webapp:${SOURCE_COMMIT:?Coolify supplies the deployed commit}
+    image: ghcr.io/hephaestus-build/webapp:${SOURCE_COMMIT:?Coolify supplies the deployed commit}
     # `expose` is how Coolify learns which port to route ${SERVICE_FQDN_WEBAPP} to; the image's own
     # EXPOSE is not read for that.
     expose:
@@ -376,4 +376,4 @@ networks:
     name: shared-network
 
 volumes:
-  postgres-data-v18:
+  postgres-data:

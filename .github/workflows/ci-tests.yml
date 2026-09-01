@@ -289,10 +289,10 @@ jobs:
         run: |
           # The base image may still be publishing; build the same Dockerfile as fallback.
           if [[ "${INPUTS_POSTGRES_IMAGE_CHANGED}" == "true" ]] ||
-            ! docker pull ghcr.io/ls1intum/hephaestus/postgres:${{ github.event.pull_request.base.sha || github.sha }}; then
-            docker build -t ghcr.io/ls1intum/hephaestus/postgres:dev docker/postgres
+            ! docker pull ghcr.io/hephaestus-build/postgres:${{ github.event.pull_request.base.sha || github.sha }}; then
+            docker build -t ghcr.io/hephaestus-build/postgres:dev docker/postgres
           else
-            docker tag ghcr.io/ls1intum/hephaestus/postgres:${{ github.event.pull_request.base.sha || github.sha }} ghcr.io/ls1intum/hephaestus/postgres:dev
+            docker tag ghcr.io/hephaestus-build/postgres:${{ github.event.pull_request.base.sha || github.sha }} ghcr.io/hephaestus-build/postgres:dev
           fi
           docker compose -f server/compose.yaml up -d --wait --no-build postgres
           cleanup() {

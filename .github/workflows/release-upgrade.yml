@@ -3,7 +3,11 @@ name: Seeded Release Upgrade
 on:
   workflow_call:
     inputs:
-      previous-application-image:
+      previous-version:
+        description: >-
+          Previous stable release version (X.Y.Z). Its image repository is resolved per
+          version from security/release-identities.json — releases published before the
+          repository transfer stay in the old GHCR namespace forever (issue #1599).
         type: string
         required: true
       candidate-application-image:
@@ -58,7 +62,7 @@ jobs:
         id: images
         env:
           GH_TOKEN: ${{ github.token }}
-          INPUT_PREVIOUS_APP: ${{ inputs.previous-application-image }}
+          INPUT_PREVIOUS_VERSION: ${{ inputs.previous-version }}
           INPUT_CANDIDATE_APP: ${{ inputs.candidate-application-image }}
           INPUT_POSTGRES: ${{ inputs.postgres-image }}
           REQUESTED_PREVIOUS: ${{ inputs.previous-tag }}

@@ -11,81 +11,69 @@ on:
 permissions: {}
 
 concurrency:
+  # Never cancel: runs in a group are serialised, so the newest event's verdict is the one that
+  # lands, and a cancelled run publishes nothing rather than a half-written state.
   group: review-policy-${{ github.event.pull_request.number || github.ref }}
-  # Never cancel: a cancelled check run on the required `review-policy` context is evaluated
-  # by the ruleset as the context's state and silently blocks merge-queue entry (observed on
-  # PRs #1655/#1664, 2026-08-31). The job takes seconds; queueing duplicates is cheap.
   cancel-in-progress: false
 
 jobs:
-  review-policy:
-    name: review-policy
+  # This job is *not* the required context. It publishes one — a check run named `review-policy`,
+  # which the `main` ruleset requires and binds to the GitHub Actions integration that a
+  # `GITHUB_TOKEN`-authenticated check run is attributed to. Reporting the verdict separately is
+  # what lets an unreviewed pull request sit pending instead of red: a job can only pass or fail,
+  # and a failing job made a healthy pull request awaiting its first review look broken on the pull
+  # request list. Renaming this job back to `review-policy` would put two check runs of that name
+  # on the same commit and make which one the ruleset reads a race.
+  publish:
+    name: Publish review-policy status
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
+      checks: write
       contents: read
       pull-requests: read
     steps:
-      - name: Enforce review policy
+      # The queue re-reports every required context against the projected commit, and the policy was
+      # already decided on the pull request that entered the queue. Written out here rather than
+      # routed through the evaluator so the queue's path needs no checkout and no import: a merge
+      # group that never receives this context sits until the queue's timeout drops it.
+      - name: Pass the merge group
+        if: github.event_name == 'merge_group'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            await github.rest.checks.create({
+              ...context.repo,
+              // Kept equal to CHECK_NAME in scripts/review-policy.ts; a test asserts they agree.
+              name: 'review-policy',
+              head_sha: context.payload.merge_group.head_sha,
+              status: 'completed',
+              conclusion: 'success',
+              output: {
+                title: 'Satisfied before this merge group was created',
+                summary:
+                  'The review policy is decided on the pull request; entering the merge queue ' +
+                  'already required it to pass.',
+              },
+            });
+
+      # The default branch, never `github.sha`: that is the pull request's merge commit on
+      # `pull_request_review`, which contains pull-request code. The base branch's copy of the
+      # policy is the authoritative one.
+      - name: Load the trusted policy evaluator
+        if: github.event_name != 'merge_group'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+          sparse-checkout: scripts
+
+      - name: Publish the review-policy check run
+        if: github.event_name != 'merge_group'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           MAINTAINERS: ${{ vars.REVIEW_POLICY_MAINTAINERS }}
         with:
           script: |
-            if (context.eventName === 'merge_group') {
-              return;
-            }
-
-            const { data: pull } = await github.rest.pulls.get({
-              ...context.repo,
-              pull_number: context.payload.pull_request.number,
-            });
-            // pull_request_review supports no base-branch filter, so guard here: the
-            // policy applies to pull requests that target main only.
-            if (pull.base.ref !== 'main') {
-              core.info(`The review policy does not apply to base branch ${pull.base.ref}.`);
-              return;
-            }
-            const author = pull.user.login.toLowerCase();
-            const maintainers = new Set(
-              (process.env.MAINTAINERS || '')
-                .split(',')
-                .map((login) => login.trim().toLowerCase())
-                .filter(Boolean),
-            );
-            if (maintainers.has(author)) {
-              core.info(`${pull.user.login} is in REVIEW_POLICY_MAINTAINERS.`);
-              return;
-            }
-
-            const reviews = await github.paginate(github.rest.pulls.listReviews, {
-              ...context.repo,
-              pull_number: pull.number,
-              per_page: 100,
-            });
-            const latestByReviewer = new Map();
-            for (const review of reviews.sort((left, right) => left.id - right.id)) {
-              if (
-                review.user &&
-                review.user.login.toLowerCase() !== author &&
-                ['APPROVED', 'CHANGES_REQUESTED', 'DISMISSED'].includes(review.state)
-              ) {
-                latestByReviewer.set(review.user.login.toLowerCase(), review);
-              }
-            }
-
-            for (const [login, review] of latestByReviewer) {
-              if (review.state !== 'APPROVED' || review.commit_id !== pull.head.sha) continue;
-              const { data } = await github.rest.repos.getCollaboratorPermissionLevel({
-                ...context.repo,
-                username: login,
-              });
-              if (['admin', 'maintain', 'write'].includes(data.permission)) {
-                core.info(`Approved by ${login}, who has ${data.permission} access.`);
-                return;
-              }
-            }
-
-            core.setFailed(
-              'This contributor pull request needs an approving review from a non-author with write access.',
-            );
+            const policy = await import(`${process.env.GITHUB_WORKSPACE}/scripts/review-policy.ts`);
+            await policy.enforce({ github, context, core });

@@ -1,11 +1,17 @@
+// Rehearses the operator upgrade documented in docs/admin/backup-restore.mdx § PostgreSQL 17 to 18:
+// dump the PostgreSQL 17 cluster, destroy the volume, recreate it under the same stable name, and
+// restore into a fresh PostgreSQL 18 cluster. It also proves the safety property ADR 0038's
+// amendment leans on — PostgreSQL 18 refuses to start against PostgreSQL 17 data instead of coming
+// up healthy and empty.
 import { spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 
 const id = `postgres-upgrade-${randomUUID().slice(0, 8)}`;
 const source = `${id}-17`;
 const target = `${id}-18`;
-const sourceVolume = `${source}-data`;
-const targetVolume = `${target}-data`;
+// One volume, reused across the major upgrade — the same stable `postgresql-data` name the shipped
+// compose files declare (Compose prefixes it with the project name).
+const volume = `${id}_postgresql-data`;
 
 function run(command: string, args: string[], input?: Buffer): string {
 	const result = spawnSync(command, args, { encoding: "utf8", input, maxBuffer: 64 * 1024 * 1024 });
@@ -54,7 +60,7 @@ function wait(container: string): void {
 	throw new Error(`${container} did not become ready`);
 }
 
-function start(container: string, volume: string, mount: string, image: string): number {
+function start(container: string, dataVolume: string, mount: string, image: string): number {
 	docker(
 		"run",
 		"-d",
@@ -63,7 +69,7 @@ function start(container: string, volume: string, mount: string, image: string):
 		"-p",
 		"127.0.0.1::5432",
 		"-v",
-		`${volume}:${mount}`,
+		`${dataVolume}:${mount}`,
 		"-e",
 		"POSTGRES_DB=hephaestus",
 		"-e",
@@ -96,10 +102,9 @@ try {
 		"docker/postgres",
 	]);
 	run("docker", ["build", "-t", `${id}:18`, "docker/postgres"]);
-	docker("volume", "create", sourceVolume);
-	docker("volume", "create", targetVolume);
+	docker("volume", "create", volume);
 
-	const sourcePort = start(source, sourceVolume, "/var/lib/postgresql/data", `${id}:17`);
+	const sourcePort = start(source, volume, "/var/lib/postgresql/data", `${id}:17`);
 	if (sql(source, "SHOW server_version_num").slice(0, 2) !== "17")
 		throw new Error("source is not PostgreSQL 17");
 
@@ -145,9 +150,41 @@ try {
 		input: dump,
 	});
 	if (listing.status !== 0) throw new Error("source dump is unreadable");
-	docker("stop", source);
+	docker("rm", "-f", source);
 
-	start(target, targetVolume, "/var/lib/postgresql", `${id}:18`);
+	// The safety property behind keeping the volume name stable: an operator who upgrades without
+	// completing the dump-and-restore gets a container that refuses to start, not a silently empty
+	// database. The 18+ entrypoint detects the foreign PG_VERSION and exits before initdb.
+	const refusal = spawnSync(
+		"docker",
+		[
+			"run",
+			"--rm",
+			"-v",
+			`${volume}:/var/lib/postgresql`,
+			"-e",
+			"POSTGRES_DB=hephaestus",
+			"-e",
+			"POSTGRES_USER=root",
+			"-e",
+			"POSTGRES_PASSWORD=root",
+			`${id}:18`,
+		],
+		{ encoding: "utf8", timeout: 120_000, maxBuffer: 64 * 1024 * 1024 },
+	);
+	if (refusal.status === 0 || refusal.status === null) {
+		throw new Error("PostgreSQL 18 did not refuse the PostgreSQL 17 data");
+	}
+	if (!refusal.stderr.includes("PostgreSQL data")) {
+		throw new Error(`PostgreSQL 18 failed for an unexpected reason:\n${refusal.stderr}`);
+	}
+
+	// The operator's destructive step: the PostgreSQL 17 volume is removed and recreated under the
+	// same name, so from here on the verified dump is the only copy of the data.
+	docker("volume", "rm", volume);
+	docker("volume", "create", volume);
+
+	start(target, volume, "/var/lib/postgresql", `${id}:18`);
 	docker("exec", target, "dropdb", "-U", "root", "hephaestus");
 	docker("exec", target, "createdb", "-U", "root", "hephaestus");
 	const restore = spawnSync(
@@ -193,15 +230,8 @@ try {
 		) !== "t"
 	)
 		throw new Error("auth_event partitions were not restored");
-
-	docker("stop", target);
-	docker("start", source);
-	wait(source);
-	if (sql(source, "SELECT value FROM upgrade_qualification WHERE id=1") !== "preserved")
-		throw new Error("PostgreSQL 17 rollback volume is unreadable");
 } finally {
 	for (const container of [source, target]) spawnSync("docker", ["rm", "-f", container]);
-	for (const volume of [sourceVolume, targetVolume])
-		spawnSync("docker", ["volume", "rm", "-f", volume]);
+	spawnSync("docker", ["volume", "rm", "-f", volume]);
 	for (const image of [`${id}:17`, `${id}:18`]) spawnSync("docker", ["rmi", "-f", image]);
 }

@@ -31,25 +31,69 @@ function purl(value: unknown): string | undefined {
 	return typeof item.purl === "string" && item.purl.length > 0 ? item.purl : undefined;
 }
 
+/**
+ * The media types of a *single* image manifest. An index (`…image.index.v1+json`,
+ * `…manifest.list.v2+json`) describes several artifacts at once, so it can never be
+ * the subject of a per-platform SBOM. Both single-manifest types stay valid: the
+ * release publishes OCI manifests, upstream registries may still serve schema 2.
+ */
+const manifestMediaTypes = new Set([
+	"application/vnd.oci.image.manifest.v1+json",
+	"application/vnd.docker.distribution.manifest.v2+json",
+]);
+
+/** Syft normalizes Docker Hub to `index.docker.io`; the inventory says `docker.io`. */
+function canonicalRepository(repository: string): string {
+	return repository.startsWith("index.docker.io/")
+		? `docker.io/${repository.slice("index.docker.io/".length)}`
+		: repository;
+}
+
+/** The subject an SBOM triple must describe: one image, one platform, one digest. */
+export type ReleaseSbomSubject = {
+	repository: string;
+	digest: string;
+	platform: string;
+};
+
 export function validateReleaseSbom(
 	syftInput: unknown,
 	spdxInput: unknown,
 	cycloneDxInput: unknown,
-	digest: string,
-	platform: string,
+	subject: ReleaseSbomSubject,
 ): JsonObject {
+	const { digest, platform } = subject;
 	if (!/^sha256:[a-f0-9]{64}$/.test(digest)) throw new Error("subject digest is malformed");
 	const [os, architecture] = platform.split("/");
 	if (os !== "linux" || !architecture) throw new Error("platform must be linux/<architecture>");
+	const repository = canonicalRepository(text(subject.repository, "subject repository"));
+	const reference = `${repository}@${digest}`;
 
 	const syft = object(syftInput, "Syft SBOM");
 	const source = object(syft.source, "Syft source");
 	const metadata = object(source.metadata, "Syft source metadata");
 	if (source.type !== "image") throw new Error("Syft source is not an image");
+	if (canonicalRepository(text(source.name, "Syft source name")) !== repository)
+		throw new Error("Syft SBOM is bound to the wrong repository");
+	if (!manifestMediaTypes.has(text(metadata.mediaType, "Syft source media type")))
+		throw new Error("Syft SBOM does not describe a single-platform image manifest");
+	// Only a registry scan digests the manifest the registry serves. Pulled through a
+	// Docker daemon the same artifact is re-serialized as a schema-2 manifest whose
+	// digest is a local accident, so the release scans with `syft --from registry`.
 	if (metadata.manifestDigest !== digest)
 		throw new Error("Syft SBOM is bound to the wrong manifest");
 	if (metadata.os !== os || metadata.architecture !== architecture)
 		throw new Error("Syft SBOM is bound to the wrong platform");
+	// `manifestDigest` alone cannot tell a scan of `repository@<index digest>` — which
+	// resolves to this platform's manifest — from a scan of the platform digest the
+	// release records. `repoDigests` carries the reference Syft actually resolved.
+	const repoDigests = array(metadata.repoDigests, "Syft source repository digests").map(
+		(value, index) => canonicalRepository(text(value, `Syft repository digest ${index}`)),
+	);
+	if (!repoDigests.includes(reference))
+		throw new Error(`Syft SBOM was not resolved from ${reference}`);
+	if (!repoDigests.every((entry) => entry.endsWith(`@${digest}`)))
+		throw new Error("Syft SBOM also resolves a digest the subject does not name");
 
 	const artifacts = array(syft.artifacts, "Syft artifacts");
 	if (artifacts.length === 0) throw new Error("Syft SBOM contains no packages");
@@ -76,8 +120,10 @@ export function validateReleaseSbom(
 	text(spdx.documentNamespace, "SPDX document namespace");
 	const spdxPurls = new Set<string>();
 	const spdxKeys = new Set<string>();
+	const spdxContainers: JsonObject[] = [];
 	for (const [index, value] of array(spdx.packages, "SPDX packages").entries()) {
 		const item = object(value, `SPDX package ${index}`);
+		if (item.primaryPackagePurpose === "CONTAINER") spdxContainers.push(item);
 		if (typeof item.name === "string" && typeof item.versionInfo === "string")
 			spdxKeys.add(`${item.name}\u0000${item.versionInfo}`);
 		for (const ref of Array.isArray(item.externalRefs) ? item.externalRefs : []) {
@@ -87,9 +133,30 @@ export function validateReleaseSbom(
 		}
 	}
 
+	// Package parity alone would accept an SPDX rendering of a *different* image that
+	// installs the same packages, so bind each document to the subject as well.
+	const [spdxContainer, ...spdxExtraContainers] = spdxContainers;
+	if (!spdxContainer || spdxExtraContainers.length > 0)
+		throw new Error("SPDX document must describe exactly one container");
+	if (
+		canonicalRepository(text(spdxContainer.name, "SPDX container name")) !== repository ||
+		spdxContainer.versionInfo !== digest
+	)
+		throw new Error(`SPDX document is not bound to ${reference}`);
+
 	const cycloneDx = object(cycloneDxInput, "CycloneDX SBOM");
 	if (cycloneDx.bomFormat !== "CycloneDX") throw new Error("invalid CycloneDX format");
 	text(cycloneDx.specVersion, "CycloneDX spec version");
+	const cycloneSubject = object(
+		object(cycloneDx.metadata, "CycloneDX metadata").component,
+		"CycloneDX metadata component",
+	);
+	if (
+		cycloneSubject.type !== "container" ||
+		canonicalRepository(text(cycloneSubject.name, "CycloneDX component name")) !== repository ||
+		cycloneSubject.version !== digest
+	)
+		throw new Error(`CycloneDX document is not bound to ${reference}`);
 	const cyclonePurls = new Set<string>();
 	const cycloneKeys = new Set<string>();
 	for (const [index, value] of array(cycloneDx.components, "CycloneDX components").entries()) {
@@ -122,14 +189,23 @@ export function validateReleaseSbom(
 }
 
 if (import.meta.main) {
-	const [syftPath, spdxPath, cycloneDxPath, digest, platform, outputPath] = process.argv.slice(2);
-	if (!syftPath || !spdxPath || !cycloneDxPath || !digest || !platform || !outputPath)
+	const [syftPath, spdxPath, cycloneDxPath, repository, digest, platform, outputPath] =
+		process.argv.slice(2);
+	if (
+		!syftPath ||
+		!spdxPath ||
+		!cycloneDxPath ||
+		!repository ||
+		!digest ||
+		!platform ||
+		!outputPath
+	)
 		throw new Error(
-			"usage: check-release-sbom <syft> <spdx> <cyclonedx> <digest> <platform> <output>",
+			"usage: check-release-sbom <syft> <spdx> <cyclonedx> <repository> <digest> <platform> <output>",
 		);
 	const readJson = (path: string): unknown => JSON.parse(readFileSync(path, "utf8")) as unknown;
 	writeFileSync(
 		outputPath,
-		`${JSON.stringify(validateReleaseSbom(readJson(syftPath), readJson(spdxPath), readJson(cycloneDxPath), digest, platform), null, 2)}\n`,
+		`${JSON.stringify(validateReleaseSbom(readJson(syftPath), readJson(spdxPath), readJson(cycloneDxPath), { repository, digest, platform }), null, 2)}\n`,
 	);
 }

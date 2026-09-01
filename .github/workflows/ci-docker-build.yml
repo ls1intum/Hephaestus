@@ -60,7 +60,7 @@ jobs:
       SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
       SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
     with:
-      image-name: "ls1intum/hephaestus/webapp"
+      image-name: "hephaestus-build/webapp"
       docker-file: "./webapp/Dockerfile"
       docker-context: "."
       registry: "ghcr.io"
@@ -98,7 +98,7 @@ jobs:
       id-token: write
       attestations: write
     with:
-      image-name: "ls1intum/hephaestus/application-server"
+      image-name: "hephaestus-build/application-server"
       # Paketo Cloud Native Buildpacks via spring-boot:build-image, with Application CDS.
       # See docs/admin/buildpacks-cds-decision.md and pom.xml's <image> block.
       use-buildpacks: true
@@ -136,7 +136,7 @@ jobs:
       id-token: write
       attestations: write
     with:
-      image-name: "ls1intum/hephaestus/agent-pi"
+      image-name: "hephaestus-build/agent-pi"
       docker-file: "./docker/agents/pi/Dockerfile"
       docker-context: "./docker/agents"
       registry: "ghcr.io"
@@ -170,7 +170,7 @@ jobs:
       id-token: write
       attestations: write
     with:
-      image-name: "ls1intum/hephaestus/postgres"
+      image-name: "hephaestus-build/postgres"
       docker-file: "./docker/postgres/Dockerfile"
       docker-context: "./docker/postgres"
       registry: "ghcr.io"
@@ -236,7 +236,7 @@ jobs:
           set -euo pipefail
 
           tag_image() {
-            local image="ghcr.io/ls1intum/hephaestus/$1"
+            local image="ghcr.io/hephaestus-build/$1"
             local source="$image:$BASE_SHA"
             local ref_tag="${GITHUB_REF_NAME//\//-}"
             local digest

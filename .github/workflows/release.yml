@@ -105,12 +105,16 @@ jobs:
               echo ""
             } >> "$NOTES"
           fi
-          git show "$SHA:CHANGELOG.md" \
-            | awk -v ver="## $VERSION" '
+          # Materialise the changelog first: awk exits at the next section
+          # heading, which would SIGPIPE (exit 141) the still-writing `git show`
+          # once CHANGELOG.md outgrew the 64 KiB pipe buffer.
+          CHANGELOG_SNAPSHOT=$(mktemp)
+          git show "$SHA:CHANGELOG.md" > "$CHANGELOG_SNAPSHOT"
+          awk -v ver="## $VERSION" '
                 $0 == ver { on=1; next }
                 on && /^## / { exit }
                 on { print }
-              ' >> "$NOTES"
+              ' "$CHANGELOG_SNAPSHOT" >> "$NOTES"
           echo "----- release notes -----"; cat "$NOTES"; echo "-------------------------"
 
           if [ "$RESUME" = false ]; then
@@ -178,7 +182,7 @@ jobs:
 
           # Resolve every source digest before publishing any release tag.
           for img in "${IMAGES[@]}"; do
-            FULL_IMAGE="ghcr.io/ls1intum/hephaestus/$img"
+            FULL_IMAGE="ghcr.io/hephaestus-build/$img"
             for i in $(seq 1 24); do
               digest=$(docker buildx imagetools inspect "$FULL_IMAGE:$SHA" --format '{{json .Manifest}}' 2>/dev/null | jq -er '.digest' 2>/dev/null) || true
               if [[ "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]; then
@@ -194,7 +198,7 @@ jobs:
           done
 
           for img in "${IMAGES[@]}"; do
-            FULL_IMAGE="ghcr.io/ls1intum/hephaestus/$img"
+            FULL_IMAGE="ghcr.io/hephaestus-build/$img"
             echo "::group::$img"
 
             SRC_DIGEST=${DIGESTS[$img]}
@@ -211,7 +215,7 @@ jobs:
 
       - name: Verify Node-only agent-pi sandbox
         env:
-          IMAGE: ghcr.io/ls1intum/hephaestus/agent-pi@${{ steps.retag.outputs.agent-pi-digest }}
+          IMAGE: ghcr.io/hephaestus-build/agent-pi@${{ steps.retag.outputs.agent-pi-digest }}
           LAYOUT: server/application/src/main/java/de/tum/cit/aet/hephaestus/agent/runtime/SandboxLayout.java
         run: |
           set -euo pipefail
@@ -272,7 +276,11 @@ jobs:
               [[ "$platform_digest" =~ ^sha256:[a-f0-9]{64}$ ]] || { echo "::error::$image $platform digest is malformed"; exit 1; }
               platform_ref="$repository@$platform_digest"
               printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$image" "$platform" "$digest" "$platform_digest" "$repository" "$provenance" >> release-platforms.tsv
-              syft "$platform_ref" --scope squashed \
+              # Scan the registry artifact, never a daemon copy of it: a daemon pull
+              # re-serializes an OCI manifest as Docker schema 2, so the SBOM would
+              # record a locally computed manifestDigest instead of the released one.
+              # --platform makes Syft fail loudly if the digest is not this platform's.
+              syft --from registry "$platform_ref" --platform "$platform" --scope squashed \
                 -o "syft-json=evidence/$image-$suffix.syft.json" \
                 -o "spdx-json=evidence/$image-$suffix.spdx.json" \
                 -o "cyclonedx-json=evidence/$image-$suffix.cdx.json"
@@ -281,7 +289,7 @@ jobs:
             done
           }
           while IFS=$'\t' read -r image digest; do
-            generate_evidence "$image" "ghcr.io/ls1intum/hephaestus/$image" "$digest" first-party
+            generate_evidence "$image" "ghcr.io/hephaestus-build/$image" "$digest" first-party
           done < release-images.tsv
           jq -r '.upstream[] | [.name, .repository, .digest] | @tsv' security/release-images.json |
           while IFS=$'\t' read -r image repository digest; do
@@ -345,6 +353,9 @@ jobs:
           done < release-images.tsv > subjects.sha256
           sha256sum "$ASSET" >> subjects.sha256
           cat subjects.sha256
+          # purl namespace/name are canonically lowercase; derive them from the run
+          # context so the attestation follows a repository transfer (issue #1599).
+          echo "purl-repository=${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
 
       - name: Attest release image lock
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
@@ -352,7 +363,7 @@ jobs:
           subject-checksums: subjects.sha256
           predicate-type: https://in-toto.io/attestation/release/v0.1
           predicate: |
-            { "purl": "pkg:github/ls1intum/hephaestus@${{ needs.release.outputs.tag_name }}" }
+            { "purl": "pkg:github/${{ steps.subjects.outputs.purl-repository }}@${{ needs.release.outputs.tag_name }}" }
 
       - name: Sign release image lock
         env:
@@ -391,9 +402,12 @@ jobs:
       contents: read
       packages: read
     with:
-      previous-application-image: ghcr.io/ls1intum/hephaestus/application-server:${{ needs.release.outputs.previous_version }}
-      candidate-application-image: ghcr.io/ls1intum/hephaestus/application-server@${{ needs.tag-images.outputs.application-server-digest }}
-      postgres-image: ghcr.io/ls1intum/hephaestus/postgres@${{ needs.tag-images.outputs.postgres-digest }}
+      # The previous release keeps the namespace it was published under (GHCR packages
+      # do not transfer between organizations — issue #1599), so the reusable workflow
+      # resolves its repository per version from security/release-identities.json.
+      previous-version: ${{ needs.release.outputs.previous_version }}
+      candidate-application-image: ghcr.io/hephaestus-build/application-server@${{ needs.tag-images.outputs.application-server-digest }}
+      postgres-image: ghcr.io/hephaestus-build/postgres@${{ needs.tag-images.outputs.postgres-digest }}
       candidate-source-sha: ${{ needs.release.outputs.sha }}
 
   supported-host-smoke:

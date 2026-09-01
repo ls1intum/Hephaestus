@@ -9,12 +9,15 @@ await test("repository release builds are covered by the evidence inventory", ()
 	assert.deepEqual(validateInventory(inventory, workflow), []);
 });
 
+await test("the shipped inventory declares the schema version the release validator requires", () => {
+	const inventory: unknown = JSON.parse(readFileSync("security/release-images.json", "utf8"));
+	assert.ok(typeof inventory === "object" && inventory !== null && "schemaVersion" in inventory);
+	assert.equal(inventory.schemaVersion, 1);
+});
+
 await test("rejects missing and duplicate inventory entries", () => {
 	assert.deepEqual(
-		validateInventory(
-			{ images: ["server"], upstream: [] },
-			'image-name: "ls1intum/hephaestus/new"',
-		),
+		validateInventory({ images: ["server"], upstream: [] }, 'image-name: "hephaestus-build/new"'),
 		["new"],
 	);
 	assert.throws(
