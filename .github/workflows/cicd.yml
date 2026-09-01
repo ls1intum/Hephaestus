@@ -34,6 +34,7 @@ jobs:
       ci-config: ${{ steps.filter.outputs.ci-config }}
       docker-config: ${{ steps.filter.outputs.docker-config }}
       pmd-canary: ${{ steps.filter.outputs.pmd-canary }}
+      version-bump: ${{ steps.version_bump.outputs.changed }}
       any-code: ${{ steps.filter.outputs.webapp == 'true' || steps.filter.outputs.application-server == 'true' || steps.filter.outputs.tooling == 'true' || steps.filter.outputs.agent-images == 'true' || steps.filter.outputs.postgres-image == 'true' }}
       should_skip: ${{ steps.skip_check.outputs.should_skip }}
     timeout-minutes: 5
@@ -47,6 +48,16 @@ jobs:
         uses: fkirc/skip-duplicate-actions@b974a9395958c231af965b70070979a577efa578 # v5.3.2
         with:
           do_not_skip: '["workflow_dispatch", "push", "merge_group"]'
+
+      - name: Detect version bump
+        id: version_bump
+        if: github.event_name == 'push'
+        run: |
+          current=$(jq -r .version package.json)
+          previous=$(git show HEAD^:package.json | jq -r .version)
+          changed=false
+          [ "$current" = "$previous" ] || changed=true
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
 
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         id: filter
@@ -183,6 +194,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [detect-changes]
     if: |
+      (github.event_name != 'push' || needs.detect-changes.outputs.version-bump == 'true') &&
       needs.detect-changes.outputs.should_skip != 'true' && (
         needs.detect-changes.outputs.ci-config == 'true' ||
         github.event_name != 'pull_request'
@@ -207,6 +219,8 @@ jobs:
     name: "Zizmor"
     timeout-minutes: 10
     runs-on: ubuntu-latest
+    needs: [detect-changes]
+    if: github.event_name != 'push' || needs.detect-changes.outputs.version-bump == 'true'
     permissions:
       contents: read
       security-events: write
@@ -230,6 +244,7 @@ jobs:
     uses: ./.github/workflows/ci-quality-gates.yml
     needs: [detect-changes]
     if: |
+      (github.event_name != 'push' || needs.detect-changes.outputs.version-bump == 'true') &&
       needs.detect-changes.outputs.should_skip != 'true' && (
         needs.detect-changes.outputs.any-code == 'true' ||
         needs.detect-changes.outputs.ci-config == 'true' ||
@@ -251,6 +266,7 @@ jobs:
     uses: ./.github/workflows/ci-security-scan.yml
     needs: [detect-changes]
     if: |
+      (github.event_name != 'push' || needs.detect-changes.outputs.version-bump == 'true') &&
       needs.detect-changes.outputs.should_skip != 'true' && (
         needs.detect-changes.outputs.any-code == 'true' ||
         needs.detect-changes.outputs.ci-config == 'true' ||
@@ -266,6 +282,7 @@ jobs:
     uses: ./.github/workflows/ci-tests.yml
     needs: [detect-changes]
     if: |
+      (github.event_name != 'push' || needs.detect-changes.outputs.version-bump == 'true') &&
       needs.detect-changes.outputs.should_skip != 'true' && (
         needs.detect-changes.outputs.any-code == 'true' ||
         needs.detect-changes.outputs.ci-config == 'true' ||
@@ -289,6 +306,13 @@ jobs:
   Changesets:
     if: github.event_name == 'pull_request'
     uses: ./.github/workflows/verify-changesets.yml
+    permissions:
+      contents: read
+
+  Compose:
+    needs: [detect-changes]
+    if: github.event_name != 'push' || needs.detect-changes.outputs.version-bump == 'true'
+    uses: ./.github/workflows/ci-compose-validate.yml
     permissions:
       contents: read
 
@@ -331,7 +355,7 @@ jobs:
     permissions:
       actions: read
       statuses: write
-    needs: [detect-changes, workflow-lint, zizmor, Quality, Security, Test, Changesets, Docker]
+    needs: [detect-changes, workflow-lint, zizmor, Quality, Security, Test, Changesets, Compose, Docker]
     if: always()
     steps:
       - name: Generate workflow timeline
@@ -388,6 +412,7 @@ jobs:
           echo "Security:       ${{ needs.Security.result }}"
           echo "Test:           ${{ needs.Test.result }}"
           echo "Changesets:     ${{ needs.Changesets.result }}"
+          echo "Compose:        ${{ needs.Compose.result }}"
           echo "Docker:         ${{ needs.Docker.result }}"
 
           if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" ]]; then
@@ -437,6 +462,7 @@ jobs:
           echo "| Quality | $(result_to_emoji '${{ needs.Quality.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| Test | $(result_to_emoji '${{ needs.Test.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| Changesets | $(result_to_emoji '${{ needs.Changesets.result }}') |" >> $GITHUB_STEP_SUMMARY
+          echo "| Compose | $(result_to_emoji '${{ needs.Compose.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| Security | $(result_to_emoji '${{ needs.Security.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| Docker | $(result_to_emoji '${{ needs.Docker.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
