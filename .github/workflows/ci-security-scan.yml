@@ -1,10 +1,5 @@
 name: Security
 
-# CodeQL SAST scanning is handled by GitHub's Default Setup (enabled in repo settings).
-# This provides automatic scanning on push/PR with incremental analysis and zero maintenance.
-# This workflow handles dependency scanning (Trivy), secret detection (TruffleHog), and
-# a freshness check on the RFC 9116 security.txt Expires field.
-
 on:
   workflow_call:
     inputs:
@@ -23,15 +18,11 @@ jobs:
     permissions:
       contents: read
     steps:
-      # Use GitHub's dependency graph instead of rescanning the whole lockfile diff ourselves. This
-      # blocks newly introduced fixable risk without wedging unrelated PRs on existing findings;
-      # Renovate and the scheduled image rescans own remediation of the existing baseline.
       - name: Review dependency changes
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
           fail-on-severity: high
-          # Build and test tools execute in CI and can compromise release artifacts; unknown scope
-          # is not evidence that a dependency is harmless.
+          # CI tooling is part of the release trust boundary.
           fail-on-scopes: runtime, development, unknown
           license-check: true
           show-patched-versions: true

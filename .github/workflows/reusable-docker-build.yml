@@ -443,14 +443,7 @@ jobs:
             > /dev/null
           gh attestation verify "oci://$IMAGE_REF" --owner "${{ github.repository_owner }}"
 
-  # The release vulnerability gate, run where the image is built. Until this job existed the
-  # policy's first execution was at `tag-images`, so a release was the first thing it could
-  # fail — a tripwire, not a safety net (issue #1703). It calls the same script and the same
-  # security/vulnerability-policy.json the release and the scheduled rescan call; a second
-  # copy of the policy is precisely the failure this prevents.
-  #
-  # linux/amd64 only: Alpine and Debian ship the same package versions across architectures,
-  # and the release still scans both, where the evidence bundle has to be complete.
+  # Scan one platform before merge; release evidence scans every published platform.
   scan:
     name: Scan linux/amd64 Image
     needs: [build, merge]
@@ -489,13 +482,10 @@ jobs:
       - name: Resolve the linux/amd64 subject
         id: subject
         env:
-          # The run tag both build paths already publish; it names this run's image whether
-          # `build` pushed it directly or `merge` assembled an index from the per-arch pushes.
           IMAGE_REF: ${{ inputs.registry }}/${{ inputs.image-name }}:run-${{ github.run_id }}-${{ github.run_attempt }}
           INPUT_IMAGE_NAME: ${{ inputs.image-name }}
         run: |
           set -euo pipefail
-          # First, so the artifact below is still named after the image if the lookup fails.
           echo "image=${INPUT_IMAGE_NAME##*/}" >> "$GITHUB_OUTPUT"
           raw=$(docker buildx imagetools inspect "$IMAGE_REF" --raw)
           if jq -e 'has("manifests")' <<< "$raw" > /dev/null; then

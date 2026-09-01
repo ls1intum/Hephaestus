@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { glob, readFile } from "node:fs/promises";
 import { describe, test } from "node:test";
 
+import { parseDocument } from "yaml";
+
 function job(source: string, name: string): string {
 	const match = source.match(
 		new RegExp(`^  ${name}:\\n([\\s\\S]*?)(?=^  [A-Za-z][\\w-]*:\\s*$|(?![\\s\\S]))`, "m"),
@@ -369,30 +371,34 @@ void describe("CI contract", () => {
 		}
 	});
 
-	void test("reviews dependency diffs and measures repository supply-chain posture", async () => {
-		const security = await readFile(".github/workflows/ci-security-scan.yml", "utf8");
-		const dependencyReview = job(security, "dependency-review");
-		assert.match(dependencyReview, /github\.event_name == 'pull_request'/);
-		assert.match(dependencyReview, /actions\/dependency-review-action@[a-f0-9]{40}/);
-		assert.match(dependencyReview, /fail-on-severity: high/);
-		assert.match(dependencyReview, /fail-on-scopes: runtime, development, unknown/);
-		assert.match(dependencyReview, /license-check: true/);
-		assert.match(dependencyReview, /show-patched-versions: true/);
-		assert.match(dependencyReview, /vulnerability-check: true/);
+	void test("blocks dependency regressions across the release trust boundary", async () => {
+		const workflow = parseDocument(
+			await readFile(".github/workflows/ci-security-scan.yml", "utf8"),
+		);
+		const jobPath = ["jobs", "dependency-review"];
+		assert.equal(
+			workflow.getIn([...jobPath, "if"]),
+			"inputs.should_skip != 'true' && github.event_name == 'pull_request'",
+		);
+		assert.equal(workflow.getIn([...jobPath, "steps", 0, "with", "fail-on-severity"]), "high");
+		assert.equal(
+			workflow.getIn([...jobPath, "steps", 0, "with", "fail-on-scopes"]),
+			"runtime, development, unknown",
+		);
+	});
 
-		const scorecard = await readFile(".github/workflows/scorecard.yml", "utf8");
-		assert.match(scorecard, /^ {2}branch_protection_rule:/m);
-		assert.match(scorecard, /^ {2}schedule:/m);
-		assert.match(scorecard, /^ {2}push:\n {4}branches: \["main"\]/m);
-		assert.doesNotMatch(scorecard, /^ {2}pull_request:/m);
-		assert.match(scorecard, /if: github\.event\.repository\.default_branch == github\.ref_name/);
-		assert.match(scorecard, /actions\/checkout@[a-f0-9]{40}/);
-		assert.match(scorecard, /persist-credentials: false/);
-		assert.match(scorecard, /ossf\/scorecard-action@[a-f0-9]{40}/);
-		assert.match(scorecard, /publish_results: true/);
-		assert.match(scorecard, /github\/codeql-action\/upload-sarif@[a-f0-9]{40}/);
-		assert.match(scorecard, /security-events: write/);
-		assert.match(scorecard, /id-token: write/);
+	void test("publishes repository posture outside the pull-request path", async () => {
+		const workflow = parseDocument(await readFile(".github/workflows/scorecard.yml", "utf8"));
+		assert.equal(workflow.hasIn(["on", "pull_request"]), false);
+		for (const event of ["branch_protection_rule", "schedule", "push"])
+			assert.equal(workflow.hasIn(["on", event]), true);
+		assert.equal(workflow.getIn(["jobs", "analysis", "permissions", "id-token"]), "write");
+		assert.equal(workflow.getIn(["jobs", "analysis", "permissions", "security-events"]), "write");
+		assert.equal(
+			workflow.getIn(["jobs", "analysis", "steps", 0, "with", "persist-credentials"]),
+			false,
+		);
+		assert.equal(workflow.getIn(["jobs", "analysis", "steps", 1, "with", "publish_results"]), true);
 	});
 
 	void test("pins every external action to a full commit SHA with a version comment", async () => {

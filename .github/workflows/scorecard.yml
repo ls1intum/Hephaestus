@@ -1,9 +1,6 @@
 name: OpenSSF Scorecard
 
-# Repository posture changes independently of a code diff. Keep this off the pull-request critical
-# path and rescan the default branch weekly; a push catches workflow and policy changes immediately.
 on:
-  # Scorecard's Branch-Protection check changes when the ruleset changes, not when source changes.
   branch_protection_rule:
   schedule:
     - cron: "23 4 * * 1"
@@ -20,8 +17,7 @@ jobs:
   analysis:
     name: Supply-chain posture
     runs-on: ubuntu-latest
-    # Publishing is supported only from the default branch. This also prevents a renamed default
-    # branch from silently running the push trigger with an identity Scorecard will not publish.
+    # OpenSSF publishing is limited to the default branch.
     if: github.event.repository.default_branch == github.ref_name
     timeout-minutes: 10
     permissions:

@@ -222,6 +222,9 @@ importers:
       vite-plus:
         specifier: 0.3.0
         version: 0.3.0(@types/node@24.12.4)(@vitest/browser-playwright@4.1.11)(@vitest/coverage-v8@4.1.11)(esbuild@0.27.7)(jiti@2.7.0)(jsdom@29.1.1)(msw@2.14.6(@types/node@24.12.4)(typescript@7.0.2))(terser@5.51.0)(typescript@7.0.2)(vite@8.2.2(@types/node@24.12.4)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.51.0)(yaml@2.9.0))(yaml@2.9.0)
+      yaml:
+        specifier: 2.9.0
+        version: 2.9.0
 
   docs:
     dependencies:

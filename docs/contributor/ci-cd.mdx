@@ -71,75 +71,36 @@ workflows run again for the merge group, which includes the current base and que
 the pull request. Each required context is bound to the GitHub Actions integration rather than
 accepting a same-named external status.
 
-Review is a *native* requirement, not a status check: the `main` ruleset sets
-`required_approving_review_count: 1` with `dismiss_stale_reviews_on_push`, so a pull request without
-a current approval sits in GitHub's own **Review required** state. That state blocks the merge
-button, blocks entry to the merge queue, and holds an armed auto-merge — and the checks list on a
-healthy pull request stays fully green, because waiting for a reviewer is no longer expressed as a
-yellow check.
+Review is a native ruleset requirement with stale approvals dismissed on every push. Authors listed
+in `REVIEW_POLICY_MAINTAINERS` receive an automated approval; every other author needs a human with
+write access. Repository administrators own that allow-list. Remove the automation when independent
+maintainer review is available.
 
-The review requirement is not waived for anyone. It is *satisfied* automatically for the authors
-listed in the comma-separated repository variable `REVIEW_POLICY_MAINTAINERS`:
-[`review-policy.yml`](https://github.com/ls1intum/Hephaestus/blob/main/.github/workflows/review-policy.yml)
-submits an approving review with `GITHUB_TOKEN`, attributed to `github-actions[bot]`, which counts
-toward the required count. Every other author waits for a human with write access. Repository
-administrators own the allow-list.
-
-Be honest about what that is: auto-approval encodes exactly the policy the old custom
-`review-policy` check encoded — *a listed maintainer may merge their own work* — and it exists only
-because the repository has a single write-access collaborator, so there is nobody else to ask. It is
-not a review. **The moment a second write-access reviewer exists, delete the workflow and the
-`REVIEW_POLICY_MAINTAINERS` variable and let the native requirement stand on its own.** Nothing else
-has to change; the ruleset already asks for the approval.
-
-Two settings this depends on, both already in place: the organisation's *Allow GitHub Actions to
-create and approve pull requests*, which governs whether `GITHUB_TOKEN` may approve at all, and
-`dismiss_stale_reviews_on_push`, which is why the workflow runs on `synchronize` as well as
-`opened`, `reopened` and `ready_for_review` — every push has to earn a fresh approval. The approval
-is pinned to the head commit it was decided against, and a run that finds its own approval already
-standing on that commit submits nothing, so re-runs do not stack duplicate reviews.
-
-The workflow deliberately carries no `branches:` filter, and runs on `edited` too, because of
-stacked pull requests (`CONTRIBUTING.md` § Stacked Pull Requests). Merging a lower layer
-retargets the upper one onto `main`, and that retarget fires no event a base-filtered workflow would
-see — the layer would reach the merge queue unapproved and be refused entry. So every layer earns
-its approval while it still points at the layer below. An approval on a pull request targeting
-anything but `main` satisfies no rule and is inert.
-
-[`scripts/review-policy.ts`](https://github.com/ls1intum/Hephaestus/blob/main/scripts/review-policy.ts)
-holds the decision, and it reads the author login and nothing else — never the diff, the title or
-the body. That is what makes it safe under `pull_request_target` with `pull-requests: write`: the
-job checks out only `scripts` from the default branch, with `persist-credentials: false`, and runs
-no pull-request code. An empty or unset `REVIEW_POLICY_MAINTAINERS` approves nobody and warns, which
-leaves every pull request needing a human — the safe direction.
+The approval workflow evaluates only the author login using code checked out from the default branch.
+It runs no pull-request code and approves nobody when the allow-list is empty. Its event set also covers
+stacked pull requests before they are retargeted to `main`.
 
 The changesets Version PR is the temporary exception: updates made with `GITHUB_TOKEN` do not trigger
 the required workflows, so release automation uses the ruleset bypass. The resulting version bump
 runs source validation on `main` before release; other pushes build final-SHA images without repeating
 source validation.
 
-## 🔒 Security
+## 🔒 Security and supply-chain controls
 
-- **CodeQL** – SAST scanning via GitHub's Default Setup (automatic, zero maintenance)
-- **Trivy** – Scans dependencies for CVEs
-- **TruffleHog** – Secret detection in code and history
-- **Renovate** – Monitors dependencies for vulnerabilities
-- **Environment protection** – Production requires approval
+| Control | Timing | Enforcement | Destination |
+| --- | --- | --- | --- |
+| GitHub dependency review | pull requests | blocks new high or critical findings in runtime, development, and unknown scopes | required Security workflow |
+| CodeQL default setup | managed by GitHub | repository SAST policy | code scanning |
+| TruffleHog and GitHub push protection | pull requests and pushes | block verified secrets | Security workflow and repository protection |
+| Trivy filesystem scan | CI | scanner failure blocks; findings publish | code scanning and Security workflow |
+| Image vulnerability policy | image build and release | blocks fixable high or critical findings | build summary and release evidence |
+| Scheduled image rescans | weekly | findings update the tracking issue; scanner failure fails the run | vulnerability response issue |
+| OpenSSF Scorecard | `main`, branch-protection changes, and weekly | posture findings do not extend the pull-request critical path | code scanning and run artifact |
+| Renovate | configured schedule and vulnerability alerts | pull requests require normal review and CI | dependency dashboard |
 
-What a Trivy image finding has to be before it blocks, and what an exception has to contain, is in
-[Vulnerability remediation](./vulnerability-remediation.mdx).
-
-### CodeQL Default Setup
-
-CodeQL runs automatically via GitHub's Default Setup (enabled in repository settings), providing:
-
-- Scans on every push to main and protected branches
-- Scans on pull request creation and updates
-- Weekly scheduled scans for the full codebase
-- Incremental analysis (20% faster on PRs)
-- Zero maintenance – GitHub manages query updates
-
-This is more efficient than a custom workflow and doesn't consume CI minutes.
+[Vulnerability remediation](./vulnerability-remediation.mdx) owns the blocking and exception policy.
+[Release management](./release-management.mdx#supply-chain-evidence) owns artifact signing, provenance,
+SBOM, and release-verification guarantees.
 
 ## 📦 Environments
 
@@ -395,34 +356,6 @@ commands.
 | Database schema drift | Run `pnpm run db:draft-changelog`              |
 
 ## 📊 CI Features
-
-### Supply-chain feedback
-
-Supply-chain checks run at the point where their result is actionable rather than making every
-scanner part of every pull request:
-
-- Pull requests use GitHub's
-  [dependency review](https://docs.github.com/code-security/supply-chain-security/understanding-your-software-supply-chain/about-dependency-review)
-  to reject newly introduced high or critical vulnerabilities and report dependency-license
-  changes. Runtime, development, and unknown-scope dependencies are all covered because build tools
-  execute inside the release trust boundary. This is a diff gate: existing findings remain visible
-  without preventing an unrelated fix from merging.
-- Trivy scans the repository dependency baseline in the required Security leg and publishes SARIF
-  to code scanning. Image builds additionally evaluate the documented vulnerability policy against
-  the image that was actually produced; weekly rescans detect vulnerability-database drift after a
-  clean merge.
-- [OpenSSF Scorecard](https://securityscorecards.dev/) evaluates repository and workflow posture on
-  every push to `main`, after branch-protection changes, and weekly. It publishes authenticated
-  results and SARIF without adding another network scanner to the pull-request critical path.
-- CodeQL remains enabled through GitHub default setup. GitHub's
-  [recommended configuration](https://docs.github.com/code-security/code-scanning/enabling-code-scanning/configuring-default-setup-for-code-scanning)
-  owns language discovery and query updates rather than a second workflow duplicating them.
-
-The checks deliberately answer different questions: dependency review prevents a regression,
-Trivy inventories current package and image exposure, CodeQL finds source-level data-flow defects,
-and Scorecard measures the repository controls that make the resulting artifacts trustworthy.
-Release images remain digest-bound, signed, SBOM-attested, provenance-attested, and verified as
-described in [Release management](./release-management.mdx#supply-chain-evidence).
 
 ### Test Results
 
