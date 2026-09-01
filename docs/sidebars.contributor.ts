@@ -40,7 +40,7 @@ const sidebars: SidebarsConfig = {
 		{
 			type: "category",
 			label: "Operations",
-			items: ["release-management", "ci-cd"],
+			items: ["release-management", "ci-cd", "vulnerability-remediation"],
 		},
 		{
 			type: "category",

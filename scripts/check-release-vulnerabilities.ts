@@ -8,6 +8,26 @@ type Finding = {
 	VulnerabilityID?: string;
 };
 
+/**
+ * The five `not_affected` justifications from CISA's *Minimum Requirements for Vulnerability
+ * Exploitability eXchange (VEX)*. They are taken as a vocabulary only: a claim that a finding does
+ * not apply has to name which of the five ways it does not apply, so prose like "not reachable"
+ * cannot stand in for an analysis nobody did. VEX itself is not adopted — see
+ * `docs/contributor/vulnerability-remediation.mdx`.
+ */
+const JUSTIFICATION_CATEGORIES = [
+	"component_not_present",
+	"vulnerable_code_not_present",
+	"vulnerable_code_not_in_execute_path",
+	"vulnerable_code_cannot_be_controlled_by_adversary",
+	"inline_mitigations_already_exist",
+] as const;
+
+export type JustificationCategory = (typeof JUSTIFICATION_CATEGORIES)[number];
+
+const isJustificationCategory = (value: unknown): value is JustificationCategory =>
+	JUSTIFICATION_CATEGORIES.some((category) => category === value);
+
 // `digest` is recorded so an exception names the artefact it was reviewed against, but it is
 // deliberately not part of the match key: the release digest does not exist until `tag-images`
 // runs, so a digest-keyed exception could only ever be authored after the gate had already
@@ -20,6 +40,8 @@ type Exception = {
 	image: string;
 	installedVersion: string;
 	justification: string;
+	/** Required when `status` is `not_affected`, and forbidden otherwise. */
+	justificationCategory?: JustificationCategory;
 	owner: string;
 	package: string;
 	platform: string;
@@ -46,7 +68,9 @@ const isException = (value: unknown): value is Exception =>
 		"status",
 		"vulnerability",
 	].every((field) => typeof value[field] === "string") &&
-	(value.status === "affected" || value.status === "not_affected");
+	(value.status === "affected" || value.status === "not_affected") &&
+	(value.justificationCategory === undefined ||
+		isJustificationCategory(value.justificationCategory));
 
 const isPolicy = (value: unknown): value is Policy =>
 	record(value) &&
@@ -106,6 +130,17 @@ export function evaluate(
 			errors.push(`malformed exception digest: ${exception.digest}`);
 		if (!/^linux\/(?:amd64|arm64)$/.test(exception.platform))
 			errors.push(`unsupported exception platform: ${exception.platform}`);
+		// An unrecognised category is already a malformed policy; what is left to check is that the
+		// category and the status agree. `affected` defers a risk we accept, and saying why the
+		// finding does not apply while conceding that it does is a contradiction, not a detail.
+		if (exception.status === "not_affected" && exception.justificationCategory === undefined)
+			errors.push(
+				`not_affected exception must name a justification category: ${exception.vulnerability}`,
+			);
+		if (exception.status === "affected" && exception.justificationCategory !== undefined)
+			errors.push(
+				`affected exception must not name a justification category: ${exception.vulnerability}`,
+			);
 		try {
 			if (new URL(exception.evidence).protocol !== "https:")
 				errors.push(`exception evidence must be an HTTPS URL: ${exception.evidence}`);

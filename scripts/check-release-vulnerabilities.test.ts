@@ -78,6 +78,7 @@ await test("accepts an owned, justified, unexpired exception", () => {
 			image: "server",
 			installedVersion: "1",
 			justification: "not reachable in the deployed configuration",
+			justificationCategory: "vulnerable_code_not_in_execute_path",
 			owner: "@security",
 			package: "lib",
 			platform: "linux/amd64",
@@ -115,6 +116,7 @@ await test("matches an exception without its digest, but still on every other fi
 		image: "server",
 		installedVersion: "1",
 		justification: "not reachable in the deployed configuration",
+		justificationCategory: "vulnerable_code_not_in_execute_path",
 		owner: "@security",
 		package: "lib",
 		platform: "linux/amd64",
@@ -211,6 +213,65 @@ await test("rejects expired and malformed exceptions", () => {
 			subject,
 		).errors.join("\n"),
 		/Trivy report is for/,
+	);
+});
+
+await test("holds a not_affected exception to one of CISA's five justifications", () => {
+	const exception = {
+		digest,
+		evidence: "https://github.com/example/project/issues/1",
+		expires: "2026-10-01T00:00:00Z",
+		image: "server",
+		installedVersion: "1",
+		justification: "the vulnerable parser is never handed untrusted input",
+		justificationCategory: "vulnerable_code_cannot_be_controlled_by_adversary",
+		owner: "@security",
+		package: "lib",
+		platform: "linux/amd64",
+		status: "not_affected",
+		vulnerability: "CVE-1",
+	};
+	const errorsWith = (override: Partial<typeof exception>): string =>
+		evaluate(
+			"server",
+			report,
+			{ ...policy, exceptions: [{ ...exception, ...override }] },
+			now,
+		).errors.join("\n");
+
+	for (const category of [
+		"component_not_present",
+		"vulnerable_code_not_present",
+		"vulnerable_code_not_in_execute_path",
+		"vulnerable_code_cannot_be_controlled_by_adversary",
+		"inline_mitigations_already_exist",
+	])
+		assert.equal(errorsWith({ justificationCategory: category }), "", category);
+
+	// A value outside the vocabulary is a malformed policy rather than a soft error: nothing
+	// downstream can interpret it, so there is no partial result worth reporting.
+	assert.throws(
+		() => errorsWith({ justificationCategory: "not_reachable" }),
+		/malformed vulnerability policy/,
+	);
+	const { justificationCategory: _omitted, ...uncategorised } = exception;
+	assert.match(
+		evaluate("server", report, { ...policy, exceptions: [uncategorised] }, now).errors.join("\n"),
+		/not_affected exception must name a justification category: CVE-1/,
+	);
+	// `affected` concedes the finding applies, so a not_affected justification contradicts it.
+	assert.match(
+		errorsWith({ status: "affected" }),
+		/affected exception must not name a justification category: CVE-1/,
+	);
+	assert.equal(
+		evaluate(
+			"server",
+			report,
+			{ ...policy, exceptions: [{ ...uncategorised, status: "affected" }] },
+			now,
+		).errors.join("\n"),
+		"",
 	);
 });
 
