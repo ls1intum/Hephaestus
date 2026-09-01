@@ -15,6 +15,25 @@ on:
         default: "false"
 
 jobs:
+  dependency-review:
+    name: "New dependency risk"
+    runs-on: ubuntu-latest
+    if: inputs.should_skip != 'true' && github.event_name == 'pull_request'
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      # Use GitHub's dependency graph instead of rescanning the whole lockfile diff ourselves. This
+      # blocks newly introduced fixable risk without wedging unrelated PRs on existing findings;
+      # Renovate and the scheduled image rescans own remediation of the existing baseline.
+      - name: Review dependency changes
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: high
+          license-check: true
+          vulnerability-check: true
+          show-openssf-scorecard: true
+
   security-scan:
     name: "Dependencies, secrets, and policy"
     runs-on: ubuntu-latest

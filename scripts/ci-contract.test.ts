@@ -369,6 +369,26 @@ void describe("CI contract", () => {
 		}
 	});
 
+	void test("reviews dependency diffs and measures repository supply-chain posture", async () => {
+		const security = await readFile(".github/workflows/ci-security-scan.yml", "utf8");
+		const dependencyReview = job(security, "dependency-review");
+		assert.match(dependencyReview, /github\.event_name == 'pull_request'/);
+		assert.match(dependencyReview, /actions\/dependency-review-action@[a-f0-9]{40}/);
+		assert.match(dependencyReview, /fail-on-severity: high/);
+		assert.match(dependencyReview, /license-check: true/);
+		assert.match(dependencyReview, /vulnerability-check: true/);
+
+		const scorecard = await readFile(".github/workflows/scorecard.yml", "utf8");
+		assert.match(scorecard, /^ {2}schedule:/m);
+		assert.match(scorecard, /^ {2}push:\n {4}branches: \["main"\]/m);
+		assert.doesNotMatch(scorecard, /^ {2}pull_request:/m);
+		assert.match(scorecard, /ossf\/scorecard-action@[a-f0-9]{40}/);
+		assert.match(scorecard, /publish_results: true/);
+		assert.match(scorecard, /github\/codeql-action\/upload-sarif@[a-f0-9]{40}/);
+		assert.match(scorecard, /security-events: write/);
+		assert.match(scorecard, /id-token: write/);
+	});
+
 	void test("pins every external action to a full commit SHA with a version comment", async () => {
 		const invalid: string[] = [];
 		const files = await Array.fromAsync(glob(".github/{actions,workflows}/**/*.{yml,yaml}"));

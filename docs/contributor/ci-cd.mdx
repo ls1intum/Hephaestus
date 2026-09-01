@@ -396,6 +396,33 @@ commands.
 
 ## 📊 CI Features
 
+### Supply-chain feedback
+
+Supply-chain checks run at the point where their result is actionable rather than making every
+scanner part of every pull request:
+
+- Pull requests use GitHub's
+  [dependency review](https://docs.github.com/code-security/supply-chain-security/understanding-your-software-supply-chain/about-dependency-review)
+  to reject newly introduced high or critical vulnerabilities and report dependency-license
+  changes. This is a diff gate: existing findings remain visible without preventing an unrelated
+  fix from merging.
+- Trivy scans the repository dependency baseline in the required Security leg and publishes SARIF
+  to code scanning. Image builds additionally evaluate the documented vulnerability policy against
+  the image that was actually produced; weekly rescans detect vulnerability-database drift after a
+  clean merge.
+- [OpenSSF Scorecard](https://securityscorecards.dev/) evaluates repository and workflow posture on
+  every push to `main` and weekly (which also catches settings-only drift). It publishes authenticated
+  results and SARIF without adding another network scanner to the pull-request critical path.
+- CodeQL remains enabled through GitHub default setup. GitHub's
+  [recommended configuration](https://docs.github.com/code-security/code-scanning/enabling-code-scanning/configuring-default-setup-for-code-scanning)
+  owns language discovery and query updates rather than a second workflow duplicating them.
+
+The checks deliberately answer different questions: dependency review prevents a regression,
+Trivy inventories current package and image exposure, CodeQL finds source-level data-flow defects,
+and Scorecard measures the repository controls that make the resulting artifacts trustworthy.
+Release images remain digest-bound, signed, SBOM-attested, provenance-attested, and verified as
+described in [Release management](./release-management.mdx#supply-chain-evidence).
+
 ### Test Results
 
 All test suites generate JUnit XML reports that are displayed in the **Test Results** tab of each workflow run:
