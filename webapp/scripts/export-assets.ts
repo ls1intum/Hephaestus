@@ -12,6 +12,12 @@ const docsBrandDirectory = resolve(docsImageDirectory, "brand");
 const readmeImageDirectory = resolve(webappDirectory, "../docs/images/readme");
 const proxyComposePath = resolve(webappDirectory, "../docker/compose.proxy.yaml");
 const markSvg = await readFile(resolve(sourceDirectory, "hephaestus-mark.svg"), "utf8");
+const applicationMarkSvg = markSvg.replace(
+	'transform="translate(24 20) scale(3.3333)"',
+	'transform="translate(14.8 12) scale(4.1)"',
+);
+if (applicationMarkSvg === markSvg)
+	throw new Error("The application icon crop could not be applied.");
 const interFont = await readFile(
 	new URL(import.meta.resolve("@fontsource-variable/inter/files/inter-latin-wght-normal.woff2")),
 );
@@ -83,21 +89,24 @@ try {
 		size: number,
 		opaque = false,
 		keepInsideSafeZone = false,
+		svg = markSvg,
 	): Promise<void> => {
 		await page.setViewportSize({ width: size, height: size });
 		await page.setContent(
-			`<style>*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;background:${opaque ? SIGNAL_BLUE : "transparent"};display:grid;place-items:center}svg{display:block;width:${keepInsideSafeZone ? "80%" : "100%"};height:${keepInsideSafeZone ? "80%" : "100%"}}</style>${markSvg}`,
+			`<style>*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;background:${opaque ? SIGNAL_BLUE : "transparent"};display:grid;place-items:center}svg{display:block;width:${keepInsideSafeZone ? "80%" : "100%"};height:${keepInsideSafeZone ? "80%" : "100%"}}</style>${svg}`,
 		);
 		await page.screenshot({ path, omitBackground: !opaque });
 	};
+	const captureApplicationMark = (path: string, size: number): Promise<void> =>
+		captureMark(path, size, true, false, applicationMarkSvg);
 
 	await captureMark(resolve(publicDirectory, "favicon.png"), 64);
 	await captureMark(resolve(publicDirectory, "apple-touch-icon.png"), 180, true);
 	await captureMark(resolve(publicDirectory, "icon-192.png"), 192, true);
 	await captureMark(resolve(publicDirectory, "icon-512.png"), 512, true);
 	await captureMark(resolve(publicDirectory, "icon-maskable-512.png"), 512, true, true);
-	await captureMark(resolve(docsBrandDirectory, "slack-app-icon-512.png"), 512, true);
-	await captureMark(resolve(docsBrandDirectory, "external-app-icon-1024.png"), 1024, true);
+	await captureApplicationMark(resolve(docsBrandDirectory, "slack-app-icon-512.png"), 512);
+	await captureApplicationMark(resolve(docsBrandDirectory, "external-app-icon-1024.png"), 1024);
 	await captureMark(resolve(docsImageDirectory, "favicon.png"), 64);
 
 	const captureLockup = async (path: string, dark: boolean): Promise<void> => {
