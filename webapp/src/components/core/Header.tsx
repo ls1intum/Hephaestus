@@ -73,15 +73,17 @@ export default function Header({
 			transition={{ type: "spring", stiffness: 500, damping: 30, mass: 0.4 }}
 		>
 			<HephaestusLogo
-				markClassName="size-8 origin-center transition-transform duration-200 ease-out group-hover/logo:-rotate-3 group-hover/logo:scale-105 motion-reduce:transform-none"
-				wordmarkClassName="hidden text-xl sm:inline"
+				className="gap-1.5 sm:gap-2"
+				markClassName="size-9 origin-center transition-transform duration-200 ease-out group-hover/logo:-rotate-3 group-hover/logo:scale-105 motion-reduce:transform-none sm:size-8"
+				wordmarkClassName="text-lg sm:text-xl"
+				wordmarkSuffixClassName="hidden sm:inline"
 			/>
 		</motion.span>
 	);
 
 	return (
 		<header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 justify-between">
-			<div className="flex items-center gap-2 px-4">
+			<div className="flex items-center gap-2 px-3 sm:px-4">
 				{sidebarTrigger}
 				<div className="flex items-center gap-2">
 					{hasWorkspace ? (
@@ -138,7 +140,7 @@ export default function Header({
 					)}
 				</div>
 			</div>
-			<div className="flex gap-2 px-4">
+			<div className="flex gap-2 px-3 sm:px-4">
 				{isAuthenticated ? feedbackDialog : null}
 				<ModeToggle />
 				<div className="flex items-center gap-2">
