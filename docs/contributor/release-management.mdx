@@ -52,8 +52,8 @@ sequenceDiagram
    `CHANGELOG.md` section. It is safe to leave open — it updates itself. It is opened by
    `github-actions[bot]` and deliberately runs **no CI**: it only bumps a version string and
    rewrites the changelog. `GITHUB_TOKEN` updates do not trigger the required workflows, so release
-   automation uses the ruleset bypass. Validation happens after the merge: `main` runs the full suite
-   and a release is only cut if that run succeeds. Versioning also moves any
+   automation uses the ruleset bypass. The version bump runs the full source-validation suite on
+   `main`, and a release is only cut if that run succeeds. Versioning also moves any
    migration fragments at the existing `### Next release` anchor in `MIGRATION.md`, creates the
    versioned section beneath it, and consumes the fragments.
 3. **Merging the Version PR cuts the release.** The workflow creates a draft release at the merge
