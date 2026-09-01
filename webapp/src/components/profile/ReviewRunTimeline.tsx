@@ -7,7 +7,6 @@ export interface ReviewRunTimelineProps {
 	openObservationId?: string;
 	observationDetail?: ObservationDetailState;
 	onToggleObservation?: (observationId: string) => void;
-	/** The developer's complete answer to one piece of feedback; the endpoint replaces, not patches. */
 	onRespond?: (observation: PracticeGroupReviewObservation, response: FeedbackResponse) => void;
 	pendingFeedbackId?: string;
 }
@@ -20,8 +19,6 @@ export function ReviewRunTimeline({
 	onRespond,
 	pendingFeedbackId,
 }: ReviewRunTimelineProps) {
-	// No empty state here: the caller decides what an empty feed means — no runs at all, or none
-	// matching the filters — and renders that itself. A second one here could only ever be wrong.
 	return (
 		<ol className="flex min-w-0 flex-col" aria-label="Review runs">
 			{runs.map((run) => (

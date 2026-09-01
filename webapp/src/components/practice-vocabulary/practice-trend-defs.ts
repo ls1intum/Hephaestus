@@ -5,11 +5,6 @@ import type { PracticeTrend } from "@/api/types.gen";
 import type { StatusDefs } from "./status-def";
 
 export type TrendDirection = PracticeTrend["direction"];
-
-/**
- * Which way recent evidence points. `UNCERTAIN` means the comparison was made and did not separate;
- * `INSUFFICIENT_EVIDENCE` that none was possible. Both render muted, so the icon separates them.
- */
 export const PRACTICE_TREND_DEFS: StatusDefs<TrendDirection> = {
 	IMPROVING: {
 		label: "More positive recently",

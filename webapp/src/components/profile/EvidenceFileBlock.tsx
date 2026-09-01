@@ -7,25 +7,13 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { type EvidenceLocation, evidenceLineRangeLabel, splitPath } from "./evidence";
-
-/** The one detector the server lets omit a quote, so the reason is knowable when it is the one that ran. */
 const SECRET_SCANNER = "secret-diff-scanner";
 
 interface EvidenceFileBlockProps {
 	location: EvidenceLocation;
-	/**
-	 * Which detector produced the evidence. Only used to explain a withheld quote: for the secret
-	 * scanner the reason can be stated, for anything else the app does not know it and says so.
-	 */
 	detector?: string;
 	defaultOpen?: boolean;
 }
-
-/**
- * A quoted citation, rendered as what its source is. Only a `code` source is located by line: for an
- * `object` source the numbers index a stored copy, not a place the reader could open, so it gets no
- * gutter. `evidence-source-defs` owns that ruling.
- */
 export function EvidenceFileBlock({
 	location,
 	detector,
@@ -64,9 +52,6 @@ export function EvidenceFileBlock({
 						{evidenceLineRangeLabel(location)}
 					</span>
 				)}
-				{/* Only the old side is marked. Nearly every quote comes from the new one, so saying
-				    "after" on all of them is noise — while "before" is the thing a reader has to know:
-				    the line quoted here is not what the file says now. */}
 				{locatedByLine && location.side === "OLD" && (
 					<Badge variant="outline" className="shrink-0">
 						{DIFF_SIDE_LABELS.OLD}

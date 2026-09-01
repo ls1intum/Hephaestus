@@ -8,17 +8,9 @@ import { formatTrendProvenance, type TrendScope } from "./practice-trend-present
 export interface PracticeTrendChipProps {
 	direction: PracticeTrend["direction"];
 	support: TrendSupport;
-	/** Which trend this is: the provenance sentence differs, because the server computes them differently. */
 	scope: TrendScope;
 	className?: string;
 }
-
-/**
- * Keyboard-reachable compact direction; provenance remains supplementary in its tooltip.
- *
- * Carries no stacking of its own: a caller that lays a whole-card link over its content has to lift
- * the chip above it via `className`, and only that caller knows it has one.
- */
 export function PracticeTrendChip({
 	direction,
 	support,

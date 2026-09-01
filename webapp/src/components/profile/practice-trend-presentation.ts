@@ -1,19 +1,9 @@
 import type { TrendSupport } from "@/api/types.gen";
 import type { TrendDirection } from "@/components/practice-vocabulary/practice-trend-defs";
-
-/** The counted unit is a *piece of reviewed work* — `practice-feedback-language.md` names it. */
 function reviewedWork(count: number): string {
 	return `${count} ${count === 1 ? "piece" : "pieces"} of reviewed work`;
 }
-
-/** A practice trend compares two bundles; a group trend pools finished comparisons. */
 export type TrendScope = "practice" | "group";
-
-/**
- * Says what the support establishes, never a comparison the server did not make: none is formed for
- * `INSUFFICIENT_EVIDENCE`, and a group trend compares no bundles at all. The calendar span covers
- * the visible evidence trail rather than the two bundles, so it stands as its own sentence.
- */
 export function formatTrendProvenance(
 	support: TrendSupport,
 	direction: TrendDirection,

@@ -17,7 +17,6 @@ interface ProfileProps {
 	activityMonitorFilters: ActivityMonitorFilters;
 	onActivityMonitorFiltersChange: (filters: ActivityMonitorFilters) => void;
 	isLoading: boolean;
-	/** The failure itself, not a flag: the alert reads the server's own words out of it. */
 	error?: unknown;
 	onRetry?: () => void;
 	username: string;
@@ -30,10 +29,6 @@ interface ProfileProps {
 	achievementsEnabled?: boolean;
 	progressionEnabled?: boolean;
 	leaguesEnabled?: boolean;
-	/**
-	 * The practice-group section, rendered by the route that has its data. A slot rather than that
-	 * component's props, so this page does not carry a type for a section it only places.
-	 */
 	practiceGroupStandings?: ReactNode;
 }
 

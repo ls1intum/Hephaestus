@@ -32,8 +32,6 @@ describe("toEvidenceLocations", () => {
 	});
 
 	it("keeps the source kind, which decides whether the numbers are lines at all", () => {
-		// An object source counts offsets into a serialised context file. Dropping the kind here is
-		// what let a Slack message render with a line gutter, as though it were a file.
 		const [location] = toEvidenceLocations({
 			citations: [citation({ sourceKind: "slack.conversation.thread", side: undefined })],
 		});
@@ -49,7 +47,7 @@ describe("toEvidenceLocations", () => {
 
 		expect(location?.snippet).toBeUndefined();
 		expect(location?.redacted).toBe(true);
-		// The place is still named: a reader learns WHERE the reviewer looked even when the quote is withheld.
+
 		expect(location?.path).toBe("src/Main.java");
 	});
 

@@ -14,6 +14,7 @@ const observation: PracticeGroupReviewObservation = {
 	presence: "PRESENT",
 	assessment: "BAD",
 	severity: "MINOR",
+	feedbackUsefulness: "HELPFUL",
 };
 
 describe("ReviewObservationRow", () => {
@@ -42,6 +43,37 @@ describe("ReviewObservationRow", () => {
 		expect(onRespond).toHaveBeenCalledExactlyOnceWith(observation, {
 			comment: "The timeout is required by the provider.",
 			resolution: "DISPUTED",
+			usefulness: "HELPFUL",
+		});
+		expect(screen.getByRole("button", { name: "Disputed" }).getAttribute("aria-pressed")).toBe(
+			"true",
+		);
+		screen.getByRole("textbox", { name: "Why do you disagree?" });
+	});
+
+	it("submits immediately when a dispute already has an explanation", () => {
+		const onRespond = vi.fn();
+		const explainedObservation = {
+			...observation,
+			feedbackResponseComment: "The provider requires this timeout.",
+		};
+		render(
+			<ul>
+				<ReviewObservationRow
+					observation={explainedObservation}
+					isOpen
+					onToggle={vi.fn()}
+					onRespond={onRespond}
+				/>
+			</ul>,
+		);
+
+		fireEvent.click(screen.getByRole("button", { name: "Disputed" }));
+
+		expect(onRespond).toHaveBeenCalledExactlyOnceWith(explainedObservation, {
+			comment: "The provider requires this timeout.",
+			resolution: "DISPUTED",
+			usefulness: "HELPFUL",
 		});
 	});
 });

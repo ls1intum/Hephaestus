@@ -69,8 +69,6 @@ const groupPractices: PracticeStanding[] = [
 		toWorkOn: [],
 	},
 ];
-
-/** The section a developer sees on their own profile, above the activity monitor. */
 const practiceGroupStandings = (
 	<PracticeGroupStandingCard
 		groups={[practiceGroup]}

@@ -63,8 +63,6 @@ describe("PracticeGroupDetailPage", () => {
 	});
 
 	it("tells an empty filtered feed apart from a group that was never reviewed", () => {
-		// One empty feed, two meanings. Saying "no review runs match your filters" to someone who set
-		// none reads as a fault in the page; saying "none yet" to someone filtering hides their filter.
 		const { rerender } = render(<PracticeGroupDetailPage group={group} isLoading={false} />);
 		screen.getByText("Review runs appear here once your work has been reviewed.");
 
@@ -80,8 +78,6 @@ describe("PracticeGroupDetailPage", () => {
 	});
 
 	it("offers a way out when the chosen practice emptied the feed", () => {
-		// Naming what narrowed the feed without offering to widen it leaves the reader to find the
-		// control that did it — which is above the fold on a phone.
 		const onSelectPractice = vi.fn();
 		render(
 			<PracticeGroupDetailPage
@@ -112,7 +108,7 @@ describe("PracticeGroupDetailPage", () => {
 				isLoading={false}
 			/>,
 		);
-		// An empty ready feed shows its empty state, so the control only appears once there are runs.
+
 		expect(screen.queryByRole("button", { name: "View earlier reviews" })).toBeNull();
 
 		rerender(

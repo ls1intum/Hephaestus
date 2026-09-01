@@ -35,8 +35,6 @@ const meta = {
 
 export default meta;
 type Story = StoryObj<typeof meta>;
-
-/** One standing fills the ring: no gaps are drawn, so the circle has to close completely. */
 export const SingleSegment: Story = {
 	args: { practices: repeat(3, "STRENGTH") },
 };
@@ -44,8 +42,6 @@ export const SingleSegment: Story = {
 export const TwoSegments: Story = {
 	args: { practices: [...repeat(1, "DEVELOPING"), ...repeat(1, "STRENGTH")] },
 };
-
-/** Every standing at once, in registry order — worst first, starting at twelve o'clock. */
 export const AllStandings: Story = {
 	args: {
 		practices: [
@@ -57,17 +53,9 @@ export const AllStandings: Story = {
 		],
 	},
 };
-
-/**
- * One practice in forty. Its share is narrower than the gap between arcs, so the arc is floored at a
- * visible sliver rather than inverting — and it has to stay inside its own slot instead of bleeding
- * over the neighbour.
- */
 export const SliverSegment: Story = {
 	args: { practices: [...repeat(39, "STRENGTH"), ...repeat(1, "DEVELOPING")] },
 };
-
-/** Nothing to draw: the component renders no SVG at all rather than an empty circle. */
 export const NoPractices: Story = {
 	args: { practices: [] },
 };

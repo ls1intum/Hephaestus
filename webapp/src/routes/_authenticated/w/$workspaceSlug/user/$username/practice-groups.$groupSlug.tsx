@@ -33,8 +33,6 @@ const practiceGroupDetailSearchSchema = z.object({
 	practice: z.string().optional(),
 	observation: z.string().optional(),
 });
-
-/** The delivered guidance, or the observation's title when it adds something the practice name lacks. */
 function nextStepOf(practiceStanding?: PracticeStanding): string | undefined {
 	const firstAction = practiceStanding?.toWorkOn[0];
 	if (!firstAction) return undefined;
@@ -49,7 +47,6 @@ export const Route = createFileRoute(
 	"/_authenticated/w/$workspaceSlug/user/$username/practice-groups/$groupSlug",
 )({
 	validateSearch: practiceGroupDetailSearchSchema,
-	/** Own profile only — gated here so another user's URL never mounts the page or its queries. */
 	beforeLoad: async ({ context, params }) => {
 		const user = await resolveCurrentUser(context.queryClient);
 		const isOwnProfile = user?.username?.toLowerCase() === params.username.toLowerCase();
@@ -70,7 +67,7 @@ function PracticeGroupDetail() {
 	const navigate = useNavigate({ from: Route.fullPath });
 	const queryClient = useQueryClient();
 	const updateSelection = (search: { practice?: string; observation?: string }) =>
-		void navigate({ search: (previous) => ({ ...previous, ...search }), replace: true });
+		void navigate({ search: (previous) => ({ ...previous, ...search }) });
 
 	const groupsQuery = useQuery({
 		...listGroupsOptions({
@@ -135,7 +132,6 @@ function PracticeGroupDetail() {
 	const trendsBySlug = new Map(
 		(trendQuery.data?.practices ?? []).map((practiceTrend) => [practiceTrend.slug, practiceTrend]),
 	);
-	// Joined here: this is the only place holding all four answers at once.
 	const practices = practicesQuery.data
 		?.filter((practice) => practice.groupSlug === groupSlug)
 		.map((practice) => {
@@ -147,7 +143,6 @@ function PracticeGroupDetail() {
 				nextStep: nextStepOf(practiceStanding),
 			};
 		});
-	// One value, not seven flags: "loading and failed" at once is unspellable.
 	const reviewRunFeed: ReviewRunFeedState = activityQuery.isPending
 		? { status: "loading" }
 		: activityQuery.error
@@ -194,7 +189,6 @@ function PracticeGroupDetail() {
 			onRespond={(observation, response) => {
 				const feedbackId = observation.feedbackId;
 				if (!feedbackId) return;
-				// Nothing left in the answer means withdraw it, not store a blank one.
 				if (isEmptyFeedbackResponse(response)) {
 					deleteResponseMutation.mutate({ path: { workspaceSlug, feedbackId } });
 					return;

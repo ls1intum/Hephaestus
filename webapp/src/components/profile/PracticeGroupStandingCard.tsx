@@ -19,7 +19,6 @@ import {
 import { PracticeTrendChip } from "./PracticeTrendChip";
 
 const COLLAPSED_GROUP_COUNT = 3;
-/** Worst first — the registry declares that order once, so a second list cannot drift from it. */
 const STANDING_ORDER = statusValues(PRACTICE_GROUP_STANDING_DEFS);
 
 export interface PracticeGroupStandingSectionProps {
@@ -103,8 +102,6 @@ export function PracticeGroupStandingCard({
 					const practices = practicesByGroup?.[group.slug] ?? [];
 					const breakdown = summarizePracticeStandings(practices);
 					const { Icon, pill } = getGroupVisual(group.icon, group.color);
-					// `pt-0` cancels the card's own top padding: the header carries a fill, and inside that
-					// padding it would leave a strip of card colour above itself.
 					return (
 						<Card key={group.slug} className="relative flex h-full flex-col overflow-hidden pt-0">
 							<CardHeader className="gap-2 border-b bg-muted/40 pt-4">
@@ -117,8 +114,6 @@ export function PracticeGroupStandingCard({
 									>
 										<Icon className="size-5" aria-hidden />
 									</span>
-									{/* A real heading, not just card-title styling: the section above is an h2, so
-									    these are the level a reader navigates the groups by. */}
 									<h3 className="min-w-0 flex-1 text-lg font-medium leading-snug">{group.name}</h3>
 									{onOpenDetails && (
 										<ChevronRightIcon className="size-4 text-muted-foreground" aria-hidden />
@@ -135,16 +130,12 @@ export function PracticeGroupStandingCard({
 												direction={groupStanding.direction}
 												support={groupStanding.trendSupport}
 												scope="group"
-												// Above the whole-card link below: it comes later in the DOM, so without
-												// this it swallows the hover and click that reveal the chip's provenance.
 												className="relative z-10"
 											/>
 										)}
 									</div>
 									{practices.length > 0 && <PracticeGroupStandingRing practices={practices} />}
 								</div>
-								{/* The registries carry a glyph for every value; the counts read them rather than
-								    reducing to bare text, so the same standing looks the same wherever it appears. */}
 								{breakdown.length > 0 && (
 									<ul className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
 										{breakdown.map(({ standing, count, label }) => {

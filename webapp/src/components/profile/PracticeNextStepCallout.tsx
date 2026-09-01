@@ -7,8 +7,6 @@ export interface PracticeNextStepCalloutProps {
 	children: ReactNode;
 	className?: string;
 }
-
-/** Shared developer-facing treatment for group-level and practice-level next steps. */
 export function PracticeNextStepCallout({
 	label,
 	children,
