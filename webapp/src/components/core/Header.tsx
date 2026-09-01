@@ -1,7 +1,6 @@
 import { TagIcon } from "@primer/octicons-react";
 import { Link } from "@tanstack/react-router";
 import { LogOut, Settings, User } from "lucide-react";
-import { motion, useReducedMotion } from "motion/react";
 
 import { SignInButtons } from "@/components/auth/SignInButtons";
 import { HephaestusLogo } from "@/components/brand/HephaestusLogo";
@@ -64,26 +63,19 @@ export default function Header({
 	const hasWorkspace = Boolean(workspaceSlug);
 	const hasUsername = Boolean(username);
 	const badge = resolveHeaderBadge(version, environmentName, isProduction);
-	const reduceMotion = useReducedMotion();
 	const logo = (
-		<motion.span
-			className="inline-flex"
-			whileHover={reduceMotion ? undefined : { y: -1, scale: 1.01 }}
-			whileTap={reduceMotion ? undefined : { scale: 0.98 }}
-			transition={{ type: "spring", stiffness: 500, damping: 30, mass: 0.4 }}
-		>
+		<span className="inline-flex">
 			<HephaestusLogo
-				className="gap-1.5 sm:gap-2"
-				markClassName="size-9 origin-center transition-transform duration-200 ease-out group-hover/logo:-rotate-3 group-hover/logo:scale-105 motion-reduce:transform-none sm:size-8"
-				wordmarkClassName="text-lg sm:text-xl"
-				wordmarkSuffixClassName="hidden sm:inline"
+				className="gap-1 sm:gap-2"
+				markClassName="size-8"
+				wordmarkClassName="text-base sm:text-xl"
 			/>
-		</motion.span>
+		</span>
 	);
 
 	return (
 		<header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 justify-between">
-			<div className="flex items-center gap-2 px-3 sm:px-4">
+			<div className="flex items-center gap-2 px-2 sm:px-4">
 				{sidebarTrigger}
 				<div className="flex items-center gap-2">
 					{hasWorkspace ? (
@@ -140,7 +132,7 @@ export default function Header({
 					)}
 				</div>
 			</div>
-			<div className="flex gap-2 px-3 sm:px-4">
+			<div className="flex gap-2 px-2 sm:px-4">
 				{isAuthenticated ? feedbackDialog : null}
 				<ModeToggle />
 				<div className="flex items-center gap-2">

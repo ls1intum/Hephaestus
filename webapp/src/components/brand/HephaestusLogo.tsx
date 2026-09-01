@@ -6,17 +6,10 @@ export function HephMark({ className = "size-8" }: { className?: string }) {
 	);
 }
 
-export function HephaestusWordmark({
-	className = "",
-	suffixClassName = "",
-}: {
-	className?: string;
-	suffixClassName?: string;
-}) {
+export function HephaestusWordmark({ className = "" }: { className?: string }) {
 	return (
 		<span className={className}>
-			<span className="text-brand-accent">Heph</span>
-			<span className={suffixClassName}>aestus</span>
+			<span className="text-brand-accent">Heph</span>aestus
 		</span>
 	);
 }
@@ -25,22 +18,17 @@ interface HephaestusLogoProps {
 	className?: string;
 	markClassName?: string;
 	wordmarkClassName?: string;
-	wordmarkSuffixClassName?: string;
 }
 
 export function HephaestusLogo({
 	className = "",
 	markClassName,
 	wordmarkClassName = "",
-	wordmarkSuffixClassName,
 }: HephaestusLogoProps) {
 	return (
 		<span className={`inline-flex items-center gap-2 ${className}`}>
 			<HephMark className={markClassName} />
-			<HephaestusWordmark
-				className={`font-semibold tracking-tight ${wordmarkClassName}`}
-				suffixClassName={wordmarkSuffixClassName}
-			/>
+			<HephaestusWordmark className={`font-semibold tracking-tight ${wordmarkClassName}`} />
 		</span>
 	);
 }
