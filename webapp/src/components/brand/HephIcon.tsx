@@ -1,23 +1,25 @@
 import { cn } from "@/lib/utils";
-import styles from "./MentorIcon.module.css";
+import styles from "./HephIcon.module.css";
 
-interface MentorIconProps {
+interface HephIconProps {
 	size?: number;
 	strokeWidth?: number;
 	pad?: number;
 	animated?: boolean;
 	streaming?: boolean;
 	className?: string;
+	label?: string;
 }
 
-export function MentorIcon({
+export function HephIcon({
 	size = 16,
 	strokeWidth = 2,
 	pad = 2,
 	animated = true,
 	streaming = false,
 	className,
-}: MentorIconProps) {
+	label,
+}: HephIconProps) {
 	return (
 		<svg
 			className={cn(styles.icon, animated && styles.animated, className)}
@@ -29,10 +31,10 @@ export function MentorIcon({
 			strokeWidth={strokeWidth}
 			strokeLinecap="round"
 			strokeLinejoin="round"
-			role="img"
-			aria-label="Heph, AI mentor"
+			role={label ? "img" : undefined}
+			aria-label={label}
+			aria-hidden={label ? undefined : true}
 		>
-			<title>Heph, AI mentor</title>
 			<ellipse className={styles.shadow} cx="12" cy="23.6" rx="5" ry="1.2" fill="currentColor" />
 			<g className={styles.float}>
 				<g className={styles.wobble}>

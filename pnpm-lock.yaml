@@ -404,6 +404,9 @@ importers:
       '@chromatic-com/storybook':
         specifier: 5.2.1
         version: 5.2.1(storybook@10.4.0(patch_hash=266885747f5f3e33f57d0f78661b7a0ce1644e54acf135146ad9efa4860e37cf)(@testing-library/dom@10.4.1)(@types/react@19.2.18)(prettier@3.9.6)(react@19.2.8)(vite-plus@0.3.0(@types/node@24.12.4)(@vitest/browser-playwright@4.1.11)(@vitest/coverage-v8@4.1.11)(esbuild@0.27.7)(jiti@2.7.0)(jsdom@29.1.1)(msw@2.14.6(@types/node@24.12.4)(typescript@7.0.2))(terser@5.51.0)(typescript@7.0.2)(vite@8.2.2(@types/node@24.12.4)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.51.0)(yaml@2.9.0))(yaml@2.9.0)))
+      '@fontsource-variable/inter':
+        specifier: ^5.3.0
+        version: 5.3.0
       '@gitlab/svgs':
         specifier: 3.163.0
         version: 3.163.0
@@ -2432,6 +2435,9 @@ packages:
 
   '@floating-ui/utils@0.2.12':
     resolution: {integrity: sha512-HpCo8tmWzLVad5s2d19EhAz5zqrrQ6s69qd6moPMQvkOuSwDT1YgRfWSVuc4ennqrgv3OHppiOGMQ7oC13yIww==}
+
+  '@fontsource-variable/inter@5.3.0':
+    resolution: {integrity: sha512-OupL48va4JNofb97w6NYeF9S7W/kHNKM0Er8Dem5nqi4jeOLrVJDoE8tZEpnMJmtkvNbB1EIPPwHcdkF6b1oUA==}
 
   '@gitlab/svgs@3.163.0':
     resolution: {integrity: sha512-u2fQ3TLMT7RJaHVCS+3C/pv/frI/SAKc6EVCi+4yLOHV2azwDr2zylcQ9EMJ7nHfVPFs+zCr9RLNS5+UALrGCA==}
@@ -14467,6 +14473,8 @@ snapshots:
       react-dom: 19.2.8(react@19.2.8)
 
   '@floating-ui/utils@0.2.12': {}
+
+  '@fontsource-variable/inter@5.3.0': {}
 
   '@gitlab/svgs@3.163.0': {}
 

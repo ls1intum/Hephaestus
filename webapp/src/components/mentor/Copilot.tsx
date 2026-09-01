@@ -7,7 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
-import { MentorIcon } from "./MentorIcon";
+import { HephIcon } from "@/components/brand/HephIcon";
 
 /** The `document.body` inline styles the scroll lock overwrites, kept so it can put them back. */
 interface BodyScrollStyles {
@@ -120,7 +120,7 @@ export function Copilot({
 							size="icon"
 							aria-label="Open Heph, AI mentor"
 						>
-							<MentorIcon size={56} pad={8} />
+							<HephIcon size={56} pad={8} />
 						</Button>
 					}
 				/>
@@ -141,7 +141,7 @@ export function Copilot({
 					<div className="flex flex-col w-full h-full bg-background rounded-2xl overflow-hidden">
 						<div className="flex items-center justify-between p-2 pl-4 border-b">
 							<h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-								<MentorIcon className="-mx-1.5" size={32} pad={4} />
+								<HephIcon className="-mx-1.5" size={32} pad={4} />
 								Heph{" "}
 								<Badge variant="outline" className="text-muted-foreground">
 									<Sparkles /> AI Mentor

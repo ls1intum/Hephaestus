@@ -1,7 +1,7 @@
 import { Link, useMatchRoute } from "@tanstack/react-router";
 import { ChevronRight, Sparkles } from "lucide-react";
 
-import { MentorIcon } from "@/components/mentor/MentorIcon";
+import { HephIcon } from "@/components/brand/HephIcon";
 import { Badge } from "@/components/ui/badge";
 import {
 	SidebarGroup,
@@ -31,7 +31,7 @@ export function NavMentor({ workspaceSlug }: { workspaceSlug: string }) {
 							/>
 						}
 					>
-						<MentorIcon className="-mx-1.5" size={30} pad={5} strokeWidth={1.5} />
+						<HephIcon className="-mx-1.5" size={30} pad={5} strokeWidth={1.5} />
 						<span className="flex items-center gap-2">
 							Heph
 							<Badge variant="outline" className="text-muted-foreground">

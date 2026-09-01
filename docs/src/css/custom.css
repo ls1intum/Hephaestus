@@ -41,10 +41,6 @@
 	--docusaurus-highlighted-code-line-bg: oklch(0.546 0.245 262.881 / 0.18);
 }
 
-[data-theme="dark"] .navbar__logo img {
-	filter: invert(1);
-}
-
 /*
  * Every override below re-points an Infima default at a value the web app already uses.
  * `scripts/check-docs-tokens.ts` pins the ones copied from `webapp/src/styles.css`.

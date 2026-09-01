@@ -11,7 +11,6 @@ const envBaseUrl = process.env.DOCUSAURUS_BASE_URL;
  */
 const baseUrl = envBaseUrl === undefined || envBaseUrl === "" ? "/" : envBaseUrl;
 
-/** The site's one-sentence definition of the product, kept in step with the README's opening. */
 const DESCRIPTION =
 	"Hephaestus is an open-source AI mentor for software teams. It reads the work developers already do against the practices their project cares about, and writes back feedback they can act on.";
 
@@ -31,7 +30,7 @@ function rawMermaidSourcePlugin(_context: LoadContext): Plugin {
 const config: Config = {
 	title: "Hephaestus Documentation",
 	tagline: "Learn from the work you're already doing",
-	favicon: "img/favicon.ico",
+	favicon: "img/favicon.png",
 
 	future: {
 		v4: true,
@@ -154,7 +153,7 @@ const config: Config = {
 	],
 
 	themeConfig: {
-		image: "img/hephaestus-social-card.jpg",
+		image: "img/hephaestus-social-card.png",
 		colorMode: {
 			respectPrefersColorScheme: true,
 			disableSwitch: false,
@@ -171,10 +170,12 @@ const config: Config = {
 			{ name: "twitter:description", content: DESCRIPTION },
 		],
 		navbar: {
-			title: "Hephaestus",
 			logo: {
-				alt: "Hephaestus logo",
-				src: "img/hammer.svg",
+				alt: "Hephaestus",
+				src: "img/brand/hephaestus-lockup-light.png",
+				srcDark: "img/brand/hephaestus-lockup-dark.png",
+				width: 155,
+				height: 32,
 			},
 			items: [
 				{

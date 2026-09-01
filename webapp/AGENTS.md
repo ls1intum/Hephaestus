@@ -277,7 +277,7 @@ from the `--color-*` block in `src/styles.css` over a hard-coded value; `text-mu
 than guessing a name.
 
 **A `*.module.css` is for what a utility cannot express, and for nothing else.** There are two in the
-tree — `MentorIcon` and the landing scene — and each holds `@keyframes`, a generated `::before`, a
+tree — `HephIcon` and the landing scene — and each holds `@keyframes`, a generated `::before`, a
 `clip-path`, or a grid whose placement descendants override at a breakpoint. Anything a utility can
 say stays a utility: a module rule that is one `letter-spacing` or one `margin` is a utility in the
 wrong file, and it silently outranks the utility it duplicates, because Vite emits module CSS

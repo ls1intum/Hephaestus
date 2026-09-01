@@ -1,6 +1,6 @@
 import { motion } from "motion/react";
 
-import { MentorIcon } from "./MentorIcon";
+import { HephIcon } from "@/components/brand/HephIcon";
 
 export const Greeting = () => {
 	return (
@@ -16,7 +16,7 @@ export const Greeting = () => {
 					exit={{ opacity: 0, scale: 0.8 }}
 					transition={{ delay: 0.3 }}
 				>
-					<MentorIcon size={80} />
+					<HephIcon size={80} />
 				</motion.div>
 				<div className="flex flex-col">
 					<motion.div

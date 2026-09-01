@@ -1,0 +1,59 @@
+---
+title: Brand assets
+---
+
+# Brand assets
+
+Hephaestus uses the solid signal-blue Heph mark for product identity. The bare, animated Heph drawing
+is reserved for the mentor persona.
+
+## Source and generation
+
+`webapp/brand/hephaestus-mark.svg` is the source for the static mark. The React `HephMark` renders
+that file directly. One exporter produces every tracked browser, app, documentation, README,
+social-card, and external-profile asset. It embeds the pinned Inter font so raster output does not
+depend on fonts installed on a contributor's computer:
+
+```bash
+pnpm --filter webapp run export:assets
+```
+
+Do not edit generated files under `webapp/public/`, `docs/images/readme/`, or `docs/static/img/`.
+The exporter also synchronizes the inline maintenance-page mark in `docker/compose.proxy.yaml`. CI
+regenerates all of these outputs and fails when the committed result differs.
+
+Application icons use a tighter optical crop so Heph remains legible at small sizes. Product UI,
+favicons, and maskable icons keep their platform-appropriate spacing.
+
+## Usage
+
+| Context | Asset |
+|---|---|
+| In-app product lockup | `HephaestusLogo` or `HephMark` |
+| Mentor conversation | `HephIcon` |
+| README and documentation navbar | Light/dark lockup PNGs |
+| Browser tab | `favicon.png` |
+| Installed web app | 192px, 512px, and maskable PNGs from `webapp/public/manifest.json` |
+| Link preview | `hephaestus-social-card.png` |
+| Slack app | `docs/static/img/brand/slack-app-icon-512.png` |
+| GitHub App, GitHub OAuth App, and other external profiles | `docs/static/img/brand/external-app-icon-1024.png` |
+| GitHub repository social preview | `docs/static/img/brand/github-repository-social-preview-1280x640.png` |
+
+The static mark remains signal blue (`#315FDC`) in both color modes. UI wordmarks use the
+mode-aware `brand-accent` token from `webapp/src/styles.css`; prose always spells the product name
+“Hephaestus.” Unlabelled React marks are decorative. Informative uses need a concise accessible name.
+
+The README uses [GitHub's theme-aware picture sources](https://github.blog/changelog/2021-11-24-specify-theme-context-for-images-in-markdown/),
+the documentation navbar uses [Docusaurus light/dark logo sources](https://docusaurus.io/docs/api/themes/configuration),
+and the installed-app exports follow the manifest [icon-purpose contract](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Manifest/Reference/icons)
+and [maskable safe zone](https://web.dev/articles/maskable-icon).
+
+## External surfaces
+
+Generated files do not update third-party accounts. After changing the static mark, maintainers must
+upload the named assets in Slack and GitHub settings. The 1024px external icon is a high-resolution
+master, not a vendor-mandated size; upload controls may resize it. Keep the mark square, without text
+or pre-rounded corners. [Slack renders app logos at 36px on mobile and applies its own corner
+treatment](https://api.slack.com/start/designing#logo_assets). GitHub's
+[repository social-preview settings](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/customizing-your-repositorys-social-media-preview)
+use the separately composed 1280×640 export.

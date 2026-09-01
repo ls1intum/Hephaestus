@@ -1,8 +1,9 @@
 import { TagIcon } from "@primer/octicons-react";
 import { Link } from "@tanstack/react-router";
-import { Hammer, LogOut, Settings, User } from "lucide-react";
+import { LogOut, Settings, User } from "lucide-react";
 
 import { SignInButtons } from "@/components/auth/SignInButtons";
+import { HephaestusLogo } from "@/components/brand/HephaestusLogo";
 import { ModeToggle } from "@/components/core/ModeToggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -62,10 +63,19 @@ export default function Header({
 	const hasWorkspace = Boolean(workspaceSlug);
 	const hasUsername = Boolean(username);
 	const badge = resolveHeaderBadge(version, environmentName, isProduction);
+	const logo = (
+		<span className="inline-flex">
+			<HephaestusLogo
+				className="gap-1 sm:gap-2"
+				markClassName="size-8"
+				wordmarkClassName="text-base sm:text-xl"
+			/>
+		</span>
+	);
 
 	return (
 		<header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 justify-between">
-			<div className="flex items-center gap-2 px-4">
+			<div className="flex items-center gap-2 px-2 sm:px-4">
 				{sidebarTrigger}
 				<div className="flex items-center gap-2">
 					{hasWorkspace ? (
@@ -73,19 +83,17 @@ export default function Header({
 							to="/w/$workspaceSlug"
 							params={{ workspaceSlug: workspaceSlug ?? "" }}
 							aria-label="Hephaestus home"
-							className="flex gap-2 items-center hover:text-muted-foreground"
+							className="group/logo flex items-center gap-2 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
 						>
-							<Hammer className="text-2xl sm:text-3xl" />
-							<span className="hidden text-xl font-semibold sm:inline">Hephaestus</span>
+							{logo}
 						</Link>
 					) : (
 						<Link
 							to="/"
 							aria-label="Hephaestus home"
-							className="flex gap-2 items-center hover:text-muted-foreground"
+							className="group/logo flex items-center gap-2 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
 						>
-							<Hammer className="text-2xl sm:text-3xl" />
-							<span className="hidden text-xl font-semibold sm:inline">Hephaestus</span>
+							{logo}
 						</Link>
 					)}
 					{badge.kind === "release" ? (
@@ -124,7 +132,7 @@ export default function Header({
 					)}
 				</div>
 			</div>
-			<div className="flex gap-2 px-4">
+			<div className="flex gap-2 px-2 sm:px-4">
 				{isAuthenticated ? feedbackDialog : null}
 				<ModeToggle />
 				<div className="flex items-center gap-2">

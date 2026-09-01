@@ -1,7 +1,7 @@
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 
-import { MentorIcon } from "./MentorIcon";
+import { HephIcon } from "@/components/brand/HephIcon";
 
 interface MentorAvatarProps {
 	/** Size of the avatar */
@@ -16,7 +16,7 @@ export function MentorAvatar({ className, streaming = false }: MentorAvatarProps
 	return (
 		<Avatar className={cn("size-16 -m-4 after:border-0", className)}>
 			<AvatarFallback className="bg-transparent text-muted-foreground size-16">
-				<MentorIcon size={64} pad={8} streaming={streaming} />
+				<HephIcon size={64} pad={8} streaming={streaming} />
 			</AvatarFallback>
 		</Avatar>
 	);

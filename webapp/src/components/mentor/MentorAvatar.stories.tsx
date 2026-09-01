@@ -3,7 +3,7 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { MentorAvatar } from "./MentorAvatar";
 
 /**
- * MentorAvatar component displays the AI mentor's avatar using our custom animated MentorIcon.
+ * MentorAvatar component displays the AI mentor's avatar using our custom animated HephIcon.
  * Designed to provide visual consistency and friendly interaction across the mentor interface.
  */
 const meta = {
