@@ -37,9 +37,6 @@ describe("practice trend copy", () => {
 	});
 
 	it("claims no comparison when the server formed none", () => {
-		// The chip reads "Not enough to compare yet". Its own tooltip used to answer "Compared your
-		// latest 4 with the 3 before them" — a comparison PracticeTrendCalculator skips outright while
-		// `opportunitiesUntilComparable` is above zero.
 		const sentence = formatTrendProvenance(
 			support({ previousOpportunities: 3, opportunitiesUntilComparable: 1 }),
 			"INSUFFICIENT_EVIDENCE",
@@ -53,8 +50,6 @@ describe("practice trend copy", () => {
 	});
 
 	it("does not describe a group trend as a comparison of bundles", () => {
-		// A group trend pools the practices' finished comparisons; there is no group-level "latest
-		// against previous" to report, and its opportunity counts are the union across practices.
 		const sentence = formatTrendProvenance(
 			support({
 				currentOpportunities: 7,

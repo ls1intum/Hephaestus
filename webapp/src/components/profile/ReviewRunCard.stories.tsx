@@ -56,11 +56,6 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = { args: { run } };
-
-/**
- * A Slack thread. Its channel is the identity, and the mark is Slack's — the card reads the artifact
- * kind off the wire, where it arrives as `chat.conversation_thread` rather than a constant's name.
- */
 export const SlackConversation: Story = {
 	args: {
 		run: {
@@ -76,8 +71,6 @@ export const SlackConversation: Story = {
 		},
 	},
 };
-
-/** An Outline document: its own mark, not the one the default provider would have lent it. */
 export const OutlineDocument: Story = {
 	args: {
 		run: {
@@ -93,8 +86,6 @@ export const OutlineDocument: Story = {
 		},
 	},
 };
-
-/** A merge request on GitLab, where the number and title carry the identity. */
 export const GitLabMergeRequest: Story = {
 	args: {
 		run: {
@@ -111,8 +102,6 @@ export const GitLabMergeRequest: Story = {
 		},
 	},
 };
-
-/** No link to follow: the identity stays plain text rather than a dead anchor. */
 export const WithoutALink: Story = {
 	args: {
 		run: {
@@ -151,8 +140,6 @@ const denseRun: PracticeGroupReviewRun = {
 		},
 	],
 };
-
-/** More observations than a card shows at once: it says how many it is holding back. */
 export const ManyObservations: Story = {
 	args: { run: denseRun, onToggleObservation: fn() },
 	play: async ({ canvas, userEvent }) => {
@@ -167,11 +154,6 @@ export const ManyObservations: Story = {
 		await expect(canvas.queryByText(held)).toBeNull();
 	},
 };
-
-/**
- * At 320px the date column, the timeline gutter and the title share one row. A long identity and a
- * repository name have to wrap rather than push the card sideways.
- */
 export const MobileReflow: Story = {
 	args: {
 		run: {

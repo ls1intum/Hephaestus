@@ -1,7 +1,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
 import { toast } from "sonner";
+import { z } from "zod";
 import {
 	deleteFeedbackResponseMutation,
 	getObservationOptions,
@@ -29,7 +29,10 @@ import { problemDetailOf } from "@/lib/problem-detail";
 
 const ACTIVITY_PAGE_SIZE = 10;
 
-/** The delivered guidance, or the observation's title when it adds something the practice name lacks. */
+const practiceGroupDetailSearchSchema = z.object({
+	practice: z.string().optional(),
+	observation: z.string().optional(),
+});
 function nextStepOf(practiceStanding?: PracticeStanding): string | undefined {
 	const firstAction = practiceStanding?.toWorkOn[0];
 	if (!firstAction) return undefined;
@@ -43,7 +46,7 @@ function nextStepOf(practiceStanding?: PracticeStanding): string | undefined {
 export const Route = createFileRoute(
 	"/_authenticated/w/$workspaceSlug/user/$username/practice-groups/$groupSlug",
 )({
-	/** Own profile only — gated here so another user's URL never mounts the page or its queries. */
+	validateSearch: practiceGroupDetailSearchSchema,
 	beforeLoad: async ({ context, params }) => {
 		const user = await resolveCurrentUser(context.queryClient);
 		const isOwnProfile = user?.username?.toLowerCase() === params.username.toLowerCase();
@@ -60,10 +63,11 @@ export const Route = createFileRoute(
 
 function PracticeGroupDetail() {
 	const { workspaceSlug, username, groupSlug } = Route.useParams();
-	const navigate = useNavigate();
+	const { practice: selectedPracticeSlug, observation: openObservationId } = Route.useSearch();
+	const navigate = useNavigate({ from: Route.fullPath });
 	const queryClient = useQueryClient();
-	const [openObservationId, setOpenObservationId] = useState<string>();
-	const [selectedPracticeSlug, setSelectedPracticeSlug] = useState<string>();
+	const updateSelection = (search: { practice?: string; observation?: string }) =>
+		void navigate({ search: (previous) => ({ ...previous, ...search }) });
 
 	const groupsQuery = useQuery({
 		...listGroupsOptions({
@@ -128,7 +132,6 @@ function PracticeGroupDetail() {
 	const trendsBySlug = new Map(
 		(trendQuery.data?.practices ?? []).map((practiceTrend) => [practiceTrend.slug, practiceTrend]),
 	);
-	// Joined here: this is the only place holding all four answers at once.
 	const practices = practicesQuery.data
 		?.filter((practice) => practice.groupSlug === groupSlug)
 		.map((practice) => {
@@ -140,7 +143,6 @@ function PracticeGroupDetail() {
 				nextStep: nextStepOf(practiceStanding),
 			};
 		});
-	// One value, not seven flags: "loading and failed" at once is unspellable.
 	const reviewRunFeed: ReviewRunFeedState = activityQuery.isPending
 		? { status: "loading" }
 		: activityQuery.error
@@ -173,20 +175,20 @@ function PracticeGroupDetail() {
 			groupTrend={trendQuery.data?.group}
 			selectedPracticeSlug={selectedPracticeSlug}
 			onSelectPractice={(practiceSlug) => {
-				setSelectedPracticeSlug(practiceSlug);
-				setOpenObservationId(undefined);
+				updateSelection({ practice: practiceSlug, observation: undefined });
 			}}
 			feed={reviewRunFeed}
 			skeletonRows={ACTIVITY_PAGE_SIZE}
 			openObservationId={openObservationId}
 			observationDetail={observationDetail}
 			onToggleObservation={(observationId) =>
-				setOpenObservationId((current) => (current === observationId ? undefined : observationId))
+				updateSelection({
+					observation: openObservationId === observationId ? undefined : observationId,
+				})
 			}
 			onRespond={(observation, response) => {
 				const feedbackId = observation.feedbackId;
 				if (!feedbackId) return;
-				// Nothing left in the answer means withdraw it, not store a blank one.
 				if (isEmptyFeedbackResponse(response)) {
 					deleteResponseMutation.mutate({ path: { workspaceSlug, feedbackId } });
 					return;
@@ -229,6 +231,7 @@ function PracticeGroupDetail() {
 				void navigate({
 					to: "/w/$workspaceSlug/user/$username",
 					params: { workspaceSlug, username },
+					search: {},
 				})
 			}
 		/>

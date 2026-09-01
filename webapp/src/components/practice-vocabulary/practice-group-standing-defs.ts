@@ -15,15 +15,6 @@ export type PracticeGroupStandingValue = PracticeGroupStanding["standing"];
 export interface PracticeGroupStandingDef extends StatusDef {
 	shortLabel: string;
 }
-
-/**
- * Where a developer stands in a practice group, worst first. `DEVELOPING` means problems
- * *predominate* — `MIXED` has them too — and `NO_OPPORTUNITY` covers evidence that settled nothing
- * as well as work that offered no occasion.
- *
- * Both silences render outline, so the icon separates them: dashed for "nothing seen yet", a slash
- * for "nothing to see". `shortLabel` is the ring legend's wording, where five entries share a row.
- */
 export const PRACTICE_GROUP_STANDING_DEFS: Record<
 	PracticeGroupStandingValue,
 	PracticeGroupStandingDef

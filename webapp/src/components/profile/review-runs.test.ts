@@ -32,8 +32,6 @@ describe("feedbackResponseOf", () => {
 	});
 
 	it("carries the parts that are missing as undefined rather than dropping them", () => {
-		// The form starts from this shape, and the endpoint replaces what it receives: a key that went
-		// missing here would be sent as "clear this field" the next time any control is used.
 		expect(feedbackResponseOf(observation({ feedbackUsefulness: "UNHELPFUL" }))).toStrictEqual({
 			usefulness: "UNHELPFUL",
 			resolution: undefined,
@@ -55,8 +53,6 @@ describe("isEmptyFeedbackResponse", () => {
 	});
 
 	it("does not mistake a blank comment for something worth storing", () => {
-		// Clearing the textarea leaves an empty string, not undefined. Storing that would keep a
-		// response row that says nothing, which reads on the server as an answer the developer gave.
 		expect(isEmptyFeedbackResponse({ comment: "   " })).toBe(true);
 	});
 

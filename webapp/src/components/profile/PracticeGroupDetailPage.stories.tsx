@@ -93,8 +93,6 @@ export const Default: Story = {};
 export const Loading: Story = { args: { isLoading: true } };
 export const Missing: Story = { args: { group: undefined } };
 export const Failure: Story = { args: { error: new Error("Unavailable") } };
-
-/** The feed as a reader normally meets it: reviews, their observations, and the filters above them. */
 export const WithReviewRuns: Story = {
 	args: {
 		feed: readyFeed,
@@ -102,8 +100,6 @@ export const WithReviewRuns: Story = {
 		onRespond: fn(),
 	},
 };
-
-/** More to load: the control names what it will fetch rather than a page number. */
 export const MoreToLoad: Story = {
 	args: {
 		feed: { ...readyFeed, hasMore: true },
@@ -113,15 +109,11 @@ export const MoreToLoad: Story = {
 export const FeedLoading: Story = {
 	args: { feed: { status: "loading" }, skeletonRows: 4 },
 };
-
-/** The feed failed on its own while the rest of the page is fine, so only it carries the error. */
 export const FeedFailed: Story = {
 	args: {
 		feed: { status: "error", error: new Error("Gateway timeout"), onRetry: fn() },
 	},
 };
-
-/** Narrowed to one practice that has nothing: the empty state names it and offers the way back. */
 export const NarrowedToEmpty: Story = {
 	args: { selectedPracticeSlug: "small-changes" },
 	play: async ({ canvas }) => {
@@ -130,8 +122,6 @@ export const NarrowedToEmpty: Story = {
 		).toBeVisible();
 	},
 };
-
-/** At 320px the two-column layout has to stack without pushing anything off the page. */
 export const MobileReflow: Story = {
 	args: { feed: readyFeed },
 	parameters: {

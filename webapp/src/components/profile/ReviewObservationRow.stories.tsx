@@ -79,8 +79,6 @@ type Story = StoryObj<typeof meta>;
 export const StrengthShown: Story = {
 	args: { observation: strength, onRespond: fn() },
 };
-
-/** Every outcome the review can record, in the order the registry declares them. */
 export const AssessmentMatrix: Story = {
 	args: StrengthShown.args,
 	render: (args) => (
@@ -126,8 +124,6 @@ const detail = {
 		],
 	},
 } satisfies ObservationDetail;
-
-/** Opened: the reasoning, the guidance and the quoted evidence behind one observation. */
 export const Opened: Story = {
 	args: {
 		observation: strength,
@@ -137,8 +133,6 @@ export const Opened: Story = {
 		detailState: { isLoading: false, detail },
 	},
 };
-
-/** The detail is still on its way; the panel holds its shape instead of jumping when it lands. */
 export const DetailLoading: Story = {
 	args: {
 		observation: strength,
@@ -148,8 +142,6 @@ export const DetailLoading: Story = {
 		detailState: { isLoading: true },
 	},
 };
-
-/** The detail request failed: the row stays open and offers the error rather than an empty panel. */
 export const DetailFailed: Story = {
 	args: {
 		observation: strength,
@@ -159,8 +151,6 @@ export const DetailFailed: Story = {
 		detailState: { isLoading: false, error: new Error("Request failed with status 503") },
 	},
 };
-
-/** Loaded, but the review recorded no rationale, guidance or evidence — said plainly, not left blank. */
 export const NoFurtherDetail: Story = {
 	args: {
 		observation: strength,
@@ -178,8 +168,6 @@ export const NoFurtherDetail: Story = {
 		},
 	},
 };
-
-/** A response already recorded, and a second one being written — both controls stay disabled meanwhile. */
 export const FeedbackPending: Story = {
 	args: {
 		observation: { ...strength, feedbackUsefulness: "UNHELPFUL" },
@@ -190,8 +178,6 @@ export const FeedbackPending: Story = {
 		detailState: { isLoading: false, detail },
 	},
 };
-
-/** Marking a piece of feedback helpful reaches the caller with the observation it belongs to. */
 export const RecordsAResponse: Story = {
 	args: {
 		observation: strength,
@@ -211,11 +197,6 @@ export const RecordsAResponse: Story = {
 		});
 	},
 };
-
-/**
- * The response in full: how useful the review was, what the developer did about it, and room to say
- * why. The three are independent — the server keeps them apart, and so does this.
- */
 export const RespondingInFull: Story = {
 	args: {
 		observation: {
@@ -231,11 +212,6 @@ export const RespondingInFull: Story = {
 		detailState: { isLoading: false, detail },
 	},
 };
-
-/**
- * Disputing is the one answer the server insists on an explanation for, so the field says it is
- * required and the save button stays disabled until something is written.
- */
 export const DisputedNeedsAnExplanation: Story = {
 	args: {
 		observation: { ...strength, feedbackUsefulness: "UNHELPFUL", feedbackResolution: "DISPUTED" },
@@ -252,8 +228,6 @@ export const DisputedNeedsAnExplanation: Story = {
 		await expect(canvas.getByRole("button", { name: "Save comment" })).toBeDisabled();
 	},
 };
-
-/** Recording a resolution keeps the usefulness already given — the whole answer travels together. */
 export const RecordsAResolution: Story = {
 	args: {
 		observation: { ...strength, feedbackUsefulness: "HELPFUL" },

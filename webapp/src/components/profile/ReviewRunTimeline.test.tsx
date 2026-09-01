@@ -45,8 +45,6 @@ describe("ReviewRunTimeline", () => {
 	});
 
 	it("sends the whole response when one part of it changes", () => {
-		// The endpoint replaces rather than patches, so a control that reported only its own field
-		// would erase the other two. `baseObservation` already carries all three.
 		const onRespond = vi.fn();
 		render(
 			<ReviewRunTimeline

@@ -13,8 +13,6 @@ import { ReviewObservationRow } from "./ReviewObservationRow";
 
 const DAY = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" });
 const TIME = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit" });
-
-/** Marks only — the words come from `getProviderLabel`, which owns provider copy for every surface. */
 const PROVIDER_ICONS = {
 	GITHUB: GithubIcon,
 	SLACK: SlackIcon,
@@ -24,25 +22,12 @@ const PROVIDER_ICONS = {
 	NonNullable<PracticeGroupReviewRun["reviewedWork"]["provider"]>,
 	typeof GithubIcon
 >;
-
-/**
- * The provider's own mark, or none at all. A run whose provider the server left off gets the kind's
- * glyph beside it either way, so the header never borrows a mark for a platform it is not from —
- * which is what a GitHub default did to every Slack thread and Outline document.
- */
 function providerMeta(run: PracticeGroupReviewRun) {
 	const provider = run.reviewedWork.provider;
 	return provider
 		? { label: getProviderLabel(provider), Icon: PROVIDER_ICONS[provider] }
 		: undefined;
 }
-
-/**
- * `reviewedWork.type` is an `ArtifactKind` — a lower-case `<domain>.<kind>` string such as
- * `scm.pull_request`, never the Java constant's name. The shared registry owns the labels and glyphs
- * so a kind added on the server shows up here as its raw id instead of silently reading as a
- * pull request.
- */
 function workIdentity(run: PracticeGroupReviewRun, providerLabel?: string) {
 	const work = run.reviewedWork;
 	if (work.type === ARTIFACT_KIND.conversationThread && work.channelName) {
@@ -62,7 +47,6 @@ export interface ReviewRunCardProps {
 	openObservationId?: string;
 	observationDetail?: ObservationDetailState;
 	onToggleObservation?: (observationId: string) => void;
-	/** The developer's complete answer to one piece of feedback; the endpoint replaces, not patches. */
 	onRespond?: (observation: PracticeGroupReviewObservation, response: FeedbackResponse) => void;
 	pendingFeedbackId?: string;
 }

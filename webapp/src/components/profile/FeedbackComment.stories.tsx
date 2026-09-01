@@ -29,24 +29,18 @@ const meta = {
 
 export default meta;
 type Story = StoryObj<typeof meta>;
-
-/** Nothing written yet: the field is optional, and there is nothing to save or cancel. */
 export const Empty: Story = {
 	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("button", { name: "Save comment" })).toBeDisabled();
 		await expect(canvas.queryByRole("button", { name: "Cancel" })).toBeNull();
 	},
 };
-
-/** A comment already recorded. Saving stays disabled until the text actually differs. */
 export const Recorded: Story = {
 	args: { comment: "Split into two commits so the reasoning reads on its own." },
 	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("button", { name: "Save comment" })).toBeDisabled();
 	},
 };
-
-/** Typing offers both actions; cancelling puts the recorded text back rather than clearing it. */
 export const Editing: Story = {
 	args: { comment: "Split into two commits." },
 	play: async ({ canvas, userEvent }) => {
@@ -58,11 +52,6 @@ export const Editing: Story = {
 		await expect(field).toHaveValue("Split into two commits.");
 	},
 };
-
-/**
- * Disputing an observation: the server rejects an empty explanation, so the field says it is
- * required and saving stays out of reach until something is written.
- */
 export const RequiredForDispute: Story = {
 	args: { isRequired: true },
 	play: async ({ args, canvas, userEvent }) => {
@@ -77,8 +66,6 @@ export const RequiredForDispute: Story = {
 		);
 	},
 };
-
-/** While the response is in flight every control is out of action, including cancel. */
 export const Saving: Story = {
 	args: { comment: "Handled in the follow-up.", isPending: true },
 };

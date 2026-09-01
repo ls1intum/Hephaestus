@@ -48,8 +48,6 @@ describe("PracticeGroupStandingCard", () => {
 	});
 
 	it("puts the groups that need attention first", () => {
-		// The order is the registry's, so a reader scanning top-down meets the worst standing first —
-		// and it must not follow the order the workspace happens to list its groups in.
 		const groups = ["going-well", "needs-attention", "mixed"].map((slug, index) => ({
 			...group,
 			id: index + 1,

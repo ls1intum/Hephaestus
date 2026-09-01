@@ -45,8 +45,6 @@ export const Default: Story = {
 		},
 	},
 };
-
-/** A single named line, the shape most observations carry. */
 export const SingleLine: Story = {
 	args: {
 		location: {
@@ -60,8 +58,6 @@ export const SingleLine: Story = {
 		},
 	},
 };
-
-/** Collapsed: the second and later files of a observation start closed so the panel stays scannable. */
 export const Collapsed: Story = {
 	args: {
 		defaultOpen: false,
@@ -76,8 +72,6 @@ export const Collapsed: Story = {
 		},
 	},
 };
-
-/** The quote was withheld and the app cannot know why: it says only that, and names the place. */
 export const Redacted: Story = {
 	args: {
 		location: {
@@ -89,11 +83,6 @@ export const Redacted: Story = {
 		},
 	},
 };
-
-/**
- * The secret scanner is the one detector allowed to omit a quote, so here the reason *is* knowable
- * and gets said — the text was never stored, and the reader is pointed at the line to read it there.
- */
 export const RedactedBySecretScanner: Story = {
 	args: {
 		location: {
@@ -107,8 +96,6 @@ export const RedactedBySecretScanner: Story = {
 		detector: "secret-diff-scanner",
 	},
 };
-
-/** No directory to absorb truncation — the file name carries the whole identity. */
 export const BareFileName: Story = {
 	args: {
 		location: {
@@ -121,8 +108,6 @@ export const BareFileName: Story = {
 		},
 	},
 };
-
-/** A line far wider than the block: it scrolls, and the gutter stays pinned to the left edge. */
 export const LongLines: Story = {
 	args: {
 		location: {
@@ -138,12 +123,6 @@ export const LongLines: Story = {
 		},
 	},
 };
-
-/**
- * A quote from an object source. Its numbers are offsets into a serialised context file, not lines
- * of anything the reader could open, so no gutter and no range are shown — only the source and the
- * quote. This is the case that used to render a Slack message as though it were code.
- */
 export const ObjectSource: Story = {
 	args: {
 		location: {
@@ -160,12 +139,6 @@ export const ObjectSource: Story = {
 		},
 	},
 };
-
-/**
- * A quote from the old side of the change: the line is marked, because it is not what the file says
- * now. The new side carries no marker — it is where nearly every quote comes from, so labelling it
- * would say nothing.
- */
 export const QuotedFromBeforeTheChange: Story = {
 	args: {
 		location: {

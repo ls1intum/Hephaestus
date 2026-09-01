@@ -5,18 +5,11 @@ import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui
 import { Textarea } from "@/components/ui/textarea";
 
 export interface FeedbackCommentProps {
-	/** The comment already recorded, if any. Editing starts from it and is discarded on cancel. */
 	comment?: string;
-	/** The server requires an explanation for a disputed observation and rejects an empty one. */
 	isRequired: boolean;
 	isPending?: boolean;
 	onSave: (comment: string | undefined) => void;
 }
-
-/**
- * The written half of a response. The draft stays local until saved, so a keystroke sends no request
- * and abandoning it leaves the recorded comment untouched.
- */
 export function FeedbackComment({ comment, isRequired, isPending, onSave }: FeedbackCommentProps) {
 	const [draft, setDraft] = useState(comment ?? "");
 	const fieldId = useId();

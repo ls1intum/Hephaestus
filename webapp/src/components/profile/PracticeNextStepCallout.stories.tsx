@@ -27,8 +27,6 @@ const meta = {
 
 export default meta;
 type Story = StoryObj<typeof meta>;
-
-/** At group level: the guidance the review delivered for the group as a whole. */
 export const SuggestedNextStep: Story = {
 	args: {
 		label: "Suggested next step",
@@ -36,11 +34,6 @@ export const SuggestedNextStep: Story = {
 			"Keep changes focused on one concern, so a reviewer can hold the whole change in view.",
 	},
 };
-
-/**
- * Inside a practice row the callout gives up its own edges, so it reads as part of the card it sits
- * in rather than as a second box drawn on top of one.
- */
 export const InsideAPracticeRow: Story = {
 	args: {
 		label: "Your next step",
@@ -57,8 +50,6 @@ export const InsideAPracticeRow: Story = {
 		),
 	],
 };
-
-/** Long guidance wraps rather than truncating: a next step read half-way is worse than none. */
 export const LongGuidance: Story = {
 	args: {
 		label: "Your next step",

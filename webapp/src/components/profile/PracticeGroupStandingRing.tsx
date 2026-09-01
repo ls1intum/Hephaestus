@@ -3,16 +3,6 @@ import { PRACTICE_GROUP_STANDING_DEFS } from "@/components/practice-vocabulary/p
 import { statusToneClass, statusValues } from "@/components/practice-vocabulary/status-def";
 
 type Standing = PracticeStanding["standing"];
-
-/**
- * One segment per standing, in the registry's own worst-first order, so the segment a reader should
- * act on starts at twelve o'clock. Words and colour both come from the registry — the legend this
- * feeds sits directly above the badge naming the same value, and the two used to disagree.
- *
- * The two outline standings are the one place the ring departs from `statusToneClass`: both would
- * resolve to the same muted grey, and two adjacent identical arcs are not a breakdown. They are
- * separated by opacity here, and by their icons in the badge.
- */
 const RING_OPACITY: Partial<Record<Standing, string>> = {
 	NOT_OBSERVED: "text-muted-foreground/75",
 	NO_OPPORTUNITY: "text-muted-foreground/45",

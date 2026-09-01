@@ -1,4 +1,5 @@
 import { ChevronDownIcon } from "lucide-react";
+import { useState } from "react";
 import type { PracticeGroupReviewObservation } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import {
@@ -37,15 +38,6 @@ interface ResponseChoiceProps<TValue extends string> {
 	isPending: boolean;
 	onChoose: (value: TValue) => void;
 }
-
-/**
- * One row of the response: a question and the answers a registry defines for it.
- *
- * Both halves render through this, so neither can pick its own words, glyph or tint. The usefulness
- * pair was written out by hand once, and the tinted background it chose put its own label at 4.46:1
- * — under WCAG 2.2 SC 1.4.3, and invisible until a story rendered that button enabled. The chosen
- * answer is marked by `bg-muted` plus the registry's tone, which stays legible for every value.
- */
 function ResponseChoice<TValue extends string>({
 	legend,
 	defs,
@@ -86,10 +78,6 @@ export interface ReviewObservationRowProps {
 	detailState?: ObservationDetailState;
 	showPracticeName?: boolean;
 	onToggle?: (observationId: string) => void;
-	/**
-	 * Records the developer's complete answer. The endpoint replaces rather than patches, so the whole
-	 * response travels together — a control that sent only its own half would erase the others.
-	 */
 	onRespond?: (observation: PracticeGroupReviewObservation, response: FeedbackResponse) => void;
 	isFeedbackResponsePending?: boolean;
 }
@@ -103,6 +91,7 @@ export function ReviewObservationRow({
 	onRespond,
 	isFeedbackResponsePending = false,
 }: ReviewObservationRowProps) {
+	const [pendingResolution, setPendingResolution] = useState<FeedbackResolution>();
 	const outcome = observationOutcome(observation);
 	const status = OBSERVATION_OUTCOME_PRESENTATION[outcome];
 	const StatusIcon = status.icon;
@@ -117,15 +106,26 @@ export function ReviewObservationRow({
 	const title = trimmedTitle.length > 0 ? trimmedTitle : observation.practiceName;
 
 	const recorded = feedbackResponseOf(observation);
+	const selectedResolution =
+		pendingResolution === recorded.resolution ? undefined : pendingResolution;
 	const respond = (change: FeedbackResponse) => {
 		if (!observation.feedbackId || !onRespond) return;
 		onRespond(observation, { ...recorded, ...change });
 	};
-	/** Pressing the value that is already set withdraws it, which is how a response is undone. */
 	const toggleUsefulness = (usefulness: FeedbackUsefulness) =>
 		respond({ usefulness: recorded.usefulness === usefulness ? undefined : usefulness });
-	const toggleResolution = (resolution: FeedbackResolution) =>
+	const toggleResolution = (resolution: FeedbackResolution) => {
+		if (selectedResolution === resolution) {
+			setPendingResolution(undefined);
+			return;
+		}
+		if (resolution === "DISPUTED" && !recorded.comment?.trim()) {
+			setPendingResolution(resolution);
+			return;
+		}
+		setPendingResolution(undefined);
 		respond({ resolution: recorded.resolution === resolution ? undefined : resolution });
+	};
 
 	return (
 		<li>
@@ -224,23 +224,23 @@ export function ReviewObservationRow({
 											isPending={isFeedbackResponsePending}
 											onChoose={toggleUsefulness}
 										/>
-										{/* A separate question from usefulness: this one is about the work, that one about
-										    the review. The server keeps them independent, so neither derives the other. */}
 										<ResponseChoice
 											legend="What did you do about it?"
 											defs={FEEDBACK_RESOLUTION_DEFS}
-											chosen={recorded.resolution}
+											chosen={selectedResolution ?? recorded.resolution}
 											isPending={isFeedbackResponsePending}
 											onChoose={toggleResolution}
 										/>
-										{/* Keyed on the answer it seeds from: a comment that changes underneath — saved,
-										    withdrawn, refetched — restarts the draft instead of leaving stale text. */}
 										<FeedbackComment
 											key={`${observation.observationId}:${recorded.comment ?? ""}`}
 											comment={recorded.comment}
-											isRequired={recorded.resolution === "DISPUTED"}
+											isRequired={
+												selectedResolution === "DISPUTED" || recorded.resolution === "DISPUTED"
+											}
 											isPending={isFeedbackResponsePending}
-											onSave={(comment) => respond({ comment })}
+											onSave={(comment) => {
+												respond({ comment, resolution: selectedResolution ?? recorded.resolution });
+											}}
 										/>
 									</div>
 								)}

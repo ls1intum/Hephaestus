@@ -32,15 +32,6 @@ import type { FeedbackResponse, ObservationDetailState } from "./review-runs";
 import { ReviewRunTimeline } from "./ReviewRunTimeline";
 
 type PracticeStandingKey = NonNullable<PracticeStanding["standing"]> | "UNMEASURED";
-
-/**
- * A practice node reads its glyph, its words and its colour off the standing registry, so it cannot
- * drift from the group badge above it — a hand-kept copy here had already lost the slash that tells
- * `NO_OPPORTUNITY` apart from `NOT_OBSERVED`, leaving the two identical on screen.
- *
- * `UNMEASURED` is the one entry the registry cannot own: it is not a standing the server reports but
- * the client's word for a practice it sent no standing for at all.
- */
 const UNMEASURED_NODE = {
 	label: "Not measured yet",
 	icon: CircleDashedIcon,
@@ -51,11 +42,6 @@ const UNMEASURED_NODE = {
 function standingNode(standing: PracticeStandingKey): StatusDef {
 	return standing === "UNMEASURED" ? UNMEASURED_NODE : PRACTICE_GROUP_STANDING_DEFS[standing];
 }
-
-/**
- * The review-run feed as one value rather than seven flags. Loading-and-failed was representable
- * before this, and an error could arrive without a retry — `PanelState` makes both unspellable.
- */
 export type ReviewRunFeedState = PanelState<{
 	runs: PracticeGroupReviewRun[];
 	hasMore: boolean;
@@ -70,24 +56,13 @@ const EMPTY_FEED: ReviewRunFeedState = {
 	isLoadingMore: false,
 	onLoadMore: () => undefined,
 };
-
-/**
- * A practice in the group, with everything this page shows about it.
- *
- * One array rather than the four slug-keyed records this used to take: those could disagree — a
- * standing for a slug the practice list did not have, or the reverse — and nothing would say so.
- * The route already holds all four facts together before splitting them up, so joining them there
- * is both shorter and the only place that can do it correctly.
- */
 export interface ContributingPractice {
 	slug: string;
 	name: string;
 	whyItMatters?: string;
 	whatGoodLooksLike?: string;
-	/** Absent when the server reported no standing for this practice at all. */
 	standing?: PracticeStanding["standing"];
 	trend?: PracticeTrend;
-	/** The delivered guidance, when the review had any; the page falls back to the catalog text. */
 	nextStep?: string;
 }
 
@@ -98,14 +73,11 @@ export interface PracticeGroupDetailPageProps {
 	groupTrend?: PracticeTrend;
 	selectedPracticeSlug?: string;
 	onSelectPractice?: (practiceSlug: string | undefined) => void;
-	/** The feed as one state: loading, failed with a retry, or ready with its paging controls. */
 	feed?: ReviewRunFeedState;
-	/** How many placeholder rows the loading feed draws — the caller knows its page size. */
 	skeletonRows?: number;
 	openObservationId?: string;
 	observationDetail?: ObservationDetailState;
 	onToggleObservation?: (observationId: string) => void;
-	/** The developer's complete answer to one piece of feedback; the endpoint replaces, not patches. */
 	onRespond?: (observation: PracticeGroupReviewObservation, response: FeedbackResponse) => void;
 	pendingFeedbackId?: string;
 	isLoading: boolean;
@@ -119,12 +91,6 @@ interface DetailSectionIntroProps {
 	title: string;
 	description: string;
 }
-
-/**
- * The heading of one column. Both columns place theirs in the same subgrid row, so the browser
- * matches their heights and the content below starts level — a fixed `min-height` guessed at that
- * and broke the moment one description wrapped to a second line.
- */
 function DetailSectionIntro({ id, title, description }: DetailSectionIntroProps) {
 	return (
 		<div className="grid content-start gap-1">
@@ -351,7 +317,6 @@ export function PracticeGroupDetailPage({
 															direction={practiceTrend.direction}
 															support={practiceTrend.support}
 															scope="practice"
-															// Above this row's own z-10 overlay link.
 															className="relative z-20"
 														/>
 													)}
@@ -480,7 +445,6 @@ export function PracticeGroupDetailPage({
 									: "Review runs appear here once your work has been reviewed."}
 							</EmptyDescription>
 						</EmptyHeader>
-						{/* The narrowed case offers the way out rather than only naming it. */}
 						{hasAnyFeedNarrowing && onSelectPractice && (
 							<EmptyContent>
 								<Button
