@@ -105,8 +105,14 @@ the changeset, not the header.
 ## 9. Open the PR
 
 ```bash
-PAGER=cat gh pr view --json number,url 2>/dev/null || PAGER=cat gh pr create --base main --title "<type>(<scope>): <description>" --body "$(cat <<'BODY'
-## Description
+PAGER=cat gh pr view --json number,url
+```
+
+If that reports that the current branch has no pull request, create it:
+
+```bash
+PAGER=cat gh pr create --base main --title "<type>(<scope>): <description>" --body "$(cat <<'BODY'
+## What changed and why
 
 <1-2 sentences: what and why>
 
@@ -114,15 +120,40 @@ PAGER=cat gh pr view --json number,url 2>/dev/null || PAGER=cat gh pr create --b
 
 <manual steps, or "CI covers this">
 
-## Checklist
+## Release impact
 
-<the items from .github/PULL_REQUEST_TEMPLATE.md that apply>
+<link the changeset and state operator action, or explain why neither applies>
+
+## Notes for reviewers
+
+<risks, tradeoffs, follow-up work, or delete this section>
+
+## Visual evidence
+
+<UI: before and after. Motion or timing: a short video. Otherwise delete this section.>
 BODY
 )"
 ```
 
-## 10. Verify
+## 10. Upload visual evidence
+
+For a UI change, save PR-only evidence under the ignored `tmp/` directory and inspect it for
+secrets, personal data, and unrelated content. Give each image alt text that describes the visible
+state. For a video, describe the demonstrated behavior in the PR body.
+
+```bash
+mkdir -p tmp
+gh pr edit --attach './tmp/before.png#Settings before the change' --attach './tmp/after.png#Settings after the change'
+```
+
+An upload can add earlier files before a later file fails. Inspect the PR before retrying, then
+attach only the missing files.
+
+## 11. Verify
 
 ```bash
 PAGER=cat gh pr view --json url,title -q '"PR: \(.title)\nURL: \(.url)"'
 ```
+
+Open the URL and check that every attachment renders, describes the intended state, and contains no
+sensitive or unrelated content.

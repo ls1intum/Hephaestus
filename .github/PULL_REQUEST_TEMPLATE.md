@@ -1,43 +1,23 @@
-<!--
-TITLE FORMAT (required):
-  <type>(<scope>): <description>
+<!-- Thanks for contributing. Use the title format in CONTRIBUTING.md and delete sections that do not apply. -->
 
-  Types and scopes: CONTRIBUTING.md § Pull Request Title Guidelines (validated by commitlint.config.ts).
-  Breaking changes are carried by the changeset (pre-1.0: minor + **Operators:** + .migration/<slug>.md), not the title.
+## What changed and why
 
-  ✓ Good: feat(leaderboard): add weekly ranking filter
-  ✓ Good: fix(ci): update workflow configuration
-  ✗ Bad:  Added weekly ranking filter to leaderboard
+<!-- Start with the problem, then explain the solution and why this approach is appropriate. -->
 
-BEFORE PUSHING:
-  pnpm run format && pnpm run check     # Apply formatting, then run the local quality gate
-
-AFTER API CHANGES:
-  pnpm run generate:api                # Rewrites server/openapi.yaml and webapp/src/api
-
-AFTER DATABASE/ENTITY CHANGES:
-  pnpm run db:draft-changelog          # Writes this branch's changelog (needs Docker); prune it, add preconditions and rollbacks
-  pnpm run db:generate-erd-docs        # After pruning
--->
-
-## Description
-
-<!-- 1-2 sentences: what changed, and why. -->
-
-Fixes # <!-- Link issue if applicable, or delete this line -->
+<!-- Link related work with "Fixes #123" when merging this PR should close it. -->
 
 ## How to test
 
-<!-- Manual steps to verify, OR "CI covers this" for config/docs changes. -->
+<!-- List the behavior you exercised and the exact steps or commands needed to reproduce it. -->
 
-## Checklist
+## Release impact
 
-<!-- Only what CI can't check for you. Changeset presence is enforced by `verify-changesets`. -->
+<!-- Link the changeset and state any operator action. If neither applies, explain why. -->
 
-- [ ] My changeset summary reads as an operator/user-facing note (it becomes the changelog entry) — see `.changeset/README.md`
-- [ ] If operators must act, the changeset and migration fragment state what the operator must do
-- [ ] I did not commit generated-artifact changes that this PR did not cause
+## Notes for reviewers
 
-## Screenshots
+<!-- Call out risks, tradeoffs, follow-up work, or the best place to begin reviewing. Delete if unnecessary. -->
 
-<!-- For UI changes. Delete section if not applicable. -->
+## Visual evidence
+
+<!-- UI changes: show before and after. Motion or timing changes: add a short video. Delete otherwise. -->

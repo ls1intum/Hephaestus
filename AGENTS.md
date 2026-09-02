@@ -203,8 +203,8 @@ Oxlint lints; oxfmt formats and sorts imports. Each tree states its rule set in 
   change is carried by the changeset.
 - Body: the problem in a sentence or two, then how you fixed it and how you verified it. End with
   the model and harness that did the work. `.github/PULL_REQUEST_TEMPLATE.md` is the shape.
-- UI changes need before/after images; motion or timing needs a short video. Upload evidence to
-  GitHub; never commit screenshots or PR-only assets.
+- UI changes need before/after images; motion or timing needs a short video. Never commit PR-only
+  evidence; `/land-pr` owns its preparation and upload.
 - One concern per PR. If the description says "also", split it.
 - A PR that changes shipped code ships a changeset — `.changeset/README.md` is the contract. With no
   TTY, hand-write `.changeset/<slug>.md` in the shape shown there; `verify-changesets` fails the PR
