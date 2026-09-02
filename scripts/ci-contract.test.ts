@@ -562,6 +562,23 @@ void describe("CI contract", () => {
 		assert.doesNotMatch(source, /pull_request\.title|github\.head_ref/);
 	});
 
+	void test("checks out no ref taken straight from a pull_request_target or workflow_run event", async () => {
+		// Scorecard's Dangerous-Workflow rule, checked here because Scorecard itself runs only after merge.
+		for (const [file, source] of await workflowSources()) {
+			if (!/^ {2}(?:pull_request_target|workflow_run):/m.test(source)) continue;
+			assert.doesNotMatch(
+				source,
+				/^ +ref:.*github\.event\.(?:pull_request|workflow_run)/m,
+				`${file} checks out a ref taken from the triggering event`,
+			);
+		}
+		// The release jobs check out the run's commit through an output; this is what makes it safe.
+		assert.match(
+			job(await readFile(".github/workflows/release.yml", "utf8"), "release"),
+			/git merge-base --is-ancestor "\$SHA" origin\/main/,
+		);
+	});
+
 	void test("never invokes a repository-local action before checkout", async () => {
 		for (const [file, source] of await workflowSources()) {
 			for (const jobSource of source.split(/^ {2}(?=[A-Za-z][\w-]*:\s*$)/m).slice(1)) {

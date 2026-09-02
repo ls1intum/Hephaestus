@@ -1,7 +1,7 @@
 name: API
 
 on:
-  pull_request_target: # zizmor: ignore[dangerous-triggers] PR code runs only in the read-only generate job.
+  pull_request:
     branches: [main]
     types: [labeled]
 
@@ -14,6 +14,7 @@ concurrency:
 jobs:
   generate:
     name: Generate spec and client
+    # A fork's token is read-only, so nothing could be pushed back; skip the whole run.
     if: >-
       ${{ github.event.label.name == 'autocommit-openapi'
         && github.event.pull_request.head.repo.full_name == github.repository }}
@@ -36,7 +37,6 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
-      # This executes PR-controlled Maven plugins, so this job must remain read-only and secretless.
       - name: Generate OpenAPI spec and client
         run: pnpm run generate:api
       - name: Upload generated files
@@ -59,7 +59,7 @@ jobs:
     outputs:
       changed: ${{ steps.commit.outputs.changed }}
     steps:
-      # Do not execute files from the checkout or artifact in this job.
+      # Holds the write token: nothing from the checkout or artifact is executed here.
       - name: Checkout PR commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
