@@ -48,13 +48,6 @@ Each of these can leave you with the wrong result.
   local OAuth variables make environment-sensitive tests fail only on your machine. Run tests with
   `MANAGEMENT_PORT=0 SERVER_PORT=0`.
 
-### OpenAPI generation
-
-`generate:api:application-server:specs` packages the reactor, boots the executable JAR under the
-`specs` profile on ports it allocates itself, and writes `/v3/api-docs.yaml` verbatim to
-`server/openapi.yaml`. Point `HEPHAESTUS_APPLICATION_JAR` at an already-built JAR to skip the
-packaging step, which is what CI does with the reactor artifact.
-
 ## Boundaries
 
 **Always** — run the unit baseline and every affected tier before committing · tag every test (`@Tag("unit")`,
@@ -75,7 +68,9 @@ excluded. Every new package needs a `package-info.java` containing
 `NullAway` suppressions. Use `@Nullable` only for genuine absence and place it on the precise type:
 `List<@Nullable String>` permits null elements; `String @Nullable []` permits a null array reference.
 Fix violations at the contract or implementation boundary. In tests, refine a nullable result once
-before using it rather than adding duplicate assertions. Run `pnpm run test:server:unit` after changing
+before using it rather than adding duplicate assertions. The schema-drift gate reads an un-annotated
+entity field in a `@NullMarked` package as a NOT NULL column, so a column that may be NULL in the
+database must carry `@Nullable` on the field. Run `pnpm run test:server:unit` after changing
 a nullness contract.
 
 ## Test tiers
@@ -159,7 +154,9 @@ or on "the only" result, and never write cleanup that another test depends on ha
 1. Modify the JPA entities.
 2. `pnpm run db:draft-changelog`, then prune the diff to the real deltas.
 3. Rename to `<epoch-ms-timestamp>_changelog.xml`; `changeSet` ids are `<timestamp>-1`, `-2`, …
-   One consolidated changelog per branch. Full rules in root `AGENTS.md` § Database changes.
+   One consolidated changelog per branch. Full rules in root `AGENTS.md` § Database changes. Name a
+   foreign key that backs a plain id column with no `@ManyToOne` `sfk_*`; the drift gate ignores
+   that prefix and rejects an `fk_*` constraint that no association declares.
 4. `pnpm run db:generate-erd-docs`.
 5. `pnpm changeset` — a user-facing summary. Touching `db/changelog/` without touching `.changeset/`
    is always wrong. These are two unrelated things both called "changeset".
@@ -187,9 +184,7 @@ through `core.webhook.WebhookProperties`, shared with auto-registration in `work
 
 ## Container image
 
-Paketo Cloud Native Buildpacks with Application CDS, built from the executable JAR the tests ran.
-`application/project.toml` pins the builder and buildpacks by digest; CI pins the run image beside
-the build. There is no `Dockerfile`. From `server/`, run
+Paketo Cloud Native Buildpacks with Application CDS; no `Dockerfile`. From `server/`:
 `./mvnw -pl application -am package -DskipTests`, then
-`pack build hephaestus/application-server --path application/target/hephaestus-application-*.jar --descriptor application/project.toml --run-image <digest in project.toml>`.
-See `docs/admin/buildpacks-cds-decision.md`.
+`pack build hephaestus/application-server --path application/target/hephaestus-application-*.jar --descriptor application/project.toml --run-image <the run image pinned in .github/workflows/ci-build.yml>`.
+Pinning and rationale: `docs/admin/buildpacks-cds-decision.md`.

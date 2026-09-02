@@ -195,6 +195,7 @@ server/postgres-data/
 server/postgres-data-temp-*
 server/postgres-data-temp/
 server/postgres-data*.tgz
+server/application/src/main/resources/db/changelog_new.xml
 /server/application/src/test/resources/application-github-integration-local.yml
 .settings/
 share/python-wheels/

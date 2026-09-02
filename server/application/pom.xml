@@ -30,7 +30,8 @@
         <hephaestus.surefire.forkCount>1</hephaestus.surefire.forkCount>
         <!-- 4g sized for the unit+arch run (ArchUnit + Modulith class graph). -->
         <hephaestus.surefire.maxHeap>4096m</hephaestus.surefire.maxHeap>
-        <!-- JaCoCo's prepare-agent overwrites this; the empty default lets surefire:test run without it. -->
+        <!-- Surefire expands @{argLine}. JaCoCo's prepare-agent sets it in the lifecycle; the empty
+             default lets a bare surefire:test goal run without that phase. -->
         <argLine />
         <surefire.excludedGroups>live</surefire.excludedGroups>
         <surefire.includedGroups>unit</surefire.includedGroups>
@@ -670,7 +671,7 @@
                 <version>${liquibase.version}</version>
                 <configuration>
                     <changeLogFile>db/master.xml</changeLogFile>
-                    <diffChangeLogFile>src/main/resources/db/changelog_new.xml</diffChangeLogFile>
+                    <diffChangeLogFile>${project.basedir}/src/main/resources/db/changelog_new.xml</diffChangeLogFile>
                     <searchPath>${project.basedir}/src/main/resources</searchPath>
                     <driver>org.postgresql.Driver</driver>
                     <url>jdbc:postgresql://localhost:${postgres.port}/hephaestus</url>
@@ -680,22 +681,14 @@
                         hibernate:spring:de.tum.cit.aet.hephaestus?dialect=org.hibernate.dialect.PostgreSQLDialect&amp;hibernate.physical_naming_strategy=org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy&amp;hibernate.implicit_naming_strategy=org.springframework.boot.hibernate.SpringImplicitNamingStrategy
                     </referenceUrl>
                     <!--
-                        Exclude objects that exist in the Liquibase-managed schema but that Hibernate
-                        cannot (and must not) generate, so the JPA-vs-DB drift diff stays empty for them.
-                        Exclusions are by TYPE + CONVENTION, not a hand-maintained name list, so new
-                        scalar FKs / partitions are covered automatically while genuine drift on the ~50
-                        entities that DO model FKs via JPA associations (named fk_*) is still caught.
-
-                        - table:shedlock / table:auth_rate_limit_bucket — sidecar tables with no JPA
-                          entity (ShedLock + the token-bucket store are managed outside JPA).
-                        - table:auth_event_default / table:auth_event_p\d+ — declarative RANGE partitions
-                          of auth_event. Hibernate models only the parent; PostgreSQL partitions are a known
-                          Liquibase-diff blind spot (liquibase/liquibase#1874), so children read as "extra".
-                        - foreignkey:sfk_.* — the "scalar foreign key" naming convention (ADR 0017): an FK
-                          backing a plain Long id with NO @ManyToOne (chosen to break module cycles).
-                          Hibernate emits the column but never the constraint. Real @ManyToOne FKs keep the
-                          fk_* name and stay drift-checked; new scalar FKs MUST be named sfk_* (enforced
-                          only by review — see the 1780825201546_changelog.xml header).
+                        Schema objects Hibernate cannot emit, excluded by type and naming convention so
+                        the JPA-vs-DB diff stays empty without a hand-maintained name list:
+                        - shedlock and auth_rate_limit_bucket have no JPA entity;
+                        - auth_event_default and auth_event_p<n> are PostgreSQL partitions of auth_event,
+                          which Liquibase reads as extra tables (liquibase/liquibase#1874);
+                        - sfk_* is a foreign key backing a scalar id column with no JPA association
+                          (ADR 0017). An association's foreign key keeps the fk_* name and is
+                          drift-checked; a misnamed constraint fails the gate in either direction.
                     -->
                     <diffExcludeObjects>table:shedlock,table:auth_rate_limit_bucket,table:auth_event_default,table:auth_event_p\d+,foreignkey:sfk_.*</diffExcludeObjects>
                     <verbose>true</verbose>

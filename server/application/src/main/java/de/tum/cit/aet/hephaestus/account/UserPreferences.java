@@ -17,6 +17,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.hibernate.annotations.ColumnDefault;
 import org.jspecify.annotations.Nullable;
 
 @Entity
@@ -43,6 +44,7 @@ public class UserPreferences {
     @ToString.Exclude
     private User user;
 
+    @ColumnDefault("false")
     @Column(name = "participate_in_research", nullable = false)
     private boolean participateInResearch = false;
 

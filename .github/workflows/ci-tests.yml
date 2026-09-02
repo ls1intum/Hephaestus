@@ -16,9 +16,9 @@ on:
 
 permissions: {}
 
-# The two long server suites compile from source and start at once: each is longer than the package
-# job, so waiting for the packaged reactor would cost more than the compile it saves, and neither
-# suite ships anything. Everything that runs the packaged reactor lives in ci-build.yml.
+# Both suites compile from source instead of depending on ci-build.yml's package job: neither
+# produces anything that ships, and each runs longer than packaging, so a dependency would only
+# lengthen the critical path. Revisit if packaging ever outlasts a suite.
 jobs:
   server-verification:
     name: "App Server: Unit and architecture"

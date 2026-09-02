@@ -50,7 +50,7 @@ on:
       labels:
         type: string
         required: false
-        description: "OCI labels"
+        description: "OCI labels for Dockerfile builds; the buildpacks path applies none"
       build-args:
         type: string
         required: false
@@ -184,9 +184,8 @@ jobs:
           name: ${{ inputs.application-artifact }}
           path: ${{ runner.temp }}/application
 
-      # The JAR is the one the test tiers ran; the buildpacks only add the runtime and the CDS
-      # archive. --publish exports straight to the registry, and the digest-pinned builder is
-      # trusted so one creator container runs every lifecycle phase.
+      # --publish exports straight to the registry; --trust-builder lets one creator container run
+      # every lifecycle phase, which is safe because the builder is pinned by digest.
       - name: Build and push (Buildpacks + CDS)
         id: build-buildpacks
         if: inputs.use-buildpacks
@@ -432,7 +431,8 @@ jobs:
             > /dev/null
           gh attestation verify "oci://$IMAGE_REF" --owner "${{ github.repository_owner }}"
 
-  # Scan one platform before merge; release evidence scans every published platform.
+  # linux/amd64 only: the base images ship the same packages on every architecture, and the
+  # release scans every published platform where the evidence bundle must be complete.
   scan:
     name: Scan linux/amd64 Image
     needs: [build, merge]
@@ -510,8 +510,7 @@ jobs:
             "$REPOSITORY" "reports/$IMAGE-linux-amd64.json" security/vulnerability-policy.json \
             "reports/$IMAGE-linux-amd64.policy.json"
 
-      # The policy result names the CVEs; without it the gate says only that the image failed,
-      # and diagnosing v0.75.0 meant rebuilding and rescanning the base image by hand.
+      # The policy result names the CVEs; the gate's exit status alone cannot.
       - name: Upload the vulnerability policy result
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

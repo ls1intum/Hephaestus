@@ -1,5 +1,5 @@
 name: "Restore the built server"
-description: "Downloads the packaged reactor into server/ and installs its generated-clients JAR, so Maven goals run against the built classes instead of compiling again."
+description: "Downloads the packaged reactor into server/ and installs its generated-clients JAR and parent pom, so single-module Maven goals resolve them from the local repository instead of compiling again."
 inputs:
   artifact:
     description: "Name of the reactor artifact uploaded by the package job"

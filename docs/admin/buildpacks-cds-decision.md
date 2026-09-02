@@ -33,8 +33,8 @@ production. CDS preserves runtime configuration while improving startup.
 
 `server/application/project.toml` pins `builder-noble-java-tiny` and the `health-checker` buildpack
 by sha256 digest; `.github/workflows/ci-build.yml` pins `ubuntu-noble-run-tiny` the same way, because
-the project descriptor has no run-image key. Renovate follows each image's `latest` tag and proposes
-the digest bumps, so a refresh is a reviewed pull request rather than a hand-edited digest.
+the project descriptor has no run-image key. Renovate tracks each image's `latest` tag and opens the
+digest bump.
 
 ## Container healthcheck on the distroless run image
 
@@ -53,13 +53,12 @@ type is added, so the JVM-spawn-per-probe issue (health-checker#87) does not app
 
 ## Rollback
 
-Switch the `application-server-image` job in `.github/workflows/ci-build.yml` from `use-buildpacks: true` to a `docker-file` that packages the same JAR, and re-add that `Dockerfile`. Coolify re-deploys the prior image SHA. Detection: Sentry release-tagged error spike, or Prometheus alert on `application_ready_time_seconds > 15` for three consecutive deploys.
+Re-add a `Dockerfile` for `server/application` and switch the `application-server-image` job in `.github/workflows/ci-build.yml` from `use-buildpacks: true` to `docker-file`. The Dockerfile path builds from the checkout, not from the packaged JAR, so the build-once guarantee lapses until that path also downloads `application-artifact`. Coolify re-deploys the prior image SHA. Detection: Sentry release-tagged error spike, or Prometheus alert on `application_ready_time_seconds > 15` for three consecutive deploys.
 
 ## Operational checklist
 
 - **Coolify graceful shutdown** — `application.yml` sets `SHUTDOWN_TIMEOUT:20s`. Coolify's default container stop-grace is 10s; bump it to ≥25s in the deploy substrate so SIGTERM has time to drain in-flight requests. The Paketo launcher `exec`s the JVM; signal forwarding is native, no `tini`.
 - **JVM memory** — do NOT set `MaxRAMPercentage`, `-Xmx`, or `-Xss` in Coolify env. Paketo's memory calculator handles them. Override only `BPL_JVM_HEAD_ROOM` if needed.
-- **CI build time** — the image job downloads the packaged JAR and spends its time in the CDS training run and the export; nothing is compiled there.
 
 ## Sources
 

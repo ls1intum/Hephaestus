@@ -10,6 +10,7 @@ import jakarta.persistence.ForeignKey;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinColumns;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
@@ -17,6 +18,7 @@ import jakarta.persistence.UniqueConstraint;
 import jakarta.validation.constraints.NotNull;
 import java.time.Instant;
 import java.util.UUID;
+import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -92,6 +94,21 @@ public class Observation {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "practice_id", nullable = false, foreignKey = @ForeignKey(name = "fk_observation_practice"))
     private Practice practice;
+
+    /** Read-only view of the tenancy key: the practice must belong to the observation's workspace. */
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumns(
+            value = {
+                @JoinColumn(name = "practice_id", referencedColumnName = "id", insertable = false, updatable = false),
+                @JoinColumn(
+                        name = "workspace_id",
+                        referencedColumnName = "workspace_id",
+                        insertable = false,
+                        updatable = false),
+            },
+            foreignKey = @ForeignKey(name = "fk_observation_practice_workspace"))
+    @Getter(AccessLevel.NONE)
+    private @Nullable Practice tenantOwnedPractice;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "practice_revision_id", foreignKey = @ForeignKey(name = "fk_observation_revision"))

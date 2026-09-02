@@ -39,10 +39,9 @@ permissions: {}
 env:
   SERVER_BUILD_ARTIFACT: server-build-${{ github.run_id }}
 
-# One package job, then everything that runs the packaged reactor: the API and database contracts,
-# the browser E2E suite and the application image. They run Maven goals or pack against the
-# restored classes and JAR; none of them compiles. The long unit and integration suites are not
-# here on purpose (ci-tests.yml).
+# Every job after server-package runs Maven goals or pack against the restored classes and JAR. A
+# lifecycle phase (compile, package, verify) in a consumer would compile a second time and break
+# the guarantee that the tested JAR is the shipped one; scripts/ci-contract.test.ts rejects it.
 jobs:
   server-package:
     name: "App Server: Package"
@@ -150,9 +149,8 @@ jobs:
 
           ISSUES_FOUND=()
 
-          # draft-changelog first applies the full master.xml chain to the empty DB via
-          # liquibase:update — so this step is ALSO the empty→head migration-chain replay gate (a
-          # changelog that doesn't apply fails here). Keep that apply intact.
+          # db:draft-changelog applies the whole master.xml chain to an empty database before it
+          # diffs, so this step is also the migration-chain replay gate.
           pnpm run db:draft-changelog || ISSUES_FOUND+=("Schema check / migration-chain apply failed. Run: pnpm run db:draft-changelog")
           if [ -f "server/application/src/main/resources/db/changelog_new.xml" ]; then
             echo "::error::Schema drift detected. Run: pnpm run db:draft-changelog"
@@ -344,5 +342,4 @@ jobs:
       # renovate: datasource=docker depName=paketobuildpacks/ubuntu-noble-run-tiny
       run-image: "paketobuildpacks/ubuntu-noble-run-tiny@sha256:c32333227b6dfbc2a4a93b03ee6d3475cfe152468c7d396bf22f06099bb0ecc9"
       registry: "ghcr.io"
-      # Buildpacks images carry the lifecycle's own metadata labels; pack accepts no OCI labels.
       single-arch: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}

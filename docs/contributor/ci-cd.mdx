@@ -76,9 +76,11 @@ in `REVIEW_POLICY_MAINTAINERS` receive an automated approval; every other author
 write access. Repository administrators own that allow-list. Remove the automation when independent
 maintainer review is available.
 
-The approval workflow evaluates only the author login using code checked out from the default branch.
-It runs no pull-request code and approves nobody when the allow-list is empty. Its event set also covers
-stacked pull requests before they are retargeted to `main`.
+The approval workflow runs on `pull_request_target` with `pull-requests: write`, so it checks out only
+`scripts/` from the default branch, reads the author login and nothing else, and executes no
+pull-request code. An empty allow-list approves nobody. It has no `branches:` filter: a stacked
+layer is approved while it still targets the layer below, because retargeting to `main` after the
+lower layer merges fires no event.
 
 The changesets Version PR is the temporary exception: updates made with `GITHUB_TOKEN` do not trigger
 the required workflows, so release automation uses the ruleset bypass. The resulting version bump
@@ -98,17 +100,11 @@ source validation.
 | OpenSSF Scorecard | `main`, branch-protection changes, and weekly | posture findings do not extend the pull-request critical path | code scanning and run artifact |
 | Renovate | configured schedule and vulnerability alerts | pull requests require normal review and CI | dependency dashboard |
 
-Renovate opens bounded, independently reviewable update pull requests on weekday mornings; only
-major updates wait for an explicit Dependency Dashboard approval. Vulnerability alerts bypass the
-normal release-age delay and approval gate. Native managers cover package manifests, lockfiles,
-container bases, Maven, and GitHub Actions, while tested regex managers cover version declarations
-that have no native manager. The dashboard is an inventory and decision surface, not a queue that
-maintainers must drain before routine fixes can start.
-
-Renovate is not the supply-chain inventory by itself: it discovers update coordinates in source,
-whereas lockfiles describe resolved package graphs and release SBOMs describe the contents of final
-artifacts. Dependency review, image scanning, signed provenance, scheduled rescans, and the release
-SBOM therefore remain required layers rather than substitutes for dependency updates.
+Renovate opens update pull requests on weekday mornings; only major updates wait for a Dependency
+Dashboard approval, and vulnerability alerts bypass the release-age delay and the approval gate.
+Native managers cover package manifests, lockfiles, container bases, Maven, and GitHub Actions;
+regex managers covered by `scripts/renovate-config.test.ts` cover version declarations that have
+no native manager.
 
 [Vulnerability remediation](./vulnerability-remediation.mdx) owns the blocking and exception policy.
 [Release management](./release-management.mdx#supply-chain-evidence) owns artifact signing, provenance,
@@ -211,7 +207,7 @@ why the label is the authority, and which alternatives were priced and declined,
 | `ci-tests.yml`         | Called by cicd.yml    | The server unit, architecture and integration suites, compiled from source |
 | `ci-docker-build.yml`  | Called by cicd.yml    | Dockerfile image builds (webapp, agent, PostgreSQL) and aliases for unchanged images |
 | `reusable-docker-build.yml` | Called by ci-build.yml and ci-docker-build.yml | Builds, signs, attests, and blocks on the release vulnerability policy for the `linux/amd64` image |
-| `ci-security-scan.yml` | Called by cicd.yml    | Dependency scanning (Trivy), secret detection      |
+| `ci-security-scan.yml` | Called by cicd.yml    | Dependency review on pull requests; Trivy dependency scan, secret detection and repository policy checks |
 | `rescan-main-images.yml` | Weekly, manual | Rescans main's published images against the release vulnerability policy and keeps one tracking issue in step with the findings |
 | `ci-profile.yml` | Weekly, manual | Profiles server integration tests and Spring contexts |
 | `ci-server-clean-reference.yml` | Weekly, manual | Records cold server phases and compares generated JARs |
@@ -230,8 +226,8 @@ why the label is the authority, and which alternatives were priced and declined,
 | Action | Contract |
 | --- | --- |
 | `setup-node-pnpm` | Installs the versions pinned in `package.json`; `install` must be `none`, `frozen`, or `hardened` |
-| `setup-caches` | Sets up the JDK and restores the Maven dependency cache with a prefix fallback; `application-server-reactor` jobs also restore the generated-client build cache and are the only jobs that write caches, `application-server-tests` jobs run goals against the packaged reactor |
-| `restore-server-build` | Downloads the packaged reactor and installs its generated-clients JAR so single-module Maven goals resolve it; outputs the executable JAR path |
+| `setup-caches` | Sets up the JDK and restores the Maven dependency cache with a prefix fallback; `application-server-reactor` also restores the generated-client build cache and is the only type that writes caches |
+| `restore-server-build` | Downloads the packaged reactor and installs its generated-clients JAR and parent pom so single-module Maven goals resolve them; outputs the executable JAR path |
 | `setup-browsers` | Restores the exact Playwright browser version and installs Chromium system dependencies |
 | `setup-release-security-tools` | Installs Cosign, Trivy, and optionally Syft for release-evidence jobs |
 | `download-trivy-db` | Fetches the vulnerability database with retries and a mirror fallback; optionally refuses one over `max-age-hours` old and records its metadata |
@@ -251,7 +247,7 @@ CI only runs jobs for components that actually changed:
 | Webapp               | `webapp/**`, `docs/images/readme/**`, `.oxlintrc.json`, `.oxfmtrc.json`, and root package configuration |
 | Application Server   | `server/**`, `scripts/**`, `docker/agents/**`, `docs/**`, root lint, format, TypeScript, and package configuration |
 | Agent images         | `docker/agents/**`                                            |
-| CI Config            | `.github/workflows/**`, `.github/actions/**` → runs all jobs  |
+| CI config            | Each leg's own workflow files and actions, through one path filter per leg; any `.github/**` change runs Actionlint and Zizmor |
 
 The whole of `scripts/` counts as application-server change, not just the database helper: the
 contract validator and the changelog-immutability guard live there, and a PR editing only a guard
@@ -282,21 +278,17 @@ limit](https://docs.github.com/en/actions/reference/limits).
 
 ### Build once
 
-`Build` compiles and packages the server reactor once. The OpenAPI and schema gates, the database
-contract tests, the browser E2E suite and the application-server image all download that artifact
-and run Maven goals or `pack` against it; none of them compiles. This is the ["only build your
-binaries once"](https://www.informit.com/articles/article.aspx?p=1621865&seqNum=3) rule of the
-deployment pipeline: the JAR the E2E suite ran is the JAR inside the image, and the OpenAPI spec is
-scraped from that same JAR.
-
-The unit, architecture and integration suites are the deliberate exception. Each is longer than the
-package job, so waiting for the artifact would delay the longest paths by more than the compile they
-save, and neither suite ships anything. They compile from source in `Test` and start immediately.
+`Build` packages the server reactor once. The OpenAPI and schema gates, the database contract tests,
+the browser E2E suite and the application-server image download that artifact and run Maven goals or
+`pack` against it: the JAR the E2E suite ran is the JAR inside the image, and the spec is scraped
+from the same JAR. The unit, architecture and integration suites are the exception: they produce
+nothing that ships and each runs longer than packaging, so they compile from source in `Test` and
+start immediately.
 
 ### Parallel Execution
 
 - Quality legs (App Server, Tooling and Docs, Webapp, Stories) start immediately from source.
-- The unit, architecture and integration suites start immediately from source; the artifact gates (OpenAPI, schema, database, E2E, image) start as soon as the reactor is packaged. Webhook reception is part of the app-server test surface since ADR 0008.
+- Artifact gates (OpenAPI, schema, database, E2E, image) start as soon as the reactor is packaged. Webhook reception is part of the app-server test surface since ADR 0008.
 - Docker images build for both architectures (amd64 + arm64) after a merge; pull requests and merge groups build amd64 only.
 - `fail-fast: false` ensures all jobs complete for full feedback
 

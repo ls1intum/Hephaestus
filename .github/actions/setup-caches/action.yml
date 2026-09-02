@@ -36,7 +36,8 @@ runs:
         fi
         echo "dependencies=$DEPENDENCY_HASH" >> "$GITHUB_OUTPUT"
         echo "generated-clients=$GENERATED_CLIENTS_HASH" >> "$GITHUB_OUTPUT"
-        # Only the default branch's pushes and schedules write caches; every other run reads them.
+        # Only default-branch runs write caches: a cache saved on any other ref is invisible to every
+        # other ref, so a pull-request write would never be reused.
         if [[ "$GITHUB_REF" == "refs/heads/$DEFAULT_BRANCH" && "$GITHUB_EVENT_NAME" =~ ^(push|schedule|workflow_dispatch)$ ]]; then
           echo "save=true" >> "$GITHUB_OUTPUT"
         else

@@ -294,8 +294,8 @@ jobs:
       tooling_changed: ${{ (needs.detect-changes.outputs.tooling == 'true' || needs.detect-changes.outputs.quality-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       pmd_canary: ${{ (needs.detect-changes.outputs.pmd-canary == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
 
-  # Packages the server once and runs everything that consumes that artifact: contracts, E2E and
-  # the application image. Same-repository previews need the image at the head SHA on every push.
+  # Same-repository pull requests run Build regardless of paths: previews need the application
+  # image at the head SHA on every push.
   Build:
     uses: ./.github/workflows/ci-build.yml
     needs: [detect-changes]

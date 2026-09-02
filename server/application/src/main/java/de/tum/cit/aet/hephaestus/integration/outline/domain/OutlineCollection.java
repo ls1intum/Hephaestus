@@ -130,7 +130,7 @@ public class OutlineCollection {
     private Instant createdAt;
 
     @UpdateTimestamp
-    @Column(name = "updated_at")
+    @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
     public boolean isEnabled() {

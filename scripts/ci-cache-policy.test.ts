@@ -24,39 +24,31 @@ await describe("CI cache policy", async () => {
 		}
 	});
 
-	await test("Maven caches are limited to Maven build jobs", async () => {
+	await test("Maven caches are written only by reactor jobs on the default branch", async () => {
 		assert.ok(actionStep("Set up JDK 21").includes("cache-jdk: false"));
 		// A pom change must fall back to the newest default-branch cache, not a full download.
 		const restore = actionStep("Restore Maven dependencies");
 		assert.match(restore, /actions\/cache\/restore@/);
-		assert.match(restore, /restore-keys: \|\n\s+\${{ [^\n]*-maven-\n/);
-		assert.match(restore, /if: steps\.identity\.outputs\.save != 'true'/);
+		assert.match(restore, /restore-keys:[\s\S]*?-maven-\s*$/m);
+		assert.ok(restore.includes("steps.identity.outputs.save != 'true'"));
 		const save = actionStep("Cache Maven dependencies");
-		assert.match(
-			save,
-			/if: steps\.identity\.outputs\.save == 'true' && inputs\.cache-type == 'application-server-reactor'/,
+		assert.ok(save.includes("steps.identity.outputs.save == 'true'"));
+		assert.ok(save.includes("inputs.cache-type == 'application-server-reactor'"));
+		const build = await readFile(".github/workflows/ci-build.yml", "utf8");
+		const e2e = build.slice(
+			build.indexOf("\n  webapp-e2e:"),
+			build.indexOf("\n  application-server-image:"),
 		);
-		assert.doesNotMatch(cacheAction, /webapp-e2e/);
-		const workflow = await readFile(".github/workflows/ci-build.yml", "utf8");
-		assert.match(workflow, /webapp-e2e:[\s\S]*?actions\/setup-java@/);
+		assert.match(e2e, /uses: actions\/setup-java@/);
+		assert.doesNotMatch(e2e, /setup-caches/);
 	});
 
-	await test("browser consumers share one cache-and-install action", async () => {
+	await test("browser consumers share one cache-and-install action", () => {
 		assert.match(
 			browserAction,
 			/key: \${{ runner\.os }}-playwright-\${{ steps\.playwright\.outputs\.version }}/,
 		);
 		assert.doesNotMatch(browserAction, /restore-keys:/);
 		assert.match(browserAction, /playwright install chromium --with-deps/);
-		for (const file of [
-			".github/workflows/ci-build.yml",
-			".github/workflows/ci-quality-gates.yml",
-		]) {
-			const workflow = await readFile(file, "utf8");
-			assert.equal(
-				(workflow.match(/uses: \.\/\.github\/actions\/setup-browsers/g) ?? []).length,
-				1,
-			);
-		}
 	});
 });

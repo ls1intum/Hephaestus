@@ -197,10 +197,10 @@ as a Liquibase `<changeSet>` — a schema change needs both. Full flow:
 
 Each of these fails *quietly* — the command reports success and leaves you with a stale or wrong result.
 
-- **`generate:api:application-server:specs` packages the server first.** It boots the executable JAR
-  on free ports and writes springdoc's YAML verbatim, so the spec always comes from the JAR the tests
-  run; `HEPHAESTUS_APPLICATION_JAR` skips the packaging step. On a cold cache the first run downloads
-  the whole Spring Boot dependency tree; expect several minutes.
+- **`generate:api:application-server:specs` honours `HEPHAESTUS_APPLICATION_JAR`.** With it set, the
+  spec is scraped from that JAR, not from your checkout, and the run still reports success; unset it
+  after a CI-style run. Without it the script packages the reactor first and boots the JAR on ports
+  it allocates itself; on a cold cache expect several minutes.
 - **`db:draft-changelog` needs Docker on PATH** and a running daemon.
 - Maven test selection, concurrent builds, and `server/.env` leaking into test JVMs are covered in
   `server/AGENTS.md` § Build traps. Read it before your first server test run.

@@ -63,7 +63,7 @@ pnpm run db:generate-erd-docs  # after any changelog change
 ```
 
 `generate:api:application-server:specs` packages the reactor and boots the executable JAR on ports
-it allocates itself, so nothing needs freeing; `server/AGENTS.md` § OpenAPI generation has the
+it allocates itself, so nothing needs freeing; root `AGENTS.md` § Command caveats covers the
 `HEPHAESTUS_APPLICATION_JAR` shortcut for a JAR you already built.
 
 ## 5. Run the tests your diff can break
