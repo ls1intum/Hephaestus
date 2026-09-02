@@ -61,20 +61,28 @@ sequenceDiagram
 Release images are promoted **by digest and never rebuilt**, so a commit the evidence gate rejects
 can never pass on a retry — only a new commit can. The gate therefore runs before anything is
 created: a rejected release leaves no draft and no tag behind (a draft materialises no tag), so
-there is nothing to clean up and the version number is not consumed.
+there is nothing to clean up.
 
-Recovering is a revert and a re-cut: revert the version commit, which restores the pending
-changesets, land the fix, and let the Version PR re-cut the same version from a commit that carries
-it. The `verify-changesets` freeze rules — `MIGRATION.md` is not editable in a feature PR, pending
-changesets and migration fragments are not deletable — are lifted for a **verified revert**, which
-`scripts/verify-revert.ts` decides structurally: every commit the pull request
-adds must record `This reverts commit <sha>.`, name a commit that is already an ancestor of the
-base, and carry that commit's patch exactly reversed. Anything else leaves the rules in force.
+Recovering is fixing forward. `scripts/plan-release.ts` cuts the version `main` carries whenever
+that version has **no published release**, from whichever commit carries it, so landing the fix is
+the whole recovery: the next successful CI run on `main` re-cuts the same version from the commit
+that fixes it. Merging the next Version PR instead works just as well — a release follows the
+latest *published* release rather than the version its parent commit carried, so a version that
+never published is simply skipped. An ordinary merge decides nothing either way: it carries a
+version that is already published, which is the one and only no-op.
 
 A failure *after* the draft exists — the seeded-upgrade or supported-host gate, or publication
 itself — is the case the resume path covers: re-running the workflow at the same commit reuses the
-existing draft, regenerates the evidence, and replaces its assets. A draft that can never pass is
-deleted by hand, and the version re-cuts from the fixed commit as above.
+existing draft, regenerates the evidence, and replaces its assets. A draft pins its version to its
+commit, so a later commit refuses to re-cut over it: a draft that can never pass is deleted by
+hand, and the version then re-cuts from the fixed commit.
+
+Reverting the version commit is therefore no longer part of recovery, but the exemption that made
+it possible stands. The `verify-changesets` freeze rules — `MIGRATION.md` is not editable in a
+feature PR, pending changesets and migration fragments are not deletable — are lifted for a
+**verified revert**, which `scripts/verify-revert.ts` decides structurally: every commit the pull
+request adds must record `This reverts commit <sha>.`, name a commit that is already an ancestor of
+the base, and carry that commit's patch exactly reversed. Anything else leaves the rules in force.
 
 ## Supported-host qualification
 

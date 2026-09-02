@@ -4,6 +4,8 @@ import { describe, test } from "node:test";
 
 import { type Document, isMap, isSeq, parseDocument, type YAMLMap } from "yaml";
 
+import { planRelease, releaseOutputs } from "./plan-release.ts";
+
 function job(source: string, name: string): string {
 	const match = source.match(
 		new RegExp(`^  ${name}:\\n([\\s\\S]*?)(?=^  [A-Za-z][\\w-]*:\\s*$|(?![\\s\\S]))`, "m"),
@@ -534,11 +536,8 @@ void describe("CI contract", () => {
 		const decide = job(source, "release");
 		const gate = job(source, "tag-images");
 		// Release images are promoted by digest and never rebuilt, so a draft cut before the gate
-		// can never pass at that commit — and it blocks the next version too, because the
-		// precondition below requires the previous version to be published.
+		// can never pass at that commit.
 		assert.doesNotMatch(decide, /gh release create/);
-		assert.match(decide, /is not a published release/);
-		assert.match(decide, /is not a stable published release/);
 		const created = gate.indexOf('gh release create "$TAG_NAME"');
 		const gated = gate.lastIndexOf("node scripts/verify-release-evidence.ts");
 		const uploaded = gate.indexOf('gh release upload "$TAG_NAME"');
@@ -549,6 +548,28 @@ void describe("CI contract", () => {
 		for (const upload of source.matchAll(/gh release upload[\s\S]*?\n\n/g)) {
 			assert.match(upload[0], /--clobber/);
 		}
+	});
+
+	void test("decides what to release in tested TypeScript, on outputs the workflow reads", async () => {
+		const source = await readFile(".github/workflows/release.yml", "utf8");
+		const decide = job(source, "release");
+		// Four branches over the release listing, one of them "cut a release on this push"; inline
+		// bash cannot be tested, and the ordinary feature merge is the case that must not regress.
+		assert.match(decide, /node scripts\/plan-release\.ts "\$SHA"/);
+		assert.doesNotMatch(decide, /PARENT_VERSION|gh release view/);
+		// Every output the workflow reads is one the planner writes, and nothing it writes is dead.
+		const plan = planRelease("cafe", "0.75.0", [
+			{ isDraft: false, isPrerelease: false, tag: "v0.74.0", targetCommitish: "main" },
+		]);
+		const read = [...source.matchAll(/steps\.cut\.outputs\.([\w-]+)/g)].map((match) => {
+			const name = match[1];
+			assert.ok(name);
+			return name;
+		});
+		assert.deepEqual(
+			[...new Set(read)].toSorted(),
+			Object.keys(releaseOutputs(plan, true)).toSorted(),
+		);
 	});
 
 	void test("exempts a verified revert from the changeset freeze rules", async () => {
