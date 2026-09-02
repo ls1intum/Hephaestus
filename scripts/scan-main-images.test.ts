@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { describe, test } from "node:test";
 
-import { PLATFORM, planSubjects, reportStem, selectPlatformDigest } from "./scan-main-images.ts";
+import { isImageIndex, PLATFORM, reportStem, selectPlatformDigest } from "./lib/image-scan.ts";
+import { planSubjects } from "./scan-main-images.ts";
 
 const DIGEST = `sha256:${"a".repeat(64)}`;
 const ARM_DIGEST = `sha256:${"b".repeat(64)}`;
@@ -32,7 +33,8 @@ void describe("planSubjects", () => {
 		const inventory: unknown = JSON.parse(await readFile("security/release-images.json", "utf8"));
 		const subjects = planSubjects(inventory, "ghcr.io/hephaestus-build", "main");
 		// The four first-party images the release promotes. The upstream images in the same file are
-		// not built here and have no `:main` tag, so they are deliberately not subjects.
+		// not built here and have no `:main` tag, so they are scanned by their pinned digest in
+		// scan-upstream-images.ts instead.
 		assert.deepEqual(subjects.map((subject) => subject.image).toSorted(), [
 			"agent-pi",
 			"application-server",
@@ -98,6 +100,27 @@ void describe("selectPlatformDigest", () => {
 
 	void test("rejects a document that is not a manifest at all", () => {
 		assert.throws(() => selectPlatformDigest("nope", PLATFORM), /must be a JSON object/);
+	});
+});
+
+void describe("isImageIndex", () => {
+	// The two ways selectPlatformDigest returns undefined mean opposite things, and only this tells
+	// them apart: a single manifest is asked for its own digest, while an index missing the platform
+	// must fail. Falling back to the index digest there would hand Trivy a multi-platform reference,
+	// which it resolves against the host — an amd64 scan filed as arm64 evidence.
+	void test("separates a multi-platform index from a single manifest", () => {
+		assert.equal(
+			isImageIndex({
+				manifests: [{ digest: DIGEST, platform: { architecture: "amd64", os: "linux" } }],
+			}),
+			true,
+		);
+		assert.equal(isImageIndex({ manifests: [] }), true);
+		assert.equal(isImageIndex({ config: {}, layers: [] }), false);
+	});
+
+	void test("rejects a document that is not a manifest at all", () => {
+		assert.throws(() => isImageIndex("nope"), /must be a JSON object/);
 	});
 });
 

@@ -1,10 +1,15 @@
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
 import { glob, readFile } from "node:fs/promises";
+import path from "node:path";
 import { describe, test } from "node:test";
 
 import { type Document, isMap, isSeq, parseDocument, type YAMLMap } from "yaml";
 
 import { planRelease, releaseOutputs } from "./plan-release.ts";
+import { planSubjects } from "./scan-main-images.ts";
+import { PLATFORMS, planUpstreamSubjects } from "./scan-upstream-images.ts";
+import { validateManifest } from "./verify-release-evidence.ts";
 
 function job(source: string, name: string): string {
 	const match = source.match(
@@ -35,6 +40,30 @@ async function readSources(files: string[]): Promise<Map<string, string>> {
 
 function escapeRegExp(value: string): string {
 	return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Every repository script a given entry point loads, transitively — its static relative imports,
+ * plus any sibling script it names as a string, which is how the scanners reach the policy
+ * evaluator (they spawn it rather than importing it, so that its exit status is the verdict).
+ */
+async function importClosure(entry: string): Promise<string[]> {
+	const seen = new Set<string>();
+	const queue = [entry];
+	while (queue.length > 0) {
+		const file = queue.shift();
+		if (file === undefined || seen.has(file)) continue;
+		seen.add(file);
+		const source = await readFile(file, "utf8");
+		const directory = path.dirname(file);
+		for (const [, specifier] of source.matchAll(/from\s+"(\.[^"]+\.ts)"/g))
+			queue.push(path.normalize(path.join(directory, specifier ?? "")));
+		for (const [, name] of source.matchAll(/"([\w.-]+\.ts)"/g)) {
+			const candidate = path.normalize(path.join(directory, "..", name ?? ""));
+			if (candidate.startsWith("scripts/") && existsSync(candidate)) queue.push(candidate);
+		}
+	}
+	return [...seen].toSorted();
 }
 
 /** The `with` map of the first step in a job whose `uses` starts with `action`. */
@@ -390,6 +419,80 @@ void describe("CI contract", () => {
 		assert.deepEqual(await Array.fromAsync(glob("security/*vulnerability*.json")), [
 			"security/vulnerability-policy.json",
 		]);
+	});
+
+	void test("scans every release subject before the release, not only at the release gate", async () => {
+		const inventory: unknown = JSON.parse(await readFile("security/release-images.json", "utf8"));
+		const namespace = "ghcr.io/hephaestus-build";
+		const digest = `sha256:${"c".repeat(64)}`;
+		// The subject set the pre-release scans cover, derived from the inventory rather than listed:
+		// the build gate and the weekly rescan take the first-party half, scan-upstream-images.ts the
+		// pinned upstream half.
+		const scanned = [
+			...planSubjects(inventory, namespace, "main").map((subject) => ({
+				...subject,
+				indexDigest: digest,
+				provenance: "first-party" as const,
+			})),
+			...planUpstreamSubjects(inventory).map((subject) => ({
+				...subject,
+				provenance: "upstream" as const,
+			})),
+		];
+		// Parity with the release gate, asserted by the release gate itself: this is the manifest that
+		// would evidence exactly the pre-release subject set, and validateManifest rejects a manifest
+		// whose subjects are not exactly the inventory. So an image the pre-release scans miss, or one
+		// they cover that the release does not, fails here — which is what v0.75.0 needed and did not
+		// have when the upstream half was scanned nowhere before the release (#1741).
+		const manifest = {
+			schemaVersion: 1,
+			subjects: scanned.flatMap((subject) =>
+				(["linux/amd64", "linux/arm64"] as const).map((platform) => ({
+					digest,
+					image: subject.image,
+					indexDigest: subject.indexDigest,
+					platform,
+					provenance: subject.provenance,
+					repository: subject.repository,
+				})),
+			),
+		};
+		assert.doesNotThrow(() => validateManifest(manifest, inventory, namespace));
+
+		// A planner nothing invokes covers nothing. The pinned digests need no build, so they are
+		// scanned on the pull request that changes them — which is the pull request a Renovate digest
+		// bump opens — and again in the weekly rescan, where a finding routes to the tracking issue.
+		assert.match(
+			await readFile(".github/workflows/ci-security-scan.yml", "utf8"),
+			/run: node scripts\/scan-upstream-images\.ts reports\n/,
+		);
+		assert.match(
+			await readFile(".github/workflows/rescan-main-images.yml", "utf8"),
+			/run: node scripts\/scan-upstream-images\.ts reports --report-only\n/,
+		);
+		const detection = job(await readFile(".github/workflows/cicd.yml", "utf8"), "detect-changes");
+		const filter = pathFilter(detection, "release-images");
+		assert.match(
+			filter,
+			/- 'security\/release-images\.json'[\s\S]*- 'security\/vulnerability-policy\.json'/,
+		);
+		// The trigger is derived, not trusted: a filter that lists the entry point but not the module
+		// it parses JSON with skips the gate on the pull request that breaks the parser. Re-walk the
+		// imports and require every file the gate actually loads to appear.
+		for (const file of await importClosure("scripts/scan-upstream-images.ts"))
+			assert.ok(
+				filter.includes(`- '${file}'`),
+				`release-images must trigger on ${file}, which the upstream scan loads`,
+			);
+	});
+
+	void test("scans both released platforms before the release, not just linux/amd64", async () => {
+		// The policy match key is `image | platform | vulnerability | package | installedVersion`, so
+		// a single-platform pre-release scan leaves an arm64-only finding — or an arm64 exception
+		// nobody wrote — to be discovered by the release gate, which is the failure this PR removes.
+		assert.deepEqual([...PLATFORMS], ["linux/amd64", "linux/arm64"]);
+		const source = await readFile("scripts/scan-upstream-images.ts", "utf8");
+		assert.match(source, /for \(const platform of PLATFORMS\)/);
 	});
 
 	void test("rescans main's images weekly and reports drift to an issue, not a status", async () => {

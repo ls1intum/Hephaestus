@@ -8,10 +8,57 @@ on:
         required: false
         type: string
         default: "false"
+      release_images_changed:
+        description: "Whether to scan the upstream images pinned in security/release-images.json"
+        required: false
+        type: string
+        default: "false"
 
 permissions: {}
 
 jobs:
+  upstream-images:
+    name: "Pinned upstream images"
+    runs-on: ubuntu-latest
+    # The four upstream images are shipped by digest and never built here, so no build gate has a
+    # subject for them and the release evidence gate was the first thing that scanned them — which
+    # is how v0.75.0 discovered a days-old finding at the worst possible moment (#1741). A digest
+    # needs no build, so the pull request that changes one scans it.
+    if: inputs.should_skip != 'true' && inputs.release_images_changed == 'true'
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-node-pnpm
+        with:
+          install: "none"
+
+      - uses: ./.github/actions/setup-release-security-tools
+        with:
+          install-syft: "false"
+
+      # A blocking gate inherits Trivy's database availability as a hard dependency, so the
+      # retries and the mirror fallback live in one action rather than in each caller.
+      - uses: ./.github/actions/download-trivy-db
+
+      - name: Enforce the release vulnerability policy on the pinned digests
+        run: node scripts/scan-upstream-images.ts reports
+
+      # The gate's exit status alone cannot say which digest carries which finding.
+      - name: Upload the vulnerability policy results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: vulnerability-policy-upstream
+          path: reports
+          if-no-files-found: warn
+          retention-days: 7
+
   dependency-review:
     name: "New dependency risk"
     runs-on: ubuntu-latest
