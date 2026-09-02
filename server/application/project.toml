@@ -1,0 +1,35 @@
+# Buildpacks recipe for the application-server image, applied by pack to the packaged executable
+# JAR; docs/admin/buildpacks-cds-decision.md has the rationale. The descriptor schema has no
+# run-image key, so ci-build.yml pins the run image beside the build.
+[_]
+schema-version = "0.2"
+
+[io.buildpacks]
+builder = "paketobuildpacks/builder-noble-java-tiny@sha256:3a9f6efa2351dba2492a9c6eb28b3bf52b5f930832a20c39b6261ed7c1a0a085"
+
+# Naming a group replaces the builder's order, so the java composite is listed before the
+# health-checker buildpack the builder does not bundle; it contributes the shell-free `thc` probe the
+# distroless run image needs for a real HEALTHCHECK (docker/compose.app.yaml).
+[[io.buildpacks.group]]
+id = "paketo-buildpacks/java"
+
+[[io.buildpacks.group]]
+uri = "docker://paketobuildpacks/health-checker@sha256:7ef317843d076c93682a2f0f79384dc11ff20227cf779d3b11b9f34e9d8b9246"
+
+[[io.buildpacks.build.env]]
+name = "BP_JVM_VERSION"
+value = "21"
+
+[[io.buildpacks.build.env]]
+name = "BP_JVM_CDS_ENABLED"
+value = "true"
+
+[[io.buildpacks.build.env]]
+name = "BP_HEALTH_CHECKER_ENABLED"
+value = "true"
+
+# The CDS training run boots under application-cds-training.yml; the runtime SPRING_PROFILES_ACTIVE
+# overrides this buildpack default.
+[[io.buildpacks.build.env]]
+name = "SPRING_PROFILES_ACTIVE"
+value = "cds-training"

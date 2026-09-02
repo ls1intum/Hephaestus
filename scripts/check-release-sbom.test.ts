@@ -2,10 +2,6 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { validateReleaseSbom } from "./check-release-sbom.ts";
 
-// The shapes below are the ones Syft 1.51.1 really emits for the released
-// ghcr.io/hephaestus-build/webapp image, digests and all: `--from registry` for the
-// passing fixtures, a Docker daemon pull and an index reference for the two ways an
-// SBOM can end up describing something other than the subject it is filed under.
 const repository = "ghcr.io/hephaestus-build/webapp";
 const digest = "sha256:1102d43b320b1b9c06bdfc7f9e616c068abadace9b6874dedfcf41e1f35da3f5";
 const indexDigest = "sha256:7baaa03d31d57baeb4c09f91d3579909e19b90e802e3e9afb148477edad4fe40";
@@ -111,10 +107,6 @@ await test("rejects wrong subjects and packages lost during conversion", () => {
 });
 
 await test("rejects an SBOM taken from a Docker daemon copy of the artifact", () => {
-	// The daemon re-serializes the registry's OCI manifest as Docker schema 2, so its
-	// digest is a local accident: `syft <ref>` without `--from registry` produced this
-	// and failed the v0.75.0 release. repoDigests still names the subject, so only the
-	// manifest digest can tell the copy from the artifact the release publishes.
 	assert.throws(
 		() =>
 			validateReleaseSbom(
@@ -131,8 +123,6 @@ await test("rejects an SBOM taken from a Docker daemon copy of the artifact", ()
 });
 
 await test("rejects an SBOM taken from the index instead of the platform manifest", () => {
-	// Scanning `repository@<index digest> --platform linux/amd64` reports this
-	// platform's manifestDigest, so only the resolved reference distinguishes it.
 	assert.throws(
 		() =>
 			validateReleaseSbom(
@@ -178,7 +168,6 @@ await test("rejects an index, which describes more than one artifact", () => {
 });
 
 await test("rejects an SBOM for the same image in another namespace", () => {
-	// The pre-transfer namespace still serves a webapp image (issue #1599).
 	const previous = "ghcr.io/ls1intum/hephaestus/webapp";
 	assert.throws(
 		() =>
@@ -240,7 +229,6 @@ await test("rejects SPDX and CycloneDX renderings of a different artifact", () =
 });
 
 await test("accepts Docker Hub's index.docker.io form of an upstream repository", () => {
-	// Syft normalizes docker.io to index.docker.io; the release inventory does not.
 	const upstream = "docker.io/library/alpine";
 	const alpineDigest = "sha256:79ff19e9084a00eece421b2523fb93e22d730e2c0e525905de047e848e56d95f";
 	const result = validateReleaseSbom(

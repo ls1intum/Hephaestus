@@ -4,12 +4,20 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "consent_notice")
+@Table(
+        name = "consent_notice",
+        uniqueConstraints = {
+            @UniqueConstraint(name = "uk_consent_notice_sha256", columnNames = "sha256"),
+            @UniqueConstraint(
+                    name = "uk_consent_notice_version_sha256",
+                    columnNames = {"version", "sha256"})
+        })
 @Getter
 @NoArgsConstructor
 class ConsentNotice {

@@ -2,7 +2,9 @@
 # environment (Alpine has no partman package). No shared_preload_libraries: maintenance runs as plain
 # SQL from the app scheduler, so this stays stock Postgres + one extension. See ADR 0018 and ADR 0038.
 ARG PG_MAJOR=18
-FROM postgres:${PG_MAJOR}-bookworm
+FROM postgres:18-bookworm@sha256:1c59e2c3c818eaa0f0628f695b36e7c9e362d6b219b36a54a32df645cbd7e1af AS postgres-18
+FROM postgres:17-bookworm@sha256:051f7b7b3abdd564d5d1bd1e8c4b9c1b6e77087d1dd22020ede611c096a272e0 AS postgres-17
+FROM postgres-${PG_MAJOR}
 ARG PG_MAJOR=18
 # Pinned for reproducibility (PGDG bookworm pool). Bump deliberately.
 ARG PARTMAN_VERSION=5.5.0-1.pgdg12+1

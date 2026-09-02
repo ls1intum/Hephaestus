@@ -129,8 +129,9 @@ class ProductionSchemaContractIntegrationTest {
         assertThat(foreignKeys)
                 .noneMatch(foreignKey -> foreignKey.endsWith(":CASCADE"))
                 .contains(
-                        "fk_observation_workspace:workspace:NO ACTION",
+                        "sfk_observation_workspace:workspace:NO ACTION",
                         "fk_observation_practice:practice:NO ACTION",
+                        "fk_observation_practice_workspace:practice:NO ACTION",
                         "fk_observation_revision:practice_revision:SET NULL");
 
         assertColumnRequired("observation", "workspace_id");

@@ -30,8 +30,9 @@
         <hephaestus.surefire.forkCount>1</hephaestus.surefire.forkCount>
         <!-- 4g sized for the unit+arch run (ArchUnit + Modulith class graph). -->
         <hephaestus.surefire.maxHeap>4096m</hephaestus.surefire.maxHeap>
-        <openapi.server.port>38090</openapi.server.port>
-        <openapi.jmx.port>9001</openapi.jmx.port>
+        <!-- Surefire expands @{argLine}. JaCoCo's prepare-agent sets it in the lifecycle; the empty
+             default lets a bare surefire:test goal run without that phase. -->
+        <argLine />
         <surefire.excludedGroups>live</surefire.excludedGroups>
         <surefire.includedGroups>unit</surefire.includedGroups>
         <failsafe.excludedGroups>live</failsafe.excludedGroups>
@@ -50,7 +51,6 @@
         <liquibase.version>5.0.4</liquibase.version>
         <liquibase-hibernate7.version>5.0.4</liquibase-hibernate7.version>
         <springdoc.version>3.1.0</springdoc.version>
-        <springdoc-maven-plugin.version>1.5</springdoc-maven-plugin.version>
         <sentry.version>8.53.0</sentry.version>
         <logstash-logback-encoder.version>9.0</logstash-logback-encoder.version>
         <slack-bolt.version>1.50.0</slack-bolt.version>
@@ -637,84 +637,13 @@
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
                     <profiles>${app.profiles}</profiles>
-                    <jvmArguments>-Dspring.application.admin.enabled=true -XX:+EnableDynamicAgentLoading
-                        --enable-native-access=ALL-UNNAMED
-                    </jvmArguments>
+                    <jvmArguments>-XX:+EnableDynamicAgentLoading --enable-native-access=ALL-UNNAMED</jvmArguments>
                     <excludes>
                         <exclude>
                             <groupId>org.projectlombok</groupId>
                             <artifactId>lombok</artifactId>
                         </exclude>
                     </excludes>
-                    <wait>1000</wait>
-                    <maxAttempts>100</maxAttempts>
-                    <!-- Buildpack selection and pinning rationale: docs/admin/buildpacks-cds-decision.md -->
-                    <image>
-                        <builder>paketobuildpacks/builder-noble-java-tiny@sha256:3a9f6efa2351dba2492a9c6eb28b3bf52b5f930832a20c39b6261ed7c1a0a085</builder>
-                        <runImage>paketobuildpacks/ubuntu-noble-run-tiny@sha256:c32333227b6dfbc2a4a93b03ee6d3475cfe152468c7d396bf22f06099bb0ecc9</runImage>
-                        <!-- Explicit order: the builder's `java` composite, then the health-checker buildpack
-                             (not bundled in builder-noble-java-tiny) so the distroless run image gets the static,
-                             shell-free `thc` binary at /workspace/health-check for a real Docker HEALTHCHECK.
-                             See docs/admin/buildpacks-cds-decision.md and docker/compose.app.yaml. -->
-                        <buildpacks>
-                            <buildpack>urn:cnb:builder:paketo-buildpacks/java</buildpack>
-                            <buildpack>docker://paketobuildpacks/health-checker@sha256:7ef317843d076c93682a2f0f79384dc11ff20227cf779d3b11b9f34e9d8b9246</buildpack>
-                        </buildpacks>
-                        <env>
-                            <BP_JVM_VERSION>21</BP_JVM_VERSION>
-                            <BP_JVM_CDS_ENABLED>true</BP_JVM_CDS_ENABLED>
-                            <BP_HEALTH_CHECKER_ENABLED>true</BP_HEALTH_CHECKER_ENABLED>
-                            <!-- Activates application-cds-training.yml during the build-time training run.
-                                 Coolify's runtime SPRING_PROFILES_ACTIVE=prod overrides this. -->
-                            <SPRING_PROFILES_ACTIVE>cds-training</SPRING_PROFILES_ACTIVE>
-                        </env>
-                    </image>
-                </configuration>
-                <executions>
-                    <execution>
-                        <id>start-for-openapi</id>
-                        <phase>pre-integration-test</phase>
-                        <goals>
-                            <goal>start</goal>
-                        </goals>
-                        <configuration>
-                            <profiles>specs</profiles>
-                            <jmxPort>${openapi.jmx.port}</jmxPort>
-                            <jvmArguments>-Dspring.application.admin.enabled=true -XX:+EnableDynamicAgentLoading
-                                --enable-native-access=ALL-UNNAMED -Dspring.devtools.restart.enabled=false
-                                -Dserver.port=${openapi.server.port}
-                            </jvmArguments>
-                        </configuration>
-                    </execution>
-                    <execution>
-                        <id>stop-after-openapi</id>
-                        <phase>post-integration-test</phase>
-                        <goals>
-                            <goal>stop</goal>
-                        </goals>
-                        <configuration>
-                            <jmxPort>${openapi.jmx.port}</jmxPort>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-            <plugin>
-                <groupId>org.springdoc</groupId>
-                <artifactId>springdoc-openapi-maven-plugin</artifactId>
-                <version>${springdoc-maven-plugin.version}</version>
-                <executions>
-                    <execution>
-                        <id>integration-test</id>
-                        <goals>
-                            <goal>generate</goal>
-                        </goals>
-                    </execution>
-                </executions>
-                <configuration>
-                    <apiDocsUrl>http://localhost:${openapi.server.port}/v3/api-docs.yaml</apiDocsUrl>
-                    <outputFileName>openapi.yaml</outputFileName>
-                    <outputDir>${maven.multiModuleProjectDirectory}</outputDir>
-                    <failOnError>true</failOnError>
                 </configuration>
             </plugin>
             <plugin>
@@ -742,7 +671,7 @@
                 <version>${liquibase.version}</version>
                 <configuration>
                     <changeLogFile>db/master.xml</changeLogFile>
-                    <diffChangeLogFile>src/main/resources/db/changelog_new.xml</diffChangeLogFile>
+                    <diffChangeLogFile>${project.build.directory}/changelog_new.xml</diffChangeLogFile>
                     <searchPath>${project.basedir}/src/main/resources</searchPath>
                     <driver>org.postgresql.Driver</driver>
                     <url>jdbc:postgresql://localhost:${postgres.port}/hephaestus</url>
@@ -752,22 +681,14 @@
                         hibernate:spring:de.tum.cit.aet.hephaestus?dialect=org.hibernate.dialect.PostgreSQLDialect&amp;hibernate.physical_naming_strategy=org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy&amp;hibernate.implicit_naming_strategy=org.springframework.boot.hibernate.SpringImplicitNamingStrategy
                     </referenceUrl>
                     <!--
-                        Exclude objects that exist in the Liquibase-managed schema but that Hibernate
-                        cannot (and must not) generate, so the JPA-vs-DB drift diff stays empty for them.
-                        Exclusions are by TYPE + CONVENTION, not a hand-maintained name list, so new
-                        scalar FKs / partitions are covered automatically while genuine drift on the ~50
-                        entities that DO model FKs via JPA associations (named fk_*) is still caught.
-
-                        - table:shedlock / table:auth_rate_limit_bucket — sidecar tables with no JPA
-                          entity (ShedLock + the token-bucket store are managed outside JPA).
-                        - table:auth_event_default / table:auth_event_p\d+ — declarative RANGE partitions
-                          of auth_event. Hibernate models only the parent; PostgreSQL partitions are a known
-                          Liquibase-diff blind spot (liquibase/liquibase#1874), so children read as "extra".
-                        - foreignkey:sfk_.* — the "scalar foreign key" naming convention (ADR 0017): an FK
-                          backing a plain Long id with NO @ManyToOne (chosen to break module cycles).
-                          Hibernate emits the column but never the constraint. Real @ManyToOne FKs keep the
-                          fk_* name and stay drift-checked; new scalar FKs MUST be named sfk_* (enforced
-                          only by review — see the 1780825201546_changelog.xml header).
+                        Schema objects Hibernate cannot emit, excluded by type and naming convention so
+                        the JPA-vs-DB diff stays empty without a hand-maintained name list:
+                        - shedlock and auth_rate_limit_bucket have no JPA entity;
+                        - auth_event_default and auth_event_p<n> are PostgreSQL partitions of auth_event,
+                          which Liquibase reads as extra tables (liquibase/liquibase#1874);
+                        - sfk_* is a foreign key backing a scalar id column with no JPA association
+                          (ADR 0017). An association's foreign key keeps the fk_* name and is
+                          drift-checked; a misnamed constraint fails the gate in either direction.
                     -->
                     <diffExcludeObjects>table:shedlock,table:auth_rate_limit_bucket,table:auth_event_default,table:auth_event_p\d+,foreignkey:sfk_.*</diffExcludeObjects>
                     <verbose>true</verbose>

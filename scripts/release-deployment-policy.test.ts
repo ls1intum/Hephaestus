@@ -28,9 +28,6 @@ await test("release publication requires the seeded upgrade gate", () => {
 		release,
 		/publish-release:\n\s+needs: \[release, tag-images, upgrade-test, supported-host-smoke\]/,
 	);
-	// The previous release keeps its pre-transfer namespace forever, so the gate passes
-	// the version and lets resolve-release-upgrade-images.ts pick the repository from
-	// security/release-identities.json (issue #1599).
 	assert.match(release, /previous-version: \$\{\{ needs\.release\.outputs\.previous_version \}\}/);
 	assert.match(upgrade, /INPUT_PREVIOUS_VERSION: \$\{\{ inputs\.previous-version \}\}/);
 	assert.match(
@@ -65,16 +62,11 @@ await test("verification identity is the release's own: run context now, the map
 	const derivedIdentity =
 		/\$\{\{ github\.server_url \}\}\/\$\{\{ github\.repository \}\}\/\.github\/workflows\/release\.yml@refs\/heads\/main/;
 
-	// release.yml verifies only the lock it signed itself, so the run's own identity is right.
 	assert.match(release, derivedIdentity);
-	// Consumers that verify a *previous* release resolve its identity per version from
-	// security/release-identities.json — a lock signed before the repository transfer
-	// carries the old owner/repo in its certificate forever (issue #1599).
 	assert.match(rescan, /resolve-release-identity\.ts.*certificate-identity/);
 	assert.match(deployment, /resolve-release-identity\.ts.*certificate-identity/);
 	assert.match(prepareLock, /releaseCertificateIdentity\(release, process\.env\)/);
 	assert.match(prepareLock, /releaseSignerRepository\(process\.env\)/);
-	// No verify step may pin a repository slug outside the identity map.
 	for (const contents of [release, deployment, rescan, prepareLock]) {
 		assert.doesNotMatch(contents, /certificate-identity[^\n]*\n?[^\n]*ls1intum\/Hephaestus/);
 		assert.doesNotMatch(
@@ -82,8 +74,6 @@ await test("verification identity is the release's own: run context now, the map
 			/certificate-identity[^\n]*\n?[^\n]*hephaestus-build\/Hephaestus/,
 		);
 	}
-	// The expected signer stays overridable for repositories the map does not know,
-	// and the override must win over the map.
 	assert.match(
 		deployment,
 		/EXPECTED_SIGNER_REPOSITORY: \$\{\{ inputs\.expected-signer-repository \}\}/,
@@ -105,13 +95,10 @@ await test("derived signer identity matches today's literals in the canonical re
 		releaseSignerIdentity(canonicalRun),
 		"https://github.com/hephaestus-build/Hephaestus/.github/workflows/release.yml@refs/heads/main",
 	);
-	// The documented operator flow (docs/admin/install.mdx) runs outside CI and keeps
-	// the canonical fallback…
 	assert.equal(
 		releaseSignerIdentity({}),
 		"https://github.com/hephaestus-build/Hephaestus/.github/workflows/release.yml@refs/heads/main",
 	);
-	// …but CI must never silently verify against a repository it is not running in.
 	assert.throws(() => releaseSignerRepository({ CI: "true" }), /GITHUB_REPOSITORY/);
 });
 
@@ -123,8 +110,6 @@ await test("release publication requires native smoke tests for every supported 
 	assert.match(smokeGate, /architecture: arm64\n\s+runner: ubuntu-24\.04-arm/);
 	assert.match(smokeGate, /up -d --wait --wait-timeout 600/);
 	assert.match(smokeGate, /prepare-release-lock\.ts/);
-	// Draft releases are visible only to tokens with push access; a read-only token cannot
-	// download the still-draft release lock and would fail every smoke run.
 	assert.match(smokeGate, /contents: write/);
 	assert.match(release, /gh release upload "\$TAG_NAME" host-smoke\/\*\.json/);
 });

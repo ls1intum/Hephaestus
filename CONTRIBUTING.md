@@ -33,7 +33,7 @@ Contributions that do not adhere to these guidelines will be rejected. We align 
 ## Contribution Process
 
 Use `pnpm run check:affected` for fast feedback. Before pushing, run `pnpm run check`; the hook runs it
-automatically. Run `pnpm run verify` before requesting review. Scope, budgets, and exclusions are documented in the
+automatically. Run `pnpm run verify` before requesting review. Scope and exclusions are documented in the
 [local verification guide](https://docs.hephaestus.build/contributor/local-verification).
 
 1. **External contributors only**: Fork the Repository and create a branch.
@@ -60,15 +60,13 @@ coordinate with a maintainer.
 
 ### Preview Deployments
 
-Want a running copy of your branch on a URL? Add the `preview` label to your pull request. It runs the
-images CI built for your commit and redeploys on every push; it never waits for your tests, so it
-exists even when they are red. Remove the label to tear it down. See
-[Preview Deployments](https://docs.hephaestus.build/contributor/ci-cd) for what a preview does
-and does not contain.
+Add the `preview` label to a same-repository pull request to deploy it; every push redeploys, tests
+are not awaited, and removing the label tears it down.
+[Preview deployments](https://docs.hephaestus.build/contributor/ci-cd#preview-deployments).
 
 ## Pull Request Title Guidelines
 
-We use automated semantic pull request validation to ensure consistent and meaningful commit history. Your pull request titles must follow the [Conventional Commits](https://www.conventionalcommits.org/) specification.
+`pull-request.yml` validates the title with commitlint (`commitlint.config.ts`). Titles follow the [Conventional Commits](https://www.conventionalcommits.org/) specification.
 
 ### Format
 
@@ -78,22 +76,12 @@ We use automated semantic pull request validation to ensure consistent and meani
 
 ### Releases and Changesets (Important)
 
-**Release ≠ deploy.** Every PR that changes shipped code (anything under `server/`, `webapp/`, or `docker/` except tests and in-tree docs) must carry a
-**changeset** — an operator-facing description of the change plus its version bump. CI enforces this
-(`verify-changesets`); commit types and scopes never affect versioning.
-
-```bash
-pnpm changeset          # user-facing change: pick the bump, describe it
-pnpm changeset --empty  # no user-facing effect — then write why in the file body
-```
-
-> ⚠️ **Pre-1.0:** never pick a `major` bump — on `0.x` it cuts 1.0.0 (CI rejects it). Use `minor` for
-> breaking changes until the [1.0 milestone](https://github.com/ls1intum/Hephaestus/issues/1378).
-
-Changesets accumulate into a **Version PR**; merging it cuts the release. How releases are cut, how to
-write good changesets, and what a version number promises all live in the
-[release management guide](https://docs.hephaestus.build/contributor/release-management) and the
-[compatibility policy](https://docs.hephaestus.build/admin/compatibility-policy).
+**Release ≠ deploy.** Every PR that changes shipped code (`server/`, `webapp/`, `docker/`, excluding
+tests and in-tree docs) carries a changeset; `Verify changesets` enforces it, and commit types never
+affect versioning. `.changeset/README.md` has the format and the pre-1.0 rule; the
+[release management guide](https://docs.hephaestus.build/contributor/release-management) has the flow
+and the [compatibility policy](https://docs.hephaestus.build/admin/compatibility-policy) what a
+version number promises.
 
 ### Allowed Types
 
@@ -141,7 +129,7 @@ write good changesets, and what a version number promises all live in the
 
 - `auth`: Authentication / identity (Account, IdentityLink, JWT, oauth2Login)
 - `integration`: Cross-cutting integration framework (webhook, oauth, registry, SPI)
-- `scm`: Source-control management (GitHub, GitLab) — formerly `gitprovider`
+- `scm`: Source-control management (GitHub, GitLab)
 - `leaderboard`: Leaderboard and rankings
 - `mentor`: AI mentor (Heph)
 - `notifications`: Email/notification system

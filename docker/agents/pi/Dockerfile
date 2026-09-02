@@ -1,7 +1,15 @@
 # syntax=docker/dockerfile:1.26@sha256:ecfaec9ed6d810b56388c508f4121597bfbba70d41a6dfeee4d8cad5f295fc32
 # renovate: datasource=docker depName=node
 ARG NODE_VERSION=24.19.0
+FROM ghcr.io/pnpm/pnpm:12.0.0@sha256:bce5ae25ef95edd79e696d7fa8489b80561ef660100fd35bd0286d0f90db3dcc AS dependencies
+ARG NODE_VERSION
+WORKDIR /opt/pi-sdk
+RUN pnpm runtime set node ${NODE_VERSION} -g
+COPY pi/package.json pi/pnpm-lock.yaml ./
+RUN pnpm install --prod --frozen-lockfile --ignore-scripts --ignore-workspace
+
 FROM node:${NODE_VERSION}-slim@sha256:a9f5f7c91a432850b2a8a7797adf5eadb6c733ceed61167806cee7ea7fbc29df
+ARG NODE_VERSION
 
 # The base digest is pinned, so Debian security updates published after the upstream image was
 # built can reach it only here; Renovate bumps the digest only when upstream republishes one.
@@ -22,13 +30,9 @@ RUN groupmod --new-name agent node && \
 
 # renovate: datasource=npm depName=@earendil-works/pi-coding-agent
 ARG PI_VERSION=0.84.3
-RUN mkdir -p /opt/pi-sdk && cd /opt/pi-sdk && \
-    printf '{"name":"hephaestus-pi-sdk","private":true,"dependencies":{"@earendil-works/pi-coding-agent":"%s"}}\n' \
-        "${PI_VERSION}" > package.json && \
-    npm install --omit=dev --ignore-scripts --no-audit --no-fund && \
-    test -d /opt/pi-sdk/node_modules/@earendil-works/pi-coding-agent \
+COPY --from=dependencies --chown=1000:1000 /opt/pi-sdk /opt/pi-sdk
+RUN test -d /opt/pi-sdk/node_modules/@earendil-works/pi-coding-agent \
       || (echo "Pi SDK not found at /opt/pi-sdk/node_modules" >&2; exit 1) && \
-    chown -R 1000:1000 /opt/pi-sdk && \
     mkdir -p /workspace && chown 1000:1000 /workspace
 
 RUN mkdir -p /tmp/abi-check && ln -sf /opt/pi-sdk/node_modules /tmp/abi-check/node_modules && \

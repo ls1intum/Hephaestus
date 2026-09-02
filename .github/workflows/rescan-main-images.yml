@@ -1,20 +1,7 @@
-# Rescans the images built from main's HEAD against the release vulnerability policy.
-#
-# The gate in reusable-docker-build.yml runs where an image is built, so it catches a change that
-# introduces a finding and cannot catch a finding that appears with no change at all. That is the
-# common case: v0.75.0 was blocked by CVEs published after the code merged clean, and nothing
-# noticed until the release failed. rescan-release-images.yml already covers published releases on
-# this cadence; this covers what main would release today.
-#
-# Non-blocking by design. Findings go to a tracking issue, updated in place, because a red status on
-# a schedule nobody triggered — for a regression no commit caused and no revert fixes — is how a team
-# learns to ignore the gate.
 name: Rescan main images
 
 on:
   schedule:
-    # Weekly, twenty minutes after the supported-release rescan, so the two never contend for the
-    # Trivy database. Monday also puts findings in front of the same review Renovate's PRs land for.
     - cron: "37 4 * * 1"
   workflow_dispatch:
 
@@ -57,15 +44,11 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # A day old at most: an older mirror would report last week's drift as this week's.
       - uses: ./.github/actions/download-trivy-db
         with:
           max-age-hours: "24"
           metadata-path: reports/trivy-db.json
 
-      # Resolves each image's `:main` tag to its linux/amd64 digest, scans it, and evaluates the one
-      # security/vulnerability-policy.json through the one scripts/check-release-vulnerabilities.ts.
-      # A finding does not fail this step; an unreachable registry or a broken scanner does.
       - name: Scan the images built from main
         env:
           TRIVY_USERNAME: ${{ github.actor }}

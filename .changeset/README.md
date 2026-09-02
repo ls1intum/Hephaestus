@@ -12,7 +12,7 @@ pnpm changeset --empty  # no user-facing effect — then write why in the file b
 
 The summary lands in the changelog **verbatim**, in the operator/user's voice — lead with what they can now
 do, or the symptom a fix removes. No class/hook/file names. No agent-attribution trailers. One changeset per
-user-visible change; unsure whether it's visible? Add one — a reviewer can delete it, a missing note can't.
+user-visible change; when in doubt, add one.
 
 No TTY (agents, CI)? `pnpm changeset` is interactive — instead write `.changeset/<slug>.md` by hand in the
 format shown below. That is the one sanctioned hand-write; never touch `CHANGELOG.md` directly.
@@ -31,7 +31,7 @@ instead, so a pre-1.0 `minor` is *not* guaranteed zero-action: if the operator m
 contains the complete `#### 🔴 …` migration-guide entry. Never edit `MIGRATION.md`; versioning assembles
 and consumes fragments in filename order.
 
-Example (a migration-bearing fix):
+Example:
 
 ```md
 ---

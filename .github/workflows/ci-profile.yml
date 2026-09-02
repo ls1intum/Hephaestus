@@ -27,7 +27,7 @@ jobs:
 
       - uses: ./.github/actions/setup-caches
         with:
-          cache-type: application-server-integration
+          cache-type: application-server-reactor
           os: ${{ runner.os }}
 
       - name: Restore performance history

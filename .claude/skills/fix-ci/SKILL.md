@@ -36,9 +36,10 @@ Anything pending means you do not yet know the failure set.
 
 ## 2. Read the job summaries before the logs
 
-The quality and test workflows write a markdown table to `$GITHUB_STEP_SUMMARY` naming, per failed
-check, the exact command that fixes it, and emit the same text as `::error::` annotations. That table
-is the prescription. Logs are only for what it cannot express — a test assertion, a type error.
+The `Quality` legs and the `App Server: Generated artifacts` job write a table to
+`$GITHUB_STEP_SUMMARY` naming the fixing command per failed check, and emit the same text as
+`::error::` annotations. That table is the prescription. Logs are for what it cannot express — a
+test assertion, a type error.
 
 ```bash
 RUN_ID=$(PAGER=cat gh run list --branch "$(git branch --show-current)" --limit 1 \
@@ -62,11 +63,12 @@ Each leg's annotation names its own command; this table is only what the annotat
 
 | Failure | What it actually means |
 |---|---|
-| `routeTree.gen.ts is stale` | A Vite build writes it. `cd webapp && pnpm run build`, then commit the file. |
-| `README images are stale` | The storybook job runs `export:readme-assets` *after* `test:storybook`, so the job goes red having printed a clean pass line. Run `pnpm --filter webapp run export:readme-assets` and commit `docs/images/readme`. |
-| Migrations gate | A changelog that reached `main` was edited, renamed or deleted, or a `master.xml` `<include>` was not appended at the end. Fix forward with a new changeset; never edit the released file. |
-| `verify-changesets` | The PR touches shipped code with no `.changeset/*.md`. `/land-pr` step 7 has the rules. |
-| App Server leg red on a docs-only PR | Expected, not a misconfiguration: `docs/**` is inside the `application-server` paths filter, because `docs:lint` and `check:diagrams` run on that leg. |
+| `routeTree.gen.ts is stale` | A Vite build writes it. `pnpm run build:webapp`, then commit the file. |
+| `Brand assets are stale` | `Webapp: Stories` runs `export:assets` after `test:storybook`, so the job goes red after a clean pass line. Run `pnpm --filter webapp run export:assets` and commit `webapp/brand`, `webapp/public`, `docs/images/readme`, `docs/static/img` and `docker/compose.proxy.yaml`. |
+| `App Server: Generated artifacts` | OpenAPI out of sync → `pnpm run generate:api`; schema drift → `pnpm run db:draft-changelog`; ERD outdated → `pnpm run db:generate-erd-docs`. |
+| `Changelog immutability guard` (Security → `Dependencies, secrets, and policy`) | A changelog that reached `main` was edited, renamed or deleted, or a `master.xml` `<include>` was not appended at the end. Fix forward with a new changeset; never edit the released file. |
+| `Verify changesets` | The PR touches shipped code with no `.changeset/*.md`. `/land-pr` step 7 has the rules. |
+| `Tooling and Docs` red on a docs-only PR | Expected: `docs/**` is in the tooling path filter, where `docs:lint` and `check:diagrams` run. |
 
 ## 4. Reproduce locally before pushing
 
@@ -75,17 +77,11 @@ pnpm run format
 pnpm run check
 ```
 
-`check` runs every leg CI runs except those needing Docker or a live credential — `docs:lint`
-included. If `check` is green and CI is not, the difference is one of those.
+`check` runs the `quality` task list in `vite.config.ts`. CI additionally runs tests, builds, images
+and the Docker-backed artifact gates; green `check` with red CI means one of those.
 
-The server reactor builds generated clients before the application. Run the unit tier with:
-
-```bash
-cd server && ./mvnw -pl application -am test -Dsurefire.includedGroups=unit -T 2C --batch-mode -q
-```
-
-`-Dgroups` is ignored: the POM binds `${surefire.includedGroups}`, and a POM element beats the
-`-Dgroups` user property. `server/AGENTS.md` § Build traps has the other three tiers.
+Server tiers: `pnpm run test:server:unit`, `pnpm run test:server:architecture`,
+`pnpm run test:server:integration`; `server/AGENTS.md` § Build traps and § Test tiers have the rest.
 
 ## 5. Commit and push once
 

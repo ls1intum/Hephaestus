@@ -164,7 +164,7 @@ public class OutlineDocument {
     private Instant createdAt;
 
     @UpdateTimestamp
-    @Column(name = "updated_at")
+    @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
     /** Whether the document has been tombstoned (removed upstream). */

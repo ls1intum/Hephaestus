@@ -2,12 +2,8 @@
 TITLE FORMAT (required):
   <type>(<scope>): <description>
 
-  Types: feat | fix | docs | style | refactor | perf | test | build | ci | chore | revert
-  Scopes (Service): webapp | server | docs
-  Scopes (Infra): ci | config | deps | deps-dev | docker | scripts | security | db | release
-  Scopes (Feature): auth | integration | scm | leaderboard | mentor | notifications | profile | teams | workspace
-
-  Breaking changes: carried by the changeset (pre-1.0 = minor + MIGRATION.md), not the title.
+  Types and scopes: CONTRIBUTING.md § Pull Request Title Guidelines (validated by commitlint.config.ts).
+  Breaking changes are carried by the changeset (pre-1.0: minor + **Operators:** + .migration/<slug>.md), not the title.
 
   ✓ Good: feat(leaderboard): add weekly ranking filter
   ✓ Good: fix(ci): update workflow configuration
@@ -17,11 +13,11 @@ BEFORE PUSHING:
   pnpm run format && pnpm run check     # Apply formatting, then run the local quality gate
 
 AFTER API CHANGES:
-  pnpm run generate:api                # Regenerate all OpenAPI clients
+  pnpm run generate:api                # Rewrites server/openapi.yaml and webapp/src/api
 
 AFTER DATABASE/ENTITY CHANGES:
-  pnpm run db:draft-changelog          # Generate Liquibase migration
-  pnpm run db:generate-erd-docs        # Update ERD documentation
+  pnpm run db:draft-changelog          # Writes this branch's changelog (needs Docker); prune it, add preconditions and rollbacks
+  pnpm run db:generate-erd-docs        # After pruning
 -->
 
 ## Description
@@ -39,7 +35,7 @@ Fixes # <!-- Link issue if applicable, or delete this line -->
 <!-- Only what CI can't check for you. Changeset presence is enforced by `verify-changesets`. -->
 
 - [ ] My changeset summary reads as an operator/user-facing note (it becomes the changelog entry) — see `.changeset/README.md`
-- [ ] If operators must act, the changeset and migration entry give actionable upgrade instructions
+- [ ] If operators must act, the changeset and migration fragment state what the operator must do
 - [ ] I did not commit generated-artifact changes that this PR did not cause
 
 ## Screenshots

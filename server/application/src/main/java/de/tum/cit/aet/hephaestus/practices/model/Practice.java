@@ -90,6 +90,15 @@ public class Practice {
     @ToString.Exclude
     private Workspace workspace;
 
+    /**
+     * Read-only twin of {@link #workspace}'s column so the composite tenancy key on Observation can
+     * reference it: Hibernate binds Observation before Practice and resolves a non-key
+     * {@code referencedColumnName} only against columns already bound.
+     */
+    @Column(name = "workspace_id", nullable = false, insertable = false, updatable = false)
+    @Setter(lombok.AccessLevel.NONE)
+    private Long workspaceId;
+
     /** Stable machine key, unique per workspace ({@code uk_practice_workspace_slug}); survives a {@link #name} rename. */
     @Column(name = "slug", nullable = false, length = 64)
     private String slug;

@@ -20,9 +20,6 @@ await test("rejects a high vulnerability without a disposition", () => {
 });
 
 await test("reports but does not reject a high vulnerability with no upstream fix", () => {
-	// The four upstream images in security/release-images.json cannot be patched at all, so
-	// an unfixable finding blocks a release without offering anyone an action. It still has
-	// to be counted, because the evidence bundle is signed and must stay complete.
 	for (const unfixable of [
 		{ ...finding, FixedVersion: "" },
 		{ ...finding, FixedVersion: "   " },
@@ -33,7 +30,6 @@ await test("reports but does not reject a high vulnerability with no upstream fi
 		assert.deepEqual(result.highCritical, ["server|CVE-1|lib|1"]);
 		assert.deepEqual(result.errors, []);
 	}
-	// A mixed report rejects only the half upstream has published a fix for.
 	const mixed = evaluate(
 		"server",
 		{
@@ -131,11 +127,7 @@ await test("matches an exception without its digest, but still on every other fi
 			now,
 			subject,
 		).rejected;
-	// The release digest does not exist until the images are tagged, so matching on it made a
-	// pre-release exception impossible to author. An exception reviewed against one digest now
-	// covers the same package at the same version wherever it is scanned.
 	assert.deepEqual(rejectedWith({ digest: `sha256:${"b".repeat(64)}` }), []);
-	// Every other field still binds.
 	for (const override of [
 		{ image: "other" },
 		{ platform: "linux/arm64" },
@@ -144,7 +136,6 @@ await test("matches an exception without its digest, but still on every other fi
 		{ vulnerability: "CVE-2" },
 	] satisfies Partial<typeof exception>[])
 		assert.deepEqual(rejectedWith(override), ["server|CVE-1|lib|1"], JSON.stringify(override));
-	// Two exceptions that differ only by digest are now one exception, twice.
 	assert.match(
 		evaluate(
 			"server",
@@ -248,8 +239,6 @@ await test("holds a not_affected exception to one of CISA's five justifications"
 	])
 		assert.equal(errorsWith({ justificationCategory: category }), "", category);
 
-	// A value outside the vocabulary is a malformed policy rather than a soft error: nothing
-	// downstream can interpret it, so there is no partial result worth reporting.
 	assert.throws(
 		() => errorsWith({ justificationCategory: "not_reachable" }),
 		/malformed vulnerability policy/,
@@ -259,7 +248,6 @@ await test("holds a not_affected exception to one of CISA's five justifications"
 		evaluate("server", report, { ...policy, exceptions: [uncategorised] }, now).errors.join("\n"),
 		/not_affected exception must name a justification category: CVE-1/,
 	);
-	// `affected` concedes the finding applies, so a not_affected justification contradicts it.
 	assert.match(
 		errorsWith({ status: "affected" }),
 		/affected exception must not name a justification category: CVE-1/,

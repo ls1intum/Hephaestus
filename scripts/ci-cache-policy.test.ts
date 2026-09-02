@@ -20,28 +20,35 @@ await describe("CI cache policy", async () => {
 		assert.notEqual(cacheKeys.length, 0);
 		for (const key of cacheKeys) {
 			assert.ok(!key.includes("hashFiles("));
-			assert.ok(key.includes("-identity.outputs.hash"));
+			assert.ok(key.includes("steps.identity.outputs."));
 		}
 	});
 
-	await test("Webapp E2E uses the server build caches", () => {
-		const javaSetup = actionStep("Set up JDK 21");
-		assert.ok(javaSetup.includes('"webapp-e2e"'));
-		assert.ok(javaSetup.includes('cache: "maven"'));
-		assert.ok(javaSetup.includes("cache-read-only:"));
-		assert.ok(javaSetup.includes("cache-jdk: false"));
-		assert.ok(actionStep("Restore generated clients").includes('"webapp-e2e"'));
-		assert.ok(actionStep("Cache generated clients").includes('"webapp-e2e"'));
+	await test("Maven caches are written only by reactor jobs on the default branch", async () => {
+		assert.ok(actionStep("Set up JDK 21").includes("cache-jdk: false"));
+		// A pom change must fall back to the newest default-branch cache, not a full download.
+		const restore = actionStep("Restore Maven dependencies");
+		assert.match(restore, /actions\/cache\/restore@/);
+		assert.match(restore, /restore-keys:[\s\S]*?-maven-\s*$/m);
+		assert.ok(restore.includes("steps.identity.outputs.save != 'true'"));
+		const save = actionStep("Cache Maven dependencies");
+		assert.ok(save.includes("steps.identity.outputs.save == 'true'"));
+		assert.ok(save.includes("inputs.cache-type == 'application-server-reactor'"));
+		const build = await readFile(".github/workflows/ci-build.yml", "utf8");
+		const e2e = build.slice(
+			build.indexOf("\n  webapp-e2e:"),
+			build.indexOf("\n  application-server-image:"),
+		);
+		assert.match(e2e, /uses: actions\/setup-java@/);
+		assert.doesNotMatch(e2e, /setup-caches/);
 	});
 
-	await test("browser consumers share one cache-and-install action", async () => {
+	await test("browser consumers share one cache-and-install action", () => {
 		assert.match(
 			browserAction,
 			/key: \${{ runner\.os }}-playwright-\${{ steps\.playwright\.outputs\.version }}/,
 		);
 		assert.doesNotMatch(browserAction, /restore-keys:/);
 		assert.match(browserAction, /playwright install chromium --with-deps/);
-		const workflow = await readFile(".github/workflows/ci-tests.yml", "utf8");
-		assert.equal((workflow.match(/uses: \.\/\.github\/actions\/setup-browsers/g) ?? []).length, 2);
 	});
 });
