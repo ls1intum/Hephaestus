@@ -182,10 +182,19 @@ export function validateManifest(
 	return { schemaVersion: 1, subjects };
 }
 
+/**
+ * Node caps a captured subprocess at 1 MiB and raises ENOBUFS past it. A `cosign verify-attestation`
+ * envelope carries the whole SPDX SBOM base64-encoded, so the webapp's exceeds that cap and failed a
+ * release mid-verification. The bound belongs here rather than at a call site: every capture in this
+ * file reads an SBOM, an attestation or an image index, and none of them has a useful size limit.
+ */
+const CAPTURE_LIMIT_BYTES = 256 * 1024 * 1024;
+
 function command(commandName: string, args: string[], capture = false): string {
 	const result = spawnSync(commandName, args, {
 		encoding: "utf8",
 		stdio: capture ? "pipe" : "inherit",
+		maxBuffer: CAPTURE_LIMIT_BYTES,
 	});
 	if (result.error) throw result.error;
 	if (result.status !== 0) {
