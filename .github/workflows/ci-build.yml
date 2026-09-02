@@ -149,14 +149,9 @@ jobs:
 
           ISSUES_FOUND=()
 
-          # db:draft-changelog applies the whole master.xml chain to an empty database before it
-          # diffs, so this step is also the migration-chain replay gate.
-          pnpm run db:draft-changelog || ISSUES_FOUND+=("Schema check / migration-chain apply failed. Run: pnpm run db:draft-changelog")
-          if [ -f "server/application/src/main/resources/db/changelog_new.xml" ]; then
-            echo "::error::Schema drift detected. Run: pnpm run db:draft-changelog"
-            cat server/application/src/main/resources/db/changelog_new.xml
-            ISSUES_FOUND+=("Schema drift detected")
-          fi
+          # db:check-drift applies the whole master.xml chain to an empty database before it diffs,
+          # so this step is also the migration-chain replay gate.
+          pnpm run db:check-drift || ISSUES_FOUND+=("Schema drift or migration-chain apply failed. Run: pnpm run db:draft-changelog")
 
           pnpm run db:generate-erd-docs || ISSUES_FOUND+=("ERD generation failed. Run: pnpm run db:generate-erd-docs")
           git add docs/contributor/erd/schema.mmd

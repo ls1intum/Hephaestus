@@ -58,7 +58,7 @@ directory first, so stash local edits.
 
 ```bash
 pnpm run generate:api          # controllers or DTOs changed: rewrites openapi.yaml AND webapp/src/api
-pnpm run db:draft-changelog    # entities changed (needs Docker); then prune the diff to real deltas
+pnpm run db:draft-changelog    # entities changed (needs Docker); writes and wires the changelog, then prune it
 pnpm run db:generate-erd-docs  # after any changelog change
 ```
 

@@ -72,6 +72,7 @@
 		"verify:storybook-build": "pnpm --filter webapp run build-storybook",
 		"typecheck": "pnpm run typecheck:webapp && pnpm run typecheck:scripts && pnpm run typecheck:agents",
 		"db:draft-changelog": "node scripts/db-utils.ts draft-changelog",
+		"db:check-drift": "node scripts/db-utils.ts check-drift",
 		"db:generate-erd-docs": "node scripts/db-utils.ts generate-erd",
 		"check:ports": "node scripts/check-ports.ts",
 		"format:achievements": "node scripts/format-achievements.ts",

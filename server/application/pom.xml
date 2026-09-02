@@ -671,7 +671,7 @@
                 <version>${liquibase.version}</version>
                 <configuration>
                     <changeLogFile>db/master.xml</changeLogFile>
-                    <diffChangeLogFile>${project.basedir}/src/main/resources/db/changelog_new.xml</diffChangeLogFile>
+                    <diffChangeLogFile>${project.build.directory}/changelog_new.xml</diffChangeLogFile>
                     <searchPath>${project.basedir}/src/main/resources</searchPath>
                     <driver>org.postgresql.Driver</driver>
                     <url>jdbc:postgresql://localhost:${postgres.port}/hephaestus</url>

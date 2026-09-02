@@ -110,9 +110,8 @@ or on "the only" result, and never write cleanup that another test depends on ha
   obsolete). Never delete one whose effect is not enforced elsewhere. Released changelogs are otherwise
   immutable and CI-enforced — root `AGENTS.md` § Database changes.
 - **The changelog is untested by the suite.** Tests run against `ddl-auto: create`, so a broken
-  changelog passes every tier. Use `pnpm run db:draft-changelog` to validate the migration history
-  against the repository-managed PostgreSQL container; discard the draft when no schema change is
-  intended.
+  changelog passes every tier. `pnpm run db:check-drift` applies the migration history to a
+  disposable PostgreSQL container and diffs it against the entities; it is the CI gate.
 - **A native `@Query` may not contain an apostrophe inside a `--` comment.** Hibernate reads it as the
   start of a string literal and the whole `ApplicationContext` fails to build, naming something else.
   `NativeQueryCommentArchTest` enforces it, so the failure arrives as a named test rather than as a
@@ -152,13 +151,13 @@ or on "the only" result, and never write cleanup that another test depends on ha
 ## Schema changes
 
 1. Modify the JPA entities.
-2. `pnpm run db:draft-changelog`, then prune the diff to the real deltas.
-3. Rename to `<epoch-ms-timestamp>_changelog.xml`; `changeSet` ids are `<timestamp>-1`, `-2`, …
-   One consolidated changelog per branch. Full rules in root `AGENTS.md` § Database changes. Name a
-   foreign key that backs a plain id column with no `@ManyToOne` `sfk_*`; the drift gate ignores
-   that prefix and rejects an `fk_*` constraint that no association declares.
-4. `pnpm run db:generate-erd-docs`.
-5. `pnpm changeset` — a user-facing summary. Touching `db/changelog/` without touching `.changeset/`
+2. `pnpm run db:draft-changelog` writes the drift into this branch's changelog, wires it into
+   `master.xml` and refreshes the ERD. Prune it to the real deltas, add preconditions and rollbacks,
+   then `pnpm run db:generate-erd-docs` if you pruned anything. Full rules in root `AGENTS.md`
+   § Database changes. Name a foreign key that backs a plain id column with no `@ManyToOne`
+   `sfk_*`; the drift gate ignores that prefix and rejects an `fk_*` constraint that no association
+   declares.
+3. `pnpm changeset` — a user-facing summary. Touching `db/changelog/` without touching `.changeset/`
    is always wrong. These are two unrelated things both called "changeset".
 
 ## Webhook receiver

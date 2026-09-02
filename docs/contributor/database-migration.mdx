@@ -10,31 +10,36 @@ Liquibase manages schema changes in the application server. Follow this workflow
 ## Quick start
 
 1. Modify JPA entities with the desired changes.
-2. Generate a draft changelog:
+2. Write the drift into this branch's changelog:
 
    ```bash
    pnpm run db:draft-changelog
    ```
 
-3. **Review `changelog_new.xml` carefully** – check for destructive operations.
-4. Rename and move the file to `server/application/src/main/resources/db/changelog/{id}_changelog.xml`.
-5. **Append an `<include>` for the new file to `server/application/src/main/resources/db/master.xml`.**
-   `master.xml` lists every changelog explicitly (not via `<includeAll/>`) so the
-   apply order is a deliberate choice — append your new entry at the end of the list.
-   Two PRs that both add migrations will then conflict in `master.xml` and the
-   authors must agree on order, instead of `<includeAll/>` silently interleaving
-   the timestamps.
-6. Regenerate docs:
+   The command applies the whole chain to a disposable database, diffs it against the JPA model,
+   and writes the difference as change sets into `server/application/src/main/resources/db/changelog/{timestamp}_changelog.xml`.
+   A branch gets one such file: the first run creates it and appends its `<include>` to
+   `master.xml`; later runs add change sets to it. It also regenerates the ERD. With no drift it
+   writes nothing.
+
+   `master.xml` lists every changelog explicitly (not via `<includeAll/>`) so the apply order is a
+   deliberate choice and stays append-only. Two PRs that both add migrations conflict in
+   `master.xml`, and the authors agree on the order instead of `<includeAll/>` silently
+   interleaving the timestamps.
+
+3. **Review the change sets carefully.** Keep the real deltas, remove what the diff only inferred,
+   check for destructive operations, and give every change set a precondition
+   (`onFail="MARK_RAN"`) and a `<rollback>`. If you pruned anything, refresh the ERD:
 
    ```bash
    pnpm run db:generate-erd-docs
    ```
 
-7. Add a **release changeset** (`pnpm changeset`) — the Liquibase `<changeSet>` and the release
+4. Add a **release changeset** (`pnpm changeset`) — the Liquibase `<changeSet>` and the release
    changeset are different things, and a schema change needs both. Keep the summary user-facing; the
    release notes flag the migration automatically. See the
    [release management guide](./release-management.mdx).
-8. Commit the migration, the `master.xml` edit, the changeset, and the documentation
+5. Commit the migration, the `master.xml` edit, the changeset, and the documentation
    (`docs/contributor/erd/schema.mmd`).
 
 :::danger Always validate
@@ -93,8 +98,8 @@ CI uses complementary database checks:
    doesn't parse or apply fails here. This runs as the first half of the schema-drift check, so
    it exercises the same empty→head path a fresh install boots through.
 2. **Schema-drift + ERD validation** (`Database` gate) – After applying the chain, diffs the
-   resulting schema against the JPA entities (drift produces a `changelog_new.xml`) and against
-   the committed ERD. Reproduce locally with `pnpm run db:draft-changelog`.
+   resulting schema against the JPA entities and against the committed ERD. Reproduce locally with
+   `pnpm run db:check-drift`; `pnpm run db:draft-changelog` writes the fix.
 3. **Changelog immutability** (`Migrations` gate) – Enforces the policy above with a pure git
    diff against the merge-base: fails if any released file under `db/changelog/` was modified,
    renamed, or deleted, or if an existing `master.xml` `<include>` line was removed, reordered,

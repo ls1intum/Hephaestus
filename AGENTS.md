@@ -141,14 +141,16 @@ change that produced them.
 ## Database changes (Liquibase)
 
 Changelogs live in `server/application/src/main/resources/db/changelog/` and are included from `master.xml`.
-Draft with `pnpm run db:draft-changelog` (needs Docker; CI sets `CI=true`), then **prune the diff to
-the real deltas** — never commit the raw diff. Then `pnpm run db:generate-erd-docs`.
+`pnpm run db:draft-changelog` (needs Docker) diffs the schema against the JPA model, writes the
+drift into this branch's changelog — a new `<epoch-ms-timestamp>_changelog.xml` appended to
+`master.xml`, or more `<changeSet>`s in the one the branch already added — and refreshes the ERD.
+Then **prune it to the real deltas** and give every `<changeSet>` a precondition
+(`onFail="MARK_RAN"`) and a `<rollback>`; never commit the raw diff. Rerun
+`pnpm run db:generate-erd-docs` after pruning. `pnpm run db:check-drift` is the CI gate.
 
-- **Filename**: `<epoch-ms-timestamp>_changelog.xml` — a real millisecond timestamp (`date +%s%3N`),
-  strictly greater than the latest existing one. No round numbers, no descriptive suffix. `changeSet`
-  ids are `<timestamp>-1`, `-2`, … Each is preconditioned (`onFail="MARK_RAN"`) with a `<rollback>`.
-- **One consolidated changelog per branch.** Every schema change for the branch is another
-  `<changeSet>` inside that one file. A PR with two new changelog files is wrong.
+- **One consolidated changelog per branch.** The tool enforces it; a PR with two new changelog
+  files is wrong. `changeSet` ids are `<timestamp>-1`, `-2`, … and the filename timestamp is a real
+  millisecond timestamp, strictly greater than the latest existing one.
 - **Released changelogs are immutable, and CI enforces it.** Once a file reaches `main` it is never
   edited, renamed or deleted, and `master.xml` is **append-only** — new `<include>`s go at the end, and
   the committed list is not globally timestamp-sorted. The `Migrations` gate fails otherwise. Fix
