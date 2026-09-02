@@ -126,3 +126,22 @@ Hephaestus is an [MIT-licensed](./LICENSE) open-source project developed by
 [Technical University of Munich](https://www.tum.de/en/). It is named after the Greek god of the
 forge, whose craft — in the myth Plato tells — was stolen from his workshop and given to people so
 they could make things for themselves.
+
+<p align="center">
+  <strong>Developed by</strong><br><br>
+  <a href="https://aet.cit.tum.de/">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="./docs/static/img/brand/aet-mark-dark.svg">
+      <img alt="Applied Education Technologies" align="middle" src="./webapp/public/brand/aet-mark.svg" height="72">
+    </picture>
+  </a>
+  &nbsp;&nbsp;&nbsp;&nbsp;
+  <a href="https://www.tum.de/en/">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="./docs/static/img/brand/tum-logo-dark.svg">
+      <img alt="Technical University of Munich" align="middle" src="./webapp/public/brand/tum-logo.svg" height="56">
+    </picture>
+  </a>
+  <br>
+  <sub><a href="https://aet.cit.tum.de/">Research Group for Applied Education Technologies</a> · <a href="https://www.tum.de/en/">Technical University of Munich</a></sub>
+</p>
