@@ -65,6 +65,8 @@ on:
         description: "Published image digest; an index digest for multi-architecture builds."
         value: ${{ inputs.single-arch && jobs.build.outputs.manifest-digest || jobs.merge.outputs.manifest-digest }}
 
+permissions: {}
+
 env:
   STANDARD_IMAGE_TAGS: |
     ${{ github.event_name == 'push' && github.ref_name || '' }}

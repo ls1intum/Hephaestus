@@ -9,6 +9,8 @@ on:
         type: string
         default: "false"
 
+permissions: {}
+
 jobs:
   dependency-review:
     name: "New dependency risk"
