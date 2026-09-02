@@ -75,17 +75,58 @@ export function indexContainsSubject(value: unknown, subject: Subject): boolean 
 	});
 }
 
-export function attestationContainsSbom(value: unknown, sbom: unknown): boolean {
-	if (!Array.isArray(value)) throw new Error("Cosign attestation result is malformed");
-	return value.some((entry) => {
-		if (!record(entry) || typeof entry.payload !== "string") return false;
-		try {
-			const envelope: unknown = JSON.parse(Buffer.from(entry.payload, "base64").toString("utf8"));
-			return record(envelope) && isDeepStrictEqual(envelope.predicate, sbom);
-		} catch {
-			return false;
-		}
-	});
+/**
+ * Cosign writes its verification banner to stderr and its result to stdout as a *stream* of JSON
+ * documents rather than as one document. `verify-attestation` prints one DSSE envelope per verified
+ * attestation, newline-delimited and unwrapped, so a subject carrying a single SBOM attestation
+ * yields a bare object — reading that as an array is what failed the v0.75.0 release. `verify`
+ * prints an array of claims instead. Cosign documents neither framing, so read all three shapes: a
+ * cosign upgrade that reframes its output must not be able to fail a release.
+ */
+function parseCosignDocuments(stdout: string): unknown[] {
+	const text = stdout.trim();
+	// A pretty-printed document spans lines and a stream of documents does not, so neither framing
+	// can be told from the text alone — parse it whole, then per line. The fallback throws on its
+	// own failure, so a capture that is genuinely unreadable still stops the release.
+	let documents: unknown[];
+	try {
+		documents = [JSON.parse(text) as unknown];
+	} catch {
+		documents = text
+			.split("\n")
+			.filter((line) => line.trim())
+			.map((line) => JSON.parse(line) as unknown);
+	}
+	const [only] = documents;
+	const result = documents.length === 1 && Array.isArray(only) ? only : documents;
+	if (result.length === 0) throw new Error("cosign verified nothing: it wrote no result");
+	return result;
+}
+
+/**
+ * The in-toto statement one DSSE envelope carries. Cosign prints only envelopes it has already
+ * verified cryptographically, so one it prints that cannot be decoded is a broken capture rather
+ * than a failed attestation, and stops the release instead of being skipped past.
+ */
+function attestedStatement(envelope: unknown): JsonObject {
+	if (!record(envelope) || typeof envelope.payload !== "string")
+		throw new Error("cosign attestation is not a DSSE envelope");
+	const statement: unknown = JSON.parse(Buffer.from(envelope.payload, "base64").toString("utf8"));
+	if (!record(statement)) throw new Error("cosign attestation payload is not an in-toto statement");
+	return statement;
+}
+
+/**
+ * Whether the attestations cosign verified for one subject carry exactly the SBOM this release
+ * recorded. `cosign attest --type spdxjson` stores the predicate file verbatim — the predicate
+ * published for `ghcr.io/hephaestus-build/webapp` is the syft document in the bundle, key for key —
+ * so the two are compared whole. Cosign re-serializes the predicate with its keys sorted, which is
+ * why this is a deep equality and not a string comparison.
+ */
+export function attestationContainsSbom(stdout: string, sbom: unknown): boolean {
+	return parseCosignDocuments(stdout).some((envelope) =>
+		isDeepStrictEqual(attestedStatement(envelope).predicate, sbom),
+	);
 }
 
 export function validateManifest(
@@ -262,16 +303,20 @@ export function verifyReleaseEvidence(
 		if (!indexContainsSubject(index, subject))
 			throw new Error(`${subject.image} index does not contain ${subject.platform} digest`);
 		if (mode === "verify-signatures" && subject.provenance === "first-party") {
-			const attestations = readJsonFromCommand("cosign", [
-				"verify-attestation",
-				"--type",
-				"spdxjson",
-				"--certificate-identity",
-				releaseCertificateIdentity(release, process.env),
-				"--certificate-oidc-issuer",
-				"https://token.actions.githubusercontent.com",
-				reference,
-			]);
+			const attestations = command(
+				"cosign",
+				[
+					"verify-attestation",
+					"--type",
+					"spdxjson",
+					"--certificate-identity",
+					releaseCertificateIdentity(release, process.env),
+					"--certificate-oidc-issuer",
+					"https://token.actions.githubusercontent.com",
+					reference,
+				],
+				true,
+			);
 			if (!attestationContainsSbom(attestations, readJson(`${prefix}.spdx.json`)))
 				throw new Error(`${subject.image} SBOM attestation does not match its durable evidence`);
 		}
