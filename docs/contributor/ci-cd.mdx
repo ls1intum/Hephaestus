@@ -96,7 +96,7 @@ source validation.
 | TruffleHog and GitHub push protection | pull requests and pushes | block verified secrets | Security workflow and repository protection |
 | Trivy filesystem scan | CI | scanner failure blocks; findings publish | code scanning and Security workflow |
 | Image vulnerability policy | image build and release | blocks fixable high or critical findings | build summary and release evidence |
-| Scheduled image rescans | weekly | findings update the tracking issue; scanner failure fails the run | vulnerability response issue |
+| Scheduled image rescans | weekly | findings update an issue; scanner failure fails the run | `main` images: the drift tracking issue; released images: the vulnerability response issue |
 | OpenSSF Scorecard | `main`, branch-protection changes, and weekly | posture findings do not extend the pull-request critical path | code scanning and run artifact |
 | Renovate | configured schedule and vulnerability alerts | pull requests require normal review and CI | dependency dashboard |
 

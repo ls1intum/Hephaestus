@@ -55,7 +55,7 @@ runs:
     # A prefix fallback keeps a pom change from downloading the whole dependency tree again;
     # setup-java's own Maven cache restores only an exact pom hash.
     - name: Restore Maven dependencies
-      if: steps.identity.outputs.save != 'true'
+      if: steps.identity.outputs.save != 'true' || inputs.cache-type != 'application-server-reactor'
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/.m2/repository

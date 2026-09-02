@@ -64,7 +64,11 @@ const lockDependencies = isRecord(lockRoot.dependencies) ? lockRoot.dependencies
 const lockedPi = isRecord(lockDependencies["@earendil-works/pi-coding-agent"])
 	? lockDependencies["@earendil-works/pi-coding-agent"]
 	: {};
-if (lockedPi.specifier !== piVersion || !String(lockedPi.version).startsWith(`${piVersion}(`)) {
+const lockedVersion = String(lockedPi.version);
+if (
+	lockedPi.specifier !== piVersion ||
+	(lockedVersion !== piVersion && !lockedVersion.startsWith(`${piVersion}(`))
+) {
 	problems.push(
 		`docker/agents/pi/pnpm-lock.yaml does not resolve the image's Pi ${piVersion} dependency.`,
 	);

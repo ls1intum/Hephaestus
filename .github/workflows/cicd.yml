@@ -164,6 +164,7 @@ jobs:
               - '.github/workflows/ci-tests.yml'
               - '.github/actions/setup-caches/**'
               - '.github/actions/setup-node-pnpm/**'
+              - '.github/actions/setup-browsers/**'
             agent-images:
               - 'docker/agents/**'
             postgres-image:
@@ -179,6 +180,7 @@ jobs:
               - '.github/workflows/ci-quality-gates.yml'
               - '.github/actions/setup-node-pnpm/**'
               - '.github/actions/setup-caches/**'
+              - '.github/actions/setup-browsers/**'
             build-config:
               - '.github/workflows/cicd.yml'
               - '.github/workflows/ci-build.yml'

@@ -57,7 +57,7 @@ async function fetchSpecification(url: string, child: ReturnType<typeof spawn>):
 	while (Date.now() < deadline) {
 		if (child.exitCode !== null) throw new Error(`The server exited with code ${child.exitCode}`);
 		try {
-			const response = await fetch(url);
+			const response = await fetch(url, { signal: AbortSignal.timeout(deadline - Date.now()) });
 			if (response.ok) return await response.text();
 		} catch {
 			// Not listening yet.
