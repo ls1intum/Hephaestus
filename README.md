@@ -132,14 +132,13 @@ they could make things for themselves.
   <a href="https://aet.cit.tum.de/">
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="./docs/static/img/brand/aet-mark-dark.svg">
-      <img alt="Applied Education Technologies" align="middle" src="./webapp/public/brand/aet-mark.svg" height="72">
+      <img alt="Applied Education Technologies" align="middle" hspace="12" src="./webapp/public/brand/aet-mark.svg" height="72">
     </picture>
   </a>
-  &nbsp;&nbsp;&nbsp;&nbsp;
   <a href="https://www.tum.de/en/">
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="./docs/static/img/brand/tum-logo-dark.svg">
-      <img alt="Technical University of Munich" align="middle" src="./webapp/public/brand/tum-logo.svg" height="56">
+      <img alt="Technical University of Munich" align="middle" hspace="12" src="./webapp/public/brand/tum-logo.svg" height="56">
     </picture>
   </a>
   <br>
