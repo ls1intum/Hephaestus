@@ -27,7 +27,7 @@ async function executableJar(): Promise<string> {
 			"application",
 			"-am",
 			"package",
-			"-DskipTests",
+			"-Dmaven.test.skip=true",
 			"--batch-mode",
 			...process.argv.slice(2),
 		],
