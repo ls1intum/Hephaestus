@@ -101,6 +101,40 @@ async function login(port: number, username: string): Promise<string> {
 	return cookie;
 }
 
+/**
+ * A signed-in person may not read anything else until they complete the current transparency
+ * notice, so the drill completes it through the endpoint the first-login interstitial uses. The
+ * notice arrived after some of the releases this runs against, and those have no consent endpoint.
+ */
+async function completeTransparencyNotice(port: number, cookie: string): Promise<void> {
+	const status = await fetch(`http://127.0.0.1:${port}/user/consent`, { headers: { cookie } });
+	if (status.status === 404) return;
+	if (!status.ok)
+		throw new Error(`Consent status returned ${status.status}: ${await status.text()}`);
+	const statusBody: unknown = await status.json();
+	if (
+		typeof statusBody !== "object" ||
+		statusBody === null ||
+		!("noticeVersion" in statusBody) ||
+		typeof statusBody.noticeVersion !== "string"
+	)
+		throw new Error("Consent status did not return the current notice version");
+	if ("completed" in statusBody && statusBody.completed === true) return;
+	const completed = await fetch(`http://127.0.0.1:${port}/user/consent`, {
+		method: "PUT",
+		headers: { "content-type": "application/json", cookie },
+		body: JSON.stringify({
+			noticeVersion: statusBody.noticeVersion,
+			termsAccepted: true,
+			participateInResearch: false,
+		}),
+	});
+	if (!completed.ok)
+		throw new Error(
+			`Completing the transparency notice returned ${completed.status}: ${await completed.text()}`,
+		);
+}
+
 async function assertCoreReads(port: number, cookie: string): Promise<void> {
 	const user = await fetch(`http://127.0.0.1:${port}/user`, { headers: { cookie } });
 	if (!user.ok) throw new Error(`Core read /user returned ${user.status}: ${await user.text()}`);
@@ -290,6 +324,7 @@ try {
 	let port = startApplication(application, previousImage);
 	await waitUntilReady(application, port);
 	const previousCookie = await login(port, "alice");
+	await completeTransparencyNotice(port, previousCookie);
 	await login(port, "root");
 	linkWorkspaceIdentity();
 	await seedWorkspace(port, previousCookie);
@@ -321,6 +356,7 @@ try {
 			`Liquibase history shrank during upgrade: before=${previousChanges}, after=${candidateChanges}`,
 		);
 	const candidateCookie = await login(port, "alice");
+	await completeTransparencyNotice(port, candidateCookie);
 	await assertCoreReads(port, candidateCookie);
 
 	console.log("Seeded previous-release upgrade passed.");

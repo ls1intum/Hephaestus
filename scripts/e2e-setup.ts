@@ -207,6 +207,15 @@ async function main(): Promise<void> {
 			},
 			path,
 		);
+	// A signed-in person may not read anything else until they complete the current transparency
+	// notice, so the seeding account completes it through the endpoint the interstitial uses.
+	const consent = object(await api("GET", "/user/consent"), "consent status");
+	if (consent.completed !== true)
+		await api("PUT", "/user/consent", {
+			noticeVersion: textField(consent, "noticeVersion", "consent status"),
+			termsAccepted: true,
+			participateInResearch: false,
+		});
 	const accountId = idField(object(await api("GET", "/user"), "user"), "user");
 	const scmOrigin = config.provider === "github" ? "https://github.com" : config.serverUrl;
 	const scmHeaders: Record<string, string> =
