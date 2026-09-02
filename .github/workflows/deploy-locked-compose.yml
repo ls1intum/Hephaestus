@@ -21,6 +21,8 @@ on:
         required: false
         default: ""
 
+permissions: {}
+
 jobs:
   deploy:
     timeout-minutes: 20

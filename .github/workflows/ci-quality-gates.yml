@@ -34,6 +34,8 @@ on:
       SURGE_TOKEN:
         required: false
 
+permissions: {}
+
 jobs:
   quality-gates:
     name: "${{ matrix.display-name }}"

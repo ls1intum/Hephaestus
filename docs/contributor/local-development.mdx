@@ -11,7 +11,10 @@ Hephaestus supports full-stack development across Java and TypeScript. This guid
 
 Install and configure the following tools before you attempt a local build:
 
-1. **Java JDK 21** – Required for the Spring Boot application server.
+1. **Java JDK 21**, plus `curl` or `wget` and `unzip` – Required for the Spring Boot application
+   server. The Maven wrapper ships no binary: on first use it downloads Maven and verifies the
+   archive against the checksum in `server/.mvn/wrapper/maven-wrapper.properties`, and without
+   `unzip` it falls back to an archive that checksum does not cover and refuses it.
 2. **Docker and Docker Compose** – Required for PostgreSQL and NATS. Verify both with `docker info`
    and `docker compose version`.
 3. **Node.js** – Match `package.json#devEngines.runtime`; it executes repository scripts and
