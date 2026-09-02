@@ -16,7 +16,6 @@ import { formatCostUsd, formatRateUsd } from "@/lib/money";
 import { type Fx, FxSpendLine } from "./fx";
 import { formatUsageDay, JOB_TYPE_LABELS } from "./usage-utils";
 
-/** Counts only — integers, so adding them is exact. Money never goes through here: see the footers. */
 function sumBy<T>(rows: T[], pick: (row: T) => number): number {
 	return rows.reduce((total, row) => total + pick(row), 0);
 }
@@ -29,24 +28,20 @@ const JOB_TYPE_SKELETON_COLUMNS = [
 	"w-16",
 	"w-20",
 	"w-20",
+	"w-20",
+	"w-20",
 	"w-12",
 	"w-12",
 ];
 const DAY_SKELETON_COLUMNS = ["w-16", "w-16", "w-16", "w-16", "w-12"];
 
 export interface LlmUsageByJobTypeTableProps {
-	/**
-	 * The whole report, not a bare `rows` array: re-adding the row costs in float would drift from the
-	 * exact total the server put on the same payload, which is what the budget gate enforces against.
-	 */
 	report?: WorkspaceLlmUsageReport;
-	/** Totals row only. Body cells stay USD-only — an estimate on each would cost the column width. */
 	fx?: Fx;
 }
 
 export function LlmUsageByJobTypeTable({ report, fx }: LlmUsageByJobTypeTableProps) {
 	const rows = report?.byJobType;
-	// One row earns no footer.
 	const totals =
 		report == null || rows == null || rows.length < 2
 			? null
@@ -55,6 +50,8 @@ export function LlmUsageByJobTypeTable({ report, fx }: LlmUsageByJobTypeTablePro
 					ownProvider: report.ownProviderTotalCostUsd,
 					unpriced: sumBy(rows, (row) => row.unpricedEventCount),
 					inputTokens: sumBy(rows, (row) => row.inputTokens),
+					cacheReadTokens: sumBy(rows, (row) => row.cacheReadTokens),
+					cacheWriteTokens: sumBy(rows, (row) => row.cacheWriteTokens),
 					outputTokens: sumBy(rows, (row) => row.outputTokens),
 					calls: sumBy(rows, (row) => row.totalCalls),
 					events: sumBy(rows, (row) => row.events),
@@ -79,6 +76,12 @@ export function LlmUsageByJobTypeTable({ report, fx }: LlmUsageByJobTypeTablePro
 					</TableHead>
 					<TableHead scope="col" className="text-right">
 						Input tokens
+					</TableHead>
+					<TableHead scope="col" className="text-right">
+						Cache reads
+					</TableHead>
+					<TableHead scope="col" className="text-right">
+						Cache writes
 					</TableHead>
 					<TableHead scope="col" className="text-right">
 						Output tokens
@@ -114,6 +117,12 @@ export function LlmUsageByJobTypeTable({ report, fx }: LlmUsageByJobTypeTablePro
 								{formatTokens(row.inputTokens)}
 							</TableCell>
 							<TableCell className="text-right tabular-nums">
+								{formatTokens(row.cacheReadTokens)}
+							</TableCell>
+							<TableCell className="text-right tabular-nums">
+								{formatTokens(row.cacheWriteTokens)}
+							</TableCell>
+							<TableCell className="text-right tabular-nums">
 								{formatTokens(row.outputTokens)}
 							</TableCell>
 							<TableCell className="text-right tabular-nums">
@@ -138,13 +147,18 @@ export function LlmUsageByJobTypeTable({ report, fx }: LlmUsageByJobTypeTablePro
 							<MoneyCell>{formatCostUsd(totals.ownProvider)}</MoneyCell>
 							<FxSpendLine usd={totals.ownProvider} fx={fx} />
 						</TableCell>
-						{/* No blended average: the two money streams are different money. */}
 						<TableCell className="text-right text-muted-foreground">—</TableCell>
 						<TableCell className="text-right tabular-nums">
 							{totals.unpriced.toLocaleString()}
 						</TableCell>
 						<TableCell className="text-right tabular-nums">
 							{formatTokens(totals.inputTokens)}
+						</TableCell>
+						<TableCell className="text-right tabular-nums">
+							{formatTokens(totals.cacheReadTokens)}
+						</TableCell>
+						<TableCell className="text-right tabular-nums">
+							{formatTokens(totals.cacheWriteTokens)}
 						</TableCell>
 						<TableCell className="text-right tabular-nums">
 							{formatTokens(totals.outputTokens)}
@@ -162,11 +176,6 @@ export function LlmUsageByJobTypeTable({ report, fx }: LlmUsageByJobTypeTablePro
 	);
 }
 
-/**
- * An average is a rate, not an amount spent, so it renders through `formatRateUsd`: rounding to cents
- * destroys the number this column exists to give. And no `≈` — on this page that means "converted".
- * The two money streams are never blended into one figure.
- */
 function AvgPerRun({ row }: { row: LlmUsageByJobType }) {
 	const parts = [
 		{ key: "shared", label: "shared models", total: row.instanceTotalCostUsd },
@@ -194,9 +203,7 @@ function AvgPerRun({ row }: { row: LlmUsageByJobType }) {
 }
 
 export interface LlmUsageByDayTableProps {
-	/** The whole report: the footer reads the server's exact total rather than re-adding floats. */
 	report?: WorkspaceLlmUsageReport;
-	/** Display-only conversion for the totals row; per-day cells stay USD-only. */
 	fx?: Fx;
 }
 

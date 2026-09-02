@@ -25,11 +25,16 @@ public final class MentorTurnMeter {
      * @param reasoningTokens already inside {@link #outputTokens}; reported, never priced twice
      */
     public record ObservedUsage(
-            long inputTokens, long outputTokens, long reasoningTokens, long cacheReadTokens, int calls) {
-        static final ObservedUsage NONE = new ObservedUsage(0, 0, 0, 0, 0);
+            long inputTokens,
+            long outputTokens,
+            long reasoningTokens,
+            long cacheReadTokens,
+            long cacheWriteTokens,
+            int calls) {
+        static final ObservedUsage NONE = new ObservedUsage(0, 0, 0, 0, 0, 0);
 
         public boolean isEmpty() {
-            return inputTokens <= 0 && outputTokens <= 0 && cacheReadTokens <= 0;
+            return inputTokens <= 0 && outputTokens <= 0 && cacheReadTokens <= 0 && cacheWriteTokens <= 0;
         }
 
         ObservedUsage plus(ProxyTokenUsage call) {
@@ -38,6 +43,7 @@ public final class MentorTurnMeter {
                     outputTokens + call.outputTokens(),
                     reasoningTokens + call.reasoningTokens(),
                     cacheReadTokens + call.cacheReadTokens(),
+                    cacheWriteTokens + call.cacheWriteTokens(),
                     calls + 1);
         }
     }
@@ -75,7 +81,10 @@ public final class MentorTurnMeter {
         }
         ObservedUsage snapshot = Objects.requireNonNull(observed.get());
         BigDecimal cost = price.calculateCost(
-                        snapshot.inputTokens(), snapshot.outputTokens(), snapshot.cacheReadTokens(), 0)
+                        snapshot.inputTokens(),
+                        snapshot.outputTokens(),
+                        snapshot.cacheReadTokens(),
+                        snapshot.cacheWriteTokens())
                 .usd();
         return cost != null ? cost : BigDecimal.ZERO;
     }

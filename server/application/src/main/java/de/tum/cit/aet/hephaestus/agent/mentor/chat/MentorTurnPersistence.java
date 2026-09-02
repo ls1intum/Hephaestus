@@ -324,7 +324,7 @@ public class MentorTurnPersistence {
                         viaProxy.inputTokens(),
                         viaProxy.outputTokens(),
                         viaProxy.cacheReadTokens(),
-                        /* cacheWrite — no OpenAI-compatible usage block reports one per call */ 0);
+                        viaProxy.cacheWriteTokens());
                 calls = viaProxy.totalCalls();
                 reasoning = viaProxy.reasoningTokens();
                 provenance = UsageProvenance.PROXY;

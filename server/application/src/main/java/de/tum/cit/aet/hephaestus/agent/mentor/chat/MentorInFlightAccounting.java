@@ -56,7 +56,7 @@ public class MentorInFlightAccounting {
                 observed.inputTokens(),
                 observed.outputTokens(),
                 observed.cacheReadTokens(),
-                0,
+                observed.cacheWriteTokens(),
                 observed.reasoningTokens(),
                 Math.max(1, observed.totalCalls()),
                 price,

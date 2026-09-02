@@ -275,9 +275,6 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
      * columns) while the proxy is still waiting on the provider, and a late write would otherwise bill
      * one attempt's tokens at another attempt's frozen price and funding source.
      *
-     * <p>{@code llm_cache_write_tokens} is not touched: the OpenAI-compatible usage shapes the proxy
-     * parses do not report cache writes, so only the runner's end-of-run report fills that column.
-     *
      * @param attempt the {@code retry_count} the caller observed when it authenticated the call
      * @return 1 if the attempt still owns the row, 0 if it has been superseded (a safe no-op)
      */
@@ -287,7 +284,8 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
             + "j.llmTotalInputTokens = COALESCE(j.llmTotalInputTokens, 0) + :input, "
             + "j.llmTotalOutputTokens = COALESCE(j.llmTotalOutputTokens, 0) + :output, "
             + "j.llmTotalReasoningTokens = COALESCE(j.llmTotalReasoningTokens, 0) + :reasoning, "
-            + "j.llmCacheReadTokens = COALESCE(j.llmCacheReadTokens, 0) + :cacheRead "
+            + "j.llmCacheReadTokens = COALESCE(j.llmCacheReadTokens, 0) + :cacheRead, "
+            + "j.llmCacheWriteTokens = COALESCE(j.llmCacheWriteTokens, 0) + :cacheWrite "
             + "WHERE j.id = :id AND j.retryCount = :attempt AND j.status = 'RUNNING'")
     int accumulateLlmUsage(
             @Param("id") UUID id,
@@ -295,7 +293,8 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
             @Param("input") int input,
             @Param("output") int output,
             @Param("reasoning") int reasoning,
-            @Param("cacheRead") int cacheRead);
+            @Param("cacheRead") int cacheRead,
+            @Param("cacheWrite") int cacheWrite);
 
     /**
      * Reads the totals straight from the row rather than from a possibly stale in-memory entity, so

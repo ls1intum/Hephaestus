@@ -75,15 +75,13 @@ class TerminalUsageTest extends BaseUnitTest {
         assertThat(usage.provenance()).isEqualTo(UsageProvenance.MERGED);
     }
 
-    // The proxy never accumulates a cache write, so a maximum against it must not read the missing
-    // column as a zero that beats the only source that has the number.
     @Test
-    @DisplayName("cache writes survive the maximum even though the proxy never counts them")
-    void cacheWritesSurviveTheMaximum() {
+    @DisplayName("cache writes use the larger observation like every other bucket")
+    void cacheWritesUseTheLargerObservation() {
         TerminalUsage usage = TerminalUsage.resolve(
-                new LlmUsage("m", 100, 200, 0, 0, 12_345, 0.0, 2), new AgentJobLlmUsage(9, 8_000, 900, 0, 0, 0));
+                new LlmUsage("m", 100, 200, 0, 0, 12_345, 0.0, 2), new AgentJobLlmUsage(9, 8_000, 900, 0, 0, 20_000));
 
-        assertThat(usage.cacheWriteTokens()).isEqualTo(12_345);
+        assertThat(usage.cacheWriteTokens()).isEqualTo(20_000);
     }
 
     // Neither source double-counts within itself, so no bucket of the maximum can exceed what was really
@@ -92,7 +90,7 @@ class TerminalUsageTest extends BaseUnitTest {
     @DisplayName("no bucket is ever billed above the larger of the two records")
     void neverBillsAboveEitherRecord() {
         LlmUsage runnerUsage = new LlmUsage("m", 100, 4_000, 7, 50, 900, 0.0, 3);
-        AgentJobLlmUsage proxy = new AgentJobLlmUsage(9, 8_000, 200, 11, 20, 0);
+        AgentJobLlmUsage proxy = new AgentJobLlmUsage(9, 8_000, 200, 11, 20, 1_000);
 
         TerminalUsage usage = TerminalUsage.resolve(runnerUsage, proxy);
 
@@ -100,7 +98,7 @@ class TerminalUsageTest extends BaseUnitTest {
         assertThat(usage.outputTokens()).isEqualTo(Math.max(4_000, 200));
         assertThat(usage.reasoningTokens()).isEqualTo(Math.max(7, 11));
         assertThat(usage.cacheReadTokens()).isEqualTo(Math.max(50, 20));
-        assertThat(usage.cacheWriteTokens()).isEqualTo(Math.max(900, 0));
+        assertThat(usage.cacheWriteTokens()).isEqualTo(Math.max(900, 1_000));
         assertThat(usage.totalCalls()).isEqualTo(Math.max(3, 9));
     }
 

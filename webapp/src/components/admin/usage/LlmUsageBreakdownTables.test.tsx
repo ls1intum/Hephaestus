@@ -45,8 +45,8 @@ const report: WorkspaceLlmUsageReport = {
 			unpricedEventCount: 1,
 			inputTokens: 1000,
 			outputTokens: 200,
-			cacheReadTokens: 0,
-			cacheWriteTokens: 0,
+			cacheReadTokens: 600,
+			cacheWriteTokens: 50,
 			totalCalls: 12,
 			events: 10,
 		},
@@ -57,8 +57,8 @@ const report: WorkspaceLlmUsageReport = {
 			unpricedEventCount: 2,
 			inputTokens: 3000,
 			outputTokens: 400,
-			cacheReadTokens: 0,
-			cacheWriteTokens: 0,
+			cacheReadTokens: 1400,
+			cacheWriteTokens: 150,
 			totalCalls: 24,
 			events: 20,
 		},
@@ -88,9 +88,33 @@ describe("usage breakdown totals", () => {
 		render(<LlmUsageByJobTypeTable report={report} />);
 
 		const footer = totalsRowOf("AI spend by run type");
-		// Reads as: the server's two money figures, a dash where a blended average would be (two
-		// purses), then the counts this table adds up itself.
-		expect(footer.textContent).toBe("Total$4.25$1.75—34,0006003630");
+		const cells = within(footer).getAllByRole("cell");
+		expect(cells.map((cell) => cell.textContent)).toStrictEqual([
+			"Total",
+			"$4.25",
+			"$1.75",
+			"—",
+			"3",
+			"4,000",
+			"2,000",
+			"200",
+			"600",
+			"36",
+			"30",
+		]);
+	});
+
+	it("shows cache reads and writes separately", () => {
+		render(<LlmUsageByJobTypeTable report={report} />);
+
+		const table = screen.getByRole("table", { name: "AI spend by run type" });
+		within(table).getByRole("columnheader", { name: "Cache reads" });
+		within(table).getByRole("columnheader", { name: "Cache writes" });
+		const cells = within(within(table).getByRole("row", { name: /PR review/ })).getAllByRole(
+			"cell",
+		);
+		expect(cells[6]?.textContent).toBe("600");
+		expect(cells[7]?.textContent).toBe("50");
 	});
 
 	it("drops the footer for a single row rather than restating the line above it", () => {

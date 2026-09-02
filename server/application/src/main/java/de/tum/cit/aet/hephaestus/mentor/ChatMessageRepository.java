@@ -60,7 +60,8 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, UUID> 
                llm_total_input_tokens = llm_total_input_tokens + :input,
                llm_total_output_tokens = llm_total_output_tokens + :output,
                llm_total_reasoning_tokens = llm_total_reasoning_tokens + :reasoning,
-               llm_cache_read_tokens = llm_cache_read_tokens + :cacheRead
+               llm_cache_read_tokens = llm_cache_read_tokens + :cacheRead,
+               llm_cache_write_tokens = llm_cache_write_tokens + :cacheWrite
          WHERE id = :id
            AND status = 'in_flight'
         """, nativeQuery = true)
@@ -69,7 +70,8 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, UUID> 
             @Param("input") long input,
             @Param("output") long output,
             @Param("reasoning") long reasoning,
-            @Param("cacheRead") long cacheRead);
+            @Param("cacheRead") long cacheRead,
+            @Param("cacheWrite") long cacheWrite);
 
     /**
      * The turn's accumulated proxy usage read straight from the row rather than from a possibly stale
@@ -78,7 +80,7 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, UUID> 
      */
     @Query("SELECT new de.tum.cit.aet.hephaestus.mentor.MentorTurnLlmUsage("
             + "m.llmTotalCalls, m.llmTotalInputTokens, m.llmTotalOutputTokens, "
-            + "m.llmTotalReasoningTokens, m.llmCacheReadTokens) "
+            + "m.llmTotalReasoningTokens, m.llmCacheReadTokens, m.llmCacheWriteTokens) "
             + "FROM ChatMessage m WHERE m.id = :id")
     Optional<MentorTurnLlmUsage> findLlmUsageById(@Param("id") UUID id);
 }

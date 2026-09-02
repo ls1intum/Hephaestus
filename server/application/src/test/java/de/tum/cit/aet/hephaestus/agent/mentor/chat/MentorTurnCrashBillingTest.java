@@ -113,7 +113,7 @@ class MentorTurnCrashBillingTest extends BaseUnitTest {
     @Test
     @DisplayName("a turn that dies before the runner reports anything is billed for the calls the proxy saw")
     void aCrashedTurnIsBilledForWhatTheProxyObserved() {
-        proxyRecorded(new MentorTurnLlmUsage(3, 6_000, 900, 50, 100));
+        proxyRecorded(new MentorTurnLlmUsage(3, 6_000, 900, 50, 100, 0));
 
         persistence.interrupt(cookie(), startedTurnWithNoRunnerReport(), new IllegalStateException("runner died"));
 

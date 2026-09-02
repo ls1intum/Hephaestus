@@ -75,16 +75,10 @@ public class ProxyAccounting {
             recordUsage(attempt, ProxyTokenUsage.from(parsed, responsesProtocol));
         } catch (Exception e) {
             log.warn("Could not parse upstream usage for {} — this call's tokens go unbilled", attempt.sourceId(), e);
-            meterRegistry
-                    .counter(
-                            "llm.proxy.usage.unparseable",
-                            "sourceType",
-                            attempt.sourceType().name())
-                    .increment();
+            recordMalformedUsage(attempt);
         }
     }
 
-    /** The shared tail of the buffered and streamed paths. */
     public void recordUsage(ProxyRouting.BilledAttempt attempt, @Nullable ProxyTokenUsage usage) {
         if (usage == null) {
             return;
@@ -93,6 +87,15 @@ public class ProxyAccounting {
             case AGENT_JOB -> usageAccumulator.accumulate(attempt, usage);
             case MENTOR_TURN -> mentorTurnUsageAccumulator.accumulate(attempt, usage);
         }
+    }
+
+    public void recordMalformedUsage(ProxyRouting.BilledAttempt attempt) {
+        meterRegistry
+                .counter(
+                        "llm.proxy.usage.unparseable",
+                        "sourceType",
+                        attempt.sourceType().name())
+                .increment();
     }
 
     public Timer.Sample startTimer() {

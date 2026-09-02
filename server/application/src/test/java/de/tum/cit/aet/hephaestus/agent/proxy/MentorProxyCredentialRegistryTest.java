@@ -118,12 +118,10 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
             assertThat(registry.bindTurn(sessionId, meter)).isTrue();
 
             // Two completed calls of 100k input tokens each, at $10 per million = $1.00 each.
-            registry.accumulate(turnId, new ProxyTokenUsage(100_000, 0, 0, 0));
-            registry.accumulate(turnId, new ProxyTokenUsage(100_000, 0, 0, 0));
+            registry.accumulate(turnId, new ProxyTokenUsage(100_000, 0, 0, 0, 0));
+            registry.accumulate(turnId, new ProxyTokenUsage(100_000, 0, 0, 0, 0));
 
             var attempt = registry.validate(token).orElseThrow().attempt();
-            org.junit.jupiter.api.Assertions.assertNotNull(attempt);
-            org.junit.jupiter.api.Assertions.assertNotNull(attempt);
             assertThat(attempt).isNotNull();
             assertThat(attempt.sourceType()).isEqualTo(LlmUsageSourceType.MENTOR_TURN);
             assertThat(attempt.sourceId()).isEqualTo(turnId);
@@ -145,7 +143,7 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
             registry.unbindTurn(sessionId, turnA);
             registry.bindTurn(sessionId, turnB);
 
-            boolean applied = registry.accumulate(turnA.turnId(), new ProxyTokenUsage(999, 0, 0, 0));
+            boolean applied = registry.accumulate(turnA.turnId(), new ProxyTokenUsage(999, 0, 0, 0, 0));
 
             assertThat(applied).as("the fence rejects it").isFalse();
             assertThat(turnB.observed().isEmpty()).as("turn B is untouched").isTrue();
@@ -157,7 +155,7 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
             String token = mint(sessionId);
             MentorTurnMeter meter = new MentorTurnMeter(UUID.randomUUID(), TEN_DOLLARS_PER_MILLION);
             registry.bindTurn(sessionId, meter);
-            registry.accumulate(meter.turnId(), new ProxyTokenUsage(50_000, 10, 0, 0));
+            registry.accumulate(meter.turnId(), new ProxyTokenUsage(50_000, 10, 0, 0, 0));
 
             registry.unbindTurn(sessionId, meter);
 
@@ -195,7 +193,7 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
 
             registry.bindTurn(sessionId, new MentorTurnMeter(UUID.randomUUID(), TEN_DOLLARS_PER_MILLION));
 
-            assertThat(registry.accumulate(turnA.turnId(), new ProxyTokenUsage(10, 0, 0, 0)))
+            assertThat(registry.accumulate(turnA.turnId(), new ProxyTokenUsage(10, 0, 0, 0, 0)))
                     .isFalse();
             assertThat(registry.boundTurns()).isEqualTo(1);
         }
@@ -223,7 +221,7 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
             registry.revoke(sessionId);
 
             assertThat(registry.boundTurns()).isZero();
-            assertThat(registry.accumulate(meter.turnId(), new ProxyTokenUsage(10, 0, 0, 0)))
+            assertThat(registry.accumulate(meter.turnId(), new ProxyTokenUsage(10, 0, 0, 0, 0)))
                     .isFalse();
         }
 
@@ -233,7 +231,7 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
             String token = mint(sessionId);
             MentorTurnMeter meter = new MentorTurnMeter(UUID.randomUUID(), null);
             registry.bindTurn(sessionId, meter);
-            registry.accumulate(meter.turnId(), new ProxyTokenUsage(1_000_000, 0, 0, 0));
+            registry.accumulate(meter.turnId(), new ProxyTokenUsage(1_000_000, 0, 0, 0, 0));
 
             var attempt = registry.validate(token).orElseThrow().attempt();
             org.junit.jupiter.api.Assertions.assertNotNull(attempt);

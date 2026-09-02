@@ -153,6 +153,10 @@ public class ChatMessage {
     @Column(name = "llm_cache_read_tokens", nullable = false, insertable = false, updatable = false)
     private long llmCacheReadTokens;
 
+    @org.hibernate.annotations.ColumnDefault("0")
+    @Column(name = "llm_cache_write_tokens", nullable = false, insertable = false, updatable = false)
+    private long llmCacheWriteTokens;
+
     /**
      * Optimistic-lock version — Hibernate bumps it on every managed write, including the reaper's.
      * Stale-snapshot writers (reaper-vs-finalise, finalise-vs-interrupt) get

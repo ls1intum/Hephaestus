@@ -43,6 +43,8 @@ final class ProxyStreamUsageTap implements Consumer<byte[]> {
     @Nullable
     private ProxyTokenUsage observed;
 
+    private boolean malformedUsage;
+
     ProxyStreamUsageTap(ObjectMapper objectMapper, boolean responsesProtocol) {
         this.objectMapper = objectMapper;
         this.responsesProtocol = responsesProtocol;
@@ -96,7 +98,7 @@ final class ProxyStreamUsageTap implements Consumer<byte[]> {
                 observed = parsed;
             }
         } catch (RuntimeException e) {
-            // Only the billing is lost; the client already has the frame verbatim.
+            malformedUsage = true;
             log.debug("Unparseable SSE frame while looking for usage: {}", e.toString());
         }
     }
@@ -105,6 +107,10 @@ final class ProxyStreamUsageTap implements Consumer<byte[]> {
     @Nullable
     ProxyTokenUsage observed() {
         return observed;
+    }
+
+    boolean hasMalformedUsage() {
+        return malformedUsage;
     }
 
     private static boolean startsWith(byte[] line, byte[] prefix) {

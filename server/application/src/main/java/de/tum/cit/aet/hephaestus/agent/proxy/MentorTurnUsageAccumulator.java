@@ -60,7 +60,8 @@ public class MentorTurnUsageAccumulator {
                     usage.billableInputTokens(),
                     usage.outputTokens(),
                     usage.reasoningTokens(),
-                    usage.cacheReadTokens());
+                    usage.cacheReadTokens(),
+                    usage.cacheWriteTokens());
             if (rows == 0) {
                 recordSuperseded(turnId);
                 return;

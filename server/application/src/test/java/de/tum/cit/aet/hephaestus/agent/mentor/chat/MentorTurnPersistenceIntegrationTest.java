@@ -619,8 +619,8 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
 
     private void accumulateProxyCall(UUID turnId, long input, long output, long reasoning, long cacheRead) {
         new TransactionTemplate(transactionManager)
-                .executeWithoutResult(ignored -> assertThat(
-                                chatMessageRepository.accumulateLlmUsage(turnId, input, output, reasoning, cacheRead))
+                .executeWithoutResult(ignored -> assertThat(chatMessageRepository.accumulateLlmUsage(
+                                turnId, input, output, reasoning, cacheRead, 0))
                         .isEqualTo(1));
     }
 
