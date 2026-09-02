@@ -43,10 +43,9 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # Pin to the exact commit CI/CD built — never main's tip, which may
-          # already carry a newer version bump (that would skip this release).
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.sha }}
           fetch-depth: 0
+          persist-credentials: false
 
       # Decides whether this commit cuts a release, and creates nothing.
       # The draft is created in tag-images, after the evidence gate, so a gate failure leaves no
@@ -61,6 +60,10 @@ jobs:
           SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
           set -euo pipefail
+
+          # Read the commit CI/CD built, not main's tip, which may already carry a newer version bump.
+          git merge-base --is-ancestor "$SHA" origin/main || {
+            echo "::error::Commit $SHA is not on main"; exit 1; }
 
           VERSION=$(git show "$SHA:package.json" | jq -r .version)
           PARENT_VERSION=$(git show "${SHA}^:package.json" | jq -r .version)
@@ -141,6 +144,7 @@ jobs:
         with:
           ref: ${{ needs.release.outputs.sha }}
           fetch-depth: 1
+          persist-credentials: false
 
       - name: Log in to GitHub Container Registry
         uses: ./.github/actions/ghcr-login
