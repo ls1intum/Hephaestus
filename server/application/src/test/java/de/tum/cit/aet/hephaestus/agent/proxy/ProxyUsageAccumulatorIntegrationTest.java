@@ -130,7 +130,7 @@ class ProxyUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegrationT
     void nullJobIdIsANoOp() {
         AgentJob job = persistedJob("proxy-usage-null-target");
 
-        accumulate(null, json("{\"usage\":{\"prompt_tokens\":10}}"), false);
+        accumulate(null, json("{\"usage\":{\"prompt_tokens\":10,\"completion_tokens\":0}}"), false);
 
         assertThat(usageOf(job).totalCalls()).isZero();
     }
@@ -189,7 +189,7 @@ class ProxyUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegrationT
         job.setLlmTotalCalls(4);
         jobRepository.saveAndFlush(job);
 
-        accumulate(job.getId(), json("{\"usage\":{\"prompt_tokens\":25}}"), false);
+        accumulate(job.getId(), json("{\"usage\":{\"prompt_tokens\":25,\"completion_tokens\":0}}"), false);
 
         AgentJobLlmUsage usage = usageOf(job);
         assertThat(usage.inputTokens()).isEqualTo(500);
@@ -222,7 +222,8 @@ class ProxyUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegrationT
         assertThatCode(() -> accumulator.accumulate(
                         new ProxyRouting.BilledAttempt(
                                 LlmUsageSourceType.AGENT_JOB, UUID.randomUUID(), 0, BigDecimal.ZERO),
-                        ProxyTokenUsage.from(json("{\"usage\":{\"prompt_tokens\":10}}"), false)))
+                        ProxyTokenUsage.from(
+                                json("{\"usage\":{\"prompt_tokens\":10,\"completion_tokens\":0}}"), false)))
                 .doesNotThrowAnyException();
 
         assertThat(registry.counter("llm.proxy.usage.accumulate.failure").count())
