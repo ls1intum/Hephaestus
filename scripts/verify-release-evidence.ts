@@ -13,7 +13,9 @@ import {
 } from "./lib/release-identities.ts";
 import { isRelease } from "./release-image-lock.ts";
 
-type Subject = {
+/** One platform of one image, as the manifest records it. `generate-release-evidence.ts` emits
+ * these and this file is the only thing that decides whether they are acceptable. */
+export type Subject = {
 	digest: string;
 	image: string;
 	indexDigest: string;

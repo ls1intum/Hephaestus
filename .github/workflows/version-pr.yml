@@ -1,8 +1,11 @@
 name: Version PR
 
 # Maintains the changesets Version PR; release.yml handles merged version bumps.
-# GITHUB_TOKEN-authored updates do not trigger CI, so release automation uses the
-# ruleset bypass. A release still requires successful main CI.
+#
+# The changesets action pushes with GITHUB_TOKEN, and a push made with that token starts no workflow
+# run — so the Version PR used to carry no checks at all and merged through a ruleset bypass.
+# workflow_dispatch is one of the two documented exceptions to that rule, so the same token starts
+# CI/CD on the Version PR's own branch instead; scripts/dispatch-version-pr-ci.ts has the reasoning.
 #
 # Contributor guide: docs/contributor/release-management.mdx
 
@@ -21,6 +24,7 @@ jobs:
     timeout-minutes: 15
     runs-on: ubuntu-latest
     permissions:
+      actions: write # dispatch CI/CD on the Version PR's branch
       contents: write
       pull-requests: write
     steps:
@@ -40,3 +44,10 @@ jobs:
           pr-title: "chore(release): version packages"
           commit-message: "chore(release): version packages"
           github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # Every Version PR head commit gets a CI/CD run, so the commit whose merge cuts a release is
+      # validated before it lands rather than after.
+      - name: Run CI on the Version PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/dispatch-version-pr-ci.ts

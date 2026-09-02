@@ -105,50 +105,17 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - uses: ./.github/actions/setup-node-pnpm
+        with:
+          install: "none"
+
+      # The images this release promotes, resolved through the same script the pre-merge evidence
+      # preflight resolves them with, so the two can never disagree about which artefact is subject.
       - name: Capture release image digests
         id: retag
         env:
           SOURCE_TAG: run-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}
-        run: |
-          set -euo pipefail
-
-          mapfile -t IMAGES < <(jq -er '.images[]' security/release-images.json)
-          [ "${#IMAGES[@]}" -gt 0 ] || { echo "::error::Release image inventory is empty"; exit 1; }
-          declare -A DIGESTS=()
-          : > release-images.tsv
-
-          # Resolve the complete image inventory before generating evidence.
-          for img in "${IMAGES[@]}"; do
-            FULL_IMAGE="ghcr.io/hephaestus-build/$img"
-            for i in $(seq 1 24); do
-              digest=$(docker buildx imagetools inspect "$FULL_IMAGE:$SOURCE_TAG" --format '{{json .Manifest}}' 2>/dev/null | jq -er '.digest' 2>/dev/null) || true
-              if [[ "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]; then
-                DIGESTS[$img]=$digest
-                break
-              fi
-              if [ "$i" -ge 24 ]; then
-                echo "::error::Could not resolve a valid digest for $FULL_IMAGE:$SOURCE_TAG after 120 s"
-                exit 1
-              fi
-              sleep 5
-            done
-          done
-
-          for img in "${IMAGES[@]}"; do
-            FULL_IMAGE="ghcr.io/hephaestus-build/$img"
-            echo "::group::$img"
-
-            SRC_DIGEST=${DIGESTS[$img]}
-            echo "$img source digest: $SRC_DIGEST"
-            printf '%s\t%s\n' "$img" "$SRC_DIGEST" >> release-images.tsv
-
-            case "$img" in
-              agent-pi)            echo "agent-pi-digest=$SRC_DIGEST" >> "$GITHUB_OUTPUT" ;;
-              application-server)  echo "application-server-digest=$SRC_DIGEST" >> "$GITHUB_OUTPUT" ;;
-              postgres)            echo "postgres-digest=$SRC_DIGEST" >> "$GITHUB_OUTPUT" ;;
-            esac
-            echo "::endgroup::"
-          done
+        run: node scripts/resolve-release-images.ts "$SOURCE_TAG" release-images.tsv
 
       - name: Verify Node-only agent-pi sandbox
         env:
@@ -171,10 +138,6 @@ jobs:
 
       - uses: ./.github/actions/setup-release-security-tools
 
-      - uses: ./.github/actions/setup-node-pnpm
-        with:
-          install: "none"
-
       # The database the whole evidence bundle is scanned against: recorded into the bundle, and
       # refused if it is over a day old, so a stale mirror cannot be signed as a fresh scan.
       - uses: ./.github/actions/download-trivy-db
@@ -186,61 +149,12 @@ jobs:
         env:
           TRIVY_USERNAME: ${{ github.actor }}
           TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE: ${{ needs.release.outputs.tag_name }}
+          COMMIT: ${{ needs.release.outputs.sha }}
         run: |
           set -euo pipefail
-          mkdir -p evidence
-          : > release-platforms.tsv
-          started=$SECONDS
-          jq -n --arg syft "$(syft version -o json | jq -r .version)" \
-            --arg trivy "$(trivy version --format json | jq -r .Version)" \
-            --arg cosign "$(cosign version --json | jq -r .gitVersion)" \
-            '{syft: $syft, trivy: $trivy, cosign: $cosign}' > evidence/tool-versions.json
-          generate_evidence() {
-            local image=$1 repository=$2 digest=$3 provenance=$4
-            local ref="$repository@$digest"
-            for platform in linux/amd64 linux/arm64; do
-              suffix=${platform//\//-}
-              architecture=${platform#*/}
-              platform_digest=$(docker buildx imagetools inspect "$ref" --raw | jq -er \
-                --arg architecture "$architecture" \
-                '.manifests[] | select(.platform.os == "linux" and .platform.architecture == $architecture) | .digest')
-              [[ "$platform_digest" =~ ^sha256:[a-f0-9]{64}$ ]] || { echo "::error::$image $platform digest is malformed"; exit 1; }
-              platform_ref="$repository@$platform_digest"
-              printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$image" "$platform" "$digest" "$platform_digest" "$repository" "$provenance" >> release-platforms.tsv
-              # Scan the registry artifact, never a daemon copy of it: a daemon pull
-              # re-serializes an OCI manifest as Docker schema 2, so the SBOM would
-              # record a locally computed manifestDigest instead of the released one.
-              # --platform makes Syft fail loudly if the digest is not this platform's.
-              syft --from registry "$platform_ref" --platform "$platform" --scope squashed \
-                -o "syft-json=evidence/$image-$suffix.syft.json" \
-                -o "spdx-json=evidence/$image-$suffix.spdx.json" \
-                -o "cyclonedx-json=evidence/$image-$suffix.cdx.json"
-              trivy image --skip-db-update --scanners vuln --format json --output "evidence/$image-$suffix.trivy.json" "$platform_ref"
-              trivy image --skip-db-update --scanners license --format json --output "evidence/$image-$suffix.license.json" "$platform_ref"
-            done
-          }
-          while IFS=$'\t' read -r image digest; do
-            generate_evidence "$image" "ghcr.io/hephaestus-build/$image" "$digest" first-party
-          done < release-images.tsv
-          jq -r '.upstream[] | [.name, .repository, .digest] | @tsv' security/release-images.json |
-          while IFS=$'\t' read -r image repository digest; do
-            generate_evidence "$image" "$repository" "$digest" upstream
-          done
-          duration=$((SECONDS - started))
-          jq -n \
-            --arg schemaVersion "1" \
-            --arg generatedAt "$(date -u +%FT%TZ)" \
-            --arg release "${{ needs.release.outputs.tag_name }}" \
-            --arg commit "${{ needs.release.outputs.sha }}" \
-            --argjson durationSeconds "$duration" \
-            --rawfile subjects release-platforms.tsv \
-            '{schemaVersion: ($schemaVersion | tonumber), release: $release, commit: $commit,
-              generatedAt: $generatedAt, durationSeconds: $durationSeconds,
-              subjects: ($subjects | split("\n") | map(select(length > 0) | split("\t") |
-                {image: .[0], platform: .[1], indexDigest: .[2], digest: .[3], repository: .[4], provenance: .[5]}))}' \
-            > evidence/manifest.json
-          cp security/vulnerability-policy.json evidence/vulnerability-policy.json
-          cp security/release-images.json evidence/release-images.json
+          node scripts/generate-release-evidence.ts evidence \
+            --release "$RELEASE" --commit "$COMMIT" --digests release-images.tsv
           node scripts/verify-release-evidence.ts evidence --write-validation
           jq -er '.subjects[] | select(.provenance == "first-party") | [.repository, .digest, .image, .platform] | @tsv' evidence/manifest.json |
           while IFS=$'\t' read -r repository digest image platform; do
@@ -279,7 +193,7 @@ jobs:
           ASSET: ${{ steps.pin.outputs.asset-path }}
         run: |
           set -euo pipefail
-          while IFS=$'\t' read -r image digest; do
+          while IFS=$'\t' read -r image _ digest; do
             printf '%s  %s\n' "${digest#sha256:}" "$image"
           done < release-images.tsv > subjects.sha256
           sha256sum "$ASSET" >> subjects.sha256

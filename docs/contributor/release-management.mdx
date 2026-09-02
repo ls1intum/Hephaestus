@@ -31,6 +31,7 @@ sequenceDiagram
     PR->>M: Merge (squash) — verify-changesets enforces the changeset
     M->>VP: changesets action folds pending changesets into the accumulating Version PR
     Note over VP: CHANGELOG.md + version bump preview
+    VP->>VP: CI/CD, dispatched onto the branch, with the release evidence preflight
     VP->>M: Maintainer merges when the release is ready
     M->>R: Plan vX.Y.Z and assemble its notes
     R->>R: Generate and verify digest-bound evidence
@@ -44,13 +45,19 @@ sequenceDiagram
 
 1. **Every PR that changes shipped code carries a changeset.** `Verify changesets` fails the PR
    otherwise; [Writing changesets](#writing-changesets) has the rules.
-2. **The Version PR accumulates.** On every push to `main`, `version-pr.yml` maintains a PR titled
-   `chore(release): version packages` that previews the version bump, the `CHANGELOG.md` section, and
-   the `MIGRATION.md` section assembled from `.migration/` fragments at the `### Next release`
-   anchor. Its updates are pushed with `GITHUB_TOKEN`, which fires no workflow, so release automation
-   merges it through the ruleset bypass; the merge commit's push runs the CI/CD workflow in full, and
-   `release.yml` starts only when that run succeeds.
-3. **Merging the Version PR cuts the release.** The workflow resolves the release image digests and
+2. **The Version PR accumulates, and is checked.** On every push to `main`, `version-pr.yml`
+   maintains a PR titled `chore(release): version packages` that previews the version bump, the
+   `CHANGELOG.md` section, and the `MIGRATION.md` section assembled from `.migration/` fragments at
+   the `### Next release` anchor. Its updates are pushed with `GITHUB_TOKEN`, and a push made with
+   that token starts no workflow run — so the same workflow dispatches CI/CD onto the Version PR's
+   branch, `workflow_dispatch` being one of the two events that token may start. Every Version PR
+   head commit gets one such run; `scripts/dispatch-version-pr-ci.ts` decides by asking whether the
+   head already has one, so a missed dispatch heals on the next push and an unchanged head costs
+   nothing. The dispatched run also carries the **release evidence preflight** below.
+3. **The merge is checked again.** The merge commit's push runs CI/CD in full — a push to `main`
+   repeats the source-validation legs only when it carries a version bump, which is exactly this
+   commit — and `release.yml` starts only when that run succeeds.
+4. **Merging the Version PR cuts the release.** The workflow resolves the release image digests and
    runs the evidence gate first, and only then creates the draft release at the merge commit and
    attaches the evidence to it. After the seeded-upgrade and supported-host gates pass too, it
    promotes the CI-built images to `X.Y.Z`, `X.Y`, and `latest`, publishes the release, deploys
@@ -112,6 +119,50 @@ images it builds.
 
 [Vulnerability remediation](./vulnerability-remediation.mdx) is the normative policy for blocking
 findings, scheduled rescans, and exceptions.
+
+### Nothing may fail for the first time at a release
+
+For a long time a release was the only thing that ever produced an evidence bundle, so it was also
+the only thing that could evaluate a check over one. v0.75.0 failed twice on findings no earlier
+gate had ever looked at. The fix for the *subjects* was to scan the pinned upstream images before the
+release; the fix for the *checks* is that the same bundle is now produced and judged before a release
+exists. `scripts/generate-release-evidence.ts` is the one generator and
+`scripts/verify-release-evidence.ts` the one verifier; `release.yml` and the `Release evidence
+preflight` job in `cicd.yml` both run them, and the preflight runs the verifier in its default mode,
+which performs every check except signature verification.
+
+| Release evidence check | Can a release be the first to run it? |
+| --- | --- |
+| Manifest matches `security/release-images.json`, both platforms, canonical order | No — `check-release-image-inventory.ts` validates the inventory on every pull request, and `generate-release-evidence.test.ts` feeds the real generator's manifest to the real verifier |
+| Syft, SPDX and CycloneDX describe the same subject and the same packages | No — the preflight generates the triple and validates it |
+| Trivy licence report is bound to its subject | No — the preflight generates and validates it |
+| Vulnerability policy, `linux/amd64` | No — also the build gate in `reusable-docker-build.yml` and, for the pinned upstream digests, `ci-security-scan.yml` |
+| Vulnerability policy, `linux/arm64` | No — `ci-security-scan.yml` for the pinned upstream digests, and the preflight for the images we build, which nothing else scans on this platform |
+| Each platform digest is a member of its published index | No — the preflight resolves and checks index membership over the images its own run pushed |
+| The validation documents re-derive unchanged | No — the preflight verifies twice, the second time comparing rather than writing |
+| SBOM attestation matches the durable evidence | **Yes, structurally.** `cosign attest` creates the attestation during the release; there is nothing to verify before it exists |
+| Image index signature and build provenance carry the release's identity | **Yes, structurally.** The Fulcio certificate identity is the release workflow's, on `refs/heads/main`, and no earlier run can produce one |
+| The manifest names a release version | **Yes, structurally.** Only `plan-release.ts` decides the tag; the preflight substitutes the version the ref carries |
+
+The two signature entries are the only mode-conditional behaviour in the verifier, and
+`ci-contract.test.ts` asserts exactly that: a check gated on anything other than
+`mode === "verify-signatures"` is a check a release could be the first to perform, and fails the
+contract test rather than a release. The third structural entry is not conditional at all — the
+verifier always demands a release version, and the preflight gives it the version the ref carries.
+
+The preflight is not free — it is a Syft and Trivy pass over every image on both architectures — so
+it runs only where its answer changes a decision: on the Version PR, and on any manual CI/CD dispatch
+that ticks `release-preflight`. It reuses the images that run already built, so what it judges is the
+artefact a release of that ref would promote, not a stand-in.
+
+The pinned upstream images are therefore judged twice on the Version PR, and deliberately: the
+upstream scan in `ci-security-scan.yml` is a minute of Trivy that answers the one question a digest
+bump can break, while the preflight is the whole evidence gate and answers it as a side effect of
+verifying a bundle. They cannot disagree — one planner, one evaluator, one policy file, and the same
+`selectPlatformDigest` resolving the same index — so the cost is a duplicated scan rather than a
+second opinion. Removing the fast one to save it would take the quick answer away from the pull
+request that most needs it; removing the upstream half of the bundle would leave a bundle the
+verifier rejects.
 
 ## Browser source maps
 
