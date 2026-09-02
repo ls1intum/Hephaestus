@@ -1,12 +1,14 @@
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
 import { glob, readFile } from "node:fs/promises";
+import path from "node:path";
 import { describe, test } from "node:test";
 
 import { type Document, isMap, isSeq, parseDocument, type YAMLMap } from "yaml";
 
 import { planRelease, releaseOutputs } from "./plan-release.ts";
 import { planSubjects } from "./scan-main-images.ts";
-import { planUpstreamSubjects } from "./scan-upstream-images.ts";
+import { PLATFORMS, planUpstreamSubjects } from "./scan-upstream-images.ts";
 import { validateManifest } from "./verify-release-evidence.ts";
 
 function job(source: string, name: string): string {
@@ -38,6 +40,30 @@ async function readSources(files: string[]): Promise<Map<string, string>> {
 
 function escapeRegExp(value: string): string {
 	return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Every repository script a given entry point loads, transitively — its static relative imports,
+ * plus any sibling script it names as a string, which is how the scanners reach the policy
+ * evaluator (they spawn it rather than importing it, so that its exit status is the verdict).
+ */
+async function importClosure(entry: string): Promise<string[]> {
+	const seen = new Set<string>();
+	const queue = [entry];
+	while (queue.length > 0) {
+		const file = queue.shift();
+		if (file === undefined || seen.has(file)) continue;
+		seen.add(file);
+		const source = await readFile(file, "utf8");
+		const directory = path.dirname(file);
+		for (const [, specifier] of source.matchAll(/from\s+"(\.[^"]+\.ts)"/g))
+			queue.push(path.normalize(path.join(directory, specifier ?? "")));
+		for (const [, name] of source.matchAll(/"([\w.-]+\.ts)"/g)) {
+			const candidate = path.normalize(path.join(directory, "..", name ?? ""));
+			if (candidate.startsWith("scripts/") && existsSync(candidate)) queue.push(candidate);
+		}
+	}
+	return [...seen].toSorted();
 }
 
 /** The `with` map of the first step in a job whose `uses` starts with `action`. */
@@ -445,10 +471,28 @@ void describe("CI contract", () => {
 			/run: node scripts\/scan-upstream-images\.ts reports --report-only\n/,
 		);
 		const detection = job(await readFile(".github/workflows/cicd.yml", "utf8"), "detect-changes");
+		const filter = pathFilter(detection, "release-images");
 		assert.match(
-			pathFilter(detection, "release-images"),
+			filter,
 			/- 'security\/release-images\.json'[\s\S]*- 'security\/vulnerability-policy\.json'/,
 		);
+		// The trigger is derived, not trusted: a filter that lists the entry point but not the module
+		// it parses JSON with skips the gate on the pull request that breaks the parser. Re-walk the
+		// imports and require every file the gate actually loads to appear.
+		for (const file of await importClosure("scripts/scan-upstream-images.ts"))
+			assert.ok(
+				filter.includes(`- '${file}'`),
+				`release-images must trigger on ${file}, which the upstream scan loads`,
+			);
+	});
+
+	void test("scans both released platforms before the release, not just linux/amd64", async () => {
+		// The policy match key is `image | platform | vulnerability | package | installedVersion`, so
+		// a single-platform pre-release scan leaves an arm64-only finding — or an arm64 exception
+		// nobody wrote — to be discovered by the release gate, which is the failure this PR removes.
+		assert.deepEqual([...PLATFORMS], ["linux/amd64", "linux/arm64"]);
+		const source = await readFile("scripts/scan-upstream-images.ts", "utf8");
+		assert.match(source, /for \(const platform of PLATFORMS\)/);
 	});
 
 	void test("rescans main's images weekly and reports drift to an issue, not a status", async () => {

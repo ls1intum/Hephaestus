@@ -11,6 +11,11 @@
  * the release evidence gate demands. Both share `lib/image-scan.ts`, which hands each Trivy report
  * to `check-release-vulnerabilities.ts`.
  *
+ * Only `linux/amd64`, unlike the upstream scan, which covers both. A finding on either architecture
+ * of an image we build is fixed by the same rebuild, and the Version PR preflight scans both before
+ * a release is cut; a pinned upstream digest has no rebuild and its fix arrives as a digest bump in
+ * a pull request, so that scan cannot leave half a subject to the release gate.
+ *
  * A finding never fails this run. `report-vulnerability-drift.ts` reads the `.policy.json` files
  * written here and routes them to a tracking issue; only an infrastructure failure — a missing tag, an
  * unreachable registry, a Trivy crash — is worth a red status on a schedule nobody triggered.

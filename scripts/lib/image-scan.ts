@@ -15,8 +15,8 @@ import path from "node:path";
 import { asRecord, isRecord } from "./json.ts";
 import { output, run, succeeds } from "./process.ts";
 
-/** The one platform these scans cover. Alpine and Debian ship the same package versions across
- * architectures, and the release still scans both, where the evidence bundle must be complete. */
+/** The platform a caller gets when it names none. Callers that must match the release evidence
+ * gate, which is keyed per platform, name both — see `scan-upstream-images.ts`. */
 export const PLATFORM = "linux/amd64";
 
 const DIGEST = /^sha256:[a-f0-9]{64}$/;
@@ -32,6 +32,9 @@ export interface ScanOutcome {
 	readonly image: string;
 	/** `false` when the policy evaluator rejected something; never throws the run. */
 	readonly passed: boolean;
+	/** Carried because the policy match key is per platform, so an outcome that does not name one
+	 * cannot be reported or compared against the release gate's subjects. */
+	readonly platform: string;
 }
 
 export interface ScanOptions {
@@ -130,7 +133,8 @@ async function scan(
 		"security/vulnerability-policy.json",
 		result,
 	];
-	if (await evaluatorPassed(evaluator, annotate)) return { image: subject.image, passed: true };
+	if (await evaluatorPassed(evaluator, annotate))
+		return { image: subject.image, passed: true, platform };
 	if (!existsSync(result)) {
 		// It threw before writing anything — a malformed report or policy, not a finding. Re-run so
 		// the reason reaches the log, then fail: this is an infrastructure failure, and unlike a CVE
@@ -138,7 +142,7 @@ async function scan(
 		await run("node", evaluator);
 		throw new Error(`vulnerability policy evaluation produced no result for ${subject.image}`);
 	}
-	return { image: subject.image, passed: false };
+	return { image: subject.image, passed: false, platform };
 }
 
 export async function scanAll(

@@ -8,8 +8,8 @@
  * been there for days (issue #1741).
  *
  * They need no build — a digest in a committed file is the whole subject — so this is cheap and
- * deterministic, and it blocks by default. A Renovate digest bump edits this very file, so the pull
- * request proposing the bump is the one that scans it.
+ * deterministic, it covers both released platforms, and it blocks by default. A Renovate digest
+ * bump edits this very file, so the pull request proposing the bump is the one that scans it.
  *
  * `--report-only` is the weekly rescan, where a finding is routed to a tracking issue rather than a
  * red status: a CVE published after the digest was pinned belongs to no commit, and a pinned
@@ -18,10 +18,18 @@
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
 
-import { PLATFORM, scanAll, type Subject } from "./lib/image-scan.ts";
+import { type ScanOutcome, scanAll, type Subject } from "./lib/image-scan.ts";
 import { asArray, asRecord, asString, readJsonFile } from "./lib/json.ts";
 
 const DIGEST = /^sha256:[a-f0-9]{64}$/;
+
+/**
+ * Both platforms, because the release evidence gate scans both and an exception matches on
+ * `image | platform | vulnerability | package | installedVersion`. Scanning only `linux/amd64`
+ * would leave an arm64-only finding — or an arm64 exception nobody wrote — discoverable for the
+ * first time at the release, which is the failure this whole script exists to remove.
+ */
+export const PLATFORMS = ["linux/amd64", "linux/arm64"] as const;
 
 export interface UpstreamSubject extends Subject {
 	/** The multi-architecture index digest pinned in the inventory, which is what the release
@@ -53,14 +61,20 @@ if (import.meta.main) {
 		throw new Error("usage: scan-upstream-images <directory> [--report-only]");
 	const reportOnly = option === "--report-only";
 	const subjects = planUpstreamSubjects(await readJsonFile("security/release-images.json"));
-	const outcomes = await scanAll(subjects, directory, { annotate: !reportOnly });
+	const outcomes: ScanOutcome[] = [];
+	for (const platform of PLATFORMS)
+		outcomes.push(...(await scanAll(subjects, directory, { annotate: !reportOnly, platform })));
 	await writeFile(
 		path.join(directory, "upstream-scan.json"),
-		`${JSON.stringify({ platform: PLATFORM, scannedAt: new Date().toISOString(), subjects }, null, 2)}\n`,
+		`${JSON.stringify({ platforms: PLATFORMS, scannedAt: new Date().toISOString(), subjects }, null, 2)}\n`,
 	);
 	for (const outcome of outcomes)
-		process.stdout.write(`${outcome.image}: ${outcome.passed ? "pass" : "fail"}\n`);
-	const failed = outcomes.filter((outcome) => !outcome.passed).map((outcome) => outcome.image);
+		process.stdout.write(
+			`${outcome.image} (${outcome.platform}): ${outcome.passed ? "pass" : "fail"}\n`,
+		);
+	const failed = outcomes
+		.filter((outcome) => !outcome.passed)
+		.map((outcome) => `${outcome.image} (${outcome.platform})`);
 	if (failed.length > 0 && !reportOnly) {
 		process.stderr.write(
 			`::error::pinned upstream images do not satisfy the vulnerability policy: ${failed.join(", ")}\n`,
