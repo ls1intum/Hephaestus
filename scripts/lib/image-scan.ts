@@ -66,12 +66,25 @@ export function selectPlatformDigest(raw: unknown, platform: string): string | u
 	return undefined;
 }
 
+/** Whether the inspected document is a multi-platform index rather than a single manifest. */
+export function isImageIndex(raw: unknown): boolean {
+	return Array.isArray(asRecord(raw, "imagetools manifest").manifests);
+}
+
 async function resolveDigest(subject: Subject, platform: string): Promise<string> {
 	const raw: unknown = JSON.parse(
 		await output("docker", ["buildx", "imagetools", "inspect", subject.reference, "--raw"]),
 	);
+	const selected = selectPlatformDigest(raw, platform);
+	// An index that publishes no manifest for this platform must fail, never fall through. The
+	// fallback below returns the *index* digest, and Trivy resolves a multi-platform reference
+	// against the host it runs on — so the scan would quietly be `linux/amd64` while being filed as
+	// this platform's evidence, and the evaluator's ArtifactName check cannot catch it, because the
+	// reference Trivy reports is exactly the one it was handed.
+	if (selected === undefined && isImageIndex(raw))
+		throw new Error(`${subject.reference} publishes no ${platform} manifest`);
 	const digest =
-		selectPlatformDigest(raw, platform) ??
+		selected ??
 		(
 			await output("docker", [
 				"buildx",
