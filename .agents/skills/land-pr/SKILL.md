@@ -2,7 +2,7 @@
 name: land-pr
 description: |
   Validate, regenerate, branch, commit, push, and open the PR.
-  Runs the local CI mirror first, so a remote build cannot fail on something a local gate catches.
+  Runs the local quality gate first, so a remote build cannot fail on something a local gate catches.
 disable-model-invocation: true
 allowed-tools:
   - Bash(gh *)
@@ -30,14 +30,10 @@ Nothing staged or modified means nothing to land.
 
 ## 2. Know which CI legs your diff triggers
 
-`.github/workflows/cicd.yml` holds the `dorny/paths-filter` block that decides this; read it rather
-than guessing, and note the two shapes that surprise people:
-
-- **`scripts/**` and the root lint, formatter, TypeScript, and package configuration listed in
-  the workflow trigger both the webapp and app-server legs**, because the gates they configure run
-  on both.
-- **`docs/**` triggers the app-server leg.** There is no such thing as a docs-only PR that skips
-  validation: `docs:lint` and `check:diagrams` run there.
+`detect-changes` in `.github/workflows/cicd.yml` holds the path filters; read it rather than
+guessing. Two shapes surprise people: `docs/**`, `scripts/**` and the root lint, format and
+tsconfig files select the `Tooling and Docs` leg, not the App Server leg; and `package.json` or
+`pnpm-lock.yaml` select every source leg.
 
 ## 3. Format, then check
 
@@ -46,8 +42,8 @@ pnpm run format
 pnpm run check
 ```
 
-`check` is the complete local quality gate — every leg is listed under `check` in the root
-`package.json`, and every one also runs in CI. CI additionally runs service tests, builds, images,
+`check` is the complete local quality gate — every task is listed in the `quality` array in
+`vite.config.ts`, and every one also runs in CI. CI additionally runs service tests, builds, images,
 security checks, and workflow-specific gates. Formatting must never be the reason a remote build
 fails.
 
@@ -59,7 +55,7 @@ directory first, so stash local edits.
 ```bash
 pnpm run generate:api          # controllers or DTOs changed: rewrites openapi.yaml AND webapp/src/api
 pnpm run db:draft-changelog    # entities changed (needs Docker); writes and wires the changelog, then prune it
-pnpm run db:generate-erd-docs  # after any changelog change
+pnpm run db:generate-erd-docs  # after pruning a changelog
 ```
 
 `generate:api:application-server:specs` packages the reactor and boots the executable JAR on ports
@@ -70,10 +66,8 @@ it allocates itself, so nothing needs freeing; root `AGENTS.md` § Command cavea
 
 ```bash
 pnpm run test:webapp
-cd server && ./mvnw -pl application -am test -Dsurefire.includedGroups=unit -T 2C --batch-mode -q
+pnpm run test:server:unit
 ```
-
-`-am` is required so a cold checkout builds the generated-client dependency before the application.
 
 ## 6. Re-run format + check
 
@@ -89,14 +83,10 @@ pnpm changeset          # user-facing: pick the bump, write the summary in the o
 pnpm changeset --empty  # no user-facing effect; say why in the body
 ```
 
-`pnpm changeset` is interactive — with no TTY, hand-write `.changeset/<slug>.md` (`.changeset/README.md`
-has the shape). The summary lands in `CHANGELOG.md` verbatim, so it names what an operator or user can
-now do, not a class or a file. **Pre-1.0, never pick `major`** — it would cut 1.0.0 and the gate
-rejects it; a breaking change rides in `minor` with `**Operators:** …` in the summary and a
-`MIGRATION.md` update.
-
-Touching `db/changelog/` without touching `.changeset/` is always wrong — they are different things
-with the same word in them.
+`pnpm changeset` is interactive — with no TTY, hand-write `.changeset/<slug>.md`. The rules — voice,
+bump, pre-1.0 `minor` with `**Operators:**` and a `.migration/<slug>.md` fragment, never
+`MIGRATION.md` — are in `.changeset/README.md`. Touching `db/changelog/` without touching
+`.changeset/` is always wrong.
 
 ## 8. Branch, commit, push
 
@@ -123,11 +113,13 @@ PAGER=cat gh pr view --json number,url 2>/dev/null || PAGER=cat gh pr create --b
 ## How to test
 
 <manual steps, or "CI covers this">
+
+## Checklist
+
+<the items from .github/PULL_REQUEST_TEMPLATE.md that apply>
 BODY
 )"
 ```
-
-`.github/PULL_REQUEST_TEMPLATE.md` carries the checklist the reviewer expects; keep its headings.
 
 ## 10. Verify
 

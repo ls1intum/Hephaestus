@@ -18,8 +18,7 @@ the Postgres container. For plain terminals: `pnpm run dev:server` and `pnpm run
   `@Configuration` edits need a full restart
   ([ref](https://docs.spring.io/spring-boot/how-to/hotswapping.html)).
 - **`ddl-auto: validate`** locally — Liquibase owns DDL. If the validator fails on boot your DB has
-  drifted: `pnpm run dev:reset`. The Postgres folder is **bind-mounted**, so `docker compose down -v` alone
-  does not clear it.
+  drifted: `pnpm run dev:reset`.
 - **`BufferingApplicationStartup`** is wired in `Application.main()`. With `app.profiles=local`,
   `GET /actuator/startup` returns the timeline; `StartupBudgetIntegrationTest` catches per-step
   regressions in CI.
@@ -68,9 +67,7 @@ excluded. Every new package needs a `package-info.java` containing
 `NullAway` suppressions. Use `@Nullable` only for genuine absence and place it on the precise type:
 `List<@Nullable String>` permits null elements; `String @Nullable []` permits a null array reference.
 Fix violations at the contract or implementation boundary. In tests, refine a nullable result once
-before using it rather than adding duplicate assertions. The schema-drift gate reads an un-annotated
-entity field in a `@NullMarked` package as a NOT NULL column, so a column that may be NULL in the
-database must carry `@Nullable` on the field. Run `pnpm run test:server:unit` after changing
+before using it rather than adding duplicate assertions. Run `pnpm run test:server:unit` after changing
 a nullness contract.
 
 ## Test tiers
@@ -80,7 +77,8 @@ a nullness contract.
 | `unit` | no Spring context | `pnpm run test:server:unit` |
 | `architecture` | ArchUnit + Modulith verification | `pnpm run test:server:architecture` |
 | `integration` | full context + Testcontainers | `pnpm run test:server:integration` |
-| `live` | real GitHub API | `./mvnw test -Plive-tests` |
+| `database` | contract tests against a running PostgreSQL | the *App Server: Database* CI job: from `server/`, `./mvnw -f application/pom.xml -Dsurefire.includedGroups=database surefire:test` with `SPRING_DATASOURCE_URL`, `_USERNAME` and `_PASSWORD` set |
+| `live` | real GitHub API | from `server/`, `./mvnw test -Plive-tests` |
 
 Live tests need GitHub App credentials in `application-live-local.yml` (gitignored); the Maven profile
 is the only guard.
@@ -104,24 +102,19 @@ or on "the only" result, and never write cleanup that another test depends on ha
   returns pull requests too. Any query that means "issues only" must say `WHERE TYPE(i) = Issue`
   explicitly — see `MentorContextQueryRepository` and `ReviewableArtifactOwnershipRepository`. A test
   with a mocked repository cannot catch a missing `TYPE(…)`.
-- **Deleting a Liquibase changeset.** Liquibase 5.x logs a warning and continues when
-  `DATABASECHANGELOG` references unknown ids, so deleting is safe **only** when the changeset's schema
-  effect is enforced by a later changeset (a NOT NULL constraint makes its own backfill validator
-  obsolete). Never delete one whose effect is not enforced elsewhere. Released changelogs are otherwise
-  immutable and CI-enforced — root `AGENTS.md` § Database changes.
 - **The changelog is untested by the suite.** Tests run against `ddl-auto: create`, so a broken
-  changelog passes every tier. `pnpm run db:check-drift` applies the migration history to a
-  disposable PostgreSQL container and diffs it against the entities; it is the CI gate.
+  changelog passes every tier; `pnpm run db:check-drift` is the check
+  (`docs/contributor/database-migration.mdx`).
 - **A native `@Query` may not contain an apostrophe inside a `--` comment.** Hibernate reads it as the
-  start of a string literal and the whole `ApplicationContext` fails to build, naming something else.
-  `NativeQueryCommentArchTest` enforces it, so the failure arrives as a named test rather than as a
-  mystery at boot; the two queries that were bitten carry the warning in place.
+  start of a string literal and the whole `ApplicationContext` fails to build, naming something else;
+  `NativeQueryCommentArchTest` turns that into a named failure.
 - **`EntityManager` is injected as a `@PersistenceContext` field**, not through the constructor
   (`WorkspaceMembershipService`, `GitHubUserProcessor`). Everything else is constructor injection via
   `@RequiredArgsConstructor`.
-  is gated by `@ConditionalOnProperty`; tolerant consumers (`AccountService`,
-  `LeaderboardTaskScheduler`) take `ObjectProvider`. A bean that is not gated the same way will
-  crash-loop the `worker` and `webhook` runtimes, which start a different slice of the context.
+- **A bean that exists in one runtime role only is gated on that role** (`@ConditionalOnProperty` on
+  a `RuntimeRole` property, as in `LeaderboardTaskScheduler`), and a consumer that must survive its
+  absence takes `ObjectProvider` (`WorkspaceSyncTargetProvider`). An ungated consumer crash-loops the
+  `worker` and `webhook` runtimes, which start a different slice of the context.
 - **`SlackMessageService` resolves bot tokens per workspace at send time** via `ConnectionService`.
   There is no global `App` bean and no `slack.token` property; admins connect each workspace through
   `/oauth/callback/slack`.
@@ -150,15 +143,13 @@ or on "the only" result, and never write cleanup that another test depends on ha
 
 ## Schema changes
 
-1. Modify the JPA entities.
-2. `pnpm run db:draft-changelog` writes the drift into this branch's changelog, wires it into
-   `master.xml` and refreshes the ERD. Prune it to the real deltas, add preconditions and rollbacks,
-   then `pnpm run db:generate-erd-docs` if you pruned anything. Full rules in root `AGENTS.md`
-   § Database changes. Name a foreign key that backs a plain id column with no `@ManyToOne`
-   `sfk_*`; the drift gate ignores that prefix and rejects an `fk_*` constraint that no association
-   declares.
-3. `pnpm changeset` — a user-facing summary. Touching `db/changelog/` without touching `.changeset/`
-   is always wrong. These are two unrelated things both called "changeset".
+Procedure: `docs/contributor/database-migration.mdx`. What the drift gate reads from an entity:
+
+- An un-annotated field in a `@NullMarked` package is a NOT NULL column; a column that may be NULL
+  carries `@Nullable` on the field.
+- A foreign key backing a plain id column with no JPA association is named `sfk_*`; the gate
+  ignores that prefix (`application/pom.xml`, `diffExcludeObjects`). An association's foreign key
+  keeps `fk_*` and is drift-checked, so a misnamed constraint fails in either direction.
 
 ## Webhook receiver
 
@@ -176,10 +167,10 @@ through `core.webhook.WebhookProperties`, shared with auto-registration in `work
   `integration.core.consumer.ConsumerSubjectMath#buildSubjectPrefix` must agree —
   `SubjectGrammarRoundTripTest` enforces it for every committed fixture.
 - **ArchUnit guards the primitives**: `HexEncodingArchTest` (only `HexFormat.of()`),
-  `LocaleSafetyArchTest` (no naked `toLowerCase`/`toUpperCase`). The webhook packages also carry
-  per-package JaCoCo branch floors (0.60 and 0.70), enforced by the unit-test CI job via
-  `-DskipCoverage=false`. The floors record what the tier covers and exist to fail a regression — raise
-  one whenever its package clears the next step.
+  `LocaleSafetyArchTest` (no naked `toLowerCase`/`toUpperCase`). `application/pom.xml` sets
+  per-package JaCoCo branch floors, checked whenever `-DskipCoverage=false`: `test:server:unit`,
+  `test:server:verification` and the *App Server: Unit and architecture* CI job. Raise a floor when
+  its package clears the next step.
 
 ## Container image
 

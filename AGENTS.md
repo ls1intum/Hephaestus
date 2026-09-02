@@ -57,11 +57,11 @@ Use `pnpm run check:affected` for in-session feedback; it is not the pre-push ga
 | Command | Does |
 |---|---|
 | `pnpm run format` / `format:check` | Apply / verify formatting (Java + TypeScript) |
-| `pnpm run check` | Static analysis, formatting checks, agent tests, and repository policy checks — every leg is listed in the root `package.json` |
+| `pnpm run check` | Static analysis, formatting checks, agent tests, and repository policy checks — every task is listed in the `quality` array in `vite.config.ts` |
 | `pnpm run verify` | Complete local CI mirror for checks that need no live service, image build, or hosted credential |
 | `pnpm run test:webapp` | Vitest |
 | `pnpm run test:agents` | Agent runtime and precompute specs, on Node |
-| `pnpm run test:server:unit` | Server unit tests — see `server/AGENTS.md` for all four tiers |
+| `pnpm run test:server:unit` | Server unit tests — the other tiers are in `server/AGENTS.md` § Test tiers |
 
 Naming: `format` applies, `format:check` verifies read-only for CI, `lint` lints, `check` is the
 comprehensive local quality gate. A `:webapp`, `:server` or `:agents` suffix scopes any of them; `:java`
@@ -134,28 +134,19 @@ test orchestration into TypeScript.
 | `webapp/src/routeTree.gen.ts` | TanStack Router Vite plugin |
 | `server/generated-clients/target/generated-sources/**` | GraphQL and Outline codegen, owned by the generated-clients Maven module |
 
-Regeneration is destructive: it empties the target directory, so do not edit or commit Maven-generated
-sources. Commit the version-controlled OpenAPI specification and webapp client alongside the API
-change that produced them.
+`generate:api:application-server:client` empties `webapp/src/api/` before it writes. Maven-generated
+sources live under `target/` and are never committed. Commit `server/openapi.yaml` and
+`webapp/src/api/**` with the API change that produced them.
 
 ## Database changes (Liquibase)
 
-Changelogs live in `server/application/src/main/resources/db/changelog/` and are included from `master.xml`.
-`pnpm run db:draft-changelog` (needs Docker) diffs the schema against the JPA model, writes the
-drift into this branch's changelog — a new `<epoch-ms-timestamp>_changelog.xml` appended to
-`master.xml`, or more `<changeSet>`s in the one the branch already added — and refreshes the ERD.
-Then **prune it to the real deltas** and give every `<changeSet>` a precondition
-(`onFail="MARK_RAN"`) and a `<rollback>`; never commit the raw diff. Rerun
-`pnpm run db:generate-erd-docs` after pruning. `pnpm run db:check-drift` is the CI gate.
+Procedure: `docs/contributor/database-migration.mdx`. Entity conventions the drift gate reads:
+`server/AGENTS.md` § Schema changes. Two rules CI enforces:
 
-- **One consolidated changelog per branch.** The tool enforces it; a PR with two new changelog
-  files is wrong. `changeSet` ids are `<timestamp>-1`, `-2`, … and the filename timestamp is a real
-  millisecond timestamp, strictly greater than the latest existing one.
-- **Released changelogs are immutable, and CI enforces it.** Once a file reaches `main` it is never
-  edited, renamed or deleted, and `master.xml` is **append-only** — new `<include>`s go at the end, and
-  the committed list is not globally timestamp-sorted. The `Migrations` gate fails otherwise. Fix
-  mistakes forward. Destructive changes deprecate-then-remove across two releases:
-  `docs/contributor/database-migration.mdx`.
+- `pnpm run db:draft-changelog` writes the drift into this branch's single changelog and wires it
+  into `master.xml`; a branch never hand-writes one or adds a second.
+- A file under `db/changelog/` that reached `main` is never edited, renamed or deleted, and
+  `master.xml` is append-only. Fix mistakes forward.
 
 ## Pull requests
 
@@ -171,29 +162,10 @@ requirements on its own is not a layer.**
 
 ### Changesets (release notes)
 
-`.changeset/*.md` files that become `CHANGELOG.md` and drive the version bump. **Not** the same thing
-as a Liquibase `<changeSet>` — a schema change needs both. Full flow:
-`docs/contributor/release-management.mdx`; the file's shape is in `.changeset/README.md`.
-
-- **Every PR that changes shipped code** (`server/`, `webapp/`, `docker/`, excluding tests and in-tree
-  docs) ships one, and `verify-changesets` fails the PR otherwise. `pnpm changeset` is interactive;
-  with no TTY, hand-writing `.changeset/<slug>.md` is the one sanctioned hand-write — never hand-edit
-  `CHANGELOG.md`. If the change is invisible to operators and users, `pnpm changeset --empty` and say
-  why in the body.
-- **The summary lands in `CHANGELOG.md` verbatim, in the operator's or user's voice.** Lead with what
-  they can now do, or the symptom a fix removes. No class names, hook names or file paths. No
-  co-authored-by or agent-attribution trailers.
-  ✗ `Refactor LeaderboardService scoring hooks` → ✓ `Fixes duplicate leaderboard entries after a team rename.`
-  One changeset per user-visible change.
-- **The bump is the operator's upgrade cost, not code semantics.** `patch` — no action needed.
-  `minor` — new capability; name any new *optional* env var. `major` — the operator must act, and a
-  matching `.migration/<changeset-slug>.md` is added. **Pre-1.0 (now): never pick `major`** — it would cut 1.0.0 and
-  `verify-changesets` rejects it. Breaking changes ride in `minor`, so a pre-1.0 `minor` is not
-  guaranteed zero-action: say `**Operators:** …` in the summary and add a migration fragment exactly
-  as a `major` would.
-- **Automatic migrations are flagged by the release workflow** (it diffs `db/changelog/`), so the
-  changeset does not mention them — keep it user-facing. Touching `db/changelog/` without touching
-  `.changeset/` is always wrong.
+`.changeset/README.md` is the contract. Every PR that changes shipped code ships one — with no TTY,
+hand-write `.changeset/<slug>.md` in the shape shown there. `verify-changesets` fails the PR
+without one and rejects `major` before 1.0. The summary is a release note in the operator's or
+user's voice, never a code description, and never carries an agent-attribution trailer.
 
 ## Command caveats
 
@@ -201,8 +173,7 @@ Each of these fails *quietly* — the command reports success and leaves you wit
 
 - **`generate:api:application-server:specs` honours `HEPHAESTUS_APPLICATION_JAR`.** With it set, the
   spec is scraped from that JAR, not from your checkout, and the run still reports success; unset it
-  after a CI-style run. Without it the script packages the reactor first and boots the JAR on ports
-  it allocates itself; on a cold cache expect several minutes.
-- **`db:draft-changelog` needs Docker on PATH** and a running daemon.
+  after a CI-style run. Without it the script packages the reactor with tests skipped and boots the
+  JAR under the `specs` profile on a free port.
 - Maven test selection, concurrent builds, and `server/.env` leaking into test JVMs are covered in
   `server/AGENTS.md` § Build traps. Read it before your first server test run.

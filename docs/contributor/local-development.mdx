@@ -335,9 +335,9 @@ Authentication is Hephaestus-native (no Keycloak — see [ADR 0017](https://gith
    (callback `http://localhost:8080/login/oauth2/code/gitlab`, scope `read_user`),
    set `GITLAB_OAUTH_CLIENT_ID` / `GITLAB_OAUTH_CLIENT_SECRET`, and point `GITLAB_OAUTH_BASE_URL` at the
    instance (defaults to `https://gitlab.com`; e.g. `https://gitlab.lrz.de`). Leave the client id blank to hide the GitLab button.
-4. Run the application server with `pnpm run dev:server`; it builds the generated-client module before
-   invoking the application module. Postgres + NATS start automatically via Spring
-   Boot's Docker Compose support. Open the webapp and click **Sign in with GitHub**.
+4. Run the application server with `pnpm run dev:server`; it brings up the Compose services, installs
+   the generated-clients module and starts the application module. Open the webapp and click
+   **Sign in with GitHub**.
 
 #### Super admin
 
@@ -347,7 +347,7 @@ App-level admin is the `APP_ADMIN` role on the `account` table (authority `app_a
 
 - **401 after login:** ensure `GITHUB_OAUTH_CLIENT_ID/SECRET` are set and the callback URL on the GitHub app matches your `SERVER_PORT`.
 - **Logins don't survive a server restart locally:** set `HEPHAESTUS_AUTH_STATE_COOKIE_KEY` (base64 32-byte; `openssl rand -base64 32`) in `server/.env` — otherwise an ephemeral per-boot key is used.
-- **Reset everything:** run `pnpm run dev:reset` (Postgres is a bind-mounted folder, so `docker compose down -v` does **not** clear it — `dev:reset` removes `server/postgres-data` and recreates the stack); on next login the account + identity link are recreated.
+- **Reset everything:** `pnpm run dev:reset` (see Running the stack); on next login the account and identity link are recreated.
 
 ### Webhook receiver
 
@@ -415,12 +415,16 @@ pnpm --filter webapp run chromatic:ci        # Visual regression in CI
 
 ### OpenAPI client
 
-The generated client in `src/api` is the only way the webapp talks to server services.
+`webapp/src/api/**` is generated from `server/openapi.yaml` and is the only way the webapp talks to
+the server. After an API change, from the repository root:
 
 ```bash
-pnpm --filter webapp run generate:api
+pnpm run generate:api   # regenerates server/openapi.yaml from the packaged JAR, then the client
 ```
 
-- Generated types drop the `Dto` suffix and mirror the Spring Boot API responses.
-- Pair every new endpoint with a typed TanStack Query hook for caching and invalidation.
-- Never hand-roll fetch calls – shared interceptors handle auth tokens and error telemetry.
+`pnpm run generate:api:application-server:client` regenerates the client alone from the committed
+spec. Commit both with the change.
+
+- Schema names carry no `DTO` suffix; the server strips it when it publishes the spec.
+- Pair every new endpoint with its generated TanStack Query options; never hand-roll `fetch` — the
+  generated client is configured once and carries the cookie session.
