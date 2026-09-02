@@ -28,8 +28,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       # No release is created here — tag-images creates the draft once the evidence gate has
-      # passed. Draft releases are invisible to tokens without push access, so the resume and
-      # parent-version preconditions below still need write.
+      # passed. Draft releases are invisible to tokens without push access, and the plan turns on
+      # whether this version's release is a draft, so listing them still needs write.
       contents: write
     outputs:
       released: ${{ steps.cut.outputs.released }}
@@ -47,12 +47,16 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      # Decides whether this commit cuts a release, and creates nothing.
-      # The draft is created in tag-images, after the evidence gate, so a gate failure leaves no
-      # release behind: release images are promoted by digest and never rebuilt, so a draft cut at
-      # a commit the gate rejected can never pass, and it would then block the next version too
-      # (the parent-version precondition below). Nothing survives a failed attempt, and the same
-      # version re-cuts from a commit that carries the fix.
+      - uses: ./.github/actions/setup-node-pnpm
+        with:
+          install: "none"
+
+      # Decides whether this commit cuts a release, and creates nothing. The rule — a version with
+      # no published release is cut, from whichever commit carries it — and the four cases it
+      # decides between are documented in scripts/plan-release.ts. The draft is created in
+      # tag-images, after the evidence gate, so a gate failure leaves nothing behind: release images
+      # are promoted by digest and never rebuilt, so a draft cut at a commit the gate rejected can
+      # never pass. The same version then re-cuts from the commit that carries the fix.
       - name: Plan the release for this commit
         id: cut
         env:
@@ -61,62 +65,11 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Read the commit CI/CD built, not main's tip, which may already carry a newer version bump.
+          # The commit CI/CD built has to be one of ours; everything downstream checks it out.
           git merge-base --is-ancestor "$SHA" origin/main || {
             echo "::error::Commit $SHA is not on main"; exit 1; }
 
-          VERSION=$(git show "$SHA:package.json" | jq -r .version)
-          PARENT_VERSION=$(git show "${SHA}^:package.json" | jq -r .version)
-          TAG="v$VERSION"
-
-          # Only the Version PR merge changes the root version. Feature merges add
-          # changesets, not version bumps, so they no-op here.
-          if [ "$VERSION" = "$PARENT_VERSION" ]; then
-            echo "Version unchanged at $VERSION — no release to cut."
-            echo "released=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          # A draft can only exist here if an earlier attempt cleared the evidence gate and failed
-          # later; it is resumed rather than recreated.
-          if existing=$(gh release view "$TAG" --repo "${{ github.repository }}" --json isDraft,targetCommitish 2>/dev/null); then
-            if [ "$(jq -r .isDraft <<< "$existing")" != true ]; then
-              echo "Release $TAG is already published."
-              echo "released=false" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-            [ "$(jq -r .targetCommitish <<< "$existing")" = "$SHA" ] || {
-              echo "::error::Draft $TAG targets a different commit"; exit 1; }
-          fi
-          echo "Cutting $TAG at $SHA (was $PARENT_VERSION)"
-
-          PREV_TAG="v$PARENT_VERSION"
-          previous=$(gh release view "$PREV_TAG" --repo "${{ github.repository }}" --json isDraft,isPrerelease 2>/dev/null) || {
-            echo "::error::Previous package version $PARENT_VERSION is not a published release"; exit 1; }
-          jq -e '.isDraft == false and .isPrerelease == false' <<< "$previous" >/dev/null || {
-            echo "::error::$PREV_TAG is not a stable published release"; exit 1; }
-
-          # The notes are assembled where the draft is created, in tag-images, from the CHANGELOG.md
-          # it checks out. Only this job has the tags to tell whether the release carries schema
-          # migrations, so that one bit travels as an output.
-          status=0
-          git diff --quiet "$PREV_TAG" "$SHA" -- server/application/src/main/resources/db/changelog/ || status=$?
-          case "$status" in
-            0) MIGRATIONS=false ;;
-            1) MIGRATIONS=true ;;
-            # Anything else is git failing, not a verdict — never stamp the warning by accident.
-            *) echo "::error::Could not diff $PREV_TAG..$SHA for schema migrations"; exit 1 ;;
-          esac
-
-          {
-            echo "released=true"
-            echo "version=$VERSION"
-            echo "major=${VERSION%%.*}"
-            MINOR="${VERSION#*.}"; echo "minor=${MINOR%%.*}"
-            echo "tag_name=$TAG"
-            echo "sha=$SHA"
-            echo "previous_version=$PARENT_VERSION"
-            echo "migrations=$MIGRATIONS"
-          } >> "$GITHUB_OUTPUT"
+          node scripts/plan-release.ts "$SHA"
 
       - name: Summary
         if: steps.cut.outputs.released == 'true'
