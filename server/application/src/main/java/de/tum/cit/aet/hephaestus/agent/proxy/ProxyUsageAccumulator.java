@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.proxy;
 
+import de.tum.cit.aet.hephaestus.agent.job.AgentJobLlmUsageDelta;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.proxy.ProxyRouting.BilledAttempt;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
@@ -48,11 +49,12 @@ public class ProxyUsageAccumulator {
             int rows = agentJobRepository.accumulateLlmUsage(
                     jobId,
                     attempt.number(),
-                    usage.billableInputTokens(),
-                    usage.outputTokens(),
-                    usage.reasoningTokens(),
-                    usage.cacheReadTokens(),
-                    usage.cacheWriteTokens());
+                    new AgentJobLlmUsageDelta(
+                            usage.billableInputTokens(),
+                            usage.outputTokens(),
+                            usage.reasoningTokens(),
+                            usage.cacheReadTokens(),
+                            usage.cacheWriteTokens()));
             if (rows == 0) {
                 recordSuperseded(attempt);
             }

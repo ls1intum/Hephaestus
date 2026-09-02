@@ -281,20 +281,14 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
     @WorkspaceAgnostic("ID-based per-call usage accumulation from the worker-local proxy")
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("UPDATE AgentJob j SET " + "j.llmTotalCalls = COALESCE(j.llmTotalCalls, 0) + 1, "
-            + "j.llmTotalInputTokens = COALESCE(j.llmTotalInputTokens, 0) + :input, "
-            + "j.llmTotalOutputTokens = COALESCE(j.llmTotalOutputTokens, 0) + :output, "
-            + "j.llmTotalReasoningTokens = COALESCE(j.llmTotalReasoningTokens, 0) + :reasoning, "
-            + "j.llmCacheReadTokens = COALESCE(j.llmCacheReadTokens, 0) + :cacheRead, "
-            + "j.llmCacheWriteTokens = COALESCE(j.llmCacheWriteTokens, 0) + :cacheWrite "
+            + "j.llmTotalInputTokens = COALESCE(j.llmTotalInputTokens, 0) + :#{#usage.inputTokens()}, "
+            + "j.llmTotalOutputTokens = COALESCE(j.llmTotalOutputTokens, 0) + :#{#usage.outputTokens()}, "
+            + "j.llmTotalReasoningTokens = COALESCE(j.llmTotalReasoningTokens, 0) + :#{#usage.reasoningTokens()}, "
+            + "j.llmCacheReadTokens = COALESCE(j.llmCacheReadTokens, 0) + :#{#usage.cacheReadTokens()}, "
+            + "j.llmCacheWriteTokens = COALESCE(j.llmCacheWriteTokens, 0) + :#{#usage.cacheWriteTokens()} "
             + "WHERE j.id = :id AND j.retryCount = :attempt AND j.status = 'RUNNING'")
     int accumulateLlmUsage(
-            @Param("id") UUID id,
-            @Param("attempt") int attempt,
-            @Param("input") int input,
-            @Param("output") int output,
-            @Param("reasoning") int reasoning,
-            @Param("cacheRead") int cacheRead,
-            @Param("cacheWrite") int cacheWrite);
+            @Param("id") UUID id, @Param("attempt") int attempt, @Param("usage") AgentJobLlmUsageDelta usage);
 
     /**
      * Reads the totals straight from the row rather than from a possibly stale in-memory entity, so

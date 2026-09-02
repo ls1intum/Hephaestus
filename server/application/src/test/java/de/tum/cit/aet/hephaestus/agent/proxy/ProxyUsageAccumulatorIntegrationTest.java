@@ -214,7 +214,7 @@ class ProxyUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegrationT
     @DisplayName("a failed write is swallowed, but counted so the under-billing is visible")
     void failedAccumulationIsCountedNotSilent() {
         AgentJobRepository failing = mock(AgentJobRepository.class);
-        when(failing.accumulateLlmUsage(any(), anyInt(), anyInt(), anyInt(), anyInt(), anyInt(), anyInt()))
+        when(failing.accumulateLlmUsage(any(), anyInt(), any()))
                 .thenThrow(new IllegalStateException("connection reset"));
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
         ProxyUsageAccumulator accumulator = new ProxyUsageAccumulator(failing, registry);
