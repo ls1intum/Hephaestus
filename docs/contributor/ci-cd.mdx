@@ -23,7 +23,8 @@ flowchart TD
     MG --> Main[Merge to main]
     Main --> Images[Build and attest images for final commit]
     Main --> VP[Maintain Version PR]
-    VP -->|Maintainer merges| ReleaseCI[Validate version commit]
+    VP --> VPCI[Validate the version commit and preflight its release evidence]
+    VPCI -->|Maintainer merges| ReleaseCI[Revalidate the merged version commit]
     ReleaseCI --> Evidence[Build evidence and sign image lock]
     Evidence --> Verify{Verify evidence and image lock}
     Verify -->|Pass| Staging[Deploy to staging]
@@ -77,8 +78,13 @@ pull-request code. An empty allow-list approves nobody. It has no `branches:` fi
 layer is approved while it still targets the layer below, because retargeting to `main` after the
 lower layer merges fires no event.
 
-The Version PR is the one pull request that merges without these checks:
-[Release management](./release-management.mdx#the-flow).
+The Version PR carries checks like any other pull request. Its updates are pushed with
+`GITHUB_TOKEN`, which starts no workflow run, so `version-pr.yml` dispatches CI/CD on the Version
+PR's branch instead — `workflow_dispatch` being one of the two events that token may start. The
+dispatched run reports `CI Status Gate` onto the branch head, which is the pull request's head
+commit, so the commit whose merge cuts a release is validated before it lands. `Verify changesets`
+is the one leg it skips, and deliberately: the Version PR is the pull request that consumes
+changesets rather than adding one. [Release management](./release-management.mdx#the-flow).
 
 ## Security and supply-chain controls
 
@@ -179,7 +185,7 @@ why the label is the authority, and which alternatives were priced and declined,
 
 | Workflow | Trigger | Purpose |
 | --- | --- | --- |
-| `cicd.yml` | PR, merge group, push to main | Validates changes before merge and builds final-SHA images after merge |
+| `cicd.yml` | PR, merge group, push to main, manual | Validates changes before merge and builds final-SHA images after merge; the `release-preflight` dispatch input adds the release evidence gate over the images the run built |
 | `review-policy.yml` | PR opened, reopened, synchronized, ready for review, edited | Approves a listed maintainer's pull request so the ruleset's required approval is met; does nothing for anyone else |
 | `pull-request.yml` | PR opened, edited, synchronized, reopened, ready for review | Validates the title with commitlint, applies labels, assigns the author |
 | `ci-quality-gates.yml` | Called by cicd.yml | Formatting, lint, type checks, webapp unit and story tests: everything verifiable from source |
@@ -201,7 +207,7 @@ why the label is the authority, and which alternatives were priced and declined,
 | `cleanup-preview.yml` | Label removed, PR closed or drafted | Removes and verifies resources, then retains a cleanup tombstone |
 | `reconcile-previews.yml` | Nightly, manual | Re-sends teardown for any preview environment whose pull request is closed, drafted or unlabelled |
 | `cd-docs.yml`, `cd-docs-teardown.yml` | `docs/**` on push and pull requests; PR closed | Publishes the docs site and its pull-request previews |
-| `version-pr.yml` | Push to main | Maintains the accumulating Version PR (changesets) |
+| `version-pr.yml` | Push to main | Maintains the accumulating Version PR (changesets) and dispatches CI/CD on its branch, release evidence preflight included |
 | `release.yml` | Successful CI/CD push on `main` | Publishes the release and promotes it through the Staging and Production environment gates |
 | `release-upgrade.yml` | Called by `release.yml`, weekly | Boots the previous stable release with seeded data, then the candidate against the same database |
 | `deploy-staging.yml`, `deploy-prod.yml` | Called by `release.yml` or manual dispatch | Deploy a verified release lock through `deploy-locked-compose.yml` |

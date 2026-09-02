@@ -295,7 +295,7 @@ void describe("CI contract", () => {
 		assert.doesNotMatch(build.slice(0, build.indexOf("with:")), /version-bump/);
 		for (const gate of ["contracts_changed", "e2e_changed"])
 			assert.match(build, new RegExp(`^\\s+${gate}:.*version-bump == 'true'`, "m"));
-		assert.match(job(source, "all-ci-passed"), /needs: \[[^\]]*Compose[^\]]*Docker\]/);
+		assert.match(job(source, "all-ci-passed"), /needs: \[[^\]]*Compose[^\]]*Docker[^\]]*\]/);
 
 		const compose = await readFile(".github/workflows/ci-compose-validate.yml", "utf8");
 		assert.match(compose, /on:\n {2}workflow_call:\n/);
@@ -404,7 +404,7 @@ void describe("CI contract", () => {
 			for (const reference of source.match(/[\w./-]*vulnerability-polic[\w-]*\.json/g) ?? [])
 				assert.ok(
 					// The evidence bundle carries a copy so a release can be re-audited against the
-					// policy it was cut under; release.yml is asserted below to copy, not author, it.
+					// policy it was cut under; the generator is asserted below to copy, not author, it.
 					["security/vulnerability-policy.json", "evidence/vulnerability-policy.json"].includes(
 						reference,
 					) || reference === "vulnerability-policy.json",
@@ -412,8 +412,8 @@ void describe("CI contract", () => {
 				);
 		}
 		assert.match(
-			await readFile(".github/workflows/release.yml", "utf8"),
-			/cp security\/vulnerability-policy\.json evidence\/vulnerability-policy\.json/,
+			await readFile("scripts/generate-release-evidence.ts", "utf8"),
+			/copyFile\(\n?\s*"security\/vulnerability-policy\.json",/,
 		);
 		// One committed policy, so "the same policy" is a fact rather than a convention.
 		assert.deepEqual(await Array.fromAsync(glob("security/*vulnerability*.json")), [
@@ -493,6 +493,69 @@ void describe("CI contract", () => {
 		assert.deepEqual([...PLATFORMS], ["linux/amd64", "linux/arm64"]);
 		const source = await readFile("scripts/scan-upstream-images.ts", "utf8");
 		assert.match(source, /for \(const platform of PLATFORMS\)/);
+	});
+
+	void test("performs every release evidence check that does not need a release before the release", async () => {
+		// #1741 pinned *subject* parity: the pre-release scans cover the images the release covers.
+		// This is *check* parity, which subject parity does not imply — the vulnerability policy was
+		// only ever one of the things the release gate evaluates. The bundle it judges is produced by
+		// one generator and judged by one verifier, and both run before a release exists, so the only
+		// checks a release can be the first to perform are the ones this asserts are release-only.
+		const release = await readFile(".github/workflows/release.yml", "utf8");
+		const cicd = await readFile(".github/workflows/cicd.yml", "utf8");
+		const preflight = job(cicd, "Release-preflight");
+		for (const source of [job(release, "tag-images"), preflight]) {
+			assert.match(source, /node scripts\/resolve-release-images\.ts /);
+			assert.match(source, /node scripts\/generate-release-evidence\.ts evidence \\/);
+			assert.match(source, /node scripts\/verify-release-evidence\.ts evidence --write-validation/);
+		}
+		// The preflight verifies twice, the second time without --write-validation, so the validation
+		// documents are re-derived and compared exactly as the release re-derives them.
+		assert.match(preflight, /node scripts\/verify-release-evidence\.ts evidence\n/);
+		assert.match(preflight, /max-age-hours: "24"/);
+		assert.match(
+			preflight,
+			/if: \$\{\{ github\.event_name == 'workflow_dispatch' && inputs\.release-preflight \}\}/,
+		);
+		assert.match(cicd, /^ {6}release-preflight:$/m);
+		assert.match(job(cicd, "all-ci-passed"), /needs: \[[^\]]*Release-preflight\]/);
+
+		// What "everything except signatures" rests on: the verifier's checks are unconditional, and
+		// the only thing any mode decides is whether the two signature checks run and whether a
+		// validation document is written or compared. A new check gated on anything else is a check a
+		// release could be the first to perform, and lands here rather than in a release.
+		const verifier = await readFile("scripts/verify-release-evidence.ts", "utf8");
+		// Template literals are elided so this test can quote the source lines it expects without
+		// carrying interpolations of its own.
+		const conditioned = verifier
+			.split("\n")
+			.map((line) => line.trim().replaceAll(/`[^`]*`/g, "<path>"))
+			.filter((line) => line.includes("mode ==="));
+		assert.deepEqual(conditioned, [
+			'persistOrVerify(<path>, sbom, mode === "write-validation");',
+			'persistOrVerify(<path>, policyResult, mode === "write-validation");',
+			'if (mode === "verify-signatures" && subject.provenance === "first-party") {',
+			'if (mode === "verify-signatures") verifyIndexSignatures(manifest, release);',
+		]);
+	});
+
+	void test("gives the Version PR the CI its merge triggers a release on", async () => {
+		const source = await readFile(".github/workflows/version-pr.yml", "utf8");
+		// A GITHUB_TOKEN push starts no workflow run, which is why the Version PR carried no checks
+		// and merged through a ruleset bypass. workflow_dispatch is one of the two documented
+		// exceptions, so the same token runs the same CI/CD on the same branch — with the release
+		// evidence preflight on, because that commit is the one whose merge cuts a release.
+		assert.match(source, /run: node scripts\/dispatch-version-pr-ci\.ts/);
+		assert.match(source, /^ {6}actions: write/m);
+		const dispatcher = await readFile("scripts/dispatch-version-pr-ci.ts", "utf8");
+		assert.match(dispatcher, /"release-preflight=true"/);
+		assert.match(dispatcher, /export const CI_WORKFLOW = "cicd\.yml";/);
+		// A dispatched run carries no pull_request payload, so the gate's status has to fall back to
+		// the dispatched ref's head — which is exactly the Version PR's head commit.
+		assert.match(
+			job(await readFile(".github/workflows/cicd.yml", "utf8"), "all-ci-passed"),
+			/const sha = context\.payload\.pull_request\?\.head\?\.sha \|\| context\.sha;/,
+		);
 	});
 
 	void test("rescans main's images weekly and reports drift to an issue, not a status", async () => {
@@ -626,8 +689,11 @@ void describe("CI contract", () => {
 			release,
 			/SOURCE_TAG: run-\${{ github\.event\.workflow_run\.id }}-\${{ github\.event\.workflow_run\.run_attempt }}/,
 		);
-		assert.match(release, /imagetools inspect "\$FULL_IMAGE:\$SOURCE_TAG"/);
-		assert.doesNotMatch(release, /imagetools inspect "\$FULL_IMAGE:\$SHA"/);
+		assert.match(release, /node scripts\/resolve-release-images\.ts "\$SOURCE_TAG"/);
+		// The run tag names this build; a branch or commit tag names whatever it points at now, and
+		// resolving either belongs in the tested resolver rather than in a shell loop the preflight
+		// would have to grow its own copy of.
+		assert.doesNotMatch(job(release, "tag-images"), /imagetools/);
 		assert.match(rescan, /node scripts\/verify-release-evidence\.ts release-evidence/);
 		assert.doesNotMatch(rescan, /node scripts\/check-release-sbom\.ts/);
 		assert.equal((release.match(/node scripts\/verify-release-evidence\.ts/g) ?? []).length, 3);

@@ -2,15 +2,24 @@ name: CI/CD
 
 on:
   workflow_dispatch:
+    inputs:
+      release-preflight:
+        description: "Generate and verify this ref's release evidence bundle, everything the release gate checks except the signatures that only exist at a release"
+        type: boolean
+        default: false
   push:
     branches: ["main"]
   pull_request:
     branches: ["**"]
   merge_group:
 
+# A dispatch never shares a group with a push on the same ref: the Version PR is validated by
+# dispatch while `main` is validated by push, and a push produces the images a release promotes, so
+# it is the one run that must never be cancelled by another. A pull request or a dispatch validates
+# a branch that is still moving, where the newest run is the only one whose answer is wanted.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' }}
 
 permissions: {}
 
@@ -40,6 +49,7 @@ jobs:
       docker-config: ${{ steps.filter.outputs.docker-config }}
       pmd-canary: ${{ steps.filter.outputs.pmd-canary }}
       version-bump: ${{ steps.version_bump.outputs.changed }}
+      version: ${{ steps.version.outputs.version }}
       any-code: ${{ steps.filter.outputs.webapp == 'true' || steps.filter.outputs.application-server == 'true' || steps.filter.outputs.tooling == 'true' || steps.filter.outputs.agent-images == 'true' || steps.filter.outputs.postgres-image == 'true' }}
       should_skip: ${{ steps.skip_check.outputs.should_skip }}
     timeout-minutes: 5
@@ -53,6 +63,12 @@ jobs:
         uses: fkirc/skip-duplicate-actions@b974a9395958c231af965b70070979a577efa578 # v5.3.2
         with:
           do_not_skip: '["workflow_dispatch", "push", "merge_group"]'
+
+      # The version this ref carries, which the release evidence preflight needs to resolve the
+      # namespace and signing identity a release of it would use.
+      - name: Read the release version
+        id: version
+        run: echo "version=$(jq -r .version package.json)" >> "$GITHUB_OUTPUT"
 
       - name: Detect version bump
         id: version_bump
@@ -412,6 +428,74 @@ jobs:
       agent_images_changed: ${{ (needs.detect-changes.outputs.agent-images == 'true' || needs.detect-changes.outputs.docker-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       postgres_image_changed: ${{ (needs.detect-changes.outputs.postgres-image == 'true' || needs.detect-changes.outputs.docker-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
 
+  # Everything the release evidence gate checks, against the images this run just built, except the
+  # signatures and attestations that do not exist until a release creates them. A release was the
+  # first and only thing that ever produced an evidence bundle, so the SBOM triple, the licence
+  # report binding, index membership, and the linux/arm64 vulnerability policy for the images we
+  # build could each fail for the first time at the release — the pinned upstream digests need no
+  # build, so ci-security-scan.yml already covers both of their platforms on the pull request that
+  # changes them. release-management.mdx § Nothing may fail for the first time at a release carries
+  # the check-by-check reasoning.
+  Release-preflight:
+    name: "Release evidence preflight"
+    needs: [detect-changes, Build, Docker]
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.release-preflight }}
+    timeout-minutes: 45
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-node-pnpm
+        with:
+          install: "none"
+
+      - uses: ./.github/actions/setup-release-security-tools
+
+      # The same freshness bound the release applies: a stale mirror must not be read as a clean scan.
+      - uses: ./.github/actions/download-trivy-db
+        with:
+          max-age-hours: "24"
+
+      - uses: ./.github/actions/ghcr-login
+        with:
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate and verify this ref's release evidence
+        env:
+          # The version this ref would release under. On the Version PR branch that is the release
+          # being prepared; on any other ref it is the version already published, and either way it
+          # resolves the namespace and identity the evidence gate demands.
+          RELEASE: v${{ needs.detect-changes.outputs.version }}
+          SOURCE_TAG: run-${{ github.run_id }}-${{ github.run_attempt }}
+          TRIVY_USERNAME: ${{ github.actor }}
+          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          node scripts/resolve-release-images.ts "$SOURCE_TAG" release-images.tsv
+          node scripts/generate-release-evidence.ts evidence \
+            --release "$RELEASE" --commit "$GITHUB_SHA" --digests release-images.tsv
+          node scripts/verify-release-evidence.ts evidence --write-validation
+          # Again without --write-validation, which re-derives the validation documents and fails if
+          # they changed: the release runs the verifier twice for the same reason.
+          node scripts/verify-release-evidence.ts evidence
+
+      # An exit status cannot say which subject carries which finding.
+      - name: Upload the evidence bundle
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-evidence-preflight
+          path: evidence
+          if-no-files-found: warn
+          retention-days: 7
+
   all-ci-passed:
     name: "CI Status Gate"
     timeout-minutes: 10
@@ -419,7 +503,7 @@ jobs:
     permissions:
       actions: read
       statuses: write
-    needs: [detect-changes, workflow-lint, zizmor, Quality, Build, Security, Test, Changesets, Compose, Docker]
+    needs: [detect-changes, workflow-lint, zizmor, Quality, Build, Security, Test, Changesets, Compose, Docker, Release-preflight]
     if: always()
     steps:
       - name: Generate workflow timeline
@@ -479,6 +563,7 @@ jobs:
           echo "Changesets:     ${{ needs.Changesets.result }}"
           echo "Compose:        ${{ needs.Compose.result }}"
           echo "Docker:         ${{ needs.Docker.result }}"
+          echo "Preflight:      ${{ needs.Release-preflight.result }}"
 
           if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" ]]; then
             echo "status=failure" >> $GITHUB_OUTPUT
@@ -531,6 +616,7 @@ jobs:
           echo "| Compose | $(result_to_emoji '${{ needs.Compose.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| Security | $(result_to_emoji '${{ needs.Security.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| Docker | $(result_to_emoji '${{ needs.Docker.result }}') |" >> $GITHUB_STEP_SUMMARY
+          echo "| Release evidence preflight | $(result_to_emoji '${{ needs.Release-preflight.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
           echo "### 📁 Components Changed" >> $GITHUB_STEP_SUMMARY
