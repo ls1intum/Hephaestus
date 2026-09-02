@@ -36,6 +36,7 @@ jobs:
       build-config: ${{ steps.filter.outputs.build-config }}
       test-config: ${{ steps.filter.outputs.test-config }}
       security-config: ${{ steps.filter.outputs.security-config }}
+      release-images: ${{ steps.filter.outputs.release-images }}
       docker-config: ${{ steps.filter.outputs.docker-config }}
       pmd-canary: ${{ steps.filter.outputs.pmd-canary }}
       version-bump: ${{ steps.version_bump.outputs.changed }}
@@ -196,6 +197,15 @@ jobs:
             security-config:
               - '.github/workflows/cicd.yml'
               - '.github/workflows/ci-security-scan.yml'
+            release-images:
+              # The pinned upstream digests need no build, so the pull request that edits them —
+              # a Renovate digest bump included — is the one that scans them (#1741).
+              - 'security/release-images.json'
+              - 'security/vulnerability-policy.json'
+              - 'scripts/scan-upstream-images.ts'
+              - 'scripts/lib/image-scan.ts'
+              - 'scripts/check-release-vulnerabilities.ts'
+              - '.github/workflows/ci-security-scan.yml'
             docker-config:
               - '.github/workflows/ci-docker-build.yml'
               - '.github/workflows/reusable-docker-build.yml'
@@ -329,6 +339,7 @@ jobs:
       needs.detect-changes.outputs.should_skip != 'true' && (
         needs.detect-changes.outputs.any-code == 'true' ||
         needs.detect-changes.outputs.security-config == 'true' ||
+        needs.detect-changes.outputs.release-images == 'true' ||
         github.event_name != 'pull_request'
       )
     permissions:
@@ -336,6 +347,7 @@ jobs:
       security-events: write
     with:
       should_skip: ${{ needs.detect-changes.outputs.should_skip }}
+      release_images_changed: ${{ (needs.detect-changes.outputs.release-images == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
 
   Test:
     uses: ./.github/workflows/ci-tests.yml

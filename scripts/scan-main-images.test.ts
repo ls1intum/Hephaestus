@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { describe, test } from "node:test";
 
-import { PLATFORM, planSubjects, reportStem, selectPlatformDigest } from "./scan-main-images.ts";
+import { PLATFORM, reportStem, selectPlatformDigest } from "./lib/image-scan.ts";
+import { planSubjects } from "./scan-main-images.ts";
 
 const DIGEST = `sha256:${"a".repeat(64)}`;
 const ARM_DIGEST = `sha256:${"b".repeat(64)}`;
@@ -32,7 +33,8 @@ void describe("planSubjects", () => {
 		const inventory: unknown = JSON.parse(await readFile("security/release-images.json", "utf8"));
 		const subjects = planSubjects(inventory, "ghcr.io/hephaestus-build", "main");
 		// The four first-party images the release promotes. The upstream images in the same file are
-		// not built here and have no `:main` tag, so they are deliberately not subjects.
+		// not built here and have no `:main` tag, so they are scanned by their pinned digest in
+		// scan-upstream-images.ts instead.
 		assert.deepEqual(subjects.map((subject) => subject.image).toSorted(), [
 			"agent-pi",
 			"application-server",

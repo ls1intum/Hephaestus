@@ -5,6 +5,9 @@ import { describe, test } from "node:test";
 import { type Document, isMap, isSeq, parseDocument, type YAMLMap } from "yaml";
 
 import { planRelease, releaseOutputs } from "./plan-release.ts";
+import { planSubjects } from "./scan-main-images.ts";
+import { planUpstreamSubjects } from "./scan-upstream-images.ts";
+import { validateManifest } from "./verify-release-evidence.ts";
 
 function job(source: string, name: string): string {
 	const match = source.match(
@@ -390,6 +393,62 @@ void describe("CI contract", () => {
 		assert.deepEqual(await Array.fromAsync(glob("security/*vulnerability*.json")), [
 			"security/vulnerability-policy.json",
 		]);
+	});
+
+	void test("scans every release subject before the release, not only at the release gate", async () => {
+		const inventory: unknown = JSON.parse(await readFile("security/release-images.json", "utf8"));
+		const namespace = "ghcr.io/hephaestus-build";
+		const digest = `sha256:${"c".repeat(64)}`;
+		// The subject set the pre-release scans cover, derived from the inventory rather than listed:
+		// the build gate and the weekly rescan take the first-party half, scan-upstream-images.ts the
+		// pinned upstream half.
+		const scanned = [
+			...planSubjects(inventory, namespace, "main").map((subject) => ({
+				...subject,
+				indexDigest: digest,
+				provenance: "first-party" as const,
+			})),
+			...planUpstreamSubjects(inventory).map((subject) => ({
+				...subject,
+				provenance: "upstream" as const,
+			})),
+		];
+		// Parity with the release gate, asserted by the release gate itself: this is the manifest that
+		// would evidence exactly the pre-release subject set, and validateManifest rejects a manifest
+		// whose subjects are not exactly the inventory. So an image the pre-release scans miss, or one
+		// they cover that the release does not, fails here — which is what v0.75.0 needed and did not
+		// have when the upstream half was scanned nowhere before the release (#1741).
+		const manifest = {
+			schemaVersion: 1,
+			subjects: scanned.flatMap((subject) =>
+				(["linux/amd64", "linux/arm64"] as const).map((platform) => ({
+					digest,
+					image: subject.image,
+					indexDigest: subject.indexDigest,
+					platform,
+					provenance: subject.provenance,
+					repository: subject.repository,
+				})),
+			),
+		};
+		assert.doesNotThrow(() => validateManifest(manifest, inventory, namespace));
+
+		// A planner nothing invokes covers nothing. The pinned digests need no build, so they are
+		// scanned on the pull request that changes them — which is the pull request a Renovate digest
+		// bump opens — and again in the weekly rescan, where a finding routes to the tracking issue.
+		assert.match(
+			await readFile(".github/workflows/ci-security-scan.yml", "utf8"),
+			/run: node scripts\/scan-upstream-images\.ts reports\n/,
+		);
+		assert.match(
+			await readFile(".github/workflows/rescan-main-images.yml", "utf8"),
+			/run: node scripts\/scan-upstream-images\.ts reports --report-only\n/,
+		);
+		const detection = job(await readFile(".github/workflows/cicd.yml", "utf8"), "detect-changes");
+		assert.match(
+			pathFilter(detection, "release-images"),
+			/- 'security\/release-images\.json'[\s\S]*- 'security\/vulnerability-policy\.json'/,
+		);
 	});
 
 	void test("rescans main's images weekly and reports drift to an issue, not a status", async () => {

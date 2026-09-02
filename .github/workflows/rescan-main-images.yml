@@ -55,6 +55,12 @@ jobs:
           TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
         run: node scripts/scan-main-images.ts reports
 
+      # The pinned upstream digests too, so the weekly picture is the release gate's subject set
+      # rather than half of it. Report-only for the same reason as the images above: a CVE
+      # published after the digest was pinned belongs to no commit here.
+      - name: Scan the pinned upstream images
+        run: node scripts/scan-upstream-images.ts reports --report-only
+
       - name: Upload the vulnerability policy results
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
