@@ -363,11 +363,13 @@ class LlmProxyControllerTest extends BaseUnitTest {
 
         private MockWebServer upstream;
         private LlmProxyController streamingController;
+        private SimpleMeterRegistry streamingMeterRegistry;
 
         @BeforeEach
         void startUpstream() throws IOException {
             upstream = new MockWebServer();
             upstream.start();
+            streamingMeterRegistry = new SimpleMeterRegistry();
             streamingController = new LlmProxyController(
                     WebClient.builder().build(),
                     resolver,
@@ -377,7 +379,7 @@ class LlmProxyControllerTest extends BaseUnitTest {
                             budgetGate,
                             usageAccumulator,
                             mentorTurnUsageAccumulator,
-                            new SimpleMeterRegistry(),
+                            streamingMeterRegistry,
                             OBJECT_MAPPER));
         }
 
@@ -453,10 +455,6 @@ class LlmProxyControllerTest extends BaseUnitTest {
             assertThat(usage.getValue().cacheReadTokens()).isEqualTo(25);
         }
 
-        /**
-         * A stream that ends before its usage frame bills what it observed — which is nothing. Recording
-         * a zero-token call instead would put a fabricated event in the ledger.
-         */
         @Test
         @DisplayName("a stream that terminates before the usage frame records nothing")
         void aTruncatedStreamRecordsNothing() throws Exception {
@@ -467,10 +465,17 @@ class LlmProxyControllerTest extends BaseUnitTest {
             verifyNoInteractions(usageAccumulator);
         }
 
-        /**
-         * The request-side half of the fix, proven on the wire: without the flag the provider sends no
-         * usage at all and there is nothing for the tap to read.
-         */
+        @Test
+        void malformedStreamUsageIsCounted() throws Exception {
+            proxyStream("{\"usage\":{\"prompt_tokens\":1,\"prompt_tokens_details\":{\"cached_tokens\":2}}}");
+
+            assertThat(streamingMeterRegistry
+                            .counter("llm.proxy.usage.unparseable", "sourceType", "AGENT_JOB")
+                            .count())
+                    .isEqualTo(1.0);
+            verifyNoInteractions(usageAccumulator);
+        }
+
         @Test
         @DisplayName("the outgoing streaming request asks the provider to report usage")
         void theOutgoingRequestAsksForUsage() throws Exception {

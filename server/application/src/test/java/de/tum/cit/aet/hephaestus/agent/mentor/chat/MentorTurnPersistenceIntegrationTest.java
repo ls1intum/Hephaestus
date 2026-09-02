@@ -579,8 +579,8 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     @DisplayName("a turn abandoned by a crashed worker is billed for the calls the proxy recorded")
     void accountingReaper_billsACrashedTurnFromItsProxyRecordedUsage() throws Exception {
         UUID crashedTurn = persistInFlightTurn("crashed-turn");
-        accumulateProxyCall(crashedTurn, 40_000, 1_000, 250, 5_000);
-        accumulateProxyCall(crashedTurn, 60_000, 2_000, 250, 5_000);
+        accumulateProxyCall(crashedTurn, 40_000, 1_000, 250, 5_000, 1_000);
+        accumulateProxyCall(crashedTurn, 60_000, 2_000, 250, 5_000, 2_000);
         setCreatedAt(crashedTurn, Instant.now().minus(Duration.ofMinutes(200)));
 
         reaperWithAnUnsafeWindow().reap();
@@ -594,6 +594,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
         assertThat(event.getInputTokens()).isEqualTo(100_000);
         assertThat(event.getOutputTokens()).isEqualTo(3_000);
         assertThat(event.getCacheReadTokens()).isEqualTo(10_000);
+        assertThat(event.getCacheWriteTokens()).isEqualTo(3_000);
         assertThat(event.getReasoningTokens()).isEqualTo(500);
         assertThat(event.getTotalCalls()).isEqualTo(2);
         assertThat(event.getPricingState()).isEqualTo(PricingState.PRICED);
@@ -617,10 +618,11 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
         assertThat(event.getCostUsd()).isNull();
     }
 
-    private void accumulateProxyCall(UUID turnId, long input, long output, long reasoning, long cacheRead) {
+    private void accumulateProxyCall(
+            UUID turnId, long input, long output, long reasoning, long cacheRead, long cacheWrite) {
         new TransactionTemplate(transactionManager)
-                .executeWithoutResult(ignored -> assertThat(
-                                chatMessageRepository.accumulateLlmUsage(turnId, input, output, reasoning, cacheRead))
+                .executeWithoutResult(ignored -> assertThat(chatMessageRepository.accumulateLlmUsage(
+                                turnId, input, output, reasoning, cacheRead, cacheWrite))
                         .isEqualTo(1));
     }
 

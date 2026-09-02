@@ -97,7 +97,7 @@ class ProxyUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegrationT
     void repeatedCallsAccumulateOntoTheSameRow() {
         AgentJob job = persistedJob("proxy-usage-adds");
         String body = "{\"usage\":{\"prompt_tokens\":30,\"completion_tokens\":10,"
-                + "\"prompt_tokens_details\":{\"cached_tokens\":5},"
+                + "\"prompt_tokens_details\":{\"cached_tokens\":5,\"cache_write_tokens\":7},"
                 + "\"completion_tokens_details\":{\"reasoning_tokens\":2}}}";
 
         accumulate(job.getId(), json(body), false);
@@ -106,8 +106,9 @@ class ProxyUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegrationT
 
         AgentJobLlmUsage usage = usageOf(job);
         assertThat(usage.totalCalls()).isEqualTo(3);
-        assertThat(usage.inputTokens()).isEqualTo(75); // 3 × (30 − 5)
+        assertThat(usage.inputTokens()).isEqualTo(54); // 3 × (30 − 5 − 7)
         assertThat(usage.cacheReadTokens()).isEqualTo(15);
+        assertThat(usage.cacheWriteTokens()).isEqualTo(21);
         assertThat(usage.outputTokens()).isEqualTo(30);
         assertThat(usage.reasoningTokens()).isEqualTo(6);
     }
@@ -129,7 +130,7 @@ class ProxyUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegrationT
     void nullJobIdIsANoOp() {
         AgentJob job = persistedJob("proxy-usage-null-target");
 
-        accumulate(null, json("{\"usage\":{\"prompt_tokens\":10}}"), false);
+        accumulate(null, json("{\"usage\":{\"prompt_tokens\":10,\"completion_tokens\":0}}"), false);
 
         assertThat(usageOf(job).totalCalls()).isZero();
     }
@@ -188,7 +189,7 @@ class ProxyUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegrationT
         job.setLlmTotalCalls(4);
         jobRepository.saveAndFlush(job);
 
-        accumulate(job.getId(), json("{\"usage\":{\"prompt_tokens\":25}}"), false);
+        accumulate(job.getId(), json("{\"usage\":{\"prompt_tokens\":25,\"completion_tokens\":0}}"), false);
 
         AgentJobLlmUsage usage = usageOf(job);
         assertThat(usage.inputTokens()).isEqualTo(500);
@@ -213,7 +214,7 @@ class ProxyUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegrationT
     @DisplayName("a failed write is swallowed, but counted so the under-billing is visible")
     void failedAccumulationIsCountedNotSilent() {
         AgentJobRepository failing = mock(AgentJobRepository.class);
-        when(failing.accumulateLlmUsage(any(), anyInt(), anyInt(), anyInt(), anyInt(), anyInt()))
+        when(failing.accumulateLlmUsage(any(), anyInt(), any()))
                 .thenThrow(new IllegalStateException("connection reset"));
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
         ProxyUsageAccumulator accumulator = new ProxyUsageAccumulator(failing, registry);
@@ -221,7 +222,8 @@ class ProxyUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegrationT
         assertThatCode(() -> accumulator.accumulate(
                         new ProxyRouting.BilledAttempt(
                                 LlmUsageSourceType.AGENT_JOB, UUID.randomUUID(), 0, BigDecimal.ZERO),
-                        ProxyTokenUsage.from(json("{\"usage\":{\"prompt_tokens\":10}}"), false)))
+                        ProxyTokenUsage.from(
+                                json("{\"usage\":{\"prompt_tokens\":10,\"completion_tokens\":0}}"), false)))
                 .doesNotThrowAnyException();
 
         assertThat(registry.counter("llm.proxy.usage.accumulate.failure").count())

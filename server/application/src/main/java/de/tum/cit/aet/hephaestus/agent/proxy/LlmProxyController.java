@@ -186,7 +186,11 @@ class LlmProxyController {
             ProxyStreamingUtils.streamSseToResponse(
                     upstream.sseBody(), upstream.headers(), response, upstream.status(), tap);
             if (tap != null) {
-                accounting.recordUsage(attempt, tap.observed());
+                if (tap.hasMalformedUsage()) {
+                    accounting.recordMalformedUsage(attempt);
+                } else {
+                    accounting.recordUsage(attempt, tap.observed());
+                }
             }
             return null;
         }

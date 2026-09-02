@@ -720,7 +720,7 @@ class MentorChatServiceTest extends BaseUnitTest {
                         proxyCredentialRegistry.validate(token).orElseThrow().attempt();
                 if (attempt != null) {
                     // 100k input tokens at the fixture's $10/M — a whole dollar of this turn's own spend.
-                    proxyCredentialRegistry.accumulate(attempt.sourceId(), new ProxyTokenUsage(100_000, 0, 0, 0));
+                    proxyCredentialRegistry.accumulate(attempt.sourceId(), new ProxyTokenUsage(100_000, 0, 0, 0, 0));
                 }
                 seen.set(Objects.requireNonNull(
                         proxyCredentialRegistry.validate(token).orElseThrow().attempt()));

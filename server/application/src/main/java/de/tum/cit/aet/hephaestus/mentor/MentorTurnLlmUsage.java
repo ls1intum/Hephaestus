@@ -5,11 +5,16 @@ package de.tum.cit.aet.hephaestus.mentor;
  * than read off a loaded entity, so it reflects every proxy call that has committed.
  */
 public record MentorTurnLlmUsage(
-        int totalCalls, long inputTokens, long outputTokens, long reasoningTokens, long cacheReadTokens) {
-    public static final MentorTurnLlmUsage NONE = new MentorTurnLlmUsage(0, 0, 0, 0, 0);
+        int totalCalls,
+        long inputTokens,
+        long outputTokens,
+        long reasoningTokens,
+        long cacheReadTokens,
+        long cacheWriteTokens) {
+    public static final MentorTurnLlmUsage NONE = new MentorTurnLlmUsage(0, 0, 0, 0, 0, 0);
 
     /** True when at least one proxied call was recorded — i.e. there is real spend to bill. */
     public boolean hasBillableUsage() {
-        return totalCalls > 0 && (inputTokens > 0 || outputTokens > 0 || cacheReadTokens > 0);
+        return totalCalls > 0 && (inputTokens > 0 || outputTokens > 0 || cacheReadTokens > 0 || cacheWriteTokens > 0);
     }
 }

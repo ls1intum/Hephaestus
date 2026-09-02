@@ -107,9 +107,9 @@ class MentorTurnUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegra
     void repeatedCallsAccumulateOntoTheSameRow() {
         UUID turnId = turn(ChatMessage.Status.in_flight);
 
-        accumulate(turnId, new ProxyTokenUsage(100, 40, 10, 25));
-        accumulate(turnId, new ProxyTokenUsage(200, 60, 5, 0));
-        accumulate(turnId, new ProxyTokenUsage(300, 80, 0, 0));
+        accumulate(turnId, new ProxyTokenUsage(100, 40, 10, 25, 15));
+        accumulate(turnId, new ProxyTokenUsage(200, 60, 5, 0, 0));
+        accumulate(turnId, new ProxyTokenUsage(300, 80, 0, 0, 0));
 
         MentorTurnLlmUsage usage = usageOf(turnId);
         assertThat(usage.totalCalls()).isEqualTo(3);
@@ -117,6 +117,7 @@ class MentorTurnUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegra
         assertThat(usage.outputTokens()).isEqualTo(180);
         assertThat(usage.reasoningTokens()).isEqualTo(15);
         assertThat(usage.cacheReadTokens()).isEqualTo(25);
+        assertThat(usage.cacheWriteTokens()).isEqualTo(15);
         assertThat(usage.hasBillableUsage()).isTrue();
     }
 
@@ -124,14 +125,14 @@ class MentorTurnUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegra
     @DisplayName("a call that lands after the turn ended is dropped, not added to a turn already billed")
     void aLateCallAfterTheTurnEndedIsDropped() {
         UUID turnId = turn(ChatMessage.Status.in_flight);
-        accumulate(turnId, new ProxyTokenUsage(100, 40, 0, 0));
+        accumulate(turnId, new ProxyTokenUsage(100, 40, 0, 0, 0));
 
         transactionTemplate.executeWithoutResult(tx -> {
             ChatMessage message = chatMessageRepository.findById(turnId).orElseThrow();
             message.setStatus(ChatMessage.Status.completed);
             chatMessageRepository.saveAndFlush(message);
         });
-        accumulate(turnId, new ProxyTokenUsage(999, 999, 0, 0));
+        accumulate(turnId, new ProxyTokenUsage(999, 999, 0, 0, 0));
 
         MentorTurnLlmUsage usage = usageOf(turnId);
         assertThat(usage.totalCalls()).isEqualTo(1);
@@ -156,7 +157,7 @@ class MentorTurnUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegra
         MentorTurnMeter meter = new MentorTurnMeter(inFlight, TEN_DOLLARS_PER_MILLION);
         credentials.bindTurn(sessionId, meter);
 
-        accumulate(inFlight, new ProxyTokenUsage(100_000, 0, 0, 0));
+        accumulate(inFlight, new ProxyTokenUsage(100_000, 0, 0, 0, 0));
 
         assertThat(credentials.validate(token).orElseThrow().inFlightSpendUsd()).isEqualByComparingTo("1.00");
 
@@ -165,7 +166,7 @@ class MentorTurnUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegra
             message.setStatus(ChatMessage.Status.interrupted);
             chatMessageRepository.saveAndFlush(message);
         });
-        accumulate(inFlight, new ProxyTokenUsage(100_000, 0, 0, 0));
+        accumulate(inFlight, new ProxyTokenUsage(100_000, 0, 0, 0, 0));
 
         assertThat(credentials.validate(token).orElseThrow().inFlightSpendUsd()).isEqualByComparingTo("1.00");
         assertThat(usageOf(inFlight).inputTokens()).isEqualTo(100_000);
@@ -182,7 +183,7 @@ class MentorTurnUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegra
 
         transactionTemplate.executeWithoutResult(tx -> {
             ChatMessage stale = chatMessageRepository.findById(turnId).orElseThrow();
-            accumulator.accumulate(attempt(turnId), new ProxyTokenUsage(4_242, 99, 0, 0));
+            accumulator.accumulate(attempt(turnId), new ProxyTokenUsage(4_242, 99, 0, 0, 0));
             stale.setMetadata(JsonNodeFactory.instance.objectNode().put("finishReason", "stop"));
             chatMessageRepository.saveAndFlush(stale);
         });
@@ -198,14 +199,14 @@ class MentorTurnUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegra
     @DisplayName("a failed write is swallowed, but counted so the under-billing is visible")
     void failedAccumulationIsCountedNotSilent() {
         ChatMessageRepository failing = mock(ChatMessageRepository.class);
-        when(failing.accumulateLlmUsage(any(), anyLong(), anyLong(), anyLong(), anyLong()))
+        when(failing.accumulateLlmUsage(any(), anyLong(), anyLong(), anyLong(), anyLong(), anyLong()))
                 .thenThrow(new IllegalStateException("connection reset"));
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
         MentorTurnUsageAccumulator failingAccumulator =
                 new MentorTurnUsageAccumulator(failing, new MentorProxyCredentialRegistry(), registry);
 
         assertThatCode(() ->
-                        failingAccumulator.accumulate(attempt(UUID.randomUUID()), new ProxyTokenUsage(10, 1, 0, 0)))
+                        failingAccumulator.accumulate(attempt(UUID.randomUUID()), new ProxyTokenUsage(10, 1, 0, 0, 0)))
                 .doesNotThrowAnyException();
 
         assertThat(registry.counter("llm.proxy.usage.mentor.failure").count()).isEqualTo(1.0);

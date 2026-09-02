@@ -160,7 +160,7 @@ class ProxyBudgetGateTest extends BaseUnitTest {
             MentorTurnMeter meter = new MentorTurnMeter(UUID.randomUUID(), TEN_DOLLARS_PER_MILLION_INPUT);
             credentials.bindTurn(sessionId, meter);
             if (inputTokens > 0) {
-                credentials.accumulate(meter.turnId(), new ProxyTokenUsage(inputTokens, 0, 0, 0));
+                credentials.accumulate(meter.turnId(), new ProxyTokenUsage(inputTokens, 0, 0, 0, 0));
             }
             return credentials.validate(token).orElseThrow();
         }

@@ -53,6 +53,7 @@ class ProxyStreamUsageTapTest extends BaseUnitTest {
             assertThat(observed.cacheReadTokens()).isEqualTo(20);
             assertThat(observed.outputTokens()).isEqualTo(50);
             assertThat(observed.reasoningTokens()).isEqualTo(10);
+            assertThat(observed.cacheWriteTokens()).isZero();
         }
 
         @Test
@@ -92,6 +93,16 @@ class ProxyStreamUsageTapTest extends BaseUnitTest {
             feed(tap, "data: {\"choices\":[{\"delta\":{\"content\":\"partial answ\"}}],\"usage\":null}\n\n");
 
             assertThat(tap.observed()).isNull();
+        }
+
+        @Test
+        void marksInvalidUsage() {
+            ProxyStreamUsageTap tap = completionsTap();
+
+            feed(tap, "data: {\"usage\":{\"prompt_tokens\":1,\"prompt_tokens_details\":{\"cached_tokens\":2}}}\n");
+
+            assertThat(tap.observed()).isNull();
+            assertThat(tap.hasMalformedUsage()).isTrue();
         }
 
         @Test

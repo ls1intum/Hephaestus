@@ -12,37 +12,8 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The token counts one ending attempt of an {@code AgentJob} is billed for, and whether they can be
- * trusted. Every terminal accounting path resolves its numbers here, so all of them answer "what did
- * this attempt spend?" the same way.
- *
- * <p>Two independent records of the same spend exist and <b>neither is complete</b>:
- *
- * <ul>
- *   <li>the runner's {@code usage.json}, which covers streamed calls the proxy never parses, but is
- *       derived by walking the agent session's surviving messages — and compaction is on for every
- *       session, so every message it drops takes its tokens out of the report with it;
- *   <li>the LLM proxy's per-call accumulation onto the {@code agent_job} row, which never forgets a call
- *       it forwarded, but sees no streamed call and no cache write.
- * </ul>
- *
- * <p>So the attempt is billed the <b>per-bucket maximum</b> of the two. Preferring the runner outright
- * — which this did — meant a compacted session was billed only for what survived compaction, and a
- * live 29-practice review booked 26 of the 143 calls the proxy had already watched go upstream. Since
- * the budget cap reads this ledger, that is a cap computed from a quarter of the spend, not an
- * accounting nit.
- *
- * <p>The maximum is safe in both directions. Neither source double-counts within itself, so no bucket
- * can exceed the truth; and each covers calls the other misses, so the larger of the two is always at
- * least as close. Where only one source exists for a bucket — {@code cacheWriteTokens}, which the proxy
- * never accumulates — the maximum simply is that source's value. It can still under-bill, when both
- * sources lost the same call, which is why {@link #provenance()} is recorded rather than inferred.
- *
- * @param verifiable whether these numbers are real observed spend, or an admission that the attempt's
- *     spend is unknown — which the ledger records UNPRICED so the month reads unverifiable rather than
- *     cheap
- * @param provenance which record the billed numbers came from, so a later reader can tell a merged row
- *     from either source's own
+ * Reconciles an ending job attempt's runner and proxy observations. Each bucket uses the larger
+ * observed value; {@link #provenance()} records whether the result matches either source.
  */
 record TerminalUsage(
         long inputTokens,
