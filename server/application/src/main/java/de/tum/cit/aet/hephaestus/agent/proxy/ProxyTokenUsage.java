@@ -27,14 +27,14 @@ public record ProxyTokenUsage(
         int cacheRead;
         int cacheWrite;
         if (responsesProtocol) {
-            input = count(usage, "input_tokens");
-            output = count(usage, "output_tokens");
+            input = requiredCount(usage, "input_tokens");
+            output = requiredCount(usage, "output_tokens");
             cacheRead = count(usage.path("input_tokens_details"), "cached_tokens");
             cacheWrite = cacheWriteTokens(usage.path("input_tokens_details"));
             reasoning = count(usage.path("output_tokens_details"), "reasoning_tokens");
         } else {
-            input = count(usage, "prompt_tokens");
-            output = count(usage, "completion_tokens");
+            input = requiredCount(usage, "prompt_tokens");
+            output = requiredCount(usage, "completion_tokens");
             cacheRead = count(usage.path("prompt_tokens_details"), "cached_tokens");
             cacheWrite = cacheWriteTokens(usage.path("prompt_tokens_details"));
             reasoning = count(usage.path("completion_tokens_details"), "reasoning_tokens");
@@ -57,6 +57,14 @@ public record ProxyTokenUsage(
     private static int count(JsonNode owner, String field) {
         Integer value = optionalCount(owner, field);
         return value != null ? value : 0;
+    }
+
+    private static int requiredCount(JsonNode owner, String field) {
+        Integer value = optionalCount(owner, field);
+        if (value == null) {
+            throw new IllegalArgumentException("Missing token count: " + field);
+        }
+        return value;
     }
 
     private static @Nullable Integer optionalCount(JsonNode owner, String field) {

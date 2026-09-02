@@ -50,6 +50,15 @@ class ProxyTokenUsageTest extends BaseUnitTest {
     }
 
     @Test
+    void rejectsIncompleteUsage() throws Exception {
+        var chat = MAPPER.readTree("{\"usage\":{\"prompt_tokens\":10}}");
+        var responses = MAPPER.readTree("{\"usage\":{\"output_tokens\":2}}");
+
+        assertThatIllegalArgumentException().isThrownBy(() -> ProxyTokenUsage.from(chat, false));
+        assertThatIllegalArgumentException().isThrownBy(() -> ProxyTokenUsage.from(responses, true));
+    }
+
+    @Test
     void missingUsageReturnsNull() throws Exception {
         assertThat(ProxyTokenUsage.from(MAPPER.readTree("{}"), false)).isNull();
     }
