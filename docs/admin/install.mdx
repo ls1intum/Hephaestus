@@ -87,8 +87,8 @@ cd docker/self-host
 ```
 
 `setup.sh` creates or updates `.env` with mode `0600` and generates the database password,
-credential-encryption key, OAuth state-cookie key, and webhook secret. It does not replace non-empty
-values and never prints a secret.
+credential-encryption key, OAuth state-cookie key, webhook secret, and message-broker credentials.
+It does not replace non-empty values and never prints a secret.
 
 Everything below runs from `/opt/hephaestus/docker/self-host`. After step 2 supplies the remaining
 required values, `docker compose config` renders the effective configuration. Before then it exits
@@ -97,8 +97,8 @@ directory; see [Troubleshooting](#troubleshooting).
 
 ## 2. Configure `.env`
 
-Open `.env` and fill in the remaining **REQUIRED** values. `setup.sh` manages the four internal
-secrets listed above; do not replace them manually.
+Open `.env` and fill in the remaining **REQUIRED** values. `setup.sh` manages the internal secrets
+listed above; do not replace them manually.
 
 | Variable | What / how |
 | --- | --- |
