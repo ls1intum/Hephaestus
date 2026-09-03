@@ -71,16 +71,9 @@ workflows run again for the merge group, which includes the current base and que
 the pull request. Each required context is bound to the GitHub Actions integration rather than
 accepting a same-named external status.
 
-Review is a native ruleset requirement with stale approvals dismissed on every push. Authors listed
-in `REVIEW_POLICY_MAINTAINERS` receive an automated approval; every other author needs a human with
-write access. Repository administrators own that allow-list. Remove the automation when independent
-maintainer review is available.
-
-The approval workflow runs on `pull_request_target` with `pull-requests: write`, so it checks out only
-`scripts/` from the default branch, reads the author login and nothing else, and executes no
-pull-request code. An empty allow-list approves nobody. It has no `branches:` filter: a stacked
-layer is approved while it still targets the layer below, because retargeting to `main` after the
-lower layer merges fires no event.
+GitHub separately enforces independent review: the latest reviewable push requires approval from
+someone other than its pusher. The `Maintainer` team can bypass that requirement when merging a pull
+request, but cannot bypass required checks or the merge queue.
 
 The Version PR carries checks like any other pull request. Its updates are pushed with
 `GITHUB_TOKEN`, which starts no workflow run, so `version-pr.yml` dispatches CI/CD on the Version
@@ -199,7 +192,6 @@ why the label is the authority, and which alternatives were priced and declined,
 | Workflow | Trigger | Purpose |
 | --- | --- | --- |
 | `cicd.yml` | PR, merge group, push to main, manual | Validates changes before merge and builds final-SHA images after merge; the release evidence gate runs over the images the run built on the Version PR's branch, and wherever the `release-preflight` dispatch input asks for it |
-| `review-policy.yml` | PR opened, reopened, synchronized, ready for review, edited | Approves a listed maintainer's pull request so the ruleset's required approval is met; does nothing for anyone else |
 | `pull-request.yml` | PR opened, edited, synchronized, reopened, ready for review | Validates the title with commitlint, applies labels, assigns the author |
 | `ci-quality-gates.yml` | Called by cicd.yml | Formatting, lint, type checks, webapp unit and story tests: everything verifiable from source |
 | `ci-build.yml` | Called by cicd.yml | Packages the server reactor once, then runs the OpenAPI, schema, database and browser E2E gates and the application-server image against that artifact |
