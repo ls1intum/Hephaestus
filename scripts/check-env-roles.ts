@@ -26,12 +26,17 @@
  *                  lock's agent image digest reached the app containers and not the webhook
  *                  receiver, which derived a tag from its own version instead and then refused to
  *                  boot on it, because the guards that read it are deliberately not role-gated.
+ *   omitted      — the same defect with the key left out rather than left blank. A container that
+ *                  never mentions a setting makes no claim to disagree with, so `DEPLOYMENT_WIDE`
+ *                  names the settings whose absence is itself the failure.
  *
- * `ROLE_SCOPES` is the only thing to extend. It is keyed on `application.yml` paths rather than on
- * whole property records because ownership is finer than a record: `hephaestus.webhook.secret` is
- * read on the server role (outbound registration) while `hephaestus.webhook.stream.*` is read on the
- * webhook role, out of the same `WebhookProperties`. A scope naming a path `application.yml` no
- * longer has fails too, so a rename cannot leave a dead entry behind that silently checks nothing.
+ * `ROLE_SCOPES` and `DEPLOYMENT_WIDE` are the two things to extend, and they are opposite claims
+ * about the same question — which containers read a setting. Both are keyed on `application.yml`
+ * paths rather than on whole property records because ownership is finer than a record:
+ * `hephaestus.webhook.secret` is read on the server role (outbound registration) while
+ * `hephaestus.webhook.stream.*` is read on the webhook role, out of the same `WebhookProperties`.
+ * An entry naming a path `application.yml` no longer has fails too, so a rename cannot leave a dead
+ * entry behind that silently checks nothing.
  *
  * Compose is read here rather than through `docker compose config`, which would be a stricter parse:
  * this gate runs in `pnpm run check` and the pre-push hook, where a Docker daemon is not a given, and
@@ -118,6 +123,42 @@ const PER_CONTAINER = new Map<string, string>([
 	["SPRING_LIQUIBASE_ENABLED", "one container owns the migration and the rest must not race it"],
 	["THC_PATH", "the receiver reports NATS through readiness; the others answer liveness"],
 ]);
+
+/**
+ * A setting every application container must be *given*, not merely agree about. These are the ones
+ * whose readers are gated on no role at all: the beans are constructed in every context, so the
+ * container that was skipped does not quietly run without the feature, it fails to boot.
+ *
+ * Declared rather than derived, and the reason is worth stating because it looks like a weakness.
+ * Nothing in Compose separates a setting the receiver must have from one it is right not to have:
+ * `GH_APP_PRIVATE_KEY` also reaches two of the three containers, and "deliver it to the third too"
+ * would be a private key shipped to a container with no use for it. Only the Java says which is
+ * which — whether the bean reading it carries a role gate — so the entry has to name that bean and
+ * be checkable by a reader against it.
+ *
+ * What is fail-closed, and needs nothing listed, is the other half: a setting more than one
+ * application container writes has to be written the same on all of them. Between the two, both
+ * shapes of the defect this exists for are covered — the container that was handed a different
+ * value, and the container that was handed none.
+ */
+interface DeploymentWideSetting {
+	readonly variable: string;
+	/** The `application.yml` path it binds. A path the file no longer has fails, as in `ROLE_SCOPES`. */
+	readonly path: string;
+	/** Named beans, so a reader can check the claim rather than take it. Quoted back in every failure. */
+	readonly why: string;
+}
+
+const DEPLOYMENT_WIDE: readonly DeploymentWideSetting[] = [
+	{
+		variable: "HEPHAESTUS_AGENT_IMAGE_REFERENCE",
+		path: "hephaestus.agent.image.reference",
+		why:
+			"AgentImageReferenceGuard and AgentImagePinGuard are plain @Components that ADR 0031 keeps " +
+			"ungated on purpose, so no pod can boot on an agent image the workers cannot run; a container " +
+			"left without the reference derives one from its own version, which is a tag, and refuses to start",
+	},
+];
 
 /** `application-<profile>.yml` turns roles off too, so a service's profiles decide as much as its env. */
 const PROFILE_YML = (profile: string): string =>
@@ -455,6 +496,34 @@ export function analyse(
 				"  No runtime role gates this setting, so every one of them reads it and they cannot both\n" +
 				"  be describing the same deployment.\n" +
 				`  Give them one value, or name ${variable} in PER_CONTAINER with the reason it differs.`,
+		);
+	}
+
+	// The disagreement above only sees containers that mention the key. A container that omits it
+	// makes no claim to disagree with, and reads the application default instead — which for the
+	// agent image is a tag derived from its own version, the exact thing the guards refuse. So an
+	// omission is a value here, not an absence.
+	for (const { variable, path, why } of DEPLOYMENT_WIDE) {
+		if (!paths.has(path)) {
+			failures.push(
+				`DEPLOYMENT_WIDE declares "${path}" (${variable}), which ${APPLICATION_YML} does not have.\n` +
+					"  Point it at wherever the setting moved, or drop the entry — as written it checks nothing.",
+			);
+			continue;
+		}
+		const missing = applicationContainers.filter(({ service }) => !service.env.has(variable));
+		if (missing.length === 0) continue;
+		const listed = missing.map(({ id }) => `    ${id}`).join("\n");
+		failures.push(
+			missing.length === applicationContainers.length
+				? `${variable} binds ${path}, and no container running the application image is given it.\n` +
+						`  ${why}.\n` +
+						"  Every one of them reads it, so the deployment has nowhere to get the value from."
+				: `${variable} binds ${path}, and these containers run the application image without it:\n${listed}\n` +
+						`  ${why}.\n` +
+						"  The setting is not gated on a runtime role, so leaving it off one container does not\n" +
+						"  scope it — that container falls back to the application default and reads a different\n" +
+						"  deployment than its siblings.",
 		);
 	}
 
