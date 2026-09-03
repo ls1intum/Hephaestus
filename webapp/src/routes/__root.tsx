@@ -33,6 +33,7 @@ import { useMentorChat } from "@/hooks/use-mentor-chat";
 import { useActiveSurvey, useSubmitProductFeedback } from "@/hooks/use-product-feedback";
 import { useWorkspaceAccess } from "@/hooks/use-workspace-access";
 import { useWorkspaceFeatures } from "@/hooks/use-workspace-features";
+import { useWorkspaceSwitcher } from "@/hooks/use-workspace-switcher";
 import { type AuthContextType, useAuth } from "@/integrations/auth/AuthContext";
 import { FeatureFlagDevTools, useFeatureFlag } from "@/integrations/feature-flags";
 import { isCopilotExcludedRoute } from "@/lib/copilot-route";
@@ -299,8 +300,9 @@ function AppSidebarContainer() {
 	const { isAuthenticated, username, isAppAdmin } = useAuth();
 	const { enabled: hasMentorAccess } = useFeatureFlag("MENTOR_ACCESS");
 	const navigate = useNavigate();
+	const switchWorkspace = useWorkspaceSwitcher();
 	const workspaceAccess = useWorkspaceAccess();
-	const { workspaceSlug, workspaces, selectWorkspace } = workspaceAccess;
+	const { workspaceSlug, workspaces } = workspaceAccess;
 	const hasWorkspace = Boolean(workspaceSlug);
 	const workspaceList = Array.isArray(workspaces) ? workspaces : [];
 	const activeWorkspace = workspaceList.find((ws) => ws.workspaceSlug === workspaceSlug);
@@ -346,10 +348,7 @@ function AppSidebarContainer() {
 
 	const handleWorkspaceChange = (ws: typeof activeWorkspace) => {
 		if (!ws) return;
-		selectWorkspace(ws.workspaceSlug);
-		const remainder = pathname.replace(/^\/w\/[^/]+/, "");
-		const target = `/w/${ws.workspaceSlug}${remainder || "/"}`;
-		void navigate({ href: target, replace: true });
+		switchWorkspace(ws.workspaceSlug);
 	};
 
 	const handleAddWorkspace = () => {

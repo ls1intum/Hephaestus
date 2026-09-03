@@ -7,12 +7,7 @@ import { hasMinimumWorkspaceRole } from "@/lib/workspace-roles";
 import { useActiveWorkspaceSlug } from "./use-active-workspace";
 
 export function useWorkspaceAccess() {
-	const {
-		workspaceSlug,
-		workspaces,
-		selectWorkspace,
-		isLoading: workspacesLoading,
-	} = useActiveWorkspaceSlug();
+	const { workspaceSlug, workspaces, isLoading: workspacesLoading } = useActiveWorkspaceSlug();
 	const { isAuthenticated, isLoading: authLoading } = useAuth();
 
 	const membershipQuery = useQuery({
@@ -25,7 +20,6 @@ export function useWorkspaceAccess() {
 	return {
 		workspaceSlug,
 		workspaces,
-		selectWorkspace,
 		role,
 		isAdmin: hasMinimumWorkspaceRole(role, "ADMIN"),
 		// The account's SCM identity for THIS workspace's provider, so prefer these over the global

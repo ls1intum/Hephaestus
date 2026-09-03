@@ -47,7 +47,6 @@ function activeWorkspace(
 		workspaceSlug: "test-workspace",
 		workspaces: [],
 		providerType: "GITHUB",
-		selectWorkspace: vi.fn(),
 		isLoading: false,
 		error: null,
 		...overrides,

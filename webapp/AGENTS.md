@@ -238,6 +238,9 @@ Declare routes with `createFileRoute`. Keep loaders side-effect free and prefer
 auth) on the router context. Never hand-edit `routeTree.gen.ts` — there is no `tsr` CLI here; the
 TanStack Router Vite plugin regenerates it when the dev server runs.
 
+The route's `workspaceSlug` is the active workspace. A workspace switch may keep a route only when
+that is its sole path parameter, and never keeps search params; otherwise it goes to workspace home.
+
 ## Role-based gating (OWNER > ADMIN > MEMBER)
 
 Client-side gating is a UX affordance only — the server enforces authorization on every endpoint.

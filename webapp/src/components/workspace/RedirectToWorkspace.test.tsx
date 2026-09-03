@@ -1,4 +1,4 @@
-import { render, waitFor } from "@testing-library/react";
+import { render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { WorkspaceListItem } from "@/api/types.gen";
@@ -11,7 +11,10 @@ const mockUseAuth = vi.fn<() => AuthContextType>();
 
 vi.mock("@tanstack/react-router", () => ({
 	createFileRoute: () => (options: unknown) => options,
-	useNavigate: () => mockNavigate,
+	Navigate: (props: unknown) => {
+		mockNavigate(props);
+		return null;
+	},
 }));
 
 vi.mock("@/hooks/use-active-workspace", () => ({
@@ -72,47 +75,37 @@ describe("RedirectToWorkspace", () => {
 		vi.clearAllMocks();
 	});
 
-	it("redirects authenticated users to the last selected workspace", async () => {
-		const selectWorkspace = vi.fn();
-
+	it("redirects authenticated users to their first available workspace", () => {
 		mockUseAuth.mockReturnValue(signedIn);
 		mockUseActiveWorkspaceSlug.mockReturnValue({
-			workspaceSlug: "prompt-edu",
+			workspaceSlug: undefined,
 			workspaces: [workspace(1, "ls1intum"), workspace(2, "prompt-edu")],
 			providerType: "GITHUB",
-			selectWorkspace,
 			isLoading: false,
 			error: null,
 		});
 
 		render(<RedirectToWorkspace />);
 
-		await waitFor(() => {
-			expect(selectWorkspace).toHaveBeenCalledWith("prompt-edu");
-			expect(mockNavigate).toHaveBeenCalledWith({
-				to: "/w/$workspaceSlug",
-				params: { workspaceSlug: "prompt-edu" },
-				replace: true,
-			});
+		expect(mockNavigate).toHaveBeenCalledWith({
+			to: "/w/$workspaceSlug",
+			params: { workspaceSlug: "ls1intum" },
+			replace: true,
 		});
 	});
 
-	it("waits for workspace selection hydration before redirecting", () => {
-		const selectWorkspace = vi.fn();
-
+	it("waits for workspaces to load before redirecting", () => {
 		mockUseAuth.mockReturnValue(signedIn);
 		mockUseActiveWorkspaceSlug.mockReturnValue({
 			workspaceSlug: undefined,
 			workspaces: [workspace(1, "ls1intum")],
 			providerType: "GITHUB",
-			selectWorkspace,
 			isLoading: true,
 			error: null,
 		});
 
 		render(<RedirectToWorkspace />);
 
-		expect(selectWorkspace).not.toHaveBeenCalled();
 		expect(mockNavigate).not.toHaveBeenCalled();
 	});
 });
