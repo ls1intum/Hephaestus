@@ -20,7 +20,7 @@ ruleTester.run("prefer-auto-story-title", preferAutoStoryTitle, {
 			filename: "webapp/src/components/admin/practices/review/ReviewPage.stories.tsx",
 		},
 		{
-			// A computed title is owned by check:story-sort, which gives the more precise diagnostic.
+			// A computed title is owned by gate:story-sort, which gives the more precise diagnostic.
 			code: `${component}\nconst meta = { title: prefix + "/Button", component: Button } satisfies Meta<typeof Button>;`,
 			filename: "webapp/src/components/ui/Button.stories.tsx",
 		},

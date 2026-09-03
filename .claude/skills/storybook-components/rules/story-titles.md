@@ -29,7 +29,7 @@ Two conventions live side by side, and which one applies is a property of the co
 
 - **Every top-level segment must appear in `storySort.order` in `webapp/.storybook/preview.tsx`, and
   every entry there must match a story.** A missing segment sorts alphabetically after every named one,
-  which buries it silently; a stale entry orders nothing. `check:story-sort` fails the build on either.
+  which buries it silently; a stale entry orders nothing. `gate:story-sort` fails the build on either.
   It reads `title:` at exactly one tab inside the `const meta` block, so a title assembled at runtime
   rather than written as a string literal fails the gate loudly.
 

@@ -324,7 +324,7 @@ async function main(): Promise<void> {
 		});
 		if (drift) {
 			console.error(`❌ The schema drifts from the JPA model:\n${drift}`);
-			console.error("Run: pnpm run db:draft-changelog");
+			console.error("Run: vp run db:draft-changelog");
 			process.exitCode = 1;
 			return;
 		}
@@ -346,7 +346,7 @@ async function main(): Promise<void> {
 	}
 	console.log(`✅ Wrote ${relative(root, written)} and refreshed the ERD.`);
 	console.log(
-		"Review it: keep the real deltas, add preconditions and rollbacks, then run pnpm run db:generate-erd-docs if you pruned anything.",
+		"Review it: keep the real deltas, add preconditions and rollbacks, then run vp run db:generate-erd-docs if you pruned anything.",
 	);
 }
 

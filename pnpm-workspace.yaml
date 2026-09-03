@@ -25,14 +25,26 @@ allowBuilds:
   msw: false
   protobufjs: false
 
-overrides:
-  # unplugin 3.1+ declares an optional peer on the retired runtime's types package, whose name
-  # would re-enter the lockfile and fail check:package-manager's repository-wide token ban.
-  "@tanstack/router-plugin>unplugin": 3.0.0
-  mermaid: 11.16.1
+# The tools vite-plus bundles, at the versions it bundles; `vp run sync:toolchain-pins` writes them.
+catalog:
+  oxfmt: 0.64.0
+  oxlint: 1.79.0
+  oxlint-tsgolint: 7.0.2001
+  "@oxlint/plugins": 1.79.0
   vitest: 4.1.11
   "@vitest/browser": 4.1.11
+  "@vitest/browser-playwright": 4.1.11
+  "@vitest/coverage-v8": 4.1.11
   "@vitest/runner": 4.1.11
+
+overrides:
+  # unplugin 3.1+ declares an optional peer on the retired runtime's types package, whose name
+  # would re-enter the lockfile and fail gate:toolchain's repository-wide token ban.
+  "@tanstack/router-plugin>unplugin": 3.0.0
+  mermaid: 11.16.1
+  vitest: "catalog:"
+  "@vitest/browser": "catalog:"
+  "@vitest/runner": "catalog:"
   "browserslist@<=4.28.6": 4.28.8
   dompurify: 3.4.13
   "js-yaml@>=4.0.0": 4.3.1

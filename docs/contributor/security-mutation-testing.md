@@ -17,7 +17,7 @@ area or the suite's build inputs. It also supports manual dispatch. Run the same
 with JDK 21:
 
 ```bash
-pnpm run test:server:mutation
+vp run test:server:mutation
 ```
 
 The command prepares reactor dependencies, compiles the target tests, and runs PIT. It fails if any

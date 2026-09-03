@@ -10,10 +10,7 @@
 		"clear": "docusaurus clear",
 		"serve": "vp exec docusaurus serve",
 		"write-translations": "docusaurus write-translations",
-		"write-heading-ids": "docusaurus write-heading-ids",
-		"typecheck": "vp lint --type-aware --type-check .",
-		"lint:md": "vp exec markdownlint-cli2",
-		"lint": "vp lint --type-aware --type-check . && vp exec markdownlint-cli2"
+		"write-heading-ids": "docusaurus write-heading-ids"
 	},
 	"dependencies": {
 		"@docusaurus/core": "3.10.1",

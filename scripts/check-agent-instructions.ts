@@ -19,7 +19,7 @@
  * classifier never opened, which every check below would otherwise read as a file that says nothing.
  *
  * The file set is `git ls-files --cached --others --exclude-standard`, read from the working tree
- * rather than the index: `pnpm run check` runs before `git add`, so a gate answering about the last
+ * rather than the index: `vp run check` runs before `git add`, so a gate answering about the last
  * commit would disagree with the tree in front of you.
  */
 import { execFile } from "node:child_process";
@@ -592,7 +592,7 @@ function uncovered(repo: Repo): readonly string[] {
 			// A remote rule set is not ours to resolve.
 			.filter((pattern) => !pattern.startsWith("http"));
 	} catch (error) {
-		// Reported rather than thrown: every gate in `pnpm run check` names its own defect, and a
+		// Reported rather than thrown: every gate in `vp run check` names its own defect, and a
 		// stack trace out of a config read would say the same thing less clearly.
 		return [
 			`${OPENCODE_CONFIG} could not be read as opencode's config: ${error instanceof Error ? error.message : String(error)}\n` +

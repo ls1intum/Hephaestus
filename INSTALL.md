@@ -8,5 +8,6 @@ There is exactly **one supported install**: the Docker Compose stack in
 
 For contributor/development setup, see the
 [contributor docs](https://docs.hephaestus.build/contributor/local-development) instead.
-Contributors need the Node.js and pnpm versions pinned in `package.json`. The supported repository-based
-installation also uses the pinned Node.js version to verify signed release locks.
+Contributors need the Node.js version pinned in `package.json` and the Vite+ launcher (`vp`). The
+supported repository-based installation also uses the pinned Node.js version to verify signed release
+locks.

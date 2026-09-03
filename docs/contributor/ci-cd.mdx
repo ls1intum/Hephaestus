@@ -46,22 +46,31 @@ published.
 
 | Job | Checks | Local command |
 | --- | --- | --- |
-| Quality → App Server | Spotless and PMD, NullAway policy, the PMD canary when PMD inputs changed, artifact-source contracts, setting delivery per runtime role | `pnpm run check:server`, `check:java-nullness`, `check:contracts`, `check:env` |
-| Quality → Tooling and Docs | package-manager and agent-runtime pins, `check:agents`, load-test format and syntax, agent specs, instruction mirrors, docs format and `docs:lint`, Mermaid parse | `pnpm run check:agents`, `check:docs`, `test:agents` |
-| Quality → Webapp | `vp check`, presentational components, story prose, story sort, docs colour tokens, unit tests, Vite build with a `routeTree.gen.ts` diff | `pnpm run check:webapp`, `test:webapp`, `build:webapp` |
-| Quality → Webapp: Stories | Storybook interaction tests, `export:assets` diff, Storybook build, Chromatic | `pnpm run test:webapp:stories` |
+| Quality → App Server | Spotless and PMD, NullAway policy, the PMD canary when PMD inputs changed, artifact-source contracts, setting delivery per runtime role | `vp run gate:server`, `gate:java-nullness`, `gate:contracts`, `gate:env` |
+| Quality → Tooling and Docs | toolchain and agent-runtime pins, the runner and lint contracts, `gate:agents`, load-test format and syntax, agent specs, instruction mirrors, docs format and `docs:lint`, Mermaid parse | `vp run gate:agents`, `gate:docs`, `test:agents` |
+| Quality → Webapp | `vp check`, presentational components, story prose, story sort, docs colour tokens, unit tests, Vite build with a `routeTree.gen.ts` diff | `vp run check:webapp`, `test:webapp`, `build:webapp` |
+| Quality → Webapp: Stories | Storybook interaction tests, `export:assets` diff, Storybook build, Chromatic | `vp run test:webapp:stories` |
+| Quality → Windows | Every gate that needs neither Maven, Docker nor the agent sandbox, on `windows-latest`, uncached | `vp run --no-cache ci:windows` |
+| Quality → Clean install | `vp install --frozen-lockfile` on a runner with Node and the launcher and nothing else, then `gate:toolchain` and the hooks path | `vp install` |
 | Build → App Server: Package | `./mvnw -pl application -am package -DskipTests`; uploads the classes and JARs once | — |
-| Build → App Server: Generated artifacts | `generate:api` diff against the packaged JAR; `db:check-drift`, which replays `master.xml` and diffs the JPA model; ERD diff | `pnpm run generate:api`, `db:check-drift`, `db:generate-erd-docs` |
-| Build → App Server: Database | Surefire `database` group against PostgreSQL; the major-upgrade drill | `pnpm run test:postgres-upgrade` |
-| Build → Webapp: E2E | Playwright against the packaged JAR | `pnpm --filter webapp run test:e2e` |
+| Build → App Server: Generated artifacts | `generate:api` diff against the packaged JAR; `db:check-drift`, which replays `master.xml` and diffs the JPA model; ERD diff | `vp run generate:api`, `db:check-drift`, `db:generate-erd-docs` |
+| Build → App Server: Database | Surefire `database` group against PostgreSQL; the major-upgrade drill | `vp run test:postgres-upgrade` |
+| Build → Webapp: E2E | Playwright against the packaged JAR | `vp run --filter webapp test:e2e` |
 | Build → App Server image | `pack build` from the packaged JAR, signed, attested and policy-scanned | — |
-| Test → App Server: Unit and architecture, App Server: Integration | compiled from source | `pnpm run test:server:verification`, `test:server:integration` |
+| Test → App Server: Unit and architecture, App Server: Integration | compiled from source | `vp run test:server:verification`, `test:server:integration` |
 | Security → New dependency risk | dependency review; pull requests only | — |
 | Security → Dependencies, secrets, and policy | Trivy filesystem scan, TruffleHog, `security.txt` expiry, changelog immutability guard, legacy-reference guards | — |
-| Changesets → Verify changesets | policy tests, verified-revert detection, release-note presence, `MIGRATION.md` freeze | `pnpm run check:changesets` |
-| Compose → Render compose stacks | the self-hosted, preview and reference stacks render | `pnpm run check:preview-stack` |
+| Changesets → Verify changesets | policy tests, verified-revert detection, release-note presence, `MIGRATION.md` freeze | `vp run gate:changesets` |
+| Compose → Render compose stacks | the self-hosted, preview and reference stacks render | `vp run gate:preview-stack` |
 | Docker → Webapp, Agent: Pi, Postgres (pg_partman), Tag unchanged images | Dockerfile images; aliases for unchanged ones | — |
 | Actionlint, Zizmor | workflow lint with ShellCheck warnings; Zizmor at medium confidence | — |
+
+The four quality legs are one matrix job, one entry per leg of the task graph. Each runs
+`vp run ci:<leg>`, then pipes `vp run --last-details` through `scripts/report-task-run.ts`: every
+task that did not pass becomes an error annotation naming the command that reproduces it, and the
+report, cache hits and miss reasons included, lands in the job summary. A leg runs when the change
+detection in `cicd.yml` says its scope changed; the Windows leg listens to the tooling scope, and
+both it and the tooling leg prove the hook dispatcher on a rejected and an accepted commit.
 
 ### Merge policy
 
@@ -237,13 +246,21 @@ why the label is the authority, and which alternatives were priced and declined,
 
 | Action | Contract |
 | --- | --- |
-| `setup-node-pnpm` | Installs the versions pinned in `package.json`; `install` must be `none`, `frozen`, or `hardened` |
-| `setup-caches` | Sets up the JDK and restores the Maven dependency cache with a prefix fallback; `application-server-reactor` also restores the generated-client build cache and is the only type that writes caches, on default-branch push, schedule and dispatch runs |
+| `setup-toolchain` | Installs the Node.js and pnpm versions pinned in `package.json`, restores the pnpm store cache, and installs the launcher through the SHA-pinned `setup-vp` with `node-manager: false`, which then runs the lockfile's `vite-plus`; `install` is `none` or `frozen` |
+| `setup-caches` | Sets up the JDK from `.java-version` and restores the Maven dependency cache with a prefix fallback; `application-server-reactor` also restores the generated-client build cache and is the only type that writes caches, on default-branch push, schedule and dispatch runs |
 | `restore-server-build` | Downloads the packaged reactor and installs its generated-clients JAR and parent pom so single-module Maven goals resolve them; outputs the executable JAR path |
 | `setup-browsers` | Restores the exact Playwright browser version and installs Chromium system dependencies |
 | `setup-release-security-tools` | Installs Cosign, Trivy, and optionally Syft for release-evidence jobs |
 | `download-trivy-db` | Fetches the vulnerability database with retries and a mirror fallback; optionally refuses one over `max-age-hours` old and records its metadata |
 | `ghcr-login` | Authenticates Docker to GHCR |
+
+### Caches
+
+A run restores caches from its own branch and from `main`, never from a sibling branch; within that
+scope the newest entry under the key prefix wins. Task-cache entries are content-addressed, so a
+pull request saves them for its own reruns; the Maven caches save only from `main` because their
+key is a pom hash. The JDK the caches depend on is pinned once, in `.java-version`, which every
+workflow provisions from.
 
 Repository-local actions require checkout first. Jobs without checkout use the external SHA-pinned
 action directly rather than checking out the repository only to reach a wrapper.
@@ -258,6 +275,7 @@ action directly rather than checking out the repository only to reach a wrapper.
 | Quality → Webapp | `webapp/**`, `docs/images/readme/**`, `docs/src/css/custom.css`, the root oxlint and oxfmt configs, the four `scripts/check-*` files it runs, root package files |
 | Quality → App Server | `server/**` except `AGENTS.md` and `CLAUDE.md`, `scripts/run-mvnw.ts`, `docker/compose.app.yaml`, `docker/compose.core.yaml`, root package files |
 | Quality → Tooling and Docs | `scripts/**`, `docker/agents/**`, `load-tests/**`, `docs/**`, tsconfigs, oxlint and oxfmt configs, `.changeset/**`, `commitlint.config.ts`, instruction files, `renovate.json`, `openapitools.json` |
+| Every quality leg | `vite.config.ts`, `.vite-hooks/**`, `.java-version`, `cicd.yml`, `ci-quality-gates.yml` and the setup actions: the task graph, the hooks and the JDK decide every leg's verdict, so a change to one runs all of them |
 | Build artifact gates | contracts: the App Server paths or `docker/postgres/**`; E2E: webapp source and the server main sources; image: `server/application/src/main/**`, the poms, `server/application/project.toml`, `server/generated-clients/**` |
 | Docker images | `webapp-image`: the webapp build inputs and non-test source; `agent-images`: `docker/agents/**`; `postgres-image`: `docker/postgres/**` |
 | CI config | one filter per leg naming its own workflow files and actions; any `.github/workflows/**` or `.github/actions/**` change runs Actionlint and Zizmor |
@@ -318,37 +336,37 @@ test-compilation, and execution profiles and compares two clean generated-client
 ## Running CI locally
 
 ```bash
-pnpm run format && pnpm run check
+vp run format && vp run check
 ```
 
-When relevant to the change, also run `pnpm run build:webapp`, `pnpm run test:server:verification`
-and `pnpm run test:server:integration`; `pnpm run verify` runs the credential-free set.
+When relevant to the change, also run `vp run build:webapp`, `vp run test:server:verification`
+and `vp run test:server:integration`; `vp run verify` runs the credential-free set.
 
 ```bash
 # Webapp
-pnpm run check:webapp          # vp check: format and lint
-pnpm run check:webapp:fix      # Same, applying every safe fix
-pnpm run typecheck:webapp      # A separate leg — check:webapp does not run it
-pnpm run test:webapp           # Unit tests
+vp run check:webapp          # vp check: format and lint
+vp run check:webapp:fix      # Same, applying every safe fix
+vp run typecheck:webapp      # A separate leg — check:webapp does not run it
+vp run test:webapp           # Unit tests
 
 # Application Server (Java)
-pnpm run format:java:check     # Check formatting
-pnpm run test:server:unit      # Unit tests
+vp run format:java:check     # Check formatting
+vp run test:server:unit      # Unit tests
 
 # Agent runtime (Node) — the Pi runner and the practice precompute scripts
-pnpm run test:agents           # Runner + precompute specs
-pnpm run check:agents          # Format check, oxlint, both typechecks, release-image inventory, scripts/*.test.ts
-pnpm run check:agents:fix      # Same, applying every safe fix
-pnpm run typecheck:agents      # Agent + precompute TypeScript
+vp run test:agents           # Runner + precompute specs
+vp run check:agents           # Format check, oxlint, both typechecks, release-image inventory, scripts/*.test.ts
+vp run check:agents:fix      # Same, applying every safe fix
+vp run typecheck:agents      # Agent + precompute TypeScript
 ```
 
 | Issue | Solution |
 | --- | --- |
-| Formatting errors | Run `pnpm run format` |
-| Lint errors (agent runtime, precompute, `scripts/`) | Run `pnpm run check:agents:fix`, then fix what remains |
-| TypeScript errors | Run `pnpm run typecheck` to see details |
-| OpenAPI out of sync | Run `pnpm run generate:api` |
-| Database schema drift | Run `pnpm run db:draft-changelog` |
+| Formatting errors | Run `vp run format` |
+| Lint errors (agent runtime, precompute, `scripts/`) | Run `vp run check:agents:fix`, then fix what remains |
+| TypeScript errors | Run `vp run typecheck` to see details |
+| OpenAPI out of sync | Run `vp run generate:api` |
+| Database schema drift | Run `vp run db:draft-changelog` |
 
 ## Adding a new service
 
@@ -359,7 +377,9 @@ Extend the pipeline at the ownership boundary that changed; do not copy an exist
 2. Add purpose-named jobs to `ci-quality-gates.yml`, `ci-tests.yml` or `ci-build.yml`. Declare
    `needs` only when a job consumes another job's artifact, and give every runnable job a timeout and
    least-privilege permissions.
-3. Use `setup-node-pnpm` with an explicit install mode. Java jobs use a validated `setup-caches`
+3. Use `setup-toolchain` with an explicit install mode: `frozen` for any job that calls `vp`,
+   because Vite+ loads the task graph from the workspace configs; `none` only for jobs that run
+   `node scripts/…` or shell alone. Java jobs use a validated `setup-caches`
    type; browser jobs use `setup-browsers`.
 4. Add image builds through `reusable-docker-build.yml`. Keep image metadata, immutable tags,
    attestations, and signing in that workflow rather than reproducing them in the caller.

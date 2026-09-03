@@ -20,7 +20,7 @@ export default defineConfig({
 	},
 	projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
 	webServer: {
-		command: `pnpm run build && pnpm exec vite preview --host 127.0.0.1 --port ${E2E_PORT}`,
+		command: `vp build && vp preview --host 127.0.0.1 --port ${E2E_PORT}`,
 		url: E2E_BASE_URL,
 		reuseExistingServer: !process.env.CI,
 		timeout: 120_000,

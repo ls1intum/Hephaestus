@@ -7,7 +7,7 @@ disable-model-invocation: true
 allowed-tools:
   - Bash(gh *)
   - Bash(git *)
-  - Bash(pnpm *)
+  - Bash(vp *)
   - Bash(./mvnw *)
   - Read
   - Grep
@@ -38,12 +38,11 @@ tsconfig files select the `Tooling and Docs` leg, not the App Server leg; and `p
 ## 3. Format, then check
 
 ```bash
-pnpm run format
-pnpm run check
+vp run format
+vp run check
 ```
 
-`check` is the complete local quality gate — every task is listed in the `quality` array in
-`vite.config.ts`, and every one also runs in CI. CI additionally runs service tests, builds, images,
+`check` is the complete local quality gate: every gate in the `quality` group in `vite.config.ts`.config.ts`, and every one also runs in CI. CI additionally runs service tests, builds, images,
 security checks, and workflow-specific gates. Formatting must never be the reason a remote build
 fails.
 
@@ -53,20 +52,20 @@ Generated artefacts are never hand-edited, and regeneration is destructive — i
 directory first, so stash local edits.
 
 ```bash
-pnpm run generate:api          # controllers or DTOs changed: rewrites openapi.yaml AND webapp/src/api
-pnpm run db:draft-changelog    # entities changed (needs Docker); writes and wires the changelog, then prune it
-pnpm run db:generate-erd-docs  # after pruning a changelog
+vp run generate:api          # controllers or DTOs changed: rewrites openapi.yaml AND webapp/src/api
+vp run db:draft-changelog    # entities changed (needs Docker); writes and wires the changelog, then prune it
+vp run db:generate-erd-docs  # after pruning a changelog
 ```
 
-`generate:api:application-server:specs` packages the reactor and boots the executable JAR on ports
+`generate:api:specs` packages the reactor and boots the executable JAR on ports
 it allocates itself, so nothing needs freeing; root `AGENTS.md` § Command caveats covers the
 `HEPHAESTUS_APPLICATION_JAR` shortcut for a JAR you already built.
 
 ## 5. Run the tests your diff can break
 
 ```bash
-pnpm run test:webapp
-pnpm run test:server:unit
+vp run test:webapp
+vp run test:server:unit
 ```
 
 ## 6. Re-run format + check
@@ -79,11 +78,11 @@ A PR touching `server/`, `webapp/` or `docker/` needs a `.changeset/*.md` or `ve
 fails it.
 
 ```bash
-pnpm changeset          # user-facing: pick the bump, write the summary in the operator's voice
-pnpm changeset --empty  # no user-facing effect; say why in the body
+vp exec changeset          # user-facing: pick the bump, write the summary in the operator's voice
+vp exec changeset --empty  # no user-facing effect; say why in the body
 ```
 
-`pnpm changeset` is interactive — with no TTY, hand-write `.changeset/<slug>.md`. The rules — voice,
+`vp exec changeset` is interactive — with no TTY, hand-write `.changeset/<slug>.md`. The rules — voice,
 bump, pre-1.0 `minor` with `**Operators:**` and a `.migration/<slug>.md` fragment, never
 `MIGRATION.md` — are in `.changeset/README.md`. Touching `db/changelog/` without touching
 `.changeset/` is always wrong.

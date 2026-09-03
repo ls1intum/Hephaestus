@@ -86,6 +86,27 @@
 		{
 			"matchDepNames": ["@earendil-works/pi-coding-agent"],
 			"groupName": "Pi SDK"
+		},
+		{
+			"matchDepNames": ["vite-plus"],
+			"prBodyNotes": [
+				"Run `vp run sync:toolchain-pins && vp install` and commit the result: the catalog must restate the versions this vite-plus bundles, and `gate:toolchain` fails until it does."
+			]
+		},
+		{
+			"description": "Bundled by vite-plus at exact versions: the catalog restates them and moves only with the vite-plus pin, which gate:toolchain enforces",
+			"matchDepNames": [
+				"oxfmt",
+				"oxlint",
+				"oxlint-tsgolint",
+				"@oxlint/plugins",
+				"vitest",
+				"@vitest/browser",
+				"@vitest/browser-playwright",
+				"@vitest/coverage-v8",
+				"@vitest/runner"
+			],
+			"enabled": false
 		}
 	],
 	"customManagers": [

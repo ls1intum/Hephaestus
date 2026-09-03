@@ -11,11 +11,11 @@ already tells you are not here.
 
 | Task | Command |
 |------|---------|
-| Dev server | `pnpm run dev:webapp` — port 4200, `strictPort`, overridable with `WEBAPP_PORT` |
-| Type check | `pnpm run typecheck:webapp` |
-| Lint + format | `pnpm run check:webapp` — does **not** type-check; that is the separate leg above |
-| Tests | `pnpm run test:webapp` |
-| Storybook | `pnpm --filter webapp run storybook:dev` |
+| Dev server | `vp run dev:webapp` — port 4200, `strictPort`, overridable with `WEBAPP_PORT` |
+| Type check | `vp run typecheck:webapp` |
+| Lint + format | `vp run check:webapp` — does **not** type-check; that is the separate leg above |
+| Tests | `vp run test:webapp` |
+| Storybook | `vp run --filter webapp storybook:dev` |
 
 ## Ask first
 
@@ -127,7 +127,7 @@ in the tree. The prefix answers it, and it also shows up in imports and in the S
 - **Components** (`src/components/**`): presentational, with no exception for a "cohesive section".
   They take their data as props and never import the query layer.
 
-`scripts/check-presentational-components.ts` enforces it, and `pnpm run check` runs it. Two halves,
+`scripts/check-presentational-components.ts` enforces it, and `vp run check` runs it. Two halves,
 because they fail differently:
 
 - **A component may not import the generated query layer or call a TanStack query hook.**

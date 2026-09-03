@@ -121,7 +121,7 @@ jobs:
             webapp:
               - 'webapp/**'
               - 'docs/images/readme/**'
-              # check:docs-tokens compares this stylesheet with webapp/src/styles.css, so both
+              # gate:docs-tokens compares this stylesheet with webapp/src/styles.css, so both
               # halves of that pair have to reach the leg that runs it.
               - 'docs/src/css/custom.css'
               - '.oxlintrc.json'
@@ -154,7 +154,7 @@ jobs:
               - 'package.json'
               - 'pnpm-lock.yaml'
               - 'scripts/run-mvnw.ts'
-              # check:env validates these deployment inputs against application.yml.
+              # gate:env validates these deployment inputs against application.yml.
               - 'docker/compose.app.yaml'
               - 'docker/compose.core.yaml'
               - '!server/**/AGENTS.md'
@@ -214,7 +214,7 @@ jobs:
               - '.github/workflows/ci-build.yml'
               - '.github/workflows/ci-tests.yml'
               - '.github/actions/setup-caches/**'
-              - '.github/actions/setup-node-pnpm/**'
+              - '.github/actions/setup-toolchain/**'
               - '.github/actions/setup-browsers/**'
             agent-images:
               - 'docker/agents/**'
@@ -228,21 +228,26 @@ jobs:
             quality-config:
               - '.github/workflows/cicd.yml'
               - '.github/workflows/ci-quality-gates.yml'
-              - '.github/actions/setup-node-pnpm/**'
+              - 'vite.config.ts'
+              - '.vite-hooks/**'
+              - '.java-version'
+              - '.github/actions/setup-toolchain/**'
               - '.github/actions/setup-caches/**'
               - '.github/actions/setup-browsers/**'
             build-config:
               - '.github/workflows/cicd.yml'
+              - '.java-version'
               - '.github/workflows/ci-build.yml'
               - '.github/workflows/reusable-docker-build.yml'
-              - '.github/actions/setup-node-pnpm/**'
+              - '.github/actions/setup-toolchain/**'
               - '.github/actions/setup-caches/**'
               - '.github/actions/setup-browsers/**'
               - '.github/actions/restore-server-build/**'
             test-config:
               - '.github/workflows/cicd.yml'
+              - '.java-version'
               - '.github/workflows/ci-tests.yml'
-              - '.github/actions/setup-node-pnpm/**'
+              - '.github/actions/setup-toolchain/**'
               - '.github/actions/setup-caches/**'
             security-config:
               - '.github/workflows/cicd.yml'
@@ -492,7 +497,7 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
-      - uses: ./.github/actions/setup-node-pnpm
+      - uses: ./.github/actions/setup-toolchain
         with:
           install: "none"
 
@@ -694,17 +699,17 @@ jobs:
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "| Issue | Fix Command |" >> $GITHUB_STEP_SUMMARY
               echo "|-------|-------------|" >> $GITHUB_STEP_SUMMARY
-              echo "| Formatting errors | \`pnpm run format\` |" >> $GITHUB_STEP_SUMMARY
-              echo "| TypeScript errors | \`pnpm run typecheck\` |" >> $GITHUB_STEP_SUMMARY
-              echo "| Lint errors (webapp) | \`pnpm run check:webapp:fix\` |" >> $GITHUB_STEP_SUMMARY
-              echo "| Lint errors (outside webapp) | \`pnpm run check:agents:fix\` |" >> $GITHUB_STEP_SUMMARY
-              echo "| Java formatting | \`pnpm run format:java\` |" >> $GITHUB_STEP_SUMMARY
-              echo "| Java lint (PMD) | \`pnpm run lint:java:report\` |" >> $GITHUB_STEP_SUMMARY
-              echo "| Storybook sidebar order | \`pnpm run check:story-sort\` |" >> $GITHUB_STEP_SUMMARY
-              echo "| Mermaid diagram parse errors | \`pnpm run check:diagrams\` |" >> $GITHUB_STEP_SUMMARY
-              echo "| Stale \`routeTree.gen.ts\` | \`cd webapp && pnpm run build\` |" >> $GITHUB_STEP_SUMMARY
-              echo "| OpenAPI out of sync | \`pnpm run generate:api\` |" >> $GITHUB_STEP_SUMMARY
-              echo "| Database schema drift | \`pnpm run db:draft-changelog\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Formatting errors | \`vp run format\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| TypeScript errors | \`vp run typecheck\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Lint errors (webapp) | \`vp run check:webapp:fix\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Lint errors (outside webapp) | \`vp run check:agents:fix\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Java formatting | \`vp run format:java\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Java lint (PMD) | \`vp run lint:java:report\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Storybook sidebar order | \`vp run gate:story-sort\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Mermaid diagram parse errors | \`vp run gate:diagrams\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Stale \`routeTree.gen.ts\` | \`vp run --filter webapp build\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| OpenAPI out of sync | \`vp run generate:api\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Database schema drift | \`vp run db:draft-changelog\` |" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "</details>" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
@@ -715,8 +720,8 @@ jobs:
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "| Test Suite | Run Locally |" >> $GITHUB_STEP_SUMMARY
               echo "|------------|-------------|" >> $GITHUB_STEP_SUMMARY
-              echo "| Webapp unit | \`pnpm run test:webapp\` |" >> $GITHUB_STEP_SUMMARY
-              echo "| Webapp Storybook | \`pnpm --filter webapp run test:storybook\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Webapp unit | \`vp run test:webapp\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Webapp Storybook | \`vp run --filter webapp test:storybook\` |" >> $GITHUB_STEP_SUMMARY
               echo "| Application server | \`cd server && ./mvnw test\` |" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "**Tip:** Check the **Test Results** tab above for specific failures." >> $GITHUB_STEP_SUMMARY
@@ -728,7 +733,7 @@ jobs:
             if [[ "${{ needs.Changesets.result }}" == "failure" ]]; then
               echo "<details><summary><b>❌ Changesets Failed</b></summary>" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
-              echo "Run \`pnpm run check:changesets\` for policy-test failures; otherwise correct the changeset reported by the job." >> $GITHUB_STEP_SUMMARY
+              echo "Run \`vp run gate:changesets\` for policy-test failures; otherwise correct the changeset reported by the job." >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "</details>" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
@@ -759,7 +764,7 @@ jobs:
 
             echo "---" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**Quick fix:** Run \`pnpm run format && pnpm run check\` before pushing." >> $GITHUB_STEP_SUMMARY
+            echo "**Quick fix:** Run \`vp run format && vp run check\` before pushing." >> $GITHUB_STEP_SUMMARY
           fi
 
           if [[ "${{ steps.evaluate.outputs.status }}" == "success" ]]; then

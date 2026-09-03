@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 
 import { isRecord, parseJson } from "./lib/json.ts";
+import { BUNDLED_PINS } from "./lib/toolchain-pins.ts";
 
 const parsedConfig: unknown = parseJson(await readFile("renovate.json", "utf8"));
 assert.ok(isRecord(parsedConfig));
@@ -158,4 +159,21 @@ void test("every custom manager extracts a dependency from its real source", asy
 			);
 		}
 	}
+});
+
+void test("the tools vite-plus bundles move only with vite-plus", () => {
+	assert.ok(Array.isArray(config.packageRules));
+	const rules = config.packageRules.filter(isRecord);
+	const frozen = rules.find(
+		(rule) => Array.isArray(rule.matchDepNames) && rule.matchDepNames.includes("oxlint"),
+	);
+	assert.ok(frozen, "a rule must disable the bundled tools");
+	assert.ok(Array.isArray(frozen.matchDepNames));
+	// The set Renovate leaves alone is the set gate:toolchain holds to the bundle, no more, no less.
+	assert.deepEqual(new Set(frozen.matchDepNames), new Set(Object.keys(BUNDLED_PINS)));
+	const bump = rules.find(
+		(rule) => Array.isArray(rule.matchDepNames) && rule.matchDepNames.includes("vite-plus"),
+	);
+	assert.ok(bump, "the vite-plus bump must say what to run");
+	assert.match(String(bump.prBodyNotes), /sync:toolchain-pins/);
 });

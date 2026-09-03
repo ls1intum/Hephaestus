@@ -27,7 +27,7 @@ sequenceDiagram
     participant VP as Version PR
     participant R as Release
 
-    PR->>PR: pnpm changeset (bump + operator-facing description)
+    PR->>PR: vp exec changeset (bump + operator-facing description)
     PR->>M: Merge (squash) — verify-changesets enforces the changeset
     M->>VP: changesets action folds pending changesets into the accumulating Version PR
     Note over VP: CHANGELOG.md + version bump preview
@@ -210,7 +210,7 @@ A changeset summary becomes the `CHANGELOG.md` entry **verbatim** — write it i
   - `major` — operator must act first (required new env var, removed/renamed config, destructive/manual
     migration, dropped API); state the action and add a `.migration` fragment.
 
-No TTY (agents, CI)? `pnpm changeset` is interactive — write the file by hand instead: create
+No TTY (agents, CI)? `vp exec changeset` is interactive — write the file by hand instead: create
 `.changeset/<slug>.md` with frontmatter `"hephaestus": <bump>` and the summary as the body (see
 `.changeset/README.md`). When action is required, add `.migration/<slug>.md` with the complete
 `#### 🔴 …` guide entry. CI requires the matching slug and `**Operators:**` marker. Never hand-edit

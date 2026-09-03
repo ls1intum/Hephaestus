@@ -2,7 +2,7 @@
 
 Scope: `webapp/src/components/**` and their colocated `*.stories.tsx`. **Grade a diff, not the repo.**
 
-**Calibration contract.** A file that renders correctly, is formatted, passes `pnpm run check`, has a
+**Calibration contract.** A file that renders correctly, is formatted, passes `vp run check`, has a
 story per variant and a green a11y panel scores **C**. C is the floor for competent work, not a
 criticism. B costs deliberate design. A costs a rejected alternative written down. A+ is rare by
 construction — at most one dimension per PR should reach it.
@@ -201,7 +201,7 @@ rather less than half the stories carry one, so the absence of a block is not by
 - **D** — A new rule added to prose that contradicts existing code, with no migration and no gate.
 - **C** — Rule in prose, no gate.
 - **B** — Rule in prose plus a mechanical check — an oxlint rule in `webapp/tools/oxlint/rules/`, or a
-  repository gate in `scripts/` wired into `pnpm run check`.
+  repository gate in `scripts/` wired into `vp run check`.
 - **A** — B, and the gate's own comment explains the neighbouring shapes it deliberately does *not*
   match, so nobody widens it into a nuisance — the house rules in `webapp/tools/oxlint/rules/` are the
   worked examples.

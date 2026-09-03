@@ -9,11 +9,11 @@ These guidelines keep every service aligned. Keep changes focused. Mention any d
 
 ## Contributor checklist
 
-- Run the formatter and linter for the area you touched. Examples: `pnpm run format:webapp`, `pnpm run lint:server`.
-- Smoke-test the critical scripts. `pnpm run build:webapp` must pass. If you changed migrations, run `pnpm run db:generate-erd-docs`.
+- Run the formatter and linter for the area you touched. Examples: `vp run format:webapp`, `vp run lint:java`.
+- Smoke-test the critical scripts. `vp run build:webapp` must pass. If you changed migrations, run `vp run db:generate-erd-docs`.
 - Update Chromatic snapshots when you change UI components.
 - Regenerate clients and documentation when you change an API contract.
-- Rerun the quality gates that match your changes: `pnpm run check`, `pnpm run generate:api`, or `cd server && ./mvnw test`.
+- Rerun the quality gates that match your changes: `vp run check`, `vp run generate:api`, or `cd server && ./mvnw test`.
 - Document what you verified in the pull request template. Link failing checks to tickets if you must defer.
 
 ## Webapp (`/webapp`)
@@ -38,15 +38,15 @@ These guidelines keep every service aligned. Keep changes focused. Mention any d
 - Respect React Compiler requirements. No conditional hooks. No prop mutation. Because the compiler memoises for you, `useMemo`, `useCallback` and `memo` cannot be imported from `react`, and neither can `forwardRef` — React 19 passes `ref` as an ordinary prop.
 - Keep render deterministic. Reading the wall clock or the RNG while rendering is a lint error (`hephaestus/no-nondeterministic-render`); component code takes the time from `@/components/common/use-now` and stories from `@/components/common/story-clock`.
 - Stay inside the `--color-*` token scale declared in `src/styles.css`. Reach for shadcn/ui primitives before adding new component libraries. `@apply` lives in `styles.css` for base and wrapper rules, not in components.
-- Co-locate `*.stories.tsx` files. Show the states the component can actually reach, with realistic data. Run `pnpm --filter webapp run chromatic:ci` whenever stories change.
+- Co-locate `*.stories.tsx` files. Show the states the component can actually reach, with realistic data. Run `vp run --filter webapp chromatic:ci` whenever stories change.
 - Defer analytics work to effects that run after paint.
 
 ### Quality gates
 
-- Install dependencies with `pnpm install` at the repo root so optional binaries resolve.
-- Run `pnpm run check:webapp` and `pnpm run build:webapp` before opening a pull request.
-- Execute Vitest suites with `pnpm run test:webapp`. Add unit tests beside the feature you touched.
-- Keep Storybook stories in sync with design. Launch `pnpm --filter webapp run storybook:dev` when pairing with design reviews.
+- Install dependencies with `vp install` at the repo root so optional binaries resolve.
+- Run `vp run check:webapp` and `vp run build:webapp` before opening a pull request.
+- Execute Vitest suites with `vp run test:webapp`. Add unit tests beside the feature you touched.
+- Keep Storybook stories in sync with design. Launch `vp run --filter webapp storybook:dev` when pairing with design reviews.
 - Validate bundle impact by checking the Vite build stats when you add large libraries.
 
 ## Spring Boot application server (`/server`)
@@ -73,13 +73,13 @@ These guidelines keep every service aligned. Keep changes focused. Mention any d
 - Bare types are non-null. Use `@Nullable` only when absence is part of the contract. On API DTOs, use explicit `@NonNull` for components that must be `required` in OpenAPI.
 - Type-use annotations describe exactly what is nullable: `List<@Nullable String>` permits null elements; `String @Nullable []` permits a null array reference.
 - Fix NullAway errors at the contract or implementation boundary. Suppressions and classes without an explicit null-marking scope fail the quality gate.
-- Run `pnpm run check:java-nullness` for the policy check and `cd server && ./mvnw test-compile -DskipTests` for compiler analysis.
+- Run `vp run gate:java-nullness` for the policy check and `cd server && ./mvnw test-compile -DskipTests` for compiler analysis.
 
 ### Safe workflows
 
 - Configuration overrides stay in `application-*.yml`. Do not commit `application-local.yml`.
 - Share long-lived infrastructure in tests. Lean on Testcontainers and GitHub fixtures where possible.
-- After updating Liquibase migrations, run `pnpm run db:generate-erd-docs`. Regenerate OpenAPI and
+- After updating Liquibase migrations, run `vp run db:generate-erd-docs`. Regenerate OpenAPI and
   the REST client only when the HTTP API contract changes.
 - Run architecture checks and the unit/integration lifecycle with
   `cd server && ./mvnw test -Parchitecture-tests && ./mvnw verify`. The reactor builds the
@@ -105,11 +105,11 @@ These guidelines keep every service aligned. Keep changes focused. Mention any d
 
 ## Docs site (`/docs`)
 
-- Docusaurus 3 powers the documentation. Install dependencies with `pnpm install` and run
-  `pnpm run docs:dev` from the repository root to preview.
+- Docusaurus 3 powers the documentation. Install dependencies with `vp install` and run
+  `vp run docs:dev` from the repository root to preview.
 - Keep front matter fields (`id`, `title`, `sidebar_position`) unique. Update `sidebars.*.ts` when adding new pages.
 - Use MDX components from `docs/src/components/**` to keep styling consistent.
-- Run `pnpm run docs:build` before committing structural changes to confirm the static export succeeds.
+- Run `vp run docs:build` before committing structural changes to confirm the static export succeeds.
 
 ## Database and migrations
 

@@ -14,7 +14,7 @@ conventions the drift gate reads are in `server/AGENTS.md` § Schema changes.
 2. Write the drift into this branch's changelog:
 
    ```bash
-   pnpm run db:draft-changelog
+   vp run db:draft-changelog
    ```
 
    The command applies the whole chain to a disposable database, diffs it against the JPA model,
@@ -33,10 +33,10 @@ conventions the drift gate reads are in `server/AGENTS.md` § Schema changes.
    precondition (`onFail="MARK_RAN"`) and a `<rollback>`. If you pruned anything, refresh the ERD:
 
    ```bash
-   pnpm run db:generate-erd-docs
+   vp run db:generate-erd-docs
    ```
 
-4. Add a release changeset: `pnpm changeset`, or hand-write `.changeset/<slug>.md`
+4. Add a release changeset: `vp exec changeset`, or hand-write `.changeset/<slug>.md`
    (`.changeset/README.md`). A Liquibase `<changeSet>` and a release changeset are different things
    and a schema change needs both; `verify-changesets` fails a PR that touches `db/changelog/`
    without one. Keep the summary user-facing; the release notes flag the migration automatically.
@@ -80,9 +80,9 @@ CI enforces 1 and 2 mechanically (see below); 3 is a review responsibility.
 ## CI validation
 
 1. **Migration-chain replay, schema drift and ERD** — Build workflow, job *App Server: Generated
-   artifacts*. `pnpm run db:check-drift` applies the full `master.xml` chain to an empty database
+   artifacts*. `vp run db:check-drift` applies the full `master.xml` chain to an empty database
    from the repository's PostgreSQL image (`docker/postgres`) and diffs the result against the JPA
-   entities; a changelog that does not parse or apply fails here. `pnpm run db:generate-erd-docs`
+   entities; a changelog that does not parse or apply fails here. `vp run db:generate-erd-docs`
    then has to leave `docs/contributor/erd/schema.mmd` unchanged.
 2. **Changelog immutability** — Security workflow, job *Dependencies, secrets, and policy*, step
    *Changelog immutability guard*. A git diff from the PR base commit fails if any file under

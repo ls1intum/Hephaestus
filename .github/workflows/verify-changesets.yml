@@ -16,14 +16,12 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-
-      - name: Setup Node.js and pnpm
-        uses: ./.github/actions/setup-node-pnpm
+      - uses: ./.github/actions/setup-toolchain
         with:
-          install: "hardened"
+          install: "frozen"
 
       - name: Test changeset and version-sync policies
-        run: pnpm run check:changesets
+        run: vp run gate:changesets
 
       # A revert of a release commit restores MIGRATION.md, the consumed changesets and the pending
       # migration fragments by construction, so it can never satisfy the rules below — the release
@@ -79,7 +77,7 @@ jobs:
           fi
 
           if [ "${#changesets_changed[@]}" -gt 0 ]; then
-            pnpm changeset status --since "$BASE_SHA" --output /tmp/changeset-status.json
+            vp exec changeset status --since "$BASE_SHA" --output /tmp/changeset-status.json
             node scripts/verify-changesets.ts /tmp/changeset-status.json "${changesets_changed[@]}"
           fi
           if [ "${#migration_changed[@]}" -gt 0 ]; then
@@ -88,7 +86,7 @@ jobs:
             # changesets CLI resolves its configured baseBranch by the exact ref name `main`,
             # which a detached PR merge-ref checkout does not have — give it one.
             git rev-parse --verify --quiet main >/dev/null || git branch main origin/main
-            pnpm changeset status --output /tmp/pending-changeset-status.json
+            vp exec changeset status --output /tmp/pending-changeset-status.json
             node scripts/verify-changesets.ts /tmp/pending-changeset-status.json --migration "${migration_changed[@]}"
           fi
 

@@ -37,187 +37,114 @@ on:
 permissions: {}
 
 jobs:
-  quality-gates:
-    name: "${{ matrix.display-name }}"
-    runs-on: ubuntu-latest
+  # Steps are gated rather than the job: a skipped leg still reports, so the status gate sees it.
+  quality:
+    name: "${{ matrix.name }}"
+    runs-on: ${{ matrix.os }}
     permissions:
       contents: read
       checks: write
     if: inputs.should_skip != 'true'
-    timeout-minutes: 15
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
         include:
-          - check: application-server-quality
-            display-name: "App Server"
-          - check: tooling-quality
-            display-name: "Tooling and Docs"
-          - check: webapp-quality
-            display-name: "Webapp"
+          - leg: server
+            name: "App Server"
+            os: ubuntu-latest
+            changes: application_server
+            history: true
+            cache: true
+            flags: ""
+          - leg: tooling
+            name: "Tooling and Docs"
+            os: ubuntu-latest
+            changes: tooling
+            hooks: true
+            cache: true
+            flags: ""
+          - leg: webapp
+            name: "Webapp"
+            os: ubuntu-latest
+            changes: webapp
+            cache: true
+            flags: ""
+          # Uncached: on Windows the runner's automatic input tracking misses a new file
+          # (scripts/check-runner-contract.ts), so a cached verdict there could be stale.
+          - leg: windows
+            name: "Windows"
+            os: windows-latest
+            changes: tooling
+            history: true
+            hooks: true
+            flags: --no-cache
+    env:
+      RUN: ${{ inputs[format('{0}_changed', matrix.changes)] }}
+    defaults:
+      run:
+        shell: bash
     steps:
-      - name: Determine if check should run
-        id: should_run
-        run: |
-          case "${{ matrix.check }}" in
-            "webapp-quality")
-              echo "run=${INPUTS_WEBAPP_CHANGED}" >> $GITHUB_OUTPUT
-              ;;
-            "application-server-quality")
-              echo "run=${INPUTS_APPLICATION_SERVER_CHANGED}" >> $GITHUB_OUTPUT
-              ;;
-            "tooling-quality")
-              echo "run=${INPUTS_TOOLING_CHANGED}" >> $GITHUB_OUTPUT
-              ;;
-            *)
-              echo "::error::Unknown check type '${{ matrix.check }}' in ci-quality-gates.yml matrix."
-              echo "::error::Please add a case for this check in the 'Determine if check should run' step."
-              echo "run=false" >> $GITHUB_OUTPUT
-              exit 1
-              ;;
-          esac
-        env:
-          INPUTS_WEBAPP_CHANGED: ${{ inputs.webapp_changed }}
-          INPUTS_APPLICATION_SERVER_CHANGED: ${{ inputs.application_server_changed }}
-          INPUTS_TOOLING_CHANGED: ${{ inputs.tooling_changed }}
-
-      - name: Skip notification
-        if: steps.should_run.outputs.run != 'true'
-        run: echo "⏭️ Skipping ${{ matrix.check }} - no relevant files changed"
-
-      - name: Checkout repository
-        if: steps.should_run.outputs.run == 'true'
+      - if: env.RUN == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # The depths are QUOTED. Unquoted, `cond && 0 || 1` always yields 1, because the number 0
-          # is falsy in GitHub expressions; the non-empty string '0' is truthy.
-          fetch-depth: ${{ matrix.check == 'application-server-quality' && '0' || '1' }}
+          # gate:contracts compares the branch with the base, which needs the history. The depths
+          # are QUOTED: unquoted, `cond && 0 || 1` always yields 1, because the number 0 is falsy in
+          # GitHub expressions and the non-empty string '0' is truthy.
+          fetch-depth: ${{ matrix.history && '0' || '1' }}
           persist-credentials: false
 
-      - name: Setup JavaScript toolchain
-        if: steps.should_run.outputs.run == 'true'
-        uses: ./.github/actions/setup-node-pnpm
+      - if: env.RUN == 'true'
+        uses: ./.github/actions/setup-toolchain
         with:
           install: "frozen"
 
-      - name: Restore Vite Task cache
-        if: steps.should_run.outputs.run == 'true'
-        id: vite-task-cache
+      # Content-addressed, so a pull request may save them for its own reruns.
+      - name: Restore Vite task cache
+        if: env.RUN == 'true' && matrix.cache
+        id: task-cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: node_modules/.vite/task-cache
-          key: vite-task-${{ runner.os }}-${{ runner.arch }}-${{ matrix.check }}-${{ github.run_id }}-${{ github.run_attempt }}
+          key: vite-task-${{ runner.os }}-${{ runner.arch }}-${{ matrix.leg }}-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: |
-            vite-task-${{ runner.os }}-${{ runner.arch }}-${{ matrix.check }}-
+            vite-task-${{ runner.os }}-${{ runner.arch }}-${{ matrix.leg }}-
 
       - name: Setup application-server caches
-        if: steps.should_run.outputs.run == 'true' && matrix.check == 'application-server-quality'
+        if: env.RUN == 'true' && matrix.leg == 'server'
         uses: ./.github/actions/setup-caches
         with:
           cache-type: application-server-reactor
           os: ${{ runner.os }}
 
-      - name: Application-server quality
-        if: steps.should_run.outputs.run == 'true' && matrix.check == 'application-server-quality'
+      - name: Quality gates
+        if: env.RUN == 'true'
+        run: vp run ${{ matrix.flags }} ci:${{ matrix.leg }}
+
+      - name: Task report
+        if: env.RUN == 'true' && !cancelled()
+        run: vp run --last-details | node scripts/report-task-run.ts
+
+      - name: PMD canary
+        if: env.RUN == 'true' && matrix.leg == 'server' && inputs.pmd_canary == 'true'
+        run: vp run gate:pmd-canary
+
+      # CI installs with --ignore-scripts, so prepare never runs: the dispatcher is proven here instead.
+      - name: Hook dispatcher
+        if: env.RUN == 'true' && matrix.hooks && !cancelled()
         run: |
-          ISSUES_FOUND=()
-          SERVER_OK=true; PMD_CANARY_OK=true; NULLNESS_OK=true; CONTRACTS_OK=true; ENV_OK=true
-
-          vp run gate:server || { SERVER_OK=false; ISSUES_FOUND+=("Server formatting or PMD failed. Run: pnpm run check:server"); }
-          vp run gate:java-nullness \
-            || { NULLNESS_OK=false; ISSUES_FOUND+=("Java nullness policy failed. Run: pnpm run check:java-nullness"); }
-          if [ "$SERVER_OK" = "true" ] && [ "${INPUTS_PMD_CANARY}" = "true" ]; then
-            PMD_CANARY=server/application/src/main/java/de/tum/cit/aet/hephaestus/Application.java
-            cp "$PMD_CANARY" "$RUNNER_TEMP/Application.java"
-            trap 'cp "$RUNNER_TEMP/Application.java" "$PMD_CANARY"' EXIT
-            sed -i '/public class Application {/a\    private int deliberatelyUnusedPmdCanary;' "$PMD_CANARY"
-            if pnpm run lint:java; then
-              PMD_CANARY_OK=false
-              ISSUES_FOUND+=("PMD accepted a planted UnusedPrivateField violation; the gate is not analyzing current main sources")
-            fi
-            cp "$RUNNER_TEMP/Application.java" "$PMD_CANARY"
-            trap - EXIT
-          fi
-          vp run gate:contracts || { CONTRACTS_OK=false; ISSUES_FOUND+=("Artifact-source contract validation failed. Run: pnpm run check:contracts"); }
-          vp run gate:env || { ENV_OK=false; ISSUES_FOUND+=("A setting does not reach a container that can read it. Run: pnpm run check:env"); }
-
-          if [ ${#ISSUES_FOUND[@]} -gt 0 ]; then
-            echo "### App Server Quality" >> $GITHUB_STEP_SUMMARY
-            echo "| Check | Status | Fix |" >> $GITHUB_STEP_SUMMARY
-            echo "|-------|--------|-----|" >> $GITHUB_STEP_SUMMARY
-            [[ "$SERVER_OK" == "false" ]] && echo "| Server formatting and PMD | :x: Failed | \`pnpm run check:server\` |" >> $GITHUB_STEP_SUMMARY
-            [[ "$PMD_CANARY_OK" == "false" ]] && echo "| PMD canary | :x: Failed | Inspect the planted-violation check |" >> $GITHUB_STEP_SUMMARY
-            [[ "$NULLNESS_OK" == "false" ]] && echo "| Java nullness policy | :x: Failed | \`pnpm run check:java-nullness\` |" >> $GITHUB_STEP_SUMMARY
-            [[ "$CONTRACTS_OK" == "false" ]] && echo "| Artifact-source contracts | :x: Failed | \`pnpm run check:contracts\` |" >> $GITHUB_STEP_SUMMARY
-            [[ "$ENV_OK" == "false" ]] && echo "| Env delivery by runtime role | :x: Failed | \`pnpm run check:env\` |" >> $GITHUB_STEP_SUMMARY
-            for issue in "${ISSUES_FOUND[@]}"; do echo "::error::$issue"; done
+          node scripts/enable-hooks.ts
+          test "$(git config core.hooksPath)" = ".vite-hooks/_"
+          git config user.name ci
+          git config user.email ci@example.invalid
+          if git commit --allow-empty --quiet -m "bad message"; then
+            echo "::error::commit-msg accepted a message commitlint rejects"
             exit 1
           fi
-        env:
-          INPUTS_PMD_CANARY: ${{ inputs.pmd_canary }}
-
-      - name: Tooling and docs quality
-        if: steps.should_run.outputs.run == 'true' && matrix.check == 'tooling-quality'
-        run: |
-          vp run gate:package-manager
-          vp run gate:agent-runtime-pins
-          vp run gate:agents
-          vp run gate:load-format
-          vp run gate:load-syntax
-          vp run gate:agent-tests
-          vp run gate:instructions
-          vp run gate:docs
-          vp run gate:diagrams
-
-      - name: Webapp quality
-        if: steps.should_run.outputs.run == 'true' && matrix.check == 'webapp-quality'
-        run: |
-          ISSUES_FOUND=()
-          CLIENT_OK=true
-          COMPONENTS_OK=true
-          STORIES_OK=true
-          SORT_OK=true
-          TOKENS_OK=true
-          BUILD_OK=true
-          ROUTES_OK=true
-          TESTS_OK=true
-
-          vp run gate:webapp || {
-            CLIENT_OK=false
-            ISSUES_FOUND+=("Webapp lint, formatting, or typecheck failed. Run: pnpm run check:client")
-          }
-          vp run gate:components || { COMPONENTS_OK=false; ISSUES_FOUND+=("Components must take data as props. Run: pnpm run check:components"); }
-          vp run gate:stories || { STORIES_OK=false; ISSUES_FOUND+=("Story prose renders HTML paragraphs. Run: pnpm run check:stories"); }
-          vp run gate:story-sort || { SORT_OK=false; ISSUES_FOUND+=("Storybook sidebar order is stale. Run: pnpm run check:story-sort"); }
-          vp run gate:docs-tokens || { TOKENS_OK=false; ISSUES_FOUND+=("The docs site copies a web app colour that has since changed. Run: pnpm run check:docs-tokens"); }
-          timeout --kill-after=30s 10m vp run gate:webapp-tests \
-            || { TESTS_OK=false; ISSUES_FOUND+=("Unit tests failed. Run: cd webapp && pnpm run test"); }
-
-          # Vite generates src/routeTree.gen.ts; compare it with the committed copy after building.
-          vp run gate:webapp-build || { BUILD_OK=false; ISSUES_FOUND+=("The webapp does not build. Run: cd webapp && pnpm run build"); }
-          if [ "$BUILD_OK" = "true" ] && ! git diff --exit-code -- webapp/src/routeTree.gen.ts; then
-            ROUTES_OK=false
-            ISSUES_FOUND+=("routeTree.gen.ts is stale. Run: cd webapp && pnpm run build, then commit the result")
-          fi
-
-          if [ ${#ISSUES_FOUND[@]} -gt 0 ]; then
-            echo "### Webapp Quality" >> $GITHUB_STEP_SUMMARY
-            echo "| Check | Status | Fix |" >> $GITHUB_STEP_SUMMARY
-            echo "|-------|--------|-----|" >> $GITHUB_STEP_SUMMARY
-            [[ "$CLIENT_OK" == "false" ]] && echo "| Lint, format, and TypeScript | :x: Failed | \`pnpm run check:client\` |" >> $GITHUB_STEP_SUMMARY
-            [[ "$COMPONENTS_OK" == "false" ]] && echo "| Presentational components | :x: Failed | \`pnpm run check:components\` |" >> $GITHUB_STEP_SUMMARY
-            [[ "$STORIES_OK" == "false" ]] && echo "| Story prose | :x: Failed | \`pnpm run check:stories\` |" >> $GITHUB_STEP_SUMMARY
-            [[ "$SORT_OK" == "false" ]] && echo "| Storybook sidebar order | :x: Failed | \`pnpm run check:story-sort\` |" >> $GITHUB_STEP_SUMMARY
-            [[ "$TOKENS_OK" == "false" ]] && echo "| Docs colour tokens | :x: Failed | \`pnpm run check:docs-tokens\` |" >> $GITHUB_STEP_SUMMARY
-            [[ "$BUILD_OK" == "false" ]] && echo "| Vite build | :x: Failed | \`cd webapp && pnpm run build\` |" >> $GITHUB_STEP_SUMMARY
-            [[ "$ROUTES_OK" == "false" ]] && echo "| routeTree.gen.ts up to date | :x: Stale | \`cd webapp && pnpm run build\` and commit |" >> $GITHUB_STEP_SUMMARY
-            [[ "$TESTS_OK" == "false" ]] && echo "| Unit tests | :x: Failed | \`cd webapp && pnpm run test\` |" >> $GITHUB_STEP_SUMMARY
-            for issue in "${ISSUES_FOUND[@]}"; do echo "::error::$issue"; done
-            exit 1
-          fi
+          git commit --allow-empty --quiet -m "chore(ci): probe the commit-msg hook"
 
       - name: Upload webapp unit-test results
-        if: steps.should_run.outputs.run == 'true' && matrix.check == 'webapp-quality' && always()
+        if: env.RUN == 'true' && matrix.leg == 'webapp' && !cancelled()
         uses: dorny/test-reporter@a43b3a5f7366b97d083190328d2c652e1a8b6aa2 # v3.0.0
         with:
           name: "Test Results - Webapp Unit"
@@ -226,12 +153,12 @@ jobs:
           fail-on-error: false
 
       - name: Summarize webapp unit tests
-        if: steps.should_run.outputs.run == 'true' && matrix.check == 'webapp-quality' && always()
+        if: env.RUN == 'true' && matrix.leg == 'webapp' && !cancelled()
         continue-on-error: true
-        run: pnpm run summarize:test-results "Webapp Unit" webapp/test-results ci-metrics/webapp-unit.json
+        run: vp run summarize:test-results "Webapp Unit" webapp/test-results ci-metrics/webapp-unit.json
 
       - name: Upload webapp test metrics
-        if: steps.should_run.outputs.run == 'true' && matrix.check == 'webapp-quality' && always()
+        if: env.RUN == 'true' && matrix.leg == 'webapp' && !cancelled()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: test-metrics-webapp-unit
@@ -239,12 +166,37 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
-      - name: Save Vite Task cache
-        if: steps.should_run.outputs.run == 'true' && success()
+      - name: Save Vite task cache
+        if: env.RUN == 'true' && matrix.cache && !cancelled()
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: node_modules/.vite/task-cache
-          key: ${{ steps.vite-task-cache.outputs.cache-primary-key }}
+          key: ${{ steps.task-cache.outputs.cache-primary-key }}
+
+  # The contributor's first command, without setup-toolchain: vp install must fetch the pinned pnpm,
+  # install the workspace and enable the hooks on its own.
+  clean-install:
+    name: "Clean install"
+    if: inputs.should_skip != 'true' && inputs.tooling_changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: package.json
+      - uses: voidzero-dev/setup-vp@1b32467adbe183473499fd9d5d372c3ed9641754 # v1.18.0
+        with:
+          node-manager: false
+          cache: false
+          run-install: false
+      - run: vp install --frozen-lockfile
+      - run: vp run gate:toolchain
+      - run: test "$(git config core.hooksPath)" = ".vite-hooks/_"
 
   webapp-stories:
     name: "Webapp: Stories"
@@ -261,7 +213,7 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - uses: ./.github/actions/setup-node-pnpm
+      - uses: ./.github/actions/setup-toolchain
         with:
           install: "frozen"
       - uses: ./.github/actions/setup-browsers
@@ -269,17 +221,17 @@ jobs:
         id: tests
         continue-on-error: true
         run: |
-          timeout --kill-after=30s 15m pnpm --filter webapp run test:storybook
-          pnpm --filter webapp run export:assets
+          timeout --kill-after=30s 15m vp run --filter webapp test:storybook
+          vp run --filter webapp export:assets
           BRAND_ASSETS=(webapp/brand webapp/public docs/images/readme docs/static/img/brand docs/static/img/favicon.png docs/static/img/hephaestus-social-card.png docker/compose.proxy.yaml)
           if [[ -n "$(git status --porcelain --untracked-files=all -- "${BRAND_ASSETS[@]}")" ]]; then
-            echo "::error::Brand assets are stale. Run 'pnpm --filter webapp run export:assets' and commit the result."
+            echo "::error::Brand assets are stale. Run 'vp run --filter webapp export:assets' and commit the result."
             git status --short --untracked-files=all -- "${BRAND_ASSETS[@]}"
             exit 1
           fi
       - name: Build Storybook with dependency stats
         run: |
-          pnpm --filter webapp run build-storybook
+          vp run --filter webapp build-storybook
           test -s webapp/storybook-static/preview-stats.json
       - name: Chromatic visual testing
         id: chromatic
@@ -329,11 +281,13 @@ jobs:
           always() && startsWith(steps.chromatic.outputs.storybookUrl, 'http') &&
           (github.event_name != 'pull_request' || steps.storybook_preview.outcome == 'success')
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          CHROMATIC_STORYBOOK_URL: ${{ steps.chromatic.outputs.storybookUrl }}
         with:
           script: |
             const storybookUrl = context.payload.pull_request
-              ? 'https://ls1intum-hephaestus-storybook-pr-${{ github.event.number }}.surge.sh'
-              : '${{ steps.chromatic.outputs.storybookUrl }}';
+              ? `https://ls1intum-hephaestus-storybook-pr-${context.payload.pull_request.number}.surge.sh`
+              : process.env.CHROMATIC_STORYBOOK_URL;
             await github.rest.repos.createCommitStatus({
               owner: context.repo.owner,
               repo: context.repo.repo,

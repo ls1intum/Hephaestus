@@ -79,7 +79,7 @@ async function main(): Promise<void> {
 		}
 	}
 	console.log("Installing dependencies...");
-	await run("pnpm", ["install", "--frozen-lockfile"], { cwd: root });
+	await run("vp", ["install", "--frozen-lockfile"], { cwd: root });
 	console.log("✅ Jean worktree setup complete.");
 }
 

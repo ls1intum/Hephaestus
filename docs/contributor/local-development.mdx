@@ -17,14 +17,22 @@ Install and configure the following tools before you attempt a local build:
    `unzip` it falls back to an archive that checksum does not cover and refuses it.
 2. **Docker and Docker Compose** – Required for PostgreSQL and NATS. Verify both with `docker info`
    and `docker compose version`.
-3. **Node.js** – Match `package.json#devEngines.runtime`; it executes repository scripts and
-   application tooling.
-4. **pnpm** – Match `package.json#packageManager`. Use pnpm's
-   [pnpm 12 standalone installer](https://pnpm.io/installation#pnpm-12-using-a-standalone-script)
-   for that exact version; this repository does not use Corepack.
+3. **Vite+ (`vp`)** – The command surface for every repository task, and how you get the pinned
+   Node.js. Install the launcher:
 
-Read both versions from `package.json`, then verify them with `node --version && pnpm --version`.
-5. **NATS CLI (optional)** – Helpful when inspecting the webhook/sync event stream (NATS is disabled by default locally). The agent job queue runs on PostgreSQL and needs no NATS.
+   ```bash
+   curl -fsSL https://vite.plus | bash
+   ```
+
+   On Windows: `irm https://vite.plus/ps1 | iex`. The launcher's own version does not matter: it
+   runs the `vite-plus` this repository pins. Managed mode is on afterwards and provides the
+   Node.js `devEngines.runtime` pins; run `vp env off` if you manage Node.js yourself. `vp install`
+   then installs dependencies through the pinned pnpm, which Vite+ downloads itself: no global
+   pnpm, no Corepack. The installer adds `vp` to your login shell; anything that does not start
+   from one, an IDE task or a desktop app, needs `vp` on its PATH like `node` and `git`.
+
+   After `vp install`, `vp --version` prints the pinned `vite-plus`.
+4. **NATS CLI (optional)** – Helpful when inspecting the webhook/sync event stream (NATS is disabled by default locally). The agent job queue runs on PostgreSQL and needs no NATS.
 
 ## Recommended IDE setup
 
@@ -42,11 +50,11 @@ TypeScript, and JSON files on save.
 Run the same checks from the shell with:
 
 ```bash
-pnpm run check:agents          # Format check, lint, and both typechecks outside the webapp
-pnpm run check:agents:fix      # Apply every safe fix
-pnpm run check:webapp          # The SPA's format and lint checks
-pnpm run typecheck:webapp      # The SPA's typecheck — a separate leg, not part of check:webapp
-pnpm run check                 # Complete local quality gate
+vp run check:agents          # Format check, lint, and both typechecks outside the webapp
+vp run check:agents:fix      # Apply every safe fix
+vp run check:webapp          # The SPA's format and lint checks
+vp run typecheck:webapp      # The SPA's typecheck — a separate leg, not part of check:webapp
+vp run check                 # Complete local quality gate
 ```
 
 Use the [local verification contract](./local-verification.mdx) for affected checks, the pre-push gate,
@@ -57,8 +65,8 @@ IntelliJ and WebStorm are also supported.
 ### Java formatting
 
 ```bash
-pnpm run format:java
-pnpm run format:java:check
+vp run format:java
+vp run format:java:check
 ```
 
 The repository commands are the source of truth. Optional editor integrations:
@@ -78,7 +86,7 @@ the per-role and per-purpose overlays (`worker`, `webhook`, `e2e`, `cds-training
 they are used.
 
 They are **not** Maven profiles. Maven passes the active Spring profile through the `app.profiles`
-property, so use `-Dapp.profiles=…` to override it; `pnpm run dev:server:e2e` uses that interface.
+property, so use `-Dapp.profiles=…` to override it; `vp run dev:server:e2e` uses that interface.
 
 Create `application-local.yml` in `server/application/src/main/resources` to override defaults. This file is gitignored.
 
@@ -92,7 +100,7 @@ Never commit `application-local.yml`. It may contain secrets and machine-specifi
 2. From the repo root, start everything with one command:
 
    ```bash
-   pnpm run dev
+   vp run dev
    ```
 
    This launches an `mprocs` session with the server and webapp in separate panes (switch with the arrow keys). The PostgreSQL container is brought up automatically.
@@ -100,8 +108,8 @@ Never commit `application-local.yml`. It may contain secrets and machine-specifi
    Prefer plain terminals? Run the two sides yourself:
 
    ```bash
-   pnpm run dev:server   # terminal 1 — brings up Postgres, then Spring Boot
-   pnpm run dev:webapp   # terminal 2 — Vite dev server
+   vp run dev:server   # terminal 1 — brings up Postgres, then Spring Boot
+   vp run dev:webapp   # terminal 2 — Vite dev server
    ```
 
 3. Access the API at `http://localhost:8080` and the webapp at `http://localhost:4200`.
@@ -111,10 +119,10 @@ Never commit `application-local.yml`. It may contain secrets and machine-specifi
    complete route list, admin routes included. For a local session, set `SPRINGDOC_API_DOCS_ENABLED=true`
    (and `SPRINGDOC_SWAGGER_UI_ENABLED=true` for the browser UI) and Swagger UI appears at
    `http://localhost:8080/swagger-ui/index.html`. Committing a spec does not need either flag —
-   `pnpm run generate:api:application-server:specs` boots under the `specs` profile, which turns them on
+   `vp run generate:api:specs` boots under the `specs` profile, which turns them on
    itself.
 
-To wipe the local database (e.g. after a bad migration or sync), run `pnpm run dev:reset`. The Postgres data is a bind-mounted folder (`server/postgres-data`), so `docker compose down -v` alone does not clear it — `dev:reset` removes the folder and recreates the stack.
+To wipe the local database (e.g. after a bad migration or sync), run `vp run dev:reset`. The Postgres data is a bind-mounted folder (`server/postgres-data`), so `docker compose down -v` alone does not clear it — `dev:reset` removes the folder and recreates the stack.
 
 ### Port overrides
 
@@ -129,7 +137,7 @@ Every host-side port is configurable so multiple Hephaestus instances (or other 
 | Webapp (Vite dev)    | 4200    | `WEBAPP_PORT`               | Shell env only                   |
 
 :::tip Pre-flight check
-Run `pnpm run check:ports` before starting the stack. It checks the three ports above; a NATS
+Run `vp run check:ports` before starting the stack. It checks the three ports above; a NATS
 container binds 4222 as well, and a conflict there shows up only at boot.
 :::
 
@@ -187,7 +195,7 @@ The Vite dev server reads `WEBAPP_PORT` from the shell environment (`process.env
 and not `server/.env`):
 
 ```bash
-WEBAPP_PORT=5200 pnpm --filter webapp run dev
+WEBAPP_PORT=5200 vp run dev:webapp
 ```
 
 When changing the webapp port, the server's CORS origin must also be updated so API calls are not rejected:
@@ -299,7 +307,7 @@ the stored configuration. New connections and models start inactive. Test the co
 its price (or explicitly mark it as having no metered API cost), then activate it and bind it to a
 purpose (`PRACTICE_REVIEW` or `MENTOR`) on the workspace's **AI models** page.
 
-For an automated local end-to-end setup, use `pnpm run e2e:setup`. It creates the connection,
+For an automated local end-to-end setup, use `vp run e2e:setup`. It creates the connection,
 model, and agent binding through the application API and keeps provider credentials out of source
 control and command-line history by reading them from `E2E_*` environment variables.
 
@@ -338,7 +346,7 @@ Authentication is Hephaestus-native (no Keycloak — see [ADR 0017](https://gith
    (callback `http://localhost:8080/login/oauth2/code/gitlab`, scope `read_user`),
    set `GITLAB_OAUTH_CLIENT_ID` / `GITLAB_OAUTH_CLIENT_SECRET`, and point `GITLAB_OAUTH_BASE_URL` at the
    instance (defaults to `https://gitlab.com`; e.g. `https://gitlab.lrz.de`). Leave the client id blank to hide the GitLab button.
-4. Run the application server with `pnpm run dev:server`; it brings up the Compose services, installs
+4. Run the application server with `vp run dev:server`; it brings up the Compose services, installs
    the generated-clients module and starts the application module. Open the webapp and click
    **Sign in with GitHub**.
 
@@ -350,13 +358,13 @@ App-level admin is the `APP_ADMIN` role on the `account` table (authority `app_a
 
 - **401 after login:** ensure `GITHUB_OAUTH_CLIENT_ID/SECRET` are set and the callback URL on the GitHub app matches your `SERVER_PORT`.
 - **Logins don't survive a server restart locally:** set `HEPHAESTUS_AUTH_STATE_COOKIE_KEY` (base64 32-byte; `openssl rand -base64 32`) in `server/.env` — otherwise an ephemeral per-boot key is used.
-- **Reset everything:** `pnpm run dev:reset` (see Running the stack); on next login the account and identity link are recreated.
+- **Reset everything:** `vp run dev:reset` (see Running the stack); on next login the account and identity link are recreated.
 
 ### Webhook receiver
 
 The webhook receiver lives in the Java server (`integration.core.webhook` package). In local
 development the monolith default boots all three runtime roles (`server`, `worker`, `webhook`),
-so `pnpm run dev:server` exposes the unified `/webhooks/{kind}` endpoint (kinds: `github`,
+so `vp run dev:server` exposes the unified `/webhooks/{kind}` endpoint (kinds: `github`,
 `gitlab`, `slack`, `outline`) alongside the rest of the API.
 
 In production the receiver is deployed as a separate `webhook-server` container from the same
@@ -385,13 +393,13 @@ For Slack app setup, use the scope/event checklist in
 1. Install dependencies:
 
    ```bash
-   pnpm install
+   vp install
    ```
 
 2. Start Vite (defaults to port 4200):
 
    ```bash
-   pnpm --filter webapp run dev
+   vp run dev:webapp
    ```
 
 3. Visit `http://localhost:4200` (or your custom `WEBAPP_PORT`).
@@ -407,9 +415,9 @@ For Slack app setup, use the scope/event checklist in
 Storybook is the source of truth for presentational components.
 
 ```bash
-pnpm --filter webapp run storybook:dev           # Local playground on http://localhost:6006
-pnpm --filter webapp run build-storybook     # Static bundle for Chromatic
-pnpm --filter webapp run chromatic:ci        # Visual regression in CI
+vp run --filter webapp storybook:dev           # Local playground on http://localhost:6006
+vp run --filter webapp build-storybook     # Static bundle for Chromatic
+vp run --filter webapp chromatic:ci        # Visual regression in CI
 ```
 
 - Every new UI component ships with at least one story covering empty, loading, and error states.
@@ -422,10 +430,10 @@ pnpm --filter webapp run chromatic:ci        # Visual regression in CI
 the server. After an API change, from the repository root:
 
 ```bash
-pnpm run generate:api   # regenerates server/openapi.yaml from the packaged JAR, then the client
+vp run generate:api   # regenerates server/openapi.yaml from the packaged JAR, then the client
 ```
 
-`pnpm run generate:api:application-server:client` regenerates the client alone from the committed
+`vp run generate:api:client` regenerates the client alone from the committed
 spec. Commit both with the change.
 
 - Schema names carry no `DTO` suffix; the server strips it when it publishes the spec.

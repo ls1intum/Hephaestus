@@ -39,6 +39,8 @@ function fixture(): { repo: string; git: Git; write: (file: string, content: str
 	git("init", "--quiet", "--initial-branch=main");
 	git("config", "user.email", "test@example.invalid");
 	git("config", "user.name", "Test");
+	// Byte-exact content is asserted below, whatever this host's line-ending conversion is.
+	git("config", "core.autocrlf", "false");
 	write("package.json", '{"version":"0.74.0"}\n');
 	write("MIGRATION.md", "# Migration\n");
 	write("changeset.md", "---\nhephaestus: minor\n---\n\nA pending note.\n");

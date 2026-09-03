@@ -16,6 +16,7 @@ import { join } from "node:path";
 import { afterEach, test } from "node:test";
 
 const sourceDirectory = join(import.meta.dirname, "..", "docker", "self-host");
+const posixOnly = { skip: process.platform === "win32" && "setup.sh is a POSIX shell script" };
 const temporaryDirectories: string[] = [];
 
 afterEach(async () => {
@@ -67,7 +68,7 @@ function managedValues(environment: string): string[] {
 		.map(([, value]) => value ?? "");
 }
 
-await test("generates protected secrets without printing them", async () => {
+await test("generates protected secrets without printing them", posixOnly, async () => {
 	const directory = await fixture();
 	const result = await setup(directory);
 	const environmentPath = join(directory, ".env");
@@ -98,7 +99,7 @@ await test("generates protected secrets without printing them", async () => {
 	assert.equal(await readFile(environmentPath, "utf8"), environment);
 });
 
-await test("preserves configured values and fills missing assignments", async () => {
+await test("preserves configured values and fills missing assignments", posixOnly, async () => {
 	const directory = await fixture();
 	const example = await readFile(join(directory, ".env.example"), "utf8");
 	await writeFile(
@@ -114,7 +115,7 @@ await test("preserves configured values and fills missing assignments", async ()
 	assert.match(environment, /^WEBHOOK_SECRET=[0-9a-f]{64}$/m);
 });
 
-await test("rejects duplicate managed assignments", async () => {
+await test("rejects duplicate managed assignments", posixOnly, async () => {
 	const directory = await fixture();
 	const examplePath = join(directory, ".env.example");
 	await writeFile(
@@ -126,25 +127,29 @@ await test("rejects duplicate managed assignments", async () => {
 	await assert.rejects(lstat(join(directory, ".env")));
 });
 
-await test("leaves an existing environment unchanged when generation fails", async () => {
-	const directory = await fixture();
-	const environmentPath = join(directory, ".env");
-	const original = await readFile(join(directory, ".env.example"), "utf8");
-	await writeFile(environmentPath, original);
-	const binaryDirectory = join(directory, "bin");
-	await mkdir(binaryDirectory);
-	const openssl = join(binaryDirectory, "openssl");
-	await writeFile(openssl, "#!/bin/sh\nexit 1\n");
-	await chmod(openssl, 0o700);
+await test(
+	"leaves an existing environment unchanged when generation fails",
+	posixOnly,
+	async () => {
+		const directory = await fixture();
+		const environmentPath = join(directory, ".env");
+		const original = await readFile(join(directory, ".env.example"), "utf8");
+		await writeFile(environmentPath, original);
+		const binaryDirectory = join(directory, "bin");
+		await mkdir(binaryDirectory);
+		const openssl = join(binaryDirectory, "openssl");
+		await writeFile(openssl, "#!/bin/sh\nexit 1\n");
+		await chmod(openssl, 0o700);
 
-	assert.notEqual(
-		(await setup(directory, `${binaryDirectory}:${process.env.PATH ?? ""}`)).exitCode,
-		0,
-	);
-	assert.equal(await readFile(environmentPath, "utf8"), original);
-});
+		assert.notEqual(
+			(await setup(directory, `${binaryDirectory}:${process.env.PATH ?? ""}`)).exitCode,
+			0,
+		);
+		assert.equal(await readFile(environmentPath, "utf8"), original);
+	},
+);
 
-await test("refuses to write through an environment symlink", async () => {
+await test("refuses to write through an environment symlink", posixOnly, async () => {
 	const directory = await fixture();
 	const target = join(directory, "target");
 	await writeFile(target, "unchanged");
