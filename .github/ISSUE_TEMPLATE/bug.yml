@@ -1,0 +1,62 @@
+name: 🐞 Report a bug
+description: Tell us about unexpected behavior in Hephaestus
+type: Bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Search [existing issues](https://github.com/hephaestus-build/Hephaestus/issues?q=is%3Aissue) first. Use [Support](https://github.com/hephaestus-build/Hephaestus/discussions/categories/support) for setup questions. Report vulnerabilities privately through [GitHub Security Advisories](https://github.com/hephaestus-build/Hephaestus/security/advisories/new). Remove secrets and personal data from all evidence.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Describe the observed behavior and what you expected instead.
+      placeholder: |
+        After I add owner/name to a workspace, the request succeeds but the repository does not appear.
+
+        I expected the repository to appear in the monitored repository list.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: How can we reproduce it?
+      description: Give the smallest sequence you know. Include necessary inputs and the frequency of intermittent failures.
+      placeholder: |
+        1. Open a workspace.
+        2. Go to Admin → Integrations.
+        3. Add owner/name.
+        4. Return to the repository list.
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Enter the release, container tag, commit SHA, or "hosted".
+      placeholder: v0.75.0, main@abcdef1, or hosted
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include relevant details such as browser, operating system, and deployment method.
+      placeholder: Firefox 142 on Ubuntu 24.04; self-hosted with Docker Compose
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log output
+      description: Paste the relevant lines. GitHub will format them as code.
+      render: text
+
+  - type: upload
+    id: evidence
+    attributes:
+      label: Screenshots, recordings, or files
+      description: Optionally attach evidence or a minimal reproduction.

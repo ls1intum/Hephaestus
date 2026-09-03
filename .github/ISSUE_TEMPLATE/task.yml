@@ -1,0 +1,42 @@
+name: 📋 Plan technical work
+description: Define a refactor, maintenance, infrastructure, documentation, or research task
+type: Task
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for concrete technical work. Use the feature form for user-facing behavior and the bug form for unexpected behavior.
+
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Outcome
+      description: State the result, not merely the activity.
+      placeholder: Failed GitHub requests are retried when GitHub says they are safe to retry.
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Why is this needed?
+      description: Explain the problem and evidence. Link related work when useful.
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope and context
+      description: Add relevant boundaries, constraints, dependencies, or links.
+
+  - type: textarea
+    id: done
+    attributes:
+      label: Done when
+      description: List observable, independently verifiable acceptance criteria.
+      placeholder: |
+        - [ ] Retryable responses are retried with the provider-requested delay.
+        - [ ] Non-retryable responses fail without another request.
+    validations:
+      required: true

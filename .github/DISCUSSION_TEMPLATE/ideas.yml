@@ -1,11 +1,25 @@
 body:
-  - type: textarea
+  - type: markdown
     attributes:
-      label: Describe the feature or potential improvement
-      description: Please describe the change as clear and concise as possible. Remember to add context as to why you believe this is needed.
+      value: |
+        Search [existing ideas](https://github.com/hephaestus-build/Hephaestus/discussions/categories/ideas) before starting a discussion.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: Explain who encounters the problem, what they are trying to accomplish, and why the current experience falls short.
     validations:
       required: true
   - type: textarea
+    id: outcome
     attributes:
-      label: Additional information
-      description: Add any other information related to the change here. If your idea is related to any issues or discussions, link them here.
+      label: What would a good outcome look like?
+      description: Describe the result and its value.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives and context
+      description: Share relevant workarounds, alternatives, constraints, or links.
