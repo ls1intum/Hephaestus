@@ -201,8 +201,9 @@ Oxlint lints; oxfmt formats and sorts imports. Each tree states its rule set in 
 - Conventional Commit titles in plain language, with the types and scopes in `CONTRIBUTING.md`:
   `fix(webapp): feedback list no longer jumps while it loads`. No `!` in the title; a breaking
   change is carried by the changeset.
-- Body: the problem in a sentence or two, then how you fixed it and how you verified it. End with
-  the model and harness that did the work. `.github/PULL_REQUEST_TEMPLATE.md` is the shape.
+- Body: the problem in a sentence or two, then how you fixed it and how you verified it.
+  `.github/PULL_REQUEST_TEMPLATE.md` is the shape. Do not add model, agent, harness or tool
+  attribution to pull request titles or bodies.
 - UI changes need before/after images; motion or timing needs a short video. Never commit PR-only
   evidence; `/land-pr` owns its preparation and upload.
 - One concern per PR. If the description says "also", split it.
