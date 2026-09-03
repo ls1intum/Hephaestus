@@ -61,6 +61,20 @@ void test("every pin of one toolchain version moves in a single pull request", (
 	}
 });
 
+void test("Vercel AI SDK packages move together", () => {
+	assert.ok(Array.isArray(config.packageRules));
+	const rules = config.packageRules.filter(isRecord);
+	const ruleIndex = rules.findLastIndex((rule) => rule.groupName === "Vercel AI SDK");
+	assert.ok(ruleIndex > rules.findLastIndex((rule) => rule.groupName === null));
+	const rule = rules[ruleIndex];
+	assert.ok(rule);
+	assert.deepEqual(rule.matchManagers, ["npm"]);
+	assert.deepEqual(rule.matchFileNames, ["webapp/package.json"]);
+	assert.deepEqual(rule.matchPackageNames, ["ai", "@ai-sdk/react"]);
+	assert.equal(rule.matchUpdateTypes, undefined);
+	assert.equal(rule.minimumGroupSize, 2);
+});
+
 void test("routine update groups preserve repository boundaries", () => {
 	assert.ok(Array.isArray(config.packageRules));
 	const rules = config.packageRules.filter(isRecord);
