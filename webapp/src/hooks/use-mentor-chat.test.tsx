@@ -45,9 +45,9 @@ function activeWorkspace(
 ): ReturnType<typeof useActiveWorkspaceSlug> {
 	return {
 		workspaceSlug: "test-workspace",
+		chromeWorkspaceSlug: "test-workspace",
 		workspaces: [],
 		providerType: "GITHUB",
-		selectWorkspace: vi.fn(),
 		isLoading: false,
 		error: null,
 		...overrides,

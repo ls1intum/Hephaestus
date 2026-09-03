@@ -11,6 +11,7 @@ import {
 	listIdentityProvidersOptions,
 	listWorkspacesQueryKey,
 } from "@/api/@tanstack/react-query.gen";
+import type { WorkspaceListItem } from "@/api/types.gen";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -28,7 +29,6 @@ import { WizardStepIndicator } from "@/components/workspace/create-workspace/Wiz
 import { useAuth } from "@/integrations/auth/AuthContext";
 import { isRecord } from "@/lib/is-record";
 import { firstNonBlank } from "@/lib/text";
-import { useWorkspaceStore } from "@/stores/workspace-store";
 
 export const Route = createFileRoute("/_authenticated/workspaces/new/gitlab")({
 	component: GitLabWizardPage,
@@ -178,7 +178,6 @@ function GitLabWizardPage() {
 	);
 	const queryClient = useQueryClient();
 	const navigate = useNavigate();
-	const { setSelectedSlug } = useWorkspaceStore();
 	const headingRef = useRef<HTMLHeadingElement>(null);
 
 	const stepAnnouncement = `Step ${state.step} of 3: ${STEP_META[state.step].title}`;
@@ -190,7 +189,10 @@ function GitLabWizardPage() {
 	const createWorkspace = useMutation({
 		...createWorkspaceMutation(),
 		onSuccess: (data) => {
-			setSelectedSlug(data.workspaceSlug);
+			queryClient.setQueryData<WorkspaceListItem[]>(listWorkspacesQueryKey(), (workspaces) => [
+				...(workspaces ?? []),
+				data,
+			]);
 			toast.success(`Workspace "${data.displayName}" created`);
 			void navigate({
 				to: "/w/$workspaceSlug",

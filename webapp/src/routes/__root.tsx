@@ -33,6 +33,7 @@ import { useMentorChat } from "@/hooks/use-mentor-chat";
 import { useActiveSurvey, useSubmitProductFeedback } from "@/hooks/use-product-feedback";
 import { useWorkspaceAccess } from "@/hooks/use-workspace-access";
 import { useWorkspaceFeatures } from "@/hooks/use-workspace-features";
+import { useWorkspaceSwitcher } from "@/hooks/use-workspace-switcher";
 import { type AuthContextType, useAuth } from "@/integrations/auth/AuthContext";
 import { FeatureFlagDevTools, useFeatureFlag } from "@/integrations/feature-flags";
 import { isCopilotExcludedRoute } from "@/lib/copilot-route";
@@ -253,7 +254,7 @@ function HeaderContainer() {
 		getUserProfilePictureUrl,
 	} = useAuth();
 	const {
-		workspaceSlug,
+		chromeWorkspaceSlug,
 		userLogin: workspaceUserLogin,
 		userName: workspaceUserName,
 	} = useWorkspaceAccess();
@@ -261,7 +262,10 @@ function HeaderContainer() {
 	const effectiveUsername = workspaceUserLogin ?? username;
 	const effectiveName =
 		workspaceUserName ?? (userProfile && `${userProfile.firstName} ${userProfile.lastName}`);
-	const feedback = useSubmitProductFeedback(workspaceSlug);
+	// Feedback about the product reaches instance administrators either way; carrying the chrome's
+	// workspace lets them answer a member in context, and the instance-only path is for an account
+	// that belongs to no workspace at all.
+	const feedback = useSubmitProductFeedback(chromeWorkspaceSlug);
 
 	return (
 		<Header
@@ -274,7 +278,7 @@ function HeaderContainer() {
 			name={effectiveName}
 			username={effectiveUsername}
 			avatarUrl={getUserProfilePictureUrl()}
-			workspaceSlug={workspaceSlug}
+			workspaceSlug={chromeWorkspaceSlug}
 			feedbackDialog={
 				<ProductFeedbackDialog
 					isSubmitting={feedback.isPending}
@@ -299,14 +303,15 @@ function AppSidebarContainer() {
 	const { isAuthenticated, username, isAppAdmin } = useAuth();
 	const { enabled: hasMentorAccess } = useFeatureFlag("MENTOR_ACCESS");
 	const navigate = useNavigate();
+	const switchWorkspace = useWorkspaceSwitcher();
 	const workspaceAccess = useWorkspaceAccess();
-	const { workspaceSlug, workspaces, selectWorkspace } = workspaceAccess;
-	const hasWorkspace = Boolean(workspaceSlug);
+	const { chromeWorkspaceSlug, workspaces } = workspaceAccess;
+	const hasWorkspace = Boolean(chromeWorkspaceSlug);
 	const workspaceList = Array.isArray(workspaces) ? workspaces : [];
-	const activeWorkspace = workspaceList.find((ws) => ws.workspaceSlug === workspaceSlug);
+	const activeWorkspace = workspaceList.find((ws) => ws.workspaceSlug === chromeWorkspaceSlug);
 	const integrationCatalogQuery = useQuery({
-		...getIntegrationCatalogOptions({ path: { workspaceSlug: workspaceSlug ?? "" } }),
-		enabled: workspaceAccess.isAdmin && Boolean(workspaceSlug),
+		...getIntegrationCatalogOptions({ path: { workspaceSlug: chromeWorkspaceSlug ?? "" } }),
+		enabled: workspaceAccess.isAdmin && Boolean(chromeWorkspaceSlug),
 		placeholderData: (previousData) => previousData,
 	});
 	const integrationCatalog = Array.isArray(integrationCatalogQuery.data)
@@ -335,7 +340,7 @@ function AppSidebarContainer() {
 		error: mentorThreadsError,
 	} = useQuery({
 		...listThreadsOptions({
-			path: { workspaceSlug: workspaceSlug ?? "" },
+			path: { workspaceSlug: chromeWorkspaceSlug ?? "" },
 		}),
 		enabled: sidebarContext === "mentor" && isAuthenticated && hasWorkspace,
 	});
@@ -346,10 +351,7 @@ function AppSidebarContainer() {
 
 	const handleWorkspaceChange = (ws: typeof activeWorkspace) => {
 		if (!ws) return;
-		selectWorkspace(ws.workspaceSlug);
-		const remainder = pathname.replace(/^\/w\/[^/]+/, "");
-		const target = `/w/${ws.workspaceSlug}${remainder || "/"}`;
-		void navigate({ href: target, replace: true });
+		void switchWorkspace(ws);
 	};
 
 	const handleAddWorkspace = () => {

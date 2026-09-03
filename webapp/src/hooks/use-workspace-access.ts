@@ -6,26 +6,25 @@ import { hasMinimumWorkspaceRole } from "@/lib/workspace-roles";
 
 import { useActiveWorkspaceSlug } from "./use-active-workspace";
 
+/** Read by the app chrome, which renders on every route, so the slug is the chrome's, not the URL's. */
 export function useWorkspaceAccess() {
 	const {
-		workspaceSlug,
+		chromeWorkspaceSlug,
 		workspaces,
-		selectWorkspace,
 		isLoading: workspacesLoading,
 	} = useActiveWorkspaceSlug();
 	const { isAuthenticated, isLoading: authLoading } = useAuth();
 
 	const membershipQuery = useQuery({
-		...workspaceMembershipQueryOptions(workspaceSlug ?? ""),
-		enabled: Boolean(workspaceSlug) && isAuthenticated && !authLoading,
+		...workspaceMembershipQueryOptions(chromeWorkspaceSlug ?? ""),
+		enabled: Boolean(chromeWorkspaceSlug) && isAuthenticated && !authLoading,
 	});
 
 	const role = membershipQuery.data?.role;
 
 	return {
-		workspaceSlug,
+		chromeWorkspaceSlug,
 		workspaces,
-		selectWorkspace,
 		role,
 		isAdmin: hasMinimumWorkspaceRole(role, "ADMIN"),
 		// The account's SCM identity for THIS workspace's provider, so prefer these over the global

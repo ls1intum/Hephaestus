@@ -47,7 +47,9 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/")({
 	component: LeaderboardContainer,
 	validateSearch: leaderboardSearchSchema,
 	search: {
-		middlewares: [retainSearchParams(["team", "sort", "after", "before", "mode"])],
+		// A workspace switch keeps this route and re-runs this middleware, so a retained key has to
+		// mean the same thing in any workspace. `team` names a team of *this* one, so it is left out.
+		middlewares: [retainSearchParams(["sort", "after", "before", "mode"])],
 	},
 });
 
