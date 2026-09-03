@@ -13,6 +13,8 @@ if (!previousImage || !candidateImage || !postgresImage) {
 	);
 }
 
+const WORKSPACE_SLUG = "upgrade-fixture";
+
 const runId = `upgrade-${randomUUID().slice(0, 8)}`;
 const network = runId;
 const postgres = `${runId}-postgres`;
@@ -170,7 +172,7 @@ async function assertCoreReads(port: number, cookie: string): Promise<void> {
 				typeof workspace === "object" &&
 				workspace !== null &&
 				"workspaceSlug" in workspace &&
-				workspace.workspaceSlug === "upgrade-fixture",
+				workspace.workspaceSlug === WORKSPACE_SLUG,
 		)
 	)
 		throw new Error("Core read /workspaces did not return the seeded workspace");
@@ -181,9 +183,9 @@ async function seedWorkspace(port: number, cookie: string): Promise<void> {
 		method: "POST",
 		headers: { "content-type": "application/json", cookie },
 		body: JSON.stringify({
-			workspaceSlug: "upgrade-fixture",
+			workspaceSlug: WORKSPACE_SLUG,
 			displayName: "Upgrade Fixture",
-			accountLogin: "upgrade-fixture",
+			accountLogin: WORKSPACE_SLUG,
 			accountType: "ORG",
 			kind: "GITHUB",
 			personalAccessToken: "upgrade-fixture-token",
@@ -191,6 +193,59 @@ async function seedWorkspace(port: number, cookie: string): Promise<void> {
 	});
 	if (response.status !== 201)
 		throw new Error(`Workspace seed returned ${response.status}: ${await response.text()}`);
+}
+
+/**
+ * Adoption is a preview-then-apply pair: the preview's ETag is the validator the apply must send as
+ * If-Match, so the workspace only ever adopts the catalog state the caller read.
+ */
+async function applyAdoption(url: string, cookie: string, expectedStatus: number): Promise<void> {
+	const preview = await fetch(url, { headers: { cookie } });
+	if (!preview.ok)
+		throw new Error(`Adoption preview returned ${preview.status}: ${await preview.text()}`);
+	const validator = preview.headers.get("etag");
+	if (!validator) throw new Error("Adoption preview returned no ETag to send as If-Match");
+	const adopted = await fetch(url, {
+		method: "POST",
+		headers: { cookie, "if-match": validator },
+	});
+	if (adopted.status !== expectedStatus)
+		throw new Error(
+			`Adopting from the catalog returned ${adopted.status}: ${await adopted.text()}`,
+		);
+}
+
+/**
+ * A workspace no longer receives a copy of the instance catalog when it is created — an
+ * administrator adopts the practices the workspace reviews. So the drill adopts one, which is what
+ * gives the upgrade a workspace practice to carry. Releases that still seeded on creation expose no
+ * adoption endpoint; a 404 there means the catalog arrived on its own and there is nothing to adopt.
+ */
+async function adoptCatalogPractices(port: number, cookie: string): Promise<void> {
+	const catalog = `http://127.0.0.1:${port}/workspaces/${WORKSPACE_SLUG}/practice-catalog/adoption`;
+	const offered = await fetch(catalog, { headers: { cookie } });
+	if (offered.status === 404) return;
+	if (!offered.ok)
+		throw new Error(`Adoptable practices returned ${offered.status}: ${await offered.text()}`);
+	const body: unknown = await offered.json();
+	if (!Array.isArray(body) || body.length === 0)
+		throw new Error("Previous release offered no catalog practice to adopt");
+	const entries = body.filter(
+		(entry: unknown): entry is { slug: string; groupSlug?: string } =>
+			typeof entry === "object" &&
+			entry !== null &&
+			"slug" in entry &&
+			typeof entry.slug === "string",
+	);
+	const [first] = entries;
+	if (first === undefined) throw new Error("Adoptable practices returned entries without a slug");
+	// One group carries several practices in a single apply; a group-less entry is adopted alone.
+	const group = entries.find((entry) => typeof entry.groupSlug === "string");
+	if (group?.groupSlug !== undefined) {
+		await applyAdoption(`${catalog}/groups/${group.groupSlug}`, cookie, 200);
+		return;
+	}
+	await applyAdoption(`${catalog}/${first.slug}`, cookie, 201);
 }
 
 function linkWorkspaceIdentity(): void {
@@ -284,13 +339,13 @@ function appliedChangeCount(): number {
 	return count("SELECT count(*) FROM databasechangelog;");
 }
 
-async function waitForSeededCatalog(): Promise<number> {
+async function waitForWorkspacePractices(): Promise<number> {
 	for (let attempt = 0; attempt < 60; attempt++) {
 		const catalogSize = seededCatalogSize();
 		if (catalogSize > 0) return catalogSize;
 		await sleep(1_000);
 	}
-	throw new Error("Previous release did not seed the practice catalog within 60 seconds");
+	throw new Error("Previous release left the workspace without a practice within 60 seconds");
 }
 
 try {
@@ -330,13 +385,14 @@ try {
 	await login(port, "root");
 	linkWorkspaceIdentity();
 	await seedWorkspace(port, previousCookie);
+	await adoptCatalogPractices(port, previousCookie);
 	await assertCoreReads(port, previousCookie);
 	const seededData = dataFingerprint();
 	for (const kind of ["account", "identity", "user", "workspace", "membership", "connection"]) {
 		if (!seededData.includes(`${kind}|`))
 			throw new Error(`Previous release did not seed ${kind} data`);
 	}
-	const seededPractices = await waitForSeededCatalog();
+	const seededPractices = await waitForWorkspacePractices();
 	const previousChanges = appliedChangeCount();
 
 	docker("stop", "--time", "30", application);
