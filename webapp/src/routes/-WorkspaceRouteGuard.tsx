@@ -13,15 +13,18 @@ export function WorkspaceRouteGuard({
 	workspaceSlug: string;
 }) {
 	const query = useQuery({ ...listWorkspacesOptions(), staleTime: 0 });
-	if (query.isPending || query.isFetching) {
+	const workspaces = Array.isArray(query.data) ? query.data : [];
+	const workspaceIsAccessible = workspaces.some(
+		(workspace) => workspace.workspaceSlug === workspaceSlug,
+	);
+	if (query.isPending || (query.isFetching && !workspaceIsAccessible)) {
 		return (
 			<div className="flex items-center justify-center h-96">
 				<Spinner className="size-8" role="status" aria-label="Loading workspace" />
 			</div>
 		);
 	}
-	const workspaces = Array.isArray(query.data) ? query.data : [];
-	if (query.error || workspaces.some((workspace) => workspace.workspaceSlug === workspaceSlug)) {
+	if (query.error || workspaceIsAccessible) {
 		return children;
 	}
 

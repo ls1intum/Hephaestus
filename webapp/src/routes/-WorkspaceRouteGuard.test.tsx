@@ -116,7 +116,7 @@ describe("WorkspaceRouteGuard", () => {
 		useQuery.mockReturnValue({
 			data: [workspace("unavailable")],
 			error: null,
-			isFetching: false,
+			isFetching: true,
 			isPending: false,
 		});
 		const router = renderRoute();
