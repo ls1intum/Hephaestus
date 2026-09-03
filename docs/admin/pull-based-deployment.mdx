@@ -37,6 +37,15 @@ move backwards, refused unless the channel sets `allowRollback`.
 | `allowRollback` | permits one deliberate move backwards |
 | `freeze` | holds the environment where it is, for an incident |
 
+## Requirements
+
+On the host: Docker Engine with Compose v2, `git`, `flock`, `cosign`, and Node.js at the version in
+`.node-version`. Outbound HTTPS to `github.com` and `ghcr.io` is the only network access needed —
+nothing has to reach the host, which is the point.
+
+Pin what you install. `cosign` verifies the release, so fetch it by checksum from its own release
+page rather than from a convenience script.
+
 ## Install
 
 1. Put a checkout of this repository on the host. The reconciler only reads it, and creates release
