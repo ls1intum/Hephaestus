@@ -67,3 +67,13 @@ jobs:
       - name: "Fail workflow if commitlint failed"
         if: steps.commitlint.outcome == 'failure'
         run: exit 1
+
+  assign-author:
+    name: "Assign author"
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    if: github.event.action == 'opened'
+    steps:
+      - uses: technote-space/assign-author@9558557c5c4816f38bd06176fbc324ba14bb3160 # v1.6.2
