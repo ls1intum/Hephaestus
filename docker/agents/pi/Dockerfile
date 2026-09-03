@@ -5,8 +5,8 @@ FROM ghcr.io/pnpm/pnpm:12.0.0@sha256:bce5ae25ef95edd79e696d7fa8489b80561ef660100
 ARG NODE_VERSION
 WORKDIR /opt/pi-sdk
 RUN pnpm runtime set node ${NODE_VERSION} -g
-COPY pi/package.json pi/pnpm-lock.yaml ./
-RUN pnpm install --prod --frozen-lockfile --ignore-scripts --ignore-workspace
+COPY pi/package.json pi/pnpm-lock.yaml pi/pnpm-workspace.yaml ./
+RUN pnpm install --prod --frozen-lockfile --ignore-scripts
 
 FROM node:${NODE_VERSION}-slim@sha256:a9f5f7c91a432850b2a8a7797adf5eadb6c733ceed61167806cee7ea7fbc29df
 ARG NODE_VERSION
