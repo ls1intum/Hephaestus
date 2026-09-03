@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.75.2
+
+### Patch Changes
+
+- The single-host Compose topology now persists each webhook and integration-sync event before the
+  broker acknowledges it, closing the periodic-sync loss window during an unclean shutdown. This
+  trades some ingest throughput and latency for stronger durability; no operator action is required.
+- Practice reviews now recognize native issue types as triage metadata instead of asking for a
+  duplicate type label.
+- Workspaces can again adopt, create, and edit practices. Existing practices keep working, and failed writes did not lose or partially save data.
+
 ## 0.75.1
 
 ### Patch Changes
