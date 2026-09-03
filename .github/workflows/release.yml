@@ -114,7 +114,7 @@ jobs:
       - name: Capture release image digests
         id: retag
         env:
-          SOURCE_TAG: run-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}
+          SOURCE_TAG: ${{ github.event.workflow_run.head_sha }}
         run: node scripts/resolve-release-images.ts "$SOURCE_TAG" release-images.tsv
 
       - name: Verify Node-only agent-pi sandbox
@@ -366,17 +366,12 @@ jobs:
           [ "$(printf '%s\n' 2.24.4 "$compose_version" | sort -V | head -n1)" = 2.24.4 ] || {
             echo "::error::Docker Compose 2.24.4 or newer is required"; exit 1; }
 
-          ./setup.sh
-          sed -i \
-            -e 's/^APP_HOSTNAME=$/APP_HOSTNAME=hephaestus-smoke.invalid/' \
-            -e 's/^ACME_EMAIL=$/ACME_EMAIL=release-smoke@example.invalid/' \
-            -e 's/^GH_OAUTH_CLIENT_ID=$/GH_OAUTH_CLIENT_ID=release-smoke/' \
-            -e 's/^GH_OAUTH_CLIENT_SECRET=$/GH_OAUTH_CLIENT_SECRET=release-smoke-secret/' \
-            -e 's/^HEPHAESTUS_AUTH_BOOTSTRAP_ADMINS=$/HEPHAESTUS_AUTH_BOOTSTRAP_ADMINS=github:1/' \
-            .env
+          node ../../scripts/prepare-host-smoke-env.ts
           node ../../scripts/prepare-release-lock.ts "$TAG_NAME"
           docker compose --env-file .env --env-file release-lock.env config --quiet
           docker compose --env-file .env --env-file release-lock.env up -d --wait --wait-timeout 600
+          # Traefik routes by the hostname the installer answered with: SMOKE_HOSTNAME in
+          # scripts/prepare-host-smoke-env.ts, which release-deployment-policy.test.ts holds to this.
           curl --fail --insecure --silent --show-error --max-time 10 --noproxy '*' \
             --resolve hephaestus-smoke.invalid:443:127.0.0.1 \
             https://hephaestus-smoke.invalid/ >/dev/null
@@ -484,28 +479,7 @@ jobs:
             --certificate-identity '${{ github.server_url }}/${{ github.repository }}/.github/workflows/release.yml@refs/heads/main' \
             --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' "$asset" >/dev/null
 
-      - name: Promote verified image digests
-        env:
-          VERSION: ${{ needs.release.outputs.version }}
-          SERIES: ${{ needs.release.outputs.major }}.${{ needs.release.outputs.minor }}
-        run: |
-          set -euo pipefail
-          jq -er '[.subjects[] | select(.provenance == "first-party") | [.repository, .indexDigest]] | unique[] | @tsv' evidence/manifest.json |
-          while IFS=$'\t' read -r ref digest; do
-            docker buildx imagetools create -t "$ref:$VERSION" "$ref@$digest"
-            promoted=$(docker buildx imagetools inspect "$ref:$VERSION" --format '{{json .Manifest}}' | jq -r .digest)
-            [ "$promoted" = "$digest" ] || { echo "::error::Promotion changed $ref:$VERSION digest"; exit 1; }
-          done
-          jq -er '[.subjects[] | select(.provenance == "first-party") | [.repository, .indexDigest]] | unique[] | @tsv' evidence/manifest.json |
-          while IFS=$'\t' read -r ref digest; do
-            docker buildx imagetools create -t "$ref:$SERIES" -t "$ref:latest" "$ref@$digest"
-            for tag in "$SERIES" latest; do
-              promoted=$(docker buildx imagetools inspect "$ref:$tag" --format '{{json .Manifest}}' | jq -r .digest)
-              [ "$promoted" = "$digest" ] || { echo "::error::Promotion changed $ref:$tag digest"; exit 1; }
-            done
-          done
-
-      - name: Publish release
+      - name: Publish immutable release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG_NAME: ${{ needs.release.outputs.tag_name }}
@@ -514,7 +488,33 @@ jobs:
           gh release upload "$TAG_NAME" host-smoke/*.json --clobber --repo "${{ github.repository }}"
           gh release edit "$TAG_NAME" --repo "${{ github.repository }}" --draft=false
           [ "$(gh release view "$TAG_NAME" --repo "${{ github.repository }}" --json isImmutable --jq .isImmutable)" = true ] || {
-            echo "::error::Repository immutable releases must be enabled before publishing"; exit 1; }
+            echo "::error::The published release is not immutable; refusing to promote image aliases"; exit 1; }
+
+      - name: Promote verified image digests
+        env:
+          VERSION: ${{ needs.release.outputs.version }}
+          SERIES: ${{ needs.release.outputs.major }}.${{ needs.release.outputs.minor }}
+        run: |
+          set -euo pipefail
+          jq -er '[.subjects[] | select(.provenance == "first-party") | [.repository, .indexDigest]] | unique[] | @tsv' \
+            evidence/manifest.json > "$RUNNER_TEMP/promotions.tsv"
+
+          # Resolve every immutable source before changing aliases. OCI registries update one tag
+          # at a time, so retries and final verification recover any interrupted promotion.
+          while IFS=$'\t' read -r ref digest; do
+            source=$(docker buildx imagetools inspect "$ref@$digest" --format '{{json .Manifest}}' | jq -r .digest)
+            [ "$source" = "$digest" ] || { echo "::error::Cannot resolve promotion source $ref@$digest"; exit 1; }
+          done < "$RUNNER_TEMP/promotions.tsv"
+          while IFS=$'\t' read -r ref digest; do
+            docker buildx imagetools create \
+              -t "$ref:$VERSION" -t "$ref:$SERIES" -t "$ref:latest" "$ref@$digest"
+          done < "$RUNNER_TEMP/promotions.tsv"
+          while IFS=$'\t' read -r ref digest; do
+            for tag in "$VERSION" "$SERIES" latest; do
+              promoted=$(docker buildx imagetools inspect "$ref:$tag" --format '{{json .Manifest}}' | jq -r .digest)
+              [ "$promoted" = "$digest" ] || { echo "::error::Promotion changed $ref:$tag digest"; exit 1; }
+            done
+          done < "$RUNNER_TEMP/promotions.tsv"
 
   # Staging pulls: this asks for the promotion and waits for it, so production is still only offered
   # a release staging is actually running. Nothing here reaches the host, and no deploy credential

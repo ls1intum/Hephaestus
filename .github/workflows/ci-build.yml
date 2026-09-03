@@ -2,15 +2,22 @@ name: Build
 
 on:
   workflow_call:
+    outputs:
+      application-server-digest:
+        description: "Digest of the application image built from this run's packaged JAR"
+        value: ${{ jobs.application-server-image.outputs.manifest-digest }}
     inputs:
       should_skip:
         description: "Whether to skip the workflow"
         required: false
         type: string
         default: "false"
+      # publish and single_arch have no default; reusable-docker-build.yml says why.
+      publish:
+        description: "Whether image jobs may write to the registry"
+        required: true
+        type: boolean
       single_arch:
-        # No default: what a release is evidenced on is not a decision to make silently on a
-        # caller's behalf. cicd.yml derives it once, for every image build in the run.
         description: "Whether to build linux/amd64 alone instead of the supported multi-architecture set"
         required: true
         type: string
@@ -343,4 +350,5 @@ jobs:
       # renovate: datasource=docker depName=paketobuildpacks/ubuntu-noble-run-tiny
       run-image: "paketobuildpacks/ubuntu-noble-run-tiny@sha256:c32333227b6dfbc2a4a93b03ee6d3475cfe152468c7d396bf22f06099bb0ecc9"
       registry: "ghcr.io"
+      publish: ${{ inputs.publish }}
       single-arch: ${{ inputs.single_arch == 'true' }}

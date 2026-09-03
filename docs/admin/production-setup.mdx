@@ -353,11 +353,30 @@ obligation. Only what is different about the multi-file stack is listed here.
    it.
 3. **Bootstrap secrets:** Load those variables into your secret manager or the `.env` files consumed
    by Docker/Kubernetes.
-4. **Deploy services:** Use `docker/compose.proxy.yaml`, `docker/compose.core.yaml` and
-   `docker/compose.app.yaml`, or your Kubernetes manifests.
-5. **Run database migrations:** The application server runs Liquibase migrations on startup; monitor
-   logs to confirm success.
-6. **Verify:**
+4. **Deploy services:** Each file is its own Compose project, so each needs its own `-p` and its own
+   `up`, and every one of them resolves its images from the verified release lock — `docker/.env`
+   defines no `HEPHAESTUS_IMAGE_*` variable, so a project started without the lock refuses to start.
+   Prepare it as [Install § 1](./install#1-get-the-files) does, writing it beside the reference
+   stack, then start the projects in this order, waiting for each to report healthy:
+
+   ```bash
+   VERSION=<the release you are deploying>   # without the leading "v"
+   node scripts/prepare-release-lock.ts "v$VERSION" docker/release-lock.env
+   cd docker
+   dc() { docker compose --env-file .env --env-file release-lock.env "$@"; }
+   dc -p hephaestus-core -f compose.core.yaml up -d --wait nats-server
+   dc -p hephaestus-app -f compose.app.yaml up -d --wait
+   dc -p hephaestus-core -f compose.core.yaml up -d --wait
+   dc -p hephaestus-proxy -f compose.proxy.yaml up -d --wait
+   ```
+
+   `depends_on` does not cross a project boundary, so the order between projects is yours to keep.
+   The broker comes up first, so a redeploy never drops the JetStream connection of an application
+   server that is already running. The application stack owns PostgreSQL and runs the Liquibase
+   migrations during its own startup — watch `application-server`'s logs to confirm they complete.
+   The core stack's webhook runtime reads what those migrations wrote, and the proxy goes last so it
+   never routes to a stack that is still starting. Kubernetes manifests need the same ordering.
+5. **Verify:**
    - The bootstrap admin can sign in and reach instance-admin navigation, and can reach workspace
      admin endpoints for workspaces they are a member of (auto-elevated to workspace ADMIN there).
    - A test webhook from GitHub or GitLab reaches the ingest pipeline.

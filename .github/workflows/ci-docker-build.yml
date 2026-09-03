@@ -15,9 +15,12 @@ on:
         required: false
         type: string
         default: "false"
+      # publish and single_arch have no default; reusable-docker-build.yml says why.
+      publish:
+        description: "Whether image jobs may write to the registry"
+        required: true
+        type: boolean
       single_arch:
-        # No default: what a release is evidenced on is not a decision to make silently on a
-        # caller's behalf. cicd.yml derives it once, for every image build in the run.
         description: "Whether to build linux/amd64 alone instead of the supported multi-architecture set"
         required: true
         type: string
@@ -67,6 +70,7 @@ jobs:
       build-args: |
         SOURCE_COMMIT=${{ github.sha }}
         COOLIFY_BRANCH=${{ github.head_ref || github.ref_name }}
+      publish: ${{ inputs.publish }}
       single-arch: ${{ inputs.single_arch == 'true' }}
       labels: |
         org.opencontainers.image.title=Hephaestus Webapp
@@ -92,6 +96,7 @@ jobs:
       # Cache-busts the OS-package upgrade layer; this build imports the `cache-main` registry cache.
       build-args: |
         SOURCE_COMMIT=${{ github.sha }}
+      publish: ${{ inputs.publish }}
       single-arch: ${{ inputs.single_arch == 'true' }}
       labels: |
         org.opencontainers.image.title=Hephaestus Agent - Pi
@@ -117,6 +122,7 @@ jobs:
       # Cache-busts the OS-package upgrade layer; this build imports the `cache-main` registry cache.
       build-args: |
         SOURCE_COMMIT=${{ github.sha }}
+      publish: ${{ inputs.publish }}
       single-arch: ${{ inputs.single_arch == 'true' }}
       labels: |
         org.opencontainers.image.title=Hephaestus Postgres
@@ -129,7 +135,7 @@ jobs:
   tag-unchanged-images:
     name: "Tag unchanged images"
     if: >-
-      inputs.should_skip != 'true' && github.event_name == 'pull_request' &&
+      inputs.should_skip != 'true' && inputs.publish && github.event_name == 'pull_request' &&
       (inputs.webapp_changed != 'true' || inputs.application_server_changed != 'true' ||
        inputs.agent_images_changed != 'true' ||
        inputs.postgres_image_changed != 'true')
@@ -163,8 +169,6 @@ jobs:
           REPOSITORY: ${{ github.repository }}
           REPOSITORY_OWNER: ${{ github.repository_owner }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          RUN_ID: ${{ github.run_id }}
-          RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
           set -euo pipefail
 
@@ -196,7 +200,6 @@ jobs:
             docker buildx imagetools create \
               --tag "$image:$HEAD_SHA" \
               --tag "$image:pr-$PR_NUMBER" \
-              --tag "$image:run-$RUN_ID-$RUN_ATTEMPT" \
               "$verified"
           }
 

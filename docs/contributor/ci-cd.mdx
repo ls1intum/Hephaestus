@@ -63,6 +63,7 @@ published.
 | Changesets → Verify changesets | policy tests, verified-revert detection, release-note presence, `MIGRATION.md` freeze | `vp run gate:changesets` |
 | Compose → Render compose stacks | the self-hosted, preview and reference stacks render | `vp run gate:preview-stack` |
 | Docker → Webapp, Agent: Pi, Postgres (pg_partman), Tag unchanged images | Dockerfile images; aliases for unchanged ones | — |
+| Supported-host boot smoke | `docker/self-host/setup.sh`, then PostgreSQL, NATS and the application server from this run's own images, waiting for the application to report healthy | — |
 | Actionlint, Zizmor | workflow lint with ShellCheck warnings; Zizmor at medium confidence | — |
 
 The four quality legs are one matrix job, one entry per leg of the task graph. Each runs
@@ -278,6 +279,7 @@ action directly rather than checking out the repository only to reach a wrapper.
 | Every quality leg | `vite.config.ts`, `.vite-hooks/**`, `.java-version`, `cicd.yml`, `ci-quality-gates.yml` and the setup actions: the task graph, the hooks and the JDK decide every leg's verdict, so a change to one runs all of them |
 | Build artifact gates | contracts: the App Server paths or `docker/postgres/**`; E2E: webapp source and the server main sources; image: `server/application/src/main/**`, the poms, `server/application/project.toml`, `server/generated-clients/**` |
 | Docker images | `webapp-image`: the webapp build inputs and non-test source; `agent-images`: `docker/agents/**`; `postgres-image`: `docker/postgres/**` |
+| Supported-host boot smoke | `docker/**`, `application*.yml`, and the sources Spring binds configuration from — `**/*Properties.java` and `Application.java`. `ci-contract.test.ts` fails if a source carrying `@ConfigurationProperties` or `@ConfigurationPropertiesScan` is not selected |
 | CI config | one filter per leg naming its own workflow files and actions; any `.github/workflows/**` or `.github/actions/**` change runs Actionlint and Zizmor |
 
 `docker/agents/**` is in both the tooling and the agent-image filters: `test:agents` and
@@ -295,6 +297,27 @@ path (`App Server image`) does not use this cache.
 Image builds authenticate to `ghcr.io` with the workflow's `GITHUB_TOKEN`; base images are pulled from
 Docker Hub anonymously, which
 [GitHub-hosted runners may do without a rate limit](https://docs.github.com/en/actions/reference/limits).
+A job that reads a first-party image back — the scan, the preflight, the boot smoke — logs in as
+well, because `packages: read` alone buys nothing.
+
+A pull request from a fork gets a read-only `GITHUB_TOKEN`, so `cicd.yml` passes `publish: false`
+to both image workflows. That build compiles the image and stops: no login, no push, no signature,
+no attestation, no policy scan and no alias moves. Forks therefore get no preview and no boot smoke;
+the release path exercises their code once it is on `main`.
+
+## Image identity
+
+Every consumer resolves an image through the commit the run built it from, and
+`reusable-docker-build.yml` publishes exactly that tag for the event the run started under:
+`github.sha` for a push, dispatch or merge group, and the pull request's head SHA for a pull request,
+where `github.sha` is a merge commit no image carries. Within a run, the vulnerability scan skips
+tags entirely and reads the digest its own build or merge job emitted as an output, so re-running the
+scan alone scans the artefact that build produced.
+
+`ci-contract.test.ts` asserts the whole contract: every tag a consumer resolves is one the build
+publishes for that consumer's event, and no job resolves an image by the run that happened to build
+it. A run-scoped tag names the attempt rather than the artefact, and GitHub's *re-run failed jobs*
+gives the retried job a new attempt number.
 
 ## Build once
 
