@@ -14,8 +14,7 @@ OnFailure=hephaestus-reconcile-notify@%n.service
 # would silently do nothing.
 Type=oneshot
 EnvironmentFile=/etc/hephaestus/reconcile.env
-# systemd already refuses to start a second copy of a running oneshot. The lock is for the other
-# path: an operator or a stray cron entry invoking the script directly while a tick is in flight.
+# systemd already refuses a second copy of a running oneshot; the lock covers direct invocation.
 ExecStart=/usr/bin/flock --nonblock /run/lock/hephaestus-reconcile.lock \
     /usr/bin/node ${HEPHAESTUS_CHECKOUT}/scripts/reconcile-deployment.ts
 TimeoutStartSec=30min
@@ -34,10 +33,8 @@ LockPersonality=yes
 SystemCallFilter=@system-service
 SystemCallErrorNumber=EPERM
 
-# None of the above reduces what this unit can ultimately do: write access to the Docker socket is
-# root-equivalent on the host by design, so the hardening bounds this process, not the daemon it
-# asks to act. Rootless Podman with Quadlet is the only structural escape, and it is a migration
-# rather than a setting.
+# The hardening bounds this process, not the daemon: Docker socket access is root-equivalent by
+# design. Rootless Podman with Quadlet is the only structural escape, and it is a migration.
 
 [Install]
 WantedBy=multi-user.target

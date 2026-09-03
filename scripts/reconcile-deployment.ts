@@ -1,31 +1,22 @@
 /**
- * Brings one host to the release its channel names. Runs from a systemd timer; the host dials out
- * and nothing dials in, so no deploy credential exists off the host to be stolen or to expire.
+ * Brings one host to the release its channel names, on a timer. Nothing dials in, so no deployment
+ * credential exists off the host.
  *
- * The channel is a commit on the `deploy-state` branch, and that is what makes the pointer safe to
- * act on. A signature proves who wrote a pointer, never that it is the *current* one — a valid old
- * pointer replayed under a moving tag verifies perfectly — so freshness has to come from somewhere
- * with an order. Git has one: a channel commit that is an ancestor of the applied commit is a move
- * backwards, and is refused unless the pointer says the rollback is deliberate. That is the whole of
- * the rollback protection TUF builds timestamp and snapshot roles for, borrowed from a history the
- * repository already keeps.
+ * A signature proves authorship, never currency: a valid old channel, replayed, verifies perfectly.
+ * Freshness therefore comes from the commit graph — a channel commit that is an ancestor of the
+ * applied one is a rewind, and is refused unless the channel declares it.
  *
- * Two verifications, not one: the pointer is signed by the promotion workflow (which a GitHub
- * environment gates, so a signature from that identity is proof the approval happened), and the
- * release lock is signed by the release workflow. The lock is what pins every image by digest.
- *
- * A failed apply stops here and says so. It does not roll back: schema changes are forward-only in
- * this project, so putting the previous images back would leave old code on a migrated database —
- * the failure mode the rollback was supposed to prevent. Alerting a human is the honest response.
+ * A failed apply stops and alerts rather than reverting. Schema changes here only move forward, so
+ * restoring the previous images would leave old code on a migrated database.
  */
+import { existsSync } from "node:fs";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { asRecord, asString, parseJson } from "./lib/json.ts";
 import { output, run, succeeds } from "./lib/process.ts";
 
-/** A stack is a Compose project this host owns. The name is also the Compose project name, so the
- * containers a previous deploy created are adopted rather than duplicated. */
+/** Also the Compose project name, so an earlier deploy's containers are adopted, not duplicated. */
 export type Stack = "proxy" | "core" | "app";
 
 const STACK_ORDER: readonly Stack[] = ["proxy", "core", "app"];
@@ -64,11 +55,7 @@ export function parseChannel(value: unknown): Channel {
 	};
 }
 
-/**
- * `rewinds` answers "is the channel commit an ancestor of the one already applied", which the caller
- * resolves with git. Passing it in keeps the decision itself free of process calls, so every branch
- * below is covered by a test rather than by a deployment.
- */
+/** `rewinds` is "the channel commit is an ancestor of the applied one", which git answers. */
 export function decide(
 	channel: Channel,
 	applied: AppliedState | undefined,
@@ -86,11 +73,7 @@ export function decide(
 	return { action: "apply", release: channel.release };
 }
 
-/**
- * The value carries no information a label cannot, so the series is a constant 1 and everything
- * interesting rides in labels — the `_info` convention Prometheus uses for build metadata, which
- * keeps the version out of the metric name where a dashboard cannot group by it.
- */
+/** Version and commit ride in labels, not the metric name, so a dashboard can group by them. */
 export function renderMetrics(state: {
 	channel: string;
 	release: string;
@@ -135,8 +118,6 @@ export function parseStacks(value: string | undefined): Stack[] {
 	return STACK_ORDER.filter((stack) => names.includes(stack));
 }
 
-/** Everything below this line touches the host. */
-
 interface HostConfig {
 	channel: string;
 	stacks: Stack[];
@@ -175,13 +156,12 @@ async function readApplied(file: string): Promise<AppliedState | undefined> {
 			appliedAt: asString(record.appliedAt, "applied.appliedAt"),
 		};
 	} catch {
-		// A host that has never converged has no state, which is not an error — it is the first run.
+		// No state is the first run, not a failure.
 		return undefined;
 	}
 }
 
-/** Written to a temporary file and renamed, because the textfile collector reads whole files and a
- * scrape landing mid-write would publish a truncated series. */
+/** Renamed into place: a scrape landing mid-write would otherwise publish a truncated series. */
 async function writeAtomic(file: string, contents: string): Promise<void> {
 	const temporary = `${file}.tmp`;
 	await writeFile(temporary, contents, { mode: 0o644 });
@@ -196,8 +176,6 @@ async function main(): Promise<void> {
 
 	await mkdir(config.stateDirectory, { recursive: true });
 
-	// The channel branch carries no code and is never merged, so fetching it costs one commit and
-	// cannot drag the checkout's working tree along with it.
 	await run(
 		"git",
 		["fetch", "--quiet", "origin", "+refs/heads/deploy-state:refs/remotes/origin/deploy-state"],
@@ -205,9 +183,13 @@ async function main(): Promise<void> {
 			cwd: config.checkout,
 		},
 	);
-	const channelCommit = await output("git", ["rev-parse", "refs/remotes/origin/deploy-state"], {
-		cwd: config.checkout,
-	});
+	// Trimmed because the SHA is compared and interpolated; the blobs below are not, since the
+	// channel must reach cosign byte for byte as it was signed.
+	const channelCommit = (
+		await output("git", ["rev-parse", "refs/remotes/origin/deploy-state"], {
+			cwd: config.checkout,
+		})
+	).trim();
 	const channelPath = `channels/${config.channel}.json`;
 	const channelJson = await output("git", ["show", `${channelCommit}:${channelPath}`], {
 		cwd: config.checkout,
@@ -225,10 +207,8 @@ async function main(): Promise<void> {
 		"verify-blob",
 		"--bundle",
 		join(scratch, "channel.sigstore.json"),
-		// The promotion workflow is the only identity allowed to move an environment, and a GitHub
-		// environment gates that workflow — so a signature from it is proof the approval happened.
-		// Cosign cannot read the certificate's environment claim, which is why the identity is the
-		// workflow file itself rather than the environment name.
+		// Cosign cannot verify the certificate's environment claim, so the gate is expressed as the
+		// identity of the workflow the environment protects: only an approved run can produce it.
 		"--certificate-identity",
 		config.promoteIdentity,
 		"--certificate-oidc-issuer",
@@ -263,13 +243,12 @@ async function main(): Promise<void> {
 		return;
 	}
 
-	// The compose files must come from the release being deployed, not from whatever the checkout
-	// happens to sit on, so each release is materialised as its own worktree.
+	// Compose files must come from the release being deployed, not from wherever the checkout sits.
 	const releaseTree = join(config.stateDirectory, "releases", decision.release);
 	await run("git", ["fetch", "--quiet", "origin", "tag", decision.release, "--no-tags"], {
 		cwd: config.checkout,
 	});
-	if (!(await succeeds("test", ["-d", releaseTree])))
+	if (!existsSync(releaseTree))
 		await run("git", ["worktree", "add", "--detach", "--quiet", releaseTree, decision.release], {
 			cwd: config.checkout,
 		});
@@ -300,8 +279,7 @@ async function main(): Promise<void> {
 				"--detach",
 				"--wait",
 				`--wait-timeout=${config.waitTimeoutSeconds}`,
-				// Without this a service removed by the release keeps running, unmanaged, until
-				// someone notices it in `docker ps`.
+				// A service the release removed would otherwise keep running, unmanaged.
 				"--remove-orphans",
 			],
 			{ cwd: releaseTree },
@@ -328,10 +306,7 @@ async function main(): Promise<void> {
 	console.log(`Applied ${decision.release} to ${config.stacks.join(", ")}`);
 }
 
-/**
- * A failed run must still publish a series, or the alert that matters — "this host has not converged
- * in N minutes" — cannot tell a broken reconcile from a host that stopped running one at all.
- */
+/** Without a series on failure, a broken reconcile is indistinguishable from a host running none. */
 async function reportFailure(): Promise<void> {
 	const metricsFile = process.env.HEPHAESTUS_METRICS_FILE;
 	const channel = process.env.HEPHAESTUS_CHANNEL;
@@ -356,9 +331,8 @@ if (process.argv[1] === import.meta.filename) {
 	try {
 		await main();
 	} catch (error) {
-		await reportFailure().catch(() => {
-			// A metric that cannot be written must not replace the error that caused the failure.
-		});
+		// An unwritable metric must not replace the error that caused the failure.
+		await reportFailure().catch(() => {});
 		throw error;
 	}
 }

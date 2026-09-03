@@ -1,10 +1,8 @@
 # Moves an environment to a release by writing its channel on `deploy-state`, which the hosts poll.
 #
-# This file is the production control. Cosign cannot check the certificate's environment claim, so
-# the hosts pin the *identity of this workflow* instead — and because a GitHub environment gates the
-# job below, a signature carrying this identity is proof the environment's reviewers approved. That
-# only holds while this workflow stays non-reusable: a `workflow_call` trigger would let any caller
-# mint the same identity, so it must never gain one.
+# The hosts pin this workflow's identity, and a GitHub environment gates it, so a signature carrying
+# that identity is proof its reviewers approved. That holds only while this workflow stays
+# non-reusable: a `workflow_call` trigger would let any caller mint the same identity.
 name: Promote
 
 on:
@@ -62,12 +60,11 @@ jobs:
           REQUESTED: ${{ inputs.release }}
         run: |
           set -euo pipefail
-          # A dispatch names the release; the automatic staging promotion takes whatever the release
-          # that just finished published, which is the newest non-draft release.
+          # A dispatch names the release; the automatic staging promotion takes the newest one.
           release="${REQUESTED:-$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)}"
           [[ "$release" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
             echo "::error::Promote an immutable vX.Y.Z release, not '$release'"; exit 1; }
-          # Refusing a draft here is what keeps a half-finished release from reaching a host.
+          # A draft is a half-published release; refusing it here keeps it off a host.
           [ "$(gh release view "$release" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)" = false ] || {
             echo "::error::$release is still a draft"; exit 1; }
           echo "release=$release" >> "$GITHUB_OUTPUT"
@@ -101,8 +98,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add channels
-          # A promotion that changes nothing must not create an empty commit: the hosts read the
-          # commit graph to tell forwards from backwards, and a no-op commit would read as forwards.
+          # An empty commit would read as a move forward to hosts that compare ancestry.
           git diff --cached --quiet && { echo "Channel already at $RELEASE"; exit 0; }
           git commit -m "chore(deploy): ${CHANNEL_FILE} -> ${RELEASE}"
           git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}" HEAD:deploy-state
@@ -114,9 +110,8 @@ jobs:
           HOSTNAME: ${{ vars.APP_HOSTNAME }}
         run: |
           set -euo pipefail
-          # The hosts pull, so nothing here can push them; the deploy is only observed. The webapp
-          # publishes the version it is running in its runtime config, which is what makes this
-          # observable at all without granting the runner any access to the host.
+          # Nothing here can push the hosts, so the deploy is observed: the webapp publishes the
+          # version it runs, which makes convergence visible without any access to the host.
           deadline=$(( SECONDS + 900 ))
           while [ "$SECONDS" -lt "$deadline" ]; do
             config=$(curl -fsS --max-time 20 "https://${HOSTNAME}/" |

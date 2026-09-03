@@ -1,4 +1,4 @@
-import { mkdtemp, rename, rm } from "node:fs/promises";
+import { mkdtemp, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 
@@ -12,27 +12,34 @@ const [release, output = join(repositoryRoot, "docker/self-host/release-lock.env
 	process.argv.slice(2);
 if (!release || !isRelease(release)) throw new Error("usage: prepare-release-lock vX.Y.Z [output]");
 
+/**
+ * A published release's assets are plain HTTPS downloads, so verifying one needs no credential and
+ * no GitHub CLI — which is what lets a deployment host, or a self-hoster, upgrade without holding an
+ * account that could also change the release it is verifying.
+ */
+async function downloadReleaseAsset(
+	repository: string,
+	tag: string,
+	name: string,
+	into: string,
+): Promise<void> {
+	const url = `https://github.com/${repository}/releases/download/${tag}/${name}`;
+	const response = await fetch(url);
+	if (!response.ok) throw new Error(`GET ${url} returned ${response.status}`);
+	await writeFile(join(into, name), Buffer.from(await response.arrayBuffer()));
+}
+
 const directory = await mkdtemp(join(tmpdir(), "hephaestus-release-"));
 const outputDirectory = dirname(output);
 const outputTempDirectory = await mkdtemp(join(outputDirectory, `.${basename(output)}-`));
 const temporaryOutput = join(outputTempDirectory, "lock.env");
 const asset = `release-${release}.json`;
 try {
-	await run("gh", [
-		"release",
-		"download",
-		release,
-		"--repo",
-		releaseSignerRepository(process.env),
-		"--dir",
-		directory,
-		"--pattern",
-		asset,
-		"--pattern",
-		`${asset}.sigstore.json`,
-		"--pattern",
-		"manifest.json",
-	]);
+	await Promise.all(
+		[asset, `${asset}.sigstore.json`, "manifest.json"].map((name) =>
+			downloadReleaseAsset(releaseSignerRepository(process.env), release, name, directory),
+		),
+	);
 	await run("cosign", [
 		"verify-blob",
 		"--bundle",
