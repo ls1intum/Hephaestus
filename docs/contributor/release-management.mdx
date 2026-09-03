@@ -53,7 +53,11 @@ sequenceDiagram
    branch, `workflow_dispatch` being one of the two events that token may start. Every Version PR
    head commit gets one such run; `scripts/dispatch-version-pr-ci.ts` decides by asking whether the
    head already has one, so a missed dispatch heals on the next push and an unchanged head costs
-   nothing. The dispatched run also carries the **release evidence preflight** below.
+   nothing. Every CI/CD run on that branch also carries the **release evidence preflight** below,
+   whichever event started it, and `CI Status Gate` fails there unless the preflight succeeded in the
+   same run. More than one run can report that gate for a Version PR head — a dispatch and an
+   approved `pull_request` run both did for v0.75.1 — and the ruleset is satisfied by either, so a
+   green gate means the preflight passed only if no run can be green without it.
 3. **The merge is checked again.** The merge commit's push runs CI/CD in full — a push to `main`
    repeats the source-validation legs only when it carries a version bump, which is exactly this
    commit — and `release.yml` starts only when that run succeeds.
@@ -151,8 +155,8 @@ contract test rather than a release. The third structural entry is not condition
 verifier always demands a release version, and the preflight gives it the version the ref carries.
 
 The preflight is not free — it is a Syft and Trivy pass over every image on both architectures — so
-it runs only where its answer changes a decision: on the Version PR, and on any manual CI/CD dispatch
-that ticks `release-preflight`. It reuses the images that run already built, so what it judges is the
+it runs only where its answer changes a decision: on every CI/CD run on the Version PR's branch, and
+on any manual CI/CD dispatch that ticks `release-preflight`. It reuses the images that run already built, so what it judges is the
 artefact a release of that ref would promote, not a stand-in.
 
 The pinned upstream images are therefore judged twice on the Version PR, and deliberately: the
