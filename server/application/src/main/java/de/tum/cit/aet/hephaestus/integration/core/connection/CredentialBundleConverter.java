@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.core.connection;
 
 import de.tum.cit.aet.hephaestus.core.security.EncryptionException;
+import de.tum.cit.aet.hephaestus.core.security.MissingCredentialKeyException;
 import de.tum.cit.aet.hephaestus.core.security.SecurityProperties;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.CredentialBundle;
 import java.nio.charset.StandardCharsets;
@@ -192,7 +193,8 @@ public class CredentialBundleConverter {
     private SecretKey requireKey(int version) {
         SecretKey key = keys.get(version);
         if (key == null) {
-            throw new EncryptionException("No encryption key configured for credential key version " + version);
+            throw new MissingCredentialKeyException(
+                    "No encryption key configured for credential key version " + version);
         }
         return key;
     }
@@ -211,7 +213,7 @@ public class CredentialBundleConverter {
 
     private void requireEnabled(String operation) {
         if (!enabled) {
-            throw new EncryptionException(
+            throw new MissingCredentialKeyException(
                     "Credential encryption is disabled; cannot " + operation + " without a configured key");
         }
     }

@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.core.metrics;
 
 public final class IntegrationCoreMetrics {
 
+    public static final String CREDENTIAL_ROTATION_FAILURES = "integration.credential.rotation.failures";
     public static final String INTEGRATION_SYNC_PUSH_MESSAGES = "integration.sync.push.messages";
     public static final String INTEGRATION_SYNC_SSE_SUBSCRIBERS = "integration.sync.sse.subscribers";
     public static final String OAUTH_STATE_NONCE_PRUNED = "oauth.state.nonce.pruned";

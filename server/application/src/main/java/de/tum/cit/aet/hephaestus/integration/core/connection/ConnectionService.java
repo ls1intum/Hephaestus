@@ -530,8 +530,7 @@ public class ConnectionService {
         connection.setStateReason(req.detail());
         if (req.next() == IntegrationState.UNINSTALLED) {
             if (connection.getCredentialsEncrypted() != null) {
-                connection.setCredentialsEncrypted(null);
-                connection.setCredentialsAlg(null);
+                connection.setCredentials(null, credentialConverter);
                 log.info("Purged credentials on UNINSTALLED transition for connection={}", connection.getId());
             }
             if (connection.getConfig() instanceof ConnectionConfig.GitLabConfig gitLabConfig) {

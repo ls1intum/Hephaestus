@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.cit.aet.hephaestus.core.security.EncryptionException;
+import de.tum.cit.aet.hephaestus.core.security.MissingCredentialKeyException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.CredentialBundle;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.InstallationCredential;
@@ -236,7 +237,7 @@ class CredentialBundleConverterTest extends BaseUnitTest {
             CredentialBundleConverter c = enabled();
             byte[] blob = c.encrypt(new BearerToken("secret", null), CTX_A);
             assertThatThrownBy(() -> c.decrypt(blob, CTX_A, 99))
-                    .isInstanceOf(EncryptionException.class)
+                    .isInstanceOf(MissingCredentialKeyException.class)
                     .hasMessageContaining("No encryption key configured");
         }
     }

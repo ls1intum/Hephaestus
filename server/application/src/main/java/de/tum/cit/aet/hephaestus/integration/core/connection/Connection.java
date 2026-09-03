@@ -94,6 +94,10 @@ public class Connection {
     @Nullable
     private Integer credentialsKeyVersion;
 
+    @Column(name = "credentials_rotation_failed_at")
+    @Nullable
+    private Instant credentialsRotationFailedAt;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private @Nullable Instant createdAt;
@@ -191,6 +195,11 @@ public class Connection {
         return credentialsKeyVersion;
     }
 
+    @Nullable
+    public Instant getCredentialsRotationFailedAt() {
+        return credentialsRotationFailedAt;
+    }
+
     public Instant getCreatedAt() {
         return Objects.requireNonNull(createdAt, "Connection has not been persisted");
     }
@@ -219,12 +228,8 @@ public class Connection {
         this.config = config;
     }
 
-    public void setCredentialsEncrypted(byte @Nullable [] credentialsEncrypted) {
+    void setCredentialsEncrypted(byte @Nullable [] credentialsEncrypted) {
         this.credentialsEncrypted = credentialsEncrypted;
-    }
-
-    public void setCredentialsAlg(@Nullable String credentialsAlg) {
-        this.credentialsAlg = credentialsAlg;
     }
 
     /** Encrypts or clears this connection's credentials. */
@@ -233,11 +238,17 @@ public class Connection {
             this.credentialsEncrypted = null;
             this.credentialsAlg = null;
             this.credentialsKeyVersion = null;
+            this.credentialsRotationFailedAt = null;
             return;
         }
         this.credentialsEncrypted = converter.encrypt(bundle, encryptionContext());
         this.credentialsAlg = CredentialBundleConverter.ALGORITHM_TAG;
         this.credentialsKeyVersion = converter.activeKeyVersion();
+        this.credentialsRotationFailedAt = null;
+    }
+
+    void markCredentialRotationFailed(Instant failedAt) {
+        this.credentialsRotationFailedAt = failedAt;
     }
 
     /** Returns the decrypted credentials, if configured. */
