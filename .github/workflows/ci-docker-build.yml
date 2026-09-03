@@ -102,9 +102,7 @@ jobs:
 
   postgres-build:
     name: "Postgres (pg_partman)"
-    if: >-
-      inputs.should_skip != 'true' &&
-      (inputs.postgres_image_changed == 'true' || github.event_name != 'pull_request')
+    if: inputs.should_skip != 'true' && inputs.postgres_image_changed == 'true'
     uses: ./.github/workflows/reusable-docker-build.yml
     permissions:
       contents: read

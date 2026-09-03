@@ -761,6 +761,70 @@ void describe("CI contract", () => {
 			events.map((event) => bothPlatforms(event, false)),
 			[false, false, true, true],
 		);
+
+		// Nor can the gate demand evidence for images the run never published. Off that branch a pull
+		// request builds what its diff touched and aliases the rest from `main`, which is right for a
+		// preview and cannot serve the preflight: the alias falls back to the candidate the merged
+		// pull request built — `linux/amd64` and an `unknown/unknown` attestation manifest, no arm64 —
+		// and it falls back every time, because `main`'s push run was started by the same push that
+		// wrote this head and has published nothing yet when the alias runs. So the version branch
+		// publishes every release image itself, under every event, exactly as its dispatch run did.
+		const complete = String(workflow.getIn([...detection, "outputs", "all-images"]));
+		const completeShape =
+			/^\$\{\{ github\.event_name != '(\w+)' \|\| steps\.version_branch\.outputs\.version-branch == 'true' }}$/.exec(
+				complete,
+			);
+		assert.ok(completeShape, `this test cannot evaluate \`${complete}\``);
+		const buildsEveryImage = (event: string, onVersionBranch: boolean): boolean =>
+			event !== completeShape[1] || onVersionBranch;
+		for (const event of events)
+			assert.ok(
+				buildsEveryImage(event, true),
+				`a ${event} run on the Version PR's branch must publish every release image itself`,
+			);
+		assert.deepEqual(
+			events.map((event) => buildsEveryImage(event, false)),
+			[false, true, true, true],
+		);
+
+		// One home for that decision too: an input that selects an image reads it, and no input
+		// re-tests the event on its own. `server_changed` is in the list because the buildpacks image
+		// is built from the JAR `App Server: Package` uploads.
+		const imageInputs = {
+			Build: ["server_changed", "server_image_changed"],
+			Docker: [
+				"webapp_changed",
+				"application_server_changed",
+				"agent_images_changed",
+				"postgres_image_changed",
+			],
+		};
+		for (const [caller, inputs] of Object.entries(imageInputs))
+			for (const name of inputs) {
+				const value = String(workflow.getIn(["jobs", caller, "with", name]));
+				assert.match(
+					value,
+					/needs\.detect-changes\.outputs\.all-images == 'true'/,
+					`${caller}.${name} must read the one decision`,
+				);
+				assert.doesNotMatch(
+					value,
+					/github\.event_name/,
+					`${caller}.${name} must not test the event itself`,
+				);
+			}
+		// And the alias cannot run behind their backs: it is reachable only while some image is
+		// unchanged, so a run that builds the whole set evidences nothing another run published.
+		const images = parseDocument(await readFile(".github/workflows/ci-docker-build.yml", "utf8"));
+		const alias = String(images.getIn(["jobs", "tag-unchanged-images", "if"]));
+		for (const name of imageInputs.Docker)
+			assert.match(alias, new RegExp(`inputs\\.${name} != 'true'`));
+		for (const image of ["webapp-build", "agent-pi-build", "postgres-build"])
+			assert.doesNotMatch(
+				String(images.getIn(["jobs", image, "if"])),
+				/github\.event_name/,
+				`${image} must not re-test the event its caller already decided on`,
+			);
 	});
 
 	void test("rescans main's images weekly and reports drift to an issue, not a status", async () => {
