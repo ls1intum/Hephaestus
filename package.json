@@ -112,7 +112,7 @@
 		"@changesets/cli": "3.0.1",
 		"@commitlint/cli": "21.0.1",
 		"@commitlint/config-conventional": "21.0.1",
-		"@earendil-works/pi-coding-agent": "0.84.3",
+		"@earendil-works/pi-coding-agent": "0.84.4",
 		"@nats-io/jetstream": "3.4.0",
 		"@nats-io/transport-node": "3.4.0",
 		"@openapitools/openapi-generator-cli": "2.32.0",
