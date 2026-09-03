@@ -8,7 +8,7 @@ import {
 } from "@tanstack/react-router";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { toast } from "sonner";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useWorkspaceSwitcher } from "./use-workspace-switcher";
 
@@ -56,6 +56,8 @@ async function clickWorkspaceSwitch() {
 }
 
 describe("useWorkspaceSwitcher", () => {
+	beforeEach(() => vi.clearAllMocks());
+
 	it("keeps a portable route and clears its search", async () => {
 		const router = renderRoute("/w/alpha/teams?tab=members", "teams");
 
@@ -74,7 +76,7 @@ describe("useWorkspaceSwitcher", () => {
 		await clickWorkspaceSwitch();
 
 		await waitFor(() => expect(router.state.location.href).toBe("/w/beta"));
-		expect(toast.info).toHaveBeenCalledWith("Switched to Beta workspace", {
+		expect(toast.info).toHaveBeenCalledExactlyOnceWith("Switched to Beta workspace", {
 			description:
 				"This page is specific to the previous workspace, so we opened the new workspace's home page.",
 		});
