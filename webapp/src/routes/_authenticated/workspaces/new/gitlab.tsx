@@ -11,6 +11,7 @@ import {
 	listIdentityProvidersOptions,
 	listWorkspacesQueryKey,
 } from "@/api/@tanstack/react-query.gen";
+import type { WorkspaceListItem } from "@/api/types.gen";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -188,6 +189,10 @@ function GitLabWizardPage() {
 	const createWorkspace = useMutation({
 		...createWorkspaceMutation(),
 		onSuccess: (data) => {
+			queryClient.setQueryData<WorkspaceListItem[]>(listWorkspacesQueryKey(), (workspaces) => [
+				...(workspaces ?? []),
+				data,
+			]);
 			toast.success(`Workspace "${data.displayName}" created`);
 			void navigate({
 				to: "/w/$workspaceSlug",

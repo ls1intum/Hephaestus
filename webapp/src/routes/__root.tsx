@@ -348,7 +348,7 @@ function AppSidebarContainer() {
 
 	const handleWorkspaceChange = (ws: typeof activeWorkspace) => {
 		if (!ws) return;
-		switchWorkspace(ws);
+		void switchWorkspace(ws);
 	};
 
 	const handleAddWorkspace = () => {

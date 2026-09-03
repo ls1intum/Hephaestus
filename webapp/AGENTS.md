@@ -240,6 +240,7 @@ TanStack Router Vite plugin regenerates it when the dev server runs.
 
 The route's `workspaceSlug` is the active workspace. A workspace switch may keep a route only when
 that is its sole path parameter, and never keeps search params; otherwise it goes to workspace home.
+An unavailable routed workspace recovers to an accessible workspace home, never to its deep link.
 
 ## Role-based gating (OWNER > ADMIN > MEMBER)
 

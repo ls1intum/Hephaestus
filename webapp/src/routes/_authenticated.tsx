@@ -4,6 +4,7 @@ import { getConsentStatusOptions } from "@/api/@tanstack/react-query.gen";
 import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/integrations/auth/AuthContext";
 import { resolveCurrentUser } from "@/integrations/auth/guard";
+import { WorkspaceRouteGuard } from "./-WorkspaceRouteGuard";
 
 // This route will be a parent for all routes that require authentication
 export const Route = createFileRoute("/_authenticated")({
@@ -33,11 +34,11 @@ export const Route = createFileRoute("/_authenticated")({
 });
 
 function AuthenticatedLayout() {
-	const { isLoading } = useAuth();
+	const { isLoading: authLoading } = useAuth();
 
 	// The beforeLoad guard already redirected unauthenticated users to /login, so here we only
 	// cover the brief window where the in-app auth probe (GET /user via useAuth) is still settling.
-	if (isLoading) {
+	if (authLoading) {
 		return (
 			<div className="flex items-center justify-center h-96">
 				<Spinner className="size-8" />
@@ -45,5 +46,9 @@ function AuthenticatedLayout() {
 		);
 	}
 
-	return <Outlet />;
+	return (
+		<WorkspaceRouteGuard>
+			<Outlet />
+		</WorkspaceRouteGuard>
+	);
 }

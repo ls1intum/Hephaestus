@@ -48,6 +48,7 @@ function activeWorkspace(
 		workspaces: [],
 		providerType: "GITHUB",
 		isLoading: false,
+		workspacesLoaded: true,
 		error: null,
 		...overrides,
 	};

@@ -6,7 +6,8 @@ import {
 	Outlet,
 	RouterProvider,
 } from "@tanstack/react-router";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { toast } from "sonner";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -17,11 +18,22 @@ vi.mock("sonner", () => ({ toast: { info: vi.fn() } }));
 function SwitchWorkspace() {
 	const switchWorkspace = useWorkspaceSwitcher();
 	return (
-		<button
-			onClick={() => switchWorkspace({ displayName: "Beta workspace", workspaceSlug: "beta" })}
-		>
-			Switch workspace
-		</button>
+		<>
+			<button
+				onClick={() =>
+					void switchWorkspace({ displayName: "Beta workspace", workspaceSlug: "beta" })
+				}
+			>
+				Switch workspace
+			</button>
+			<button
+				onClick={() =>
+					void switchWorkspace({ displayName: "Alpha workspace", workspaceSlug: "alpha" })
+				}
+			>
+				Keep workspace
+			</button>
+		</>
 	);
 }
 
@@ -52,7 +64,8 @@ function renderRoute(initialEntry: string, path: string) {
 }
 
 async function clickWorkspaceSwitch() {
-	fireEvent.click(await screen.findByRole("button", { name: "Switch workspace" }));
+	const user = userEvent.setup();
+	await user.click(await screen.findByRole("button", { name: "Switch workspace" }));
 }
 
 describe("useWorkspaceSwitcher", () => {
@@ -70,6 +83,11 @@ describe("useWorkspaceSwitcher", () => {
 	it.each([
 		["mentor thread", "/w/alpha/mentor/thread-1?message=foreign", "mentor/$threadId"],
 		["user profile", "/w/alpha/user/octocat?group=foreign", "user/$username"],
+		[
+			"practice",
+			"/w/alpha/admin/practices/testing?status=foreign",
+			"admin/practices/$practiceSlug",
+		],
 	])("falls back to workspace home from a %s", async (_name, initialEntry, path) => {
 		const router = renderRoute(initialEntry, path);
 
@@ -80,5 +98,15 @@ describe("useWorkspaceSwitcher", () => {
 			description:
 				"This page is specific to the previous workspace, so we opened the new workspace's home page.",
 		});
+	});
+
+	it("does nothing when the selected workspace is already active", async () => {
+		const router = renderRoute("/w/alpha/mentor/thread-1?message=current", "mentor/$threadId");
+		const user = userEvent.setup();
+
+		await user.click(await screen.findByRole("button", { name: "Keep workspace" }));
+
+		expect(router.state.location.href).toBe("/w/alpha/mentor/thread-1?message=current");
+		expect(toast.info).not.toHaveBeenCalled();
 	});
 });

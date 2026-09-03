@@ -1,19 +1,23 @@
-import { useMatches, useNavigate } from "@tanstack/react-router";
+import { useNavigate, useParams } from "@tanstack/react-router";
 import { toast } from "sonner";
-
-import { getWorkspaceRouteMatch, isPortableWorkspaceRoute } from "@/lib/workspace-switching";
 
 export function useWorkspaceSwitcher() {
 	const navigate = useNavigate();
-	const portable = useMatches({
-		select: (matches) =>
-			isPortableWorkspaceRoute(getWorkspaceRouteMatch(matches.map(({ params }) => ({ params })))),
-	});
+	const params = useParams({ strict: false });
+	const currentWorkspaceSlug =
+		"workspaceSlug" in params && typeof params.workspaceSlug === "string"
+			? params.workspaceSlug
+			: undefined;
+	const portable =
+		currentWorkspaceSlug !== undefined &&
+		Object.keys(params).every((parameter) => parameter === "workspaceSlug");
 
-	return (workspace: { displayName: string; workspaceSlug: string }) => {
+	return async (workspace: { displayName: string; workspaceSlug: string }) => {
 		const { displayName, workspaceSlug } = workspace;
+		if (workspaceSlug === currentWorkspaceSlug) return;
+
 		if (portable) {
-			void navigate({
+			await navigate({
 				to: ".",
 				params: (previous) => ({ ...previous, workspaceSlug }),
 				search: () => ({}),
@@ -22,7 +26,7 @@ export function useWorkspaceSwitcher() {
 			return;
 		}
 
-		void navigate({
+		await navigate({
 			to: "/w/$workspaceSlug",
 			params: { workspaceSlug },
 			search: () => ({}),
