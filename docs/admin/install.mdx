@@ -86,9 +86,12 @@ node scripts/prepare-release-lock.ts "v$VERSION"
 cd docker/self-host
 ```
 
-`setup.sh` creates or updates `.env` with mode `0600` and generates the database password,
-credential-encryption key, OAuth state-cookie key, webhook secret, and message-broker credentials.
-It does not replace non-empty values and never prints a secret.
+`setup.sh` creates or updates `.env` with mode `0600` and generates the database password, both
+encryption keys — `HEPHAESTUS_SECURITY_ENCRYPTION_KEY` and
+`HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY` — the OAuth state-cookie key, the webhook secret,
+and the message-broker credentials. It does not replace non-empty values and never prints a secret.
+Changing either encryption key on an existing installation makes everything encrypted under the old
+one unreadable.
 
 Everything below runs from `/opt/hephaestus/docker/self-host`. After step 2 supplies the remaining
 required values, `docker compose config` renders the effective configuration. Before then it exits
