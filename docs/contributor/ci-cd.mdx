@@ -37,8 +37,10 @@ Every push to `main` builds and attests multi-architecture images for that commi
 Version PR; merging the Version PR cuts a release that promotes those images by digest —
 [Release management](./release-management.mdx). Pull requests and merge groups build `linux/amd64`
 only; a merge group has its own SHA, so its images are never the ones a release promotes. The
-exception is the Version PR's branch, where every run builds both architectures, because the release
-evidence preflight that guards that branch evidences each image on both published platforms.
+exception is the Version PR's branch, where every run builds every release image on both
+architectures, whichever event started it, because the release evidence preflight that guards that
+branch evidences each image on both published platforms and can only evidence what the run
+published.
 
 ## Quality gates
 
@@ -136,6 +138,9 @@ Preview environments do not need to be created in advance. The preview workflow 
 Add the `preview` label to a same-repository pull request. Every push redeploys, and a preview does
 not wait for tests. `Docker` rebuilds the images whose inputs changed and its `Tag unchanged images`
 job aliases the base commit's verified digests for the rest, so every image exists at the head SHA.
+An alias serves a preview and never release evidence: when the base commit's image is still
+publishing it falls back to the candidate the merged pull request built, which carries `linux/amd64`
+alone. That is why the Version PR's branch builds every image itself instead.
 
 A sticky comment carries the URL, and GitHub records each accepted update as the transient
 environment `preview/pr-N`, so the pull request's **View deployment** link opens it too.
@@ -275,8 +280,9 @@ nothing that ships, so they compile from source in `Test` and do not wait for pa
 - `Quality` legs and `Test` suites start from source; `Build` gates start when `App Server: Package`
   uploads its artifact.
 - Pull requests and merge groups build `linux/amd64`; pushes to `main`, and every run on the Version
-  PR's branch, build both architectures. `detect-changes` decides that once and hands it to every
-  image build in the run.
+  PR's branch, build both architectures. A pull request also builds only the images its diff touched
+  and aliases the rest, while the Version PR's branch builds all of them. `detect-changes` decides
+  both once, as `single-arch` and `all-images`, and hands them to every image build in the run.
 - The `Quality` matrix uses `fail-fast: false`; the image matrix in `reusable-docker-build.yml` uses
   `fail-fast: true`.
 - Pull-request runs cancel superseded runs; `release.yml` never cancels.

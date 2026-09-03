@@ -60,6 +60,15 @@ jobs:
       # than by it, and the preflight can only find it in a manifest that exists. That branch is a
       # single pull request, and it is the one whose merge cuts the release.
       single-arch: ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group') && steps.version_branch.outputs.version-branch != 'true' }}
+      # Whether this run publishes every release image itself, rather than building what its diff
+      # touched and aliasing the rest from `main`. Aliasing is right for a preview and wrong on the
+      # Version PR's branch, for two reasons that both hold every time: the alias falls back to the
+      # candidate the merged pull request built, which is `linux/amd64` alone, and it falls back
+      # because `main`'s own push run — started by the same push that wrote this head — has not
+      # published anything yet when the alias runs. Neither is a race the preflight can win by
+      # waiting, so that branch builds the whole set under any event, which is what the dispatch run
+      # on it already did.
+      all-images: ${{ github.event_name != 'pull_request' || steps.version_branch.outputs.version-branch == 'true' }}
       # A Version PR head is validated once per head commit, never inherited from an earlier run that
       # matched its tree: a skipped duplicate would skip the image builds the preflight below needs,
       # and the gate refuses to pass on that branch without a preflight.
@@ -371,11 +380,11 @@ jobs:
     with:
       should_skip: ${{ needs.detect-changes.outputs.should_skip }}
       single_arch: ${{ needs.detect-changes.outputs.single-arch }}
-      server_changed: ${{ (needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.e2e == 'true' || needs.detect-changes.outputs.postgres-image == 'true' || needs.detect-changes.outputs.build-config == 'true' || needs.detect-changes.outputs.application-server-image == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+      server_changed: ${{ (needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.e2e == 'true' || needs.detect-changes.outputs.postgres-image == 'true' || needs.detect-changes.outputs.build-config == 'true' || needs.detect-changes.outputs.application-server-image == 'true' || needs.detect-changes.outputs.all-images == 'true') && 'true' || 'false' }}
       contracts_changed: ${{ (github.event_name != 'push' || needs.detect-changes.outputs.version-bump == 'true') && (needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.postgres-image == 'true' || needs.detect-changes.outputs.build-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       e2e_changed: ${{ (github.event_name != 'push' || needs.detect-changes.outputs.version-bump == 'true') && (needs.detect-changes.outputs.e2e == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       postgres_image_changed: ${{ (needs.detect-changes.outputs.postgres-image == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
-      server_image_changed: ${{ (needs.detect-changes.outputs.application-server-image == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+      server_image_changed: ${{ (needs.detect-changes.outputs.application-server-image == 'true' || needs.detect-changes.outputs.all-images == 'true') && 'true' || 'false' }}
 
   Security:
     uses: ./.github/workflows/ci-security-scan.yml
@@ -450,10 +459,10 @@ jobs:
     with:
       should_skip: ${{ needs.detect-changes.outputs.should_skip }}
       single_arch: ${{ needs.detect-changes.outputs.single-arch }}
-      webapp_changed: ${{ (needs.detect-changes.outputs.webapp-image == 'true' || needs.detect-changes.outputs.docker-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
-      application_server_changed: ${{ (needs.detect-changes.outputs.application-server-image == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
-      agent_images_changed: ${{ (needs.detect-changes.outputs.agent-images == 'true' || needs.detect-changes.outputs.docker-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
-      postgres_image_changed: ${{ (needs.detect-changes.outputs.postgres-image == 'true' || needs.detect-changes.outputs.docker-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+      webapp_changed: ${{ (needs.detect-changes.outputs.webapp-image == 'true' || needs.detect-changes.outputs.docker-config == 'true' || needs.detect-changes.outputs.all-images == 'true') && 'true' || 'false' }}
+      application_server_changed: ${{ (needs.detect-changes.outputs.application-server-image == 'true' || needs.detect-changes.outputs.all-images == 'true') && 'true' || 'false' }}
+      agent_images_changed: ${{ (needs.detect-changes.outputs.agent-images == 'true' || needs.detect-changes.outputs.docker-config == 'true' || needs.detect-changes.outputs.all-images == 'true') && 'true' || 'false' }}
+      postgres_image_changed: ${{ (needs.detect-changes.outputs.postgres-image == 'true' || needs.detect-changes.outputs.docker-config == 'true' || needs.detect-changes.outputs.all-images == 'true') && 'true' || 'false' }}
 
   # Everything the release evidence gate checks, against the images this run just built, except the
   # signatures and attestations that do not exist until a release creates them. A release was the
