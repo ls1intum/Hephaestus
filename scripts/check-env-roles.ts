@@ -18,6 +18,15 @@
  *                  at all, so setting it in `.env` does nothing. A setting that is not meant to be
  *                  operator-tunable is written without a placeholder and is never in scope here.
  *
+ * The mirror image is a setting no role gates. Every container running the application image reads
+ * it, so the value one of them is given is a claim about the whole deployment, and two containers
+ * making different claims describe a stack that does not exist:
+ *
+ *   disagreed    — application containers spell one setting differently. That is how the release
+ *                  lock's agent image digest reached the app containers and not the webhook
+ *                  receiver, which derived a tag from its own version instead and then refused to
+ *                  boot on it, because the guards that read it are deliberately not role-gated.
+ *
  * `ROLE_SCOPES` is the only thing to extend. It is keyed on `application.yml` paths rather than on
  * whole property records because ownership is finer than a record: `hephaestus.webhook.secret` is
  * read on the server role (outbound registration) while `hephaestus.webhook.stream.*` is read on the
@@ -89,6 +98,27 @@ const ROLE_FLAGS: Record<Role, string> = {
 	webhook: "HEPHAESTUS_RUNTIME_WEBHOOK_ENABLED",
 };
 
+/**
+ * The lock variable naming the one image every role boots from. A service running it is an
+ * application container: whichever slice of the context its roles leave out, the ungated beans — and
+ * therefore every setting not listed in `ROLE_SCOPES` — are there and read on it.
+ */
+const APPLICATION_IMAGE = "HEPHAESTUS_IMAGE_APPLICATION_SERVER";
+
+/**
+ * Keys an application container is meant to spell differently from its siblings, because they are
+ * what makes it that slice of the deployment rather than another. Everything else describes the
+ * deployment, which is one thing: the roles differ, the stack they run in does not.
+ */
+const PER_CONTAINER = new Map<string, string>([
+	["SPRING_PROFILES_ACTIVE", "the profile list is how a container selects the slice it boots"],
+	[ROLE_FLAGS.server, "the role flags are the split itself"],
+	[ROLE_FLAGS.worker, "the role flags are the split itself"],
+	[ROLE_FLAGS.webhook, "the role flags are the split itself"],
+	["SPRING_LIQUIBASE_ENABLED", "one container owns the migration and the rest must not race it"],
+	["THC_PATH", "the receiver reports NATS through readiness; the others answer liveness"],
+]);
+
 /** `application-<profile>.yml` turns roles off too, so a service's profiles decide as much as its env. */
 const PROFILE_YML = (profile: string): string =>
 	`server/application/src/main/resources/application-${profile}.yml`;
@@ -135,8 +165,11 @@ const isStructural = (line: string): boolean =>
  * own answer, and the only one that is the same on every machine. `${VAR:-d}` and `${VAR-d}` fall
  * back to `d`; a bare `${VAR}` resolves to the empty string, exactly as Compose leaves it.
  */
+/** The value as the file writes it: trimmed, with the quotes YAML would have dropped anyway. */
+const unquote = (raw: string): string => raw.trim().replace(/^["']|["']$/g, "");
+
 export function composeDefault(raw: string): string {
-	const value = raw.trim().replace(/^["']|["']$/g, "");
+	const value = unquote(raw);
 	const placeholder = /^\$\{[A-Z0-9_]+(?<dash>:?-)?(?<fallback>[^}]*)\}$/.exec(value);
 	if (!placeholder) return value;
 	// The `-` is the only optional part: a placeholder without it offers no fallback at all, and
@@ -194,6 +227,14 @@ export interface ComposeService {
 	readonly name: string;
 	readonly env: Set<string>;
 	readonly flags: Map<string, string>;
+	/**
+	 * What the file writes for each key it spells itself, before interpolation. `flags` answers what
+	 * an operator who sets nothing gets, and two services can agree on that and still be handed
+	 * different values — `${VAR:?required}` and a valueless key both resolve to nothing here.
+	 */
+	readonly raw: Map<string, string>;
+	/** The `image:` line, uninterpolated, so a service can be recognised by the image it runs. */
+	image: string;
 }
 
 /**
@@ -226,7 +267,12 @@ export function readComposeServices(text: string): Map<string, ComposeService> {
 		}
 		if (top !== "services") continue;
 		if (path.length === 2) {
-			services.set(key, { name: key, env: new Set(), flags: new Map() });
+			services.set(key, { name: key, env: new Set(), flags: new Map(), raw: new Map(), image: "" });
+			continue;
+		}
+		if (path.length === 3 && key === "image" && serviceName !== undefined) {
+			const named = services.get(serviceName);
+			if (named) named.image = unquote(value);
 			continue;
 		}
 		if (path.length !== 4 || section !== "environment" || serviceName === undefined) continue;
@@ -241,6 +287,7 @@ export function readComposeServices(text: string): Map<string, ComposeService> {
 		}
 		service.env.add(key);
 		service.flags.set(key, composeDefault(value));
+		service.raw.set(key, unquote(value));
 	}
 	return services;
 }
@@ -305,6 +352,8 @@ interface DeliveredVariable {
 interface Analysis {
 	readonly failures: string[];
 	readonly delivered: ReadonlyMap<string, DeliveredVariable>;
+	/** Ids of the services running the application image, so a caller can check the set was found. */
+	readonly applicationContainers: readonly string[];
 }
 
 export function analyse(
@@ -333,6 +382,7 @@ export function analyse(
 	}
 
 	const delivered = new Map<string, DeliveredVariable>();
+	const applicationContainers: Delivery[] = [];
 	for (const [label, text] of compose) {
 		const services = readComposeServices(text);
 		if (services.size === 0) {
@@ -343,6 +393,7 @@ export function analyse(
 		}
 		for (const [name, service] of services) {
 			const id = `${label}:${name}`;
+			if (service.image.includes(APPLICATION_IMAGE)) applicationContainers.push({ id, service });
 			for (const variable of service.env) {
 				const scope = ownership.get(variable);
 				if (!scope) continue;
@@ -380,7 +431,34 @@ export function analyse(
 		);
 	}
 
-	return { failures, delivered };
+	// The other half of ROLE_SCOPES. A setting nothing gates on a role is read by every container
+	// running the application image, so the value one of them is handed is a claim about the whole
+	// deployment — and two containers making different claims describe a stack that does not exist.
+	// The release lock's agent digest reached the app containers and not the receiver that way; the
+	// receiver derived a tag from its own version instead and the pin guard refused to boot on it.
+	const spellings = new Map<string, Map<string, string[]>>();
+	for (const { id, service } of applicationContainers) {
+		for (const [variable, value] of service.raw) {
+			if (PER_CONTAINER.has(variable)) continue;
+			const byValue = spellings.get(variable) ?? new Map<string, string[]>();
+			spellings.set(variable, byValue);
+			byValue.set(value, [...(byValue.get(value) ?? []), id]);
+		}
+	}
+	for (const [variable, byValue] of spellings) {
+		if (byValue.size < 2) continue;
+		const written = [...byValue]
+			.map(([value, ids]) => `    ${value === "" ? "<nothing>" : value}\n      ${ids.join(", ")}`)
+			.join("\n");
+		failures.push(
+			`Containers running the application image disagree on ${variable}:\n${written}\n` +
+				"  No runtime role gates this setting, so every one of them reads it and they cannot both\n" +
+				"  be describing the same deployment.\n" +
+				`  Give them one value, or name ${variable} in PER_CONTAINER with the reason it differs.`,
+		);
+	}
+
+	return { failures, delivered, applicationContainers: applicationContainers.map((c) => c.id) };
 }
 
 if (process.argv[1] === import.meta.filename) {
@@ -389,7 +467,7 @@ if (process.argv[1] === import.meta.filename) {
 		compose.push([file, await readFile(join(REPO_ROOT, file), "utf8")]);
 	}
 	const profileRoles = await readProfileRoles();
-	const { failures, delivered } = analyse(
+	const { failures, delivered, applicationContainers } = analyse(
 		await readFile(join(REPO_ROOT, APPLICATION_YML), "utf8"),
 		compose,
 		profileRoles,
@@ -399,6 +477,7 @@ if (process.argv[1] === import.meta.filename) {
 		process.exit(1);
 	}
 	console.log(
-		`check-env-roles: ${delivered.size} role-scoped variable(s) reach a container that runs their role.`,
+		`check-env-roles: ${delivered.size} role-scoped variable(s) reach a container that runs their role, ` +
+			`and ${applicationContainers.length} application container(s) agree on every setting that is not role-scoped.`,
 	);
 }
