@@ -30,6 +30,27 @@ void test("Renovate creates bounded update PRs without a manual dispatch queue",
 	);
 });
 
+void test("every pin of one toolchain version moves in a single pull request", () => {
+	// Renovate merges every matching packageRule in order, so the last one to set a key wins.
+	assert.ok(Array.isArray(config.packageRules));
+	const rules = config.packageRules.filter(isRecord);
+	const ungrouped = rules.findLastIndex((rule) => rule.groupName === null);
+	assert.ok(ungrouped >= 0, "a rule must ungroup majors for the toolchain rules to reinstate it");
+	for (const [depName, groupName] of [
+		["node", "Node.js toolchain"],
+		["pnpm", "pnpm toolchain"],
+		["ghcr.io/pnpm/pnpm", "pnpm toolchain"],
+		["@earendil-works/pi-coding-agent", "Pi SDK"],
+	]) {
+		const index = rules.findLastIndex(
+			(rule) => Array.isArray(rule.matchDepNames) && rule.matchDepNames.includes(depName),
+		);
+		assert.equal(rules[index]?.groupName, groupName, `${depName} must be grouped as ${groupName}`);
+		assert.equal(rules[index]?.matchUpdateTypes, undefined, `${depName} groups every update type`);
+		assert.ok(index > ungrouped, `${depName} must be grouped after majors are ungrouped`);
+	}
+});
+
 void test("vulnerability remediation bypasses normal update latency", () => {
 	assert.equal(config.osvVulnerabilityAlerts, true);
 	assert.equal(config.dependencyDashboardOSVVulnerabilitySummary, "unresolved");
@@ -58,6 +79,16 @@ void test("every custom manager extracts a dependency from its real source", asy
 			["server/application/project.toml"],
 		],
 		["Track the OpenAPI Generator CLI distribution", ["openapitools.json"]],
+		["Track the Node.js pin in devEngines", ["package.json"]],
+		["Track the pnpm pin in devEngines", ["package.json"]],
+		[
+			"Track the Pi SDK pin in the live agent tests",
+			[
+				"server/application/src/test/java/de/tum/cit/aet/hephaestus/agent/mentor/live/MentorLiveLlmTest.java",
+				"server/application/src/test/java/de/tum/cit/aet/hephaestus/agent/mentor/live/MentorSandboxStressTest.java",
+				"server/application/src/test/java/de/tum/cit/aet/hephaestus/agent/practice/live/PracticeRunnerLiveLlmTest.java",
+			],
+		],
 		["Track release image tags and digests", ["security/release-images.json"]],
 	]);
 	assert.ok(Array.isArray(config.customManagers));
