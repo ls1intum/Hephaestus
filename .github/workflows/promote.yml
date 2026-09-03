@@ -2,7 +2,9 @@
 #
 # The hosts pin this workflow's identity, and a GitHub environment gates it, so a signature carrying
 # that identity is proof its reviewers approved. That holds only while this workflow stays
-# non-reusable: a `workflow_call` trigger would let any caller mint the same identity.
+# non-reusable: a `workflow_call` trigger would let any caller mint the same identity. The release
+# reaches staging by dispatching this workflow, not by triggering on its completion, so no run here
+# inherits a context it did not ask for.
 name: Promote
 
 on:
@@ -25,23 +27,17 @@ on:
         description: Hold the environment where it is and ignore this release
         type: boolean
         default: false
-  # A published release moves staging on its own; production is only ever moved by hand above.
-  workflow_run:
-    workflows: [Release]
-    types: [completed]
-
 permissions: {}
 
 concurrency:
-  group: promote-${{ inputs.environment || 'Staging' }}
+  group: promote-${{ inputs.environment }}
   cancel-in-progress: false
 
 jobs:
   promote:
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    environment: ${{ inputs.environment || 'Staging' }}
+    environment: ${{ inputs.environment }}
     permissions:
       contents: write
       id-token: write
@@ -60,8 +56,7 @@ jobs:
           REQUESTED: ${{ inputs.release }}
         run: |
           set -euo pipefail
-          # A dispatch names the release; the automatic staging promotion takes the newest one.
-          release="${REQUESTED:-$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)}"
+          release="$REQUESTED"
           [[ "$release" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
             echo "::error::Promote an immutable vX.Y.Z release, not '$release'"; exit 1; }
           # A draft is a half-published release; refusing it here keeps it off a host.
@@ -72,7 +67,7 @@ jobs:
 
       - name: Write and sign the channel
         env:
-          CHANNEL: ${{ inputs.environment && format('{0}', inputs.environment) || 'Staging' }}
+          CHANNEL: ${{ inputs.environment }}
           RELEASE: ${{ steps.release.outputs.release }}
           ALLOW_ROLLBACK: ${{ inputs.allow-rollback || false }}
           FREEZE: ${{ inputs.freeze || false }}
