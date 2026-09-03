@@ -210,6 +210,9 @@ configs:
       jetstream {
         store_dir: "/data"
         max_mem: ${NATS_JS_MAX_MEM:-4G}
+        # Per-message fsync protects R1 acknowledgements at a throughput cost:
+        # https://jepsen.io/analyses/nats-2.12.1
+        sync_interval: always
         # In bytes, and shared with HEPHAESTUS_WEBHOOK_STREAM_STORAGE_BUDGET above so the two cannot
         # drift. A byte count is the one literal NATS and Spring read identically. Keep it under the
         # free space on this volume — docs/admin/webhook-ingestion-operations says what happens if not.

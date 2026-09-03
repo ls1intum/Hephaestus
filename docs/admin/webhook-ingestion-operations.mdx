@@ -14,6 +14,24 @@ receiver and the consumer is gone.
 This page is what to watch, what to set, and what to do when it goes wrong. Why it is built this way
 is [ADR 0008](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0008-webhook-runtime-role.md).
 
+## Durability and availability
+
+The supported Compose topology runs one NATS server and every webhook stream has one replica (R1).
+The bundled broker sets `sync_interval: always`, so it calls `fsync` for each message before
+acknowledging it. An acknowledged webhook or integration-sync event therefore survives host power
+loss or an unclean shutdown, provided the storage stack honours `fsync`. The
+[NATS durability documentation](https://docs.nats.io/nats-concepts/jetstream#syncing-data-to-disk)
+defines this guarantee; [Jepsen's NATS 2.12.1 analysis](https://jepsen.io/analyses/nats-2.12.1)
+demonstrates the acknowledged-write loss possible with periodic syncing.
+
+Waiting for durable storage costs write throughput and latency. R1 remains unavailable while its
+only server is down, and cannot survive loss or corruption of its only JetStream volume.
+
+A clustered profile with three servers and R3 streams can remain available after one server fails,
+as described by [NATS replicated storage](https://docs.nats.io/nats-concepts/jetstream/replication).
+That profile may use a longer sync interval after evaluating its failure model and latency budget;
+keep `always` to protect acknowledgements from a correlated, unclean shutdown of the whole cluster.
+
 ## What to alert on
 
 Metrics are Micrometer, exposed on the receiver's actuator endpoint, all tagged `stream` with one of
