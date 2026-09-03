@@ -1,0 +1,132 @@
+# Moves an environment to a release by writing its channel on `deploy-state`, which the hosts poll.
+#
+# This file is the production control. Cosign cannot check the certificate's environment claim, so
+# the hosts pin the *identity of this workflow* instead — and because a GitHub environment gates the
+# job below, a signature carrying this identity is proof the environment's reviewers approved. That
+# only holds while this workflow stays non-reusable: a `workflow_call` trigger would let any caller
+# mint the same identity, so it must never gain one.
+name: Promote
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Environment to move
+        type: choice
+        options: [Staging, Production]
+        required: true
+      release:
+        description: Release to run, as vX.Y.Z
+        type: string
+        required: true
+      allow-rollback:
+        description: Permit moving this environment backwards
+        type: boolean
+        default: false
+      freeze:
+        description: Hold the environment where it is and ignore this release
+        type: boolean
+        default: false
+  # A published release moves staging on its own; production is only ever moved by hand above.
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+
+permissions: {}
+
+concurrency:
+  group: promote-${{ inputs.environment || 'Staging' }}
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: ${{ inputs.environment || 'Staging' }}
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: deploy-state
+          persist-credentials: false
+
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Resolve the release to promote
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUESTED: ${{ inputs.release }}
+        run: |
+          set -euo pipefail
+          # A dispatch names the release; the automatic staging promotion takes whatever the release
+          # that just finished published, which is the newest non-draft release.
+          release="${REQUESTED:-$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)}"
+          [[ "$release" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+            echo "::error::Promote an immutable vX.Y.Z release, not '$release'"; exit 1; }
+          # Refusing a draft here is what keeps a half-finished release from reaching a host.
+          [ "$(gh release view "$release" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)" = false ] || {
+            echo "::error::$release is still a draft"; exit 1; }
+          echo "release=$release" >> "$GITHUB_OUTPUT"
+          echo "version=${release#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Write and sign the channel
+        env:
+          CHANNEL: ${{ inputs.environment && format('{0}', inputs.environment) || 'Staging' }}
+          RELEASE: ${{ steps.release.outputs.release }}
+          ALLOW_ROLLBACK: ${{ inputs.allow-rollback || false }}
+          FREEZE: ${{ inputs.freeze || false }}
+        run: |
+          set -euo pipefail
+          channel=$(echo "$CHANNEL" | tr '[:upper:]' '[:lower:]')
+          mkdir -p channels
+          jq -n --arg release "$RELEASE" --argjson allowRollback "$ALLOW_ROLLBACK" \
+            --argjson freeze "$FREEZE" \
+            '{release: $release, allowRollback: $allowRollback, freeze: $freeze}' \
+            > "channels/${channel}.json"
+          cosign sign-blob --yes \
+            --bundle "channels/${channel}.json.sigstore.json" \
+            "channels/${channel}.json"
+          echo "CHANNEL_FILE=channels/${channel}.json" >> "$GITHUB_ENV"
+
+      - name: Publish the channel
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE: ${{ steps.release.outputs.release }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add channels
+          # A promotion that changes nothing must not create an empty commit: the hosts read the
+          # commit graph to tell forwards from backwards, and a no-op commit would read as forwards.
+          git diff --cached --quiet && { echo "Channel already at $RELEASE"; exit 0; }
+          git commit -m "chore(deploy): ${CHANNEL_FILE} -> ${RELEASE}"
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}" HEAD:deploy-state
+
+      - name: Wait for the environment to converge
+        if: ${{ !inputs.freeze }}
+        env:
+          EXPECTED: ${{ steps.release.outputs.version }}
+          HOSTNAME: ${{ vars.APP_HOSTNAME }}
+        run: |
+          set -euo pipefail
+          # The hosts pull, so nothing here can push them; the deploy is only observed. The webapp
+          # publishes the version it is running in its runtime config, which is what makes this
+          # observable at all without granting the runner any access to the host.
+          deadline=$(( SECONDS + 900 ))
+          while [ "$SECONDS" -lt "$deadline" ]; do
+            config=$(curl -fsS --max-time 20 "https://${HOSTNAME}/" |
+              grep -oE '/env-config\.[a-f0-9]{8}\.js' | head -1 || true)
+            if [ -n "$config" ]; then
+              running=$(curl -fsS --max-time 20 "https://${HOSTNAME}${config}" |
+                sed -nE 's/.*APPLICATION_VERSION: "([^"]*)".*/\1/p' | head -1 || true)
+              [ "$running" = "$EXPECTED" ] && { echo "Converged on $running"; exit 0; }
+            fi
+            sleep 20
+          done
+          echo "::error::${HOSTNAME} did not reach ${EXPECTED} within 15 minutes"
+          exit 1

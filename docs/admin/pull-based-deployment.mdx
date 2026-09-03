@@ -1,0 +1,108 @@
+---
+id: pull-based-deployment
+title: Pull-Based Deployment
+description: Let a host keep itself on the release its channel names, verifying the signature itself, with nothing dialing in.
+---
+
+A host can upgrade itself. It polls a **channel** — one file naming a release — verifies the
+signatures, and applies the release's digest-pinned Compose stacks. Nothing connects *to* the host,
+so no deployment credential exists anywhere off it.
+
+This is the same verification the manual upgrade in [Install](./install.mdx#upgrades) performs, on a
+timer.
+
+## What the host trusts
+
+Two signatures, both checked on the host:
+
+| Artifact | Signed by | Answers |
+| --- | --- | --- |
+| The channel (`channels/<env>.json`) | the promotion workflow | *may this host move, and who said so* |
+| The release lock (`release-<version>.json`) | the release workflow | *which exact image digests are this release* |
+
+A signature proves who wrote something, never that it is the newest thing they wrote — a valid old
+channel replayed verifies perfectly. Freshness therefore comes from the commit graph: the channel
+lives on the `deploy-state` branch, and a commit that is an ancestor of the one already applied is a
+move backwards, refused unless the channel sets `allowRollback`.
+
+## The channel
+
+```json
+{ "release": "v1.2.3", "allowRollback": false, "freeze": false }
+```
+
+| Field | Effect |
+| --- | --- |
+| `release` | the immutable `vX.Y.Z` release this environment runs |
+| `allowRollback` | permits one deliberate move backwards |
+| `freeze` | holds the environment where it is, for an incident |
+
+## Install
+
+1. Put a checkout of this repository on the host. The reconciler only reads it, and creates release
+   worktrees under the state directory.
+2. Copy `docker/self-host/systemd/reconcile.env.example` to `/etc/hephaestus/reconcile.env`
+   (`root:root`, `0600`) and set the channel, the stacks this host owns, and the promotion identity.
+3. Put one `<stack>.env` per stack in `/etc/hephaestus`, `0600`. These hold the deployment secrets
+   and never leave the host.
+4. Install the units:
+
+   ```bash
+   sudo install -m 644 docker/self-host/systemd/hephaestus-reconcile.service \
+     docker/self-host/systemd/hephaestus-reconcile.timer \
+     docker/self-host/systemd/hephaestus-reconcile-notify@.service /etc/systemd/system/
+   sudo systemctl daemon-reload
+   sudo systemctl enable --now hephaestus-reconcile.timer
+   ```
+
+5. Watch the first run: `journalctl -fu hephaestus-reconcile.service`.
+
+`HEPHAESTUS_STACKS` is what a host owns. A host whose edge belongs to something else — a shared
+proxy, or a PaaS serving preview environments beside it — omits `proxy` and keeps `core app`.
+
+## Operating it
+
+| You want to | Do this |
+| --- | --- |
+| Move an environment | Run the **Promote** workflow: pick the environment and release |
+| Roll back | Promote the older release with **allow-rollback** |
+| Hold an environment | Promote with **freeze** |
+| Stop the host reconciling, right now | `sudo systemctl disable --now hephaestus-reconcile.timer` |
+| See what a host runs | `cat /var/lib/hephaestus/applied.json` |
+
+:::warning Disable the timer before hand-patching a host
+A reconciler reapplies its channel. Manual changes to a stack it owns are reverted at the next tick,
+which during an incident is the last thing you want. Disable the timer first, and re-enable it when
+the fix has landed in a release.
+:::
+
+## Watching it
+
+With `HEPHAESTUS_METRICS_FILE` set, each run writes to the node_exporter textfile collector:
+
+```text
+hephaestus_deploy_info{channel="staging",release="v1.2.3",channel_commit="…"} 1
+hephaestus_deploy_reconcile_success 1
+hephaestus_deploy_reconcile_timestamp_seconds …
+hephaestus_deploy_last_success_timestamp_seconds …
+```
+
+**Alert on staleness.** A host that stops reconciling is silent, not loud — that is the one real cost
+of pulling instead of being pushed to. Alert when
+`time() - hephaestus_deploy_last_success_timestamp_seconds` exceeds ten minutes, or when
+`hephaestus_deploy_reconcile_success` is `0`. Without that alert, a host can sit on an old release
+indefinitely and nothing will say so.
+
+The promotion workflow also waits for the environment to report the new version before it goes
+green, so an unconverged deploy fails in Actions as well.
+
+## What it will not do
+
+**It does not roll back a failed deploy.** A failed apply stops and alerts. Schema changes here are
+forward-only, so putting the previous images back would leave old code on a migrated database — the
+failure the rollback was meant to prevent. Recover by promoting a release that fixes the problem, or
+by restoring from a backup if the database itself is wrong; see
+[Backup & Restore](./backup-restore.mdx).
+
+**It does not manage anything it does not own.** The reconciler touches only the Compose projects
+named in `HEPHAESTUS_STACKS`. Containers belonging to anything else on the host are left alone.

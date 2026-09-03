@@ -1,0 +1,43 @@
+# Brings this host to the release its channel names. Install alongside hephaestus-reconcile.timer
+# and an environment file at /etc/hephaestus/reconcile.env; see docker/self-host/systemd/README.md.
+[Unit]
+Description=Reconcile this host to its Hephaestus release channel
+Documentation=https://docs.hephaestus.build/admin/pull-based-deployment
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+OnFailure=hephaestus-reconcile-notify@%n.service
+
+[Service]
+# Deliberately not RemainAfterExit: that would leave the unit "active" after the first run, and
+# systemd does not restart a unit that is already active when its timer elapses — every later tick
+# would silently do nothing.
+Type=oneshot
+EnvironmentFile=/etc/hephaestus/reconcile.env
+# systemd already refuses to start a second copy of a running oneshot. The lock is for the other
+# path: an operator or a stray cron entry invoking the script directly while a tick is in flight.
+ExecStart=/usr/bin/flock --nonblock /run/lock/hephaestus-reconcile.lock \
+    /usr/bin/node ${HEPHAESTUS_CHECKOUT}/scripts/reconcile-deployment.ts
+TimeoutStartSec=30min
+
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ReadWritePaths=/var/lib/hephaestus /run/lock
+# The Docker socket is reached over AF_UNIX; omitting it here breaks connect(2). Read-only
+# directory protections do not block Unix sockets, so ProtectSystem=strict leaves it reachable.
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+LockPersonality=yes
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+
+# None of the above reduces what this unit can ultimately do: write access to the Docker socket is
+# root-equivalent on the host by design, so the hardening bounds this process, not the daemon it
+# asks to act. Rootless Podman with Quadlet is the only structural escape, and it is a migration
+# rather than a setting.
+
+[Install]
+WantedBy=multi-user.target
