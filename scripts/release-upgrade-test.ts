@@ -217,19 +217,19 @@ async function applyAdoption(url: string, cookie: string, expectedStatus: number
 
 /**
  * A workspace no longer receives a copy of the instance catalog when it is created — an
- * administrator adopts the practices the workspace reviews. So the drill adopts one, which is what
- * gives the upgrade a workspace practice to carry. Releases that still seeded on creation expose no
- * adoption endpoint; a 404 there means the catalog arrived on its own and there is nothing to adopt.
+ * administrator adopts the practices the workspace reviews. Returns whether it adopted anything: a
+ * release that predates adoption exposes no endpoint (404), and a release that seeded the whole
+ * catalog on creation leaves nothing on offer. Both mean the workspace already has its practices.
  */
-async function adoptCatalogPractices(port: number, cookie: string): Promise<void> {
+async function adoptCatalogPractices(port: number, cookie: string): Promise<boolean> {
 	const catalog = `http://127.0.0.1:${port}/workspaces/${WORKSPACE_SLUG}/practice-catalog/adoption`;
 	const offered = await fetch(catalog, { headers: { cookie } });
-	if (offered.status === 404) return;
+	if (offered.status === 404) return false;
 	if (!offered.ok)
 		throw new Error(`Adoptable practices returned ${offered.status}: ${await offered.text()}`);
 	const body: unknown = await offered.json();
-	if (!Array.isArray(body) || body.length === 0)
-		throw new Error("Previous release offered no catalog practice to adopt");
+	if (!Array.isArray(body)) throw new Error("Adoptable practices did not return a list");
+	if (body.length === 0) return false;
 	const entries = body.filter(
 		(entry: unknown): entry is { slug: string; groupSlug?: string } =>
 			typeof entry === "object" &&
@@ -243,9 +243,10 @@ async function adoptCatalogPractices(port: number, cookie: string): Promise<void
 	const group = entries.find((entry) => typeof entry.groupSlug === "string");
 	if (group?.groupSlug !== undefined) {
 		await applyAdoption(`${catalog}/groups/${group.groupSlug}`, cookie, 200);
-		return;
+		return true;
 	}
 	await applyAdoption(`${catalog}/${first.slug}`, cookie, 201);
+	return true;
 }
 
 function linkWorkspaceIdentity(): void {
@@ -339,15 +340,6 @@ function appliedChangeCount(): number {
 	return count("SELECT count(*) FROM databasechangelog;");
 }
 
-async function waitForWorkspacePractices(): Promise<number> {
-	for (let attempt = 0; attempt < 60; attempt++) {
-		const catalogSize = seededCatalogSize();
-		if (catalogSize > 0) return catalogSize;
-		await sleep(1_000);
-	}
-	throw new Error("Previous release left the workspace without a practice within 60 seconds");
-}
-
 try {
 	docker("network", "create", network);
 	docker(
@@ -385,14 +377,15 @@ try {
 	await login(port, "root");
 	linkWorkspaceIdentity();
 	await seedWorkspace(port, previousCookie);
-	await adoptCatalogPractices(port, previousCookie);
 	await assertCoreReads(port, previousCookie);
 	const seededData = dataFingerprint();
 	for (const kind of ["account", "identity", "user", "workspace", "membership", "connection"]) {
 		if (!seededData.includes(`${kind}|`))
 			throw new Error(`Previous release did not seed ${kind} data`);
 	}
-	const seededPractices = await waitForWorkspacePractices();
+	// Whatever the previous release left the workspace holding: a release that seeded the catalog on
+	// creation leaves the whole of it, and a release that expects adoption leaves none.
+	const seededPractices = seededCatalogSize();
 	const previousChanges = appliedChangeCount();
 
 	docker("stop", "--time", "30", application);
@@ -416,6 +409,18 @@ try {
 	const candidateCookie = await login(port, "alice");
 	await completeTransparencyNotice(port, candidateCookie);
 	await assertCoreReads(port, candidateCookie);
+
+	// Adopting writes a practice, which fires the deferred projection trigger — the drill runs it on
+	// the upgraded release so a migration that leaves that trigger unable to commit fails here
+	// rather than in a workspace.
+	const adopted = await adoptCatalogPractices(port, candidateCookie);
+	const adoptedPractices = seededCatalogSize();
+	if (adopted && adoptedPractices <= upgradedPractices)
+		throw new Error(
+			`Adoption added no practice: before=${upgradedPractices}, after=${adoptedPractices}`,
+		);
+	if (adoptedPractices === 0)
+		throw new Error("Upgraded release left the workspace with no practice");
 
 	console.log("Seeded previous-release upgrade passed.");
 } catch (error) {

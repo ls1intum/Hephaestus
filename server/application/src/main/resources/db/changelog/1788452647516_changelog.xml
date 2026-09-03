@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+    <changeSet id="1788452647516-1" author="practice-projection-join">
+        <preConditions onFail="MARK_RAN" onFailMessage="practice projection trigger already joins practice_group by its own alias">
+            <sqlCheck expectedResult="1"><![CDATA[
+            SELECT count(*) FROM pg_proc
+            WHERE proname = 'enforce_practice_current_revision_projection'
+              AND pg_get_functiondef(oid) LIKE '%ON area.id = practice.practice_group_id%'
+            ]]></sqlCheck>
+        </preConditions>
+        <comment>Join the practice group by the alias the group vocabulary left it under, so writing a practice can commit.</comment>
+        <!--
+        1787844107869-2 renamed the area vocabulary to group by rewriting this function's own
+        definition with string replacements. `practice_area area` became `practice_group
+        practice_group` and `area.slug` became `practice_group.slug`, but the join predicate reads
+        `area.id`, which no replacement covered — so the deferred constraint trigger raised
+        `missing FROM-clause entry for table "area"` at COMMIT for every insert or update of a
+        practice's projected columns. Adopting a catalog practice, creating one and editing one all
+        failed with an internal error, and the startup catalog repair failed the same way.
+
+        The correction is the replacement that was missing, applied the same way rather than by
+        transcribing the body: the function has been rewritten twice already, and re-stating thirty
+        lines of predicate here would silently drop whatever a later change added to it.
+        -->
+        <sql splitStatements="false"><![CDATA[
+        DO $functions$
+        DECLARE
+            definition text;
+        BEGIN
+            SELECT pg_get_functiondef('enforce_practice_current_revision_projection()'::regprocedure)
+              INTO definition;
+            definition := replace(
+                definition,
+                'ON area.id = practice.practice_group_id',
+                'ON practice_group.id = practice.practice_group_id');
+            EXECUTE definition;
+        END
+        $functions$;
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+            DO $functions$
+            DECLARE
+                definition text;
+            BEGIN
+                SELECT pg_get_functiondef('enforce_practice_current_revision_projection()'::regprocedure)
+                  INTO definition;
+                definition := replace(
+                    definition,
+                    'ON practice_group.id = practice.practice_group_id',
+                    'ON area.id = practice.practice_group_id');
+                EXECUTE definition;
+            END
+            $functions$;
+            ]]></sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>
