@@ -385,7 +385,7 @@ void describe("CI contract", () => {
 		assert.match(job(source, "Compose"), /uses: \.\/\.github\/workflows\/ci-compose-validate\.yml/);
 	});
 
-	void test("builds pre-merge candidates on one architecture and final images on both", async () => {
+	void test("decides an image's architectures once, for every image the run builds", async () => {
 		const source = await readFile(".github/workflows/cicd.yml", "utf8");
 		const caller = job(source, "Docker");
 		for (const secret of ["SENTRY_AUTH_TOKEN", "SENTRY_ORG", "SENTRY_PROJECT"]) {
@@ -397,18 +397,24 @@ void describe("CI contract", () => {
 
 		const docker = await readFile(".github/workflows/ci-docker-build.yml", "utf8");
 		const build = await readFile(".github/workflows/ci-build.yml", "utf8");
+		// The architecture set is one decision, taken in cicd.yml and handed to every image build, so
+		// a run cannot evidence one image on both platforms and its sibling on one. The test below
+		// owns what that decision is; this owns that nothing decides it locally.
 		for (const image of [
 			job(docker, "webapp-build"),
 			job(docker, "agent-pi-build"),
 			job(docker, "postgres-build"),
 			job(build, "application-server-image"),
 		]) {
-			assert.match(
-				image,
-				/single-arch: \${{ github\.event_name == 'pull_request' \|\| github\.event_name == 'merge_group' }}/,
-			);
+			assert.match(image, /single-arch: \${{ inputs\.single_arch == 'true' }}/);
 			assert.doesNotMatch(image, /^\s+tags:/m);
 		}
+		for (const called of [docker, build])
+			// Required, and with no default: a caller that forgets it fails to start, rather than
+			// silently publishing one architecture where a release needs two.
+			assert.match(called, /^ {6}single_arch:\n(?: {8}.*\n)*? {8}required: true$/m);
+		for (const consumer of [job(source, "Build"), job(source, "Docker")])
+			assert.match(consumer, /single_arch: \${{ needs\.detect-changes\.outputs\.single-arch }}/);
 		const inherited = job(docker, "tag-unchanged-images");
 		assert.match(inherited, /HEAD_SHA/);
 		assert.match(inherited, /pr-\$PR_NUMBER/);
@@ -724,6 +730,37 @@ void describe("CI contract", () => {
 				true,
 				`preflight ${preflight} must fail the gate`,
 			);
+
+		// A demand the run cannot satisfy is not a gate, it is a wall. The preflight evidences every
+		// image on both published platforms — the vulnerability policy's match key includes the
+		// platform, so an arm64-only finding must not reach a release undiscovered (#1743) — and it
+		// can only do that for manifests that exist. So wherever the gate demands a preflight, the
+		// same run's image builds have to publish both. A pull request on that branch published
+		// `linux/amd64` alone and could not, which is what blocked v0.75.1.
+		const architectures = String(workflow.getIn([...detection, "outputs", "single-arch"]));
+		const shape =
+			/^\$\{\{ \(github\.event_name == '(\w+)' \|\| github\.event_name == '(\w+)'\) && steps\.version_branch\.outputs\.version-branch != 'true' }}$/.exec(
+				architectures,
+			);
+		assert.ok(shape, `this test cannot evaluate \`${architectures}\``);
+		const preMerge = shape.slice(1);
+		const bothPlatforms = (event: string, onVersionBranch: boolean): boolean =>
+			!preMerge.includes(event) || onVersionBranch;
+		const events = ["pull_request", "merge_group", "workflow_dispatch", "push"];
+		for (const onVersionBranch of [true, false]) {
+			const demanded = (await verdict({ "Release-preflight": "skipped" }, onVersionBranch)).failed;
+			for (const event of events)
+				assert.ok(
+					!demanded || bothPlatforms(event, onVersionBranch),
+					`a ${event} run that the gate demands a preflight from must publish both platforms`,
+				);
+		}
+		// And the cost stays where it was: everything else pre-merge is still one architecture, since
+		// a candidate image is only ever run on amd64 before it merges.
+		assert.deepEqual(
+			events.map((event) => bothPlatforms(event, false)),
+			[false, false, true, true],
+		);
 	});
 
 	void test("rescans main's images weekly and reports drift to an issue, not a status", async () => {

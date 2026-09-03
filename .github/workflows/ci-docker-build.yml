@@ -15,6 +15,12 @@ on:
         required: false
         type: string
         default: "false"
+      single_arch:
+        # No default: what a release is evidenced on is not a decision to make silently on a
+        # caller's behalf. cicd.yml derives it once, for every image build in the run.
+        description: "Whether to build linux/amd64 alone instead of the supported multi-architecture set"
+        required: true
+        type: string
       webapp_changed:
         description: "Whether webapp files changed (or should build for other reasons)"
         required: false
@@ -61,7 +67,7 @@ jobs:
       build-args: |
         SOURCE_COMMIT=${{ github.sha }}
         COOLIFY_BRANCH=${{ github.head_ref || github.ref_name }}
-      single-arch: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
+      single-arch: ${{ inputs.single_arch == 'true' }}
       labels: |
         org.opencontainers.image.title=Hephaestus Webapp
         org.opencontainers.image.description=Web client for Hephaestus
@@ -86,7 +92,7 @@ jobs:
       # Cache-busts the OS-package upgrade layer; this build imports the `cache-main` registry cache.
       build-args: |
         SOURCE_COMMIT=${{ github.sha }}
-      single-arch: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
+      single-arch: ${{ inputs.single_arch == 'true' }}
       labels: |
         org.opencontainers.image.title=Hephaestus Agent - Pi
         org.opencontainers.image.description=Sandboxed Pi coding agent for AI-powered code review
@@ -113,7 +119,7 @@ jobs:
       # Cache-busts the OS-package upgrade layer; this build imports the `cache-main` registry cache.
       build-args: |
         SOURCE_COMMIT=${{ github.sha }}
-      single-arch: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
+      single-arch: ${{ inputs.single_arch == 'true' }}
       labels: |
         org.opencontainers.image.title=Hephaestus Postgres
         org.opencontainers.image.description=PostgreSQL + pg_partman for all environments (dev/preview/prod)

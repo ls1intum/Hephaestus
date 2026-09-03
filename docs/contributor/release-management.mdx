@@ -57,7 +57,10 @@ sequenceDiagram
    whichever event started it, and `CI Status Gate` fails there unless the preflight succeeded in the
    same run. More than one run can report that gate for a Version PR head — a dispatch and an
    approved `pull_request` run both did for v0.75.1 — and the ruleset is satisfied by either, so a
-   green gate means the preflight passed only if no run can be green without it.
+   green gate means the preflight passed only if no run can be green without it. Every run on that
+   branch therefore builds both architectures, unlike the `linux/amd64` candidate an ordinary pull
+   request builds: the preflight evidences each image on both published platforms, and it can only
+   do that for manifests that exist.
 3. **The merge is checked again.** The merge commit's push runs CI/CD in full — a push to `main`
    repeats the source-validation legs only when it carries a version bump, which is exactly this
    commit — and `release.yml` starts only when that run succeeds.
@@ -154,8 +157,9 @@ The two signature entries are the only mode-conditional behaviour in the verifie
 contract test rather than a release. The third structural entry is not conditional at all — the
 verifier always demands a release version, and the preflight gives it the version the ref carries.
 
-The preflight is not free — it is a Syft and Trivy pass over every image on both architectures — so
-it runs only where its answer changes a decision: on every CI/CD run on the Version PR's branch, and
+The preflight is not free — it is a Syft and Trivy pass over every image on both architectures, plus
+the `linux/arm64` half of the image builds it reads, which no other pre-merge run pays for — so it
+runs only where its answer changes a decision: on every CI/CD run on the Version PR's branch, and
 on any manual CI/CD dispatch that ticks `release-preflight`. It reuses the images that run already built, so what it judges is the
 artefact a release of that ref would promote, not a stand-in.
 
