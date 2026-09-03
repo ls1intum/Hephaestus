@@ -23,6 +23,7 @@ const OTHER = "fedcba9876543210fedcba9876543210fedcba98";
 
 /** A review this module submitted: it carries the marker. */
 const ours = (over: Partial<Review> & Pick<Review, "id">): Review => ({
+	node_id: `review-${over.id}`,
 	state: "APPROVED",
 	commit_id: HEAD,
 	body: approvalBody("Maintainer"),
@@ -32,6 +33,7 @@ const ours = (over: Partial<Review> & Pick<Review, "id">): Review => ({
 
 /** A review somebody else submitted: no marker. */
 const theirs = (over: Partial<Review> & Pick<Review, "id">): Review => ({
+	node_id: `review-${over.id}`,
 	state: "APPROVED",
 	commit_id: HEAD,
 	body: "Looks good.",
@@ -64,10 +66,12 @@ interface GitHubOptions {
 	readonly reviews?: readonly Review[];
 	readonly failPullWith?: Error;
 	readonly failReviewWith?: Error;
+	readonly failMinimizeWith?: Error;
 }
 
 const makeGitHub = (options: GitHubOptions = {}) => {
 	const submitted: CreateReviewRequest[] = [];
+	const minimized: string[] = [];
 	const reviews = [...(options.reviews ?? [])];
 	const getPull = () =>
 		options.failPullWith
@@ -75,6 +79,11 @@ const makeGitHub = (options: GitHubOptions = {}) => {
 			: Promise.resolve({ data: options.resolvedPull ?? pull });
 
 	const github: GitHubApi = {
+		graphql: (_query, variables) => {
+			if (options.failMinimizeWith) return Promise.reject(options.failMinimizeWith);
+			minimized.push(variables.subjectId);
+			return Promise.resolve({});
+		},
 		paginate: () => Promise.resolve(reviews),
 		rest: {
 			pulls: {
@@ -88,7 +97,7 @@ const makeGitHub = (options: GitHubOptions = {}) => {
 			},
 		},
 	};
-	return { submitted, github };
+	return { minimized, submitted, github };
 };
 
 /** The single review a run under test is expected to have submitted. */
@@ -250,6 +259,16 @@ void describe("review policy", () => {
 			assert.deepEqual(core.failures, []);
 		});
 
+		void it("minimizes earlier automatic approvals after submitting their replacement", async () => {
+			const { minimized, github, submitted } = makeGitHub({
+				reviews: [ours({ id: 1, commit_id: OTHER }), ours({ id: 2, commit_id: OTHER })],
+			});
+			await enforce({ github, context, core: makeCore() });
+
+			assert.equal(submitted.length, 1);
+			assert.deepEqual(minimized, ["review-1", "review-2"]);
+		});
+
 		void it("submits nothing for an author who is not on the allow-list", async () => {
 			const { submitted, github } = makeGitHub({
 				resolvedPull: { ...pull, user: { login: "Contributor" } },
@@ -261,11 +280,28 @@ void describe("review policy", () => {
 			assert.deepEqual(core.failures, []);
 		});
 
-		void it("submits nothing when its own approval already stands", async () => {
-			const { submitted, github } = makeGitHub({ reviews: [ours({ id: 1 })] });
+		void it("keeps the standing approval visible and minimizes its predecessors", async () => {
+			const { minimized, submitted, github } = makeGitHub({
+				reviews: [ours({ id: 1, commit_id: OTHER }), ours({ id: 2 })],
+			});
 			await enforce({ github, context, core: makeCore() });
 
 			assert.deepEqual(submitted, []);
+			assert.deepEqual(minimized, ["review-1"]);
+		});
+
+		void it("keeps a new approval when an old review cannot be minimized", async () => {
+			const { submitted, github } = makeGitHub({
+				reviews: [ours({ id: 1, commit_id: OTHER })],
+				failMinimizeWith: new Error("minimization rejected"),
+			});
+			const core = makeCore();
+			await enforce({ github, context, core });
+
+			assert.equal(submitted.length, 1);
+			assert.equal(core.warnings.length, 1);
+			assert.match(String(core.warnings[0]), /minimization rejected/);
+			assert.deepEqual(core.failures, []);
 		});
 
 		void it("approves a stacked pull request, so it survives being retargeted onto main", async () => {

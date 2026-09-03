@@ -28,6 +28,7 @@ type ApiMethod<T> = (params: Record<string, unknown>) => Promise<{ data: T }>;
 
 export interface Review {
 	readonly id: number;
+	readonly node_id: string;
 	readonly state: string;
 	readonly commit_id: string;
 	readonly body?: string | null;
@@ -51,6 +52,7 @@ export interface CreateReviewRequest {
 }
 
 export interface GitHubApi {
+	readonly graphql: (query: string, variables: { subjectId: string }) => Promise<unknown>;
 	readonly paginate: (
 		endpoint: ApiMethod<Review[]>,
 		params: Record<string, unknown>,
@@ -123,14 +125,39 @@ export const parseMaintainers = (raw: string | undefined): Set<string> =>
  * race in the safe direction: an approval recorded against an earlier commit does not count here
  * either way, so a re-approval is submitted whether or not GitHub has finished dismissing it yet.
  */
-export const approvalStands = (reviews: readonly Review[], headSha: string): boolean => {
-	const ours = reviews
+const ourReviews = (reviews: readonly Review[]): Review[] =>
+	reviews
 		.filter((entry) => (entry.body ?? "").includes(APPROVAL_MARKER))
-		.filter((entry) => DECISIVE_STATES.has(entry.state))
 		.toSorted((left, right) => left.id - right.id);
+
+export const approvalStands = (reviews: readonly Review[], headSha: string): boolean => {
+	const ours = ourReviews(reviews).filter((entry) => DECISIVE_STATES.has(entry.state));
 
 	const latest = ours.at(-1);
 	return latest !== undefined && latest.state === "APPROVED" && latest.commit_id === headSha;
+};
+
+const minimizeReview = `mutation MinimizeReview($subjectId: ID!) {
+	minimizeComment(input: { subjectId: $subjectId, classifier: OUTDATED }) {
+		minimizedComment {
+			isMinimized
+		}
+	}
+}`;
+
+const minimizeSupersededApprovals = async (
+	github: GitHubApi,
+	reviews: readonly Review[],
+	core: ActionsCore,
+): Promise<void> => {
+	for (const review of reviews) {
+		try {
+			await github.graphql(minimizeReview, { subjectId: review.node_id });
+		} catch (error) {
+			const reason = error instanceof Error ? error.message : String(error);
+			core.warning(`Could not minimize superseded automatic approval ${review.id}: ${reason}`);
+		}
+	}
 };
 
 export type DecisionKind = "approve" | "standing" | "skip";
@@ -228,7 +255,11 @@ export const enforce = async ({ github, context, core }: EnforceInput): Promise<
 			reviews,
 		});
 		core.info(decision.reason);
-		if (decision.kind !== "approve") return;
+		if (decision.kind === "skip") return;
+		if (decision.kind === "standing") {
+			await minimizeSupersededApprovals(github, ourReviews(reviews).slice(0, -1), core);
+			return;
+		}
 
 		// `commit_id` pins the approval to the commit the decision was made against. If a push landed
 		// between the read and this call, the approval attaches to the commit that was evaluated and
@@ -241,6 +272,7 @@ export const enforce = async ({ github, context, core }: EnforceInput): Promise<
 			event: "APPROVE",
 			body: approvalBody(pull.user.login),
 		});
+		await minimizeSupersededApprovals(github, ourReviews(reviews), core);
 		core.info(`Approved ${shortSha(pull.head.sha)} on pull request #${pull.number}.`);
 	} catch (error) {
 		const reason = error instanceof Error ? error.message : String(error);
