@@ -4,10 +4,9 @@ import { toast } from "sonner";
 export function useWorkspaceSwitcher() {
 	const navigate = useNavigate();
 	const params = useParams({ strict: false });
-	const currentWorkspaceSlug =
-		"workspaceSlug" in params && typeof params.workspaceSlug === "string"
-			? params.workspaceSlug
-			: undefined;
+	const currentWorkspaceSlug = params.workspaceSlug;
+	// A route is portable only when `workspaceSlug` is the only thing in the URL that names a
+	// workspace-scoped row: any second path param names a row the new workspace does not have.
 	const portable =
 		currentWorkspaceSlug !== undefined &&
 		Object.keys(params).every((parameter) => parameter === "workspaceSlug");
@@ -35,7 +34,7 @@ export function useWorkspaceSwitcher() {
 		if (currentWorkspaceSlug !== undefined) {
 			toast.info(`Switched to ${displayName}`, {
 				description:
-					"This page is specific to the previous workspace, so we opened the new workspace's home page.",
+					"This page is specific to the previous workspace, so Hephaestus opened the new workspace's home page.",
 			});
 		}
 	};

@@ -6,8 +6,13 @@ import { hasMinimumWorkspaceRole } from "@/lib/workspace-roles";
 
 import { useActiveWorkspaceSlug } from "./use-active-workspace";
 
+/** Read by the app chrome, which renders on every route, so the slug is the chrome's, not the URL's. */
 export function useWorkspaceAccess() {
-	const { workspaceSlug, workspaces, isLoading: workspacesLoading } = useActiveWorkspaceSlug();
+	const {
+		chromeWorkspaceSlug: workspaceSlug,
+		workspaces,
+		isLoading: workspacesLoading,
+	} = useActiveWorkspaceSlug();
 	const { isAuthenticated, isLoading: authLoading } = useAuth();
 
 	const membershipQuery = useQuery({

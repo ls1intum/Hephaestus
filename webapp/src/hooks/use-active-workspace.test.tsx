@@ -40,38 +40,54 @@ function workspace(
 }
 
 function ActiveWorkspace() {
-	const { workspaceSlug, providerType } = useActiveWorkspaceSlug();
-	return <output>{`${workspaceSlug}|${providerType}`}</output>;
+	const { workspaceSlug, chromeWorkspaceSlug, providerType } = useActiveWorkspaceSlug();
+	return <output>{`${workspaceSlug}|${chromeWorkspaceSlug}|${providerType}`}</output>;
+}
+
+function renderAt(initialEntry: string) {
+	const queryClient = new QueryClient();
+	queryClient.setQueryData(listWorkspacesOptions().queryKey, [
+		workspace("alpha", "GITHUB"),
+		workspace("beta", "GITLAB"),
+	]);
+	const rootRoute = createRootRoute();
+	const workspaceRoute = createRoute({
+		getParentRoute: () => rootRoute,
+		path: "w/$workspaceSlug",
+		component: ActiveWorkspace,
+	});
+	const settingsRoute = createRoute({
+		getParentRoute: () => rootRoute,
+		path: "settings",
+		component: ActiveWorkspace,
+	});
+	const router = createRouter({
+		routeTree: rootRoute.addChildren([workspaceRoute, settingsRoute]),
+		history: createMemoryHistory({ initialEntries: [initialEntry] }),
+	});
+
+	render(
+		<QueryClientProvider client={queryClient}>
+			<RouterProvider router={router} />
+		</QueryClientProvider>,
+	);
+	return router;
 }
 
 describe("useActiveWorkspaceSlug", () => {
 	it("derives the active workspace and provider from the route", async () => {
-		const queryClient = new QueryClient();
-		queryClient.setQueryData(listWorkspacesOptions().queryKey, [
-			workspace("alpha", "GITHUB"),
-			workspace("beta", "GITLAB"),
-		]);
-		const rootRoute = createRootRoute();
-		const workspaceRoute = createRoute({
-			getParentRoute: () => rootRoute,
-			path: "w/$workspaceSlug",
-			component: ActiveWorkspace,
-		});
-		const router = createRouter({
-			routeTree: rootRoute.addChildren([workspaceRoute]),
-			history: createMemoryHistory({ initialEntries: ["/w/beta"] }),
-		});
+		const router = renderAt("/w/beta");
 
-		render(
-			<QueryClientProvider client={queryClient}>
-				<RouterProvider router={router} />
-			</QueryClientProvider>,
-		);
-
-		await screen.findByText("beta|GITLAB");
+		await screen.findByText("beta|beta|GITLAB");
 		await act(() =>
 			router.navigate({ to: "/w/$workspaceSlug", params: { workspaceSlug: "alpha" } }),
 		);
-		await screen.findByText("alpha|GITHUB");
+		await screen.findByText("alpha|alpha|GITHUB");
+	});
+
+	it("leaves the route slug undefined on a route that names no workspace, and the chrome on the first", async () => {
+		renderAt("/settings");
+
+		await screen.findByText("undefined|alpha|GITHUB");
 	});
 });

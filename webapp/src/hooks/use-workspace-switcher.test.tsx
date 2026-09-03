@@ -37,8 +37,22 @@ function SwitchWorkspace() {
 	);
 }
 
-function renderRoute(initialEntry: string, path: string) {
-	const rootRoute = createRootRoute({ component: Outlet });
+/**
+ * `mountAtRoot` puts the switcher above every match, which is where `__root.tsx` renders it —
+ * the placement the whole portable branch rests on, since `to: "."` resolves from the deepest
+ * match of the current location rather than from the calling component's route.
+ */
+function renderRoute(initialEntry: string, path: string, { mountAtRoot = false } = {}) {
+	const rootRoute = createRootRoute({
+		component: mountAtRoot
+			? () => (
+					<>
+						<SwitchWorkspace />
+						<Outlet />
+					</>
+				)
+			: Outlet,
+	});
 	const workspaceRoute = createRoute({
 		getParentRoute: () => rootRoute,
 		path: "w/$workspaceSlug",
@@ -47,7 +61,7 @@ function renderRoute(initialEntry: string, path: string) {
 	const currentRoute = createRoute({
 		getParentRoute: () => workspaceRoute,
 		path,
-		component: SwitchWorkspace,
+		component: mountAtRoot ? () => null : SwitchWorkspace,
 	});
 	const indexRoute = createRoute({
 		getParentRoute: () => workspaceRoute,
@@ -101,6 +115,26 @@ describe("useWorkspaceSwitcher", () => {
 		expect(toast.info).not.toHaveBeenCalled();
 	});
 
+	it("keeps a portable route when the switcher is mounted above every match", async () => {
+		const router = renderRoute("/w/alpha/teams?tab=members", "teams", { mountAtRoot: true });
+
+		await clickWorkspaceSwitch();
+
+		await waitFor(() => expect(router.state.location.href).toBe("/w/beta/teams"));
+		expect(toast.info).not.toHaveBeenCalled();
+	});
+
+	it("switches back to the workspace it came from", async () => {
+		const router = renderRoute("/w/alpha/teams?tab=members", "teams");
+		const user = userEvent.setup();
+
+		await clickWorkspaceSwitch();
+		await waitFor(() => expect(router.state.location.href).toBe("/w/beta/teams"));
+		await user.click(await screen.findByRole("button", { name: "Keep workspace" }));
+
+		await waitFor(() => expect(router.state.location.href).toBe("/w/alpha/teams"));
+	});
+
 	it.each([
 		["mentor thread", "/w/alpha/mentor/thread-1?message=foreign", "mentor/$threadId"],
 		["user profile", "/w/alpha/user/octocat?group=foreign", "user/$username"],
@@ -117,7 +151,7 @@ describe("useWorkspaceSwitcher", () => {
 		await waitFor(() => expect(router.state.location.href).toBe("/w/beta"));
 		expect(toast.info).toHaveBeenCalledExactlyOnceWith("Switched to Beta workspace", {
 			description:
-				"This page is specific to the previous workspace, so we opened the new workspace's home page.",
+				"This page is specific to the previous workspace, so Hephaestus opened the new workspace's home page.",
 		});
 	});
 

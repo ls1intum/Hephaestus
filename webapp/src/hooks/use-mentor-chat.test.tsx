@@ -45,6 +45,7 @@ function activeWorkspace(
 ): ReturnType<typeof useActiveWorkspaceSlug> {
 	return {
 		workspaceSlug: "test-workspace",
+		chromeWorkspaceSlug: "test-workspace",
 		workspaces: [],
 		providerType: "GITHUB",
 		isLoading: false,

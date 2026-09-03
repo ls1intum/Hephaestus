@@ -2,4 +2,4 @@
 "hephaestus": patch
 ---
 
-Switching workspaces now keeps only pages that apply to both workspaces and resets page filters and URL options. When Hephaestus needs to return you to the selected workspace's home page, it explains why. Links also recover safely when their workspace is no longer available.
+Switching workspaces no longer carries a page that belongs to the workspace you are leaving — a conversation, a person or a practice opens the new workspace's home page instead, with a note explaining why, and page filters and other URL options are cleared. A link to a workspace you can no longer access opens a workspace you can. Hephaestus opens your first workspace when you sign in rather than the one you last used.
