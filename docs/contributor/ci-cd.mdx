@@ -74,7 +74,8 @@ accepting a same-named external status.
 Review is a native ruleset requirement with stale approvals dismissed on every push. Authors listed
 in `REVIEW_POLICY_MAINTAINERS` receive an automated approval; every other author needs a human with
 write access. Repository administrators own that allow-list. Remove the automation when independent
-maintainer review is available.
+maintainer review is available. The workflow minimizes superseded automatic reviews after approving
+the current commit, so only its current automatic approval remains expanded.
 
 The approval workflow runs on `pull_request_target` with `pull-requests: write`, so it checks out only
 `scripts/` from the default branch, reads the author login and nothing else, and executes no
