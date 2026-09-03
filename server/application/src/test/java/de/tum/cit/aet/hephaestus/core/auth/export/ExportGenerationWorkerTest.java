@@ -8,6 +8,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.core.PrivacyJobMetrics;
+import de.tum.cit.aet.hephaestus.core.PrivacyJobMetrics.Job;
+import de.tum.cit.aet.hephaestus.core.PrivacyJobMetrics.Outcome;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Clock;
 import java.time.Duration;
@@ -22,8 +25,9 @@ import tools.jackson.databind.ObjectMapper;
 /**
  * Pins {@link ExportGenerationWorker}'s outcome state machine: success sets payload + a 48h expiry
  * and flips to READY; an assembly error flips to FAILED with the payload nulled (never left
- * half-written); and a vanished row is a no-op. Guards against a failed export being stranded in
- * PROCESSING or a failure leaking a partial payload.
+ * half-written); and a vanished row writes nothing. Guards against a failed export being stranded in
+ * PROCESSING or a failure leaking a partial payload, and against any of the three paths ending
+ * without the terminal outcome an operator alerts on.
  */
 class ExportGenerationWorkerTest extends BaseUnitTest {
 
@@ -34,6 +38,7 @@ class ExportGenerationWorkerTest extends BaseUnitTest {
     private AccountExportRepository repository;
     private ExportBundleAssembler assembler;
     private ObjectMapper objectMapper;
+    private PrivacyJobMetrics metrics;
     private ExportGenerationWorker worker;
 
     @BeforeEach
@@ -41,7 +46,9 @@ class ExportGenerationWorkerTest extends BaseUnitTest {
         repository = mock(AccountExportRepository.class);
         assembler = mock(ExportBundleAssembler.class);
         objectMapper = mock(ObjectMapper.class);
-        worker = new ExportGenerationWorker(repository, assembler, objectMapper, Clock.fixed(NOW, ZoneOffset.UTC));
+        metrics = mock(PrivacyJobMetrics.class);
+        worker = new ExportGenerationWorker(
+                repository, assembler, objectMapper, Clock.fixed(NOW, ZoneOffset.UTC), metrics);
     }
 
     private AccountExport existingExport() {
@@ -64,6 +71,8 @@ class ExportGenerationWorkerTest extends BaseUnitTest {
         assertThat(export.getPayload()).containsExactly(1, 2, 3);
         assertThat(export.getCompletedAt()).isEqualTo(NOW);
         assertThat(export.getExpiresAt()).isEqualTo(NOW.plus(Duration.ofHours(48)));
+        verify(metrics).record(Job.EXPORT_GENERATION, Outcome.SUCCESS);
+        verify(metrics).recordAffected(Job.EXPORT_GENERATION, 1);
     }
 
     @Test
@@ -76,15 +85,17 @@ class ExportGenerationWorkerTest extends BaseUnitTest {
         assertThat(export.getStatus()).isEqualTo(AccountExport.Status.FAILED);
         assertThat(export.getFailureReason()).isEqualTo("assembly_failed");
         assertThat(export.getPayload()).isNull();
+        verify(metrics).record(Job.EXPORT_GENERATION, Outcome.FAILURE);
     }
 
     @Test
-    void generate_missingRow_isNoOp() {
+    void generate_missingRow_writesNothingAndReportsFailure() {
         when(repository.findByIdAndAccountId(EXPORT_ID, ACCOUNT_ID)).thenReturn(Optional.empty());
 
         worker.generate(EXPORT_ID, ACCOUNT_ID);
 
         verify(repository, never()).save(any());
         verify(assembler, never()).assemble(eq(ACCOUNT_ID));
+        verify(metrics).record(Job.EXPORT_GENERATION, Outcome.FAILURE);
     }
 }

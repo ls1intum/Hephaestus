@@ -14,6 +14,15 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UUID> {
+    /** One retention batch. {@code occurred_at} is indexed on its own so this never scans the ledger. */
+    @WorkspaceAgnostic("Retention removes expired usage rows across all workspaces")
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(
+            value = "DELETE FROM llm_usage_event WHERE id IN ("
+                    + "  SELECT e.id FROM llm_usage_event e WHERE e.occurred_at < :cutoff LIMIT :batchSize)",
+            nativeQuery = true)
+    int deleteExpired(@Param("cutoff") Instant cutoff, @Param("batchSize") int batchSize);
+
     /**
      * Idempotent append. The column list, the VALUES list and {@link LlmUsageInsert}'s components are
      * one list written three times, checked against each other position by position by

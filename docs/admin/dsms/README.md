@@ -19,6 +19,7 @@ A different operator forking Hephaestus must amend, before opening their deploym
 | [`dpia-prescreen.md`](./dpia-prescreen.md) | Art. 35 pre-screen. Records the pending controller/DPO determination, safeguards, and change freeze. |
 | [`processor-checklist.md`](./processor-checklist.md) | Art. 28 checklist. Per-processor AVV status; LRZ-as-separate-controller analysis. |
 | [`artifact-source-governance.md`](./artifact-source-governance.md) | Approval, minimization, processor-egress, retention, and erasure gate for every AI-readable source. |
+| [`personal-data-map.md`](./personal-data-map.md) | Personal-data stores, export coverage, erasure paths, residual retention, and their verification. |
 
 The live imprint and privacy pages are at https://hephaestus.aet.cit.tum.de/imprint and https://hephaestus.aet.cit.tum.de/privacy. Markdown source: [`webapp/public/legal/profiles/tumaet/`](https://github.com/ls1intum/Hephaestus/tree/main/webapp/public/legal/profiles/tumaet).
 
