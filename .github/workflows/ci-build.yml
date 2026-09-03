@@ -8,6 +8,12 @@ on:
         required: false
         type: string
         default: "false"
+      single_arch:
+        # No default: what a release is evidenced on is not a decision to make silently on a
+        # caller's behalf. cicd.yml derives it once, for every image build in the run.
+        description: "Whether to build linux/amd64 alone instead of the supported multi-architecture set"
+        required: true
+        type: string
       server_changed:
         description: "Whether anything that runs the packaged reactor changed"
         required: false
@@ -337,4 +343,4 @@ jobs:
       # renovate: datasource=docker depName=paketobuildpacks/ubuntu-noble-run-tiny
       run-image: "paketobuildpacks/ubuntu-noble-run-tiny@sha256:c32333227b6dfbc2a4a93b03ee6d3475cfe152468c7d396bf22f06099bb0ecc9"
       registry: "ghcr.io"
-      single-arch: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
+      single-arch: ${{ inputs.single_arch == 'true' }}

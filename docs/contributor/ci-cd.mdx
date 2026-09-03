@@ -36,7 +36,9 @@ flowchart TD
 Every push to `main` builds and attests multi-architecture images for that commit and maintains the
 Version PR; merging the Version PR cuts a release that promotes those images by digest —
 [Release management](./release-management.mdx). Pull requests and merge groups build `linux/amd64`
-only; a merge group has its own SHA, so its images are never the ones a release promotes.
+only; a merge group has its own SHA, so its images are never the ones a release promotes. The
+exception is the Version PR's branch, where every run builds both architectures, because the release
+evidence preflight that guards that branch evidences each image on both published platforms.
 
 ## Quality gates
 
@@ -272,7 +274,9 @@ nothing that ships, so they compile from source in `Test` and do not wait for pa
 
 - `Quality` legs and `Test` suites start from source; `Build` gates start when `App Server: Package`
   uploads its artifact.
-- Pull requests and merge groups build `linux/amd64`; pushes to `main` build both architectures.
+- Pull requests and merge groups build `linux/amd64`; pushes to `main`, and every run on the Version
+  PR's branch, build both architectures. `detect-changes` decides that once and hands it to every
+  image build in the run.
 - The `Quality` matrix uses `fail-fast: false`; the image matrix in `reusable-docker-build.yml` uses
   `fail-fast: true`.
 - Pull-request runs cancel superseded runs; `release.yml` never cancels.
