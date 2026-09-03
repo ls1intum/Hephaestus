@@ -5,6 +5,8 @@ import { appendFileSync } from "node:fs";
 import { requiredEnv as required, requiredPositiveInteger } from "./lib/env.ts";
 import { isRecord } from "./lib/json.ts";
 
+import { CAPTURE_LIMIT_BYTES } from "./lib/process.ts";
+
 type WebhookAction = "closed" | "opened";
 type FinalState = "error" | "failure" | "success";
 
@@ -521,6 +523,7 @@ const systemCommandRunner: CommandRunner = {
 	run: (command, arguments_, options) => {
 		const result = spawnSync(command, [...arguments_], {
 			encoding: "utf8",
+			maxBuffer: CAPTURE_LIMIT_BYTES,
 			input: options?.input,
 			stdio: ["pipe", "pipe", "pipe"],
 		});

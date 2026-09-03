@@ -4,6 +4,8 @@ import { isDeepStrictEqual } from "node:util";
 
 import packageArgument from "npm-package-arg";
 
+import { CAPTURE_LIMIT_BYTES } from "./lib/process.ts";
+
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null;
 }
@@ -152,7 +154,12 @@ if (
 const retired = ["b", "un"].join("");
 const isHistorical = (file: string): boolean =>
 	file === "CHANGELOG.md" || file === "MIGRATION.md" || file.startsWith("docs/decisions/");
-const tracked = execFileSync("git", ["ls-files", "-z"], { encoding: "utf8" })
+// The tracked-file list grows with the repository, so it needs the shared ceiling rather than
+// Node's 1 MiB default — this runs in `pnpm run check` on every machine.
+const tracked = execFileSync("git", ["ls-files", "-z"], {
+	encoding: "utf8",
+	maxBuffer: CAPTURE_LIMIT_BYTES,
+})
 	.split("\0")
 	.filter(Boolean);
 const forbiddenWord = new RegExp(`\\b${retired}\\b`, "i");

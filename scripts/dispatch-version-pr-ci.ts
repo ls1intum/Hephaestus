@@ -83,6 +83,11 @@ if (import.meta.main) {
 				await gh([
 					"api",
 					`repos/${repository}/actions/workflows/${CI_WORKFLOW}/runs?branch=${encodeURIComponent(branch)}&per_page=100`,
+					// Only the head SHA decides whether a run already exists. The unprojected listing
+					// carries the full repository object per run and passed a megabyte at 135 runs,
+					// which is a payload that grows with the branch's history for no gain.
+					"--jq",
+					"{workflow_runs: [.workflow_runs[] | {head_sha}]}",
 				]),
 			),
 		);

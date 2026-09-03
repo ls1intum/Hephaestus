@@ -1,5 +1,7 @@
 import { spawnSync } from "node:child_process";
 
+import { CAPTURE_LIMIT_BYTES } from "./lib/process.ts";
+
 export type Scope = "agents" | "docs" | "full" | "server" | "webapp";
 export type Command = readonly [string, ...string[]];
 
@@ -69,6 +71,7 @@ function git(cwd: string, ...args: string[]): string[] {
 	const result = spawnSync("git", args, {
 		cwd,
 		encoding: "utf8",
+		maxBuffer: CAPTURE_LIMIT_BYTES,
 		env: environmentWithoutGitRepository(),
 	});
 	if (result.status !== 0)

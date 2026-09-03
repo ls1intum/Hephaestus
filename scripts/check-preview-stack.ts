@@ -12,6 +12,8 @@ import { readFileSync } from "node:fs";
 import { readComposeServices } from "./check-env-roles.ts";
 import { isRecord } from "./lib/json.ts";
 
+import { CAPTURE_LIMIT_BYTES } from "./lib/process.ts";
+
 const COMPOSE_FILE = "docker/preview/compose.app.yaml";
 const REFERENCE_FILE = "docker/compose.app.yaml";
 /** Images this repository builds, addressed by commit rather than digest. */
@@ -244,7 +246,7 @@ export function renderStack(): unknown {
 		// against. Rendering without it resolves them under docker/preview/ and checks a stack that
 		// would never be deployed.
 		["compose", "-f", COMPOSE_FILE, "--project-directory", ".", "config", "--format", "json"],
-		{ encoding: "utf8", env: { ...ambient, ...RENDER_ENV } },
+		{ encoding: "utf8", env: { ...ambient, ...RENDER_ENV }, maxBuffer: CAPTURE_LIMIT_BYTES },
 	);
 	if (result.status !== 0) {
 		const unavailable =
