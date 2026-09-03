@@ -18,11 +18,25 @@
  *                  at all, so setting it in `.env` does nothing. A setting that is not meant to be
  *                  operator-tunable is written without a placeholder and is never in scope here.
  *
- * `ROLE_SCOPES` is the only thing to extend. It is keyed on `application.yml` paths rather than on
- * whole property records because ownership is finer than a record: `hephaestus.webhook.secret` is
- * read on the server role (outbound registration) while `hephaestus.webhook.stream.*` is read on the
- * webhook role, out of the same `WebhookProperties`. A scope naming a path `application.yml` no
- * longer has fails too, so a rename cannot leave a dead entry behind that silently checks nothing.
+ * The mirror image is a setting no role gates. Every container running the application image reads
+ * it, so the value one of them is given is a claim about the whole deployment, and two containers
+ * making different claims describe a stack that does not exist:
+ *
+ *   disagreed    — application containers spell one setting differently. That is how the release
+ *                  lock's agent image digest reached the app containers and not the webhook
+ *                  receiver, which derived a tag from its own version instead and then refused to
+ *                  boot on it, because the guards that read it are deliberately not role-gated.
+ *   omitted      — the same defect with the key left out rather than left blank. A container that
+ *                  never mentions a setting makes no claim to disagree with, so `DEPLOYMENT_WIDE`
+ *                  names the settings whose absence is itself the failure.
+ *
+ * `ROLE_SCOPES` and `DEPLOYMENT_WIDE` are the two things to extend, and they are opposite claims
+ * about the same question — which containers read a setting. Both are keyed on `application.yml`
+ * paths rather than on whole property records because ownership is finer than a record:
+ * `hephaestus.webhook.secret` is read on the server role (outbound registration) while
+ * `hephaestus.webhook.stream.*` is read on the webhook role, out of the same `WebhookProperties`.
+ * An entry naming a path `application.yml` no longer has fails too, so a rename cannot leave a dead
+ * entry behind that silently checks nothing.
  *
  * Compose is read here rather than through `docker compose config`, which would be a stricter parse:
  * this gate runs in `pnpm run check` and the pre-push hook, where a Docker daemon is not a given, and
@@ -89,6 +103,63 @@ const ROLE_FLAGS: Record<Role, string> = {
 	webhook: "HEPHAESTUS_RUNTIME_WEBHOOK_ENABLED",
 };
 
+/**
+ * The lock variable naming the one image every role boots from. A service running it is an
+ * application container: whichever slice of the context its roles leave out, the ungated beans — and
+ * therefore every setting not listed in `ROLE_SCOPES` — are there and read on it.
+ */
+const APPLICATION_IMAGE = "HEPHAESTUS_IMAGE_APPLICATION_SERVER";
+
+/**
+ * Keys an application container is meant to spell differently from its siblings, because they are
+ * what makes it that slice of the deployment rather than another. Everything else describes the
+ * deployment, which is one thing: the roles differ, the stack they run in does not.
+ */
+const PER_CONTAINER = new Map<string, string>([
+	["SPRING_PROFILES_ACTIVE", "the profile list is how a container selects the slice it boots"],
+	[ROLE_FLAGS.server, "the role flags are the split itself"],
+	[ROLE_FLAGS.worker, "the role flags are the split itself"],
+	[ROLE_FLAGS.webhook, "the role flags are the split itself"],
+	["SPRING_LIQUIBASE_ENABLED", "one container owns the migration and the rest must not race it"],
+	["THC_PATH", "the receiver reports NATS through readiness; the others answer liveness"],
+]);
+
+/**
+ * A setting every application container must be *given*, not merely agree about. These are the ones
+ * whose readers are gated on no role at all: the beans are constructed in every context, so the
+ * container that was skipped does not quietly run without the feature, it fails to boot.
+ *
+ * Declared rather than derived, and the reason is worth stating because it looks like a weakness.
+ * Nothing in Compose separates a setting the receiver must have from one it is right not to have:
+ * `GH_APP_PRIVATE_KEY` also reaches two of the three containers, and "deliver it to the third too"
+ * would be a private key shipped to a container with no use for it. Only the Java says which is
+ * which — whether the bean reading it carries a role gate — so the entry has to name that bean and
+ * be checkable by a reader against it.
+ *
+ * What is fail-closed, and needs nothing listed, is the other half: a setting more than one
+ * application container writes has to be written the same on all of them. Between the two, both
+ * shapes of the defect this exists for are covered — the container that was handed a different
+ * value, and the container that was handed none.
+ */
+interface DeploymentWideSetting {
+	readonly variable: string;
+	/** The `application.yml` path it binds. A path the file no longer has fails, as in `ROLE_SCOPES`. */
+	readonly path: string;
+	/** Named beans, so a reader can check the claim rather than take it. Quoted back in every failure. */
+	readonly why: string;
+}
+
+const DEPLOYMENT_WIDE: readonly DeploymentWideSetting[] = [
+	{
+		variable: "HEPHAESTUS_AGENT_IMAGE_REFERENCE",
+		path: "hephaestus.agent.image.reference",
+		why:
+			"AgentImageReferenceGuard and AgentImagePinGuard are plain @Components that ADR 0031 keeps " +
+			"ungated on purpose, so no pod can boot on an agent image the workers cannot run; a container " +
+			"left without the reference derives one from its own version, which is a tag, and refuses to start",
+	},
+];
+
 /** `application-<profile>.yml` turns roles off too, so a service's profiles decide as much as its env. */
 const PROFILE_YML = (profile: string): string =>
 	`server/application/src/main/resources/application-${profile}.yml`;
@@ -135,8 +206,11 @@ const isStructural = (line: string): boolean =>
  * own answer, and the only one that is the same on every machine. `${VAR:-d}` and `${VAR-d}` fall
  * back to `d`; a bare `${VAR}` resolves to the empty string, exactly as Compose leaves it.
  */
+/** The value as the file writes it: trimmed, with the quotes YAML would have dropped anyway. */
+const unquote = (raw: string): string => raw.trim().replace(/^["']|["']$/g, "");
+
 export function composeDefault(raw: string): string {
-	const value = raw.trim().replace(/^["']|["']$/g, "");
+	const value = unquote(raw);
 	const placeholder = /^\$\{[A-Z0-9_]+(?<dash>:?-)?(?<fallback>[^}]*)\}$/.exec(value);
 	if (!placeholder) return value;
 	// The `-` is the only optional part: a placeholder without it offers no fallback at all, and
@@ -194,6 +268,14 @@ export interface ComposeService {
 	readonly name: string;
 	readonly env: Set<string>;
 	readonly flags: Map<string, string>;
+	/**
+	 * What the file writes for each key it spells itself, before interpolation. `flags` answers what
+	 * an operator who sets nothing gets, and two services can agree on that and still be handed
+	 * different values — `${VAR:?required}` and a valueless key both resolve to nothing here.
+	 */
+	readonly raw: Map<string, string>;
+	/** The `image:` line, uninterpolated, so a service can be recognised by the image it runs. */
+	image: string;
 }
 
 /**
@@ -226,7 +308,12 @@ export function readComposeServices(text: string): Map<string, ComposeService> {
 		}
 		if (top !== "services") continue;
 		if (path.length === 2) {
-			services.set(key, { name: key, env: new Set(), flags: new Map() });
+			services.set(key, { name: key, env: new Set(), flags: new Map(), raw: new Map(), image: "" });
+			continue;
+		}
+		if (path.length === 3 && key === "image" && serviceName !== undefined) {
+			const named = services.get(serviceName);
+			if (named) named.image = unquote(value);
 			continue;
 		}
 		if (path.length !== 4 || section !== "environment" || serviceName === undefined) continue;
@@ -241,6 +328,7 @@ export function readComposeServices(text: string): Map<string, ComposeService> {
 		}
 		service.env.add(key);
 		service.flags.set(key, composeDefault(value));
+		service.raw.set(key, unquote(value));
 	}
 	return services;
 }
@@ -305,6 +393,8 @@ interface DeliveredVariable {
 interface Analysis {
 	readonly failures: string[];
 	readonly delivered: ReadonlyMap<string, DeliveredVariable>;
+	/** Ids of the services running the application image, so a caller can check the set was found. */
+	readonly applicationContainers: readonly string[];
 }
 
 export function analyse(
@@ -333,6 +423,7 @@ export function analyse(
 	}
 
 	const delivered = new Map<string, DeliveredVariable>();
+	const applicationContainers: Delivery[] = [];
 	for (const [label, text] of compose) {
 		const services = readComposeServices(text);
 		if (services.size === 0) {
@@ -343,6 +434,7 @@ export function analyse(
 		}
 		for (const [name, service] of services) {
 			const id = `${label}:${name}`;
+			if (service.image.includes(APPLICATION_IMAGE)) applicationContainers.push({ id, service });
 			for (const variable of service.env) {
 				const scope = ownership.get(variable);
 				if (!scope) continue;
@@ -380,7 +472,62 @@ export function analyse(
 		);
 	}
 
-	return { failures, delivered };
+	// The other half of ROLE_SCOPES. A setting nothing gates on a role is read by every container
+	// running the application image, so the value one of them is handed is a claim about the whole
+	// deployment — and two containers making different claims describe a stack that does not exist.
+	// The release lock's agent digest reached the app containers and not the receiver that way; the
+	// receiver derived a tag from its own version instead and the pin guard refused to boot on it.
+	const spellings = new Map<string, Map<string, string[]>>();
+	for (const { id, service } of applicationContainers) {
+		for (const [variable, value] of service.raw) {
+			if (PER_CONTAINER.has(variable)) continue;
+			const byValue = spellings.get(variable) ?? new Map<string, string[]>();
+			spellings.set(variable, byValue);
+			byValue.set(value, [...(byValue.get(value) ?? []), id]);
+		}
+	}
+	for (const [variable, byValue] of spellings) {
+		if (byValue.size < 2) continue;
+		const written = [...byValue]
+			.map(([value, ids]) => `    ${value === "" ? "<nothing>" : value}\n      ${ids.join(", ")}`)
+			.join("\n");
+		failures.push(
+			`Containers running the application image disagree on ${variable}:\n${written}\n` +
+				"  No runtime role gates this setting, so every one of them reads it and they cannot both\n" +
+				"  be describing the same deployment.\n" +
+				`  Give them one value, or name ${variable} in PER_CONTAINER with the reason it differs.`,
+		);
+	}
+
+	// The disagreement above only sees containers that mention the key. A container that omits it
+	// makes no claim to disagree with, and reads the application default instead — which for the
+	// agent image is a tag derived from its own version, the exact thing the guards refuse. So an
+	// omission is a value here, not an absence.
+	for (const { variable, path, why } of DEPLOYMENT_WIDE) {
+		if (!paths.has(path)) {
+			failures.push(
+				`DEPLOYMENT_WIDE declares "${path}" (${variable}), which ${APPLICATION_YML} does not have.\n` +
+					"  Point it at wherever the setting moved, or drop the entry — as written it checks nothing.",
+			);
+			continue;
+		}
+		const missing = applicationContainers.filter(({ service }) => !service.env.has(variable));
+		if (missing.length === 0) continue;
+		const listed = missing.map(({ id }) => `    ${id}`).join("\n");
+		failures.push(
+			missing.length === applicationContainers.length
+				? `${variable} binds ${path}, and no container running the application image is given it.\n` +
+						`  ${why}.\n` +
+						"  Every one of them reads it, so the deployment has nowhere to get the value from."
+				: `${variable} binds ${path}, and these containers run the application image without it:\n${listed}\n` +
+						`  ${why}.\n` +
+						"  The setting is not gated on a runtime role, so leaving it off one container does not\n" +
+						"  scope it — that container falls back to the application default and reads a different\n" +
+						"  deployment than its siblings.",
+		);
+	}
+
+	return { failures, delivered, applicationContainers: applicationContainers.map((c) => c.id) };
 }
 
 if (process.argv[1] === import.meta.filename) {
@@ -389,7 +536,7 @@ if (process.argv[1] === import.meta.filename) {
 		compose.push([file, await readFile(join(REPO_ROOT, file), "utf8")]);
 	}
 	const profileRoles = await readProfileRoles();
-	const { failures, delivered } = analyse(
+	const { failures, delivered, applicationContainers } = analyse(
 		await readFile(join(REPO_ROOT, APPLICATION_YML), "utf8"),
 		compose,
 		profileRoles,
@@ -399,6 +546,7 @@ if (process.argv[1] === import.meta.filename) {
 		process.exit(1);
 	}
 	console.log(
-		`check-env-roles: ${delivered.size} role-scoped variable(s) reach a container that runs their role.`,
+		`check-env-roles: ${delivered.size} role-scoped variable(s) reach a container that runs their role, ` +
+			`and ${applicationContainers.length} application container(s) agree on every setting that is not role-scoped.`,
 	);
 }

@@ -24,9 +24,15 @@ function failureAt(failures: readonly string[], index: number): string {
 	return failure;
 }
 
-/** Carries every path ROLE_SCOPES names, so a scope that goes stale fails loudly rather than here. */
+/**
+ * Carries every path ROLE_SCOPES and DEPLOYMENT_WIDE name, so a scope that goes stale fails loudly
+ * rather than here.
+ */
 const APPLICATION = `
 hephaestus:
+    agent:
+        image:
+            reference: ghcr.io/hephaestus-build/agent-pi:1.2.3
     webhook:
         secret: \${WEBHOOK_SECRET:}
         stream:
@@ -223,6 +229,115 @@ hephaestus:
 	assert.deepEqual([...disabled].toSorted(), ["server", "webhook"]);
 });
 
+/** The lock digest, spelled as the shipped topology spells it. */
+const AGENT_DIGEST = `HEPHAESTUS_AGENT_IMAGE_REFERENCE: \${HEPHAESTUS_IMAGE_AGENT_PI:?verified release lock required}`;
+
+/** Two containers of the one image every role boots from, each given its own environment lines. */
+const applicationPair = (server: readonly string[], receiver: readonly string[]): ComposeFile[] => {
+	const lines = (env: readonly string[]): string => env.map((line) => `      ${line}`).join("\n");
+	return compose(`  application-server:
+    image: "\${HEPHAESTUS_IMAGE_APPLICATION_SERVER:?verified release lock required}"
+    environment:
+      HEPHAESTUS_RUNTIME_WEBHOOK_ENABLED: "false"
+${lines(server)}
+  webhook-server:
+    image: "\${HEPHAESTUS_IMAGE_APPLICATION_SERVER:?verified release lock required}"
+    environment:
+      HEPHAESTUS_RUNTIME_WEBHOOK_ENABLED: "true"
+      HEPHAESTUS_WEBHOOK_STREAM_MAX_BYTES: \${HEPHAESTUS_WEBHOOK_STREAM_MAX_BYTES:-1073741824}
+${lines(receiver)}
+`);
+};
+
+await test("application containers that spell an ungated setting differently fail", () => {
+	const { failures, applicationContainers: found } = analyse(
+		APPLICATION,
+		// The shape the release lock left behind: the digest on one container, a valueless passthrough
+		// on the other. Both resolve to nothing when the operator sets nothing, so only the spelling
+		// tells them apart — which is why the gate reads the value the file writes.
+		applicationPair([AGENT_DIGEST], ["HEPHAESTUS_AGENT_IMAGE_REFERENCE:"]),
+	);
+
+	assert.deepEqual(found, ["compose.yaml:application-server", "compose.yaml:webhook-server"]);
+	assert.equal(failures.length, 1, failures.join("\n"));
+	assert.match(failureAt(failures, 0), /disagree on HEPHAESTUS_AGENT_IMAGE_REFERENCE/);
+	assert.match(failureAt(failures, 0), /<nothing>/);
+});
+
+await test("an application container that omits a deployment-wide setting fails", () => {
+	// The half a comparison across only the containers that mention a key cannot see: the receiver
+	// makes no claim to disagree with, and reads application.yml's derived tag instead.
+	const { failures } = analyse(APPLICATION, applicationPair([AGENT_DIGEST], []));
+
+	assert.equal(failures.length, 1, failures.join("\n"));
+	assert.match(
+		failureAt(failures, 0),
+		/HEPHAESTUS_AGENT_IMAGE_REFERENCE binds hephaestus\.agent\.image\.reference/,
+	);
+	assert.match(
+		failureAt(failures, 0),
+		/run the application image without it:\n {4}compose\.yaml:webhook-server/,
+	);
+});
+
+await test("a deployment-wide setting no application container is given fails", () => {
+	const { failures } = analyse(APPLICATION, applicationPair([], []));
+
+	assert.equal(failures.length, 1, failures.join("\n"));
+	assert.match(failureAt(failures, 0), /no container running the application image is given it/);
+});
+
+await test("application containers agreeing on an ungated setting pass", () => {
+	const { failures } = analyse(APPLICATION, applicationPair([AGENT_DIGEST], [AGENT_DIGEST]));
+
+	assert.deepEqual(failures, []);
+});
+
+await test("a setting named in PER_CONTAINER may differ", () => {
+	// THC_PATH is in the list: the receiver reports NATS through readiness and the others do not.
+	const { failures } = analyse(
+		APPLICATION,
+		applicationPair(
+			[AGENT_DIGEST, "THC_PATH: /actuator/health/liveness"],
+			[AGENT_DIGEST, "THC_PATH: /actuator/health/readiness"],
+		),
+	);
+
+	assert.deepEqual(failures, []);
+});
+
+await test("a DEPLOYMENT_WIDE entry naming a path application.yml does not have is a failure", () => {
+	const withoutTheSetting = APPLICATION.replace(
+		"    agent:\n        image:\n            reference: ghcr.io/hephaestus-build/agent-pi:1.2.3\n",
+		"",
+	);
+
+	const { failures } = analyse(withoutTheSetting, applicationPair([AGENT_DIGEST], [AGENT_DIGEST]));
+
+	assert.ok(
+		failures.some((f) => /DEPLOYMENT_WIDE declares "hephaestus\.agent\.image\.reference"/.test(f)),
+		failures.join("\n"),
+	);
+});
+
+await test("a service running some other image is not compared against the application containers", () => {
+	const { failures, applicationContainers: found } = analyse(
+		APPLICATION,
+		compose(`  application-server:
+    image: "\${HEPHAESTUS_IMAGE_APPLICATION_SERVER:?verified release lock required}"
+    environment:
+      HEPHAESTUS_AGENT_IMAGE_REFERENCE: \${HEPHAESTUS_IMAGE_AGENT_PI:?verified release lock required}
+  webapp:
+    image: "\${HEPHAESTUS_IMAGE_WEBAPP:?verified release lock required}"
+    environment:
+      HEPHAESTUS_AGENT_IMAGE_REFERENCE: something-else
+${RECEIVER}`),
+	);
+
+	assert.deepEqual(failures, []);
+	assert.deepEqual(found, ["compose.yaml:application-server"]);
+});
+
 await test("a scope naming a path application.yml does not have is a failure", () => {
 	const { failures } = analyse("hephaestus:\n    webhook:\n        secret: x\n", compose(RECEIVER));
 
@@ -239,7 +354,7 @@ await test("the shipped topology delivers every role-scoped variable to a contai
 	);
 	// With the profile overlays, exactly as the CLI runs it. Omitting them makes this pass on a
 	// topology the real gate fails, which is the whole defect class the gate is here for.
-	const { failures } = analyse(
+	const { failures, applicationContainers } = analyse(
 		await readFile(
 			join(REPO_ROOT, "server/application/src/main/resources/application.yml"),
 			"utf8",
@@ -249,4 +364,12 @@ await test("the shipped topology delivers every role-scoped variable to a contai
 	);
 
 	assert.deepEqual(failures, []);
+	// Named rather than counted: the settings comparison only runs over containers the parse
+	// recognised as running the application image, so a renamed lock variable would otherwise retire
+	// that half of the gate by finding nothing to compare.
+	assert.deepEqual(applicationContainers, [
+		"docker/compose.app.yaml:application-server",
+		"docker/compose.app.yaml:application-worker",
+		"docker/compose.core.yaml:webhook-server",
+	]);
 });

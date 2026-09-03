@@ -89,10 +89,12 @@ services:
       HEPHAESTUS_TRUSTED_PROXIES: ${HEPHAESTUS_TRUSTED_PROXIES:-}
       # AgentImagePinGuard loads in any prod pod; set false for non-release deploys that skip the pin.
       HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST: ${HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST:-true}
-      # AgentImageReferenceGuard is deliberately not role-gated (ADR 0031), so a reference the workers
-      # cannot run crash-loops this pod too — and the override has to reach here to fix it. Valueless,
-      # as in docker/compose.app.yaml.
-      HEPHAESTUS_AGENT_IMAGE_REFERENCE:
+      # Both agent image guards are deliberately not role-gated (ADR 0031): the server and the agent
+      # image are one runtime contract, so a reference the workers cannot run has to fail this pod
+      # too rather than let it boot on a deployment the rest of the stack rejects. That makes the
+      # lock's digest a setting this pod is owed, exactly as in docker/compose.app.yaml. Unset, the
+      # reference derives from APP_VERSION — a tag, which the pin guard above refuses.
+      HEPHAESTUS_AGENT_IMAGE_REFERENCE: ${HEPHAESTUS_IMAGE_AGENT_PI:?verified release lock required}
       # thc healthcheck target: readiness (reports unhealthy while NATS/JetStream is unavailable).
       THC_PORT: "8080"
       THC_PATH: /actuator/health/readiness
