@@ -1,5 +1,44 @@
 # Changelog
 
+## 0.75.1
+
+### Patch Changes
+
+- Dependencies in the agent image that runs practice reviews could be less than three days old,
+  escaping the release-age floor every other Hephaestus dependency is held to. The image now applies
+  that floor and verifies it while it builds.
+- The reference multi-host stack now deploys instead of stopping with `service "webhook-server"
+depends on undefined service "postgres": invalid compose project`. That deployment brings the proxy,
+  core and app stacks up as three separate Compose projects, and the core stack had been asking Compose
+  to start the webhook receiver after a database that belongs to the app stack — an order Compose
+  cannot honour across projects, and one that made the core stack refuse to render at all. The receiver
+  reaches the database over the shared network as it always did, and retries until it answers. The
+  single-host install is unaffected: it runs everything as one project and still starts the receiver
+  after the database. Nothing to set on either — deploy or upgrade as usual.
+- A fresh self-host install now starts instead of crash-looping with
+  `hephaestus.security.prior-credential-encryption-key and prior-credential-encryption-key-version must
+be configured together`. The stack passes both credential-rotation variables through empty when you
+  have not set them, and Hephaestus was reading one empty value as a half-finished key rotation; an
+  empty value now means what you meant by it — not configured. Finishing a rotation by clearing the
+  prior key and its version works the same way. Setting only one of the two is still refused at
+  startup, so a rotation cannot half-apply and leave stored credentials unreadable.
+- A fresh self-host install now starts instead of stopping with `required variable NATS_USERNAME is
+missing a value`: `setup.sh` generates the message-broker credentials alongside the database password
+  and the other internal secrets. Upgrading an existing installation picks them up by rerunning
+  `docker/self-host/setup.sh`, which leaves every value you already set untouched.
+- The webhook receiver in a self-host install now starts instead of crash-looping with
+  `hephaestus.agent.image.reference must be digest-pinned`, so incoming pull request, issue and chat
+  events are received again. The stack was handing the verified release lock's agent image digest to
+  the API server and the worker but not to the receiver, which fell back to naming that image by tag —
+  and Hephaestus refuses a tag there, because the tag can move to an image built from a different
+  commit than the one you installed. Every container now reads the same digest from the lock. Nothing
+  to set: reinstall or upgrade as usual.
+- Hephaestus now serves HTTP on Apache Tomcat 11.0.25. The previous release line could apply a
+  security constraint written for a longer path ahead of a stricter one covering a shorter path
+  beneath it, letting a request reach a page the constraint was meant to close; it could also let a
+  redirect after a sign-in form skip a method restriction, and let one DIGEST-authenticated request be
+  replayed. No action on upgrade — the server picks the new version up with the image.
+
 ## 0.75.0
 
 ### Minor Changes
