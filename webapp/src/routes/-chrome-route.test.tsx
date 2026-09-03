@@ -42,9 +42,7 @@ describe("app chrome on a route with no workspace in the URL", () => {
 		const user = userEvent.setup();
 		renderRouteAt(path);
 
-		await user.click(
-			await screen.findByRole("button", { name: "Account menu" }, ROUTE_RENDER_WAIT),
-		);
+		await user.click(await screen.findByRole("button", { name: "Account" }, ROUTE_RENDER_WAIT));
 
 		const profile = await screen.findByRole("menuitem", { name: "My Profile" });
 		expect(profile.getAttribute("aria-disabled")).toBeNull();

@@ -142,7 +142,7 @@ export default function Header({
 						<div className="flex items-center gap-2">
 							<DropdownMenu>
 								<DropdownMenuTrigger
-									aria-label="Account menu"
+									aria-label="Account"
 									render={<Button variant="ghost" size="icon" className="rounded-full" />}
 								>
 									<Avatar className="hover:brightness-90">

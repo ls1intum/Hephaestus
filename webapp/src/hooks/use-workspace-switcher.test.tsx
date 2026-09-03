@@ -122,14 +122,20 @@ describe("useWorkspaceSwitcher", () => {
 	});
 
 	it("clears the leaderboard's team filter and keeps its workspace-independent options", async () => {
-		const router = renderRoute("/w/alpha?team=Backend&sort=LEAGUE_POINTS&mode=TEAM", "teams", {
-			mountAtRoot: true,
-		});
+		const router = renderRoute(
+			"/w/alpha?team=Backend&sort=LEAGUE_POINTS&mode=INDIVIDUAL",
+			"teams",
+			{
+				mountAtRoot: true,
+			},
+		);
 
 		await clickWorkspaceSwitch();
 
 		await waitFor(() =>
-			expect(router.state.location.href).toBe("/w/beta?team=all&sort=LEAGUE_POINTS&mode=TEAM"),
+			expect(router.state.location.href).toBe(
+				"/w/beta?team=all&sort=LEAGUE_POINTS&mode=INDIVIDUAL",
+			),
 		);
 	});
 
