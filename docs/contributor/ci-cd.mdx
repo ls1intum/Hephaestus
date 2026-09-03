@@ -101,14 +101,17 @@ changesets rather than adding one. [Release management](./release-management.mdx
 | OpenSSF Scorecard | `main` pushes, branch-protection changes, and weekly; never on pull requests | reports | code scanning and a run artifact |
 | Renovate | configured schedule and vulnerability alerts | pull requests require normal review and CI | dependency dashboard |
 
-Renovate opens pull requests before 07:00 Europe/Berlin on weekdays after a three-day release age;
-majors wait seven days and a Dependency Dashboard approval, and vulnerability alerts skip both.
-Lockfile maintenance runs on Mondays. Enabled managers: npm, Maven, the Maven wrapper, Dockerfiles,
-Compose files, GitHub Actions, and the regex managers in `renovate.json`, which
-`scripts/renovate-config.test.ts` covers. The Node, pnpm and Pi SDK pins are grouped, so a version
-stated in several managed files moves in one pull request; the toolchain checks reject a version that
-reads differently in any of them. Renovate provisions the Node it runs lockfile updates with from
-`engines`, so `engines.node` restates `devEngines.runtime` exactly rather than the supported line.
+Renovate groups routine updates only when they share a review and verification boundary. Production
+dependencies remain separate unless Renovate identifies a package family that must move together.
+Major updates and minor updates to pre-1.0 dependencies remain ungrouped, wait seven days, and require
+Dependency Dashboard approval. Vulnerability alerts remain ungrouped and bypass those gates.
+
+Lockfile maintenance runs on Mondays. `renovate.json` owns the managed ecosystems and extraction
+rules; `scripts/renovate-config.test.ts` exercises each custom manager against its source. The Node,
+pnpm and Pi SDK pins are grouped, so a version stated in several managed files moves in one pull
+request; the toolchain checks reject a version that reads differently in any of them. Renovate
+provisions the Node it runs lockfile updates with from `engines`, so `engines.node` restates
+`devEngines.runtime` exactly rather than the supported line.
 
 [Vulnerability remediation](./vulnerability-remediation.mdx) owns the blocking and exception policy.
 [Release management](./release-management.mdx#supply-chain-evidence) owns artifact signing, provenance,

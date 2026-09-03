@@ -35,7 +35,34 @@
 			"groupName": "GitHub Actions"
 		},
 		{
+			"matchManagers": ["npm"],
+			"matchFileNames": ["package.json"],
+			"matchUpdateTypes": ["minor", "patch", "digest", "pin", "pinDigest"],
+			"groupName": "repository tooling dependencies"
+		},
+		{
+			"matchManagers": ["npm"],
+			"matchFileNames": ["webapp/package.json"],
+			"matchDepTypes": ["devDependencies"],
+			"matchUpdateTypes": ["minor", "patch", "digest", "pin", "pinDigest"],
+			"groupName": "webapp development dependencies"
+		},
+		{
+			"matchManagers": ["maven"],
+			"matchDepTypes": ["build", "test"],
+			"matchUpdateTypes": ["minor", "patch", "digest", "pin", "pinDigest"],
+			"groupName": "server build dependencies"
+		},
+		{
 			"matchUpdateTypes": ["major"],
+			"minimumReleaseAge": "7 days",
+			"addLabels": ["breaking"],
+			"groupName": null,
+			"dependencyDashboardApproval": true
+		},
+		{
+			"matchCurrentVersion": "/^0\\./",
+			"matchUpdateTypes": ["minor"],
 			"minimumReleaseAge": "7 days",
 			"addLabels": ["breaking"],
 			"groupName": null,
