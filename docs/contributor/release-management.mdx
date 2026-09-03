@@ -160,7 +160,8 @@ verifier always demands a release version, and the preflight gives it the versio
 
 The preflight is not free — it is a Syft and Trivy pass over every image on both architectures, plus
 the image builds it reads, which on the Version PR's branch means the whole set on both
-architectures where an ordinary pull request would build one image on one — so it
+architectures where an ordinary pull request would build only the images its diff touches, on
+`linux/amd64` — so it
 runs only where its answer changes a decision: on every CI/CD run on the Version PR's branch, and
 on any manual CI/CD dispatch that ticks `release-preflight`. It reuses the images that run already built, so what it judges is the
 artefact a release of that ref would promote, not a stand-in.
