@@ -1,0 +1,43 @@
+name: ✨ Plan a feature
+description: Define implementation-ready user-facing functionality
+type: Feature
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for implementation-ready work. Start proposals that still need validation or design in [Ideas](https://github.com/hephaestus-build/Hephaestus/discussions/categories/ideas).
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: User problem
+      description: Who has the problem, what are they trying to accomplish, and why can they not do it today?
+      placeholder: A workspace admin needs to add a repository without reinstalling the GitHub App so that a newly created repository can be reviewed immediately.
+    validations:
+      required: true
+
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: Describe the user-visible result.
+    validations:
+      required: true
+
+  - type: textarea
+    id: criteria
+    attributes:
+      label: Acceptance criteria
+      description: List observable behavior that would show the problem is solved.
+      placeholder: |
+        - [ ] A workspace admin can add a repository by entering owner/name.
+        - [ ] A clear error explains when the repository cannot be accessed.
+        - [ ] The repository remains listed after a page reload.
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Add relevant mockups, constraints, or links.

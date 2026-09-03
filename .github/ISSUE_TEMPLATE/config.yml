@@ -1,7 +1,8 @@
+blank_issues_enabled: false
 contact_links:
-  - name: 💡 Feature Request
-    url: https://github.com/ls1intum/Hephaestus/discussions/new?category=ideas
-    about: Suggest any ideas you have using our discussion forums.
-  - name: 🤗 Get Help
-    url: https://github.com/ls1intum/Hephaestus/discussions/new?category=support
-    about: If you can't get something to work the way you expect, open a question in our discussion forums.
+  - name: 💡 Propose an idea
+    url: https://github.com/hephaestus-build/Hephaestus/discussions/new?category=ideas
+    about: Explore a feature or improvement before it is ready for implementation.
+  - name: 🤗 Ask for help
+    url: https://github.com/hephaestus-build/Hephaestus/discussions/new?category=support
+    about: Get help installing, configuring, or using Hephaestus.
