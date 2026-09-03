@@ -40,8 +40,8 @@ function workspace(
 }
 
 function ActiveWorkspace() {
-	const { workspaceSlug, providerType, workspacesLoaded } = useActiveWorkspaceSlug();
-	return <output>{`${workspaceSlug}|${providerType}|${workspacesLoaded}`}</output>;
+	const { workspaceSlug, providerType } = useActiveWorkspaceSlug();
+	return <output>{`${workspaceSlug}|${providerType}`}</output>;
 }
 
 describe("useActiveWorkspaceSlug", () => {
@@ -68,10 +68,10 @@ describe("useActiveWorkspaceSlug", () => {
 			</QueryClientProvider>,
 		);
 
-		await screen.findByText("beta|GITLAB|true");
+		await screen.findByText("beta|GITLAB");
 		await act(() =>
 			router.navigate({ to: "/w/$workspaceSlug", params: { workspaceSlug: "alpha" } }),
 		);
-		await screen.findByText("alpha|GITHUB|true");
+		await screen.findByText("alpha|GITHUB");
 	});
 });

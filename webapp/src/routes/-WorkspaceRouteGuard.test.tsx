@@ -6,15 +6,19 @@ import {
 	Outlet,
 	RouterProvider,
 } from "@tanstack/react-router";
-import { render, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { WorkspaceListItem } from "@/api/types.gen";
-import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 
 import { WorkspaceRouteGuard } from "./-WorkspaceRouteGuard";
 
-vi.mock("@/hooks/use-active-workspace");
+const { useQuery } = vi.hoisted(() => ({ useQuery: vi.fn() }));
+
+vi.mock("@tanstack/react-query", async (importOriginal) => ({
+	...(await importOriginal()),
+	useQuery,
+}));
 
 function workspace(workspaceSlug: string): WorkspaceListItem {
 	return {
@@ -33,19 +37,10 @@ function workspace(workspaceSlug: string): WorkspaceListItem {
 	};
 }
 
-function renderRoute(workspaces: WorkspaceListItem[]) {
-	vi.mocked(useActiveWorkspaceSlug).mockReturnValue({
-		workspaceSlug: "unavailable",
-		workspaces,
-		providerType: "GITHUB",
-		isLoading: false,
-		workspacesLoaded: true,
-		error: null,
-	});
-
+function renderRoute() {
 	const rootRoute = createRootRoute({
 		component: () => (
-			<WorkspaceRouteGuard>
+			<WorkspaceRouteGuard workspaceSlug="unavailable">
 				<Outlet />
 			</WorkspaceRouteGuard>
 		),
@@ -53,7 +48,7 @@ function renderRoute(workspaces: WorkspaceListItem[]) {
 	const indexRoute = createRoute({
 		getParentRoute: () => rootRoute,
 		path: "/",
-		component: () => null,
+		component: () => <p>Root</p>,
 	});
 	const workspaceRoute = createRoute({
 		getParentRoute: () => rootRoute,
@@ -63,7 +58,7 @@ function renderRoute(workspaces: WorkspaceListItem[]) {
 	const threadRoute = createRoute({
 		getParentRoute: () => workspaceRoute,
 		path: "mentor/$threadId",
-		component: () => null,
+		component: () => <p>Thread</p>,
 	});
 	const router = createRouter({
 		routeTree: rootRoute.addChildren([indexRoute, workspaceRoute.addChildren([threadRoute])]),
@@ -78,14 +73,55 @@ function renderRoute(workspaces: WorkspaceListItem[]) {
 
 describe("WorkspaceRouteGuard", () => {
 	it("returns an inaccessible workspace route to an accessible workspace home", async () => {
-		const router = renderRoute([workspace("available")]);
+		useQuery.mockReturnValue({
+			data: [workspace("available")],
+			error: null,
+			isFetching: false,
+			isPending: false,
+		});
+		const router = renderRoute();
 
 		await waitFor(() => expect(router.state.location.href).toBe("/w/available"));
 	});
 
 	it("returns to the root when no workspace is accessible", async () => {
-		const router = renderRoute([]);
+		useQuery.mockReturnValue({ data: [], error: null, isFetching: false, isPending: false });
+		const router = renderRoute();
 
 		await waitFor(() => expect(router.state.location.href).toBe("/"));
+	});
+
+	it("waits for a fresh workspace list before redirecting", async () => {
+		useQuery.mockReturnValue({ data: [], error: null, isFetching: true, isPending: false });
+		const router = renderRoute();
+
+		await screen.findByRole("status", { name: "Loading workspace" });
+		expect(router.state.location.href).toBe("/w/unavailable/mentor/thread-1?message=stale");
+	});
+
+	it("keeps rendering when the workspace list cannot be refreshed", async () => {
+		useQuery.mockReturnValue({
+			data: undefined,
+			error: new Error("Unavailable"),
+			isFetching: false,
+			isPending: false,
+		});
+		const router = renderRoute();
+
+		await screen.findByText("Thread");
+		expect(router.state.location.href).toBe("/w/unavailable/mentor/thread-1?message=stale");
+	});
+
+	it("renders an accessible workspace route", async () => {
+		useQuery.mockReturnValue({
+			data: [workspace("unavailable")],
+			error: null,
+			isFetching: false,
+			isPending: false,
+		});
+		const router = renderRoute();
+
+		await screen.findByText("Thread");
+		expect(router.state.location.href).toBe("/w/unavailable/mentor/thread-1?message=stale");
 	});
 });

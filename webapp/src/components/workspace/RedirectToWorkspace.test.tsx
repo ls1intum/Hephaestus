@@ -82,7 +82,6 @@ describe("RedirectToWorkspace", () => {
 			workspaces: [workspace(1, "ls1intum"), workspace(2, "prompt-edu")],
 			providerType: "GITHUB",
 			isLoading: false,
-			workspacesLoaded: true,
 			error: null,
 		});
 
@@ -102,7 +101,6 @@ describe("RedirectToWorkspace", () => {
 			workspaces: [workspace(1, "ls1intum")],
 			providerType: "GITHUB",
 			isLoading: true,
-			workspacesLoaded: false,
 			error: null,
 		});
 

@@ -28,7 +28,6 @@ export function useActiveWorkspaceSlug() {
 		workspaces,
 		providerType: toScmProviderType(activeWorkspace?.providerType),
 		isLoading: authLoading || query.isLoading,
-		workspacesLoaded: query.data !== undefined,
 		error: query.error,
 	};
 }

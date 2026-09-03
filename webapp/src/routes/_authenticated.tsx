@@ -4,7 +4,6 @@ import { getConsentStatusOptions } from "@/api/@tanstack/react-query.gen";
 import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/integrations/auth/AuthContext";
 import { resolveCurrentUser } from "@/integrations/auth/guard";
-import { WorkspaceRouteGuard } from "./-WorkspaceRouteGuard";
 
 // This route will be a parent for all routes that require authentication
 export const Route = createFileRoute("/_authenticated")({
@@ -46,9 +45,5 @@ function AuthenticatedLayout() {
 		);
 	}
 
-	return (
-		<WorkspaceRouteGuard>
-			<Outlet />
-		</WorkspaceRouteGuard>
-	);
+	return <Outlet />;
 }
