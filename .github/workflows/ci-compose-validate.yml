@@ -108,8 +108,14 @@ jobs:
         working-directory: docker
         run: |
           set -euo pipefail
-          # Values mirror what the deploy workflow supplies; only proves the files
-          # still render, not that they are correct for production.
-          docker compose \
-            -f compose.proxy.yaml -f compose.core.yaml -f compose.app.yaml \
-            --env-file self-host/.env --env-file self-host/release-lock.env config --quiet
+          # One stack at a time, because that is how the reference deployment runs them:
+          # deploy-locked-compose.yml renders each file on its own and brings it up as its own
+          # Compose project under /opt/hephaestus/<stack>. Rendering the three merged instead made
+          # every cross-project reference look satisfiable, and hid a `depends_on` no stack could
+          # honour until a release had already been published. The merged combination is still
+          # covered — the single-host stack above includes all three. Values mirror what the deploy
+          # workflow supplies; this only proves each file renders, not that it is right for production.
+          for stack in proxy core app; do
+            docker compose -f "compose.${stack}.yaml" \
+              --env-file self-host/.env --env-file self-host/release-lock.env config --quiet
+          done
