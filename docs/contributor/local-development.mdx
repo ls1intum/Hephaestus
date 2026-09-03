@@ -134,10 +134,11 @@ Every host-side port is configurable so multiple Hephaestus instances (or other 
 | -------------------- | ------- | --------------------------- | -------------------------------- |
 | PostgreSQL           | 5432    | `POSTGRES_PORT`             | `server/.env` |
 | Application server   | 8080    | `SERVER_PORT`               | `server/.env` |
+| Sandbox gateway      | 8081    | `SANDBOX_API_PORT`          | `server/.env` |
 | Webapp (Vite dev)    | 4200    | `WEBAPP_PORT`               | Shell env only                   |
 
 :::tip Pre-flight check
-Run `vp run check:ports` before starting the stack. It checks the three ports above; a NATS
+Run `vp run check:ports` before starting the stack. It checks the four ports above; a NATS
 container binds 4222 as well, and a conflict there shows up only at boot.
 :::
 

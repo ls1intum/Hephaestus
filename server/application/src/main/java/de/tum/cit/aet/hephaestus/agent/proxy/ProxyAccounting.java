@@ -2,6 +2,8 @@ package de.tum.cit.aet.hephaestus.agent.proxy;
 
 import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import org.jspecify.annotations.Nullable;
@@ -27,6 +29,13 @@ public class ProxyAccounting {
     private final MeterRegistry meterRegistry;
     private final ObjectMapper objectMapper;
 
+    // Only the request meters are the LLM capability's own; the rate limiter guards every capability
+    // the gateway chain carries, so its meters take no capability tag.
+    private final Counter gatewayRequests;
+    private final DistributionSummary gatewayRequestSize;
+    private final Counter gatewayThrottled;
+    private final Counter gatewayLimiterErrors;
+
     ProxyAccounting(
             ProxyBudgetGate budgetGate,
             ProxyUsageAccumulator usageAccumulator,
@@ -38,6 +47,21 @@ public class ProxyAccounting {
         this.mentorTurnUsageAccumulator = mentorTurnUsageAccumulator;
         this.meterRegistry = meterRegistry;
         this.objectMapper = objectMapper;
+        this.gatewayRequests = Counter.builder(AgentMetrics.SANDBOX_GATEWAY_REQUESTS)
+                .description("Sandbox gateway requests served")
+                .tag("capability", "llm")
+                .register(meterRegistry);
+        this.gatewayRequestSize = DistributionSummary.builder(AgentMetrics.SANDBOX_GATEWAY_REQUEST_SIZE)
+                .description("Sandbox gateway request body size")
+                .baseUnit("bytes")
+                .tag("capability", "llm")
+                .register(meterRegistry);
+        this.gatewayThrottled = Counter.builder(AgentMetrics.SANDBOX_GATEWAY_THROTTLED)
+                .description("Sandbox gateway requests refused by the per-principal rate limit")
+                .register(meterRegistry);
+        this.gatewayLimiterErrors = Counter.builder(AgentMetrics.SANDBOX_GATEWAY_LIMITER_ERRORS)
+                .description("Sandbox gateway requests served without a rate-limit decision")
+                .register(meterRegistry);
     }
 
     /**
@@ -100,6 +124,25 @@ public class ProxyAccounting {
 
     public Timer.Sample startTimer() {
         return Timer.start();
+    }
+
+    /** Counted once the gateway has accepted the request, so it measures work served, not probes. */
+    public void recordGatewayRequest(int requestBytes) {
+        gatewayRequests.increment();
+        gatewayRequestSize.record(requestBytes);
+    }
+
+    public void recordGatewayThrottled() {
+        gatewayThrottled.increment();
+    }
+
+    /**
+     * The store behind the gateway's rate limit could not be reached, so the request was served
+     * without a limit. A sustained rate means the gateway is unlimited, which no log line makes
+     * alertable on its own.
+     */
+    public void recordGatewayLimiterError() {
+        gatewayLimiterErrors.increment();
     }
 
     public void stopTimer(Timer.Sample sample, String apiProtocol) {

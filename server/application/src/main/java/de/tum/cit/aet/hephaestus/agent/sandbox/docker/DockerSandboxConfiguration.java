@@ -4,6 +4,7 @@ import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.core.DefaultDockerClientConfig;
 import com.github.dockerjava.core.DockerClientImpl;
 import com.github.dockerjava.httpclient5.ApacheDockerHttpClient;
+import de.tum.cit.aet.hephaestus.agent.gateway.SandboxGatewayProperties;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.proxy.MentorProxyCredentialRegistry;
 import de.tum.cit.aet.hephaestus.agent.runtime.AgentImageProperties;
@@ -189,16 +190,14 @@ public class DockerSandboxConfiguration {
             SandboxWorkspaceManager workspaceManager,
             SandboxContainerManager containerManager,
             ContainerSecurityPolicy securityPolicy,
-            SandboxProperties properties,
-            @Value("${server.port:8080}") int serverPort,
+            SandboxGatewayProperties gatewayProperties,
             MeterRegistry meterRegistry) {
         return new DockerSandboxAdapter(
                 networkManager,
                 workspaceManager,
                 containerManager,
                 securityPolicy,
-                properties,
-                serverPort,
+                gatewayProperties.port(),
                 meterRegistry);
     }
 
@@ -243,7 +242,6 @@ public class DockerSandboxConfiguration {
     @Bean
     public InteractiveSandboxService dockerInteractiveSandboxAdapter(
             InteractiveSandboxProperties interactiveProperties,
-            SandboxProperties sandboxProperties,
             SandboxNetworkManager networkManager,
             SandboxWorkspaceManager workspaceManager,
             SandboxContainerManager containerManager,
@@ -255,11 +253,10 @@ public class DockerSandboxConfiguration {
             // adapter runs runClose() here too — docker-java sync calls pin virtual carriers on JDK 21.
             ExecutorService dockerWaitExecutor,
             @Value("${hephaestus.mentor.docker-cli:docker}") String dockerCli,
-            @Value("${server.port:8080}") int serverPort,
+            SandboxGatewayProperties gatewayProperties,
             MentorProxyCredentialRegistry mentorProxyCredentialRegistry) {
         return new DockerInteractiveSandboxAdapter(
                 interactiveProperties,
-                sandboxProperties,
                 networkManager,
                 workspaceManager,
                 containerManager,
@@ -269,7 +266,7 @@ public class DockerSandboxConfiguration {
                 mapper,
                 dockerWaitExecutor,
                 dockerCli,
-                serverPort,
+                gatewayProperties.port(),
                 mentorProxyCredentialRegistry);
     }
 

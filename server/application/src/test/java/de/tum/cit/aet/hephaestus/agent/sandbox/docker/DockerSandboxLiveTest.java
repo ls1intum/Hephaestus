@@ -58,7 +58,7 @@ class DockerSandboxLiveTest {
     @BeforeEach
     void setUp() {
         SandboxProperties properties = new SandboxProperties(
-                "unix:///var/run/docker.sock", false, null, 5, 10, 60, null, 8080, null, 209_715_200L, 500_000, null);
+                "unix:///var/run/docker.sock", false, null, 5, 10, 60, null, null, 209_715_200L, 500_000, null);
 
         var dockerClient = DockerClientImpl.getInstance(
                 DefaultDockerClientConfig.createDefaultConfigBuilder().build(),
@@ -74,13 +74,7 @@ class DockerSandboxLiveTest {
         ContainerSecurityPolicy securityPolicy = new ContainerSecurityPolicy(properties, null);
 
         sandboxAdapter = new DockerSandboxAdapter(
-                networkManager,
-                workspaceManager,
-                containerManager,
-                securityPolicy,
-                properties,
-                8080,
-                new SimpleMeterRegistry());
+                networkManager, workspaceManager, containerManager, securityPolicy, 8080, new SimpleMeterRegistry());
     }
 
     @AfterEach

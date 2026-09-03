@@ -1,5 +1,8 @@
 package de.tum.cit.aet.hephaestus.core.auth.ratelimit;
 
+import io.github.bucket4j.Bandwidth;
+import io.github.bucket4j.BucketConfiguration;
+import io.github.bucket4j.Refill;
 import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
@@ -74,6 +77,17 @@ public record AuthRateLimitProperties(
 
         static Limit of(long capacity, Duration period) {
             return new Limit(capacity, period);
+        }
+
+        /**
+         * This limit as a Bucket4j configuration: one bandwidth with an interval refill, so a caller
+         * gets a fresh budget each window rather than a trickle. Every limiter in the instance builds
+         * its buckets from here, so two limits with the same numbers behave the same way.
+         */
+        public BucketConfiguration bucketConfiguration() {
+            return BucketConfiguration.builder()
+                    .addLimit(Bandwidth.classic(capacity, Refill.intervally(capacity, period)))
+                    .build();
         }
     }
 }

@@ -30,6 +30,11 @@ function failureAt(failures: readonly string[], index: number): string {
  */
 const APPLICATION = `
 hephaestus:
+    sandbox:
+        gateway:
+            port: 8081
+            max-request-bytes: 4194304
+            requests-per-minute: 120
     agent:
         image:
             reference: ghcr.io/hephaestus-build/agent-pi:1.2.3

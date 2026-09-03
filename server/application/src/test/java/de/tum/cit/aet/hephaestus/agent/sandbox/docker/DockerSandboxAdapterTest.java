@@ -13,7 +13,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.sandbox.SandboxProperties;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.NetworkPolicy;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.ResourceLimits;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxCancelledException;
@@ -82,11 +81,9 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        SandboxProperties properties = new SandboxProperties(
-                "unix:///var/run/docker.sock", false, null, 5, 10, 60, null, null, null, 209_715_200L, 500_000, null);
         meterRegistry = new SimpleMeterRegistry();
         sandboxAdapter = new DockerSandboxAdapter(
-                networkManager, workspaceManager, containerManager, securityPolicy, properties, 8080, meterRegistry);
+                networkManager, workspaceManager, containerManager, securityPolicy, 8081, meterRegistry);
     }
 
     private SandboxSpec createSpec() {
@@ -179,33 +176,15 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
 
             Map<String, String> env = captor.getValue().environment();
             // No per-provider path segment — the connection is identified from the authenticated token, not the URL.
-            assertThat(env).containsEntry("LLM_PROXY_URL", "http://172.18.0.2:8080/internal/llm");
+            assertThat(env).containsEntry("LLM_PROXY_URL", "http://172.18.0.2:8081/internal/llm");
+            assertThat(env).containsEntry("GATEWAY_URL", "http://172.18.0.2:8081");
             assertThat(env).containsEntry("LLM_PROXY_TOKEN", "token-123");
         }
 
         @Test
-        void shouldUseActiveServerPortWhenProxyPortUnset() {
-            SandboxProperties properties = new SandboxProperties(
-                    "unix:///var/run/docker.sock",
-                    false,
-                    null,
-                    5,
-                    10,
-                    60,
-                    null,
-                    null,
-                    null,
-                    209_715_200L,
-                    500_000,
-                    null);
+        void shouldPointTheSandboxAtTheConfiguredGatewayPort() {
             sandboxAdapter = new DockerSandboxAdapter(
-                    networkManager,
-                    workspaceManager,
-                    containerManager,
-                    securityPolicy,
-                    properties,
-                    8090,
-                    meterRegistry);
+                    networkManager, workspaceManager, containerManager, securityPolicy, 8090, meterRegistry);
             setupHappyPath();
 
             SandboxSpec spec = new SandboxSpec(

@@ -42,6 +42,10 @@ public final class AgentMetrics {
     public static final String MENTOR_TURN_STARTED = "mentor.turn.started";
     public static final String SANDBOX_EXECUTIONS = "sandbox.executions";
     public static final String SANDBOX_EXECUTION_DURATION = "sandbox.execution.duration";
+    public static final String SANDBOX_GATEWAY_LIMITER_ERRORS = "sandbox.gateway.limiter.errors";
+    public static final String SANDBOX_GATEWAY_REQUESTS = "sandbox.gateway.requests";
+    public static final String SANDBOX_GATEWAY_REQUEST_SIZE = "sandbox.gateway.request.size";
+    public static final String SANDBOX_GATEWAY_THROTTLED = "sandbox.gateway.throttled";
     public static final String SANDBOX_RECONCILER_DURATION = "sandbox.reconciler.duration";
     public static final String SANDBOX_RECONCILER_ORPHANED = "sandbox.reconciler.orphaned";
     public static final String SANDBOX_RECONCILER_SWEEPS = "sandbox.reconciler.sweeps";

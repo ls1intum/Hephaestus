@@ -1,22 +1,16 @@
 package de.tum.cit.aet.hephaestus.core.auth.ratelimit;
 
 import de.tum.cit.aet.hephaestus.core.auth.metrics.AuthMetrics;
-import io.github.bucket4j.Bandwidth;
-import io.github.bucket4j.Bucket;
-import io.github.bucket4j.BucketConfiguration;
 import io.github.bucket4j.ConsumptionProbe;
-import io.github.bucket4j.Refill;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.time.Duration;
 import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
@@ -105,13 +99,11 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
 
         AuthRateLimitProperties.Limit limit = limitFor(endpoint);
         String key = resolveBucketKey(endpoint, request);
-        ConsumptionProbe probe;
-        try {
-            Bucket bucket = bucketResolver.resolve(key, configFor(limit));
-            probe = bucket.tryConsumeAndReturnRemaining(1);
-        } catch (RuntimeException e) {
+        ConsumptionProbe probe = bucketResolver.tryConsume(key, limit.bucketConfiguration(), e -> {
             metrics.recordRateLimitBackendError();
             log.warn("Rate limit backend error: endpoint={} key={}", endpoint, key, e);
+        });
+        if (probe == null) {
             if (endpoint.failOpen) {
                 chain.doFilter(request, response);
             } else {
@@ -125,13 +117,12 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
             return;
         }
 
-        long retryAfterSeconds =
-                Math.max(1, Duration.ofNanos(probe.getNanosToWaitForRefill()).toSeconds());
+        long retryAfterSeconds = RateLimitResponse.retryAfterSeconds(probe);
         // key is namespaced (no raw account-id PII beyond what already exists in auth logs); safe at WARN.
         log.warn("Rate limit exceeded: endpoint={} key={} retryAfterSeconds={}", endpoint, key, retryAfterSeconds);
         // Tag by bucket namespace (oauth-authz/refresh/impersonate/delete-user) — bounded, no PII.
         metrics.recordRateLimitBlocked(endpoint.namespace);
-        writeTooManyRequests(request, response, retryAfterSeconds);
+        RateLimitResponse.writeTooManyRequests(request, response, retryAfterSeconds, objectMapper);
     }
 
     /**
@@ -228,26 +219,6 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
     String clientIp(HttpServletRequest request) {
         String remote = request.getRemoteAddr();
         return remote != null ? remote : "unknown";
-    }
-
-    /** Builds a Bucket4j configuration: one bandwidth, interval refill (fresh budget per window). */
-    private static BucketConfiguration configFor(AuthRateLimitProperties.Limit limit) {
-        Bandwidth bandwidth = Bandwidth.classic(limit.capacity(), Refill.intervally(limit.capacity(), limit.period()));
-        return BucketConfiguration.builder().addLimit(bandwidth).build();
-    }
-
-    private void writeTooManyRequests(HttpServletRequest request, HttpServletResponse response, long retryAfterSeconds)
-            throws IOException {
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
-                HttpStatus.TOO_MANY_REQUESTS, "Rate limit exceeded. Retry after " + retryAfterSeconds + " seconds.");
-        problem.setTitle("Too Many Requests");
-        problem.setProperty("retryAfterSeconds", retryAfterSeconds);
-        problem.setInstance(java.net.URI.create(request.getRequestURI()));
-
-        response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
-        response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
-        response.setHeader(HttpHeaders.RETRY_AFTER, Long.toString(retryAfterSeconds));
-        response.getWriter().write(objectMapper.writeValueAsString(problem));
     }
 
     private void writeServiceUnavailable(HttpServletRequest request, HttpServletResponse response) throws IOException {
