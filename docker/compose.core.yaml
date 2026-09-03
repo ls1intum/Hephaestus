@@ -98,10 +98,16 @@ services:
       # thc healthcheck target: readiness (reports unhealthy while NATS/JetStream is unavailable).
       THC_PORT: "8080"
       THC_PATH: /actuator/health/readiness
+    # nats-server only. `postgres` is a service of docker/compose.app.yaml, and the reference
+    # deployment runs proxy, core and app as three separate Compose projects under
+    # /opt/hephaestus/<stack>; depends_on is project-scoped, so naming it here orders nothing and
+    # makes this file refuse to render on its own. The receiver reaches the database across
+    # shared-network by the alias compose.app.yaml gives it, `restart: unless-stopped` carries it
+    # over a database that is not up yet, and its readiness group (application.yml) names no `db`
+    # contributor, so ingestion health stays honest either way. The single-host install merges all
+    # three files into one project and does declare it — docker/self-host/compose.single-host.yaml.
     depends_on:
       nats-server:
-        condition: service_healthy
-      postgres:
         condition: service_healthy
     restart: unless-stopped
     # Spring drains HTTP (timeout-per-shutdown-phase 20s) THEN WebhookGracefulShutdown drains
