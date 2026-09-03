@@ -67,6 +67,10 @@ jobs:
           done
           # Some Compose releases accept `!override` without applying it.
           rendered=$(docker compose config)
+          nats_config=$(docker compose config --format json \
+            | jq -r '.configs["nats-server.conf"].content')
+          grep -Eq '^[[:space:]]*sync_interval:[[:space:]]*always[[:space:]]*$' <<< "$nats_config" || {
+            echo "::error::the single-node JetStream store must fsync every write"; exit 1; }
           for required in \
             'entrypoints.https.http.middlewares=security-headers@docker' \
             'request-body-limit@docker' \
