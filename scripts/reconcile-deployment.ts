@@ -104,6 +104,20 @@ export function renderMetrics(state: {
 	return `${lines.join("\n")}\n`;
 }
 
+/**
+ * The lock only guarantees anything if nothing the release renders escapes it: a compose file that
+ * hardcoded a tag would otherwise deploy an image no signature covers.
+ */
+export function unlockedImages(rendered: readonly string[], lockEnv: string): string[] {
+	const locked = new Set(
+		lockEnv
+			.split("\n")
+			.map((line) => line.slice(line.indexOf("=") + 1).trim())
+			.filter((value) => value.includes("@sha256:")),
+	);
+	return rendered.filter((image) => !locked.has(image));
+}
+
 function isStack(name: string): name is Stack {
 	return STACK_ORDER.some((stack) => stack === name);
 }
@@ -262,19 +276,37 @@ async function main(): Promise<void> {
 		},
 	);
 
+	const lockEnv = await readFile(lockFile, "utf8");
 	for (const stack of config.stacks) {
+		const composeArgs = [
+			"compose",
+			"--project-name",
+			stack,
+			"--env-file",
+			join(config.secretsDirectory, `${stack}.env`),
+			"--env-file",
+			lockFile,
+			"--file",
+			join(releaseTree, `docker/compose.${stack}.yaml`),
+		];
+		const rendered = asRecord(
+			parseJson(
+				await output("docker", [...composeArgs, "config", "--format", "json"], {
+					cwd: releaseTree,
+				}),
+			),
+			`${stack} configuration`,
+		);
+		const images = Object.values(asRecord(rendered.services, `${stack}.services`)).map((service) =>
+			asString(asRecord(service, `${stack} service`).image, `${stack} service image`),
+		);
+		const unlocked = unlockedImages(images, lockEnv);
+		if (unlocked.length > 0)
+			throw new Error(`${stack} renders images outside the release lock: ${unlocked.join(", ")}`);
 		await run(
 			"docker",
 			[
-				"compose",
-				"--project-name",
-				stack,
-				"--env-file",
-				join(config.secretsDirectory, `${stack}.env`),
-				"--env-file",
-				lockFile,
-				"--file",
-				join(releaseTree, `docker/compose.${stack}.yaml`),
+				...composeArgs,
 				"up",
 				"--detach",
 				"--wait",

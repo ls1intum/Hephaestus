@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { decide, parseChannel, parseStacks, renderMetrics } from "./reconcile-deployment.ts";
+import {
+	decide,
+	parseChannel,
+	parseStacks,
+	renderMetrics,
+	unlockedImages,
+} from "./reconcile-deployment.ts";
 
 const applied = {
 	release: "v0.75.2",
@@ -95,4 +101,20 @@ await test("a failed run still publishes a series, or silence and failure look a
 	});
 	assert.match(metrics, /hephaestus_deploy_reconcile_success 0/);
 	assert.doesNotMatch(metrics, /last_success/);
+});
+
+await test("an image the release lock does not cover is refused", () => {
+	const lock = [
+		"HEPHAESTUS_IMAGE_APPLICATION_SERVER=ghcr.io/o/application-server@sha256:aaa",
+		"HEPHAESTUS_IMAGE_POSTGRES=ghcr.io/o/postgres@sha256:bbb",
+		"IMAGE_TAG=v1.2.3",
+	].join("\n");
+	assert.deepEqual(
+		unlockedImages(
+			["ghcr.io/o/application-server@sha256:aaa", "ghcr.io/o/postgres@sha256:bbb"],
+			lock,
+		),
+		[],
+	);
+	assert.deepEqual(unlockedImages(["ghcr.io/o/webapp:latest"], lock), ["ghcr.io/o/webapp:latest"]);
 });
