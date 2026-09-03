@@ -18,24 +18,34 @@ void test("Renovate creates bounded update PRs without a manual dispatch queue",
 	assert.equal(config.prHourlyLimit, 2);
 	assert.equal(config.prConcurrentLimit, 5);
 	assert.equal(config.branchConcurrentLimit, 10);
-	assert.ok(
-		Array.isArray(config.packageRules) &&
-			config.packageRules.some(
-				(rule) =>
-					isRecord(rule) &&
-					rule.dependencyDashboardApproval === true &&
-					Array.isArray(rule.matchUpdateTypes) &&
-					rule.matchUpdateTypes.includes("major"),
-			),
-	);
+	assert.ok(Array.isArray(config.packageRules));
+	const rules = config.packageRules.filter(isRecord);
+	for (const [updateType, currentVersion] of [
+		["major", undefined],
+		["minor", "/^0\\./"],
+	]) {
+		const rule = rules.find(
+			(candidate) =>
+				candidate.matchCurrentVersion === currentVersion &&
+				Array.isArray(candidate.matchUpdateTypes) &&
+				candidate.matchUpdateTypes.includes(updateType),
+		);
+		assert.ok(rule);
+		assert.equal(rule.minimumReleaseAge, "7 days");
+		assert.equal(rule.dependencyDashboardApproval, true);
+		assert.equal(rule.groupName, null);
+		assert.ok(Array.isArray(rule.addLabels) && rule.addLabels.includes("breaking"));
+	}
 });
 
 void test("every pin of one toolchain version moves in a single pull request", () => {
-	// Renovate merges every matching packageRule in order, so the last one to set a key wins.
 	assert.ok(Array.isArray(config.packageRules));
 	const rules = config.packageRules.filter(isRecord);
-	const ungrouped = rules.findLastIndex((rule) => rule.groupName === null);
-	assert.ok(ungrouped >= 0, "a rule must ungroup majors for the toolchain rules to reinstate it");
+	const lastUngroupedRule = rules.findLastIndex((rule) => rule.groupName === null);
+	assert.ok(
+		lastUngroupedRule >= 0,
+		"high-risk updates must be ungrouped before toolchain groups reinstate them",
+	);
 	for (const [depName, groupName] of [
 		["node", "Node.js toolchain"],
 		["pnpm", "pnpm toolchain"],
@@ -47,7 +57,29 @@ void test("every pin of one toolchain version moves in a single pull request", (
 		);
 		assert.equal(rules[index]?.groupName, groupName, `${depName} must be grouped as ${groupName}`);
 		assert.equal(rules[index]?.matchUpdateTypes, undefined, `${depName} groups every update type`);
-		assert.ok(index > ungrouped, `${depName} must be grouped after majors are ungrouped`);
+		assert.ok(index > lastUngroupedRule, `${depName} must follow the high-risk update rules`);
+	}
+});
+
+void test("routine update groups preserve repository boundaries", () => {
+	assert.ok(Array.isArray(config.packageRules));
+	const rules = config.packageRules.filter(isRecord);
+	const groups = [
+		["repository tooling dependencies", "npm", "package.json", undefined],
+		["webapp development dependencies", "npm", "webapp/package.json", ["devDependencies"]],
+		["server build dependencies", "maven", undefined, ["build", "test"]],
+	] as const;
+	for (const [groupName, manager, fileName, depTypes] of groups) {
+		const rule = rules.find((candidate) => candidate.groupName === groupName);
+		assert.ok(rule);
+		assert.deepEqual(rule.matchManagers, [manager]);
+		assert.deepEqual(rule.matchFileNames, fileName === undefined ? undefined : [fileName]);
+		assert.deepEqual(rule.matchDepTypes, depTypes);
+		assert.ok(Array.isArray(rule.matchUpdateTypes));
+		assert.deepEqual(
+			new Set(rule.matchUpdateTypes),
+			new Set(["minor", "patch", "digest", "pin", "pinDigest"]),
+		);
 	}
 });
 
