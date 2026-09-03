@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import process from "node:process";
 import { setTimeout as sleep } from "node:timers/promises";
 
+import { asArray, asRecord, asString } from "./lib/json.ts";
 import { CAPTURE_LIMIT_BYTES } from "./lib/process.ts";
 
 const [previousImage, candidateImage, postgresImage] = process.argv.slice(2);
@@ -14,6 +15,9 @@ if (!previousImage || !candidateImage || !postgresImage) {
 }
 
 const WORKSPACE_SLUG = "upgrade-fixture";
+const ADOPTION_WORKSPACE_SLUG = "upgrade-adoption-fixture";
+const HTTP_TIMEOUT_MS = 30_000;
+const READINESS_TIMEOUT_MS = 2_000;
 
 const runId = `upgrade-${randomUUID().slice(0, 8)}`;
 const network = runId;
@@ -26,6 +30,10 @@ function docker(...args: string[]): string {
 		throw new Error(`docker ${args.join(" ")} failed:\n${result.stdout}${result.stderr}`);
 	}
 	return result.stdout.trim();
+}
+
+function fetchWithTimeout(input: string, init?: RequestInit): Promise<Response> {
+	return fetch(input, { ...init, signal: AbortSignal.timeout(HTTP_TIMEOUT_MS) });
 }
 
 function startApplication(name: string, image: string): number {
@@ -75,7 +83,9 @@ async function waitUntilReady(name: string, port: number): Promise<void> {
 		const state = docker("inspect", "--format", "{{.State.Status}}", name);
 		if (state !== "running") throw new Error(`${name} stopped during startup`);
 		try {
-			const response = await fetch(`http://127.0.0.1:${port}/actuator/health/readiness`);
+			const response = await fetch(`http://127.0.0.1:${port}/actuator/health/readiness`, {
+				signal: AbortSignal.timeout(READINESS_TIMEOUT_MS),
+			});
 			if (response.ok) return;
 		} catch {
 			// The endpoint is unavailable while the container starts.
@@ -86,7 +96,7 @@ async function waitUntilReady(name: string, port: number): Promise<void> {
 }
 
 async function login(port: number, username: string): Promise<string> {
-	const response = await fetch(`http://127.0.0.1:${port}/auth/dev-login`, {
+	const response = await fetchWithTimeout(`http://127.0.0.1:${port}/auth/dev-login`, {
 		method: "POST",
 		headers: { "content-type": "application/json" },
 		body: JSON.stringify({
@@ -111,7 +121,9 @@ async function login(port: number, username: string): Promise<string> {
  * notice arrived after some of the releases this runs against, and those have no consent endpoint.
  */
 async function completeTransparencyNotice(port: number, cookie: string): Promise<void> {
-	const status = await fetch(`http://127.0.0.1:${port}/user/consent`, { headers: { cookie } });
+	const status = await fetchWithTimeout(`http://127.0.0.1:${port}/user/consent`, {
+		headers: { cookie },
+	});
 	if (status.status === 404) return;
 	if (!status.ok)
 		throw new Error(`Consent status returned ${status.status}: ${await status.text()}`);
@@ -124,7 +136,7 @@ async function completeTransparencyNotice(port: number, cookie: string): Promise
 	)
 		throw new Error("Consent status did not return the current notice version");
 	if ("completed" in statusBody && statusBody.completed === true) return;
-	const completed = await fetch(`http://127.0.0.1:${port}/user/consent`, {
+	const completed = await fetchWithTimeout(`http://127.0.0.1:${port}/user/consent`, {
 		method: "PUT",
 		headers: { "content-type": "application/json", cookie },
 		body: JSON.stringify({
@@ -140,7 +152,7 @@ async function completeTransparencyNotice(port: number, cookie: string): Promise
 }
 
 async function assertCoreReads(port: number, cookie: string): Promise<void> {
-	const user = await fetch(`http://127.0.0.1:${port}/user`, { headers: { cookie } });
+	const user = await fetchWithTimeout(`http://127.0.0.1:${port}/user`, { headers: { cookie } });
 	if (!user.ok) throw new Error(`Core read /user returned ${user.status}: ${await user.text()}`);
 	const userBody: unknown = await user.json();
 	if (
@@ -151,7 +163,7 @@ async function assertCoreReads(port: number, cookie: string): Promise<void> {
 	)
 		throw new Error("Core read /user did not return the seeded account");
 
-	const providers = await fetch(`http://127.0.0.1:${port}/identity-providers`);
+	const providers = await fetchWithTimeout(`http://127.0.0.1:${port}/identity-providers`);
 	if (!providers.ok)
 		throw new Error(
 			`Core read /identity-providers returned ${providers.status}: ${await providers.text()}`,
@@ -159,7 +171,9 @@ async function assertCoreReads(port: number, cookie: string): Promise<void> {
 	const providerBody: unknown = await providers.json();
 	if (!Array.isArray(providerBody) || providerBody.length === 0)
 		throw new Error("Core read /identity-providers returned no providers");
-	const workspaces = await fetch(`http://127.0.0.1:${port}/workspaces`, { headers: { cookie } });
+	const workspaces = await fetchWithTimeout(`http://127.0.0.1:${port}/workspaces`, {
+		headers: { cookie },
+	});
 	if (!workspaces.ok)
 		throw new Error(
 			`Core read /workspaces returned ${workspaces.status}: ${await workspaces.text()}`,
@@ -178,14 +192,14 @@ async function assertCoreReads(port: number, cookie: string): Promise<void> {
 		throw new Error("Core read /workspaces did not return the seeded workspace");
 }
 
-async function seedWorkspace(port: number, cookie: string): Promise<void> {
-	const response = await fetch(`http://127.0.0.1:${port}/workspaces`, {
+async function seedWorkspace(port: number, cookie: string, workspaceSlug: string): Promise<void> {
+	const response = await fetchWithTimeout(`http://127.0.0.1:${port}/workspaces`, {
 		method: "POST",
 		headers: { "content-type": "application/json", cookie },
 		body: JSON.stringify({
-			workspaceSlug: WORKSPACE_SLUG,
+			workspaceSlug,
 			displayName: "Upgrade Fixture",
-			accountLogin: WORKSPACE_SLUG,
+			accountLogin: workspaceSlug,
 			accountType: "ORG",
 			kind: "GITHUB",
 			personalAccessToken: "upgrade-fixture-token",
@@ -195,58 +209,51 @@ async function seedWorkspace(port: number, cookie: string): Promise<void> {
 		throw new Error(`Workspace seed returned ${response.status}: ${await response.text()}`);
 }
 
-/**
- * Adoption is a preview-then-apply pair: the preview's ETag is the validator the apply must send as
- * If-Match, so the workspace only ever adopts the catalog state the caller read.
- */
-async function applyAdoption(url: string, cookie: string, expectedStatus: number): Promise<void> {
-	const preview = await fetch(url, { headers: { cookie } });
+async function adoptCatalogPractice(port: number, cookie: string): Promise<void> {
+	const catalog = `http://127.0.0.1:${port}/workspaces/${ADOPTION_WORKSPACE_SLUG}/practice-catalog/adoption`;
+	const offered = await fetchWithTimeout(catalog, {
+		headers: { cookie },
+	});
+	if (!offered.ok)
+		throw new Error(`Adoptable practices returned ${offered.status}: ${await offered.text()}`);
+	const entries = asArray(await offered.json(), "Adoptable practices").map((entry, index) => {
+		const summary = asRecord(entry, `Adoptable practices[${index}]`);
+		const availability = asString(
+			summary.availability,
+			`Adoptable practices[${index}].availability`,
+		);
+		if (
+			availability !== "AVAILABLE" &&
+			availability !== "ADOPTED" &&
+			availability !== "SLUG_CONFLICT"
+		)
+			throw new Error(
+				`Adoptable practices[${index}].availability has unexpected value: ${availability}`,
+			);
+		return {
+			availability,
+			slug: asString(summary.slug, `Adoptable practices[${index}].slug`),
+		};
+	});
+	const practice = entries.find((entry) => entry.availability === "AVAILABLE");
+	if (!practice) throw new Error("Candidate returned no practice available for adoption");
+
+	const url = `${catalog}/${encodeURIComponent(practice.slug)}`;
+	const preview = await fetchWithTimeout(url, {
+		headers: { cookie },
+	});
 	if (!preview.ok)
 		throw new Error(`Adoption preview returned ${preview.status}: ${await preview.text()}`);
 	const validator = preview.headers.get("etag");
 	if (!validator) throw new Error("Adoption preview returned no ETag to send as If-Match");
-	const adopted = await fetch(url, {
+	const adopted = await fetchWithTimeout(url, {
 		method: "POST",
 		headers: { cookie, "if-match": validator },
 	});
-	if (adopted.status !== expectedStatus)
+	if (adopted.status !== 201)
 		throw new Error(
 			`Adopting from the catalog returned ${adopted.status}: ${await adopted.text()}`,
 		);
-}
-
-/**
- * A workspace no longer receives a copy of the instance catalog when it is created — an
- * administrator adopts the practices the workspace reviews. Returns whether it adopted anything: a
- * release that predates adoption exposes no endpoint (404), and a release that seeded the whole
- * catalog on creation leaves nothing on offer. Both mean the workspace already has its practices.
- */
-async function adoptCatalogPractices(port: number, cookie: string): Promise<boolean> {
-	const catalog = `http://127.0.0.1:${port}/workspaces/${WORKSPACE_SLUG}/practice-catalog/adoption`;
-	const offered = await fetch(catalog, { headers: { cookie } });
-	if (offered.status === 404) return false;
-	if (!offered.ok)
-		throw new Error(`Adoptable practices returned ${offered.status}: ${await offered.text()}`);
-	const body: unknown = await offered.json();
-	if (!Array.isArray(body)) throw new Error("Adoptable practices did not return a list");
-	if (body.length === 0) return false;
-	const entries = body.filter(
-		(entry: unknown): entry is { slug: string; groupSlug?: string } =>
-			typeof entry === "object" &&
-			entry !== null &&
-			"slug" in entry &&
-			typeof entry.slug === "string",
-	);
-	const [first] = entries;
-	if (first === undefined) throw new Error("Adoptable practices returned entries without a slug");
-	// One group carries several practices in a single apply; a group-less entry is adopted alone.
-	const group = entries.find((entry) => typeof entry.groupSlug === "string");
-	if (group?.groupSlug !== undefined) {
-		await applyAdoption(`${catalog}/groups/${group.groupSlug}`, cookie, 200);
-		return true;
-	}
-	await applyAdoption(`${catalog}/${first.slug}`, cookie, 201);
-	return true;
 }
 
 function linkWorkspaceIdentity(): void {
@@ -332,8 +339,16 @@ function count(sql: string): number {
 	return Number(value);
 }
 
-function seededCatalogSize(): number {
-	return count("SELECT count(*) FROM practice;");
+function workspacePracticeCount(workspaceSlug: string): number {
+	return count(`
+		SELECT count(*)
+		FROM practice
+		JOIN workspace ON workspace.id = practice.workspace_id
+		WHERE coalesce(
+			to_jsonb(workspace)->>'workspace_slug',
+			to_jsonb(workspace)->>'slug'
+		) = '${workspaceSlug}';
+	`);
 }
 
 function appliedChangeCount(): number {
@@ -376,16 +391,14 @@ try {
 	await completeTransparencyNotice(port, previousCookie);
 	await login(port, "root");
 	linkWorkspaceIdentity();
-	await seedWorkspace(port, previousCookie);
+	await seedWorkspace(port, previousCookie, WORKSPACE_SLUG);
 	await assertCoreReads(port, previousCookie);
 	const seededData = dataFingerprint();
 	for (const kind of ["account", "identity", "user", "workspace", "membership", "connection"]) {
 		if (!seededData.includes(`${kind}|`))
 			throw new Error(`Previous release did not seed ${kind} data`);
 	}
-	// Whatever the previous release left the workspace holding: a release that seeded the catalog on
-	// creation leaves the whole of it, and a release that expects adoption leaves none.
-	const seededPractices = seededCatalogSize();
+	const previousPractices = workspacePracticeCount(WORKSPACE_SLUG);
 	const previousChanges = appliedChangeCount();
 
 	docker("stop", "--time", "30", application);
@@ -396,10 +409,10 @@ try {
 	const upgradedData = dataFingerprint();
 	if (upgradedData !== seededData)
 		throw new Error("Seeded application data changed during upgrade");
-	const upgradedPractices = seededCatalogSize();
-	if (upgradedPractices < seededPractices)
+	const upgradedPractices = workspacePracticeCount(WORKSPACE_SLUG);
+	if (upgradedPractices < previousPractices)
 		throw new Error(
-			`Practice catalog shrank during upgrade: before=${seededPractices}, after=${upgradedPractices}`,
+			`Workspace practices shrank during upgrade: before=${previousPractices}, after=${upgradedPractices}`,
 		);
 	const candidateChanges = appliedChangeCount();
 	if (candidateChanges < previousChanges)
@@ -410,17 +423,14 @@ try {
 	await completeTransparencyNotice(port, candidateCookie);
 	await assertCoreReads(port, candidateCookie);
 
-	// Adopting writes a practice, which fires the deferred projection trigger — the drill runs it on
-	// the upgraded release so a migration that leaves that trigger unable to commit fails here
-	// rather than in a workspace.
-	const adopted = await adoptCatalogPractices(port, candidateCookie);
-	const adoptedPractices = seededCatalogSize();
-	if (adopted && adoptedPractices <= upgradedPractices)
-		throw new Error(
-			`Adoption added no practice: before=${upgradedPractices}, after=${adoptedPractices}`,
-		);
-	if (adoptedPractices === 0)
-		throw new Error("Upgraded release left the workspace with no practice");
+	await seedWorkspace(port, candidateCookie, ADOPTION_WORKSPACE_SLUG);
+	const practicesBeforeAdoption = workspacePracticeCount(ADOPTION_WORKSPACE_SLUG);
+	if (practicesBeforeAdoption !== 0)
+		throw new Error(`New workspace unexpectedly started with ${practicesBeforeAdoption} practices`);
+	await adoptCatalogPractice(port, candidateCookie);
+	const practicesAfterAdoption = workspacePracticeCount(ADOPTION_WORKSPACE_SLUG);
+	if (practicesAfterAdoption !== 1)
+		throw new Error(`Adoption created ${practicesAfterAdoption} practices instead of one`);
 
 	console.log("Seeded previous-release upgrade passed.");
 } catch (error) {

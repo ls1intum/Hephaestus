@@ -1,57 +1,81 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
-    <changeSet id="1788452647516-1" author="practice-projection-join">
+    <changeSet id="1788452647516-1" author="hephaestus">
         <preConditions onFail="MARK_RAN" onFailMessage="practice projection trigger already joins practice_group by its own alias">
-            <sqlCheck expectedResult="1"><![CDATA[
-            SELECT count(*) FROM pg_proc
-            WHERE proname = 'enforce_practice_current_revision_projection'
-              AND pg_get_functiondef(oid) LIKE '%ON area.id = practice.practice_group_id%'
+            <sqlCheck expectedResult="0"><![CDATA[
+            SELECT count(*)
+            FROM pg_proc
+            WHERE oid = 'enforce_practice_current_revision_projection()'::regprocedure
+              AND pg_get_functiondef(oid) LIKE '%ON practice_group.id = practice.practice_group_id%'
             ]]></sqlCheck>
         </preConditions>
-        <comment>Join the practice group by the alias the group vocabulary left it under, so writing a practice can commit.</comment>
-        <!--
-        1787844107869-2 renamed the area vocabulary to group by rewriting this function's own
-        definition with string replacements. `practice_area area` became `practice_group
-        practice_group` and `area.slug` became `practice_group.slug`, but the join predicate reads
-        `area.id`, which no replacement covered — so the deferred constraint trigger raised
-        `missing FROM-clause entry for table "area"` at COMMIT for every insert or update of a
-        practice's projected columns. Adopting a catalog practice, creating one and editing one all
-        failed with an internal error, and the startup catalog repair failed the same way.
-
-        The correction is the replacement that was missing, applied the same way rather than by
-        transcribing the body: the function has been rewritten twice already, and re-stating thirty
-        lines of predicate here would silently drop whatever a later change added to it.
-        -->
+        <comment>Restore practice writes by joining the current revision projection to its practice group alias.</comment>
         <sql splitStatements="false"><![CDATA[
-        DO $functions$
-        DECLARE
-            definition text;
+        CREATE OR REPLACE FUNCTION enforce_practice_current_revision_projection()
+        RETURNS trigger
+        LANGUAGE plpgsql
+        AS $current_projection$
         BEGIN
-            SELECT pg_get_functiondef('enforce_practice_current_revision_projection()'::regprocedure)
-              INTO definition;
-            definition := replace(
-                definition,
-                'ON area.id = practice.practice_group_id',
-                'ON practice_group.id = practice.practice_group_id');
-            EXECUTE definition;
-        END
-        $functions$;
+            IF NOT EXISTS (
+                SELECT 1
+                FROM practice practice
+                JOIN practice_revision revision
+                  ON revision.id = practice.current_revision_id
+                 AND revision.practice_id = practice.id
+                LEFT JOIN practice_group practice_group
+                  ON practice_group.id = practice.practice_group_id
+                WHERE practice.id = NEW.id
+                  AND revision.slug = practice.slug
+                  AND revision.name = practice.name
+                  AND revision.applies_to = practice.applies_to
+                  AND revision.bindings = practice.bindings
+                  AND revision.criteria = practice.criteria
+                  AND revision.precompute_script IS NOT DISTINCT FROM practice.precompute_script
+                  AND revision.automated_review_policy = practice.automated_review_policy
+                  AND revision.why_it_matters IS NOT DISTINCT FROM practice.why_it_matters
+                  AND revision.what_good_looks_like IS NOT DISTINCT FROM practice.what_good_looks_like
+                  AND revision.group_slug IS NOT DISTINCT FROM practice_group.slug
+            ) THEN
+                RAISE EXCEPTION 'practice current revision does not match its current projection'
+                    USING ERRCODE = '23514';
+            END IF;
+            RETURN NULL;
+        END;
+        $current_projection$;
         ]]></sql>
         <rollback>
             <sql splitStatements="false"><![CDATA[
-            DO $functions$
-            DECLARE
-                definition text;
+            CREATE OR REPLACE FUNCTION enforce_practice_current_revision_projection()
+            RETURNS trigger
+            LANGUAGE plpgsql
+            AS $current_projection$
             BEGIN
-                SELECT pg_get_functiondef('enforce_practice_current_revision_projection()'::regprocedure)
-                  INTO definition;
-                definition := replace(
-                    definition,
-                    'ON practice_group.id = practice.practice_group_id',
-                    'ON area.id = practice.practice_group_id');
-                EXECUTE definition;
-            END
-            $functions$;
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM practice practice
+                    JOIN practice_revision revision
+                      ON revision.id = practice.current_revision_id
+                     AND revision.practice_id = practice.id
+                    LEFT JOIN practice_group practice_group
+                      ON area.id = practice.practice_group_id
+                    WHERE practice.id = NEW.id
+                      AND revision.slug = practice.slug
+                      AND revision.name = practice.name
+                      AND revision.applies_to = practice.applies_to
+                      AND revision.bindings = practice.bindings
+                      AND revision.criteria = practice.criteria
+                      AND revision.precompute_script IS NOT DISTINCT FROM practice.precompute_script
+                      AND revision.automated_review_policy = practice.automated_review_policy
+                      AND revision.why_it_matters IS NOT DISTINCT FROM practice.why_it_matters
+                      AND revision.what_good_looks_like IS NOT DISTINCT FROM practice.what_good_looks_like
+                      AND revision.group_slug IS NOT DISTINCT FROM practice_group.slug
+                ) THEN
+                    RAISE EXCEPTION 'practice current revision does not match its current projection'
+                        USING ERRCODE = '23514';
+                END IF;
+                RETURN NULL;
+            END;
+            $current_projection$;
             ]]></sql>
         </rollback>
     </changeSet>
