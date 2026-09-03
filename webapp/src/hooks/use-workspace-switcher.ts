@@ -32,9 +32,11 @@ export function useWorkspaceSwitcher() {
 			search: () => ({}),
 			replace: true,
 		});
-		toast.info(`Switched to ${displayName}`, {
-			description:
-				"This page is specific to the previous workspace, so we opened the new workspace's home page.",
-		});
+		if (currentWorkspaceSlug !== undefined) {
+			toast.info(`Switched to ${displayName}`, {
+				description:
+					"This page is specific to the previous workspace, so we opened the new workspace's home page.",
+			});
+		}
 	};
 }

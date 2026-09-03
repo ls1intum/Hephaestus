@@ -63,6 +63,27 @@ function renderRoute(initialEntry: string, path: string) {
 	return router;
 }
 
+function renderGlobalRoute() {
+	const rootRoute = createRootRoute({ component: Outlet });
+	const settingsRoute = createRoute({
+		getParentRoute: () => rootRoute,
+		path: "settings",
+		component: SwitchWorkspace,
+	});
+	const workspaceRoute = createRoute({
+		getParentRoute: () => rootRoute,
+		path: "w/$workspaceSlug",
+		component: () => null,
+	});
+	const router = createRouter({
+		routeTree: rootRoute.addChildren([settingsRoute, workspaceRoute]),
+		history: createMemoryHistory({ initialEntries: ["/settings"] }),
+	});
+
+	render(<RouterProvider router={router} />);
+	return router;
+}
+
 async function clickWorkspaceSwitch() {
 	const user = userEvent.setup();
 	await user.click(await screen.findByRole("button", { name: "Switch workspace" }));
@@ -107,6 +128,15 @@ describe("useWorkspaceSwitcher", () => {
 		await user.click(await screen.findByRole("button", { name: "Keep workspace" }));
 
 		expect(router.state.location.href).toBe("/w/alpha/mentor/thread-1?message=current");
+		expect(toast.info).not.toHaveBeenCalled();
+	});
+
+	it("opens workspace home silently from a global route", async () => {
+		const router = renderGlobalRoute();
+
+		await clickWorkspaceSwitch();
+
+		await waitFor(() => expect(router.state.location.href).toBe("/w/beta"));
 		expect(toast.info).not.toHaveBeenCalled();
 	});
 });

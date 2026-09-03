@@ -13,7 +13,7 @@ export function WorkspaceRouteGuard({
 	workspaceSlug: string;
 }) {
 	const query = useQuery({ ...listWorkspacesOptions(), staleTime: 0 });
-	const workspaces = Array.isArray(query.data) ? query.data : [];
+	const workspaces = query.data ?? [];
 	const workspaceIsAccessible = workspaces.some(
 		(workspace) => workspace.workspaceSlug === workspaceSlug,
 	);

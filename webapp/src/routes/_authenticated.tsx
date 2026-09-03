@@ -33,11 +33,11 @@ export const Route = createFileRoute("/_authenticated")({
 });
 
 function AuthenticatedLayout() {
-	const { isLoading: authLoading } = useAuth();
+	const { isLoading } = useAuth();
 
 	// The beforeLoad guard already redirected unauthenticated users to /login, so here we only
 	// cover the brief window where the in-app auth probe (GET /user via useAuth) is still settling.
-	if (authLoading) {
+	if (isLoading) {
 		return (
 			<div className="flex items-center justify-center h-96">
 				<Spinner className="size-8" />
