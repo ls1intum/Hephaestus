@@ -1,10 +1,9 @@
 export interface WorkspaceRouteMatch {
-	routeId: string;
 	params: Record<string, unknown>;
 }
 
 export function getWorkspaceRouteMatch(
-	matches: readonly { routeId: string; params: Record<string, unknown> }[],
+	matches: readonly WorkspaceRouteMatch[],
 ): WorkspaceRouteMatch | undefined {
 	for (let index = matches.length - 1; index >= 0; index -= 1) {
 		const match = matches[index];

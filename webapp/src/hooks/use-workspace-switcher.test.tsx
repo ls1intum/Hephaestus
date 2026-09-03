@@ -7,13 +7,22 @@ import {
 	RouterProvider,
 } from "@tanstack/react-router";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { toast } from "sonner";
+import { describe, expect, it, vi } from "vitest";
 
 import { useWorkspaceSwitcher } from "./use-workspace-switcher";
 
+vi.mock("sonner", () => ({ toast: { info: vi.fn() } }));
+
 function SwitchWorkspace() {
 	const switchWorkspace = useWorkspaceSwitcher();
-	return <button onClick={() => switchWorkspace("beta")}>Switch workspace</button>;
+	return (
+		<button
+			onClick={() => switchWorkspace({ displayName: "Beta workspace", workspaceSlug: "beta" })}
+		>
+			Switch workspace
+		</button>
+	);
 }
 
 function renderRoute(initialEntry: string, path: string) {
@@ -53,6 +62,7 @@ describe("useWorkspaceSwitcher", () => {
 		await clickWorkspaceSwitch();
 
 		await waitFor(() => expect(router.state.location.href).toBe("/w/beta/teams"));
+		expect(toast.info).not.toHaveBeenCalled();
 	});
 
 	it.each([
@@ -64,5 +74,9 @@ describe("useWorkspaceSwitcher", () => {
 		await clickWorkspaceSwitch();
 
 		await waitFor(() => expect(router.state.location.href).toBe("/w/beta"));
+		expect(toast.info).toHaveBeenCalledWith("Switched to Beta workspace", {
+			description:
+				"This page is specific to the previous workspace, so we opened the new workspace's home page.",
+		});
 	});
 });
