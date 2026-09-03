@@ -55,6 +55,10 @@ async function main(): Promise<void> {
 				name: "Application server",
 				port: positivePort(value("SERVER_PORT", "8080"), "SERVER_PORT"),
 			},
+			{
+				name: "Sandbox gateway",
+				port: positivePort(value("SANDBOX_API_PORT", "8081"), "SANDBOX_API_PORT"),
+			},
 			{ name: "Webapp (Vite)", port: positivePort(value("WEBAPP_PORT", "4200"), "WEBAPP_PORT") },
 		];
 	} catch (error) {

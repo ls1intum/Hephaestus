@@ -224,6 +224,9 @@ services:
       HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST: ${HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST:-true}
       HEPHAESTUS_AGENT_IMAGE_REFERENCE: ${HEPHAESTUS_IMAGE_AGENT_PI:?verified release lock required}
       SANDBOX_DOCKER_HOST: ${SANDBOX_DOCKER_HOST:-unix:///var/run/docker.sock}
+      SANDBOX_API_PORT: ${SANDBOX_API_PORT:-8081}
+      SANDBOX_API_MAX_REQUEST_BYTES: ${SANDBOX_API_MAX_REQUEST_BYTES:-4194304}
+      SANDBOX_API_REQUESTS_PER_MINUTE: ${SANDBOX_API_REQUESTS_PER_MINUTE:-120}
       SANDBOX_CONTAINER_RUNTIME: ${SANDBOX_CONTAINER_RUNTIME:-}
       SANDBOX_MAX_CONCURRENT: ${SANDBOX_MAX_CONCURRENT:-5}
       SANDBOX_MEMORY_BYTES: ${SANDBOX_MEMORY_BYTES:-4294967296}
@@ -327,7 +330,8 @@ services:
         max-size: "50m"
         max-file: "5"
 
-  # Worker runtime — same image, worker profile, internal-only HTTP proxy, dials the hub over WSS.
+  # Worker runtime — same image, worker profile. Dials the hub over WSS; the only inbound port is
+  # the sandbox gateway.
   application-worker:
     image: "${HEPHAESTUS_IMAGE_APPLICATION_SERVER:?verified release lock required}"
     # Bounds heap sizing to this container (see application-server).
@@ -352,6 +356,9 @@ services:
       HEPHAESTUS_FABRIC_ROOT: /data/git-repos
       HEPHAESTUS_FABRIC_GC_RETENTION_DAYS: ${HEPHAESTUS_FABRIC_GC_RETENTION_DAYS:-30}
       SANDBOX_DOCKER_HOST: ${SANDBOX_DOCKER_HOST:-unix:///var/run/docker.sock}
+      SANDBOX_API_PORT: ${SANDBOX_API_PORT:-8081}
+      SANDBOX_API_MAX_REQUEST_BYTES: ${SANDBOX_API_MAX_REQUEST_BYTES:-4194304}
+      SANDBOX_API_REQUESTS_PER_MINUTE: ${SANDBOX_API_REQUESTS_PER_MINUTE:-120}
       SANDBOX_CONTAINER_RUNTIME: ${SANDBOX_CONTAINER_RUNTIME:-}
       SANDBOX_MAX_CONCURRENT: ${SANDBOX_MAX_CONCURRENT:-5}
       SANDBOX_MEMORY_BYTES: ${SANDBOX_MEMORY_BYTES:-4294967296}
@@ -399,7 +406,7 @@ services:
       # application-prod.yml binds host-url=${APPLICATION_HOST_URL} with no YAML default; compose always
       # supplies it so the agent context builds links from a real origin (an unset var fails the boot).
       APPLICATION_HOST_URL: https://${APP_HOSTNAME}
-      # thc healthcheck target: actuator liveness on the management port (still :8080 though server.port=-1).
+      # thc runs inside the container, so it reaches the loopback-bound management endpoint.
       THC_PORT: "8080"
       THC_PATH: /actuator/health/liveness
     depends_on:

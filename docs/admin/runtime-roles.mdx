@@ -53,7 +53,7 @@ Split the webhook receiver out when:
 
 Each role ships with a Spring profile YAML that flips the other two flags off and prunes the bean graph:
 
-- `application-worker.yml` — `runtime.server=false`, `runtime.webhook=false`, OAuth2 autoconfigure excluded, JPA still enabled. The servlet container stays on (`web-application-type=servlet`) with a real `server.port`: the internal LLM proxy (`/internal/llm/**`, the only credential path a sandbox has) is served with the worker/sandbox capability, and no `ports:`/Traefik mapping exposes it externally.
+- `application-worker.yml` — `runtime.server=false`, `runtime.webhook=false`, OAuth2 autoconfigure excluded, JPA still enabled. Its HTTP connector, which also serves the management endpoints, binds to loopback for in-container health checks. A separate sandbox gateway listens on `SANDBOX_API_PORT` (default `8081`); its connector-specific security chain accepts only job-token-authenticated sandbox capabilities, and every other path on that port answers an empty `404`. A capability call over `SANDBOX_API_MAX_REQUEST_BYTES` is refused with `413`, one that declares no body length with `411`, and one past `SANDBOX_API_REQUESTS_PER_MINUTE` with `429` and a `Retry-After`. If the gateway cannot reach the store its rate limiter counts against, it serves the call unlimited and counts that under `sandbox.gateway.limiter.errors`, so a review is never stopped by the limiter's own outage. Traefik never routes to this port.
 - `application-webhook.yml` — `runtime.server=false`, `runtime.worker=false`, sync NATS enabled, agent job queue disabled (webhook pods never claim jobs).
 - No `application-server.yml` — the monolith default *is* the server profile.
 
@@ -74,6 +74,9 @@ overlay's value where the overlay pins one, otherwise the base default.
 | `hephaestus.sync.nats.enabled` | false | **false** | **true** | env default / profile overlay |
 | `hephaestus.agent.enabled` | false | false | false | env default |
 | `hephaestus.integration.outline.allowed-origins` | empty | empty | empty | env default |
+| `hephaestus.sandbox.gateway.port` | 8081 | 8081 | — | env default (`SANDBOX_API_PORT`) |
+| `hephaestus.sandbox.gateway.requests-per-minute` | 120 | 120 | — | env default (`SANDBOX_API_REQUESTS_PER_MINUTE`) |
+| `hephaestus.sandbox.gateway.max-request-bytes` | 4194304 | 4194304 | — | env default (`SANDBOX_API_MAX_REQUEST_BYTES`) |
 | Needs user-auth wiring | yes | no | no | role gating |
 
 Bolded cells are pinned by that role's profile overlay and are not the base default. Reading the
@@ -99,7 +102,16 @@ does differ by role. The whole `core.auth` module carries `@ConditionalOnServerR
 wiring at boot. The `webhook` overlay does not carry that exclusion and relies on the role gate alone.
 
 There is no `hephaestus.sandbox.enabled`, and an arch test forbids introducing one: the Docker
-sandbox *is* the worker capability, so it follows `hephaestus.runtime.worker.enabled`.
+sandbox *is* the worker capability, so it follows `hephaestus.runtime.worker.enabled`. Reading the
+worker row down the **Server** column: a server pod carries the worker role too, so it opens the
+sandbox gateway on the same port and needs the same firewall treatment as a split-out worker. The
+webhook role turns the worker role off, so it opens no gateway — the three `sandbox.gateway` rows
+read `—` in that column.
+
+Only worker containers bind their HTTP and management endpoints to loopback: that is the `worker`
+overlay's doing, and a single-container install running all three roles still serves `/api/**` and
+the management endpoints on `SERVER_PORT`. On that topology the gateway is a second, narrower door
+rather than the only one.
 
 One row reads differently from what a bare `docker compose up` produces, because the shipped compose
 file sets the env var the base default leaves off:

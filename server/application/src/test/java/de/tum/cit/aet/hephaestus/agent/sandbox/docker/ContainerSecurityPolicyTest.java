@@ -23,7 +23,7 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         SandboxProperties properties = new SandboxProperties(
-                "unix:///var/run/docker.sock", false, null, 5, 10, 60, null, 8080, null, 209_715_200L, 500_000, null);
+                "unix:///var/run/docker.sock", false, null, 5, 10, 60, null, null, 209_715_200L, 500_000, null);
         securityPolicy = new ContainerSecurityPolicy(properties, null);
     }
 
@@ -140,18 +140,7 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
         @Test
         void shouldUseGlobalRuntime() {
             SandboxProperties propsWithRuntime = new SandboxProperties(
-                    "unix:///var/run/docker.sock",
-                    false,
-                    null,
-                    5,
-                    10,
-                    60,
-                    "runsc",
-                    8080,
-                    null,
-                    209_715_200L,
-                    500_000,
-                    null);
+                    "unix:///var/run/docker.sock", false, null, 5, 10, 60, "runsc", null, 209_715_200L, 500_000, null);
             ContainerSecurityPolicy policyWithRuntime = new ContainerSecurityPolicy(propsWithRuntime, null);
 
             DockerOperations.HostConfigSpec config = policyWithRuntime.buildHostConfig(
@@ -196,7 +185,6 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
                             10,
                             60,
                             null,
-                            8080,
                             null,
                             209_715_200L,
                             500_000,
@@ -354,18 +342,7 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
         @Test
         void shouldPreventRuntimeDowngrade() {
             SandboxProperties propsWithRuntime = new SandboxProperties(
-                    "unix:///var/run/docker.sock",
-                    false,
-                    null,
-                    5,
-                    10,
-                    60,
-                    "runsc",
-                    8080,
-                    null,
-                    209_715_200L,
-                    500_000,
-                    null);
+                    "unix:///var/run/docker.sock", false, null, 5, 10, 60, "runsc", null, 209_715_200L, 500_000, null);
             ContainerSecurityPolicy policyWithRuntime = new ContainerSecurityPolicy(propsWithRuntime, null);
 
             SecurityProfile runcProfile = new SecurityProfile("runc", "none", List.of("ALL"), Map.of());

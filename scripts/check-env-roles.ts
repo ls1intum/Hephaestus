@@ -70,6 +70,21 @@ interface RoleScope {
  */
 const ROLE_SCOPES: readonly RoleScope[] = [
 	{
+		path: "hephaestus.sandbox.gateway.port",
+		role: "worker",
+		why: "SandboxGatewayConfiguration opens the connector and LlmProxySecurityConfig matches its chains on that port; both are gated on hephaestus.runtime.worker.enabled",
+	},
+	{
+		path: "hephaestus.sandbox.gateway.max-request-bytes",
+		role: "worker",
+		why: "SandboxGatewayPayloadSizeFilter enforces it on the gateway chain, which LlmProxySecurityConfig installs gated on hephaestus.runtime.worker.enabled",
+	},
+	{
+		path: "hephaestus.sandbox.gateway.requests-per-minute",
+		role: "worker",
+		why: "SandboxGatewayRateLimitFilter is installed by LlmProxySecurityConfig, which is gated on hephaestus.runtime.worker.enabled",
+	},
+	{
 		path: "hephaestus.webhook.stream",
 		role: "webhook",
 		why: "WebhookJetStreamBootstrap and WebhookStreamMonitor are contributed by WebhookProducerBeans, which WebhookConfiguration gates on hephaestus.runtime.webhook.enabled",

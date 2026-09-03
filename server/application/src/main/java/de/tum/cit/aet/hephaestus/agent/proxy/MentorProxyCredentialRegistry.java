@@ -144,7 +144,10 @@ public class MentorProxyCredentialRegistry {
         }
         MentorTurnMeter turn = entry.currentTurn().get();
         return Optional.of(new ProxyRouting(
-                "mentor-session",
+                // Names the session, because everything keyed on the principal — the gateway's rate
+                // limit, the proxy's MDC — would otherwise treat every session in the instance as one
+                // caller and let one workspace's conversation throttle another's.
+                "mentor-session:" + entry.sessionId(),
                 entry.apiProtocol(),
                 entry.baseUrl(),
                 entry.connectionScope(),

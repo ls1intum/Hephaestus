@@ -38,7 +38,6 @@ class SandboxNetworkManagerTest extends BaseUnitTest {
                 10,
                 60,
                 null,
-                8080,
                 "app-server-id",
                 209_715_200L,
                 500_000,
@@ -85,18 +84,7 @@ class SandboxNetworkManagerTest extends BaseUnitTest {
         @Test
         void shouldFallBackToHostname() {
             SandboxProperties propsNoId = new SandboxProperties(
-                    "unix:///var/run/docker.sock",
-                    false,
-                    null,
-                    5,
-                    10,
-                    60,
-                    null,
-                    8080,
-                    null,
-                    209_715_200L,
-                    500_000,
-                    null);
+                    "unix:///var/run/docker.sock", false, null, 5, 10, 60, null, null, 209_715_200L, 500_000, null);
             SandboxNetworkManager mgr = new SandboxNetworkManager(networkOps, propsNoId, () -> "hostname-container-id");
 
             when(networkOps.connectToNetwork(NETWORK_ID, "hostname-container-id"))
@@ -111,18 +99,7 @@ class SandboxNetworkManagerTest extends BaseUnitTest {
         @Test
         void shouldReturnNullWhenNoContainerId() {
             SandboxProperties propsNoId = new SandboxProperties(
-                    "unix:///var/run/docker.sock",
-                    false,
-                    null,
-                    5,
-                    10,
-                    60,
-                    null,
-                    8080,
-                    null,
-                    209_715_200L,
-                    500_000,
-                    null);
+                    "unix:///var/run/docker.sock", false, null, 5, 10, 60, null, null, 209_715_200L, 500_000, null);
             SandboxNetworkManager mgr = new SandboxNetworkManager(networkOps, propsNoId, () -> null);
 
             String ip = mgr.connectAppServer(NETWORK_ID);
@@ -133,18 +110,7 @@ class SandboxNetworkManagerTest extends BaseUnitTest {
         @Test
         void shouldReturnNullWhenHostnameBlank() {
             SandboxProperties propsNoId = new SandboxProperties(
-                    "unix:///var/run/docker.sock",
-                    false,
-                    null,
-                    5,
-                    10,
-                    60,
-                    null,
-                    8080,
-                    null,
-                    209_715_200L,
-                    500_000,
-                    null);
+                    "unix:///var/run/docker.sock", false, null, 5, 10, 60, null, null, 209_715_200L, 500_000, null);
             SandboxNetworkManager mgr = new SandboxNetworkManager(networkOps, propsNoId, () -> "  ");
 
             String ip = mgr.connectAppServer(NETWORK_ID);
@@ -156,18 +122,7 @@ class SandboxNetworkManagerTest extends BaseUnitTest {
         void shouldCacheContainerId() {
             var callCount = new AtomicInteger(0);
             SandboxProperties propsNoId = new SandboxProperties(
-                    "unix:///var/run/docker.sock",
-                    false,
-                    null,
-                    5,
-                    10,
-                    60,
-                    null,
-                    8080,
-                    null,
-                    209_715_200L,
-                    500_000,
-                    null);
+                    "unix:///var/run/docker.sock", false, null, 5, 10, 60, null, null, 209_715_200L, 500_000, null);
             SandboxNetworkManager mgr = new SandboxNetworkManager(networkOps, propsNoId, () -> {
                 callCount.incrementAndGet();
                 return "cached-id";
@@ -196,18 +151,7 @@ class SandboxNetworkManagerTest extends BaseUnitTest {
         @Test
         void shouldNoOpWhenNoContainerId() {
             SandboxProperties propsNoId = new SandboxProperties(
-                    "unix:///var/run/docker.sock",
-                    false,
-                    null,
-                    5,
-                    10,
-                    60,
-                    null,
-                    8080,
-                    null,
-                    209_715_200L,
-                    500_000,
-                    null);
+                    "unix:///var/run/docker.sock", false, null, 5, 10, 60, null, null, 209_715_200L, 500_000, null);
             SandboxNetworkManager mgr = new SandboxNetworkManager(networkOps, propsNoId, () -> null);
 
             // Should not throw — silently skips disconnect

@@ -1,0 +1,60 @@
+package de.tum.cit.aet.hephaestus.agent.proxy;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import jakarta.servlet.ServletRequest;
+import jakarta.servlet.ServletResponse;
+import java.nio.charset.StandardCharsets;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.junit.jupiter.api.Test;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
+
+class SandboxGatewayPayloadSizeFilterTest extends BaseUnitTest {
+
+    private final AtomicInteger served = new AtomicInteger();
+    private final SandboxGatewayPayloadSizeFilter filter = new SandboxGatewayPayloadSizeFilter(16);
+
+    @Test
+    void shouldServeARequestWithinTheLimit() throws Exception {
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(requestOf("{\"model\":1}"), response, this::serve);
+
+        assertThat(served).hasValue(1);
+        assertThat(response.getStatus()).isEqualTo(200);
+    }
+
+    @Test
+    void shouldRefuseARequestLargerThanTheConfiguredLimit() throws Exception {
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(requestOf("{\"prompt\":\"far too many bytes\"}"), response, this::serve);
+
+        assertThat(served).hasValue(0);
+        assertThat(response.getStatus()).isEqualTo(413);
+    }
+
+    /** A body whose size is only knowable after reading it is the case the limit exists to avoid. */
+    @Test
+    void shouldRefuseARequestThatDeclaresNoLength() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/internal/llm/responses");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, this::serve);
+
+        assertThat(served).hasValue(0);
+        assertThat(response.getStatus()).isEqualTo(411);
+    }
+
+    private static MockHttpServletRequest requestOf(String body) {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/internal/llm/responses");
+        request.setContent(body.getBytes(StandardCharsets.UTF_8));
+        return request;
+    }
+
+    private void serve(ServletRequest request, ServletResponse response) {
+        served.incrementAndGet();
+    }
+}

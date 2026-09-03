@@ -128,6 +128,42 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         assertThat(result.authentication()).isNull();
     }
 
+    /**
+     * Two sandboxes share a worker, so one holding the other's token must not become the other: the
+     * route and the execution it bills both come from the row the token names.
+     */
+    @Test
+    void shouldRouteEachJobTokenOnlyToTheJobThatMintedIt() throws Exception {
+        AgentJob first = runningJob(true);
+        AgentJob second = runningJob(true);
+
+        ProxyRouting firstRouting = routingOf(authenticate(tokenFor(first)));
+        ProxyRouting secondRouting = routingOf(authenticate(tokenFor(second)));
+
+        assertThat(firstRouting.principalDescription()).isEqualTo("job:" + first.getId());
+        assertThat(firstRouting.sourceId()).isEqualTo(first.getId());
+        assertThat(secondRouting.principalDescription()).isEqualTo("job:" + second.getId());
+        assertThat(secondRouting.sourceId()).isEqualTo(second.getId());
+    }
+
+    /**
+     * A requeue starts a new attempt with its own token, so the one the dead attempt handed its
+     * sandbox has to stop working — otherwise an orphaned container keeps spending on a row that has
+     * already been re-admitted.
+     */
+    @Test
+    void shouldRejectAJobTokenMintedForAnEarlierAttempt() throws Exception {
+        AgentJob job = runningJob(true);
+        String earlierAttempt = tokenFor(job);
+        job.setRetryCount(job.getRetryCount() + 1);
+        jobRepository.save(job);
+
+        AuthenticationResult result = authenticate(earlierAttempt);
+
+        assertThat(result.status()).isEqualTo(401);
+        assertThat(result.authentication()).isNull();
+    }
+
     @Test
     void shouldFailClosedWhenCatalogModelIsDisabled() {
         AgentJob job = runningJob(false);
@@ -156,6 +192,15 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     private record AuthenticationResult(int status, Authentication authentication) {}
 
+    private String tokenFor(AgentJob job) {
+        return jwtIssuer.issueForJob(job.getId(), workspace.getId(), job.getRetryCount(), Duration.ofMinutes(5));
+    }
+
+    private static ProxyRouting routingOf(AuthenticationResult result) {
+        Authentication authentication = Objects.requireNonNull(result.authentication(), "token did not authenticate");
+        return (ProxyRouting) Objects.requireNonNull(authentication.getPrincipal(), "no routing on the principal");
+    }
+
     private AgentJob runningJob(boolean modelEnabled) {
         LlmConnection connection = LlmCatalogTestFixtures.connection("connection-" + System.nanoTime());
         connection.setBaseUrl("https://api.example.com/v1");
@@ -166,7 +211,10 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
         LlmModel model = modelRepository.save(LlmCatalogTestFixtures.model(
                 connection, "model-" + System.nanoTime(), "catalog-model", ModelVisibility.PUBLIC, modelEnabled));
-        WorkspaceAgentBinding binding = new WorkspaceAgentBinding();
+        // A workspace binds one model per purpose, so a second job re-points the binding it already has.
+        WorkspaceAgentBinding binding = agentBindingRepository
+                .findByWorkspaceIdAndPurpose(workspace.getId(), AgentPurpose.PRACTICE_REVIEW)
+                .orElseGet(WorkspaceAgentBinding::new);
         binding.setWorkspace(workspace);
         binding.setPurpose(AgentPurpose.PRACTICE_REVIEW);
         binding.setInstanceModel(model);

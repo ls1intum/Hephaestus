@@ -52,7 +52,6 @@ class LlmProxyController {
 
     private static final Logger log = LoggerFactory.getLogger(LlmProxyController.class);
     private static final Duration BLOCK_TIMEOUT = Duration.ofSeconds(310);
-    private static final int MAX_REQUEST_BODY_SIZE = 4 * 1024 * 1024;
     private static final String COMPLETIONS_PROTOCOL = "openai-completions";
     private static final String RESPONSES_PROTOCOL = "openai-responses";
     private static final String COMPLETIONS_PROXY_PATH = "/internal/llm/chat/completions";
@@ -83,10 +82,14 @@ class LlmProxyController {
             HttpServletRequest request,
             HttpServletResponse response,
             @RequestHeader HttpHeaders incomingHeaders,
-            @RequestBody(required = false) byte[] body) {
+            @RequestBody(required = false) byte @Nullable [] body) {
         ProxyRouting routing = authenticatedRouting();
-        ResponseEntity<String> rejected = validateSafeSurface(request, routing, body);
+        ResponseEntity<String> rejected = validateSafeSurface(request, routing);
         if (rejected != null) return rejected;
+        if (body == null || body.length == 0) return ResponseEntity.badRequest().body("Request body is required");
+        rejected = validateJsonObject(body);
+        if (rejected != null) return rejected;
+        accounting.recordGatewayRequest(body.length);
 
         MDC.put("proxy.principal", routing.principalDescription());
         MDC.put("proxy.apiProtocol", routing.apiProtocol());
@@ -224,8 +227,8 @@ class LlmProxyController {
         return body != null && new String(body, StandardCharsets.UTF_8).contains("stream_options");
     }
 
-    private @Nullable ResponseEntity<String> validateSafeSurface(
-            HttpServletRequest request, ProxyRouting routing, byte[] body) {
+    private static @Nullable ResponseEntity<String> validateSafeSurface(
+            HttpServletRequest request, ProxyRouting routing) {
         if (!"POST".equals(request.getMethod()))
             return ResponseEntity.status(405).body("Method not allowed");
         if (request.getQueryString() != null)
@@ -240,9 +243,10 @@ class LlmProxyController {
         if (expectedPath == null || !expectedPath.equals(request.getRequestURI())) {
             return ResponseEntity.status(404).body("Not found");
         }
-        if (body == null || body.length == 0) return ResponseEntity.badRequest().body("Request body is required");
-        if (body.length > MAX_REQUEST_BODY_SIZE)
-            return ResponseEntity.status(413).body("Request body too large");
+        return null;
+    }
+
+    private @Nullable ResponseEntity<String> validateJsonObject(byte[] body) {
         try {
             if (!objectMapper.readTree(body).isObject()) {
                 return ResponseEntity.badRequest().body("Request body must be a JSON object");

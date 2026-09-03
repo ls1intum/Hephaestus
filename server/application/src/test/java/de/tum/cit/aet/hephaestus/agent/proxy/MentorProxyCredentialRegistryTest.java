@@ -76,6 +76,25 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
     }
 
     /**
+     * The principal is what the sandbox gateway keys its rate-limit bucket on and what the proxy puts in
+     * its MDC. A principal that named only the role would file every mentor session on a worker under one
+     * bucket, and one workspace's conversation would throttle another's.
+     */
+    @Test
+    void namesTheSessionInThePrincipalSoTwoSessionsNeverShareABucket() {
+        UUID first = UUID.randomUUID();
+        UUID second = UUID.randomUUID();
+        String firstToken =
+                registry.mint(first, new Route("openai-completions", "https://api.openai.com", null, null, null, null));
+        String secondToken = registry.mint(
+                second, new Route("anthropic-messages", "https://api.anthropic.com", null, null, null, null));
+
+        assertThat(registry.validate(firstToken).orElseThrow().principalDescription())
+                .isEqualTo("mentor-session:" + first)
+                .isNotEqualTo(registry.validate(secondToken).orElseThrow().principalDescription());
+    }
+
+    /**
      * The turn binding: what makes a mentor turn's spend visible while the turn is still running. A
      * {@code validate} that returned no billing target would let a turn already at the cap make
      * unbounded calls before anything observed a cent of it.

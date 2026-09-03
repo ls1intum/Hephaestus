@@ -100,7 +100,7 @@ class DockerInteractiveSandboxLiveTest {
     @BeforeEach
     void setUp() throws Exception {
         SandboxProperties sandboxProperties = new SandboxProperties(
-                "unix:///var/run/docker.sock", false, null, 5, 10, 60, null, 8080, null, 209_715_200L, 500_000, null);
+                "unix:///var/run/docker.sock", false, null, 5, 10, 60, null, null, 209_715_200L, 500_000, null);
         // Tight TTL so idle eviction tests don't have to wait minutes.
         InteractiveSandboxProperties interactiveProperties = new InteractiveSandboxProperties(
                 /* idleTtlSeconds */ 2,
@@ -135,7 +135,6 @@ class DockerInteractiveSandboxLiveTest {
         proxyCredentialRegistry = new MentorProxyCredentialRegistry();
         adapter = new DockerInteractiveSandboxAdapter(
                 interactiveProperties,
-                sandboxProperties,
                 networkManager,
                 workspaceManager,
                 containerManager,

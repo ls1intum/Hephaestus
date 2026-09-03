@@ -182,6 +182,19 @@ class LlmProxyControllerTest extends BaseUnitTest {
     @Nested
     class SafeSurface {
 
+        /** A truncated runner or a retried request whose body was already consumed sends no bytes. */
+        @Test
+        void shouldRejectABodylessCallBeforeCredentialResolution() {
+            authenticate(routing("openai-responses"));
+
+            var result = controller.proxy(
+                    request("POST", "/internal/llm/responses"), new MockHttpServletResponse(), new HttpHeaders(), null);
+
+            assertThat(result).isNotNull();
+            assertThat(result.getStatusCode().value()).isEqualTo(400);
+            verifyNoInteractions(resolver);
+        }
+
         @Test
         void shouldRejectNonPostBeforeCredentialResolution() {
             authenticate(routing("openai-completions"));
