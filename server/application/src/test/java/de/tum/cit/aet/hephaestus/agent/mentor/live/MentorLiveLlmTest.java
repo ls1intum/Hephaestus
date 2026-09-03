@@ -67,7 +67,7 @@ import tools.jackson.databind.node.ObjectNode;
 class MentorLiveLlmTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
-    private static final String PI_SDK_VERSION = "0.84.3";
+    private static final String PI_SDK_VERSION = "0.84.4";
 
     private static final Duration TURN_TIMEOUT = Duration.ofSeconds(90);
 

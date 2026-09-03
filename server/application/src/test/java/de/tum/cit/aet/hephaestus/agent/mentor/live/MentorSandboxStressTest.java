@@ -54,7 +54,7 @@ import tools.jackson.databind.node.ObjectNode;
 class MentorSandboxStressTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
-    private static final String PI_SDK_VERSION = "0.84.3";
+    private static final String PI_SDK_VERSION = "0.84.4";
     private static final Path SDK_DIR = Path.of("target", "pi-sdk").toAbsolutePath();
     private static final Path RUNNER =
             Path.of("src", "main", "resources", "agent", "pi-mentor-runner.ts").toAbsolutePath();
