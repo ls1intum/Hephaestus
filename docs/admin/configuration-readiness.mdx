@@ -85,8 +85,9 @@ application key.
 
 Server and webhook roles require NATS and an explicit `nats://` or `tls://` URI with a host, an optional
 valid port, and no query, fragment, or non-root path. A worker-only process must disable NATS because
-its job queue is PostgreSQL-backed. The reference deployment requires `NATS_USERNAME` and
-`NATS_PASSWORD`. This check validates syntax and role consistency, not connectivity or JetStream health.
+its job queue is PostgreSQL-backed. Every deployment requires `NATS_USERNAME` and `NATS_PASSWORD`;
+the supported self-host setup generates both. This check validates syntax and role consistency, not
+connectivity or JetStream health.
 
 ## Login
 

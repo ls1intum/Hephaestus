@@ -28,7 +28,7 @@ else
 fi
 chmod 600 "$working_file"
 
-for key in POSTGRES_PASSWORD HEPHAESTUS_SECURITY_ENCRYPTION_KEY HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY HEPHAESTUS_AUTH_STATE_COOKIE_KEY WEBHOOK_SECRET; do
+for key in POSTGRES_PASSWORD HEPHAESTUS_SECURITY_ENCRYPTION_KEY HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY HEPHAESTUS_AUTH_STATE_COOKIE_KEY WEBHOOK_SECRET NATS_USERNAME NATS_PASSWORD; do
 	if [ "$(grep -c "^${key}=" "$working_file")" -gt 1 ]; then
 		printf 'Refusing duplicate %s assignments in %s.\n' "$key" "$environment_file" >&2
 		exit 1
@@ -45,6 +45,10 @@ set_if_empty() {
 		hex16) value=$(openssl rand -hex 16) || return 1 ;;
 		hex32) value=$(openssl rand -hex 32) || return 1 ;;
 		base64) value=$(openssl rand -base64 32 | tr -d '\n') || return 1 ;;
+		# The broker reads these from its own config file, which interpolates them unquoted;
+		# its parser reads an all-digit token as a number and exits before it listens. The
+		# prefix keeps a letter in every generated value.
+		broker) value=heph$(openssl rand -hex 16) || return 1 ;;
 	esac
 	if ! grep -q "^${key}=" "$working_file"; then
 		printf '%s=%s\n' "$key" "$value" >> "$working_file"
@@ -84,6 +88,8 @@ if ! grep -q '^HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY=.' "$working_file";
 fi
 set_if_empty HEPHAESTUS_AUTH_STATE_COOKIE_KEY base64
 set_if_empty WEBHOOK_SECRET hex32
+set_if_empty NATS_USERNAME broker
+set_if_empty NATS_PASSWORD broker
 
 mv "$working_file" "$environment_file"
 

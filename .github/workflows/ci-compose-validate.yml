@@ -23,17 +23,13 @@ jobs:
         working-directory: docker/self-host
         run: |
           set -euo pipefail
-          # Supply required operator values; missing defaults must still fail rendering.
-          cp .env.example .env
+          # Render what the install guide produces: the installer's generated secrets plus the
+          # values step 2 asks the operator for. Hand-filling the generated ones here would hide a
+          # required variable the installer forgets, which is how one reached a release smoke test.
+          ./setup.sh
           sed -i \
             -e 's|^APP_HOSTNAME=$|APP_HOSTNAME=hephaestus.example.com|' \
             -e 's|^ACME_EMAIL=$|ACME_EMAIL=operator@example.com|' \
-            -e 's|^POSTGRES_PASSWORD=$|POSTGRES_PASSWORD=ci-not-a-real-password|' \
-            -e 's|^HEPHAESTUS_SECURITY_ENCRYPTION_KEY=$|HEPHAESTUS_SECURITY_ENCRYPTION_KEY=0123456789abcdef0123456789abcdef|' \
-            -e 's|^HEPHAESTUS_AUTH_STATE_COOKIE_KEY=$|HEPHAESTUS_AUTH_STATE_COOKIE_KEY=Y2ktbm90LWEtcmVhbC1zdGF0ZS1jb29raWUta2V5|' \
-            -e 's|^WEBHOOK_SECRET=$|WEBHOOK_SECRET=ci000000000000000000000000000000000|' \
-            -e 's|^NATS_USERNAME=$|NATS_USERNAME=ci|' \
-            -e 's|^NATS_PASSWORD=$|NATS_PASSWORD=ci-not-a-real-password|' \
             .env
           while IFS= read -r image; do
             name="HEPHAESTUS_IMAGE_${image^^}"

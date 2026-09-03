@@ -57,6 +57,8 @@ function managedValues(environment: string): string[] {
 		"HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY",
 		"HEPHAESTUS_AUTH_STATE_COOKIE_KEY",
 		"WEBHOOK_SECRET",
+		"NATS_USERNAME",
+		"NATS_PASSWORD",
 	]);
 	return environment
 		.split("\n")
@@ -81,6 +83,13 @@ await test("generates protected secrets without printing them", async () => {
 	assert.equal(credentialKey, encryptionKey);
 	assert.match(environment, /^HEPHAESTUS_AUTH_STATE_COOKIE_KEY=[A-Za-z0-9+/]{43}=$/m);
 	assert.match(environment, /^WEBHOOK_SECRET=[0-9a-f]{64}$/m);
+	// The broker's config file rejects an all-digit credential, so both carry a letter prefix.
+	assert.match(environment, /^NATS_USERNAME=heph[0-9a-f]{32}$/m);
+	assert.match(environment, /^NATS_PASSWORD=heph[0-9a-f]{32}$/m);
+	assert.notEqual(
+		environment.match(/^NATS_USERNAME=(.+)$/m)?.[1],
+		environment.match(/^NATS_PASSWORD=(.+)$/m)?.[1],
+	);
 	assert.equal((await lstat(environmentPath)).mode & 0o777, 0o600);
 	for (const secret of managedValues(environment)) assert.ok(!result.output.includes(secret));
 
