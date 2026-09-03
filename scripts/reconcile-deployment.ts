@@ -268,12 +268,13 @@ async function main(): Promise<void> {
 		});
 
 	const lockFile = join(releaseTree, "release-lock.env");
+	// The verifier is the host's copy, never the release's: a release that shipped its own
+	// verification script would be attesting to itself. Only the compose files below come from the
+	// release, and they are applied after its images are checked against the lock.
 	await run(
 		process.execPath,
-		[join(releaseTree, "scripts/prepare-release-lock.ts"), decision.release, lockFile],
-		{
-			cwd: releaseTree,
-		},
+		[join(config.checkout, "scripts/prepare-release-lock.ts"), decision.release, lockFile],
+		{ cwd: releaseTree },
 	);
 
 	const lockEnv = await readFile(lockFile, "utf8");

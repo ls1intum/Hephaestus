@@ -25,7 +25,9 @@ NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes
 PrivateTmp=yes
-ReadWritePaths=/var/lib/hephaestus /run/lock
+# Everything the reconciler writes lives under the state directory, including its checkout, so the
+# writable set stays this short. The metrics path is optional, hence the leading dash.
+ReadWritePaths=/var/lib/hephaestus /run/lock -/var/lib/node_exporter
 # The Docker socket is reached over AF_UNIX; omitting it here breaks connect(2). Read-only
 # directory protections do not block Unix sockets, so ProtectSystem=strict leaves it reachable.
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6

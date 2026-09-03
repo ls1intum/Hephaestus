@@ -48,8 +48,9 @@ page rather than from a convenience script.
 
 ## Install
 
-1. Put a checkout of this repository on the host. The reconciler only reads it, and creates release
-   worktrees under the state directory.
+1. Clone this repository to `/var/lib/hephaestus/checkout`. It belongs under the state directory
+   because the reconciler fetches into it; the unit makes only that directory writable, so a
+   checkout anywhere else needs a matching `ReadWritePaths` entry.
 2. Copy `docker/self-host/systemd/reconcile.env.example` to `/etc/hephaestus/reconcile.env`
    (`root:root`, `0600`) and set the channel, the stacks this host owns, and the promotion identity.
 3. Put one `<stack>.env` per stack in `/etc/hephaestus`, `0600`. These hold the deployment secrets
