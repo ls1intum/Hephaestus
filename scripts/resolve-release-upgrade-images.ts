@@ -4,6 +4,8 @@ import process from "node:process";
 
 import { currentReleaseIdentity, releaseIdentityFor } from "./lib/release-identities.ts";
 
+import { CAPTURE_LIMIT_BYTES } from "./lib/process.ts";
+
 // The candidate is built by this repository's CI, so it lives in the current
 // namespace. The previous release keeps the namespace it was published under —
 // GHCR packages do not transfer between organizations (issue #1599) — so its
@@ -13,7 +15,7 @@ const applicationRepository = `${currentNamespace}/application-server`;
 const postgresRepository = `${currentNamespace}/postgres`;
 
 function command(executable: string, args: string[]): string {
-	const result = spawnSync(executable, args, { encoding: "utf8" });
+	const result = spawnSync(executable, args, { encoding: "utf8", maxBuffer: CAPTURE_LIMIT_BYTES });
 	if (result.status !== 0)
 		throw new Error(`${executable} ${args.join(" ")} failed:\n${result.stdout}${result.stderr}`);
 	return result.stdout.trim();

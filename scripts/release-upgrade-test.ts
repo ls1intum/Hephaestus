@@ -3,6 +3,8 @@ import { randomUUID } from "node:crypto";
 import process from "node:process";
 import { setTimeout as sleep } from "node:timers/promises";
 
+import { CAPTURE_LIMIT_BYTES } from "./lib/process.ts";
+
 const [previousImage, candidateImage, postgresImage] = process.argv.slice(2);
 
 if (!previousImage || !candidateImage || !postgresImage) {
@@ -17,7 +19,7 @@ const postgres = `${runId}-postgres`;
 let application = `${runId}-previous`;
 
 function docker(...args: string[]): string {
-	const result = spawnSync("docker", args, { encoding: "utf8" });
+	const result = spawnSync("docker", args, { encoding: "utf8", maxBuffer: CAPTURE_LIMIT_BYTES });
 	if (result.status !== 0) {
 		throw new Error(`docker ${args.join(" ")} failed:\n${result.stdout}${result.stderr}`);
 	}

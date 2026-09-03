@@ -486,6 +486,25 @@ void describe("CI contract", () => {
 			);
 	});
 
+	void test("bounds every captured subprocess above Node's 1 MiB default", async () => {
+		// Node caps a captured subprocess at 1 MiB and throws past it. That default has broken the
+		// release pipeline three times: a cosign attestation carrying an SBOM, a `gh api` release
+		// listing, and a `gh api` workflow-run listing that stopped the Version PR being maintained
+		// at all. The ceiling has one home, and a capture that does not use it is the fourth.
+		const offenders: string[] = [];
+		for await (const file of glob("scripts/**/*.ts")) {
+			if (file.endsWith(".test.ts")) continue;
+			const source = await readFile(file, "utf8");
+			// `stdio: inherit`/`ignore` streams to the parent and buffers nothing; only a capture,
+			// which is what `encoding` marks, can overflow.
+			const captures =
+				source.match(/exec(?:File)?Sync\(|execFileAsync\(|spawnSync\(/g)?.length ?? 0;
+			if (captures === 0 || !source.includes("encoding")) continue;
+			if (!/maxBuffer/.test(source)) offenders.push(file);
+		}
+		assert.deepEqual(offenders, [], "these capture a subprocess without bounding its buffer");
+	});
+
 	void test("scans both released platforms before the release, not just linux/amd64", async () => {
 		// The policy match key is `image | platform | vulnerability | package | installedVersion`, so
 		// a single-platform pre-release scan leaves an arm64-only finding — or an arm64 exception

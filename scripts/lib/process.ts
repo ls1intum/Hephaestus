@@ -3,6 +3,15 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 
+/**
+ * Node caps a captured subprocess at 1 MiB and throws `ERR_CHILD_PROCESS_STDIO_MAXBUFFER` past it.
+ * Nothing captured here has a useful size limit — a `gh api` listing, a git diff, an SBOM — and the
+ * default has broken the release pipeline three separate times. The ceiling is stated once, here,
+ * rather than rediscovered per call site. It stays finite on purpose: an unbounded capture of a
+ * runaway process is its own failure.
+ */
+export const CAPTURE_LIMIT_BYTES = 256 * 1024 * 1024;
+
 export interface RunOptions {
 	cwd?: string;
 	env?: Record<string, string | undefined>;
@@ -56,6 +65,7 @@ export async function output(
 		env: { ...process.env, ...options.env },
 		signal: options.signal,
 		encoding: "utf8",
+		maxBuffer: CAPTURE_LIMIT_BYTES,
 	});
 	return stdout;
 }
