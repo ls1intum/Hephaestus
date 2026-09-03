@@ -1,11 +1,14 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { glob, readFile } from "node:fs/promises";
+import { glob, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, test } from "node:test";
 
-import { type Document, isMap, isSeq, parseDocument, type YAMLMap } from "yaml";
+import { type Document, isMap, isScalar, isSeq, parseDocument, type YAMLMap } from "yaml";
 
+import { versionBranch } from "./dispatch-version-pr-ci.ts";
 import { planRelease, releaseOutputs } from "./plan-release.ts";
 import { planSubjects } from "./scan-main-images.ts";
 import { PLATFORMS, planUpstreamSubjects } from "./scan-upstream-images.ts";
@@ -80,6 +83,86 @@ function step(workflow: Document, jobPath: string[], action: string): YAMLMap {
 		}
 	}
 	throw new Error(`${jobPath.join(".")} has no ${action} step`);
+}
+
+/** The shell a named `run` step ships. */
+function runScript(workflow: Document, jobPath: string[], name: string): string {
+	const steps = workflow.getIn([...jobPath, "steps"]);
+	assert.ok(isSeq(steps), `${jobPath.join(".")} has no steps`);
+	for (const item of steps.items) {
+		if (!isMap(item) || item.get("name") !== name) continue;
+		const shell = item.get("run");
+		assert.ok(typeof shell === "string", `${name} is not a run step`);
+		return shell;
+	}
+	throw new Error(`${jobPath.join(".")} has no ${name} step`);
+}
+
+/**
+ * Runs a step's shell the way the runner does — `bash -e`, with `GITHUB_OUTPUT` pointing at a file
+ * of its own — and reports the exit status and the outputs it wrote. A gate whose verdict is bash
+ * is only pinned by running that bash.
+ */
+async function runStep(
+	shell: string,
+	environment: Record<string, string> = {},
+): Promise<{ readonly failed: boolean; readonly outputs: Record<string, string> }> {
+	const outputFile = path.join(await mkdtemp(path.join(tmpdir(), "ci-contract-")), "output");
+	await writeFile(outputFile, "");
+	const run = spawnSync("bash", ["--noprofile", "--norc", "-e", "-c", shell], {
+		encoding: "utf8",
+		env: { ...process.env, ...environment, GITHUB_OUTPUT: outputFile },
+	});
+	assert.equal(run.error, undefined);
+	const outputs = (await readFile(outputFile, "utf8"))
+		.split("\n")
+		.filter((line) => line.length > 0)
+		.map((line) => [line.slice(0, line.indexOf("=")), line.slice(line.indexOf("=") + 1)] as const);
+	return { failed: run.status !== 0, outputs: Object.fromEntries(outputs) };
+}
+
+/**
+ * Substitutes the workflow expressions a step's shell reads, as the runner substitutes them: by
+ * text, before bash sees any of it. An expression this cannot evaluate throws rather than rendering
+ * empty, so a new one has to be taught here instead of quietly leaving its case untested.
+ */
+function render(
+	shell: string,
+	results: Readonly<Record<string, string>>,
+	outputs: Readonly<Record<string, string>>,
+): string {
+	const value = (operand: string): string => {
+		const result = /^needs\.([\w-]+)\.result$/.exec(operand)?.[1];
+		if (result !== undefined) {
+			const conclusion = results[result];
+			assert.ok(conclusion !== undefined, `${operand} is not one of the job's needs`);
+			return conclusion;
+		}
+		const output = /^needs\.detect-changes\.outputs\.([\w-]+)$/.exec(operand)?.[1];
+		if (output !== undefined) {
+			const declared = outputs[output];
+			assert.ok(declared !== undefined, `${operand} is not a detect-changes output`);
+			return declared;
+		}
+		const contained = /^contains\(needs\.\*\.result, '(\w+)'\)$/.exec(operand)?.[1];
+		if (contained !== undefined) return String(Object.values(results).includes(contained));
+		throw new Error(`this test cannot evaluate \`${operand}\``);
+	};
+	return shell.replaceAll(/\$\{\{ (.+?) }}/g, (_, expression: string) => {
+		const terms = expression.split(" && ");
+		if (terms.length === 1 && !/ (?:==|!=) /.test(expression)) return value(expression);
+		// A conjunction of comparisons renders as the literal `true` or `false`, which is why the
+		// workflow reduces its conditions to one before a shell ever sees them.
+		return String(
+			terms.every((term) => {
+				const comparison = /^(.+) (==|!=) '(\w*)'$/.exec(term);
+				assert.ok(comparison, `this test cannot evaluate \`${term}\``);
+				const [, operand, operator, literal] = comparison;
+				const equal = value(operand ?? "") === literal;
+				return operator === "==" ? equal : !equal;
+			}),
+		);
+	});
 }
 
 void describe("CI contract", () => {
@@ -534,7 +617,7 @@ void describe("CI contract", () => {
 		assert.match(preflight, /max-age-hours: "24"/);
 		assert.match(
 			preflight,
-			/if: \$\{\{ github\.event_name == 'workflow_dispatch' && inputs\.release-preflight \}\}/,
+			/if: \$\{\{ \(github\.event_name == 'workflow_dispatch' && inputs\.release-preflight\) \|\| needs\.detect-changes\.outputs\.version-branch == 'true' \}\}/,
 		);
 		assert.match(cicd, /^ {6}release-preflight:$/m);
 		assert.match(job(cicd, "all-ci-passed"), /needs: \[[^\]]*Release-preflight\]/);
@@ -575,6 +658,72 @@ void describe("CI contract", () => {
 			job(await readFile(".github/workflows/cicd.yml", "utf8"), "all-ci-passed"),
 			/const sha = context\.payload\.pull_request\?\.head\?\.sha \|\| context\.sha;/,
 		);
+	});
+
+	void test("fails the CI gate on the Version PR when its release evidence preflight did not", async () => {
+		// #1745's guarantee is that a green Version PR gate means the release will clear its evidence
+		// gate. Two runs reported that gate for #1757's head — the dispatch, where the preflight
+		// succeeded, and a pull_request run, where it skipped — and the ruleset is satisfied by
+		// either, so the guarantee held only for as long as the dispatch was the sole reporter. Every
+		// run on that branch now runs the preflight, and the gate treats a preflight that is anything
+		// other than successful as the missing answer it is.
+		const workflow = parseDocument(await readFile(".github/workflows/cicd.yml", "utf8"));
+		const detection = ["jobs", "detect-changes"];
+
+		// One home for the branch name: the workflow reads it out of the same `.changeset/config.json`
+		// `versionBranch()` reads, so this runs the workflow's own shell and requires the two to agree
+		// rather than restating either. A base-branch rename moves both or fails here.
+		const detect = runScript(workflow, detection, "Detect the Version PR branch");
+		const branch = versionBranch(JSON.parse(await readFile(".changeset/config.json", "utf8")));
+		const detected = async (head: string): Promise<string | undefined> =>
+			(await runStep(detect, { HEAD_BRANCH: head })).outputs["version-branch"];
+		assert.equal(await detected(branch), "true");
+		for (const other of ["main", `${branch}-old`, "changeset-release/release-1.0", "renovate/vite"])
+			assert.equal(await detected(other), "false", `${other} is not the Version PR's branch`);
+
+		// The gate can only demand a preflight it lets run. On that branch the preflight runs for
+		// every event, and a duplicate-run skip must not take the image builds it needs away.
+		assert.match(
+			String(workflow.getIn(["jobs", "Release-preflight", "if"])),
+			/needs\.detect-changes\.outputs\.version-branch == 'true'/,
+		);
+		assert.match(
+			String(workflow.getIn([...detection, "outputs", "should_skip"])),
+			/steps\.version_branch\.outputs\.version-branch != 'true'/,
+		);
+
+		// The verdict itself, run rather than read. Its needs are the jobs it judges, so a new one is
+		// covered here the moment it is added.
+		const gate = ["jobs", "all-ci-passed"];
+		const needed = workflow.getIn([...gate, "needs"]);
+		assert.ok(isSeq(needed));
+		const green = Object.fromEntries(
+			needed.items.map((item) => {
+				const name = isScalar(item) ? item.value : item;
+				assert.ok(typeof name === "string");
+				return [name, "success"];
+			}),
+		);
+		const evaluate = runScript(workflow, gate, "Evaluate CI results");
+		const verdict = async (results: Record<string, string>, onVersionBranch: boolean) =>
+			runStep(
+				render(evaluate, { ...green, ...results }, { "version-branch": String(onVersionBranch) }),
+			);
+		const passes = { failed: false, outputs: { status: "success" } };
+
+		// An ordinary pull request legitimately skips the preflight, and blocking one would block
+		// every pull request in the repository.
+		assert.deepEqual(await verdict({ "Release-preflight": "skipped" }, false), passes);
+		// Nothing else changes meaning on that branch: a dispatched run has no `Changesets` job, and
+		// a path filter may skip any other leg, exactly as on `main`.
+		assert.deepEqual(await verdict({ Changesets: "skipped" }, true), passes);
+		// The Version PR, whichever run reports the gate: a preflight that did not succeed fails it.
+		for (const preflight of ["skipped", "failure", "cancelled"])
+			assert.equal(
+				(await verdict({ "Release-preflight": preflight }, true)).failed,
+				true,
+				`preflight ${preflight} must fail the gate`,
+			);
 	});
 
 	void test("rescans main's images weekly and reports drift to an issue, not a status", async () => {

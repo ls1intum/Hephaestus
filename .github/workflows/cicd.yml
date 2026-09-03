@@ -50,8 +50,12 @@ jobs:
       pmd-canary: ${{ steps.filter.outputs.pmd-canary }}
       version-bump: ${{ steps.version_bump.outputs.changed }}
       version: ${{ steps.version.outputs.version }}
+      version-branch: ${{ steps.version_branch.outputs.version-branch }}
       any-code: ${{ steps.filter.outputs.webapp == 'true' || steps.filter.outputs.application-server == 'true' || steps.filter.outputs.tooling == 'true' || steps.filter.outputs.agent-images == 'true' || steps.filter.outputs.postgres-image == 'true' }}
-      should_skip: ${{ steps.skip_check.outputs.should_skip }}
+      # A Version PR head is validated once per head commit, never inherited from an earlier run that
+      # matched its tree: a skipped duplicate would skip the image builds the preflight below needs,
+      # and the gate refuses to pass on that branch without a preflight.
+      should_skip: ${{ steps.skip_check.outputs.should_skip == 'true' && steps.version_branch.outputs.version-branch != 'true' }}
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -69,6 +73,19 @@ jobs:
       - name: Read the release version
         id: version
         run: echo "version=$(jq -r .version package.json)" >> "$GITHUB_OUTPUT"
+
+      # Whether this run is looking at the Version PR's head, whichever event started it. The branch
+      # name is read from the config changesets derives it from rather than restated, so a
+      # base-branch rename cannot quietly turn the release evidence preflight off; ci-contract.test.ts
+      # runs this shell against `versionBranch()` and requires the two to agree.
+      - name: Detect the Version PR branch
+        id: version_branch
+        env:
+          HEAD_BRANCH: ${{ github.head_ref || github.ref_name }}
+        run: |
+          version_branch="changeset-release/$(jq -r .baseBranch .changeset/config.json)"
+          [ "$HEAD_BRANCH" = "$version_branch" ] && on_version_branch=true || on_version_branch=false
+          echo "version-branch=$on_version_branch" >> "$GITHUB_OUTPUT"
 
       - name: Detect version bump
         id: version_bump
@@ -436,10 +453,15 @@ jobs:
   # build, so ci-security-scan.yml already covers both of their platforms on the pull request that
   # changes them. release-management.mdx § Nothing may fail for the first time at a release carries
   # the check-by-check reasoning.
+  #
+  # On the Version PR's branch it runs whatever event started the run. That head is the commit whose
+  # merge cuts a release, and more than one run can report `CI Status Gate` for it — the run
+  # version-pr.yml dispatches, and an approved `pull_request` run — while the ruleset is satisfied by
+  # either. So the answer has to be in every one of them, not in the dispatched one alone.
   Release-preflight:
     name: "Release evidence preflight"
     needs: [detect-changes, Build, Docker]
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.release-preflight }}
+    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.release-preflight) || needs.detect-changes.outputs.version-branch == 'true' }}
     timeout-minutes: 45
     runs-on: ubuntu-latest
     permissions:
@@ -564,6 +586,7 @@ jobs:
           echo "Compose:        ${{ needs.Compose.result }}"
           echo "Docker:         ${{ needs.Docker.result }}"
           echo "Preflight:      ${{ needs.Release-preflight.result }}"
+          echo "Version branch: ${{ needs.detect-changes.outputs.version-branch == 'true' }}"
 
           if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" ]]; then
             echo "status=failure" >> $GITHUB_OUTPUT
@@ -572,6 +595,15 @@ jobs:
 
           if [[ "${{ contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
             echo "status=cancelled" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+          # The Version PR's merge cuts a release, so its gate is only worth the name if the release
+          # evidence preflight actually ran here. A skipped job is a missing answer, not an
+          # affirmative one, and the checks above read it as neither failed nor cancelled.
+          if [[ "${{ needs.detect-changes.outputs.version-branch == 'true' && needs.Release-preflight.result != 'success' }}" == "true" ]]; then
+            echo "The Version PR requires a successful release evidence preflight; this run's was '${{ needs.Release-preflight.result }}'."
+            echo "status=failure" >> $GITHUB_OUTPUT
             exit 1
           fi
 
@@ -632,6 +664,11 @@ jobs:
           if [[ "${{ steps.evaluate.outputs.status }}" == "failure" ]]; then
             echo "### 💡 Troubleshooting Guide" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
+
+            if [[ "${{ needs.detect-changes.outputs.version-branch == 'true' && needs.Release-preflight.result != 'success' }}" == "true" ]]; then
+              echo "❌ **The release evidence preflight did not pass.** Merging this pull request cuts a release, so its gate requires the preflight to succeed in this run; it was \`${{ needs.Release-preflight.result }}\`." >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+            fi
 
             if [[ "${{ needs.Quality.result }}" == "failure" ]]; then
               echo "<details><summary><b>❌ Quality Failed</b></summary>" >> $GITHUB_STEP_SUMMARY
