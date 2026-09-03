@@ -17,6 +17,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueComment;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueCommentRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issuetype.IssueType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.Milestone;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
@@ -130,6 +131,10 @@ class IssueContentSourceTest extends BaseUnitTest {
         issue.setSubIssuesCompleted(3);
         issue.setAuthor(user("felix"));
 
+        IssueType issueType = new IssueType();
+        issueType.setName("Task");
+        issue.setIssueType(issueType);
+
         Repository repo = new Repository();
         repo.setNameWithOwner("owner/repo");
         issue.setRepository(repo);
@@ -171,6 +176,7 @@ class IssueContentSourceTest extends BaseUnitTest {
             assertThat(meta.get("state_reason").asString()).isEqualTo("COMPLETED");
             assertThat(meta.get("repository_full_name").asString()).isEqualTo("owner/repo");
             assertThat(meta.get("author").asString()).isEqualTo("felix");
+            assertThat(meta.get("issue_type").asString()).isEqualTo("Task");
             assertThat(meta.get("is_locked").asBoolean()).isTrue();
             assertThat(meta.get("comments_count").asInt()).isEqualTo(2);
             assertThat(meta.get("milestone").asString()).isEqualTo("v1.0");
@@ -336,6 +342,7 @@ class IssueContentSourceTest extends BaseUnitTest {
             String md = new String(files.get(SUMMARY_KEY), StandardCharsets.UTF_8);
             assertThat(md).contains("# Issue #123 — Tighten the practice catalogue");
             assertThat(md).contains("**State:** CLOSED (COMPLETED)");
+            assertThat(md).contains("**Type:** Task");
             assertThat(md).contains("**Sub-issues:** 3/4 completed");
             assertThat(md).doesNotContain("## Discussion").doesNotContain("**bob** wrote:");
 

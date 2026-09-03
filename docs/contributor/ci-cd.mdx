@@ -201,7 +201,7 @@ why the label is the authority, and which alternatives were priced and declined,
 | --- | --- | --- |
 | `cicd.yml` | PR, merge group, push to main, manual | Validates changes before merge and builds final-SHA images after merge; the release evidence gate runs over the images the run built on the Version PR's branch, and wherever the `release-preflight` dispatch input asks for it |
 | `review-policy.yml` | PR opened, reopened, synchronized, ready for review, edited | Approves a listed maintainer's pull request so the ruleset's required approval is met; does nothing for anyone else |
-| `pull-request.yml` | PR opened, edited, synchronized, reopened, ready for review | Validates the title with commitlint, applies labels, assigns the author |
+| `pull-request.yml` | PR opened, edited, synchronized, reopened, ready for review | Validates the title with commitlint |
 | `ci-quality-gates.yml` | Called by cicd.yml | Formatting, lint, type checks, webapp unit and story tests: everything verifiable from source |
 | `ci-build.yml` | Called by cicd.yml | Packages the server reactor once, then runs the OpenAPI, schema, database and browser E2E gates and the application-server image against that artifact |
 | `ci-tests.yml` | Called by cicd.yml | The server unit, architecture and integration suites, compiled from source |

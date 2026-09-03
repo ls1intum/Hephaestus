@@ -1,12 +1,9 @@
-// Precompute HINTS for issue-has-checkable-outcome: surface whether the issue body carries a verifiable
-// "done" artifact — an acceptance-criteria / definition-of-done block, a task checklist, or an explicit
-// outcome statement. FACTS only (section presence + checkbox counts); the LLM decides if "done" is truly
-// verifiable. No observation.
 import type { Hint } from "../lib/types.ts";
 
 interface IssueMeta {
 	title?: string;
 	body?: string;
+	issue_type?: string | null;
 	labels?: string[];
 }
 
@@ -17,6 +14,7 @@ export default function issueHasCheckableOutcome(
 ) {
 	const body = (m.body ?? "").trim();
 	const title = (m.title ?? "").trim();
+	const issueType = (m.issue_type ?? "").toLowerCase();
 	const labels = (m.labels ?? []).map((l) => l.toLowerCase());
 	const uncheckedBoxes = (body.match(/^[\s>]*[-*]\s+\[ \]/gm) ?? []).length;
 	const checkedBoxes = (body.match(/^[\s>]*[-*]\s+\[[xX]\]/gm) ?? []).length;
@@ -30,8 +28,6 @@ export default function issueHasCheckableOutcome(
 		/\bso that\b/i.test(body) || /\bas an?\b[\s\S]{0,60}\bi (want|need|would like)\b/i.test(body);
 	const isStub = body.length < 40;
 
-	// Issue-type classification — duplicated verbatim from issue-states-an-actionable-problem.ts on purpose
-	// (precompute scripts ship as standalone DB rows, no shared import). Keep the two copies BYTE-IDENTICAL.
 	const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
 	const titleNorm = norm(title);
 	const bodyNorm = norm(body);
@@ -39,19 +35,18 @@ export default function issueHasCheckableOutcome(
 		bodyNorm.length > 0 &&
 		(bodyNorm === titleNorm || titleNorm.includes(bodyNorm) || bodyNorm.includes(titleNorm));
 	const emptyOrTitleEcho = body.length < 25 || titleEcho;
-	const hasDeliverableTypeLabel = labels.some((l) =>
-		/\b(user ?story|story|bug|defect|feature|enhancement|task|chore|requirement|artifact|epic|spike)\b/.test(
-			l,
-		),
-	);
+	const deliverableType =
+		/\b(user ?story|story|bug|defect|feature|enhancement|task|chore|requirement|artifact|epic|spike)\b/;
+	const hasDeliverableType =
+		deliverableType.test(issueType) || labels.some((l) => deliverableType.test(l));
 	const looksUmbrella =
 		labels.some((l) => /\b(epic|umbrella|meta|initiative|requirement)\b/.test(l)) ||
 		/\b(epic|umbrella|initiative)\b/i.test(title);
 
 	const directions: string[] = [];
-	if (emptyOrTitleEcho && hasDeliverableTypeLabel) {
+	if (emptyOrTitleEcho && hasDeliverableType) {
 		directions.push(
-			`Classification fact: the body is empty or echoes the title yet carries a deliverable type label — there is no checkable outcome and no actionable content for a reader to verify "done" against.`,
+			`Classification fact: the body is empty or echoes the title yet carries a deliverable type — there is no checkable outcome and no actionable content for a reader to verify "done" against.`,
 		);
 	} else if (looksUmbrella) {
 		directions.push(
@@ -85,7 +80,7 @@ export default function issueHasCheckableOutcome(
 			checkedBoxes,
 			valueClausePresent: valueClause ? 1 : 0,
 			emptyOrTitleEcho: emptyOrTitleEcho ? 1 : 0,
-			hasDeliverableTypeLabel: hasDeliverableTypeLabel ? 1 : 0,
+			hasDeliverableType: hasDeliverableType ? 1 : 0,
 			looksUmbrella: looksUmbrella ? 1 : 0,
 		},
 		directions,

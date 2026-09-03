@@ -139,6 +139,9 @@ public class IssueContentSource implements EvidenceSource, ReviewContextBuilder 
             meta.put("html_url", issue.getHtmlUrl());
             meta.put("repository_full_name", repoFullName);
             meta.put("author", issue.getAuthor() != null ? issue.getAuthor().getLogin() : null);
+            meta.put(
+                    "issue_type",
+                    issue.getIssueType() != null ? issue.getIssueType().getName() : null);
             meta.put("is_locked", issue.isLocked());
             meta.put("comments_count", issue.getCommentsCount());
             meta.put("sub_issues_total", issue.getSubIssuesTotal());
@@ -169,6 +172,9 @@ public class IssueContentSource implements EvidenceSource, ReviewContextBuilder 
                 md.append(" (").append(issue.getStateReason()).append(")");
             md.append("\n");
             md.append("- **Repository:** ").append(repoFullName).append("\n");
+            if (issue.getIssueType() != null) {
+                md.append("- **Type:** ").append(issue.getIssueType().getName()).append("\n");
+            }
             if (!issue.getLabels().isEmpty()) {
                 md.append("- **Labels:** ")
                         .append(String.join(
