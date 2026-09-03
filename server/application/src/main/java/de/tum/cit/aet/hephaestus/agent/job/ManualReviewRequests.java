@@ -50,6 +50,13 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <p>Checks run standing, then rate limits, then the ledger row, then the gate. Limiting before recording
  * keeps a declined ask from tightening the limit under retry (see {@link ManualReviewRateLimits}); the
  * gate runs last because only it needs a ledger row to settle against.
+ *
+ * <p>Work the mirror has tombstoned is refused here as {@link SignalStateReason#ARTIFACT_GONE}, not by the
+ * ownership check: the workspace does monitor that artifact, so ownership answers yes, and an asker who is
+ * looking straight at the work is better served by a reason they can read than by a 404. Only a review
+ * somebody asked for is stopped this way — a pending signal an automatic resubmitter re-offers reaches the
+ * gate on a tombstoned row, because every reason that would retire it is terminal and a tombstone is
+ * reversible. ADR 0024 § Update — 2026-09-03 (issue #1404): which reads honour a drift tombstone.
  */
 @Service
 public class ManualReviewRequests {
@@ -101,6 +108,9 @@ public class ManualReviewRequests {
                     requesters.size());
             return ManualReviewOutcome.forbidden();
         }
+        if (pullRequest.getDeletedAt() != null) {
+            return ManualReviewOutcome.refused(SignalStateReason.ARTIFACT_GONE);
+        }
         String headRefOid = pullRequest.getHeadRefOid();
         if (headRefOid == null || pullRequest.getHeadRefName() == null || pullRequest.getBaseRefName() == null) {
             // Reported as the artifact being gone, not a gate skip: the mirror hasn't caught up, the
@@ -134,6 +144,9 @@ public class ManualReviewRequests {
                     issue.getId(),
                     requesters.size());
             return ManualReviewOutcome.forbidden();
+        }
+        if (issue.getDeletedAt() != null) {
+            return ManualReviewOutcome.refused(SignalStateReason.ARTIFACT_GONE);
         }
         if (issue.getRepository() == null) {
             return ManualReviewOutcome.refused(SignalStateReason.ARTIFACT_GONE);

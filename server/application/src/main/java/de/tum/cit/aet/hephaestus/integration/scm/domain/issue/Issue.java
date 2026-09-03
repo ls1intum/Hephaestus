@@ -114,28 +114,9 @@ public class Issue extends BaseGitServiceEntity {
      * back to {@code null}, so an item that reappears upstream — or one a faulty sweep tombstoned
      * — is resurrected by the next ordinary sync with no operator intervention.
      *
-     * <p><strong>Read scope — deliberately narrow.</strong> This codebase uses no Hibernate
-     * soft-delete filter, and only the queries that exist to serve reconciliation honour the
-     * tombstone. Filtering is opt-in per query, so the exhaustive list of readers that see
-     * {@code deletedAt IS NULL} is:
-     *
-     * <ul>
-     *   <li>the per-repository sync counts the admin UI renders
-     *       ({@code IssueRepository.count{Issues,PullRequests}GroupedByRepositoryIds});
-     *   <li>the sweep's own local-number listing
-     *       ({@code IssueRepository.findLive{Issue,PullRequest}NumbersByRepositoryId});
-     *   <li>{@code IssueRepository.tombstone{Issues,PullRequests}ByRepositoryIdAndNumbers}, where it
-     *       preserves the first observation time.
-     * </ul>
-     *
-     * <p><strong>Everything else still shows upstream-deleted rows.</strong> The product read
-     * surfaces do not filter this column: {@code LeaderboardReviewQueryRepository},
-     * {@code ProfilePullRequestQueryRepository}, {@code WorkspaceContributionQueryRepository},
-     * {@code ActivityEventRepository}, {@code MentorContextQueryRepository}, and the review /
-     * review-comment / thread repositories all surface tombstoned issues and pull requests. The
-     * tombstone makes those rows <em>identifiable</em> and fixes the counts; it does not hide them.
-     * Teaching the remaining read paths to filter has a far wider blast radius (scoring, XP, profile
-     * history and mentor context would all shift) and is a separate change.
+     * <p>Which surfaces filter and which deliberately do not, and why there is no entity-level
+     * {@code @SQLRestriction}, is decided in ADR 0024 § Update — 2026-09-03 (issue #1404): which reads honour a
+     * drift tombstone.
      */
     @Column(name = "deleted_at")
     private Instant deletedAt;

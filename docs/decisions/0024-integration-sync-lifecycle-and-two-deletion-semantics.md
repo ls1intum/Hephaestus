@@ -191,3 +191,52 @@ incomplete until a documented backup cycle exists; `sync_job` or `connection_act
 carrying mirrored third-party content, which would move it from "retained audit" to "must be erased";
 or SCM entities gain a `workspace_id`, which would retire the orphan guard in favour of scoped
 deletes.
+
+## Update — 2026-09-03 (issue #1404): which reads honour a drift tombstone
+
+Supersedes nothing above; it answers a question section (a) left open. (a) says a tombstone makes a
+row identifiable and reversible. It does not say who is allowed to keep reading it, and the answer
+had been decided query by query, which is how the same developer could be shown a merged-pull-request
+count and a list under it that disagreed.
+
+There is no entity-level `@SQLRestriction` and there will not be one: reconciliation, resurrection,
+retention and audit all read `deleted_at`, and a restriction that hid the column's own rows would
+break the self-healing (a) rests on. Filtering is therefore per query, the convention
+`SlackMessageRepository` and `OutlineDocumentRepository` already follow, and this section is the one
+home for who does it.
+
+**A tombstoned row is refused where Hephaestus would otherwise speak about work as if it were live.**
+
+| Surface | Honours the tombstone | Why |
+| --- | --- | --- |
+| Mentor context (`MentorContextQueryRepository`) | Yes | Heph describes the developer's current work; citing something they cannot open is a wrong claim about their work. |
+| Project-inventory evidence source (`WorkspaceInventoryContentSource`) | Yes | The "what else exists in this project" index staged into a review's evidence; listing work that is gone invites an observation about nothing. |
+| A review somebody asks for (`ManualReviewRequests`) | Yes | A review of deleted work is wrong by construction. Refused as `SignalStateReason.ARTIFACT_GONE` rather than 404'd by the ownership check: the workspace does monitor that artifact, so the asker gets the reason instead of an error status. |
+| A backfill or sweep campaign's scope (`ReviewBackfillScopeRepository`) | Yes | Predates this update — a campaign spends budget per artifact, so a tombstoned row never enters the scope rather than being refused per ask. |
+| Sync-admin counts and the sweep's own listings | Yes | Predates this update — the number is the operator's answer to "what is in the mirror". |
+
+**A tombstoned row stays visible where the record is of something that happened.**
+
+| Surface | Honours the tombstone | Why |
+| --- | --- | --- |
+| Activity events, XP, leaderboard (`activity`, `leaderboard`) | No | An event is a historical fact: the review happened, and the reviewer earned it. Deleting the work upstream does not un-review it, and rewriting scores retroactively is a worse lie than an orphaned row. |
+| Profile counts, contributed repositories, earliest-contribution dates (`profile`, `workspace`) | No | Same record, same reason; a profile that shrinks when somebody else deletes a branch is not a profile of the developer. |
+| Observations and delivered feedback (`practices`) | No | Feedback that was delivered was delivered — the ledger says so, and hiding it at read time would make the ledger and the read disagree with no recorded reason. Suppressing feedback about a vanished artifact is a *delivery* decision and belongs to `FeedbackSuppressionReason.ARTIFACT_GONE`, in the `agent` module that may depend on `integration.scm`. `practices` may depend on the integration contract and on nothing that implements it, so it never names the `issue` table. |
+| The gate loaders the pending-signal resubmitters read | No | They must tell "deleted upstream" apart from "temporarily swept": a resubmitter that cannot find the row records `SignalStateReason.ARTIFACT_GONE`, which is terminal, and the resurrection (a) promises would leave the occasion retired for good. So a review a person asks for on one artifact is refused with `SignalStateReason.ARTIFACT_GONE`; an automatically re-offered signal is not, and can still start a review of a tombstoned row. Retiring it needs a retryable reason meaning "temporarily swept", which the vocabulary does not have yet. |
+
+**Slack and Outline are out of scope of this update, deliberately.** `SlackMessage` and
+`OutlineDocument` carry their own `deletedAt` and their own repositories already filter it, so the
+mirror reads are consistent. What is undecided is whether an observation grounded in a deleted
+conversation thread or document should still be shown — the same question as the `practices` row
+above, and it gets the same answer for the same reason, through the delivery policy rather than a
+read filter.
+
+**Consequence.** The vocabulary for "the work is gone" stays split by stage and stays typed:
+`SignalStateReason.ARTIFACT_GONE` at the occasion stage, `FeedbackSuppressionReason.ARTIFACT_GONE` at
+delivery. A capture-stage refusal written as a free-text job failure is a bug, not a third option —
+`docs/contributor/practice-review-pipeline.mdx` § Where a review can stop.
+
+**Revisit trigger for this section.** A read surface changes side; an artifact kind other than
+`scm.pull_request` / `scm.issue` needs the same distinction; or a retryable signal-state reason for
+"temporarily swept" exists, at which point a re-offered pending signal can be held rather than
+allowed to review a tombstoned row.

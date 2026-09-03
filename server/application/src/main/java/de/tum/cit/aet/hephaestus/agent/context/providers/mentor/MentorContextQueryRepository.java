@@ -35,12 +35,14 @@ public interface MentorContextQueryRepository extends JpaRepository<User, Long> 
                 FROM PullRequest p1
                 JOIN RepositoryToMonitor rtm1 ON rtm1.nameWithOwner = p1.repository.nameWithOwner
                 WHERE p1.author.id = :userId
+                  AND p1.deletedAt IS NULL
                   AND rtm1.workspace.id = :workspaceId
                   AND p1.state = de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue.State.OPEN), 0L),
             COALESCE((SELECT COUNT(p2)
                 FROM PullRequest p2
                 JOIN RepositoryToMonitor rtm2 ON rtm2.nameWithOwner = p2.repository.nameWithOwner
                 WHERE p2.author.id = :userId
+                  AND p2.deletedAt IS NULL
                   AND rtm2.workspace.id = :workspaceId
                   AND p2.isMerged = true
                   AND p2.mergedAt > :weekAgo
@@ -49,6 +51,7 @@ public interface MentorContextQueryRepository extends JpaRepository<User, Long> 
                 FROM PullRequest p3
                 JOIN RepositoryToMonitor rtm3 ON rtm3.nameWithOwner = p3.repository.nameWithOwner
                 WHERE p3.author.id = :userId
+                  AND p3.deletedAt IS NULL
                   AND rtm3.workspace.id = :workspaceId
                   AND p3.isMerged = true
                   AND p3.mergedAt > :twoWeeksAgo
@@ -58,12 +61,14 @@ public interface MentorContextQueryRepository extends JpaRepository<User, Long> 
                 JOIN RepositoryToMonitor rtmi ON rtmi.nameWithOwner = i.repository.nameWithOwner
                 WHERE TYPE(i) = Issue
                   AND i.author.id = :userId
+                  AND i.deletedAt IS NULL
                   AND rtmi.workspace.id = :workspaceId
                   AND i.state = de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue.State.OPEN), 0L),
             COALESCE((SELECT COUNT(r1)
                 FROM PullRequestReview r1
                 JOIN RepositoryToMonitor rtmr1 ON rtmr1.nameWithOwner = r1.pullRequest.repository.nameWithOwner
                 WHERE r1.author.id = :userId
+                  AND r1.pullRequest.deletedAt IS NULL
                   AND rtmr1.workspace.id = :workspaceId
                   AND r1.submittedAt > :weekAgo
                   AND r1.submittedAt <= :now), 0L),
@@ -71,6 +76,7 @@ public interface MentorContextQueryRepository extends JpaRepository<User, Long> 
                 FROM PullRequestReview r2
                 JOIN RepositoryToMonitor rtmr2 ON rtmr2.nameWithOwner = r2.pullRequest.repository.nameWithOwner
                 WHERE r2.author.id = :userId
+                  AND r2.pullRequest.deletedAt IS NULL
                   AND rtmr2.workspace.id = :workspaceId
                   AND r2.submittedAt > :twoWeeksAgo
                   AND r2.submittedAt <= :weekAgo), 0L),
@@ -78,6 +84,7 @@ public interface MentorContextQueryRepository extends JpaRepository<User, Long> 
                 FROM PullRequestReview r3
                 JOIN RepositoryToMonitor rtmr3 ON rtmr3.nameWithOwner = r3.pullRequest.repository.nameWithOwner
                 WHERE r3.pullRequest.author.id = :userId
+                  AND r3.pullRequest.deletedAt IS NULL
                   AND rtmr3.workspace.id = :workspaceId
                   AND r3.submittedAt > :weekAgo
                   AND r3.submittedAt <= :now), 0L),
@@ -86,12 +93,14 @@ public interface MentorContextQueryRepository extends JpaRepository<User, Long> 
                 JOIN RepositoryToMonitor rtmpr ON rtmpr.nameWithOwner = prr.repository.nameWithOwner
                 JOIN prr.requestedReviewers reviewer
                 WHERE reviewer.id = :userId
+                  AND prr.deletedAt IS NULL
                   AND rtmpr.workspace.id = :workspaceId
                   AND prr.state = de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue.State.OPEN), 0L),
             COALESCE((SELECT COUNT(t)
                 FROM PullRequestReviewThread t
                 JOIN RepositoryToMonitor rtmt ON rtmt.nameWithOwner = t.pullRequest.repository.nameWithOwner
                 WHERE t.pullRequest.author.id = :userId
+                  AND t.pullRequest.deletedAt IS NULL
                   AND rtmt.workspace.id = :workspaceId
                   AND t.pullRequest.state = de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue.State.OPEN
                   AND t.state = de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.PullRequestReviewThread.State.UNRESOLVED), 0L)
@@ -123,6 +132,7 @@ public interface MentorContextQueryRepository extends JpaRepository<User, Long> 
         LEFT JOIN FETCH i.milestone
         WHERE TYPE(i) = Issue
           AND a.id = :userId
+          AND i.deletedAt IS NULL
           AND rtm.workspace.id = :workspaceId
           AND i.state = de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue.State.OPEN
         ORDER BY i.createdAt DESC
@@ -138,6 +148,7 @@ public interface MentorContextQueryRepository extends JpaRepository<User, Long> 
         LEFT JOIN FETCH p.author
         LEFT JOIN FETCH p.repository
         WHERE reviewer.id = :userId
+          AND p.deletedAt IS NULL
           AND rtm.workspace.id = :workspaceId
           AND p.state = de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue.State.OPEN
         ORDER BY p.createdAt DESC
@@ -199,6 +210,7 @@ public interface MentorContextQueryRepository extends JpaRepository<User, Long> 
         LEFT JOIN FETCH prr.author
         LEFT JOIN FETCH prr.pullRequest
         WHERE prr.pullRequest.author.id = :userId
+          AND prr.pullRequest.deletedAt IS NULL
           AND rtm.workspace.id = :workspaceId
           AND prr.submittedAt > :since
         ORDER BY prr.submittedAt DESC
@@ -220,6 +232,7 @@ public interface MentorContextQueryRepository extends JpaRepository<User, Long> 
         FROM PullRequest p
         JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = p.repository.nameWithOwner
         WHERE p.author.id = :userId
+          AND p.deletedAt IS NULL
           AND rtm.workspace.id = :workspaceId
         ORDER BY p.createdAt DESC
         """)
@@ -235,6 +248,7 @@ public interface MentorContextQueryRepository extends JpaRepository<User, Long> 
         FROM Issue i
         JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = i.repository.nameWithOwner
         WHERE i.author.id = :userId
+          AND i.deletedAt IS NULL
           AND rtm.workspace.id = :workspaceId
           AND TYPE(i) = Issue
         ORDER BY i.createdAt DESC

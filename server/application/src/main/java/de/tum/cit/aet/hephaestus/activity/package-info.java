@@ -6,6 +6,9 @@
  * SUM/GROUP BY against the event table — see {@link de.tum.cit.aet.hephaestus.leaderboard}
  * for the read side.
  *
+ * <p>Events are historical facts and remain when their upstream target is later deleted — ADR 0024
+ * § Update — 2026-09-03 (issue #1404): which reads honour a drift tombstone.
+ *
  * <p>Distinct bounded context from {@link de.tum.cit.aet.hephaestus.practices} (code-health
  * analysis), even though both consume {@code ScmDomainEvent}s.
  *
