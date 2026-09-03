@@ -26,6 +26,7 @@ const sidebars: SidebarsConfig = {
 		{ type: "doc", id: "configuration-readiness", label: "Configuration Readiness" },
 		{ type: "doc", id: "threat-model", label: "Threat Model" },
 		{ type: "doc", id: "release-image-lock", label: "Release image lock" },
+		{ type: "doc", id: "pull-based-deployment", label: "Pull-Based Deployment" },
 		{ type: "doc", id: "buildpacks-cds-decision", label: "Server image build (Buildpacks + CDS)" },
 		{ type: "doc", id: "legal-pages", label: "Legal Pages" },
 		{

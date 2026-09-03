@@ -516,19 +516,41 @@ jobs:
           [ "$(gh release view "$TAG_NAME" --repo "${{ github.repository }}" --json isImmutable --jq .isImmutable)" = true ] || {
             echo "::error::Repository immutable releases must be enabled before publishing"; exit 1; }
 
-  deploy-staging:
+  # Staging pulls: this asks for the promotion and waits for it, so production is still only offered
+  # a release staging is actually running. Nothing here reaches the host, and no deploy credential
+  # is involved — see ADR 0041.
+  promote-staging:
     needs: [release, tag-images, publish-release]
     if: needs.release.outputs.released == 'true'
-    uses: ./.github/workflows/deploy-staging.yml
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
+      actions: write
       contents: read
-      packages: read
-    with:
-      image-tag: ${{ needs.release.outputs.tag_name }}
-    secrets: inherit # zizmor: ignore[secrets-inherit]
+    steps:
+      - name: Promote staging and wait for it to converge
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE: ${{ needs.release.outputs.tag_name }}
+        run: |
+          set -euo pipefail
+          since=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          gh workflow run promote.yml --repo "$GITHUB_REPOSITORY" \
+            -f environment=Staging -f release="$RELEASE"
+          # The dispatch returns before the run exists, and picking the newest run blindly could
+          # watch someone else's promotion, so the run is matched on being newer than the request.
+          for _ in $(seq 1 30); do
+            run=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow promote.yml --limit 10 \
+              --json databaseId,createdAt \
+              --jq "[.[] | select(.createdAt > \"$since\")] | sort_by(.createdAt) | .[0].databaseId // empty")
+            [ -n "$run" ] && break
+            sleep 5
+          done
+          [ -n "$run" ] || { echo "::error::promote.yml did not start"; exit 1; }
+          gh run watch "$run" --repo "$GITHUB_REPOSITORY" --exit-status
 
   deploy-production:
-    needs: [release, deploy-staging]
+    needs: [release, promote-staging]
     if: needs.release.outputs.released == 'true'
     uses: ./.github/workflows/deploy-prod.yml
     permissions:

@@ -1,0 +1,370 @@
+/**
+ * Brings one host to the release its channel names, on a timer. Nothing dials in, so no deployment
+ * credential exists off the host.
+ *
+ * A signature proves authorship, never currency: a valid old channel, replayed, verifies perfectly.
+ * Freshness therefore comes from the commit graph — a channel commit that is an ancestor of the
+ * applied one is a rewind, and is refused unless the channel declares it.
+ *
+ * A failed apply stops and alerts rather than reverting. Schema changes here only move forward, so
+ * restoring the previous images would leave old code on a migrated database.
+ */
+import { existsSync } from "node:fs";
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+
+import { asRecord, asString, parseJson } from "./lib/json.ts";
+import { output, run, succeeds } from "./lib/process.ts";
+
+/** Also the Compose project name, so an earlier deploy's containers are adopted, not duplicated. */
+export type Stack = "proxy" | "core" | "app";
+
+const STACK_ORDER: readonly Stack[] = ["proxy", "core", "app"];
+
+export interface Channel {
+	/** The release this environment should run, as an immutable `vX.Y.Z` tag. */
+	release: string;
+	/** Set when a promotion deliberately moves backwards; without it a rewind is refused. */
+	allowRollback?: boolean;
+	/** Set to hold the environment where it is, for an incident. */
+	freeze?: boolean;
+}
+
+export interface AppliedState {
+	release: string;
+	channelCommit: string;
+	appliedAt: string;
+}
+
+export type Decision =
+	| { action: "apply"; release: string }
+	| { action: "noop"; reason: string }
+	| { action: "refuse"; reason: string };
+
+const RELEASE_TAG = /^v\d+\.\d+\.\d+$/;
+
+export function parseChannel(value: unknown): Channel {
+	const record = asRecord(value, "channel");
+	const release = asString(record.release, "channel.release");
+	if (!RELEASE_TAG.test(release))
+		throw new Error(`channel.release must be an immutable vX.Y.Z tag, not ${release}`);
+	return {
+		release,
+		allowRollback: record.allowRollback === true,
+		freeze: record.freeze === true,
+	};
+}
+
+/** `rewinds` is "the channel commit is an ancestor of the applied one", which git answers. */
+export function decide(
+	channel: Channel,
+	applied: AppliedState | undefined,
+	channelCommit: string,
+	rewinds: boolean,
+): Decision {
+	if (channel.freeze) return { action: "noop", reason: "channel is frozen" };
+	if (applied?.release === channel.release && applied.channelCommit === channelCommit)
+		return { action: "noop", reason: `already running ${channel.release}` };
+	if (rewinds && !channel.allowRollback)
+		return {
+			action: "refuse",
+			reason: `channel commit ${channelCommit.slice(0, 8)} precedes the applied one; set allowRollback to move back deliberately`,
+		};
+	return { action: "apply", release: channel.release };
+}
+
+/** Version and commit ride in labels, not the metric name, so a dashboard can group by them. */
+export function renderMetrics(state: {
+	channel: string;
+	release: string;
+	commit: string;
+	success: boolean;
+	now: Date;
+	lastSuccessAt?: Date;
+}): string {
+	const seconds = (date: Date) => Math.floor(date.getTime() / 1000);
+	const lines = [
+		"# HELP hephaestus_deploy_info The release this host currently runs.",
+		"# TYPE hephaestus_deploy_info gauge",
+		`hephaestus_deploy_info{channel="${state.channel}",release="${state.release}",channel_commit="${state.commit}"} 1`,
+		"# HELP hephaestus_deploy_reconcile_success Whether the last reconcile attempt succeeded.",
+		"# TYPE hephaestus_deploy_reconcile_success gauge",
+		`hephaestus_deploy_reconcile_success ${state.success ? 1 : 0}`,
+		"# HELP hephaestus_deploy_reconcile_timestamp_seconds When the last reconcile attempt ran.",
+		"# TYPE hephaestus_deploy_reconcile_timestamp_seconds gauge",
+		`hephaestus_deploy_reconcile_timestamp_seconds ${seconds(state.now)}`,
+	];
+	if (state.lastSuccessAt) {
+		lines.push(
+			"# HELP hephaestus_deploy_last_success_timestamp_seconds When this host last converged.",
+			"# TYPE hephaestus_deploy_last_success_timestamp_seconds gauge",
+			`hephaestus_deploy_last_success_timestamp_seconds ${seconds(state.lastSuccessAt)}`,
+		);
+	}
+	return `${lines.join("\n")}\n`;
+}
+
+/**
+ * The lock only guarantees anything if nothing the release renders escapes it: a compose file that
+ * hardcoded a tag would otherwise deploy an image no signature covers.
+ */
+export function unlockedImages(rendered: readonly string[], lockEnv: string): string[] {
+	const locked = new Set(
+		lockEnv
+			.split("\n")
+			.map((line) => line.slice(line.indexOf("=") + 1).trim())
+			.filter((value) => value.includes("@sha256:")),
+	);
+	return rendered.filter((image) => !locked.has(image));
+}
+
+function isStack(name: string): name is Stack {
+	return STACK_ORDER.some((stack) => stack === name);
+}
+
+export function parseStacks(value: string | undefined): Stack[] {
+	const names = (value ?? "").split(/[\s,]+/).filter(Boolean);
+	if (names.length === 0) throw new Error("HEPHAESTUS_STACKS must name at least one stack");
+	const unknown = names.filter((name) => !isStack(name));
+	if (unknown.length > 0) throw new Error(`unknown stack(s): ${unknown.join(", ")}`);
+	// Order is the dependency order, not the order the operator happened to type: the broker comes
+	// up before the application that waits on it, and the edge before either.
+	return STACK_ORDER.filter((stack) => names.includes(stack));
+}
+
+interface HostConfig {
+	channel: string;
+	stacks: Stack[];
+	checkout: string;
+	stateDirectory: string;
+	secretsDirectory: string;
+	metricsFile?: string;
+	waitTimeoutSeconds: number;
+	promoteIdentity: string;
+}
+
+function hostConfig(environment: NodeJS.ProcessEnv): HostConfig {
+	const required = (name: string): string => {
+		const value = environment[name];
+		if (!value) throw new Error(`${name} must be set`);
+		return value;
+	};
+	return {
+		channel: required("HEPHAESTUS_CHANNEL"),
+		stacks: parseStacks(environment.HEPHAESTUS_STACKS),
+		checkout: required("HEPHAESTUS_CHECKOUT"),
+		stateDirectory: environment.HEPHAESTUS_STATE ?? "/var/lib/hephaestus",
+		secretsDirectory: environment.HEPHAESTUS_SECRETS ?? "/etc/hephaestus",
+		metricsFile: environment.HEPHAESTUS_METRICS_FILE,
+		waitTimeoutSeconds: Number(environment.HEPHAESTUS_WAIT_TIMEOUT ?? 600),
+		promoteIdentity: required("HEPHAESTUS_PROMOTE_IDENTITY"),
+	};
+}
+
+async function readApplied(file: string): Promise<AppliedState | undefined> {
+	try {
+		const record = asRecord(parseJson(await readFile(file, "utf8")), "applied state");
+		return {
+			release: asString(record.release, "applied.release"),
+			channelCommit: asString(record.channelCommit, "applied.channelCommit"),
+			appliedAt: asString(record.appliedAt, "applied.appliedAt"),
+		};
+	} catch {
+		// No state is the first run, not a failure.
+		return undefined;
+	}
+}
+
+/** Renamed into place: a scrape landing mid-write would otherwise publish a truncated series. */
+async function writeAtomic(file: string, contents: string): Promise<void> {
+	const temporary = `${file}.tmp`;
+	await writeFile(temporary, contents, { mode: 0o644 });
+	await rename(temporary, file);
+}
+
+async function main(): Promise<void> {
+	const config = hostConfig(process.env);
+	const appliedFile = join(config.stateDirectory, "applied.json");
+	const applied = await readApplied(appliedFile);
+	const startedAt = new Date();
+
+	await mkdir(config.stateDirectory, { recursive: true });
+
+	await run(
+		"git",
+		["fetch", "--quiet", "origin", "+refs/heads/deploy-state:refs/remotes/origin/deploy-state"],
+		{
+			cwd: config.checkout,
+		},
+	);
+	// Trimmed because the SHA is compared and interpolated; the blobs below are not, since the
+	// channel must reach cosign byte for byte as it was signed.
+	const channelCommit = (
+		await output("git", ["rev-parse", "refs/remotes/origin/deploy-state"], {
+			cwd: config.checkout,
+		})
+	).trim();
+	const channelPath = `channels/${config.channel}.json`;
+	const channelJson = await output("git", ["show", `${channelCommit}:${channelPath}`], {
+		cwd: config.checkout,
+	});
+	const signature = await output("git", ["show", `${channelCommit}:${channelPath}.sigstore.json`], {
+		cwd: config.checkout,
+	});
+
+	// Verifying before parsing keeps unverified bytes from reaching any decision.
+	const scratch = join(config.stateDirectory, "channel");
+	await mkdir(scratch, { recursive: true });
+	await writeFile(join(scratch, "channel.json"), channelJson);
+	await writeFile(join(scratch, "channel.sigstore.json"), signature);
+	await run("cosign", [
+		"verify-blob",
+		"--bundle",
+		join(scratch, "channel.sigstore.json"),
+		// Cosign cannot verify the certificate's environment claim, so the gate is expressed as the
+		// identity of the workflow the environment protects: only an approved run can produce it.
+		"--certificate-identity",
+		config.promoteIdentity,
+		"--certificate-oidc-issuer",
+		"https://token.actions.githubusercontent.com",
+		join(scratch, "channel.json"),
+	]);
+
+	const channel = parseChannel(parseJson(channelJson));
+	const rewinds = applied
+		? await succeeds("git", ["merge-base", "--is-ancestor", channelCommit, applied.channelCommit], {
+				cwd: config.checkout,
+			})
+		: false;
+	const decision = decide(channel, applied, channelCommit, rewinds);
+
+	if (decision.action === "refuse") throw new Error(decision.reason);
+	if (decision.action === "noop") {
+		console.log(`No change: ${decision.reason}`);
+		if (config.metricsFile && applied) {
+			await writeAtomic(
+				config.metricsFile,
+				renderMetrics({
+					channel: config.channel,
+					release: applied.release,
+					commit: applied.channelCommit,
+					success: true,
+					now: startedAt,
+					lastSuccessAt: new Date(applied.appliedAt),
+				}),
+			);
+		}
+		return;
+	}
+
+	// Compose files must come from the release being deployed, not from wherever the checkout sits.
+	const releaseTree = join(config.stateDirectory, "releases", decision.release);
+	await run("git", ["fetch", "--quiet", "origin", "tag", decision.release, "--no-tags"], {
+		cwd: config.checkout,
+	});
+	if (!existsSync(releaseTree))
+		await run("git", ["worktree", "add", "--detach", "--quiet", releaseTree, decision.release], {
+			cwd: config.checkout,
+		});
+
+	const lockFile = join(releaseTree, "release-lock.env");
+	await run(
+		process.execPath,
+		[join(releaseTree, "scripts/prepare-release-lock.ts"), decision.release, lockFile],
+		{
+			cwd: releaseTree,
+		},
+	);
+
+	const lockEnv = await readFile(lockFile, "utf8");
+	for (const stack of config.stacks) {
+		const composeArgs = [
+			"compose",
+			"--project-name",
+			stack,
+			"--env-file",
+			join(config.secretsDirectory, `${stack}.env`),
+			"--env-file",
+			lockFile,
+			"--file",
+			join(releaseTree, `docker/compose.${stack}.yaml`),
+		];
+		const rendered = asRecord(
+			parseJson(
+				await output("docker", [...composeArgs, "config", "--format", "json"], {
+					cwd: releaseTree,
+				}),
+			),
+			`${stack} configuration`,
+		);
+		const images = Object.values(asRecord(rendered.services, `${stack}.services`)).map((service) =>
+			asString(asRecord(service, `${stack} service`).image, `${stack} service image`),
+		);
+		const unlocked = unlockedImages(images, lockEnv);
+		if (unlocked.length > 0)
+			throw new Error(`${stack} renders images outside the release lock: ${unlocked.join(", ")}`);
+		await run(
+			"docker",
+			[
+				...composeArgs,
+				"up",
+				"--detach",
+				"--wait",
+				`--wait-timeout=${config.waitTimeoutSeconds}`,
+				// A service the release removed would otherwise keep running, unmanaged.
+				"--remove-orphans",
+			],
+			{ cwd: releaseTree },
+		);
+	}
+
+	const finishedAt = new Date();
+	await writeAtomic(
+		appliedFile,
+		`${JSON.stringify({ release: decision.release, channelCommit, appliedAt: finishedAt.toISOString() }, null, "\t")}\n`,
+	);
+	if (config.metricsFile)
+		await writeAtomic(
+			config.metricsFile,
+			renderMetrics({
+				channel: config.channel,
+				release: decision.release,
+				commit: channelCommit,
+				success: true,
+				now: finishedAt,
+				lastSuccessAt: finishedAt,
+			}),
+		);
+	console.log(`Applied ${decision.release} to ${config.stacks.join(", ")}`);
+}
+
+/** Without a series on failure, a broken reconcile is indistinguishable from a host running none. */
+async function reportFailure(): Promise<void> {
+	const metricsFile = process.env.HEPHAESTUS_METRICS_FILE;
+	const channel = process.env.HEPHAESTUS_CHANNEL;
+	if (!metricsFile || !channel) return;
+	const applied = await readApplied(
+		join(process.env.HEPHAESTUS_STATE ?? "/var/lib/hephaestus", "applied.json"),
+	);
+	await writeAtomic(
+		metricsFile,
+		renderMetrics({
+			channel,
+			release: applied?.release ?? "none",
+			commit: applied?.channelCommit ?? "none",
+			success: false,
+			now: new Date(),
+			lastSuccessAt: applied ? new Date(applied.appliedAt) : undefined,
+		}),
+	);
+}
+
+if (process.argv[1] === import.meta.filename) {
+	try {
+		await main();
+	} catch (error) {
+		// An unwritable metric must not replace the error that caused the failure.
+		await reportFailure().catch(() => {});
+		throw error;
+	}
+}
