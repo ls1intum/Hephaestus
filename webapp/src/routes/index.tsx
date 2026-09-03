@@ -1,10 +1,9 @@
-import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
 import { listWorkspacesOptions } from "@/api/@tanstack/react-query.gen";
 import { StandardPageSurface } from "@/components/core/StandardPageSurface";
 import { LandingPage } from "@/components/info/landing/LandingPage";
 import { NoWorkspace } from "@/components/workspace/NoWorkspace";
-import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { useAuth } from "@/integrations/auth/AuthContext";
 import { resolveCurrentUser } from "@/integrations/auth/guard";
 
@@ -20,10 +19,10 @@ export const Route = createFileRoute("/")({
 	beforeLoad: async ({ context }) => {
 		const user = await resolveCurrentUser(context.queryClient);
 		if (!user) return;
-		const workspaces = await context.queryClient
-			.query(listWorkspacesOptions())
-			.catch(() => undefined);
-		const workspaceSlug = workspaces?.[0]?.workspaceSlug;
+		// A list that cannot be fetched is not an empty one: let the error surface rather than tell a
+		// member of workspaces that they are in none.
+		const workspaces = await context.queryClient.query(listWorkspacesOptions());
+		const workspaceSlug = workspaces[0]?.workspaceSlug;
 		if (workspaceSlug) {
 			throw redirect({ to: "/w/$workspaceSlug", params: { workspaceSlug }, replace: true });
 		}
@@ -42,22 +41,8 @@ function IndexPage() {
 	);
 }
 
+/** Only reached signed out, so the landing page needs no signed-in affordance. */
 function LandingContainer() {
-	const { login, isAuthenticated } = useAuth();
-	const { chromeWorkspaceSlug } = useActiveWorkspaceSlug();
-	const navigate = useNavigate();
-
-	const handleGoToDashboard = () => {
-		if (chromeWorkspaceSlug) {
-			void navigate({ to: "/w/$workspaceSlug", params: { workspaceSlug: chromeWorkspaceSlug } });
-		}
-	};
-
-	return (
-		<LandingPage
-			onSignIn={(idpHint) => login(idpHint, "/")}
-			onGoToDashboard={handleGoToDashboard}
-			isSignedIn={isAuthenticated}
-		/>
-	);
+	const { login } = useAuth();
+	return <LandingPage onSignIn={(idpHint) => login(idpHint, "/")} />;
 }

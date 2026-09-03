@@ -12,6 +12,8 @@ import { routeTree } from "@/routeTree.gen";
 vi.setConfig({ testTimeout: 15_000 });
 
 const DEEP_LINK = "/w/foreign/mentor/thread-1?message=stale";
+// The workspace home writes its own schema defaults into the URL it lands on.
+const WORKSPACE_HOME = "/w/acme?team=all&sort=SCORE&mode=INDIVIDUAL";
 
 function listWorkspaces(...slugs: string[]) {
 	server.use(
@@ -26,7 +28,6 @@ async function land(url: string, queryClient = new QueryClient()) {
 		context: { queryClient, auth: undefined },
 	});
 	await router.load();
-	// The workspace home fills in its own search defaults, so a redirect is judged on the path.
 	return router.state.location;
 }
 
@@ -34,17 +35,17 @@ async function land(url: string, queryClient = new QueryClient()) {
 describe("workspace route gate", () => {
 	it("opens a workspace the account can reach", async () => {
 		listWorkspaces("acme");
-		expect((await land("/w/acme")).pathname).toBe("/w/acme");
+		expect((await land("/w/acme")).href).toBe("/w/acme");
 	});
 
 	it("returns an inaccessible workspace's deep link to an accessible workspace home", async () => {
 		listWorkspaces("acme");
-		expect((await land(DEEP_LINK)).pathname).toBe("/w/acme");
+		expect((await land(DEEP_LINK)).href).toBe(WORKSPACE_HOME);
 	});
 
 	it("returns to the home page when no workspace is accessible", async () => {
 		listWorkspaces();
-		expect((await land(DEEP_LINK)).pathname).toBe("/");
+		expect((await land(DEEP_LINK)).href).toBe("/");
 	});
 
 	it("keeps the route when the workspace list cannot be fetched", async () => {
@@ -62,6 +63,6 @@ describe("workspace route gate", () => {
 			workspaceListItem("brand-new"),
 		]);
 
-		expect((await land("/w/brand-new", queryClient)).pathname).toBe("/w/brand-new");
+		expect((await land("/w/brand-new", queryClient)).href).toBe("/w/brand-new");
 	});
 });

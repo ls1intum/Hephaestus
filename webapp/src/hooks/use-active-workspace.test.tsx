@@ -10,34 +10,13 @@ import { act, render, screen } from "@testing-library/react";
 import { describe, it, vi } from "vitest";
 
 import { listWorkspacesOptions } from "@/api/@tanstack/react-query.gen";
-import type { WorkspaceListItem } from "@/api/types.gen";
+import { workspaceListItem } from "@/mocks/fixtures/workspaces";
 
 import { useActiveWorkspaceSlug } from "./use-active-workspace";
 
 vi.mock("@/integrations/auth/AuthContext", () => ({
 	useAuth: () => ({ isAuthenticated: true, isLoading: false }),
 }));
-
-function workspace(
-	workspaceSlug: string,
-	providerType: WorkspaceListItem["providerType"],
-): WorkspaceListItem {
-	return {
-		id: 1,
-		workspaceSlug,
-		providerType,
-		accountLogin: workspaceSlug,
-		displayName: workspaceSlug,
-		createdAt: new Date("2026-01-01T00:00:00Z"),
-		status: "ACTIVE",
-		achievementsEnabled: false,
-		leaderboardEnabled: false,
-		leaguesEnabled: false,
-		mentorEnabled: false,
-		practicesEnabled: false,
-		progressionEnabled: false,
-	};
-}
 
 function ActiveWorkspace() {
 	const { workspaceSlug, chromeWorkspaceSlug, providerType } = useActiveWorkspaceSlug();
@@ -47,8 +26,8 @@ function ActiveWorkspace() {
 function renderAt(initialEntry: string) {
 	const queryClient = new QueryClient();
 	queryClient.setQueryData(listWorkspacesOptions().queryKey, [
-		workspace("alpha", "GITHUB"),
-		workspace("beta", "GITLAB"),
+		workspaceListItem("alpha"),
+		workspaceListItem("beta", { providerType: "GITLAB" }),
 	]);
 	const rootRoute = createRootRoute();
 	const workspaceRoute = createRoute({

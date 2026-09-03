@@ -11,6 +11,8 @@ export function useWorkspaceSwitcher() {
 		currentWorkspaceSlug !== undefined &&
 		Object.keys(params).every((parameter) => parameter === "workspaceSlug");
 
+	// The destination route's search middleware runs after this updater, so clearing the search leaves
+	// each route to declare which of its own options are portable through `retainSearchParams`.
 	return async (workspace: { displayName: string; workspaceSlug: string }) => {
 		const { displayName, workspaceSlug } = workspace;
 		if (workspaceSlug === currentWorkspaceSlug) return;
@@ -18,7 +20,7 @@ export function useWorkspaceSwitcher() {
 		if (portable) {
 			await navigate({
 				to: ".",
-				params: (previous) => ({ ...previous, workspaceSlug }),
+				params: { workspaceSlug },
 				search: () => ({}),
 				replace: true,
 			});

@@ -9,21 +9,21 @@ import { useActiveWorkspaceSlug } from "./use-active-workspace";
 /** Read by the app chrome, which renders on every route, so the slug is the chrome's, not the URL's. */
 export function useWorkspaceAccess() {
 	const {
-		chromeWorkspaceSlug: workspaceSlug,
+		chromeWorkspaceSlug,
 		workspaces,
 		isLoading: workspacesLoading,
 	} = useActiveWorkspaceSlug();
 	const { isAuthenticated, isLoading: authLoading } = useAuth();
 
 	const membershipQuery = useQuery({
-		...workspaceMembershipQueryOptions(workspaceSlug ?? ""),
-		enabled: Boolean(workspaceSlug) && isAuthenticated && !authLoading,
+		...workspaceMembershipQueryOptions(chromeWorkspaceSlug ?? ""),
+		enabled: Boolean(chromeWorkspaceSlug) && isAuthenticated && !authLoading,
 	});
 
 	const role = membershipQuery.data?.role;
 
 	return {
-		workspaceSlug,
+		chromeWorkspaceSlug,
 		workspaces,
 		role,
 		isAdmin: hasMinimumWorkspaceRole(role, "ADMIN"),

@@ -11,6 +11,8 @@ import userEvent from "@testing-library/user-event";
 import { toast } from "sonner";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { Route as workspaceHomeRoute } from "@/routes/_authenticated/w/$workspaceSlug/index";
+
 import { useWorkspaceSwitcher } from "./use-workspace-switcher";
 
 vi.mock("sonner", () => ({ toast: { info: vi.fn() } }));
@@ -63,10 +65,14 @@ function renderRoute(initialEntry: string, path: string, { mountAtRoot = false }
 		path,
 		component: mountAtRoot ? () => null : SwitchWorkspace,
 	});
+	// The workspace home's own schema and search middleware, not a copy: which of its options survive
+	// a switch is the thing under test, so a key added to the retain list is tested here too.
 	const indexRoute = createRoute({
 		getParentRoute: () => workspaceRoute,
 		path: "/",
 		component: () => null,
+		validateSearch: workspaceHomeRoute.options.validateSearch,
+		search: workspaceHomeRoute.options.search,
 	});
 	const router = createRouter({
 		routeTree: rootRoute.addChildren([workspaceRoute.addChildren([indexRoute, currentRoute])]),
@@ -106,13 +112,25 @@ async function clickWorkspaceSwitch() {
 describe("useWorkspaceSwitcher", () => {
 	beforeEach(() => vi.clearAllMocks());
 
-	it("keeps a portable route and clears its search", async () => {
+	it("keeps a portable route", async () => {
 		const router = renderRoute("/w/alpha/teams?tab=members", "teams");
 
 		await clickWorkspaceSwitch();
 
 		await waitFor(() => expect(router.state.location.href).toBe("/w/beta/teams"));
 		expect(toast.info).not.toHaveBeenCalled();
+	});
+
+	it("clears the leaderboard's team filter and keeps its workspace-independent options", async () => {
+		const router = renderRoute("/w/alpha?team=Backend&sort=LEAGUE_POINTS&mode=TEAM", "teams", {
+			mountAtRoot: true,
+		});
+
+		await clickWorkspaceSwitch();
+
+		await waitFor(() =>
+			expect(router.state.location.href).toBe("/w/beta?team=all&sort=LEAGUE_POINTS&mode=TEAM"),
+		);
 	});
 
 	it("keeps a portable route when the switcher is mounted above every match", async () => {
@@ -148,7 +166,10 @@ describe("useWorkspaceSwitcher", () => {
 
 		await clickWorkspaceSwitch();
 
-		await waitFor(() => expect(router.state.location.href).toBe("/w/beta"));
+		// The workspace home writes its own defaults into the URL; nothing of the previous page's.
+		await waitFor(() =>
+			expect(router.state.location.href).toBe("/w/beta?team=all&sort=SCORE&mode=INDIVIDUAL"),
+		);
 		expect(toast.info).toHaveBeenCalledExactlyOnceWith("Switched to Beta workspace", {
 			description:
 				"This page is specific to the previous workspace, so Hephaestus opened the new workspace's home page.",
