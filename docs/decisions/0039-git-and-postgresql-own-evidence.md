@@ -159,3 +159,9 @@ preserves the same failure matrix without shared evidence storage.
 - [PostgreSQL binary data types](https://www.postgresql.org/docs/18/datatype-binary.html)
 - [PostgreSQL TOAST](https://www.postgresql.org/docs/18/storage-toast.html)
 - [PostgreSQL transaction isolation](https://www.postgresql.org/docs/18/transaction-iso.html)
+
+## Update — 2026-09-03 (issue #1719)
+
+[ADR 0041](0041-compose-1x-kubernetes-2.md) supersedes § Publication, erasure, and collection,
+§ Durability contract, and § Materialization and limits. Verification happens once at result
+admission against the job folder the agent read; only the verdict survives.

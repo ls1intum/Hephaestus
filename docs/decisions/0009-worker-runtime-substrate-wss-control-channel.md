@@ -1,6 +1,6 @@
 # ADR 0009: Worker runtime substrate + WSS-over-443 control channel
 
-**Status:** Accepted (amended 2026-07-21 — drain requeues instead of cancelling, #1368 fix wave)
+**Status:** Accepted (amended 2026-07-21 — drain requeues instead of cancelling, #1368 fix wave; 2026-09-03 #1719 — see the update below)
 **Date:** 2026-05-21
 
 > **Amendment (2026-07-21):** `AgentJobExecutor#cancelInFlight` (referenced in the Drain row below)
@@ -75,3 +75,9 @@ previous `@PreDestroy` never awaited the sandbox executor (latent bug); this fix
   redeploy or the `keys[]` ring).
 - Adaptive concurrency rules — static config is the contract.
 - Worker-side observability: `worker_*` Prometheus catalog ships, no golden-file pinning yet.
+
+## Update — 2026-09-03 (issue #1719)
+
+[ADR 0041](0041-compose-1x-kubernetes-2.md) supersedes the Context's remote-worker premise; the
+Decision's control channel and its drain semantics stand. Sandbox data-plane traffic uses the
+worker's Sandbox Gateway port, not WSS.

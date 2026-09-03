@@ -1,6 +1,6 @@
 # ADR 0006: LLM proxy stays on the coordinator (BYO trust model)
 
-**Status:** Accepted (amended 2026-07-20 and 2026-07-28 — see the updates below)
+**Status:** Accepted (amended 2026-07-20, 2026-07-28 and 2026-09-03 — see the updates below); placement superseded by [ADR 0041](0041-compose-1x-kubernetes-2.md)
 **Date:** 2026-05-20
 **Authors:** Server foundations epic (#1097)
 
@@ -228,3 +228,14 @@ pod Hephaestus does not operate** (the BYO-runner epic, or a course running its 
 decision this ADR has not made: either the proxy moves back to the coordinator for those pods and
 they lose local Docker-network addressing, or BYO runners get per-runner credentials that are safe to
 ship. Do not start that epic assuming the 2026-05-20 default still protects it.
+
+## Update — 2026-09-03 (issue #1719)
+
+[ADR 0041](0041-compose-1x-kubernetes-2.md) supersedes the **Decision** above, and with it the
+2026-07-28 update's Revisit trigger. Considered option 3, “hardcode on worker”, rejected here on
+2026-05-20, is now the chosen path: the proxy is capability 1 of four on the owning worker's Sandbox
+Gateway and `hephaestus.sandbox.llm-proxy.enabled` is retired. The rejection was sound for its
+premise — a worker Hephaestus does not operate — and ADR 0041 removes that premise by withdrawing the
+BYO remote-worker purpose. “BYO” is now a governed provider-key lookup behind that proxy. The
+credential-isolation driver in the Context above is unchanged and still binding: the sandbox receives
+no provider credential and can reach only the gateway.

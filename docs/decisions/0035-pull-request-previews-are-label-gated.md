@@ -180,3 +180,14 @@ the author why, so the refusal is immediate and names the pull requests holding 
   Coolify, not a proof; the nightly reconcile re-sends it but checks nothing on the host. Verifying it
   would mean a standing credential on the deployment host, which is not worth paying for a failure
   that has not been seen.
+
+## Update — 2026-09-03 (issue #1719)
+
+[ADR 0041](0041-compose-1x-kubernetes-2.md) supersedes the Consequences' “copy of staging's data”
+consequence for agent execution, and the Revisit trigger's assumption that previews stay on the
+staging VM. Agent-enabled previews run only against fixture workspaces, under the sandbox bounds ADR
+0041 fixes, on a separate cluster or tainted node pool: giving pull-request code the shared Docker
+socket is unsafe. A preview may still use a neutralized copy of staging for the application read
+model, but job-folder rendering, repository mirrors, provider credentials, and agent bindings are
+restricted to fixture workspaces. There is no separate less-restricted “non-agent preview” mode.
+Label admission is unchanged, and the Coolify production path is deleted in 2.0.

@@ -1,6 +1,6 @@
 # ADR 0020: Context Fabric — everything is an integration, only practice-detection and mentor are native
 
-**Status:** Accepted (amended 2026-08-04 — see the update below)
+**Status:** Accepted (amended 2026-08-04, 2026-08-30 and 2026-09-03 — see the updates below)
 **Date:** 2026-06-12
 **Authors:** Hephaestus maintainers
 **Builds on:** [ADR 0015](0015-unified-integration-framework.md) (the integration framework and `Connection` aggregate), [ADR 0004](0004-sql-layer-tenancy-via-statement-inspector.md) (SQL-layer tenancy), [ADR 0014](0014-per-row-aes-gcm-aad-binding.md) (per-row AAD), [ADR 0007](0007-sandbox-spi-shape.md) (the agent sandbox / `ContentSource` seam)
@@ -391,3 +391,9 @@ retention clock, and shared-fabric deployment contract above.
 The 2026-08-04 update's "bounded residual windows" consequence for the CAS and replay cache remains
 accurate for pre-cutover releases only; in the 1.0 target ADR 0039's SQL-root-set collection replaces
 it, and selective erasure stops being a deployment-approval consideration tied to a filesystem cache.
+
+## Update — 2026-09-03 (issue #1719)
+
+[ADR 0041](0041-compose-1x-kubernetes-2.md) supersedes what remains of § CAS and final filesystem
+layout, the 2026-08-04 update's § Filesystem layout (finalises §1/§2), and § Decision register's
+retained-payload entries. One job folder per attempt, rendered at job start, replaces them.

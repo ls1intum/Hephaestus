@@ -39,3 +39,14 @@ Rollback selects an earlier published lock and never rebuilds metadata or resolv
 
 Revisit when Compose natively verifies signed image collections with equivalent signer, release,
 platform, and exact-topology policy.
+
+## Update — 2026-09-03 (issue #1719)
+
+[ADR 0041](0041-compose-1x-kubernetes-2.md) extends § Decision to a second inventory; it supersedes
+nothing above. Agent image contract v2 to protocol v3 is a single release-lock upgrade: the server,
+worker, webhook, and agent images cannot be rolled independently across that boundary. The 1.x lock
+covers Compose. The 2.0 lock adds the Helm chart digest and the pinned
+Agent Sandbox CRD and controller image digests; the chart, CRD, and images used for install, upgrade,
+and rollback all come from that lock. ADR 0034's signer identity, signature validation, immutable
+publication, and no-rebuild rollback rules apply unchanged. Compose and the Docker driver are absent
+from the 2.0 inventory rather than retained as exclusions.
