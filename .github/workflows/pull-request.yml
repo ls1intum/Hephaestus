@@ -28,9 +28,7 @@ jobs:
     steps:
       - name: "Checkout repository"
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Setup Node.js and pnpm
-        uses: ./.github/actions/setup-node-pnpm
+      - uses: ./.github/actions/setup-toolchain
         with:
           install: "frozen"
 
@@ -39,7 +37,7 @@ jobs:
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
-          printf '%s\n' "$PR_TITLE" | pnpm exec commitlint 2>&1 | tee "$RUNNER_TEMP/commitlint-output.txt"
+          printf '%s\n' "$PR_TITLE" | vp exec commitlint 2>&1 | tee "$RUNNER_TEMP/commitlint-output.txt"
           exit_code=${PIPESTATUS[1]}
 
           {

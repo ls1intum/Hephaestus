@@ -69,7 +69,7 @@ await test("fails closed for shared, generated, contract, tooling, and unknown i
 		"webapp/src/routeTree.gen.ts",
 		"webapp/tools/oxlint/index.ts",
 		"docs/contributor/erd/schema.mmd",
-		".husky/pre-push",
+		".vite-hooks/pre-push",
 		"docker/compose.app.yaml",
 		"webapp/CLAUDE.md",
 		"some-new-root-input.txt",

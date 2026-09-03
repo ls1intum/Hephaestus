@@ -8,7 +8,7 @@
  * the tree inside a worker starves the route tests sharing it.
  */
 import { readdir, readFile } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
 
 /** Resolved from this file, so the script runs identically from the repo root and from `webapp/`. */
 const REPO_ROOT = resolve(import.meta.dirname, "..");
@@ -76,10 +76,13 @@ const listFiles = async (directory: string, suffixes: readonly string[]): Promis
 		recursive: true,
 		withFileTypes: true,
 	});
-	return entries
-		.filter((entry) => entry.isFile() && suffixes.some((suffix) => entry.name.endsWith(suffix)))
-		.map((entry) => join(entry.parentPath, entry.name).slice(`${REPO_ROOT}/`.length))
-		.toSorted();
+	return (
+		entries
+			.filter((entry) => entry.isFile() && suffixes.some((suffix) => entry.name.endsWith(suffix)))
+			// Repository-relative with `/`, whatever the platform separator is.
+			.map((entry) => relative(REPO_ROOT, join(entry.parentPath, entry.name)).split(sep).join("/"))
+			.toSorted()
+	);
 };
 
 const readSource = async (path: string): Promise<string> => readFile(join(REPO_ROOT, path), "utf8");

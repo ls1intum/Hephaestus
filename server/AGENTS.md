@@ -10,15 +10,15 @@ are not here: write code that reads like the file you are editing.
 
 ## Local development loop
 
-`pnpm run dev` from the repo root launches `mprocs` with server and webapp in separate panes and brings up
-the Postgres container. For plain terminals: `pnpm run dev:server` and `pnpm run dev:webapp`.
+`vp run dev` from the repo root launches `mprocs` with server and webapp in separate panes and brings up
+the Postgres container. For plain terminals: `vp run dev:server` and `vp run dev:webapp`.
 
 - **No devtools.** Hot reload is JVM HotSwap via the IDE — IntelliJ's Spring Boot run config with
   *Update Classes and Resources* on save. Method-body edits reload; signature changes, new methods and
   `@Configuration` edits need a full restart
   ([ref](https://docs.spring.io/spring-boot/how-to/hotswapping.html)).
 - **`ddl-auto: validate`** locally — Liquibase owns DDL. If the validator fails on boot your DB has
-  drifted: `pnpm run dev:reset`.
+  drifted: `vp run dev:reset`.
 - **`BufferingApplicationStartup`** is wired in `Application.main()`. With `app.profiles=local`,
   `GET /actuator/startup` returns the timeline; `StartupBudgetIntegrationTest` catches per-step
   regressions in CI.
@@ -29,13 +29,13 @@ Each of these can leave you with the wrong result.
 
 - **Use the reactor.** `server/generated-clients` owns every GraphQL and Outline generator and
   `server/application` consumes its JAR. From the repository root, use
-  `pnpm run test:server:unit` after a fresh checkout or generated-client input change. For the repeated
+  `vp run test:server:unit` after a fresh checkout or generated-client input change. For the repeated
   application-edit loop, use `./mvnw -f application/pom.xml test` from `server/` (and
   `-Dtest=ClassName` to focus a test) so Maven does not restore the generated module and invalidate
   application incremental compilation.
 - **`-Dgroups=architecture` silently runs the unit suite instead.** `pom.xml` sets Surefire's `<groups>`
   to `${surefire.includedGroups}`, and a POM element beats the `-Dgroups` user property — so the flag is
-  discarded and the default (`unit`) runs. Use `pnpm run test:server:architecture`; CI passes the
+  discarded and the default (`unit`) runs. Use `vp run test:server:architecture`; CI passes the
   `${surefire.includedGroups}` property that the POM reads.
 - **`clean` does not guarantee a cold build.** It removes workspace outputs, but Maven Build Cache can
   restore them. The repository enables the cache for `generated-clients`; Maven logs `Found cached
@@ -67,16 +67,16 @@ excluded. Every new package needs a `package-info.java` containing
 `NullAway` suppressions. Use `@Nullable` only for genuine absence and place it on the precise type:
 `List<@Nullable String>` permits null elements; `String @Nullable []` permits a null array reference.
 Fix violations at the contract or implementation boundary. In tests, refine a nullable result once
-before using it rather than adding duplicate assertions. Run `pnpm run test:server:unit` after changing
+before using it rather than adding duplicate assertions. Run `vp run test:server:unit` after changing
 a nullness contract.
 
 ## Test tiers
 
 | Tag | Runs | Command |
 |---|---|---|
-| `unit` | no Spring context | `pnpm run test:server:unit` |
-| `architecture` | ArchUnit + Modulith verification | `pnpm run test:server:architecture` |
-| `integration` | full context + Testcontainers | `pnpm run test:server:integration` |
+| `unit` | no Spring context | `vp run test:server:unit` |
+| `architecture` | ArchUnit + Modulith verification | `vp run test:server:architecture` |
+| `integration` | full context + Testcontainers | `vp run test:server:integration` |
 | `database` | contract tests against a running PostgreSQL | the *App Server: Database* CI job: from `server/`, `./mvnw -f application/pom.xml -Dsurefire.includedGroups=database surefire:test` with `SPRING_DATASOURCE_URL`, `_USERNAME` and `_PASSWORD` set |
 | `live` | real GitHub API | from `server/`, `./mvnw test -Plive-tests` |
 
@@ -103,7 +103,7 @@ or on "the only" result, and never write cleanup that another test depends on ha
   explicitly — see `MentorContextQueryRepository` and `ReviewableArtifactOwnershipRepository`. A test
   with a mocked repository cannot catch a missing `TYPE(…)`.
 - **The changelog is untested by the suite.** Tests run against `ddl-auto: create`, so a broken
-  changelog passes every tier; `pnpm run db:check-drift` is the check
+  changelog passes every tier; `vp run db:check-drift` is the check
   (`docs/contributor/database-migration.mdx`).
 - **A native `@Query` may not contain an apostrophe inside a `--` comment.** Hibernate reads it as the
   start of a string literal and the whole `ApplicationContext` fails to build, naming something else;

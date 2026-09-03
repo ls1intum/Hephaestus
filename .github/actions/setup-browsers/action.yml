@@ -13,4 +13,4 @@ runs:
         key: ${{ runner.os }}-playwright-${{ steps.playwright.outputs.version }}
     - name: Install Chromium
       shell: bash
-      run: pnpm --filter webapp exec playwright install chromium --with-deps
+      run: vp -C webapp exec playwright install chromium --with-deps

@@ -6,16 +6,17 @@ title: Local verification
 
 | Command | What success proves | Excludes |
 |---|---|---|
-| `pnpm run check:affected` | Static and policy checks selected for the branch and working tree passed | Tests, builds, unaffected scopes, and CI-only checks |
-| `pnpm run check` | Every task in the `quality` list in `vite.config.ts` passed | Builds, browser and live-service tests, images, mutation analysis, and release security |
-| `pnpm run verify` | The complete credential-free local CI inventory passed | Live-service integration and E2E tests, images, mutation analysis, and release security |
+| `vp run check:affected` | Static and policy checks selected for the branch and working tree passed | Tests, builds, unaffected scopes, and CI-only checks |
+| `vp run check` | Every gate the `quality` task in `vite.config.ts` runs passed | Builds, browser and live-service tests, images, mutation analysis, and release security |
+| `vp run verify` | The complete credential-free local CI inventory passed | Live-service integration and E2E tests, images, mutation analysis, and release security |
 
 Run `check:affected` while working, `check` before pushing, and `verify` before requesting review.
+`vp run` with no task name lists every task, and `vite.config.ts` is where each one is defined.
 
 ## Affected selection
 
 The command compares committed, staged, unstaged, untracked, and deleted paths with the merge base of
-`origin/main`. For another target, run `pnpm run check:affected --base <revision>`.
+`origin/main`. For another target, run `vp run check:affected --base <revision>`.
 
 | Changed path | Task |
 |---|---|
@@ -24,7 +25,7 @@ The command compares committed, staged, unstaged, untracked, and deleted paths w
 | `server/**/resources/{agent,practices/precompute}/**`, `docker/agents/**` | `affected:agents` |
 | `docs/**` | `affected:docs` |
 | `docs/images/readme/**` | `affected:docs` and `affected:webapp` |
-| `.github/**`, `.claude/**`, `.agents/**`, `.changeset/**`, `scripts/**`, root package and tsconfig files, generated artifacts, `AGENTS.md`, `CLAUDE.md`, or any other path | `quality` |
+| `.github/**`, `.claude/**`, `.agents/**`, `.changeset/**`, `scripts/**`, `webapp/tools/oxlint/**`, root package and tsconfig files, generated artifacts, `AGENTS.md`, `CLAUDE.md`, or any other path | `quality` |
 
 The tasks are defined in `vite.config.ts`. Selection uses `git diff --no-renames`, so both sides of a
 rename are evaluated. Git documents the underlying change statuses in
@@ -32,13 +33,12 @@ rename are evaluated. Git documents the underlying change statuses in
 
 ## Pre-push hook
 
-The hook runs the read-only `pnpm run check`. For an emergency bypass,
-`HEPHAESTUS_SKIP_PRE_PUSH=1 git push` prints an unverified result and the corrective command. Git's
-standard `git push --no-verify` skips the hook without output.
+`vp install` enables the Vite+ hook dispatcher, which runs the project hooks in `.vite-hooks/`. The
+pre-push hook runs `vp run check`; `git push --no-verify` skips it.
 
 ## Complete local verification
 
-`pnpm run verify` runs `quality`, then the webapp unit tests, the Storybook browser tests,
+`vp run verify` runs `quality`, then the webapp unit tests, the Storybook browser tests,
 `test:server:verification` (unit and architecture with coverage), the webapp build with a
 `routeTree.gen.ts` comparison that restores the committed file before exiting, the Storybook build,
 and the docs build.
@@ -48,7 +48,13 @@ CI: [CI/CD](./ci-cd.mdx).
 
 ## Vite+ task cache
 
-Both `check` and `verify` enter the Vite+ task graph and reuse unchanged task results. Run
-`vp run --last-details` to inspect the latest run or `vp cache clean` to discard the local task cache.
+On Windows the runner's automatic input tracking misses a file you add, so run
+`vp run --no-cache check` there.
 
-Node is pinned by `package.json#devEngines.runtime`; Vite+ does not manage the runtime.
+`quality` is a group: its gates run in parallel, and a gate whose inputs are unchanged replays.
+`vite.config.ts` states which gates are uncached and which name their inputs. Run
+`vp run --last-details` to inspect the latest run and its miss reasons, or `vp cache clean` to
+discard the local cache. In CI the cache restores per [CI/CD](./ci-cd.mdx#caches).
+
+The facts the graph relies on are gates of their own: `gate:runner-contract` proves how `vp run`
+executes commands, and `gate:lint-contract` proves every house rule still fires through `vp lint`.

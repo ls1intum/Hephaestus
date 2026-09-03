@@ -13,7 +13,7 @@
  * against. Only something that reads the whole tree at once can compare the two sets.
  */
 import { readdir, readFile } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { join, resolve, sep } from "node:path";
 
 /** Resolved from this file, so the gate answers the same from the repo root or from `webapp/`. */
 const REPO_ROOT = resolve(import.meta.dirname, "..");
@@ -108,7 +108,11 @@ if (order.length === 0) {
 }
 
 const entries = await readdir(join(REPO_ROOT, STORIES_ROOT), { recursive: true });
-const files = entries.filter((entry) => entry.endsWith(STORY_SUFFIX)).toSorted();
+// `readdir` returns platform separators; titles and the sidebar order are written with `/`.
+const files = entries
+	.map((entry) => entry.replaceAll(sep, "/"))
+	.filter((entry) => entry.endsWith(STORY_SUFFIX))
+	.toSorted();
 if (files.length === 0) {
 	fail(`No story files under ${STORIES_ROOT} — this check would pass without checking.`);
 }

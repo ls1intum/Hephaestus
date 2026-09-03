@@ -25,7 +25,7 @@ export function parseBase(args: string[]): string {
 	const [flag, revision] = args;
 	if (args.length === 2 && flag === "--base" && revision !== undefined && revision !== "")
 		return revision;
-	throw new Error("Usage: pnpm run check:affected [--base <revision>]");
+	throw new Error("Usage: vp run check:affected [--base <revision>]");
 }
 
 const fullGateInputs = [
@@ -131,7 +131,7 @@ function main(): void {
 	if (scopes.includes("full")) console.log("Complete local quality gate passed.");
 	else
 		console.log(
-			"Affected checks passed. The complete local gate has not run; use `pnpm run check` before pushing.",
+			"Affected checks passed. The complete local gate has not run; use `vp run check` before pushing.",
 		);
 }
 

@@ -29,7 +29,7 @@ Load the one file that answers your question.
 
 ## Already enforced — do not re-litigate, and do not restate in prose
 
-These fail `pnpm run check`. Treat a violation as a build error, not a style opinion, and do not
+These fail `vp run check`. Treat a violation as a build error, not a style opinion, and do not
 write a guideline that repeats one.
 
 The house rules are registered in `webapp/tools/oxlint/index.ts` — read it rather than trusting a
@@ -53,10 +53,10 @@ from both is simply off, and nothing reports that.
 
 Beyond oxlint:
 
-- `scripts/check-story-prose.ts` (`check:stories`) — `<p>` in a comment Storybook publishes.
-- `scripts/check-story-sort.ts` (`check:story-sort`) — a title segment missing from `storySort.order`,
+- `scripts/check-story-prose.ts` (`gate:stories`) — `<p>` in a comment Storybook publishes.
+- `scripts/check-story-sort.ts` (`gate:story-sort`) — a title segment missing from `storySort.order`,
   or an `order` entry no story claims.
-- `scripts/check-presentational-components.ts` (`check:components`) — a component importing the
+- `scripts/check-presentational-components.ts` (`gate:components`) — a component importing the
   query layer, and a story installing MSW handlers. Its allowlist is shrink-only.
 - `webapp/.storybook/preview.tsx` sets `a11y: { test: "error" }` project-wide. Adding a per-story
   override is a finding, not a fix.

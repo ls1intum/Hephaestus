@@ -28,17 +28,16 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
-      - name: Setup Node.js and pnpm
-        uses: ./.github/actions/setup-node-pnpm
+      - uses: ./.github/actions/setup-toolchain
         with:
-          install: "hardened"
+          install: "frozen"
       - name: Setup Java
         uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
         with:
           distribution: temurin
-          java-version: 21
+          java-version-file: .java-version
       - name: Generate OpenAPI spec and client
-        run: pnpm run generate:api
+        run: vp run generate:api
       - name: Upload generated files
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

@@ -9,6 +9,8 @@ import { describe, test } from "node:test";
 import { type Document, isMap, isScalar, isSeq, parseDocument, type YAMLMap } from "yaml";
 
 import { versionBranch } from "./dispatch-version-pr-ci.ts";
+import { asRecord, isRecord } from "./lib/json.ts";
+import { commandsOf, loadTasks } from "./lib/task-graph.ts";
 import { planRelease, releaseOutputs } from "./plan-release.ts";
 import { planSubjects } from "./scan-main-images.ts";
 import { PLATFORMS, planUpstreamSubjects } from "./scan-upstream-images.ts";
@@ -30,15 +32,68 @@ function pathFilter(source: string, name: string): string {
 	return match[0];
 }
 
+/** Repository-relative `/`-separated paths, whatever separator `fs.glob` yields on this platform. */
+async function posixGlob(pattern: string): Promise<string[]> {
+	return (await Array.fromAsync(glob(pattern)))
+		.map((file) => file.split(path.sep).join("/"))
+		.toSorted();
+}
+
 async function workflowSources(): Promise<Map<string, string>> {
-	const files = (await Array.fromAsync(glob(".github/workflows/*.{yml,yaml}"))).toSorted();
-	return readSources(files);
+	return readSources(await posixGlob(".github/workflows/*.{yml,yaml}"));
 }
 
 async function readSources(files: string[]): Promise<Map<string, string>> {
 	return new Map(
 		await Promise.all(files.map(async (file) => [file, await readFile(file, "utf8")] as const)),
 	);
+}
+
+/** A task name as a workflow writes it, including an unresolved matrix expression. */
+// Flags, and a matrix value standing for flags, may come before the task name; `--filter` selects
+// a package script instead of a task and is left where the caller can see it.
+const TASK_INVOCATION =
+	/\bvp run (?:(?:--(?!filter\b)[\w-]+|\$\{\{ *matrix\.\w+ *\}\}) +)*((?:[\w:-]|\$\{\{ *matrix\.\w+ *\}\})+)/g;
+
+/** The task names one job's steps invoke, with a `${{ matrix.<key> }}` resolved from its matrix. */
+function invokedTasks(definition: YAMLMap): string[] {
+	const names: string[] = [];
+	const matrix = definition.getIn(["strategy", "matrix"]);
+	const steps = definition.get("steps");
+	if (!isSeq(steps)) return names;
+	for (const item of steps.items) {
+		if (!isMap(item) || typeof item.get("run") !== "string") continue;
+		// A command a step prints as guidance is not a command it runs.
+		const command = String(item.get("run")).replaceAll(/`[^`]*`/g, "");
+		for (const [, raw] of command.matchAll(TASK_INVOCATION)) {
+			// `vp run --filter <package> <script>` runs a package script rather than a task.
+			if (raw === undefined || raw.startsWith("-")) continue;
+			const expression = /\$\{\{ *matrix\.(\w+) *\}\}/.exec(raw);
+			if (expression?.[1] === undefined) {
+				names.push(raw);
+				continue;
+			}
+			const values = isMap(matrix) ? matrixValues(matrix, expression[1]) : [];
+			assert.ok(values.length > 0, `matrix.${expression[1]} has no values`);
+			for (const value of values) names.push(raw.replace(expression[0], value));
+		}
+	}
+	return names;
+}
+
+/** Every value a matrix key takes, in a plain list and across `include` entries. */
+function matrixValues(matrix: YAMLMap, key: string): string[] {
+	const values: string[] = [];
+	const direct = matrix.get(key);
+	if (isSeq(direct))
+		for (const item of direct.items) if (isScalar(item)) values.push(String(item.value));
+	const include = matrix.get("include");
+	if (isSeq(include))
+		for (const entry of include.items) {
+			const node = isMap(entry) ? entry.get(key, true) : undefined;
+			if (isScalar(node)) values.push(String(node.value));
+		}
+	return values;
 }
 
 function escapeRegExp(value: string): string {
@@ -58,11 +113,11 @@ async function importClosure(entry: string): Promise<string[]> {
 		if (file === undefined || seen.has(file)) continue;
 		seen.add(file);
 		const source = await readFile(file, "utf8");
-		const directory = path.dirname(file);
+		const directory = path.posix.dirname(file);
 		for (const [, specifier] of source.matchAll(/from\s+"(\.[^"]+\.ts)"/g))
-			queue.push(path.normalize(path.join(directory, specifier ?? "")));
+			queue.push(path.posix.normalize(path.posix.join(directory, specifier ?? "")));
 		for (const [, name] of source.matchAll(/"([\w.-]+\.ts)"/g)) {
-			const candidate = path.normalize(path.join(directory, "..", name ?? ""));
+			const candidate = path.posix.normalize(path.posix.join(directory, "..", name ?? ""));
 			if (candidate.startsWith("scripts/") && existsSync(candidate)) queue.push(candidate);
 		}
 	}
@@ -166,58 +221,53 @@ function render(
 }
 
 void describe("CI contract", () => {
-	void test("references every top-level check leg from a workflow", async () => {
-		const packageJson: unknown = JSON.parse(await readFile("package.json", "utf8"));
-		assert.ok(packageJson && typeof packageJson === "object" && "scripts" in packageJson);
-		const rawScripts: unknown = packageJson.scripts;
-		assert.ok(rawScripts && typeof rawScripts === "object");
-		const scripts: Record<string, string> = {};
-		for (const [name, command] of Object.entries(rawScripts)) {
-			if (typeof command !== "string")
-				throw new TypeError(`package.json#scripts.${name} must be a string`);
-			scripts[name] = command;
-		}
-		const checkScript = scripts.check;
-		assert.ok(checkScript);
-		const checkLegs = checkScript.split(/\s+/).filter((token) => scripts[token]);
-		const reachable = new Set<string>();
+	void test("every local gate runs in a workflow, and every CI gate is a local gate", async () => {
+		const tasks = await loadTasks();
 		const dependencies = (name: string): string[] => {
-			const command = scripts[name];
-			if (!command) return [];
-			const viaRun = Object.keys(scripts).filter((candidate) =>
-				new RegExp(`(?:node|npm|pnpm) run ${escapeRegExp(candidate)}(?:\\s|$)`).test(command),
-			);
-			// run-s chains package scripts by name, so every named token is an edge.
-			const viaRunS = /(?:^|[;&|]\s*)run-s(?:\s|$)/.test(command)
-				? command.split(/\s+/).filter((token) => scripts[token])
+			const task = tasks[name];
+			return isRecord(task) && Array.isArray(task.dependsOn)
+				? task.dependsOn.filter((entry): entry is string => typeof entry === "string")
 				: [];
-			return [...new Set([...viaRun, ...viaRunS])];
 		};
-		const visit = (name: string): void => {
-			if (reachable.has(name)) return;
-			reachable.add(name);
-			for (const dependency of dependencies(name)) visit(dependency);
+		// A workflow may run a gate directly or through a group; the graph decides what a
+		// `vp run <task>` covers, so it is expanded here rather than pattern-matched in YAML.
+		const expand = (name: string, into: Set<string>): void => {
+			if (into.has(name)) return;
+			into.add(name);
+			for (const dependency of dependencies(name)) expand(dependency, into);
+			for (const command of commandsOf(tasks[name])) {
+				const nested = /^vp run ([\w:-]+)$/.exec(command)?.[1];
+				if (nested !== undefined) expand(nested, into);
+			}
 		};
-		// A workflow that runs a script file directly on Node covers every package script built on it.
-		const scriptsByFile = new Map<string, string[]>();
-		for (const [name, command] of Object.entries(scripts)) {
-			for (const file of command.match(/scripts\/[\w./-]+\.ts/g) ?? []) {
-				scriptsByFile.set(file, [...(scriptsByFile.get(file) ?? []), name]);
+		const local = new Set<string>();
+		expand("quality", local);
+		const ci = new Set<string>();
+		for (const [file, source] of await workflowSources()) {
+			const jobs = parseDocument(source).get("jobs");
+			if (!isMap(jobs)) continue;
+			for (const entry of jobs.items) {
+				if (!isMap(entry.value)) continue;
+				for (const name of invokedTasks(entry.value)) {
+					assert.ok(name in tasks, `${file} runs ${name}, which is not a task`);
+					expand(name, ci);
+				}
 			}
 		}
-		for (const source of (await workflowSources()).values()) {
-			for (const line of source.split("\n")) {
-				const invocation = line.match(/^\s*(?:run:\s+)?(?:\(cd \.\. && )?pnpm run ([\w:-]+)/)?.[1];
-				if (invocation && scripts[invocation]) visit(invocation);
-				const file = line.match(/(?:^|\s)node (?:--test )?(?:\.\.\/)?(scripts\/[\w./-]+\.ts)/)?.[1];
-				for (const name of file ? (scriptsByFile.get(file) ?? []) : []) visit(name);
-			}
-		}
-
+		const gates = (names: Set<string>): string[] =>
+			[...names]
+				.filter((name) => name.startsWith("gate:") && !name.startsWith("gate:verify:"))
+				.toSorted();
 		assert.deepEqual(
-			checkLegs.filter((leg) => !reachable.has(leg)),
+			gates(local).filter((gate) => !ci.has(gate)),
 			[],
-			"Every package.json#check leg must be covered by at least one workflow",
+		);
+		// Builds and tests that only CI runs (`gate:webapp-tests`, `gate:load-syntax`) are the
+		// exceptions the verification graph owns; every other CI gate is part of `check`.
+		const ciOnly = new Set(["gate:webapp-tests", "gate:load-syntax", "gate:pmd-canary"]);
+		assert.deepEqual(
+			gates(ci).filter((gate) => !local.has(gate) && !ciOnly.has(gate)),
+			[],
 		);
 	});
 
@@ -294,8 +344,8 @@ void describe("CI contract", () => {
 		// The long suites compile from source and never wait for the package job.
 		const tests = await readFile(".github/workflows/ci-tests.yml", "utf8");
 		assert.doesNotMatch(tests, /^ {4}needs:|download-artifact|restore-server-build/m);
-		assert.match(job(tests, "server-verification"), /pnpm run test:server:verification/);
-		assert.match(job(tests, "server-integration"), /pnpm run test:server:integration/);
+		assert.match(job(tests, "server-verification"), /vp run test:server:verification/);
+		assert.match(job(tests, "server-integration"), /vp run test:server:integration/);
 		const orchestrator = await readFile(".github/workflows/cicd.yml", "utf8");
 		assert.match(job(orchestrator, "Build"), /needs: \[detect-changes\]/);
 
@@ -318,7 +368,7 @@ void describe("CI contract", () => {
 			await readFile(".github/workflows/ci-quality-gates.yml", "utf8"),
 			"webapp-stories",
 		);
-		assert.equal((storybook.match(/pnpm --filter webapp run build-storybook/g) ?? []).length, 1);
+		assert.equal((storybook.match(/vp run --filter webapp build-storybook/g) ?? []).length, 1);
 		assert.match(storybook, /test -s webapp\/storybook-static\/preview-stats\.json/);
 		assert.match(storybook, /storybookBuildDir: storybook-static/);
 		assert.match(storybook, /onlyChanged: true/);
@@ -484,11 +534,11 @@ void describe("CI contract", () => {
 		// Every path that evaluates the policy — the build gate, the release, the release rescan and
 		// the main rescan — must name this one file. A second copy is the failure the whole effort
 		// removes, and it would be invisible: two policies both pass until they disagree.
-		const files = [
-			...(await Array.fromAsync(glob(".github/workflows/*.{yml,yaml}"))),
-			...(await Array.fromAsync(glob("scripts/*.ts"))),
-		];
-		for (const [file, source] of await readSources(files)) {
+		const sources = await readSources([
+			...(await posixGlob(".github/workflows/*.{yml,yaml}")),
+			...(await posixGlob("scripts/*.ts")),
+		]);
+		for (const [file, source] of sources) {
 			if (file.endsWith(".test.ts")) continue;
 			for (const reference of source.match(/[\w./-]*vulnerability-polic[\w-]*\.json/g) ?? [])
 				assert.ok(
@@ -505,7 +555,7 @@ void describe("CI contract", () => {
 			/copyFile\(\n?\s*"security\/vulnerability-policy\.json",/,
 		);
 		// One committed policy, so "the same policy" is a fact rather than a convention.
-		assert.deepEqual(await Array.fromAsync(glob("security/*vulnerability*.json")), [
+		assert.deepEqual(await posixGlob("security/*vulnerability*.json"), [
 			"security/vulnerability-policy.json",
 		]);
 	});
@@ -581,7 +631,7 @@ void describe("CI contract", () => {
 		// listing, and a `gh api` workflow-run listing that stopped the Version PR being maintained
 		// at all. The ceiling has one home, and a capture that does not use it is the fourth.
 		const offenders: string[] = [];
-		for await (const file of glob("scripts/**/*.ts")) {
+		for (const file of await posixGlob("scripts/**/*.ts")) {
 			if (file.endsWith(".test.ts")) continue;
 			const source = await readFile(file, "utf8");
 			// `stdio: inherit`/`ignore` streams to the parent and buffers nothing; only a capture,
@@ -904,8 +954,9 @@ void describe("CI contract", () => {
 
 	void test("pins every external action to a full commit SHA with a version comment", async () => {
 		const invalid: string[] = [];
-		const files = await Array.fromAsync(glob(".github/{actions,workflows}/**/*.{yml,yaml}"));
-		for (const [file, source] of await readSources(files)) {
+		for (const [file, source] of await readSources(
+			await posixGlob(".github/{actions,workflows}/**/*.{yml,yaml}"),
+		)) {
 			for (const [index, line] of source.split("\n").entries()) {
 				const uses = line.match(/^\s+(?:- )?uses:\s+(\S+)(.*)$/);
 				if (!uses) continue;
@@ -927,17 +978,17 @@ void describe("CI contract", () => {
 			assert.doesNotMatch(
 				source,
 				/pnpm install --frozen-lockfile/,
-				`${file} must install through setup-node-pnpm`,
+				`${file} must install through setup-toolchain`,
 			);
-			const setupCalls = source.match(/uses: \.\/\.github\/actions\/setup-node-pnpm/g) ?? [];
+			const setupCalls = source.match(/uses: \.\/\.github\/actions\/setup-toolchain/g) ?? [];
 			const explicitModes =
 				source.match(
-					/uses: \.\/\.github\/actions\/setup-node-pnpm\n\s+with:\n\s+install: "(?:none|frozen|hardened)"/g,
+					/uses: \.\/\.github\/actions\/setup-toolchain\n\s+with:\n\s+install: "(?:none|frozen)"/g,
 				) ?? [];
 			assert.equal(
 				explicitModes.length,
 				setupCalls.length,
-				`${file} must select an explicit setup-node-pnpm install mode`,
+				`${file} must select an explicit setup-toolchain install mode`,
 			);
 		}
 		for (const file of [
@@ -1053,61 +1104,135 @@ void describe("CI contract", () => {
 	});
 });
 
-void test("CI and package scripts enter the Vite+ task graph", async () => {
-	const manifest: unknown = JSON.parse(await readFile("package.json", "utf8"));
-	assert.ok(
-		manifest &&
-			typeof manifest === "object" &&
-			"scripts" in manifest &&
-			"devDependencies" in manifest,
-	);
-	const scripts: unknown = manifest.scripts;
-	const devDependencies: unknown = manifest.devDependencies;
-	assert.ok(scripts && typeof scripts === "object");
-	assert.ok(devDependencies && typeof devDependencies === "object");
-	assert.ok("check" in scripts && "verify" in scripts);
-	assert.equal(scripts.check, "vp run quality");
-	assert.equal(scripts.verify, "vp run verification");
-	assert.equal("npm-run-all2" in devDependencies, false);
-
-	const graph = await readFile("vite.config.ts", "utf8");
-	for (const entry of [
-		"quality",
-		"verification",
-		"gate:server",
-		"gate:env",
-		"gate:lint-contract",
-	]) {
-		assert.match(graph, new RegExp(`(?:^|\\s)"?${escapeRegExp(entry)}"?:`));
+void test("the task graph keeps its cache posture", async () => {
+	const tasks = await loadTasks();
+	for (const entry of ["check", "verify", "quality", "verification"])
+		assert.ok(entry in tasks, `${entry} must be a task`);
+	for (const [name, task] of Object.entries(tasks)) {
+		if (!isRecord(task)) continue;
+		const commands = commandsOf(task);
+		// A cached task owns its command: `vp run <task>` resolves to that node and never caches, and
+		// `vp exec` runs a bundled binary the runner does not fingerprint.
+		if (task.cache !== false)
+			for (const command of commands) {
+				assert.doesNotMatch(command, /^vp run /, `${name} must own its command to cache`);
+				assert.doesNotMatch(command, /^vp exec /, `${name} cannot cache through vp exec`);
+			}
+		// Shell parameter expansion is outside the runner contract (scripts/check-runner-contract.ts).
+		for (const command of commands)
+			assert.doesNotMatch(command, /\$/, `${name} must not rely on shell expansion`);
 	}
-	for (const entry of [
-		"gate:package-manager",
-		"gate:java-nullness",
-		"gate:server",
-		"gate:lint-contract",
-		"gate:agents",
-		"gate:agent-tests",
-		"gate:preview-stack",
-		"gate:env",
-		"gate:contracts",
-		"gate:instructions",
-		"gate:docs",
-		"gate:webapp-tests",
-		"gate:webapp-build",
-		"gate:load-syntax",
-		"gate:verify:storybook-tests",
-		"gate:verify:webapp-build",
-		"gate:verify:storybook-build",
-		"gate:verify:docs-build",
-		"gate:verify:server",
-	])
-		assert.match(graph, new RegExp(`"${escapeRegExp(entry)}": uncached\\(`));
+	// One Maven process per checkout: the two Maven gates run one after another, the install PMD
+	// needs is an uncached dependency because no cache replays it, and both name the JDK they read.
+	const serverCommands = commandsOf(tasks["gate:server"]);
+	assert.ok(
+		serverCommands.indexOf("vp run gate:server-format") <
+			serverCommands.indexOf("vp run gate:server-lint"),
+	);
+	const serverLint = asRecord(tasks["gate:server-lint"], "gate:server-lint");
+	assert.ok(
+		Array.isArray(serverLint.dependsOn) &&
+			serverLint.dependsOn.includes("prepare:server:generated"),
+	);
+	assert.equal(
+		asRecord(tasks["prepare:server:generated"], "prepare:server:generated").cache,
+		false,
+	);
+	for (const entry of ["gate:server-format", "gate:server-lint", "gate:docs-lint"])
+		assert.ok(Array.isArray(asRecord(tasks[entry], entry).input), `${entry} names its inputs`);
+	for (const entry of ["gate:server-format", "gate:server-lint"]) {
+		const env = asRecord(tasks[entry], entry).env;
+		assert.ok(Array.isArray(env) && env.includes("JAVA_HOME"), `${entry} names JAVA_HOME`);
+	}
 
 	for (const [file, source] of await workflowSources()) {
 		assert.doesNotMatch(
 			source,
-			/^\s*(?:run:\s*)?(?:pnpm exec )?(?:vite|vitest|oxlint|oxfmt)(?:\s|$)/m,
+			/^\s*(?:run:\s*)?(?:vp exec )?(?:vite|vitest|oxlint|oxfmt)(?:\s|$)/m,
 			`${file} bypasses the pinned Vite+ interface`,
 		);
 	}
+});
+
+// Vite+ loads the task graph from every workspace config, and those configs import dependencies, so a
+// job that calls `vp` has installed them; `none` is for jobs that run `node scripts/…` or shell alone.
+void test("installs dependencies in every job that calls vp", async () => {
+	const offenders: string[] = [];
+	for (const [file, source] of await workflowSources()) {
+		const jobs = parseDocument(source).get("jobs");
+		if (!isMap(jobs)) continue;
+		for (const pair of jobs.items) {
+			const jobName = String(pair.key);
+			const jobDefinition = pair.value;
+			if (!isMap(jobDefinition)) continue;
+			const steps = jobDefinition.get("steps");
+			if (!isSeq(steps)) continue;
+			let install: string | undefined;
+			let callsVp = false;
+			let installsItself = false;
+			for (const item of steps.items) {
+				if (!isMap(item)) continue;
+				const uses = item.get("uses");
+				if (uses === "./.github/actions/setup-toolchain") {
+					const inputs = item.get("with");
+					install = isMap(inputs) ? String(inputs.get("install")) : undefined;
+				}
+				const run = item.get("run");
+				if (typeof run === "string" && /\bvp install\b/.test(run)) installsItself = true;
+				// An invocation starts a command; `vp run …` quoted in a message for the summary does not.
+				if (
+					typeof run === "string" &&
+					/(?:^|[|&;]\s*|timeout \S+ \S+ )(?:\S+=\S+ )*vp (?:run|exec|-C)\b/m.test(
+						run.replaceAll(/\\?`[^`]*\\?`/g, ""),
+					)
+				)
+					callsVp = true;
+			}
+			if (callsVp && install !== "frozen" && !installsItself)
+				offenders.push(`${file}#${jobName} (install: ${install ?? "no setup-toolchain step"})`);
+		}
+	}
+	assert.deepEqual(offenders, [], "A job that calls vp must install dependencies first");
+});
+
+// A toolchain claim is a job: every leg of the task graph is one matrix entry of one job, the Vite+
+// shell and the hook dispatcher run on Windows as one of them, and the documented first command of
+// a contributor runs from a clone that has nothing but the launcher.
+void test("proves the toolchain on Windows and from a clean clone", async () => {
+	const source = await readFile(".github/workflows/ci-quality-gates.yml", "utf8");
+	const quality = job(source, "quality");
+	assert.match(quality, /runs-on: \$\{\{ matrix\.os \}\}/);
+	assert.match(quality, /shell: bash/);
+	assert.match(quality, /run: vp run \$\{\{ matrix\.flags \}\} ci:\$\{\{ matrix\.leg \}\}/);
+	assert.match(quality, /- leg: windows\n(?:\s+\S[^\n]*\n)*?\s+os: windows-latest/);
+	// The task cache is a Linux-only trust: the Windows leg neither restores nor saves it.
+	assert.doesNotMatch(quality, /- leg: windows\n(?:\s+\S[^\n]*\n)*?\s+cache: true/);
+	assert.match(quality, /- leg: windows\n(?:\s+\S[^\n]*\n)*?\s+flags: --no-cache/);
+	const install = job(source, "clean-install");
+	assert.doesNotMatch(install, /setup-toolchain|pnpm\/setup/);
+	assert.match(install, /vp install --frozen-lockfile/);
+	assert.match(install, /vp run gate:toolchain/);
+	// The legs that own hooks install them the way an install does, then fire the commit-msg hook
+	// on a message commitlint rejects and on one it accepts.
+	assert.match(quality, /if: env\.RUN == 'true' && matrix\.hooks && !cancelled\(\)/);
+	assert.match(quality, /node scripts\/enable-hooks\.ts/);
+	assert.match(quality, /git config core\.hooksPath/);
+	assert.equal((quality.match(/git commit --allow-empty/g) ?? []).length, 2);
+});
+
+void test("a change to the task graph or the hooks selects every quality leg", async () => {
+	const orchestrator = await readFile(".github/workflows/cicd.yml", "utf8");
+	const filter = pathFilter(orchestrator, "quality-config");
+	for (const entry of ["vite.config.ts", ".vite-hooks/**", ".java-version"])
+		assert.match(
+			filter,
+			new RegExp(`'${escapeRegExp(entry)}'`),
+			`quality-config must list ${entry}`,
+		);
+	for (const name of ["build-config", "test-config"])
+		assert.match(
+			pathFilter(orchestrator, name),
+			/'\.java-version'/,
+			`${name} must list .java-version`,
+		);
 });

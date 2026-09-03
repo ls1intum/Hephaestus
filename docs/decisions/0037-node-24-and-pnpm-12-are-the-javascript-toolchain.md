@@ -4,6 +4,8 @@
 
 Accepted. Supersedes [ADR 0033](0033-bun-is-the-javascript-runtime-and-package-manager.md).
 Complements [ADR 0036](0036-agent-runtime-runs-on-node-24.md), which moved the sandbox runtime first.
+Complemented by [ADR 0040](0040-vite-plus-is-the-command-surface.md), which makes Vite+ (`vp`) the
+command surface on top of this toolchain.
 
 ## Context
 

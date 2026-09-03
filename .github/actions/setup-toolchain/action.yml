@@ -1,0 +1,33 @@
+name: "Setup toolchain"
+description: "The Node.js, pnpm and Vite+ versions package.json pins, with the pnpm store cached; install is none or frozen."
+inputs:
+  install:
+    description: "none, or frozen: pnpm install --frozen-lockfile --ignore-scripts. No lifecycle script runs in CI, so pnpm-workspace.yaml#allowBuilds is exercised only by a contributor's install."
+    required: false
+    default: "none"
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      with:
+        node-version-file: package.json
+    - if: inputs.install != 'none' && inputs.install != 'frozen'
+      shell: bash
+      run: |
+        echo "::error::setup-toolchain: install must be none or frozen"
+        exit 1
+    - uses: pnpm/setup@703c52620218391530e48b9e8870d5c0082e1b9b # v2.1.0
+      with:
+        cache: ${{ inputs.install == 'frozen' }}
+        cache-dependency-path: pnpm-lock.yaml
+        install: false
+        require-lockfile: true
+    - uses: voidzero-dev/setup-vp@1b32467adbe183473499fd9d5d372c3ed9641754 # v1.18.0
+      with:
+        node-manager: false
+        cache: false
+        run-install: false
+    # pnpm/setup cannot pass --ignore-scripts, so the install is its own step.
+    - if: inputs.install == 'frozen'
+      shell: bash
+      run: pnpm install --frozen-lockfile --ignore-scripts

@@ -6,15 +6,15 @@ the version bump. (Not a Liquibase `<changeSet>` — a schema change needs both.
 Every PR that changes shipped code (anything under `server/`, `webapp/`, or `docker/` except tests and in-tree docs) ships one; CI (`verify-changesets`) enforces it.
 
 ```bash
-pnpm changeset          # write one (pick the bump, describe the change)
-pnpm changeset --empty  # no user-facing effect — then write why in the file body (non-interactive)
+vp exec changeset          # write one (pick the bump, describe the change)
+vp exec changeset --empty  # no user-facing effect — then write why in the file body (non-interactive)
 ```
 
 The summary lands in the changelog **verbatim**, in the operator/user's voice — lead with what they can now
 do, or the symptom a fix removes. No class/hook/file names. No agent-attribution trailers. One changeset per
 user-visible change; when in doubt, add one.
 
-No TTY (agents, CI)? `pnpm changeset` is interactive — instead write `.changeset/<slug>.md` by hand in the
+No TTY (agents, CI)? `vp exec changeset` is interactive — instead write `.changeset/<slug>.md` by hand in the
 format shown below. That is the one sanctioned hand-write; never touch `CHANGELOG.md` directly.
 
 **Bump = the operator's upgrade cost:**

@@ -11,7 +11,7 @@ COPY docs/package.json /repo/docs/
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store,sharing=locked \
     pnpm fetch --filter webapp
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store,sharing=locked \
-    pnpm install --offline --frozen-lockfile --filter webapp
+    pnpm install --offline --frozen-lockfile --ignore-scripts --filter webapp
 COPY webapp/ /repo/webapp/
 RUN --mount=type=secret,id=sentry_auth_token,required=false \
     --mount=type=secret,id=sentry_org,required=false \

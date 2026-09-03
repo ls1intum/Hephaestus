@@ -85,7 +85,7 @@ else. Before calling a change done, walk this list and say which entries applied
   its own container.
 - **Wire contract.** Anything crossing HTTP is a DTO in `server/openapi.yaml` and the generated
   client in `webapp/src/api/**`; change the controller, regenerate both, commit both.
-- **Schema.** An entity change is a changelog and an ERD (`pnpm run db:draft-changelog`), and a
+- **Schema.** An entity change is a changelog and an ERD (`vp run db:draft-changelog`), and a
   new workspace-owned table is workspace-scoped from its first migration.
 - **Channels.** Feedback appears on the reviewed work, on the developer's practice page and in
   conversation; a change to what feedback carries needs a decision per channel.
@@ -118,16 +118,16 @@ generated client. `docs/contributor/system-design.mdx` has the diagrams and
 - `webapp/` — React 19 SPA, TanStack Router/Query, Tailwind 4, generated API client in `src/api/**`.
   `webapp/AGENTS.md` has the component and story conventions.
 - `docs/` — user, admin and contributor docs published to GitHub Pages, including the generated ERD.
-- `scripts/` — repository tooling in TypeScript, on the Node and pnpm versions pinned by
-  `package.json#devEngines.runtime` and `packageManager`. The agent runner
-  (`server/application/src/main/resources/agent/`), the precompute runner and lib
+- `scripts/` — repository tooling in TypeScript, on the Node version pinned by
+  `package.json#devEngines.runtime`, run through the Vite+ version pinned in `devDependencies`. The
+  agent runner (`server/application/src/main/resources/agent/`), the precompute runner and lib
   (`docker/agents/precompute/`) and the per-practice precompute scripts
   (`server/application/src/main/resources/practices/precompute/`) are type-checked as one project
   via `tsconfig.agents.json`.
 
 Skills live in `.claude/skills/<name>/`, read by Claude Code and opencode; Codex reads
 `.agents/skills/` and nothing else, so the four that drive a contribution are mirrored there byte
-for byte and `check:instructions` fails when a half drifts. Copy a skill nowhere else.
+for byte and `gate:instructions` fails when a half drifts. Copy a skill nowhere else.
 
 | Skill | When |
 |-------|------|
@@ -140,10 +140,10 @@ for byte and `check:instructions` fails when a half drifts. Copy a skill nowhere
 
 ## Dev servers
 
-- `pnpm run dev` starts PostgreSQL, the server and the webapp in one terminal; `dev:server` and
+- `vp run dev` starts PostgreSQL, the server and the webapp in one terminal; `dev:server` and
   `dev:webapp` are the halves. Host ports come from `server/.env`, one set per worktree, so read
   them there rather than assuming the defaults.
-- `pnpm run dev:reset` wipes the local database; the data folder under `server/` is a bind mount
+- `vp run dev:reset` wipes the local database; the data folder under `server/` is a bind mount
   that `docker compose down -v` leaves in place.
 - Stop what you started, by the PID you tracked. Other worktrees run their own servers on this host.
 - `docs/contributor/local-development.mdx` has sign-in, bootstrap admins and the port map.
@@ -151,38 +151,40 @@ for byte and `check:instructions` fails when a half drifts. Copy a skill nowhere
 ## Verifying
 
 - Smallest proof that the change works: the test file you touched, the scoped check for the tree
-  you changed (`pnpm run check:affected` selects it from your diff).
+  you changed (`vp run check:affected` selects it from your diff).
 - Test observable behaviour. A story proves what a component renders from its props and installs
   no network; a route test owns the wire contract. Do not assert callback wiring or mirror the
   implementation.
 - Backend behaviour changes ship with focused tests in the right tier (`server/AGENTS.md` § Test
   tiers). Integration tests share a database with earlier tests: assert on the row you created,
   never on a count.
-- Before pushing, `pnpm run format` then `pnpm run check`; the pre-push hook runs `check` again.
-  `pnpm run verify` adds the credential-free builds and suites before review. CI owns images,
+- Before pushing, `vp run format` then `vp run check`; the pre-push hook runs `check` again.
+  `vp run verify` adds the credential-free builds and suites before review. CI owns images,
   browser and live-service suites — `docs/contributor/local-verification.mdx`.
 - Ask before computer use or spinning up a browser; a run environment the maintainer already
   started is the one to test against.
 
 | Command | Does |
 |---|---|
-| `pnpm run format` / `format:check` | Apply / verify formatting (Java + TypeScript) |
-| `pnpm run check` | Every task in the `quality` array in `vite.config.ts`: static analysis, formatting, agent tests, repository policy |
-| `pnpm run verify` | `check` plus the credential-free builds and test suites |
-| `pnpm run test:webapp` | Vitest |
-| `pnpm run test:agents` | Agent runtime and precompute specs, on Node |
-| `pnpm run test:server:unit` | Server unit tests — the other tiers are in `server/AGENTS.md` § Test tiers |
+| `vp run format` / `format:check` | Apply / verify formatting (Java + TypeScript) |
+| `vp run check` | Every gate in the `quality` group in `vite.config.ts`: static analysis, formatting, agent tests, repository policy |
+| `vp run verify` | `check` plus the credential-free builds and test suites |
+| `vp run test:webapp` | Vitest |
+| `vp run test:agents` | Agent runtime and precompute specs, on Node |
+| `vp run test:server:unit` | Server unit tests — the other tiers are in `server/AGENTS.md` § Test tiers |
 
 Naming: `format` applies, `format:check` verifies read-only for CI, `lint` lints, `check` is the
-quality gate. A `:webapp`, `:server` or `:agents` suffix scopes any of them; `:java` scopes `format`
-and `lint` only — the Java leg of `check` is `check:server`.
+quality gate. A `gate:` name is one leaf verdict, what CI annotates and what `check` is made of. A
+`:webapp`, `:server` or `:agents` suffix scopes any of them; `:java` scopes `format` and `lint`, and
+the Java leg of `check` is `gate:server`.
 
 ### Lint and format
 
 Oxlint lints; oxfmt formats and sorts imports. Each tree states its rule set in full —
 `webapp/.oxlintrc.json`, `docs/.oxlintrc.json`, and the root `.oxlintrc.json` for the agent trees,
 `scripts/**` and tooling config — and each config carries the reasoning for its own deltas.
-`docs:lint` is the docs package's `typecheck` plus `markdownlint-cli2` (`docs/.markdownlint-cli2.jsonc`).
+`gate:docs-lint` type-checks the docs tree and runs `markdownlint-cli2` (`docs/.markdownlint-cli2.jsonc`);
+`docs:lint` is its alias.
 
 - **Start every oxlint run from the repo root.** A nested config *replaces* the root's rules rather
   than merging, and `options` — `typeAware`, `reportUnusedDisableDirectives` — is honoured only from
@@ -193,6 +195,11 @@ Oxlint lints; oxfmt formats and sorts imports. Each tree states its rule set in 
 - **The house rules are one oxlint plugin under `webapp/tools/oxlint/`.** All three configs load it
   and each chooses which rules to turn on, so adding a rule there enables it nowhere.
   `webapp/AGENTS.md` § Linting has the rest.
+- **`vp run` does not give a command a POSIX shell on every platform.** So a command never contains
+  `$`, which `scripts/ci-contract.test.ts` enforces, and what it reads from the environment is
+  decided in `vite.config.ts` when the config loads. The runner facts the graph relies on are proven
+  in `scripts/check-runner-contract.ts`. oxfmt expands a pattern itself, always recursively, so a
+  root-only format task names its files.
 
 ## Pull requests
 
@@ -251,20 +258,20 @@ repository.
 
 | Artefact | Command |
 |---|---|
-| `server/openapi.yaml` | `pnpm run generate:api:application-server:specs` |
-| `webapp/src/api/**` | `pnpm run generate:api:application-server:client` |
-| `docs/contributor/erd/schema.mmd` | `pnpm run db:generate-erd-docs` |
+| `server/openapi.yaml` | `vp run generate:api:specs` |
+| `webapp/src/api/**` | `vp run generate:api:client` |
+| `docs/contributor/erd/schema.mmd` | `vp run db:generate-erd-docs` |
 | `webapp/src/routeTree.gen.ts` | TanStack Router Vite plugin |
 | `server/generated-clients/target/generated-sources/**` | GraphQL and Outline codegen, owned by the generated-clients Maven module |
 
-Never hand-edit these. `generate:api:application-server:client` empties `webapp/src/api/` first;
+Never hand-edit these. `generate:api:client` empties `webapp/src/api/` first;
 Maven-generated sources live under `target/` and are never committed. Commit `server/openapi.yaml`
 and `webapp/src/api/**` with the API change that produced them.
 
 ## Database changes
 
 Procedure: `docs/contributor/database-migration.mdx`. Entity conventions the drift gate reads:
-`server/AGENTS.md` § Schema changes. `pnpm run db:draft-changelog` writes the drift into this
+`server/AGENTS.md` § Schema changes. `vp run db:draft-changelog` writes the drift into this
 branch's single changelog and wires it into `master.xml`; a branch never hand-writes one or adds a
 second. A file under `db/changelog/` that reached `main` is never edited, renamed or deleted, and
 `master.xml` is append-only.
@@ -273,12 +280,12 @@ second. A file under `db/changelog/` that reached `main` is never edited, rename
 
 Each of these reports success and leaves a stale or wrong result.
 
-- **`generate:api:application-server:specs` honours `HEPHAESTUS_APPLICATION_JAR`.** With it set, the
+- **`generate:api:specs` honours `HEPHAESTUS_APPLICATION_JAR`.** With it set, the
   spec is scraped from that JAR, not from your checkout. Unset it after a CI-style run. Without it
   the script packages the reactor with tests skipped and boots the JAR under the `specs` profile on
   a free port.
 - **`surefire:test` as a bare goal runs whatever `target/test-classes` holds.** After editing a
-  test, run a lifecycle phase (`test-compile`) first, or use the `pnpm run test:server:*` scripts,
+  test, run a lifecycle phase (`test-compile`) first, or use the `vp run test:server:*` tasks,
   which do.
 - **One Maven process per checkout**, and `server/.env` leaks into test JVMs — `server/AGENTS.md`
   § Build traps.

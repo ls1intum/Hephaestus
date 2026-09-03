@@ -75,8 +75,9 @@ do, its home is the Admin Guide (`docs/admin/`) and the runbook links to it.
 | [0034](0034-signed-release-image-lock.md) | Production consumes one signed release image lock | Accepted |
 | [0035](0035-pull-request-previews-are-label-gated.md) | Pull request previews are label-gated and driven from the default branch | Accepted |
 | [0036](0036-agent-runtime-runs-on-node-24.md) | Agent runtime runs on Node.js 24 with bounded resources | Accepted |
-| [0037](0037-node-24-and-pnpm-12-are-the-javascript-toolchain.md) | Node.js 24 and pnpm 12 are the JavaScript toolchain | Accepted |
+| [0037](0037-node-24-and-pnpm-12-are-the-javascript-toolchain.md) | Node.js 24 and pnpm 12 are the JavaScript toolchain | Accepted (amended 2026-09-03 — [0040](0040-vite-plus-is-the-command-surface.md) makes Vite+ the command surface) |
 | [0038](0038-postgresql-18-release-baseline.md) | PostgreSQL 18 is the qualified release baseline | Accepted (amended 2026-08-31 #1673 — the Compose volume keeps its stable `postgresql-data` name) |
 | [0039](0039-git-and-postgresql-own-evidence.md) | Git owns repository evidence; PostgreSQL owns captured payloads and references | Accepted |
+| [0040](0040-vite-plus-is-the-command-surface.md) | Vite+ is the command surface; pnpm stays the package manager | Accepted |
 
 Template: [0000-template.md](0000-template.md).

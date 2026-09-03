@@ -7,7 +7,7 @@ disable-model-invocation: true
 allowed-tools:
   - Bash(gh *)
   - Bash(git *)
-  - Bash(pnpm *)
+  - Bash(vp *)
   - Bash(./mvnw *)
   - Read
   - Grep
@@ -63,25 +63,25 @@ Each leg's annotation names its own command; this table is only what the annotat
 
 | Failure | What it actually means |
 |---|---|
-| `routeTree.gen.ts is stale` | A Vite build writes it. `pnpm run build:webapp`, then commit the file. |
-| `Brand assets are stale` | `Webapp: Stories` runs `export:assets` after `test:storybook`, so the job goes red after a clean pass line. Run `pnpm --filter webapp run export:assets` and commit `webapp/brand`, `webapp/public`, `docs/images/readme`, `docs/static/img` and `docker/compose.proxy.yaml`. |
-| `App Server: Generated artifacts` | OpenAPI out of sync → `pnpm run generate:api`; schema drift → `pnpm run db:draft-changelog`; ERD outdated → `pnpm run db:generate-erd-docs`. |
+| `routeTree.gen.ts is stale` | A Vite build writes it. `vp run build:webapp`, then commit the file. |
+| `Brand assets are stale` | `Webapp: Stories` runs `export:assets` after `test:storybook`, so the job goes red after a clean pass line. Run `vp run --filter webapp export:assets` and commit `webapp/brand`, `webapp/public`, `docs/images/readme`, `docs/static/img` and `docker/compose.proxy.yaml`. |
+| `App Server: Generated artifacts` | OpenAPI out of sync → `vp run generate:api`; schema drift → `vp run db:draft-changelog`; ERD outdated → `vp run db:generate-erd-docs`. |
 | `Changelog immutability guard` (Security → `Dependencies, secrets, and policy`) | A changelog that reached `main` was edited, renamed or deleted, or a `master.xml` `<include>` was not appended at the end. Fix forward with a new changeset; never edit the released file. |
 | `Verify changesets` | The PR touches shipped code with no `.changeset/*.md`. `/land-pr` step 7 has the rules. |
-| `Tooling and Docs` red on a docs-only PR | Expected: `docs/**` is in the tooling path filter, where `docs:lint` and `check:diagrams` run. |
+| `Tooling and Docs` red on a docs-only PR | Expected: `docs/**` is in the tooling path filter, where `docs:lint` and `gate:diagrams` run. |
 
 ## 4. Reproduce locally before pushing
 
 ```bash
-pnpm run format
-pnpm run check
+vp run format
+vp run check
 ```
 
-`check` runs the `quality` task list in `vite.config.ts`. CI additionally runs tests, builds, images
+`check` runs the `quality` group in `vite.config.ts`. CI additionally runs tests, builds, images
 and the Docker-backed artifact gates; green `check` with red CI means one of those.
 
-Server tiers: `pnpm run test:server:unit`, `pnpm run test:server:architecture`,
-`pnpm run test:server:integration`; `server/AGENTS.md` § Build traps and § Test tiers have the rest.
+Server tiers: `vp run test:server:unit`, `vp run test:server:architecture`,
+`vp run test:server:integration`; `server/AGENTS.md` § Build traps and § Test tiers have the rest.
 
 ## 5. Commit and push once
 

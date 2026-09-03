@@ -1,6 +1,6 @@
-# Local development stack. From the repo root: `pnpm run dev` runs `docker compose up -d --wait`
+# Local development stack. From the repo root: `vp run dev` runs `docker compose up -d --wait`
 # then starts the server + webapp. Postgres is a bind mount (./postgres-data), so
-# `docker compose down -v` won't clear it — use `pnpm run dev:reset` to reset the DB.
+# `docker compose down -v` won't clear it — use `vp run dev:reset` to reset the DB.
 #
 # Authentication is Hephaestus-native (no Keycloak — ADR 0017). For local login, register a
 # GitHub OAuth app (callback http://localhost:8080/login/oauth2/code/github) and set

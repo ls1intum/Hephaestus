@@ -47,7 +47,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: ./.github/actions/setup-node-pnpm
+      - uses: ./.github/actions/setup-toolchain
         with:
           install: "none"
 
@@ -105,7 +105,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: ./.github/actions/setup-node-pnpm
+      - uses: ./.github/actions/setup-toolchain
         with:
           install: "none"
 
@@ -324,7 +324,7 @@ jobs:
           ref: ${{ needs.release.outputs.sha }}
           persist-credentials: false
 
-      - uses: ./.github/actions/setup-node-pnpm
+      - uses: ./.github/actions/setup-toolchain
         with:
           install: "none"
 
@@ -420,7 +420,7 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
-      - uses: ./.github/actions/setup-node-pnpm
+      - uses: ./.github/actions/setup-toolchain
         with:
           install: "none"
 

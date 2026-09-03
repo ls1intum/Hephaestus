@@ -46,7 +46,7 @@ jobs:
 
       - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
 
-      - uses: ./.github/actions/setup-node-pnpm
+      - uses: ./.github/actions/setup-toolchain
         with:
           install: "none"
 
@@ -91,7 +91,7 @@ jobs:
           ref: ${{ steps.lock.outputs.commit }}
           persist-credentials: false
 
-      - uses: ./.github/actions/setup-node-pnpm
+      - uses: ./.github/actions/setup-toolchain
         with:
           install: "none"
 

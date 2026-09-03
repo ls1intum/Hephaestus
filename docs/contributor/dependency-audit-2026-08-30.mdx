@@ -29,3 +29,8 @@ maintained platform or ecosystem replacements.
 | `raw-loader` | Remove | Upstream is [archived](https://github.com/webpack-contrib/raw-loader) and recommends webpack 5 asset modules. The documentation now imports Mermaid text through the bundler-native `asset/source` module type. |
 | `tailwindcss-animate` | Replace | Replaced by maintained [`tw-animate-css`](https://github.com/Wombosvideo/tw-animate-css), which provides the same Tailwind 4 CSS-first utility contract. |
 | `usehooks-ts` | Retain as mature and stable | Directly supplies `useWindowSize` to the responsive mentor input; [upstream remains active](https://github.com/juliencrn/usehooks-ts). |
+
+## Update — 2026-09-03
+
+`husky` is no longer a dependency: ADR 0040 moved Git hooks to the Vite+ dispatcher, and the project
+hooks live in `.vite-hooks/`. The 2026-08-30 dispositions above stand as recorded.

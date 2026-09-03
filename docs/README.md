@@ -15,7 +15,7 @@ Those three directories are the whole site: each is one `@docusaurus/plugin-cont
 
 ## Diagrams
 
-Mermaid, validated by `pnpm run check:diagrams` — which fails a diagram with no `accTitle` and
+Mermaid, validated by `vp run gate:diagrams` — which fails a diagram with no `accTitle` and
 `accDescr`, because the picture is the only copy of that information for a sighted reader.
 
 Three shapes, so a reader recognises what they are looking at before reading it:
@@ -39,21 +39,19 @@ into them by absolute GitHub URL rather than a relative path.
 
 ```bash
 # From repo root (recommended)
-pnpm run docs:dev       # Start dev server at http://localhost:3000/
+vp run docs:dev       # Start dev server at http://localhost:3000/
 
-# Or from docs directory
-cd docs && pnpm run start
+# Or through the package script
+vp run --filter docs start
 ```
 
 ## Prerequisites
 
-- Node.js and pnpm as pinned by the root `package.json`
-
-Install dependencies from the repo root — the docs site is a workspace package, so a root
-`pnpm install` covers it:
+The toolchain the [local development guide](contributor/local-development.mdx#prerequisites)
+installs. The docs site is a workspace package, so a root `vp install` covers it:
 
 ```bash
-pnpm install
+vp install
 ```
 
 ## Available Scripts
@@ -61,19 +59,19 @@ pnpm install
 Run from repo root:
 
 ```bash
-pnpm run docs:dev     # Start development server
-pnpm run docs:build   # Build for production
-pnpm run docs:serve   # Preview production build
-pnpm run docs:lint    # TypeScript + Markdown linting
+vp run docs:dev     # Start development server
+vp run docs:build   # Build for production
+vp run docs:serve   # Preview production build
+vp run docs:lint    # TypeScript + Markdown linting
 ```
 
 ## Quality Gates
 
-CI runs these checks automatically:
+Two commands cover the docs tree:
 
-1. **TypeScript check** – `pnpm run typecheck`
-2. **Markdown lint** – `pnpm run lint:md`
-3. **Build with strict validation** – `pnpm run build`
+- `vp run docs:lint` — the TypeScript check and markdownlint, part of `vp run check`.
+- `vp run docs:build` — the build with strict validation, part of `vp run verify`; the deployment
+  workflow builds the same package script.
 
 The build fails on:
 

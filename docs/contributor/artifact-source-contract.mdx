@@ -98,7 +98,7 @@ deployment obligations. A source allowed in an internal mirror is not thereby al
 
 The machine-readable [catalog](https://github.com/ls1intum/Hephaestus/blob/main/server/application/src/main/resources/contracts/artifact-source/1.0.0/catalog.json),
 its adjacent JSON Schemas, and the checks in
-[`check:contracts`](https://github.com/ls1intum/Hephaestus/blob/main/scripts/validate-artifact-source-contracts.ts)
+[`gate:contracts`](https://github.com/ls1intum/Hephaestus/blob/main/scripts/validate-artifact-source-contracts.ts)
 jointly define conformance. Schema validation alone is insufficient because standard JSON Schema `uniqueItems`
 compares whole values rather than a selected identity property, so the script also rejects duplicate source
 kinds and holds each schema's pinned `catalogDigest` to the catalog's actual hash. The cross-resource rules
@@ -410,7 +410,7 @@ or expanded source use. Accuracy or product benefit alone does not authorize col
 
 The rules are enforced mechanically, in two places:
 
-- `check:contracts` validates every contract resource and the bundled practice catalog against their schemas,
+- `gate:contracts` validates every contract resource and the bundled practice catalog against their schemas,
   rejects duplicate source kinds, holds each schema's pinned catalog digest to the catalog's actual hash, and
   exercises the policy schema against deliberately broken fixtures — including a retired evidence profile and
   evidence needs written onto a policy instead of a binding — because a guard whose failure path never runs is

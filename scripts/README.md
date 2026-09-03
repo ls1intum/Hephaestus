@@ -3,7 +3,7 @@
 The Node.js version pinned in `package.json#devEngines.runtime` executes these TypeScript utilities
 using native type stripping.
 
-Most scripts require `pnpm install` at the repository root. Jean setup performs that installation.
+Most scripts require `vp install` at the repository root; Jean setup performs it.
 
 ## Available Scripts
 
@@ -15,11 +15,11 @@ Substantive developer orchestration under `scripts/` uses typed Node.js entry po
 
 | Command | Purpose |
 | --- | --- |
-| `pnpm run check:ports` | Validate configured local ports and report listeners. |
-| `pnpm run db:draft-changelog` | Rebuild a disposable database and generate a Liquibase diff. |
-| `pnpm run db:generate-erd-docs` | Apply migrations and regenerate the Mermaid ERD. |
-| `pnpm run e2e:setup -- <options>` | Configure a local E2E workspace against the selected SCM and model provider. Secrets are environment-only. |
-| `pnpm run jean:public-test -- <command>` | Manage the machine-local public test route. |
+| `vp run check:ports` | Validate configured local ports and report listeners. |
+| `vp run db:draft-changelog` | Rebuild a disposable database and generate a Liquibase diff. |
+| `vp run db:generate-erd-docs` | Apply migrations and regenerate the Mermaid ERD. |
+| `vp run e2e:setup <options>` | Configure a local E2E workspace against the selected SCM and model provider. Secrets are environment-only. |
+| `vp run jean:public-test <command>` | Manage the machine-local public test route. |
 
 The database commands require Docker with the Compose plugin.
 
@@ -47,7 +47,7 @@ Rewrite `server/application/src/main/resources/achievements/achievements.yml` in
 [Achievements](../docs/contributor/achievements.mdx).
 
 ```bash
-pnpm run format:achievements
+vp run format:achievements
 ```
 
 ### NATS Webhook Example Extraction
@@ -55,9 +55,9 @@ pnpm run format:achievements
 Extract webhook payloads from NATS JetStream for test fixtures:
 
 ```bash
-pnpm run nats:extract-examples
+vp run nats:extract-examples
 # With options:
-pnpm run nats:extract-examples -- --event push --event pull_request:opened
+vp run nats:extract-examples --event push --event pull_request:opened
 ```
 
 **Environment variables:**
@@ -81,7 +81,7 @@ pnpm run nats:extract-examples -- --event push --event pull_request:opened
 
 The retained shell files run where shell is already part of the runtime:
 
-- `.husky/_/husky.sh` is Husky's generated, minimal Git-hook bootstrap.
+- `.vite-hooks/commit-msg` and `.vite-hooks/pre-push` are the project-owned Git hooks the Vite+ dispatcher runs.
 - `docker/self-host/setup.sh` bootstraps an operator installation before the repository toolchain is available; its test
   orchestration is typed TypeScript under `scripts/`.
 - `webapp/docker/entrypoint.sh` prepares assets in the final nginx image, which does not contain Node.

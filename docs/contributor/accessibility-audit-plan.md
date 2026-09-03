@@ -61,7 +61,7 @@ Link every failure to an issue with its context, reproduction steps, expected an
 user impact, environment, applicable WCAG criterion and evidence. Use GitHub assignment, priority and
 milestones for ownership and scheduling. Check other callers when the failure is in a shared component.
 
-`pnpm --filter webapp run test:storybook` runs axe against the maintained Storybook states in Chromium.
+`vp run --filter webapp test:storybook` runs axe against the maintained Storybook states in Chromium.
 Retain its report, revision and browser version with the audit, and document any rule exclusions.
 
 An AA conformance claim requires every scoped page and complete process to pass every applicable Level

@@ -48,7 +48,7 @@ jobs:
           ref: ${{ inputs.candidate-source-sha || inputs.candidate-sha || github.sha }}
           persist-credentials: false
 
-      - uses: ./.github/actions/setup-node-pnpm
+      - uses: ./.github/actions/setup-toolchain
         with:
           install: "none"
 

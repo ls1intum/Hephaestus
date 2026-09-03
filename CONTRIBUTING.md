@@ -2,9 +2,7 @@
 
 Read the [local development guide](https://docs.hephaestus.build/contributor/local-development) on how to set up your environment.
 
-Repository tooling requires the Node.js version pinned in `package.json#devEngines.runtime`. pnpm
-installs dependencies and dispatches package scripts; TypeScript scripts and application tools execute
-on Node.js.
+Repository tooling runs through Vite+ (`vp`); the local development guide above has the install.
 
 ## Maintenance Status
 
@@ -32,8 +30,9 @@ Contributions that do not adhere to these guidelines will be rejected. We align 
 
 ## Contribution Process
 
-Use `pnpm run check:affected` for fast feedback. Before pushing, run `pnpm run check`; the hook runs it
-automatically. Run `pnpm run verify` before requesting review. Scope and exclusions are documented in the
+Run `vp install` after a pull that changes the lockfile; the [local verification guide](https://docs.hephaestus.build/contributor/local-verification) has what it does to your Git hooks. Use
+`vp run check:affected` for fast feedback. Before pushing, run `vp run check`; the hook runs it
+automatically. Run `vp run verify` before requesting review. Scope and exclusions are documented in the
 [local verification guide](https://docs.hephaestus.build/contributor/local-verification).
 
 1. **External contributors only**: Fork the Repository and create a branch.
