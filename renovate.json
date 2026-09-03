@@ -30,71 +30,28 @@
 			"enabled": false
 		},
 		{
-			"matchManagers": ["maven"],
-			"matchDepTypes": ["compile", "runtime", "provided", "optional", "parent", "parent-root"],
+			"matchManagers": ["github-actions"],
 			"matchUpdateTypes": ["minor", "patch", "digest", "pin", "pinDigest"],
-			"labels": ["dependencies", "java"]
-		},
-		{
-			"matchManagers": ["maven"],
-			"matchDepTypes": ["build", "test"],
-			"matchUpdateTypes": ["minor", "patch", "digest", "pin", "pinDigest"],
-			"labels": ["dependencies", "java"]
-		},
-		{
-			"matchFileNames": ["webapp/package.json"],
-			"matchDepTypes": ["dependencies"],
-			"matchUpdateTypes": ["minor", "patch"],
-			"labels": ["dependencies", "webapp"]
-		},
-		{
-			"matchFileNames": ["webapp/package.json"],
-			"matchDepTypes": ["devDependencies"],
-			"matchUpdateTypes": ["minor", "patch"],
-			"labels": ["dependencies", "webapp"]
-		},
-		{
-			"matchFileNames": ["docs/package.json"],
-			"matchDepTypes": ["dependencies"],
-			"matchUpdateTypes": ["minor", "patch"],
-			"labels": ["dependencies", "docs"]
-		},
-		{
-			"matchFileNames": ["docs/package.json"],
-			"matchDepTypes": ["devDependencies"],
-			"matchUpdateTypes": ["minor", "patch"],
-			"labels": ["dependencies", "docs"]
+			"groupName": "GitHub Actions"
 		},
 		{
 			"matchUpdateTypes": ["major"],
 			"minimumReleaseAge": "7 days",
-			"labels": ["dependencies", "breaking"],
-			"dependencyDashboardApproval": true
-		},
-		{
-			"matchPackageNames": [
-				"typescript",
-				"react",
-				"react-dom",
-				"/^@tanstack/",
-				"/^org\\.springframework/"
-			],
-			"matchUpdateTypes": ["minor"]
-		},
-		{
-			"matchManagers": ["github-actions"],
-			"matchUpdateTypes": ["minor", "patch", "digest", "pin", "pinDigest"],
-			"groupName": "GitHub Actions",
-			"labels": ["dependencies", "ci"]
-		},
-		{
-			"matchManagers": ["dockerfile", "docker-compose"],
-			"labels": ["dependencies", "infrastructure"]
-		},
-		{
-			"matchUpdateTypes": ["major"],
+			"addLabels": ["breaking"],
 			"groupName": null,
 			"dependencyDashboardApproval": true
+		},
+		{
+			"matchDepNames": ["node"],
+			"groupName": "Node.js toolchain"
+		},
+		{
+			"matchDepNames": ["pnpm", "ghcr.io/pnpm/pnpm"],
+			"groupName": "pnpm toolchain"
+		},
+		{
+			"matchDepNames": ["@earendil-works/pi-coding-agent"],
+			"groupName": "Pi SDK"
 		}
 	],
 	"customManagers": [
@@ -164,6 +121,37 @@
 			"depNameTemplate": "OpenAPITools/openapi-generator",
 			"extractVersionTemplate": "^v(?<version>.*)$",
 			"versioningTemplate": "semver"
+		},
+		{
+			"description": "Track the Node.js pin in devEngines",
+			"customType": "regex",
+			"managerFilePatterns": ["/^package\\.json$/"],
+			"matchStrings": [
+				"\"runtime\":\\s*\\{\\s*\"name\":\\s*\"node\",\\s*\"version\":\\s*\"(?<currentValue>[^\"]+)\""
+			],
+			"depNameTemplate": "node",
+			"datasourceTemplate": "node-version",
+			"versioningTemplate": "node"
+		},
+		{
+			"description": "Track the pnpm pin in devEngines",
+			"customType": "regex",
+			"managerFilePatterns": ["/^package\\.json$/"],
+			"matchStrings": [
+				"\"packageManager\":\\s*\\{\\s*\"name\":\\s*\"pnpm\",\\s*\"version\":\\s*\"(?<currentValue>[^\"]+)\""
+			],
+			"depNameTemplate": "pnpm",
+			"datasourceTemplate": "npm",
+			"versioningTemplate": "npm"
+		},
+		{
+			"description": "Track the Pi SDK pin in the live agent tests",
+			"customType": "regex",
+			"managerFilePatterns": ["/^server/application/src/test/java/.*\\.java$/"],
+			"matchStrings": ["private static final String PI_SDK_VERSION = \"(?<currentValue>[^\"]+)\";"],
+			"depNameTemplate": "@earendil-works/pi-coding-agent",
+			"datasourceTemplate": "npm",
+			"versioningTemplate": "npm"
 		},
 		{
 			"description": "Track release image tags and digests",

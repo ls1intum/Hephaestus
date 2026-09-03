@@ -3,31 +3,26 @@ import { existsSync, readFileSync } from "node:fs";
 import { isDeepStrictEqual } from "node:util";
 
 import packageArgument from "npm-package-arg";
+import { parse } from "yaml";
 
+import { asRecord, asString, isRecord, parseJson } from "./lib/json.ts";
 import { CAPTURE_LIMIT_BYTES } from "./lib/process.ts";
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null;
-}
-
-const manifest: unknown = JSON.parse(readFileSync("package.json", "utf8"));
-if (!isRecord(manifest)) throw new Error("package.json must be an object");
+const manifest = asRecord(parseJson(readFileSync("package.json", "utf8")), "package.json");
 const { devEngines, engines, packageManager } = manifest;
 const match =
 	typeof packageManager === "string" ? /^pnpm@(\d+\.\d+\.\d+)$/.exec(packageManager) : null;
 if (!match) throw new Error("package.json#packageManager must pin an exact pnpm version");
-const version = match[1];
-if (!isRecord(engines) || engines.node !== ">=24.19.0 <25")
-	throw new Error("package.json#engines.node must require the supported Node 24 line");
+const version = asString(match[1], "package.json#packageManager");
 const runtime = isRecord(devEngines) ? devEngines.runtime : undefined;
 const manager = isRecord(devEngines) ? devEngines.packageManager : undefined;
-if (
-	!isRecord(runtime) ||
-	runtime.name !== "node" ||
-	runtime.version !== "24.19.0" ||
-	runtime.onFail !== "error"
-)
-	throw new Error("package.json#devEngines.runtime must pin Node 24.19.0");
+if (!isRecord(runtime) || runtime.name !== "node" || runtime.onFail !== "error")
+	throw new Error("package.json#devEngines.runtime must pin Node and fail on drift");
+const runtimeVersion = asString(runtime.version, "package.json#devEngines.runtime.version");
+if (!/^\d+\.\d+\.\d+$/.test(runtimeVersion))
+	throw new Error("package.json#devEngines.runtime must pin an exact Node version");
+if (!isRecord(engines) || engines.node !== runtimeVersion)
+	throw new Error(`package.json#engines.node must pin Node ${runtimeVersion}`);
 if (
 	!isRecord(manager) ||
 	manager.name !== "pnpm" ||
@@ -39,7 +34,12 @@ const runningVersion = execFileSync("pnpm", ["--version"], { encoding: "utf8" })
 if (runningVersion !== version)
 	throw new Error(`Expected pnpm ${version}, found ${runningVersion}`);
 
-for (const file of ["package.json", "docs/package.json", "webapp/package.json"]) {
+for (const file of [
+	"package.json",
+	"docs/package.json",
+	"webapp/package.json",
+	"docker/agents/pi/package.json",
+]) {
 	const workspaceManifest: unknown = JSON.parse(readFileSync(file, "utf8"));
 	if (!isRecord(workspaceManifest)) throw new Error(`${file} must be an object`);
 	const scripts = workspaceManifest.scripts;
@@ -91,7 +91,22 @@ expectConfig("publicHoistPattern", [
 	"@types/react-dom",
 	"@types/hast",
 ]);
-expectConfig("minimumReleaseAge", 4320);
+const releaseAge = 4320;
+expectConfig("minimumReleaseAge", releaseAge);
+// The agent image is its own pnpm project: nothing the root pins reaches it unless it is restated.
+const imageWorkspace = asRecord(
+	parse(readFileSync("docker/agents/pi/pnpm-workspace.yaml", "utf8")),
+	"docker/agents/pi/pnpm-workspace.yaml",
+);
+if (imageWorkspace.minimumReleaseAge !== releaseAge)
+	throw new Error(`docker/agents/pi/pnpm-workspace.yaml must set minimumReleaseAge ${releaseAge}`);
+const imageManifest = asRecord(
+	parseJson(readFileSync("docker/agents/pi/package.json", "utf8")),
+	"docker/agents/pi/package.json",
+);
+const imageEngines = imageManifest.engines;
+if (!isRecord(imageEngines) || imageEngines.pnpm !== version)
+	throw new Error(`docker/agents/pi/package.json must pin pnpm ${version} through engines`);
 expectConfig("allowBuilds", {
 	"@nestjs/core": false,
 	protobufjs: false,
@@ -136,18 +151,44 @@ if (/^\s*(?:version|runtime):/m.test(setup)) {
 }
 
 const dockerfile = readFileSync("webapp/Dockerfile", "utf8");
-if (!dockerfile.includes(`ghcr.io/pnpm/pnpm:${version}@sha256:`)) {
-	throw new Error(`webapp/Dockerfile must use the digest-pinned pnpm ${version} image`);
+const agentDockerfile = readFileSync("docker/agents/pi/Dockerfile", "utf8");
+// One tag over two digests is two different pnpm builds wearing a single version number.
+const pnpmImage = new RegExp(
+	`ghcr\\.io/pnpm/pnpm:${version.replaceAll(".", "\\.")}@(sha256:[a-f0-9]{64})`,
+);
+const pnpmDigests = new Set(
+	(
+		[
+			["webapp/Dockerfile", dockerfile],
+			["docker/agents/pi/Dockerfile", agentDockerfile],
+		] as const
+	).map(([file, content]) => {
+		const digest = pnpmImage.exec(content)?.[1];
+		if (!digest) throw new Error(`${file} must use the digest-pinned pnpm ${version} image`);
+		return digest;
+	}),
+);
+if (pnpmDigests.size !== 1) throw new Error("both Dockerfiles must pin one pnpm base digest");
+// Those settings only bind if the image copies them and lets pnpm read them.
+if (
+	!/^COPY pi\/package\.json pi\/pnpm-lock\.yaml pi\/pnpm-workspace\.yaml \.\/$/m.test(
+		agentDockerfile,
+	) ||
+	!/^RUN pnpm install --prod --frozen-lockfile --ignore-scripts$/m.test(agentDockerfile)
+) {
+	throw new Error(
+		"docker/agents/pi/Dockerfile must install from its own workspace settings, without lifecycle scripts",
+	);
 }
 if (
-	!new RegExp(`^ARG NODE_VERSION=${runtime.version.replaceAll(".", "\\.")}$`, "m").test(
+	!new RegExp(`^ARG NODE_VERSION=${runtimeVersion.replaceAll(".", "\\.")}$`, "m").test(
 		dockerfile,
 	) ||
 	!new RegExp(["^RUN pnpm runtime set node \\$", "\\{NODE_VERSION\\} -g$"].join(""), "m").test(
 		dockerfile,
 	)
 ) {
-	throw new Error(`webapp/Dockerfile must install Node ${runtime.version} through pnpm`);
+	throw new Error(`webapp/Dockerfile must install Node ${runtimeVersion} through pnpm`);
 }
 
 // Construct the token so this source file also satisfies the repository-wide ban.
@@ -181,5 +222,5 @@ for (const file of tracked) {
 	}
 }
 console.log(
-	`pnpm ${version}, Node ${runtime.version}, and the no-legacy-runtime policy are consistent`,
+	`pnpm ${version}, Node ${runtimeVersion}, and the no-legacy-runtime policy are consistent`,
 );

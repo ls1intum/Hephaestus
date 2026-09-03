@@ -103,7 +103,10 @@ Renovate opens pull requests before 07:00 Europe/Berlin on weekdays after a thre
 majors wait seven days and a Dependency Dashboard approval, and vulnerability alerts skip both.
 Lockfile maintenance runs on Mondays. Enabled managers: npm, Maven, the Maven wrapper, Dockerfiles,
 Compose files, GitHub Actions, and the regex managers in `renovate.json`, which
-`scripts/renovate-config.test.ts` covers.
+`scripts/renovate-config.test.ts` covers. The Node, pnpm and Pi SDK pins are grouped, so a version
+stated in several managed files moves in one pull request; the toolchain checks reject a version that
+reads differently in any of them. Renovate provisions the Node it runs lockfile updates with from
+`engines`, so `engines.node` restates `devEngines.runtime` exactly rather than the supported line.
 
 [Vulnerability remediation](./vulnerability-remediation.mdx) owns the blocking and exception policy.
 [Release management](./release-management.mdx#supply-chain-evidence) owns artifact signing, provenance,
