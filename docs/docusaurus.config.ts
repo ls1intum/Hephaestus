@@ -250,7 +250,7 @@ const config: Config = {
 						},
 						{
 							label: "Feature Requests",
-							href: "https://github.com/ls1intum/Hephaestus/discussions/categories/ideas",
+							href: "https://github.com/hephaestus-build/Hephaestus/discussions/categories/ideas",
 						},
 						{
 							label: "Bug Tracker",
