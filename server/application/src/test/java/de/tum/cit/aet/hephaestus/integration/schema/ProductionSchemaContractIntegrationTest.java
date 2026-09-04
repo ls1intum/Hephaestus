@@ -115,7 +115,7 @@ class ProductionSchemaContractIntegrationTest {
 
     @Test
     void observationForeignKeysPreserveTenantAndProvenance() {
-        List<String> foreignKeys = jdbcTemplate.queryForList("""
+        List<@Nullable String> foreignKeys = jdbcTemplate.queryForList("""
             SELECT DISTINCT rc.constraint_name || ':' || parent.table_name || ':' || rc.delete_rule
             FROM information_schema.referential_constraints rc
             JOIN information_schema.key_column_usage child
