@@ -1347,12 +1347,12 @@ void test("the task graph keeps its cache posture", async () => {
 	for (const [name, task] of Object.entries(tasks)) {
 		if (!isRecord(task)) continue;
 		const commands = commandsOf(task);
-		// A cached task owns its command: `vp run <task>` resolves to that node and never caches, and
-		// `vp exec` runs a bundled binary the runner does not fingerprint.
+		// The runner never caches a command that delegates (scripts/check-runner-contract.ts).
+		// vite.config.ts rejects the literal form, so only a command widened to string reaches here.
 		if (task.cache !== false)
 			for (const command of commands) {
-				assert.doesNotMatch(command, /^vp run /, `${name} must own its command to cache`);
-				assert.doesNotMatch(command, /^vp exec /, `${name} cannot cache through vp exec`);
+				assert.doesNotMatch(command, /\bvp run\b/, `${name} must own its command to cache`);
+				assert.doesNotMatch(command, /\bvp exec\b/, `${name} cannot cache through vp exec`);
 			}
 		// Shell parameter expansion is outside the runner contract (scripts/check-runner-contract.ts).
 		for (const command of commands)

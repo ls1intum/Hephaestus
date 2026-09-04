@@ -25,19 +25,26 @@ const run = (
 	command: string | string[],
 	{ cwd, dependsOn = [] }: { cwd?: string; dependsOn?: string[] } = {},
 ) => ({ command, cwd, dependsOn, cache: false as const });
+type CacheableCommand<Command extends string> =
+	Command extends `${string}vp ${"run" | "exec"}${string}` ? never : Command;
 // pnpm rewrites node_modules/.modules.yaml on every install; no verdict reads it.
-const cached = (command: string) => ({
+const cached = <Command extends string>(command: CacheableCommand<Command>) => ({
 	command,
 	input: [{ auto: true }, "!node_modules/.modules.yaml"],
 });
 // For a verdict the tracker cannot see through a subprocess: the inputs are named. A cached task
 // runs with a filtered environment, so anything the command reads from it is named in `env` and
 // becomes part of the fingerprint.
-const cachedOn = (
-	command: string,
+const cachedOn = <Command extends string>(
+	command: CacheableCommand<Command>,
 	input: string[],
 	{ env = [], dependsOn = [] }: { env?: string[]; dependsOn?: string[] } = {},
 ) => ({ command, input, output: [], env, dependsOn });
+// A rejection nothing exercises stops rejecting: these two calls must not compile.
+// @ts-expect-error `vp run <task>` resolves to another node, which the runner never caches
+void cached("vp run check");
+// @ts-expect-error `vp exec` runs a bundled binary the runner does not fingerprint, wherever it sits
+void cachedOn("node scripts/x.ts && vp exec oxlint .", ["package.json"]);
 // No command of its own: runs its dependencies in parallel and fails when any of them fails.
 const group = (dependsOn: readonly string[]) => ({
 	command: [],
@@ -276,7 +283,6 @@ export default defineConfig({
 			// Agent runtime, precompute, repository scripts and tooling config
 			"gate:agents-format": cached(`vp fmt --check ${agentSources}`),
 			"gate:config-format": cached(`vp fmt --check ${configFiles}`),
-			// A command that starts with `vp exec` is never cached — scripts/check-runner-contract.ts.
 			"gate:agents-lint": run(`vp exec oxlint ${oxlintFormat}${oxlintTargets}`),
 			"gate:agents-typecheck": cached("tsc -p tsconfig.agents.json --noEmit"),
 			"gate:scripts-typecheck": cached("tsc -p scripts/tsconfig.json --noEmit"),
