@@ -60,7 +60,7 @@ services:
       - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
       - "traefik.http.routers.http-webapp.entryPoints=http"
       - "traefik.http.routers.http-webapp.middlewares=redirect-to-https"
-      - "traefik.http.routers.http-webapp.rule=Host(`${APP_HOSTNAME}`) && PathPrefix(`/`)"
+      - "traefik.http.routers.http-webapp.rule=(${APP_HOST_MATCH:-Host(`${APP_HOSTNAME}`)}) && PathPrefix(`/`)"
       - "traefik.http.routers.http-webapp.service=http-webapp"
       - "traefik.http.routers.https-webapp.entryPoints=https"
       # Keep buffering off the /api router because it would hold SSE responses until they close.
@@ -68,7 +68,7 @@ services:
       - traefik.http.middlewares.webapp-body-limit.buffering.maxRequestBodyBytes=26214400
       - traefik.http.middlewares.webapp-body-limit.buffering.memRequestBodyBytes=1048576
       - "traefik.http.routers.https-webapp.middlewares=webapp-body-limit"
-      - "traefik.http.routers.https-webapp.rule=Host(`${APP_HOSTNAME}`) && PathPrefix(`/`)"
+      - "traefik.http.routers.https-webapp.rule=(${APP_HOST_MATCH:-Host(`${APP_HOSTNAME}`)}) && PathPrefix(`/`)"
       - "traefik.http.routers.https-webapp.service=https-webapp"
       - "traefik.http.routers.https-webapp.tls.certresolver=letsencrypt"
       - "traefik.http.routers.https-webapp.tls=true"
@@ -291,11 +291,11 @@ services:
       - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
       - "traefik.http.routers.http-application-server.entryPoints=http"
       - "traefik.http.routers.http-application-server.middlewares=redirect-to-https"
-      - "traefik.http.routers.http-application-server.rule=Host(`${APP_HOSTNAME}`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.http-application-server.rule=(${APP_HOST_MATCH:-Host(`${APP_HOSTNAME}`)}) && PathPrefix(`/api`)"
       - "traefik.http.routers.http-application-server.service=http-application-server"
       - "traefik.http.routers.https-application-server.entryPoints=https"
       - "traefik.http.routers.https-application-server.middlewares=edge-api-rate-limit,https-application-server-stripprefix"
-      - "traefik.http.routers.https-application-server.rule=Host(`${APP_HOSTNAME}`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.https-application-server.rule=(${APP_HOST_MATCH:-Host(`${APP_HOSTNAME}`)}) && PathPrefix(`/api`)"
       - "traefik.http.routers.https-application-server.tls.certresolver=letsencrypt"
       - "traefik.http.routers.https-application-server.tls=true"
       - "traefik.http.routers.https-application-server.service=https-application-server"
