@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { devNull, tmpdir } from "node:os";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 
@@ -14,7 +14,6 @@ const cleanGitEnv = (): NodeJS.ProcessEnv => ({
 			.filter((key) => key.startsWith("GIT_"))
 			.map((key) => [key, undefined]),
 	),
-	GIT_CONFIG_GLOBAL: devNull,
 	GIT_CONFIG_NOSYSTEM: "1",
 });
 
@@ -22,7 +21,10 @@ type Git = (...args: string[]) => string;
 
 function repoWithCommittedFiles() {
 	const repo = mkdtempSync(join(tmpdir(), "commit-via-api-"));
-	const env = { ...process.env, ...cleanGitEnv() };
+	mkdirSync(join(repo, ".git"));
+	const globalConfig = join(repo, ".git", "test-global-config");
+	writeFileSync(globalConfig, "");
+	const env = { ...process.env, ...cleanGitEnv(), GIT_CONFIG_GLOBAL: globalConfig };
 	const git: Git = (...args) =>
 		execFileSync("git", args, {
 			cwd: repo,
@@ -32,7 +34,7 @@ function repoWithCommittedFiles() {
 		});
 	git("init", "--quiet", "--initial-branch=main");
 	git("config", "commit.gpgsign", "false");
-	git("config", "core.hooksPath", devNull);
+	git("config", "core.hooksPath", join(repo, ".git", "disabled-hooks"));
 	git("config", "user.email", "test@example.invalid");
 	git("config", "user.name", "Test");
 	for (const path of ["kept.txt", "edited.txt", "removed.txt", "moved.txt"])
