@@ -7,6 +7,7 @@ import { test } from "node:test";
 import {
 	commitLockEnvironment,
 	decide,
+	isTarget,
 	lockedReleaseCommit,
 	parseChannel,
 	parseStacks,
@@ -229,4 +230,35 @@ await test("an environment following the branch reports the commit it runs", () 
 		rendered.indexOf("HEPHAESTUS_IMAGE_ALPINE") < rendered.indexOf("HEPHAESTUS_IMAGE_WEBAPP"),
 	);
 	assert.ok(rendered.endsWith("\n"));
+});
+
+await test("a build that finishes late cannot put staging back on an older commit", () => {
+	// Two builds of main can finish out of order. The later-finishing older build writes the newer
+	// channel commit, so channel ancestry accepts it — what refuses it is comparing the commit being
+	// asked for against the commit already running.
+	const older = { ...applied, release: "b".repeat(40) };
+	const decision = decide({ release: "a".repeat(40), images }, older, "e".repeat(40), true, true);
+	assert.equal(decision.action, "refuse");
+	assert.match(JSON.stringify(decision), /behind the running/);
+});
+
+await test("moving deliberately backwards is still possible", () => {
+	assert.deepEqual(
+		decide(
+			{ release: "a".repeat(40), images, allowRollback: true },
+			{ ...applied, release: "b".repeat(40) },
+			"e".repeat(40),
+			true,
+			true,
+		),
+		{ action: "apply", release: "a".repeat(40) },
+	);
+});
+
+await test("a host remembers a commit it applied, not only a release", () => {
+	// The state file is read on the next tick; rejecting what was just written would strand the host.
+	assert.ok(isTarget("v1.2.3"));
+	assert.ok(isTarget("c".repeat(40)));
+	assert.ok(!isTarget("main"));
+	assert.ok(!isTarget("v1.2"));
 });

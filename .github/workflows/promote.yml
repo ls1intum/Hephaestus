@@ -63,6 +63,9 @@ jobs:
       # deploy-state carries channels, not code, so the image resolver comes from the default branch.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          # The commit being promoted, so the upstream pins and the resolver are the ones that
+          # commit carries. An empty ref is the default branch, which is what a release wants.
+          ref: ${{ inputs.commit }}
           path: .promotion-scripts
           sparse-checkout: |
             scripts

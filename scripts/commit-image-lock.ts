@@ -132,6 +132,11 @@ async function resolveAndVerify(repository: string, commit: string): Promise<str
 			// The runner is part of what the signature attests to, and no self-hosted runner is in
 			// this repository's build path.
 			"--deny-self-hosted-runners",
+			// Without this the check proves only that this workflow attested this digest at some
+			// point, so an older image retagged onto the commit would pass. This binds the
+			// attestation to the source revision being deployed.
+			"--source-digest",
+			commit,
 			"--predicate-type",
 			"https://slsa.dev/provenance/v1",
 		],

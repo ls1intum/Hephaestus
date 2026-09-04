@@ -49,6 +49,11 @@ const COMMIT_SHA = /^[0-9a-f]{40}$/;
 const IMAGE_KEY = /^HEPHAESTUS_IMAGE_[A-Z0-9_]+$/;
 const IMAGE_DIGEST = /^[^\s@]+@sha256:[0-9a-f]{64}$/;
 
+/** What a channel may ask a host to run: a published release, or a commit of the default branch. */
+export function isTarget(value: string): boolean {
+	return RELEASE_TAG.test(value) || COMMIT_SHA.test(value);
+}
+
 function optionalBoolean(value: unknown, label: string): boolean {
 	if (value === undefined) return false;
 	if (typeof value !== "boolean") throw new TypeError(`${label} must be a boolean`);
@@ -121,6 +126,8 @@ export function decide(
 	applied: AppliedState | undefined,
 	channelCommit: string,
 	advances: boolean,
+	/** Whether what the channel asks for is behind what is already running. */
+	targetPrecedesApplied = false,
 ): Decision {
 	if (applied && channelCommit !== applied.channelCommit && !advances)
 		return {
@@ -132,9 +139,16 @@ export function decide(
 	// how a host that was hand-patched during an incident converges again.
 	if (applied?.release === channel.release && applied.channelCommit === channelCommit)
 		return { action: "noop", reason: `already running ${channel.release}` };
-	// Releases are ordered, so moving to an earlier one is refused on the version alone. Commits are
-	// not ordered, and their protection is the channel ancestry checked above: a channel commit that
-	// does not descend from the last accepted one is already refused, whichever form it names.
+	// Two builds of the default branch can finish out of order, and the later-finishing older build
+	// writes the newer channel commit — so channel ancestry says nothing about which build a channel
+	// carries. What runs has to be compared with what is asked for, and for commits only the host's
+	// clone can answer that, so the caller resolves it and passes the answer in.
+	if (applied && targetPrecedesApplied && !channel.allowRollback)
+		return {
+			action: "refuse",
+			reason: `${channel.release} is behind the running ${applied.release}; set allowRollback to move back deliberately`,
+		};
+	// Releases are also ordered by version, which catches a rewind without consulting a clone.
 	const ordered = RELEASE_TAG.test(channel.release) && RELEASE_TAG.test(applied?.release ?? "");
 	if (
 		applied &&
@@ -273,7 +287,8 @@ export async function readApplied(file: string): Promise<AppliedState | undefine
 			channelCommit: asString(record.channelCommit, "applied.channelCommit"),
 			appliedAt: asString(record.appliedAt, "applied.appliedAt"),
 		};
-		if (!RELEASE_TAG.test(applied.release)) throw new Error("applied.release must be vX.Y.Z");
+		if (!isTarget(applied.release))
+			throw new Error("applied.release must be a vX.Y.Z tag or a commit");
 		if (!/^[a-f0-9]{40}$/.test(applied.channelCommit))
 			throw new Error("applied.channelCommit must be a Git commit");
 		if (
@@ -355,7 +370,31 @@ async function main(): Promise<void> {
 					},
 				)
 			: true;
-	const decision = decide(channel, applied, channelCommit, advances);
+	// Whether the target is behind what runs. Both are commits of the default branch here, so the
+	// clone answers it directly; between releases the version comparison in decide covers it, and a
+	// change of form is a deliberate move only a version or an operator can order.
+	//
+	// The branch is fetched first: without the objects, `merge-base` fails and a failure would read
+	// as "not behind", which is the wrong way for this check to be wrong.
+	let targetPrecedesApplied = false;
+	if (applied && !RELEASE_TAG.test(channel.release) && !RELEASE_TAG.test(applied.release)) {
+		await run("git", ["fetch", "--quiet", "origin", "+refs/heads/main:refs/remotes/origin/main"], {
+			cwd: config.checkout,
+		});
+		for (const commit of [channel.release, applied.release])
+			if (
+				!(await succeeds("git", ["cat-file", "-e", `${commit}^{commit}`], { cwd: config.checkout }))
+			)
+				throw new Error(
+					`cannot order ${channel.release} against ${applied.release}: ${commit} is unknown here`,
+				);
+		targetPrecedesApplied =
+			channel.release !== applied.release &&
+			(await succeeds("git", ["merge-base", "--is-ancestor", channel.release, applied.release], {
+				cwd: config.checkout,
+			}));
+	}
+	const decision = decide(channel, applied, channelCommit, advances, targetPrecedesApplied);
 
 	if (decision.action === "refuse") throw new Error(decision.reason);
 	if (decision.action === "noop") {
@@ -383,9 +422,15 @@ async function main(): Promise<void> {
 	}
 
 	const releaseTree = join(config.stateDirectory, "releases", decision.release);
-	await run("git", ["fetch", "--quiet", "origin", "tag", decision.release, "--no-tags"], {
-		cwd: config.checkout,
-	});
+	// A release arrives as a tag; a commit is only reachable through the branch it is on, because a
+	// server does not serve an arbitrary object by name unless it is configured to.
+	await run(
+		"git",
+		RELEASE_TAG.test(decision.release)
+			? ["fetch", "--quiet", "origin", "tag", decision.release, "--no-tags"]
+			: ["fetch", "--quiet", "origin", "+refs/heads/main:refs/remotes/origin/main"],
+		{ cwd: config.checkout },
+	);
 	const releaseCommit = (
 		await output("git", ["rev-parse", `${decision.release}^{commit}`], { cwd: config.checkout })
 	).trim();

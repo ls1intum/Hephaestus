@@ -34,6 +34,7 @@ jobs:
     timeout-minutes: 30
     permissions:
       actions: write # dispatch the promotion workflow
+      contents: read # read the channel to honour a freeze
     steps:
       - name: Follow this commit on staging
         env:
@@ -41,6 +42,15 @@ jobs:
           COMMIT: ${{ github.event.workflow_run.head_sha }}
         run: |
           set -euo pipefail
+          # A hold has to survive the next green build, or it is advice rather than a hold. The
+          # channel is the record of it, so it is what gets asked.
+          frozen=$(gh api "repos/$GITHUB_REPOSITORY/contents/channels/staging.json?ref=deploy-state" \
+            --jq '.content' 2>/dev/null | base64 -d 2>/dev/null | jq -r '.freeze // false' || echo false)
+          if [ "$frozen" = true ]; then
+            echo "::notice::staging is frozen; leaving it where it is"
+            exit 0
+          fi
+
           since=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           gh workflow run promote.yml --repo "$GITHUB_REPOSITORY" \
             -f environment=Staging -f commit="$COMMIT"

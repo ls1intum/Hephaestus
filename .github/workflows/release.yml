@@ -515,14 +515,39 @@ jobs:
             done
           done < "$RUNNER_TEMP/promotions.tsv"
 
-  # Staging is not promoted here. It follows the default branch, so by the time a release exists it
-  # has been running this very commit since it merged — and a release re-tags those images rather
-  # than rebuilding them, so the digests production is offered are the digests staging has been
-  # running. Asking for a second promotion would only move staging from the commit onto the tag for
-  # the same bytes, and leave the environment flipping between two forms of the same thing.
+  # Staging is not promoted here — it follows the default branch, and a release re-tags that commit's
+  # images rather than rebuilding them, so the digests production is offered are the digests staging
+  # runs. But following is not the same as having arrived: this release and that promotion start
+  # from the same finished build, so production waits until staging is actually on this commit.
+  awaiting-staging:
+    needs: [release, tag-images, publish-release]
+    if: needs.release.outputs.released == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Wait for staging to be running this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMMIT: ${{ needs.release.outputs.sha }}
+        run: |
+          set -euo pipefail
+          deadline=$(( SECONDS + 1500 ))
+          while [ "$SECONDS" -lt "$deadline" ]; do
+            channel=$(gh api "repos/$GITHUB_REPOSITORY/contents/channels/staging.json?ref=deploy-state" \
+              --jq '.content' 2>/dev/null | base64 -d 2>/dev/null || echo '{}')
+            [ "$(jq -r '.commit // empty' <<< "$channel")" = "$COMMIT" ] && {
+              echo "staging is on $COMMIT"; exit 0; }
+            [ "$(jq -r '.freeze // false' <<< "$channel")" = true ] && {
+              echo "::error::staging is frozen, so this release has not been rehearsed there"; exit 1; }
+            sleep 20
+          done
+          echo "::error::staging did not reach ${COMMIT} — production is not offered an unrehearsed release"
+          exit 1
 
   deploy-production:
-    needs: [release, tag-images, publish-release]
+    needs: [release, awaiting-staging]
     if: needs.release.outputs.released == 'true'
     uses: ./.github/workflows/deploy-prod.yml
     permissions:

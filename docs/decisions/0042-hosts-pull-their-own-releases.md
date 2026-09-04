@@ -49,10 +49,15 @@ let any caller mint the same identity.
 release or a commit. A release is the promoted artifact: its lock, provenance and signature are
 fetched and verified, which is how production moves. A commit has no release to fetch, so the
 channel carries the digests to run and the channel's own signature covers them; provenance comes
-from GitHub's build attestations, checked per image, which make the same claim a release lock's
-signature makes. Every image is still pinned by digest and still has to have been built by this
-repository's workflow on a hosted runner, so nothing is weakened — and staging stops waiting for a
-release to be cut before it reflects the branch. Only a commit already on the default branch may be
+from GitHub's build attestations, checked per image and bound to the commit being deployed, so an
+image retagged onto that commit does not pass.
+
+This is not the same assurance a release carries, and it is worth being exact about the difference.
+A release additionally binds the lock to the source tree, enumerates every platform, and gates on the
+SBOM, licence and vulnerability policy. A commit channel checks none of those. That is acceptable for
+an environment that follows the branch — the code is already merged, and the vulnerability policy is
+enforced before the release that reaches production — and it would not be acceptable for production,
+which is why production names releases. Only a commit already on the default branch may be
 followed.
 
 The split is by environment, not by a setting. An environment that sometimes follows the branch and
