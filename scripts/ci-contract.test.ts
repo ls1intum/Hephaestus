@@ -1503,6 +1503,17 @@ void describe("CI contract", () => {
 		);
 	});
 
+	void test("resolves every commit's author without checking out the pull request", async () => {
+		const identity = job(
+			await readFile(".github/workflows/pull-request.yml", "utf8"),
+			"verify-commit-identity",
+		);
+		// The workflow's trigger is justified to Zizmor by the claim that it checks out and runs no
+		// pull-request code; a job that reads the pull request's own commits is where that slips.
+		assert.doesNotMatch(identity, /uses: actions\/checkout@/);
+		assert.match(identity, /uses: actions\/github-script@/);
+	});
+
 	void test("never invokes a repository-local action before checkout", async () => {
 		for (const [file, source] of await workflowSources()) {
 			for (const jobSource of source.split(/^ {2}(?=[A-Za-z][\w-]*:\s*$)/m).slice(1)) {

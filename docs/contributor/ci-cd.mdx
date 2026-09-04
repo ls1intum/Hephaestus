@@ -65,6 +65,7 @@ published.
 | Docker → Webapp, Agent: Pi, Postgres (pg_partman), Tag unchanged images | Dockerfile images; aliases for unchanged ones | — |
 | Supported-host boot smoke | `docker/self-host/setup.sh`, then PostgreSQL, NATS and the application server from this run's own images, waiting for the application to report healthy | — |
 | Actionlint, Zizmor | workflow lint with ShellCheck warnings; Zizmor at medium confidence | — |
+| PR → Verify commit identity | every commit's primary author resolves to a GitHub account, and that account is the pull request's author; a `Bot` author is matched against its `[bot]` account | — |
 
 The four quality legs are one matrix job, one entry per leg of the task graph. Each runs
 `vp run ci:<leg>`, then pipes `vp run --last-details` through `scripts/report-task-run.ts`: every
@@ -243,7 +244,7 @@ why the label is the authority, and which alternatives were priced and declined,
 | --- | --- | --- |
 | `cicd.yml` | PR, merge group, push to main, manual | Validates changes before merge and builds final-SHA images after merge; the release evidence gate runs over the images the run built on the Version PR's branch, and wherever the `release-preflight` dispatch input asks for it |
 | `review-policy.yml` | PR opened, reopened, synchronized, ready for review, edited | Approves a listed maintainer's pull request so the ruleset's required approval is met; does nothing for anyone else |
-| `pull-request.yml` | PR opened, edited, synchronized, reopened, ready for review | Validates the title with commitlint and assigns the author when the pull request opens |
+| `pull-request.yml` | PR opened, edited, synchronized, reopened, ready for review | Validates the title with commitlint, checks that every commit resolves to the pull request's author, and assigns the author when the pull request opens |
 | `ci-quality-gates.yml` | Called by cicd.yml | Formatting, lint, type checks, webapp unit and story tests: everything verifiable from source |
 | `ci-build.yml` | Called by cicd.yml | Packages the server reactor once, then runs the OpenAPI, schema, database and browser E2E gates and the application-server image against that artifact |
 | `ci-tests.yml` | Called by cicd.yml | The server unit, architecture and integration suites, compiled from source |

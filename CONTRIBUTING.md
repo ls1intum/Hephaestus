@@ -26,6 +26,8 @@ To ensure a transparent and trustworthy environment, we have established differe
 
 ### Compliance
 
+Every commit on a pull request must be authored by an email address that resolves to the GitHub account that opened it, so set `git config user.email` accordingly before you commit.
+
 Contributions that do not adhere to these guidelines will be rejected. We align with [GitHub Acceptable Use Policies](https://docs.github.com/en/site-policy/acceptable-use-policies).
 
 ## Contribution Process
