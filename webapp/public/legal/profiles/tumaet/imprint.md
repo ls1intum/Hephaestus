@@ -39,13 +39,13 @@ Boltzmannstraße 3
 For questions regarding Hephaestus, please contact:
 
 Email: [ls1.admin@in.tum.de](mailto:ls1.admin@in.tum.de)  
-Issues: [github.com/ls1intum/Hephaestus/issues](https://github.com/ls1intum/Hephaestus/issues)
+Issues: [github.com/hephaestus-build/Hephaestus/issues](https://github.com/hephaestus-build/Hephaestus/issues)
 
 ## Terms of Use
 
 Texts, images, graphics, and the design of these pages may be subject to copyright. As a private individual, you may use copyrighted material for private and other personal use within the scope of § 53 UrhG. Any duplication or use of objects such as images, diagrams, sounds, or texts in other electronic or printed publications is not permitted without our agreement. This consent will be granted on request by the person responsible for the content.
 
-The source code of Hephaestus is available under the MIT License at [github.com/ls1intum/Hephaestus](https://github.com/ls1intum/Hephaestus).
+The source code of Hephaestus is available under the MIT License at [github.com/hephaestus-build/Hephaestus](https://github.com/hephaestus-build/Hephaestus).
 
 ## Liability Disclaimer
 

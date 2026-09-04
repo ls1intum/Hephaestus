@@ -110,7 +110,7 @@ const helpfulErrorsPlugin = {
 const configuration = {
 	extends: ["@commitlint/config-conventional"],
 	plugins: [helpfulErrorsPlugin],
-	helpUrl: "https://github.com/ls1intum/Hephaestus/blob/main/CONTRIBUTING.md",
+	helpUrl: "https://github.com/hephaestus-build/Hephaestus/blob/main/CONTRIBUTING.md",
 	rules: {
 		// Use custom rules for helpful error messages
 		"type-enum-helpful": [2, "always"],

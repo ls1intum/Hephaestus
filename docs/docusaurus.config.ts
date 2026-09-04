@@ -60,7 +60,7 @@ const config: Config = {
 	},
 
 	customFields: {
-		productUrl: "https://hephaestus.aet.cit.tum.de",
+		productUrl: "https://hephaestus.build",
 		repoUrl: "https://github.com/ls1intum/Hephaestus",
 	},
 
@@ -201,7 +201,7 @@ const config: Config = {
 				},
 
 				{
-					href: "https://hephaestus.aet.cit.tum.de",
+					href: "https://hephaestus.build",
 					label: "Open Hephaestus",
 					position: "right",
 				},
@@ -237,7 +237,7 @@ const config: Config = {
 						},
 						{
 							label: "Open Hephaestus",
-							href: "https://hephaestus.aet.cit.tum.de",
+							href: "https://hephaestus.build",
 						},
 					],
 				},
@@ -271,11 +271,11 @@ const config: Config = {
 						},
 						{
 							label: "Imprint",
-							href: "https://hephaestus.aet.cit.tum.de/imprint",
+							href: "https://hephaestus.build/imprint",
 						},
 						{
 							label: "Privacy",
-							href: "https://hephaestus.aet.cit.tum.de/privacy",
+							href: "https://hephaestus.build/privacy",
 						},
 					],
 				},

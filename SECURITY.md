@@ -4,7 +4,7 @@
 
 **Please do not report security vulnerabilities through public GitHub issues, discussions, or pull requests.**
 
-Report privately via [GitHub private vulnerability reporting](https://github.com/ls1intum/Hephaestus/security/advisories/new) — it keeps the report confidential and credits you in the resulting advisory. If you cannot use GitHub, email [felixtj.dietrich@tum.de](mailto:felixtj.dietrich@tum.de) with the subject "Hephaestus Security Vulnerability Report".
+Report privately via [GitHub private vulnerability reporting](https://github.com/hephaestus-build/Hephaestus/security/advisories/new) — it keeps the report confidential and credits you in the resulting advisory. If you cannot use GitHub, email [felixtj.dietrich@tum.de](mailto:felixtj.dietrich@tum.de) with the subject "Hephaestus Security Vulnerability Report".
 
 Please include as much as you can:
 
@@ -19,7 +19,7 @@ Security reports are triaged before other work.
 
 - **Initial response within 14 days.**
 - We follow **coordinated disclosure**: please give us time to ship a fix before disclosing publicly. If we cannot agree on a timeline, we treat **90 days** from your report as the default disclosure date, shortened when a vulnerability is being actively exploited.
-- Confirmed vulnerabilities are fixed as soon as feasible and published as [GitHub Security Advisories](https://github.com/ls1intum/Hephaestus/security/advisories). You are credited unless you prefer to stay anonymous.
+- Confirmed vulnerabilities are fixed as soon as feasible and published as [GitHub Security Advisories](https://github.com/hephaestus-build/Hephaestus/security/advisories). You are credited unless you prefer to stay anonymous.
 
 We do not run a bug bounty program.
 
@@ -53,4 +53,4 @@ Independent of this reporting channel, the project runs:
 - **Static analysis**: GitHub CodeQL
 - **Native alerts**: GitHub secret scanning and Dependabot dependency alerts
 
-A machine-readable [`security.txt`](https://hephaestus.aet.cit.tum.de/.well-known/security.txt) ([RFC 9116](https://www.rfc-editor.org/info/rfc9116/)) points to this policy.
+A machine-readable [`security.txt`](https://hephaestus.build/.well-known/security.txt) ([RFC 9116](https://www.rfc-editor.org/info/rfc9116/)) points to this policy.

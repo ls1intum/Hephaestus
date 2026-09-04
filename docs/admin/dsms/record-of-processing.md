@@ -1,6 +1,6 @@
 # Hephaestus — Record of Processing Activities (Art. 30 GDPR)
 
-This file is the Art. 30 record for the TUM-operated Hephaestus deployment at https://hephaestus.aet.cit.tum.de. Each section maps to a single Art. 30 element. Fenced code blocks are paste-ready into the corresponding TUM DSMS form field at https://dsms.datenschutz.tum.de/; everything outside the fences is contextual.
+This file is the Art. 30 record for the TUM-operated Hephaestus deployment at https://hephaestus.build. Each section maps to a single Art. 30 element. Fenced code blocks are paste-ready into the corresponding TUM DSMS form field at https://dsms.datenschutz.tum.de/; everything outside the fences is contextual.
 
 ## Identifier
 
@@ -29,7 +29,7 @@ DSMS responsible person: Stephan Krusche (krusche@tum.de). Felix Dietrich (felix
 ## Purpose and description (Art. 30(1)(b))
 
 ```text
-Hephaestus is a self-hosted web platform operated by AET on TUM infrastructure at https://hephaestus.aet.cit.tum.de. Its purpose is to support project-based software-engineering teaching at TUM and the development work of AET research projects by giving each contributor feedback on their collaborative engineering work: for example, whether a pull request is small enough to review well, or whether a review reply addresses the question raised.
+Hephaestus is a self-hosted web platform operated by AET on TUM infrastructure at https://hephaestus.build. Its purpose is to support project-based software-engineering teaching at TUM and the development work of AET research projects by giving each contributor feedback on their collaborative engineering work: for example, whether a pull request is small enough to review well, or whether a review reply addresses the question raised.
 
 A workspace administrator connects one or more Git repositories from github.com or gitlab.lrz.de. Hephaestus then synchronises the pull/merge requests, issues, code reviews, review comments, and commit metadata authored in those repositories. The platform processes activity authored in the connected repositories, whether or not the author has signed in to Hephaestus.
 
@@ -93,7 +93,7 @@ U.S. recipients are covered by the EU-US Data Privacy Framework (Commission Impl
 **Where stored**
 
 ```text
-Self-hosted by AET at https://hephaestus.aet.cit.tum.de on AET-administered infrastructure at TUM. Application data — including authentication state (accounts, federated identity links, the cookie-session revocation list, and the auth-event log) — in PostgreSQL, which also holds the practice-review job queue; webhook and integration-sync events in NATS JetStream. Local working copies of monitored repositories may be stored on the host filesystem when practice-review code execution is enabled. Container stdout goes to the Docker json-file driver. Every service in the stack sets an explicit rotation cap in the compose files: 50 MiB per file × 5 files for the webapp, the application server, the worker and PostgreSQL; 10 MiB × 3 for the webhook receiver, NATS, the reverse proxy and the maintenance page. No layer of the stack writes an HTTP access log — Tomcat's is explicitly disabled in the production profile, the Traefik reverse proxy is not started with `--accesslog` (Traefik's default is off), and both nginx containers (the static frontend and the maintenance page) disable it at the server level. No per-request IP/URL record is created anywhere.
+Self-hosted by AET at https://hephaestus.build on AET-administered infrastructure at TUM. Application data — including authentication state (accounts, federated identity links, the cookie-session revocation list, and the auth-event log) — in PostgreSQL, which also holds the practice-review job queue; webhook and integration-sync events in NATS JetStream. Local working copies of monitored repositories may be stored on the host filesystem when practice-review code execution is enabled. Container stdout goes to the Docker json-file driver. Every service in the stack sets an explicit rotation cap in the compose files: 50 MiB per file × 5 files for the webapp, the application server, the worker and PostgreSQL; 10 MiB × 3 for the webhook receiver, NATS, the reverse proxy and the maintenance page. No layer of the stack writes an HTTP access log — Tomcat's is explicitly disabled in the production profile, the Traefik reverse proxy is not started with `--accesslog` (Traefik's default is off), and both nginx containers (the static frontend and the maintenance page) disable it at the server level. No per-request IP/URL record is created anywhere.
 
 Application and authentication data reside on TUM infrastructure within the EU. AI-assisted features additionally forward code snippets and surrounding discussion to the workspace-configured LLM provider (default for the TUM-operated deployment: Microsoft Azure OpenAI in an EU region).
 ```
@@ -246,8 +246,8 @@ DSMS multi-select: tick `Data received from third parties` and `Directly from th
 
 ## Information duty (Art. 13)
 
-- https://hephaestus.aet.cit.tum.de/privacy
-- https://hephaestus.aet.cit.tum.de/imprint
+- https://hephaestus.build/privacy
+- https://hephaestus.build/imprint
 
 Markdown source under `webapp/public/legal/profiles/tumaet/`.
 

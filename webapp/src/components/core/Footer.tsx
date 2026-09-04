@@ -46,7 +46,7 @@ export default function Footer({ className, isProduction, buildInfo }: FooterPro
 					</a>
 					. Source on{" "}
 					<a
-						href="https://github.com/ls1intum/Hephaestus"
+						href="https://github.com/hephaestus-build/Hephaestus"
 						target="_blank"
 						rel="noopener noreferrer"
 						className="font-medium underline underline-offset-4 hover:text-foreground"
@@ -65,7 +65,7 @@ export default function Footer({ className, isProduction, buildInfo }: FooterPro
 							About
 						</Link>
 						<a
-							href="https://github.com/ls1intum/Hephaestus/releases"
+							href="https://github.com/hephaestus-build/Hephaestus/releases"
 							target="_blank"
 							rel="noopener noreferrer"
 							className="text-sm text-muted-foreground hover:text-foreground hover:underline underline-offset-4"
@@ -102,7 +102,7 @@ export default function Footer({ className, isProduction, buildInfo }: FooterPro
 									<TooltipTrigger
 										render={
 											<a
-												href={`https://github.com/ls1intum/Hephaestus/tree/${buildInfo.branch}`}
+												href={`https://github.com/hephaestus-build/Hephaestus/tree/${buildInfo.branch}`}
 												target="_blank"
 												rel="noopener noreferrer"
 												aria-label={`View branch ${buildInfo.branch}`}
@@ -122,7 +122,7 @@ export default function Footer({ className, isProduction, buildInfo }: FooterPro
 									<TooltipTrigger
 										render={
 											<a
-												href={`https://github.com/ls1intum/Hephaestus/commit/${buildInfo.commit}`}
+												href={`https://github.com/hephaestus-build/Hephaestus/commit/${buildInfo.commit}`}
 												target="_blank"
 												rel="noopener noreferrer"
 												aria-label={`View commit ${buildInfo.commit.substring(0, 7)}`}

@@ -40,7 +40,7 @@ Strict subset of standard OIDC ID-Token claims:
 
 | Claim | Type | Notes |
 |---|---|---|
-| `iss` | string | `https://hephaestus.aet.cit.tum.de` (env-configurable). |
+| `iss` | string | `https://hephaestus.build` (env-configurable). |
 | `sub` | string | `Account.id` as decimal. |
 | `aud` | string | `hephaestus-spa` for the SPA cookie. Future audiences allowed. |
 | `jti` | UUID | Inserted into `issued_jwt`. |
