@@ -15,9 +15,6 @@ const digest = `sha256:${"1".repeat(64)}`;
 const resolver = () => Promise.resolve(digest);
 
 await test("a commit channel pins every image the stacks actually read", async () => {
-	// The point of the lock is that nothing renders from a floating tag. If the stacks grow an
-	// image this does not resolve, Compose would fail to render on the host rather than here.
-	// fileURLToPath, not .pathname: on Windows that yields "/C:/..." and no file opens there.
 	const inventory = await readInventory(
 		fileURLToPath(new URL("../security/release-images.json", import.meta.url)),
 	);

@@ -11,7 +11,6 @@ const REPO_ROOT = resolve(import.meta.dirname, "..");
 const SCRIPT = join(REPO_ROOT, "scripts", "enable-hooks.ts");
 const temporaries: string[] = [];
 
-/** A global Git config holding exactly these lines, so the machine's own cannot decide a test. */
 function globalConfig(contents = ""): string {
 	const directory = mkdtempSync(join(tmpdir(), "enable-hooks-config-"));
 	temporaries.push(directory);
@@ -22,14 +21,7 @@ function globalConfig(contents = ""): string {
 
 const EMPTY_GLOBAL_CONFIG = globalConfig();
 
-/**
- * Git exports `GIT_DIR` and its siblings to every hook process, and they outrank a child's `cwd`.
- * Inherited, they would point both the script under test and the assertions at the repository the
- * hook is running in rather than at the clone made below. The global and system configs are then
- * replaced rather than dropped, and `CI` is removed, because what a developer's own config says
- * about commit signing and whether this suite is running on a runner are exactly what these tests
- * decide.
- */
+// Git hook variables override cwd; keep each subprocess inside its isolated fixture.
 function hookFreeEnv(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
 	const inherited = Object.fromEntries(
 		Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_") && key !== "CI"),
@@ -46,7 +38,6 @@ after(() => {
 	for (const temporary of temporaries) rmSync(temporary, { recursive: true, force: true });
 });
 
-/** A clone with the project hooks whose Git still points at an earlier hook manager's directory. */
 function clone(): { repository: string; git: (...args: string[]) => string } {
 	const repository = mkdtempSync(join(tmpdir(), "enable-hooks-"));
 	temporaries.push(repository);
@@ -58,12 +49,11 @@ function clone(): { repository: string; git: (...args: string[]) => string } {
 			env: hookFreeEnv(),
 		}).trim();
 	git("init", "--quiet");
-	git("config", "core.hooksPath", ".husky/_");
 	cpSync(join(REPO_ROOT, ".vite-hooks"), join(repository, ".vite-hooks"), { recursive: true });
 	return { repository, git };
 }
 
-void test("an install moves Git from an earlier hooks directory to the dispatcher", () => {
+void test("an install enables the dispatcher and is idempotent", () => {
 	const { repository, git } = clone();
 	const result = spawnSync("node", [SCRIPT], {
 		cwd: repository,
@@ -82,25 +72,48 @@ void test("an install moves Git from an earlier hooks directory to the dispatche
 	assert.equal(git("config", "core.hooksPath"), ".vite-hooks/_");
 });
 
-// Git exports `GIT_DIR` to a hook only when the push runs from a linked worktree, so no CI push can
-// reach this state; setting it here is the whole reproduction.
-void test("an install under a hook's GIT_DIR configures the clone it runs in", () => {
-	const decoy = clone();
+void test("an install preserves disabled hooks until explicitly re-enabled", () => {
 	const { repository, git } = clone();
-	process.env.GIT_DIR = join(decoy.repository, ".git");
-	try {
-		const result = spawnSync("node", [SCRIPT], {
-			cwd: repository,
-			encoding: "utf8",
-			maxBuffer: CAPTURE_LIMIT_BYTES,
-			env: hookFreeEnv(),
-		});
+	const run = (...args: string[]) => {
+		const result = spawnSync("vp", args, { cwd: repository, encoding: "utf8", env: hookFreeEnv() });
 		assert.equal(result.status, 0, `${result.stdout}${result.stderr}`);
-	} finally {
-		delete process.env.GIT_DIR;
-	}
+	};
+	run("hooks", "enable");
+	run("hooks", "disable");
+	const install = spawnSync("node", [SCRIPT], {
+		cwd: repository,
+		encoding: "utf8",
+		env: hookFreeEnv(),
+	});
+	assert.equal(install.status, 0, `${install.stdout}${install.stderr}`);
+	assert.equal(git("config", "--type=bool", "vp.hooks.disabled"), "true");
+	assert.ok(!git("config", "--local", "--list").includes("core.hookspath="));
+	run("hooks", "enable");
 	assert.equal(git("config", "core.hooksPath"), ".vite-hooks/_");
-	assert.equal(decoy.git("config", "core.hooksPath"), ".husky/_");
+});
+
+void test("an install leaves a contributor's custom hooks directory intact", () => {
+	const { repository, git } = clone();
+	git("config", "core.hooksPath", ".custom-hooks");
+	const result = spawnSync("node", [SCRIPT], {
+		cwd: repository,
+		encoding: "utf8",
+		env: hookFreeEnv(),
+	});
+	assert.equal(result.status, 0, `${result.stdout}${result.stderr}`);
+	assert.equal(git("config", "core.hooksPath"), ".custom-hooks");
+});
+
+void test("a source archive installs without Git configuration or signing advice", () => {
+	const directory = mkdtempSync(join(tmpdir(), "enable-hooks-archive-"));
+	temporaries.push(directory);
+	const result = spawnSync("node", [SCRIPT], {
+		cwd: directory,
+		encoding: "utf8",
+		env: hookFreeEnv(),
+	});
+	assert.equal(result.status, 0, `${result.stdout}${result.stderr}`);
+	assert.equal(result.stderr, "");
 });
 
 void test("an install without commit signing configured warns and still succeeds", () => {

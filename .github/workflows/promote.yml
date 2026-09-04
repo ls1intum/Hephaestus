@@ -1,12 +1,7 @@
-# Moves an environment to a release by writing its channel on `deploy-state`, which the hosts poll.
-#
-# The hosts pin this workflow's identity, and a GitHub environment gates it, so a signature carrying
-# that identity is proof its reviewers approved. That holds only while this workflow stays
-# non-reusable: a `workflow_call` trigger would let any caller mint the same identity. The release
-# reaches staging by dispatching this workflow, not by triggering on its completion, so no run here
-# inherits a context it did not ask for.
+# Hosts trust this workflow's signing identity. Keep signing behind the environment gate;
+# making this workflow reusable would let callers share that identity.
 name: Promote
-run-name: Promote ${{ inputs.release }} to ${{ inputs.environment }}
+run-name: Promote ${{ inputs.release || inputs.commit }} to ${{ inputs.environment }}
 
 on:
   workflow_dispatch:
@@ -24,6 +19,10 @@ on:
         description: Commit to run, as a full SHA. Only for an environment that follows main.
         type: string
         required: false
+      automatic:
+        description: Follow main only if the channel is not frozen or ahead of this build
+        type: boolean
+        default: false
       allow-rollback:
         description: Permit moving this environment backwards
         type: boolean
@@ -39,22 +38,49 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  automatic:
+    if: ${{ inputs.automatic }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      apply: ${{ steps.policy.outputs.apply }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: deploy-state
+          path: deploy-state
+          persist-credentials: false
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          install: "none"
+      # The workflow lock covers this read through publication, including manually requested holds.
+      - name: Check automatic promotion
+        id: policy
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMMIT: ${{ inputs.commit }}
+          CHANNEL: ${{ inputs.environment }}
+        run: node scripts/automatic-promotion.ts
+
   promote:
+    needs: automatic
+    if: ${{ !cancelled() && !failure() && (!inputs.automatic || needs.automatic.outputs.apply == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment:
       name: ${{ inputs.environment }}
-      # GitHub records this as the deployment's environment_url, on the status it writes when the
-      # job ends. A status posted from inside the job would be superseded by that one, so the URL
-      # has to come from here rather than from a step. It is a step output because APP_HOSTNAME is
-      # scoped to the environment being resolved.
+      # APP_HOSTNAME is environment-scoped, so resolve it after the job starts.
       url: ${{ steps.release.outputs.environment_url }}
     permissions:
       contents: write
       id-token: write
     steps:
-      # `deploy-state` carries channels and no code, so the tooling that writes it is checked out
-      # from the ref this workflow was dispatched on and the branch itself sits beside it.
+      # Tooling comes from the dispatched workflow ref, not from the deployment target.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -71,17 +97,7 @@ jobs:
 
       - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
 
-      # The resolver is tooling: it comes from the default branch so that a commit older than it can
-      # still be promoted, which is exactly what rolling an environment back means.
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          path: .promotion-scripts
-          sparse-checkout: scripts
-          persist-credentials: false
-
-      # The pins are data about the commit being promoted, so they come from that commit. Reading
-      # them from the default branch instead would deploy one commit's code against another's
-      # upstream images.
+      # Unlike tooling, upstream image pins must come from the deployment target.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: ${{ inputs.commit != '' }}
         with:
@@ -106,8 +122,7 @@ jobs:
               echo "::error::Name a release or a commit, not both"; exit 1; }
             [[ "$COMMIT" =~ ^[0-9a-f]{40}$ ]] || {
               echo "::error::Follow a full commit SHA, not '$COMMIT'"; exit 1; }
-            # Only what is already on the default branch may be followed: a commit that is not an
-            # ancestor of main has not been through review, whoever is able to dispatch this.
+            # Dispatch permission must not authorize commits outside main.
             gh api "repos/$GITHUB_REPOSITORY/compare/$COMMIT...main" --jq .status |
               grep -qE '^(identical|ahead)$' || {
                 echo "::error::$COMMIT is not on the default branch"; exit 1; }
@@ -120,9 +135,7 @@ jobs:
           release="$REQUESTED"
           [[ "$release" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || {
             echo "::error::Promote an immutable vX.Y.Z release, not '$release'"; exit 1; }
-          # GitHub tag immutability is not a gate here: the host takes the source commit and every
-          # image digest from the cosign-signed release lock, so a moved tag changes nothing that is
-          # deployed. Requiring it would refuse the older releases a rollback exists to reach.
+          # The host binds the tag's source tree to the signed release lock before applying it.
           [ "$(gh release view "$release" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)" = false ] || {
             echo "::error::$release is still a draft"; exit 1; }
           echo "release=$release" >> "$GITHUB_OUTPUT"
@@ -144,10 +157,8 @@ jobs:
           channel=$(echo "$CHANNEL" | tr '[:upper:]' '[:lower:]')
           mkdir -p channels
           if [ "$FOLLOWS" = commit ]; then
-            # A commit has no release to fetch a lock from, so the channel carries the digests
-            # itself. They are covered by the signature below, which is the same authority that
-            # stands behind a release lock.
-            node "$GITHUB_WORKSPACE/.promotion-scripts/scripts/commit-image-lock.ts" \
+            # Commit deployments carry verified image digests in the signed channel.
+            node "$GITHUB_WORKSPACE/scripts/commit-image-lock.ts" \
               "$RELEASE" "$OWNER" "$GITHUB_WORKSPACE/.promotion-inventory/security/release-images.json" \
               > images.json
             jq -n --arg commit "$RELEASE" --slurpfile images images.json \
@@ -172,8 +183,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE: ${{ steps.release.outputs.release }}
         run: |
-          # An empty commit would read as a move forward to hosts that compare ancestry, so a channel
-          # already at this release produces none.
           node ../scripts/commit-via-api.ts \
             --branch deploy-state \
             --message "chore(deploy): ${CHANNEL_FILE} -> ${RELEASE}" \
@@ -186,8 +195,7 @@ jobs:
           HOSTNAME: ${{ vars.APP_HOSTNAME }}
         run: |
           set -euo pipefail
-          # Nothing here can push the hosts, so the deploy is observed: the webapp publishes the
-          # version it runs, which makes convergence visible without any access to the host.
+          # Observe the public webapp version; host metrics report stack readiness separately.
           deadline=$(( SECONDS + 900 ))
           while [ "$SECONDS" -lt "$deadline" ]; do
             config=$(curl -fsS --max-time 20 "https://${HOSTNAME}/" |

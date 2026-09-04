@@ -174,7 +174,7 @@ await test("rejects expired and malformed exceptions", () => {
 	assert.throws(() => evaluate("server", {}, policy), /malformed Trivy report/);
 	assert.throws(
 		() => evaluate("server", { Results: [{ Vulnerabilities: [{ Severity: "HIGH" }] }] }, policy),
-		/missing InstalledVersion/,
+		/InstalledVersion must be a string/,
 	);
 	assert.match(
 		evaluate("server", report, {
@@ -289,4 +289,51 @@ await test("names the rejected findings in the run summary", () => {
 	);
 	assert.match(clean, /server \(linux\/amd64\): pass/);
 	assert.doesNotMatch(clean, /\| Vulnerability \|/);
+});
+
+await test("rejects malformed severities rather than treating them as below HIGH", () => {
+	for (const severity of ["high", "CRITCAL", " ", 4, null]) {
+		assert.throws(
+			() =>
+				evaluate(
+					"server",
+					{ Results: [{ Vulnerabilities: [{ ...finding, Severity: severity }] }] },
+					policy,
+				),
+			/Severity/,
+		);
+	}
+	for (const severity of ["UNKNOWN", "LOW", "MEDIUM", "HIGH", "CRITICAL"]) {
+		const result = evaluate(
+			"server",
+			{ Results: [{ Vulnerabilities: [{ ...finding, Severity: severity }] }] },
+			policy,
+		);
+		assert.equal(result.rejected.length, ["HIGH", "CRITICAL"].includes(severity) ? 1 : 0);
+	}
+});
+
+await test("rejects an exception expiry that JavaScript rolls into another month", () => {
+	const exception = {
+		digest,
+		evidence: "https://github.com/example/project/issues/1",
+		expires: "2026-02-30T00:00:00Z",
+		image: "server",
+		installedVersion: "1",
+		justification: "risk accepted pending an upgrade",
+		owner: "@security",
+		package: "lib",
+		platform: "linux/amd64",
+		status: "affected",
+		vulnerability: "CVE-1",
+	};
+	assert.match(
+		evaluate(
+			"server",
+			report,
+			{ ...policy, exceptions: [exception] },
+			new Date("2026-02-01T00:00:00Z"),
+		).errors.join("\n"),
+		/invalid or expired exception/,
+	);
 });

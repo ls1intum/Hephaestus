@@ -12,12 +12,9 @@ runs:
       shell: bash
       run: |
         echo "version=$(jq -r '.devEngines.packageManager.version' package.json)" >> "$GITHUB_OUTPUT"
-        # On Windows this shell is Git Bash, whose $HOME is an MSYS path that the Windows PATH
-        # cannot resolve. os.homedir() is what both pnpm/setup and actions/cache's `~` expand to, so
-        # asking Node keeps the destination, the cache path and PATH the same directory everywhere.
+        # Use the native home directory, not Git Bash's MSYS path, on Windows.
         echo "dest=$(node -p 'require("node:path").join(require("node:os").homedir(), "setup-pnpm")')" >> "$GITHUB_OUTPUT"
-    # The path is pnpm/setup's own default destination, so the action does not restate it as `dest`;
-    # the version check below fails the job if that default ever moves.
+    # Cache pnpm/setup's default installation directory.
     - id: pnpm-cache
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
@@ -78,14 +75,12 @@ runs:
         cache-dependency-path: pnpm-lock.yaml
         install: false
         require-lockfile: true
-    # A cache key cannot be overwritten, so one truncated save would poison every job until the pin
-    # moves. Answering here proves the restored tree and the PATH it was reached through, and holds
-    # the freshly installed tree to the pin before it is offered to anyone else.
+    # Cache entries are immutable: validate the executable before publishing a new entry.
     - shell: bash
       env:
         PNPM_VERSION: ${{ steps.pnpm.outputs.version }}
       run: test "$(pnpm --version)" = "$PNPM_VERSION"
-    # A cache saved on any ref other than the default branch is invisible to every other ref.
+    # Default-branch caches are reusable across PRs; merge-ref caches are scoped to that PR.
     - if: steps.pnpm-cache.outputs.cache-hit != 'true' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
       uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:

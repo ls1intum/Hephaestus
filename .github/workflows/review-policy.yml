@@ -1,29 +1,19 @@
 name: Review policy
 
 on:
-  pull_request_target: # zizmor: ignore[dangerous-triggers] API reads only; no pull-request code is executed.
+  pull_request_target: # zizmor: ignore[dangerous-triggers] Trusted policy only; no pull-request code is executed.
     types: [opened, reopened, synchronize, ready_for_review, edited]
 
 permissions: {}
 
 concurrency:
-  # Never cancel: runs in a group are serialised, so the newest event's decision is the one that
-  # lands, and a cancelled run leaves an approval unsubmitted rather than half-written.
+  # Serialize writes without interrupting an approval; each run re-reads the current head.
   group: review-policy-${{ github.event.pull_request.number }}
   cancel-in-progress: false
 
 jobs:
-  # This job is *not* a required status check, and must never become one. The `main` ruleset requires
-  # one native approving review; all this job does is supply that approval for the authors listed in
-  # `REVIEW_POLICY_MAINTAINERS`. A pull request by anyone else gets no approval here and sits in
-  # GitHub's own "Review required" state, which blocks merging, merge-queue entry and auto-merge.
-  #
-  # `synchronize` is load-bearing: the ruleset dismisses stale approvals on push, so every push has
-  # to earn a fresh one. `edited` is load-bearing for stacked pull requests: merging a lower layer
-  # retargets the upper one onto `main`, which fires no other event here — without it the layer
-  # arrives at the queue unapproved and cannot enter. For the same reason there is no `branches:`
-  # filter: a layer must already hold its approval when it is retargeted, and an approval on a pull
-  # request targeting anything but `main` satisfies no rule and is inert.
+  # Not a required check: GitHub's native review requirement owns merge eligibility.
+  # No base filter: stacked layers need approval before retargeting. Pushes dismiss stale reviews.
   approve:
     name: Approve a maintainer's pull request
     runs-on: ubuntu-latest
@@ -32,8 +22,7 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      # The default branch, never `github.sha` or the pull request's head: the base branch's copy of
-      # the policy is the authoritative one, and nothing from the pull request is fetched or run.
+      # Execute only the default branch's policy, never the pull request's code.
       - name: Load the trusted policy evaluator
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -41,9 +30,7 @@ jobs:
           persist-credentials: false
           sparse-checkout: scripts
 
-      # The review is attributed to `github-actions[bot]`, which counts toward the ruleset's
-      # `required_approving_review_count`. That needs the organisation's "Allow GitHub Actions to
-      # create and approve pull requests" setting left on.
+      # Requires the organisation's "Allow GitHub Actions to create and approve pull requests" setting.
       - name: Approve when the author is a listed maintainer
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:

@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
+import { parseDocument } from "yaml";
+
 import { releaseSignerIdentity, releaseSignerRepository } from "./lib/release-signer.ts";
 import { SMOKE_HOSTNAME } from "./prepare-host-smoke-env.ts";
 import { parseStacks } from "./reconcile-deployment.ts";
@@ -130,14 +132,13 @@ await test("verification identity is the release's own: run context now, the map
 
 await test("promotion refuses a draft but reaches any published release, and the host verifies", () => {
 	assert.match(promotion, /--json isDraft --jq \.isDraft/);
-	// Releases published before GitHub offered tag immutability are the ones a rollback reaches, and
-	// the signed lock names the source commit and every digest, so tag mutability changes nothing.
+	// Rollback must support releases predating immutable tags; the signed lock binds their digests.
 	assert.doesNotMatch(promotion, /isImmutable/);
 	assert.match(reconciler, /join\(config\.checkout, "scripts\/prepare-release-lock\.ts"\)/);
 	assert.doesNotMatch(reconciler, /join\(releaseTree, "scripts\/prepare-release-lock\.ts"\)/);
 });
 
-await test("derived signer identity matches today's literals in the canonical repository", () => {
+await test("derives the canonical signer identity and refuses missing CI identity", () => {
 	const canonicalRun = {
 		CI: "true",
 		GITHUB_SERVER_URL: "https://github.com",
@@ -177,5 +178,22 @@ await test("the release smoke reaches the installation by the name the installer
 	assert.ok(
 		release.includes(`https://${SMOKE_HOSTNAME}/`),
 		`release.yml must request the installation at ${SMOKE_HOSTNAME}`,
+	);
+});
+
+await test("automatic promotion gates the environment job under one workflow lock", () => {
+	const workflow = parseDocument(promotion);
+	assert.equal(workflow.getIn(["concurrency", "group"]), `promote-\${{ inputs.environment }}`);
+	assert.equal(workflow.getIn(["concurrency", "cancel-in-progress"]), false);
+	assert.equal(workflow.getIn(["jobs", "automatic", "environment"]), undefined);
+	assert.equal(workflow.getIn(["jobs", "automatic", "permissions", "contents"]), "read");
+	assert.equal(
+		workflow.getIn(["jobs", "automatic", "outputs", "apply"]),
+		`\${{ steps.policy.outputs.apply }}`,
+	);
+	assert.equal(workflow.getIn(["jobs", "promote", "needs"]), "automatic");
+	assert.equal(
+		workflow.getIn(["jobs", "promote", "if"]),
+		`\${{ !cancelled() && !failure() && (!inputs.automatic || needs.automatic.outputs.apply == 'true') }}`,
 	);
 });

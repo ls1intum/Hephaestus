@@ -1,30 +1,24 @@
 ---
 id: pull-based-deployment
 title: Pull-Based Deployment
-description: Let a host keep itself on the release its channel names, verifying the signature itself, with nothing dialing in.
+description: Reconcile a host to a signed release or commit channel without inbound deployment access.
 ---
 
-A host can upgrade itself. It polls a **channel** — one file naming a release — verifies the
-signatures, and applies the release's digest-pinned Compose stacks. Nothing connects *to* the host,
-so no deployment credential exists anywhere off it.
-
-This is the same verification the manual upgrade in [Install](./install.mdx#upgrades) performs, on a
-timer.
+A host polls a **channel** naming a release or commit, verifies its signature, and applies
+digest-pinned Compose stacks. Deployment needs no inbound administration connection to the host.
 
 ## What the host trusts
 
-Two signatures, both checked on the host:
+For a release deployment, the host verifies two signatures:
 
 | Artifact | Signed by | Answers |
 | --- | --- | --- |
 | The channel (`channels/<env>.json`) | the promotion workflow | *may this host move, and who said so* |
 | The release lock (`release-<version>.json`) | the release workflow | *which source commit and image digests are this release* |
 
-A signature proves who wrote something, never that it is the newest thing they wrote — a valid old
-channel replayed verifies perfectly. Freshness therefore comes from the commit graph: the channel
-lives on the `deploy-state` branch, and each accepted commit must descend from the last one. A lower
-release version also requires `allowRollback`; a deliberate rollback is a new channel commit, never
-permission to replay an old one.
+The host rejects a new channel commit that does not descend from its last accepted channel commit.
+It also rejects lower release versions and older commits unless `allowRollback` is set. These checks
+do not order manual transitions between releases and commits; choose those targets deliberately.
 
 ## The channel
 
@@ -34,24 +28,40 @@ permission to replay an old one.
 
 | Field | Effect |
 | --- | --- |
-| `release` | the immutable `vX.Y.Z` release this environment runs |
+| `release` | the `vX.Y.Z` release to apply when not frozen |
 | `allowRollback` | permits one deliberate move backwards |
 | `freeze` | holds the environment where it is, for an incident |
 
+Staging can follow successful builds of `main` instead of releases. Its channel names a full
+`commit` SHA instead of `release`, plus an `images` map of digest-pinned references. The promotion
+workflow verifies first-party image provenance against that source commit before signing the channel.
+Upstream image pins come from that commit's inventory.
+
+Automatic promotions check the latest channel while holding the promotion lock. A frozen channel,
+an already-promoted commit, or an older completed build leaves the channel unchanged, including
+when switching from a release to a commit. An unreadable channel or failed history comparison stops
+promotion rather than clearing a hold. Establish the initial channel with a manual promotion before
+enabling continuous staging.
+
 ## Requirements
 
-On the host: Docker Engine with Compose v2, `git`, `cosign`, and Node.js at the version in
-`package.json#devEngines.runtime`. Outbound HTTPS to `github.com` and `ghcr.io` is the only network
-access needed — nothing has to reach the host, which is the point.
+Install Docker Engine with Compose v2, `git`, `cosign`, and the Node.js version pinned in
+`package.json#devEngines.runtime`. Verify downloaded tools against their published checksums.
 
-Pin what you install. `cosign` verifies the release, so fetch it by checksum from its own release
-page rather than from a convenience script.
+Allow outbound HTTPS to GitHub and its release-asset download hosts, Sigstore trust services, and
+the image registries in the lock, including GHCR and Docker Hub. Registry authentication and download
+redirects may use additional hosts; an allowlist limited to `github.com` and `ghcr.io` is insufficient.
 
 ## Install
 
-1. Clone the `main` branch to `/var/lib/hephaestus/checkout`. This is the trusted, host-owned copy of
-   the reconciler and release verifier; release contents never replace it. Update it separately when
-   you intentionally adopt reconciler changes.
+1. Install the trusted reconciler checkout. Update it separately from application releases.
+
+   ```bash
+   sudo install -d -m 0750 /var/lib/hephaestus
+   sudo git clone --branch main --single-branch \
+     https://github.com/hephaestus-build/Hephaestus.git /var/lib/hephaestus/checkout
+   ```
+
 2. Copy `docker/self-host/systemd/reconcile.env.example` to `/etc/hephaestus/reconcile.env`
    (`root:root`, `0600`) and set the channel, the stacks this host owns, and the promotion identity.
 3. Put one `<stack>.env` per stack in `/etc/hephaestus`, `0600`. These hold the deployment secrets
@@ -59,9 +69,6 @@ page rather than from a convenience script.
 4. Install the units:
 
    ```bash
-   sudo install -d -m 0750 /var/lib/hephaestus
-   sudo git clone --branch main --single-branch \
-     https://github.com/hephaestus-build/Hephaestus.git /var/lib/hephaestus/checkout
    sudo install -m 644 \
      /var/lib/hephaestus/checkout/docker/self-host/systemd/hephaestus-reconcile.service \
      /var/lib/hephaestus/checkout/docker/self-host/systemd/hephaestus-reconcile.timer \
@@ -72,31 +79,34 @@ page rather than from a convenience script.
 
 5. Watch the first run: `journalctl -fu hephaestus-reconcile.service`.
 
-`HEPHAESTUS_STACKS` is what a host owns. A host whose edge belongs to something else — a shared
-proxy, or a PaaS serving preview environments beside it — omits `proxy` and keeps `core app`.
+`HEPHAESTUS_STACKS` selects the Compose projects this host manages. If another proxy provides its
+ingress, omit `proxy` and use `core app`.
 
 ## Operating it
 
 | You want to | Do this |
 | --- | --- |
-| Move an environment | Run the **Promote** workflow: pick the environment and release |
+| Move an environment | Run the **Promote** workflow: pick the environment and release or commit |
 | Roll back | Promote the older release with **allow-rollback** |
 | Hold an environment | Promote with **freeze** |
-| Put a hand-patched host back on its release | Promote the release it already runs |
-| Stop the host reconciling, right now | `sudo systemctl disable --now hephaestus-reconcile.timer` |
+| Resume a held environment | Manually promote the desired release or commit with **freeze** cleared |
+| Reapply Compose configuration | Promote the release or commit the host already runs |
+| Prevent new reconciliation runs | `sudo systemctl disable --now hephaestus-reconcile.timer` |
 | See what a host runs | `cat /var/lib/hephaestus/applied.json` |
 
-:::warning Disable the timer before hand-patching a host
-A reconciler reapplies its channel. Manual changes to a stack it owns are reverted the next time the
-channel moves — including a promotion of the release the host already runs, which is how you put a
-drifted host back. During an incident that is the last thing you want, so disable the timer first,
-and re-enable it when the fix has landed in a release.
+:::warning Pause reconciliation before manual changes
+Disable the timer and confirm the service is no longer running with
+`systemctl status hephaestus-reconcile.service` before editing.
+Disabling the timer does not stop an active reconciliation. Re-enable the timer after recovery.
+
+Re-promoting reapplies Compose configuration; it does not restore arbitrary container-file changes.
+The reconciler refuses a release checkout with modified tracked files.
 :::
 
 ## Watching it
 
 Set `HEPHAESTUS_METRICS_FILE` to a `.prom` file in an existing node_exporter textfile collector
-directory. Each run then writes:
+directory. After a deployment has succeeded, the metrics include:
 
 ```text
 hephaestus_deploy_info{channel="staging",release="v1.2.3",channel_commit="…"} 1
@@ -105,23 +115,21 @@ hephaestus_deploy_reconcile_timestamp_seconds …
 hephaestus_deploy_last_success_timestamp_seconds …
 ```
 
-**Alert on staleness.** A host that stops reconciling is silent, not loud — that is the one real cost
-of pulling instead of being pushed to. Alert when
-`time() - hephaestus_deploy_last_success_timestamp_seconds` exceeds ten minutes, or when
-`hephaestus_deploy_reconcile_success` is `0`. Without that alert, a host can sit on an old release
-indefinitely and nothing will say so.
+Alert when `time() - hephaestus_deploy_reconcile_timestamp_seconds` exceeds ten minutes, when
+`hephaestus_deploy_reconcile_success` is `0`, or when the host's reconciliation metrics are absent.
+`hephaestus_deploy_last_success_timestamp_seconds` records the last successful **apply**; unchanged
+and frozen channels do not advance it, so its age is not a reconciliation-liveness check.
 
-The promotion workflow also waits for the environment to report the new version before it goes
-green, so an unconverged deploy fails in Actions as well.
+A promotion without **freeze** waits for the public webapp to report the requested version. This
+checks the webapp version, not the readiness of every service; use host metrics and logs for the
+Compose result. A promotion with **freeze** records the hold without waiting for a version change.
+Skipped automatic promotions do not start an environment deployment.
 
 ## What it will not do
 
-**It does not roll back a failed deploy.** A failed apply stops and publishes a failure metric when
-the textfile collector is configured. Schema changes here are forward-only, so putting the previous
-images back would leave old code on a migrated database — the failure the rollback was meant to
-prevent. Recover by promoting a release that fixes the problem, or by restoring from a backup if the
-database itself is wrong; see
-[Backup & Restore](./backup-restore.mdx).
+**It does not roll back a failed deploy.** A failed apply may leave some services updated. Schema
+migrations are forward-only; older images may be incompatible with the migrated database. Promote a
+fix, or follow [Backup & Restore](./backup-restore.mdx) if database recovery is needed.
 
 **It does not manage anything it does not own.** The reconciler touches only the Compose projects
 named in `HEPHAESTUS_STACKS`. Containers belonging to anything else on the host are left alone.

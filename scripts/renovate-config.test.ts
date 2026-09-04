@@ -47,6 +47,18 @@ void test("Renovate creates bounded update PRs without a manual dispatch queue",
 	}
 });
 
+void test("dependency pull requests explain the human-review requirement", () => {
+	assert.ok(Array.isArray(config.prBodyNotes));
+	assert.ok(
+		config.prBodyNotes.some(
+			(note) =>
+				typeof note === "string" &&
+				note.includes("Human review required") &&
+				note.includes("https://docs.hephaestus.build/contributor/ci-cd#merge-policy"),
+		),
+	);
+});
+
 void test("every pin of one toolchain version moves in a single pull request", () => {
 	assert.ok(Array.isArray(config.packageRules));
 	const rules = config.packageRules.filter(isRecord);

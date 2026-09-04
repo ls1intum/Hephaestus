@@ -1,20 +1,10 @@
-/**
- * Points Git at the Vite+ hook dispatcher in `.vite-hooks/`, which `package.json#scripts.prepare`
- * runs on every install. `vp hooks enable` keeps whatever `core.hooksPath` a clone already has, so
- * a checkout made before the dispatcher moved would keep the old path and run none of the project
- * hooks; clearing it first is what makes the install repair such a clone rather than pass over it.
- */
+/** Configure the Vite+ dispatcher during install without changing local hook preferences. */
 import { execFileSync, spawnSync } from "node:child_process";
 
 import { CAPTURE_LIMIT_BYTES } from "./lib/process.ts";
 
 const HOOKS_DIR = ".vite-hooks";
 
-/**
- * The repository refuses a push whose commits are unsigned, and an install is the last moment a
- * contributor is in front of the machine that has to sign. It is a warning rather than a failure:
- * a clone with no signing key still has to be able to build.
- */
 const SIGNING_WARNING = `
 warning: commits pushed to a branch in this repository must be signed, and this checkout is not
 configured to sign. Sign with the SSH key you already push with:
@@ -43,18 +33,13 @@ function git(...args: string[]): string {
 
 // An image build or a source tarball has no work tree, and no hooks to enable.
 if (git("rev-parse", "--is-inside-work-tree") === "true") {
-	const current = git("config", "--local", "core.hooksPath");
-	if (current !== "" && current !== `${HOOKS_DIR}/_`)
-		git("config", "--local", "--unset", "core.hooksPath");
-	const enabled = spawnSync("vp", ["hooks", "enable", "--hooks-dir", HOOKS_DIR], {
+	const enabled = spawnSync("vp", ["config", "--no-agent", "--hooks-dir", HOOKS_DIR], {
 		stdio: "inherit",
 	});
 	process.exitCode = enabled.status ?? 1;
 
-	// The hint is for a person at their keyboard; in a job log it is only noise. GitHub Actions, like
-	// every runner, sets `CI`.
+	// Signing remains a warning so a checkout without a key can still build.
 	if (process.env.CI !== "true") {
-		// `--type=bool` so `1`, `yes` and `on` count as configured; every `gpg.format` signs.
 		const signs =
 			git("config", "--get", "--type=bool", "commit.gpgsign") === "true" &&
 			git("config", "--get", "user.signingkey") !== "";
