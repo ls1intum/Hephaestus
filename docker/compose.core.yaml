@@ -119,7 +119,7 @@ services:
       - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
       - "traefik.http.routers.http-webhook-server.entryPoints=http"
       - "traefik.http.routers.http-webhook-server.middlewares=redirect-to-https"
-      - "traefik.http.routers.http-webhook-server.rule=Host(`${APP_HOSTNAME}`) && PathPrefix(`/webhooks`)"
+      - "traefik.http.routers.http-webhook-server.rule=(${APP_HOST_MATCH:-Host(`${APP_HOSTNAME}`)}) && PathPrefix(`/webhooks`)"
       - "traefik.http.routers.https-webhook-server.entryPoints=https"
       # No stripprefix: the receiver owns the full "/webhooks/{kind}" path (controller + payload-size
       # filter + security chain all bind to /webhooks/**). Stripping it would 404 every delivery.
@@ -128,7 +128,7 @@ services:
       - traefik.http.middlewares.webhook-body-limit.buffering.maxRequestBodyBytes=26214400
       - traefik.http.middlewares.webhook-body-limit.buffering.memRequestBodyBytes=1048576
       - "traefik.http.routers.https-webhook-server.middlewares=webhook-body-limit,gzip"
-      - "traefik.http.routers.https-webhook-server.rule=Host(`${APP_HOSTNAME}`) && PathPrefix(`/webhooks`)"
+      - "traefik.http.routers.https-webhook-server.rule=(${APP_HOST_MATCH:-Host(`${APP_HOSTNAME}`)}) && PathPrefix(`/webhooks`)"
       - "traefik.http.routers.https-webhook-server.tls.certresolver=letsencrypt"
       - "traefik.http.routers.https-webhook-server.tls=true"
       - "traefik.http.routers.http-webhook-server.priority=100"

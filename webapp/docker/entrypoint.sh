@@ -4,6 +4,11 @@ set -euo pipefail
 readonly HTML_DIR="/usr/share/nginx/html"
 readonly INDEX_HTML="${HTML_DIR}/index.html"
 readonly ENV_TS="/app/src/environment/index.ts"
+# NGINX_DIR is overridable so the canonical-host rules can be exercised without a container;
+# nginx itself only ever reads the default path.
+readonly NGINX_DIR="${NGINX_DIR:-/etc/nginx}"
+readonly SERVER_NAME_CONF="${NGINX_DIR}/canonical-server-name.conf"
+readonly CANONICAL_REDIRECT_CONF="${NGINX_DIR}/conf.d/canonical-redirect.conf"
 
 # Must match LEGAL_PROFILE_PATTERN_SOURCE in webapp/src/lib/legal.ts. A unit
 # test pins them together — keep both in sync if you widen the policy.
@@ -33,6 +38,51 @@ extract_env_vars() {
   grep -oE '[A-Z_]+\?:' "$ENV_TS" | sed 's/\?:$//' | grep -v '^__'
 }
 
+# A deployment answers on every host its proxy routes to it, but only one of them is the origin
+# the SPA, the API and the auth issuer are configured for. Sending the rest there with a 301 keeps
+# sessions, cookies and CSP on a single origin instead of splitting them per hostname.
+#
+# APPLICATION_CLIENT_URL is that origin already — the SPA builds its own absolute URLs from it — so
+# it is the one source of truth here rather than a second variable that could disagree with it.
+configure_canonical_host() {
+  local url="${APPLICATION_CLIENT_URL:-}" authority="" host=""
+  # Without the scheme check a bare typo ("hephaestus.build", or any stray word) would read as a
+  # hostname and every visitor would be redirected to it.
+  if [[ "$url" =~ ^https?:// ]]; then
+    authority="${url#*://}"
+    authority="${authority%%/*}"
+    host="${authority%%:*}"
+  fi
+
+  # This value becomes nginx configuration, so it is a trust boundary: anything but a bare
+  # hostname is refused rather than escaped, and the deployment keeps answering on every host.
+  if [[ -z "$host" || ! "$host" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$ ]]; then
+    printf 'server_name localhost;\n' > "$SERVER_NAME_CONF"
+    rm -f "$CANONICAL_REDIRECT_CONF"
+    if [[ -n "$url" ]]; then
+      log "WARN: APPLICATION_CLIENT_URL='${url}' has no usable hostname; serving every Host header unredirected."
+    else
+      log "APPLICATION_CLIENT_URL unset; serving every Host header unredirected."
+    fi
+    return
+  fi
+
+  printf 'server_name %s localhost;\n' "$host" > "$SERVER_NAME_CONF"
+
+  # listen 80 default_server catches the hosts the block above does not name. localhost stays on
+  # the SPA so the container healthcheck is not answered by a redirect.
+  cat > "$CANONICAL_REDIRECT_CONF" <<EOF
+server {
+    listen 80 default_server;
+    server_name _;
+    server_tokens off;
+    access_log off;
+    return 301 https://${authority}\$request_uri;
+}
+EOF
+  log "Canonical host: ${host} (other hosts redirect to https://${authority})"
+}
+
 main() {
   # Recover git metadata from build-time variables if runtime vars are empty/missing
   # Coolify tends to inject empty GIT_COMMIT/SOURCE_COMMIT at runtime, overriding baked ENV vars.
@@ -60,7 +110,7 @@ main() {
 
        # Try to resolve actual branch name via GitHub API if token is available
        if [[ -n "${GH_AUTH_TOKEN:-}" ]]; then
-         local api_url="https://api.github.com/repos/ls1intum/Hephaestus/pulls/${pr_id}"
+         local api_url="https://api.github.com/repos/hephaestus-build/Hephaestus/pulls/${pr_id}"
          local pr_json
          if pr_json=$(curl --connect-timeout 5 --max-time 10 -sS -H "Authorization: Bearer $GH_AUTH_TOKEN" "$api_url"); then
            # Extract head.ref safely using grep/sed (no jq in image)
@@ -82,6 +132,8 @@ main() {
        log "Detected PR deployment from FQDN. Overriding GIT_BRANCH to: $GIT_BRANCH"
     fi
   fi
+
+  configure_canonical_host
 
   log "Generating runtime config..."
 
@@ -172,4 +224,8 @@ main() {
   log "Done (hash: ${hash})"
 }
 
-main
+# Sourcing this file defines its functions without running them, which is how the
+# canonical-host rules are tested.
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  main
+fi
