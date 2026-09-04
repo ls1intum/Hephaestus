@@ -20,6 +20,13 @@ The stack you get:
 | `postgres` | PostgreSQL 18 + pg_partman (custom image — vanilla `postgres:18` is **not** a drop-in) |
 | `nats-server` | NATS JetStream event buffer |
 
+Docker Compose on one Linux host is supported for every 1.x release. **Hephaestus 2.0 runs on
+Kubernetes only**: it ships one Helm chart, and the Compose stack described here is removed. The 2.0
+release includes a migration guide covering your database, event buffer, and secrets; nothing you
+configure today is lost. See
+[ADR 0041](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0041-compose-1x-kubernetes-2.md)
+for the decision and the conditions that would reverse it.
+
 ## Requirements
 
 ### Supported host matrix

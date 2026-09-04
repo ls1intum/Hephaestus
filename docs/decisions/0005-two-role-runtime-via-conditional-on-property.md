@@ -172,3 +172,10 @@ the shipped topology does with nothing set is the question.
 Spring profiles — a Kubernetes adapter with its own templating, or a BYO runner — makes reading the
 Compose files the wrong way to answer the question, and the gate has to move to whatever declares the
 topology instead.
+
+## Update — 2026-09-03 (issue #1719)
+
+[ADR 0041](0041-compose-1x-kubernetes-2.md) supersedes the Decision's deferral of further roles to
+the BYO-runner and Kubernetes-adapter epics; the 2026-05-20 update above already recorded the third
+role landing as ADR 0008. ADR 0041 fixes the steady-state role set, and the BYO-runner epic the
+Decision defers to is withdrawn. The Compose role declarations are deleted in 2.0.

@@ -63,3 +63,12 @@ credentials per industry research) that don't exist yet.
 The first non-`HostPathMount` volume mount needs a real consumer in production code; or
 the BYO-runner epic surfaces a concrete auth model that needs an SPI; or a new
 `NetworkPolicy` field starts seeing wide use and validation gaps surface.
+
+## Update — 2026-09-03 (issue #1719)
+
+[ADR 0041](0041-compose-1x-kubernetes-2.md) supersedes the Decision's `VolumeMount` portability
+rationale and its withheld `WorkerAuthProvider` SPI, and the Revisit trigger's first two clauses:
+ADR 0041 withdraws the BYO remote-worker purpose, so no BYO-runner auth model will surface.
+A driver only launches, observes, kills, removes and lists; the workspace moves as one tar and
+sandboxes take no host mounts, so the first non-`HostPathMount` consumer this ADR was reserving the
+seal for will not arrive.
