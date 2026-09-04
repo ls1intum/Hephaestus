@@ -7,10 +7,9 @@ const STACKS = ["app", "core", "proxy"] as const;
 /** Every `traefik.http.routers.<name>.rule=` value in a stack's Compose file. */
 function rules(stack: (typeof STACKS)[number]): { router: string; rule: string }[] {
 	const file = readFileSync(new URL(`../docker/compose.${stack}.yaml`, import.meta.url), "utf8");
-	return [...file.matchAll(/traefik\.http\.routers\.([a-z-]+)\.rule=(.*?)"?$/gm)].map((m) => ({
-		router: `${stack}/${m[1]}`,
-		rule: m[2],
-	}));
+	return [...file.matchAll(/traefik\.http\.routers\.([a-z-]+)\.rule=(.*?)"?$/gm)].flatMap(
+		([, router, rule]) => (router && rule ? [{ router: `${stack}/${router}`, rule }] : []),
+	);
 }
 
 const all = STACKS.flatMap(rules);
