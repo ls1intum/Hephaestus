@@ -66,6 +66,104 @@ jobs:
         if: steps.commitlint.outcome == 'failure'
         run: exit 1
 
+  # Squash-merge hides a commit's author on `main`, but a pull request's commit list keeps it
+  # forever, and that list is where reviewers and provenance readers look. `CONTRIBUTING.md`
+  # § Identity and Transparency asks for accountable identities; this is what holds them to it.
+  verify-commit-identity:
+    name: "Verify commit identity"
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.pull_request.draft }}
+    permissions:
+      contents: read
+      pull-requests: write
+    # No checkout: the query and the rule live here, so nothing from the pull request is fetched.
+    steps:
+      - name: "Resolve the author of every commit"
+        id: identity
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        continue-on-error: true
+        with:
+          script: |
+            const { writeFile } = require("node:fs/promises");
+
+            // `authors(first:1)` is the primary author alone: a co-author after the first is a
+            // credit, not the identity the commit is attributed to.
+            const query = `query($owner:String!,$name:String!,$number:Int!,$after:String){
+              repository(owner:$owner,name:$name){ pullRequest(number:$number){
+                author{ __typename login }
+                commits(first:100,after:$after){ pageInfo{hasNextPage endCursor}
+                  nodes{ commit{ abbreviatedOid authors(first:1){ nodes{ email name user{ login } } } } } } } } }`;
+
+            const pull = context.payload.pull_request;
+            const nodes = [];
+            let author;
+            let after = null;
+            do {
+              const page = await github.graphql(query, {
+                owner: context.repo.owner,
+                name: context.repo.repo,
+                number: pull.number,
+                after,
+              });
+              const data = page.repository.pullRequest;
+              author = data.author;
+              nodes.push(...data.commits.nodes);
+              after = data.commits.pageInfo.hasNextPage ? data.commits.pageInfo.endCursor : null;
+            } while (after);
+
+            // A `Bot` author's login carries no suffix while the account its commits resolve to
+            // does: Renovate opens a pull request as `renovate` and signs its commits as
+            // `renovate[bot]`. Deriving the one from the other keeps bots under the same rule
+            // rather than exempting them.
+            const expected = author.__typename === "Bot" ? `${author.login}[bot]` : author.login;
+            const offenders = nodes.filter(
+              ({ commit }) =>
+                commit.authors.nodes[0]?.user?.login?.toLowerCase() !== expected.toLowerCase(),
+            );
+            if (offenders.length === 0) return;
+
+            const listed = offenders.map(({ commit }) => {
+              const [commitAuthor] = commit.authors.nodes;
+              const resolved = commitAuthor?.user ? `@${commitAuthor.user.login}` : "no GitHub account";
+              return `    ${commit.abbreviatedOid}  ${commitAuthor?.email ?? "no author email"}  ${resolved}`;
+            });
+            await writeFile(
+              `${process.env.RUNNER_TEMP}/identity-comment.md`,
+              [
+                "## Commit identity check failed",
+                "",
+                `Every commit here must be authored by @${expected}, the account that opened this`,
+                "pull request. These are not:",
+                "",
+                ...listed,
+                "",
+                "Point `git config user.email` at an address on that account, then re-author them:",
+                "",
+                `    git rebase -i --exec "git commit --amend --no-edit --reset-author" origin/${pull.base.ref}`,
+                "",
+              ].join("\n"),
+            );
+            core.setFailed(`${offenders.length} commit(s) do not resolve to @${expected}.`);
+
+      - name: "Comment on PR with the offending commits"
+        uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
+        if: steps.identity.outcome == 'failure'
+        with:
+          header: pr-commit-identity-error
+          path: ${{ runner.temp }}/identity-comment.md
+
+      - name: "Remove error comment on success"
+        uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
+        if: steps.identity.outcome == 'success'
+        with:
+          header: pr-commit-identity-error
+          delete: true
+
+      - name: "Fail workflow if a commit did not resolve"
+        if: steps.identity.outcome == 'failure'
+        run: exit 1
+
   assign-author:
     name: "Assign author"
     timeout-minutes: 5
