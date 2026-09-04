@@ -71,16 +71,23 @@ jobs:
 
       - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
 
-      # deploy-state carries channels, not code, so the image resolver comes from the default branch.
+      # The resolver is tooling: it comes from the default branch so that a commit older than it can
+      # still be promoted, which is exactly what rolling an environment back means.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # The commit being promoted, so the upstream pins and the resolver are the ones that
-          # commit carries. An empty ref is the default branch, which is what a release wants.
-          ref: ${{ inputs.commit }}
           path: .promotion-scripts
-          sparse-checkout: |
-            scripts
-            security
+          sparse-checkout: scripts
+          persist-credentials: false
+
+      # The pins are data about the commit being promoted, so they come from that commit. Reading
+      # them from the default branch instead would deploy one commit's code against another's
+      # upstream images.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: ${{ inputs.commit != '' }}
+        with:
+          ref: ${{ inputs.commit }}
+          path: .promotion-inventory
+          sparse-checkout: security
           persist-credentials: false
 
       - name: Resolve the release to promote
@@ -140,7 +147,9 @@ jobs:
             # A commit has no release to fetch a lock from, so the channel carries the digests
             # itself. They are covered by the signature below, which is the same authority that
             # stands behind a release lock.
-            node .promotion-scripts/scripts/commit-image-lock.ts "$RELEASE" "$OWNER" > images.json
+            node "$GITHUB_WORKSPACE/.promotion-scripts/scripts/commit-image-lock.ts" \
+              "$RELEASE" "$OWNER" "$GITHUB_WORKSPACE/.promotion-inventory/security/release-images.json" \
+              > images.json
             jq -n --arg commit "$RELEASE" --slurpfile images images.json \
               --argjson allowRollback "$ALLOW_ROLLBACK" --argjson freeze "$FREEZE" \
               '{commit: $commit, images: $images[0], allowRollback: $allowRollback, freeze: $freeze}' \
