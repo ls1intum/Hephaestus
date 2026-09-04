@@ -144,7 +144,8 @@ webhook streams (ADR 0008) was delivered to `application-server`, which runs wit
 `hephaestus.runtime.webhook.enabled=false`: the bound and its documented recovery procedure were both
 inert.
 
-**Decision.** `scripts/check-env-roles.mjs` fails the build on three shapes of the same defect:
+**Decision.** `scripts/check-env-roles.ts` fails the build on three shapes of the same defect, and
+its own header carries the full set the gate has grown since:
 
 | Failure | What it catches |
 |---|---|

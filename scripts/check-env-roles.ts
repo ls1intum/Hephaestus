@@ -4,28 +4,20 @@
  * Runtime roles (`hephaestus.runtime.<role>.enabled`, ADR 0005 / ADR 0008) decide which beans exist
  * in a container. A `@ConfigurationProperties` record read only by role-gated beans is, on a
  * container running with that role off, a variable nothing binds: Compose sets it, `docker inspect`
- * shows it, the documented procedure quotes it, and it configures nothing. That is how a disk bound
- * for the webhook streams was delivered to the container that does not run the webhook role, leaving
- * both the bound and the recovery procedure inert with no signal anywhere.
+ * shows it, the documented procedure quotes it, and it configures nothing.
  *
- * Three failures, all of them the same defect seen from a different side:
+ * Five shapes of that one defect, and this file is the only place they are named:
  *
  *   misdelivered — a service sets a variable whose owning role that same service disables.
- *   undelivered  — the deployment forwards the variable somewhere, but no container that runs the
- *                  owning role receives it. This is the half that stays broken after the misdelivery
+ *   undelivered  — the deployment forwards the variable somewhere, but no container running the
+ *                  owning role receives it. This is the half that stays broken after a misdelivery
  *                  is removed from the wrong service and never added to the right one.
  *   unforwarded  — `application.yml` offers the knob as `${VAR:default}` and no service forwards it
  *                  at all, so setting it in `.env` does nothing. A setting that is not meant to be
  *                  operator-tunable is written without a placeholder and is never in scope here.
- *
- * The mirror image is a setting no role gates. Every container running the application image reads
- * it, so the value one of them is given is a claim about the whole deployment, and two containers
- * making different claims describe a stack that does not exist:
- *
- *   disagreed    — application containers spell one setting differently. That is how the release
- *                  lock's agent image digest reached the app containers and not the webhook
- *                  receiver, which derived a tag from its own version instead and then refused to
- *                  boot on it, because the guards that read it are deliberately not role-gated.
+ *   disagreed    — application containers spell one ungated setting differently. Every one of them
+ *                  reads it, so the value one is handed is a claim about the whole deployment, and
+ *                  two claims describe a stack that does not exist.
  *   omitted      — the same defect with the key left out rather than left blank. A container that
  *                  never mentions a setting makes no claim to disagree with, so `DEPLOYMENT_WIDE`
  *                  names the settings whose absence is itself the failure.
@@ -38,15 +30,19 @@
  * An entry naming a path `application.yml` no longer has fails too, so a rename cannot leave a dead
  * entry behind that silently checks nothing.
  *
- * Compose is read here rather than through `docker compose config`, which would be a stricter parse:
- * this gate runs in `vp run check` and the pre-push hook, where a Docker daemon is not a given, and
- * `config` interpolates from the ambient environment, so its verdict would depend on whose shell it
- * ran in. What the shipped topology does with nothing set is the question, so the `${VAR:-default}`
- * defaults are what gets evaluated. A compose file that yields no services fails rather than passes,
- * which is the failure mode a hand-written parse otherwise hides.
+ * Compose is read with the `yaml` library rather than through `docker compose config`, which would
+ * be a stricter parse: this gate runs in `vp run check` and the pre-push hook, where a Docker daemon
+ * is not a given, and `config` interpolates from the ambient environment, so its verdict would
+ * depend on whose shell it ran in. What the shipped topology does with nothing set is the question,
+ * so the `${VAR:-default}` defaults are what gets evaluated. A Compose file that yields no services
+ * fails rather than passes.
  */
 import { readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
+
+import { parse, parseAllDocuments } from "yaml";
+
+import { isRecord } from "./lib/json.ts";
 
 /** Resolved from this file, so the gate answers the same whatever the working directory is. */
 const REPO_ROOT = resolve(import.meta.dirname, "..");
@@ -140,21 +136,11 @@ const PER_CONTAINER = new Map<string, string>([
 ]);
 
 /**
- * A setting every application container must be *given*, not merely agree about. These are the ones
- * whose readers are gated on no role at all: the beans are constructed in every context, so the
- * container that was skipped does not quietly run without the feature, it fails to boot.
- *
  * Declared rather than derived, and the reason is worth stating because it looks like a weakness.
  * Nothing in Compose separates a setting the receiver must have from one it is right not to have:
  * `GH_APP_PRIVATE_KEY` also reaches two of the three containers, and "deliver it to the third too"
- * would be a private key shipped to a container with no use for it. Only the Java says which is
- * which — whether the bean reading it carries a role gate — so the entry has to name that bean and
- * be checkable by a reader against it.
- *
- * What is fail-closed, and needs nothing listed, is the other half: a setting more than one
- * application container writes has to be written the same on all of them. Between the two, both
- * shapes of the defect this exists for are covered — the container that was handed a different
- * value, and the container that was handed none.
+ * would be a private key shipped to a container with no use for it. Only the role gate on the bean
+ * that reads it decides, so each entry names that bean and a reader can check it against the Java.
  */
 interface DeploymentWideSetting {
 	readonly variable: string;
@@ -200,8 +186,8 @@ export async function readProfileRoles(root = REPO_ROOT): Promise<ProfileRoles> 
 				profile,
 				readDisabledRoles(await readFile(join(root, PROFILE_YML(profile)), "utf8")),
 			);
-		} catch {
-			// A profile with no overlay file turns nothing off.
+		} catch (error) {
+			if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error;
 		}
 	}
 	return profileRoles;
@@ -209,55 +195,27 @@ export async function readProfileRoles(root = REPO_ROOT): Promise<ProfileRoles> 
 
 /** `${VAR:default}` — Spring's syntax. Stops at `$` so a nested placeholder is skipped, not misread. */
 const SPRING_PLACEHOLDER = /\$\{([A-Z0-9_]+):[^}$]*\}/;
-/** `key: value`, the only line shape read here. `<<` is YAML's merge key and is one of the keys. */
-const MAPPING_LINE = /^(<<|[A-Za-z0-9_.-]+):\s*(.*)$/;
 
-const indentOf = (line: string): number => line.length - line.trimStart().length;
-const isStructural = (line: string): boolean =>
-	line.trim().length > 0 && !line.trim().startsWith("#");
+function yamlDocuments(text: string): unknown[] {
+	return parseAllDocuments(text, { merge: true }).map((document) => {
+		const error = document.errors[0];
+		if (error) throw error;
+		return document.toJS() as unknown;
+	});
+}
 
-/**
- * What a Compose value resolves to when the operator sets nothing — which is the shipped topology's
- * own answer, and the only one that is the same on every machine. `${VAR:-d}` and `${VAR-d}` fall
- * back to `d`; a bare `${VAR}` resolves to the empty string, exactly as Compose leaves it.
- */
-/** The value as the file writes it: trimmed, with the quotes YAML would have dropped anyway. */
 const unquote = (raw: string): string => raw.trim().replace(/^["']|["']$/g, "");
 
+/**
+ * `${VAR:-d}` and `${VAR-d}` fall back to `d`; a bare `${VAR}` resolves to the empty string, exactly
+ * as Compose leaves it. The `-` is the only optional part of the syntax.
+ */
 export function composeDefault(raw: string): string {
 	const value = unquote(raw);
 	const placeholder = /^\$\{[A-Z0-9_]+(?<dash>:?-)?(?<fallback>[^}]*)\}$/.exec(value);
 	if (!placeholder) return value;
-	// The `-` is the only optional part: a placeholder without it offers no fallback at all, and
-	// Compose leaves that variable empty. Whatever follows it is the fallback, the empty one included.
 	const groups = placeholder.groups;
 	return groups?.dash === undefined ? "" : (groups.fallback ?? "");
-}
-
-/** One `key: value`. `path` ends in `key`; callers that want a dotted path join it themselves. */
-interface MappingEntry {
-	readonly path: readonly string[];
-	readonly key: string;
-	readonly value: string;
-}
-
-/** Every `key: value` in a YAML mapping, with the path of keys above it. Comments and lists are skipped. */
-function* mappingEntries(text: string): Generator<MappingEntry, void, undefined> {
-	const stack: { indent: number; key: string }[] = [];
-	for (const line of text.split("\n")) {
-		if (!isStructural(line)) continue;
-		const indent = indentOf(line);
-		// Both groups are mandatory, so either one missing means the line is not a mapping entry.
-		const [, key, value] = MAPPING_LINE.exec(line.trim()) ?? [];
-		if (key === undefined || value === undefined) continue;
-		let parent = stack.at(-1);
-		while (parent !== undefined && parent.indent >= indent) {
-			stack.pop();
-			parent = stack.at(-1);
-		}
-		yield { path: [...stack.map((entry) => entry.key), key], key, value: value.trim() };
-		stack.push({ indent, key });
-	}
 }
 
 interface ApplicationConfig {
@@ -270,80 +228,85 @@ interface ApplicationConfig {
 export function readApplicationConfig(text: string): ApplicationConfig {
 	const paths = new Set<string>();
 	const placeholders = new Map<string, string>();
-	for (const { path, value } of mappingEntries(text)) {
-		paths.add(path.join("."));
-		const variable = SPRING_PLACEHOLDER.exec(value)?.[1];
-		if (variable) placeholders.set(variable, path.join("."));
+	const visit = (value: unknown, parent: readonly string[]): void => {
+		if (!isRecord(value)) return;
+		for (const [key, child] of Object.entries(value)) {
+			const path = [...parent, key];
+			const dotted = path.join(".");
+			paths.add(dotted);
+			if (typeof child === "string") {
+				const variable = SPRING_PLACEHOLDER.exec(child)?.[1];
+				if (variable) placeholders.set(variable, dotted);
+			}
+			visit(child, path);
+		}
+	};
+	for (const document of yamlDocuments(text)) {
+		visit(document, []);
 	}
 	return { paths, placeholders };
 }
 
-/** `env` is every key the service delivers, merges included; `flags` is only what it spells itself. */
+/**
+ * `flags` is what an operator who sets nothing gets, and two services can agree on that and still be
+ * handed different values, because `${VAR:?required}` and a valueless key both resolve to nothing.
+ * `raw` is what the file writes, so those two stay distinguishable.
+ */
 export interface ComposeService {
 	readonly name: string;
 	readonly env: Set<string>;
 	readonly flags: Map<string, string>;
-	/**
-	 * What the file writes for each key it spells itself, before interpolation. `flags` answers what
-	 * an operator who sets nothing gets, and two services can agree on that and still be handed
-	 * different values — `${VAR:?required}` and a valueless key both resolve to nothing here.
-	 */
 	readonly raw: Map<string, string>;
-	/** The `image:` line, uninterpolated, so a service can be recognised by the image it runs. */
 	image: string;
 }
 
 /**
- * Services in one Compose file, each with the environment keys it delivers and the role flags it
- * resolves to. Merge keys are resolved against the file's own `x-*` anchors, so a shared block counts
- * as delivered by every service that merges it. Indentation is read relatively, so reformatting the
- * file cannot quietly empty the result.
+ * Compose accepts `environment:` as a mapping or as a `KEY=value` sequence, and both forms deliver
+ * the same environment; reading only the mapping would let the sequence form empty a service's
+ * environment and pass. A sequence entry with no `=` inherits from the caller's shell, which this
+ * gate deliberately does not read, so it delivers nothing here.
+ */
+function* environmentEntries(environment: unknown): Generator<readonly [string, string]> {
+	if (isRecord(environment)) {
+		for (const [key, value] of Object.entries(environment)) {
+			if (value === null) yield [key, ""];
+			else if (typeof value === "string" || typeof value === "number" || typeof value === "boolean")
+				yield [key, `${value}`];
+		}
+		return;
+	}
+	if (!Array.isArray(environment)) return;
+	for (const entry of environment) {
+		if (typeof entry !== "string") continue;
+		const separator = entry.indexOf("=");
+		yield separator === -1 ? [entry, ""] : [entry.slice(0, separator), entry.slice(separator + 1)];
+	}
+}
+
+/**
+ * Services in one Compose file, with `<<:` merges resolved against the file's own `x-*` anchors, so
+ * a shared block counts on every service that merges it.
  */
 export function readComposeServices(text: string): Map<string, ComposeService> {
-	/** Anchor name to the environment keys its block declares. */
-	const anchors = new Map<string, Set<string>>();
-	/** Top-level key of an anchored block to that same set, so keys under it land in the anchor. */
-	const anchoredAt = new Map<string, Set<string>>();
 	const services = new Map<string, ComposeService>();
+	const compose = parse(text, { merge: true }) as unknown;
+	if (!isRecord(compose) || !isRecord(compose.services)) return services;
 
-	for (const { path, key, value } of mappingEntries(text)) {
-		const [top, serviceName, section] = path;
-
-		const declared = /^&([A-Za-z0-9_-]+)/.exec(value)?.[1];
-		if (path.length === 1 && declared !== undefined) {
-			const declaredKeys = new Set<string>();
-			anchors.set(declared, declaredKeys);
-			anchoredAt.set(key, declaredKeys);
-			continue;
+	for (const [name, value] of Object.entries(compose.services)) {
+		if (!isRecord(value)) continue;
+		const service: ComposeService = {
+			name,
+			env: new Set(),
+			flags: new Map(),
+			raw: new Map(),
+			image: typeof value.image === "string" ? value.image : "",
+		};
+		services.set(name, service);
+		for (const [key, raw] of environmentEntries(value.environment)) {
+			service.env.add(key);
+			service.flags.set(key, composeDefault(raw));
+			service.raw.set(key, raw);
 		}
-		const anchored = path.length === 2 && top !== undefined ? anchoredAt.get(top) : undefined;
-		if (anchored) {
-			anchored.add(key);
-			continue;
-		}
-		if (top !== "services") continue;
-		if (path.length === 2) {
-			services.set(key, { name: key, env: new Set(), flags: new Map(), raw: new Map(), image: "" });
-			continue;
-		}
-		if (path.length === 3 && key === "image" && serviceName !== undefined) {
-			const named = services.get(serviceName);
-			if (named) named.image = unquote(value);
-			continue;
-		}
-		if (path.length !== 4 || section !== "environment" || serviceName === undefined) continue;
-		const service = services.get(serviceName);
-		if (!service) continue;
-		if (key === "<<") {
-			for (const [, merged] of value.matchAll(/\*([A-Za-z0-9_-]+)/g)) {
-				if (merged === undefined) continue;
-				for (const inherited of anchors.get(merged) ?? []) service.env.add(inherited);
-			}
-			continue;
-		}
-		service.env.add(key);
-		service.flags.set(key, composeDefault(value));
-		service.raw.set(key, unquote(value));
 	}
 	return services;
 }
@@ -363,27 +326,13 @@ const runsRole = (service: ComposeService, role: Role, profileRoles: ProfileRole
 /** Roles an `application-<profile>.yml` overlay switches off. */
 export function readDisabledRoles(text: string): Set<string> {
 	const disabled = new Set<string>();
-	let runtimeIndent: number | null = null;
-	let role: string | null = null;
-	for (const line of text.split("\n")) {
-		if (!isStructural(line)) continue;
-		const indent = indentOf(line);
-		const trimmed = line.trim();
-		if (runtimeIndent !== null && indent <= runtimeIndent) {
-			runtimeIndent = null;
-			role = null;
+	for (const document of yamlDocuments(text)) {
+		if (!isRecord(document) || !isRecord(document.hephaestus)) continue;
+		const runtime = document.hephaestus.runtime;
+		if (!isRecord(runtime)) continue;
+		for (const [role, configuration] of Object.entries(runtime)) {
+			if (isRecord(configuration) && configuration.enabled === false) disabled.add(role);
 		}
-		if (trimmed === "runtime:") {
-			runtimeIndent = indent;
-			continue;
-		}
-		if (runtimeIndent === null) continue;
-		const key = /^([a-z-]+):$/.exec(trimmed)?.[1];
-		if (key) {
-			role = key;
-			continue;
-		}
-		if (role && trimmed === "enabled: false") disabled.add(role);
 	}
 	return disabled;
 }
@@ -440,7 +389,17 @@ export function analyse(
 	const delivered = new Map<string, DeliveredVariable>();
 	const applicationContainers: Delivery[] = [];
 	for (const [label, text] of compose) {
-		const services = readComposeServices(text);
+		let services: Map<string, ComposeService>;
+		try {
+			services = readComposeServices(text);
+		} catch (error) {
+			// Only here is the file's name known, so a YAML error is reported the way every other
+			// failure in this list is rather than ending the run as an unlabelled stack trace.
+			failures.push(
+				`${label} is not valid YAML: ${error instanceof Error ? error.message : String(error)}`,
+			);
+			continue;
+		}
 		if (services.size === 0) {
 			failures.push(
 				`${label} parsed to zero services, so every check below ran against nothing.\n` +
@@ -487,11 +446,8 @@ export function analyse(
 		);
 	}
 
-	// The other half of ROLE_SCOPES. A setting nothing gates on a role is read by every container
-	// running the application image, so the value one of them is handed is a claim about the whole
-	// deployment — and two containers making different claims describe a stack that does not exist.
-	// The release lock's agent digest reached the app containers and not the receiver that way; the
-	// receiver derived a tag from its own version instead and the pin guard refused to boot on it.
+	// disagreed. Compared on the raw spelling rather than the resolved default, because two
+	// containers can both resolve to nothing and still be handed different values.
 	const spellings = new Map<string, Map<string, string[]>>();
 	for (const { id, service } of applicationContainers) {
 		for (const [variable, value] of service.raw) {
@@ -514,10 +470,8 @@ export function analyse(
 		);
 	}
 
-	// The disagreement above only sees containers that mention the key. A container that omits it
-	// makes no claim to disagree with, and reads the application default instead — which for the
-	// agent image is a tag derived from its own version, the exact thing the guards refuse. So an
-	// omission is a value here, not an absence.
+	// omitted. The loop above sees only containers that mention the key, so an absence has to be
+	// checked separately: the container that omits it reads the application default instead.
 	for (const { variable, path, why } of DEPLOYMENT_WIDE) {
 		if (!paths.has(path)) {
 			failures.push(
