@@ -34,6 +34,8 @@ Install and configure the following tools before you attempt a local build:
    After `vp install`, `vp --version` prints the pinned `vite-plus`.
 4. **NATS CLI (optional)** – Helpful when inspecting the webhook/sync event stream (NATS is disabled by default locally). The agent job queue runs on PostgreSQL and needs no NATS.
 
+If you push branches to the repository rather than to a fork, configure commit signing as well — [CONTRIBUTING.md § Signed Commits](https://github.com/hephaestus-build/Hephaestus/blob/main/CONTRIBUTING.md#signed-commits) has the setup, and `vp install` warns while it is missing.
+
 ## Recommended IDE setup
 
 Open the repository using the `project.code-workspace` file in VS Code and install the workspace recommendations (`@recommended` in the Extensions view). Key extensions include:
