@@ -1,0 +1,67 @@
+# Moves the environment that follows the default branch to every commit CI has built.
+#
+# Releases are how production is promoted: they carry a version, a provenance manifest and a signed
+# lock, and a person decides when one is cut. Staging exists to be the branch as it stands, so it
+# follows commits instead — the promotion workflow is still the only thing that writes a channel, so
+# the identity a host pins does not change.
+#
+# There is no switch for this. An environment that sometimes follows the branch and sometimes runs a
+# release is two environments wearing one name, and the channel already has the only hold that
+# matters: `freeze`, which is signed and travels with the channel rather than sitting beside it.
+name: Continuous staging
+
+on:
+  workflow_run: # zizmor: ignore[dangerous-triggers] Nothing from the run is checked out or executed.
+    workflows: ["CI/CD"]
+    types: [completed]
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  # Not cancel-in-progress: a superseded promotion has already written its channel, and the next one
+  # supersedes it on the host anyway.
+  group: continuous-staging
+  cancel-in-progress: false
+
+jobs:
+  follow-main:
+    # A red build is not something to deploy, and a run that was cancelled decided nothing.
+    if: >-
+      ${{ github.event.workflow_run.conclusion == 'success'
+        && github.event.workflow_run.event == 'push' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      actions: write # dispatch the promotion workflow
+      contents: read # read the channel to honour a freeze
+    steps:
+      - name: Follow this commit on staging
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMMIT: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          # A hold has to survive the next green build, or it is advice rather than a hold. The
+          # channel is the record of it, so it is what gets asked.
+          frozen=$(gh api "repos/$GITHUB_REPOSITORY/contents/channels/staging.json?ref=deploy-state" \
+            --jq '.content' 2>/dev/null | base64 -d 2>/dev/null | jq -r '.freeze // false' || echo false)
+          if [ "$frozen" = true ]; then
+            echo "::notice::staging is frozen; leaving it where it is"
+            exit 0
+          fi
+
+          since=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          gh workflow run promote.yml --repo "$GITHUB_REPOSITORY" \
+            -f environment=Staging -f commit="$COMMIT"
+          # The dispatch returns before the run exists, and taking the newest run blindly could
+          # watch someone else's promotion, so the run is matched on being newer than the request.
+          for _ in $(seq 1 30); do
+            run=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow promote.yml --limit 10 \
+              --json databaseId,createdAt \
+              --jq "[.[] | select(.createdAt > \"$since\")] | sort_by(.createdAt) | .[0].databaseId // empty")
+            [ -n "$run" ] && break
+            sleep 5
+          done
+          [ -n "$run" ] || { echo "::error::promote.yml did not start"; exit 1; }
+          gh run watch "$run" --repo "$GITHUB_REPOSITORY" --exit-status

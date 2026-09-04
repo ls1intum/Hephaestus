@@ -45,6 +45,29 @@ a GitHub environment gates that workflow: a signature carrying that identity is 
 approved. This holds only while `promote.yml` stays non-reusable — a `workflow_call` trigger would
 let any caller mint the same identity.
 
+**Staging follows the default branch; production runs releases.** A channel names either a
+release or a commit. A release is the promoted artifact: its lock, provenance and signature are
+fetched and verified, which is how production moves. A commit has no release to fetch, so the
+channel carries the digests to run and the channel's own signature covers them; provenance comes
+from GitHub's build attestations, checked per image and bound to the commit being deployed, so an
+image retagged onto that commit does not pass.
+
+This is not the same assurance a release carries, and it is worth being exact about the difference.
+A release additionally binds the lock to the source tree, enumerates every platform, and gates on the
+SBOM, licence and vulnerability policy. A commit channel checks none of those. That is acceptable for
+an environment that follows the branch — the code is already merged, and the vulnerability policy is
+enforced before the release that reaches production — and it would not be acceptable for production,
+which is why production names releases. Only a commit already on the default branch may be
+followed.
+
+The split is by environment, not by a setting. An environment that sometimes follows the branch and
+sometimes runs a release is two environments sharing a name, and every release would drag staging
+from a commit back onto a tag naming the same bytes — a release re-tags the commit's images rather
+than rebuilding them. So a release no longer promotes staging: by the time one exists, staging has
+been running that commit since it merged, which is a longer and more honest rehearsal than the
+minutes a pre-production promotion bought. Holding an environment still is what the channel's
+`freeze` is for, signed and carried with the channel rather than configured beside it.
+
 **A failed apply stops.** It does not roll back. Schema changes are forward-only here, so restoring
 the previous images would leave old code on a migrated database. Host monitoring reads the failure
 and staleness metrics instead.

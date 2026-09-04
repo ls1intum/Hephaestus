@@ -515,40 +515,39 @@ jobs:
             done
           done < "$RUNNER_TEMP/promotions.tsv"
 
-  # Staging pulls: this asks for the promotion and waits for it, so production is still only offered
-  # a release staging is actually running. Nothing here reaches the host, and no deploy credential
-  # is involved — see ADR 0042.
-  promote-staging:
+  # Staging is not promoted here — it follows the default branch, and a release re-tags that commit's
+  # images rather than rebuilding them, so the digests production is offered are the digests staging
+  # runs. But following is not the same as having arrived: this release and that promotion start
+  # from the same finished build, so production waits until staging is actually on this commit.
+  awaiting-staging:
     needs: [release, tag-images, publish-release]
     if: needs.release.outputs.released == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
-      actions: write
       contents: read
     steps:
-      - name: Promote staging and wait for it to converge
+      - name: Wait for staging to be running this commit
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE: ${{ needs.release.outputs.tag_name }}
+          COMMIT: ${{ needs.release.outputs.sha }}
         run: |
           set -euo pipefail
-          since=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          title="Promote ${RELEASE} to Staging"
-          gh workflow run promote.yml --repo "$GITHUB_REPOSITORY" \
-            -f environment=Staging -f release="$RELEASE"
-          for _ in $(seq 1 30); do
-            run=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow promote.yml --limit 100 \
-              --json databaseId,createdAt,displayTitle,event \
-              --jq "[.[] | select(.event == \"workflow_dispatch\" and .displayTitle == \"$title\" and .createdAt >= \"$since\")] | sort_by(.createdAt) | .[0].databaseId // empty")
-            [ -n "$run" ] && break
-            sleep 5
+          deadline=$(( SECONDS + 1500 ))
+          while [ "$SECONDS" -lt "$deadline" ]; do
+            channel=$(gh api "repos/$GITHUB_REPOSITORY/contents/channels/staging.json?ref=deploy-state" \
+              --jq '.content' 2>/dev/null | base64 -d 2>/dev/null || echo '{}')
+            [ "$(jq -r '.commit // empty' <<< "$channel")" = "$COMMIT" ] && {
+              echo "staging is on $COMMIT"; exit 0; }
+            [ "$(jq -r '.freeze // false' <<< "$channel")" = true ] && {
+              echo "::error::staging is frozen, so this release has not been rehearsed there"; exit 1; }
+            sleep 20
           done
-          [ -n "$run" ] || { echo "::error::promote.yml did not start"; exit 1; }
-          gh run watch "$run" --repo "$GITHUB_REPOSITORY" --exit-status
+          echo "::error::staging did not reach ${COMMIT} — production is not offered an unrehearsed release"
+          exit 1
 
   deploy-production:
-    needs: [release, promote-staging]
+    needs: [release, awaiting-staging]
     if: needs.release.outputs.released == 'true'
     uses: ./.github/workflows/deploy-prod.yml
     permissions:
