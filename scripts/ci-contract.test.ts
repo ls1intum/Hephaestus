@@ -1516,6 +1516,24 @@ void describe("CI contract", () => {
 			}
 		}
 	});
+
+	void test("bounds every job that runs steps of its own", async () => {
+		// A job that declares no `timeout-minutes` inherits GitHub's six-hour default, so one hung
+		// step holds a runner for a working day and reports nothing until it is killed. A job that
+		// only `uses:` a reusable workflow runs no step here: its bound is on the callee's jobs.
+		const unbounded: string[] = [];
+		for (const [file, source] of await workflowSources()) {
+			const jobs = parseDocument(source).get("jobs");
+			if (!isMap(jobs)) continue;
+			for (const entry of jobs.items) {
+				const definition = entry.value;
+				if (!isMap(definition) || !isSeq(definition.get("steps"))) continue;
+				if (definition.get("timeout-minutes") === undefined)
+					unbounded.push(`${file}#${String(entry.key)}`);
+			}
+		}
+		assert.deepEqual(unbounded, [], "these jobs run steps without bounding how long they may run");
+	});
 });
 
 void test("the task graph keeps its cache posture", async () => {
