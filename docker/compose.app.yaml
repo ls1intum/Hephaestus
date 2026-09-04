@@ -91,7 +91,7 @@ services:
       - "traefik.http.middlewares.canonical-host.redirectregex.replacement=https://${APP_HOSTNAME}/$${1}"
       - "traefik.http.middlewares.canonical-host.redirectregex.permanent=true"
       - "traefik.http.routers.https-canonical.entryPoints=https"
-      - "traefik.http.routers.https-canonical.middlewares=canonical-host"
+      - "traefik.http.routers.https-canonical.middlewares=app-hsts,canonical-host"
       - "traefik.http.routers.https-canonical.rule=(${APP_HOST_MATCH:-Host(`${APP_HOSTNAME}`)}) && !Host(`${APP_HOSTNAME}`) && PathPrefix(`/`)"
       - "traefik.http.routers.https-canonical.service=https-webapp"
       # No certresolver here on purpose: ACME derives a router's domains from its rule and does not
