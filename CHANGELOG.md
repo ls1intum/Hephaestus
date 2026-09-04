@@ -1,5 +1,48 @@
 # Changelog
 
+## 0.76.0
+
+### Minor Changes
+
+- Operators can now alert on privacy-job outcomes: account erasure, export generation, export expiry and LLM usage retention each publish success, failure and affected-row counters. A retention pass that runs out of its time budget with rows still expired reports `incomplete` rather than success, so a sweep that never catches up is visible.
+
+  LLM usage accounting is no longer kept indefinitely — rows become eligible for deletion 400 days after they were recorded by default, and a daily sweep removes them in batches. The public privacy statement and the record of processing document the window.
+
+  **Operators:** the first sweep after upgrade begins deleting usage rows older than the window, and further sweeps continue until the backlog is gone. If your accounting obligations require longer, set `HEPHAESTUS_LLM_USAGE_RETENTION` before upgrading.
+
+- Hosts can now keep themselves on a release instead of being deployed to. A host polls a channel naming the release it should run, verifies the release signature and the channel's own signature itself, and applies the digest-pinned stacks — so no deployment credential, and no way in to the machine, has to exist anywhere else. A failed upgrade stops and reports failure for host monitoring rather than rolling back, because schema changes only ever move forward.
+
+  Nothing changes until you install the units in `docker/self-host/systemd/`. If you do, set up the staleness alert the guide describes before relying on it: a host that stops updating is quiet, and that alert is what makes it loud.
+
+- An instance can now answer on more than one hostname. Set `APP_HOST_MATCH` to a matcher naming
+  **every** hostname it should answer on, `APP_HOSTNAME` included — the matcher replaces the default
+  rather than adding to it, so a hostname left out of it stops being served and drops out of the
+  certificate. All the names in it are served and covered by the same certificate, which is what makes
+  a move to a new domain possible without the old one going dark:
+
+  ```
+  APP_HOST_MATCH=Host(`new.example.com`) || Host(`old.example.com`)
+  ```
+
+  `APP_HOSTNAME` stays the instance's single origin: the SPA, the API and the auth issuer are all
+  configured for it, so a browser arriving on any other name is redirected there and the app is only
+  ever loaded from one host. The OAuth callback URLs stay on `APP_HOSTNAME` alone. An instance with a
+  single hostname needs no matcher and behaves exactly as before.
+
+- **Operators:** Worker sandboxes now reach a dedicated sandbox gateway on `SANDBOX_API_PORT` (default `8081`), which serves only the sandbox capabilities and answers every other path with an empty `404`. Worker containers bind their HTTP and management endpoints to loopback, so sandboxes reach them only through the gateway. `SANDBOX_API_REQUESTS_PER_MINUTE` caps each authenticated sandbox and `SANDBOX_API_MAX_REQUEST_BYTES` caps the request bodies it accepts.
+
+### Patch Changes
+
+- Credential key rotation now quarantines and reports undecryptable integration credentials while continuing to rotate healthy connections. The rotation guide explains how operators identify, recover, or replace affected credentials.
+- Heph no longer uses issues or pull requests that were deleted upstream, and asking for a practice review of deleted work now says so instead of starting one. Leaderboard scores, profile counts and the practice feedback you already received are unchanged: they are a record of what happened, not of the work's current state.
+- Pull-request previews start again. The application refuses to talk to a database it cannot recognise
+  as local over an unencrypted connection, and a preview's database answers to a per-pull-request name
+  rather than the one on that list, so every preview's application server failed to start and retried
+  until the deployment was reported as failed. Previews now declare that their database is a sibling
+  container on the deployment's own private network, which is the trust every other stack already has.
+- Switching workspaces no longer carries a page that belongs to the workspace you are leaving — a conversation, a person or a practice opens the new workspace's home page instead, with a note explaining why. A page option that names something in the workspace you are leaving, such as a team filter, is cleared. A link to a workspace you can no longer access opens a workspace you can. Hephaestus opens your first workspace when you sign in rather than the one you last used.
+- The application and webhook stacks now carry their own request-body limits, so they work with an existing Traefik edge without depending on the bundled proxy stack. Required deployment secrets are now rejected during stack rendering instead of after containers start.
+
 ## 0.75.2
 
 ### Patch Changes

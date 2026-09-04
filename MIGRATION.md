@@ -65,6 +65,32 @@ Entries exist only for releases that need operator action. Everything else is in
 
 ### Next release
 
+### v0.76.0
+
+#### 🔴 LLM usage accounting older than the retention window is deleted after upgrade
+
+**Affected**: every deployment that has recorded LLM usage for longer than the window — 400 days
+unless you set your own — and any operator whose commercial or tax retention obligations cover that
+accounting data.
+
+**Before**: rows in the LLM usage ledger — per-run token counts and cost, attributed to a workspace —
+were kept indefinitely.
+
+**After**: a daily sweep deletes usage older than the configured window, default 400 days. The
+deletion is irreversible. Each pass deletes in batches for at most five minutes, so the first sweep
+after upgrade begins clearing the historical backlog and later sweeps finish it; a pass that stops
+with rows still expired reports the `incomplete` privacy-job outcome.
+
+**Migration**: if your accounting obligations require a longer window, set
+`HEPHAESTUS_LLM_USAGE_RETENTION` (an ISO-8601 duration, for example `P3650D`) before deploying this
+release. No action is needed to keep the default.
+
+#### 🔴 Allow sandbox traffic on the new gateway port
+
+Worker sandboxes now connect to `SANDBOX_API_PORT` (default `8081`) instead of the worker application port. Allow sandbox-to-worker traffic on this port and keep the worker application and management ports private. Set `SANDBOX_API_PORT` consistently in the worker and any network policy that restricts sandbox egress. A single-container install runs the worker role in the `application-server` container, so it opens this port too.
+
+`SANDBOX_LLM_PROXY_PORT` is no longer read — set `SANDBOX_API_PORT` instead.
+
 ### v0.75.0
 
 #### 🔴 Integration credentials use a dedicated encryption key
