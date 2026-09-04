@@ -71,6 +71,7 @@ type Story = StoryObj<typeof LeagueIcon>;
  * Displays a placeholder icon indicating unranked status.
  */
 export const NotRanked: Story = {
+	name: "Not ranked — preview verification",
 	args: {
 		leaguePoints: undefined,
 	},
