@@ -65,9 +65,15 @@ services:
       - "traefik.http.routers.https-webapp.entryPoints=https"
       # Keep buffering off the /api router because it would hold SSE responses until they close.
       # Define this middleware with its router so the app stack does not depend on the proxy stack.
+      # HSTS rides on the router, not on the entrypoint: an entrypoint middleware exists only when
+      # this deployment's edge is the proxy stack, and behind someone else's proxy the header
+      # would silently go missing. The other security headers are set by the responses
+      # themselves, so this is the one that has nowhere else to come from.
+      - traefik.http.middlewares.app-hsts.headers.stsSeconds=2592000
+      - traefik.http.middlewares.app-hsts.headers.stsIncludeSubdomains=true
       - traefik.http.middlewares.webapp-body-limit.buffering.maxRequestBodyBytes=26214400
       - traefik.http.middlewares.webapp-body-limit.buffering.memRequestBodyBytes=1048576
-      - "traefik.http.routers.https-webapp.middlewares=webapp-body-limit"
+      - "traefik.http.routers.https-webapp.middlewares=app-hsts,webapp-body-limit"
       - "traefik.http.routers.https-webapp.rule=(${APP_HOST_MATCH:-Host(`${APP_HOSTNAME}`)}) && PathPrefix(`/`)"
       - "traefik.http.routers.https-webapp.service=https-webapp"
       - "traefik.http.routers.https-webapp.tls.certresolver=letsencrypt"
@@ -85,7 +91,7 @@ services:
       - "traefik.http.middlewares.canonical-host.redirectregex.replacement=https://${APP_HOSTNAME}/$${1}"
       - "traefik.http.middlewares.canonical-host.redirectregex.permanent=true"
       - "traefik.http.routers.https-canonical.entryPoints=https"
-      - "traefik.http.routers.https-canonical.middlewares=canonical-host"
+      - "traefik.http.routers.https-canonical.middlewares=app-hsts,canonical-host"
       - "traefik.http.routers.https-canonical.rule=(${APP_HOST_MATCH:-Host(`${APP_HOSTNAME}`)}) && !Host(`${APP_HOSTNAME}`) && PathPrefix(`/`)"
       - "traefik.http.routers.https-canonical.service=https-webapp"
       # No certresolver here on purpose: ACME derives a router's domains from its rule and does not
@@ -312,7 +318,7 @@ services:
       - "traefik.http.routers.http-application-server.rule=(${APP_HOST_MATCH:-Host(`${APP_HOSTNAME}`)}) && PathPrefix(`/api`)"
       - "traefik.http.routers.http-application-server.service=http-application-server"
       - "traefik.http.routers.https-application-server.entryPoints=https"
-      - "traefik.http.routers.https-application-server.middlewares=edge-api-rate-limit,https-application-server-stripprefix"
+      - "traefik.http.routers.https-application-server.middlewares=app-hsts,edge-api-rate-limit,https-application-server-stripprefix"
       - "traefik.http.routers.https-application-server.rule=(${APP_HOST_MATCH:-Host(`${APP_HOSTNAME}`)}) && PathPrefix(`/api`)"
       - "traefik.http.routers.https-application-server.tls.certresolver=letsencrypt"
       - "traefik.http.routers.https-application-server.tls=true"
