@@ -12,6 +12,8 @@
  */
 import { readFile } from "node:fs/promises";
 
+import { CAPTURE_LIMIT_BYTES } from "./lib/process.ts";
+
 export interface ImageInventory {
 	readonly images: readonly string[];
 	readonly upstream: readonly {
@@ -107,7 +109,7 @@ async function resolveAndVerify(repository: string, commit: string): Promise<str
 			"--format",
 			"{{.Manifest.Digest}}",
 		],
-		{ encoding: "utf8" },
+		{ encoding: "utf8", maxBuffer: CAPTURE_LIMIT_BYTES },
 	).trim();
 
 	execFileSync(
@@ -126,7 +128,7 @@ async function resolveAndVerify(repository: string, commit: string): Promise<str
 			"--predicate-type",
 			"https://slsa.dev/provenance/v1",
 		],
-		{ stdio: ["ignore", "ignore", "inherit"] },
+		{ stdio: ["ignore", "ignore", "inherit"], maxBuffer: CAPTURE_LIMIT_BYTES },
 	);
 	return digest;
 }
