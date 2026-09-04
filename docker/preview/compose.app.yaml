@@ -246,6 +246,12 @@ services:
       # SERVICE_NAME_*, so the bare service name resolves to nothing inside a preview. The defaults
       # keep this file runnable on its own.
       DATABASE_URL: postgresql://${SERVICE_NAME_POSTGRES:-postgres}:5432/hephaestus?sslmode=disable
+      # That renaming is also why this is set. The transport guard allows plaintext to a database
+      # it can name as local, and `postgres` is on that list — but a preview's database answers
+      # to `postgres-pr-<id>`, so the guard reads a sibling container on the deployment's own
+      # private network as a remote host and refuses to start. The trust is identical to the
+      # reference stack's; only the name differs.
+      HEPHAESTUS_DATABASE_ALLOW_INSECURE_REMOTE: "true"
       DATABASE_USERNAME: hephaestus
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
       # The integration consumer reads staging's JetStream, so a preview sees the events a shared
