@@ -231,6 +231,7 @@ erDiagram
         TIMESTAMPTZ updated_at "NOT NULL"
         BIGINT version "NOT NULL"
         INTEGER credentials_key_version
+        TIMESTAMPTZ credentials_rotation_failed_at
     }
 
     ConnectionActivity {

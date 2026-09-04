@@ -19,6 +19,7 @@ import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobService;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.lang.reflect.Field;
+import java.time.Instant;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -222,6 +223,7 @@ class ConnectionServiceTest extends BaseUnitTest {
     void transition_toUninstalled_purgesCredentials() {
         Connection connection = connectionInState(IntegrationState.ACTIVE);
         connection.setCredentials(new BearerToken("ghp-secret", null), credentialConverter);
+        connection.markCredentialRotationFailed(Instant.parse("2026-09-03T12:00:00Z"));
         assertThat(connection.getCredentialsEncrypted()).isNotNull();
         assertThat(connection.getCredentialsAlg()).isEqualTo(CredentialBundleConverter.ALGORITHM_TAG);
 
@@ -233,6 +235,8 @@ class ConnectionServiceTest extends BaseUnitTest {
         assertThat(result.getState()).isEqualTo(IntegrationState.UNINSTALLED);
         assertThat(result.getCredentialsEncrypted()).isNull();
         assertThat(result.getCredentialsAlg()).isNull();
+        assertThat(result.getCredentialsKeyVersion()).isNull();
+        assertThat(result.getCredentialsRotationFailedAt()).isNull();
         // The transition that purged credentials is still audited.
         ArgumentCaptor<ConnectionAudit> audit = ArgumentCaptor.forClass(ConnectionAudit.class);
         verify(auditRepository).save(audit.capture());
