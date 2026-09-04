@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
 
 import {
 	environmentKey,
@@ -16,8 +17,9 @@ const resolver = () => Promise.resolve(digest);
 await test("a commit channel pins every image the stacks actually read", async () => {
 	// The point of the lock is that nothing renders from a floating tag. If the stacks grow an
 	// image this does not resolve, Compose would fail to render on the host rather than here.
+	// fileURLToPath, not .pathname: on Windows that yields "/C:/..." and no file opens there.
 	const inventory = await readInventory(
-		new URL("../security/release-images.json", import.meta.url).pathname,
+		fileURLToPath(new URL("../security/release-images.json", import.meta.url)),
 	);
 	const images = await resolveImages(inventory, commit, "hephaestus-build", resolver);
 
