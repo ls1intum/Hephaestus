@@ -16,9 +16,9 @@ const repositories: string[] = [];
  * Inherited, they would point both the script under test and the assertions at the repository the
  * hook is running in rather than at the clone made below.
  */
-const ENV = Object.fromEntries(
-	Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")),
-);
+function hookFreeEnv(): NodeJS.ProcessEnv {
+	return Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")));
+}
 
 after(() => {
 	for (const repository of repositories) rmSync(repository, { recursive: true, force: true });
@@ -33,7 +33,7 @@ function clone(): { repository: string; git: (...args: string[]) => string } {
 			cwd: repository,
 			encoding: "utf8",
 			maxBuffer: CAPTURE_LIMIT_BYTES,
-			env: ENV,
+			env: hookFreeEnv(),
 		}).trim();
 	git("init", "--quiet");
 	git("config", "core.hooksPath", ".husky/_");
@@ -47,11 +47,36 @@ void test("an install moves Git from an earlier hooks directory to the dispatche
 		cwd: repository,
 		encoding: "utf8",
 		maxBuffer: CAPTURE_LIMIT_BYTES,
-		env: ENV,
+		env: hookFreeEnv(),
 	});
 	assert.equal(result.status, 0, `${result.stdout}${result.stderr}`);
 	assert.equal(git("config", "core.hooksPath"), ".vite-hooks/_");
-	const again = spawnSync("node", [SCRIPT], { cwd: repository, encoding: "utf8", env: ENV });
+	const again = spawnSync("node", [SCRIPT], {
+		cwd: repository,
+		encoding: "utf8",
+		env: hookFreeEnv(),
+	});
 	assert.equal(again.status, 0, `${again.stdout}${again.stderr}`);
 	assert.equal(git("config", "core.hooksPath"), ".vite-hooks/_");
+});
+
+// Git exports `GIT_DIR` to a hook only when the push runs from a linked worktree, so no CI push can
+// reach this state; setting it here is the whole reproduction.
+void test("an install under a hook's GIT_DIR configures the clone it runs in", () => {
+	const decoy = clone();
+	const { repository, git } = clone();
+	process.env.GIT_DIR = join(decoy.repository, ".git");
+	try {
+		const result = spawnSync("node", [SCRIPT], {
+			cwd: repository,
+			encoding: "utf8",
+			maxBuffer: CAPTURE_LIMIT_BYTES,
+			env: hookFreeEnv(),
+		});
+		assert.equal(result.status, 0, `${result.stdout}${result.stderr}`);
+	} finally {
+		delete process.env.GIT_DIR;
+	}
+	assert.equal(git("config", "core.hooksPath"), ".vite-hooks/_");
+	assert.equal(decoy.git("config", "core.hooksPath"), ".husky/_");
 });
