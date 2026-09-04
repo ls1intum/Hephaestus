@@ -52,7 +52,7 @@ services:
       # Shared webhook secret used for incoming HMAC / token verification.
       # WEBHOOK_EXTERNAL_URL is only used by auto-registration (server role) and is intentionally
       # not set on the webhook-server pod.
-      WEBHOOK_SECRET: ${WEBHOOK_SECRET:?inbound deliveries cannot be authenticated without it}
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET:?Set WEBHOOK_SECRET to at least 32 printable ASCII characters}
       # DataSource for the JPA layer (connection credentials used by the HMAC
       # path reads); the auth web layer and workspace-context filter are gated off this role.
       # Internal, trusted docker-network DB: skip TLS. pgJDBC doesn't validate Postgres' self-signed cert
@@ -62,8 +62,8 @@ services:
       DATABASE_USERNAME: root
       DATABASE_PASSWORD: root
       # Connection credentials are decrypted on every role.
-      HEPHAESTUS_SECURITY_ENCRYPTION_KEY: ${HEPHAESTUS_SECURITY_ENCRYPTION_KEY:?encrypted fields cannot be read without it}
-      HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY: ${HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY:?credentials at rest cannot be decrypted without it}
+      HEPHAESTUS_SECURITY_ENCRYPTION_KEY: ${HEPHAESTUS_SECURITY_ENCRYPTION_KEY:?Set HEPHAESTUS_SECURITY_ENCRYPTION_KEY to exactly 32 printable ASCII characters}
+      HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY: ${HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY:?Set HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY to exactly 32 printable ASCII characters}
       HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY_VERSION: ${HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY_VERSION:-1}
       HEPHAESTUS_SECURITY_PRIOR_CREDENTIAL_ENCRYPTION_KEY: ${HEPHAESTUS_SECURITY_PRIOR_CREDENTIAL_ENCRYPTION_KEY:-}
       HEPHAESTUS_SECURITY_PRIOR_CREDENTIAL_ENCRYPTION_KEY_VERSION: ${HEPHAESTUS_SECURITY_PRIOR_CREDENTIAL_ENCRYPTION_KEY_VERSION:-}
@@ -123,9 +123,8 @@ services:
       - "traefik.http.routers.https-webhook-server.entryPoints=https"
       # No stripprefix: the receiver owns the full "/webhooks/{kind}" path (controller + payload-size
       # filter + security chain all bind to /webhooks/**). Stripping it would 404 every delivery.
-      # Caps deliveries at the same 25 MiB the receiver admits. Defined here, not on the edge, so
-      # the receiver enforces its own limit behind any proxy; router-scoped because entrypoint-wide
-      # buffering would stall the /api SSE streams.
+      # Match the receiver's 25 MiB limit here, not on the shared entrypoint where buffering would
+      # hold /api SSE responses. Keeping it with this router avoids a dependency on the proxy stack.
       - traefik.http.middlewares.webhook-body-limit.buffering.maxRequestBodyBytes=26214400
       - traefik.http.middlewares.webhook-body-limit.buffering.memRequestBodyBytes=1048576
       - "traefik.http.routers.https-webhook-server.middlewares=webhook-body-limit,gzip"

@@ -7,7 +7,18 @@ import { output, run, succeeds } from "./lib/process.ts";
 
 export type Stack = "proxy" | "core" | "app";
 
-const STACK_ORDER: readonly Stack[] = ["proxy", "core", "app"];
+const STACK_ORDER: readonly Stack[] = ["core", "app", "proxy"];
+
+/**
+ * The database and the broker, which both applications need before either can pass a health gate:
+ * the receiver in `core` cannot build its JPA context without PostgreSQL in `app`, and the server in
+ * `app` never reports ready without NATS in `core`. Compose cannot express a dependency across
+ * projects, and no stack order resolves a cycle, so these come up first and the applications follow.
+ */
+const FOUNDATION: Partial<Record<Stack, readonly string[]>> = {
+	app: ["postgres"],
+	core: ["nats-server"],
+};
 
 export interface Channel {
 	release: string;
@@ -339,18 +350,38 @@ async function main(): Promise<void> {
 	const lockEnv = await readFile(lockFile, "utf8");
 	if (lockedReleaseCommit(lockEnv) !== releaseCommit)
 		throw new Error(`signed release lock does not cover the ${decision.release} source tree`);
+
+	const composeFor = (stack: Stack): string[] => [
+		"compose",
+		"--project-name",
+		stack,
+		"--env-file",
+		join(config.secretsDirectory, `${stack}.env`),
+		"--env-file",
+		lockFile,
+		"--file",
+		join(releaseTree, `docker/compose.${stack}.yaml`),
+	];
+
 	for (const stack of config.stacks) {
-		const composeArgs = [
-			"compose",
-			"--project-name",
-			stack,
-			"--env-file",
-			join(config.secretsDirectory, `${stack}.env`),
-			"--env-file",
-			lockFile,
-			"--file",
-			join(releaseTree, `docker/compose.${stack}.yaml`),
-		];
+		const foundation = FOUNDATION[stack];
+		if (!foundation) continue;
+		await run(
+			"docker",
+			[
+				...composeFor(stack),
+				"up",
+				"--detach",
+				"--wait",
+				`--wait-timeout=${config.waitTimeoutSeconds}`,
+				...foundation,
+			],
+			{ cwd: releaseTree },
+		);
+	}
+
+	for (const stack of config.stacks) {
+		const composeArgs = composeFor(stack);
 		const rendered = asRecord(
 			parseJson(
 				await output("docker", [...composeArgs, "config", "--format", "json"], {

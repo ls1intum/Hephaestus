@@ -67,20 +67,26 @@ jobs:
           done
           # Some Compose releases accept `!override` without applying it.
           rendered=$(docker compose config)
-          nats_config=$(docker compose config --format json \
-            | jq -r '.configs["nats-server.conf"].content')
+          rendered_json=$(docker compose config --format json)
+          nats_config=$(jq -r '.configs["nats-server.conf"].content' <<< "$rendered_json")
           grep -Eq '^[[:space:]]*sync_interval:[[:space:]]*always[[:space:]]*$' <<< "$nats_config" || {
             echo "::error::the single-node JetStream store must fsync every write"; exit 1; }
+          jq -e '
+            .services.webapp.labels["traefik.http.middlewares.webapp-body-limit.buffering.maxRequestBodyBytes"] == "26214400" and
+            .services.webapp.labels["traefik.http.middlewares.webapp-body-limit.buffering.memRequestBodyBytes"] == "1048576" and
+            .services.webapp.labels["traefik.http.routers.https-webapp.middlewares"] == "webapp-body-limit" and
+            .services["webhook-server"].labels["traefik.http.middlewares.webhook-body-limit.buffering.maxRequestBodyBytes"] == "26214400" and
+            .services["webhook-server"].labels["traefik.http.middlewares.webhook-body-limit.buffering.memRequestBodyBytes"] == "1048576" and
+            .services["webhook-server"].labels["traefik.http.routers.https-webhook-server.middlewares"] == "webhook-body-limit,gzip"
+          ' <<< "$rendered_json" >/dev/null || {
+            echo "::error::webapp and webhook request-body limits are not attached to their routers"; exit 1; }
           for required in \
             'entrypoints.https.http.middlewares=security-headers@docker' \
-            'request-body-limit@docker' \
             'providers.file.filename=/etc/traefik/dynamic.yml' \
             'contentsecuritypolicy' \
             'default-src' \
             'stsseconds' \
             '2592000' \
-            'maxrequestbodybytes' \
-            '26214400' \
             'minversion' \
             'versiontls12'; do
             grep -Fiq "$required" <<< "$rendered" || {

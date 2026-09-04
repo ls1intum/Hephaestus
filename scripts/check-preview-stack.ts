@@ -100,6 +100,7 @@ export function findStaleOmissions(referenceText: string): string[] {
 const RENDER_ENV: Record<string, string> = {
 	SOURCE_COMMIT: "a".repeat(40),
 	POSTGRES_PASSWORD: "ci-not-a-real-password",
+	PREVIEW_SEED_SOURCE_PASSWORD: "ci-not-a-real-seed-password",
 	HEPHAESTUS_AUTH_STATE_COOKIE_KEY: "ci-not-a-real-state-cookie-key",
 	HEPHAESTUS_SECURITY_ENCRYPTION_KEY: "0123456789abcdef0123456789abcdef",
 	WEBHOOK_SECRET: "ci-not-a-real-webhook-secret-0123456789",

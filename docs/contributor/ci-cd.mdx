@@ -144,12 +144,13 @@ SBOM, and release-verification guarantees.
 2. Create `Staging` (no rules)
 3. Create `Production` with **Required reviewers**
 
-A deploy brings up three stacks in order — `proxy`, `core`, `app` — and the `proxy` stack publishes
-:80 and :443. An environment whose host already has an edge in front of it sets the environment
-variable `DEPLOY_EDGE_PROXY=false`, which leaves `proxy` out of both the render and the deploy;
-anything else, including an unset variable, deploys all three. Staging sets it, because it shares a
-host with the Coolify instance that serves preview deployments and that proxy holds both ports —
-a second edge there fails the deploy on a port that is already allocated.
+A deploy brings up `core`, then `app`, then `proxy`, so every router is complete before the bundled
+edge reloads; the `proxy` stack publishes :80 and :443. An environment whose host already has an
+edge in front of it sets the environment variable `DEPLOY_EDGE_PROXY=false`, which leaves `proxy`
+out of both the render and the deploy; anything else, including an unset variable, deploys all
+three. Staging sets it, because it shares a host with the Coolify instance that serves preview
+deployments and that proxy holds both ports — a second edge there fails the deploy on a port that
+is already allocated.
 
 Preview environments do not need to be created in advance. The preview workflow registers
 `preview/pr-N` as a transient GitHub environment when Coolify accepts the first deployment.

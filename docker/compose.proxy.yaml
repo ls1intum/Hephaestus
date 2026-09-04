@@ -18,9 +18,8 @@ services:
       - "--metrics.prometheus=true"
       - "--entrypoints.http.address=:80"
       - "--entrypoints.https.address=:443"
-      # Entrypoint-wide response headers only. Request-body caps belong to the stacks that serve
-      # the traffic, so this edge is replaceable: nothing in app or core resolves a middleware
-      # defined here.
+      # Request-body caps stay on their service routers because buffering here would hold SSE
+      # responses and make the app and core stacks depend on this proxy stack.
       - "--entrypoints.https.http.middlewares=security-headers@docker"
       - "--entrypoints.http.http.encodequerysemicolons=true"
       - "--entryPoints.http.http2.maxConcurrentStreams=50"
@@ -39,8 +38,7 @@ services:
       - "--certificatesresolvers.letsencrypt.acme.email=admin@tum.de"
       - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=http"
       - "--providers.docker=true"
-      # TLS options are not definable through Docker labels — the provider silently drops them —
-      # so they live in this file-provider fragment.
+      # Docker labels cannot define TLS options, so load them through the file provider.
       - "--providers.file.filename=/etc/traefik/dynamic.yml"
     configs:
       - source: traefik-dynamic
@@ -117,10 +115,6 @@ networks:
 configs:
   traefik-dynamic:
     content: |
-      # File-provider fragment for dynamic configuration the docker provider cannot express as
-      # labels. Traefik silently ignores tls.options and serversTransports labels, so putting
-      # these there would leave TLS 1.0/1.1 accepted and (for a referenced transport) disable
-      # the router that names it.
       tls:
         options:
           default:

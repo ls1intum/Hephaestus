@@ -63,9 +63,8 @@ services:
       - "traefik.http.routers.http-webapp.rule=Host(`${APP_HOSTNAME}`) && PathPrefix(`/`)"
       - "traefik.http.routers.http-webapp.service=http-webapp"
       - "traefik.http.routers.https-webapp.entryPoints=https"
-      # Router-scoped rather than entrypoint-wide: the buffering middleware buffers responses too,
-      # which would stall the /api SSE streams. Defined here rather than on the edge so this stack
-      # routes identically behind any proxy — the edge supplies TLS and nothing else it depends on.
+      # Keep buffering off the /api router because it would hold SSE responses until they close.
+      # Define this middleware with its router so the app stack does not depend on the proxy stack.
       - traefik.http.middlewares.webapp-body-limit.buffering.maxRequestBodyBytes=26214400
       - traefik.http.middlewares.webapp-body-limit.buffering.memRequestBodyBytes=1048576
       - "traefik.http.routers.https-webapp.middlewares=webapp-body-limit"
@@ -145,7 +144,7 @@ services:
       NATS_PASSWORD: ${NATS_PASSWORD:?Set NATS_PASSWORD}
       # Auth (Hephaestus-native; ADR 0017). State-cookie key MUST be base64 32-byte AES.
       HEPHAESTUS_AUTH_ISSUER: https://${APP_HOSTNAME}
-      HEPHAESTUS_AUTH_STATE_COOKIE_KEY: ${HEPHAESTUS_AUTH_STATE_COOKIE_KEY:?sign-in state cannot be verified without it}
+      HEPHAESTUS_AUTH_STATE_COOKIE_KEY: ${HEPHAESTUS_AUTH_STATE_COOKIE_KEY:?Set HEPHAESTUS_AUTH_STATE_COOKIE_KEY to a Base64-encoded 32-byte key}
       # First instance super-admin bootstrap (auth-cutover runbook). The admin UI is admin-gated, so
       # the first APP_ADMIN must come from operator config — comma-separated <provider>:@user or
       # <provider>:<subject>. Optional break-glass token enables POST /auth/bootstrap-admin.
@@ -179,14 +178,14 @@ services:
       LEADERBOARD_SCHEDULE_DAY: ${LEADERBOARD_SCHEDULE_DAY:-2}
       LEADERBOARD_SCHEDULE_TIME: ${LEADERBOARD_SCHEDULE_TIME:-9}
       SENTRY_DSN: ${SENTRY_DSN}
-      WEBHOOK_SECRET: ${WEBHOOK_SECRET:?inbound deliveries cannot be authenticated without it}
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET:?Set WEBHOOK_SECRET to at least 32 printable ASCII characters}
       # WEBHOOK_EXTERNAL_URL intentionally unset: GitLab auto-registration defaults it to
       # APPLICATION_HOST_URL (same origin here), then appends /webhooks/gitlab itself.
       # AES-256-GCM key for credentials encrypted at rest in the `connection` table. Exactly 32
       # chars. Required in prod (fail-fast); the Liquibase backfill re-encrypts on boot, so this
       # MUST be set on application-server (where Liquibase runs). Keep it stable.
-      HEPHAESTUS_SECURITY_ENCRYPTION_KEY: ${HEPHAESTUS_SECURITY_ENCRYPTION_KEY:?encrypted fields cannot be read without it}
-      HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY: ${HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY:?credentials at rest cannot be decrypted without it}
+      HEPHAESTUS_SECURITY_ENCRYPTION_KEY: ${HEPHAESTUS_SECURITY_ENCRYPTION_KEY:?Set HEPHAESTUS_SECURITY_ENCRYPTION_KEY to exactly 32 printable ASCII characters}
+      HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY: ${HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY:?Set HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY to exactly 32 printable ASCII characters}
       HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY_VERSION: ${HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY_VERSION:-1}
       HEPHAESTUS_SECURITY_PRIOR_CREDENTIAL_ENCRYPTION_KEY: ${HEPHAESTUS_SECURITY_PRIOR_CREDENTIAL_ENCRYPTION_KEY:-}
       HEPHAESTUS_SECURITY_PRIOR_CREDENTIAL_ENCRYPTION_KEY_VERSION: ${HEPHAESTUS_SECURITY_PRIOR_CREDENTIAL_ENCRYPTION_KEY_VERSION:-}
@@ -386,8 +385,8 @@ services:
       DATABASE_USERNAME: root
       DATABASE_PASSWORD: root
       # Connection credentials are decrypted on every role.
-      HEPHAESTUS_SECURITY_ENCRYPTION_KEY: ${HEPHAESTUS_SECURITY_ENCRYPTION_KEY:?encrypted fields cannot be read without it}
-      HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY: ${HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY:?credentials at rest cannot be decrypted without it}
+      HEPHAESTUS_SECURITY_ENCRYPTION_KEY: ${HEPHAESTUS_SECURITY_ENCRYPTION_KEY:?Set HEPHAESTUS_SECURITY_ENCRYPTION_KEY to exactly 32 printable ASCII characters}
+      HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY: ${HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY:?Set HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY to exactly 32 printable ASCII characters}
       HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY_VERSION: ${HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY_VERSION:-1}
       HEPHAESTUS_SECURITY_PRIOR_CREDENTIAL_ENCRYPTION_KEY: ${HEPHAESTUS_SECURITY_PRIOR_CREDENTIAL_ENCRYPTION_KEY:-}
       HEPHAESTUS_SECURITY_PRIOR_CREDENTIAL_ENCRYPTION_KEY_VERSION: ${HEPHAESTUS_SECURITY_PRIOR_CREDENTIAL_ENCRYPTION_KEY_VERSION:-}

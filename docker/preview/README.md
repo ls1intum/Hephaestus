@@ -95,11 +95,10 @@ Create one Docker Compose application for `ls1intum/Hephaestus` on branch `main`
 3. Assign the webapp and appserver sibling wildcard domains, shaped `pr<id>.<preview zone>` and
    `pr<id>.api.<preview zone>`. The web hostname must match the `COOLIFY_PREVIEW_URL_TEMPLATE`
    repository variable below — that variable is the single place the zone is written down.
-4. Set the values in `.env.example` — all of them. The server validates its production
-   configuration before it starts, so a missing `WEBHOOK_SECRET` or `HEPHAESTUS_AUTH_STATE_COOKIE_KEY`
-   makes every preview restart-loop rather than fail loudly. Generate new database, state-cookie, and encryption secrets for
-   this preview application. A GitHub OAuth app is optional, but if configured it must be
-   preview-only.
+4. Set every value in `.env.example`. Compose rejects a blank required value before any container
+   starts. Generate new database, state-cookie, encryption, and webhook secrets for this preview;
+   the broker and seed-role credentials must match staging. A GitHub OAuth app is optional, but if
+   configured it must be preview-only.
 5. Leave `SOURCE_COMMIT`, `COOLIFY_BRANCH`, and the `SERVICE_*` variables to Coolify. Define nothing
    on this application beyond `.env.example`; anything else does not belong here.
 6. Disable **Connect to predefined network**. Coolify attaches its proxy to each generated preview

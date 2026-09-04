@@ -31,15 +31,14 @@ jobs:
     permissions:
       contents: read
     env:
-      # Which stacks this environment runs, and the order they come up in: the application server
-      # migrates the database before the new webhook runtime in core may use it, and the edge comes
-      # last so it never routes to a stack that is still starting. An environment whose edge is
-      # owned by something else on the host sets DEPLOY_EDGE_PROXY=false and keeps proxy out of both
-      # the render and the deploy — the reference deployment leaves it unset and gets all three.
+      # Which stacks this environment runs, in deployment order. Core provides the broker, app and
+      # core publish their complete routing labels, then the edge starts or reloads against them.
+      # An environment whose edge is owned by something else on the host sets DEPLOY_EDGE_PROXY=false
+      # and keeps proxy out of both the render and the deploy.
       # Staging shares its host with the Coolify instance that serves pull-request previews, and
       # that proxy holds :80/:443, so a second edge there fails the deploy on a port that is
       # already allocated.
-      STACKS: ${{ vars.DEPLOY_EDGE_PROXY == 'false' && 'app core' || 'app core proxy' }}
+      STACKS: ${{ vars.DEPLOY_EDGE_PROXY == 'false' && 'core app' || 'core app proxy' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
