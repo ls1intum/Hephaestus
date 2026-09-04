@@ -2,32 +2,32 @@
 # Docs: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
 
 # Default owners for everything in the repo
-* @ls1intum/hephaestus-maintainers
+* @hephaestus-build/maintainer
 
 # Release management and CI/CD
-.github/                         @ls1intum/hephaestus-maintainers
-.changeset/                      @ls1intum/hephaestus-maintainers
-CHANGELOG.md                     @ls1intum/hephaestus-maintainers
-commitlint.config.ts             @ls1intum/hephaestus-maintainers
-renovate.json                    @ls1intum/hephaestus-maintainers
+.github/                         @hephaestus-build/maintainer
+.changeset/                      @hephaestus-build/maintainer
+CHANGELOG.md                     @hephaestus-build/maintainer
+commitlint.config.ts             @hephaestus-build/maintainer
+renovate.json                    @hephaestus-build/maintainer
 
 # Application Server (Java/Spring)
-server/       @ls1intum/hephaestus-maintainers
+server/       @hephaestus-build/maintainer
 
 # Auth / identity (Account, IdentityLink, JWT issuance, oauth2Login) — see ADR 0017
-server/application/src/main/java/de/tum/cit/aet/hephaestus/core/auth/   @FelixTJDietrich @ls1intum/hephaestus-maintainers
+server/application/src/main/java/de/tum/cit/aet/hephaestus/core/auth/   @FelixTJDietrich @hephaestus-build/maintainer
 docs/decisions/0017-replace-keycloak-with-spring-native-auth.md   @FelixTJDietrich
 docs/auth-glossary.md            @FelixTJDietrich
 docs/auth-architecture.md        @FelixTJDietrich
 docs/runbooks/auth-cutover.md    @FelixTJDietrich
 
 # Webapp (React/TypeScript)
-webapp/                          @ls1intum/hephaestus-maintainers
+webapp/                          @hephaestus-build/maintainer
 
 # Documentation
-docs/                            @ls1intum/hephaestus-maintainers
+docs/                            @hephaestus-build/maintainer
 
 # Infrastructure
-docker/                          @ls1intum/hephaestus-maintainers
-**/Dockerfile                    @ls1intum/hephaestus-maintainers
-**/docker-compose*.yml           @ls1intum/hephaestus-maintainers
+docker/                          @hephaestus-build/maintainer
+**/Dockerfile                    @hephaestus-build/maintainer
+**/docker-compose*.yml           @hephaestus-build/maintainer
