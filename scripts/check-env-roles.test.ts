@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { test } from "node:test";
 
@@ -80,8 +81,6 @@ await test("a variable set on a container that disables the role reading it is a
 });
 
 await test("the role flag is read through its Compose default, not as raw text", () => {
-	// The form nearly every other key in these files uses. Comparing the uninterpolated string is
-	// how the historical misdelivery passed the gate written to catch it.
 	const { failures } = analyse(
 		APPLICATION,
 		compose(`  application-server:
@@ -153,29 +152,40 @@ ${RECEIVER}`),
 	assert.equal(delivered.size, 1);
 });
 
-await test("a merged anchor counts as delivered by every service that merges it", () => {
+await test("a service that merges an anchor delivers every key in it", () => {
 	const services = readComposeServices(`x-shared: &shared
   HEPHAESTUS_WEBHOOK_STREAM_MAX_BYTES: 1
+x-runtime: &runtime
+  HEPHAESTUS_RUNTIME_WEBHOOK_ENABLED: true
 services:
   webhook-server:
     environment:
-      <<: [*shared]
-      HEPHAESTUS_RUNTIME_WEBHOOK_ENABLED: "true"
+      <<: [*shared, *runtime]
 `);
 
 	assert.ok(services.get("webhook-server")?.env.has("HEPHAESTUS_WEBHOOK_STREAM_MAX_BYTES"));
+	assert.equal(
+		services.get("webhook-server")?.flags.get("HEPHAESTUS_RUNTIME_WEBHOOK_ENABLED"),
+		"true",
+	);
 });
 
-await test("services are found at whatever indentation the file uses", () => {
+await test("a service writing its environment as a sequence delivers the same keys", () => {
 	const services = readComposeServices(`services:
-    webhook-server:
-        environment:
-            HEPHAESTUS_RUNTIME_WEBHOOK_ENABLED: "true"
+  webhook-server:
+    environment:
+      - HEPHAESTUS_RUNTIME_WEBHOOK_ENABLED=true
+      - HEPHAESTUS_WEBHOOK_STREAM_MAX_BYTES=\${HEPHAESTUS_WEBHOOK_STREAM_MAX_BYTES:-1073741824}
 `);
 
-	// A scanner keyed on literal indent columns returns nothing here and exits 0, so a reindent
-	// silently retires the gate.
-	assert.deepEqual([...services.keys()], ["webhook-server"]);
+	assert.deepEqual([...(services.get("webhook-server")?.env ?? [])].toSorted(), [
+		"HEPHAESTUS_RUNTIME_WEBHOOK_ENABLED",
+		"HEPHAESTUS_WEBHOOK_STREAM_MAX_BYTES",
+	]);
+	assert.equal(
+		services.get("webhook-server")?.flags.get("HEPHAESTUS_WEBHOOK_STREAM_MAX_BYTES"),
+		"1073741824",
+	);
 });
 
 await test("a compose file that yields no services is a failure, not a pass", () => {
@@ -187,9 +197,18 @@ await test("a compose file that yields no services is a failure, not a pass", ()
 	);
 });
 
+await test("a compose file that is not valid YAML fails by name, not by stack trace", () => {
+	const { failures } = analyse(APPLICATION, [["compose.yaml", "services: [\n"]]);
+
+	assert.ok(
+		failures.some((f) => f.startsWith("compose.yaml is not valid YAML: ")),
+		failures.join("\n"),
+	);
+});
+
 await test("compose defaults resolve the way an operator who sets nothing gets them", () => {
-	// `\${` throughout: these are Compose interpolation syntax under test, and a plain string spelling
-	// them reads as a template literal someone forgot to make one.
+	// `\${` throughout: these are Compose interpolation syntax under test, and a plain string
+	// spelling them reads as a template literal someone forgot to make one.
 	assert.equal(composeDefault(`\${HEPHAESTUS_RUNTIME_WEBHOOK_ENABLED:-false}`), "false");
 	assert.equal(composeDefault(`\${HEPHAESTUS_RUNTIME_WEBHOOK_ENABLED-false}`), "false");
 	assert.equal(composeDefault('"false"'), "false");
@@ -197,8 +216,6 @@ await test("compose defaults resolve the way an operator who sets nothing gets t
 });
 
 await test("a role a profile overlay switches off does not count as a reader", () => {
-	// application-worker.yml turns the webhook role off, so a worker container is not somewhere the
-	// webhook stream bounds can be read even though its environment says nothing about the role.
 	const profileRoles = new Map([["worker", new Set(["server", "webhook"])]]);
 
 	const { failures } = analyse(
@@ -234,6 +251,41 @@ hephaestus:
 	assert.deepEqual([...disabled].toSorted(), ["server", "webhook"]);
 });
 
+await test("reads disabled roles from every YAML document", () => {
+	const disabled = readDisabledRoles(`
+hephaestus:
+    runtime:
+        server:
+            enabled: false
+---
+spring:
+    config:
+        activate:
+            on-profile: worker
+hephaestus:
+    runtime:
+        webhook:
+            enabled: false
+`);
+
+	assert.deepEqual([...disabled].toSorted(), ["server", "webhook"]);
+});
+
+await test("readProfileRoles rejects malformed YAML", async () => {
+	const root = await mkdtemp(join(tmpdir(), "check-env-roles-"));
+	try {
+		const resources = join(root, "server/application/src/main/resources");
+		await mkdir(resources, { recursive: true });
+		await writeFile(
+			join(resources, "application-worker.yml"),
+			"hephaestus: {}\n---\nhephaestus: [",
+		);
+		await assert.rejects(readProfileRoles(root));
+	} finally {
+		await rm(root, { recursive: true, force: true });
+	}
+});
+
 /** The lock digest, spelled as the shipped topology spells it. */
 const AGENT_DIGEST = `HEPHAESTUS_AGENT_IMAGE_REFERENCE: \${HEPHAESTUS_IMAGE_AGENT_PI:?verified release lock required}`;
 
@@ -257,9 +309,7 @@ ${lines(receiver)}
 await test("application containers that spell an ungated setting differently fail", () => {
 	const { failures, applicationContainers: found } = analyse(
 		APPLICATION,
-		// The shape the release lock left behind: the digest on one container, a valueless passthrough
-		// on the other. Both resolve to nothing when the operator sets nothing, so only the spelling
-		// tells them apart — which is why the gate reads the value the file writes.
+		// Raw spellings must differ even when both default to an empty value.
 		applicationPair([AGENT_DIGEST], ["HEPHAESTUS_AGENT_IMAGE_REFERENCE:"]),
 	);
 
@@ -270,8 +320,6 @@ await test("application containers that spell an ungated setting differently fai
 });
 
 await test("an application container that omits a deployment-wide setting fails", () => {
-	// The half a comparison across only the containers that mention a key cannot see: the receiver
-	// makes no claim to disagree with, and reads application.yml's derived tag instead.
 	const { failures } = analyse(APPLICATION, applicationPair([AGENT_DIGEST], []));
 
 	assert.equal(failures.length, 1, failures.join("\n"));
