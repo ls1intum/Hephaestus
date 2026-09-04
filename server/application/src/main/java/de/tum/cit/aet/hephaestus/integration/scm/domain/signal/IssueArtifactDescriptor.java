@@ -19,17 +19,17 @@ import org.springframework.stereotype.Component;
 /**
  * The issue as a reviewable artifact.
  *
- * <p>An issue has no diff, so it has no inline lane or reviewer relation; every signal keys on a
- * content digest rather than a commit.
+ * <p>An issue has no diff, so it has no inline lane or reviewer relation.
  */
 @Component
 public class IssueArtifactDescriptor implements ArtifactDescriptor {
 
     private static final List<Signal> SIGNALS = List.of(
             declareRecommended(ScmSignals.ISSUE_OPENED, "Opened", Set.of(GITHUB_ISSUES, GITLAB_ISSUE)),
-            // GitLab has no native "labeled" action; its issue processor derives one per newly added
-            // label off the update event, so the provenance is real.
-            declareRecommended(ScmSignals.ISSUE_LABELED, "Labeled", Set.of(GITHUB_ISSUES, GITLAB_ISSUE)),
+            // Both providers raise it, but from different vocabularies: GitHub has an action per edit,
+            // GitLab one update action whose changes diff says what moved. Neither can report a type
+            // change on GitLab, which is why the display name does not promise one.
+            declareRecommended(ScmSignals.ISSUE_UPDATED, "Details changed", Set.of(GITHUB_ISSUES, GITLAB_ISSUE)),
             declare(ScmSignals.ISSUE_CLOSED, "Closed", Set.of(GITHUB_ISSUES, GITLAB_ISSUE)),
             declareManualRequest(ScmSignals.ISSUE_MANUAL_REVIEW, "Review requested by hand"));
 

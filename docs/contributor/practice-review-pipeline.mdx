@@ -82,6 +82,66 @@ Operator remediation is in [When a workspace goes quiet](/admin/practice-review#
 The occurrence ledger has no pruning job; capacity planning must treat it as append-only. Retry and lapse
 thresholds are documented in the admin guide.
 
+### Issue lifecycle occasions
+
+Issue practices bind to three lifecycle occasions:
+
+| Occasion | Transition | Revision identity |
+| --- | --- | --- |
+| `scm.issue.opened` | The issue is created | Title and body |
+| `scm.issue.updated` | The review-relevant snapshot changes, including reopening | The whole snapshot |
+| `scm.issue.closed` | The issue enters a closed state | The close timestamp |
+
+The snapshot is the title, body, native type, labels, assignees, milestone, state, and state reason — the
+fields the issue evidence a bundled practice reads is built from. Labels and assignees are sorted while the
+digest is built, so provider ordering does not change the revision.
+
+Only `scm.issue.updated` keys on the whole snapshot. The other two deliberately do not, because a recurring
+backfill sweep re-derives their keys from the artifact as it stands: an opening keys on the prose and a
+close on the moment it closed, so triage between two sweeps moves neither and buys no second review.
+
+Unlike a merged pull request, a closed issue is not in a state it cannot leave. Keying the close on its
+timestamp keeps a redelivery of one close inert while making the close that follows a reopen a second
+occasion, so the retrospective at-close review runs for each round of work rather than only the first.
+Neither provider guarantees a close timestamp; a mirror row without one falls back to a single close
+occasion, since there is then nothing to tell two closes apart.
+
+Two consequences are worth stating because neither is obvious:
+
+- **A return to a previously-seen snapshot occasions nothing.** Adding a label occasions a review, removing
+  it occasions another, and adding it back matches a revision already in the ledger and occasions none.
+  Reverse states are symmetric in what they raise, not in what they spend. A reopen is the exception: it
+  moves the state field, so it occasions an update review, and the close after it occasions its own close
+  review because that close is a different moment.
+- **Each distinct intermediate snapshot in a burst spends a review.** Deduplication is by content, not by
+  time: five triage actions on one issue arrive as five deliveries carrying five different snapshots, and
+  are five occasions. There is no temporal debounce, so do not read this section as a coalescing guarantee.
+
+| Transition | GitHub webhook action | GitLab webhook action | Review decision |
+| --- | --- | --- | --- |
+| Title or body changed | `edited` | `update` | Updated |
+| Native type set or removed | `typed`, `untyped` | Not exposed by the validated webhook contract | GitHub: updated; GitLab: synchronization only |
+| Label added or removed | `labeled`, `unlabeled` | `update` | Updated |
+| Assignee added or removed | `assigned`, `unassigned` | `update` | Updated |
+| Milestone set or removed | `milestoned`, `demilestoned` | `update` | Updated |
+| Reopened | `reopened` | `reopen` | Updated |
+| Closed | `closed` | `close` | Closed |
+| Locked, pinned, due date, weight, time tracking | `locked`, `pinned` | `update` | Nothing |
+
+Both adapters report what a delivery moved as a field set, and an update that moves none of the snapshot's
+fields occasions nothing: GitHub compares the mirrored row against the incoming one, and GitLab reads the
+`changes` diff its `update` action carries, which is the only thing distinguishing a retitling from a
+due-date, weight or time-tracking edit.
+
+Synchronization updates the issue projection without creating lifecycle occasions. GitLab synchronization
+includes native type, but its webhook contract does not provide a reliable type transition; the GitLab
+adapter therefore does not advertise live type-change reviews. A type set on GitLab still reaches the
+snapshot through the mirror, so it lands in the digest of whichever later `update` happens to fire.
+
+Every practice bound to `scm.issue.updated` is reevaluated. Practice bindings declare occasions and evidence
+sources, not dependencies on individual issue fields. Reevaluating the bounded issue evidence avoids
+retaining observations whose inputs changed without introducing a second dependency model.
+
 ## Capture
 
 Capture stages **every source the contract says applies to the artifact kind under review** — all of them,

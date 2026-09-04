@@ -5,9 +5,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.tum.cit.aet.hephaestus.integration.core.signal.RevisionScheme;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalKey;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.Milestone;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import java.time.Instant;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -106,6 +110,54 @@ class ReviewBackfillSignalsTest extends BaseUnitTest {
 
         assertThat(key).isPresent();
         assertThat(key.orElseThrow().revision().scheme()).contains(RevisionScheme.CONTENT_DIGEST);
+    }
+
+    /**
+     * Triage moves no prose, so it must not mint a second measurement: the label that buys a live
+     * {@code scm.issue.updated} review would otherwise buy a backfill review of the same issue on the
+     * next sweep as well, and both rewrite the same summary comment on the issue.
+     */
+    @Test
+    void triagingAnIssueBetweenTwoSweepsLeavesItsIdentityAlone() {
+        Issue triaged = issue();
+        Label label = new Label();
+        label.setName("needs-triage");
+        triaged.getLabels().add(label);
+        User assignee = new User();
+        assignee.setLogin("alice");
+        triaged.getAssignees().add(assignee);
+        Milestone milestone = new Milestone();
+        milestone.setTitle("v1");
+        triaged.setMilestone(milestone);
+
+        assertThat(ReviewBackfillSignals.keyFor(WORKSPACE_ID, triaged))
+                .isEqualTo(ReviewBackfillSignals.keyFor(WORKSPACE_ID, issue()));
+    }
+
+    /**
+     * A sweep measures a closed issue at the moment it closed, so triage since then has nothing new to
+     * measure — while a genuine second close, after a reopen, does.
+     */
+    @Test
+    void aClosedIssueIsMeasuredAtTheMomentItClosed() {
+        Issue closed = closedIssue(Instant.parse("2026-09-04T08:00:00Z"));
+        Issue relabelledSinceClosing = closedIssue(Instant.parse("2026-09-04T08:00:00Z"));
+        Label label = new Label();
+        label.setName("wontfix");
+        relabelledSinceClosing.getLabels().add(label);
+        Issue closedAgainAfterAReopen = closedIssue(Instant.parse("2026-09-11T08:00:00Z"));
+
+        assertThat(ReviewBackfillSignals.keyFor(WORKSPACE_ID, relabelledSinceClosing))
+                .isEqualTo(ReviewBackfillSignals.keyFor(WORKSPACE_ID, closed));
+        assertThat(ReviewBackfillSignals.keyFor(WORKSPACE_ID, closedAgainAfterAReopen))
+                .isNotEqualTo(ReviewBackfillSignals.keyFor(WORKSPACE_ID, closed));
+    }
+
+    private Issue closedIssue(Instant closedAt) {
+        Issue issue = issue();
+        issue.setState(Issue.State.CLOSED);
+        issue.setClosedAt(closedAt);
+        return issue;
     }
 
     private PullRequest pullRequest() {

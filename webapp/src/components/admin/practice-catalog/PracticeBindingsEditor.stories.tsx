@@ -76,7 +76,7 @@ export const IssueLifecycle: Story = {
 	args: { options: mockIssueWorkType, binding: mockIssueBinding },
 	play: async ({ canvas }) => {
 		const strip = within(canvas.getByRole("group", { name: "Reviews when" }));
-		await expect(strip.getByRole("checkbox", { name: "Labeled every time" })).toBeChecked();
+		await expect(strip.getByRole("checkbox", { name: "Details changed every time" })).toBeChecked();
 		// An issue is never a draft, so the question is not asked.
 		await expect(canvas.queryByRole("switch", { name: /^Include drafts/ })).toBeNull();
 	},

@@ -13,7 +13,6 @@ import {
 	type LucideIcon,
 	MessageSquareTextIcon,
 	MessagesSquareIcon,
-	TagIcon,
 } from "lucide-react";
 
 import type { PracticeSignalOption, PracticeWorkTypeDefinitionOptions } from "@/api/types.gen";
@@ -64,7 +63,7 @@ const MOMENTS: Record<string, MomentDef> = {
 	"scm.pull_request.closed": { icon: GitPullRequestClosedIcon, phase: "end", repeats: false },
 
 	"scm.issue.opened": { icon: CircleDotIcon, phase: "start", repeats: false },
-	"scm.issue.labeled": { icon: TagIcon, phase: "during", repeats: true },
+	"scm.issue.updated": { icon: FilePenLineIcon, phase: "during", repeats: true },
 	"scm.issue.closed": { icon: CircleCheckIcon, phase: "end", repeats: false },
 
 	"chat.conversation_thread.settled": { icon: MessagesSquareIcon, phase: "end", repeats: false },

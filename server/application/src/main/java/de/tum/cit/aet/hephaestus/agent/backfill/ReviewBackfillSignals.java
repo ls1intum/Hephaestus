@@ -50,8 +50,19 @@ final class ReviewBackfillSignals {
                 pullRequest.getBody());
     }
 
+    /**
+     * The ledger identity for reviewing this issue as it stands.
+     *
+     * <p>Never {@code scm.issue.updated}: a sweep measures the artifact, not a transition, and it has no
+     * previous snapshot to say the artifact moved away from. Keeping the two occasions apart is also what
+     * bounds the spend — an issue keeps the identity its prose gives it while open and the one its close
+     * moment gives it once closed, so triage between two sweeps moves neither, and the second sweep still
+     * recognises it as already measured.
+     */
     static Optional<SignalKey> keyFor(long workspaceId, Issue issue) {
-        SignalName signal = issue.getState() == Issue.State.CLOSED ? ScmSignals.ISSUE_CLOSED : ScmSignals.ISSUE_OPENED;
-        return ScmSignals.issueKey(workspaceId, issue.getId(), signal, issue.getTitle(), issue.getBody(), null);
+        if (issue.getState() == Issue.State.CLOSED) {
+            return ScmSignals.issueClosedKey(workspaceId, issue.getId(), issue.getClosedAt());
+        }
+        return ScmSignals.issueOpenedKey(workspaceId, issue.getId(), issue.getTitle(), issue.getBody());
     }
 }

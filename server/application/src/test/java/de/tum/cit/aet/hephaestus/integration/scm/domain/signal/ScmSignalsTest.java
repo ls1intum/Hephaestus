@@ -3,9 +3,13 @@ package de.tum.cit.aet.hephaestus.integration.scm.domain.signal;
 import static de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent.TriggerEventNames;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.core.signal.RevisionScheme;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalKey;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.jspecify.annotations.Nullable;
@@ -31,23 +35,208 @@ class ScmSignalsTest extends BaseUnitTest {
                 body);
     }
 
-    private Optional<SignalKey> issue(String triggerEvent, String title, String body, @Nullable String labelName) {
+    private Optional<SignalKey> issue(String triggerEvent, String title, String body) {
         return ScmSignals.issueKey(
-                WORKSPACE_ID,
+                WORKSPACE_ID, ScmSignals.forTriggerEvent(triggerEvent).orElseThrow(), issueData(title, body));
+    }
+
+    private SignalKey updated(List<String> labels, List<String> assignees) {
+        ScmEventPayload.IssueData issue = new ScmEventPayload.IssueData(
                 ARTIFACT_ID,
-                ScmSignals.forTriggerEvent(triggerEvent).orElseThrow(),
+                1,
+                "Bug",
+                "Steps",
+                Issue.State.OPEN,
+                null,
+                null,
+                false,
+                new RepositoryRef(1L, "owner/repo", "main"),
+                null,
+                "Bug",
+                "v1",
+                labels,
+                assignees,
+                null,
+                null,
+                null);
+        return ScmSignals.issueKey(WORKSPACE_ID, ScmSignals.ISSUE_UPDATED, issue)
+                .orElseThrow();
+    }
+
+    private ScmEventPayload.IssueData issueData(String title, String body) {
+        return new ScmEventPayload.IssueData(
+                ARTIFACT_ID,
+                1,
                 title,
                 body,
-                labelName);
+                Issue.State.OPEN,
+                null,
+                null,
+                false,
+                new RepositoryRef(1L, "owner/repo", "main"),
+                null,
+                null,
+                null,
+                List.of(),
+                List.of(),
+                null,
+                null,
+                null);
+    }
+
+    private SignalKey closed(ScmEventPayload.IssueData issue) {
+        return ScmSignals.issueKey(WORKSPACE_ID, ScmSignals.ISSUE_CLOSED, issue).orElseThrow();
+    }
+
+    private ScmEventPayload.IssueData closedData(Instant closedAt) {
+        return new ScmEventPayload.IssueData(
+                ARTIFACT_ID,
+                1,
+                "Bug",
+                "Steps",
+                Issue.State.CLOSED,
+                "COMPLETED",
+                null,
+                false,
+                new RepositoryRef(1L, "owner/repo", "main"),
+                null,
+                "Bug",
+                null,
+                List.of(),
+                List.of(),
+                null,
+                closedAt,
+                closedAt);
+    }
+
+    @Test
+    void shouldNotLetProviderOrderingOfLabelsAndAssigneesMoveTheRevision() {
+        SignalKey asGitHubSentThem = updated(List.of("backend", "urgent"), List.of("alice", "bob"));
+        SignalKey asGitLabSentThem = updated(List.of("urgent", "backend"), List.of("bob", "alice"));
+
+        assertThat(asGitLabSentThem).isEqualTo(asGitHubSentThem);
+    }
+
+    @Test
+    void shouldReMeasureAnIssueWhoseTriageMetadataMoved() {
+        SignalKey before = updated(List.of("backend", "urgent"), List.of("alice", "bob"));
+
+        assertThat(updated(List.of("backend"), List.of("alice", "bob"))).isNotEqualTo(before);
+        assertThat(updated(List.of("backend", "urgent"), List.of("alice"))).isNotEqualTo(before);
+    }
+
+    @Test
+    void shouldNotReMeasureAnIssueWhoseTriageReturnedItToASnapshotAlreadySeen() {
+        SignalKey before = updated(List.of("backend"), List.of("alice"));
+        SignalKey labelled = updated(List.of("backend", "urgent"), List.of("alice"));
+        SignalKey labelRemovedAgain = updated(List.of("backend"), List.of("alice"));
+
+        assertThat(labelled).isNotEqualTo(before);
+        assertThat(labelRemovedAgain).isEqualTo(before);
+    }
+
+    @Test
+    void shouldMakeARedeliveredCloseOfTheSameIssueInert() {
+        Instant closedAt = Instant.parse("2026-09-04T08:00:00Z");
+
+        SignalKey first = closed(closedData(closedAt));
+        SignalKey redelivered = closed(closedData(closedAt));
+
+        assertThat(redelivered).isEqualTo(first);
+    }
+
+    /**
+     * An issue can be reopened, so its close is not a state it cannot leave: the outcome of the second
+     * round of work is a second thing to review, and a constant revision would let the first close
+     * settle the row the second one needs.
+     */
+    @Test
+    void shouldOccasionASecondCloseAfterAReopen() {
+        SignalKey first = closed(closedData(Instant.parse("2026-09-04T08:00:00Z")));
+        SignalKey afterReopeningAndClosingAgain = closed(closedData(Instant.parse("2026-09-04T09:00:00Z")));
+
+        assertThat(afterReopeningAndClosingAgain).isNotEqualTo(first);
+    }
+
+    /**
+     * The occasion a backfill sweep measures a closed issue at. Keying it on the issue's content would
+     * make labelling a long-closed issue re-run the review of how it ended on the next sweep.
+     */
+    @Test
+    void shouldKeepAnIssueClosedIdentityOutOfReachOfTriage() {
+        Instant closedAt = Instant.parse("2026-09-04T08:00:00Z");
+        ScmEventPayload.IssueData triagedSinceClosing = new ScmEventPayload.IssueData(
+                ARTIFACT_ID,
+                1,
+                "Bug, renamed after the fact",
+                "Steps",
+                Issue.State.CLOSED,
+                "COMPLETED",
+                null,
+                false,
+                new RepositoryRef(1L, "owner/repo", "main"),
+                null,
+                "Bug",
+                "v2",
+                List.of("wontfix"),
+                List.of("alice"),
+                null,
+                closedAt,
+                closedAt);
+
+        assertThat(closed(triagedSinceClosing)).isEqualTo(closed(closedData(closedAt)));
+        assertThat(ScmSignals.issueClosedKey(WORKSPACE_ID, ARTIFACT_ID, closedAt))
+                .contains(closed(closedData(closedAt)));
+    }
+
+    /** A provider that omits the close moment leaves nothing to tell two closes apart. */
+    @Test
+    void shouldFallBackToOneCloseOccasionWhenTheProviderNamesNoCloseMoment() {
+        assertThat(ScmSignals.issueClosedKey(WORKSPACE_ID, ARTIFACT_ID, null))
+                .isEqualTo(ScmSignals.issueClosedKey(WORKSPACE_ID, ARTIFACT_ID, null))
+                .isNotEqualTo(
+                        ScmSignals.issueClosedKey(WORKSPACE_ID, ARTIFACT_ID, Instant.parse("2026-09-04T08:00:00Z")));
+    }
+
+    /**
+     * The occasion a backfill sweep measures an open issue at. Keying it on the whole snapshot would give
+     * a triaged issue a fresh identity, and the next sweep would review it again as if newly opened.
+     */
+    @Test
+    void shouldKeepAnIssueOpenedIdentityOutOfReachOfTriage() {
+        SignalKey fromProse = ScmSignals.issueOpenedKey(WORKSPACE_ID, ARTIFACT_ID, "Bug", "Steps")
+                .orElseThrow();
+        SignalKey afterTriage = ScmSignals.issueKey(
+                        WORKSPACE_ID,
+                        ScmSignals.ISSUE_OPENED,
+                        new ScmEventPayload.IssueData(
+                                ARTIFACT_ID,
+                                1,
+                                "Bug",
+                                "Steps",
+                                Issue.State.OPEN,
+                                null,
+                                null,
+                                false,
+                                new RepositoryRef(1L, "owner/repo", "main"),
+                                null,
+                                "Bug",
+                                "v1",
+                                List.of("needs-triage"),
+                                List.of("alice"),
+                                null,
+                                null,
+                                null))
+                .orElseThrow();
+
+        assertThat(afterTriage).isEqualTo(fromProse);
     }
 
     @Test
     void shouldReMeasureAnIssueAfterItsAuthorRewritesTheDescription() {
-        // An issue has no commits, so if its signal keyed on anything code-shaped, an issue-writing
-        // practice could be measured once and never again.
         SignalKey before =
-                issue(TriggerEventNames.ISSUE_CREATED, "Bug", "it broke", null).orElseThrow();
-        SignalKey after = issue(TriggerEventNames.ISSUE_CREATED, "Bug", "Login 500s on expired token", null)
+                issue(TriggerEventNames.ISSUE_CREATED, "Bug", "it broke").orElseThrow();
+        SignalKey after = issue(TriggerEventNames.ISSUE_CREATED, "Bug", "Login 500s on expired token")
                 .orElseThrow();
 
         assertThat(after.revision()).isNotEqualTo(before.revision());
@@ -56,52 +245,15 @@ class ScmSignalsTest extends BaseUnitTest {
     @Test
     void shouldNotReMeasureAnIssueThatWasMerelyRedelivered() {
         SignalKey first =
-                issue(TriggerEventNames.ISSUE_CREATED, "Bug", "it broke", null).orElseThrow();
+                issue(TriggerEventNames.ISSUE_CREATED, "Bug", "it broke").orElseThrow();
         SignalKey redelivered =
-                issue(TriggerEventNames.ISSUE_CREATED, "Bug", "it broke", null).orElseThrow();
+                issue(TriggerEventNames.ISSUE_CREATED, "Bug", "it broke").orElseThrow();
 
         assertThat(redelivered).isEqualTo(first);
-    }
-
-    @Test
-    void shouldGiveEachLabelOfOneUpdateItsOwnOccurrence() {
-        // Applying three labels in one edit raises three events differing only in the label; keying on
-        // anything else collapses them into one ledger row, measuring a labelling-bound practice once per
-        // edit instead of once per label.
-        SignalKey bug = issue(TriggerEventNames.ISSUE_LABELED, "Login fails", "500 on expired token", "bug")
-                .orElseThrow();
-        SignalKey regression = issue(
-                        TriggerEventNames.ISSUE_LABELED, "Login fails", "500 on expired token", "regression")
-                .orElseThrow();
-        SignalKey priorityHigh = issue(
-                        TriggerEventNames.ISSUE_LABELED, "Login fails", "500 on expired token", "priority/high")
-                .orElseThrow();
-
-        assertThat(List.of(bug.revision(), regression.revision(), priorityHigh.revision()))
-                .doesNotHaveDuplicates();
-    }
-
-    @Test
-    void shouldNotReMeasureTheSameLabellingThatWasMerelyRedelivered() {
-        SignalKey first = issue(TriggerEventNames.ISSUE_LABELED, "Login fails", "500", "bug")
-                .orElseThrow();
-        SignalKey redelivered = issue(TriggerEventNames.ISSUE_LABELED, "Login fails", "500", "bug")
-                .orElseThrow();
-
-        assertThat(redelivered).isEqualTo(first);
-    }
-
-    @Test
-    void shouldDeclineToKeyALabellingThatCannotNameItsLabel() {
-        // Same rule as a code-shaped signal with no head commit: a row keyed on nothing swallows every later labelling.
-        assertThat(issue(TriggerEventNames.ISSUE_LABELED, "Login fails", "500", null))
-                .isEmpty();
     }
 
     @Test
     void shouldNotReReviewUnchangedCodeBecauseTheDescriptionWasEdited() {
-        // Converse of the issue case: a push signal's subject is the code, so editing prose must not buy
-        // another review.
         SignalKey before = pullRequest(TriggerEventNames.PULL_REQUEST_SYNCHRONIZED, "abc123", "Add cache", "faster")
                 .orElseThrow();
         SignalKey after = pullRequest(
@@ -123,7 +275,6 @@ class ScmSignalsTest extends BaseUnitTest {
 
     @Test
     void shouldMakeARedeliveredMergeInert() {
-        // A merge happens once; keying it on anything that can move would let a redelivery spend a second review.
         SignalKey merged = pullRequest(TriggerEventNames.PULL_REQUEST_MERGED, "abc123", "Add cache", "body")
                 .orElseThrow();
         SignalKey redelivered = pullRequest(TriggerEventNames.PULL_REQUEST_MERGED, "def456", "Add cache", "body")
@@ -144,7 +295,6 @@ class ScmSignalsTest extends BaseUnitTest {
 
     @Test
     void shouldDeclineToKeyACodeShapedSignalWithNoHeadCommit() {
-        // Better no ledger row than one keyed on nothing, which would deduplicate away every later occurrence.
         assertThat(pullRequest(TriggerEventNames.PULL_REQUEST_READY, null, "t", "b"))
                 .isEmpty();
     }
@@ -159,7 +309,6 @@ class ScmSignalsTest extends BaseUnitTest {
 
     @Test
     void shouldRoundTripEverySignalBackToTheTriggerEventThatRaisedIt() {
-        // The reaper re-runs the gate from a stored signal; one that cannot name its trigger can never be re-offered.
         for (String triggerEvent : new String[] {
             TriggerEventNames.PULL_REQUEST_CREATED,
             TriggerEventNames.PULL_REQUEST_READY,
@@ -168,7 +317,7 @@ class ScmSignalsTest extends BaseUnitTest {
             TriggerEventNames.PULL_REQUEST_MERGED,
             TriggerEventNames.PULL_REQUEST_CLOSED,
             TriggerEventNames.ISSUE_CREATED,
-            TriggerEventNames.ISSUE_LABELED,
+            TriggerEventNames.ISSUE_UPDATED,
             TriggerEventNames.ISSUE_CLOSED,
         }) {
             var signal = ScmSignals.forTriggerEvent(triggerEvent).orElseThrow();
@@ -187,13 +336,15 @@ class ScmSignalsTest extends BaseUnitTest {
             ScmSignals.PULL_REQUEST_CLOSED,
             ScmSignals.PULL_REQUEST_MANUAL_REVIEW,
             ScmSignals.ISSUE_OPENED,
-            ScmSignals.ISSUE_LABELED,
+            ScmSignals.ISSUE_UPDATED,
             ScmSignals.ISSUE_CLOSED,
             ScmSignals.ISSUE_MANUAL_REVIEW,
         }) {
             assertThat(ScmSignals.revisionScheme(signal)).as(signal.value()).isNotNull();
         }
         assertThat(ScmSignals.revisionScheme(ScmSignals.ISSUE_OPENED)).isEqualTo(RevisionScheme.CONTENT_DIGEST);
+        assertThat(ScmSignals.revisionScheme(ScmSignals.ISSUE_UPDATED)).isEqualTo(RevisionScheme.CONTENT_DIGEST);
+        assertThat(ScmSignals.revisionScheme(ScmSignals.ISSUE_CLOSED)).isEqualTo(RevisionScheme.CONTENT_DIGEST);
         assertThat(ScmSignals.revisionScheme(ScmSignals.PULL_REQUEST_READY)).isEqualTo(RevisionScheme.HEAD_COMMIT);
         assertThat(ScmSignals.revisionScheme(ScmSignals.PULL_REQUEST_REVIEWED)).isEqualTo(RevisionScheme.EVENT_ID);
     }

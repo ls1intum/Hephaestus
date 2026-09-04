@@ -95,7 +95,7 @@ export const mockMergeBinding = {
 } satisfies PracticeBinding;
 
 export const mockIssueBinding = {
-	signals: ["scm.issue.labeled", "scm.issue.opened"],
+	signals: ["scm.issue.opened", "scm.issue.updated"],
 	needs: [
 		{ sourceKind: "scm.issue.comments", stance: "REQUIRED" },
 		{ sourceKind: "scm.issue.core", stance: "REQUIRED" },
@@ -287,7 +287,7 @@ export const mockPracticeDefinitionOptions = {
 			artifactKind: "scm.issue",
 			signals: [
 				{ signal: "scm.issue.opened", displayName: "Opened", recommended: true },
-				{ signal: "scm.issue.labeled", displayName: "Labeled", recommended: true },
+				{ signal: "scm.issue.updated", displayName: "Details changed", recommended: true },
 				{ signal: "scm.issue.closed", displayName: "Closed", recommended: false },
 			],
 			manualReviewSignal: {

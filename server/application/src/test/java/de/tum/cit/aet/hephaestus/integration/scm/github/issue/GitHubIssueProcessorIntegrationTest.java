@@ -34,6 +34,7 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -727,6 +728,98 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             assertThat(issueRepository.count()).isEqualTo(countAfterFirst);
         }
 
+        /**
+         * Assignees live in a join table the atomic upsert cannot touch, so a change to them is reported
+         * under one name for labels and assignees alike — which is what the review pipeline reads to
+         * decide that a triage action moved evidence a practice can see.
+         */
+        @Test
+        void shouldReportRelationshipsWhenAnIssueIsAssigned() {
+            Long issueId = 888999111L;
+            Issue existing = new Issue();
+            existing.setNativeId(issueId);
+            existing.setNumber(21);
+            existing.setTitle("Issue");
+            existing.setState(Issue.State.OPEN);
+            existing.setHtmlUrl("https://example.com/issues/21");
+            existing.setRepository(testRepository);
+            existing.setProvider(githubProvider);
+            issueRepository.save(existing);
+
+            eventListener.clear();
+
+            Issue result = processor.process(
+                    issueDto(issueId, 21, "Issue", false, 0, List.of(createAuthorDto())), createContext());
+            assertNotNull(result);
+
+            assertThat(result.getAssignees()).isNotEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.IssueUpdated.class))
+                    .first()
+                    .satisfies(event -> assertThat(event.changedFields()).contains("relationships"));
+        }
+
+        /**
+         * Locking an issue and commenting on it move no field the issue evidence is built from. The
+         * mirror still reports them, and reporting them under their own names is what lets the review
+         * pipeline decline the occasion instead of spending a review on evidence that did not move.
+         */
+        @Test
+        void shouldNameOnlyTheFieldsThatMovedWhenAnIssueIsLockedAndCommentedOn() {
+            Long issueId = 888999222L;
+            Issue existing = new Issue();
+            existing.setNativeId(issueId);
+            existing.setNumber(22);
+            existing.setTitle("Issue");
+            existing.setState(Issue.State.OPEN);
+            existing.setLocked(false);
+            existing.setCommentsCount(0);
+            existing.setHtmlUrl("https://example.com/issues/22");
+            existing.setRepository(testRepository);
+            existing.setProvider(githubProvider);
+            issueRepository.save(existing);
+
+            eventListener.clear();
+
+            Issue result = processor.process(issueDto(issueId, 22, "Issue", true, 3, null), createContext());
+            assertNotNull(result);
+
+            assertThat(eventListener.ofType(ScmDomainEvent.IssueUpdated.class))
+                    .first()
+                    .satisfies(event ->
+                            assertThat(event.changedFields()).containsExactlyInAnyOrder("locked", "commentsCount"));
+        }
+
+        private GitHubIssueDTO issueDto(
+                Long issueId,
+                int number,
+                String title,
+                boolean locked,
+                int commentsCount,
+                @Nullable List<GitHubUserDTO> assignees) {
+            return new GitHubIssueDTO(
+                    issueId,
+                    null,
+                    "node",
+                    number,
+                    title,
+                    null,
+                    "open",
+                    null,
+                    "https://example.com/issues/" + number,
+                    commentsCount,
+                    Instant.now(),
+                    Instant.now(),
+                    null,
+                    locked,
+                    null,
+                    assignees,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null);
+        }
+
         @Test
         void shouldUpdateMilestoneWhenChanged() {
             // Given - create issue without milestone
@@ -1087,6 +1180,51 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                         assertThat(event.issueType().name()).isEqualTo("Task");
                         assertThat(event.issue().id()).isEqualTo(result.getId());
                     });
+        }
+
+        /**
+         * A native type is one of the fields the issue evidence is built from, so typing an issue that
+         * already exists has to be reported as a moved field — that, not the IssueTyped event, is what
+         * occasions the review of the retyped issue.
+         */
+        @Test
+        void shouldReportIssueTypeWhenAnExistingIssueIsTyped() {
+            Long issueId = 888999333L;
+            processor.process(createBasicIssueDto(issueId, 23), createContext());
+            eventListener.clear();
+
+            GitHubIssueTypeDTO typeDto = new GitHubIssueTypeDTO(
+                    27228861L, "IT_kwDODNYmp84Bn3q9", "Task", "A specific piece of work", "yellow", true);
+            GitHubIssueDTO basic = createBasicIssueDto(issueId, 23);
+            GitHubIssueDTO typed = new GitHubIssueDTO(
+                    basic.id(),
+                    basic.databaseId(),
+                    basic.nodeId(),
+                    basic.number(),
+                    basic.title(),
+                    basic.body(),
+                    basic.state(),
+                    basic.stateReason(),
+                    basic.htmlUrl(),
+                    basic.commentsCount(),
+                    basic.createdAt(),
+                    basic.updatedAt(),
+                    basic.closedAt(),
+                    basic.locked(),
+                    basic.author(),
+                    basic.assignees(),
+                    basic.labels(),
+                    basic.milestone(),
+                    typeDto,
+                    basic.repository(),
+                    basic.pullRequest());
+
+            Issue result = processor.processTyped(typed, typeDto, FIXTURE_ORG_LOGIN, createContext());
+            assertNotNull(result);
+
+            assertThat(eventListener.ofType(ScmDomainEvent.IssueUpdated.class))
+                    .first()
+                    .satisfies(event -> assertThat(event.changedFields()).contains("issueType"));
         }
 
         @Test

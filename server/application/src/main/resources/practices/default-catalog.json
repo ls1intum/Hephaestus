@@ -222,7 +222,7 @@
 					"name": "State a problem a maintainer can act on",
 					"on": [
 						{
-							"signals": ["scm.issue.labeled", "scm.issue.opened"],
+							"signals": ["scm.issue.opened", "scm.issue.updated"],
 							"needs": [
 								{
 									"sourceKind": "scm.issue.comments",
@@ -245,7 +245,7 @@
 					"name": "Keep the issue to one concern",
 					"on": [
 						{
-							"signals": ["scm.issue.labeled", "scm.issue.opened"],
+							"signals": ["scm.issue.opened", "scm.issue.updated"],
 							"needs": [
 								{
 									"sourceKind": "scm.issue.core",
@@ -264,7 +264,7 @@
 					"name": "Define a checkable outcome",
 					"on": [
 						{
-							"signals": ["scm.issue.closed", "scm.issue.labeled", "scm.issue.opened"],
+							"signals": ["scm.issue.closed", "scm.issue.opened", "scm.issue.updated"],
 							"needs": [
 								{
 									"sourceKind": "scm.issue.comments",
@@ -1000,7 +1000,7 @@
 					"name": "Point the issue to the context it depends on",
 					"on": [
 						{
-							"signals": ["scm.issue.labeled", "scm.issue.opened"],
+							"signals": ["scm.issue.opened", "scm.issue.updated"],
 							"needs": [
 								{
 									"sourceKind": "scm.issue.core",
@@ -1104,7 +1104,7 @@
 					"name": "Break large work into trackable subtasks",
 					"on": [
 						{
-							"signals": ["scm.issue.closed", "scm.issue.labeled", "scm.issue.opened"],
+							"signals": ["scm.issue.closed", "scm.issue.opened", "scm.issue.updated"],
 							"needs": [
 								{
 									"sourceKind": "scm.issue.comments",
@@ -1127,7 +1127,7 @@
 					"name": "Classify issues for triage",
 					"on": [
 						{
-							"signals": ["scm.issue.labeled", "scm.issue.opened"],
+							"signals": ["scm.issue.opened", "scm.issue.updated"],
 							"needs": [
 								{
 									"sourceKind": "scm.issue.core",

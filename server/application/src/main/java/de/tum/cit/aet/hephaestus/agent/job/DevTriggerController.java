@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.agent.handler.PullRequestReviewSubmissionReques
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
 import de.tum.cit.aet.hephaestus.core.AuditExempt;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.core.signal.DiscoveredVia;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalKey;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
@@ -163,30 +164,29 @@ public class DevTriggerController {
             return Prepared.done("Issue not found in workspace " + workspaceId + ": " + issueId);
         }
         SignalName triggerSignal = signal == null || signal.isBlank() ? null : SignalName.of(signal);
+        // Before the gate, because an issue whose repository the mirror never resolved is not
+        // reviewable at all: reading one to build a signal key would dereference that relation, and a
+        // refusal recorded against it would claim the gate had an opinion about an artifact nobody can
+        // fetch.
+        IssueReviewSubmissionRequest request = agentJobService.buildIssueRequest(issue, triggerSignal);
+        if (request == null) {
+            return Prepared.done("Issue missing repository: issueId=" + issue.getId());
+        }
         if (triggerSignal != null) {
             GateDecision decision = detectionGate.evaluateIssue(issue, triggerSignal, TriggerMode.AUTO);
             if (decision instanceof GateDecision.Skip skip) {
                 recordRefusal(
-                        ScmSignals.issueKey(
-                                        workspaceId,
-                                        issue.getId(),
-                                        triggerSignal,
-                                        issue.getTitle(),
-                                        issue.getBody(),
-                                        null)
+                        ScmSignals.issueKey(workspaceId, triggerSignal, ScmEventPayload.IssueData.from(issue))
                                 .orElse(null),
                         skip);
                 return Prepared.done("Gate skipped (" + triggerSignal + "): " + skip.reason());
             }
         }
-        IssueReviewSubmissionRequest request = agentJobService.buildIssueRequest(issue, triggerSignal);
-        return request == null
-                ? Prepared.done("Issue missing repository: issueId=" + issue.getId())
-                : Prepared.issue(
-                        request,
-                        triggerSignal == null
-                                ? recordManualRequest(workspaceId, issue.getId(), ScmSignals.ISSUE_MANUAL_REVIEW)
-                                : null);
+        return Prepared.issue(
+                request,
+                triggerSignal == null
+                        ? recordManualRequest(workspaceId, issue.getId(), ScmSignals.ISSUE_MANUAL_REVIEW)
+                        : null);
     }
 
     /**

@@ -36,6 +36,7 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceResolver;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -98,6 +99,10 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
                 null,
                 null,
                 null,
+                List.of(),
+                List.of(),
+                null,
+                null,
                 null);
     }
 
@@ -115,14 +120,6 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
 
     private EventContext syncContext() {
         return EventContext.forSync(1L, REPO_REF);
-    }
-
-    private ScmEventPayload.LabelData createLabelData() {
-        return createLabelData("bug");
-    }
-
-    private ScmEventPayload.LabelData createLabelData(String name) {
-        return new ScmEventPayload.LabelData(500L, name, "ff0000", null);
     }
 
     /**
@@ -358,13 +355,14 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldPassIssueLabeledTriggerEventName() {
+        void shouldPassIssueUpdatedTriggerEventName() {
             Issue issue = setupHappyPath();
             var issueData = createIssueData(Issue.State.OPEN);
 
-            listener.onIssueLabeled(new ScmDomainEvent.IssueLabeled(issueData, createLabelData(), webhookContext(1L)));
+            listener.onIssueUpdated(
+                    new ScmDomainEvent.IssueUpdated(issueData, Set.of("relationships"), webhookContext(1L)));
 
-            verify(practiceReviewDetectionGate).evaluateIssue(issue, ScmSignals.ISSUE_LABELED, TriggerMode.AUTO);
+            verify(practiceReviewDetectionGate).evaluateIssue(issue, ScmSignals.ISSUE_UPDATED, TriggerMode.AUTO);
         }
 
         @Test
@@ -377,7 +375,6 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
             when(practiceReviewDetectionGate.evaluateIssue(issue, ScmSignals.ISSUE_OPENED, TriggerMode.AUTO))
                     .thenThrow(new RuntimeException("DB connectivity error"));
 
-            // Should not throw — outer catch handles gate exceptions
             listener.onIssueCreated(event);
 
             verify(agentJobService, never()).submit(any(), any(), any(), any(), any());
@@ -410,7 +407,7 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
         @Test
         void onIssueClosed_routesThroughGateAndCarriesTheClosedTriggerOntoTheJob() {
             // The closed terminal state IS this trigger's reason to run — it must reach the gate, unlike the
-            // live create/labeled handlers that short-circuit on a closed issue.
+            // live create/update handlers that short-circuit on a closed issue.
             Issue issue = createIssue(Issue.State.CLOSED);
             when(issueRepository.findByIdWithRepositoryAndAssignees(ISSUE_ID)).thenReturn(Optional.of(issue));
             Workspace workspace = new Workspace();
@@ -441,49 +438,79 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
     }
 
     @Nested
-    class IssueLabeledTests {
+    class IssueUpdatedTests {
 
         @Test
         void shouldSubmitWhenGatePasses() {
             var issueData = createIssueData(Issue.State.OPEN);
-            var event = new ScmDomainEvent.IssueLabeled(issueData, createLabelData(), webhookContext(1L));
+            var event = new ScmDomainEvent.IssueUpdated(issueData, Set.of("relationships"), webhookContext(1L));
 
             setupHappyPath();
 
-            listener.onIssueLabeled(event);
+            listener.onIssueUpdated(event);
 
             var request = captureSubmission(WORKSPACE_ID);
-            assertThat(request.triggerSignal()).isEqualTo(ScmSignals.ISSUE_LABELED);
+            assertThat(request.triggerSignal()).isEqualTo(ScmSignals.ISSUE_UPDATED);
             assertThat(request.issueId()).isEqualTo(ISSUE_ID);
         }
 
         /**
-         * Two labels applied in one edit raise two events that agree on the issue, its prose and its
-         * timestamps; the label is the only thing that tells them apart. A key that does not carry it
-         * gives both the same ledger identity, so the second labelling is deduplicated away and the
-         * practice bound to it is measured once for an edit that occasioned it twice.
+         * The ledger, not the listener, is what stops a redelivery: the second call reaches the recorder
+         * with the identical key, the unique constraint refuses it, and nothing downstream runs. Reviews
+         * are the expensive half, so the assertion that matters is that the gate is never asked twice.
          */
         @Test
-        void shouldGiveEachLabelOfOneEditItsOwnLedgerIdentity() {
+        void shouldNotReachTheGateForAnUpdateTheLedgerHasAlreadySettled() {
+            setupHappyPath();
             var issueData = createIssueData(Issue.State.OPEN);
             var context = webhookContext(1L);
+            when(signalRecorder.record(any(), any(), any())).thenReturn(true).thenReturn(false);
 
-            listener.onIssueLabeled(new ScmDomainEvent.IssueLabeled(issueData, createLabelData("bug"), context));
-            listener.onIssueLabeled(new ScmDomainEvent.IssueLabeled(issueData, createLabelData("regression"), context));
+            listener.onIssueUpdated(new ScmDomainEvent.IssueUpdated(issueData, Set.of("title"), context));
+            listener.onIssueUpdated(new ScmDomainEvent.IssueUpdated(issueData, Set.of("title"), context));
 
             ArgumentCaptor<SignalKey> keys = ArgumentCaptor.forClass(SignalKey.class);
             verify(signalRecorder, times(2)).record(keys.capture(), any(), any());
-            assertThat(keys.getAllValues()).extracting(SignalKey::revision).doesNotHaveDuplicates();
+            assertThat(keys.getAllValues().get(1)).isEqualTo(keys.getAllValues().getFirst());
+            verify(practiceReviewDetectionGate, times(1)).evaluateIssue(any(), any(), any());
+        }
+
+        /**
+         * A lock, a pin or a comment count moves nothing the issue evidence is built from, so every
+         * practice bound to the occasion would read byte-identical evidence and republish the conclusion
+         * it already reached. The mirror still records the change; the review pipeline never hears of it.
+         */
+        @Test
+        void shouldNotOccasionAReviewForAnUpdateThatMovedNoReviewableField() {
+            var issueData = createIssueData(Issue.State.OPEN);
+
+            listener.onIssueUpdated(
+                    new ScmDomainEvent.IssueUpdated(issueData, Set.of("locked", "commentsCount"), webhookContext(1L)));
+
+            verify(signalRecorder, never()).record(any(), any(), any());
+            verify(practiceReviewDetectionGate, never()).evaluateIssue(any(), any(), any());
+            verify(agentJobService, never()).submit(any(), any(), any(), any(), any());
+        }
+
+        @Test
+        void shouldOccasionAReviewWhenLabelsOrAssigneesMoved() {
+            Issue issue = setupHappyPath();
+            var issueData = createIssueData(Issue.State.OPEN);
+
+            listener.onIssueUpdated(
+                    new ScmDomainEvent.IssueUpdated(issueData, Set.of("relationships"), webhookContext(1L)));
+
+            verify(practiceReviewDetectionGate).evaluateIssue(issue, ScmSignals.ISSUE_UPDATED, TriggerMode.AUTO);
         }
 
         @Test
         void shouldRecordSyncDiscoveredSignalsWithoutReviewingThem() {
-            // Same split as the created path: a labelling caught up with by reconciliation is recorded and
+            // Same split as the created path: an update caught up with by reconciliation is recorded and
             // not coached on.
             var issueData = createIssueData(Issue.State.OPEN);
-            var event = new ScmDomainEvent.IssueLabeled(issueData, createLabelData(), syncContext());
+            var event = new ScmDomainEvent.IssueUpdated(issueData, Set.of("relationships"), syncContext());
 
-            listener.onIssueLabeled(event);
+            listener.onIssueUpdated(event);
 
             verify(signalRecorder).record(any(), any(), eq(DiscoveredVia.SYNC));
             verify(issueRepository, never()).findByIdWithRepositoryAndAssignees(anyLong());
@@ -493,12 +520,12 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
 
         @Test
         void shouldSkipClosedIssues() {
-            // The closed-skip guard lives in handleIssueEvent, shared by the labeled path: a label fired on an
+            // The closed-skip guard lives in handleIssueEvent, shared by the update path: an edit to an
             // already-closed issue must never reach the gate, mirroring the onIssueCreated coverage.
             var issueData = createIssueData(Issue.State.CLOSED);
-            var event = new ScmDomainEvent.IssueLabeled(issueData, createLabelData(), webhookContext(1L));
+            var event = new ScmDomainEvent.IssueUpdated(issueData, Set.of("relationships"), webhookContext(1L));
 
-            listener.onIssueLabeled(event);
+            listener.onIssueUpdated(event);
 
             verify(issueRepository, never()).findByIdWithRepositoryAndAssignees(anyLong());
             verify(practiceReviewDetectionGate, never()).evaluateIssue(any(), any(), any());
@@ -508,13 +535,13 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
         @Test
         void shouldSkipWhenIssueHasNullRepository() {
             var issueData = createIssueData(Issue.State.OPEN);
-            var event = new ScmDomainEvent.IssueLabeled(issueData, createLabelData(), webhookContext(1L));
+            var event = new ScmDomainEvent.IssueUpdated(issueData, Set.of("relationships"), webhookContext(1L));
 
             Issue issue = createIssue(Issue.State.OPEN);
             org.springframework.test.util.ReflectionTestUtils.setField(issue, "repository", null);
             when(issueRepository.findByIdWithRepositoryAndAssignees(ISSUE_ID)).thenReturn(Optional.of(issue));
 
-            listener.onIssueLabeled(event);
+            listener.onIssueUpdated(event);
 
             verify(signalRecorder).markRefused(any(), eq(SignalStateReason.ARTIFACT_GONE));
             verify(practiceReviewDetectionGate, never()).evaluateIssue(any(), any(), any());

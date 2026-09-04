@@ -16,6 +16,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -140,6 +141,10 @@ class MentorContextInvalidatorTest extends BaseUnitTest {
                 false,
                 new RepositoryRef(repoId, "acme/repo", "main"),
                 authorId,
+                null,
+                null,
+                List.of(),
+                List.of(),
                 Instant.now(),
                 Instant.now(),
                 null);

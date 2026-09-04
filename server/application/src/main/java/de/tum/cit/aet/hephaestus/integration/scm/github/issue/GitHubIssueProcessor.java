@@ -220,6 +220,12 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
         return assigneesChanged || labelsChanged;
     }
 
+    /**
+     * What this delivery moved, in the field vocabulary {@code ScmDomainEvent.IssueUpdated} carries.
+     * Reports every field the mirror tracks rather than only the review-relevant ones: which of them are
+     * worth a review is the review pipeline's decision, and which are worth a cache eviction is the
+     * mentor's, so narrowing here would silently answer both questions at once.
+     */
     private Set<String> computeChangedFields(Issue oldIssue, Issue newIssue) {
         Set<String> changedFields = new HashSet<>();
 

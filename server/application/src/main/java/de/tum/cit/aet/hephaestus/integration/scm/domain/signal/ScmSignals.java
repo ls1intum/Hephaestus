@@ -2,11 +2,14 @@ package de.tum.cit.aet.hephaestus.integration.scm.domain.signal;
 
 import static de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent.TriggerEventNames;
 
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.signal.RevisionScheme;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalKey;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalRevision;
+import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -47,7 +50,7 @@ public final class ScmSignals {
     public static final SignalName PULL_REQUEST_MANUAL_REVIEW = SignalName.of("scm.pull_request.manual_review");
 
     public static final SignalName ISSUE_OPENED = SignalName.of("scm.issue.opened");
-    public static final SignalName ISSUE_LABELED = SignalName.of("scm.issue.labeled");
+    public static final SignalName ISSUE_UPDATED = SignalName.of("scm.issue.updated");
     public static final SignalName ISSUE_CLOSED = SignalName.of("scm.issue.closed");
     public static final SignalName ISSUE_MANUAL_REVIEW = SignalName.of("scm.issue.manual_review");
 
@@ -66,8 +69,8 @@ public final class ScmSignals {
             PULL_REQUEST_CLOSED,
             TriggerEventNames.ISSUE_CREATED,
             ISSUE_OPENED,
-            TriggerEventNames.ISSUE_LABELED,
-            ISSUE_LABELED,
+            TriggerEventNames.ISSUE_UPDATED,
+            ISSUE_UPDATED,
             TriggerEventNames.ISSUE_CLOSED,
             ISSUE_CLOSED);
 
@@ -83,8 +86,8 @@ public final class ScmSignals {
             Map.entry(PULL_REQUEST_CLOSED, RevisionScheme.TERMINAL_STATE),
             Map.entry(PULL_REQUEST_MANUAL_REVIEW, RevisionScheme.RUN_ID),
             Map.entry(ISSUE_OPENED, RevisionScheme.CONTENT_DIGEST),
-            Map.entry(ISSUE_LABELED, RevisionScheme.CONTENT_DIGEST),
-            Map.entry(ISSUE_CLOSED, RevisionScheme.TERMINAL_STATE),
+            Map.entry(ISSUE_UPDATED, RevisionScheme.CONTENT_DIGEST),
+            Map.entry(ISSUE_CLOSED, RevisionScheme.CONTENT_DIGEST),
             Map.entry(ISSUE_MANUAL_REVIEW, RevisionScheme.RUN_ID));
 
     private ScmSignals() {}
@@ -132,30 +135,68 @@ public final class ScmSignals {
     }
 
     /**
-     * The ledger identity of an issue signal, keyed on what its author wrote.
+     * The ledger identity of an issue's opening, keyed on what its author wrote.
      *
-     * @param labelName the label {@link #ISSUE_LABELED} was raised for, which is what that occurrence
-     *                  <em>is</em>: three labels applied in one update are three occurrences, and keying
-     *                  them on the prose alone would deduplicate all but the first. Empty for a caller
-     *                  that cannot name the label, in which case a labelling has nothing to key on —
-     *                  better no ledger row than one that swallows every later labelling. Ignored by
-     *                  every other signal.
+     * <p>Deliberately blind to labels, assignees, milestone and type: a backfill sweep re-derives this
+     * key from the artifact as it stands, so keying it on metadata triage moves would give an untouched
+     * issue a fresh identity every time somebody labelled it, and buy a second review of the same prose.
+     * {@link #ISSUE_UPDATED} is the one occasion that metadata <em>is</em>.
      */
-    public static Optional<SignalKey> issueKey(
-            long workspaceId,
-            long issueId,
-            SignalName signal,
-            String title,
-            @Nullable String body,
-            @Nullable String labelName) {
+    public static Optional<SignalKey> issueOpenedKey(
+            long workspaceId, long issueId, String title, @Nullable String body) {
+        return issueKey(workspaceId, issueId, ISSUE_OPENED, title, body);
+    }
+
+    /**
+     * The ledger identity of an issue's close: the moment it closed.
+     *
+     * <p>An issue is not a pull request — it can be reopened, so a close is not a state it cannot leave
+     * and a constant revision would let the first close settle the row a later one needs. Two closes are
+     * two moments and two retrospective reviews; a redelivery of one close carries the same moment and
+     * is inert. The issue's own content is deliberately absent, so triaging a long-closed issue does not
+     * make the next backfill sweep re-run the review of how it ended.
+     *
+     * <p>A mirror row without a close timestamp keys on the absence instead, which is again constant per
+     * issue: neither provider guarantees {@code closed_at}, and inventing a moment would mint an
+     * occurrence nobody observed.
+     */
+    public static Optional<SignalKey> issueClosedKey(long workspaceId, long issueId, @Nullable Instant closedAt) {
+        return issueKey(workspaceId, issueId, ISSUE_CLOSED, closedAt != null ? closedAt.toString() : null);
+    }
+
+    /**
+     * The ledger identity of an issue signal raised by a domain event, dispatched to the rule for that
+     * occasion. {@link #ISSUE_UPDATED} digests the whole review-relevant snapshot, because that occasion
+     * is precisely "this snapshot differs from the last one", so two deliveries describing the same
+     * snapshot are one occurrence. Labels and assignees are sorted here, because a provider may order
+     * them however it likes and the digest may not depend on that.
+     */
+    public static Optional<SignalKey> issueKey(long workspaceId, SignalName signal, ScmEventPayload.IssueData issue) {
+        if (signal.equals(ISSUE_CLOSED)) {
+            return issueClosedKey(workspaceId, issue.id(), issue.closedAt());
+        }
+        if (!signal.equals(ISSUE_UPDATED)) {
+            return issueKey(workspaceId, issue.id(), signal, issue.title(), issue.body());
+        }
+        return issueKey(
+                workspaceId,
+                issue.id(),
+                signal,
+                issue.title(),
+                issue.body(),
+                issue.state().name(),
+                issue.stateReason(),
+                issue.issueType(),
+                issue.milestone(),
+                joinSorted(issue.labels()),
+                joinSorted(issue.assignees()));
+    }
+
+    private static Optional<SignalKey> issueKey(
+            long workspaceId, long issueId, SignalName signal, @Nullable String... content) {
         if (!ISSUE.equals(signal.artifactKind())) {
             return Optional.empty();
         }
-        boolean labelling = signal.equals(ISSUE_LABELED);
-        if (labelling && (labelName == null || labelName.isBlank())) {
-            return Optional.empty();
-        }
-        String[] content = labelling ? new String[] {title, body, labelName} : new String[] {title, body};
         return revisionFor(signal, null, content)
                 .map(revision -> new SignalKey(workspaceId, issueId, signal, revision));
     }
@@ -189,5 +230,10 @@ public final class ScmSignals {
 
     private static String lastSegmentOf(SignalName signal) {
         return signal.value().substring(signal.value().lastIndexOf('.') + 1);
+    }
+
+    /** Unit separator: no label or login may contain it, so no two lists join to the same string. */
+    private static String joinSorted(List<String> values) {
+        return values.stream().sorted().collect(Collectors.joining("\u001f"));
     }
 }
