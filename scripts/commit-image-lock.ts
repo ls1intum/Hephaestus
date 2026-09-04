@@ -36,27 +36,34 @@ export function environmentKey(image: string): string {
 	return `HEPHAESTUS_IMAGE_${image.toUpperCase().replaceAll("-", "_")}`;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function stringField(source: Record<string, unknown>, field: string, label: string): string {
+	const value = source[field];
+	if (typeof value !== "string") throw new Error(`${label} has no ${field}`);
+	return value;
+}
+
 export function parseInventory(value: unknown): ImageInventory {
-	if (typeof value !== "object" || value === null)
-		throw new Error("image inventory is not an object");
-	const record = value as Record<string, unknown>;
-	const images = record.images;
-	const upstream = record.upstream;
-	if (!Array.isArray(images) || images.some((image) => typeof image !== "string"))
+	if (!isRecord(value)) throw new Error("image inventory is not an object");
+	const { images, upstream } = value;
+	if (!Array.isArray(images) || !images.every((image) => typeof image === "string"))
 		throw new Error("image inventory lists no first-party images");
 	if (!Array.isArray(upstream)) throw new Error("image inventory lists no upstream images");
 	return {
-		images: images as string[],
+		images,
 		upstream: upstream.map((entry, index) => {
-			const item = entry as Record<string, unknown>;
-			for (const field of ["name", "repository", "digest"])
-				if (typeof item[field] !== "string") throw new Error(`upstream[${index}] has no ${field}`);
-			if (!DIGEST.test(String(item.digest)))
-				throw new Error(`upstream ${String(item.name)} is not pinned by digest`);
+			const label = `upstream[${index}]`;
+			if (!isRecord(entry)) throw new Error(`${label} is not an object`);
+			const digest = stringField(entry, "digest", label);
+			if (!DIGEST.test(digest))
+				throw new Error(`upstream ${stringField(entry, "name", label)} is not pinned by digest`);
 			return {
-				name: String(item.name),
-				repository: String(item.repository),
-				digest: String(item.digest),
+				name: stringField(entry, "name", label),
+				repository: stringField(entry, "repository", label),
+				digest,
 			};
 		}),
 	};

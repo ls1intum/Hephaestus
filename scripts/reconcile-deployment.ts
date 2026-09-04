@@ -94,10 +94,10 @@ function parseImages(value: unknown): Readonly<Record<string, string>> {
 	const images: Record<string, string> = {};
 	for (const [key, reference] of Object.entries(record)) {
 		if (!IMAGE_KEY.test(key)) throw new Error(`channel.images has an unusable name ${key}`);
-		const value = asString(reference, `channel.images.${key}`);
-		if (!IMAGE_DIGEST.test(value))
-			throw new Error(`channel.images.${key} must be pinned by digest, not ${value}`);
-		images[key] = value;
+		const pinned = asString(reference, `channel.images.${key}`);
+		if (!IMAGE_DIGEST.test(pinned))
+			throw new Error(`channel.images.${key} must be pinned by digest, not ${pinned}`);
+		images[key] = pinned;
 	}
 	if (Object.keys(images).length === 0) throw new Error("channel.images names no image");
 	return images;
