@@ -778,8 +778,8 @@ jobs:
               echo "|-------|-------------|" >> $GITHUB_STEP_SUMMARY
               echo "| Formatting errors | \`vp run format\` |" >> $GITHUB_STEP_SUMMARY
               echo "| TypeScript errors | \`vp run typecheck\` |" >> $GITHUB_STEP_SUMMARY
-              echo "| Lint errors (webapp) | \`vp run check:webapp:fix\` |" >> $GITHUB_STEP_SUMMARY
-              echo "| Lint errors (outside webapp) | \`vp run check:agents:fix\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Lint errors (webapp) | \`vp run fix:webapp\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Lint errors (outside webapp) | \`vp run fix:agents\` |" >> $GITHUB_STEP_SUMMARY
               echo "| Java formatting | \`vp run format:java\` |" >> $GITHUB_STEP_SUMMARY
               echo "| Java lint (PMD) | \`vp run lint:java:report\` |" >> $GITHUB_STEP_SUMMARY
               echo "| Storybook sidebar order | \`vp run gate:story-sort\` |" >> $GITHUB_STEP_SUMMARY

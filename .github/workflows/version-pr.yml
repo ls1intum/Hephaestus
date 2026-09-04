@@ -38,7 +38,7 @@ jobs:
       - name: Maintain Version PR
         uses: changesets/action@8488615a623b1b9c987934bb89eae8af6a946ac1 # v2.1.1
         with:
-          version-script: vp run changeset:version
+          version-script: vp run release:version
           pr-title: "chore(release): version packages"
           commit-message: "chore(release): version packages"
           github-token: ${{ secrets.GITHUB_TOKEN }}

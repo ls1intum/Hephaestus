@@ -18,12 +18,12 @@ Substantive developer orchestration under `scripts/` uses typed Node.js entry po
 | `vp run check:ports` | Validate configured local ports and report listeners. |
 | `vp run db:draft-changelog` | Rebuild a disposable database and generate a Liquibase diff. |
 | `vp run db:generate-erd-docs` | Apply migrations and regenerate the Mermaid ERD. |
-| `vp run e2e:setup <options>` | Configure a local E2E workspace against the selected SCM and model provider. Secrets are environment-only. |
-| `vp run jean:public-test <command>` | Manage the machine-local public test route. |
+| `vp run dev:e2e:setup <options>` | Configure a local E2E workspace against the selected SCM and model provider. Secrets are environment-only. |
+| `vp run dev:public-test <command>` | Manage the machine-local public test route. |
 
 The database commands require Docker with the Compose plugin.
 
-`jean:public-test` accepts `start`, `stop`, `status`, `smoke`, and `seed-status`. The route is
+`dev:public-test` accepts `start`, `stop`, `status`, `smoke`, and `seed-status`. The route is
 internet-facing and requires Docker, the machine's Coolify network and Traefik configuration
 directory, and `server/.env`.
 
@@ -55,9 +55,9 @@ vp run format:achievements
 Extract webhook payloads from NATS JetStream for test fixtures:
 
 ```bash
-vp run nats:extract-examples
+vp run schema:nats
 # With options:
-vp run nats:extract-examples --event push --event pull_request:opened
+vp run schema:nats --event push --event pull_request:opened
 ```
 
 **Environment variables:**

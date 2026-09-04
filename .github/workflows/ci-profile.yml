@@ -53,7 +53,7 @@ jobs:
         if: always()
         continue-on-error: true
         run: >-
-          vp run summarize:test-results "Server Integration Profile"
+          vp run report:test-results "Server Integration Profile"
           server/application/target/surefire-reports ci-metrics/server-integration-profile.json
           ci-metrics/server-integration.log ci-metrics/server-integration-resource.txt
 

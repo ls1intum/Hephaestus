@@ -21,8 +21,8 @@ only transport policy — retries, rate-limit accounting, pagination bounds, ten
 | Slack | Official SDK | `com.slack.api:bolt` |
 | Outline | OpenAPI spec | `openapi-generator-maven-plugin` → `spec3.yml` + `outline-supplement.yaml` |
 
-Schemas and specs are refreshed by `vp run github:update-schema`, `gitlab:update-schema`, and
-`outline:update-spec`. No integration hand-rolls a vendor DTO.
+Schemas and specs are refreshed by `vp run schema:github`, `schema:gitlab`, and `schema:outline`.
+No integration hand-rolls a vendor DTO.
 
 ## The matrix
 

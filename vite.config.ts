@@ -115,7 +115,13 @@ const policyGates = [
 	"gate:env",
 ];
 const serverGates = ["gate:java-nullness", "gate:server"];
-const webappGates = ["gate:webapp", "gate:components", "gate:stories", "gate:story-sort"];
+const webappGates = [
+	"gate:webapp",
+	"gate:webapp-format",
+	"gate:components",
+	"gate:stories",
+	"gate:story-sort",
+];
 const agentGates = ["gate:agents", "gate:agent-tests"];
 const docsGates = ["gate:docs", "gate:diagrams", "gate:docs-tokens"];
 const loadGates = ["gate:load-format"];
@@ -145,12 +151,12 @@ export default defineConfig({
 			// Each leg saturates the machine on its own, so they run one after another.
 			verification: run([
 				"vp run quality",
-				"vp run gate:webapp-tests",
-				"vp run gate:verify:storybook-tests",
-				"vp run gate:verify:server",
-				"vp run gate:verify:webapp-build",
-				"vp run gate:verify:storybook-build",
-				"vp run gate:verify:docs-build",
+				"vp run verification:webapp-tests",
+				"vp run verification:storybook-tests",
+				"vp run verification:server-tests",
+				"vp run verification:webapp-build",
+				"vp run verification:storybook-build",
+				"vp run verification:docs-build",
 			]),
 			"check:affected": run("node scripts/check-affected.ts"),
 
@@ -201,13 +207,9 @@ export default defineConfig({
 			"typecheck:scripts": group(["gate:scripts-typecheck"]),
 			"typecheck:agents": group(["gate:agents-typecheck"]),
 			"check:webapp": run("vp -C webapp check"),
-			"check:webapp:fix": run("vp -C webapp check --fix"),
+			"fix:webapp": run("vp -C webapp check --fix"),
 			"check:agents": group(["gate:agents"]),
-			"check:agents:fix": run([
-				"vp run format:agents",
-				"vp run format:config",
-				"vp run lint:agents:fix",
-			]),
+			"fix:agents": run(["vp run format:agents", "vp run format:config", "vp run lint:agents:fix"]),
 
 			// Repository policy
 			"gate:toolchain": run("node scripts/check-toolchain.ts"),
@@ -266,7 +268,9 @@ export default defineConfig({
 			"test:postgres-upgrade": run("node scripts/postgres-major-upgrade-test.ts"),
 
 			// Webapp
-			"gate:webapp": cached("vp -C webapp check"),
+			// `vp check` is format plus lint; the format half is `gate:webapp-format`, so one failure
+			// stays one verdict.
+			"gate:webapp": cached("vp -C webapp check --no-fmt"),
 			"gate:webapp-format": cached(`vp fmt --check ${webappSources}`),
 			"gate:components": cached("node scripts/check-presentational-components.ts"),
 			"gate:stories": cached("node scripts/check-story-prose.ts"),
@@ -274,7 +278,7 @@ export default defineConfig({
 			"gate:docs-tokens": cached(
 				"node scripts/check-docs-tokens.ts && node --test scripts/check-docs-tokens.test.ts",
 			),
-			"gate:webapp-tests": group(["test:webapp"]),
+			"verification:webapp-tests": group(["test:webapp"]),
 			"test:webapp": run("vp run --filter webapp test"),
 			"test:webapp:stories": run("vp run --filter webapp test:storybook"),
 			"build:webapp": run("vp -C webapp build"),
@@ -336,10 +340,10 @@ export default defineConfig({
 				...loadGates,
 				"gate:load-syntax",
 			]),
-			"ci:webapp:static": group([...webappGates, "gate:docs-tokens", "gate:webapp-tests"]),
+			"ci:webapp:static": group([...webappGates, "gate:docs-tokens", "verification:webapp-tests"]),
 			// The build regenerates the route tree, so it never runs beside a gate that reads it. A
 			// second name after `vp run` is an argument, not a second task, so the two are separate.
-			"ci:webapp": run(["vp run ci:webapp:static", "vp run gate:verify:webapp-build"]),
+			"ci:webapp": run(["vp run ci:webapp:static", "vp run verification:webapp-build"]),
 			"ci:windows": group(checkTasks.filter((gate) => !linuxOnly.includes(gate))),
 
 			// Scoped selections for check:affected
@@ -349,11 +353,11 @@ export default defineConfig({
 			"affected:webapp": group(webappGates),
 
 			// The credential-free builds and suites that verification adds to quality
-			"gate:verify:storybook-tests": group(["test:webapp:stories"]),
-			"gate:verify:webapp-build": run("node scripts/verify-webapp-build.ts"),
-			"gate:verify:storybook-build": run("vp run --filter webapp build-storybook"),
-			"gate:verify:docs-build": group(["docs:build"]),
-			"gate:verify:server": group(["test:server:verification"]),
+			"verification:storybook-tests": group(["test:webapp:stories"]),
+			"verification:webapp-build": run("node scripts/verify-webapp-build.ts"),
+			"verification:storybook-build": run("vp run --filter webapp build-storybook"),
+			"verification:docs-build": group(["docs:build"]),
+			"verification:server-tests": group(["test:server:verification"]),
 
 			// Generated artefacts, schema and integration schemas
 			"generate:api": run(["vp run generate:api:specs", "vp run generate:api:client"]),
@@ -364,12 +368,12 @@ export default defineConfig({
 			"db:draft-changelog": run("node scripts/db-utils.ts draft-changelog"),
 			"db:check-drift": run("node scripts/db-utils.ts check-drift"),
 			"db:generate-erd-docs": run("node scripts/db-utils.ts generate-erd"),
-			"github:update-schema": run("node scripts/update-github-schema.ts"),
-			"gitlab:update-schema": run("node scripts/update-gitlab-schema.ts"),
-			"outline:update-spec": run("node scripts/update-outline-spec.ts"),
-			"nats:extract-examples": run("node scripts/nats-extract-examples.ts"),
-			"summarize:test-results": run("node scripts/summarize-test-results.ts"),
-			"changeset:version": run("changeset version && node scripts/sync-release-version.ts"),
+			"schema:github": run("node scripts/update-github-schema.ts"),
+			"schema:gitlab": run("node scripts/update-gitlab-schema.ts"),
+			"schema:outline": run("node scripts/update-outline-spec.ts"),
+			"schema:nats": run("node scripts/nats-extract-examples.ts"),
+			"report:test-results": run("node scripts/summarize-test-results.ts"),
+			"release:version": run("changeset version && node scripts/sync-release-version.ts"),
 
 			// Local development
 			dev: run("mprocs"),
@@ -387,8 +391,8 @@ export default defineConfig({
 				dependsOn: ["dev:compose:e2e", "prepare:server:generated"],
 			}),
 			"check:ports": run("node scripts/check-ports.ts"),
-			"e2e:setup": run("node scripts/e2e-setup.ts"),
-			"jean:public-test": run("node scripts/jean-public-test.ts"),
+			"dev:e2e:setup": run("node scripts/e2e-setup.ts"),
+			"dev:public-test": run("node scripts/jean-public-test.ts"),
 		},
 	},
 });
