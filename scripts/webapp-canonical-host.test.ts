@@ -7,6 +7,7 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
 const entrypoint = fileURLToPath(new URL("../webapp/docker/entrypoint.sh", import.meta.url));
+const posixOnly = { skip: process.platform === "win32" && "entrypoint.sh is a bash script" };
 
 /** Runs the image entrypoint's canonical-host step against a throwaway nginx config directory. */
 function configure(clientUrl: string | undefined): {
@@ -34,14 +35,14 @@ function configure(clientUrl: string | undefined): {
 	};
 }
 
-await test("every other host is sent to the origin the SPA is configured for", () => {
+await test("every other host is sent to the origin the SPA is configured for", posixOnly, () => {
 	const { serverName, redirect } = configure("https://hephaestus.build");
 	assert.equal(serverName, "server_name hephaestus.build localhost 127.0.0.1;\n");
 	assert.match(redirect ?? "", /listen 80 default_server;/);
 	assert.match(redirect ?? "", /return 301 https:\/\/hephaestus\.build\$request_uri;/);
 });
 
-await test("both container healthcheck probes reach the app, not the redirect", () => {
+await test("both container healthcheck probes reach the app, not the redirect", posixOnly, () => {
 	// nginx prefers an exact server_name over the default server. compose.app.yaml probes
 	// `http://localhost` and the preview stack probes `http://127.0.0.1:80/`; a probe that landed on
 	// the default server would get a 301, which `curl -f` reports as success without following it —
@@ -51,19 +52,23 @@ await test("both container healthcheck probes reach the app, not the redirect", 
 	assert.match(serverName, /\b127\.0\.0\.1\b/);
 });
 
-await test("a port in the origin is kept in the redirect but not in the server name", () => {
-	const { serverName, redirect } = configure("https://heph.example:8443");
-	assert.equal(serverName, "server_name heph.example localhost 127.0.0.1;\n");
-	assert.match(redirect ?? "", /https:\/\/heph\.example:8443\$request_uri/);
-});
+await test(
+	"a port in the origin is kept in the redirect but not in the server name",
+	posixOnly,
+	() => {
+		const { serverName, redirect } = configure("https://heph.example:8443");
+		assert.equal(serverName, "server_name heph.example localhost 127.0.0.1;\n");
+		assert.match(redirect ?? "", /https:\/\/heph\.example:8443\$request_uri/);
+	},
+);
 
-await test("a deployment with no configured origin answers on every host", () => {
+await test("a deployment with no configured origin answers on every host", posixOnly, () => {
 	const { serverName, redirect } = configure(undefined);
 	assert.equal(serverName, "server_name localhost 127.0.0.1;\n");
 	assert.equal(redirect, undefined, "a stale redirect from an earlier boot must be removed");
 });
 
-await test("a value that is not a bare hostname is refused rather than escaped", () => {
+await test("a value that is not a bare hostname is refused rather than escaped", posixOnly, () => {
 	// The value reaches nginx configuration, so injection is refused outright.
 	for (const hostile of [
 		"https://evil.example;\nserver{listen 80;}",
