@@ -1,5 +1,5 @@
 name: "Setup toolchain"
-description: "The Node.js, pnpm and Vite+ versions package.json pins, with the pnpm store cached; install is none or frozen."
+description: "The Node.js, pnpm and Vite+ versions package.json pins, with the pinned pnpm executable and, for a frozen install, the pnpm store cached; install is none or frozen."
 inputs:
   install:
     description: "none, or frozen: pnpm install --frozen-lockfile --ignore-scripts. No lifecycle script runs in CI, so pnpm-workspace.yaml#allowBuilds is exercised only by a contributor's install."
@@ -8,20 +8,89 @@ inputs:
 runs:
   using: "composite"
   steps:
+    - id: pnpm
+      shell: bash
+      run: |
+        echo "version=$(jq -r '.devEngines.packageManager.version' package.json)" >> "$GITHUB_OUTPUT"
+        # On Windows this shell is Git Bash, whose $HOME is an MSYS path that the Windows PATH
+        # cannot resolve. os.homedir() is what both pnpm/setup and actions/cache's `~` expand to, so
+        # asking Node keeps the destination, the cache path and PATH the same directory everywhere.
+        echo "dest=$(node -p 'require("node:path").join(require("node:os").homedir(), "setup-pnpm")')" >> "$GITHUB_OUTPUT"
+    # The path is pnpm/setup's own default destination, so the action does not restate it as `dest`;
+    # the version check below fails the job if that default ever moves.
+    - id: pnpm-cache
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/setup-pnpm
+        key: pnpm-bin-${{ runner.os }}-${{ runner.arch }}-${{ steps.pnpm.outputs.version }}
+    # A hit skips pnpm/setup, so it has to reproduce what that action exports: PNPM_HOME, and both
+    # the destination and its bin directory on PATH.
+    - if: steps.pnpm-cache.outputs.cache-hit == 'true'
+      shell: bash
+      env:
+        PNPM_DEST: ${{ steps.pnpm.outputs.dest }}
+      run: |
+        echo "PNPM_HOME=$PNPM_DEST" >> "$GITHUB_ENV"
+        echo "$PNPM_DEST/bin" >> "$GITHUB_PATH"
+        echo "$PNPM_DEST" >> "$GITHUB_PATH"
     - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
       with:
         node-version-file: package.json
+        cache: ${{ steps.pnpm-cache.outputs.cache-hit == 'true' && inputs.install == 'frozen' && 'pnpm' || '' }}
+        cache-dependency-path: pnpm-lock.yaml
     - if: inputs.install != 'none' && inputs.install != 'frozen'
       shell: bash
       run: |
         echo "::error::setup-toolchain: install must be none or frozen"
         exit 1
-    - uses: pnpm/setup@703c52620218391530e48b9e8870d5c0082e1b9b # v2.1.0
+    # GitHub Actions has no retry for a `uses:` step and pnpm/setup has no retry input, so the
+    # attempts are written out; a loop would mean re-implementing the installer and giving up npm's
+    # signature verification of the executable. pnpm/setup does not separate a registry blip from a
+    # bad pin, so a deterministic failure also costs all three attempts.
+    - id: pnpm-setup-1
+      if: steps.pnpm-cache.outputs.cache-hit != 'true'
+      continue-on-error: true
+      uses: pnpm/setup@703c52620218391530e48b9e8870d5c0082e1b9b # v2.1.0
       with:
         cache: ${{ inputs.install == 'frozen' }}
         cache-dependency-path: pnpm-lock.yaml
         install: false
         require-lockfile: true
+    - if: steps.pnpm-setup-1.outcome == 'failure'
+      shell: bash
+      run: sleep 5
+    - id: pnpm-setup-2
+      if: steps.pnpm-setup-1.outcome == 'failure'
+      continue-on-error: true
+      uses: pnpm/setup@703c52620218391530e48b9e8870d5c0082e1b9b # v2.1.0
+      with:
+        cache: ${{ inputs.install == 'frozen' }}
+        cache-dependency-path: pnpm-lock.yaml
+        install: false
+        require-lockfile: true
+    - if: steps.pnpm-setup-2.outcome == 'failure'
+      shell: bash
+      run: sleep 10
+    - if: steps.pnpm-setup-2.outcome == 'failure'
+      uses: pnpm/setup@703c52620218391530e48b9e8870d5c0082e1b9b # v2.1.0
+      with:
+        cache: ${{ inputs.install == 'frozen' }}
+        cache-dependency-path: pnpm-lock.yaml
+        install: false
+        require-lockfile: true
+    # A cache key cannot be overwritten, so one truncated save would poison every job until the pin
+    # moves. Answering here proves the restored tree and the PATH it was reached through, and holds
+    # the freshly installed tree to the pin before it is offered to anyone else.
+    - shell: bash
+      env:
+        PNPM_VERSION: ${{ steps.pnpm.outputs.version }}
+      run: test "$(pnpm --version)" = "$PNPM_VERSION"
+    # A cache saved on any ref other than the default branch is invisible to every other ref.
+    - if: steps.pnpm-cache.outputs.cache-hit != 'true' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/setup-pnpm
+        key: pnpm-bin-${{ runner.os }}-${{ runner.arch }}-${{ steps.pnpm.outputs.version }}
     - uses: voidzero-dev/setup-vp@1b32467adbe183473499fd9d5d372c3ed9641754 # v1.18.0
       with:
         node-manager: false

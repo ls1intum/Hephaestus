@@ -442,6 +442,19 @@ void describe("CI contract", () => {
 		assert.match(job(source, "Compose"), /uses: \.\/\.github\/workflows\/ci-compose-validate\.yml/);
 	});
 
+	void test("reports a failed merge-group run on its pull request, and only a failure", async () => {
+		const source = await readFile(".github/workflows/cicd.yml", "utf8");
+		const reporter = job(source, "report-unsuccessful-merge-group");
+		assert.match(reporter, /needs: \[all-ci-passed\]/);
+		assert.match(reporter, /github\.event_name == 'merge_group'/);
+		// A merge queue cancels the runs it regroups, which says nothing about the pull request.
+		assert.match(reporter, /needs\.all-ci-passed\.result == 'failure'/);
+		assert.doesNotMatch(reporter, /always\(\)/);
+		assert.match(reporter, /pull-requests: write/);
+		// A ref the job cannot read is a missing report, so it fails rather than commenting nowhere.
+		assert.match(reporter, /core\.setFailed/);
+	});
+
 	void test("decides an image's architectures once, for every image the run builds", async () => {
 		const source = await readFile(".github/workflows/cicd.yml", "utf8");
 		const caller = job(source, "Docker");

@@ -241,10 +241,94 @@ if (installInput.default !== "none")
 	throw new Error("setup-toolchain must install nothing unless a job asks");
 if (withOf(setupStep(usesAction("actions/setup-node")))["node-version-file"] !== "package.json")
 	throw new Error("setup-toolchain must provision package.json#devEngines.runtime");
-const pnpmSetup = withOf(setupStep(usesAction("pnpm/setup")));
+// Every expression below is derived from the id of the step it reads, so renaming a step is not a
+// drift; changing what a step does is.
+const steps = setupSteps.filter(isRecord);
+const idOf = (step: Record<string, unknown>): string => {
+	if (typeof step.id !== "string") throw new Error("setup-toolchain step must carry an id");
+	return step.id;
+};
+const pnpmPin = setupStep((step) => String(step.run).includes("devEngines.packageManager.version"));
+const versionOutput = `steps.${idOf(pnpmPin)}.outputs.version`;
+// Git Bash gives Windows an MSYS $HOME that the Windows PATH cannot resolve, so the destination has
+// to be resolved the way pnpm/setup and actions/cache resolve it.
+if (!String(pnpmPin.run).includes("dest=$(node "))
+	throw new Error("setup-toolchain must resolve the pnpm destination the way the runner expands ~");
+const destOutput = `\${{ steps.${idOf(pnpmPin)}.outputs.dest }}`;
+const pnpmCache = setupStep(usesAction("actions/cache/restore"));
+const cacheHit = `steps.${idOf(pnpmCache)}.outputs.cache-hit`;
+if (
+	withOf(pnpmCache).path !== "~/setup-pnpm" ||
+	!["runner.os", "runner.arch", versionOutput].every((part) =>
+		String(withOf(pnpmCache).key).includes(part),
+	)
+)
+	throw new Error("setup-toolchain must cache the platform-specific pinned pnpm binary");
+// Without PNPM_HOME and PATH the hit path leaves the job no pnpm at all, and setup-node's store
+// cache fails looking for it.
+const restored = steps.find((step) => step.if === `${cacheHit} == 'true'`) ?? {};
+if (
+	!String(restored.run).includes("PNPM_HOME=") ||
+	!String(restored.run).includes('>> "$GITHUB_PATH"')
+)
+	throw new Error("setup-toolchain must put the restored pnpm on PATH and in PNPM_HOME");
+if (
+	String(restored.run).includes("$HOME") ||
+	!Object.values(isRecord(restored.env) ? restored.env : {}).includes(destOutput)
+)
+	throw new Error(
+		"setup-toolchain must export the resolved pnpm destination, not the shell's HOME",
+	);
+const pnpmSetupOrder = steps.flatMap((step, index) =>
+	usesAction("pnpm/setup")(step) ? [index] : [],
+);
+if (pnpmSetupOrder.length !== 3)
+	throw new Error("setup-toolchain must retry pnpm setup twice before failing");
+const pnpmSetups = pnpmSetupOrder.map((index) => steps[index] ?? {});
+const firstAttempt = pnpmSetups[0] ?? {};
+if (firstAttempt.if !== `${cacheHit} != 'true'`)
+	throw new Error("setup-toolchain must skip pnpm setup entirely when the binary cache hits");
+for (const [attempt, index] of pnpmSetupOrder.slice(1).entries()) {
+	const previous = pnpmSetups[attempt] ?? {};
+	const guard = `steps.${idOf(previous)}.outcome == 'failure'`;
+	if (previous["continue-on-error"] !== true)
+		throw new Error("setup-toolchain must let a retried pnpm setup attempt fail without the job");
+	if (steps[index]?.if !== guard)
+		throw new Error("setup-toolchain must run each pnpm setup attempt only after the last failed");
+	const backoff = steps[index - 1] ?? {};
+	if (backoff.if !== guard || !/^sleep \d+$/.test(String(backoff.run)))
+		throw new Error("setup-toolchain must back off before each pnpm setup retry");
+}
+if ("continue-on-error" in (pnpmSetups[2] ?? {}))
+	throw new Error("setup-toolchain must fail the job when its last pnpm setup attempt fails");
+const pnpmSetup = withOf(firstAttempt);
 if (pnpmSetup.install !== false || pnpmSetup["require-lockfile"] !== true)
 	throw new Error(
 		"setup-toolchain must leave the install to its own step and require the lockfile",
+	);
+for (const step of pnpmSetups)
+	if (!isDeepStrictEqual(withOf(step), pnpmSetup))
+		throw new Error("setup-toolchain must retry the same pnpm setup operation");
+// A cache key cannot be overwritten, so an unproven tree saved once is served to every job.
+const proof = steps.find((step) => String(step.run).includes("pnpm --version")) ?? {};
+if ("if" in proof || !isRecord(proof.env) || proof.env.PNPM_VERSION !== `\${{ ${versionOutput} }}`)
+	throw new Error("setup-toolchain must prove the pinned pnpm answers on both setup paths");
+const pnpmCacheSave = setupStep(usesAction("actions/cache/save"));
+if (steps.indexOf(proof) > steps.indexOf(pnpmCacheSave))
+	throw new Error("setup-toolchain must prove the pnpm binary before it saves it");
+if (!isDeepStrictEqual(withOf(pnpmCacheSave), withOf(pnpmCache)))
+	throw new Error("setup-toolchain must save the pnpm binary under its exact restore identity");
+if (
+	pnpmCacheSave.if !==
+	`${cacheHit} != 'true' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)`
+)
+	throw new Error("setup-toolchain must write the pnpm binary cache only from the default branch");
+const nodeSetup = withOf(setupStep(usesAction("actions/setup-node")));
+if (
+	nodeSetup.cache !== `\${{ ${cacheHit} == 'true' && inputs.install == 'frozen' && 'pnpm' || '' }}`
+)
+	throw new Error(
+		"setup-toolchain must cache the pnpm store through setup-node exactly when pnpm/setup did not",
 	);
 const vpSetup = withOf(setupStep(usesAction("voidzero-dev/setup-vp")));
 if (vpSetup["node-manager"] !== false || vpSetup["run-install"] !== false)
