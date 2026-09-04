@@ -16,7 +16,7 @@ await test("release promotion deploys the complete topology by signed tag", () =
 	assert.doesNotMatch(release, /'image-tag': '\$\{\{ needs\.release\.outputs\.version \}\}'/);
 	for (const stack of ["proxy", "core", "app"])
 		assert.match(deployment, new RegExp(`render ${stack} docker/compose\\.${stack}\\.yaml`));
-	assert.match(deployment, /STACKS: .*'core app'.*'core app proxy'/);
+	assert.match(deployment, /STACKS: .*'app core'.*'app core proxy'/);
 });
 
 await test("deployment uses Compose metadata, waits for readiness, and preserves rollback images", () => {
