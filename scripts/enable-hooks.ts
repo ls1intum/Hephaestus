@@ -51,9 +51,13 @@ if (git("rev-parse", "--is-inside-work-tree") === "true") {
 	});
 	process.exitCode = enabled.status ?? 1;
 
-	// `--type=bool` so `1`, `yes` and `on` count as configured; every `gpg.format` signs.
-	const signs =
-		git("config", "--get", "--type=bool", "commit.gpgsign") === "true" &&
-		git("config", "--get", "user.signingkey") !== "";
-	if (!signs) process.stderr.write(SIGNING_WARNING);
+	// The hint is for a person at their keyboard; in a job log it is only noise. GitHub Actions, like
+	// every runner, sets `CI`.
+	if (process.env.CI !== "true") {
+		// `--type=bool` so `1`, `yes` and `on` count as configured; every `gpg.format` signs.
+		const signs =
+			git("config", "--get", "--type=bool", "commit.gpgsign") === "true" &&
+			git("config", "--get", "user.signingkey") !== "";
+		if (!signs) process.stderr.write(SIGNING_WARNING);
+	}
 }

@@ -26,14 +26,19 @@ const EMPTY_GLOBAL_CONFIG = globalConfig();
  * Git exports `GIT_DIR` and its siblings to every hook process, and they outrank a child's `cwd`.
  * Inherited, they would point both the script under test and the assertions at the repository the
  * hook is running in rather than at the clone made below. The global and system configs are then
- * replaced rather than dropped, because what a developer's own config says about commit signing is
- * exactly what these tests decide.
+ * replaced rather than dropped, and `CI` is removed, because what a developer's own config says
+ * about commit signing and whether this suite is running on a runner are exactly what these tests
+ * decide.
  */
-function hookFreeEnv(configPath: string = EMPTY_GLOBAL_CONFIG): NodeJS.ProcessEnv {
+function hookFreeEnv(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
+	const inherited = Object.fromEntries(
+		Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_") && key !== "CI"),
+	);
 	return {
-		...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_"))),
-		GIT_CONFIG_GLOBAL: configPath,
+		...inherited,
+		GIT_CONFIG_GLOBAL: EMPTY_GLOBAL_CONFIG,
 		GIT_CONFIG_NOSYSTEM: "1",
+		...overrides,
 	};
 }
 
@@ -120,8 +125,21 @@ void test("an install with commit signing configured says nothing about it", () 
 		cwd: repository,
 		encoding: "utf8",
 		maxBuffer: CAPTURE_LIMIT_BYTES,
-		env: hookFreeEnv(signing),
+		env: hookFreeEnv({ GIT_CONFIG_GLOBAL: signing }),
 	});
 	assert.equal(result.status, 0, `${result.stdout}${result.stderr}`);
+	assert.doesNotMatch(result.stderr, /commit\.gpgsign/);
+});
+
+void test("an install on a runner stays silent even with no commit signing configured", () => {
+	const { repository, git } = clone();
+	const result = spawnSync("node", [SCRIPT], {
+		cwd: repository,
+		encoding: "utf8",
+		maxBuffer: CAPTURE_LIMIT_BYTES,
+		env: hookFreeEnv({ CI: "true" }),
+	});
+	assert.equal(result.status, 0, `${result.stdout}${result.stderr}`);
+	assert.equal(git("config", "core.hooksPath"), ".vite-hooks/_");
 	assert.doesNotMatch(result.stderr, /commit\.gpgsign/);
 });
