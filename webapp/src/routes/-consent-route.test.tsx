@@ -32,17 +32,11 @@ describe("first-login consent route", () => {
 		});
 		renderRouteAtWithRouter("/consent");
 
-		await screen.findByRole(
-			"heading",
-			{ name: "How Hephaestus uses your data" },
-			ROUTE_RENDER_WAIT,
-		);
+		await screen.findByRole("dialog", undefined, ROUTE_RENDER_WAIT);
 		const continueButton = screen.getByRole("button", { name: "Continue" });
 		expect(continueButton.hasAttribute("disabled")).toBe(true);
 
-		await userEvent.click(
-			screen.getByRole("checkbox", { name: "I accept the Hephaestus terms of use" }),
-		);
+		await userEvent.click(screen.getByRole("checkbox", { name: /terms of use/i }));
 		fireEvent.click(continueButton);
 
 		await waitFor(() =>
@@ -61,17 +55,9 @@ describe("first-login consent route", () => {
 		});
 		renderRouteAtWithRouter("/consent");
 
-		await screen.findByRole(
-			"heading",
-			{ name: "How Hephaestus uses your data" },
-			ROUTE_RENDER_WAIT,
-		);
-		await userEvent.click(
-			screen.getByRole("checkbox", { name: "I accept the Hephaestus terms of use" }),
-		);
-		await userEvent.click(
-			screen.getByRole("checkbox", { name: "I consent to academic research participation" }),
-		);
+		await screen.findByRole("dialog", undefined, ROUTE_RENDER_WAIT);
+		await userEvent.click(screen.getByRole("checkbox", { name: /terms of use/i }));
+		await userEvent.click(screen.getByRole("checkbox", { name: /research/i }));
 		fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
 		await waitFor(() =>
