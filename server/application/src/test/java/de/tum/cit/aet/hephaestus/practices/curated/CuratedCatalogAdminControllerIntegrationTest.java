@@ -1003,7 +1003,7 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
         return rows;
     }
 
-    private List<String> auditValues(String entityType, String entityId) {
+    private List<@Nullable String> auditValues(String entityType, String entityId) {
         return jdbcTemplate.queryForList("""
             SELECT new_value::text
             FROM config_audit_event

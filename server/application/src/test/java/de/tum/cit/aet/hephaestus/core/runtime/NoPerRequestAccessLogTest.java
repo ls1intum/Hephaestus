@@ -56,12 +56,7 @@ class NoPerRequestAccessLogTest extends BaseUnitTest {
 
     @Test
     void maintenancePageNginxDisablesTheAccessLogForTheWholeServerBlock() throws Exception {
-        String conf = propertyIn(PROXY_COMPOSE, "configs.nginx-default-config.content");
-
-        assertThat(conf)
-                .as("docker/compose.proxy.yaml no longer inlines an nginx server config under that key")
-                .isNotNull();
-        assertThat(directivesAtServerLevel(conf))
+        assertThat(directivesAtServerLevel(maintenancePageConf()))
                 .as("the maintenance page answers on a catch-all Host rule whenever the webapp router is "
                         + "down, so the URL it would log is the deep link the contributor was reaching for")
                 .contains("access_log off");
@@ -75,9 +70,8 @@ class NoPerRequestAccessLogTest extends BaseUnitTest {
     @Test
     void noNginxLocationReEnablesTheAccessLog() throws Exception {
         List<String> reEnabling = new ArrayList<>();
-        for (String conf : List.of(
-                Files.readString(WEBAPP_NGINX_CONF, StandardCharsets.UTF_8),
-                propertyIn(PROXY_COMPOSE, "configs.nginx-default-config.content"))) {
+        for (String conf :
+                List.of(Files.readString(WEBAPP_NGINX_CONF, StandardCharsets.UTF_8), maintenancePageConf())) {
             conf.lines()
                     .map(NoPerRequestAccessLogTest::directive)
                     .filter(line -> line.startsWith("access_log") && !line.equals("access_log off"))
@@ -87,6 +81,20 @@ class NoPerRequestAccessLogTest extends BaseUnitTest {
         assertThat(reEnabling)
                 .as("every access_log directive in a shipped nginx config must be `off`")
                 .isEmpty();
+    }
+
+    /**
+     * The maintenance page's nginx config is inlined into the compose file rather than shipped as a
+     * file, so a key that stops resolving would silently narrow both tests that read it to the webapp
+     * config alone. Asserting here names that as the failure instead.
+     */
+    private static String maintenancePageConf() throws IOException {
+        String conf = propertyIn(PROXY_COMPOSE, "configs.nginx-default-config.content");
+
+        assertThat(conf)
+                .as("docker/compose.proxy.yaml no longer inlines an nginx server config under that key")
+                .isNotNull();
+        return conf;
     }
 
     /**
