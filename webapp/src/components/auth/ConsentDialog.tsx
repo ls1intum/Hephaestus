@@ -1,4 +1,4 @@
-import { ExternalLinkIcon } from "lucide-react";
+import { ExternalLinkIcon, GraduationCapIcon } from "lucide-react";
 import { useId, useState } from "react";
 
 import type { ConsentStatus } from "@/api/types.gen";
@@ -58,6 +58,7 @@ export function ConsentDialog({
 	const [research, setResearch] = useState(false);
 	const termsId = useId();
 	const researchId = useId();
+	const researchHeadingId = useId();
 
 	return (
 		// Held open: a request to close is ignored rather than unsupported, because the server refuses
@@ -93,21 +94,57 @@ export function ConsentDialog({
 					</>
 				) : notice ? (
 					<>
-						<DialogBody className="space-y-4 leading-6">
-							{notice.noticeText.split("\n\n").map((paragraph) => (
-								<p key={paragraph} className="text-muted-foreground">
-									{paragraph}
-								</p>
-							))}
-							<a
-								href="/privacy"
-								target="_blank"
-								rel="noreferrer"
-								className="text-foreground inline-flex items-center gap-1 font-medium underline underline-offset-4"
+						<DialogBody className="space-y-6 leading-6">
+							<div className="space-y-4">
+								{notice.noticeText.split("\n\n").map((paragraph) => (
+									<p key={paragraph} className="text-muted-foreground">
+										{paragraph}
+									</p>
+								))}
+								<a
+									href="/privacy"
+									target="_blank"
+									rel="noreferrer"
+									className="text-foreground inline-flex items-center gap-1 font-medium underline underline-offset-4"
+								>
+									Read the full privacy notice
+									<ExternalLinkIcon className="size-3.5" aria-hidden />
+								</a>
+							</div>
+
+							{/* The research invitation stands on its own, as a thing worth doing, rather than as a
+							    second checkbox under the legal one. It stays unticked: consent has to be an act
+							    the reader takes, and a pre-ticked box is not one. */}
+							<section
+								aria-labelledby={researchHeadingId}
+								className="bg-primary/5 ring-primary/20 space-y-3 rounded-lg p-4 ring-1"
 							>
-								Read the full privacy notice
-								<ExternalLinkIcon className="size-3.5" aria-hidden />
-							</a>
+								<div className="flex items-start gap-3">
+									<GraduationCapIcon className="text-primary mt-0.5 size-5 shrink-0" aria-hidden />
+									<div className="space-y-1">
+										<h3 id={researchHeadingId} className="text-foreground font-semibold">
+											Help TUM understand how developers grow
+										</h3>
+										<p className="text-muted-foreground">
+											Hephaestus is built by TUM's Applied Education Technologies group. If you take
+											part, how you use Hephaestus and how you respond to its feedback informs that
+											research — only for as long as you say so.
+										</p>
+									</div>
+								</div>
+								<Field orientation="horizontal" className="pl-8">
+									<Checkbox id={researchId} checked={research} onCheckedChange={setResearch} />
+									<FieldContent>
+										<FieldLabel htmlFor={researchId} className="font-medium">
+											Yes, I'll take part in the research
+										</FieldLabel>
+										<FieldDescription>
+											Optional. It never changes the feedback you get, and you can withdraw any time
+											in settings.
+										</FieldDescription>
+									</FieldContent>
+								</Field>
+							</section>
 						</DialogBody>
 
 						<form
@@ -131,17 +168,6 @@ export function ConsentDialog({
 									<FieldContent>
 										<FieldLabel htmlFor={termsId}>I accept the terms of use</FieldLabel>
 										<FieldDescription>Required to use Hephaestus.</FieldDescription>
-									</FieldContent>
-								</Field>
-
-								<Field orientation="horizontal" className="bg-muted/40 rounded-lg border p-3">
-									<Checkbox id={researchId} checked={research} onCheckedChange={setResearch} />
-									<FieldContent>
-										<FieldLabel htmlFor={researchId}>Help improve Hephaestus research</FieldLabel>
-										<FieldDescription>
-											Optional. Declining changes nothing about your access, and you can change this
-											later in settings.
-										</FieldDescription>
 									</FieldContent>
 								</Field>
 

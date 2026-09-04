@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn, userEvent, within } from "storybook/test";
+import { expect, fn, screen, userEvent, within } from "storybook/test";
 
 import { ConsentDialog } from "./ConsentDialog";
 
@@ -27,8 +27,8 @@ export const Default: Story = {};
 
 /** Nothing can be submitted until the required acceptance is given. */
 export const RequiresAcceptance: Story = {
-	play: async ({ canvas, args }) => {
-		const dialog = within(await canvas.findByRole("dialog"));
+	play: async ({ args }) => {
+		const dialog = within(await screen.findByRole("dialog"));
 		const submit = dialog.getByRole("button", { name: "Continue" });
 		await expect(submit).toBeDisabled();
 
@@ -45,8 +45,8 @@ export const RequiresAcceptance: Story = {
 
 /** The optional choice is off until it is chosen, and never gates the button. */
 export const ResearchIsOptional: Story = {
-	play: async ({ canvas, args }) => {
-		const dialog = within(await canvas.findByRole("dialog"));
+	play: async ({ args }) => {
+		const dialog = within(await screen.findByRole("dialog"));
 		await expect(dialog.getByRole("checkbox", { name: /research/i })).not.toBeChecked();
 
 		await userEvent.click(dialog.getByRole("checkbox", { name: /terms of use/i }));
@@ -63,8 +63,8 @@ export const Submitting: Story = { args: { submitting: true } };
 /** The choice reached the server and was refused; the reader is told and can retry. */
 export const SubmitFailed: Story = {
 	args: { failedToSubmit: true },
-	play: async ({ canvas }) => {
-		const dialog = within(await canvas.findByRole("dialog"));
+	play: async () => {
+		const dialog = within(await screen.findByRole("dialog"));
 		await expect(dialog.getByRole("alert")).toHaveTextContent(/wasn't saved/i);
 	},
 };
@@ -75,16 +75,16 @@ export const Loading: Story = { args: { notice: undefined } };
 /** The notice could not be fetched. The reader stays blocked, because the choice is still required. */
 export const FailedToLoad: Story = {
 	args: { notice: undefined, failedToLoad: true },
-	play: async ({ canvas }) => {
-		const dialog = within(await canvas.findByRole("dialog"));
+	play: async () => {
+		const dialog = within(await screen.findByRole("dialog"));
 		await expect(dialog.getByRole("alert")).toHaveTextContent(/couldn't load/i);
 	},
 };
 
 /** A mandatory dialog still needs a way out: declining is an answer, not a dead end. */
 export const CanDeclineAndSignOut: Story = {
-	play: async ({ canvas, args }) => {
-		const dialog = within(await canvas.findByRole("dialog"));
+	play: async ({ args }) => {
+		const dialog = within(await screen.findByRole("dialog"));
 		await userEvent.click(dialog.getByRole("button", { name: /sign out/i }));
 		await expect(args.onSignOut).toHaveBeenCalled();
 	},
@@ -93,8 +93,8 @@ export const CanDeclineAndSignOut: Story = {
 /** The load failure offers a retry rather than stranding the reader on a reload instruction. */
 export const FailedToLoadCanRetry: Story = {
 	args: { notice: undefined, failedToLoad: true },
-	play: async ({ canvas, args }) => {
-		const dialog = within(await canvas.findByRole("dialog"));
+	play: async ({ args }) => {
+		const dialog = within(await screen.findByRole("dialog"));
 		await userEvent.click(dialog.getByRole("button", { name: /try again/i }));
 		await expect(args.onRetry).toHaveBeenCalled();
 	},
