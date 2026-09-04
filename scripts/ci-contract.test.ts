@@ -458,6 +458,7 @@ void describe("CI contract", () => {
 		assert.match(storybook, /render-preview-comment\.ts storybook webapp\/storybook-static/);
 		assert.match(storybook, /github\.event\.pull_request\.base\.sha/);
 		assert.match(storybook, /path: \$\{\{ runner\.temp \}\}\/storybook-preview\.md/);
+		assert.match(storybook, /name: Create Storybook status check\s+if: >-\s+success\(\)/);
 	});
 
 	void test("publishes documentation links derived from the built pages", async () => {
