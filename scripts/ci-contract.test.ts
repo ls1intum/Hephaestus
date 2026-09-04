@@ -1486,6 +1486,24 @@ void describe("CI contract", () => {
 		assert.doesNotMatch(source, /pull_request\.title|github\.head_ref/);
 	});
 
+	void test("creates every automation commit through the API, so GitHub signs it", async () => {
+		// Actions holds no signing key, so a commit a workflow pushes with git is unsigned and a
+		// required-signature rule rejects it. `scripts/commit-via-api.ts` commits through
+		// `createCommitOnBranch`, which GitHub signs. A dry run is the one push that reaches no ref:
+		// the pre-push hook probe needs a push to prove the hook runs, and writes nothing.
+		const pushes: string[] = [];
+		for (const [file, source] of await workflowSources()) {
+			for (const [index, line] of source.split("\n").entries()) {
+				const statement = line.trim();
+				if (statement.startsWith("#")) continue;
+				const command = /\bgit push\b.*/.exec(statement)?.[0];
+				if (!command || /\s--dry-run(?:\s|$)/.test(command)) continue;
+				pushes.push(`${file}:${index + 1}: ${command}`);
+			}
+		}
+		assert.deepEqual(pushes, [], "A workflow commits through scripts/commit-via-api.ts");
+	});
+
 	void test("checks out no ref taken straight from a pull_request_target or workflow_run event", async () => {
 		// Scorecard's Dangerous-Workflow rule, checked here because Scorecard itself runs only after merge.
 		for (const [file, source] of await workflowSources()) {
