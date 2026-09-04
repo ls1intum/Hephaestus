@@ -45,7 +45,7 @@ a GitHub environment gates that workflow: a signature carrying that identity is 
 approved. This holds only while `promote.yml` stays non-reusable — a `workflow_call` trigger would
 let any caller mint the same identity.
 
-**An environment may follow the default branch instead of a release.** A channel names either a
+**Staging follows the default branch; production runs releases.** A channel names either a
 release or a commit. A release is the promoted artifact: its lock, provenance and signature are
 fetched and verified, which is how production moves. A commit has no release to fetch, so the
 channel carries the digests to run and the channel's own signature covers them; provenance comes
@@ -54,6 +54,14 @@ signature makes. Every image is still pinned by digest and still has to have bee
 repository's workflow on a hosted runner, so nothing is weakened — and staging stops waiting for a
 release to be cut before it reflects the branch. Only a commit already on the default branch may be
 followed.
+
+The split is by environment, not by a setting. An environment that sometimes follows the branch and
+sometimes runs a release is two environments sharing a name, and every release would drag staging
+from a commit back onto a tag naming the same bytes — a release re-tags the commit's images rather
+than rebuilding them. So a release no longer promotes staging: by the time one exists, staging has
+been running that commit since it merged, which is a longer and more honest rehearsal than the
+minutes a pre-production promotion bought. Holding an environment still is what the channel's
+`freeze` is for, signed and carried with the channel rather than configured beside it.
 
 **A failed apply stops.** It does not roll back. Schema changes are forward-only here, so restoring
 the previous images would leave old code on a migrated database. Host monitoring reads the failure

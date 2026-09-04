@@ -515,40 +515,14 @@ jobs:
             done
           done < "$RUNNER_TEMP/promotions.tsv"
 
-  # Staging pulls: this asks for the promotion and waits for it, so production is still only offered
-  # a release staging is actually running. Nothing here reaches the host, and no deploy credential
-  # is involved — see ADR 0042.
-  promote-staging:
-    needs: [release, tag-images, publish-release]
-    if: needs.release.outputs.released == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    permissions:
-      actions: write
-      contents: read
-    steps:
-      - name: Promote staging and wait for it to converge
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE: ${{ needs.release.outputs.tag_name }}
-        run: |
-          set -euo pipefail
-          since=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          title="Promote ${RELEASE} to Staging"
-          gh workflow run promote.yml --repo "$GITHUB_REPOSITORY" \
-            -f environment=Staging -f release="$RELEASE"
-          for _ in $(seq 1 30); do
-            run=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow promote.yml --limit 100 \
-              --json databaseId,createdAt,displayTitle,event \
-              --jq "[.[] | select(.event == \"workflow_dispatch\" and .displayTitle == \"$title\" and .createdAt >= \"$since\")] | sort_by(.createdAt) | .[0].databaseId // empty")
-            [ -n "$run" ] && break
-            sleep 5
-          done
-          [ -n "$run" ] || { echo "::error::promote.yml did not start"; exit 1; }
-          gh run watch "$run" --repo "$GITHUB_REPOSITORY" --exit-status
+  # Staging is not promoted here. It follows the default branch, so by the time a release exists it
+  # has been running this very commit since it merged — and a release re-tags those images rather
+  # than rebuilding them, so the digests production is offered are the digests staging has been
+  # running. Asking for a second promotion would only move staging from the commit onto the tag for
+  # the same bytes, and leave the environment flipping between two forms of the same thing.
 
   deploy-production:
-    needs: [release, promote-staging]
+    needs: [release, tag-images, publish-release]
     if: needs.release.outputs.released == 'true'
     uses: ./.github/workflows/deploy-prod.yml
     permissions:

@@ -4,6 +4,10 @@
 # lock, and a person decides when one is cut. Staging exists to be the branch as it stands, so it
 # follows commits instead — the promotion workflow is still the only thing that writes a channel, so
 # the identity a host pins does not change.
+#
+# There is no switch for this. An environment that sometimes follows the branch and sometimes runs a
+# release is two environments wearing one name, and the channel already has the only hold that
+# matters: `freeze`, which is signed and travels with the channel rather than sitting beside it.
 name: Continuous staging
 
 on:
@@ -25,8 +29,7 @@ jobs:
     # A red build is not something to deploy, and a run that was cancelled decided nothing.
     if: >-
       ${{ github.event.workflow_run.conclusion == 'success'
-        && github.event.workflow_run.event == 'push'
-        && vars.CONTINUOUS_STAGING == 'true' }}
+        && github.event.workflow_run.event == 'push' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
