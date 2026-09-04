@@ -24,6 +24,26 @@ To ensure a transparent and trustworthy environment, we have established differe
 2. **Forking**: Fork the repository and work on changes in your own branch.
 3. **Pull Request**: Submit a PR from your fork. Ensure your branch is up to date with `main`.
 
+### Signed Commits
+
+A commit pushed to a branch in this repository is signed, and its commit email is an address verified on your GitHub account; a push carrying an unsigned commit is refused. A pull request from a fork needs none of this — the commit that lands on `main` is created and signed by GitHub.
+
+Sign with the SSH key you already push with — [GitHub accepts an authentication key a second time as a signing key](https://docs.github.com/en/authentication/managing-commit-signature-verification/about-commit-signature-verification):
+
+```bash
+git config --global gpg.format ssh
+git config --global user.signingkey ~/.ssh/id_ed25519.pub
+git config --global commit.gpgsign true
+```
+
+Then register that public key on GitHub under Settings → SSH and GPG keys → New SSH key with the key type **Signing Key**, or run `gh ssh-key add ~/.ssh/id_ed25519.pub --type signing`. Until it is registered as a signing key, signatures made with it stay unverified. `vp install` warns when this is not configured.
+
+If a push is refused, sign the commits your branch already carries and force-push:
+
+```bash
+git rebase --exec 'git commit --amend --no-edit -S' origin/main
+```
+
 ### Compliance
 
 Contributions that do not adhere to these guidelines will be rejected. We align with [GitHub Acceptable Use Policies](https://docs.github.com/en/site-policy/acceptable-use-policies).
