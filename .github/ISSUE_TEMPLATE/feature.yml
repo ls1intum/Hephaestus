@@ -28,7 +28,7 @@ body:
     id: criteria
     attributes:
       label: Acceptance criteria
-      description: List observable behavior that would show the problem is solved.
+      description: Observable behavior that shows the problem is solved. Each bullet is a change that ships; a measurement alone is not one (CONTRIBUTING.md § Issues).
       placeholder: |
         - [ ] A workspace admin can add a repository by entering owner/name.
         - [ ] A clear error explains when the repository cannot be accessed.

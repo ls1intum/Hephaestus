@@ -261,7 +261,8 @@ directories the `.gitignore` names are the only place for them. Durable architec
 and decisions go into the `docs/` document that owns them, or an ADR under `docs/decisions/`, and
 get updated when the product changes so the next reader finds facts rather than abandoned
 intentions. A merged PR is the implementation record; do not keep a second checklist in the
-repository.
+repository. An issue you file follows `CONTRIBUTING.md` § Issues: every *Done when* bullet is a
+change that ships, never a measurement or a verdict alone.
 
 ## Taste
 
