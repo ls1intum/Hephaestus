@@ -12,6 +12,14 @@ assert.ok(Array.isArray(config.extends));
 assert.ok(config.extends.every((entry) => typeof entry === "string"));
 const extensions = config.extends;
 
+/**
+ * Datasources whose versions are release tags, which upstreams prefix with `v` while the pins here
+ * are bare. Unless a manager strips the prefix, the version Renovate resolves for a pin is the tag
+ * rather than the pin, so every rule that reads a version — `matchCurrentVersion` included — is
+ * matched against a string the file does not contain.
+ */
+const RELEASE_TAG_DATASOURCES = new Set(["github-releases", "github-tags"]);
+
 void test("Renovate creates bounded update PRs without a manual dispatch queue", () => {
 	assert.ok(extensions.includes("config:best-practices"));
 	assert.ok(!extensions.includes(":dependencyDashboardApproval"));
@@ -62,7 +70,7 @@ void test("every pin of one toolchain version moves in a single pull request", (
 	}
 });
 
-void test("Vercel AI SDK packages move together", () => {
+void test("Vercel AI SDK packages move together", async () => {
 	assert.ok(Array.isArray(config.packageRules));
 	const rules = config.packageRules.filter(isRecord);
 	const ruleIndex = rules.findLastIndex((rule) => rule.groupName === "Vercel AI SDK");
@@ -73,7 +81,17 @@ void test("Vercel AI SDK packages move together", () => {
 	assert.deepEqual(rule.matchFileNames, ["webapp/package.json"]);
 	assert.deepEqual(rule.matchPackageNames, ["ai", "@ai-sdk/react"]);
 	assert.equal(rule.matchUpdateTypes, undefined);
-	assert.equal(rule.minimumGroupSize, 2);
+	// Renovate creates no branch at all below `minimumGroupSize`, so a floor above the number of
+	// pins the rule can match would hold every update in the group back, security ones included.
+	const manifest: unknown = parseJson(await readFile("webapp/package.json", "utf8"));
+	assert.ok(isRecord(manifest));
+	const dependencies: unknown = manifest.dependencies;
+	assert.ok(isRecord(dependencies));
+	assert.ok(Array.isArray(rule.matchPackageNames));
+	const pinned = rule.matchPackageNames.filter(
+		(name) => typeof name === "string" && name in dependencies,
+	);
+	assert.equal(rule.minimumGroupSize, pinned.length);
 });
 
 void test("routine update groups preserve repository boundaries", () => {
@@ -111,7 +129,7 @@ void test("vulnerability remediation bypasses normal update latency", () => {
 	});
 });
 
-void test("every custom manager extracts a dependency from its real source", async () => {
+void test("every custom manager reads every file it claims to read", async () => {
 	const sources = new Map<string, string[]>([
 		["Track Dockerfile ARG version pins", ["docker/agents/pi/Dockerfile", "webapp/Dockerfile"]],
 		[
@@ -147,17 +165,50 @@ void test("every custom manager extracts a dependency from its real source", asy
 	for (const manager of config.customManagers) {
 		if (typeof manager.description !== "string") throw new TypeError("manager description");
 		const description = manager.description;
-		assert.ok(Array.isArray(manager.matchStrings));
+		assert.ok(Array.isArray(manager.matchStrings), `${description} declares no matchStrings`);
+		assert.ok(
+			manager.matchStrings.every((pattern) => typeof pattern === "string"),
+			`${description} declares a matchStrings entry that is not a string`,
+		);
+		assert.ok(
+			Array.isArray(manager.managerFilePatterns),
+			`${description} declares no managerFilePatterns`,
+		);
+		assert.ok(
+			manager.managerFilePatterns.every((pattern) => typeof pattern === "string"),
+			`${description} declares a managerFilePatterns entry that is not a string`,
+		);
 		const files = sources.get(description);
 		assert.ok(files);
-		const contents = await Promise.all(files.map((file) => readFile(file, "utf8")));
-		for (const pattern of manager.matchStrings) {
-			if (typeof pattern !== "string") throw new TypeError("manager match pattern");
+		const datasources = new Set(
+			typeof manager.datasourceTemplate === "string" ? [manager.datasourceTemplate] : [],
+		);
+		for (const file of files) {
 			assert.ok(
-				contents.some((content) => new RegExp(pattern, "m").test(content)),
-				`${description} no longer matches its source`,
+				// `managerFilePatterns` accepts a glob as well as a `/`-delimited regex; only the
+				// latter survives the slice, so anything else is not a pattern this check can read.
+				manager.managerFilePatterns.some(
+					(pattern) =>
+						pattern.startsWith("/") &&
+						pattern.endsWith("/") &&
+						new RegExp(pattern.slice(1, -1)).test(file),
+				),
+				`${description} does not select ${file}`,
 			);
+			const content = await readFile(file, "utf8");
+			assert.ok(
+				manager.matchStrings.some((pattern) => new RegExp(pattern, "m").test(content)),
+				`${description} no longer extracts a dependency from ${file}`,
+			);
+			for (const [, datasource = ""] of content.matchAll(/# renovate: datasource=(\S+)/g))
+				datasources.add(datasource);
 		}
+		if ([...datasources].some((datasource) => RELEASE_TAG_DATASOURCES.has(datasource)))
+			assert.ok(
+				manager.extractVersionTemplate === "^v(?<version>.*)$" ||
+					manager.matchStrings.some((pattern) => pattern.includes("(?<extractVersion>")),
+				`${description} reads release tags without stripping their v prefix`,
+			);
 	}
 });
 

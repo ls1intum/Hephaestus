@@ -92,7 +92,7 @@ if (!nodeBase) {
 }
 
 for (const marker of [
-	"datasource=docker depName=node",
+	"datasource=node-version depName=node",
 	"datasource=npm depName=@earendil-works/pi-coding-agent",
 ]) {
 	if (!dockerfile.includes(`# renovate: ${marker}`)) {
