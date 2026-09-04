@@ -7,6 +7,8 @@ import { SMOKE_HOSTNAME } from "./prepare-host-smoke-env.ts";
 
 const release = readFileSync(".github/workflows/release.yml", "utf8");
 const deployment = readFileSync(".github/workflows/deploy-locked-compose.yml", "utf8");
+const promotion = readFileSync(".github/workflows/promote.yml", "utf8");
+const reconciler = readFileSync("scripts/reconcile-deployment.ts", "utf8");
 const upgradeDrill = readFileSync("scripts/release-upgrade-test.ts", "utf8");
 
 await test("release promotion deploys the complete topology by signed tag", () => {
@@ -99,7 +101,7 @@ await test("verification identity is the release's own: run context now, the map
 	assert.match(rescan, /resolve-release-identity\.ts.*certificate-identity/);
 	assert.match(deployment, /resolve-release-identity\.ts.*certificate-identity/);
 	assert.match(prepareLock, /releaseCertificateIdentity\(release, process\.env\)/);
-	assert.match(prepareLock, /releaseSignerRepository\(process\.env\)/);
+	assert.match(prepareLock, /releaseRepository\(release, process\.env\)/);
 	for (const contents of [release, deployment, rescan, prepareLock]) {
 		assert.doesNotMatch(contents, /certificate-identity[^\n]*\n?[^\n]*ls1intum\/Hephaestus/);
 		assert.doesNotMatch(
@@ -115,6 +117,13 @@ await test("verification identity is the release's own: run context now, the map
 		deployment,
 		/"\$\{SERVER_URL\}\/\$\{EXPECTED_SIGNER_REPOSITORY\}\/\.github\/workflows\/release\.yml@refs\/heads\/main"/,
 	);
+});
+
+await test("promotion accepts only immutable releases and the host supplies the verifier", () => {
+	assert.match(promotion, /--json isDraft,isImmutable/);
+	assert.match(promotion, /\.isImmutable/);
+	assert.match(reconciler, /join\(config\.checkout, "scripts\/prepare-release-lock\.ts"\)/);
+	assert.doesNotMatch(reconciler, /join\(releaseTree, "scripts\/prepare-release-lock\.ts"\)/);
 });
 
 await test("derived signer identity matches today's literals in the canonical repository", () => {

@@ -3,8 +3,7 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 
 import { run } from "./lib/process.ts";
-import { releaseCertificateIdentity } from "./lib/release-identities.ts";
-import { releaseSignerRepository } from "./lib/release-signer.ts";
+import { releaseCertificateIdentity, releaseRepository } from "./lib/release-identities.ts";
 import { isRelease } from "./release-image-lock.ts";
 
 const repositoryRoot = join(import.meta.dirname, "..");
@@ -12,11 +11,6 @@ const [release, output = join(repositoryRoot, "docker/self-host/release-lock.env
 	process.argv.slice(2);
 if (!release || !isRelease(release)) throw new Error("usage: prepare-release-lock vX.Y.Z [output]");
 
-/**
- * A published release's assets are plain HTTPS downloads, so verifying one needs no credential and
- * no GitHub CLI — which is what lets a deployment host, or a self-hoster, upgrade without holding an
- * account that could also change the release it is verifying.
- */
 async function downloadReleaseAsset(
 	repository: string,
 	tag: string,
@@ -34,12 +28,27 @@ const outputDirectory = dirname(output);
 const outputTempDirectory = await mkdtemp(join(outputDirectory, `.${basename(output)}-`));
 const temporaryOutput = join(outputTempDirectory, "lock.env");
 const asset = `release-${release}.json`;
+const repository = releaseRepository(release, process.env);
 try {
-	await Promise.all(
-		[asset, `${asset}.sigstore.json`, "manifest.json"].map((name) =>
-			downloadReleaseAsset(releaseSignerRepository(process.env), release, name, directory),
-		),
-	);
+	const assets = [asset, `${asset}.sigstore.json`, "manifest.json"];
+	if (process.env.GITHUB_ACTIONS === "true") {
+		if (!process.env.GH_TOKEN) throw new Error("GH_TOKEN is required to verify a draft release");
+		// Draft release assets used by the publication smoke test require authenticated GitHub access.
+		await run("gh", [
+			"release",
+			"download",
+			release,
+			"--repo",
+			repository,
+			"--dir",
+			directory,
+			...assets.flatMap((name) => ["--pattern", name]),
+		]);
+	} else {
+		await Promise.all(
+			assets.map((name) => downloadReleaseAsset(repository, release, name, directory)),
+		);
+	}
 	await run("cosign", [
 		"verify-blob",
 		"--bundle",

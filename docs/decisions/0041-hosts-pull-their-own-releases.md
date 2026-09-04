@@ -32,11 +32,11 @@ A host polls a channel and applies the release it names. Nothing connects to the
 release. The branch carries no code and triggers no workflow.
 
 **Freshness comes from the commit graph.** A signature proves authorship, not currency: a valid old
-channel, replayed, verifies. The reconciler refuses a channel commit that is an ancestor of the one
-it applied, unless the channel declares the rollback. This is the property TUF builds timestamp and
-snapshot roles for, taken from a history the repository already keeps — which is also why the
-channel is not an OCI artifact under a mutable tag, where no such order exists and where GHCR offers
-no tag immutability.
+channel, replayed, verifies. The reconciler accepts only a channel commit that descends from the last
+one it accepted. Moving to a lower release additionally requires `allowRollback` on that new commit;
+the flag never authorizes replay. This is the property TUF builds timestamp and snapshot roles for,
+taken from a history the repository already keeps — which is also why the channel is not an OCI
+artifact under a mutable tag, where no such order exists and where GHCR offers no tag immutability.
 
 **Approval is bound by identity, not by claim.** Fulcio does record GitHub's `environment` claim, but
 cosign exposes no way to verify it, so requiring "signed by a job in the Production environment" is
@@ -46,7 +46,8 @@ approved. This holds only while `promote.yml` stays non-reusable — a `workflow
 let any caller mint the same identity.
 
 **A failed apply stops.** It does not roll back. Schema changes are forward-only here, so restoring
-the previous images would leave old code on a migrated database. The reconciler alerts instead.
+the previous images would leave old code on a migrated database. Host monitoring reads the failure
+and staleness metrics instead.
 
 **Feedback is observed, not reported.** Because nothing can push the hosts, the promotion workflow
 polls the environment's public runtime configuration until it reports the promoted version. A deploy

@@ -1,33 +1,23 @@
-# Brings this host to the release its channel names. Install alongside hephaestus-reconcile.timer
-# and an environment file at /etc/hephaestus/reconcile.env; see docker/self-host/systemd/README.md.
 [Unit]
 Description=Reconcile this host to its Hephaestus release channel
 Documentation=https://docs.hephaestus.build/admin/pull-based-deployment
 Requires=docker.service
 After=docker.service network-online.target
 Wants=network-online.target
-OnFailure=hephaestus-reconcile-notify@%n.service
 
 [Service]
-# Deliberately not RemainAfterExit: that would leave the unit "active" after the first run, and
-# systemd does not restart a unit that is already active when its timer elapses — every later tick
-# would silently do nothing.
 Type=oneshot
 EnvironmentFile=/etc/hephaestus/reconcile.env
-# systemd already refuses a second copy of a running oneshot; the lock covers direct invocation.
-# `env` rather than a hardcoded interpreter path: a distribution package puts node in /usr/bin and
-# an official tarball in /usr/local/bin, both of which are on systemd's default PATH.
-ExecStart=/usr/bin/flock --nonblock /run/lock/hephaestus-reconcile.lock \
-    /usr/bin/env node ${HEPHAESTUS_CHECKOUT}/scripts/reconcile-deployment.ts
+StateDirectory=hephaestus
+StateDirectoryMode=0750
+ExecStart=/usr/bin/env node /var/lib/hephaestus/checkout/scripts/reconcile-deployment.ts
 TimeoutStartSec=30min
 
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes
 PrivateTmp=yes
-# Everything the reconciler writes lives under the state directory, including its checkout, so the
-# writable set stays this short. The metrics path is optional, hence the leading dash.
-ReadWritePaths=/var/lib/hephaestus /run/lock -/var/lib/node_exporter
+ReadWritePaths=-/var/lib/node_exporter
 # The Docker socket is reached over AF_UNIX; omitting it here breaks connect(2). Read-only
 # directory protections do not block Unix sockets, so ProtectSystem=strict leaves it reachable.
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
@@ -36,9 +26,6 @@ RestrictRealtime=yes
 LockPersonality=yes
 SystemCallFilter=@system-service
 SystemCallErrorNumber=EPERM
-
-# The hardening bounds this process, not the daemon: Docker socket access is root-equivalent by
-# design. Rootless Podman with Quadlet is the only structural escape, and it is a migration.
 
 [Install]
 WantedBy=multi-user.target

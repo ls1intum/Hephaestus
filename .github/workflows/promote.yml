@@ -6,6 +6,7 @@
 # reaches staging by dispatching this workflow, not by triggering on its completion, so no run here
 # inherits a context it did not ask for.
 name: Promote
+run-name: Promote ${{ inputs.release }} to ${{ inputs.environment }}
 
 on:
   workflow_dispatch:
@@ -57,11 +58,13 @@ jobs:
         run: |
           set -euo pipefail
           release="$REQUESTED"
-          [[ "$release" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+          [[ "$release" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || {
             echo "::error::Promote an immutable vX.Y.Z release, not '$release'"; exit 1; }
-          # A draft is a half-published release; refusing it here keeps it off a host.
-          [ "$(gh release view "$release" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)" = false ] || {
+          metadata=$(gh release view "$release" --repo "$GITHUB_REPOSITORY" --json isDraft,isImmutable)
+          [ "$(jq -r .isDraft <<<"$metadata")" = false ] || {
             echo "::error::$release is still a draft"; exit 1; }
+          [ "$(jq -r .isImmutable <<<"$metadata")" = true ] || {
+            echo "::error::$release is not immutable"; exit 1; }
           echo "release=$release" >> "$GITHUB_OUTPUT"
           echo "version=${release#v}" >> "$GITHUB_OUTPUT"
 

@@ -18,12 +18,13 @@ Two signatures, both checked on the host:
 | Artifact | Signed by | Answers |
 | --- | --- | --- |
 | The channel (`channels/<env>.json`) | the promotion workflow | *may this host move, and who said so* |
-| The release lock (`release-<version>.json`) | the release workflow | *which exact image digests are this release* |
+| The release lock (`release-<version>.json`) | the release workflow | *which source commit and image digests are this release* |
 
 A signature proves who wrote something, never that it is the newest thing they wrote — a valid old
 channel replayed verifies perfectly. Freshness therefore comes from the commit graph: the channel
-lives on the `deploy-state` branch, and a commit that is an ancestor of the one already applied is a
-move backwards, refused unless the channel sets `allowRollback`.
+lives on the `deploy-state` branch, and each accepted commit must descend from the last one. A lower
+release version also requires `allowRollback`; a deliberate rollback is a new channel commit, never
+permission to replay an old one.
 
 ## The channel
 
@@ -39,18 +40,18 @@ move backwards, refused unless the channel sets `allowRollback`.
 
 ## Requirements
 
-On the host: Docker Engine with Compose v2, `git`, `flock`, `cosign`, and Node.js at the version in
-`.node-version`. Outbound HTTPS to `github.com` and `ghcr.io` is the only network access needed —
-nothing has to reach the host, which is the point.
+On the host: Docker Engine with Compose v2, `git`, `cosign`, and Node.js at the version in
+`package.json#devEngines.runtime`. Outbound HTTPS to `github.com` and `ghcr.io` is the only network
+access needed — nothing has to reach the host, which is the point.
 
 Pin what you install. `cosign` verifies the release, so fetch it by checksum from its own release
 page rather than from a convenience script.
 
 ## Install
 
-1. Clone this repository to `/var/lib/hephaestus/checkout`. It belongs under the state directory
-   because the reconciler fetches into it; the unit makes only that directory writable, so a
-   checkout anywhere else needs a matching `ReadWritePaths` entry.
+1. Clone the `main` branch to `/var/lib/hephaestus/checkout`. This is the trusted, host-owned copy of
+   the reconciler and release verifier; release contents never replace it. Update it separately when
+   you intentionally adopt reconciler changes.
 2. Copy `docker/self-host/systemd/reconcile.env.example` to `/etc/hephaestus/reconcile.env`
    (`root:root`, `0600`) and set the channel, the stacks this host owns, and the promotion identity.
 3. Put one `<stack>.env` per stack in `/etc/hephaestus`, `0600`. These hold the deployment secrets
@@ -58,9 +59,13 @@ page rather than from a convenience script.
 4. Install the units:
 
    ```bash
-   sudo install -m 644 docker/self-host/systemd/hephaestus-reconcile.service \
-     docker/self-host/systemd/hephaestus-reconcile.timer \
-     docker/self-host/systemd/hephaestus-reconcile-notify@.service /etc/systemd/system/
+   sudo install -d -m 0750 /var/lib/hephaestus
+   sudo git clone --branch main --single-branch \
+     https://github.com/hephaestus-build/Hephaestus.git /var/lib/hephaestus/checkout
+   sudo install -m 644 \
+     /var/lib/hephaestus/checkout/docker/self-host/systemd/hephaestus-reconcile.service \
+     /var/lib/hephaestus/checkout/docker/self-host/systemd/hephaestus-reconcile.timer \
+     /etc/systemd/system/
    sudo systemctl daemon-reload
    sudo systemctl enable --now hephaestus-reconcile.timer
    ```
@@ -88,7 +93,8 @@ the fix has landed in a release.
 
 ## Watching it
 
-With `HEPHAESTUS_METRICS_FILE` set, each run writes to the node_exporter textfile collector:
+Set `HEPHAESTUS_METRICS_FILE` to a `.prom` file in an existing node_exporter textfile collector
+directory. Each run then writes:
 
 ```text
 hephaestus_deploy_info{channel="staging",release="v1.2.3",channel_commit="…"} 1
@@ -108,10 +114,11 @@ green, so an unconverged deploy fails in Actions as well.
 
 ## What it will not do
 
-**It does not roll back a failed deploy.** A failed apply stops and alerts. Schema changes here are
-forward-only, so putting the previous images back would leave old code on a migrated database — the
-failure the rollback was meant to prevent. Recover by promoting a release that fixes the problem, or
-by restoring from a backup if the database itself is wrong; see
+**It does not roll back a failed deploy.** A failed apply stops and publishes a failure metric when
+the textfile collector is configured. Schema changes here are forward-only, so putting the previous
+images back would leave old code on a migrated database — the failure the rollback was meant to
+prevent. Recover by promoting a release that fixes the problem, or by restoring from a backup if the
+database itself is wrong; see
 [Backup & Restore](./backup-restore.mdx).
 
 **It does not manage anything it does not own.** The reconciler touches only the Compose projects
