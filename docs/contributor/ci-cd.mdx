@@ -166,8 +166,10 @@ SBOM, and release-verification guarantees.
 2. Create `Staging` (no rules)
 3. Create `Production` with **Required reviewers**
 
-A deploy brings up `core`, then `app`, then `proxy`, so every router is complete before the bundled
-edge reloads; the `proxy` stack publishes :80 and :443. An environment whose host already has an
+A deploy brings up `app`, then `core`, then `proxy`: the application server runs the Liquibase
+migration the webhook runtime in `core` reads, and the edge starts last, against routers that are
+already complete. Both deploy paths use this order — the push workflow and the pull reconciler.
+The `proxy` stack publishes :80 and :443. An environment whose host already has an
 edge in front of it sets the environment variable `DEPLOY_EDGE_PROXY=false`, which leaves `proxy`
 out of both the render and the deploy; anything else, including an unset variable, deploys all
 three. Staging sets it, because it shares a host with the Coolify instance that serves preview

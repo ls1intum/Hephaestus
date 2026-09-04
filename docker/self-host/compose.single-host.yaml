@@ -54,6 +54,10 @@ services:
       # 300s leaves margin above Traefik's 180s default.
       - "--entryPoints.http.transport.respondingTimeouts.idleTimeout=300s"
       - "--entryPoints.https.transport.respondingTimeouts.idleTimeout=300s"
+      # Backend timeouts, same as the reference. `command:` is !override, so nothing here is
+      # inherited. Traefik's default transport waits forever for response headers.
+      - "--serversTransport.forwardingTimeouts.dialTimeout=10s"
+      - "--serversTransport.forwardingTimeouts.responseHeaderTimeout=30s"
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
       - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"

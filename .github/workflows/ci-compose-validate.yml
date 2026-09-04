@@ -83,6 +83,8 @@ jobs:
           for required in \
             'entrypoints.https.http.middlewares=security-headers@docker' \
             'providers.file.filename=/etc/traefik/dynamic.yml' \
+            'serversTransport.forwardingTimeouts.dialTimeout=10s' \
+            'serversTransport.forwardingTimeouts.responseHeaderTimeout=30s' \
             'contentsecuritypolicy' \
             'default-src' \
             'stsseconds' \
@@ -126,4 +128,15 @@ jobs:
           for stack in proxy core app; do
             docker compose -f "compose.${stack}.yaml" \
               --env-file self-host/.env --env-file self-host/release-lock.env config --quiet
+          done
+          # No service names a serversTransport, because only the file provider can define one and
+          # the app stack must render without the proxy stack. The backend timeouts therefore have
+          # to reach default@internal from the edge's own static configuration, or they are absent.
+          proxy=$(docker compose -f compose.proxy.yaml \
+            --env-file self-host/.env --env-file self-host/release-lock.env config)
+          for required in \
+            'serversTransport.forwardingTimeouts.dialTimeout=10s' \
+            'serversTransport.forwardingTimeouts.responseHeaderTimeout=30s'; do
+            grep -Fq "$required" <<< "$proxy" || {
+              echo "::error::the bundled edge does not bound the backend wait ('$required')"; exit 1; }
           done

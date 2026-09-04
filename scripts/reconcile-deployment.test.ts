@@ -40,6 +40,13 @@ await test("an unchanged channel is a no-op, so most ticks do nothing", () => {
 	});
 });
 
+await test("re-promoting the release a host already runs re-applies it, so drift converges", () => {
+	assert.deepEqual(decide({ release: applied.release }, applied, "c".repeat(40), true), {
+		action: "apply",
+		release: applied.release,
+	});
+});
+
 await test("a descendant channel commit applies", () => {
 	assert.deepEqual(decide({ release: "v0.75.3" }, applied, "c".repeat(40), true), {
 		action: "apply",
@@ -99,9 +106,9 @@ await test("only a missing applied-state file means first run", async () => {
 	}
 });
 
-await test("stacks publish dependencies and routes before the edge reloads", () => {
-	assert.deepEqual(parseStacks("app core"), ["core", "app"]);
-	assert.deepEqual(parseStacks("app, core, proxy"), ["core", "app", "proxy"]);
+await test("stacks come up in dependency order regardless of how they were configured", () => {
+	assert.deepEqual(parseStacks("core app"), ["app", "core"]);
+	assert.deepEqual(parseStacks("proxy, core, app"), ["app", "core", "proxy"]);
 	assert.throws(() => parseStacks("app database"), /unknown stack/);
 	assert.throws(() => parseStacks(""), /at least one stack/);
 });
