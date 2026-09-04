@@ -37,7 +37,7 @@ class PracticeSignalOptionsTest extends BaseUnitTest {
                         ScmSignals.PULL_REQUEST_CLOSED);
         assertThat(options.bindableOptionsFor(ArtifactKinds.ISSUE))
                 .extracting(SignalOption::signal)
-                .containsExactly(ScmSignals.ISSUE_OPENED, ScmSignals.ISSUE_LABELED, ScmSignals.ISSUE_CLOSED);
+                .containsExactly(ScmSignals.ISSUE_OPENED, ScmSignals.ISSUE_UPDATED, ScmSignals.ISSUE_CLOSED);
     }
 
     /**

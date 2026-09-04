@@ -65,7 +65,7 @@ public class GitHubManifest implements IntegrationManifest {
                                 ScmSignals.PULL_REQUEST_MERGED,
                                 ScmSignals.PULL_REQUEST_CLOSED),
                         ScmSignals.ISSUE,
-                        Set.of(ScmSignals.ISSUE_OPENED, ScmSignals.ISSUE_LABELED, ScmSignals.ISSUE_CLOSED)),
+                        Set.of(ScmSignals.ISSUE_OPENED, ScmSignals.ISSUE_UPDATED, ScmSignals.ISSUE_CLOSED)),
                 Map.of(
                         ScmSignals.PULL_REQUEST,
                         Set.of(FeedbackLane.IN_CONTEXT_SUMMARY, FeedbackLane.IN_CONTEXT_INLINE),

@@ -8,6 +8,7 @@ import {
 import {
 	mockConversationWorkType,
 	mockDocumentWorkType,
+	mockIssueWorkType,
 	mockPracticeDefinitionOptions,
 	mockPullRequestWorkType,
 } from "@/mocks/fixtures/practice";
@@ -43,6 +44,19 @@ describe("momentBands", () => {
 			],
 			["end", ["scm.pull_request.merged", "scm.pull_request.closed"]],
 		]);
+	});
+
+	it("warns that an issue's middle moment repeats, because binding it is a decision about volume", () => {
+		const bands = momentBands(mockIssueWorkType.signals);
+
+		expect(
+			bands.map((band) => [band.phase, band.moments.map((moment) => moment.signal)]),
+		).toStrictEqual([
+			["start", ["scm.issue.opened"]],
+			["during", ["scm.issue.updated"]],
+			["end", ["scm.issue.closed"]],
+		]);
+		expect(momentDef("scm.issue.updated").repeats).toBe(true);
 	});
 
 	it("gives a document its own three moments under the same three bands", () => {

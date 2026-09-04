@@ -15,6 +15,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.Team;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import org.jspecify.annotations.NonNull;
@@ -54,6 +55,10 @@ public final class ScmEventPayload {
             boolean isPullRequest,
             @NonNull RepositoryRef repository,
             @Nullable Long authorId,
+            @Nullable String issueType,
+            @Nullable String milestone,
+            @NonNull List<String> labels,
+            @NonNull List<String> assignees,
             @Nullable Instant createdAt,
             @Nullable Instant updatedAt,
             @Nullable Instant closedAt) {
@@ -69,6 +74,13 @@ public final class ScmEventPayload {
                     issue.isPullRequest(),
                     Objects.requireNonNull(RepositoryRef.from(issue.getRepository())),
                     issue.getAuthor() != null ? issue.getAuthor().getId() : null,
+                    issue.getIssueType() != null ? issue.getIssueType().getName() : null,
+                    issue.getMilestone() != null ? issue.getMilestone().getTitle() : null,
+                    issue.getLabels().stream().map(Label::getName).toList(),
+                    issue.getAssignees().stream()
+                            .map(User::getLogin)
+                            .filter(Objects::nonNull)
+                            .toList(),
                     issue.getCreatedAt(),
                     issue.getUpdatedAt(),
                     issue.getClosedAt());

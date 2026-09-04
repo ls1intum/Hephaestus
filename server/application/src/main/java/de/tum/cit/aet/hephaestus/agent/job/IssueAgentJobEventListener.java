@@ -20,6 +20,8 @@ import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewDetectionGate;
 import de.tum.cit.aet.hephaestus.practices.review.TriggerMode;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceResolver;
+import java.util.Collections;
+import java.util.Set;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,6 +48,15 @@ public class IssueAgentJobEventListener {
 
     private static final Logger log = LoggerFactory.getLogger(IssueAgentJobEventListener.class);
 
+    /**
+     * The issue fields the review evidence is built from ({@code IssueContentSource}). An update that
+     * moves nothing else — a lock, a comment count, a due date, a weight — occasions no review: the
+     * mirror still records it, but every practice bound to the occasion would read byte-identical
+     * evidence and reach the conclusion it already published.
+     */
+    private static final Set<String> REVIEWABLE_ISSUE_FIELDS =
+            Set.of("title", "body", "state", "stateReason", "issueType", "milestone", "relationships");
+
     private final AgentJobService agentJobService;
     private final IssueRepository issueRepository;
     private final PracticeReviewDetectionGate practiceReviewDetectionGate;
@@ -69,14 +80,17 @@ public class IssueAgentJobEventListener {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onIssueCreated(ScmDomainEvent.IssueCreated event) {
-        handleIssueEvent(event.issue(), null, event.context(), TriggerEventNames.ISSUE_CREATED);
+        handleIssueEvent(event.issue(), event.context(), TriggerEventNames.ISSUE_CREATED);
     }
 
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onIssueLabeled(ScmDomainEvent.IssueLabeled event) {
-        handleIssueEvent(event.issue(), event.label().name(), event.context(), TriggerEventNames.ISSUE_LABELED);
+    public void onIssueUpdated(ScmDomainEvent.IssueUpdated event) {
+        if (Collections.disjoint(event.changedFields(), REVIEWABLE_ISSUE_FIELDS)) {
+            return;
+        }
+        handleIssueEvent(event.issue(), event.context(), TriggerEventNames.ISSUE_UPDATED);
     }
 
     @Async
@@ -86,15 +100,11 @@ public class IssueAgentJobEventListener {
         handleRetrospectiveIssueEvent(event.issue(), event.context(), TriggerEventNames.ISSUE_CLOSED);
     }
 
-    private void handleIssueEvent(
-            ScmEventPayload.IssueData issueData,
-            @Nullable String labelName,
-            EventContext context,
-            String triggerEventName) {
+    private void handleIssueEvent(ScmEventPayload.IssueData issueData, EventContext context, String triggerEventName) {
         if (issueData.state() == Issue.State.CLOSED) {
             return;
         }
-        dispatchIssueEvent(issueData, labelName, context, triggerEventName);
+        dispatchIssueEvent(issueData, context, triggerEventName);
     }
 
     /**
@@ -103,7 +113,7 @@ public class IssueAgentJobEventListener {
      */
     private void handleRetrospectiveIssueEvent(
             ScmEventPayload.IssueData issueData, EventContext context, String triggerEventName) {
-        dispatchIssueEvent(issueData, null, context, triggerEventName);
+        dispatchIssueEvent(issueData, context, triggerEventName);
     }
 
     /**
@@ -111,12 +121,9 @@ public class IssueAgentJobEventListener {
      * listener, and for the same reason: what we saw is a fact, whether to coach on it is a policy.
      */
     private void dispatchIssueEvent(
-            ScmEventPayload.IssueData issueData,
-            @Nullable String labelName,
-            EventContext context,
-            String triggerEventName) {
+            ScmEventPayload.IssueData issueData, EventContext context, String triggerEventName) {
         try {
-            SignalKey key = signalKeyFor(issueData, labelName, triggerEventName);
+            SignalKey key = signalKeyFor(issueData, triggerEventName);
             if (key == null) {
                 return;
             }
@@ -163,14 +170,7 @@ public class IssueAgentJobEventListener {
         }
     }
 
-    /**
-     * The ledger identity of this event. An issue carries no commit, so its signal keys on what the
-     * author wrote — an edit becomes a fresh occurrence and gets re-measured; a labelling also keys on
-     * the label, since three labels in one update are three occurrences with an otherwise-identical
-     * payload.
-     */
-    private @Nullable SignalKey signalKeyFor(
-            ScmEventPayload.IssueData issueData, @Nullable String labelName, String triggerEventName) {
+    private @Nullable SignalKey signalKeyFor(ScmEventPayload.IssueData issueData, String triggerEventName) {
         Workspace workspace = workspaceResolver
                 .resolveForRepository(issueData.repository().nameWithOwner())
                 .orElse(null);
@@ -185,9 +185,7 @@ public class IssueAgentJobEventListener {
             log.debug("No signal declared for trigger event, nothing to record: event={}", triggerEventName);
             return null;
         }
-        return ScmSignals.issueKey(
-                        workspace.getId(), issueData.id(), signal, issueData.title(), issueData.body(), labelName)
-                .orElse(null);
+        return ScmSignals.issueKey(workspace.getId(), signal, issueData).orElse(null);
     }
 
     private void submitJob(Issue issue, GateDecision.Detect detect, SignalKey signalKey) {

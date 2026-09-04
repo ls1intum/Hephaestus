@@ -79,7 +79,7 @@ public class GitLabManifest implements IntegrationManifest {
                                 ScmSignals.PULL_REQUEST_MERGED,
                                 ScmSignals.PULL_REQUEST_CLOSED),
                         ScmSignals.ISSUE,
-                        Set.of(ScmSignals.ISSUE_OPENED, ScmSignals.ISSUE_LABELED, ScmSignals.ISSUE_CLOSED)),
+                        Set.of(ScmSignals.ISSUE_OPENED, ScmSignals.ISSUE_UPDATED, ScmSignals.ISSUE_CLOSED)),
                 gitlabStackEnabled
                         ? Map.of(
                                 ScmSignals.PULL_REQUEST,

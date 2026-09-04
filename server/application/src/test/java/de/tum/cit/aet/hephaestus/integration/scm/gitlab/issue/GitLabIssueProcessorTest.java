@@ -382,7 +382,6 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
             assertThat(result).isNotNull();
 
             ArgumentCaptor<Object> eventCaptor = ArgumentCaptor.forClass(Object.class);
-            // processClosed calls process() which may publish IssueCreated, then publishes IssueClosed
             verify(eventPublisher).publishEvent(eventCaptor.capture());
             assertThat(eventCaptor.getValue()).isInstanceOf(ScmDomainEvent.IssueClosed.class);
         }
@@ -404,8 +403,10 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
             assertThat(result).isNotNull();
 
             ArgumentCaptor<Object> eventCaptor = ArgumentCaptor.forClass(Object.class);
-            verify(eventPublisher).publishEvent(eventCaptor.capture());
-            assertThat(eventCaptor.getValue()).isInstanceOf(ScmDomainEvent.IssueReopened.class);
+            verify(eventPublisher, Mockito.times(2)).publishEvent(eventCaptor.capture());
+            assertThat(eventCaptor.getAllValues())
+                    .extracting(Object::getClass)
+                    .containsExactlyInAnyOrder(ScmDomainEvent.IssueUpdated.class, ScmDomainEvent.IssueReopened.class);
         }
     }
 
@@ -443,9 +444,79 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                     .thenReturn(createUserEntity());
 
             // An ordinary title/description edit (no changes.labels) must not trigger label-based detection.
-            processor.processUpdated(createUpdateEventWithAddedLabel(null), createContext());
+            processor.processUpdated(createUpdateEventWithChanges(titleChanged()), createContext());
 
             verify(eventPublisher, never()).publishEvent(any(ScmDomainEvent.IssueLabeled.class));
+        }
+
+        @Test
+        void publishesIssueUpdatedNamingWhatTheChangesDiffSaysMoved() {
+            Issue issue = createIssueEntity();
+            when(issueRepository.findByRepositoryIdAndNumber(REPO_ID, ISSUE_IID))
+                    .thenReturn(Optional.of(issue))
+                    .thenReturn(Optional.of(issue));
+            when(gitLabUserService.findOrCreateUser(any(GitLabWebhookUser.class), eq(PROVIDER_ID)))
+                    .thenReturn(createUserEntity());
+
+            processor.processUpdated(createUpdateEventWithChanges(titleChanged()), createContext());
+
+            ArgumentCaptor<ScmDomainEvent.IssueUpdated> captor =
+                    ArgumentCaptor.forClass(ScmDomainEvent.IssueUpdated.class);
+            verify(eventPublisher).publishEvent(captor.capture());
+            assertThat(captor.getValue().changedFields()).containsExactly("title");
+        }
+
+        /**
+         * GitLab has one update action for every field it tracks, most of which the review evidence never
+         * reads. Publishing regardless would mint a fresh occasion for a due-date edit — a review nobody
+         * asked for, on evidence that did not move.
+         */
+        @Test
+        void publishesNothingWhenTheUpdateMovedNoFieldTheDomainNames() {
+            Issue issue = createIssueEntity();
+            when(issueRepository.findByRepositoryIdAndNumber(REPO_ID, ISSUE_IID))
+                    .thenReturn(Optional.of(issue))
+                    .thenReturn(Optional.of(issue));
+            when(gitLabUserService.findOrCreateUser(any(GitLabWebhookUser.class), eq(PROVIDER_ID)))
+                    .thenReturn(createUserEntity());
+
+            // A due-date-only edit: GitLab still sends changes, but none of its keys is a field the
+            // shared domain has a name for.
+            processor.processUpdated(
+                    createUpdateEventWithChanges(new GitLabIssueEventDTO.Changes(null, null, null, null, null, null)),
+                    createContext());
+
+            verify(eventPublisher, never()).publishEvent(any(ScmDomainEvent.IssueUpdated.class));
+        }
+
+        @Test
+        void publishesOneIssueUpdatedForALabelAndAssigneeEditTogether() {
+            Issue issue = createIssueEntity();
+            when(issueRepository.findByRepositoryIdAndNumber(REPO_ID, ISSUE_IID))
+                    .thenReturn(Optional.of(issue))
+                    .thenReturn(Optional.of(issue));
+            when(gitLabUserService.findOrCreateUser(any(GitLabWebhookUser.class), eq(PROVIDER_ID)))
+                    .thenReturn(createUserEntity());
+
+            processor.processUpdated(
+                    createUpdateEventWithChanges(new GitLabIssueEventDTO.Changes(
+                            new GitLabIssueEventDTO.LabelsChange(List.of(), List.of()),
+                            null,
+                            null,
+                            new GitLabIssueEventDTO.AttributeChange(),
+                            null,
+                            null)),
+                    createContext());
+
+            ArgumentCaptor<ScmDomainEvent.IssueUpdated> captor =
+                    ArgumentCaptor.forClass(ScmDomainEvent.IssueUpdated.class);
+            verify(eventPublisher).publishEvent(captor.capture());
+            assertThat(captor.getValue().changedFields()).containsExactly("relationships");
+        }
+
+        private GitLabIssueEventDTO.Changes titleChanged() {
+            return new GitLabIssueEventDTO.Changes(
+                    null, new GitLabIssueEventDTO.AttributeChange(), null, null, null, null);
         }
     }
 
@@ -1169,8 +1240,25 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                 null);
     }
 
-    /** An {@code action=update} event whose {@code changes.labels} diff adds the given label (null = none). */
-    private GitLabIssueEventDTO createUpdateEventWithAddedLabel(@Nullable GitLabWebhookLabel addedLabel) {
+    /** An {@code action=update} event carrying the given {@code changes} diff and no label delta. */
+    private GitLabIssueEventDTO createUpdateEventWithChanges(GitLabIssueEventDTO.Changes changes) {
+        return withChanges(null, changes);
+    }
+
+    private GitLabIssueEventDTO createUpdateEventWithAddedLabel(GitLabWebhookLabel addedLabel) {
+        return withChanges(
+                addedLabel,
+                new GitLabIssueEventDTO.Changes(
+                        new GitLabIssueEventDTO.LabelsChange(List.of(), List.of(addedLabel)),
+                        null,
+                        null,
+                        null,
+                        null,
+                        null));
+    }
+
+    private GitLabIssueEventDTO withChanges(
+            @Nullable GitLabWebhookLabel addedLabel, GitLabIssueEventDTO.Changes changes) {
         var attrs = new GitLabIssueEventDTO.ObjectAttributes(
                 RAW_ISSUE_ID,
                 ISSUE_IID,
@@ -1186,9 +1274,6 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                 "2026-01-31 19:03:35 +0100",
                 null,
                 "https://gitlab.lrz.de/hephaestustest/demo-repository/-/issues/5");
-        var changes = addedLabel == null
-                ? null
-                : new GitLabIssueEventDTO.Changes(new GitLabIssueEventDTO.LabelsChange(List.of(), List.of(addedLabel)));
         return new GitLabIssueEventDTO(
                 "issue",
                 "issue",
@@ -1226,7 +1311,8 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
 
         private GitLabIssueEventDTO eventWithLabelChange(
                 @Nullable List<GitLabWebhookLabel> previous, List<GitLabWebhookLabel> current) {
-            var changes = new GitLabIssueEventDTO.Changes(new GitLabIssueEventDTO.LabelsChange(previous, current));
+            var changes = new GitLabIssueEventDTO.Changes(
+                    new GitLabIssueEventDTO.LabelsChange(previous, current), null, null, null, null, null);
             return new GitLabIssueEventDTO("issue", "issue", null, null, null, List.of(), null, changes);
         }
 

@@ -36,7 +36,8 @@ public final class ScmDomainEvent {
         public static final String PULL_REQUEST_CLOSED = "PullRequestClosed";
 
         public static final String ISSUE_CREATED = "IssueCreated";
-        public static final String ISSUE_LABELED = "IssueLabeled";
+        public static final String ISSUE_UPDATED = "IssueUpdated";
+
         /** Retrospective: an issue was closed. Drives at-close, feed-forward detection (outcome before close). */
         public static final String ISSUE_CLOSED = "IssueClosed";
 

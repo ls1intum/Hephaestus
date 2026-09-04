@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabEventAction
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.dto.GitLabWebhookLabel;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.dto.GitLabWebhookProject;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.dto.GitLabWebhookUser;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -37,16 +38,61 @@ public record GitLabIssueEventDTO(
         @Nullable List<GitLabWebhookUser> assignees,
         @JsonProperty("changes") @Nullable Changes changes) {
     /**
-     * The {@code changes} diff GitLab sends on an {@code action=update} event. We only care about the
-     * label delta — GitLab has no dedicated "labeled" action, so label changes arrive here.
+     * The {@code changes} diff GitLab sends on an {@code action=update} event: one entry per attribute
+     * the update moved. GitLab has no per-attribute action, so this diff is the only thing that says
+     * what an {@code update} was — without it a due-date edit is indistinguishable from a retitling.
+     *
+     * <p>Only the attributes the shared domain has a field name for are declared; the rest (due date,
+     * weight, time tracking, confidentiality) are what {@code ignoreUnknown} drops.
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record Changes(@Nullable LabelsChange labels) {}
+    public record Changes(
+            @Nullable LabelsChange labels,
+            @Nullable AttributeChange title,
+            @Nullable AttributeChange description,
+            @Nullable AttributeChange assignees,
+            @JsonProperty("milestone_id") @Nullable AttributeChange milestoneId,
+            @JsonProperty("state_id") @Nullable AttributeChange stateId) {}
+
+    /**
+     * An attribute GitLab reported as changed. Its {@code previous}/{@code current} values are
+     * deliberately not bound: the mirror is refreshed from {@code object_attributes} either way, so the
+     * only thing read here is that the key was present.
+     */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record AttributeChange() {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record LabelsChange(
             @Nullable List<GitLabWebhookLabel> previous,
             @Nullable List<GitLabWebhookLabel> current) {}
+
+    /**
+     * What this update moved, in the field vocabulary {@code ScmDomainEvent.IssueUpdated} carries, so a
+     * consumer reads the same names whichever provider raised the event.
+     */
+    public Set<String> changedFields() {
+        if (changes == null) {
+            return Set.of();
+        }
+        Set<String> fields = new LinkedHashSet<>();
+        if (changes.title() != null) {
+            fields.add("title");
+        }
+        if (changes.description() != null) {
+            fields.add("body");
+        }
+        if (changes.stateId() != null) {
+            fields.add("state");
+        }
+        if (changes.milestoneId() != null) {
+            fields.add("milestone");
+        }
+        if (changes.labels() != null || changes.assignees() != null) {
+            fields.add("relationships");
+        }
+        return Set.copyOf(fields);
+    }
 
     /**
      * Labels newly added in this update (current minus previous, keyed by id). Empty when the update
@@ -66,8 +112,8 @@ public record GitLabIssueEventDTO(
                         .collect(Collectors.toSet());
         return changes.labels().current().stream()
                 // A current label with a null id is treated as added: GitLab's changes.labels diff reliably carries
-                // ids, so this branch is defensive only and deliberately favours over-firing IssueLabeled (better to
-                // re-trigger detection than silently miss a real add) over under-firing on a malformed payload.
+                // ids, so this branch is defensive only and deliberately favours an extra activity entry over
+                // silently losing a real add on a malformed payload.
                 .filter(label -> label.id() == null || !previousIds.contains(label.id()))
                 .toList();
     }

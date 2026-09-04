@@ -103,7 +103,8 @@ public class GitLabIssueMessageHandler extends AbstractIntegrationMessageHandler
 
         switch (action) {
             case OPEN -> issueProcessor.process(event, context);
-            // UPDATE carries the changes.labels diff — processUpdated also emits IssueLabeled per added label.
+            // UPDATE carries the changes diff — it is the only action GitLab has for a retitling, a
+            // relabelling and a due-date edit alike, so processUpdated reads that diff to tell them apart.
             case UPDATE -> issueProcessor.processUpdated(event, context);
             case CLOSE -> issueProcessor.processClosed(event, context);
             case REOPEN -> issueProcessor.processReopened(event, context);

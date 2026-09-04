@@ -174,19 +174,26 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
     }
 
     /**
-     * Handles an {@code action=update} issue event. Persists the issue, then emits one
-     * {@link ScmDomainEvent.IssueLabeled}
-     * per newly-added label — GitLab has no native "labeled" action, so this is how the IssueLabeled
-     * trigger reaches parity with GitHub. The added-label delta is read from the webhook's
-     * {@code changes.labels} diff, so a plain title/description edit emits nothing.
+     * Handles an {@code action=update} issue event. Persists the issue, publishes one
+     * {@link ScmDomainEvent.IssueUpdated} carrying what the webhook's {@code changes} diff says moved,
+     * then one {@link ScmDomainEvent.IssueLabeled} per newly-added label — GitLab has no native
+     * "labeled" action, so this is how the activity feed reaches parity with GitHub. An update that
+     * moved only attributes the shared domain has no field name for (due date, weight, time tracking)
+     * publishes nothing: the mirror is refreshed either way, and an event with an empty diff would tell
+     * every consumer that something changed while naming nothing.
      */
     @Transactional
     @Nullable
     public Issue processUpdated(GitLabIssueEventDTO event, ProcessingContext context) {
         List<GitLabWebhookLabel> addedLabels = event.addedLabels();
+        Set<String> changedFields = event.changedFields();
         Issue issue = processInternal(event, context);
-        if (issue == null || addedLabels.isEmpty()) {
+        if (issue == null) {
             return issue;
+        }
+        if (!changedFields.isEmpty()) {
+            eventPublisher.publishEvent(new ScmDomainEvent.IssueUpdated(
+                    ScmEventPayload.IssueData.from(issue), changedFields, EventContext.from(context)));
         }
         for (GitLabWebhookLabel labelDto : addedLabels) {
             Label label = findOrCreateLabel(labelDto, Objects.requireNonNull(context.repository()));
@@ -389,8 +396,10 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
     public Issue processReopened(GitLabIssueEventDTO event, ProcessingContext context) {
         Issue issue = processInternal(event, context);
         if (issue != null) {
-            eventPublisher.publishEvent(new ScmDomainEvent.IssueReopened(
-                    ScmEventPayload.IssueData.from(issue), EventContext.from(context)));
+            ScmEventPayload.IssueData issueData = ScmEventPayload.IssueData.from(issue);
+            eventPublisher.publishEvent(
+                    new ScmDomainEvent.IssueUpdated(issueData, Set.of("state"), EventContext.from(context)));
+            eventPublisher.publishEvent(new ScmDomainEvent.IssueReopened(issueData, EventContext.from(context)));
             log.debug("Reopened issue: issueId={}", issue.getId());
         }
         return issue;
