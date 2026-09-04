@@ -1449,6 +1449,8 @@ void test("installs dependencies in every job that calls vp", async () => {
 // a contributor runs from a clone that has nothing but the launcher.
 void test("proves the toolchain on Windows and from a clean clone", async () => {
 	const source = await readFile(".github/workflows/ci-quality-gates.yml", "utf8");
+	const workflow = parseDocument(source);
+	const qualityPath = ["jobs", "quality"];
 	const quality = job(source, "quality");
 	assert.match(quality, /runs-on: \$\{\{ matrix\.os \}\}/);
 	assert.match(quality, /shell: bash/);
@@ -1461,12 +1463,19 @@ void test("proves the toolchain on Windows and from a clean clone", async () => 
 	assert.doesNotMatch(install, /setup-toolchain|pnpm\/setup/);
 	assert.match(install, /vp install --frozen-lockfile/);
 	assert.match(install, /vp run gate:toolchain/);
-	// The legs that own hooks install them the way an install does, then fire the commit-msg hook
-	// on a message commitlint rejects and on one it accepts.
-	assert.match(quality, /if: env\.RUN == 'true' && matrix\.hooks && !cancelled\(\)/);
-	assert.match(quality, /node scripts\/enable-hooks\.ts/);
-	assert.match(quality, /git config core\.hooksPath/);
-	assert.equal((quality.match(/git commit --allow-empty/g) ?? []).length, 2);
+	const hookCondition = "env.RUN == 'true' && matrix.hooks && !cancelled()";
+	for (const name of ["Commit-msg hook", "Pre-push hook"])
+		assert.equal(namedStep(workflow, qualityPath, name).get("if"), hookCondition);
+	const commitHook = runScript(workflow, qualityPath, "Commit-msg hook");
+	assert.match(commitHook, /node scripts\/enable-hooks\.ts/);
+	assert.match(commitHook, /git config core\.hooksPath/);
+	assert.equal((commitHook.match(/git commit --allow-empty/g) ?? []).length, 2);
+	const prePushHook = runScript(workflow, qualityPath, "Pre-push hook");
+	assert.match(prePushHook, /node scripts\/enable-hooks\.ts/);
+	assert.match(prePushHook, /git push --dry-run\b/);
+	// The step moves the launcher aside, so it must put it back however it exits.
+	assert.match(prePushHook, /trap .*EXIT/);
+	assert.doesNotMatch(prePushHook, /^\s*vp run check\s*$/m);
 });
 
 void test("a change to the task graph or the hooks selects every quality leg", async () => {
