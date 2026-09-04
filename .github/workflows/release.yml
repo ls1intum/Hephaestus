@@ -517,7 +517,7 @@ jobs:
 
   # Staging pulls: this asks for the promotion and waits for it, so production is still only offered
   # a release staging is actually running. Nothing here reaches the host, and no deploy credential
-  # is involved — see ADR 0041.
+  # is involved — see ADR 0042.
   promote-staging:
     needs: [release, tag-images, publish-release]
     if: needs.release.outputs.released == 'true'

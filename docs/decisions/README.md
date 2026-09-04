@@ -80,5 +80,6 @@ do, its home is the Admin Guide (`docs/admin/`) and the runbook links to it.
 | [0039](0039-git-and-postgresql-own-evidence.md) | Git owns repository evidence; PostgreSQL owns captured payloads and references | Accepted (amended 2026-09-03 #1719 — evidence retention and replay superseded by [0041](0041-compose-1x-kubernetes-2.md)) |
 | [0040](0040-vite-plus-is-the-command-surface.md) | Vite+ is the command surface; pnpm stays the package manager | Accepted |
 | [0041](0041-compose-1x-kubernetes-2.md) | Compose for 1.x; Kubernetes only for 2.0 | Accepted |
+| [0042](0042-hosts-pull-their-own-releases.md) | Hosts pull their own releases | Accepted |
 
 Template: [0000-template.md](0000-template.md).
