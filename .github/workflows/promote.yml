@@ -60,11 +60,11 @@ jobs:
           release="$REQUESTED"
           [[ "$release" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || {
             echo "::error::Promote an immutable vX.Y.Z release, not '$release'"; exit 1; }
-          metadata=$(gh release view "$release" --repo "$GITHUB_REPOSITORY" --json isDraft,isImmutable)
-          [ "$(jq -r .isDraft <<<"$metadata")" = false ] || {
+          # GitHub tag immutability is not a gate here: the host takes the source commit and every
+          # image digest from the cosign-signed release lock, so a moved tag changes nothing that is
+          # deployed. Requiring it would refuse the older releases a rollback exists to reach.
+          [ "$(gh release view "$release" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)" = false ] || {
             echo "::error::$release is still a draft"; exit 1; }
-          [ "$(jq -r .isImmutable <<<"$metadata")" = true ] || {
-            echo "::error::$release is not immutable"; exit 1; }
           echo "release=$release" >> "$GITHUB_OUTPUT"
           echo "version=${release#v}" >> "$GITHUB_OUTPUT"
 

@@ -4,6 +4,7 @@ import { test } from "node:test";
 
 import { releaseSignerIdentity, releaseSignerRepository } from "./lib/release-signer.ts";
 import { SMOKE_HOSTNAME } from "./prepare-host-smoke-env.ts";
+import { parseStacks } from "./reconcile-deployment.ts";
 
 const release = readFileSync(".github/workflows/release.yml", "utf8");
 const deployment = readFileSync(".github/workflows/deploy-locked-compose.yml", "utf8");
@@ -25,7 +26,7 @@ await test("deployment uses Compose metadata, waits for readiness, and preserves
 	assert.doesNotMatch(deployment, /docker image prune/);
 });
 
-await test("a deployment starts the broker before the stacks that talk to it", () => {
+await test("both deploy paths start the stacks in the same order", () => {
 	const configured = /^\s+STACKS: (.+)$/m.exec(deployment)?.[1];
 	assert.ok(configured, "the deploy job must declare the stacks and their order in STACKS");
 	// Every stack list the expression can yield: one per environment shape it selects between.
@@ -42,6 +43,13 @@ await test("a deployment starts the broker before the stacks that talk to it", (
 		);
 		// The edge comes last, so it never routes to a stack that is still starting.
 		if (stacks.includes("proxy")) assert.equal(stacks.at(-1), "proxy");
+		// The pull reconciler decides its own order from the same stack names, and a host that
+		// migrates after it starts the webhook runtime serves deliveries against a stale schema.
+		assert.deepEqual(
+			parseStacks(stacks.join(" ")),
+			stacks,
+			"the pull reconciler must order stacks the way the push deploy does",
+		);
 	}
 
 	const script = deployment.slice(deployment.indexOf("envs: STACKS"));
@@ -120,9 +128,11 @@ await test("verification identity is the release's own: run context now, the map
 	);
 });
 
-await test("promotion accepts only immutable releases and the host supplies the verifier", () => {
-	assert.match(promotion, /--json isDraft,isImmutable/);
-	assert.match(promotion, /\.isImmutable/);
+await test("promotion refuses a draft but reaches any published release, and the host verifies", () => {
+	assert.match(promotion, /--json isDraft --jq \.isDraft/);
+	// Releases published before GitHub offered tag immutability are the ones a rollback reaches, and
+	// the signed lock names the source commit and every digest, so tag mutability changes nothing.
+	assert.doesNotMatch(promotion, /isImmutable/);
 	assert.match(reconciler, /join\(config\.checkout, "scripts\/prepare-release-lock\.ts"\)/);
 	assert.doesNotMatch(reconciler, /join\(releaseTree, "scripts\/prepare-release-lock\.ts"\)/);
 });

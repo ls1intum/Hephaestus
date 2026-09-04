@@ -32,6 +32,14 @@ services:
       # above the 20s heartbeat — if heartbeats stop, the proxy reaps within 5 minutes.
       - "--entryPoints.http.transport.respondingTimeouts.idleTimeout=300s"
       - "--entryPoints.https.transport.respondingTimeouts.idleTimeout=300s"
+      # Backend timeouts belong in static configuration: a serversTransport is definable only by the
+      # file provider, so a router that named one would break whenever this stack is not deployed.
+      # These land on default@internal, which every service that names no transport uses. Traefik
+      # ships dialTimeout=30s and responseHeaderTimeout=0 — no timeout — so an application-server
+      # that accepts the connection and never answers would otherwise hold the client forever. Only
+      # the wait for response headers is bounded, so SSE response bodies are unaffected.
+      - "--serversTransport.forwardingTimeouts.dialTimeout=10s"
+      - "--serversTransport.forwardingTimeouts.responseHeaderTimeout=30s"
       - "--providers.docker.exposedbydefault=false"
       - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
       - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"

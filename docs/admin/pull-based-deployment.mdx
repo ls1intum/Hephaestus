@@ -82,13 +82,15 @@ proxy, or a PaaS serving preview environments beside it — omits `proxy` and ke
 | Move an environment | Run the **Promote** workflow: pick the environment and release |
 | Roll back | Promote the older release with **allow-rollback** |
 | Hold an environment | Promote with **freeze** |
+| Put a hand-patched host back on its release | Promote the release it already runs |
 | Stop the host reconciling, right now | `sudo systemctl disable --now hephaestus-reconcile.timer` |
 | See what a host runs | `cat /var/lib/hephaestus/applied.json` |
 
 :::warning Disable the timer before hand-patching a host
-A reconciler reapplies its channel. Manual changes to a stack it owns are reverted at the next tick,
-which during an incident is the last thing you want. Disable the timer first, and re-enable it when
-the fix has landed in a release.
+A reconciler reapplies its channel. Manual changes to a stack it owns are reverted the next time the
+channel moves — including a promotion of the release the host already runs, which is how you put a
+drifted host back. During an incident that is the last thing you want, so disable the timer first,
+and re-enable it when the fix has landed in a release.
 :::
 
 ## Watching it

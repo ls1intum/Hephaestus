@@ -7,16 +7,19 @@ import { output, run, succeeds } from "./lib/process.ts";
 
 export type Stack = "proxy" | "core" | "app";
 
-const STACK_ORDER: readonly Stack[] = ["core", "app", "proxy"];
+/**
+ * The application server runs the Liquibase migration the webhook runtime in `core` reads, and the
+ * edge comes last so it never routes to a stack that is still starting. The push deploy declares the
+ * same order in `.github/workflows/deploy-locked-compose.yml`, and one test holds the two together.
+ */
+const STACK_ORDER: readonly Stack[] = ["app", "core", "proxy"];
 
 /**
- * The database and the broker, which both applications need before either can pass a health gate:
- * the receiver in `core` cannot build its JPA context without PostgreSQL in `app`, and the server in
- * `app` never reports ready without NATS in `core`. Compose cannot express a dependency across
- * projects, and no stack order resolves a cycle, so these come up first and the applications follow.
+ * The application server never reports ready without the broker, and the broker lives in the `core`
+ * project, which Compose cannot express as a dependency. PostgreSQL needs no entry: it sits in `app`
+ * beside the services that declare `depends_on` on it.
  */
 const FOUNDATION: Partial<Record<Stack, readonly string[]>> = {
-	app: ["postgres"],
 	core: ["nats-server"],
 };
 
@@ -83,7 +86,9 @@ export function decide(
 			reason: `channel commit ${channelCommit.slice(0, 8)} does not descend from the last accepted channel`,
 		};
 	if (channel.freeze) return { action: "noop", reason: "channel is frozen" };
-	if (applied?.release === channel.release)
+	// A new channel commit naming the release already applied is a re-promotion, and re-applying is
+	// how a host that was hand-patched during an incident converges again.
+	if (applied?.release === channel.release && applied.channelCommit === channelCommit)
 		return { action: "noop", reason: `already running ${channel.release}` };
 	if (applied && compareReleases(channel.release, applied.release) < 0 && !channel.allowRollback)
 		return {
@@ -330,10 +335,16 @@ async function main(): Promise<void> {
 			cwd: config.checkout,
 		});
 	}
+	// Tracked content only: Compose writes into the worktree it renders from — the proxy stack's ACME
+	// store is `docker/letsencrypt/` — so counting untracked files would turn every retry after a
+	// partial apply into a permanent refusal. An untracked file cannot alter a tracked Compose file,
+	// and anyone who can write here already has the Docker socket.
 	const worktreeChanges = await output(
 		"git",
-		["status", "--porcelain=v1", "--untracked-files=all", "--ignored=matching"],
-		{ cwd: releaseTree },
+		["status", "--porcelain=v1", "--untracked-files=no"],
+		{
+			cwd: releaseTree,
+		},
 	);
 	if (worktreeChanges) throw new Error(`${releaseTree} differs from ${decision.release}`);
 
@@ -363,23 +374,9 @@ async function main(): Promise<void> {
 		join(releaseTree, `docker/compose.${stack}.yaml`),
 	];
 
-	for (const stack of config.stacks) {
-		const foundation = FOUNDATION[stack];
-		if (!foundation) continue;
-		await run(
-			"docker",
-			[
-				...composeFor(stack),
-				"up",
-				"--detach",
-				"--wait",
-				`--wait-timeout=${config.waitTimeoutSeconds}`,
-				...foundation,
-			],
-			{ cwd: releaseTree },
-		);
-	}
-
+	// Every stack is verified before any container starts, so a release that renders an unlocked image
+	// cannot get one running in the window before the guard refuses it.
+	const composeArgsByStack = new Map<Stack, string[]>();
 	for (const stack of config.stacks) {
 		const composeArgs = composeFor(stack);
 		const rendered = asRecord(
@@ -396,6 +393,27 @@ async function main(): Promise<void> {
 		const unlocked = unlockedImages(images, lockEnv);
 		if (unlocked.length > 0)
 			throw new Error(`${stack} renders images outside the release lock: ${unlocked.join(", ")}`);
+		composeArgsByStack.set(stack, composeArgs);
+	}
+
+	for (const [stack, composeArgs] of composeArgsByStack) {
+		const foundation = FOUNDATION[stack];
+		if (!foundation) continue;
+		await run(
+			"docker",
+			[
+				...composeArgs,
+				"up",
+				"--detach",
+				"--wait",
+				`--wait-timeout=${config.waitTimeoutSeconds}`,
+				...foundation,
+			],
+			{ cwd: releaseTree },
+		);
+	}
+
+	for (const [, composeArgs] of composeArgsByStack) {
 		await run(
 			"docker",
 			[
