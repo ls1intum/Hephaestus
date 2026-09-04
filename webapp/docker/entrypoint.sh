@@ -51,13 +51,14 @@ configure_canonical_host() {
   if [[ "$url" =~ ^https?:// ]]; then
     authority="${url#*://}"
     authority="${authority%%/*}"
-    host="${authority%%:*}"
   fi
 
-  # This value becomes nginx configuration, so it is a trust boundary: anything but a bare
-  # hostname is refused rather than escaped, and the deployment keeps answering on every host.
-  if [[ -z "$host" || ! "$host" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$ ]]; then
-    printf 'server_name localhost;\n' > "$SERVER_NAME_CONF"
+  # The whole authority is validated, not just the name in front of the port: it is what the
+  # redirect sends browsers to, and what is written into nginx configuration. Checking only up to
+  # the first colon would accept userinfo -- https://good.example:x@attacker.example redirects to
+  # attacker.example -- and would let anything after that colon through into the config file.
+  if [[ ! "$authority" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?(:[0-9]{1,5})?$ ]]; then
+    printf 'server_name localhost 127.0.0.1;\n' > "$SERVER_NAME_CONF"
     rm -f "$CANONICAL_REDIRECT_CONF"
     if [[ -n "$url" ]]; then
       log "WARN: APPLICATION_CLIENT_URL='${url}' has no usable hostname; serving every Host header unredirected."
@@ -67,10 +68,13 @@ configure_canonical_host() {
     return
   fi
 
-  printf 'server_name %s localhost;\n' "$host" > "$SERVER_NAME_CONF"
+  host="${authority%%:*}"
+  # Container healthchecks probe by address, not by the public name: compose.app.yaml curls
+  # localhost and the preview stack curls 127.0.0.1. Naming both keeps them on the app rather than
+  # on the redirect, which curl -f would report as success without ever reaching the SPA.
+  printf 'server_name %s localhost 127.0.0.1;\n' "$host" > "$SERVER_NAME_CONF"
 
-  # listen 80 default_server catches the hosts the block above does not name. localhost stays on
-  # the SPA so the container healthcheck is not answered by a redirect.
+  # default_server takes the hosts the block above does not name.
   cat > "$CANONICAL_REDIRECT_CONF" <<EOF
 server {
     listen 80 default_server;

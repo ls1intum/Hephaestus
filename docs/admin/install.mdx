@@ -124,17 +124,26 @@ migrating away from, or a `www.` variant — name every one of them in `APP_HOST
 handed to the reverse proxy as a host matcher:
 
 ```bash
-APP_HOST_MATCH=Host(`hephaestus.example.com`,`old.example.com`)
+APP_HOST_MATCH=Host(`hephaestus.example.com`) || Host(`old.example.com`)
 ```
+
+Traefik takes one hostname per `Host()`, joined with `||` — `Host(\`a\`,\`b\`)` is rejected and the
+router does not load at all.
 
 Point each name at this host in DNS before you deploy: the certificate covers exactly the names in
 the matcher, and it is obtained by answering a challenge on each of them, so a name that does not yet
 resolve here holds up the whole certificate.
 
 `APP_HOSTNAME` remains the instance's single origin. The SPA, the API and the auth issuer are all
-configured for it, and a browser arriving on any other name is redirected there, so a session only
-ever exists on one host — which is also why the OAuth callback URLs stay on `APP_HOSTNAME` and the
-other names never need their own.
+configured for it, and **a browser that opens any other name is redirected there**, so the app is
+only ever loaded from one host and the OAuth callback URLs stay on `APP_HOSTNAME`.
+
+The API and the webhook endpoints do answer on every name in the matcher, which is deliberate: a
+tab someone still has open, and a provider still posting to the old name, keep working through the
+move. One consequence is worth knowing — a sign-in *started* by opening `/api/login/...` on an
+older name fails rather than completing, because the provider returns to `APP_HOSTNAME`, where the
+state cookie set on the other name is not readable. Reaching the instance the normal way is
+unaffected, since the redirect happens before any sign-in begins.
 
 :::danger Back up both encryption keys
 `HEPHAESTUS_SECURITY_ENCRYPTION_KEY` protects legacy encrypted values and the JWT signing key.
