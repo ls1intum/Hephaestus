@@ -4,6 +4,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.MentorContextQueryRepository;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactSignal;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactSignalRepository;
+import de.tum.cit.aet.hephaestus.integration.core.signal.DiscoveredVia;
+import de.tum.cit.aet.hephaestus.integration.core.signal.PendingSignalResubmitter;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalKey;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalRecorder;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalRevision;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalState;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalStateReason;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
@@ -11,18 +21,23 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewDetectionGate;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * The two halves of the tombstone decision, on one pull request and one issue that are tombstoned and
@@ -32,8 +47,8 @@ import org.springframework.data.domain.PageRequest;
  * refused on it by name — so the mentor's queries and the project inventory drop the tombstoned row, and
  * the request path answers {@link SignalStateReason#ARTIFACT_GONE}. Everything the drift tombstone
  * promises to be able to undo must still see it: the upsert that resurrects it, and the gate loader the
- * pending-signal resubmitters read, which reports a missing row as {@code ARTIFACT_GONE} and retires the
- * occasion for good.
+ * pending-signal resubmitters read, which holds the occasion as {@link
+ * SignalStateReason#ARTIFACT_NOT_VISIBLE} rather than retiring it.
  *
  * <p>Both kinds are exercised because {@code Issue} and {@code PullRequest} share one table and the
  * issue side additionally has to hold its {@code TYPE(i) = Issue} discriminator.
@@ -46,6 +61,7 @@ class UpstreamDeletedWorkReadScopeIntegrationTest extends AbstractWorkspaceInteg
     private static final int PR_NUMBER = 42;
     private static final int ISSUE_NUMBER = 43;
     private static final PageRequest FIRST_PAGE = PageRequest.of(0, 20);
+    private static final SignalRevision REVISION = new SignalRevision("read-scope-revision");
 
     @Autowired
     private RepositoryRepository repositoryRepository;
@@ -64,6 +80,21 @@ class UpstreamDeletedWorkReadScopeIntegrationTest extends AbstractWorkspaceInteg
 
     @Autowired
     private ManualReviewRequests manualReviewRequests;
+
+    @Autowired
+    private ArtifactSignalRepository artifactSignalRepository;
+
+    @Autowired
+    private SignalRecorder signalRecorder;
+
+    @Autowired
+    private AgentJobService agentJobService;
+
+    @Autowired
+    private PracticeReviewDetectionGate gate;
+
+    @Autowired
+    private TransactionTemplate transactionTemplate;
 
     private Workspace workspace;
     private User author;
@@ -115,7 +146,6 @@ class UpstreamDeletedWorkReadScopeIntegrationTest extends AbstractWorkspaceInteg
                 .doesNotContain(pullRequestId);
         assertThat(pullRequestInventoryIds()).doesNotContain(pullRequestId);
 
-        // Upstream hands the pull request back — a sweep that tombstoned on a truncated listing heals here.
         upsertPullRequest();
 
         assertThat(mentorAuthoredPullRequestIds()).contains(pullRequestId);
@@ -171,10 +201,9 @@ class UpstreamDeletedWorkReadScopeIntegrationTest extends AbstractWorkspaceInteg
     }
 
     /**
-     * A pending signal re-offered while the row is tombstoned must not be retired: the resubmitters
-     * read this loader and record {@code SignalStateReason.ARTIFACT_GONE} — a terminal
-     * {@code LAPSED} — for anything it cannot find, and nothing would re-open the occasion once the
-     * next ordinary sync brought the pull request back.
+     * The loader must keep handing back a tombstoned row: telling "the row is gone" apart from "the row
+     * is not visible right now" is what lets the resubmitters record terminal
+     * {@code ARTIFACT_GONE} for the first and retryable {@code ARTIFACT_NOT_VISIBLE} for the second.
      */
     @Test
     void theGateLoaderAndTheUpsertLookupStillSeeATombstonedPullRequest() {
@@ -188,6 +217,90 @@ class UpstreamDeletedWorkReadScopeIntegrationTest extends AbstractWorkspaceInteg
                 .get()
                 .extracting(PullRequest::getId)
                 .isEqualTo(pullRequestId);
+    }
+
+    @Test
+    void aTombstonedPullRequestHoldsItsPendingSignalUntilAnOrdinarySyncBringsItBack() {
+        ArtifactSignal signal = recordSignal(pullRequestId, ScmSignals.PULL_REQUEST, ScmSignals.PULL_REQUEST_OPENED);
+        tombstonePullRequest();
+
+        resubmit(pullRequestResubmitter(), signal);
+
+        ArtifactSignal held = reload(signal);
+        assertThat(held.getState()).isEqualTo(SignalState.PENDING);
+        assertThat(held.getStateReason()).isEqualTo(SignalStateReason.ARTIFACT_NOT_VISIBLE);
+        assertThat(retryableSignalIds())
+                .as("a held occasion the reaper never re-offers is retired in all but name")
+                .contains(held.getId());
+
+        upsertPullRequest();
+        resubmit(pullRequestResubmitter(), signal);
+
+        ArtifactSignal released = reload(signal);
+        assertThat(released.getStateReason())
+                .as("a resurrected pull request is back to whatever the gate makes of it")
+                .isNotIn(SignalStateReason.ARTIFACT_NOT_VISIBLE, SignalStateReason.ARTIFACT_GONE);
+        assertThat(released.getState()).isNotEqualTo(SignalState.PENDING);
+    }
+
+    @Test
+    void aTombstonedIssueHoldsItsPendingSignalUntilAnOrdinarySyncBringsItBack() {
+        ArtifactSignal signal = recordSignal(issueId, ScmSignals.ISSUE, ScmSignals.ISSUE_OPENED);
+        tombstoneIssue();
+
+        resubmit(issueResubmitter(), signal);
+
+        ArtifactSignal held = reload(signal);
+        assertThat(held.getState()).isEqualTo(SignalState.PENDING);
+        assertThat(held.getStateReason()).isEqualTo(SignalStateReason.ARTIFACT_NOT_VISIBLE);
+        assertThat(retryableSignalIds()).contains(held.getId());
+
+        upsertIssue();
+        resubmit(issueResubmitter(), signal);
+
+        ArtifactSignal released = reload(signal);
+        assertThat(released.getStateReason())
+                .isNotIn(SignalStateReason.ARTIFACT_NOT_VISIBLE, SignalStateReason.ARTIFACT_GONE);
+        assertThat(released.getState()).isNotEqualTo(SignalState.PENDING);
+    }
+
+    /**
+     * Both resubmitters are {@code @ConditionalOnProperty(hephaestus.agent.enabled)}, which the test
+     * profile leaves off, so they are built from the same beans the container would inject.
+     */
+    private PullRequestSignalResubmitter pullRequestResubmitter() {
+        return new PullRequestSignalResubmitter(agentJobService, pullRequestRepository, gate, signalRecorder);
+    }
+
+    private IssueSignalResubmitter issueResubmitter() {
+        return new IssueSignalResubmitter(agentJobService, issueRepository, gate, signalRecorder);
+    }
+
+    /** Supplies the transaction the bean's own {@code REQUIRES_NEW} would open around the ledger writes. */
+    private void resubmit(PendingSignalResubmitter resubmitter, ArtifactSignal signal) {
+        transactionTemplate.executeWithoutResult(status -> resubmitter.resubmit(signal));
+    }
+
+    private ArtifactSignal recordSignal(long artifactId, ArtifactKind kind, SignalName signalName) {
+        SignalKey key = new SignalKey(workspace.getId(), artifactId, signalName, REVISION);
+        transactionTemplate.executeWithoutResult(
+                status -> signalRecorder.record(key, Instant.now(), DiscoveredVia.EVENT));
+        return artifactSignalRepository
+                .findForArtifact(workspace.getId(), kind.value(), artifactId)
+                .getFirst();
+    }
+
+    private ArtifactSignal reload(ArtifactSignal signal) {
+        return artifactSignalRepository.findById(signal.getId()).orElseThrow();
+    }
+
+    /** What the reaper's next sweep would pick up, with every retry interval already elapsed. */
+    private List<UUID> retryableSignalIds() {
+        return artifactSignalRepository
+                .findRetryablePending(Instant.now().plus(Duration.ofDays(1)), FIRST_PAGE)
+                .stream()
+                .map(ArtifactSignal::getId)
+                .toList();
     }
 
     private void tombstonePullRequest() {

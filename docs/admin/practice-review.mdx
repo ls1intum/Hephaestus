@@ -271,7 +271,9 @@ you which step to jump to.
 
 If the trace says the review model is not set up, or the practices that watch this are set to off, or the
 budget was used up, you are done; go fix that. If it says nothing was recorded at all, the problem is
-upstream of practice review — check the integration's sync.
+upstream of practice review — check the integration's sync. If it says the work is not showing on the
+provider, nothing is misconfigured: a sync marked that work as gone and the reviews are being held. They
+run themselves once a sync finds the work again, and are dropped if it does not within a week.
 
 1. **Is a review model bound and enabled?** Administration → **AI models**, the **Practice reviews** card.
 2. **Is the bound model still usable?** A model is usable only if the model *and* its connection are

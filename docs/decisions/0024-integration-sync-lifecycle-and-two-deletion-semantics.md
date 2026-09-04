@@ -240,3 +240,28 @@ delivery. A capture-stage refusal written as a free-text job failure is a bug, n
 `scm.pull_request` / `scm.issue` needs the same distinction; or a retryable signal-state reason for
 "temporarily swept" exists, at which point a re-offered pending signal can be held rather than
 allowed to review a tombstoned row.
+
+## Update — 2026-09-04 (issue #1806): a re-offered signal is held, not retired
+
+Supersedes the "gate loaders the pending-signal resubmitters read" row, the **Consequence**
+paragraph and the **Revisit trigger for this section** of the 2026-09-03 update above; those stay
+standing as the record of what was priced and declined. The trigger they named has fired:
+`SignalStateReason.ARTIFACT_NOT_VISIBLE` now exists and resolves to `SignalState.PENDING`.
+
+The gate loaders still hand back tombstoned rows and still will — that is what lets a caller tell a
+missing row from a tombstoned one. What changed is the two SCM resubmitters, and only them:
+`PullRequestSignalResubmitter` and `IssueSignalResubmitter` read `deletedAt` and record retryable
+`ARTIFACT_NOT_VISIBLE`, so the occasion is held and re-offered until an ordinary sync resurrects the
+row or its normal pending deadline lapses it. A missing or otherwise unreviewable row still records
+terminal `ARTIFACT_GONE`, and a review somebody asks for is still refused with `ARTIFACT_GONE`.
+
+**Scope, and what is still open.** The live-event submission paths — `AgentJobEventListener` and
+`IssueAgentJobEventListener` — read the same gate loaders and do not make this distinction, so an
+event arriving between a reconciliation sweep and the next ordinary sync can still start a review of
+a tombstoned row. `ConversationReviewSubmitter` keeps terminal `ARTIFACT_GONE`, correctly: a Slack
+tombstone wipes the message text under (b) and is genuinely irreversible. Outline has no
+`PendingSignalResubmitter`, so its signals lapse on the deadline; its tombstone *is* reversible, so
+adding one inherits this question.
+
+**Revisit trigger.** The live-event submission paths need the same distinction; an artifact kind
+other than `scm.pull_request` / `scm.issue` needs it; or Outline gains a resubmitter.

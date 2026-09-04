@@ -5,8 +5,9 @@ package de.tum.cit.aet.hephaestus.integration.core.signal;
  * that "how many reviews did this instance not run last week, and why" is a {@code GROUP BY}.
  *
  * <p>Each reason decides its own resulting state, so the retryable/terminal judgement lives here rather
- * than at every refusal site: a reason is retryable exactly when an operator can lift it without the
- * artifact changing. The sentence a reader sees lives in {@link #describe()}.
+ * than at every refusal site: a reason is retryable exactly when the condition it names can clear on its
+ * own — an operator action, a budget refill, or an ordinary sync that restores the artifact — without a
+ * new occurrence. The sentence a reader sees lives in {@link #describe()}.
  */
 public enum SignalStateReason {
     GATE_SKIPPED(SignalState.SUPPRESSED),
@@ -61,6 +62,8 @@ public enum SignalStateReason {
 
     MODEL_UNAVAILABLE(SignalState.PENDING),
 
+    ARTIFACT_NOT_VISIBLE(SignalState.PENDING),
+
     PENDING_DEADLINE_EXCEEDED(SignalState.LAPSED),
 
     ARTIFACT_GONE(SignalState.LAPSED);
@@ -113,6 +116,8 @@ public enum SignalStateReason {
                 "This work could not be attributed to anybody Hephaestus knows; resolving the author re-offers it.";
             case MODEL_UNAVAILABLE ->
                 "The model this review is bound to left the catalog; re-pointing the binding re-offers it.";
+            case ARTIFACT_NOT_VISIBLE ->
+                "The artifact is not visible upstream right now; it is re-offered if it returns.";
             case PENDING_DEADLINE_EXCEEDED -> "It waited longer than the ledger keeps re-offering a signal.";
             case ARTIFACT_GONE -> "The artifact was deleted before a review could run.";
         };

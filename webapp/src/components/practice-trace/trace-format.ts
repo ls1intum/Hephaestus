@@ -45,6 +45,8 @@ export const SIGNAL_STATE_REASON_LABELS: Record<SignalStateReason, string> = {
 	BUDGET_EXHAUSTED: "The workspace's AI budget was used up; it refills",
 	SUBJECT_UNLINKED: "Hephaestus could not tell whose work this is",
 	MODEL_UNAVAILABLE: "The AI model set for reviews is no longer available",
+	ARTIFACT_NOT_VISIBLE:
+		"This work is not showing on the provider right now; it will be checked again",
 	PENDING_DEADLINE_EXCEEDED: "It waited too long to be picked up",
 	ARTIFACT_GONE: "The work no longer exists",
 	STALE_ROLLOUT_REVISION: "Review settings changed after this review started",

@@ -73,8 +73,10 @@ An occasion is one named signal on one revision of one artifact. It is recorded 
 `SignalState` has five values: `RECORDED` for an occurrence nobody has decided on yet, `TRIGGERED` for one
 that started a review, terminal `SUPPRESSED`, retryable `PENDING`, and retired `LAPSED`. Terminal rows
 never reopen; pending rows are re-offered until their reason clears or their deadline passes. Retryability
-belongs to the reason, not to the caller: each `SignalStateReason` declares the state it resolves to. The canonical reason list, provenance mapping,
-and UI labels are in [How a review was occasioned](./practice-review-glossary.mdx#how-a-review-was-occasioned).
+belongs to the reason, not to the caller: each `SignalStateReason` declares the state it resolves to. Which
+reason to reach for, and the two that are easy to confuse, are in
+[Signal state reasons](./practice-review-glossary.mdx#signal-state-reasons); provenance mapping and UI
+labels are in [How a review was occasioned](./practice-review-glossary.mdx#how-a-review-was-occasioned).
 Operator remediation is in [When a workspace goes quiet](/admin/practice-review#when-a-workspace-goes-quiet).
 
 The occurrence ledger has no pruning job; capacity planning must treat it as append-only. Retry and lapse

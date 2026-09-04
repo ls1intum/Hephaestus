@@ -56,6 +56,11 @@ public class IssueSignalResubmitter implements PendingSignalResubmitter {
         Issue issue = issueRepository
                 .findByIdWithRepositoryAndAssignees(key.artifactId())
                 .orElse(null);
+        if (issue != null && issue.getDeletedAt() != null) {
+            log.debug("Pending signal's issue is not visible upstream: issueId={}", issue.getId());
+            signalRecorder.markRefused(key, SignalStateReason.ARTIFACT_NOT_VISIBLE);
+            return;
+        }
         if (issue == null || issue.getRepository() == null) {
             log.debug("Pending signal has no reviewable issue left: issueId={}", key.artifactId());
             signalRecorder.markRefused(key, SignalStateReason.ARTIFACT_GONE);
