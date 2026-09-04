@@ -148,6 +148,37 @@ function namedStep(workflow: Document, jobPath: string[], name: string): YAMLMap
 	throw new Error(`${jobPath.join(".")} has no ${name} step`);
 }
 
+/**
+ * Why one entry of `security/trivy-dependency-ignore.yaml` is not a usable exception, or `undefined`
+ * when it is. Trivy honours an entry it can parse and says nothing about the rest, so an exception
+ * that names no package or expires in 2099 suppresses the gate silently — the fields and the 90-day
+ * ceiling are `docs/contributor/vulnerability-remediation.mdx` § Dependency exceptions.
+ */
+function exceptionFault(entry: unknown, now: number): string | undefined {
+	if (!isRecord(entry)) return "is not a mapping";
+	if (typeof entry.id !== "string" || entry.id.trim() === "") return "names no vulnerability id";
+	if (
+		!Array.isArray(entry.purls) ||
+		entry.purls.length === 0 ||
+		!entry.purls.every((purl) => typeof purl === "string" && purl.startsWith("pkg:"))
+	)
+		return "names no package URLs";
+	if (typeof entry.statement !== "string" || entry.statement.trim() === "")
+		return "carries no statement";
+	if (typeof entry.expired_at !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(entry.expired_at))
+		return "has no YYYY-MM-DD expired_at";
+	if (Date.parse(`${entry.expired_at}T00:00:00Z`) - now > 90 * 24 * 60 * 60 * 1000)
+		return "expires more than 90 days out";
+	return undefined;
+}
+
+/** A step's `with` map. */
+function stepInputs(declaration: YAMLMap): YAMLMap {
+	const map = declaration.get("with");
+	assert.ok(isMap(map), "step declares no inputs");
+	return map;
+}
+
 /** The shell a named `run` step ships. */
 function runScript(workflow: Document, jobPath: string[], name: string): string {
 	const shell = namedStep(workflow, jobPath, name).get("run");
@@ -1176,16 +1207,106 @@ void describe("CI contract", () => {
 	});
 
 	void test("blocks dependency regressions across the release trust boundary", async () => {
+		const orchestrator = await readFile(".github/workflows/cicd.yml", "utf8");
+		const securityConfig = pathFilter(orchestrator, "security-config");
+		assert.match(securityConfig, /- '\.github\/dependency-review-config\.yml'/);
+		assert.match(
+			securityConfig,
+			/- 'security\/trivy-dependency-ignore\.yaml'/,
+			"a pull request that suppresses a finding has to select the job that would have reported it",
+		);
 		const workflow = parseDocument(
 			await readFile(".github/workflows/ci-security-scan.yml", "utf8"),
 		);
-		const jobPath = ["jobs", "dependency-review"];
+		const reviewPath = ["jobs", "dependency-review"];
 		assert.ok(
-			String(workflow.getIn([...jobPath, "if"])).includes("github.event_name == 'pull_request'"),
+			String(workflow.getIn([...reviewPath, "if"])).includes("github.event_name == 'pull_request'"),
 		);
-		const review = step(workflow, jobPath, "actions/dependency-review-action");
-		assert.equal(review.get("fail-on-severity"), "high");
-		assert.equal(review.get("fail-on-scopes"), "runtime, development, unknown");
+		const review = step(workflow, reviewPath, "actions/dependency-review-action");
+		assert.equal(review.get("config-file"), "./.github/dependency-review-config.yml");
+
+		const config = parseDocument(await readFile(".github/dependency-review-config.yml", "utf8"));
+		assert.equal(config.get("warn-only"), true);
+		assert.ok(
+			!config.has("fail-on-severity"),
+			"warn-only reports every severity, so a threshold here names a policy the action does not apply",
+		);
+		const scopes = config.get("fail-on-scopes");
+		assert.ok(isSeq(scopes));
+		assert.deepEqual(
+			new Set(scopes.items.map((scope) => (isScalar(scope) ? scope.value : undefined))),
+			new Set(["runtime", "development", "unknown"]),
+		);
+
+		const scanPath = ["jobs", "security-scan"];
+		const report = stepInputs(namedStep(workflow, scanPath, "Trivy dependency scan"));
+		assert.equal(report.get("format"), "sarif");
+		assert.ok(
+			!report.has("severity"),
+			"SARIF output reports every severity unless limit-severities-for-sarif is true, so a filter here states a policy Trivy does not apply",
+		);
+		assert.ok(
+			!report.has("exit-code"),
+			"the SARIF pass is the code-scanning feed; the pass below is the verdict",
+		);
+		assert.ok(
+			!report.has("scanners"),
+			"trivy fs defaults to vuln,secret, and narrowing this pass drops tree-wide secret findings from code scanning",
+		);
+
+		const gateStep = namedStep(workflow, scanPath, "Enforce dependency vulnerability policy");
+		const gate = stepInputs(gateStep);
+		assert.equal(gate.get("format"), "table");
+		assert.equal(gate.get("scanners"), "vuln");
+		assert.equal(gate.get("severity"), "HIGH,CRITICAL");
+		assert.equal(gate.get("ignore-unfixed"), true);
+		assert.equal(gate.get("exit-code"), "1");
+		assert.equal(gate.get("trivyignores"), "security/trivy-dependency-ignore.yaml");
+		assert.equal(gate.get("skip-setup-trivy"), true);
+
+		// The step is continue-on-error so the table reaches the log; the aggregator is what turns
+		// its outcome into the job's verdict.
+		assert.equal(gateStep.get("id"), "dependency-policy");
+		const aggregator = namedStep(workflow, scanPath, "Evaluate security checks");
+		const env = aggregator.get("env");
+		assert.ok(isMap(env));
+		assert.match(
+			String(env.get("DEPENDENCY_POLICY")),
+			/^\${{ steps\.dependency-policy\.outcome }}$/,
+		);
+		assert.match(String(aggregator.get("run")), /for result in [^\n]*"\$DEPENDENCY_POLICY"/);
+
+		const ignore: unknown = parseDocument(
+			await readFile("security/trivy-dependency-ignore.yaml", "utf8"),
+		).toJS();
+		assert.ok(isRecord(ignore) && Array.isArray(ignore.vulnerabilities));
+		const now = Date.now();
+		for (const entry of ignore.vulnerabilities) {
+			const fault = exceptionFault(entry, now);
+			assert.equal(fault, undefined, `security/trivy-dependency-ignore.yaml entry ${fault}`);
+		}
+	});
+
+	void test("rejects a dependency exception that names no subject or outlives the ceiling", () => {
+		const now = Date.parse("2026-01-01T00:00:00Z");
+		const exception = {
+			id: "CVE-2026-0001",
+			purls: ["pkg:npm/example@1.3.0"],
+			statement: "Upstream has no release carrying the fix; the risk issue tracks the upgrade.",
+			expired_at: "2026-03-01",
+		};
+		assert.equal(exceptionFault(exception, now), undefined);
+		for (const [fault, malformed] of [
+			["is not a mapping", "CVE-2026-0001"],
+			["names no vulnerability id", { ...exception, id: "" }],
+			["names no package URLs", { ...exception, purls: [] }],
+			["names no package URLs", { ...exception, purls: ["example@1.3.0"] }],
+			["carries no statement", { ...exception, statement: "  " }],
+			["has no YYYY-MM-DD expired_at", { ...exception, expired_at: "March 2026" }],
+			["expires more than 90 days out", { ...exception, expired_at: "2026-06-01" }],
+		] as const) {
+			assert.equal(exceptionFault(malformed, now), fault);
+		}
 	});
 
 	void test("publishes repository posture outside the pull-request path", async () => {

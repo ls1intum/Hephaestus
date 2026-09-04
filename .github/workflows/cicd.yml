@@ -251,6 +251,9 @@ jobs:
             security-config:
               - '.github/workflows/cicd.yml'
               - '.github/workflows/ci-security-scan.yml'
+              - '.github/dependency-review-config.yml'
+              # A suppression has to re-run the gate it suppresses.
+              - 'security/trivy-dependency-ignore.yaml'
             release-images:
               # The pinned upstream digests need no build, so the pull request that edits them —
               # a Renovate digest bump included — is the one that scans them (#1741). The script

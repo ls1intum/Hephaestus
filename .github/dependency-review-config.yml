@@ -1,0 +1,14 @@
+# The Security workflow's dependency vulnerability gate owns the severity verdict, over every
+# dependency in the checkout rather than only the ones a pull request changes. This review reports
+# what a pull request introduces so a reviewer sees it with its advisory and patched version, and
+# holds no second verdict with a second exception path. `fail-on-severity` would be inert here:
+# `warn-only` reports every severity.
+warn-only: true
+# Build tooling can affect shipped artifacts; unclassified dependencies are reported too.
+fail-on-scopes:
+  - runtime
+  - development
+  - unknown
+license-check: true
+vulnerability-check: true
+show-patched-versions: true
