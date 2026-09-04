@@ -41,7 +41,7 @@ read -rsp "LLM key: " E2E_LLM_KEY && echo && export E2E_LLM_KEY
 export E2E_LLM_PRICING_MODE=PRICED
 export E2E_LLM_INPUT_USD="$YOUR_CONTRACT_INPUT_RATE_PER_1M"
 export E2E_LLM_OUTPUT_USD="$YOUR_CONTRACT_OUTPUT_RATE_PER_1M"
-vp run e2e:setup \
+vp run dev:e2e:setup \
   --account-login group/subgroup \
   --repo group/subgroup/project \
   --llm-base-url https://llm.example/v1 \

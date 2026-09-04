@@ -55,6 +55,10 @@ async function readSources(files: string[]): Promise<Map<string, string>> {
 const TASK_INVOCATION =
 	/\bvp run (?:(?:--(?!filter\b)[\w-]+|\$\{\{ *matrix\.\w+ *\}\}) +)*((?:[\w:-]|\$\{\{ *matrix\.\w+ *\}\})+)/g;
 
+// The two gates `check` cannot run: the k6 syntax check needs the pinned container, and the PMD
+// canary runs only when CI decides PMD inputs changed. Every other CI gate is part of `check`.
+const CI_ONLY_GATES = new Set(["gate:load-syntax", "gate:pmd-canary"]);
+
 /** The task names one job's steps invoke, with a `${{ matrix.<key> }}` resolved from its matrix. */
 function invokedTasks(definition: YAMLMap): string[] {
 	const names: string[] = [];
@@ -253,29 +257,68 @@ function render(
 	});
 }
 
+function taskClosure(tasks: Record<string, unknown>, roots: Iterable<string>): Set<string> {
+	const closure = new Set<string>();
+	const expand = (name: string): void => {
+		if (closure.has(name)) return;
+		assert.ok(name in tasks, `${name} is named as a dependency but is not a task`);
+		closure.add(name);
+		const task = asRecord(tasks[name], name);
+		if (Array.isArray(task.dependsOn))
+			for (const dependency of task.dependsOn)
+				if (typeof dependency === "string") expand(dependency);
+		for (const command of commandsOf(task)) {
+			const nested = /^vp run ([\w:-]+)$/.exec(command)?.[1];
+			if (nested !== undefined) expand(nested);
+		}
+	};
+	for (const root of roots) expand(root);
+	return closure;
+}
+
 void describe("CI contract", () => {
+	void test("task names follow the vocabulary in AGENTS.md", async () => {
+		const tasks = await loadTasks();
+		const instructions = await readFile("AGENTS.md", "utf8");
+		const vocabulary = /^### Task vocabulary\n([\s\S]*?)(?=^###? )/m.exec(instructions)?.[1];
+		assert.ok(vocabulary, "AGENTS.md § Verifying must contain the task vocabulary");
+		const allowedPrefixes = new Set(
+			[...vocabulary.matchAll(/^\| `([a-z]+)` \|/gm)].map((match) => match[1] ?? ""),
+		);
+		assert.ok(allowedPrefixes.size > 0, "AGENTS.md task vocabulary lists no prefixes");
+		const used = new Set<string>();
+		for (const name of Object.keys(tasks).toSorted()) {
+			assert.match(name, /^[a-z]+(?::[a-z0-9-]+)*$/, `${name} is not a valid task name`);
+			const prefix = name.split(":", 1)[0] ?? "";
+			assert.ok(
+				allowedPrefixes.has(prefix),
+				`${name} does not use a task prefix listed in AGENTS.md § Verifying`,
+			);
+			used.add(prefix);
+		}
+		assert.deepEqual(
+			[...allowedPrefixes].filter((prefix) => !used.has(prefix)),
+			[],
+			"AGENTS.md § Verifying lists a task prefix no task uses",
+		);
+	});
+
+	void test("every gate belongs to quality or the CI-only inventory", async () => {
+		const tasks = await loadTasks();
+		const reachable = taskClosure(tasks, ["quality"]);
+		assert.deepEqual(
+			Object.keys(tasks)
+				.filter((taskName) => taskName.startsWith("gate:") && !reachable.has(taskName))
+				.toSorted(),
+			[...CI_ONLY_GATES].toSorted(),
+			"every gate must be reachable from quality or listed as CI-only",
+		);
+	});
+
 	void test("every local gate runs in a workflow, and every CI gate is a local gate", async () => {
 		const tasks = await loadTasks();
-		const dependencies = (name: string): string[] => {
-			const task = tasks[name];
-			return isRecord(task) && Array.isArray(task.dependsOn)
-				? task.dependsOn.filter((entry): entry is string => typeof entry === "string")
-				: [];
-		};
-		// A workflow may run a gate directly or through a group; the graph decides what a
-		// `vp run <task>` covers, so it is expanded here rather than pattern-matched in YAML.
-		const expand = (name: string, into: Set<string>): void => {
-			if (into.has(name)) return;
-			into.add(name);
-			for (const dependency of dependencies(name)) expand(dependency, into);
-			for (const command of commandsOf(tasks[name])) {
-				const nested = /^vp run ([\w:-]+)$/.exec(command)?.[1];
-				if (nested !== undefined) expand(nested, into);
-			}
-		};
-		const local = new Set<string>();
-		expand("quality", local);
-		const ci = new Set<string>();
+		const local = taskClosure(tasks, ["quality"]);
+		const ciRoots = new Set<string>();
 		for (const [file, source] of await workflowSources()) {
 			const jobs = parseDocument(source).get("jobs");
 			if (!isMap(jobs)) continue;
@@ -283,24 +326,25 @@ void describe("CI contract", () => {
 				if (!isMap(entry.value)) continue;
 				for (const name of invokedTasks(entry.value)) {
 					assert.ok(name in tasks, `${file} runs ${name}, which is not a task`);
-					expand(name, ci);
+					ciRoots.add(name);
 				}
 			}
 		}
+		const ci = taskClosure(tasks, ciRoots);
 		const gates = (names: Set<string>): string[] =>
-			[...names]
-				.filter((name) => name.startsWith("gate:") && !name.startsWith("gate:verify:"))
-				.toSorted();
+			[...names].filter((name) => name.startsWith("gate:")).toSorted();
 		assert.deepEqual(
 			gates(local).filter((gate) => !ci.has(gate)),
 			[],
 		);
-		// Builds and tests that only CI runs (`gate:webapp-tests`, `gate:load-syntax`) are the
-		// exceptions the verification graph owns; every other CI gate is part of `check`.
-		const ciOnly = new Set(["gate:webapp-tests", "gate:load-syntax", "gate:pmd-canary"]);
 		assert.deepEqual(
-			gates(ci).filter((gate) => !local.has(gate) && !ciOnly.has(gate)),
+			gates(ci).filter((gate) => !local.has(gate) && !CI_ONLY_GATES.has(gate)),
 			[],
+		);
+		assert.deepEqual(
+			[...CI_ONLY_GATES].filter((gate) => !ci.has(gate)),
+			[],
+			"every CI-only gate must run in CI",
 		);
 	});
 
@@ -1491,6 +1535,13 @@ void test("the task graph keeps its cache posture", async () => {
 		// Shell parameter expansion is outside the runner contract (scripts/check-runner-contract.ts).
 		for (const command of commands)
 			assert.doesNotMatch(command, /\$/, `${name} must not rely on shell expansion`);
+		// A `check:` name is a read-only entry point a contributor types: it either collects gates,
+		// which carry the verdicts and the caching, or it runs uncached.
+		if (name === "check" || name.startsWith("check:")) {
+			const isGroup =
+				commands.length === 0 && Array.isArray(task.dependsOn) && task.dependsOn.length > 0;
+			assert.ok(isGroup || task.cache === false, `${name} must be a group or uncached`);
+		}
 	}
 	// One Maven process per checkout: the two Maven gates run one after another, the install PMD
 	// needs is an uncached dependency because no cache replays it, and both name the JDK they read.

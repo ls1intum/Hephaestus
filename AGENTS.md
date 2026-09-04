@@ -173,10 +173,39 @@ for byte and `gate:instructions` fails when a half drifts. Copy a skill nowhere 
 | `vp run test:agents` | Agent runtime and precompute specs, on Node |
 | `vp run test:server:unit` | Server unit tests — the other tiers are in `server/AGENTS.md` § Test tiers |
 
-Naming: `format` applies, `format:check` verifies read-only for CI, `lint` lints, `check` is the
-quality gate. A `gate:` name is one leaf verdict, what CI annotates and what `check` is made of. A
-`:webapp`, `:server` or `:agents` suffix scopes any of them; `:java` scopes `format` and `lint`, and
-the Java leg of `check` is `gate:server`.
+### Task vocabulary
+
+Task names are lowercase colon-separated words; a word may also contain digits or hyphens. The
+first word says what kind of task it is, and only these prefixes are allowed:
+
+| Prefix | Meaning |
+|---|---|
+| `affected` | Internal groups selected by `check:affected` for one changed tree |
+| `build` | Produce a distributable artifact |
+| `check` | Run an uncached read-only check or a group of checks; `check` is the local quality entry point |
+| `ci` | Internal groups shaped for CI jobs and runner platforms |
+| `db` | Inspect or update the development database schema and its generated documentation |
+| `dev` | Start, stop, reset, or configure local development infrastructure |
+| `docs` | Build, serve, or lint the documentation site |
+| `fix` | Apply formatting and safe lint fixes |
+| `format` | Apply formatting; a final `check` segment makes the operation read-only |
+| `gate` | Produce one verdict that CI can annotate; every gate belongs to `quality` unless explicitly CI-only in the task contract test |
+| `generate` | Regenerate a committed artifact from its authoritative source |
+| `lint` | Run a linter; a final `fix` segment applies safe fixes and `report` writes a report |
+| `prepare` | Produce an uncommitted prerequisite needed by another task |
+| `quality` | Internal graph containing every local quality gate; use `check` at the command line |
+| `release` | Prepare or publish a release version |
+| `report` | Turn existing results into a human- or machine-readable report |
+| `schema` | Refresh a checked-in external integration schema or contract fixture |
+| `sync` | Reconcile checked-in values with an authoritative local source |
+| `test` | Execute a test suite |
+| `typecheck` | Run a language type checker without emitting artifacts |
+| `verification` | Run credential-free builds and test suites beyond `quality`; the bare name is the internal graph |
+| `verify` | Run the complete credential-free local verification entry point |
+
+Segments after the prefix identify the subject and specialization, such as
+`test:server:integration`. `:webapp`, `:server` and `:agents` are the tree scopes; `:java` scopes
+only `format` and `lint`, and the Java leg of `check` is `gate:server`.
 
 ### Lint and format
 

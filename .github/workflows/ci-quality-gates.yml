@@ -181,7 +181,7 @@ jobs:
       - name: Summarize webapp unit tests
         if: env.RUN == 'true' && matrix.leg == 'webapp' && !cancelled()
         continue-on-error: true
-        run: vp run summarize:test-results "Webapp Unit" webapp/test-results ci-metrics/webapp-unit.json
+        run: vp run report:test-results "Webapp Unit" webapp/test-results ci-metrics/webapp-unit.json
 
       - name: Upload webapp test metrics
         if: env.RUN == 'true' && matrix.leg == 'webapp' && !cancelled()
