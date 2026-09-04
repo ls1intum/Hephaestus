@@ -1,4 +1,4 @@
-# 0041. Hosts pull their own releases
+# ADR 0042: Hosts pull their own releases
 
 Date: 2026-09-03
 
