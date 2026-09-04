@@ -18,10 +18,9 @@ services:
       - "--metrics.prometheus=true"
       - "--entrypoints.http.address=:80"
       - "--entrypoints.https.address=:443"
-      # Entrypoint-wide response headers only. The request-body-limit buffering middleware must NOT
-      # sit on the entrypoint: Traefik's buffering middleware buffers whole responses, which would
-      # hold back every SSE stream (mentor chat, sync live-push) until it closes. It is attached
-      # per-router to the non-streaming surfaces (webapp, webhook-server) instead.
+      # Entrypoint-wide response headers only. Request-body caps belong to the stacks that serve
+      # the traffic, so this edge is replaceable: nothing in app or core resolves a middleware
+      # defined here.
       - "--entrypoints.https.http.middlewares=security-headers@docker"
       - "--entrypoints.http.http.encodequerysemicolons=true"
       - "--entryPoints.http.http2.maxConcurrentStreams=50"
@@ -40,9 +39,8 @@ services:
       - "--certificatesresolvers.letsencrypt.acme.email=admin@tum.de"
       - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=http"
       - "--providers.docker=true"
-      # TLS options and serversTransports are NOT definable through Docker labels (the docker
-      # provider silently drops them, and a dangling serversTransport reference disables the whole
-      # router), so they live in this file-provider fragment.
+      # TLS options are not definable through Docker labels — the provider silently drops them —
+      # so they live in this file-provider fragment.
       - "--providers.file.filename=/etc/traefik/dynamic.yml"
     configs:
       - source: traefik-dynamic
@@ -56,8 +54,6 @@ services:
       - traefik.http.middlewares.security-headers.headers.referrerPolicy=strict-origin-when-cross-origin
       - traefik.http.middlewares.security-headers.headers.permissionsPolicy=geolocation=(), camera=(), microphone=(), payment=()
       - "traefik.http.middlewares.security-headers.headers.contentSecurityPolicy=default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https: wss:; worker-src 'self' blob:; manifest-src 'self'; upgrade-insecure-requests"
-      - traefik.http.middlewares.request-body-limit.buffering.maxRequestBodyBytes=26214400
-      - traefik.http.middlewares.request-body-limit.buffering.memRequestBodyBytes=1048576
       - traefik.http.middlewares.errorpage.errors.status=501,502,503,504
       - traefik.http.middlewares.errorpage.errors.service=maintenance
       - traefik.http.middlewares.errorpage.errors.query=/index.html
@@ -129,12 +125,6 @@ configs:
         options:
           default:
             minVersion: VersionTLS12
-      http:
-        serversTransports:
-          application:
-            forwardingTimeouts:
-              dialTimeout: 10s
-              responseHeaderTimeout: 30s
   nginx-default-config:
     content: |
       server {
