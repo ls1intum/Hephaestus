@@ -57,9 +57,12 @@ const agentSources =
 	"'server/application/src/{main,test}/resources/agent/**/*.ts' 'server/application/src/main/resources/practices/precompute/**/*.ts' 'docker/agents/precompute/**/*.ts' 'scripts/**/*.ts'";
 const loadSources = "'load-tests/**/*.js'";
 const docsSources = "'docs/**/*.{js,jsx,ts,tsx,json,jsonc,css}'";
-// Named file by file: the runner hands a glob to oxfmt unexpanded, and oxfmt matches it recursively.
-const configFiles =
-	"package.json renovate.json tsconfig.json tsconfig.agents.json jean.json opencode.json openapitools.json vite.config.ts commitlint.config.ts .oxfmtrc.json .oxlintrc.json project.code-workspace .changeset/changelog.cjs .changeset/config.json .changeset/tsconfig.json .vscode/settings.json scripts/tsconfig.json";
+// Two passes: a negation applies to the whole invocation, so `!*/**` would also drop the nested set.
+const rootConfigSources = "'*.{json,ts,code-workspace}' '!*/**'";
+const nestedConfigSources = "'{.changeset,.vscode,scripts}/*.{cjs,json}'";
+// `as const` keeps the command a literal type, so `cached` can still read what it runs.
+const configFormatCommand = (mode: "--check" | "--write") =>
+	`vp fmt ${mode} ${rootConfigSources} && vp fmt ${mode} ${nestedConfigSources}` as const;
 const oxlintTargets = "server docker scripts .changeset .github commitlint.config.ts";
 // Decided when the config loads; a command never uses shell expansion.
 const oxlintFormat = process.env.GITHUB_ACTIONS === "true" ? "-f github " : "";
@@ -181,7 +184,7 @@ export default defineConfig({
 			"format:load:check": group(["gate:load-format"]),
 			"format:docs": run(`vp fmt --write ${docsSources}`),
 			"format:docs:check": group(["gate:docs-format"]),
-			"format:config": run(`vp fmt --write ${configFiles}`),
+			"format:config": run(configFormatCommand("--write")),
 			"format:config:check": group(["gate:config-format"]),
 			"format:achievements": run("node scripts/format-achievements.ts"),
 
@@ -282,7 +285,7 @@ export default defineConfig({
 
 			// Agent runtime, precompute, repository scripts and tooling config
 			"gate:agents-format": cached(`vp fmt --check ${agentSources}`),
-			"gate:config-format": cached(`vp fmt --check ${configFiles}`),
+			"gate:config-format": cached(configFormatCommand("--check")),
 			"gate:agents-lint": run(`vp exec oxlint ${oxlintFormat}${oxlintTargets}`),
 			"gate:agents-typecheck": cached("tsc -p tsconfig.agents.json --noEmit"),
 			"gate:scripts-typecheck": cached("tsc -p scripts/tsconfig.json --noEmit"),
