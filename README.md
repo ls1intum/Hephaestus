@@ -9,11 +9,11 @@
   <p><strong>Learn from the work you're already doing</strong></p>
 
   <p>
-    <a href="https://hephaestus.aet.cit.tum.de"><img alt="Open the TUM-operated Hephaestus web app" src="https://img.shields.io/badge/web_app-try_it-493C83"></a>
+    <a href="https://hephaestus.build"><img alt="Open the TUM-operated Hephaestus web app" src="https://img.shields.io/badge/web_app-try_it-493C83"></a>
     <a href="https://docs.hephaestus.build/"><img alt="Read the Hephaestus documentation" src="https://img.shields.io/badge/docs-read_online-1F75CB?logo=docusaurus&logoColor=white"></a>
-    <a href="https://github.com/ls1intum/Hephaestus/releases/latest"><img alt="Latest Hephaestus release" src="https://img.shields.io/github/v/release/ls1intum/Hephaestus?display_name=tag&sort=semver"></a>
-    <a href="https://github.com/ls1intum/Hephaestus/actions/workflows/cicd.yml"><img alt="Hephaestus CI status" src="https://github.com/ls1intum/Hephaestus/actions/workflows/cicd.yml/badge.svg?branch=main"></a>
-    <a href="https://github.com/ls1intum/Hephaestus/blob/main/LICENSE"><img alt="MIT license" src="https://img.shields.io/github/license/ls1intum/Hephaestus"></a>
+    <a href="https://github.com/hephaestus-build/Hephaestus/releases/latest"><img alt="Latest Hephaestus release" src="https://img.shields.io/github/v/release/hephaestus-build/Hephaestus?display_name=tag&sort=semver"></a>
+    <a href="https://github.com/hephaestus-build/Hephaestus/actions/workflows/cicd.yml"><img alt="Hephaestus CI status" src="https://github.com/hephaestus-build/Hephaestus/actions/workflows/cicd.yml/badge.svg?branch=main"></a>
+    <a href="https://github.com/hephaestus-build/Hephaestus/blob/main/LICENSE"><img alt="MIT license" src="https://img.shields.io/github/license/hephaestus-build/Hephaestus"></a>
   </p>
 </div>
 
@@ -39,12 +39,12 @@ relationships stay with people.
 
 > [!IMPORTANT]
 > **Hephaestus is pre-1.0.** It is released continuously and only the
-> [latest release](https://github.com/ls1intum/Hephaestus/releases/latest) is supported — no
+> [latest release](https://github.com/hephaestus-build/Hephaestus/releases/latest) is supported — no
 > maintenance branches, no backports. Until 1.0, a *minor* release can change configuration or the
 > API in ways that need you to act, so read the release notes before every upgrade.
 > Version 1.0 is what makes upgrades, configuration, Compose and the REST API predictable:
 > [compatibility policy](https://docs.hephaestus.build/admin/compatibility-policy) ·
-> [1.0 milestone](https://github.com/ls1intum/Hephaestus/issues/1378).
+> [1.0 milestone](https://github.com/hephaestus-build/Hephaestus/issues/1378).
 
 ## What Hephaestus does
 
@@ -81,13 +81,13 @@ The feedback is advisory: it does not approve a change for merge or grade anyone
 
 ## Get started
 
-- **Try the hosted app:** open the [TUM deployment](https://hephaestus.aet.cit.tum.de).
+- **Try the hosted app:** open the [TUM deployment](https://hephaestus.build).
 - **Learn how it works:** read the [user guide](https://docs.hephaestus.build/user/overview).
 - **Run your own deployment.** One 64-bit Linux host, 4 vCPUs / 8 GB RAM / 40 GB SSD recommended:
 
   ```bash
   VERSION=0.76.0   # the release you are installing, without the leading "v"
-  sudo git clone --depth 1 --branch "v$VERSION" https://github.com/ls1intum/Hephaestus.git /opt/hephaestus
+  sudo git clone --depth 1 --branch "v$VERSION" https://github.com/hephaestus-build/Hephaestus.git /opt/hephaestus
   sudo chown -R "$USER" /opt/hephaestus
   cd /opt/hephaestus/docker/self-host
   cp .env.example .env
@@ -106,8 +106,8 @@ The feedback is advisory: it does not approve a change for merge or grade anyone
 
 ## Get help
 
-- Ask questions and share ideas in [GitHub Discussions](https://github.com/ls1intum/Hephaestus/discussions).
-- Report reproducible bugs in [GitHub Issues](https://github.com/ls1intum/Hephaestus/issues).
+- Ask questions and share ideas in [GitHub Discussions](https://github.com/hephaestus-build/Hephaestus/discussions).
+- Report reproducible bugs in [GitHub Issues](https://github.com/hephaestus-build/Hephaestus/issues).
 - Report security vulnerabilities privately as described in [SECURITY.md](./SECURITY.md).
 
 ## Contributing

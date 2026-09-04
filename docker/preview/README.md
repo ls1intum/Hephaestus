@@ -83,7 +83,7 @@ serialized through one Actions concurrency group, so previews never start at onc
 
 ## Coolify configuration
 
-Create one Docker Compose application for `ls1intum/Hephaestus` on branch `main` and point it at
+Create one Docker Compose application for `hephaestus-build/Hephaestus` on branch `main` and point it at
 `/docker/preview/compose.app.yaml`.
 
 1. Keep normal automatic deployment off. Disable the repository webhook that targets Coolify's

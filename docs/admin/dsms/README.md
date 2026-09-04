@@ -7,7 +7,7 @@ description: Art. 30 / Art. 35 / Art. 28 records and source-governance controls 
 
 # Hephaestus — Data-Protection Documentation
 
-This folder is the data-protection package for the TUM-operated Hephaestus deployment at https://hephaestus.aet.cit.tum.de. Files are named after the GDPR articles they answer to, not after the TUM DSMS portal field labels. The portal supplies its own field prompts; submit by pasting from the fenced code blocks in `record-of-processing.md` into the corresponding form fields.
+This folder is the data-protection package for the TUM-operated Hephaestus deployment at https://hephaestus.build. Files are named after the GDPR articles they answer to, not after the TUM DSMS portal field labels. The portal supplies its own field prompts; submit by pasting from the fenced code blocks in `record-of-processing.md` into the corresponding form fields.
 
 A different operator forking Hephaestus must amend, before opening their deployment to users: the controller block in `record-of-processing.md`, the operational-contact email, the Art. 28 row for any processor they engage that is not on the AET pool, the consent / public-task framing in `record-of-processing.md` "Legal basis", and the live privacy notice and imprint under `webapp/public/legal/profiles/`.
 
@@ -21,7 +21,7 @@ A different operator forking Hephaestus must amend, before opening their deploym
 | [`artifact-source-governance.md`](./artifact-source-governance.md) | Approval, minimization, processor-egress, retention, and erasure gate for every AI-readable source. |
 | [`personal-data-map.md`](./personal-data-map.md) | Personal-data stores, export coverage, erasure paths, residual retention, and their verification. |
 
-The live imprint and privacy pages are at https://hephaestus.aet.cit.tum.de/imprint and https://hephaestus.aet.cit.tum.de/privacy. Markdown source: [`webapp/public/legal/profiles/tumaet/`](https://github.com/ls1intum/Hephaestus/tree/main/webapp/public/legal/profiles/tumaet).
+The live imprint and privacy pages are at https://hephaestus.build/imprint and https://hephaestus.build/privacy. Markdown source: [`webapp/public/legal/profiles/tumaet/`](https://github.com/hephaestus-build/Hephaestus/tree/main/webapp/public/legal/profiles/tumaet).
 
 ## Maintenance
 

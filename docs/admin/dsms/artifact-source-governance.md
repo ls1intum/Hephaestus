@@ -53,7 +53,7 @@ missing or expired is never read, whatever the deployment sets. Disabling a use 
 contract version in which that decision no longer permits it.
 
 The runtime registry is
-[`source-use-decisions.json`](https://github.com/ls1intum/Hephaestus/blob/main/server/application/src/main/resources/contracts/artifact-source/1.0.0/source-use-decisions.json).
+[`source-use-decisions.json`](https://github.com/hephaestus-build/Hephaestus/blob/main/server/application/src/main/resources/contracts/artifact-source/1.0.0/source-use-decisions.json).
 It is an engineering gate and contains only releasable decision summaries. Each record governs exactly one source-use purpose; a source references separate records for automated review, feedback delivery, Mentor context, and operator evidence review:
 
 - `ENGINEERING_BASELINE` with `ENGINEERING_APPROVED` records maintainer approval of the shipped, minimized

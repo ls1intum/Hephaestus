@@ -12,7 +12,7 @@ The operator of this deployment is legally required under § 5 DDG (Digitale-Die
 
 ## What the operator must do
 
-See [Legal pages operator guide](https://github.com/ls1intum/Hephaestus/blob/main/docs/admin/legal-pages.mdx) for configuration options:
+See [Legal pages operator guide](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/admin/legal-pages.mdx) for configuration options:
 
 1. Configure `LEGAL_PROFILE` to select a bundled profile, **or**
 2. Mount a custom Markdown override directory at the documented path, **or**
