@@ -81,6 +81,12 @@ workflows run again for the merge group, which includes the current base and que
 the pull request. Each required context is bound to the GitHub Actions integration rather than
 accepting a same-named external status.
 
+A failed merge group drops its pull requests from the queue without failing any check on them, so
+CI updates a comment on the pull request named by the merge group's head ref with the run link. It
+does not requeue automatically: the result does not say whether the failure was transient or
+deterministic. Regrouping the queue cancels the runs it dissolves, and a cancelled run is reported
+to nobody.
+
 Review is a native ruleset requirement with stale approvals dismissed on every push. Authors listed
 in `REVIEW_POLICY_MAINTAINERS` receive an automated approval; every other author needs a human with
 write access. Repository administrators own that allow-list. Remove the automation when independent
@@ -248,7 +254,7 @@ why the label is the authority, and which alternatives were priced and declined,
 
 | Action | Contract |
 | --- | --- |
-| `setup-toolchain` | Installs the Node.js and pnpm versions pinned in `package.json`, restores the pnpm store cache, and installs the launcher through the SHA-pinned `setup-vp` with `node-manager: false`, which then runs the lockfile's `vite-plus`; `install` is `none` or `frozen` |
+| `setup-toolchain` | Installs the Node.js and pnpm versions pinned in `package.json`, caching the pnpm executable by runner platform and pinned version and retrying its download twice on a miss, restores the pnpm store cache, and installs the launcher through the SHA-pinned `setup-vp` with `node-manager: false`, which then runs the lockfile's `vite-plus`; `install` is `none` or `frozen` |
 | `setup-caches` | Sets up the JDK from `.java-version` and restores the Maven dependency cache with a prefix fallback; `application-server-reactor` also restores the generated-client build cache and is the only type that writes caches, on default-branch push, schedule and dispatch runs |
 | `restore-server-build` | Downloads the packaged reactor and installs its generated-clients JAR and parent pom so single-module Maven goals resolve them; outputs the executable JAR path |
 | `setup-browsers` | Restores the exact Playwright browser version and installs Chromium system dependencies |
@@ -260,9 +266,10 @@ why the label is the authority, and which alternatives were priced and declined,
 
 A run restores caches from its own branch and from `main`, never from a sibling branch; within that
 scope the newest entry under the key prefix wins. Task-cache entries are content-addressed, so a
-pull request saves them for its own reruns; the Maven caches save only from `main` because their
-key is a pom hash. The JDK the caches depend on is pinned once, in `.java-version`, which every
-workflow provisions from.
+pull request saves them for its own reruns; the Maven caches and the pnpm executable cache save only
+from `main`, because every branch shares their key and a write from any other ref would be reused by
+nobody. The JDK the caches depend on is pinned once, in `.java-version`, which every workflow
+provisions from.
 
 Repository-local actions require checkout first. Jobs without checkout use the external SHA-pinned
 action directly rather than checking out the repository only to reach a wrapper.

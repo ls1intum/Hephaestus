@@ -884,3 +884,34 @@ jobs:
               description: description,
               context: 'All CI Passed'
             });
+
+  report-unsuccessful-merge-group:
+    name: "Report unsuccessful merge group"
+    needs: [all-ci-passed]
+    # A merge queue regroups whenever the entries ahead change and cancels the runs it dissolves, so
+    # only a failure says anything about this pull request.
+    if: ${{ !cancelled() && github.event_name == 'merge_group' && needs.all-ci-passed.result == 'failure' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: write
+    steps:
+      - id: pull-request
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const ref = context.payload.merge_group?.head_ref ?? '';
+            const match = /^refs\/heads\/gh-readonly-queue\/[^/]+\/pr-(\d+)-/.exec(ref);
+            if (!match) {
+              core.setFailed(`Cannot identify the pull request from merge queue ref ${ref}`);
+              return;
+            }
+            core.setOutput('number', match[1]);
+
+      - uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
+        with:
+          header: merge-queue-failure
+          number_force: ${{ steps.pull-request.outputs.number }}
+          message: >-
+            The [combined merge-queue CI run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            failed, so this pull request left the queue. Inspect the run before re-queueing it.
