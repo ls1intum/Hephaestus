@@ -3,11 +3,8 @@ Description=Poll the Hephaestus release channel
 Documentation=https://docs.hephaestus.build/admin/pull-based-deployment
 
 [Timer]
-# A minute is short enough that a promotion feels immediate and long enough that a host which
-# cannot reach GitHub is not hammering it. Most ticks read one commit and exit.
 OnBootSec=2min
 OnUnitActiveSec=1min
-# Spreads the tick across hosts so a fleet does not arrive at the registry together.
 RandomizedDelaySec=15s
 AccuracySec=10s
 

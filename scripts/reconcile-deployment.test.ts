@@ -1,10 +1,15 @@
 import assert from "node:assert/strict";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { test } from "node:test";
 
 import {
 	decide,
+	lockedReleaseCommit,
 	parseChannel,
 	parseStacks,
+	readApplied,
 	renderMetrics,
 	unlockedImages,
 } from "./reconcile-deployment.ts";
@@ -22,8 +27,10 @@ await test("a channel names an immutable release", () => {
 		freeze: false,
 	});
 	assert.throws(() => parseChannel({ release: "main" }), /immutable vX\.Y\.Z tag/);
+	assert.throws(() => parseChannel({ release: "v01.2.3" }), /immutable vX\.Y\.Z tag/);
 	assert.throws(() => parseChannel({ release: "v1.2.3-rc.1" }), /immutable vX\.Y\.Z tag/);
 	assert.throws(() => parseChannel({}), /channel\.release/);
+	assert.throws(() => parseChannel({ release: "v1.2.3", freeze: "yes" }), /must be a boolean/);
 });
 
 await test("an unchanged channel is a no-op, so most ticks do nothing", () => {
@@ -33,27 +40,32 @@ await test("an unchanged channel is a no-op, so most ticks do nothing", () => {
 	});
 });
 
-await test("a newer channel commit applies", () => {
-	assert.deepEqual(decide({ release: "v0.75.3" }, applied, "c".repeat(40), false), {
+await test("a descendant channel commit applies", () => {
+	assert.deepEqual(decide({ release: "v0.75.3" }, applied, "c".repeat(40), true), {
 		action: "apply",
 		release: "v0.75.3",
 	});
 });
 
-await test("a rewind is refused, because a replayed pointer verifies as well as a current one", () => {
-	const decision = decide({ release: "v0.75.1" }, applied, "a".repeat(40), true);
+await test("a replay or divergent channel history is refused", () => {
+	const decision = decide({ release: "v0.75.3" }, applied, "a".repeat(40), false);
 	assert.equal(decision.action, "refuse");
 });
 
-await test("a rewind the promotion declares is allowed", () => {
+await test("a downgrade requires an explicit rollback on a new channel commit", () => {
+	assert.equal(decide({ release: "v0.75.1" }, applied, "c".repeat(40), true).action, "refuse");
 	assert.deepEqual(
-		decide({ release: "v0.75.1", allowRollback: true }, applied, "a".repeat(40), true),
+		decide({ release: "v0.75.1", allowRollback: true }, applied, "c".repeat(40), true),
 		{ action: "apply", release: "v0.75.1" },
+	);
+	assert.equal(
+		decide({ release: "v0.75.1", allowRollback: true }, applied, "a".repeat(40), false).action,
+		"refuse",
 	);
 });
 
 await test("a frozen channel holds the host where it is, even against a newer release", () => {
-	assert.deepEqual(decide({ release: "v0.99.0", freeze: true }, applied, "c".repeat(40), false), {
+	assert.deepEqual(decide({ release: "v0.99.0", freeze: true }, applied, "c".repeat(40), true), {
 		action: "noop",
 		reason: "channel is frozen",
 	});
@@ -64,6 +76,27 @@ await test("a host with no state converges on its first run", () => {
 		action: "apply",
 		release: "v0.75.2",
 	});
+});
+
+await test("only a missing applied-state file means first run", async () => {
+	const directory = await mkdtemp(join(tmpdir(), "reconcile-state-"));
+	try {
+		assert.equal(await readApplied(join(directory, "missing.json")), undefined);
+		const corrupt = join(directory, "applied.json");
+		await writeFile(corrupt, "not json");
+		await assert.rejects(readApplied(corrupt), /JSON/);
+		await writeFile(
+			corrupt,
+			JSON.stringify({
+				release: "v1.2.3",
+				channelCommit: "d".repeat(40),
+				appliedAt: "September 4, 2026",
+			}),
+		);
+		await assert.rejects(readApplied(corrupt), /ISO timestamp/);
+	} finally {
+		await rm(directory, { recursive: true, force: true });
+	}
 });
 
 await test("stacks come up in dependency order regardless of how they were configured", () => {
@@ -107,8 +140,10 @@ await test("an image the release lock does not cover is refused", () => {
 	const lock = [
 		"HEPHAESTUS_IMAGE_APPLICATION_SERVER=ghcr.io/o/application-server@sha256:aaa",
 		"HEPHAESTUS_IMAGE_POSTGRES=ghcr.io/o/postgres@sha256:bbb",
+		`HEPHAESTUS_RELEASE_COMMIT=${"d".repeat(40)}`,
 		"IMAGE_TAG=v1.2.3",
 	].join("\n");
+	assert.equal(lockedReleaseCommit(lock), "d".repeat(40));
 	assert.deepEqual(
 		unlockedImages(
 			["ghcr.io/o/application-server@sha256:aaa", "ghcr.io/o/postgres@sha256:bbb"],
@@ -117,4 +152,8 @@ await test("an image the release lock does not cover is refused", () => {
 		[],
 	);
 	assert.deepEqual(unlockedImages(["ghcr.io/o/webapp:latest"], lock), ["ghcr.io/o/webapp:latest"]);
+	assert.throws(
+		() => lockedReleaseCommit(lock.replace("d".repeat(40), "invalid")),
+		/source commit/,
+	);
 });

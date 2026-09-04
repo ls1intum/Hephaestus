@@ -1,14 +1,3 @@
-/**
- * Brings one host to the release its channel names, on a timer. Nothing dials in, so no deployment
- * credential exists off the host.
- *
- * A signature proves authorship, never currency: a valid old channel, replayed, verifies perfectly.
- * Freshness therefore comes from the commit graph — a channel commit that is an ancestor of the
- * applied one is a rewind, and is refused unless the channel declares it.
- *
- * A failed apply stops and alerts rather than reverting. Schema changes here only move forward, so
- * restoring the previous images would leave old code on a migrated database.
- */
 import { existsSync } from "node:fs";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -16,17 +5,13 @@ import { join } from "node:path";
 import { asRecord, asString, parseJson } from "./lib/json.ts";
 import { output, run, succeeds } from "./lib/process.ts";
 
-/** Also the Compose project name, so an earlier deploy's containers are adopted, not duplicated. */
 export type Stack = "proxy" | "core" | "app";
 
 const STACK_ORDER: readonly Stack[] = ["proxy", "core", "app"];
 
 export interface Channel {
-	/** The release this environment should run, as an immutable `vX.Y.Z` tag. */
 	release: string;
-	/** Set when a promotion deliberately moves backwards; without it a rewind is refused. */
 	allowRollback?: boolean;
-	/** Set to hold the environment where it is, for an incident. */
 	freeze?: boolean;
 }
 
@@ -41,7 +26,14 @@ export type Decision =
 	| { action: "noop"; reason: string }
 	| { action: "refuse"; reason: string };
 
-const RELEASE_TAG = /^v\d+\.\d+\.\d+$/;
+const RELEASE_TAG = /^v(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/;
+const CHANNEL_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+function optionalBoolean(value: unknown, label: string): boolean {
+	if (value === undefined) return false;
+	if (typeof value !== "boolean") throw new TypeError(`${label} must be a boolean`);
+	return value;
+}
 
 export function parseChannel(value: unknown): Channel {
 	const record = asRecord(value, "channel");
@@ -50,30 +42,46 @@ export function parseChannel(value: unknown): Channel {
 		throw new Error(`channel.release must be an immutable vX.Y.Z tag, not ${release}`);
 	return {
 		release,
-		allowRollback: record.allowRollback === true,
-		freeze: record.freeze === true,
+		allowRollback: optionalBoolean(record.allowRollback, "channel.allowRollback"),
+		freeze: optionalBoolean(record.freeze, "channel.freeze"),
 	};
 }
 
-/** `rewinds` is "the channel commit is an ancestor of the applied one", which git answers. */
+function compareReleases(left: string, right: string): number {
+	const parts = (release: string) => release.slice(1).split(".");
+	const leftParts = parts(left);
+	const rightParts = parts(right);
+	for (const [index, leftPart] of leftParts.entries()) {
+		const rightPart = rightParts[index];
+		if (rightPart === undefined) throw new Error(`invalid release ${right}`);
+		if (leftPart.length !== rightPart.length) return leftPart.length - rightPart.length;
+		if (leftPart !== rightPart) return leftPart < rightPart ? -1 : 1;
+	}
+	return 0;
+}
+
 export function decide(
 	channel: Channel,
 	applied: AppliedState | undefined,
 	channelCommit: string,
-	rewinds: boolean,
+	advances: boolean,
 ): Decision {
-	if (channel.freeze) return { action: "noop", reason: "channel is frozen" };
-	if (applied?.release === channel.release && applied.channelCommit === channelCommit)
-		return { action: "noop", reason: `already running ${channel.release}` };
-	if (rewinds && !channel.allowRollback)
+	if (applied && channelCommit !== applied.channelCommit && !advances)
 		return {
 			action: "refuse",
-			reason: `channel commit ${channelCommit.slice(0, 8)} precedes the applied one; set allowRollback to move back deliberately`,
+			reason: `channel commit ${channelCommit.slice(0, 8)} does not descend from the last accepted channel`,
+		};
+	if (channel.freeze) return { action: "noop", reason: "channel is frozen" };
+	if (applied?.release === channel.release)
+		return { action: "noop", reason: `already running ${channel.release}` };
+	if (applied && compareReleases(channel.release, applied.release) < 0 && !channel.allowRollback)
+		return {
+			action: "refuse",
+			reason: `${channel.release} precedes ${applied.release}; set allowRollback to move back deliberately`,
 		};
 	return { action: "apply", release: channel.release };
 }
 
-/** Version and commit ride in labels, not the metric name, so a dashboard can group by them. */
 export function renderMetrics(state: {
 	channel: string;
 	release: string;
@@ -118,6 +126,16 @@ export function unlockedImages(rendered: readonly string[], lockEnv: string): st
 	return rendered.filter((image) => !locked.has(image));
 }
 
+export function lockedReleaseCommit(lockEnv: string): string {
+	const values = lockEnv
+		.split("\n")
+		.filter((line) => line.startsWith("HEPHAESTUS_RELEASE_COMMIT="))
+		.map((line) => line.slice(line.indexOf("=") + 1));
+	if (values.length !== 1 || !/^[a-f0-9]{40}$/.test(values[0] ?? ""))
+		throw new Error("release lock must contain one source commit");
+	return values[0] ?? "";
+}
+
 function isStack(name: string): name is Stack {
 	return STACK_ORDER.some((stack) => stack === name);
 }
@@ -127,8 +145,6 @@ export function parseStacks(value: string | undefined): Stack[] {
 	if (names.length === 0) throw new Error("HEPHAESTUS_STACKS must name at least one stack");
 	const unknown = names.filter((name) => !isStack(name));
 	if (unknown.length > 0) throw new Error(`unknown stack(s): ${unknown.join(", ")}`);
-	// Order is the dependency order, not the order the operator happened to type: the broker comes
-	// up before the application that waits on it, and the edge before either.
 	return STACK_ORDER.filter((stack) => names.includes(stack));
 }
 
@@ -149,29 +165,46 @@ function hostConfig(environment: NodeJS.ProcessEnv): HostConfig {
 		if (!value) throw new Error(`${name} must be set`);
 		return value;
 	};
+	const channel = required("HEPHAESTUS_CHANNEL");
+	if (!CHANNEL_NAME.test(channel))
+		throw new Error("HEPHAESTUS_CHANNEL must contain lowercase letters, digits, and hyphens");
+	const stateDirectory = environment.STATE_DIRECTORY ?? "/var/lib/hephaestus";
+	const waitTimeoutSeconds = Number(environment.HEPHAESTUS_WAIT_TIMEOUT ?? 600);
+	if (!Number.isSafeInteger(waitTimeoutSeconds) || waitTimeoutSeconds <= 0)
+		throw new Error("HEPHAESTUS_WAIT_TIMEOUT must be a positive integer");
 	return {
-		channel: required("HEPHAESTUS_CHANNEL"),
+		channel,
 		stacks: parseStacks(environment.HEPHAESTUS_STACKS),
-		checkout: required("HEPHAESTUS_CHECKOUT"),
-		stateDirectory: environment.HEPHAESTUS_STATE ?? "/var/lib/hephaestus",
+		checkout: join(stateDirectory, "checkout"),
+		stateDirectory,
 		secretsDirectory: environment.HEPHAESTUS_SECRETS ?? "/etc/hephaestus",
 		metricsFile: environment.HEPHAESTUS_METRICS_FILE,
-		waitTimeoutSeconds: Number(environment.HEPHAESTUS_WAIT_TIMEOUT ?? 600),
+		waitTimeoutSeconds,
 		promoteIdentity: required("HEPHAESTUS_PROMOTE_IDENTITY"),
 	};
 }
 
-async function readApplied(file: string): Promise<AppliedState | undefined> {
+export async function readApplied(file: string): Promise<AppliedState | undefined> {
 	try {
 		const record = asRecord(parseJson(await readFile(file, "utf8")), "applied state");
-		return {
+		const applied = {
 			release: asString(record.release, "applied.release"),
 			channelCommit: asString(record.channelCommit, "applied.channelCommit"),
 			appliedAt: asString(record.appliedAt, "applied.appliedAt"),
 		};
-	} catch {
-		// No state is the first run, not a failure.
-		return undefined;
+		if (!RELEASE_TAG.test(applied.release)) throw new Error("applied.release must be vX.Y.Z");
+		if (!/^[a-f0-9]{40}$/.test(applied.channelCommit))
+			throw new Error("applied.channelCommit must be a Git commit");
+		if (
+			!Number.isFinite(Date.parse(applied.appliedAt)) ||
+			new Date(applied.appliedAt).toISOString() !== applied.appliedAt
+		)
+			throw new Error("applied.appliedAt must be an ISO timestamp");
+		return applied;
+	} catch (error) {
+		if (typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT")
+			return undefined;
+		throw error;
 	}
 }
 
@@ -231,23 +264,34 @@ async function main(): Promise<void> {
 	]);
 
 	const channel = parseChannel(parseJson(channelJson));
-	const rewinds = applied
-		? await succeeds("git", ["merge-base", "--is-ancestor", channelCommit, applied.channelCommit], {
-				cwd: config.checkout,
-			})
-		: false;
-	const decision = decide(channel, applied, channelCommit, rewinds);
+	const advances =
+		applied && channelCommit !== applied.channelCommit
+			? await succeeds(
+					"git",
+					["merge-base", "--is-ancestor", applied.channelCommit, channelCommit],
+					{
+						cwd: config.checkout,
+					},
+				)
+			: true;
+	const decision = decide(channel, applied, channelCommit, advances);
 
 	if (decision.action === "refuse") throw new Error(decision.reason);
 	if (decision.action === "noop") {
 		console.log(`No change: ${decision.reason}`);
+		if (applied && applied.channelCommit !== channelCommit) {
+			await writeAtomic(
+				appliedFile,
+				`${JSON.stringify({ ...applied, channelCommit }, null, "\t")}\n`,
+			);
+		}
 		if (config.metricsFile && applied) {
 			await writeAtomic(
 				config.metricsFile,
 				renderMetrics({
 					channel: config.channel,
 					release: applied.release,
-					commit: applied.channelCommit,
+					commit: channelCommit,
 					success: true,
 					now: startedAt,
 					lastSuccessAt: new Date(applied.appliedAt),
@@ -257,26 +301,44 @@ async function main(): Promise<void> {
 		return;
 	}
 
-	// Compose files must come from the release being deployed, not from wherever the checkout sits.
 	const releaseTree = join(config.stateDirectory, "releases", decision.release);
 	await run("git", ["fetch", "--quiet", "origin", "tag", decision.release, "--no-tags"], {
 		cwd: config.checkout,
 	});
-	if (!existsSync(releaseTree))
+	const releaseCommit = (
+		await output("git", ["rev-parse", `${decision.release}^{commit}`], { cwd: config.checkout })
+	).trim();
+	if (existsSync(releaseTree)) {
+		const worktreeCommit = (
+			await output("git", ["rev-parse", "HEAD"], { cwd: releaseTree })
+		).trim();
+		if (worktreeCommit !== releaseCommit)
+			throw new Error(`${releaseTree} is not the worktree for ${decision.release}`);
+	} else {
 		await run("git", ["worktree", "add", "--detach", "--quiet", releaseTree, decision.release], {
 			cwd: config.checkout,
 		});
+	}
+	const worktreeChanges = await output(
+		"git",
+		["status", "--porcelain=v1", "--untracked-files=all", "--ignored=matching"],
+		{ cwd: releaseTree },
+	);
+	if (worktreeChanges) throw new Error(`${releaseTree} differs from ${decision.release}`);
 
-	const lockFile = join(releaseTree, "release-lock.env");
+	const lockDirectory = join(config.stateDirectory, "release-locks");
+	await mkdir(lockDirectory, { recursive: true });
+	const lockFile = join(lockDirectory, `${decision.release}.env`);
+	// A release must not supply the code that decides whether that same release is trusted.
 	await run(
 		process.execPath,
-		[join(releaseTree, "scripts/prepare-release-lock.ts"), decision.release, lockFile],
-		{
-			cwd: releaseTree,
-		},
+		[join(config.checkout, "scripts/prepare-release-lock.ts"), decision.release, lockFile],
+		{ cwd: releaseTree },
 	);
 
 	const lockEnv = await readFile(lockFile, "utf8");
+	if (lockedReleaseCommit(lockEnv) !== releaseCommit)
+		throw new Error(`signed release lock does not cover the ${decision.release} source tree`);
 	for (const stack of config.stacks) {
 		const composeArgs = [
 			"compose",
@@ -344,7 +406,7 @@ async function reportFailure(): Promise<void> {
 	const channel = process.env.HEPHAESTUS_CHANNEL;
 	if (!metricsFile || !channel) return;
 	const applied = await readApplied(
-		join(process.env.HEPHAESTUS_STATE ?? "/var/lib/hephaestus", "applied.json"),
+		join(process.env.STATE_DIRECTORY ?? "/var/lib/hephaestus", "applied.json"),
 	);
 	await writeAtomic(
 		metricsFile,

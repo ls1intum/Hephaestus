@@ -313,8 +313,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 20
     permissions:
-      # The release is still a draft here, and draft releases are visible only to tokens with push
-      # access, so `gh release download` in prepare-release-lock.ts needs contents: write.
+      # The release is still a draft here, so its assets require authenticated push access.
       contents: write
       packages: read
     steps:
@@ -535,14 +534,13 @@ jobs:
         run: |
           set -euo pipefail
           since=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          title="Promote ${RELEASE} to Staging"
           gh workflow run promote.yml --repo "$GITHUB_REPOSITORY" \
             -f environment=Staging -f release="$RELEASE"
-          # The dispatch returns before the run exists, and picking the newest run blindly could
-          # watch someone else's promotion, so the run is matched on being newer than the request.
           for _ in $(seq 1 30); do
-            run=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow promote.yml --limit 10 \
-              --json databaseId,createdAt \
-              --jq "[.[] | select(.createdAt > \"$since\")] | sort_by(.createdAt) | .[0].databaseId // empty")
+            run=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow promote.yml --limit 100 \
+              --json databaseId,createdAt,displayTitle,event \
+              --jq "[.[] | select(.event == \"workflow_dispatch\" and .displayTitle == \"$title\" and .createdAt >= \"$since\")] | sort_by(.createdAt) | .[0].databaseId // empty")
             [ -n "$run" ] && break
             sleep 5
           done
