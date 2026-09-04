@@ -43,7 +43,6 @@ Split the worker out when:
 
 - LLM reviews and HTTP traffic compete for the same JVM heap / sandbox quota.
 - You want to scale practice-review throughput independently of webhook ingestion.
-- You're running BYO worker pods behind enterprise MITM proxies (ADR 0009 — WSS over TLS-443).
 
 Split the webhook receiver out when:
 
