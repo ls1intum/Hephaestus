@@ -54,16 +54,19 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
-      contents: write # push generated files to the PR branch
+      contents: write # commit generated files to the PR branch
     outputs:
       changed: ${{ steps.commit.outputs.changed }}
     steps:
-      # Holds the write token: nothing from the checkout or artifact is executed here.
+      # Holds the write token: it installs no dependencies, and nothing from the artifact is run.
       - name: Checkout PR commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          install: "none"
       - name: Remove checked-in client
         run: rm -rf webapp/src/api
       - name: Download generated files
@@ -71,25 +74,20 @@ jobs:
         with:
           name: generated-openapi-${{ github.run_id }}
           path: .
-      - name: Commit and push generated files
+      - name: Commit generated files
         id: commit
         env:
           GH_TOKEN: ${{ github.token }}
           HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+          # Stale runs fail closed: a branch that moved since the label was applied rejects the
+          # commit rather than replacing whatever moved it.
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
-          set -euo pipefail
-          git add -- server/openapi.yaml webapp/src/api
-          if git diff --cached --quiet; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          git config --local user.name "github-actions[bot]"
-          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "chore: update API specs and client"
-          # Never force-push: stale runs must fail closed.
-          gh auth setup-git
-          git push origin "HEAD:$HEAD_BRANCH"
-          echo "changed=true" >> "$GITHUB_OUTPUT"
+          node scripts/commit-via-api.ts \
+            --branch "$HEAD_BRANCH" \
+            --expected-head "$EXPECTED_HEAD" \
+            --message "chore: update API specs and client" \
+            -- server/openapi.yaml webapp/src/api
 
   report:
     name: Report result

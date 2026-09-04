@@ -53,10 +53,21 @@ jobs:
       contents: write
       id-token: write
     steps:
+      # `deploy-state` carries channels and no code, so the tooling that writes it is checked out
+      # from the ref this workflow was dispatched on and the branch itself sits beside it.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: deploy-state
+          path: deploy-state
           persist-credentials: false
+
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          install: "none"
 
       - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
 
@@ -112,6 +123,7 @@ jobs:
           echo "follows=release" >> "$GITHUB_OUTPUT"
 
       - name: Write and sign the channel
+        working-directory: deploy-state
         env:
           CHANNEL: ${{ inputs.environment }}
           RELEASE: ${{ steps.release.outputs.release }}
@@ -146,18 +158,17 @@ jobs:
           echo "CHANNEL_FILE=channels/${channel}.json" >> "$GITHUB_ENV"
 
       - name: Publish the channel
+        working-directory: deploy-state
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE: ${{ steps.release.outputs.release }}
         run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add channels
-          # An empty commit would read as a move forward to hosts that compare ancestry.
-          git diff --cached --quiet && { echo "Channel already at $RELEASE"; exit 0; }
-          git commit -m "chore(deploy): ${CHANNEL_FILE} -> ${RELEASE}"
-          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}" HEAD:deploy-state
+          # An empty commit would read as a move forward to hosts that compare ancestry, so a channel
+          # already at this release produces none.
+          node ../scripts/commit-via-api.ts \
+            --branch deploy-state \
+            --message "chore(deploy): ${CHANNEL_FILE} -> ${RELEASE}" \
+            -- channels
 
       - name: Wait for the environment to converge
         if: ${{ !inputs.freeze }}

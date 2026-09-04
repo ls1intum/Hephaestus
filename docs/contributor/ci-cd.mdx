@@ -269,6 +269,22 @@ why the label is the authority, and which alternatives were priced and declined,
 | `release-upgrade.yml` | Called by `release.yml`, weekly | Boots the previous stable release with seeded data, then the candidate against the same database |
 | `deploy-staging.yml`, `deploy-prod.yml` | Called by `release.yml` or manual dispatch | Deploy a verified release lock through `deploy-locked-compose.yml` |
 
+### Commits a workflow makes
+
+Actions holds no signing key, so a commit pushed with `git` from a workflow is unsigned and a
+required-signature rule rejects it. Every commit an automation makes here is created through
+GitHub's `createCommitOnBranch` mutation instead, which GitHub signs — the same path
+`changesets/action` lands the Version PR on and Renovate lands a dependency bump on.
+`scripts/commit-via-api.ts` is the one caller: `openapi-autocommit.yml` commits the regenerated spec
+and client to the pull request's branch through it, and `promote.yml` commits the channel to
+`deploy-state`. `scripts/ci-contract.test.ts` fails any workflow that pushes to a real ref.
+
+The mutation carries whole file contents rather than a diff, so the script enumerates every added,
+modified and deleted path from the work tree and sends each file entire; a rename is its source
+deleted and its destination added. It commits against the head the work tree was compared with, so a
+branch that moved in the meantime fails the run instead of overwriting whatever moved it. The
+credential is still `GITHUB_TOKEN`, so these commits start no further workflow run.
+
 ### Shared setup actions
 
 | Action | Contract |
