@@ -146,9 +146,11 @@ async function resolveAndVerify(repository: string, commit: string): Promise<str
 }
 
 if (import.meta.main) {
-	const [commit, owner = "hephaestus-build"] = process.argv.slice(2);
-	if (!commit) throw new Error("usage: commit-image-lock <commit> [owner]");
-	const inventory = await readInventory("security/release-images.json");
+	const [commit, owner = "hephaestus-build", inventoryPath = "security/release-images.json"] =
+		process.argv.slice(2);
+	if (!commit) throw new Error("usage: commit-image-lock <commit> [owner] [inventory]");
+	// The inventory belongs to the commit being promoted; this file may be newer than it.
+	const inventory = await readInventory(inventoryPath);
 	const images = await resolveImages(inventory, commit, owner, resolveAndVerify);
 	process.stdout.write(`${JSON.stringify(images, null, 2)}\n`);
 }
