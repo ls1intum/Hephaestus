@@ -110,3 +110,25 @@ await test("what an operator is told to copy is one host per Host()", () => {
 		}
 	}
 });
+
+await test("every https router sets HSTS itself, not through the edge", () => {
+	// The proxy stack puts security-headers on its https entrypoint, which covers a deployment whose
+	// edge is that stack. Staging and every preview run behind someone else's proxy, where no
+	// entrypoint middleware of ours exists — and the omission is invisible, because the webapp's
+	// nginx sets the other security headers on its own responses. HSTS is the one no response can
+	// set for itself, so each router that terminates a public request carries it.
+	for (const stack of ["app", "core"] as const) {
+		const file = readFileSync(new URL(`../docker/compose.${stack}.yaml`, import.meta.url), "utf8");
+		const routers = [...file.matchAll(/traefik\.http\.routers\.(https-[a-z-]+)\.rule=/g)].map(
+			([, name]) => name,
+		);
+		assert.ok(routers.length > 0, `${stack} declares no https router`);
+		for (const router of routers) {
+			const attached = new RegExp(`routers\\.${router}\\.middlewares=([^"\n]*)`).exec(file)?.[1];
+			assert.ok(
+				attached?.includes("hsts"),
+				`${stack}/${router} would serve without HSTS behind a proxy that is not ours`,
+			);
+		}
+	}
+});
