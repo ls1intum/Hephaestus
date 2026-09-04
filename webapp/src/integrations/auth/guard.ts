@@ -1,6 +1,7 @@
 import type { QueryClient } from "@tanstack/react-query";
 
 import {
+	getConsentStatusOptions,
 	getCurrentUserMembershipOptions,
 	getCurrentUserOptions,
 } from "@/api/@tanstack/react-query.gen";
@@ -144,4 +145,28 @@ export function safeReturnTo(value: string | undefined): string {
 	// Validation ran on the fully-decoded value; return the ORIGINAL so legitimate encoded
 	// segments (e.g. a `%26` in a query string) are preserved exactly as the caller intended.
 	return value;
+}
+
+/**
+ * Whether the reader still owes the transparency notice.
+ *
+ * The server answers every gated call with 428 until the choice is recorded, so a route that runs a
+ * gated query first would throw before anything could ask for the choice. Routes ask this instead
+ * and skip the work; the notice is then put to the reader in place, over the page they were opening.
+ */
+export async function consentIsPending(queryClient: QueryClient): Promise<boolean> {
+	// Only a signed-in reader can owe it. Asking on a public page would spend a request that can only
+	// answer 401, on the landing page's critical path, for every anonymous visitor.
+	if (!(await resolveCurrentUser(queryClient))) return false;
+	try {
+		const status = await queryClient.query(getConsentStatusOptions({}));
+		return !status.completed;
+	} catch {
+		// Only an explicit "not answered" blocks the application. Treating an unanswerable question as
+		// outstanding would put an undismissable notice in front of every reader whenever this one
+		// call failed, with no way out but a reload — and it would not even be protective, because the
+		// server refuses the gated calls itself. A reader who does owe the notice still meets that
+		// refusal; a reader who does not keeps working.
+		return false;
+	}
 }

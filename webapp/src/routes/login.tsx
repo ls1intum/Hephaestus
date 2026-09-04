@@ -1,4 +1,4 @@
-import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { toast } from "sonner";
 
@@ -59,19 +59,15 @@ function LoginPage() {
 	return (
 		<LoginCard
 			title="Welcome to Hephaestus"
+			// Two sentences, not five: the detail belongs in the transparency notice. But the fact that
+			// signing in shares a provider identity has to be here, because it is the decision being
+			// made on this page — a notice shown afterwards cannot inform it.
 			description={
 				<span className="space-y-2">
 					<span className="block">Your AI mentor for growing as a software engineer.</span>
-					<span className="block text-left">
-						TUM's Applied Education Technologies group operates Hephaestus. Signing in shares your
-						provider identity with us. Hephaestus analyzes connected GitHub, GitLab, Slack, and
-						Outline activity against your team's practices to provide feedback. Research use is
-						optional and off by default. You can exercise your data-protection rights as described
-						in the{" "}
-						<Link to="/privacy" target="_blank" className="underline underline-offset-4">
-							privacy notice
-						</Link>
-						.
+					<span className="block">
+						Signing in shares your provider identity with TUM. What happens with it is explained
+						next, before anything is analysed.
 					</span>
 				</span>
 			}
