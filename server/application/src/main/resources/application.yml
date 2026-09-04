@@ -559,6 +559,10 @@ hephaestus:
             # Where the daily euro reference rates come from. Override only on an air-gapped instance
             # that mirrors the ECB file internally.
             daily-url: ${HEPHAESTUS_LLM_FX_DAILY_URL:https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml}
+        usage:
+            # Age at which a spend-ledger row is deleted by the nightly sweep. Raise it on an instance
+            # whose accounting obligations run longer than the default; the deletion is irreversible.
+            retention: ${HEPHAESTUS_LLM_USAGE_RETENTION:P400D}
 
     # ═══════════════════════════════════════════════════════════════════════════
     # WEBHOOK CONFIGURATION

@@ -1,5 +1,9 @@
 package de.tum.cit.aet.hephaestus.core.auth.export;
 
+import de.tum.cit.aet.hephaestus.core.PrivacyJobMetrics;
+import de.tum.cit.aet.hephaestus.core.PrivacyJobMetrics.Job;
+import de.tum.cit.aet.hephaestus.core.PrivacyJobMetrics.Outcome;
+import de.tum.cit.aet.hephaestus.core.TransactionCallbacks;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import java.time.Clock;
@@ -14,14 +18,8 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Runs the actual bundle assembly off the request thread.
- *
- * <p>Lives in a separate bean from {@code AccountExportService} so the {@link Async} boundary is
- * a real proxy hop (self-invocation would silently run inline) — the same separation
- * {@code AuthEventLogger}/{@code AuthEventWriter} use for their {@code REQUIRES_NEW} boundary.
- * The async executor is the application's {@code applicationTaskExecutor} (a bounded pool that
- * waits for in-flight DB work on shutdown — see {@code SpringAsyncConfig}); under
- * {@code spring.threads.virtual.enabled} each task still runs on a managed thread.
+ * Separate bean from {@code AccountExportService}: self-invocation would bypass the {@link Async}
+ * proxy and run the assembly inline on the request thread.
  */
 @ConditionalOnServerRole
 @Component
@@ -37,22 +35,25 @@ public class ExportGenerationWorker {
     private final ExportBundleAssembler assembler;
     private final ObjectMapper objectMapper;
     private final Clock clock;
+    private final PrivacyJobMetrics metrics;
 
     public ExportGenerationWorker(
             AccountExportRepository accountExportRepository,
             ExportBundleAssembler assembler,
             ObjectMapper objectMapper,
-            Clock clock) {
+            Clock clock,
+            PrivacyJobMetrics metrics) {
         this.accountExportRepository = accountExportRepository;
         this.assembler = assembler;
         this.objectMapper = objectMapper;
         this.clock = clock;
+        this.metrics = metrics;
     }
 
     /**
-     * Generate the bundle for {@code exportId} (owned by {@code accountId}) and persist the
-     * outcome. PROCESSING → READY on success (payload + expiry set), → FAILED on any error. Never
-     * throws to the caller (it's fire-and-forget); failures are recorded on the row.
+     * Generate the bundle for {@code exportId} (owned by {@code accountId}) and persist the outcome.
+     * PROCESSING → READY on success (payload + expiry set), → FAILED on any error. Never throws to the
+     * caller (it's fire-and-forget); failures are recorded on the row and on the privacy-job counters.
      */
     @Async
     @Transactional
@@ -63,6 +64,7 @@ public class ExportGenerationWorker {
         if (export == null) {
             // Row vanished (e.g. account hard-deleted between request and pickup). Nothing to do.
             log.warn("auth.export: generation skipped, export {} for account {} not found", exportId, accountId);
+            recordAfterCommit(Outcome.FAILURE);
             return;
         }
         export.setStatus(AccountExport.Status.PROCESSING);
@@ -77,6 +79,10 @@ public class ExportGenerationWorker {
             export.setExpiresAt(now.plus(RETENTION));
             export.setStatus(AccountExport.Status.READY);
             accountExportRepository.save(export);
+            TransactionCallbacks.afterCommit(() -> {
+                metrics.record(Job.EXPORT_GENERATION, Outcome.SUCCESS);
+                metrics.recordAffected(Job.EXPORT_GENERATION, 1);
+            });
             log.info("auth.export: export {} for account {} READY ({} bytes)", exportId, accountId, payload.length);
         } catch (JacksonException e) {
             fail(export, "serialization_failed");
@@ -92,5 +98,11 @@ public class ExportGenerationWorker {
         export.setFailureReason(reason);
         export.setPayload(null);
         accountExportRepository.save(export);
+        recordAfterCommit(Outcome.FAILURE);
+    }
+
+    /** A counter an operator alerts on must not claim an outcome for a row the commit could still lose. */
+    private void recordAfterCommit(Outcome outcome) {
+        TransactionCallbacks.afterCommit(() -> metrics.record(Job.EXPORT_GENERATION, outcome));
     }
 }

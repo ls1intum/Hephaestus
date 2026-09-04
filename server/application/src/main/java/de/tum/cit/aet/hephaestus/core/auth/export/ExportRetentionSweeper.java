@@ -1,5 +1,8 @@
 package de.tum.cit.aet.hephaestus.core.auth.export;
 
+import de.tum.cit.aet.hephaestus.core.PrivacyJobMetrics;
+import de.tum.cit.aet.hephaestus.core.PrivacyJobMetrics.Job;
+import de.tum.cit.aet.hephaestus.core.PrivacyJobMetrics.Outcome;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
@@ -9,18 +12,11 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * Hourly sweep that enforces the {@link ExportGenerationWorker#RETENTION 48h} retention window:
- * READY exports past {@code expires_at} flip to EXPIRED and have their payload nulled so the
- * exported PII isn't retained beyond the download window.
+ * Hourly sweep that enforces the {@link ExportGenerationWorker#RETENTION} window: READY exports past
+ * {@code expires_at} flip to EXPIRED and have their payload nulled.
  *
- * <p>This bean owns only scheduling and cross-pod locking; the transactional work lives in
- * {@link AccountExportService#expireRetention()}. Delegating across a real proxy hop (rather than a
- * self-invoked method) is what lets that {@code @Transactional} take effect — the bulk
- * {@code @Modifying} UPDATE requires an active transaction.
- *
- * <p>Scheduling is gated by {@code ServerSchedulingConfig} ({@code @EnableScheduling} only on the
- * server role), and wrapped in {@link SchedulerLock} so concurrent server pods don't both run the
- * sweep — the same pattern as {@code OAuthStateNonceCleanupJob}.
+ * <p>The bulk {@code @Modifying} update needs an active transaction, which only a real proxy hop into
+ * {@link AccountExportService} opens.
  */
 @ConditionalOnServerRole
 @Component
@@ -30,17 +26,26 @@ public class ExportRetentionSweeper {
     private static final Logger log = LoggerFactory.getLogger(ExportRetentionSweeper.class);
 
     private final AccountExportService accountExportService;
+    private final PrivacyJobMetrics metrics;
 
-    public ExportRetentionSweeper(AccountExportService accountExportService) {
+    public ExportRetentionSweeper(AccountExportService accountExportService, PrivacyJobMetrics metrics) {
         this.accountExportService = accountExportService;
+        this.metrics = metrics;
     }
 
     @Scheduled(cron = "0 0 * * * *")
     @SchedulerLock(name = "account-export-retention-sweep", lockAtMostFor = "PT5M", lockAtLeastFor = "PT30S")
     public void sweep() {
-        int expired = accountExportService.expireRetention();
-        if (expired > 0) {
-            log.info("auth.export: expired {} READY export(s) past retention", expired);
+        try {
+            int expired = accountExportService.expireRetention();
+            metrics.record(Job.EXPORT_RETENTION, Outcome.SUCCESS);
+            metrics.recordAffected(Job.EXPORT_RETENTION, expired);
+            if (expired > 0) {
+                log.info("auth.export: expired {} READY export(s) past retention", expired);
+            }
+        } catch (RuntimeException e) {
+            metrics.record(Job.EXPORT_RETENTION, Outcome.FAILURE);
+            throw e;
         }
     }
 }

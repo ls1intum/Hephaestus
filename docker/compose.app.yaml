@@ -245,6 +245,10 @@ services:
       # The reports and the FX fetcher are server-role, so this belongs on this pod.
       HEPHAESTUS_LLM_DISPLAY_CURRENCY: ${HEPHAESTUS_LLM_DISPLAY_CURRENCY:-}
       HEPHAESTUS_LLM_FX_DAILY_URL: ${HEPHAESTUS_LLM_FX_DAILY_URL:-https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml}
+      # Storage limitation on the spend ledger. The nightly sweep is server-role, so this pod only.
+      # Raise it where a commercial or tax retention obligation runs past the default; deletion is
+      # irreversible.
+      HEPHAESTUS_LLM_USAGE_RETENTION: ${HEPHAESTUS_LLM_USAGE_RETENTION:-P400D}
       # SSRF guard. Set on BOTH this pod and the worker or the two disagree: this pod decides whether
       # a loopback provider URL may be SAVED, the worker's proxy decides whether it may be DIALLED.
       # Leave false in production.

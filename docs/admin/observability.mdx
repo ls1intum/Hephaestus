@@ -32,6 +32,25 @@ Delivery is optional. Jobs that do not complete successfully may have no deliver
 labels. See [Practice Review Operations](./practice-review-operations.mdx) for queue health and the
 existing execution metric.
 
+## Privacy-job metrics
+
+Account erasure, export generation, export expiry and LLM usage retention each report one terminal
+outcome per run, published by the server role.
+
+| Prometheus name | Type | Labels | Meaning |
+| --- | --- | --- | --- |
+| `privacy_job_completed_total` | Counter | `job`, `outcome` | Terminal privacy-job executions |
+| `privacy_job_affected_total` | Counter | `job` | Rows or subjects the run removed or produced |
+
+`job` is one of `account_erasure`, `export_generation`, `export_retention`, or
+`llm_usage_retention`. `outcome` is `success`, `incomplete` or `failure`. An empty backlog is a
+`success`, so silence on the success counter is itself alertable. `incomplete` means the run finished
+without error but ran out of its time budget with work still eligible — the LLM usage retention sweep
+deletes in batches for at most five minutes and reports `incomplete` when expired rows remain, so a
+deployment that reports it every day never finishes deleting. Account, workspace, export and source
+identifiers are not labels. The erasure and retention paths these cover are listed in the
+[personal-data map](./dsms/personal-data-map.md).
+
 ## Correlating a request
 
 Every HTTP response carries an `X-Request-Id` header whose value is the request's W3C trace ID — a

@@ -1,5 +1,8 @@
 package de.tum.cit.aet.hephaestus.core.auth;
 
+import de.tum.cit.aet.hephaestus.core.PrivacyJobMetrics;
+import de.tum.cit.aet.hephaestus.core.PrivacyJobMetrics.Job;
+import de.tum.cit.aet.hephaestus.core.PrivacyJobMetrics.Outcome;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
@@ -14,11 +17,9 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * Enforces the GDPR Art. 17 hard-delete that {@code AccountService.softDelete} promises. An account
- * sits in {@link Account.Status#DELETING} during the {@link AuthProperties#deleteCooldown 48h}
- * grace period (a delayed purge — the user cannot self-recover; sessions are revoked immediately on
- * soft-delete); once {@code deleted_at} is older than that, this sweep removes the account's
- * personal / auth data and flips it to {@link Account.Status#DELETED}.
+ * Enforces the GDPR Art. 17 hard-delete that {@code AccountService.softDelete} promises: once
+ * {@code deleted_at} is older than the {@link AuthProperties#deleteCooldown} grace period, this sweep
+ * removes the account's personal / auth data and flips it to {@link Account.Status#DELETED}.
  *
  * <h2>What it purges</h2>
  * The account's child auth rows — {@code identity_link}, {@code account_feature}, {@code issued_jwt},
@@ -34,13 +35,6 @@ import org.springframework.stereotype.Component;
  * not the other way around, so deleting the identity links severs the personal ↔ mirror association
  * automatically. The activity graph itself is retained under the Art. 17(3) public-archive carve-out
  * and is out of scope for this sweep.
- *
- * <h2>Scheduling &amp; safety</h2>
- * Mirrors {@code ExportRetentionSweeper} / {@code AuthEventPartitionMaintenance}: {@code @Scheduled} is
- * gated by {@code ServerSchedulingConfig} (server role only) and {@code @SchedulerLock} single-flights
- * across replicas. The work is idempotent — re-running after a flipped status is a no-op because the
- * row is no longer {@code DELETING}, and the child deletes are unconditional {@code DELETE ... WHERE
- * account_id = ?}.
  */
 @ConditionalOnServerRole
 @Component
@@ -56,34 +50,46 @@ public class AccountHardDeleteSweeper {
     private final AccountPurger accountPurger;
     private final AuthProperties properties;
     private final Clock clock;
+    private final PrivacyJobMetrics metrics;
 
     public AccountHardDeleteSweeper(
-            AccountRepository accountRepository, AccountPurger accountPurger, AuthProperties properties, Clock clock) {
+            AccountRepository accountRepository,
+            AccountPurger accountPurger,
+            AuthProperties properties,
+            Clock clock,
+            PrivacyJobMetrics metrics) {
         this.accountRepository = accountRepository;
         this.accountPurger = accountPurger;
         this.properties = properties;
         this.clock = clock;
+        this.metrics = metrics;
     }
 
-    /** Runs hourly. {@code sweepNow()} is also callable directly from tests. */
     @Scheduled(cron = "0 5 * * * *")
     @SchedulerLock(name = "account-hard-delete-sweep", lockAtMostFor = "PT5M", lockAtLeastFor = "PT30S")
     public void sweep() {
-        int purged = sweepNow();
-        if (purged > 0) {
-            log.info("auth.account: hard-deleted {} account(s) past the GDPR delete cooldown", purged);
+        try {
+            SweepResult result = purgeEligibleAccounts();
+            metrics.record(Job.ACCOUNT_ERASURE, result.failed() == 0 ? Outcome.SUCCESS : Outcome.FAILURE);
+            metrics.recordAffected(Job.ACCOUNT_ERASURE, result.purged());
+            if (result.purged() > 0) {
+                log.info("auth.account: hard-deleted {} account(s) past the GDPR delete cooldown", result.purged());
+            }
+        } catch (RuntimeException e) {
+            metrics.record(Job.ACCOUNT_ERASURE, Outcome.FAILURE);
+            throw e;
         }
     }
 
-    /**
-     * Hard-delete every account whose soft-delete cooldown has elapsed. Orchestrator only — each account
-     * is purged in its OWN transaction via {@link AccountPurger} so one bad row never blocks the rest of
-     * the GDPR erasure backlog. Returns the count of SUCCESSFUL purges; a failed account stays DELETING
-     * and is retried next sweep. Idempotent: an already-DELETED account is never selected.
-     */
+    /** Each account is purged in its own transaction so one failure does not block the backlog. */
     public int sweepNow() {
+        return purgeEligibleAccounts().purged();
+    }
+
+    private SweepResult purgeEligibleAccounts() {
         Instant cutoff = clock.instant().minus(properties.deleteCooldown());
-        int total = 0;
+        int purged = 0;
+        int failed = 0;
         // Always fetch page 0: a successful purge flips the account to DELETED so it drops out of the
         // result set, advancing the window naturally. We stop when a page is empty (backlog drained) or
         // when a page made ZERO progress (every purge threw) — otherwise the same failing rows would be
@@ -97,9 +103,10 @@ public class AccountHardDeleteSweeper {
             for (Long id : page) {
                 try {
                     accountPurger.purge(id);
-                    total++;
+                    purged++;
                     purgedThisPage++;
                 } catch (RuntimeException e) {
+                    failed++;
                     log.error(
                             "auth.account: hard-delete FAILED for accountId={} (skipped, will retry next sweep)",
                             id,
@@ -110,6 +117,8 @@ public class AccountHardDeleteSweeper {
                 break;
             }
         }
-        return total;
+        return new SweepResult(purged, failed);
     }
+
+    private record SweepResult(int purged, int failed) {}
 }

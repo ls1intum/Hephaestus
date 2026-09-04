@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.core.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
@@ -9,6 +10,9 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.core.PrivacyJobMetrics;
+import de.tum.cit.aet.hephaestus.core.PrivacyJobMetrics.Job;
+import de.tum.cit.aet.hephaestus.core.PrivacyJobMetrics.Outcome;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Clock;
@@ -32,6 +36,9 @@ class AccountHardDeleteSweeperTest extends BaseUnitTest {
     @Mock
     private AuthProperties authProperties;
 
+    @Mock
+    private PrivacyJobMetrics metrics;
+
     private final Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
 
     @Test
@@ -50,10 +57,35 @@ class AccountHardDeleteSweeperTest extends BaseUnitTest {
                 .when(accountPurger)
                 .purge(anyLong());
         AccountHardDeleteSweeper sweeper =
-                new AccountHardDeleteSweeper(accountRepository, accountPurger, authProperties, clock);
+                new AccountHardDeleteSweeper(accountRepository, accountPurger, authProperties, clock, metrics);
 
         assertThat(sweeper.sweepNow()).isEqualTo(1);
         verify(accountPurger).purge(1L);
         verify(accountPurger, times(2)).purge(2L);
+    }
+
+    @Test
+    void shouldRecordSuccessfulEmptySweep() {
+        when(authProperties.deleteCooldown()).thenReturn(Duration.ofHours(48));
+        when(accountRepository.findDeletingPastCooldown(any(), any())).thenReturn(List.of());
+        AccountHardDeleteSweeper sweeper =
+                new AccountHardDeleteSweeper(accountRepository, accountPurger, authProperties, clock, metrics);
+
+        sweeper.sweep();
+
+        verify(metrics).record(Job.ACCOUNT_ERASURE, Outcome.SUCCESS);
+        verify(metrics).recordAffected(Job.ACCOUNT_ERASURE, 0);
+    }
+
+    @Test
+    void shouldRecordSweepQueryFailure() {
+        when(authProperties.deleteCooldown()).thenReturn(Duration.ofHours(48));
+        when(accountRepository.findDeletingPastCooldown(any(), any())).thenThrow(new IllegalStateException("db down"));
+        AccountHardDeleteSweeper sweeper =
+                new AccountHardDeleteSweeper(accountRepository, accountPurger, authProperties, clock, metrics);
+
+        assertThatThrownBy(sweeper::sweep).isInstanceOf(IllegalStateException.class);
+
+        verify(metrics).record(Job.ACCOUNT_ERASURE, Outcome.FAILURE);
     }
 }
