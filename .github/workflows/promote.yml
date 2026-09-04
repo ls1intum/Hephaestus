@@ -38,7 +38,13 @@ jobs:
   promote:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    environment: ${{ inputs.environment }}
+    environment:
+      name: ${{ inputs.environment }}
+      # GitHub records this as the deployment's environment_url, on the status it writes when the
+      # job ends. A status posted from inside the job would be superseded by that one, so the URL
+      # has to come from here rather than from a step. It is a step output because APP_HOSTNAME is
+      # scoped to the environment being resolved.
+      url: ${{ steps.release.outputs.environment_url }}
     permissions:
       contents: write
       id-token: write
@@ -55,6 +61,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           REQUESTED: ${{ inputs.release }}
+          HOSTNAME: ${{ vars.APP_HOSTNAME }}
         run: |
           set -euo pipefail
           release="$REQUESTED"
@@ -67,6 +74,7 @@ jobs:
             echo "::error::$release is still a draft"; exit 1; }
           echo "release=$release" >> "$GITHUB_OUTPUT"
           echo "version=${release#v}" >> "$GITHUB_OUTPUT"
+          echo "environment_url=https://${HOSTNAME}" >> "$GITHUB_OUTPUT"
 
       - name: Write and sign the channel
         env:
