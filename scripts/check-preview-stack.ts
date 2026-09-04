@@ -100,9 +100,13 @@ export function findStaleOmissions(referenceText: string): string[] {
 const RENDER_ENV: Record<string, string> = {
 	SOURCE_COMMIT: "a".repeat(40),
 	POSTGRES_PASSWORD: "ci-not-a-real-password",
+	PREVIEW_SEED_SOURCE_PASSWORD: "ci-not-a-real-seed-password",
 	HEPHAESTUS_AUTH_STATE_COOKIE_KEY: "ci-not-a-real-state-cookie-key",
 	HEPHAESTUS_SECURITY_ENCRYPTION_KEY: "0123456789abcdef0123456789abcdef",
 	WEBHOOK_SECRET: "ci-not-a-real-webhook-secret-0123456789",
+	HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY: "0123456789abcdef0123456789abcdef",
+	NATS_USERNAME: "ci-not-a-real-nats-user",
+	NATS_PASSWORD: "ci-not-a-real-nats-password",
 	HEPHAESTUS_TRUSTED_PROXIES: "172.(1[6-9]|2[0-9]|3[01]).[0-9]{1,3}.[0-9]{1,3}",
 	SERVICE_FQDN_WEBAPP: "pr1.example.com",
 	SERVICE_FQDN_APPSERVER: "pr1.api.example.com",

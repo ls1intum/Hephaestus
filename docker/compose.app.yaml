@@ -63,10 +63,11 @@ services:
       - "traefik.http.routers.http-webapp.rule=Host(`${APP_HOSTNAME}`) && PathPrefix(`/`)"
       - "traefik.http.routers.http-webapp.service=http-webapp"
       - "traefik.http.routers.https-webapp.entryPoints=https"
-      # Request-body cap (defined in compose.proxy.yaml). Router-scoped rather than entrypoint-wide
-      # because the buffering middleware also buffers responses, which would stall the /api SSE
-      # streams; the static SPA and the webhook receiver have no streaming responses.
-      - "traefik.http.routers.https-webapp.middlewares=request-body-limit@docker"
+      # Keep buffering off the /api router because it would hold SSE responses until they close.
+      # Define this middleware with its router so the app stack does not depend on the proxy stack.
+      - traefik.http.middlewares.webapp-body-limit.buffering.maxRequestBodyBytes=26214400
+      - traefik.http.middlewares.webapp-body-limit.buffering.memRequestBodyBytes=1048576
+      - "traefik.http.routers.https-webapp.middlewares=webapp-body-limit"
       - "traefik.http.routers.https-webapp.rule=Host(`${APP_HOSTNAME}`) && PathPrefix(`/`)"
       - "traefik.http.routers.https-webapp.service=https-webapp"
       - "traefik.http.routers.https-webapp.tls.certresolver=letsencrypt"
@@ -143,7 +144,7 @@ services:
       NATS_PASSWORD: ${NATS_PASSWORD:?Set NATS_PASSWORD}
       # Auth (Hephaestus-native; ADR 0017). State-cookie key MUST be base64 32-byte AES.
       HEPHAESTUS_AUTH_ISSUER: https://${APP_HOSTNAME}
-      HEPHAESTUS_AUTH_STATE_COOKIE_KEY: ${HEPHAESTUS_AUTH_STATE_COOKIE_KEY}
+      HEPHAESTUS_AUTH_STATE_COOKIE_KEY: ${HEPHAESTUS_AUTH_STATE_COOKIE_KEY:?Set HEPHAESTUS_AUTH_STATE_COOKIE_KEY to a Base64-encoded 32-byte key}
       # First instance super-admin bootstrap (auth-cutover runbook). The admin UI is admin-gated, so
       # the first APP_ADMIN must come from operator config — comma-separated <provider>:@user or
       # <provider>:<subject>. Optional break-glass token enables POST /auth/bootstrap-admin.
@@ -177,14 +178,14 @@ services:
       LEADERBOARD_SCHEDULE_DAY: ${LEADERBOARD_SCHEDULE_DAY:-2}
       LEADERBOARD_SCHEDULE_TIME: ${LEADERBOARD_SCHEDULE_TIME:-9}
       SENTRY_DSN: ${SENTRY_DSN}
-      WEBHOOK_SECRET: ${WEBHOOK_SECRET}
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET:?Set WEBHOOK_SECRET to at least 32 printable ASCII characters}
       # WEBHOOK_EXTERNAL_URL intentionally unset: GitLab auto-registration defaults it to
       # APPLICATION_HOST_URL (same origin here), then appends /webhooks/gitlab itself.
       # AES-256-GCM key for credentials encrypted at rest in the `connection` table. Exactly 32
       # chars. Required in prod (fail-fast); the Liquibase backfill re-encrypts on boot, so this
       # MUST be set on application-server (where Liquibase runs). Keep it stable.
-      HEPHAESTUS_SECURITY_ENCRYPTION_KEY: ${HEPHAESTUS_SECURITY_ENCRYPTION_KEY}
-      HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY: ${HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY}
+      HEPHAESTUS_SECURITY_ENCRYPTION_KEY: ${HEPHAESTUS_SECURITY_ENCRYPTION_KEY:?Set HEPHAESTUS_SECURITY_ENCRYPTION_KEY to exactly 32 printable ASCII characters}
+      HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY: ${HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY:?Set HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY to exactly 32 printable ASCII characters}
       HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY_VERSION: ${HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY_VERSION:-1}
       HEPHAESTUS_SECURITY_PRIOR_CREDENTIAL_ENCRYPTION_KEY: ${HEPHAESTUS_SECURITY_PRIOR_CREDENTIAL_ENCRYPTION_KEY:-}
       HEPHAESTUS_SECURITY_PRIOR_CREDENTIAL_ENCRYPTION_KEY_VERSION: ${HEPHAESTUS_SECURITY_PRIOR_CREDENTIAL_ENCRYPTION_KEY_VERSION:-}
@@ -300,9 +301,6 @@ services:
       - "traefik.http.routers.https-application-server.service=https-application-server"
       - "traefik.http.services.http-application-server.loadbalancer.server.port=8080"
       - "traefik.http.services.https-application-server.loadbalancer.server.port=8080"
-      # The transport is defined by the proxy's file provider (compose.proxy.yaml): serversTransports
-      # cannot be defined via docker labels, and referencing an undefined one disables this router.
-      - "traefik.http.services.https-application-server.loadbalancer.serverstransport=application@file"
       - "traefik.http.routers.http-application-server.priority=5"
       - "traefik.http.routers.https-application-server.priority=10"
       # Replica affinity for workspace traffic (mentor lives here) — see docs/contributor/unified-pi-runtime.mdx.
@@ -387,8 +385,8 @@ services:
       DATABASE_USERNAME: root
       DATABASE_PASSWORD: root
       # Connection credentials are decrypted on every role.
-      HEPHAESTUS_SECURITY_ENCRYPTION_KEY: ${HEPHAESTUS_SECURITY_ENCRYPTION_KEY}
-      HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY: ${HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY}
+      HEPHAESTUS_SECURITY_ENCRYPTION_KEY: ${HEPHAESTUS_SECURITY_ENCRYPTION_KEY:?Set HEPHAESTUS_SECURITY_ENCRYPTION_KEY to exactly 32 printable ASCII characters}
+      HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY: ${HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY:?Set HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY to exactly 32 printable ASCII characters}
       HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY_VERSION: ${HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY_VERSION:-1}
       HEPHAESTUS_SECURITY_PRIOR_CREDENTIAL_ENCRYPTION_KEY: ${HEPHAESTUS_SECURITY_PRIOR_CREDENTIAL_ENCRYPTION_KEY:-}
       HEPHAESTUS_SECURITY_PRIOR_CREDENTIAL_ENCRYPTION_KEY_VERSION: ${HEPHAESTUS_SECURITY_PRIOR_CREDENTIAL_ENCRYPTION_KEY_VERSION:-}

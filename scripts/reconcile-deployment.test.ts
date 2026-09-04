@@ -99,9 +99,9 @@ await test("only a missing applied-state file means first run", async () => {
 	}
 });
 
-await test("stacks come up in dependency order regardless of how they were configured", () => {
+await test("stacks publish dependencies and routes before the edge reloads", () => {
 	assert.deepEqual(parseStacks("app core"), ["core", "app"]);
-	assert.deepEqual(parseStacks("app, core, proxy"), ["proxy", "core", "app"]);
+	assert.deepEqual(parseStacks("app, core, proxy"), ["core", "app", "proxy"]);
 	assert.throws(() => parseStacks("app database"), /unknown stack/);
 	assert.throws(() => parseStacks(""), /at least one stack/);
 });
