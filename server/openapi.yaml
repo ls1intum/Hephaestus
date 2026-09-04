@@ -14491,6 +14491,7 @@ components:
           - BUDGET_EXHAUSTED
           - SUBJECT_UNLINKED
           - MODEL_UNAVAILABLE
+          - ARTIFACT_NOT_VISIBLE
           - PENDING_DEADLINE_EXCEEDED
           - ARTIFACT_GONE
         reasonDescription:
@@ -15334,6 +15335,7 @@ components:
           - BUDGET_EXHAUSTED
           - SUBJECT_UNLINKED
           - MODEL_UNAVAILABLE
+          - ARTIFACT_NOT_VISIBLE
           - PENDING_DEADLINE_EXCEEDED
           - ARTIFACT_GONE
       required:

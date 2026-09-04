@@ -53,10 +53,11 @@ import org.springframework.transaction.support.TransactionTemplate;
  *
  * <p>Work the mirror has tombstoned is refused here as {@link SignalStateReason#ARTIFACT_GONE}, not by the
  * ownership check: the workspace does monitor that artifact, so ownership answers yes, and an asker who is
- * looking straight at the work is better served by a reason they can read than by a 404. Only a review
- * somebody asked for is stopped this way — a pending signal an automatic resubmitter re-offers reaches the
- * gate on a tombstoned row, because every reason that would retire it is terminal and a tombstone is
- * reversible. ADR 0024 § Update — 2026-09-03 (issue #1404): which reads honour a drift tombstone.
+ * looking straight at the work is better served by a reason they can read than by a 404. Terminal is right
+ * here and wrong for an automatically re-offered signal, which the resubmitters hold under
+ * {@link SignalStateReason#ARTIFACT_NOT_VISIBLE} instead: nobody is waiting on this answer, so a tombstone
+ * a later sync reverses must not have retired the occasion. ADR 0024 § Update — 2026-09-04 (issue #1806):
+ * a re-offered signal is held, not retired.
  */
 @Service
 public class ManualReviewRequests {

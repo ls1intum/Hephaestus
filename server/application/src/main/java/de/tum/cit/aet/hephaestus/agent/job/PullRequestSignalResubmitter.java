@@ -67,6 +67,11 @@ public class PullRequestSignalResubmitter implements PendingSignalResubmitter {
         SignalKey key = signal.key();
         PullRequest pr =
                 pullRequestRepository.findByIdWithAllForGate(key.artifactId()).orElse(null);
+        if (pr != null && pr.getDeletedAt() != null) {
+            log.debug("Pending signal's pull request is not visible upstream: prId={}", pr.getId());
+            signalRecorder.markRefused(key, SignalStateReason.ARTIFACT_NOT_VISIBLE);
+            return;
+        }
         if (pr == null || pr.getHeadRefName() == null || pr.getHeadRefOid() == null || pr.getBaseRefName() == null) {
             log.debug("Pending signal has no reviewable pull request left: prId={}", key.artifactId());
             signalRecorder.markRefused(key, SignalStateReason.ARTIFACT_GONE);
