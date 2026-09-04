@@ -4,11 +4,6 @@ set -euo pipefail
 readonly HTML_DIR="/usr/share/nginx/html"
 readonly INDEX_HTML="${HTML_DIR}/index.html"
 readonly ENV_TS="/app/src/environment/index.ts"
-# NGINX_DIR is overridable so the canonical-host rules can be exercised without a container;
-# nginx itself only ever reads the default path.
-readonly NGINX_DIR="${NGINX_DIR:-/etc/nginx}"
-readonly SERVER_NAME_CONF="${NGINX_DIR}/canonical-server-name.conf"
-readonly CANONICAL_REDIRECT_CONF="${NGINX_DIR}/conf.d/canonical-redirect.conf"
 
 # Must match LEGAL_PROFILE_PATTERN_SOURCE in webapp/src/lib/legal.ts. A unit
 # test pins them together — keep both in sync if you widen the policy.
@@ -36,60 +31,6 @@ extract_env_vars() {
     exit 1
   fi
   grep -oE '[A-Z_]+\?:' "$ENV_TS" | sed 's/\?:$//' | grep -v '^__'
-}
-
-# A deployment answers on every host its proxy routes to it, but only one of them is the origin
-# the SPA, the API and the auth issuer are configured for. Sending the rest there with a 301 keeps
-# sessions, cookies and CSP on a single origin instead of splitting them per hostname.
-#
-# APPLICATION_CLIENT_URL is that origin already — the SPA builds its own absolute URLs from it — so
-# it is the one source of truth here rather than a second variable that could disagree with it.
-configure_canonical_host() {
-  local url="${APPLICATION_CLIENT_URL:-}" authority="" host=""
-  # Without the scheme check a bare typo ("hephaestus.build", or any stray word) would read as a
-  # hostname and every visitor would be redirected to it.
-  if [[ "$url" =~ ^https?:// ]]; then
-    authority="${url#*://}"
-    authority="${authority%%/*}"
-  fi
-
-  # The whole authority is validated, not just the name in front of the port: it is what the
-  # redirect sends browsers to, and what is written into nginx configuration. Checking only up to
-  # the first colon would accept userinfo -- https://good.example:x@attacker.example redirects to
-  # attacker.example -- and would let anything after that colon through into the config file.
-  # Labels are bounded and a port range is checked below, so what survives is a name a browser can
-  # actually resolve rather than one that only becomes a broken Location header.
-  local label='[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?'
-  local port="${authority##*:}"
-  if [[ ! "$authority" =~ ^${label}(\.${label})*(:[0-9]{1,5})?$ ]] ||
-    { [[ "$authority" == *:* ]] && { [[ "$port" -lt 1 ]] || [[ "$port" -gt 65535 ]]; }; }; then
-    printf 'server_name localhost 127.0.0.1;\n' > "$SERVER_NAME_CONF"
-    rm -f "$CANONICAL_REDIRECT_CONF"
-    if [[ -n "$url" ]]; then
-      log "WARN: APPLICATION_CLIENT_URL='${url}' has no usable hostname; serving every Host header unredirected."
-    else
-      log "APPLICATION_CLIENT_URL unset; serving every Host header unredirected."
-    fi
-    return
-  fi
-
-  host="${authority%%:*}"
-  # Container healthchecks probe by address, not by the public name: compose.app.yaml curls
-  # localhost and the preview stack curls 127.0.0.1. Naming both keeps them on the app rather than
-  # on the redirect, which curl -f would report as success without ever reaching the SPA.
-  printf 'server_name %s localhost 127.0.0.1;\n' "$host" > "$SERVER_NAME_CONF"
-
-  # default_server takes the hosts the block above does not name.
-  cat > "$CANONICAL_REDIRECT_CONF" <<EOF
-server {
-    listen 80 default_server;
-    server_name _;
-    server_tokens off;
-    access_log off;
-    return 301 https://${authority}\$request_uri;
-}
-EOF
-  log "Canonical host: ${host} (other hosts redirect to https://${authority})"
 }
 
 main() {
@@ -141,8 +82,6 @@ main() {
        log "Detected PR deployment from FQDN. Overriding GIT_BRANCH to: $GIT_BRANCH"
     fi
   fi
-
-  configure_canonical_host
 
   log "Generating runtime config..."
 
@@ -233,8 +172,4 @@ main() {
   log "Done (hash: ${hash})"
 }
 
-# Sourcing this file defines its functions without running them, which is how the
-# canonical-host rules are tested.
-if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
-  main
-fi
+main

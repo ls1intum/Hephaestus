@@ -76,6 +76,24 @@ services:
       - "traefik.http.services.https-webapp.loadbalancer.server.port=80"
       - "traefik.http.routers.http-webapp.priority=2"
       - "traefik.http.routers.https-webapp.priority=3"
+      # Everything the instance serves is loaded from one origin. This router takes the served hosts
+      # that are not APP_HOSTNAME and sends the browser there; it outranks https-webapp and loses to
+      # the /api (10) and /webhooks (100) routers, so an open tab and a provider still posting to an
+      # older name keep working through a domain move. With APP_HOST_MATCH unset the rule reduces to
+      # `Host(x) && !Host(x)` and matches nothing, so a single-hostname instance never redirects.
+      - "traefik.http.middlewares.canonical-host.redirectregex.regex=^https?://[^/]+/(.*)"
+      - "traefik.http.middlewares.canonical-host.redirectregex.replacement=https://${APP_HOSTNAME}/$${1}"
+      - "traefik.http.middlewares.canonical-host.redirectregex.permanent=true"
+      - "traefik.http.routers.https-canonical.entryPoints=https"
+      - "traefik.http.routers.https-canonical.middlewares=canonical-host"
+      - "traefik.http.routers.https-canonical.rule=(${APP_HOST_MATCH:-Host(`${APP_HOSTNAME}`)}) && !Host(`${APP_HOSTNAME}`) && PathPrefix(`/`)"
+      - "traefik.http.routers.https-canonical.service=https-webapp"
+      # No certresolver here on purpose: ACME derives a router's domains from its rule and does not
+      # deduplicate them, so this rule's negated Host() would order a certificate that names
+      # APP_HOSTNAME twice. https-webapp's resolver already covers every served name, and SNI finds
+      # that certificate for this router.
+      - "traefik.http.routers.https-canonical.tls=true"
+      - "traefik.http.routers.https-canonical.priority=4"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost"]
       interval: 5s

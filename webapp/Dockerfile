@@ -12,6 +12,9 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store,sharing=locked \
     pnpm fetch --filter webapp
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store,sharing=locked \
     pnpm install --offline --frozen-lockfile --ignore-scripts --filter webapp
+# `pnpm run` installs before it runs, so the workspace root's `prepare` executes here even though
+# the install above ignored scripts. It has to resolve; there is no work tree, so it enables nothing.
+COPY scripts/ /repo/scripts/
 COPY webapp/ /repo/webapp/
 RUN --mount=type=secret,id=sentry_auth_token,required=false \
     --mount=type=secret,id=sentry_org,required=false \

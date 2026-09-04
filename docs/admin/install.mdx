@@ -117,22 +117,36 @@ listed above; do not replace them manually.
 | `GH_OAUTH_CLIENT_ID` / `_SECRET` | From step 3 |
 | `HEPHAESTUS_AUTH_BOOTSTRAP_ADMINS` | From step 4 — set it **before** first boot |
 
+:::danger Back up both encryption keys
+`HEPHAESTUS_SECURITY_ENCRYPTION_KEY` protects legacy encrypted values and the JWT signing key.
+`HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY` protects integration credentials. Losing either key
+makes the corresponding database values unreadable. Store both with the database backup. Rotate the
+credential key only with the [credential-key rotation procedure](./credential-key-rotation).
+:::
+
+The other generated values also have lifecycle consequences: changing the database password does not
+update an initialized PostgreSQL volume, rotating the state-cookie key invalidates OAuth flows already
+in progress, and rotating the webhook secret requires the same change at every configured provider.
+Back up `.env` with the database as described in [Backup & Restore](./backup-restore).
+
 ### Serving more than one hostname
 
 An instance answers on `APP_HOSTNAME`. To have it answer on further names as well — a domain you are
-migrating away from, or a `www.` variant — name every one of them in `APP_HOST_MATCH`, which is
-handed to the reverse proxy as a host matcher:
+migrating away from, or a `www.` variant — name every one of them in `APP_HOST_MATCH`, which the
+reverse proxy in front of the instance reads as a host matcher. It **replaces** the default rather
+than adding to it, so name `APP_HOSTNAME` in it too:
 
-```bash
+```ini
 APP_HOST_MATCH=Host(`hephaestus.example.com`) || Host(`old.example.com`)
 ```
 
-Traefik takes one hostname per `Host()`, joined with `||` — `Host(\`a\`,\`b\`)` is rejected and the
+Traefik takes one hostname per `Host()`, joined with `||`. ``Host(`a`,`b`)`` is rejected and the
 router does not load at all.
 
 Point each name at this host in DNS before you deploy: the certificate covers exactly the names in
 the matcher, and it is obtained by answering a challenge on each of them, so a name that does not yet
-resolve here holds up the whole certificate.
+resolve here holds up the whole certificate. The first name in the matcher becomes the certificate's
+subject and the rest its alternative names.
 
 `APP_HOSTNAME` remains the instance's single origin. The SPA, the API and the auth issuer are all
 configured for it, and **a browser that opens any other name is redirected there**, so the app is
@@ -149,17 +163,10 @@ one on `APP_HOSTNAME`. Reaching the instance the normal way never hits this, sin
 happens before any sign-in begins. Register callbacks for `APP_HOSTNAME` only: registering one for
 another name is what would let a session be established somewhere other than the canonical origin.
 
-:::danger Back up both encryption keys
-`HEPHAESTUS_SECURITY_ENCRYPTION_KEY` protects legacy encrypted values and the JWT signing key.
-`HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY` protects integration credentials. Losing either key
-makes the corresponding database values unreadable. Store both with the database backup. Rotate the
-credential key only with the [credential-key rotation procedure](./credential-key-rotation).
-:::
-
-The other generated values also have lifecycle consequences: changing the database password does not
-update an initialized PostgreSQL volume, rotating the state-cookie key invalidates OAuth flows already
-in progress, and rotating the webhook secret requires the same change at every configured provider.
-Back up `.env` with the database as described in [Backup & Restore](./backup-restore).
+Both the matcher and the redirect are the proxy's work. An instance fronted by a proxy that does not
+read this stack's routing configuration answers on whatever names that proxy sends it, and
+`APP_HOST_MATCH` does nothing — configure the extra names, their certificate and the redirect to
+`APP_HOSTNAME` there instead.
 
 ## 3. Create the GitHub OAuth App (login — mandatory)
 
