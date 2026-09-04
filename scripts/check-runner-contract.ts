@@ -1,10 +1,13 @@
 /**
- * The task graph in `vite.config.ts` relies on how `vp run` executes a command. Those facts are
- * Vite+ behaviour, not documented guarantees, so this gate runs the pinned `vite-plus` against a
+ * The task graph in `vite.config.ts` relies on how `vp run` and its bundled tools execute a
+ * command. These are not documented guarantees, so this gate runs the pinned tools against a
  * scratch workspace outside the repository and fails on the first fact that no longer holds:
  *
  *   - array commands run in order, and an `&&` chain keeps its order;
  *   - a glob reaches the command as written, quoted or not; the runner never expands it;
+ *   - an oxfmt pattern with no slash matches a basename at any depth, and a negation confines a pass
+ *     to the directory it runs in; a pattern containing a slash is anchored there and reaches no
+ *     deeper;
  *   - an uncached task inherits the caller's environment; a cached task is given a filtered one and
  *     sees only what it names in `env`;
  *   - a task runs its `dependsOn` before its own command, and a group with no command runs its
@@ -22,7 +25,7 @@
  */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { after, test } from "node:test";
@@ -36,7 +39,7 @@ const PROBE_ENV = 'node -e "console.log(JSON.stringify([process.env.PROBE ?? nul
 
 const workspace = mkdtempSync(join(tmpdir(), "runner-contract-"));
 mkdirSync(join(workspace, "node_modules"));
-for (const entry of ["vite-plus", ".bin"])
+for (const entry of ["vite-plus", "oxfmt", ".bin"])
 	symlinkSync(
 		join(REPO_ROOT, "node_modules", entry),
 		join(workspace, "node_modules", entry),
@@ -53,6 +56,9 @@ writeFileSync(
 );
 mkdirSync(join(workspace, "fixtures"));
 for (const name of ["a.json", "b.json"]) writeFileSync(join(workspace, "fixtures", name), "{}\n");
+// The formatter probes write what they format, so they run in a directory no other task declares.
+const probeRoot = join(workspace, "root-probe");
+mkdirSync(join(probeRoot, "nested", "deep"), { recursive: true });
 // Written as data, so a quote inside a command never has to survive a second layer of quoting.
 const tasks = {
 	order: {
@@ -68,6 +74,12 @@ const tasks = {
 		cache: false,
 	},
 	glob: { command: `${ARGV} fixtures/*.json 'fixtures/*.json'`, cache: false },
+	rootFormat: {
+		command: "vp fmt --write '*.{json,ts,code-workspace}' '!*/**'",
+		cwd: "root-probe",
+		cache: false,
+	},
+	nestedFormat: { command: "vp fmt --write 'nested/*.json'", cwd: "root-probe", cache: false },
 	env: { command: PROBE_ENV, cache: false },
 	cachedEnv: { command: PROBE_ENV, input: ["package.json"], output: [] },
 	declaredEnv: { command: PROBE_ENV, input: ["package.json"], output: [], env: ["PROBE"] },
@@ -130,6 +142,40 @@ void test("globs reach the command unexpanded, quoted or not", () => {
 	const { status, output } = run(["glob"]);
 	assert.equal(status, 0, output);
 	assert.deepEqual(printed(output), [["fixtures/*.json", "fixtures/*.json"]], output);
+});
+
+const UNFORMATTED_JSON = '{"probe":true}';
+const UNFORMATTED_TYPESCRIPT = "export default {probe:true}";
+
+void test("an oxfmt root pattern paired with !*/** reaches no subdirectory", () => {
+	const root = join(probeRoot, "root.json");
+	const rootTypeScript = join(probeRoot, "root.ts");
+	// `.code-workspace` is the one extension in the root set oxfmt has to recognise as JSON.
+	const rootWorkspace = join(probeRoot, "root.code-workspace");
+	const nested = join(probeRoot, "nested", "out-of-scope.json");
+	writeFileSync(root, UNFORMATTED_JSON);
+	writeFileSync(rootTypeScript, UNFORMATTED_TYPESCRIPT);
+	writeFileSync(rootWorkspace, UNFORMATTED_JSON);
+	writeFileSync(nested, UNFORMATTED_JSON);
+
+	const { status, output } = run(["rootFormat"]);
+	assert.equal(status, 0, output);
+	assert.notEqual(readFileSync(root, "utf8"), UNFORMATTED_JSON);
+	assert.notEqual(readFileSync(rootTypeScript, "utf8"), UNFORMATTED_TYPESCRIPT);
+	assert.notEqual(readFileSync(rootWorkspace, "utf8"), UNFORMATTED_JSON);
+	assert.equal(readFileSync(nested, "utf8"), UNFORMATTED_JSON);
+});
+
+void test("an oxfmt pattern containing a slash is anchored and reaches no deeper", () => {
+	const nested = join(probeRoot, "nested", "in-scope.json");
+	const deeper = join(probeRoot, "nested", "deep", "out-of-scope.json");
+	writeFileSync(nested, UNFORMATTED_JSON);
+	writeFileSync(deeper, UNFORMATTED_JSON);
+
+	const { status, output } = run(["nestedFormat"]);
+	assert.equal(status, 0, output);
+	assert.notEqual(readFileSync(nested, "utf8"), UNFORMATTED_JSON);
+	assert.equal(readFileSync(deeper, "utf8"), UNFORMATTED_JSON);
 });
 
 void test("an uncached task inherits the caller's environment", () => {

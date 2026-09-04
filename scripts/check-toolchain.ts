@@ -89,18 +89,7 @@ if (!isDeepStrictEqual(Object.keys(scripts), ["prepare"]))
 	throw new Error(
 		"package.json#scripts must contain only prepare; commands live in vite.config.ts",
 	);
-// A root-level config file is formatted by name, so a new one must be added to `format:config`.
 const tasks = await loadTasks();
-const configFormat = new Set(commandsOf(tasks["format:config"]).join(" ").split(" "));
-const trackedConfig = execFileSync(
-	"git",
-	["ls-files", "-z", "*.json", "*.ts", ".vscode/*.json", ".changeset/*.cjs", ".changeset/*.json"],
-	{ encoding: "utf8", maxBuffer: CAPTURE_LIMIT_BYTES },
-)
-	.split("\0")
-	.filter((file) => file !== "" && (!file.includes("/") || /^\.(?:vscode|changeset)\//.test(file)));
-for (const file of [...trackedConfig, "scripts/tsconfig.json", "project.code-workspace"])
-	if (!configFormat.has(file)) throw new Error(`${file} is not in the format:config file set`);
 const usesTsx = (command: string): boolean => /(?:^|[;&|])\s*tsx(?:\s|$)/.test(command);
 for (const [name, task] of Object.entries(tasks)) {
 	for (const line of commandsOf(task))

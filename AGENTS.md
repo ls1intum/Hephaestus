@@ -227,8 +227,9 @@ Oxlint lints; oxfmt formats and sorts imports. Each tree states its rule set in 
 - **`vp run` does not give a command a POSIX shell on every platform.** So a command never contains
   `$`, which `scripts/ci-contract.test.ts` enforces, and what it reads from the environment is
   decided in `vite.config.ts` when the config loads. The runner facts the graph relies on are proven
-  in `scripts/check-runner-contract.ts`. oxfmt expands a pattern itself, always recursively, so a
-  root-only format task names its files.
+  in `scripts/check-runner-contract.ts`. An oxfmt pattern with no `/` matches a basename at any
+  depth and one with a `/` is anchored at the working directory, so a root-only pass pairs its
+  patterns with `!*/**`.
 
 ## Pull requests
 
