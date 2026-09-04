@@ -57,7 +57,12 @@ configure_canonical_host() {
   # redirect sends browsers to, and what is written into nginx configuration. Checking only up to
   # the first colon would accept userinfo -- https://good.example:x@attacker.example redirects to
   # attacker.example -- and would let anything after that colon through into the config file.
-  if [[ ! "$authority" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?(:[0-9]{1,5})?$ ]]; then
+  # Labels are bounded and a port range is checked below, so what survives is a name a browser can
+  # actually resolve rather than one that only becomes a broken Location header.
+  local label='[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?'
+  local port="${authority##*:}"
+  if [[ ! "$authority" =~ ^${label}(\.${label})*(:[0-9]{1,5})?$ ]] ||
+    { [[ "$authority" == *:* ]] && { [[ "$port" -lt 1 ]] || [[ "$port" -gt 65535 ]]; }; }; then
     printf 'server_name localhost 127.0.0.1;\n' > "$SERVER_NAME_CONF"
     rm -f "$CANONICAL_REDIRECT_CONF"
     if [[ -n "$url" ]]; then

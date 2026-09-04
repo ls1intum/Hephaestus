@@ -140,10 +140,14 @@ only ever loaded from one host and the OAuth callback URLs stay on `APP_HOSTNAME
 
 The API and the webhook endpoints do answer on every name in the matcher, which is deliberate: a
 tab someone still has open, and a provider still posting to the old name, keep working through the
-move. One consequence is worth knowing — a sign-in *started* by opening `/api/login/...` on an
-older name fails rather than completing, because the provider returns to `APP_HOSTNAME`, where the
-state cookie set on the other name is not readable. Reaching the instance the normal way is
-unaffected, since the redirect happens before any sign-in begins.
+move. Only what a browser loads is redirected.
+
+One consequence is worth knowing. The login callback is built from the address the request arrived
+on, so a sign-in *started* by opening `/api/login/...` on one of the other names asks the provider to
+return to that name — and the provider refuses, because the only callback registered for it is the
+one on `APP_HOSTNAME`. Reaching the instance the normal way never hits this, since the redirect
+happens before any sign-in begins. Register callbacks for `APP_HOSTNAME` only: registering one for
+another name is what would let a session be established somewhere other than the canonical origin.
 
 :::danger Back up both encryption keys
 `HEPHAESTUS_SECURITY_ENCRYPTION_KEY` protects legacy encrypted values and the JWT signing key.

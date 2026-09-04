@@ -24,13 +24,16 @@ await test("every host-routed router is reachable on the hosts the instance serv
 await test("a path-scoped router keeps its path condition on every served host", () => {
 	// Traefik binds && tighter than ||, so `Host(a) || Host(b) && PathPrefix(/webhooks)` matches
 	// host a on *every* path. On the webhook router, which outranks the others, that hands the
-	// whole site to the webhook service. Grouping the matcher is what prevents it.
+	// whole site to the webhook service. Grouping the matcher is what prevents it, and it is
+	// asserted for every router rather than only the ones combining today: an ungrouped matcher
+	// reads as correct right up until someone appends a condition to it.
 	for (const { router, rule } of all) {
-		if (!rule.includes("&&")) continue;
-		const hostCondition = rule.slice(0, rule.indexOf("&&")).trim();
+		const hostCondition = rule.includes("&&")
+			? rule.slice(0, rule.indexOf("&&")).trim()
+			: rule.trim();
 		assert.ok(
 			hostCondition.startsWith("(") && hostCondition.endsWith(")"),
-			`${router} combines the host matcher with a path condition without grouping it: ${hostCondition}`,
+			`${router} does not group its host matcher: ${hostCondition}`,
 		);
 	}
 });

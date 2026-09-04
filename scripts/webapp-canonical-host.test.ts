@@ -84,6 +84,12 @@ await test("a value that is not a bare hostname is refused rather than escaped",
 		"https://good.example:80\nserver{listen 80 default_server; return 301 http://attacker.example;}",
 		"https://good.example:not-a-port",
 		"https://good.example:8443:9000",
+		// A name or port a browser cannot resolve is only a broken Location header later.
+		"https://good..example",
+		"https://good.-bad.example",
+		`https://${"a".repeat(64)}.example`,
+		"https://good.example:65536",
+		"https://good.example:0",
 	]) {
 		const { serverName, redirect } = configure(hostile);
 		assert.equal(serverName, "server_name localhost 127.0.0.1;\n", `accepted ${hostile}`);
