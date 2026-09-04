@@ -147,6 +147,17 @@ function comment(
 		}
 		sections.push(`### ${linksHeading}${count}\n\n${list.join("\n")}`);
 	}
+	const { GITHUB_SERVER_URL, GITHUB_REPOSITORY, GITHUB_RUN_ID } = process.env;
+	if (GITHUB_SERVER_URL && GITHUB_REPOSITORY && GITHUB_RUN_ID) {
+		const sha = execFileSync("git", ["rev-parse", "HEAD"], {
+			encoding: "utf8",
+			maxBuffer: CAPTURE_LIMIT_BYTES,
+		}).trim();
+		const repositoryUrl = `${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}`;
+		sections.push(
+			`Built from [\`${sha.slice(0, 7)}\`](<${repositoryUrl}/commit/${sha}>) · [Build logs](<${repositoryUrl}/actions/runs/${GITHUB_RUN_ID}>). Updates after successful preview builds.`,
+		);
+	}
 	return `${sections.join("\n\n")}\n`;
 }
 

@@ -38,7 +38,13 @@ async function render(
 ): Promise<string> {
 	execFileSync("node", [script, kind, directory, "https://preview.example/", base, "comment.md"], {
 		cwd: root,
-		env: environment,
+		env: {
+			...environment,
+			GITHUB_SERVER_URL: "https://github.com",
+			GITHUB_REPOSITORY: "example/project",
+			GITHUB_RUN_ID: "123",
+			GITHUB_SHA: "not-the-checked-out-commit",
+		},
 	});
 	return readFile(resolve(root, "comment.md"), "utf8");
 }
@@ -85,6 +91,16 @@ void test("links only stories from changed files to their canvases", async () =>
 	assert.doesNotMatch(comment, /other--unchanged/);
 	assert.ok(comment.includes("Unsafe &lt;img&gt;"));
 	assert.doesNotMatch(comment, /Unsafe\n/);
+	const sha = git(root, "rev-parse", "HEAD");
+	assert.ok(
+		comment.includes(
+			`Built from [\`${sha.slice(0, 7)}\`](<https://github.com/example/project/commit/${sha}>)`,
+		),
+	);
+	assert.ok(
+		comment.includes("[Build logs](<https://github.com/example/project/actions/runs/123>)"),
+	);
+	assert.doesNotMatch(comment, /not-the-checked-out-commit/);
 });
 
 void test("limits long story lists", async () => {
