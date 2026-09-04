@@ -74,12 +74,23 @@ jobs:
           jq -e '
             .services.webapp.labels["traefik.http.middlewares.webapp-body-limit.buffering.maxRequestBodyBytes"] == "26214400" and
             .services.webapp.labels["traefik.http.middlewares.webapp-body-limit.buffering.memRequestBodyBytes"] == "1048576" and
-            .services.webapp.labels["traefik.http.routers.https-webapp.middlewares"] == "webapp-body-limit" and
+            (.services.webapp.labels["traefik.http.routers.https-webapp.middlewares"] | split(",") | index("webapp-body-limit")) != null and
             .services["webhook-server"].labels["traefik.http.middlewares.webhook-body-limit.buffering.maxRequestBodyBytes"] == "26214400" and
             .services["webhook-server"].labels["traefik.http.middlewares.webhook-body-limit.buffering.memRequestBodyBytes"] == "1048576" and
-            .services["webhook-server"].labels["traefik.http.routers.https-webhook-server.middlewares"] == "webhook-body-limit,gzip"
+            (.services["webhook-server"].labels["traefik.http.routers.https-webhook-server.middlewares"] | split(",") | index("webhook-body-limit") != null and index("gzip") != null)
           ' <<< "$rendered_json" >/dev/null || {
             echo "::error::webapp and webhook request-body limits are not attached to their routers"; exit 1; }
+
+          # HSTS is the one security header a response cannot set for itself, and the entrypoint
+          # that used to carry it exists only where the proxy stack is the edge. Behind any other
+          # proxy the header simply vanished, so each router that terminates a public request
+          # carries it now, and this is what keeps that true.
+          jq -e '
+            [ .services | to_entries[] | .value.labels // {} | to_entries[]
+              | select(.key | test("^traefik\\.http\\.routers\\.https-[a-z-]+\\.middlewares$"))
+              | select((.value | split(",") | any(test("hsts"))) | not) | .key ] | length == 0
+          ' <<< "$rendered_json" >/dev/null || {
+            echo "::error::an https router would serve without HSTS behind a proxy that is not ours"; exit 1; }
           for required in \
             'entrypoints.https.http.middlewares=security-headers@docker' \
             'providers.file.filename=/etc/traefik/dynamic.yml' \
