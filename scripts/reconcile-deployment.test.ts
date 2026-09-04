@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 
 import {
+	commitLockEnvironment,
 	decide,
 	lockedReleaseCommit,
 	parseChannel,
@@ -163,4 +164,69 @@ await test("an image the release lock does not cover is refused", () => {
 		() => lockedReleaseCommit(lock.replace("d".repeat(40), "invalid")),
 		/source commit/,
 	);
+});
+
+const commit = "c".repeat(40);
+const digest = `sha256:${"1".repeat(64)}`;
+const images = { HEPHAESTUS_IMAGE_WEBAPP: `ghcr.io/o/webapp@${digest}` };
+
+await test("a channel may follow the default branch by naming a commit and what to run", () => {
+	assert.deepEqual(parseChannel({ commit, images }), {
+		release: commit,
+		images,
+		allowRollback: false,
+		freeze: false,
+	});
+});
+
+await test("a commit channel pins every image by digest, never by tag", () => {
+	// A tag lets the registry answer with something else later, which is the reason the release
+	// path pins digests as well.
+	assert.throws(
+		() => parseChannel({ commit, images: { HEPHAESTUS_IMAGE_WEBAPP: "ghcr.io/o/webapp:main" } }),
+		/pinned by digest/,
+	);
+	assert.throws(() => parseChannel({ commit, images: {} }), /names no image/);
+	assert.throws(
+		() => parseChannel({ commit, images: { WEBAPP: `ghcr.io/o/w@${digest}` } }),
+		/unusable name/,
+	);
+});
+
+await test("a commit channel names a whole commit, so it cannot be an abbreviation", () => {
+	assert.throws(() => parseChannel({ commit: "c".repeat(7), images }), /full 40-character commit/);
+	assert.throws(() => parseChannel({ commit: "main", images }), /full 40-character commit/);
+});
+
+await test("a channel names a release or a commit, never both", () => {
+	assert.throws(() => parseChannel({ release: "v1.2.3", commit, images }), /must name one/);
+});
+
+await test("a commit is applied even though it cannot be ordered against a release", () => {
+	// Releases compare by version; commits have no order at all. What stops either from moving
+	// backwards is the channel ancestry check, which runs before this.
+	assert.deepEqual(decide({ release: commit, images }, applied, "d".repeat(40), true), {
+		action: "apply",
+		release: commit,
+	});
+});
+
+await test("a rewind is still refused when the channel follows a commit", () => {
+	assert.equal(
+		decide({ release: commit, images }, applied, "a".repeat(40), false).action,
+		"refuse",
+	);
+});
+
+await test("an environment following the branch reports the commit it runs", () => {
+	const rendered = commitLockEnvironment(commit, {
+		HEPHAESTUS_IMAGE_WEBAPP: `ghcr.io/o/webapp@${digest}`,
+		HEPHAESTUS_IMAGE_ALPINE: `docker.io/library/alpine@${digest}`,
+	});
+	assert.match(rendered, new RegExp(`^IMAGE_TAG=${commit}$`, "m"));
+	// Sorted, so the same channel always renders the same file.
+	assert.ok(
+		rendered.indexOf("HEPHAESTUS_IMAGE_ALPINE") < rendered.indexOf("HEPHAESTUS_IMAGE_WEBAPP"),
+	);
+	assert.ok(rendered.endsWith("\n"));
 });

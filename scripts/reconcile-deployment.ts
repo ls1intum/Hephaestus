@@ -24,7 +24,10 @@ const FOUNDATION: Partial<Record<Stack, readonly string[]>> = {
 };
 
 export interface Channel {
+	/** What this channel asks the host to run: a release tag, or the commit a build came from. */
 	release: string;
+	/** Set only by a commit channel: the digests to run, pinned by the channel's own signature. */
+	images?: Readonly<Record<string, string>>;
 	allowRollback?: boolean;
 	freeze?: boolean;
 }
@@ -42,6 +45,9 @@ export type Decision =
 
 const RELEASE_TAG = /^v(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/;
 const CHANNEL_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const COMMIT_SHA = /^[0-9a-f]{40}$/;
+const IMAGE_KEY = /^HEPHAESTUS_IMAGE_[A-Z0-9_]+$/;
+const IMAGE_DIGEST = /^[^\s@]+@sha256:[0-9a-f]{64}$/;
 
 function optionalBoolean(value: unknown, label: string): boolean {
 	if (value === undefined) return false;
@@ -49,16 +55,52 @@ function optionalBoolean(value: unknown, label: string): boolean {
 	return value;
 }
 
+/**
+ * A channel names either a release or a commit.
+ *
+ * A release is a published artifact: its lock, provenance and signature are fetched and verified
+ * before anything runs, which is what production is promoted with. A commit is a build of the
+ * default branch, and carries the digests to run in the channel itself — they are covered by the
+ * channel's own signature, so the same authority stands behind them without a release having to
+ * exist. That is what lets an environment follow the default branch continuously.
+ */
 export function parseChannel(value: unknown): Channel {
 	const record = asRecord(value, "channel");
+	const allowRollback = optionalBoolean(record.allowRollback, "channel.allowRollback");
+	const freeze = optionalBoolean(record.freeze, "channel.freeze");
+
+	if (record.commit !== undefined) {
+		if (record.release !== undefined)
+			throw new Error("channel names both a release and a commit; it must name one");
+		const commit = asString(record.commit, "channel.commit");
+		if (!COMMIT_SHA.test(commit))
+			throw new Error(`channel.commit must be a full 40-character commit, not ${commit}`);
+		return { release: commit, images: parseImages(record.images), allowRollback, freeze };
+	}
+
 	const release = asString(record.release, "channel.release");
 	if (!RELEASE_TAG.test(release))
 		throw new Error(`channel.release must be an immutable vX.Y.Z tag, not ${release}`);
-	return {
-		release,
-		allowRollback: optionalBoolean(record.allowRollback, "channel.allowRollback"),
-		freeze: optionalBoolean(record.freeze, "channel.freeze"),
-	};
+	return { release, allowRollback, freeze };
+}
+
+/**
+ * The images a commit channel pins, as the environment the Compose files read. Every value is a
+ * digest: a tag would let the registry answer with something else later, which is the whole reason
+ * the release path pins digests too.
+ */
+function parseImages(value: unknown): Readonly<Record<string, string>> {
+	const record = asRecord(value, "channel.images");
+	const images: Record<string, string> = {};
+	for (const [key, reference] of Object.entries(record)) {
+		if (!IMAGE_KEY.test(key)) throw new Error(`channel.images has an unusable name ${key}`);
+		const value = asString(reference, `channel.images.${key}`);
+		if (!IMAGE_DIGEST.test(value))
+			throw new Error(`channel.images.${key} must be pinned by digest, not ${value}`);
+		images[key] = value;
+	}
+	if (Object.keys(images).length === 0) throw new Error("channel.images names no image");
+	return images;
 }
 
 function compareReleases(left: string, right: string): number {
@@ -90,12 +132,35 @@ export function decide(
 	// how a host that was hand-patched during an incident converges again.
 	if (applied?.release === channel.release && applied.channelCommit === channelCommit)
 		return { action: "noop", reason: `already running ${channel.release}` };
-	if (applied && compareReleases(channel.release, applied.release) < 0 && !channel.allowRollback)
+	// Releases are ordered, so moving to an earlier one is refused on the version alone. Commits are
+	// not ordered, and their protection is the channel ancestry checked above: a channel commit that
+	// does not descend from the last accepted one is already refused, whichever form it names.
+	const ordered = RELEASE_TAG.test(channel.release) && RELEASE_TAG.test(applied?.release ?? "");
+	if (
+		applied &&
+		ordered &&
+		compareReleases(channel.release, applied.release) < 0 &&
+		!channel.allowRollback
+	)
 		return {
 			action: "refuse",
 			reason: `${channel.release} precedes ${applied.release}; set allowRollback to move back deliberately`,
 		};
 	return { action: "apply", release: channel.release };
+}
+
+/**
+ * The environment a commit channel's images become, in the shape the Compose files already read.
+ * IMAGE_TAG is what the webapp reports as its version, so an environment following the default
+ * branch reports the commit it is running rather than a release it is not.
+ */
+export function commitLockEnvironment(
+	commit: string,
+	images: Readonly<Record<string, string>>,
+): string {
+	const lines = [`IMAGE_TAG=${commit}`, `HEPHAESTUS_RELEASE_COMMIT=${commit}`];
+	for (const key of Object.keys(images).toSorted()) lines.push(`${key}=${images[key]}`);
+	return `${lines.join("\n")}\n`;
 }
 
 export function renderMetrics(state: {
@@ -351,15 +416,24 @@ async function main(): Promise<void> {
 	const lockDirectory = join(config.stateDirectory, "release-locks");
 	await mkdir(lockDirectory, { recursive: true });
 	const lockFile = join(lockDirectory, `${decision.release}.env`);
-	// A release must not supply the code that decides whether that same release is trusted.
-	await run(
-		process.execPath,
-		[join(config.checkout, "scripts/prepare-release-lock.ts"), decision.release, lockFile],
-		{ cwd: releaseTree },
-	);
+	if (channel.images) {
+		// A commit channel carries its own digests, and the channel file they arrived in was
+		// signature-verified before this point, so there is no release to fetch or verify. The
+		// version the instance reports is the commit, which is what the environment is following.
+		await writeFile(lockFile, commitLockEnvironment(decision.release, channel.images), {
+			mode: 0o600,
+		});
+	} else {
+		// A release must not supply the code that decides whether that same release is trusted.
+		await run(
+			process.execPath,
+			[join(config.checkout, "scripts/prepare-release-lock.ts"), decision.release, lockFile],
+			{ cwd: releaseTree },
+		);
+	}
 
 	const lockEnv = await readFile(lockFile, "utf8");
-	if (lockedReleaseCommit(lockEnv) !== releaseCommit)
+	if (!channel.images && lockedReleaseCommit(lockEnv) !== releaseCommit)
 		throw new Error(`signed release lock does not cover the ${decision.release} source tree`);
 
 	const composeFor = (stack: Stack): string[] => [

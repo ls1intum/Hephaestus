@@ -45,6 +45,16 @@ a GitHub environment gates that workflow: a signature carrying that identity is 
 approved. This holds only while `promote.yml` stays non-reusable — a `workflow_call` trigger would
 let any caller mint the same identity.
 
+**An environment may follow the default branch instead of a release.** A channel names either a
+release or a commit. A release is the promoted artifact: its lock, provenance and signature are
+fetched and verified, which is how production moves. A commit has no release to fetch, so the
+channel carries the digests to run and the channel's own signature covers them; provenance comes
+from GitHub's build attestations, checked per image, which make the same claim a release lock's
+signature makes. Every image is still pinned by digest and still has to have been built by this
+repository's workflow on a hosted runner, so nothing is weakened — and staging stops waiting for a
+release to be cut before it reflects the branch. Only a commit already on the default branch may be
+followed.
+
 **A failed apply stops.** It does not roll back. Schema changes are forward-only here, so restoring
 the previous images would leave old code on a migrated database. Host monitoring reads the failure
 and staleness metrics instead.
