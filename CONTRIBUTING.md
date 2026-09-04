@@ -28,6 +28,20 @@ To ensure a transparent and trustworthy environment, we have established differe
 
 Contributions that do not adhere to these guidelines will be rejected. We align with [GitHub Acceptable Use Policies](https://docs.github.com/en/site-policy/acceptable-use-policies).
 
+## Issues
+
+An issue ships something. Its *Done when* names changes a reviewer can find in the repository — code,
+a test, a gate, a document — never a number, a measurement or a verdict on its own. A measurement is a
+step toward one of those bullets, or it comes out of a harness the issue ships; the run itself is an
+operations action recorded where it happens, such as a release plan, not an issue that waits for it.
+"Verify" and "audit" are not outcomes: do the verification while writing the issue and file what it
+found as bullets, or make the check a gate that ships. Research is held to the same bar — the artifact
+in the tree is the outcome. What one review unit cannot ship becomes a follow-up issue linked with
+`Part of`.
+
+The [issue forms](.github/ISSUE_TEMPLATE) carry the shape. In a pull request, `Fixes #n` means every
+bullet of that issue is met; `Part of #n` means the issue stays open and says what remains.
+
 ## Contribution Process
 
 Run `vp install` after a pull that changes the lockfile; the [local verification guide](https://docs.hephaestus.build/contributor/local-verification) has what it does to your Git hooks. Use

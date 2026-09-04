@@ -34,7 +34,7 @@ body:
     id: done
     attributes:
       label: Done when
-      description: List observable, independently verifiable acceptance criteria.
+      description: Changes a reviewer can find in the repository — code, a test, a gate, a document. A measurement or a verdict alone is not a criterion (CONTRIBUTING.md § Issues).
       placeholder: |
         - [ ] Retryable responses are retried with the provider-requested delay.
         - [ ] Non-retryable responses fail without another request.
