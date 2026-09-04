@@ -67,15 +67,15 @@ jobs:
     permissions:
       contents: read
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
       - name: Review dependency changes
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
-          fail-on-severity: high
-          # CI tooling is part of the release trust boundary.
-          fail-on-scopes: runtime, development, unknown
-          license-check: true
-          show-patched-versions: true
-          vulnerability-check: true
+          config-file: ./.github/dependency-review-config.yml
 
   security-scan:
     name: "Dependencies, secrets, and policy"
@@ -91,6 +91,8 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      # SARIF output reports every severity whatever `severity` says, so this pass carries no
+      # severity or exit code: it is the code-scanning feed, and the pass below is the verdict.
       - name: Trivy dependency scan
         id: dependencies
         continue-on-error: true
@@ -107,6 +109,24 @@ jobs:
         uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
         with:
           sarif_file: "trivy-results.sarif"
+
+      # Every dependency in the checkout, not only the ones a pull request changes, so an advisory
+      # published against an untouched pin fails this job on the next push to main. `skip-setup-trivy`
+      # reuses the binary the scan above installed.
+      - name: Enforce dependency vulnerability policy
+        id: dependency-policy
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: "fs"
+          scan-ref: "."
+          format: "table"
+          scanners: "vuln"
+          severity: "HIGH,CRITICAL"
+          ignore-unfixed: true
+          exit-code: "1"
+          trivyignores: "security/trivy-dependency-ignore.yaml"
+          skip-setup-trivy: true
 
       - name: Secret detection
         id: secrets
@@ -144,11 +164,12 @@ jobs:
         continue-on-error: true
         env:
           DEPENDENCIES: ${{ steps.dependencies.outcome }}
+          DEPENDENCY_POLICY: ${{ steps.dependency-policy.outcome }}
           SECRETS: ${{ steps.secrets.outcome }}
           POLICY: ${{ steps.policy.outcome }}
         run: |
           failed=false
-          for result in "$DEPENDENCIES" "$SECRETS" "$POLICY"; do
+          for result in "$DEPENDENCIES" "$DEPENDENCY_POLICY" "$SECRETS" "$POLICY"; do
             if [ "$result" != "success" ]; then failed=true; fi
           done
           if [ "$failed" = "true" ]; then

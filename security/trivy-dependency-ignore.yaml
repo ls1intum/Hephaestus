@@ -1,0 +1,5 @@
+# Temporary dependency exceptions, in Trivy's YAML ignore format. Each entry names `id`, the
+# `purls` it applies to, an `expired_at` at most 90 days out, and a `statement` saying why the
+# risk is accepted — the same ceiling and accountability the image policy carries.
+# `docs/contributor/vulnerability-remediation.mdx` § Dependency exceptions.
+vulnerabilities: []

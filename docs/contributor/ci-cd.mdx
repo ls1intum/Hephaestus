@@ -59,7 +59,7 @@ published.
 | Build → App Server image | `pack build` from the packaged JAR, signed, attested and policy-scanned | — |
 | Test → App Server: Unit and architecture, App Server: Integration | compiled from source | `vp run test:server:verification`, `test:server:integration` |
 | Security → New dependency risk | dependency review; pull requests only | — |
-| Security → Dependencies, secrets, and policy | Trivy filesystem scan, TruffleHog, `security.txt` expiry, changelog immutability guard, legacy-reference guards | — |
+| Security → Dependencies, secrets, and policy | Trivy filesystem scan, dependency vulnerability gate, TruffleHog, `security.txt` expiry, changelog immutability guard, legacy-reference guards | — |
 | Changesets → Verify changesets | policy tests, verified-revert detection, release-note presence, `MIGRATION.md` freeze | `vp run gate:changesets` |
 | Compose → Render compose stacks | the self-hosted, preview and reference stacks render | `vp run gate:preview-stack` |
 | Docker → Webapp, Agent: Pi, Postgres (pg_partman), Tag unchanged images | Dockerfile images; aliases for unchanged ones | — |
@@ -105,14 +105,29 @@ changesets rather than adding one. [Release management](./release-management.mdx
 
 | Control | Timing | Enforcement | Destination |
 | --- | --- | --- | --- |
-| GitHub dependency review | pull requests | blocks new high or critical findings in runtime, development, and unknown scopes | required Security workflow |
+| Dependency vulnerability gate | Security workflow | owns the dependency verdict; blocks fixable high or critical findings in every dependency the checkout resolves | required Security workflow |
+| GitHub dependency review | pull requests | reports the advisories a pull request introduces, with their patched versions; holds no verdict | Security workflow summary |
 | CodeQL default setup | managed by GitHub | repository SAST policy | code scanning |
 | TruffleHog and GitHub push protection | pull requests and pushes | block verified secrets | Security workflow and repository protection |
-| Trivy filesystem scan | Security workflow | a scanner error fails the job; findings are uploaded and do not block | code scanning |
+| Trivy filesystem scan | Security workflow | a scanner error blocks; findings of every severity are report-only | code scanning |
 | Image vulnerability policy | image build and release | blocks fixable high or critical findings | build summary and release evidence |
 | Weekly image rescans | `rescan-main-images.yml`, `rescan-release-images.yml` | the `main` rescan upserts one tracking issue; the release rescan fails and comments on the vulnerability response issue | issues and run artifacts |
 | OpenSSF Scorecard | `main` pushes, branch-protection changes, and weekly; never on pull requests | reports | code scanning and a run artifact |
 | Renovate | configured schedule and vulnerability alerts | pull requests require normal review and CI | dependency dashboard |
+
+One check owns the dependency verdict: the dependency vulnerability gate in `ci-security-scan.yml`,
+a second Trivy pass in `table` format over the same checkout. It runs on pull requests and on `main`
+pushes and evaluates every dependency the lockfiles resolve, so an advisory published against a pin
+no pull request touches fails the next run rather than waiting for someone to open the code-scanning
+dashboard. It applies the severity policy in [vulnerability
+remediation](./vulnerability-remediation.mdx) — fixable high or critical — and its exceptions are the
+one exception path for a dependency finding, recorded in `security/trivy-dependency-ignore.yaml`.
+
+Dependency review sees only the manifests a pull request changes, so it cannot hold that verdict; it
+reports what the pull request introduces and fails nothing. The first Trivy pass is the
+code-scanning feed: SARIF output reports every severity whatever `severity` is set to, so the pass
+that publishes it carries neither `severity` nor `exit-code`, and it keeps Trivy's secret scanner,
+which covers the whole tree where TruffleHog covers a pull request's own commits.
 
 Renovate groups routine updates only when they share a review and verification boundary. Production
 dependencies remain separate unless Renovate identifies a package family that must move together.
@@ -126,7 +141,8 @@ request; the toolchain checks reject a version that reads differently in any of 
 provisions the Node it runs lockfile updates with from `engines`, so `engines.node` restates
 `devEngines.runtime` exactly rather than the supported line.
 
-[Vulnerability remediation](./vulnerability-remediation.mdx) owns the blocking and exception policy.
+[Vulnerability remediation](./vulnerability-remediation.mdx) owns the severity policy and the shape,
+ceiling and approval of an exception, for images and dependencies alike.
 [Release management](./release-management.mdx#supply-chain-evidence) owns artifact signing, provenance,
 SBOM, and release-verification guarantees.
 
