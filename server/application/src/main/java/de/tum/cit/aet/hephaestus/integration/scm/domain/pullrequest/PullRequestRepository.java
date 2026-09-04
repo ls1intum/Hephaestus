@@ -109,14 +109,15 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
      * Repository-wide pull-request inventory ordered newest-first by number, for the cross-artifact
      * project-context telescope. The author is fetched up front to avoid a per-row lazy load; review
      * threads/diffs/bodies are intentionally NOT fetched — the inventory is a compact "what else exists
-     * in this project" index, not a full body.
+     * in this project" index, not a full body. Tombstones are excluded: something deleted upstream is no
+     * longer in the project.
      *
      * @param repositoryId the repository ID
      * @param pageable the cap (newest N) — caller supplies {@code PageRequest.of(0, cap)}
      * @return newest-first pull requests for the repository
      */
     @Query("SELECT p FROM PullRequest p LEFT JOIN FETCH p.author LEFT JOIN FETCH p.milestone "
-            + "WHERE p.repository.id = :repositoryId ORDER BY p.number DESC")
+            + "WHERE p.repository.id = :repositoryId AND p.deletedAt IS NULL ORDER BY p.number DESC")
     List<PullRequest> findPullRequestInventoryByRepositoryId(
             @Param("repositoryId") long repositoryId, Pageable pageable);
 

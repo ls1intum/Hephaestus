@@ -80,6 +80,11 @@ A tombstoned row is still queryable retained personal data, so a tombstone can n
 disconnect trigger. A hard delete destroys data the drift sweep expects to be able to resurrect, so
 erasure can never implement the drift path.
 
+There is no entity-level soft-delete filter: which reads honour a tombstone, and which keep returning
+the row because they record something that happened, is decided surface by surface in
+[ADR 0024](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0024-integration-sync-lifecycle-and-two-deletion-semantics.md)
+§ Update — 2026-09-03 (issue #1404): which reads honour a drift tombstone.
+
 ### Erasure is orphan-guarded
 
 SCM tables carry no `workspace_id`: `repository` and its cascade are instance-global and shared

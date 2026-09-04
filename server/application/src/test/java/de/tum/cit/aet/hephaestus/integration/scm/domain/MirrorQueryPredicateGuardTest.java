@@ -3,7 +3,9 @@ package de.tum.cit.aet.hephaestus.integration.scm.domain;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.MentorContextQueryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueCommentRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReviewRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment.PullRequestReviewCommentRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -12,6 +14,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.DisplayName;
@@ -20,19 +23,104 @@ import org.junit.jupiter.api.Test;
 import org.springframework.data.jpa.repository.Query;
 
 /**
- * Guards the two ways a mirror query silently counts or returns rows it should not.
+ * Guards the ways a mirror query silently counts or returns rows it should not.
  *
- * <p><b>Why this asserts on the query text rather than on returned rows.</b> Both defects live
+ * <p><b>Why this asserts on the query text rather than on returned rows.</b> The defects live
  * entirely in JPQL semantics, and neither tier that could execute JPQL catches them cheaply: unit
  * tests mock the repository interface, so a mock returns whatever the test stubs regardless of what
  * the {@code @Query} says, and the integration tier needs a live Postgres. The predicates are
  * therefore verified where they are actually written. A missing predicate fails here, in the tier
- * every contributor runs first, instead of surfacing as a wrong number on an admin page.
+ * every contributor runs first, instead of surfacing as a wrong number in the product.
  */
 class MirrorQueryPredicateGuardTest extends BaseUnitTest {
 
     /** Matches a JPQL {@code FROM Issue <alias>} range declaration, including inside a subquery. */
     private static final Pattern ISSUE_RANGE = Pattern.compile("\\bFROM\\s+Issue\\s+(\\w+)\\b");
+
+    /**
+     * Matches any JPQL range declaration over a tombstonable artifact or one of its children.
+     * Longest-first alternation so {@code PullRequestReviewThread} is never read as
+     * {@code PullRequest}. {@code JOIN} declares a range as much as {@code FROM} does — this tree
+     * already writes entity joins with {@code ON} — while an association join ({@code JOIN p.author},
+     * {@code JOIN FETCH p.reviews}) never matches the entity-name alternation.
+     */
+    private static final Pattern ARTIFACT_RANGE = Pattern.compile("\\b(?:FROM|JOIN)\\s+(PullRequestReviewThread"
+            + "|PullRequestReviewComment|PullRequestReview|IssueComment|PullRequest|Issue)\\s+(\\w+)\\b");
+
+    /**
+     * The path from a range's alias to the {@code deleted_at} column that decides whether its rows are
+     * live. A review, review comment or thread carries no tombstone of its own — it goes away with the
+     * pull request it hangs off — so the parent's column is the only signal there is.
+     */
+    private static final Map<String, String> TOMBSTONE_PATH_BY_ENTITY = Map.of(
+            "PullRequestReviewThread", ".pullRequest.deletedAt IS NULL",
+            "PullRequestReviewComment", ".pullRequest.deletedAt IS NULL",
+            "PullRequestReview", ".pullRequest.deletedAt IS NULL",
+            "IssueComment", ".issue.deletedAt IS NULL",
+            "PullRequest", ".deletedAt IS NULL",
+            "Issue", ".deletedAt IS NULL");
+
+    /**
+     * Mentor queries the range scan cannot read — native SQL, and derived methods with no
+     * {@code @Query} at all. Each name here is a claim that the query reaches no issue or pull-request
+     * row; a mentor query that adds one has to be weighed and named here before the guard goes quiet.
+     */
+    private static final Set<String> MENTOR_QUERIES_THE_SCAN_CANNOT_READ = Set.of(
+            // chat_message joined to chat_thread; no SCM artifact in either.
+            "findFirstUserMessagePartsByThreadIds");
+
+    @Nested
+    @DisplayName("mentor context")
+    class MentorContext {
+
+        /**
+         * Heph answers about the developer's own work, so a pull request or issue deleted upstream must
+         * not reach it — the mentor would describe something the developer cannot open.
+         *
+         * <p>Scanned per range declaration rather than per method name: a whole-query substring passes a
+         * query that has two ranges and one predicate, and a method-name list goes quiet the moment a
+         * tenth query is added. Every range over an artifact or one of its children must carry its own
+         * predicate, so a new unguarded mentor query fails here without anyone remembering to extend a
+         * list.
+         */
+        @Test
+        void everyMentorArtifactRangeExcludesTombstones() {
+            assertEveryRangeHasLivePredicate(MentorContextQueryRepository.class, MENTOR_QUERIES_THE_SCAN_CANNOT_READ);
+        }
+    }
+
+    @Nested
+    @DisplayName("project inventory")
+    class ProjectInventory {
+
+        /**
+         * The project inventory is staged into a practice review's evidence, so it honours the tombstone
+         * for a neighbouring reason: an index of work that is gone invites an observation about nothing.
+         * Named rather than scanned per class: most queries on these two repositories must <em>not</em>
+         * filter — the gate loaders, the upsert lookups and the sweep's own listings all need to see a
+         * tombstoned row — so a whole-class scan would be mostly allow-list. Both kinds are checked
+         * together because {@code Issue} and {@code PullRequest} share a table, and one guarded side
+         * reads like coverage of the other.
+         */
+        @Test
+        void bothProjectInventoryQueriesExcludeTombstones() {
+            Map<String, String> offenders = new LinkedHashMap<>();
+
+            collectUnguardedRanges(
+                    "findIssueInventoryByRepositoryId",
+                    queryOf(IssueRepository.class, "findIssueInventoryByRepositoryId"),
+                    offenders);
+            collectUnguardedRanges(
+                    "findPullRequestInventoryByRepositoryId",
+                    queryOf(PullRequestRepository.class, "findPullRequestInventoryByRepositoryId"),
+                    offenders);
+
+            assertThat(offenders)
+                    .as("the project inventory must exclude tombstones, or a review is handed an index of work "
+                            + "that is no longer in the project. Offending method -> the predicate it is missing")
+                    .isEmpty();
+        }
+    }
 
     @Nested
     @DisplayName("single-table discriminator")
@@ -113,7 +201,7 @@ class MirrorQueryPredicateGuardTest extends BaseUnitTest {
                     new Guarded(PullRequestReviewCommentRepository.class, "c.pullRequest"));
 
             for (Guarded entry : guarded) {
-                String jpql = normalize(countQueryOf(entry.repository()));
+                String jpql = normalize(queryOf(entry.repository(), "countGroupedByRepositoryIds"));
 
                 assertThat(jpql)
                         .as(
@@ -131,7 +219,7 @@ class MirrorQueryPredicateGuardTest extends BaseUnitTest {
          */
         @Test
         void theExclusionStaysInsideTheExistingGroupedQuery() {
-            String jpql = normalize(countQueryOf(IssueCommentRepository.class));
+            String jpql = normalize(queryOf(IssueCommentRepository.class, "countGroupedByRepositoryIds"));
 
             assertThat(jpql).contains("GROUP BY");
             assertThat(countOccurrences(jpql, "SELECT"))
@@ -141,18 +229,68 @@ class MirrorQueryPredicateGuardTest extends BaseUnitTest {
         }
     }
 
-    private static String countQueryOf(Class<?> repository) {
+    private static String queryOf(Class<?> repository, String methodName) {
         for (Method method : repository.getDeclaredMethods()) {
-            if (!"countGroupedByRepositoryIds".equals(method.getName())) {
+            if (!methodName.equals(method.getName())) {
                 continue;
             }
             Query query = method.getAnnotation(Query.class);
             assertThat(query)
-                    .as("%s.countGroupedByRepositoryIds must carry an explicit @Query", repository.getSimpleName())
+                    .as("%s.%s must carry an explicit @Query", repository.getSimpleName(), methodName)
                     .isNotNull();
             return query.value();
         }
-        throw new AssertionError(repository.getSimpleName() + " declares no countGroupedByRepositoryIds");
+        throw new AssertionError(repository.getSimpleName() + " declares no " + methodName);
+    }
+
+    /**
+     * Fails for every artifact range whose alias carries no live predicate, and for every query the
+     * scan cannot read that the caller has not excused by name.
+     */
+    private static void assertEveryRangeHasLivePredicate(Class<?> repository, Set<String> unreadableButReviewed) {
+        Map<String, String> offenders = new LinkedHashMap<>();
+        List<String> unreadable = new ArrayList<>();
+
+        for (Method method : repository.getDeclaredMethods()) {
+            Query query = method.getAnnotation(Query.class);
+            if (query == null || query.nativeQuery()) {
+                if (!unreadableButReviewed.contains(method.getName())) {
+                    unreadable.add(method.getName());
+                }
+                continue;
+            }
+            collectUnguardedRanges(method.getName(), query.value(), offenders);
+        }
+
+        assertThat(offenders)
+                .as(
+                        "%s: every issue or pull-request range must exclude tombstones, or Heph describes work "
+                                + "the developer can no longer open. Offending method -> the predicate it is missing",
+                        repository.getSimpleName())
+                .isEmpty();
+        assertThat(unreadable)
+                .as(
+                        "%s: a derived or native query cannot be scanned for a tombstone predicate. Name it in the "
+                                + "reviewed set once it is known to reach no issue or pull-request row",
+                        repository.getSimpleName())
+                .isEmpty();
+    }
+
+    /** Records, per artifact range the JPQL declares, the live predicate its alias is missing. */
+    private static void collectUnguardedRanges(String methodName, String rawJpql, Map<String, String> offenders) {
+        String jpql = normalize(rawJpql);
+        Matcher matcher = ARTIFACT_RANGE.matcher(jpql);
+        while (matcher.find()) {
+            String alias = matcher.group(2);
+            String required = alias + TOMBSTONE_PATH_BY_ENTITY.get(matcher.group(1));
+            // Anchored on a word boundary rather than a bare substring: an alias that is a suffix of
+            // another alias in the same query would otherwise be excused by the other one's predicate.
+            if (!Pattern.compile("(?<![\\w.])" + Pattern.quote(required))
+                    .matcher(jpql)
+                    .find()) {
+                offenders.put(methodName + " (" + alias + ")", required);
+            }
+        }
     }
 
     private static List<String> issueAliases(String jpql) {
