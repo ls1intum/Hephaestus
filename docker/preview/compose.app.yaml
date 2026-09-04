@@ -251,8 +251,8 @@ services:
       # The integration consumer reads staging's JetStream, so a preview sees the events a shared
       # GitHub App delivers there rather than an empty broker.
       NATS_SERVER: ${NATS_SERVER:-nats://nats-server:4222}
-      NATS_USERNAME: ${NATS_USERNAME}
-      NATS_PASSWORD: ${NATS_PASSWORD}
+      NATS_USERNAME: ${NATS_USERNAME:?the broker requires it}
+      NATS_PASSWORD: ${NATS_PASSWORD:?the broker requires it}
       NATS_ENABLED: "true"
       # Per-deploy durable name, so previews get their own JetStream consumers instead of competing
       # for one and stealing each other's messages.
@@ -262,10 +262,10 @@ services:
       # enough that a redeploy resumes on its own cursor.
       HEPHAESTUS_INTEGRATION_CONSUMER_INACTIVE_THRESHOLD: 72h
       HEPHAESTUS_AUTH_ISSUER: https://${SERVICE_FQDN_WEBAPP}
-      HEPHAESTUS_AUTH_STATE_COOKIE_KEY: ${HEPHAESTUS_AUTH_STATE_COOKIE_KEY}
+      HEPHAESTUS_AUTH_STATE_COOKIE_KEY: ${HEPHAESTUS_AUTH_STATE_COOKIE_KEY:?sign-in state cannot be verified without it}
       HEPHAESTUS_AUTH_BOOTSTRAP_ADMINS: ${HEPHAESTUS_AUTH_BOOTSTRAP_ADMINS:-}
-      HEPHAESTUS_SECURITY_ENCRYPTION_KEY: ${HEPHAESTUS_SECURITY_ENCRYPTION_KEY}
-      HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY: ${HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY}
+      HEPHAESTUS_SECURITY_ENCRYPTION_KEY: ${HEPHAESTUS_SECURITY_ENCRYPTION_KEY:?encrypted fields cannot be read without it}
+      HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY: ${HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY:?credentials at rest cannot be decrypted without it}
       HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY_VERSION: ${HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY_VERSION:-1}
       HEPHAESTUS_SECURITY_PRIOR_CREDENTIAL_ENCRYPTION_KEY: ${HEPHAESTUS_SECURITY_PRIOR_CREDENTIAL_ENCRYPTION_KEY:-}
       HEPHAESTUS_SECURITY_PRIOR_CREDENTIAL_ENCRYPTION_KEY_VERSION: ${HEPHAESTUS_SECURITY_PRIOR_CREDENTIAL_ENCRYPTION_KEY_VERSION:-}
@@ -286,7 +286,7 @@ services:
       MONITORING_BACKFILL_ENABLED: "false"
       LEADERBOARD_NOTIFICATION_ENABLED: "false"
       SENTRY_DSN: ""
-      WEBHOOK_SECRET: ${WEBHOOK_SECRET}
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET:?inbound deliveries cannot be authenticated without it}
       WEBHOOK_EXTERNAL_URL: ""
     # Joined to reach staging's broker; this stack's own database and SPA stay on Coolify's
     # per-preview network.
