@@ -31,14 +31,15 @@ jobs:
     permissions:
       contents: read
     env:
-      # Which stacks this environment runs, and the order they come up in: the edge first, then the
-      # broker the receiver waits on, then the application. An environment whose edge is owned by
-      # something else on the host sets DEPLOY_EDGE_PROXY=false and keeps proxy out of both the
-      # render and the deploy — the reference deployment leaves it unset and gets all three.
+      # Which stacks this environment runs, and the order they come up in: the application server
+      # migrates the database before the new webhook runtime in core may use it, and the edge comes
+      # last so it never routes to a stack that is still starting. An environment whose edge is
+      # owned by something else on the host sets DEPLOY_EDGE_PROXY=false and keeps proxy out of both
+      # the render and the deploy — the reference deployment leaves it unset and gets all three.
       # Staging shares its host with the Coolify instance that serves pull-request previews, and
       # that proxy holds :80/:443, so a second edge there fails the deploy on a port that is
       # already allocated.
-      STACKS: ${{ vars.DEPLOY_EDGE_PROXY == 'false' && 'core app' || 'proxy core app' }}
+      STACKS: ${{ vars.DEPLOY_EDGE_PROXY == 'false' && 'app core' || 'app core proxy' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -188,15 +189,25 @@ jobs:
           envs: STACKS
           script: |
             set -euo pipefail
+
+            # The broker is recreated before the stacks so a running application server never loses
+            # its JetStream connection mid-deploy; ordering inside a stack is its own compose file's
+            # depends_on.
+            case " $STACKS " in *" core "*)
+              cd /opt/hephaestus/core
+              chmod 600 deployment.env
+              docker compose --env-file deployment.env -f compose.yaml config >/dev/null
+              docker compose --env-file deployment.env -f compose.yaml pull nats-server
+              docker compose --env-file deployment.env -f compose.yaml up -d --wait \
+                --wait-timeout 600 --force-recreate nats-server
+              ;;
+            esac
+
             for stack in $STACKS; do
               cd "/opt/hephaestus/$stack"
               chmod 600 deployment.env
               docker compose --env-file deployment.env -f compose.yaml config >/dev/null
               docker compose --env-file deployment.env -f compose.yaml pull
-              if [ "$stack" = core ]; then
-                docker compose --env-file deployment.env -f compose.yaml up -d \
-                  --force-recreate nats-server
-              fi
               docker compose --env-file deployment.env -f compose.yaml up -d --remove-orphans \
                 --wait --wait-timeout 600
             done

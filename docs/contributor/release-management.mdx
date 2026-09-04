@@ -108,6 +108,13 @@ waits for stack readiness, and exercises HTTPS ingress. Either cell can block pu
 Each cell's status record is attached to the immutable GitHub release. This qualification covers a
 clean boot; the seeded-upgrade gate separately proves the supported migration path.
 
+A pull request that can change what a fresh installation binds gets the same boot before merge:
+`Supported-host boot smoke` in `cicd.yml` runs `docker/self-host/setup.sh` and starts PostgreSQL,
+NATS and the application server from the images that run built, on `amd64` only and without the
+edge. Both jobs fill the installer's blank settings through `scripts/prepare-host-smoke-env.ts`, so
+the pre-merge boot and the release boot answer the operator's questions identically. The paths that
+select it are in [CI/CD § Path filters](./ci-cd.mdx#path-filters).
+
 ## Supply-chain evidence
 
 No release exists until every image in `security/release-images.json` passes the evidence gate, and
@@ -151,6 +158,7 @@ which performs every check except signature verification.
 | SBOM attestation matches the durable evidence | **Yes, structurally.** `cosign attest` creates the attestation during the release; there is nothing to verify before it exists |
 | Image index signature and build provenance carry the release's identity | **Yes, structurally.** The Fulcio certificate identity is the release workflow's, on `refs/heads/main`, and no earlier run can produce one |
 | The manifest names a release version | **Yes, structurally.** Only `plan-release.ts` decides the tag; the preflight substitutes the version the ref carries |
+| The bundle describes the images this run built | No — the preflight and `release.yml` both resolve subjects through the commit tag the image build publishes, and `ci-contract.test.ts` requires the build to publish it for every event either can run under. See [CI/CD § Image identity](./ci-cd.mdx#image-identity) |
 
 The two signature entries are the only mode-conditional behaviour in the verifier, and
 `ci-contract.test.ts` asserts exactly that: a check gated on anything other than

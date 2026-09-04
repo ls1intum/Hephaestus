@@ -1,10 +1,8 @@
 /**
  * Resolves the first-party release images a CI/CD run published to their index digests.
  *
- * `reusable-docker-build.yml` tags every run's images `run-<run id>-<attempt>`. That is the only tag
- * that names *this* build rather than whatever a branch tag happens to point at now, so it is what
- * both the release and the pre-merge evidence preflight resolve their subjects through — one
- * resolver, so the two can never disagree about which artefact the evidence describes.
+ * Both release paths resolve through the commit tag the image build publishes, so a re-run of a
+ * failed job resolves the artefact its own run produced.
  *
  * The image set itself is not redefined here: `planSubjects` derives it from
  * `security/release-images.json`, the same file the release evidence gate validates the finished

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { glob, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { chmod, glob, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, test } from "node:test";
@@ -140,17 +140,19 @@ function step(workflow: Document, jobPath: string[], action: string): YAMLMap {
 	throw new Error(`${jobPath.join(".")} has no ${action} step`);
 }
 
-/** The shell a named `run` step ships. */
-function runScript(workflow: Document, jobPath: string[], name: string): string {
+/** A job's step by its `name`. */
+function namedStep(workflow: Document, jobPath: string[], name: string): YAMLMap {
 	const steps = workflow.getIn([...jobPath, "steps"]);
 	assert.ok(isSeq(steps), `${jobPath.join(".")} has no steps`);
-	for (const item of steps.items) {
-		if (!isMap(item) || item.get("name") !== name) continue;
-		const shell = item.get("run");
-		assert.ok(typeof shell === "string", `${name} is not a run step`);
-		return shell;
-	}
+	for (const item of steps.items) if (isMap(item) && item.get("name") === name) return item;
 	throw new Error(`${jobPath.join(".")} has no ${name} step`);
+}
+
+/** The shell a named `run` step ships. */
+function runScript(workflow: Document, jobPath: string[], name: string): string {
+	const shell = namedStep(workflow, jobPath, name).get("run");
+	assert.ok(typeof shell === "string", `${name} is not a run step`);
+	return shell;
 }
 
 /**
@@ -350,10 +352,15 @@ void describe("CI contract", () => {
 		assert.match(job(orchestrator, "Build"), /needs: \[detect-changes\]/);
 
 		const reusable = await readFile(".github/workflows/reusable-docker-build.yml", "utf8");
-		const packBuild = reusable.replace(/\\\n\s*/g, " ").match(/^\s+pack build .*$/m)?.[0];
-		assert.ok(packBuild, "the buildpacks path must call pack build");
-		for (const flag of ["--path", "--descriptor", "--run-image", "--publish"])
-			assert.ok(packBuild.includes(flag), `pack build must pass ${flag}`);
+		const packBuilds = [...reusable.replace(/\\\n\s*/g, " ").matchAll(/^\s+pack build .*$/gm)].map(
+			(match) => match[0],
+		);
+		assert.ok(packBuilds.length > 0, "the buildpacks path must call pack build");
+		for (const packBuild of packBuilds)
+			for (const flag of ["--path", "--descriptor", "--run-image"])
+				assert.ok(packBuild.includes(flag), `pack build must pass ${flag}`);
+		// One invocation exports to the registry; the fork path builds the same image locally.
+		assert.equal(packBuilds.filter((call) => call.includes("--publish")).length, 1);
 		for (const [file, source] of await workflowSources()) {
 			assert.doesNotMatch(
 				source,
@@ -468,19 +475,8 @@ void describe("CI contract", () => {
 		const inherited = job(docker, "tag-unchanged-images");
 		assert.match(inherited, /HEAD_SHA/);
 		assert.match(inherited, /pr-\$PR_NUMBER/);
-		assert.match(inherited, /run-\$RUN_ID-\$RUN_ATTEMPT/);
 
 		const reusable = await readFile(".github/workflows/reusable-docker-build.yml", "utf8");
-		for (const tag of [
-			/github\.event_name == 'push' && github\.ref_name/,
-			/github\.event_name == 'push' && github\.sha/,
-			/github\.event_name == 'push' && format\('ci-\{0\}', github\.run_number\)/,
-			/github\.event_name == 'pull_request' && github\.event\.pull_request\.head\.sha/,
-			/github\.event_name == 'pull_request' && format\('pr-\{0\}', github\.event\.number\)/,
-			/run-\${{ github\.run_id }}-\${{ github\.run_attempt }}/,
-		]) {
-			assert.match(reusable, tag);
-		}
 		for (const secret of ["SENTRY_AUTH_TOKEN", "SENTRY_ORG", "SENTRY_PROJECT"]) {
 			assert.match(reusable, new RegExp(`github\\.event_name == 'push'.*secrets\\.${secret}`));
 		}
@@ -488,6 +484,242 @@ void describe("CI contract", () => {
 			reusable,
 			/inputs\.single-arch.*linux\/amd64.*ubuntu-24\.04.*linux\/arm64.*ubuntu-24\.04-arm/,
 		);
+	});
+
+	void test("builds fork pull-request images without registry writes", async () => {
+		const orchestrator = parseDocument(await readFile(".github/workflows/cicd.yml", "utf8"));
+		// One decision, taken where the run can see whose repository the head branch is on. A fork's
+		// GITHUB_TOKEN is read-only, so a publishing build there fails on its first write.
+		for (const caller of ["Build", "Docker"])
+			assert.match(
+				String(orchestrator.getIn(["jobs", caller, "with", "publish"])),
+				/^\$\{\{ github\.event_name != 'pull_request' \|\| github\.event\.pull_request\.head\.repo\.full_name == github\.repository }}$/,
+			);
+
+		const reusable = parseDocument(
+			await readFile(".github/workflows/reusable-docker-build.yml", "utf8"),
+		);
+		const declaration = reusable.getIn(["on", "workflow_call", "inputs", "publish"]);
+		assert.ok(isMap(declaration));
+		assert.equal(declaration.get("type"), "boolean");
+		// No default: a caller that forgets it fails to start, rather than silently writing to the
+		// registry on behalf of a run that may not be allowed to.
+		assert.equal(declaration.get("required"), true);
+		assert.equal(declaration.get("default"), undefined);
+
+		const build = ["jobs", "build"];
+		for (const name of [
+			"Log in to Container Registry",
+			"Apply tags to buildpack image",
+			"Capture single-architecture digest",
+			"Generate build provenance attestation",
+			"Install Cosign",
+			"Sign and verify image",
+			"Upload digest",
+		])
+			assert.match(
+				String(namedStep(reusable, build, name).get("if")),
+				/inputs\.publish/,
+				`${name} writes to the registry and must be gated on publish`,
+			);
+		const buildx = namedStep(reusable, build, "Build and push (Dockerfile)");
+		const inputs = buildx.get("with");
+		assert.ok(isMap(inputs));
+		assert.match(String(inputs.get("push")), /^\$\{\{ inputs\.publish }}$/);
+		// An untagged local image is one nothing can name, so a fork only loads what it also tags.
+		assert.match(String(inputs.get("load")), /^\$\{\{ !inputs\.publish && inputs\.single-arch }}$/);
+		assert.match(String(inputs.get("outputs")), /inputs\.publish &&/);
+		for (const gated of ["merge", "scan"])
+			assert.match(String(reusable.getIn(["jobs", gated, "if"])), /inputs\.publish/);
+
+		const docker = parseDocument(await readFile(".github/workflows/ci-docker-build.yml", "utf8"));
+		assert.match(String(docker.getIn(["jobs", "tag-unchanged-images", "if"])), /inputs\.publish/);
+	});
+
+	void test("a fork's buildpack build produces an image without contacting the registry", async () => {
+		const reusable = parseDocument(
+			await readFile(".github/workflows/reusable-docker-build.yml", "utf8"),
+		);
+		const shell = runScript(reusable, ["jobs", "build"], "Build with Buildpacks and CDS");
+		const directory = await mkdtemp(path.join(tmpdir(), "buildpacks-"));
+		await writeFile(path.join(directory, "hephaestus-application-1.0.0.jar"), "");
+		const calls = path.join(directory, "calls");
+		for (const tool of ["pack", "docker"]) {
+			const stub = path.join(directory, tool);
+			await writeFile(
+				stub,
+				`#!/bin/sh\necho "${tool} $*" >> "${calls}"\n[ "$1" = image ] && echo sha256:stub\nexit 0\n`,
+			);
+			await chmod(stub, 0o755);
+		}
+		const environment = {
+			APPLICATION_DIRECTORY: directory,
+			GITHUB_RUN_ID: "1",
+			INPUT_IMAGE_NAME: "hephaestus-build/application-server",
+			INPUT_REGISTRY: "ghcr.io",
+			MATRIX_PLATFORM: "linux/amd64",
+			PATH: `${directory}${path.delimiter}${process.env["PATH"] ?? ""}`,
+			PLATFORM_PAIR: "linux-amd64",
+			PROJECT_DESCRIPTOR: "project.toml",
+			RUN_IMAGE: "paketobuildpacks/run",
+		};
+
+		const local = await runStep(shell, { ...environment, PUBLISH: "false" });
+		assert.equal(local.failed, false);
+		// The digest is the daemon's image ID: a local build has no registry to read a manifest back
+		// from, and the step must still tell its caller what it produced.
+		assert.match(local.outputs["digest"] ?? "", /^sha256:/);
+		const invoked = await readFile(calls, "utf8");
+		assert.doesNotMatch(invoked, /--publish/);
+		assert.match(invoked, /^pack build .*--trust-builder/m);
+	});
+
+	void test("every job that boots the supported installation authenticates to the registry", async () => {
+		// `packages: read` is inert without a login, and the boot's first pull is where that shows.
+		// Only a boot the runner performs itself needs one: a deploy hands its script to a host that
+		// authenticates on its own.
+		for (const [file, source] of await workflowSources()) {
+			const jobs = parseDocument(source).get("jobs");
+			if (!isMap(jobs)) continue;
+			for (const entry of jobs.items) {
+				const steps = isMap(entry.value) ? entry.value.get("steps") : undefined;
+				if (!isSeq(steps)) continue;
+				const boots = steps.items.some(
+					(item) =>
+						isMap(item) &&
+						typeof item.get("run") === "string" &&
+						/docker compose .*--env-file[\s\S]*?\bup -d\b/.test(String(item.get("run"))),
+				);
+				const name = isScalar(entry.key) ? String(entry.key.value) : "";
+				if (!boots) continue;
+				assert.match(
+					job(source, name),
+					/uses: \.\/\.github\/actions\/ghcr-login/,
+					`${file} ${name} boots first-party images and must log in to the registry`,
+				);
+			}
+		}
+	});
+
+	void test("a pull request boots the supported installation from the images its own run built", async () => {
+		const build = parseDocument(await readFile(".github/workflows/ci-build.yml", "utf8"));
+		assert.match(
+			String(build.getIn(["on", "workflow_call", "outputs", "application-server-digest", "value"])),
+			/^\$\{\{ jobs\.application-server-image\.outputs\.manifest-digest }}$/,
+		);
+
+		const source = await readFile(".github/workflows/cicd.yml", "utf8");
+		const orchestrator = parseDocument(source);
+		const condition = String(orchestrator.getIn(["jobs", "Supported-host-smoke", "if"]));
+		// A fork publishes no images, so there is nothing for this job to pull.
+		assert.match(condition, /github\.event_name == 'pull_request'/);
+		assert.match(condition, /head\.repo\.full_name == github\.repository/);
+		assert.match(condition, /needs\.detect-changes\.outputs\.supported-host-smoke == 'true'/);
+
+		const smoke = job(source, "Supported-host-smoke");
+		assert.match(
+			smoke,
+			/APPLICATION_DIGEST: \${{ needs\.Build\.outputs\.application-server-digest }}/,
+		);
+		// The reduced topology an operator's first boot has to get through: no edge, no webapp. The
+		// service list runs onto a continuation line, so the command is rejoined before it is read.
+		const boot = /up -d --wait --wait-timeout \d+ ([^\n]+)/.exec(smoke.replace(/\s*\\\n\s+/g, " "));
+		assert.ok(boot, "the boot smoke must start the installation and wait for it to be ready");
+		assert.deepEqual(String(boot[1]).trim().split(/\s+/).toSorted(), [
+			"application-server",
+			"nats-server",
+			"postgres",
+		]);
+		// The installer an operator runs, filled in by the one script both smoke jobs call.
+		assert.match(smoke, /scripts\/prepare-host-smoke-env\.ts/);
+		assert.match(
+			job(await readFile(".github/workflows/release.yml", "utf8"), "supported-host-smoke"),
+			/scripts\/prepare-host-smoke-env\.ts/,
+		);
+		// The paths that trigger the smoke also have to rebuild the images it boots.
+		for (const flag of ["server_image_changed", "application_server_changed"])
+			assert.match(source, new RegExp(`${flag}:.*supported-host-smoke`));
+		assert.match(job(source, "all-ci-passed"), /needs: \[[^\]]*Supported-host-smoke[^\]]*\]/);
+	});
+
+	void test("the supported-host boot smoke runs on every source it can be broken by", async () => {
+		const filter = pathFilter(
+			await readFile(".github/workflows/cicd.yml", "utf8"),
+			"supported-host-smoke",
+		);
+		const patterns = [...filter.matchAll(/^ +- '(.+)'$/gm)].map((match) => String(match[1]));
+		const selected = new Set((await Promise.all(patterns.map(posixGlob))).flat());
+		// Spring binds a class the moment it carries the annotation, wherever it lives, so the filter
+		// has to select the whole binding tree rather than the part someone remembered.
+		for (const file of await posixGlob("server/application/src/main/java/**/*.java")) {
+			if (!/^@ConfigurationProperties(?:Scan)?\b/m.test(await readFile(file, "utf8"))) continue;
+			assert.ok(
+				selected.has(file),
+				`${file} binds configuration at boot, so a change to it must run the supported-host boot smoke`,
+			);
+		}
+	});
+
+	void test("every image a consumer resolves is one the build published for that event", async () => {
+		const reusable = parseDocument(
+			await readFile(".github/workflows/reusable-docker-build.yml", "utf8"),
+		);
+		const declared = reusable.getIn(["env", "STANDARD_IMAGE_TAGS"]);
+		assert.equal(typeof declared, "string");
+		// `${{ github.event_name <op> '<event>' && <expression> || '' }}`: every tag the build
+		// publishes is guarded on the event that started the run, so a consumer can derive from its
+		// own event which tags exist. A tag published under every event names the attempt rather than
+		// the artefact, and a re-run of a failed job would resolve nothing.
+		const guard = /^\$\{\{ github\.event_name (==|!=) '(\w+)' && (.+?) \|\| '' }}$/;
+		const lines = String(declared)
+			.split("\n")
+			.filter((line) => line.length > 0);
+		const publishedOn = (event: string): string[] =>
+			lines.flatMap((line) => {
+				const parsed = guard.exec(line);
+				assert.ok(parsed, `image tag "${line}" is published under every event`);
+				return (parsed[1] === "==") === (parsed[2] === event) ? [String(parsed[3])] : [];
+			});
+
+		const source = await readFile(".github/workflows/cicd.yml", "utf8");
+		const triggers = /^on:\n([\s\S]*?)^\S/m.exec(source)?.[1] ?? "";
+		const events = [...triggers.matchAll(/^ {2}(\w+):/gm)].map((match) => String(match[1]));
+		assert.ok(events.includes("workflow_dispatch") && events.includes("merge_group"));
+		for (const event of events) {
+			// A pull request resolves its own head: `github.sha` there is a merge commit no image
+			// carries. Every other event resolves the commit it ran on.
+			const resolved =
+				event === "pull_request" ? "github.event.pull_request.head.sha" : "github.sha";
+			assert.ok(
+				publishedOn(event).includes(resolved),
+				`a ${event} run resolves images by ${resolved}, which the image build does not publish`,
+			);
+		}
+
+		// The consumers, and the commit each resolves through. The scan resolves a digest its own
+		// producer job emitted, so it needs no tag at all.
+		const preflight = job(source, "Release-preflight");
+		assert.match(
+			preflight,
+			/COMMIT: \${{ github\.event\.pull_request\.head\.sha \|\| github\.sha }}/,
+		);
+		assert.match(preflight, /resolve-release-images\.ts "\$COMMIT"/);
+		assert.match(preflight, /--commit "\$COMMIT"/);
+		const smoke = job(source, "Supported-host-smoke");
+		assert.match(smoke, /HEAD_SHA: \${{ github\.event\.pull_request\.head\.sha }}/);
+		// `workflow_run.head_sha` is the producing push run's own `github.sha`.
+		const release = await readFile(".github/workflows/release.yml", "utf8");
+		assert.match(
+			job(release, "tag-images"),
+			/SOURCE_TAG: \${{ github\.event\.workflow_run\.head_sha }}/,
+		);
+
+		for (const [file, workflow] of await workflowSources())
+			assert.doesNotMatch(
+				workflow,
+				/:run-\$/,
+				`${file} must not resolve an image by the run that happened to build it`,
+			);
 	});
 
 	void test("enforces the release vulnerability policy where images are built", async () => {
@@ -504,7 +736,10 @@ void describe("CI contract", () => {
 			scan,
 			/node scripts\/check-release-vulnerabilities\.ts[\s\S]*security\/vulnerability-policy\.json/,
 		);
-		assert.match(scan, /run-\${{ github\.run_id }}-\${{ github\.run_attempt }}/);
+		assert.match(scan, /needs\.build\.outputs\.manifest-digest/);
+		assert.match(scan, /needs\.merge\.outputs\.manifest-digest/);
+		assert.match(scan, /IMAGE_REF:.*@\${{/);
+		assert.doesNotMatch(scan, /github\.(?:run_id|run_attempt)/);
 		assert.match(scan, /linux\/amd64/);
 		assert.doesNotMatch(scan, /linux\/arm64/);
 		// A gate that cannot say what it rejected is not finished.
@@ -1005,14 +1240,8 @@ void describe("CI contract", () => {
 	void test("runs release evidence verification through tested TypeScript", async () => {
 		const release = await readFile(".github/workflows/release.yml", "utf8");
 		const rescan = await readFile(".github/workflows/rescan-release-images.yml", "utf8");
-		assert.match(
-			release,
-			/SOURCE_TAG: run-\${{ github\.event\.workflow_run\.id }}-\${{ github\.event\.workflow_run\.run_attempt }}/,
-		);
+		assert.match(release, /SOURCE_TAG: \${{ github\.event\.workflow_run\.head_sha }}/);
 		assert.match(release, /node scripts\/resolve-release-images\.ts "\$SOURCE_TAG"/);
-		// The run tag names this build; a branch or commit tag names whatever it points at now, and
-		// resolving either belongs in the tested resolver rather than in a shell loop the preflight
-		// would have to grow its own copy of.
 		assert.doesNotMatch(job(release, "tag-images"), /imagetools/);
 		assert.match(rescan, /node scripts\/verify-release-evidence\.ts release-evidence/);
 		assert.doesNotMatch(rescan, /node scripts\/check-release-sbom\.ts/);
@@ -1033,6 +1262,13 @@ void describe("CI contract", () => {
 		assert.ok(gated >= 0, "tag-images must run the evidence verifier");
 		assert.ok(created > gated, "the draft must be created after the evidence gate");
 		assert.ok(uploaded > created, "release assets need a draft to upload to");
+		const publication = job(source, "publish-release");
+		const published = publication.indexOf('gh release edit "$TAG_NAME"');
+		const immutable = publication.indexOf("--json isImmutable");
+		const promoted = publication.indexOf("docker buildx imagetools create");
+		assert.ok(published >= 0 && immutable > published, "publication must verify immutable state");
+		assert.ok(promoted > immutable, "image aliases must only move after immutable publication");
+
 		// A re-run resumes the draft, so uploads must replace assets instead of failing on names.
 		for (const upload of source.matchAll(/gh release upload[\s\S]*?\n\n/g)) {
 			assert.match(upload[0], /--clobber/);

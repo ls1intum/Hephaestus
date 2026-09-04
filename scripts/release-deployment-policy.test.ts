@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import { releaseSignerIdentity, releaseSignerRepository } from "./lib/release-signer.ts";
+import { SMOKE_HOSTNAME } from "./prepare-host-smoke-env.ts";
 
 const release = readFileSync(".github/workflows/release.yml", "utf8");
 const deployment = readFileSync(".github/workflows/deploy-locked-compose.yml", "utf8");
@@ -19,6 +20,38 @@ await test("deployment uses Compose metadata, waits for readiness, and preserves
 	assert.match(deployment, /config --variables --format json/);
 	assert.match(deployment, /--wait --wait-timeout 600/);
 	assert.doesNotMatch(deployment, /docker image prune/);
+});
+
+await test("a deployment starts the broker before the stacks that talk to it", () => {
+	const configured = /^\s+STACKS: (.+)$/m.exec(deployment)?.[1];
+	assert.ok(configured, "the deploy job must declare the stacks and their order in STACKS");
+	// Every stack list the expression can yield: one per environment shape it selects between.
+	const orders = [...configured.matchAll(/&& '([a-z ]+)' \|\| '([a-z ]+)'/g)].flatMap((match) => [
+		String(match[1]).split(" "),
+		String(match[2]).split(" "),
+	]);
+	assert.ok(orders.length > 0);
+	for (const stacks of orders) {
+		// The application server runs the Liquibase migration the webhook runtime in core reads.
+		assert.ok(
+			stacks.indexOf("app") < stacks.indexOf("core"),
+			`${stacks.join(" ")} starts the webhook runtime before the migration that feeds it`,
+		);
+		// The edge comes last, so it never routes to a stack that is still starting.
+		if (stacks.includes("proxy")) assert.equal(stacks.at(-1), "proxy");
+	}
+
+	const script = deployment.slice(deployment.indexOf("envs: STACKS"));
+	// The broker is recreated before any stack, and only where this environment runs core, so an
+	// environment that leaves core out never deploys a broker it did not render.
+	const broker = script.search(/\*" core "\*\)/);
+	const stacks = script.indexOf("for stack in $STACKS");
+	assert.ok(
+		broker >= 0,
+		"the broker must be guarded on core being one of this deployment's stacks",
+	);
+	assert.ok(stacks > broker, "the broker must be recreated before any stack starts");
+	assert.match(script.slice(broker, stacks), /--force-recreate nats-server/);
 });
 
 const upgrade = readFileSync(".github/workflows/release-upgrade.yml", "utf8");
@@ -112,4 +145,17 @@ await test("release publication requires native smoke tests for every supported 
 	assert.match(smokeGate, /prepare-release-lock\.ts/);
 	assert.match(smokeGate, /contents: write/);
 	assert.match(release, /gh release upload "\$TAG_NAME" host-smoke\/\*\.json/);
+});
+
+await test("the release smoke reaches the installation by the name the installer answers with", () => {
+	// Traefik routes on the hostname the installer answered with, so a rename in the script has to
+	// reach this curl or the ingress check fails for the first time at a release.
+	assert.ok(
+		release.includes(`--resolve ${SMOKE_HOSTNAME}:443:127.0.0.1`),
+		`release.yml must resolve ${SMOKE_HOSTNAME} to the loopback`,
+	);
+	assert.ok(
+		release.includes(`https://${SMOKE_HOSTNAME}/`),
+		`release.yml must request the installation at ${SMOKE_HOSTNAME}`,
+	);
 });
