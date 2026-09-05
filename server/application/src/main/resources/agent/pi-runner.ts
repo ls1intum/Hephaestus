@@ -14,6 +14,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 
 import { errorText } from "./pi-error-text.ts";
+import { buildGrepTool } from "./pi-grep-tool.ts";
 import {
 	citationMatchesArtifact,
 	dedupeKeyForObservation,
@@ -172,6 +173,9 @@ function isAdmittedObservation(value: unknown): value is AdmittedObservation {
 
 // Overridable so a harness with no /workspace can drive the runner. Production never sets it.
 const WORKSPACE_ROOT = "/workspace";
+// The SDK's grep spawns ripgrep, which the sandbox forbids; the runner's own search tool takes its
+// place in every session under the same name. "grep" stays listed: the SDK filters custom tools
+// through this list too, and a listed custom definition replaces the built-in of that name.
 const EVIDENCE_TOOLS = ["read", "grep"] as const;
 const CWD = process.env.PI_RUNNER_CWD ?? WORKSPACE_ROOT;
 const OUTPUT = `${CWD}/out`;
@@ -1575,6 +1579,7 @@ async function main() {
 	// the model is ever called. Nothing project-local is wanted here anyway: every resource this run
 	// uses is injected by the runner, never discovered from the checkout.
 	const settingsManager = SettingsManager.create(CWD, AGENT_DIR, { projectTrusted: false });
+	const grepTool = buildGrepTool(CWD);
 	// The only instructions a session carries beyond its prompt are the orchestrator the server staged
 	// in the agent dir. The SDK's own context-file discovery would climb from the working directory
 	// to `/` looking for AGENTS.md and die on the first ancestor the allowlist forbids, and it would
@@ -1658,7 +1663,7 @@ async function main() {
 				cwd: CWD,
 				agentDir: AGENT_DIR,
 				tools: ["read", "grep", "report_feedback", "report_summary"],
-				customTools: [feedbackTool, buildSummaryTool()],
+				customTools: [grepTool, feedbackTool, buildSummaryTool()],
 				sessionManager: SessionManager.inMemory(),
 				settingsManager,
 				resourceLoader: await loadResources(),
@@ -1735,7 +1740,7 @@ async function main() {
 			cwd: CWD,
 			agentDir: AGENT_DIR,
 			tools: [...EVIDENCE_TOOLS],
-			customTools: [],
+			customTools: [grepTool],
 			sessionManager: manager,
 			settingsManager,
 			resourceLoader: await loadResources(),
@@ -1796,7 +1801,7 @@ async function main() {
 					cwd: CWD,
 					agentDir: AGENT_DIR,
 					tools: [...EVIDENCE_TOOLS, "report_observation"],
-					customTools: [scopedTool],
+					customTools: [grepTool, scopedTool],
 					sessionManager: manager,
 					settingsManager,
 					resourceLoader: await loadResources(),
@@ -1927,7 +1932,7 @@ async function main() {
 					cwd: CWD,
 					agentDir: AGENT_DIR,
 					tools: [...EVIDENCE_TOOLS, "report_observation"],
-					customTools: [retryTool],
+					customTools: [grepTool, retryTool],
 					sessionManager: priorSessionFile
 						? SessionManager.open(priorSessionFile, sessionDir)
 						: SessionManager.inMemory(),
