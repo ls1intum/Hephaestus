@@ -36,9 +36,8 @@ RUN test -d /opt/pi-sdk/node_modules/@earendil-works/pi-coding-agent \
     mkdir -p /workspace && chown 1000:1000 /workspace
 
 RUN mkdir -p /tmp/abi-check && ln -sf /opt/pi-sdk/node_modules /tmp/abi-check/node_modules && \
-    cd /tmp/abi-check && \
-    printf 'const sdk = await import("@earendil-works/pi-coding-agent");\nif (!sdk || typeof sdk !== "object") { throw new Error("Pi SDK import yielded no module namespace"); }\nconsole.log("pi sdk exports:", Object.keys(sdk).length);\n' > check.ts && \
-    node --permission --allow-fs-read=/tmp/abi-check --allow-fs-read=/opt/pi-sdk check.ts && \
+    printf 'const sdk = await import("@earendil-works/pi-coding-agent");\nif (!sdk || typeof sdk !== "object") { throw new Error("Pi SDK import yielded no module namespace"); }\nconsole.log("pi sdk exports:", Object.keys(sdk).length);\n' > /tmp/abi-check/check.ts && \
+    node --permission --allow-fs-read=/tmp/abi-check --allow-fs-read=/opt/pi-sdk /tmp/abi-check/check.ts && \
     mkdir -p /tmp/abi-check/work/nested /tmp/abi-check/agent /tmp/abi-check/home && \
     printf 'SENTINEL-ORCHESTRATOR\n' > /tmp/abi-check/agent/AGENTS.md && \
     printf '{}\n' > /tmp/abi-check/agent/settings.json && \
@@ -71,8 +70,8 @@ RUN mkdir -p /tmp/abi-check && ln -sf /opt/pi-sdk/node_modules /tmp/abi-check/no
       'const modelRuntime = await ModelRuntime.create({ authPath: `${agentDir}/auth.json`, modelsPath: `${agentDir}/models.json`, allowModelNetwork: false });' \
       'modelRuntime.registerProvider("gate", { name: "gate", baseUrl: "http://127.0.0.1:9/v1", apiKey: "$GATE_TOKEN", authHeader: true, api: "openai-completions", models: [{ id: "model", name: "model", reasoning: false, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 1000, maxTokens: 100 }] });' \
       'if (!(await modelRuntime.checkAuth("gate"))) { throw new Error("the credential of the gate provider did not resolve"); }' \
-      > runner-path-check.ts && \
-    HOME=/tmp/abi-check/home GATE_TOKEN=gate node --permission --allow-fs-read=/tmp/abi-check --allow-fs-read=/opt/pi-sdk --allow-fs-write=/tmp/abi-check/agent runner-path-check.ts && \
+      > /tmp/abi-check/runner-path-check.ts && \
+    HOME=/tmp/abi-check/home GATE_TOKEN=gate node --permission --allow-fs-read=/tmp/abi-check --allow-fs-read=/opt/pi-sdk --allow-fs-write=/tmp/abi-check/agent /tmp/abi-check/runner-path-check.ts && \
     ! node --permission --allow-fs-read=/tmp/abi-check --allow-fs-read=/opt/pi-sdk \
       -e 'require("node:fs").readFileSync("/etc/passwd")' 2>/dev/null && \
     # A write grant on a directory absent at startup covers its mkdir but nothing inside it; the
@@ -85,8 +84,8 @@ RUN mkdir -p /tmp/abi-check && ln -sf /opt/pi-sdk/node_modules /tmp/abi-check/no
       'let denied = false;' \
       'try { fs.writeFileSync(`${dir}/x`, "1"); } catch (error) { denied = error.code === "ERR_ACCESS_DENIED"; }' \
       'if (!denied) { throw new Error("a write inside a directory granted before it existed was allowed; revisit the pre-creation in PiRuntimeFactory"); }' \
-      > absent-grant-check.cjs && \
-    node --permission --allow-fs-read=/tmp/abi-check --allow-fs-write=/tmp/abi-check/absent absent-grant-check.cjs /tmp/abi-check/absent && \
+      > /tmp/abi-check/absent-grant-check.cjs && \
+    node --permission --allow-fs-read=/tmp/abi-check --allow-fs-write=/tmp/abi-check/absent /tmp/abi-check/absent-grant-check.cjs /tmp/abi-check/absent && \
     ! node --permission --allow-fs-read=/tmp/abi-check --allow-fs-read=/opt/pi-sdk \
       -e 'require("node:child_process").spawnSync("true")' 2>/dev/null && \
     rm -rf /tmp/abi-check
@@ -103,18 +102,21 @@ ENV GIT_PAGER=cat
 ENV GIT_TERMINAL_PROMPT=0
 ENV LANG=C.UTF-8
 
-RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
+# The base image installs Yarn as a tree under /opt that /usr/local/bin only links to, so removing
+# the links alone leaves a runnable package manager behind — which is why the check below reads the
+# filesystem rather than the PATH.
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack /opt/yarn-* \
         /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
         /usr/local/bin/yarn /usr/local/bin/yarnpkg /usr/local/bin/pnpm /usr/local/bin/pnpx && \
     set -eu; \
     node --version; \
-    # `!` exempts a command from errexit and only the last iteration's status would escape the
-    # loop, so each hit must fail explicitly.
-    for manager in npm npx corepack yarn yarnpkg pnpm pnpx; do \
-        if command -v "$manager" >/dev/null 2>&1; then \
-            echo "FATAL: '$manager' resolves to $(command -v "$manager"); this image must carry no package manager." >&2; exit 1; \
-        fi; \
-    done
+    found=$(find / -xdev -path /proc -prune -o -path /sys -prune -o \
+        \( -name npm -o -name npx -o -name corepack -o -name yarn -o -name yarnpkg -o -name pnpm -o -name pnpx \) -print); \
+    if [ -n "$found" ]; then \
+        echo "FATAL: this image must carry no package manager, and ships:" >&2; \
+        echo "$found" >&2; \
+        exit 1; \
+    fi
 
 LABEL hephaestus.agent.runtime-contract=2
 LABEL hephaestus.agent.node-version=${NODE_VERSION}
