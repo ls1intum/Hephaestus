@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.core.auth.ratelimit.AuthRateLimitProperties;
 import de.tum.cit.aet.hephaestus.core.auth.ratelimit.BucketResolver;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtVerifier;
+import de.tum.cit.aet.hephaestus.core.web.PayloadSizeFilter;
 import java.time.Duration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -75,8 +76,7 @@ class LlmProxySecurityConfig {
                         new JobTokenAuthenticationFilter(agentJobRepository, jwtVerifier, mentorRegistry, objectMapper),
                         UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(
-                        new SandboxGatewayPayloadSizeFilter(gatewayProperties.maxRequestBytes()),
-                        JobTokenAuthenticationFilter.class)
+                        new PayloadSizeFilter(gatewayProperties.maxRequestBytes()), JobTokenAuthenticationFilter.class)
                 .addFilterAfter(
                         new SandboxGatewayRateLimitFilter(limit, bucketResolver, objectMapper, accounting),
                         JobTokenAuthenticationFilter.class);

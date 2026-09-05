@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus.agent.proxy;
+package de.tum.cit.aet.hephaestus.core.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -11,10 +11,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
-class SandboxGatewayPayloadSizeFilterTest extends BaseUnitTest {
+class PayloadSizeFilterTest extends BaseUnitTest {
 
     private final AtomicInteger served = new AtomicInteger();
-    private final SandboxGatewayPayloadSizeFilter filter = new SandboxGatewayPayloadSizeFilter(16);
+    private final PayloadSizeFilter filter = new PayloadSizeFilter(16);
 
     @Test
     void shouldServeARequestWithinTheLimit() throws Exception {
@@ -39,7 +39,7 @@ class SandboxGatewayPayloadSizeFilterTest extends BaseUnitTest {
     /** A body whose size is only knowable after reading it is the case the limit exists to avoid. */
     @Test
     void shouldRefuseARequestThatDeclaresNoLength() throws Exception {
-        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/internal/llm/responses");
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/any");
         MockHttpServletResponse response = new MockHttpServletResponse();
 
         filter.doFilter(request, response, this::serve);
@@ -49,7 +49,7 @@ class SandboxGatewayPayloadSizeFilterTest extends BaseUnitTest {
     }
 
     private static MockHttpServletRequest requestOf(String body) {
-        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/internal/llm/responses");
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/any");
         request.setContent(body.getBytes(StandardCharsets.UTF_8));
         return request;
     }
