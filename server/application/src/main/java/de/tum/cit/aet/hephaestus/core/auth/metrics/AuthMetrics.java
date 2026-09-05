@@ -81,6 +81,7 @@ public class AuthMetrics {
     private static final String AUDIT_WRITE_FAILED_METRIC = "auth.audit.write_failed";
     private static final String REFRESH_RESULT_METRIC = "auth.token.refresh.result";
     private static final String REVOCATION_CHECK_FAILED_METRIC = "auth.revocation.check_failed";
+    private static final String IMPERSONATION_AUTO_EXIT_METRIC = "auth.impersonation.auto_exit";
 
     private final MeterRegistry registry;
     private final Counter loginSuccess;
@@ -186,5 +187,19 @@ public class AuthMetrics {
      */
     public void recordAuditWriteFailed() {
         auditWriteFailed.increment();
+    }
+
+    /**
+     * Count one impersonation ended by a rotation rather than by the operator. {@code reason} is a fixed
+     * set ({@code expired}, {@code target_promoted}), so cardinality stays bounded. A rising
+     * {@code target_promoted} rate is worth looking at: it means operators are promoting the accounts
+     * they are impersonating.
+     */
+    public void recordImpersonationAutoExit(String reason) {
+        Counter.builder(IMPERSONATION_AUTO_EXIT_METRIC)
+                .description("Impersonations ended by a token rotation, tagged by reason.")
+                .tag("reason", reason)
+                .register(registry)
+                .increment();
     }
 }
