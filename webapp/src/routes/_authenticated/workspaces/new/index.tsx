@@ -42,7 +42,9 @@ function ProviderSelectionPage() {
 	const blockedForNonAdmin = adminOnly && !isAppAdmin;
 
 	const providers: Provider[] = [];
-	if (workspaceProviders?.github) {
+	// The GitHub card leads to a page whose only action is the installation link, so a provider
+	// without a usable URL is a dead end rather than a choice.
+	if (workspaceProviders?.github?.appInstallationUrl) {
 		providers.push({
 			id: "github",
 			name: "GitHub",

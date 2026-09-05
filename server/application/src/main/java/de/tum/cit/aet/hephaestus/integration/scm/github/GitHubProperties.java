@@ -76,7 +76,14 @@ public record GitHubProperties(@Valid App app, @Valid Meta meta) {
 
             @Nullable Resource privateKeyLocation,
             @Nullable String privateKey,
-            @Nullable String installationUrl) {}
+            @Nullable String installationUrl) {
+        // application.yml binds `${GH_APP_INSTALLATION_URL:}`, so an install that configured no URL
+        // arrives as "" rather than null — treat blank as absent, or GitHubWorkspaceProviderAvailability
+        // offers a wizard option whose link is the empty string.
+        public App {
+            installationUrl = installationUrl == null || installationUrl.isBlank() ? null : installationUrl;
+        }
+    }
 
     /**
      * GitHub metadata API configuration.
