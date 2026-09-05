@@ -85,7 +85,7 @@ class ResponseOwnedDockerHttpClientTest extends BaseUnitTest {
 
         @Override
         public void close() throws IOException {
-            if (!aborted) skip(available());
+            if (!aborted) skipNBytes(available());
             closed = true;
             super.close();
         }
