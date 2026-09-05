@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.integration.core.fabric.FabricLayout;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.testconfig.GitTestFixtures;
 import java.io.IOException;
+import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -16,8 +17,11 @@ import java.util.List;
 import java.util.Map;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.api.errors.InvalidRemoteException;
+import org.eclipse.jgit.errors.NoRemoteRepositoryException;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.PersonIdent;
+import org.eclipse.jgit.util.FileUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -230,6 +234,102 @@ class GitRepositoryManagerTest extends BaseUnitTest {
                             .isEqualTo(replacementPath.toUri().toString());
                 }
             }
+        }
+
+        @Test
+        void shouldRebuildCheckoutWhenStaleOriginUrlPrecedesCurrentOne() throws Exception {
+            manager = createManager(true);
+            try (Git sourceGit = createSourceRepo()) {
+                String cloneUrl = sourceRepoPath.toUri().toString();
+                Path repoPath = manager.ensureRepository(1L, cloneUrl, null);
+
+                // JGit reads the last value back as the configured URL but fetches from the first,
+                // which is not a repository. Dropping the fetch refspec instead only yields "Nothing
+                // to fetch".
+                try (Git clone = Git.open(repoPath.toFile())) {
+                    var config = clone.getRepository().getConfig();
+                    config.setStringList(
+                            "remote",
+                            "origin",
+                            "url",
+                            List.of(tempDir.resolve("missing").toUri().toString(), cloneUrl));
+                    config.save();
+                    assertThatThrownBy(() -> clone.fetch().setRemote("origin").call())
+                            .isInstanceOf(InvalidRemoteException.class);
+                }
+
+                Path result = manager.ensureRepository(1L, cloneUrl, null);
+
+                assertThat(result).isEqualTo(repoPath);
+                try (Git clone = Git.open(result.toFile())) {
+                    assertThat(clone.getRepository().getConfig().getStringList("remote", "origin", "url"))
+                            .containsExactly(cloneUrl);
+                }
+
+                Files.writeString(sourceRepoPath.resolve("file2.txt"), "content");
+                sourceGit.add().addFilepattern("file2.txt").call();
+                String newSha = commit(sourceGit, "Second commit");
+
+                manager.ensureRepository(1L, cloneUrl, null);
+
+                assertThat(manager.commitExists(1L, newSha)).isTrue();
+            }
+        }
+
+        @Test
+        void shouldRebuildCheckoutWhenRemoteConfigurationDoesNotParse() throws Exception {
+            manager = createManager(true);
+            try (Git sourceGit = createSourceRepo()) {
+                String cloneUrl = sourceRepoPath.toUri().toString();
+                Path repoPath = manager.ensureRepository(1L, cloneUrl, null);
+
+                // An empty pushurl, as a partially written config leaves behind: JGit parses every URL
+                // of the remote before fetching and rejects the empty one.
+                try (Git clone = Git.open(repoPath.toFile())) {
+                    var config = clone.getRepository().getConfig();
+                    config.setString("remote", "origin", "pushurl", "");
+                    config.save();
+                    assertThatThrownBy(() -> clone.fetch().setRemote("origin").call())
+                            .isInstanceOf(InvalidRemoteException.class)
+                            .hasRootCauseInstanceOf(URISyntaxException.class);
+                }
+
+                Path result = manager.ensureRepository(1L, cloneUrl, null);
+
+                assertThat(result).isEqualTo(repoPath);
+                try (Git clone = Git.open(result.toFile())) {
+                    assertThat(clone.getRepository().getConfig().getString("remote", "origin", "pushurl"))
+                            .isNull();
+                }
+
+                Files.writeString(sourceRepoPath.resolve("file2.txt"), "content");
+                sourceGit.add().addFilepattern("file2.txt").call();
+                String newSha = commit(sourceGit, "Second commit");
+
+                manager.ensureRepository(1L, cloneUrl, null);
+
+                assertThat(manager.commitExists(1L, newSha)).isTrue();
+            }
+        }
+
+        @Test
+        void shouldKeepCheckoutWhenRepositoryIsGoneUpstream() throws Exception {
+            manager = createManager(true);
+            String cloneUrl = sourceRepoPath.toUri().toString();
+            String head;
+            try (Git sourceGit = createSourceRepo()) {
+                head = sourceGit.log().call().iterator().next().getName();
+            }
+            manager.ensureRepository(1L, cloneUrl, null);
+            FileUtils.delete(sourceRepoPath.toFile(), FileUtils.RECURSIVE);
+
+            assertThatThrownBy(() -> manager.ensureRepository(1L, cloneUrl, null))
+                    .isInstanceOf(GitRepositoryManager.GitOperationException.class)
+                    .hasMessageContaining("not found upstream")
+                    .hasRootCauseInstanceOf(NoRemoteRepositoryException.class);
+
+            assertThat(manager.isRepositoryCloned(1L)).isTrue();
+            assertThat(manager.commitExists(1L, head)).isTrue();
         }
     }
 
