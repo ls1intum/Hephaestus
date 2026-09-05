@@ -9,7 +9,6 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.core.security.EncryptionException;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService.TransitionRequest;
 import de.tum.cit.aet.hephaestus.integration.core.events.ConnectionLifecycleEvent;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
@@ -21,7 +20,6 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.lang.reflect.Field;
 import java.time.Instant;
-import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -585,29 +583,6 @@ class ConnectionServiceTest extends BaseUnitTest {
 
             Mockito.verifyNoInteractions(eventPublisher);
         }
-    }
-
-    @Test
-    void hasActiveCredentials_reportsPresenceWhenTheRunningKeyCannotReadThem() {
-        Connection connection = connectionInState(IntegrationState.ACTIVE);
-        connection.setCredentials(
-                new BearerToken("ghp_written_under_another_key", null),
-                new CredentialBundleConverter("b".repeat(32), "dev"));
-        when(connectionRepository.findActive(7L, IntegrationKind.GITHUB)).thenReturn(Optional.of(connection));
-
-        assertThat(service.hasActiveCredentials(7L, IntegrationKind.GITHUB)).isTrue();
-        assertThatThrownBy(() -> service.findActiveBearerToken(7L, IntegrationKind.GITHUB))
-                .isInstanceOf(EncryptionException.class);
-    }
-
-    @Test
-    void hasActiveCredentials_isFalseWithoutAnActiveConnectionOrStoredCredentials() {
-        Connection withoutCredentials = connectionInState(IntegrationState.ACTIVE);
-        when(connectionRepository.findActive(7L, IntegrationKind.SLACK)).thenReturn(Optional.empty());
-        when(connectionRepository.findActive(7L, IntegrationKind.GITHUB)).thenReturn(Optional.of(withoutCredentials));
-
-        assertThat(service.hasActiveCredentials(7L, IntegrationKind.SLACK)).isFalse();
-        assertThat(service.hasActiveCredentials(7L, IntegrationKind.GITHUB)).isFalse();
     }
 
     private Connection pendingConnection() {

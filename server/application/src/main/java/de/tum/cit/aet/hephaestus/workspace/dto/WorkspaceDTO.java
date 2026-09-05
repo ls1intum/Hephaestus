@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.workspace.dto;
 
+import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
@@ -130,10 +131,10 @@ public record WorkspaceDTO(
         // Presence only: this view must not decrypt anything, or a credential the running key cannot
         // read takes the whole workspace page down with it.
         boolean hasPat = (gitHubPat.isPresent()
-                        && connectionService.hasActiveCredentials(workspaceId, IntegrationKind.GITHUB))
-                || (gitLab.isPresent() && connectionService.hasActiveCredentials(workspaceId, IntegrationKind.GITLAB));
+                        && storesCredentials(connectionService, workspaceId, IntegrationKind.GITHUB))
+                || (gitLab.isPresent() && storesCredentials(connectionService, workspaceId, IntegrationKind.GITLAB));
 
-        boolean hasSlackToken = connectionService.hasActiveCredentials(workspaceId, IntegrationKind.SLACK);
+        boolean hasSlackToken = storesCredentials(connectionService, workspaceId, IntegrationKind.SLACK);
 
         Long slackConnectionId = connectionService
                 .findActive(workspaceId, IntegrationKind.SLACK)
@@ -179,5 +180,13 @@ public record WorkspaceDTO(
                 workspace.getFeatures().getLeaguesEnabled(),
                 workspace.getFeatures().getPracticeReviewAutoTriggerEnabled(),
                 workspace.getFeatures().getPracticeReviewManualTriggerEnabled());
+    }
+
+    private static boolean storesCredentials(
+            ConnectionService connectionService, long workspaceId, IntegrationKind kind) {
+        return connectionService
+                .findActive(workspaceId, kind)
+                .map(Connection::hasCredentials)
+                .orElse(false);
     }
 }
