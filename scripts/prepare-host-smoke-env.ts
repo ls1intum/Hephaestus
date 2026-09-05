@@ -11,7 +11,7 @@ import { join } from "node:path";
 
 import { run } from "./lib/process.ts";
 
-const SELF_HOST = join(import.meta.dirname, "..", "docker", "self-host");
+export const SELF_HOST = join(import.meta.dirname, "..", "docker", "self-host");
 
 /**
  * Traefik routes a boot by `Host(APP_HOSTNAME)`, so the release smoke's ingress check reaches the

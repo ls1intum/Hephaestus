@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 
 import { environmentForGitFixture, GIT_REPOSITORY_VARIABLES } from "./lib/git-environment.ts";
+import { parseJson } from "./lib/json.ts";
 import {
 	adoptTooling,
 	appliedCommit,
@@ -19,6 +20,7 @@ import {
 	parseStacks,
 	readApplied,
 	renderMetrics,
+	serializeChannel,
 	syncUnits,
 	unlockedImages,
 } from "./reconcile-deployment.ts";
@@ -232,6 +234,16 @@ await test("a commit channel names a whole commit, so it cannot be an abbreviati
 
 await test("a channel names a release or a commit, never both", () => {
 	assert.throws(() => parseChannel({ release: "v1.2.3", commit, images }), /must name one/);
+});
+
+await test("the channel the promotion writes is the channel the host reads back", () => {
+	for (const channel of [
+		parseChannel({ release: "v1.2.3", freeze: true }),
+		parseChannel({ commit, images, allowRollback: true }),
+	])
+		assert.deepEqual(parseChannel(parseJson(serializeChannel(channel))), channel);
+	assert.match(serializeChannel({ release: commit, images }), /"commit": "c{40}"/);
+	assert.doesNotMatch(serializeChannel({ release: "v1.2.3" }), /images/);
 });
 
 await test("a commit is applied even though it cannot be ordered against a release", () => {

@@ -11,6 +11,7 @@ import { parseStacks } from "./reconcile-deployment.ts";
 const release = readFileSync(".github/workflows/release.yml", "utf8");
 const deployment = readFileSync(".github/workflows/deploy-locked-compose.yml", "utf8");
 const promotion = readFileSync(".github/workflows/promote.yml", "utf8");
+const resolver = readFileSync("scripts/resolve-promotion.ts", "utf8");
 const reconciler = readFileSync("scripts/reconcile-deployment.ts", "utf8");
 const upgradeDrill = readFileSync("scripts/release-upgrade-test.ts", "utf8");
 
@@ -130,10 +131,21 @@ await test("verification identity is the release's own: run context now, the map
 	);
 });
 
-await test("promotion refuses a draft but reaches any published release, and the host verifies", () => {
-	assert.match(promotion, /--json isDraft --jq \.isDraft/);
+await test("every promotion decision is taken by the script that owns it", () => {
+	// Each decision below is proven by its own spec; what no spec can see is the workflow that
+	// stops calling it, or a step reading a channel file the resolver did not write.
+	assert.match(promotion, /^ +run: node scripts\/resolve-promotion\.ts$/m);
+	for (const consumer of ["Sign the channel", "Publish the channel"])
+		assert.match(
+			promotion,
+			new RegExp(
+				`name: ${consumer}\\n(?: +.*\\n)*? +CHANNEL_FILE: \\$\\{\\{ steps\\.release\\.outputs\\.channel \\}\\}`,
+			),
+			`${consumer} must sign and publish the file the resolver wrote`,
+		);
+	assert.match(release, /^ +run: node scripts\/await-staging\.ts$/m);
 	// Rollback must support releases predating immutable tags; the signed lock binds their digests.
-	assert.doesNotMatch(promotion, /isImmutable/);
+	assert.doesNotMatch(resolver, /isImmutable/);
 	// The verifier is the tooling this tick runs — resolved from the running script, which Node pins
 	// to the tree it loaded — never the release under review.
 	assert.match(reconciler, /join\(import\.meta\.dirname, "prepare-release-lock\.ts"\)/);

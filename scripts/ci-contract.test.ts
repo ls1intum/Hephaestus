@@ -13,6 +13,7 @@ import { versionBranch } from "./dispatch-version-pr-ci.ts";
 import { asArray, asRecord, asString, isRecord } from "./lib/json.ts";
 import { commandsOf, loadTasks } from "./lib/task-graph.ts";
 import { planRelease, releaseOutputs } from "./plan-release.ts";
+import { resolveAliasBase } from "./resolve-alias-base.ts";
 import { planSubjects } from "./scan-main-images.ts";
 import { PLATFORMS, planUpstreamSubjects } from "./scan-upstream-images.ts";
 import { validateManifest } from "./verify-release-evidence.ts";
@@ -591,6 +592,65 @@ void describe("CI contract", () => {
 			reusable,
 			/inputs\.single-arch.*linux\/amd64.*ubuntu-24\.04.*linux\/arm64.*ubuntu-24\.04-arm/,
 		);
+	});
+
+	void test("a pull request based on an unmerged branch still reaches a Docker verdict", async () => {
+		const orchestrator = parseDocument(await readFile(".github/workflows/cicd.yml", "utf8"));
+		const detect = ["jobs", "detect-changes"];
+		const resolve = namedStep(
+			orchestrator,
+			detect,
+			"Resolve the commit unchanged images are aliased from",
+		);
+		assert.equal(resolve.get("run"), "node scripts/resolve-alias-base.ts");
+		assert.match(
+			String(orchestrator.getIn([...detect, "outputs", "alias-base"])),
+			/^\$\{\{ steps\.alias_base\.outputs\.commit }}$/,
+		);
+
+		// A layer's base is the head of an open pull request, which published no image of its own. The
+		// walk ends on the commit the default branch contains, and that is what the tagging job aliases.
+		const published = "a".repeat(40);
+		assert.equal(
+			await resolveAliasBase("b".repeat(40), "main", {
+				compare: (base) => Promise.resolve(base === published ? "ahead" : "diverged"),
+				baseOf: () => Promise.resolve(published),
+			}),
+			published,
+		);
+
+		const docker = parseDocument(await readFile(".github/workflows/ci-docker-build.yml", "utf8"));
+		const tagging = ["jobs", "tag-unchanged-images"];
+		assert.match(
+			String(orchestrator.getIn(["jobs", "Docker", "with", "alias_base"])),
+			/^\$\{\{ needs\.detect-changes\.outputs\.alias-base }}$/,
+		);
+		const shell = runScript(docker, tagging, "Verify and tag unchanged images");
+		assert.match(shell, /\$ALIAS_BASE/);
+		assert.doesNotMatch(shell, /BASE_SHA/);
+
+		// A run that reaches no published commit builds every image rather than failing to alias one,
+		// which leaves this job nothing to do and the Docker verdict green either way.
+		assert.match(
+			String(orchestrator.getIn([...detect, "outputs", "all-images"])),
+			/steps\.alias_base\.outputs\.commit == ''/,
+		);
+		for (const image of [
+			"webapp_changed",
+			"application_server_changed",
+			"agent_images_changed",
+			"postgres_image_changed",
+		]) {
+			assert.match(
+				String(orchestrator.getIn(["jobs", "Docker", "with", image])),
+				/all-images == 'true'/,
+				`${image} must be built when the run has nothing to alias`,
+			);
+			assert.match(
+				String(docker.getIn([...tagging, "if"])),
+				new RegExp(`inputs\\.${image} != 'true'`),
+			);
+		}
 	});
 
 	void test("builds fork pull-request images without registry writes", async () => {
@@ -1173,12 +1233,15 @@ void describe("CI contract", () => {
 		// publishes every release image itself, under every event, exactly as its dispatch run did.
 		const complete = String(workflow.getIn([...detection, "outputs", "all-images"]));
 		const completeShape =
-			/^\$\{\{ github\.event_name != '(\w+)' \|\| steps\.version_branch\.outputs\.version-branch == 'true' }}$/.exec(
+			/^\$\{\{ github\.event_name != '(\w+)' \|\| steps\.version_branch\.outputs\.version-branch == 'true' \|\| steps\.alias_base\.outputs\.commit == '' }}$/.exec(
 				complete,
 			);
 		assert.ok(completeShape, `this test cannot evaluate \`${complete}\``);
-		const buildsEveryImage = (event: string, onVersionBranch: boolean): boolean =>
-			event !== completeShape[1] || onVersionBranch;
+		const buildsEveryImage = (
+			event: string,
+			onVersionBranch: boolean,
+			nothingToAlias = false,
+		): boolean => event !== completeShape[1] || onVersionBranch || nothingToAlias;
 		for (const event of events)
 			assert.ok(
 				buildsEveryImage(event, true),
@@ -1188,6 +1251,9 @@ void describe("CI contract", () => {
 			events.map((event) => buildsEveryImage(event, false)),
 			[false, true, true, true],
 		);
+		// The other run with nothing to alias: a pull request whose chain of bases reaches no
+		// published commit builds the whole set rather than failing to alias one.
+		assert.ok(buildsEveryImage("pull_request", false, true));
 
 		// One home for that decision too: an input that selects an image reads it, and no input
 		// re-tests the event on its own. `server_changed` is in the list because the buildpacks image
