@@ -51,10 +51,18 @@ jobs:
           fail-on-error: false
 
   server-integration:
-    name: "App Server: Integration"
+    name: "App Server: Integration (${{ matrix.shard }})"
     if: inputs.should_skip != 'true' && inputs.application_server_changed == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard: providers
+            tests: "**/integration/**"
+          - shard: application
+            tests: "*,!**/integration/**"
     permissions:
       contents: read
       checks: write
@@ -70,12 +78,13 @@ jobs:
           cache-type: application-server-reactor
           os: ${{ runner.os }}
       - name: Run integration tests
-        run: vp run test:server:integration
+        # The generated-clients reactor module has no tests matching these selectors.
+        run: vp run test:server:integration "-Dtest=${{ matrix.tests }}" -Dsurefire.failIfNoSpecifiedTests=false
       - name: Upload test results
         if: always()
         uses: dorny/test-reporter@a43b3a5f7366b97d083190328d2c652e1a8b6aa2 # v3.0.0
         with:
-          name: "Test Results - App Server Integration"
+          name: "Test Results - App Server Integration (${{ matrix.shard }})"
           path: "server/application/target/surefire-reports/TEST-*.xml"
           reporter: java-junit
           fail-on-error: false

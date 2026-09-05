@@ -391,6 +391,23 @@ void describe("CI contract", () => {
 		assert.deepEqual(used, accepted, "Every accepted cache type is requested by a workflow");
 	});
 
+	void test("partitions integration tests without duplicating tiers or bypassing the status gate", async () => {
+		const source = await readFile(".github/workflows/ci-tests.yml", "utf8");
+		const integration = job(source, "server-integration");
+		assert.match(integration, /fail-fast: false/);
+		const selectors = [...integration.matchAll(/tests: "([^"\n]+)"/g)].map((match) => match[1]);
+		assert.deepEqual(selectors, ["**/integration/**", "*,!**/integration/**"]);
+		assert.match(integration, /"-Dtest=\$\{\{ matrix.tests \}\}"/);
+		assert.match(integration, /-Dsurefire.failIfNoSpecifiedTests=false/);
+		assert.match(integration, /Test Results - App Server Integration \(\$\{\{ matrix.shard \}\}\)/);
+		assert.equal((source.match(/run: vp run test:server:integration/g) ?? []).length, 1);
+		const tasks = await readFile("vite.config.ts", "utf8");
+		assert.match(tasks, /"test:server:integration": run\([\s\S]*?-Dsurefire.includedGroups=integration/);
+		const orchestrator = await readFile(".github/workflows/cicd.yml", "utf8");
+		assert.match(job(orchestrator, "Test"), /uses: \.\/\.github\/workflows\/ci-tests.yml/);
+		assert.match(job(orchestrator, "all-ci-passed"), /needs\.Test\.result/);
+	});
+
 	void test("packages the server once and runs every artifact gate against it", async () => {
 		const build = await readFile(".github/workflows/ci-build.yml", "utf8");
 		const packageJob = job(build, "server-package");

@@ -422,6 +422,13 @@ nothing that ships, so they compile from source in `Test` and do not wait for pa
 
 - `Quality` legs and `Test` suites start from source; `Build` gates start when `App Server: Package`
   uploads its artifact.
+- `App Server: Integration` runs two independent matrix shards: `providers` selects the
+  `integration/` package and `application` selects its complement. Both retain the `integration`
+  tag filter and run sequentially inside their own JVM and Testcontainers database. New packages
+  automatically belong to one shard; unit and architecture tests still run only in their own job.
+  Each shard compiles from source concurrently with packaging. `fail-fast: false` lets both finish
+  reporting, and `CI Status Gate` requires the aggregate `Test` result, covering both shards.
+  Local and weekly profile runs still execute the complete integration tier in one invocation.
 - Pull requests and merge groups build `linux/amd64`; pushes to `main`, and every run on the Version
   PR's branch, build both architectures. A pull request also builds only the images its diff touched
   and aliases the rest, while the Version PR's branch builds all of them. `detect-changes` decides
