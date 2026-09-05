@@ -1,6 +1,4 @@
 ---
-"hephaestus": patch
 ---
 
-Practice reviews start again after upgrading the agent image. On the previous image every review
-stopped inside its sandbox before it had looked at the work.
+No release note: the agent-image upgrade that broke practice reviews was fixed before any release shipped it, so no operator's instance was ever affected.
