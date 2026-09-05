@@ -75,6 +75,11 @@ RUN mkdir -p /tmp/abi-check && ln -sf /opt/pi-sdk/node_modules /tmp/abi-check/no
     HOME=/tmp/abi-check/home GATE_TOKEN=gate node --permission --allow-fs-read=/tmp/abi-check --allow-fs-read=/opt/pi-sdk --allow-fs-write=/tmp/abi-check/agent runner-path-check.ts && \
     ! node --permission --allow-fs-read=/tmp/abi-check --allow-fs-read=/opt/pi-sdk \
       -e 'require("node:fs").readFileSync("/etc/passwd")' 2>/dev/null && \
+    # A write grant on a directory absent at startup covers its mkdir but nothing inside it; the
+    # server therefore creates every writable directory before Node starts, and this build fails
+    # the day Node changes that, so the pre-creation can be revisited rather than cargo-culted.
+    ! node --permission --allow-fs-read=/tmp/abi-check --allow-fs-write=/tmp/abi-check/absent \
+      -e 'const fs = require("node:fs"); fs.mkdirSync("/tmp/abi-check/absent"); fs.writeFileSync("/tmp/abi-check/absent/x", "1")' 2>/dev/null && \
     ! node --permission --allow-fs-read=/tmp/abi-check --allow-fs-read=/opt/pi-sdk \
       -e 'require("node:child_process").spawnSync("true")' 2>/dev/null && \
     rm -rf /tmp/abi-check

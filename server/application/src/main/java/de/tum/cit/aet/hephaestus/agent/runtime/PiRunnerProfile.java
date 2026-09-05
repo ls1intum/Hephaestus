@@ -21,6 +21,9 @@ public interface PiRunnerProfile {
             // The SDK takes a lock directory beside settings.json and auth.json and keeps a models store
             // in the agent dir; without this every session dies at its first model turn.
             "--allow-fs-write=/workspace/.pi",
+            // A write grant is resolved when Node starts: a directory that does not exist yet accepts
+            // mkdir and then denies every write inside it, so PiRuntimeFactory creates each of these
+            // before the process starts.
             "--allow-fs-write=/workspace/.sessions",
             "--allow-fs-write=/workspace/out");
     /** Runner script filename under {@code resources/agent/}. */

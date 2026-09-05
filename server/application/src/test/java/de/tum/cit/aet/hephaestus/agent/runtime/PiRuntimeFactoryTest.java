@@ -323,6 +323,8 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                     .contains("--allow-fs-read=/workspace")
                     .contains("--allow-fs-read=/home/agent")
                     .contains("--allow-fs-write=/workspace/.pi")
+                    // Granted for writing, so it must exist before Node starts.
+                    .contains("mkdir -p /workspace/out /workspace/.sessions ")
                     .contains("--allow-fs-write=/workspace/out");
         }
 
