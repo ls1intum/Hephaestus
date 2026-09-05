@@ -322,7 +322,7 @@ public class SyncStatusService {
                             connected,
                             c == null ? null : c.getId(),
                             c == null ? null : c.getState(),
-                            c == null ? null : c.getCredentialsRotationFailedAt());
+                            c == null ? null : c.credentialsUnreadableSince());
                 })
                 .toList();
     }

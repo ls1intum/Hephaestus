@@ -78,7 +78,7 @@ public record ConnectionDetailDTO(
                 c.getUpdatedAt(),
                 manifests.capabilitiesFor(c.getKind()),
                 configMap,
-                c.getCredentialsRotationFailedAt());
+                c.credentialsUnreadableSince());
     }
 
     /**

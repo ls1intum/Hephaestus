@@ -179,7 +179,13 @@ export function IntegrationOverviewCard({
 				)}
 			</CardContent>
 			{isConnectionActive && (
-				<CardFooter className="mt-auto justify-between gap-2">
+				<CardFooter
+					className={
+						entry.credentialsUnreadableSince
+							? "mt-auto justify-end gap-2"
+							: "mt-auto justify-between gap-2"
+					}
+				>
 					{/* This card's trigger only ever enqueues a reconciliation, so that is what it announces.
 					    A sync cannot use a token the server cannot read, so the trigger is not offered then. */}
 					{!entry.credentialsUnreadableSince && (

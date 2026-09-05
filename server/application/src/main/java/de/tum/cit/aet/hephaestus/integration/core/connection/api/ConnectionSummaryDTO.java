@@ -40,6 +40,6 @@ public record ConnectionSummaryDTO(
                 c.getCreatedAt(),
                 c.getUpdatedAt(),
                 manifests.capabilitiesFor(c.getKind()),
-                c.getCredentialsRotationFailedAt());
+                c.credentialsUnreadableSince());
     }
 }

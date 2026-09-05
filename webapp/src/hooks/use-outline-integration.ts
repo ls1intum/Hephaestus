@@ -254,6 +254,7 @@ export function useOutlineIntegration(workspaceSlug: string) {
 	// Outline exposes no backfill affordance, so `onBackfill` is omitted and the split button never
 	// appears.
 	const syncStatusHeaderProps: Omit<SyncStatusHeaderProps, "label"> = {
+		credentialsUnreadableSince: outlineConnection?.credentialsUnreadableSince,
 		status: connectionStatus,
 		isConnectionActive,
 		// Outline's only manual trigger is a reconciliation, so a bare `isPending` names it exactly.

@@ -220,11 +220,7 @@ function ScmIntegrationPage() {
 				<ConnectionStateNotice
 					connectionState={entry.connectionState}
 					credentialsUnreadableSince={entry.credentialsUnreadableSince}
-					credentialRecovery={
-						isAppInstallationWorkspace
-							? "This GitHub App connection does not use it, so syncing is not affected"
-							: "Replace it by submitting a new personal access token to the workspace token endpoint, which the console has no form for yet"
-					}
+					credentialRecovery="Replace it by submitting a new personal access token to the workspace token endpoint, which the console has no form for yet"
 					displayName={label}
 				/>
 			)}
@@ -235,6 +231,7 @@ function ScmIntegrationPage() {
 				isLoading={workspaceQuery.isLoading || catalogQuery.isLoading || statusQuery.isLoading}
 				error={workspaceQuery.error ?? catalogQuery.error ?? statusQuery.error}
 				isConnectionActive={isConnectionActive}
+				credentialsUnreadableSince={entry.credentialsUnreadableSince}
 				triggeringType={triggeringType}
 				actions={
 					isAppInstallationWorkspace && (

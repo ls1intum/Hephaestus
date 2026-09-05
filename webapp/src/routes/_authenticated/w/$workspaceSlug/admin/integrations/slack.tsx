@@ -268,6 +268,7 @@ function SlackIntegrationPage() {
 				<ConnectionStateNotice
 					connectionState={entry.connectionState}
 					credentialsUnreadableSince={entry.credentialsUnreadableSince}
+					credentialRecovery="Replace it by disconnecting and connecting again"
 					displayName="Slack"
 				/>
 			)}
@@ -277,6 +278,7 @@ function SlackIntegrationPage() {
 					label="Slack"
 					status={status}
 					isConnectionActive={isConnectionActive}
+					credentialsUnreadableSince={entry.credentialsUnreadableSince}
 					triggeringType={triggerSync.isPending ? "RECONCILIATION" : null}
 					isCancelling={cancelJob.isPending}
 					onRetry={() => void statusQuery.refetch()}

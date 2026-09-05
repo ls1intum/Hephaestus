@@ -200,6 +200,17 @@ public class Connection {
         return credentialsRotationFailedAt;
     }
 
+    /**
+     * When the credential this connection runs on was first found unreadable, or null while it reads
+     * or while nothing runs on it. A GitHub App connection runs on its installation id and the app's
+     * own key; the blob it stores is installation identity that the rotation job may quarantine but
+     * that no request needs, so it is never reported as a state of the connection.
+     */
+    @Nullable
+    public Instant credentialsUnreadableSince() {
+        return config instanceof ConnectionConfig.GitHubAppConfig ? null : credentialsRotationFailedAt;
+    }
+
     public Instant getCreatedAt() {
         return Objects.requireNonNull(createdAt, "Connection has not been persisted");
     }

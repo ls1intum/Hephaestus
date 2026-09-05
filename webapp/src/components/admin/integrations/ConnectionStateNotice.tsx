@@ -55,7 +55,8 @@ export interface ConnectionStateNoticeProps {
 	credentialsUnreadableSince?: Date | null;
 	/**
 	 * How this integration's credential gets replaced, as one sentence without a trailing period: the
-	 * doors differ by provider, and the notice must name only the one that exists.
+	 * doors differ by provider, so a page that knows its provider names the one that exists, and the
+	 * overview, which does not, points at the page.
 	 */
 	credentialRecovery?: string;
 	/** The integration as the admin knows it — "Slack", "GitHub", "Outline". */
@@ -78,7 +79,7 @@ export interface ConnectionStateNoticeProps {
 export function ConnectionStateNotice({
 	connectionState,
 	credentialsUnreadableSince,
-	credentialRecovery = "Replace it by disconnecting and connecting again",
+	credentialRecovery = "The connection's page says how to replace it",
 	displayName,
 	className,
 }: ConnectionStateNoticeProps) {
