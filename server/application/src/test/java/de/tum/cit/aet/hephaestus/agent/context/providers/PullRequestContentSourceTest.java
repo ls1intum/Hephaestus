@@ -36,9 +36,12 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.eclipse.jgit.util.QuotedString;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -86,6 +89,12 @@ class PullRequestContentSourceTest extends BaseUnitTest {
                 List.of(scmTokenSource));
     }
 
+    private static int countOccurrences(String haystack, String needle) {
+        int count = 0;
+        for (int at = haystack.indexOf(needle); at >= 0; at = haystack.indexOf(needle, at + needle.length())) count++;
+        return count;
+    }
+
     private ObjectNode sampleMetadata() {
         ObjectNode metadata = objectMapper.createObjectNode();
         metadata.put("repository_id", 123L);
@@ -125,7 +134,7 @@ class PullRequestContentSourceTest extends BaseUnitTest {
                 .thenReturn(new String[] {"main", "abc123def456"});
         lenient()
                 .when(gitDiffOperations.diff(Path.of("/tmp/hephaestus-git-repos/123"), "main", "abc123def456"))
-                .thenReturn("diff --git a/a.txt b/a.txt\n@@ -0,0 +1 @@\n+content\n");
+                .thenReturn("diff --git a/a.txt b/a.txt\n--- a/a.txt\n+++ b/a.txt\n@@ -0,0 +1 @@\n+content\n");
         lenient()
                 .when(gitDiffOperations.diffStat(Path.of("/tmp/hephaestus-git-repos/123"), "main", "abc123def456"))
                 .thenReturn(" a.txt | 1\n");
@@ -282,31 +291,101 @@ class PullRequestContentSourceTest extends BaseUnitTest {
         private final String repoPath = "/tmp/hephaestus-git-repos/123";
 
         @Test
-        void computeAndStoreDiffSummary_parsesPerFileChunks() throws Exception {
-            String annotated = "[L1] diff --git a/src/A.java b/src/A.java\n" + "[L1] +line a1\n"
-                    + "[L2] +line a2\n"
-                    + "[L1] diff --git a/src/B.java b/src/B.java\n"
-                    + "[L1] +line b1\n";
+        void shouldIndexEveryFileOfThePatchExactlyOnce() {
+            String diff = "diff --git a/src/A.java b/src/A.java\n"
+                    + "--- a/src/A.java\n+++ b/src/A.java\n@@ -0,0 +1,2 @@\n+line a1\n+line a2\n"
+                    + "diff --git a/src/B.java b/src/B.java\n"
+                    + "--- a/src/B.java\n+++ b/src/B.java\n@@ -0,0 +1 @@\n+line b1\n";
+            byte[] annotated =
+                    GitDiffOperations.annotateDiffWithLineNumbers(diff).getBytes(StandardCharsets.UTF_8);
             Map<String, byte[]> files = new LinkedHashMap<>();
-            files.put("inputs/context/diff.patch", annotated.getBytes(StandardCharsets.UTF_8));
+            files.put("inputs/context/diff.patch", annotated);
 
-            provider.computeAndStoreDiffSummary(files);
+            provider.computeAndStoreDiffSummary(files, diff);
 
-            assertThat(files).containsKey("inputs/context/diff_summary.md");
             String summary = new String(files.get("inputs/context/diff_summary.md"), StandardCharsets.UTF_8);
             assertThat(summary).contains("**2 files changed**");
-            assertThat(summary).contains("`src/A.java`");
-            assertThat(summary).contains("`src/B.java`");
+            assertThat(countOccurrences(summary, "src/A.java")).isOne();
+            assertThat(countOccurrences(summary, "src/B.java")).isOne();
+            assertThat(summary).contains("`diff.patch`").doesNotContain("[L1]");
+            assertThat(files.get("inputs/context/diff.patch")).isEqualTo(annotated);
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = {"foo b/bar", "quoted\"path.txt", "café.txt", "pipe|back`tick*.txt", "line\nbreak.txt"})
+        void shouldPreserveGitPathsWithoutMarkdownInterpretation(String path) {
+            String oldPath = QuotedString.GIT_PATH.quote("a/" + path);
+            String newPath = QuotedString.GIT_PATH.quote("b/" + path);
+            String diff = "diff --git " + oldPath + " " + newPath + "\n" + "--- " + oldPath + "\n+++ " + newPath
+                    + "\n@@ -0,0 +1 @@\n+content\n";
+            Map<String, byte[]> files = new LinkedHashMap<>();
+
+            provider.computeAndStoreDiffSummary(files, diff);
+
+            String summary = new String(files.get("inputs/context/diff_summary.md"), StandardCharsets.UTF_8);
+            assertThat(summary)
+                    .contains("**1 file changed**", "\n    " + objectMapper.writeValueAsString(path) + "\n\n");
         }
 
         @Test
-        void computeAndStoreDiffSummary_emptyDiffPatch_writesZeroFileSummary() {
+        void shouldSummarizeRenamesDeletionsAndNonTextChanges() {
+            String diff = "diff --git a/old.txt b/new.txt\n"
+                    + "similarity index 100%\nrename from old.txt\nrename to new.txt\n"
+                    + "diff --git a/deleted.txt b/deleted.txt\n"
+                    + "deleted file mode 100644\n--- a/deleted.txt\n+++ /dev/null\n"
+                    + "@@ -1 +0,0 @@\n-content\n"
+                    + "diff --git a/logo.png b/logo.png\n"
+                    + "index 1234567..abcdef0 100644\nBinary files a/logo.png and b/logo.png differ\n"
+                    + "diff --git a/script.sh b/script.sh\nold mode 100644\nnew mode 100755\n";
             Map<String, byte[]> files = new LinkedHashMap<>();
-            provider.computeAndStoreDiffSummary(files);
-            assertThat(files).doesNotContainKey("inputs/context/diff_summary.md");
 
-            files.put("inputs/context/diff.patch", new byte[0]);
-            provider.computeAndStoreDiffSummary(files);
+            provider.computeAndStoreDiffSummary(files, diff);
+
+            assertThat(new String(files.get("inputs/context/diff_summary.md"), StandardCharsets.UTF_8))
+                    .contains(
+                            "**4 files changed**",
+                            "    \"new.txt\"",
+                            "    \"deleted.txt\"",
+                            "    \"logo.png\"",
+                            "    \"script.sh\"")
+                    .doesNotContain("/dev/null", "    \"old.txt\"");
+        }
+
+        @Test
+        void shouldSummarizeAPatchWhoseOnlyProblemsAreWarnings() {
+            // A trailing "\ No newline at end of file" on the removed side alone is a warning in JGit; the
+            // file list is still trustworthy, and a review must not be lost to it.
+            String diff = "diff --git a/a.txt b/a.txt\n--- a/a.txt\n+++ b/a.txt\n"
+                    + "@@ -1 +1 @@\n-old\n\\ No newline at end of file\n+new\n";
+            Map<String, byte[]> files = new LinkedHashMap<>();
+
+            provider.computeAndStoreDiffSummary(files, diff);
+
+            assertThat(new String(files.get("inputs/context/diff_summary.md"), StandardCharsets.UTF_8))
+                    .contains("**1 file changed**", "    \"a.txt\"");
+        }
+
+        @ParameterizedTest
+        @ValueSource(
+                strings = {
+                    "not a patch",
+                    "diff --git a/a.txt b/a.txt\n--- a/a.txt\n+++ b/a.txt\n@@ -0,0 +1,2 @@\n+only one line\n"
+                })
+        void shouldRefuseMalformedDiffSummaryRatherThanInventAnEmptyChange(String diff) {
+            Map<String, byte[]> files = new LinkedHashMap<>();
+
+            assertThatThrownBy(() -> provider.computeAndStoreDiffSummary(files, diff))
+                    .isInstanceOf(JobPreparationException.class);
+
+            assertThat(files).doesNotContainKey("inputs/context/diff_summary.md");
+        }
+
+        @Test
+        void shouldSummarizeAnEmptyDiffAsZeroFiles() {
+            Map<String, byte[]> files = new LinkedHashMap<>();
+
+            provider.computeAndStoreDiffSummary(files, "");
+
             assertThat(new String(files.get("inputs/context/diff_summary.md"), StandardCharsets.UTF_8))
                     .contains("**0 files changed**");
         }
@@ -414,7 +493,8 @@ class PullRequestContentSourceTest extends BaseUnitTest {
             when(gitDiffOperations.diffStat(Path.of(repoPath), "main", "abc123def456"))
                     .thenReturn("1 file changed");
             when(gitDiffOperations.diff(Path.of(repoPath), "main", "abc123def456"))
-                    .thenReturn("diff --git a/src/A.java b/src/A.java\n@@ -1,1 +1,2 @@\n context\n+added\n");
+                    .thenReturn(
+                            "diff --git a/src/A.java b/src/A.java\n--- a/src/A.java\n+++ b/src/A.java\n@@ -1,1 +1,2 @@\n context\n+added\n");
 
             Map<String, byte[]> files = new LinkedHashMap<>();
             provider.contribute(request(sampleMetadata()), files);
