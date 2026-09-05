@@ -4,17 +4,15 @@ title: GitHub Integration
 description: OAuth App for login, PAT or GitHub App for data access, and manual webhook setup.
 ---
 
-Hephaestus talks to GitHub through **three separate mechanisms** — easy to confuse, so
-here is the map:
+Hephaestus uses three GitHub mechanisms:
 
 | Mechanism | Purpose | Required? |
 | --- | --- | --- |
 | **OAuth App** | "Sign in with GitHub" | Yes (unless you use GitLab login only) |
-| **PAT** *or* **GitHub App** | Reading repository data (per workspace) | One of the two |
-| **Webhook** | Live event ingestion (PRs, reviews, pushes, …) | Strongly recommended — without it you only get the hourly sync poll |
+| **PAT** *or* **GitHub App** | Repository data access and feedback delivery (per workspace) | One of the two |
+| **Webhook** | Live event ingestion (PRs, reviews, pushes, …) | Strongly recommended — without it updates wait for scheduled sync (hourly by default in production) |
 
-The OAuth App is covered in the [install guide](./install#3-create-the-github-oauth-app-login--mandatory).
-This page covers the other two.
+Configure login using the [OAuth App setup](./install#3-create-the-github-oauth-app-login--mandatory).
 
 ## Choosing PAT vs GitHub App
 
@@ -25,8 +23,8 @@ install. Use a GitHub App before enabling feedback delivery so comments have a d
 | --- | --- | --- |
 | Setup effort | Paste a token in the workspace UI | Create + install an App, manage a private key |
 | Environment variables | None | `GH_APP_ID`, `GH_APP_PRIVATE_KEY`, `GH_APP_INSTALLATION_URL` |
-| Rate limits | 5,000 req/h, shared across all of that user's tokens | 5,000+ req/h **per installation**, scaling with org size (up to 12,500) |
-| AI-review feedback posted back to GitHub (PR comments, inline notes, approvals) | Posted as the token's user; do not use for active delivery | Posted as the App |
+| API rate-limit budget | Shared with the user's other API use | Per installation; see [GitHub's limits](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/rate-limits-for-github-apps) |
+| Practice feedback posted back to GitHub (PR comments, inline notes, approvals) | Posted as the token's user; do not use for active delivery | Posted as the App |
 | Webhooks | Create manually (below) | Configured once on the App |
 
 Tokens are stored encrypted (AES-256-GCM) per workspace in the database.
@@ -36,64 +34,206 @@ Tokens are stored encrypted (AES-256-GCM) per workspace in the database.
 1. Create a token: **classic PAT** with `repo` + `read:org` (the `repo` scope already
    grants PR/issue write access), or a **fine-grained PAT** whose *resource
    owner* is the organization, with repository permissions Contents, Issues, Pull requests
-   and Discussions (Read) plus organization permissions Members and Projects (Read). Omitting
-   Discussions or Projects leaves those syncs silently empty.
-2. Leave `GH_APP_ID` unset (defaults to `0` = PAT mode).
+   and Discussions (Read) plus organization permissions Members, Projects and Issue types (Read).
+   Omitting Discussions, Projects or Issue types leaves those syncs silently empty.
+2. PAT connections need no GitHub App credentials. Keep existing App configuration if other
+   workspaces use it; authentication is selected per workspace connection.
 3. Paste the token when creating/configuring the workspace in the UI.
-4. Set up a webhook manually (next section).
+4. [Create a manual webhook](#github-webhooks--manual-setup-pat-mode).
 
-### GitHub App mode
+## GitHub App mode
 
 Create the App at **Settings → Developer settings → GitHub Apps → New GitHub App**
-and use the generated
-[`external-app-icon-1024.png`](/img/brand/external-app-icon-1024.png) as its display image.
-(on your org: `https://github.com/organizations/<org>/settings/apps`).
+(for an organization: `https://github.com/organizations/<org>/settings/apps`).
+Use [`external-app-icon-1024.png`](/img/brand/external-app-icon-1024.png) as its display image.
 
-- **Homepage URL:** `https://<APP_HOSTNAME>`
+- **Homepage URL:** any page that describes this deployment — see
+  [brand identity and instance routing](#brand-identity-instance-routing-and-consent).
 - **Webhook → Active:** ✔, **Webhook URL:** `https://<APP_HOSTNAME>/webhooks/github`,
-  **Secret:** your `WEBHOOK_SECRET` from `.env` (byte-identical)
-- **Where can this GitHub App be installed:** *Only on this account* is fine — as long as you created the App on the organization that will install it (an App registered under a personal account can never be installed on an org)
+  **Secret:** your `WEBHOOK_SECRET` from `.env` (byte-identical).
+- **Where can this GitHub App be installed:** **Any account**. A personally owned app can
+  be installed on organizations when public; **Only on this account** restricts it to its owner.
+  Installation and repository selection are still required.
 
-**Repository permissions** (GitHub greys out webhook events until the matching permission
-is granted):
+### Permission model
 
-| Permission | Level | Why |
-| --- | --- | --- |
-| Metadata | Read | Baseline (mandatory) |
-| Contents | Read | Push/commit sync, repo checkout for AI review |
-| Pull requests | Read & write | PR/review sync; posting review feedback, inline notes, approvals |
-| Issues | Read & write | Issue sync; delivering feedback as issue/PR comments (GraphQL `addComment`) |
-| Discussions | Read | Discussion sync |
+**Core** permissions support synchronization and feedback delivery. **Provisioned** reads are
+granted ahead of named features to batch approval rounds; they do not enable those features.
+**Held** permissions are not granted until their release conditions are met.
 
-**Organization permissions:**
+Pre-provisioning trades broader access for fewer approval rounds, unlike GitHub's default advice to
+[request only necessary permissions and events](https://docs.github.com/en/apps/creating-github-apps/about-creating-github-apps/best-practices-for-creating-a-github-app).
+It applies to permissions only; a subscription follows its consumer, as the next section explains.
+Limit installed repositories, omit any provisioned read you would rather approve when its feature
+arrives, and never pre-provision a write.
 
-| Permission | Level | Why |
-| --- | --- | --- |
-| Members | Read | Org membership, teams, member events |
-| Projects | Read | `projects_v2*` events + Projects v2 sync (Projects is an org-level permission) |
+:::note Keep the configuration and guide together
 
-**Subscribe to events** (check all — this list mirrors what the server actually consumes,
-`GitHubEventType`):
+Every permission or event change lands on this page in the **same pull request** — the tables, the
+manifest that mirrors them, and the description GitHub shows on the consent screen. Apply the
+configuration to each environment and verify installation approvals.
 
-`push`, `pull_request`, `pull_request_review`, `pull_request_review_comment`,
-`pull_request_review_thread`, `issues`, `issue_comment`, `label`, `milestone`, `member`,
-`repository`, `discussion`, `discussion_comment`, `sub_issues`, `issue_dependencies`,
-`organization`, `team`, `membership`
+:::
 
-Installation events are delivered to Apps automatically — there is no checkbox for them.
-If `issue_dependencies` isn't offered in your App's list, skip it: Hephaestus also reads
-issue dependencies through its regular GraphQL sync, so you only lose live updates for
-that one relation type.
+The [manifest template](#github-app-manifest-template) at the end of this page carries this same set
+machine-readably, and the two are kept identical. The tables say why each grant exists.
 
-**Projects v2 is the exception.** GitHub documents `projects_v2`, `projects_v2_item` and
-`projects_v2_status_update` as **organization-webhook** events, so a GitHub App's own
-webhook may not receive them. If you want project boards to sync live, add an
-organization webhook (next section) alongside the App — and grant the App the
-organization **Projects: Read** permission, which the project sync itself needs.
+#### Core contract — required
 
-Then:
+“Write” in GitHub's manifest includes read access. All unlisted permissions remain **No access**.
 
-1. Generate a **private key** (App settings → Private keys) and download the `.pem`.
+| Permission (manifest key) | Scope | Level | Why |
+| --- | --- | --- | --- |
+| Metadata (`metadata`) | Repository | Read | Mandatory repository identity and metadata |
+| Contents (`contents`) | Repository | Read | Push/commit sync and repository checkout for practice reviews; no code writes |
+| Pull requests (`pull_requests`) | Repository | Read & write | PR/review sync; delivering review feedback, inline notes, and approvals |
+| Issues (`issues`) | Repository | Read & write | Issue sync; delivering feedback as issue/PR comments |
+| Discussions (`discussions`) | Repository | Read | Discussion sync, not discussion delivery |
+| Members (`members`) | Organization | Read | Organization membership, teams, and member events |
+| Projects (`organization_projects`) | Organization | Read | Projects v2 sync and project event access; not classic repository projects |
+| Issue types (`issue_types`) | Organization | Read | Native issue-type sync, and the issue-type change that opens a practice review |
+
+#### Provisioned — read access ahead of features
+
+| Permission (manifest key) | Scope | Level | Why / roadmap |
+| --- | --- | --- | --- |
+| Checks (`checks`) | Repository | Read | Check outcomes as practice context and CI snapshots at merge: [#1403](https://github.com/hephaestus-build/Hephaestus/issues/1403), [#1338](https://github.com/hephaestus-build/Hephaestus/issues/1338) |
+| Commit statuses (`statuses`) | Repository | Read | Commit-level CI conclusions, including non-Actions CI: [#1403](https://github.com/hephaestus-build/Hephaestus/issues/1403), [#1338](https://github.com/hephaestus-build/Hephaestus/issues/1338) |
+| Actions (`actions`) | Repository | Read | Workflow/run/job signals; no workflow dispatch or cancellation: [#1403](https://github.com/hephaestus-build/Hephaestus/issues/1403), [#1338](https://github.com/hephaestus-build/Hephaestus/issues/1338) |
+| Deployments (`deployments`) | Repository | Read | Delivery cadence, outcomes, and approval history: [#1676](https://github.com/hephaestus-build/Hephaestus/issues/1676) |
+| Merge queues (`merge_queues`) | Repository | Read | Queue usage and ejection signals, never queue control: [#1677](https://github.com/hephaestus-build/Hephaestus/issues/1677) |
+| Dependabot alerts (`vulnerability_alerts`) | Repository | Read | Vulnerability-response timing and dismissal hygiene: [#1675](https://github.com/hephaestus-build/Hephaestus/issues/1675) |
+| Secret scanning alerts (`secret_scanning_alerts`) | Repository | Read | Leaked-credential response timing: [#1675](https://github.com/hephaestus-build/Hephaestus/issues/1675) |
+| Code scanning alerts (`security_events`) | Repository | Read | Static-analysis triage discipline: [#1675](https://github.com/hephaestus-build/Hephaestus/issues/1675) |
+
+A provisioned permission grants the *access*, not the subscription: the events these permissions
+would carry stay [unsubscribed](#deliberately-not-subscribed) until a feature reads them. If you
+subscribe to the security-alert events regardless, their payloads are sensitive long before anything
+consumes them — restrict access to delivery logs and queue storage, and never copy a raw payload or a
+secret value into application logs, support tickets, or practice context.
+
+#### Held — do not grant
+
+| Permission | Release trigger / why it is held |
+| --- | --- |
+| Checks **write** | Only with non-blocking annotation delivery ([#1678](https://github.com/hephaestus-build/Hephaestus/issues/1678)); requires an installation approval round. |
+| Administration **read** | Held until GitHub offers a narrower branch-protection grant; broad administration access is not justified for that signal. |
+| Issue fields | Custom issue fields have no reader; issue-type sync uses Issue types above. Revoke it where an existing registration grants it. |
+| Copilot metrics | Privacy assessment first ([#1679](https://github.com/hephaestus-build/Hephaestus/issues/1679)); provision only if approved. |
+
+### Event subscriptions
+
+Subscribe to the events below and to nothing else: this is the complete set Hephaestus consumes.
+GitHub's [event reference](https://docs.github.com/en/webhooks/webhook-events-and-payloads) lists
+permissions and availability for each webhook type.
+
+**A subscription with no consumer still costs you.** The webhook role stores every delivery in its
+queue before anything decides whether a consumer exists, and that queue is bounded and sheds the
+oldest delivery first. Subscribing to a high-volume family — `workflow_job` alone can outnumber
+`pull_request` a hundredfold — evicts the pull-request and review deliveries the queue is sized to
+hold until nightly reconciliation can re-fetch them; see
+[webhook ingestion operations](./webhook-ingestion-operations). So provision the *permission* now,
+because the permission increase is what costs an approval round, and add the subscription in the
+release that ships the feature reading it.
+
+| Event | Rationale |
+| --- | --- |
+| `push` | Refresh commits and repository activity. |
+| `pull_request` | Synchronize PR lifecycle and changes. |
+| `pull_request_review` | Synchronize submitted and updated reviews. |
+| `pull_request_review_comment` | Synchronize inline review comments. |
+| `pull_request_review_thread` | Track review-thread resolution. |
+| `issues` | Synchronize issue lifecycle and content. |
+| `issue_comment` | Synchronize issue and PR conversation comments. |
+| `label` | Keep label metadata current. |
+| `milestone` | Keep milestone metadata current. |
+| `member` | Track repository collaborator changes. |
+| `repository` | Track repository metadata and lifecycle. |
+| `discussion` | Synchronize discussions. |
+| `discussion_comment` | Synchronize discussion comments. |
+| `sub_issues` | Update parent/child issue relationships. |
+| `issue_dependencies` | Update blocking/blocked-by relationships. |
+| `organization` | Track organization changes. |
+| `team` | Synchronize teams. |
+| `membership` | Synchronize team membership. |
+| `projects_v2` | Synchronize organization project metadata where delivered. |
+| `projects_v2_item` | Synchronize project items and field values where delivered. |
+| `projects_v2_status_update` | Synchronize project status updates where delivered. |
+
+GitHub delivers `installation` and `installation_repositories` automatically; do not add them
+to the manifest's `default_events`. The server also handles account renames through
+`installation_target` when delivered.
+
+**Projects v2:** GitHub's event reference lists organization-webhook availability for the three
+project events. Verify App delivery with a real project change; if unavailable, add an
+organization webhook subscribed **only to those three events**. Projects read is still required
+for API synchronization.
+
+#### Deliberately not subscribed
+
+Everything GitHub offers that the table above omits. Three groups are worth naming:
+
+| Not subscribed | Why |
+| --- | --- |
+| The provisioned families — `check_run`, `check_suite`, `status`, `workflow_run`, `workflow_job`, `deployment`, `deployment_status`, `deployment_review`, `merge_group`, `merge_queue_entry`, `release`, `commit_comment`, `create`, `delete`, `dependabot_alert`, `secret_scanning_alert`, `code_scanning_alert` | Their permissions are provisioned; their consumers are not built. Subscribe with the feature, not before it. |
+| `deployment_protection_rule`, `exemption_request_push_ruleset` | Each asks Hephaestus for an approval decision, and Hephaestus observes work — it never gates it. `exemption_request_push_ruleset` also needs Administration read, which this app holds. |
+| `deploy_key`, `team_add` | Access plumbing, not practice context; team and membership sync use the events above. |
+
+### GitHub App manifest template
+
+This reference uses GitHub's [native manifest format](https://docs.github.com/en/apps/sharing-github-apps/registering-a-github-app-from-a-manifest).
+Replace the app name and `<APP_HOSTNAME>` for each environment. Use the manual setup above unless
+you have tooling for GitHub's manifest registration flow; Hephaestus does not implement that flow.
+
+```json
+{
+  "name": "your-hephaestus",
+  "url": "https://<APP_HOSTNAME>",
+  "description": "Reads repository and organization data, including CI, deployment, merge-queue and security-alert signals. Can write pull-request reviews and issue/PR comments for practice feedback. Never modifies your code.",
+  "public": true,
+  "hook_attributes": {
+    "url": "https://<APP_HOSTNAME>/webhooks/github",
+    "active": true
+  },
+  "request_oauth_on_install": false,
+  "default_permissions": {
+    "metadata": "read",
+    "contents": "read",
+    "pull_requests": "write",
+    "issues": "write",
+    "discussions": "read",
+    "members": "read",
+    "organization_projects": "read",
+    "issue_types": "read",
+    "checks": "read",
+    "statuses": "read",
+    "actions": "read",
+    "deployments": "read",
+    "merge_queues": "read",
+    "vulnerability_alerts": "read",
+    "secret_scanning_alerts": "read",
+    "security_events": "read"
+  },
+  "default_events": [
+    "push", "pull_request", "pull_request_review", "pull_request_review_comment",
+    "pull_request_review_thread", "issues", "issue_comment", "label", "milestone",
+    "member", "repository", "discussion", "discussion_comment", "sub_issues",
+    "issue_dependencies", "organization", "team", "membership", "projects_v2",
+    "projects_v2_item", "projects_v2_status_update"
+  ]
+}
+```
+
+The GitHub App uses installation tokens, so the manifest has no `callback_urls`.
+Login uses a [separate OAuth App](./install#3-create-the-github-oauth-app-login--mandatory);
+only that app's credentials belong in `GH_OAUTH_CLIENT_ID` / `GH_OAUTH_CLIENT_SECRET`.
+
+### Install and configure
+
+1. Generate a **private key** (App settings → Private keys) and download the `.pem`, or use the
+   key returned by manifest registration. On an existing instance, set the new App's webhook
+   secret to the existing `WEBHOOK_SECRET`; replacing the instance secret would break other
+   configured webhooks. On a new instance, the manifest-generated secret can become `WEBHOOK_SECRET`.
 2. **Install the App** on your organization (all repositories, or the ones to monitor).
 3. In `.env`, set:
 
@@ -103,7 +243,7 @@ Then:
    GH_APP_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----
    ...
    -----END RSA PRIVATE KEY-----"
-   # Shown in the workspace-creation wizard so admins can install the App:
+   # The workspace-creation wizard sends operators to this URL to install the App.
    GH_APP_INSTALLATION_URL=https://github.com/apps/<your-app-slug>/installations/new
    ```
 
@@ -111,10 +251,7 @@ Then:
 
 ## GitHub webhooks — manual setup (PAT mode)
 
-Unlike GitLab (where Hephaestus auto-registers a group webhook), **there is no GitHub
-webhook auto-registration**. In GitHub App mode the App's webhook covers everything; in
-PAT mode you create one yourself, or your install ingests **zero live events with no
-error telling you why**.
+PAT connections require a manually configured webhook for live updates.
 
 Prefer one **organization webhook** (repo webhooks can't deliver `organization`, `team`,
 `membership`): `https://github.com/organizations/<org>/settings/hooks` → **Add webhook**.
@@ -122,17 +259,86 @@ Prefer one **organization webhook** (repo webhooks can't deliver `organization`,
 - **Payload URL:** `https://<APP_HOSTNAME>/webhooks/github`
 - **Content type:** `application/json`
 - **Secret:** your `WEBHOOK_SECRET` (verified as `X-Hub-Signature-256` HMAC)
-- **Events:** "Let me select individual events" → check the same event list as above, plus
-  `projects_v2`, `projects_v2_item` and `projects_v2_status_update` if you use project
-  boards. Those three exist on **organization** webhooks only (never repository webhooks)
-  and only fire for organization-level projects.
+- **Events:** "Let me select individual events" → select the events listed above that GitHub offers
+  for this webhook type, including the three `projects_v2*` events for organization project boards.
+  App-only events are not selectable here, and a subscription grants the PAT no API access.
+
+## Operational mechanics
+
+### Permission changes and approval rounds
+
+[Permission increases](https://docs.github.com/en/apps/maintaining-github-apps/editing-a-github-apps-permissions)
+take effect **per installation**, after its account owner approves the request under
+organization → **Settings → GitHub Apps**. Until approval, that installation retains its old
+grants; new installations approve the current set during installation. Batch increases and
+verify each installation's approval before enabling dependent features.
+
+Reductions and event changes apply immediately without approval. A new subscription cannot
+bypass a pending permission increase; recheck event availability after reducing permissions.
+
+### Brand identity, instance routing, and consent
+
+A homepage URL is identity: any page that describes the deployment will do, and nothing is ever
+delivered to it. The webhook URL and every OAuth callback must be the **instance hostname**, because
+GitHub deliveries do **not** follow redirects — a webhook URL that redirects loses every event while
+still working in a browser. Keep TLS verification enabled and route `/webhooks/github` to the webhook
+runtime role.
+
+Each environment needs its own GitHub App because an app has one webhook URL. Use separate
+keys and secrets, and a `-staging` name suffix for staging. Register a separate login OAuth App
+per environment with its instance callback and credentials.
+
+Use the manifest description for consent text. Disclose reads and writes, including provisioned
+security-alert access. “Never modifies your code” describes Contents read, not an absence of
+review/comment writes. Describe provisioned signals as access, not available features.
+
+### Ownership transfer
+
+Use the app registration's **Advanced → Transfer ownership**, not delete-and-recreate. The app ID,
+client credentials, and private keys remain unchanged. Installations normally remain in place,
+but [GitHub warns when a transfer would uninstall the app](https://docs.github.com/en/apps/maintaining-github-apps/transferring-ownership-of-a-github-app).
+Review any warning before proceeding. Check **Where can this app be installed → Any account**
+before and after transfer, then verify installations, repository selections, and delivery.
+
+Review app managers and secret-store access. Transfer does not revoke copies of credentials:
+rotate keys and secrets separately if the previous owner must lose access.
+
+### Failed deliveries and redelivery
+
+For a GitHub App, open its **registration** (not the organization's installation page) →
+**Advanced → Recent deliveries**. Select a delivery GUID to inspect its request/response and
+**Redeliver** after fixing the cause. For a manual webhook, use the organization's or
+repository's **Settings → Webhooks → webhook → Recent Deliveries** instead.
+
+Redelivery and its limits — how far back it reaches, and which events GitHub will not redeliver at
+all — are in [webhook ingestion operations](./webhook-ingestion-operations). Do not rely on scheduled
+polling to recover event-only history such as CI state at merge or security-response timestamps.
+
+| Symptom | Check / action |
+| --- | --- |
+| No delivery entry | Confirm installation/repository selection, subscription, accepted permissions, and that the event is available for this webhook type; check [GitHub Status](https://www.githubstatus.com/). |
+| `3xx` | Replace the redirecting webhook URL with the direct instance URL. |
+| `401` on a real event | Check that the app/manual webhook secret matches `WEBHOOK_SECRET`; proxies must preserve the body and signature header. |
+| Timeout, TLS error, or `404` | Check public DNS, certificate chain, reverse-proxy routing, and webhook-role health. |
+| `5xx` | Inspect webhook-role and NATS health ([webhook ingestion operations](./webhook-ingestion-operations)); repair the failure before redelivery. |
+| `2xx`, but no application update | Check server consumption and workspace repository selection; an event no feature reads yet is acknowledged and dropped without updating anything. |
+
+Follow GitHub's [delivery troubleshooting guide](https://docs.github.com/en/webhooks/testing-and-troubleshooting-webhooks/troubleshooting-webhooks).
 
 ## Verify it works
 
-1. GitHub → your App/webhook settings → **Recent Deliveries**: real events return `2xx`.
-   Note the initial `ping` returns `200` even when the secret is wrong (it is answered
-   before signature verification), so judge by a real event. A `401` means the secret
-   doesn't match `.env`; a timeout means `/webhooks` isn't reachable from the internet.
-2. `docker compose logs -f webhook-server` — each accepted delivery is published to NATS.
-3. Open a test PR in a monitored repo; it should appear in Hephaestus within seconds
-   (webhook) rather than on the next hourly sync (polling fallback).
+1. Compare each environment's registration with the permission tables above, including the held
+   grants. Confirm each installation's approved permissions, and remove any grant or subscription
+   the tables do not list.
+2. Open and update a test PR in a monitored repository. Verify `2xx` delivery and the updated
+   state in the correct workspace without waiting for scheduled sync. The initial `ping` returns
+   `200` even with a wrong secret; it tests reachability, not authentication. For failures, use
+   [delivery triage](#failed-deliveries-and-redelivery) and `docker compose logs -f webhook-server`.
+3. For Projects v2, change a project item and verify delivery and synchronization; add the
+   narrowly scoped organization webhook only if App delivery is unavailable.
+4. On a **dedicated test App**, change the secret in **GitHub's App settings only**, leaving the
+   receiver's `WEBHOOK_SECRET` unchanged. Trigger a new real event and confirm rejection.
+   Restore the matching secret, **Redeliver** the rejected event, and verify acceptance and
+   application state. Do not run this test on a shared staging App.
+5. Sign in through the instance hostname and verify the OAuth callback returns to that instance,
+   not the product homepage or another environment.
