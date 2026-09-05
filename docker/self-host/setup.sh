@@ -68,20 +68,35 @@ set_if_empty() {
 	fi
 }
 
-# A key is generated for a new instance and must never be generated for an existing one: rows
-# the database already holds were encrypted with the key that instance had, and a fresh key makes
-# them unreadable without a word of warning. The database is a Docker volume, so an existing volume
-# is the evidence; when docker is not on PATH there is no database on this host to protect.
-if command -v docker >/dev/null 2>&1; then
-	existing_volume=$(docker volume ls --quiet --filter name=postgresql-data 2>/dev/null | head -n 1 || true)
-	if [ -n "$existing_volume" ]; then
-		for key in HEPHAESTUS_SECURITY_ENCRYPTION_KEY HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY; do
-			if ! grep -q "^${key}=." "$working_file"; then
-				printf 'A Hephaestus database already exists on this host (volume %s). Set %s to the value that database was encrypted with before running setup; a generated key would make its stored credentials unreadable.\n' "$existing_volume" "$key" >&2
-				exit 1
-			fi
-		done
+# A key is generated for a new instance and must never be generated for an existing one: rows the
+# database already holds were encrypted with the key that instance had, and a fresh key makes them
+# unreadable without a word of warning. The supported topology keeps the database in the Compose
+# volume hephaestus_postgresql-data, so that exact volume is the evidence; anything short of a clear
+# "no such volume" answer means the question could not be settled, and the keys are not generated.
+database_evidence() {
+	if ! command -v docker >/dev/null 2>&1; then
+		echo unknown
+		return
 	fi
+	if error=$(docker volume inspect --format '{{.Name}}' hephaestus_postgresql-data 2>&1 >/dev/null); then
+		echo present
+	elif printf '%s' "$error" | grep -qi 'no such volume'; then
+		echo absent
+	else
+		echo unknown
+	fi
+}
+if ! grep -q '^HEPHAESTUS_SECURITY_ENCRYPTION_KEY=.' "$working_file"; then
+	case $(database_evidence) in
+		present)
+			printf '%s\n' 'A Hephaestus database already exists on this host (volume hephaestus_postgresql-data). Set HEPHAESTUS_SECURITY_ENCRYPTION_KEY to the value that database was encrypted with before running setup, and HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY as well if the previous configuration set it separately; a generated key would make the stored credentials unreadable.' >&2
+			exit 1
+			;;
+		unknown)
+			printf '%s\n' 'Could not tell whether a Hephaestus database already exists on this host: docker is missing or its daemon did not answer. Start Docker and run setup again, or set HEPHAESTUS_SECURITY_ENCRYPTION_KEY yourself.' >&2
+			exit 1
+			;;
+	esac
 fi
 
 set_if_empty POSTGRES_PASSWORD hex16
