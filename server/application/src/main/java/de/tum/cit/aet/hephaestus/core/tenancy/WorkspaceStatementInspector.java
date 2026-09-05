@@ -82,6 +82,9 @@ public class WorkspaceStatementInspector implements StatementInspector {
             "(?:\\bFROM\\b|\\bJOIN\\b|\\bUPDATE\\b)\\s+(\"?[A-Za-z_][A-Za-z0-9_]*\"?(?:\\s*\\.\\s*\"?[A-Za-z_][A-Za-z0-9_]*\"?)?)",
             Pattern.CASE_INSENSITIVE);
 
+    /** One surrogate-key predicate: {@code id = ?} or {@code <anything>_id = ?}, optionally quoted. */
+    private static final String KEY_EQUALS_PARAMETER = "\"?(?:id|[A-Za-z_][A-Za-z0-9_]*_id)\"?\\s*=\\s*\\?";
+
     /**
      * Matches Hibernate-emitted DML on a single row identified solely by primary key —
      * {@code DELETE FROM table WHERE id = ?} or
@@ -99,12 +102,27 @@ public class WorkspaceStatementInspector implements StatementInspector {
      */
     private static final Pattern PK_ONLY_DML_PATTERN = Pattern.compile(
             "^\\s*(?:DELETE\\s+FROM|UPDATE)\\s+\"?[A-Za-z_][A-Za-z0-9_]*\"?" + "(?:\\s+SET\\s+.+?)?"
-                    + "\\s+WHERE\\s+\"?(?:id|[A-Za-z_][A-Za-z0-9_]*_id)\"?\\s*=\\s*\\?"
+                    + "\\s+WHERE\\s+" + KEY_EQUALS_PARAMETER
                     +
                     // Optional @Version optimistic-lock predicate: AND version = ?
                     "(?:\\s+AND\\s+\"?version\"?\\s*=\\s*\\?)?"
                     + "\\s*$",
             Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+
+    /**
+     * Matches the one statement Hibernate emits to remove an element of a {@code @ManyToMany}:
+     * the join-table row deleted by both of its foreign keys,
+     * {@code DELETE FROM issue_label WHERE issue_id = ? AND label_id = ?}. Fully anchored, DELETE
+     * only, exactly two key predicates, so neither a comment nor a SET clause can hide anything
+     * in it. Which tables it may apply to is not a naming convention: the captured table must be
+     * a many-to-many join table in the mapping metamodel, so an entity table with two
+     * {@code *_id} columns never qualifies however it is named.
+     */
+    private static final Pattern JOIN_TABLE_ROW_DELETE_PATTERN = Pattern.compile(
+            "^\\s*DELETE\\s+FROM\\s+\"?([A-Za-z_][A-Za-z0-9_]*)\"?\\s+WHERE\\s+"
+                    + "\"?([A-Za-z_][A-Za-z0-9_]*_id)\"?\\s*=\\s*\\?\\s+AND\\s+"
+                    + "\"?([A-Za-z_][A-Za-z0-9_]*_id)\"?\\s*=\\s*\\?\\s*$",
+            Pattern.CASE_INSENSITIVE);
 
     /**
      * Matches a Hibernate-emitted load that pins the result set to a single row (or a
@@ -193,6 +211,13 @@ public class WorkspaceStatementInspector implements StatementInspector {
         // Hibernate-emitted single-row PK DML is safe: the row was already loaded
         // within a workspace-checked scope and identified by a surrogate primary key.
         if (PK_ONLY_DML_PATTERN.matcher(sql).matches()) {
+            return Decision.ok();
+        }
+        Matcher joinTableRowDelete = JOIN_TABLE_ROW_DELETE_PATTERN.matcher(sql);
+        if (joinTableRowDelete.matches()
+                // Two different foreign keys: the row's whole key, not one key named twice.
+                && !joinTableRowDelete.group(2).equalsIgnoreCase(joinTableRowDelete.group(3))
+                && scopedTables.isManyToManyJoinTable(unqualify(joinTableRowDelete.group(1)))) {
             return Decision.ok();
         }
         // Hibernate-emitted entity load / lazy-fetch by PK is safe for the same reason —

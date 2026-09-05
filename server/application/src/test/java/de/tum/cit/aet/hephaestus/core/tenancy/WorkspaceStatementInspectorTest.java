@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.micrometer.core.instrument.Counter;
+import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -169,6 +170,43 @@ class WorkspaceStatementInspectorTest extends BaseUnitTest {
     }
 
     @Test
+    void deleteManyToManyJoinTableRowByBothKeysIsAllowed() {
+        // Removing one element of a @ManyToMany: Hibernate deletes the join-table row by both
+        // foreign keys. The table is known from the mapping metamodel, not from its name.
+        WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.THROW);
+        when(scopedTables.isManyToManyJoinTable("issue_label")).thenReturn(true);
+        inspector.inspect("delete from issue_label where issue_id=? and label_id=?");
+        inspector.inspect("DELETE FROM \"issue_label\" WHERE \"issue_id\"=? AND \"label_id\"=?");
+        verifyNoInteractions(reporter);
+    }
+
+    @Test
+    void twoForeignKeysOnAnEntityTableStillRequireWorkspaceId() {
+        // feedback.id is the key; recipient_user_id and about_user_id are ordinary columns, so
+        // this shape must not pass on the strength of two *_id names.
+        WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.LOG);
+        when(scopedTables.isScoped("feedback")).thenReturn(true);
+        String sql = "delete from feedback where recipient_user_id=? and about_user_id=?";
+        inspector.inspect(sql);
+        verify(reporter).report(sql, Set.of("feedback"), TenancyEnforcement.LOG);
+    }
+
+    @Test
+    void joinTableAllowanceIsDeleteByBothKeysAndNothingElse() {
+        WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.LOG);
+        when(scopedTables.isScoped("issue_label")).thenReturn(true);
+        when(scopedTables.isManyToManyJoinTable("issue_label")).thenReturn(true);
+        for (String sql : List.of(
+                "delete from issue_label where issue_id=? or label_id=?",
+                "delete from issue_label where issue_id=? and name=?",
+                "update issue_label set label_id=? where issue_id=? and label_id=?",
+                "delete from issue_label where issue_id=? and label_id=? and version=?")) {
+            inspector.inspect(sql);
+            verify(reporter).report(sql, Set.of("issue_label"), TenancyEnforcement.LOG);
+        }
+    }
+
+    @Test
     void optimisticLockUpdateIsAllowed() {
         // Hibernate appends "AND version = ?" to UPDATEs for entities with @Version.
         WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.THROW);
@@ -179,8 +217,8 @@ class WorkspaceStatementInspectorTest extends BaseUnitTest {
 
     @Test
     void deleteWithExtraPredicateStillRequiresWorkspaceId() {
-        // PK-only allowance MUST NOT extend to multi-column deletes — those are likely
-        // hand-written queries where we still want the workspace_id discipline.
+        // The key-only allowance covers conjunctions of keys, never a non-key column: that is a
+        // hand-written query where we still want the workspace_id discipline.
         WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.LOG);
         when(scopedTables.isScoped("practice")).thenReturn(true);
         inspector.inspect("delete from practice where id=? and slug=?");
