@@ -38,6 +38,7 @@ async function render(
 ): Promise<string> {
 	execFileSync("node", [script, kind, directory, "https://preview.example/", base, "comment.md"], {
 		cwd: root,
+		stdio: "pipe",
 		env: {
 			...environment,
 			GITHUB_SERVER_URL: "https://github.com",
@@ -127,12 +128,15 @@ void test("limits long story lists", async () => {
 	assert.match(comment, /3 more are available in the full preview/);
 });
 
-void test("explains when no story files changed", async () => {
-	const { base, root } = await repository("webapp/src/Button.tsx");
+void test("does not claim files are unchanged when they have no published stories", async () => {
+	const { base, root } = await repository("webapp/src/Button.stories.tsx");
 	await mkdir(resolve(root, "build"));
 	await writeFile(resolve(root, "build/index.json"), JSON.stringify({ entries: {} }));
 	const comment = await render(root, base, "storybook", "build");
-	assert.match(comment, /Stories in changed files\n\nNo story files changed\./);
+	assert.match(
+		comment,
+		/Stories in changed files\n\nNo published stories found in changed files\./,
+	);
 });
 
 void test("renders safe changed Docusaurus routes once", async () => {
@@ -176,4 +180,28 @@ void test("renders safe changed Docusaurus routes once", async () => {
 	assert.equal(comment.split(link).length - 1, 1);
 	assert.doesNotMatch(comment, /attacker|External/);
 	assert.doesNotMatch(comment, /Unchanged/);
+});
+
+void test("rejects an invalid Storybook index instead of publishing an empty result", async () => {
+	const { base, root } = await repository("webapp/src/Button.stories.tsx");
+	await mkdir(resolve(root, "build"));
+	for (const index of [
+		{},
+		{ entries: [] },
+		{ entries: null },
+		{ entries: { "button--primary": { type: "story" } } },
+	]) {
+		await writeFile(resolve(root, "build/index.json"), JSON.stringify(index));
+		await assert.rejects(
+			render(root, base, "storybook", "build"),
+			/Storybook (index\.entries|entry button--primary\.importPath) must be/,
+		);
+	}
+});
+
+void test("does not claim docs are unchanged when a changed page is unpublished", async () => {
+	const { base, root } = await repository("docs/user/draft.mdx");
+	await mkdir(resolve(root, "metadata"));
+	const comment = await render(root, base, "docs", "metadata");
+	assert.match(comment, /Changed pages\n\nNo published pages found in changed files\./);
 });

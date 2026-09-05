@@ -10,6 +10,9 @@ on:
     types: [opened, synchronize, reopened]
     paths:
       - "docs/**"
+      - "scripts/render-preview-comment.ts"
+      - "scripts/lib/json.ts"
+      - "scripts/lib/process.ts"
       - ".github/workflows/cd-docs.yml"
   workflow_dispatch:
 

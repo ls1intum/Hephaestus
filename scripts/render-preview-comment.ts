@@ -1,7 +1,8 @@
 import { execFileSync } from "node:child_process";
-import { readdir, readFile, writeFile } from "node:fs/promises";
+import { readdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
+import { asRecord, asString, isRecord, readJsonFile } from "./lib/json.ts";
 import { CAPTURE_LIMIT_BYTES } from "./lib/process.ts";
 
 function argument(index: number): string {
@@ -43,26 +44,13 @@ function markdown(value: string): string {
 		.replaceAll(">", "&gt;");
 }
 
-function record(value: unknown): object | undefined {
-	return typeof value === "object" && value !== null && !Array.isArray(value) ? value : undefined;
-}
-
-function field(value: object | undefined, key: string): unknown {
-	return value === undefined ? undefined : Reflect.get(value, key);
-}
-
-function entries(value: object | undefined): [string, unknown][] {
-	return value === undefined ? [] : Object.keys(value).map((key) => [key, Reflect.get(value, key)]);
-}
-
 async function renderDocs(): Promise<string> {
 	const links = new Map<string, string>();
 	for (const file of await readdir(artifactDirectory, { recursive: true })) {
 		if (!file.endsWith(".json")) continue;
-		const metadata = record(JSON.parse(await readFile(resolve(artifactDirectory, file), "utf8")));
-		const sourcePath = field(metadata, "source");
-		const permalink = field(metadata, "permalink");
-		const title = field(metadata, "title");
+		const metadata = await readJsonFile(resolve(artifactDirectory, file));
+		if (!isRecord(metadata)) continue;
+		const { source: sourcePath, permalink, title } = metadata;
 		if (
 			typeof sourcePath !== "string" ||
 			typeof permalink !== "string" ||
@@ -83,28 +71,22 @@ async function renderDocs(): Promise<string> {
 		"Open full documentation preview",
 		[...links].map(([url, title]) => ({ title, url })).toSorted(compareLinks),
 		"Changed pages",
-		"No documentation pages changed.",
+		"No published pages found in changed files.",
 	);
 }
 
 async function renderStorybook(): Promise<string> {
-	const index = record(
-		JSON.parse(await readFile(resolve(artifactDirectory, "index.json"), "utf8")),
+	const index = asRecord(
+		await readJsonFile(resolve(artifactDirectory, "index.json")),
+		"Storybook index",
 	);
-	const links = entries(record(field(index, "entries")))
+	const links = Object.entries(asRecord(index.entries, "Storybook index.entries"))
 		.flatMap(([id, value]) => {
-			const entry = record(value);
-			const type = field(entry, "type");
-			const importPath = field(entry, "importPath");
-			const name = field(entry, "name");
-			const title = field(entry, "title");
-			if (
-				type !== "story" ||
-				typeof importPath !== "string" ||
-				typeof name !== "string" ||
-				typeof title !== "string"
-			)
-				return [];
+			const entry = asRecord(value, `Storybook entry ${id}`);
+			if (entry.type !== "story") return [];
+			const importPath = asString(entry.importPath, `Storybook entry ${id}.importPath`);
+			const name = asString(entry.name, `Storybook entry ${id}.name`);
+			const title = asString(entry.title, `Storybook entry ${id}.title`);
 			if (!changedFiles.has(`webapp/${importPath.replace(/^\.\//, "")}`)) return [];
 			return [
 				{
@@ -119,7 +101,7 @@ async function renderStorybook(): Promise<string> {
 		"Open full Storybook preview",
 		links,
 		"Stories in changed files",
-		"No story files changed.",
+		"No published stories found in changed files.",
 	);
 }
 

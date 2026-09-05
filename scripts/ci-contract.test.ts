@@ -463,6 +463,11 @@ void describe("CI contract", () => {
 
 	void test("publishes documentation links derived from the built pages", async () => {
 		const docs = await readFile(".github/workflows/cd-docs.yml", "utf8");
+		assert.ok(
+			String(parseDocument(docs).getIn(["on", "pull_request", "paths"])).includes(
+				"scripts/render-preview-comment.ts",
+			),
+		);
 		const buildPreview = job(docs, "build-preview");
 		assert.match(buildPreview, /fetch-depth: 0/);
 		assert.match(buildPreview, /render-preview-comment\.ts docs docs\/\.docusaurus/);
