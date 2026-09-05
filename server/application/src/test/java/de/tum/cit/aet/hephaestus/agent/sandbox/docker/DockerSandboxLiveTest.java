@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.sandbox.docker;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import com.github.dockerjava.core.DefaultDockerClientConfig;
@@ -9,12 +10,14 @@ import com.github.dockerjava.httpclient5.ApacheDockerHttpClient;
 import de.tum.cit.aet.hephaestus.agent.sandbox.SandboxProperties;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.NetworkPolicy;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.ResourceLimits;
+import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxException;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxResult;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxSpec;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SecurityProfile;
 import de.tum.cit.aet.hephaestus.testconfig.LiveDockerTest;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -46,6 +49,7 @@ class DockerSandboxLiveTest {
     private SandboxNetworkManager networkManager;
     private SandboxWorkspaceManager workspaceManager;
     private DockerClientOperations dockerOps;
+    private ContainerSecurityPolicy securityPolicy;
     private ExecutorService dockerWaitExecutor;
 
     @BeforeAll
@@ -60,18 +64,20 @@ class DockerSandboxLiveTest {
         SandboxProperties properties = new SandboxProperties(
                 "unix:///var/run/docker.sock", false, null, 5, 10, 60, null, null, 209_715_200L, 500_000, null);
 
+        // Wrapped exactly as DockerSandboxConfiguration wraps it, so the archive tests below exercise the
+        // real Apache transport this application ships rather than docker-java's default ownership.
         var dockerClient = DockerClientImpl.getInstance(
                 DefaultDockerClientConfig.createDefaultConfigBuilder().build(),
-                new ApacheDockerHttpClient.Builder()
+                new ResponseOwnedDockerHttpClient(new ApacheDockerHttpClient.Builder()
                         .dockerHost(URI.create("unix:///var/run/docker.sock"))
-                        .build());
+                        .build()));
 
         dockerOps = new DockerClientOperations(dockerClient, dockerClient);
         dockerWaitExecutor = Executors.newCachedThreadPool();
         containerManager = new SandboxContainerManager(dockerOps, image -> {}, properties, dockerWaitExecutor);
         networkManager = new SandboxNetworkManager(dockerOps, properties);
         workspaceManager = new SandboxWorkspaceManager(dockerOps);
-        ContainerSecurityPolicy securityPolicy = new ContainerSecurityPolicy(properties, null);
+        securityPolicy = new ContainerSecurityPolicy(properties, null);
 
         sandboxAdapter = new DockerSandboxAdapter(
                 networkManager, workspaceManager, containerManager, securityPolicy, 8080, new SimpleMeterRegistry());
@@ -112,34 +118,6 @@ class DockerSandboxLiveTest {
     class EndToEnd {
 
         @Test
-        void shouldRunAndCollectOutput() {
-            UUID jobId = UUID.randomUUID();
-
-            String script =
-                    "#!/bin/sh\nmkdir -p /workspace/out\necho '{\"status\":\"ok\"}' > /workspace/out/result.json\necho 'done'";
-
-            SandboxSpec spec = new SandboxSpec(
-                    jobId,
-                    "alpine:latest",
-                    List.of("sh", "-c", script),
-                    Map.of("TEST_VAR", "hello"),
-                    new NetworkPolicy(true, null, null), // Use bridge for simplicity
-                    new ResourceLimits(512 * 1024 * 1024, 1.0, 128, Duration.ofMinutes(1)),
-                    testSecurityProfile(),
-                    Map.of(),
-                    "/workspace/out",
-                    null);
-
-            SandboxResult result = sandboxAdapter.execute(spec);
-
-            assertThat(result.exitCode()).isZero();
-            assertThat(result.timedOut()).isFalse();
-            assertThat(result.duration()).isPositive();
-            assertThat(result.outputFiles()).containsKey("result.json");
-            assertThat(new String(result.outputFiles().get("result.json"))).contains("ok");
-        }
-
-        @Test
         void shouldHandleNonZeroExit() {
             UUID jobId = UUID.randomUUID();
 
@@ -159,6 +137,88 @@ class DockerSandboxLiveTest {
 
             assertThat(result.exitCode()).isEqualTo(42);
             assertThat(result.timedOut()).isFalse();
+        }
+    }
+
+    /**
+     * The archive the reader parses is produced by the daemon's own Go {@code archive/tar}, so these are
+     * the cases a hand-built fixture cannot vouch for: what Moby actually emits, and what it emits for a
+     * name or an entry the reader refuses.
+     */
+    @Nested
+    class OutputArchive {
+
+        @Test
+        void shouldCollectExactBytesWhenContainerWritesOutput() {
+            String written = "{\"observations\":[],\"schemaVersion\":1}\n";
+
+            SandboxResult result = run("printf '%s' '" + written + "' > /var/tmp/out/result.json");
+
+            assertThat(result.timedOut()).isFalse();
+            assertThat(result.duration()).isPositive();
+            assertThat(result.outputFiles()).containsOnlyKeys("result.json");
+            assertThat(result.outputFiles().get("result.json")).isEqualTo(written.getBytes(StandardCharsets.UTF_8));
+        }
+
+        @Test
+        void shouldRejectRunWhenAnOutputNameNeedsANameExtensionRecord() {
+            String name = "a".repeat(97) + ".json";
+
+            assertThatThrownBy(() -> run("echo '{}' > /var/tmp/out/" + name))
+                    .isInstanceOf(SandboxException.class)
+                    .cause()
+                    .hasMessageContaining("at most 100 ASCII bytes");
+        }
+
+        @Test
+        void shouldRejectRunWhenOutputContainsASymlink() {
+            assertThatThrownBy(() -> run("ln -s /etc/passwd /var/tmp/out/leak"))
+                    .isInstanceOf(SandboxException.class)
+                    .cause()
+                    .hasMessageContaining("regular files");
+        }
+
+        @Test
+        void shouldRejectRunWhenOutputExceedsTheBudget() {
+            var tightAdapter = new DockerSandboxAdapter(
+                    networkManager,
+                    new SandboxWorkspaceManager(dockerOps, 4096, 4096, 4096, 16),
+                    containerManager,
+                    securityPolicy,
+                    8080,
+                    new SimpleMeterRegistry());
+
+            assertThatThrownBy(() -> run("dd if=/dev/zero of=/var/tmp/out/big.bin bs=1k count=64", tightAdapter))
+                    .isInstanceOf(SandboxException.class)
+                    .cause()
+                    .hasMessageContaining("extracted size limit");
+        }
+
+        private SandboxResult run(String script) {
+            return run(script, sandboxAdapter);
+        }
+
+        /**
+         * Collects from {@code /var/var/tmp/out} rather than {@code /workspace/out}: the container runs as uid
+         * 1000, a stock image has no {@code /workspace} it may create, and the policy's mandatory tmpfs
+         * mounts are gone by the time the archive is read. Only the {@code out} basename reaches the
+         * reader, so the archive is shaped exactly as production's.
+         */
+        private SandboxResult run(String script, DockerSandboxAdapter adapter) {
+            SandboxSpec spec = new SandboxSpec(
+                    UUID.randomUUID(),
+                    "alpine:latest",
+                    List.of("sh", "-c", "mkdir -p /var/tmp/out && " + script),
+                    Map.of(),
+                    new NetworkPolicy(true, null, null),
+                    new ResourceLimits(256 * 1024 * 1024, 0.5, 64, Duration.ofMinutes(1)),
+                    testSecurityProfile(),
+                    Map.of(),
+                    "/var/tmp/out",
+                    null);
+            SandboxResult result = adapter.execute(spec);
+            assertThat(result.exitCode()).isZero();
+            return result;
         }
     }
 
@@ -226,13 +286,13 @@ class DockerSandboxLiveTest {
             SandboxSpec spec = new SandboxSpec(
                     jobId,
                     "alpine:latest",
-                    List.of("echo", "cleanup-test"),
+                    List.of("sh", "-c", "mkdir -p /var/tmp/out && echo cleanup-test > /var/tmp/out/done.txt"),
                     Map.of(),
                     new NetworkPolicy(true, null, null),
                     new ResourceLimits(256 * 1024 * 1024, 0.5, 64, Duration.ofMinutes(1)),
                     testSecurityProfile(),
                     Map.of(),
-                    "/workspace/out",
+                    "/var/tmp/out",
                     null);
 
             sandboxAdapter.execute(spec);

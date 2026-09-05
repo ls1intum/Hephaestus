@@ -364,6 +364,9 @@ public class DockerClientOperations
             return dockerClient
                     .copyArchiveFromContainerCmd(containerId, remotePath)
                     .exec();
+        } catch (NotFoundException e) {
+            // A path the container never wrote is absent on every retry, so this is not infrastructure.
+            throw new SandboxException("No archive at " + remotePath + " in container " + containerId, e);
         } catch (DockerException e) {
             throw new SandboxInfrastructureException(
                     "Failed to copy archive from container " + containerId + " at " + remotePath, e);

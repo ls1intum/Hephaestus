@@ -10,6 +10,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxException;
+import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxInfrastructureException;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -20,9 +21,9 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
+import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -46,7 +47,6 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
     class InjectFiles {
 
         @Test
-        @DisplayName("should create tar archive and copy to container")
         void shouldInjectFiles() {
             Map<String, byte[]> files = Map.of(".prompt", "test prompt".getBytes(), "config.json", "{}".getBytes());
 
@@ -56,7 +56,6 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("applies workspace region permissions")
         void shouldApplyWorkspaceRegionPermissionsWhenFilesAreInjected() throws IOException {
             Map<String, byte[]> files = new HashMap<>();
             files.put("inputs/context/diff.patch", "d".getBytes());
@@ -155,8 +154,7 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("stages an input far past the removed 50 MB ceiling")
-        void shouldStageInputsBeyondTheFormerCeiling(@TempDir Path tempDir) throws Exception {
+        void shouldStreamLargeInputsFromDisk(@TempDir Path tempDir) throws Exception {
             // The archive is written to a temp file and on-disk entries stream through a fixed buffer,
             // so total staged size is bounded by disk, not by heap.
             Path large = tempDir.resolve("large.bin");
@@ -190,7 +188,6 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("streams on-disk inputs without reading them into this process")
         void shouldStreamOnDiskInputs(@TempDir Path tempDir) throws Exception {
             Path source = tempDir.resolve("App.java");
             Files.writeString(source, "class App {}");
@@ -238,19 +235,33 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return empty map when docker cp fails")
-        void shouldReturnEmptyOnFailure() {
+        void shouldStayRetryableWhenTheOutputTransferFails() {
             when(fileOps.copyArchiveFromContainer(CONTAINER_ID, "/workspace/out"))
-                    .thenThrow(new SandboxException("No such path"));
+                    .thenThrow(new SandboxInfrastructureException("Docker daemon socket closed"));
 
-            Map<String, byte[]> output = manager.collectOutput(CONTAINER_ID, "/workspace/out");
+            assertThatThrownBy(() -> manager.collectOutput(CONTAINER_ID, "/workspace/out"))
+                    .as("AgentJobExecutor.isRetryableInfraFailure requeues on this type, and a daemon that"
+                            + " dropped a completed run's transfer is exactly what it is for")
+                    .isInstanceOf(SandboxInfrastructureException.class)
+                    .hasMessage("Docker daemon socket closed");
+        }
 
-            assertThat(output).isEmpty();
+        @Test
+        void shouldFailWithoutInfrastructureRetryWhenTheOutputArchiveIsInvalid() throws Exception {
+            byte[] tarBytes = createTestTar(Map.of("out/result.json", "{}".getBytes()));
+            tarBytes[0] ^= 1;
+            when(fileOps.copyArchiveFromContainer(CONTAINER_ID, "/workspace/out"))
+                    .thenReturn(new ByteArrayInputStream(tarBytes));
+
+            assertThatThrownBy(() -> manager.collectOutput(CONTAINER_ID, "/workspace/out"))
+                    .as("a rejected archive is rejected identically on every retry")
+                    .isExactlyInstanceOf(SandboxException.class)
+                    .hasMessageContaining("Invalid or incomplete sandbox output archive");
         }
 
         @Test
         void shouldEnforceOutputSizeLimit() throws Exception {
-            // Use a small limit (1 KB) for this test to avoid allocating megabytes in CI
+            // A 1 KB budget keeps the fixture out of the megabytes while still crossing the limit.
             var limitedManager = new SandboxWorkspaceManager(
                     fileOps,
                     1024,
@@ -265,52 +276,44 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
             when(fileOps.copyArchiveFromContainer(CONTAINER_ID, "/workspace/out"))
                     .thenReturn(new ByteArrayInputStream(tarBytes));
 
-            Map<String, byte[]> output = limitedManager.collectOutput(CONTAINER_ID, "/workspace/out");
-
-            // Only one file should be collected — the second pushes past the limit
-            assertThat(output).hasSize(1);
+            assertThatThrownBy(() -> limitedManager.collectOutput(CONTAINER_ID, "/workspace/out"))
+                    .isInstanceOf(SandboxException.class);
         }
 
         @Test
-        void shouldSkipTraversalPathsInOutput() throws Exception {
+        void shouldRejectWholeOutputWhenPathTraversesRoot() throws Exception {
             byte[] tarBytes = createTestTar(Map.of(
                     "out/../../../etc/passwd", "malicious".getBytes(), "out/safe.txt", "safe content".getBytes()));
             when(fileOps.copyArchiveFromContainer(CONTAINER_ID, "/workspace/out"))
                     .thenReturn(new ByteArrayInputStream(tarBytes));
 
-            Map<String, byte[]> output = manager.collectOutput(CONTAINER_ID, "/workspace/out");
-
-            assertThat(output).hasSize(1);
-            assertThat(output).containsKey("safe.txt");
-            assertThat(output).doesNotContainKey("../../../etc/passwd");
+            assertThatThrownBy(() -> manager.collectOutput(CONTAINER_ID, "/workspace/out"))
+                    .isInstanceOf(SandboxException.class);
         }
 
         @Test
-        @DisplayName("should skip symbolic links in output archive")
-        void shouldSkipSymlinks() throws Exception {
+        void shouldRejectOutputWhenItContainsSymlinks() throws Exception {
             byte[] tarBytes = createTestTarWithSymlink("out/evil", "/etc/shadow");
             when(fileOps.copyArchiveFromContainer(CONTAINER_ID, "/workspace/out"))
                     .thenReturn(new ByteArrayInputStream(tarBytes));
 
-            Map<String, byte[]> output = manager.collectOutput(CONTAINER_ID, "/workspace/out");
-
-            assertThat(output).isEmpty();
+            assertThatThrownBy(() -> manager.collectOutput(CONTAINER_ID, "/workspace/out"))
+                    .isInstanceOf(SandboxException.class);
         }
 
         @Test
-        void shouldSkipHardLinks() throws Exception {
+        void shouldRejectOutputWhenItContainsHardLinks() throws Exception {
             byte[] tarBytes = createTestTarWithHardLink("out/link", "out/target");
             when(fileOps.copyArchiveFromContainer(CONTAINER_ID, "/workspace/out"))
                     .thenReturn(new ByteArrayInputStream(tarBytes));
 
-            Map<String, byte[]> output = manager.collectOutput(CONTAINER_ID, "/workspace/out");
-
-            assertThat(output).isEmpty();
+            assertThatThrownBy(() -> manager.collectOutput(CONTAINER_ID, "/workspace/out"))
+                    .isInstanceOf(SandboxException.class);
         }
 
         @Test
-        void shouldSkipOversizedSingleFile() throws Exception {
-            // Use a manager with a 10-byte per-file limit to avoid allocating megabytes in tests
+        void shouldRejectWholeOutputWhenSingleFileExceedsLimit() throws Exception {
+            // A 10-byte per-file budget keeps the fixture out of the megabytes.
             var limitedManager = new SandboxWorkspaceManager(
                     fileOps,
                     10_000,
@@ -325,14 +328,11 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
             when(fileOps.copyArchiveFromContainer(CONTAINER_ID, "/workspace/out"))
                     .thenReturn(new ByteArrayInputStream(tarBytes));
 
-            Map<String, byte[]> output = limitedManager.collectOutput(CONTAINER_ID, "/workspace/out");
-
-            assertThat(output).containsKey("small.txt");
-            assertThat(output).doesNotContainKey("toobig.txt");
+            assertThatThrownBy(() -> limitedManager.collectOutput(CONTAINER_ID, "/workspace/out"))
+                    .isInstanceOf(SandboxException.class);
         }
 
         @Test
-        @DisplayName("should skip directory entries in tar")
         void shouldSkipDirectories() throws Exception {
             byte[] tarBytes = createTestTarWithDir("result.json", "{}".getBytes());
             when(fileOps.copyArchiveFromContainer(CONTAINER_ID, "/workspace/out"))
@@ -351,15 +351,41 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         @TempDir
         Path tempDir;
 
-        // Size limit tests
+        @Test
+        void shouldExcludeSymbolicLinksWhenInjectingDirectory() throws Exception {
+            Path source = Files.createDirectory(tempDir.resolve("source"));
+            Path outside = Files.createDirectory(tempDir.resolve("outside"));
+            Path secret = Files.writeString(outside.resolve("secret.txt"), "not an input");
+            Files.writeString(source.resolve("kept.txt"), "input");
+            Files.createSymbolicLink(source.resolve("file-link"), secret);
+            Files.createSymbolicLink(source.resolve("directory-link"), outside);
+            Files.createSymbolicLink(source.resolve("dangling-link"), outside.resolve("missing"));
+            Map<String, byte[]> entries = new HashMap<>();
+            doAnswer(invocation -> {
+                        try (var tar = new TarArchiveInputStream(invocation.getArgument(2, InputStream.class))) {
+                            TarArchiveEntry entry;
+                            while ((entry = tar.getNextEntry()) != null) {
+                                entries.put(entry.getName(), tar.readAllBytes());
+                            }
+                        }
+                        return null;
+                    })
+                    .when(fileOps)
+                    .copyArchiveToContainer(eq(CONTAINER_ID), eq("/workspace"), any(InputStream.class));
+
+            manager.injectDirectories(CONTAINER_ID, Map.of(source.toString(), "/workspace/repo"));
+
+            assertThat(entries).containsOnlyKeys("repo/", "repo/kept.txt");
+            assertThat(entries.get("repo/kept.txt"))
+                    .isEqualTo("input".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        }
 
         @Test
         void shouldRejectDirectoryExceedingSizeLimit() throws Exception {
-            // Use a tiny limit (1 KB) to avoid allocating megabytes in CI
+            // A 1 KB budget keeps the fixture out of the megabytes while still crossing the limit.
             var limitedManager = new SandboxWorkspaceManager(
                     fileOps, 50L * 1024 * 1024, 10L * 1024 * 1024, 1024, SandboxWorkspaceManager.MAX_DIRECTORY_ENTRIES);
 
-            // Create two files totaling > 1024 bytes
             Files.write(tempDir.resolve("file1.txt"), new byte[600]);
             Files.write(tempDir.resolve("file2.txt"), new byte[600]);
 
@@ -371,7 +397,6 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
 
         @Test
         void shouldAcceptDirectoryAtExactSizeLimit() throws Exception {
-            // Exactly 100 bytes of content — limit is 100
             var limitedManager = new SandboxWorkspaceManager(
                     fileOps, 50L * 1024 * 1024, 10L * 1024 * 1024, 100, SandboxWorkspaceManager.MAX_DIRECTORY_ENTRIES);
 
@@ -401,7 +426,6 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
             var limitedManager = new SandboxWorkspaceManager(
                     fileOps, 50L * 1024 * 1024, 10L * 1024 * 1024, 4096, SandboxWorkspaceManager.MAX_DIRECTORY_ENTRIES);
 
-            // Create a nested directory structure: sub/nested.txt
             Path subDir = Files.createDirectory(tempDir.resolve("sub"));
             Files.write(subDir.resolve("nested.txt"), "nested content".getBytes());
             Files.write(tempDir.resolve("root.txt"), "root content".getBytes());
@@ -557,12 +581,10 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         try (TarArchiveOutputStream tar = new TarArchiveOutputStream(baos)) {
             tar.setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
 
-            // Add directory entry
             TarArchiveEntry dirEntry = new TarArchiveEntry("out/");
             tar.putArchiveEntry(dirEntry);
             tar.closeArchiveEntry();
 
-            // Add file entry
             TarArchiveEntry fileEntry = new TarArchiveEntry("out/" + fileName);
             fileEntry.setSize(content.length);
             tar.putArchiveEntry(fileEntry);

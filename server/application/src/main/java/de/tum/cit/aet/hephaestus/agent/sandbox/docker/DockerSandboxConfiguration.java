@@ -116,7 +116,7 @@ public class DockerSandboxConfiguration {
                 .responseTimeout(responseTimeout)
                 .build();
 
-        DockerClient client = DockerClientImpl.getInstance(config, httpClient);
+        DockerClient client = DockerClientImpl.getInstance(config, new ResponseOwnedDockerHttpClient(httpClient));
         log.info(
                 "Docker sandbox client configured: kind={}, host={}, tlsVerify={}, responseTimeout={}, maxConnections={}",
                 kind,

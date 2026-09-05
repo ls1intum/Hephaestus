@@ -35,6 +35,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
@@ -110,6 +111,16 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
     }
 
     private void setupHappyPath() {
+        setupExecution();
+        when(workspaceManager.collectOutput(eq(CONTAINER_ID), anyString()))
+                .thenReturn(Map.of("result.json", "{}".getBytes()));
+    }
+
+    private void setupExecution() {
+        setupExecution(0, false);
+    }
+
+    private void setupExecution(int exitCode, boolean timedOut) {
         when(networkManager.createJobNetwork(eq(JOB_ID), eq(false))).thenReturn(NETWORK_ID);
         when(networkManager.connectAppServer(NETWORK_ID)).thenReturn(APP_SERVER_IP);
         when(securityPolicy.buildHostConfig(any(), any(), any())).thenReturn(DEFAULT_HOST_CONFIG);
@@ -117,9 +128,7 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
                 .thenReturn(Map.of("hephaestus.managed", "true", "hephaestus.job-id", JOB_ID.toString()));
         when(containerManager.createContainer(any())).thenReturn(CONTAINER_ID);
         when(containerManager.waitForCompletion(eq(CONTAINER_ID), any()))
-                .thenReturn(new SandboxContainerManager.WaitOutcome(0, false));
-        when(workspaceManager.collectOutput(eq(CONTAINER_ID), anyString()))
-                .thenReturn(Map.of("result.json", "{}".getBytes()));
+                .thenReturn(new SandboxContainerManager.WaitOutcome(exitCode, timedOut));
         when(containerManager.getLogs(eq(CONTAINER_ID), anyInt())).thenReturn("hello\n");
     }
 
@@ -453,6 +462,35 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
 
     @Nested
     class FailureHandling {
+
+        @ParameterizedTest
+        @CsvSource({"137,true", "42,false"})
+        void shouldPreserveTerminalFailureWhenOutputCollectionFails(int exitCode, boolean timedOut) {
+            setupExecution(exitCode, timedOut);
+            when(workspaceManager.collectOutput(eq(CONTAINER_ID), anyString()))
+                    .thenThrow(new SandboxException("No output directory"));
+
+            var result = sandboxAdapter.execute(createSpec());
+
+            assertThat(result.timedOut()).isEqualTo(timedOut);
+            assertThat(result.exitCode()).isEqualTo(exitCode);
+            assertThat(result.outputFiles()).isEmpty();
+            verify(containerManager).forceRemove(CONTAINER_ID);
+        }
+
+        @Test
+        void shouldFailAndCleanUpWhenOutputIsInvalidDespiteZeroExit() {
+            setupExecution();
+            when(workspaceManager.collectOutput(eq(CONTAINER_ID), anyString()))
+                    .thenThrow(new SandboxException("Invalid output archive"));
+
+            assertThatThrownBy(() -> sandboxAdapter.execute(createSpec()))
+                    .isInstanceOf(SandboxException.class)
+                    .hasMessageContaining("Invalid output archive");
+            verify(containerManager).forceRemove(CONTAINER_ID);
+            verify(networkManager).disconnectAppServer(NETWORK_ID);
+            verify(networkManager).removeNetwork(NETWORK_ID);
+        }
 
         @Test
         void shouldThrowOnNetworkFailure() {
@@ -853,7 +891,7 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
 
         @Test
         void shouldBlockCaseVariants() {
-            // Some tools/shells inject lowercase variants
+            // Some tools and shells inject lowercase variants.
             assertThat(SandboxEnvBlocklist.isBlocked("aws_access_key_id")).isTrue();
             assertThat(SandboxEnvBlocklist.isBlocked("docker_host")).isTrue();
             assertThat(SandboxEnvBlocklist.isBlocked("Google_Cloud_Project")).isTrue();
@@ -979,7 +1017,6 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
             assertThat(env).containsEntry("GIT_ATTR_NOSYSTEM", "1");
             assertThat(env).containsKey("GIT_CONFIG_COUNT");
 
-            // core.hooksPath must be /nonexistent — the canonical safety check
             assertThat(env.get("GIT_CONFIG_KEY_0")).isEqualTo("core.hooksPath");
             assertThat(env.get("GIT_CONFIG_VALUE_0")).isEqualTo("/nonexistent");
         }
