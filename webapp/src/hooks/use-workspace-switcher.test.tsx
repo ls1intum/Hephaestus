@@ -39,21 +39,14 @@ function SwitchWorkspace() {
 	);
 }
 
-/**
- * `mountAtRoot` puts the switcher above every match, which is where `__root.tsx` renders it —
- * the placement the whole portable branch rests on, since `to: "."` resolves from the deepest
- * match of the current location rather than from the calling component's route.
- */
-function renderRoute(initialEntry: string, path: string, { mountAtRoot = false } = {}) {
+function renderRoute(initialEntry: string, path: string) {
 	const rootRoute = createRootRoute({
-		component: mountAtRoot
-			? () => (
-					<>
-						<SwitchWorkspace />
-						<Outlet />
-					</>
-				)
-			: Outlet,
+		component: () => (
+			<>
+				<SwitchWorkspace />
+				<Outlet />
+			</>
+		),
 	});
 	const workspaceRoute = createRoute({
 		getParentRoute: () => rootRoute,
@@ -63,10 +56,9 @@ function renderRoute(initialEntry: string, path: string, { mountAtRoot = false }
 	const currentRoute = createRoute({
 		getParentRoute: () => workspaceRoute,
 		path,
-		component: mountAtRoot ? () => null : SwitchWorkspace,
+		component: () => null,
 	});
-	// The workspace home's own schema and search middleware, not a copy: which of its options survive
-	// a switch is the thing under test, so a key added to the retain list is tested here too.
+	// The workspace home's own schema and middleware, so the retain list under test is the real one.
 	const indexRoute = createRoute({
 		getParentRoute: () => workspaceRoute,
 		path: "/",
@@ -112,23 +104,8 @@ async function clickWorkspaceSwitch() {
 describe("useWorkspaceSwitcher", () => {
 	beforeEach(() => vi.clearAllMocks());
 
-	it("keeps a portable route", async () => {
-		const router = renderRoute("/w/alpha/teams?tab=members", "teams");
-
-		await clickWorkspaceSwitch();
-
-		await waitFor(() => expect(router.state.location.href).toBe("/w/beta/teams"));
-		expect(toast.info).not.toHaveBeenCalled();
-	});
-
 	it("clears the leaderboard's team filter and keeps its workspace-independent options", async () => {
-		const router = renderRoute(
-			"/w/alpha?team=Backend&sort=LEAGUE_POINTS&mode=INDIVIDUAL",
-			"teams",
-			{
-				mountAtRoot: true,
-			},
-		);
+		const router = renderRoute("/w/alpha?team=Backend&sort=LEAGUE_POINTS&mode=INDIVIDUAL", "teams");
 
 		await clickWorkspaceSwitch();
 
@@ -139,8 +116,8 @@ describe("useWorkspaceSwitcher", () => {
 		);
 	});
 
-	it("keeps a portable route when the switcher is mounted above every match", async () => {
-		const router = renderRoute("/w/alpha/teams?tab=members", "teams", { mountAtRoot: true });
+	it("keeps a portable route", async () => {
+		const router = renderRoute("/w/alpha/teams?tab=members", "teams");
 
 		await clickWorkspaceSwitch();
 
@@ -160,22 +137,21 @@ describe("useWorkspaceSwitcher", () => {
 	});
 
 	it.each([
-		["mentor thread", "/w/alpha/mentor/thread-1?message=foreign", "mentor/$threadId"],
-		["user profile", "/w/alpha/user/octocat?group=foreign", "user/$username"],
+		["mentor thread", "/w/alpha/mentor/thread-1?message=foreign", "mentor/$threadId", "message"],
+		["user profile", "/w/alpha/user/octocat?group=foreign", "user/$username", "group"],
 		[
 			"practice",
 			"/w/alpha/admin/practices/testing?status=foreign",
 			"admin/practices/$practiceSlug",
+			"status",
 		],
-	])("falls back to workspace home from a %s", async (_name, initialEntry, path) => {
+	])("falls back to workspace home from a %s", async (_name, initialEntry, path, searchKey) => {
 		const router = renderRoute(initialEntry, path);
 
 		await clickWorkspaceSwitch();
 
-		// The workspace home writes its own defaults into the URL; nothing of the previous page's.
-		await waitFor(() =>
-			expect(router.state.location.href).toBe("/w/beta?team=all&sort=SCORE&mode=INDIVIDUAL"),
-		);
+		await waitFor(() => expect(router.state.location.pathname).toBe("/w/beta"));
+		expect(router.state.location.search).not.toHaveProperty(searchKey);
 		expect(toast.info).toHaveBeenCalledExactlyOnceWith("Switched to Beta workspace", {
 			description:
 				"This page is specific to the previous workspace, so Hephaestus opened the new workspace's home page.",

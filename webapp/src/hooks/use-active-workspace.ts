@@ -14,14 +14,11 @@ export function useActiveWorkspaceSlug() {
 	const query = useQuery({
 		...listWorkspacesOptions(),
 		enabled: isAuthenticated && !authLoading,
-		staleTime: 30_000,
-		refetchOnWindowFocus: true,
 	});
 	const workspaces = Array.isArray(query.data) ? query.data : NO_WORKSPACES;
 	const workspaceSlug = useParams({ strict: false, select: (params) => params.workspaceSlug });
-	// The app chrome renders on every route, including the ones whose URL names no workspace, and a
-	// member of workspaces must not be shown as belonging to none. `workspaceSlug` stays the only
-	// source for workspace-scoped data, so the two are separate values rather than one fallback.
+	// Two values, not one fallback: the app chrome also renders on routes whose URL names no
+	// workspace, while `workspaceSlug` stays the only source for workspace-scoped data.
 	const chromeWorkspaceSlug = workspaceSlug ?? workspaces[0]?.workspaceSlug;
 	const chromeWorkspace = workspaces.find(
 		(workspace) => workspace.workspaceSlug === chromeWorkspaceSlug,
@@ -30,6 +27,7 @@ export function useActiveWorkspaceSlug() {
 	return {
 		workspaceSlug,
 		chromeWorkspaceSlug,
+		chromeWorkspace,
 		workspaces,
 		// A workspace is SCM-backed; SLACK (an identity provider) never reaches SCM-only UI, but the
 		// generated type includes it, so narrow to the SCM ProviderType with a GITHUB fallback.

@@ -59,9 +59,8 @@ function LoginPage() {
 	return (
 		<LoginCard
 			title="Welcome to Hephaestus"
-			// Two sentences, not five: the detail belongs in the transparency notice. But the fact that
-			// signing in shares a provider identity has to be here, because it is the decision being
-			// made on this page — a notice shown afterwards cannot inform it.
+			// Sharing the provider identity is the decision made on this page, so it is said here; the
+			// notice shown afterwards cannot inform it.
 			description={
 				<span className="space-y-2">
 					<span className="block">Your AI mentor for growing as a software engineer.</span>

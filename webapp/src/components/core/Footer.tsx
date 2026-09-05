@@ -6,6 +6,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { optionalIntegrationsAvailable, requestConsentReopen } from "@/integrations/consent";
 import { hasText } from "@/lib/text";
 import { cn } from "@/lib/utils";
+import { REPO_URL } from "@/lib/version";
 
 export interface FooterProps {
 	className?: string;
@@ -46,7 +47,7 @@ export default function Footer({ className, isProduction, buildInfo }: FooterPro
 					</a>
 					. Source on{" "}
 					<a
-						href="https://github.com/hephaestus-build/Hephaestus"
+						href={REPO_URL}
 						target="_blank"
 						rel="noopener noreferrer"
 						className="font-medium underline underline-offset-4 hover:text-foreground"
@@ -65,7 +66,7 @@ export default function Footer({ className, isProduction, buildInfo }: FooterPro
 							About
 						</Link>
 						<a
-							href="https://github.com/hephaestus-build/Hephaestus/releases"
+							href={`${REPO_URL}/releases`}
 							target="_blank"
 							rel="noopener noreferrer"
 							className="text-sm text-muted-foreground hover:text-foreground hover:underline underline-offset-4"
@@ -102,7 +103,7 @@ export default function Footer({ className, isProduction, buildInfo }: FooterPro
 									<TooltipTrigger
 										render={
 											<a
-												href={`https://github.com/hephaestus-build/Hephaestus/tree/${buildInfo.branch}`}
+												href={`${REPO_URL}/tree/${buildInfo.branch}`}
 												target="_blank"
 												rel="noopener noreferrer"
 												aria-label={`View branch ${buildInfo.branch}`}
@@ -122,7 +123,7 @@ export default function Footer({ className, isProduction, buildInfo }: FooterPro
 									<TooltipTrigger
 										render={
 											<a
-												href={`https://github.com/hephaestus-build/Hephaestus/commit/${buildInfo.commit}`}
+												href={`${REPO_URL}/commit/${buildInfo.commit}`}
 												target="_blank"
 												rel="noopener noreferrer"
 												aria-label={`View commit ${buildInfo.commit.substring(0, 7)}`}

@@ -1,9 +1,8 @@
 import type { WorkspaceListItem } from "@/api/types.gen";
 
 /**
- * One entry of `GET /workspaces`. `createdAt` is a real `Date` — the shape the generated response
- * transformer produces — so the same value can seed the query cache directly and, through
- * `HttpResponse.json`, serialise to the ISO string a response carries.
+ * `createdAt` is a `Date`, the transformed shape, so one value both seeds the query cache and
+ * serialises through `HttpResponse.json` to the ISO string the wire carries.
  */
 export function workspaceListItem(
 	workspaceSlug: string,

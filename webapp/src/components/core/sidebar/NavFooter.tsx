@@ -7,6 +7,7 @@ import {
 	SidebarMenuItem,
 	SidebarSeparator,
 } from "@/components/ui/sidebar";
+import { REPO_URL } from "@/lib/version";
 
 interface NavFooterProps {
 	isAppAdmin?: boolean;
@@ -41,7 +42,7 @@ export function NavFooter({ isAppAdmin = false }: NavFooterProps) {
 				<SidebarMenuItem>
 					<SidebarMenuButton
 						tooltip="Report issue"
-						render={<a href="https://github.com/hephaestus-build/Hephaestus/issues/new/choose" />}
+						render={<a href={`${REPO_URL}/issues/new/choose`} />}
 					>
 						<Bug />
 						<span>Report&nbsp;issue</span>
@@ -51,9 +52,7 @@ export function NavFooter({ isAppAdmin = false }: NavFooterProps) {
 					<SidebarMenuButton
 						tooltip="Request a feature"
 						className="text-provider-upsell-foreground hover:text-provider-upsell-foreground hover:bg-provider-upsell-foreground/10 dark:hover:bg-provider-upsell-foreground/10"
-						render={
-							<a href="https://github.com/hephaestus-build/Hephaestus/discussions/new/choose" />
-						}
+						render={<a href={`${REPO_URL}/discussions/new/choose`} />}
 					>
 						<Sparkles />
 						<span>Request&nbsp;a&nbsp;feature</span>

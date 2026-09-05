@@ -5,14 +5,16 @@ export function useWorkspaceSwitcher() {
 	const navigate = useNavigate();
 	const params = useParams({ strict: false });
 	const currentWorkspaceSlug = params.workspaceSlug;
-	// A route is portable only when `workspaceSlug` is the only thing in the URL that names a
-	// workspace-scoped row: any second path param names a row the new workspace does not have.
+	// Any path param besides `workspaceSlug` names a row of the current workspace, which the new one
+	// does not have.
 	const portable =
 		currentWorkspaceSlug !== undefined &&
 		Object.keys(params).every((parameter) => parameter === "workspaceSlug");
 
-	// The destination route's search middleware runs after this updater, so clearing the search leaves
-	// each route to declare which of its own options are portable through `retainSearchParams`.
+	// `to: "."` resolves from the current location's deepest match, not from the route that rendered
+	// the caller, so the switcher can live in the app chrome. The destination's search middleware runs
+	// after this updater, so clearing the search leaves each route to declare which of its own options
+	// are portable through `retainSearchParams`.
 	return async (workspace: { displayName: string; workspaceSlug: string }) => {
 		const { displayName, workspaceSlug } = workspace;
 		if (workspaceSlug === currentWorkspaceSlug) return;

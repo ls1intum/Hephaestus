@@ -19,14 +19,7 @@ export const Route = createFileRoute("/")({
 	beforeLoad: async ({ context }) => {
 		const user = await resolveCurrentUser(context.queryClient);
 		if (!user) return;
-		// Every gated call is refused until the transparency notice is answered, and "/" is the page a
-		// reader lands on after signing in — so without this the first thing a new account meets is
-		// the error boundary. `_authenticated` has always done this; only this route was missing it.
-		//
-		// A redirect rather than a flag: suppressing what renders would not stop the routes below from
-		// running their own guards, which fetch too. Aborting the match is what actually stops them.
-		// The mask keeps the address bar on the page the reader asked for, so the notice reads as an
-		// interruption of that page rather than a trip to somewhere else.
+		// The workspace list below is a gated call, refused until the notice is answered.
 		if (await consentIsPending(context.queryClient)) {
 			throw redirect({
 				to: "/consent",
@@ -56,7 +49,6 @@ function IndexPage() {
 	);
 }
 
-/** Only reached signed out, so the landing page needs no signed-in affordance. */
 function LandingContainer() {
 	const { login } = useAuth();
 	return <LandingPage onSignIn={(idpHint) => login(idpHint, "/")} />;

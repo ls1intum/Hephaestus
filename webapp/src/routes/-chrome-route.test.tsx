@@ -10,10 +10,6 @@ import { ROUTE_RENDER_WAIT, renderRouteAt } from "@/test/router-harness";
 // A case mounts the whole app chrome, whose route modules are imported lazily.
 vi.setConfig({ testTimeout: 30_000 });
 
-/**
- * `/settings` and the instance console name no workspace in their URL, and the chrome renders on
- * both — so a member of workspaces must not be told there they belong to none.
- */
 describe("app chrome on a route with no workspace in the URL", () => {
 	beforeEach(() => {
 		server.use(

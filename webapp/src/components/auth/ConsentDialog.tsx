@@ -23,17 +23,14 @@ export interface ConsentChoice {
 }
 
 interface ConsentDialogProps {
-	/** The notice to show. While it is loading the dialog is already open, so the app never flashes. */
+	/** Absent only when loading it failed. */
 	notice: ConsentStatus | undefined;
-	/** The notice could not be loaded; the app stays blocked because the choice is still required. */
 	failedToLoad?: boolean;
 	onSubmit: (choice: ConsentChoice) => void;
 	/** Declining is an answer too: without a way out, the only exit from a trapped surface is the tab. */
 	onSignOut: () => void;
-	/** Retry loading the notice, so a failed fetch is not a dead end. */
 	onRetry: () => void;
 	submitting?: boolean;
-	/** The choice reached the server and was not stored. */
 	failedToSubmit?: boolean;
 }
 
@@ -61,11 +58,8 @@ export function ConsentDialog({
 	const researchHeadingId = useId();
 
 	return (
-		// Held open: a request to close is ignored rather than unsupported, because the server refuses
-		// every other call until the choice is recorded and a closeable dialog would leave an
-		// application that answers nothing.
 		<Dialog open modal onOpenChange={() => undefined}>
-			<DialogContent showCloseButton={false} className="sm:max-w-xl" aria-describedby={undefined}>
+			<DialogContent showCloseButton={false} className="sm:max-w-xl">
 				<DialogHeader>
 					<DialogTitle>How Hephaestus uses your data</DialogTitle>
 					<DialogDescription>
@@ -75,12 +69,12 @@ export function ConsentDialog({
 					</DialogDescription>
 				</DialogHeader>
 
-				{failedToLoad ? (
+				{failedToLoad || !notice ? (
 					<>
 						<DialogBody>
 							<p role="alert" className="text-muted-foreground">
-								We couldn't load the notice just now. Reload the page to try again — this choice is
-								needed before Hephaestus can show you anything.
+								We couldn't load the notice just now. This choice is needed before Hephaestus can
+								show you anything.
 							</p>
 						</DialogBody>
 						<DialogFooter className="flex-col items-stretch gap-3 sm:flex-col sm:items-stretch">
@@ -92,7 +86,7 @@ export function ConsentDialog({
 							</Button>
 						</DialogFooter>
 					</>
-				) : notice ? (
+				) : (
 					<>
 						<DialogBody className="space-y-6 leading-6">
 							<div className="space-y-4">
@@ -112,9 +106,8 @@ export function ConsentDialog({
 								</a>
 							</div>
 
-							{/* The research invitation stands on its own, as a thing worth doing, rather than as a
-							    second checkbox under the legal one. It stays unticked: consent has to be an act
-							    the reader takes, and a pre-ticked box is not one. */}
+							{/* Its own section rather than a second checkbox under the legal one, and never
+							    pre-ticked: consent is an act the reader takes. */}
 							<section
 								aria-labelledby={researchHeadingId}
 								className="bg-primary/5 ring-primary/20 space-y-3 rounded-lg p-4 ring-1"
@@ -187,10 +180,6 @@ export function ConsentDialog({
 							</DialogFooter>
 						</form>
 					</>
-				) : (
-					<DialogBody className="flex justify-center py-8">
-						<Spinner className="size-6" aria-label="Loading the transparency notice" />
-					</DialogBody>
 				)}
 			</DialogContent>
 		</Dialog>

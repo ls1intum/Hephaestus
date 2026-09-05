@@ -1,6 +1,7 @@
 import { Github } from "@/components/icons/brand";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
+import { REPO_URL } from "@/lib/version";
 
 export function AboutCallToActionSection() {
 	return (
@@ -20,7 +21,7 @@ export function AboutCallToActionSection() {
 			</p>
 			<div className="flex flex-col sm:flex-row gap-4 justify-center">
 				<a
-					href="https://github.com/ls1intum/Hephaestus"
+					href={REPO_URL}
 					target="_blank"
 					rel="noopener noreferrer"
 					className={buttonVariants({ size: "lg" })}

@@ -2,6 +2,6 @@
 Contact: https://github.com/hephaestus-build/Hephaestus/security/advisories/new
 Contact: mailto:felixtj.dietrich@tum.de
 Policy: https://github.com/hephaestus-build/Hephaestus/blob/main/SECURITY.md
-Canonical: https://hephaestus.aet.cit.tum.de/.well-known/security.txt
+Canonical: https://hephaestus.build/.well-known/security.txt
 Preferred-Languages: en, de
 Expires: 2027-07-16T00:00:00Z

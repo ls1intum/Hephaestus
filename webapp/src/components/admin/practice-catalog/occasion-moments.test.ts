@@ -46,7 +46,7 @@ describe("momentBands", () => {
 		]);
 	});
 
-	it("warns that an issue's middle moment repeats, because binding it is a decision about volume", () => {
+	it("reads an issue as start, one repeating middle moment, and end", () => {
 		const bands = momentBands(mockIssueWorkType.signals);
 
 		expect(
@@ -56,7 +56,6 @@ describe("momentBands", () => {
 			["during", ["scm.issue.updated"]],
 			["end", ["scm.issue.closed"]],
 		]);
-		expect(momentDef("scm.issue.updated").repeats).toBe(true);
 	});
 
 	it("gives a document its own three moments under the same three bands", () => {

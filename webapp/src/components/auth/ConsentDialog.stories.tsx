@@ -25,7 +25,6 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
-/** Nothing can be submitted until the required acceptance is given. */
 export const RequiresAcceptance: Story = {
 	play: async ({ args }) => {
 		const dialog = within(await screen.findByRole("dialog"));
@@ -43,7 +42,6 @@ export const RequiresAcceptance: Story = {
 	},
 };
 
-/** The optional choice is off until it is chosen, and never gates the button. */
 export const ResearchIsOptional: Story = {
 	play: async ({ args }) => {
 		const dialog = within(await screen.findByRole("dialog"));
@@ -60,7 +58,6 @@ export const ResearchIsOptional: Story = {
 
 export const Submitting: Story = { args: { submitting: true } };
 
-/** The choice reached the server and was refused; the reader is told and can retry. */
 export const SubmitFailed: Story = {
 	args: { failedToSubmit: true },
 	play: async () => {
@@ -69,10 +66,6 @@ export const SubmitFailed: Story = {
 	},
 };
 
-/** Still open while the notice loads, so the application never paints behind it first. */
-export const Loading: Story = { args: { notice: undefined } };
-
-/** The notice could not be fetched. The reader stays blocked, because the choice is still required. */
 export const FailedToLoad: Story = {
 	args: { notice: undefined, failedToLoad: true },
 	play: async () => {
@@ -81,7 +74,6 @@ export const FailedToLoad: Story = {
 	},
 };
 
-/** A mandatory dialog still needs a way out: declining is an answer, not a dead end. */
 export const CanDeclineAndSignOut: Story = {
 	play: async ({ args }) => {
 		const dialog = within(await screen.findByRole("dialog"));
@@ -90,7 +82,6 @@ export const CanDeclineAndSignOut: Story = {
 	},
 };
 
-/** The load failure offers a retry rather than stranding the reader on a reload instruction. */
 export const FailedToLoadCanRetry: Story = {
 	args: { notice: undefined, failedToLoad: true },
 	play: async ({ args }) => {
