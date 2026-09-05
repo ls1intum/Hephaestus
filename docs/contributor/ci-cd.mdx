@@ -117,7 +117,7 @@ changesets rather than adding one. [Release management](./release-management.mdx
 | --- | --- | --- | --- |
 | Dependency vulnerability gate | Security workflow | owns the dependency verdict; blocks fixable high or critical findings in every dependency the checkout resolves | required Security workflow |
 | GitHub dependency review | pull requests | reports the advisories a pull request introduces, with their patched versions; holds no verdict | Security workflow summary |
-| CodeQL default setup | managed by GitHub | repository SAST policy | code scanning |
+| CodeQL advanced setup | pull requests, merge groups, `main` pushes, and weekly | repository SAST policy | code scanning |
 | TruffleHog and GitHub push protection | pull requests and pushes | block verified secrets | Security workflow and repository protection |
 | Trivy filesystem scan | Security workflow | a scanner error blocks; findings of every severity are report-only | code scanning |
 | Semgrep TLS policy | pull requests, merge groups, and `main` pushes | fails on a rule violation or a scanner error | code scanning and a run artifact |
@@ -171,6 +171,16 @@ Semgrep reports; it is not a required check. The digest-pinned scanner runs with
 credentials over a read-only checkout, and `.github/workflows/semgrep.yml` owns the commands that
 reproduce a run locally. A pull request from a fork gets the scan verdict but no code-scanning row,
 because GitHub caps a fork token's `security-events` access at read.
+
+### CodeQL configuration
+
+`.github/workflows/codeql.yml` runs CodeQL under advanced setup: only advanced setup reads a
+committed config file, and `.github/codeql/codeql-config.yml` excludes `security/semgrep/**`,
+whose fixtures deliberately carry the patterns the Semgrep rules exist to flag — unused parameters
+among them — which CodeQL's own queries otherwise report in code that is never shipped. Advanced
+setup replaces GitHub's managed default setup; switching a repository between the two is a one-time
+manual step under **Settings → Advanced Security → Code scanning → CodeQL analysis → Switch to
+advanced → Disable CodeQL**, not something a workflow file can do.
 
 ### Scorecard baseline
 

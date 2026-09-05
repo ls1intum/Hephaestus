@@ -1803,6 +1803,35 @@ void test("Semgrep scans PRs, main and merge queues without a privileged trigger
 	);
 });
 
+void test("CodeQL runs advanced setup and excludes the Semgrep fixtures it would otherwise flag", async () => {
+	const source = await readFile(".github/workflows/codeql.yml", "utf8");
+	const workflow = parseDocument(source);
+	for (const trigger of ["pull_request", "push", "merge_group", "schedule"])
+		assert.ok(workflow.hasIn(["on", trigger]), `codeql.yml must run on ${trigger}`);
+	assert.equal(workflow.hasIn(["on", "pull_request_target"]), false);
+	const permissions = workflow.getIn(["jobs", "analyze", "permissions"]);
+	assert.ok(isMap(permissions));
+	assert.deepEqual(permissions.toJSON(), {
+		actions: "read",
+		contents: "read",
+		"security-events": "write",
+	});
+	for (const action of ["github/codeql-action/init", "github/codeql-action/analyze"])
+		for (const match of source.matchAll(new RegExp(`uses: ${action}@([\\w.-]+)`, "g")))
+			assert.match(match[1] ?? "", /^[a-f0-9]{40}$/, `${action} must be pinned by commit`);
+	const init = step(workflow, ["jobs", "analyze"], "github/codeql-action/init");
+	assert.equal(init.get("build-mode"), "none");
+	assert.equal(init.get("config-file"), "./.github/codeql/codeql-config.yml");
+	assert.match(String(init.get("languages")), /^\$\{\{ *matrix\.language *\}\}$/);
+	const analyze = step(workflow, ["jobs", "analyze"], "github/codeql-action/analyze");
+	assert.match(String(analyze.get("category")), /^\/language:\$\{\{ *matrix\.language *\}\}$/);
+	const config = asRecord(
+		parseDocument(await readFile(".github/codeql/codeql-config.yml", "utf8")).toJSON(),
+		"codeql-config.yml",
+	);
+	assert.deepEqual(config["paths-ignore"], ["security/semgrep/**"]);
+});
+
 void test("every Semgrep rule ships a positive and a negative fixture", async () => {
 	const files = await posixGlob("security/semgrep/*");
 	const rulesets = files.filter((file) => file.endsWith(".yaml"));
