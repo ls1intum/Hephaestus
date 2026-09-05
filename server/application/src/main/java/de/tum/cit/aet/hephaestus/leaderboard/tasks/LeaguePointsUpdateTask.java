@@ -100,7 +100,7 @@ public class LeaguePointsUpdateTask {
                 return;
             }
             var user = userRepository
-                    .findByLoginWithEagerMergedPullRequests(leaderboardUser.login())
+                    .findByIdWithEagerMergedPullRequests(leaderboardUser.id())
                     .orElseThrow();
             int currentPoints = workspaceMembershipService.getCurrentLeaguePoints(workspaceId, user);
             int newPoints = leaguePointsService.calculateNewPoints(user, currentPoints, entry);

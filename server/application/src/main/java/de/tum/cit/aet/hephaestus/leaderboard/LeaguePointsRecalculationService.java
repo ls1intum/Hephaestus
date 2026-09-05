@@ -86,9 +86,8 @@ public class LeaguePointsRecalculationService implements LeaguePointsRecalculato
             }
 
             Long userId = memberUser.getId();
-            User hydratedUser = userRepository
-                    .findByLoginWithEagerMergedPullRequests(memberUser.getLogin())
-                    .orElse(memberUser);
+            User hydratedUser =
+                    userRepository.findByIdWithEagerMergedPullRequests(userId).orElse(memberUser);
             memberUsersById.put(userId, hydratedUser);
             currentPointsByUserId.put(userId, POINTS_DEFAULT);
             Instant firstContribution = workspaceContributionActivityService

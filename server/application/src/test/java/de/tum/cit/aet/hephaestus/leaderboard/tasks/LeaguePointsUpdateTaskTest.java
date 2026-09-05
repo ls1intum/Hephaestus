@@ -135,7 +135,8 @@ class LeaguePointsUpdateTaskTest extends BaseUnitTest {
 
     private User stubUser(String login) {
         User user = new User();
-        when(userRepository.findByLoginWithEagerMergedPullRequests(login)).thenReturn(Optional.of(user));
+        // Entries carry the user's id (1L in entry()); the lookup is by id, never by login.
+        when(userRepository.findByIdWithEagerMergedPullRequests(1L)).thenReturn(Optional.of(user));
         return user;
     }
 

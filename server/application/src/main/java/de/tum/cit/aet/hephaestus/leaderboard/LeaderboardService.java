@@ -390,15 +390,16 @@ public class LeaderboardService {
      */
     @Transactional(readOnly = true)
     public LeagueChangeDTO computeUserLeagueStats(Workspace workspace, String login, Instant after, Instant before) {
-        User user = userRepository
-                .findByLoginWithEagerMergedPullRequests(login)
-                .orElseThrow(() -> new EntityNotFoundException("User", login));
-
         if (workspace == null || workspace.getId() == null) {
             throw new IllegalStateException("Workspace context is required to compute league stats");
         }
 
         Long workspaceId = workspace.getId();
+        // The member decides which user a login means: a login is not unique across providers.
+        User user = workspaceMembershipService
+                .findMemberByLogin(workspaceId, login)
+                .flatMap(member -> userRepository.findByIdWithEagerMergedPullRequests(member.getId()))
+                .orElseThrow(() -> new EntityNotFoundException("User", login));
 
         // Always use the GLOBAL leaderboard (team = "all") so that league points are
         // independent of any team filter the caller might be viewing.
