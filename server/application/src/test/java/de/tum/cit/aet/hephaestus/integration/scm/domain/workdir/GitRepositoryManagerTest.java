@@ -6,6 +6,7 @@ import static org.mockito.Mockito.mock;
 
 import de.tum.cit.aet.hephaestus.integration.core.fabric.FabricLayout;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import de.tum.cit.aet.hephaestus.testconfig.GitTestFixtures;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -79,6 +80,7 @@ class GitRepositoryManagerTest extends BaseUnitTest {
 
     private Git createSourceRepo() throws GitAPIException, IOException {
         Git git = Git.init().setDirectory(sourceRepoPath.toFile()).call();
+        GitTestFixtures.disableSigning(git.getRepository());
         Path file = sourceRepoPath.resolve("README.md");
         Files.writeString(file, "# Test Repository\n");
         git.add().addFilepattern("README.md").call();
@@ -202,6 +204,7 @@ class GitRepositoryManagerTest extends BaseUnitTest {
                 String replacementHead;
                 try (Git replacement =
                         Git.init().setDirectory(replacementPath.toFile()).call()) {
+                    GitTestFixtures.disableSigning(replacement.getRepository());
                     Files.writeString(replacementPath.resolve("replacement.txt"), "replacement\n");
                     replacement.add().addFilepattern("replacement.txt").call();
                     replacementHead = replacement

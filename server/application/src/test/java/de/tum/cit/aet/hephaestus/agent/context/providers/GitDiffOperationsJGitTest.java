@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.context.providers;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import de.tum.cit.aet.hephaestus.testconfig.GitTestFixtures;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -42,6 +43,7 @@ class GitDiffOperationsJGitTest extends BaseUnitTest {
     void setUp() throws GitAPIException, IOException {
         git = Git.init().setDirectory(repoDir.toFile()).setInitialBranch("main").call();
         repo = git.getRepository();
+        GitTestFixtures.disableSigning(repo);
 
         write("a.txt", "line one\nline two\nline three\n");
         baseSha = commit("initial");
