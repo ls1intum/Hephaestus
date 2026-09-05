@@ -261,14 +261,45 @@ export function unlockedImages(rendered: readonly string[], lockEnv: string): st
 	return rendered.filter((image) => !locked.has(image));
 }
 
-export function lockedReleaseCommit(lockEnv: string): string {
-	const values = lockEnv
+function lockValues(lockEnv: string, key: string): string[] {
+	return lockEnv
 		.split("\n")
-		.filter((line) => line.startsWith("HEPHAESTUS_RELEASE_COMMIT="))
-		.map((line) => line.slice(line.indexOf("=") + 1));
+		.filter((line) => line.startsWith(`${key}=`))
+		.map((line) => line.slice(key.length + 1));
+}
+
+export function lockedReleaseCommit(lockEnv: string): string {
+	const values = lockValues(lockEnv, "HEPHAESTUS_RELEASE_COMMIT");
 	if (values.length !== 1 || !isCommit(values[0] ?? ""))
 		throw new Error("release lock must contain one source commit");
 	return values[0] ?? "";
+}
+
+const POSTGRES_IMAGE = "HEPHAESTUS_IMAGE_POSTGRES";
+
+/** Everything the PostgreSQL image is built from; CI's `postgres-image` filter names the same tree. */
+export const POSTGRES_IMAGE_INPUTS = "docker/postgres";
+
+/**
+ * The images a commit channel runs on this host: the channel's, except that PostgreSQL stays at the
+ * pin the host last applied while the image's own inputs are unchanged.
+ *
+ * Every push to the default branch rebuilds the PostgreSQL image, because its Dockerfile bakes the
+ * source commit into a layer so the OS upgrade cannot replay from cache, so a commit channel names a
+ * new digest for it on every commit. Compose recreates a container whose image changed, and a
+ * recreated database drops every connection pool and kills the reviews in flight. A host following
+ * commits therefore moves PostgreSQL only when what it is built from moved. A release is applied as
+ * signed: its lock is the artifact its evidence describes, and a rebuilt image is part of it.
+ */
+export function carryDataImage(
+	images: Readonly<Record<string, string>>,
+	appliedLockEnv: string | undefined,
+	inputsChanged: boolean,
+): Readonly<Record<string, string>> {
+	if (inputsChanged || appliedLockEnv === undefined || !(POSTGRES_IMAGE in images)) return images;
+	const [kept, ...rest] = lockValues(appliedLockEnv, POSTGRES_IMAGE);
+	if (kept === undefined || rest.length > 0 || !IMAGE_DIGEST.test(kept)) return images;
+	return { ...images, [POSTGRES_IMAGE]: kept };
 }
 
 function isStack(name: string): name is Stack {
@@ -520,9 +551,14 @@ async function main(): Promise<void> {
 		// A commit channel carries its own digests, and the channel file they arrived in was
 		// signature-verified before this point, so there is no release to fetch or verify. The
 		// version the instance reports is the commit, which is what the environment is following.
-		await writeFile(lockFile, commitLockEnvironment(decision.release, channel.images), {
-			mode: 0o600,
-		});
+		const images = await commitImages(
+			config,
+			lockDirectory,
+			applied,
+			releaseCommit,
+			channel.images,
+		);
+		await writeFile(lockFile, commitLockEnvironment(decision.release, images), { mode: 0o600 });
 	} else {
 		// The verifier is the tooling this tick runs, never the release's own copy of it.
 		await run(
@@ -623,6 +659,38 @@ async function main(): Promise<void> {
 	console.log(`Applied ${decision.release} to ${config.stacks.join(", ")}`);
 	// Only now, with the release verified and running, does the host run that release's tooling.
 	await followTooling(config, releaseTree);
+}
+
+/**
+ * `carryDataImage` with what this host knows: the lock it wrote for the applied release, which is
+ * its own record of the pins it verified and ran, and git's word on whether the PostgreSQL image's
+ * inputs changed between the applied commit and the one being applied.
+ */
+async function commitImages(
+	config: HostConfig,
+	lockDirectory: string,
+	applied: AppliedState | undefined,
+	releaseCommit: string,
+	images: Readonly<Record<string, string>>,
+): Promise<Readonly<Record<string, string>>> {
+	if (applied === undefined) return images;
+	const previous = appliedCommit(applied);
+	if (previous === undefined) return images;
+	let appliedLockEnv: string | undefined;
+	try {
+		appliedLockEnv = await readFile(join(lockDirectory, `${applied.release}.env`), "utf8");
+	} catch (error) {
+		if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error;
+	}
+	// `--quiet` exits 0 only when nothing under the path differs. A commit the checkout does not have
+	// fails it too, and that reads as changed: when the host cannot tell, it runs what the channel
+	// names rather than keep an image on a guess.
+	const unchanged = await succeeds(
+		"git",
+		["diff", "--quiet", previous, releaseCommit, "--", POSTGRES_IMAGE_INPUTS],
+		{ cwd: config.checkout },
+	);
+	return carryDataImage(images, appliedLockEnv, !unchanged);
 }
 
 /**

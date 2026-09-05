@@ -11,6 +11,7 @@ import {
 	adoptTooling,
 	appliedCommit,
 	carriesToolingLink,
+	carryDataImage,
 	commitLockEnvironment,
 	ensureReleaseTree,
 	decide,
@@ -273,6 +274,34 @@ await test("an environment following the branch reports the commit it runs", () 
 		rendered.indexOf("HEPHAESTUS_IMAGE_ALPINE") < rendered.indexOf("HEPHAESTUS_IMAGE_WEBAPP"),
 	);
 	assert.ok(rendered.endsWith("\n"));
+});
+
+await test("a host following commits moves its database only when the image's inputs did", () => {
+	// Every commit of the default branch rebuilds the PostgreSQL image, so two consecutive channels
+	// name two digests for it; Compose recreates a container whose image changed, and the database
+	// coming back means every connection pool and review in flight is lost.
+	const running = `ghcr.io/o/postgres@sha256:${"a".repeat(64)}`;
+	const rebuilt = `ghcr.io/o/postgres@sha256:${"b".repeat(64)}`;
+	const channel = { ...images, HEPHAESTUS_IMAGE_POSTGRES: rebuilt };
+	const appliedLock = commitLockEnvironment("d".repeat(40), {
+		...images,
+		HEPHAESTUS_IMAGE_POSTGRES: running,
+	});
+	const kept = carryDataImage(channel, appliedLock, false);
+	assert.deepEqual(kept, { ...images, HEPHAESTUS_IMAGE_POSTGRES: running });
+	// The lock the host then renders names what it keeps, so the app stack passes the lock guard
+	// with the same pin — and the same Compose configuration — as before.
+	assert.deepEqual(unlockedImages([running], commitLockEnvironment(commit, kept)), []);
+
+	// A change under the image's inputs is applied, and so is the channel's pin on a host that has
+	// no record of what it ran, or one whose record is not a digest.
+	assert.deepEqual(carryDataImage(channel, appliedLock, true), channel);
+	assert.deepEqual(carryDataImage(channel, undefined, false), channel);
+	assert.deepEqual(
+		carryDataImage(channel, "HEPHAESTUS_IMAGE_POSTGRES=ghcr.io/o/postgres:main\n", false),
+		channel,
+	);
+	assert.deepEqual(carryDataImage(images, appliedLock, false), images);
 });
 
 await test("a build that finishes late cannot put staging back on an older commit", () => {
