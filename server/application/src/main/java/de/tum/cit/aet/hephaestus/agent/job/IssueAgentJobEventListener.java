@@ -154,6 +154,13 @@ public class IssueAgentJobEventListener {
                 return;
             }
 
+            // A tombstone the next ordinary sync can lift, so the occasion is held rather than retired:
+            // the reaper re-offers it, and a sweep that guessed wrong costs a delay instead of a review.
+            if (issue.getDeletedAt() != null) {
+                signalRecorder.markRefused(key, SignalStateReason.ARTIFACT_NOT_VISIBLE);
+                return;
+            }
+
             switch (practiceReviewDetectionGate.evaluateIssue(issue, key.signalName(), TriggerMode.AUTO)) {
                 case GateDecision.Skip skip -> {
                     log.debug(

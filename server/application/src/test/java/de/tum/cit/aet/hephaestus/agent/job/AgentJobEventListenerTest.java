@@ -10,6 +10,7 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
@@ -51,6 +52,8 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import tools.jackson.databind.ObjectMapper;
@@ -183,6 +186,61 @@ class AgentJobEventListenerTest extends BaseUnitTest {
     }
 
     // Test Groups
+
+    @Nested
+    class TombstonedWorkTests {
+
+        @ParameterizedTest
+        @ValueSource(strings = {"created", "ready", "synchronized", "merged", "closed", "reviewed"})
+        void shouldHoldOccasionBeforeAdmissionWhenPullRequestIsTombstoned(String event) {
+            PullRequest pr = mockPullRequest("abc123", "feature", "main");
+            Repository repository = new Repository();
+            repository.setId(REPO_REF.id());
+            repository.setNameWithOwner(REPO_REF.nameWithOwner());
+            pr.setRepository(repository);
+            pr.setTitle("Test PR");
+            pr.setDeletedAt(Instant.now());
+            when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
+            boolean merged = event.equals("merged");
+            Issue.State state = merged || event.equals("closed") ? Issue.State.CLOSED : Issue.State.OPEN;
+            pr.setState(state);
+            pr.setMerged(merged);
+            var data = createPrData(state, false, merged);
+            var context = webhookContext(WORKSPACE_ID);
+            switch (event) {
+                case "created" -> listener.onPullRequestCreated(new ScmDomainEvent.PullRequestCreated(data, context));
+                case "ready" -> listener.onPullRequestReady(new ScmDomainEvent.PullRequestReady(data, context));
+                case "synchronized" ->
+                    listener.onPullRequestSynchronized(new ScmDomainEvent.PullRequestSynchronized(data, context));
+                case "merged" -> listener.onPullRequestMerged(new ScmDomainEvent.PullRequestMerged(data, context));
+                case "closed" ->
+                    listener.onPullRequestClosed(new ScmDomainEvent.PullRequestClosed(data, false, context));
+                case "reviewed" ->
+                    listener.onReviewSubmitted(new ScmDomainEvent.ReviewSubmitted(createReviewData(), context));
+                default -> throw new AssertionError(event);
+            }
+
+            verify(signalRecorder).markRefused(any(), eq(SignalStateReason.ARTIFACT_NOT_VISIBLE));
+            verifyNoInteractions(practiceReviewDetectionGate, agentJobService);
+        }
+
+        /**
+         * Pins the order against the branch-info check: missing refs leave the occasion RECORDED, which
+         * would silently swallow the hold if the tombstone check moved below it.
+         */
+        @Test
+        void shouldHoldTombstonedPullRequestEvenWhenBranchInformationIsMissing() {
+            PullRequest pr = mockPullRequest(null, null, null);
+            pr.setDeletedAt(Instant.now());
+            when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
+
+            listener.onPullRequestCreated(new ScmDomainEvent.PullRequestCreated(
+                    createPrData(Issue.State.OPEN, false, false), webhookContext(WORKSPACE_ID)));
+
+            verify(signalRecorder).markRefused(any(), eq(SignalStateReason.ARTIFACT_NOT_VISIBLE));
+            verifyNoInteractions(practiceReviewDetectionGate, agentJobService);
+        }
+    }
 
     @Nested
     class FilteringTests {

@@ -2,8 +2,21 @@ package de.tum.cit.aet.hephaestus.agent.job;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.MentorContextQueryRepository;
+import de.tum.cit.aet.hephaestus.agent.handler.IssueReviewSubmissionRequest;
+import de.tum.cit.aet.hephaestus.agent.handler.PullRequestReviewSubmissionRequest;
+import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactSignal;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactSignalRepository;
@@ -15,6 +28,7 @@ import de.tum.cit.aet.hephaestus.integration.core.signal.SignalRecorder;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalRevision;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalState;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalStateReason;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.common.DataSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
@@ -23,18 +37,22 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.practices.review.GateDecision;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewDetectionGate;
+import de.tum.cit.aet.hephaestus.practices.review.TriggerMode;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceResolver;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -48,7 +66,9 @@ import org.springframework.transaction.support.TransactionTemplate;
  * the request path answers {@link SignalStateReason#ARTIFACT_GONE}. Everything the drift tombstone
  * promises to be able to undo must still see it: the upsert that resurrects it, and the gate loader the
  * pending-signal resubmitters read, which holds the occasion as {@link
- * SignalStateReason#ARTIFACT_NOT_VISIBLE} rather than retiring it.
+ * SignalStateReason#ARTIFACT_NOT_VISIBLE} rather than retiring it. A live event reaching the listener
+ * while the row is tombstoned takes the same hold, and the row the reaper would pick up is asserted
+ * here rather than inferred.
  *
  * <p>Both kinds are exercised because {@code Issue} and {@code PullRequest} share one table and the
  * issue side additionally has to hold its {@code TYPE(i) = Issue} discriminator.
@@ -95,6 +115,9 @@ class UpstreamDeletedWorkReadScopeIntegrationTest extends AbstractWorkspaceInteg
 
     @Autowired
     private TransactionTemplate transactionTemplate;
+
+    @Autowired
+    private WorkspaceResolver workspaceResolver;
 
     private Workspace workspace;
     private User author;
@@ -262,6 +285,110 @@ class UpstreamDeletedWorkReadScopeIntegrationTest extends AbstractWorkspaceInteg
         assertThat(released.getStateReason())
                 .isNotIn(SignalStateReason.ARTIFACT_NOT_VISIBLE, SignalStateReason.ARTIFACT_GONE);
         assertThat(released.getState()).isNotEqualTo(SignalState.PENDING);
+    }
+
+    @Test
+    void aLivePullRequestEventIsHeldWhileTheWorkIsTombstonedAndSubmittedOnceAnUpsertRestoresIt() {
+        var data = ScmEventPayload.PullRequestData.from(gateLoadedPullRequest());
+        var event = new ScmDomainEvent.PullRequestCreated(data, webhookContext());
+        var jobs = mock(AgentJobService.class);
+        var detectionGate = mock(PracticeReviewDetectionGate.class);
+        var listener = new AgentJobEventListener(
+                jobs, pullRequestRepository, detectionGate, workspaceResolver, signalRecorder);
+        tombstonePullRequest();
+
+        transactionTemplate.executeWithoutResult(status -> listener.onPullRequestCreated(event));
+
+        ArtifactSignal held = artifactSignalRepository
+                .findForArtifact(workspace.getId(), ScmSignals.PULL_REQUEST.value(), pullRequestId)
+                .getFirst();
+        assertHeld(held);
+        verifyNoInteractions(jobs, detectionGate);
+
+        upsertPullRequest();
+        assertThat(gateLoadedPullRequest().getDeletedAt()).isNull();
+        var decision = new GateDecision.Detect(workspace, List.of(), 1, TriggerMode.AUTO);
+        when(detectionGate.evaluate(any(), eq(ScmSignals.PULL_REQUEST_OPENED), eq(TriggerMode.AUTO)))
+                .thenReturn(decision);
+        resubmit(new PullRequestSignalResubmitter(jobs, pullRequestRepository, detectionGate, signalRecorder), held);
+
+        var request = ArgumentCaptor.forClass(PullRequestReviewSubmissionRequest.class);
+        verify(jobs)
+                .submit(
+                        eq(workspace.getId()),
+                        eq(AgentJobType.PULL_REQUEST_REVIEW),
+                        request.capture(),
+                        eq(held.key()),
+                        eq(decision));
+        PullRequest restored = gateLoadedPullRequest();
+        assertThat(request.getValue().pullRequest().id()).isEqualTo(restored.getId());
+        assertThat(request.getValue().pullRequest().title()).isEqualTo(restored.getTitle());
+        assertThat(request.getValue().headRefOid()).isEqualTo(restored.getHeadRefOid());
+        assertThat(request.getValue().headRefName()).isEqualTo(restored.getHeadRefName());
+        assertThat(request.getValue().baseRefName()).isEqualTo(restored.getBaseRefName());
+        assertThat(request.getValue().triggerSignal()).isEqualTo(ScmSignals.PULL_REQUEST_OPENED);
+    }
+
+    @Test
+    void aLiveIssueEventIsHeldWhileTheWorkIsTombstonedAndSubmittedOnceAnUpsertRestoresIt() {
+        var data = transactionTemplate.execute(status -> ScmEventPayload.IssueData.from(gateLoadedIssue()));
+        assertNotNull(data);
+        var event = new ScmDomainEvent.IssueCreated(data, webhookContext());
+        var jobs = mock(AgentJobService.class);
+        var detectionGate = mock(PracticeReviewDetectionGate.class);
+        var listener =
+                new IssueAgentJobEventListener(jobs, issueRepository, detectionGate, workspaceResolver, signalRecorder);
+        tombstoneIssue();
+
+        transactionTemplate.executeWithoutResult(status -> listener.onIssueCreated(event));
+
+        ArtifactSignal held = artifactSignalRepository
+                .findForArtifact(workspace.getId(), ScmSignals.ISSUE.value(), issueId)
+                .getFirst();
+        assertHeld(held);
+        verifyNoInteractions(jobs, detectionGate);
+
+        upsertIssue();
+        assertThat(gateLoadedIssue().getDeletedAt()).isNull();
+        var decision = new GateDecision.Detect(workspace, List.of(), 1, TriggerMode.AUTO);
+        when(detectionGate.evaluateIssue(any(), eq(ScmSignals.ISSUE_OPENED), eq(TriggerMode.AUTO)))
+                .thenReturn(decision);
+        resubmit(new IssueSignalResubmitter(jobs, issueRepository, detectionGate, signalRecorder), held);
+
+        var request = ArgumentCaptor.forClass(IssueReviewSubmissionRequest.class);
+        verify(jobs)
+                .submit(
+                        eq(workspace.getId()),
+                        eq(AgentJobType.ISSUE_REVIEW),
+                        request.capture(),
+                        eq(held.key()),
+                        eq(decision));
+        Issue restored = gateLoadedIssue();
+        assertThat(request.getValue().issueId()).isEqualTo(restored.getId());
+        assertThat(request.getValue().issueNumber()).isEqualTo(restored.getNumber());
+        assertThat(request.getValue().repositoryId()).isEqualTo(repository.getId());
+        assertThat(request.getValue().title()).isEqualTo(restored.getTitle());
+        assertThat(request.getValue().body()).isEqualTo(restored.getBody());
+        assertThat(request.getValue().triggerSignal()).isEqualTo(ScmSignals.ISSUE_OPENED);
+    }
+
+    private void assertHeld(ArtifactSignal held) {
+        assertThat(held.getState()).isEqualTo(SignalState.PENDING);
+        assertThat(held.getStateReason()).isEqualTo(SignalStateReason.ARTIFACT_NOT_VISIBLE);
+        assertThat(held.getDiscoveredVia()).isEqualTo(DiscoveredVia.EVENT);
+        assertThat(retryableSignalIds()).contains(held.getId());
+    }
+
+    private EventContext webhookContext() {
+        return new EventContext(
+                UUID.randomUUID(),
+                Instant.now(),
+                workspace.getId(),
+                new RepositoryRef(repository.getId(), repository.getNameWithOwner(), "main"),
+                DataSource.WEBHOOK,
+                "opened",
+                UUID.randomUUID().toString(),
+                null);
     }
 
     /**

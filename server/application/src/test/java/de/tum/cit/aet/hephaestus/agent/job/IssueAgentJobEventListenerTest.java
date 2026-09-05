@@ -10,6 +10,7 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
@@ -41,6 +42,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 
@@ -162,6 +165,31 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
     }
 
     // Test Groups
+
+    @Nested
+    class TombstonedWorkTests {
+
+        @ParameterizedTest
+        @ValueSource(strings = {"created", "updated", "closed"})
+        void shouldHoldOccasionBeforeAdmissionWhenIssueIsTombstoned(String event) {
+            Issue.State state = event.equals("closed") ? Issue.State.CLOSED : Issue.State.OPEN;
+            Issue issue = createIssue(state);
+            issue.setDeletedAt(Instant.now());
+            when(issueRepository.findByIdWithRepositoryAndAssignees(ISSUE_ID)).thenReturn(Optional.of(issue));
+            var data = createIssueData(state);
+            var context = webhookContext(WORKSPACE_ID);
+            switch (event) {
+                case "created" -> listener.onIssueCreated(new ScmDomainEvent.IssueCreated(data, context));
+                case "updated" ->
+                    listener.onIssueUpdated(new ScmDomainEvent.IssueUpdated(data, Set.of("body"), context));
+                case "closed" -> listener.onIssueClosed(new ScmDomainEvent.IssueClosed(data, null, context));
+                default -> throw new AssertionError(event);
+            }
+
+            verify(signalRecorder).markRefused(any(), eq(SignalStateReason.ARTIFACT_NOT_VISIBLE));
+            verifyNoInteractions(practiceReviewDetectionGate, agentJobService);
+        }
+    }
 
     @Nested
     class FilteringTests {

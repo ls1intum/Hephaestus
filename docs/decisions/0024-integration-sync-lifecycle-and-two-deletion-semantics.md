@@ -265,3 +265,19 @@ adding one inherits this question.
 
 **Revisit trigger.** The live-event submission paths need the same distinction; an artifact kind
 other than `scm.pull_request` / `scm.issue` needs it; or Outline gains a resubmitter.
+
+## Update — 2026-09-05 (issue #1825): live occasions share the reversible hold
+
+Supersedes the live-event gap and that part of the revisit trigger in the 2026-09-04 update.
+Live GitHub and GitLab occasions are held rather than dropped while their work is tombstoned.
+The listeners record the occasion before admission, so the signal ledger provides both the recorded
+outcome and the retry mechanism.
+
+The automatic submission boundary owns the check: a global ORM filter would hide reversible absence,
+while a shared practice gate would have to distinguish an automatic hold from an explicit request's
+terminal refusal. The [glossary](../contributor/practice-review-glossary.mdx#signal-state-reasons) owns
+that distinction; the [pipeline](../contributor/practice-review-pipeline.mdx#occasion) owns eligibility
+and retry behavior.
+
+This does not serialize admission with later deletion, query upstream synchronously, or cancel
+in-flight reviews. Slack's irreversible deletion and Outline's lack of a resubmitter remain unchanged.

@@ -3,11 +3,27 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequest;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.agent.AgentJobType;
+import de.tum.cit.aet.hephaestus.agent.handler.PullRequestReviewSubmissionRequest;
+import de.tum.cit.aet.hephaestus.agent.job.AgentJobEventListener;
+import de.tum.cit.aet.hephaestus.agent.job.AgentJobService;
+import de.tum.cit.aet.hephaestus.agent.job.PullRequestSignalResubmitter;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactSignal;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactSignalRepository;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalRecorder;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalState;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalStateReason;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
@@ -18,13 +34,18 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRe
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReviewRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequest.dto.GitLabMergeRequestEventDTO;
+import de.tum.cit.aet.hephaestus.practices.review.GateDecision;
+import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewDetectionGate;
+import de.tum.cit.aet.hephaestus.practices.review.TriggerMode;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.RecordingScmEventListener;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceResolver;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -34,6 +55,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -123,8 +145,18 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
     @Autowired
     private RecordingScmEventListener eventListener;
 
+    @Autowired
+    private ArtifactSignalRepository artifactSignalRepository;
+
+    @Autowired
+    private SignalRecorder signalRecorder;
+
+    @Autowired
+    private WorkspaceResolver workspaceResolver;
+
     private Repository savedRepo;
     private IdentityProvider savedProvider;
+    private Workspace savedWorkspace;
 
     @BeforeEach
     void setUp() {
@@ -591,6 +623,75 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         }
     }
 
+    // Tombstoned Work
+
+    @Nested
+    class TombstonedWork {
+
+        /**
+         * The hold is provider-neutral, so this proves it on the GitLab adapter's own path: the merge
+         * request, the domain event and the restoring delivery all come from real webhook payloads rather
+         * than from a hand-built {@code ScmDomainEvent}.
+         *
+         * <p>The listener is constructed here because {@code hephaestus.agent.enabled} is off in the
+         * integration profile, and driven inside a transaction because its {@code REQUIRES_NEW} proxy is
+         * bypassed by direct construction.
+         */
+        @Test
+        void tombstonedMergeRequestHoldsItsOccasionUntilAFurtherDeliveryRestoresIt() throws Exception {
+            handler.handleEvent(loadPayload("merge_request.open"));
+            ScmDomainEvent.PullRequestCreated created = eventListener
+                    .ofType(ScmDomainEvent.PullRequestCreated.class)
+                    .getFirst();
+            long pullRequestId = pullRequestRepository
+                    .findByRepositoryIdAndNumber(savedRepo.getId(), MR3_IID)
+                    .orElseThrow()
+                    .getId();
+            assertThat(issueRepository.tombstonePullRequestsByRepositoryIdAndNumbers(
+                            savedRepo.getId(), List.of(MR3_IID), Instant.now()))
+                    .isEqualTo(1);
+
+            var jobs = mock(AgentJobService.class);
+            var gate = mock(PracticeReviewDetectionGate.class);
+            var listener =
+                    new AgentJobEventListener(jobs, pullRequestRepository, gate, workspaceResolver, signalRecorder);
+            transactionTemplate.executeWithoutResult(status -> listener.onPullRequestCreated(created));
+
+            ArtifactSignal held = artifactSignalRepository
+                    .findForArtifact(savedWorkspace.getId(), ScmSignals.PULL_REQUEST.value(), pullRequestId)
+                    .getFirst();
+            assertThat(held.getState()).isEqualTo(SignalState.PENDING);
+            assertThat(held.getStateReason()).isEqualTo(SignalStateReason.ARTIFACT_NOT_VISIBLE);
+            verifyNoInteractions(jobs, gate);
+
+            handler.handleEvent(loadPayload("merge_request.reopen"));
+            assertThat(pullRequestRepository
+                            .findById(pullRequestId)
+                            .orElseThrow()
+                            .getDeletedAt())
+                    .isNull();
+
+            var decision = new GateDecision.Detect(savedWorkspace, List.of(), 1, TriggerMode.AUTO);
+            when(gate.evaluate(any(), eq(ScmSignals.PULL_REQUEST_OPENED), eq(TriggerMode.AUTO)))
+                    .thenReturn(decision);
+            transactionTemplate.executeWithoutResult(status ->
+                    new PullRequestSignalResubmitter(jobs, pullRequestRepository, gate, signalRecorder).resubmit(held));
+
+            var request = ArgumentCaptor.forClass(PullRequestReviewSubmissionRequest.class);
+            verify(jobs)
+                    .submit(
+                            eq(savedWorkspace.getId()),
+                            eq(AgentJobType.PULL_REQUEST_REVIEW),
+                            request.capture(),
+                            eq(held.key()),
+                            eq(decision));
+            assertThat(request.getValue().pullRequest().id()).isEqualTo(pullRequestId);
+            assertThat(request.getValue().headRefName()).isEqualTo(MR3_SOURCE_BRANCH);
+            assertThat(request.getValue().baseRefName()).isEqualTo(MR3_TARGET_BRANCH);
+            assertThat(request.getValue().triggerSignal()).isEqualTo(ScmSignals.PULL_REQUEST_OPENED);
+        }
+    }
+
     // Helpers
 
     private GitLabMergeRequestEventDTO loadPayload(String filename) throws IOException {
@@ -638,7 +739,7 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         workspace.setOrganization(org);
         workspace.setAccountLogin(FIXTURE_ORG_LOGIN);
         workspace.setAccountType(AccountType.ORG);
-        workspaceRepository.save(workspace);
+        savedWorkspace = workspaceRepository.save(workspace);
     }
 
     private static long persistedId(IdentityProvider provider) {
