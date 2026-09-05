@@ -6,6 +6,8 @@ description: Reconcile a host to a signed release or commit channel without inbo
 
 A host polls a **channel** naming a release or commit, verifies its signature, and applies
 digest-pinned Compose stacks. Deployment needs no inbound administration connection to the host.
+Why it is built this way is
+[ADR 0042](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0042-hosts-pull-their-own-releases.md).
 
 ## What the host trusts
 

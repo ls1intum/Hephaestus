@@ -1,11 +1,9 @@
 # ADR 0042: Hosts pull their own releases
 
-Date: 2026-09-03
-
-## Status
-
-Accepted. Supersedes the SSH-push half of ADR 0005's deployment story; the release evidence and
-image-lock decisions it builds on are unchanged.
+**Status:** Accepted
+**Date:** 2026-09-03
+**Builds on:** [ADR 0034](0034-signed-release-image-lock.md), whose release evidence and image-lock
+decisions are unchanged; replaces the SSH push in `deploy-locked-compose.yml`.
 
 ## Context
 
@@ -24,6 +22,28 @@ The project already produces everything a host needs to deploy itself: a cosign-
 naming every image by digest, and `prepare-release-lock.ts`, which verifies that signature and
 renders the lock. Self-hosters already upgrade this way by hand.
 
+## Decision drivers
+
+- No remote party holds a credential that reaches a host; secrets live only where they are used.
+- A replayed or stale channel must not verify, and a rollback must be a deliberate, signed act.
+- Approval is proven by a signing identity a verifier can check, not by a claim it cannot.
+- A deploy that does not converge, or a host that stops reconciling, fails loudly.
+
+## Considered options
+
+1. **Keep pushing from CI over SSH.** Rejected: two long-lived keys and every deployment secret on
+   a third-party runner, and a failure mode no check catches before a deploy attempt.
+2. **A channel as an OCI artifact under a mutable tag.** Rejected: a tag carries no order, so a
+   replayed old channel is indistinguishable from a current one, and GHCR offers no tag
+   immutability.
+3. **Approval verified from Fulcio's `environment` claim.** Rejected: Fulcio records the claim, but
+   cosign exposes no way to verify it.
+4. **Roll back automatically when an apply fails.** Rejected: schema changes are forward-only, so
+   restoring the previous images would leave old code on a migrated database.
+5. **Rootless Podman with Quadlet on the host.** Not attempted: it would remove the root-equivalent
+   Docker socket the reconciler still holds, and is the remaining gap.
+6. **A host that polls a signed commit channel.** Chosen.
+
 ## Decision
 
 A host polls a channel and applies the release it names. Nothing connects to the host.
@@ -35,13 +55,10 @@ release. The branch carries no code and triggers no workflow.
 channel, replayed, verifies. The reconciler accepts only a channel commit that descends from the last
 one it accepted. Moving to a lower release additionally requires `allowRollback` on that new commit;
 the flag never authorizes replay. This is the property TUF builds timestamp and snapshot roles for,
-taken from a history the repository already keeps — which is also why the channel is not an OCI
-artifact under a mutable tag, where no such order exists and where GHCR offers no tag immutability.
+taken from a history the repository already keeps.
 
-**Approval is bound by identity, not by claim.** Fulcio does record GitHub's `environment` claim, but
-cosign exposes no way to verify it, so requiring "signed by a job in the Production environment" is
-not something a verifier can express today. Instead the hosts pin the identity of `promote.yml`, and
-a GitHub environment gates that workflow: a signature carrying that identity is proof the reviewers
+**Approval is bound by identity, not by claim.** The hosts pin the identity of `promote.yml`, and a
+GitHub environment gates that workflow: a signature carrying that identity is proof the reviewers
 approved. This holds only while `promote.yml` stays non-reusable — a `workflow_call` trigger would
 let any caller mint the same identity.
 
@@ -63,10 +80,10 @@ followed.
 The split is by environment, not by a setting. An environment that sometimes follows the branch and
 sometimes runs a release is two environments sharing a name, and every release would drag staging
 from a commit back onto a tag naming the same bytes — a release re-tags the commit's images rather
-than rebuilding them. So a release no longer promotes staging: by the time one exists, staging has
-been running that commit since it merged, which is a longer and more honest rehearsal than the
-minutes a pre-production promotion bought. Holding an environment still is what the channel's
-`freeze` is for, signed and carried with the channel rather than configured beside it.
+than rebuilding them. So a release does not promote staging: by the time one exists, staging has
+been running that commit since it merged, a longer rehearsal than a pre-production promotion buys.
+Holding an environment still is what the channel's `freeze` is for, signed and carried with the
+channel rather than configured beside it.
 
 **The host runs the tooling of the release it applied.** The reconciler and the verifier run from
 the host's own tooling directory, never from the release being verified: the tick that verifies a
@@ -100,7 +117,7 @@ the deployment audit log.
 
 The reconciler is as privileged as the SSH user it replaces: write access to the Docker socket is
 root-equivalent, and no systemd hardening changes that. What changes is that no remote party holds
-it. Rootless Podman with Quadlet would close the remaining gap and is not attempted here.
+it.
 
 An operator must disable the timer before hand-patching a host, or the next tick reverts the fix.
 
@@ -110,3 +127,9 @@ manage disjoint resources.
 
 Production adopts this after its outstanding version gap is closed by hand; the mechanism is proven
 on staging first.
+
+## Revisit trigger
+
+A verifier that can check the Fulcio `environment` claim, which would let approval be expressed
+without pinning one workflow's identity; a need to make `promote.yml` reusable, which this design
+forbids; or an incident on the host's Docker socket, which reopens rootless Podman with Quadlet.

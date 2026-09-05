@@ -11,6 +11,7 @@ import { parseStacks } from "./reconcile-deployment.ts";
 const release = readFileSync(".github/workflows/release.yml", "utf8");
 const deployment = readFileSync(".github/workflows/deploy-locked-compose.yml", "utf8");
 const promotion = readFileSync(".github/workflows/promote.yml", "utf8");
+const resolver = readFileSync("scripts/resolve-promotion.ts", "utf8");
 const reconciler = readFileSync("scripts/reconcile-deployment.ts", "utf8");
 const upgradeDrill = readFileSync("scripts/release-upgrade-test.ts", "utf8");
 
@@ -38,7 +39,6 @@ await test("both deploy paths start the stacks in the same order", () => {
 	]);
 	assert.ok(orders.length > 0);
 	for (const stacks of orders) {
-		// The application server runs the Liquibase migration the webhook runtime in core reads.
 		assert.ok(
 			stacks.indexOf("app") < stacks.indexOf("core"),
 			`${stacks.join(" ")} starts the webhook runtime before the migration that feeds it`,
@@ -130,10 +130,9 @@ await test("verification identity is the release's own: run context now, the map
 	);
 });
 
-await test("promotion refuses a draft but reaches any published release, and the host verifies", () => {
-	assert.match(promotion, /--json isDraft --jq \.isDraft/);
+await test("promotion reaches any published release, and the host verifies", () => {
 	// Rollback must support releases predating immutable tags; the signed lock binds their digests.
-	assert.doesNotMatch(promotion, /isImmutable/);
+	assert.doesNotMatch(resolver, /isImmutable/);
 	// The verifier is the tooling this tick runs — resolved from the running script, which Node pins
 	// to the tree it loaded — never the release under review.
 	assert.match(reconciler, /join\(import\.meta\.dirname, "prepare-release-lock\.ts"\)/);

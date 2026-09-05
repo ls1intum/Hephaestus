@@ -5,7 +5,7 @@
  */
 import { readFileSync } from "node:fs";
 
-import { asRecord } from "./json.ts";
+import { asRecord, parseJson } from "./json.ts";
 
 export const CATALOG_FILE = "pnpm-workspace.yaml";
 
@@ -25,7 +25,7 @@ export const BUNDLED_PINS: Record<string, string> = {
 /** The versions the installed vite-plus bundles, by package name. */
 export function bundledVersions(): Record<string, string> {
 	const dependencies = asRecord(
-		asRecord(JSON.parse(readFileSync("node_modules/vite-plus/package.json", "utf8")), "vite-plus")
+		asRecord(parseJson(readFileSync("node_modules/vite-plus/package.json", "utf8")), "vite-plus")
 			.dependencies,
 		"vite-plus dependencies",
 	);

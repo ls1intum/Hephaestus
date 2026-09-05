@@ -10,8 +10,8 @@ description: Deliberate releases with changesets — Version PR, curated changel
 **Release ≠ deploy.** Development is trunk-based: all work merges to `main` (squash merge, no
 `develop` branch) and every merge builds deployable images. A **release** is a deliberate act:
 cutting a version of Hephaestus for self-hosters, with a tag, curated release notes, and versioned
-Docker images. Our own instances ride the release cut — staging deploys automatically, production
-after approval. Releases are managed with [changesets](https://github.com/changesets/changesets).
+Docker images. Our own staging follows `main`; production rides the release cut, after approval.
+Releases are managed with [changesets](https://github.com/changesets/changesets).
 
 What a released version number promises is defined in the
 [compatibility policy](https://docs.hephaestus.build/admin/compatibility-policy).
@@ -39,7 +39,7 @@ sequenceDiagram
     R->>R: Upgrade seeded data from the previous stable release
     R->>R: Qualify supported hosts
     R->>R: Promote X.Y.Z / X.Y / latest image tags
-    R->>R: Publish release and deploy staging
+    R->>R: Publish release and wait for staging to run its commit
     Note over R: Production still requires approval
 ```
 
@@ -55,9 +55,9 @@ sequenceDiagram
    head already has one, so a missed dispatch heals on the next push and an unchanged head costs
    nothing. Every CI/CD run on that branch also carries the **release evidence preflight** below,
    whichever event started it, and `CI Status Gate` fails there unless the preflight succeeded in the
-   same run. More than one run can report that gate for a Version PR head — a dispatch and an
-   approved `pull_request` run both did for v0.75.1 — and the ruleset is satisfied by either, so a
-   green gate means the preflight passed only if no run can be green without it. Every run on that
+   same run. More than one run can report that gate for a Version PR head — a dispatch and a
+   `pull_request` run — and the ruleset is satisfied by either, so a green gate means the preflight
+   passed only if no run on that branch can be green without it. Every run on that
    branch therefore publishes the whole release image set on both architectures, where an ordinary
    pull request builds the `linux/amd64` candidates its diff touched and aliases the rest from
    `main`: the preflight evidences each image on both published platforms, and it can only evidence
@@ -68,8 +68,8 @@ sequenceDiagram
 4. **Merging the Version PR cuts the release.** The workflow resolves the release image digests and
    runs the evidence gate first, and only then creates the draft release at the merge commit and
    attaches the evidence to it. After the seeded-upgrade and supported-host gates pass too, it
-   promotes the CI-built images to `X.Y.Z`, `X.Y`, and `latest`, publishes the release, deploys
-   staging, and requests production approval.
+   promotes the CI-built images to `X.Y.Z`, `X.Y`, and `latest`, publishes the release, waits for
+   staging to be running its commit, and requests production approval.
 
 ### When a release fails
 
@@ -92,10 +92,10 @@ existing draft, regenerates the evidence, and replaces its assets. A draft pins 
 commit, so a later commit refuses to re-cut over it: a draft that can never pass is deleted by
 hand, and the version then re-cuts from the fixed commit.
 
-Reverting the version commit is therefore no longer part of recovery, but the exemption that made
-it possible stands. The `verify-changesets` freeze rules — `MIGRATION.md` is not editable in a
-feature PR, pending changesets and migration fragments are not deletable — are lifted for a
-**verified revert**, which `scripts/verify-revert.ts` decides structurally: every commit the pull
+Recovery never reverts the version commit. The `verify-changesets` freeze rules — `MIGRATION.md`
+is not editable in a feature PR, pending changesets and migration fragments are not deletable —
+are nonetheless lifted for a **verified revert**, which `scripts/verify-revert.ts` decides
+structurally: every commit the pull
 request adds must record `This reverts commit <sha>.`, name a commit that is already an ancestor of
 the base, and carry that commit's patch exactly reversed. Anything else leaves the rules in force.
 
@@ -137,11 +137,9 @@ findings, scheduled rescans, and exceptions.
 
 ### Nothing may fail for the first time at a release
 
-For a long time a release was the only thing that ever produced an evidence bundle, so it was also
-the only thing that could evaluate a check over one. v0.75.0 failed twice on findings no earlier
-gate had ever looked at. The fix for the *subjects* was to scan the pinned upstream images before the
-release; the fix for the *checks* is that the same bundle is now produced and judged before a release
-exists. `scripts/generate-release-evidence.ts` is the one generator and
+A release is never the first thing to evaluate a check over an evidence bundle: the pinned upstream
+images are scanned before the release, and the bundle a release verifies is produced and judged
+before a release exists. `scripts/generate-release-evidence.ts` is the one generator and
 `scripts/verify-release-evidence.ts` the one verifier; `release.yml` and the `Release evidence
 preflight` job in `cicd.yml` both run them, and the preflight runs the verifier in its default mode,
 which performs every check except signature verification.
@@ -199,46 +197,29 @@ release assets provide the per-platform SBOM, vulnerability, license, and index-
 
 ## Writing changesets
 
-A changeset summary becomes the `CHANGELOG.md` entry **verbatim** — write it in the operator/user's voice:
+`.changeset/README.md` is the contract: the voice of a summary, one changeset per user-visible
+change, the bump ladder, the pre-1.0 rule and the hand-written shape for a session without a TTY.
+What it leaves to this page:
 
-- Lead with what an operator or user can now do, or the symptom a fix removes. No class names, hook
-  names, or file paths. If operators must act, add a line: `**Operators:** …`.
-- **One changeset per user-visible change** — a PR that ships two unrelated visible changes ships two
-  changeset files. Unsure whether it's visible? Add one; a reviewer can delete a superfluous note, but a
-  missing one is invisible.
 - Once a changeset reaches `main`, revise it in place. If it should not become a release note, convert
   it to an explained empty changeset instead of deleting or renaming it.
-- **Don't mention automatic migrations** — the release notes get an automatic "back up before
-  upgrading" banner whenever a release touches `server/application/src/main/resources/db/changelog/`, so the
-  changeset stays user-facing. Only a migration that requires operator action belongs in the summary
-  (`**Operators:** …` plus a `.migration/<changeset-slug>.md` fragment).
-- **Bump = the operator's upgrade cost**, not code semantics:
-  - `patch` — upgrade needs no action (bug fix, internal change, additive auto-applied migration).
-  - `minor` — new capability, still zero-action; note any new *optional* env var / flag in the summary.
-  - `major` — operator must act first (required new env var, removed/renamed config, destructive/manual
-    migration, dropped API); state the action and add a `.migration` fragment.
-
-No TTY (agents, CI)? `vp exec changeset` is interactive — write the file by hand instead: create
-`.changeset/<slug>.md` with frontmatter `"hephaestus": <bump>` and the summary as the body (see
-`.changeset/README.md`). When action is required, add `.migration/<slug>.md` with the complete
-`#### 🔴 …` guide entry. CI requires the matching slug and `**Operators:**` marker. Never hand-edit
-`CHANGELOG.md` or `MIGRATION.md`; versioning generates both.
-
-:::caution Pre-1.0
-Never pick a `major` bump while the version is `0.x` — it would cut 1.0.0, and CI rejects it. Breaking
-changes ride in `minor` instead, so a pre-1.0 `minor` is **not** guaranteed zero-action: if the operator
-must act, say so in the summary and add a migration fragment exactly as a `major` would.
-:::
-
-The whole app is versioned as one product: changesets target the root `hephaestus` package only;
-`webapp` and `docs` are never versioned individually.
+- Do not mention automatic migrations: the release notes get a "back up before upgrading" banner
+  whenever a release touches `server/application/src/main/resources/db/changelog/`. Only a migration
+  that requires operator action belongs in the summary, as `**Operators:** …` plus the
+  `.migration/<changeset-slug>.md` fragment; CI requires the matching slug and marker.
+- Never hand-edit `CHANGELOG.md` or `MIGRATION.md`; versioning generates both.
+- The whole app is versioned as one product: changesets target the root `hephaestus` package only;
+  `webapp` and `docs` are never versioned individually.
 
 ## Deploys
 
-`release.yml` calls `deploy-staging.yml` on publication and `deploy-prod.yml` after the Production
-environment's required reviewer approves; both also run by `workflow_dispatch` with a release tag.
-The environments are listed in [CI/CD](./ci-cd.mdx#environments). Verify staging before approving
-production. Hotfixes have no separate process: PR → changeset → merge → merge the Version PR.
+Staging follows `main`: `continuous-staging.yml` dispatches `promote.yml` for every successful build,
+and the staging host pulls the commit the channel names —
+[Pull-based deployment](../admin/pull-based-deployment). `release.yml` waits until staging runs the
+release's commit, then calls `deploy-prod.yml` after the Production environment's required reviewer
+approves; `deploy-prod.yml` also runs by `workflow_dispatch` with a release tag. The environments are
+listed in [CI/CD](./ci-cd.mdx#environments). Verify staging before approving production. Hotfixes
+have no separate process: PR → changeset → merge → merge the Version PR.
 
 ## Version management
 
@@ -249,7 +230,7 @@ lock sets `IMAGE_TAG`, which `docker/compose.app.yaml` passes as `APP_VERSION`; 
 exposes it as `spring.application.version`.
 
 Check the current release: `git describe --tags --abbrev=0` or
-[GitHub Releases](https://github.com/ls1intum/Hephaestus/releases).
+[GitHub Releases](https://github.com/hephaestus-build/Hephaestus/releases).
 
 ## Dependency management
 

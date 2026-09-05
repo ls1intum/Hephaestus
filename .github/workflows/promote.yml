@@ -106,81 +106,29 @@ jobs:
           sparse-checkout: security
           persist-credentials: false
 
-      - name: Resolve the release to promote
+      - name: Resolve the release to promote and write the channel
         id: release
         env:
           GH_TOKEN: ${{ github.token }}
-          REQUESTED: ${{ inputs.release }}
-          HOSTNAME: ${{ vars.APP_HOSTNAME }}
-          COMMIT: ${{ inputs.commit }}
-        run: |
-          set -euo pipefail
-          echo "environment_url=https://${HOSTNAME}" >> "$GITHUB_OUTPUT"
-
-          if [ -n "$COMMIT" ]; then
-            [ -z "$REQUESTED" ] || {
-              echo "::error::Name a release or a commit, not both"; exit 1; }
-            [[ "$COMMIT" =~ ^[0-9a-f]{40}$ ]] || {
-              echo "::error::Follow a full commit SHA, not '$COMMIT'"; exit 1; }
-            # Dispatch permission must not authorize commits outside main.
-            gh api "repos/$GITHUB_REPOSITORY/compare/$COMMIT...main" --jq .status |
-              grep -qE '^(identical|ahead)$' || {
-                echo "::error::$COMMIT is not on the default branch"; exit 1; }
-            echo "release=$COMMIT" >> "$GITHUB_OUTPUT"
-            echo "version=$COMMIT" >> "$GITHUB_OUTPUT"
-            echo "follows=commit" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          release="$REQUESTED"
-          [[ "$release" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || {
-            echo "::error::Promote an immutable vX.Y.Z release, not '$release'"; exit 1; }
-          # The host binds the tag's source tree to the signed release lock before applying it.
-          [ "$(gh release view "$release" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)" = false ] || {
-            echo "::error::$release is still a draft"; exit 1; }
-          echo "release=$release" >> "$GITHUB_OUTPUT"
-          echo "version=${release#v}" >> "$GITHUB_OUTPUT"
-          echo "follows=release" >> "$GITHUB_OUTPUT"
-
-      - name: Write and sign the channel
-        working-directory: deploy-state
-        env:
           CHANNEL: ${{ inputs.environment }}
-          RELEASE: ${{ steps.release.outputs.release }}
-          FOLLOWS: ${{ steps.release.outputs.follows }}
-          OWNER: ${{ github.repository_owner }}
-          GH_TOKEN: ${{ github.token }}
+          RELEASE: ${{ inputs.release }}
+          COMMIT: ${{ inputs.commit }}
           ALLOW_ROLLBACK: ${{ inputs.allow-rollback || false }}
           FREEZE: ${{ inputs.freeze || false }}
-        run: |
-          set -euo pipefail
-          channel=$(echo "$CHANNEL" | tr '[:upper:]' '[:lower:]')
-          mkdir -p channels
-          if [ "$FOLLOWS" = commit ]; then
-            # Commit deployments carry verified image digests in the signed channel.
-            node "$GITHUB_WORKSPACE/scripts/commit-image-lock.ts" \
-              "$RELEASE" "$OWNER" "$GITHUB_WORKSPACE/.promotion-inventory/security/release-images.json" \
-              > images.json
-            jq -n --arg commit "$RELEASE" --slurpfile images images.json \
-              --argjson allowRollback "$ALLOW_ROLLBACK" --argjson freeze "$FREEZE" \
-              '{commit: $commit, images: $images[0], allowRollback: $allowRollback, freeze: $freeze}' \
-              > "channels/${channel}.json"
-            rm -f images.json
-          else
-            jq -n --arg release "$RELEASE" --argjson allowRollback "$ALLOW_ROLLBACK" \
-              --argjson freeze "$FREEZE" \
-              '{release: $release, allowRollback: $allowRollback, freeze: $freeze}' \
-              > "channels/${channel}.json"
-          fi
-          cosign sign-blob --yes \
-            --bundle "channels/${channel}.json.sigstore.json" \
-            "channels/${channel}.json"
-          echo "CHANNEL_FILE=channels/${channel}.json" >> "$GITHUB_ENV"
+          HOSTNAME: ${{ vars.APP_HOSTNAME }}
+        run: node scripts/resolve-promotion.ts
+
+      - name: Sign the channel
+        working-directory: deploy-state
+        env:
+          CHANNEL_FILE: ${{ steps.release.outputs.channel }}
+        run: cosign sign-blob --yes --bundle "${CHANNEL_FILE}.sigstore.json" "$CHANNEL_FILE"
 
       - name: Publish the channel
         working-directory: deploy-state
         env:
           GH_TOKEN: ${{ github.token }}
+          CHANNEL_FILE: ${{ steps.release.outputs.channel }}
           RELEASE: ${{ steps.release.outputs.release }}
         run: |
           node ../scripts/commit-via-api.ts \

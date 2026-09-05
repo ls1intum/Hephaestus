@@ -21,7 +21,11 @@ const priorities = new Map(
 	]),
 );
 
-/** The index of the parenthesis that closes the one at index 0, or -1 if the rule opens with none. */
+/**
+ * The index of the parenthesis that closes the one at index 0, or -1 if the rule opens with none.
+ * Found by counting depth, not by looking at the last character: `(A) || (B) && PathPrefix(/)`
+ * also starts with `(` and ends with `)` and has the bug.
+ */
 function endOfLeadingGroup(rule: string): number {
 	if (!rule.startsWith("(")) return -1;
 	let depth = 0;
@@ -38,8 +42,6 @@ await test("a router that routes on the served host set groups its matcher", () 
 	// whole site to the webhook service. Grouping the matcher is what prevents it, and it is
 	// asserted for every router that names the matcher rather than only the ones combining today:
 	// an ungrouped matcher reads as correct right up until someone appends a condition to it.
-	// The closing parenthesis is found by counting depth, not by looking at the last character —
-	// `(A) || (B) && PathPrefix(/)` also starts with `(` and ends with `)` and has the bug.
 	const matcherRules = rules.filter(({ value }) => value.includes("APP_HOST_MATCH"));
 	assert.notEqual(
 		matcherRules.length,
@@ -62,7 +64,7 @@ await test("the canonical redirect takes the browser and leaves the API and the 
 	// An open tab and a provider still posting to an older name keep working through a domain move
 	// only while /api and /webhooks outrank the redirect, and the redirect only reaches a browser
 	// while it outranks the SPA router. Traefik falls back to rule length when priorities tie, which
-	// nobody edits on purpose, so the promise install.mdx makes rests on these four numbers.
+	// nobody edits on purpose, so the promise install.mdx makes rests on these priorities.
 	const canonical = priorities.get("app/https-canonical");
 	assert.notEqual(canonical, undefined, "the canonical-redirect router is gone");
 

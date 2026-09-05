@@ -15,29 +15,20 @@ jobs:
     timeout-minutes: 15
     runs-on: ubuntu-latest
     env:
-      COMPOSE_ENV_FILES: .env,release-lock.env
+      COMPOSE_ENV_FILES: .env,smoke-lock.env
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          install: "frozen"
 
       - name: Render the self-hosted stack
         working-directory: docker/self-host
         run: |
           set -euo pipefail
-          # Render what the install guide produces: the installer's generated secrets plus the
-          # values step 2 asks the operator for. Hand-filling the generated ones here would hide a
-          # required variable the installer forgets, which is how one reached a release smoke test.
-          ./setup.sh
-          sed -i \
-            -e 's|^APP_HOSTNAME=$|APP_HOSTNAME=hephaestus.example.com|' \
-            -e 's|^ACME_EMAIL=$|ACME_EMAIL=operator@example.com|' \
-            .env
-          while IFS= read -r image; do
-            name="HEPHAESTUS_IMAGE_${image^^}"
-            name=${name//-/_}
-            printf '%s=%s@sha256:%s\n' "$name" "example.invalid/${image}" "$(printf '0%.0s' {1..64})" >> release-lock.env
-          done < <(jq -r '.images[], .upstream[].name' ../../security/release-images.json)
-          printf 'IMAGE_TAG=0.0.0\nHEPHAESTUS_RELEASE=v0.0.0\nHEPHAESTUS_RELEASE_COMMIT=%s\n' \
-            "$(printf '0%.0s' {1..40})" >> release-lock.env
+          node ../../scripts/prepare-host-smoke-env.ts
+          node ../../scripts/prepare-smoke-lock.ts
           docker compose config > /dev/null
           echo "Rendered services:"
           docker compose config --services | sort
@@ -81,10 +72,9 @@ jobs:
           ' <<< "$rendered_json" >/dev/null || {
             echo "::error::webapp and webhook request-body limits are not attached to their routers"; exit 1; }
 
-          # HSTS is the one security header a response cannot set for itself, and the entrypoint
-          # that used to carry it exists only where the proxy stack is the edge. Behind any other
-          # proxy the header simply vanished, so each router that terminates a public request
-          # carries it now, and this is what keeps that true.
+          # HSTS is the one security header a response cannot set for itself, and an entrypoint
+          # middleware exists only where the proxy stack is the edge, so every https router carries
+          # it — compose.app.yaml says why.
           jq -e '
             [ .services | to_entries[] | .value.labels // {} | to_entries[]
               | select(.key | test("^traefik\\.http\\.routers\\.https-[a-z-]+\\.middlewares$"))
@@ -118,9 +108,6 @@ jobs:
             | jq -r '.services["reverse-proxy"].ports[].published' | sort -n | tr '\n' ' ')
           [ "$published" = "80 443 " ] || {
             echo "::error::reverse-proxy publishes '$published', expected '80 443 ' — !override was ignored"; exit 1; }
-      - uses: ./.github/actions/setup-toolchain
-        with:
-          install: "frozen"
 
       - name: Render the preview stack and assert it stays sandboxed
         run: vp run gate:preview-stack
@@ -138,13 +125,13 @@ jobs:
           # workflow supplies; this only proves each file renders, not that it is right for production.
           for stack in proxy core app; do
             docker compose -f "compose.${stack}.yaml" \
-              --env-file self-host/.env --env-file self-host/release-lock.env config --quiet
+              --env-file self-host/.env --env-file self-host/smoke-lock.env config --quiet
           done
           # No service names a serversTransport, because only the file provider can define one and
           # the app stack must render without the proxy stack. The backend timeouts therefore have
           # to reach default@internal from the edge's own static configuration, or they are absent.
           proxy=$(docker compose -f compose.proxy.yaml \
-            --env-file self-host/.env --env-file self-host/release-lock.env config)
+            --env-file self-host/.env --env-file self-host/smoke-lock.env config)
           for required in \
             'serversTransport.forwardingTimeouts.dialTimeout=10s' \
             'serversTransport.forwardingTimeouts.responseHeaderTimeout=30s'; do

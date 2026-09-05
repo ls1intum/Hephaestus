@@ -31,15 +31,11 @@ jobs:
     permissions:
       contents: read
     env:
-      # Which stacks this environment runs, in deployment order. The broker is recreated ahead of
-      # every stack below, so this order carries the other dependency: the application server runs
-      # the migration the webhook runtime in core reads, and the edge starts last against complete
-      # routing labels.
-      # An environment whose edge is owned by something else on the host sets DEPLOY_EDGE_PROXY=false
-      # and keeps proxy out of both the render and the deploy.
-      # Staging shares its host with the Coolify instance that serves pull-request previews, and
-      # that proxy holds :80/:443, so a second edge there fails the deploy on a port that is
-      # already allocated.
+      # Which stacks this environment runs, in deployment order: `STACK_ORDER` in
+      # scripts/reconcile-deployment.ts says why, and release-deployment-policy.test.ts holds the
+      # two together. An environment whose edge is owned by something else on the host sets
+      # DEPLOY_EDGE_PROXY=false: staging shares its host with the Coolify proxy that serves
+      # pull-request previews, which already holds :80/:443.
       STACKS: ${{ vars.DEPLOY_EDGE_PROXY == 'false' && 'app core' || 'app core proxy' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

@@ -49,13 +49,15 @@ async function readSources(files: string[]): Promise<Map<string, string>> {
 	);
 }
 
-/** A task name as a workflow writes it, including an unresolved matrix expression. */
-// Flags, and a matrix value standing for flags, may come before the task name; `--filter` selects
-// a package script instead of a task and is left where the caller can see it.
+/**
+ * A task name as a workflow writes it, including an unresolved matrix expression. Flags, and a
+ * matrix value standing for flags, may come before the task name; `--filter` selects a package
+ * script instead of a task and is left where the caller can see it.
+ */
 const TASK_INVOCATION =
 	/\bvp run (?:(?:--(?!filter\b)[\w-]+|\$\{\{ *matrix\.\w+ *\}\}) +)*((?:[\w:-]|\$\{\{ *matrix\.\w+ *\}\})+)/g;
 
-// The two gates `check` cannot run: the k6 syntax check needs the pinned container, and the PMD
+// The gates `check` cannot run: the k6 syntax check needs the pinned container, and the PMD
 // canary runs only when CI decides PMD inputs changed. Every other CI gate is part of `check`.
 const CI_ONLY_GATES = new Set(["gate:load-syntax", "gate:pmd-canary"]);
 
@@ -144,7 +146,6 @@ function step(workflow: Document, jobPath: string[], action: string): YAMLMap {
 	throw new Error(`${jobPath.join(".")} has no ${action} step`);
 }
 
-/** A job's step by its `name`. */
 function namedStep(workflow: Document, jobPath: string[], name: string): YAMLMap {
 	const steps = workflow.getIn([...jobPath, "steps"]);
 	assert.ok(isSeq(steps), `${jobPath.join(".")} has no steps`);
@@ -176,14 +177,12 @@ function exceptionFault(entry: unknown, now: number): string | undefined {
 	return undefined;
 }
 
-/** A step's `with` map. */
 function stepInputs(declaration: YAMLMap): YAMLMap {
 	const map = declaration.get("with");
 	assert.ok(isMap(map), "step declares no inputs");
 	return map;
 }
 
-/** The shell a named `run` step ships. */
 function runScript(workflow: Document, jobPath: string[], name: string): string {
 	const shell = namedStep(workflow, jobPath, name).get("run");
 	assert.ok(typeof shell === "string", `${name} is not a run step`);

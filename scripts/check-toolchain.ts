@@ -4,20 +4,19 @@
  * gate fails when a pin, a bundled tool version, a setup step or a command anywhere in the tree
  * drifts from that shape.
  */
-import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { isDeepStrictEqual } from "node:util";
 
 import packageArgument from "npm-package-arg";
 import { parse } from "yaml";
 
-import { asRecord, isRecord } from "./lib/json.ts";
-import { CAPTURE_LIMIT_BYTES } from "./lib/process.ts";
+import { asRecord, isRecord, parseJson } from "./lib/json.ts";
+import { output } from "./lib/process.ts";
 import { commandsOf, loadTasks } from "./lib/task-graph.ts";
 import { BUNDLED_PINS, bundledVersions, CATALOG_FILE } from "./lib/toolchain-pins.ts";
 
 function readJson(file: string): Record<string, unknown> {
-	return asRecord(JSON.parse(readFileSync(file, "utf8")), file);
+	return asRecord(parseJson(readFileSync(file, "utf8")), file);
 }
 
 const manifest = readJson("package.json");
@@ -57,7 +56,7 @@ const vitePlusPin = devDependencies["vite-plus"];
 if (typeof vitePlusPin !== "string" || !/^\d+\.\d+\.\d+$/.test(vitePlusPin))
 	throw new Error("package.json#devDependencies.vite-plus must pin an exact version");
 const vitePlus: string = vitePlusPin;
-const huskyFiles = execFileSync("git", ["ls-files", ".husky"], { encoding: "utf8" }).trim();
+const huskyFiles = (await output("git", ["ls-files", ".husky"])).trim();
 if ("husky" in devDependencies || huskyFiles !== "")
 	throw new Error("Git hooks run through the Vite+ dispatcher; remove husky");
 const scripts = manifest.scripts;
@@ -66,7 +65,7 @@ if (!isRecord(scripts) || scripts.prepare !== "node scripts/enable-hooks.ts")
 for (const hook of ["commit-msg", "pre-push"]) {
 	const file = `.vite-hooks/${hook}`;
 	// Git carries the executable bit; a Windows checkout does not, so the index is the answer.
-	const indexed = execFileSync("git", ["ls-files", "-s", file], { encoding: "utf8" });
+	const indexed = await output("git", ["ls-files", "-s", file]);
 	if (!indexed.startsWith("100755 ")) throw new Error(`${file} must be committed with mode 100755`);
 }
 
@@ -196,7 +195,7 @@ if (!/^\d+$/.test(javaVersion) || javaVersion !== pomJava)
 	throw new Error(
 		`.java-version must state the JDK line server/pom.xml compiles for (${pomJava ?? "unset"})`,
 	);
-for (const file of execFileSync("git", ["ls-files", ".github"], { encoding: "utf8" }).split("\n")) {
+for (const file of (await output("git", ["ls-files", ".github"])).split("\n")) {
 	if (!/\.ya?ml$/.test(file)) continue;
 	const source = readFileSync(file, "utf8");
 	if (/^\s*java-version:/m.test(source))
@@ -393,12 +392,7 @@ const isHistorical = (file: string): boolean =>
 	file === "CHANGELOG.md" || file === "MIGRATION.md" || file.startsWith("docs/decisions/");
 // The image builds have no `vp`: they install and build through the package-manager lane alone.
 const isImageBuild = (file: string): boolean => file.endsWith("Dockerfile");
-const tracked = execFileSync("git", ["ls-files", "-z"], {
-	encoding: "utf8",
-	maxBuffer: CAPTURE_LIMIT_BYTES,
-})
-	.split("\0")
-	.filter(Boolean);
+const tracked = (await output("git", ["ls-files", "-z"])).split("\0").filter(Boolean);
 const forbiddenWord = new RegExp(`\\b${retired}\\b`, "i");
 const forbiddenPath = new RegExp(
 	`(?:^|/)(?:${retired}\\.lockb?|${retired}fig\\.toml|setup-${retired})(?:$|/)`,

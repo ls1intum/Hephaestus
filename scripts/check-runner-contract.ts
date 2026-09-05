@@ -1,21 +1,7 @@
 /**
  * The task graph in `vite.config.ts` relies on how `vp run` and its bundled tools execute a
- * command. These are not documented guarantees, so this gate runs the pinned tools against a
- * scratch workspace outside the repository and fails on the first fact that no longer holds:
- *
- *   - array commands run in order, and an `&&` chain keeps its order;
- *   - a glob reaches the command as written, quoted or not; the runner never expands it;
- *   - an oxfmt pattern with no slash matches a basename at any depth, and a negation confines a pass
- *     to the directory it runs in; a pattern containing a slash is anchored there and reaches no
- *     deeper;
- *   - an uncached task inherits the caller's environment; a cached task is given a filtered one and
- *     sees only what it names in `env`;
- *   - a task runs its `dependsOn` before its own command, and a group with no command runs its
- *     dependencies and fails when one of them fails;
- *   - arguments after the task name reach the command;
- *   - a task caches only when it runs its command itself: neither `vp run <task>` nor `vp exec <bin>`
- *     as a command is ever cached, and a file added to a directory the command read is a miss,
- *     except on Windows, where automatic tracking misses it and the CI leg runs uncached.
+ * command. None of it is a documented guarantee, so each test below runs the pinned tools against
+ * a scratch workspace outside the repository and fails on the first fact that no longer holds.
  *
  * Shell parameter expansion is outside the contract because the runner's shell is not a POSIX
  * shell on every platform; `ci-contract.test.ts` keeps `$` out of every command instead.

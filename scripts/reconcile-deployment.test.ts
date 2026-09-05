@@ -5,6 +5,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 
+// A git hook exports GIT_DIR and GIT_WORK_TREE for the repository it runs in, and the pre-push hook
+// runs this suite; left in place, the fixture's git calls would commit and tag in that repository.
+for (const key of Object.keys(process.env)) if (key.startsWith("GIT_")) delete process.env[key];
+
+import { parseJson } from "./lib/json.ts";
 import {
 	adoptTooling,
 	appliedCommit,
@@ -18,6 +23,7 @@ import {
 	parseStacks,
 	readApplied,
 	renderMetrics,
+	serializeChannel,
 	syncUnits,
 	unlockedImages,
 } from "./reconcile-deployment.ts";
@@ -206,8 +212,6 @@ await test("a channel may follow the default branch by naming a commit and what 
 });
 
 await test("a commit channel pins every image by digest, never by tag", () => {
-	// A tag lets the registry answer with something else later, which is the reason the release
-	// path pins digests as well.
 	assert.throws(
 		() => parseChannel({ commit, images: { HEPHAESTUS_IMAGE_WEBAPP: "ghcr.io/o/webapp:main" } }),
 		/pinned by digest/,
@@ -226,6 +230,16 @@ await test("a commit channel names a whole commit, so it cannot be an abbreviati
 
 await test("a channel names a release or a commit, never both", () => {
 	assert.throws(() => parseChannel({ release: "v1.2.3", commit, images }), /must name one/);
+});
+
+await test("the channel the promotion writes is the channel the host reads back", () => {
+	for (const channel of [
+		parseChannel({ release: "v1.2.3", freeze: true }),
+		parseChannel({ commit, images, allowRollback: true }),
+	])
+		assert.deepEqual(parseChannel(parseJson(serializeChannel(channel))), channel);
+	assert.match(serializeChannel({ release: commit, images }), /"commit": "c{40}"/);
+	assert.doesNotMatch(serializeChannel({ release: "v1.2.3" }), /images/);
 });
 
 await test("a commit is applied even though it cannot be ordered against a release", () => {
@@ -258,9 +272,6 @@ await test("an environment following the branch reports the commit it runs", () 
 });
 
 await test("a build that finishes late cannot put staging back on an older commit", () => {
-	// Two builds of main can finish out of order. The later-finishing older build writes the newer
-	// channel commit, so channel ancestry accepts it — what refuses it is comparing the commit being
-	// asked for against the commit already running.
 	const older = { ...applied, release: "b".repeat(40) };
 	const decision = decide({ release: "a".repeat(40), images }, older, "e".repeat(40), true, true);
 	assert.equal(decision.action, "refuse");

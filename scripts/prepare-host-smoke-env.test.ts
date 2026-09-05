@@ -27,7 +27,7 @@ await test("answers the settings a boot refuses to start without, and touches no
 		changed.set(key, String(after[index]).slice(key.length + 1));
 	}
 
-	// Without these five the installation stops at boot: no hostname, no certificate contact, no
+	// Without these the installation stops at boot: no hostname, no certificate contact, no
 	// login provider, and nobody who can reach instance administration.
 	assert.deepEqual([...changed.keys()].toSorted(), [
 		"ACME_EMAIL",

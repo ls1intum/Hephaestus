@@ -527,24 +527,19 @@ jobs:
     permissions:
       contents: read
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          install: "none"
+
       - name: Wait for staging to be running this commit
         env:
           GH_TOKEN: ${{ github.token }}
           COMMIT: ${{ needs.release.outputs.sha }}
-        run: |
-          set -euo pipefail
-          deadline=$(( SECONDS + 1500 ))
-          while [ "$SECONDS" -lt "$deadline" ]; do
-            channel=$(gh api "repos/$GITHUB_REPOSITORY/contents/channels/staging.json?ref=deploy-state" \
-              --jq '.content' 2>/dev/null | base64 -d 2>/dev/null || echo '{}')
-            [ "$(jq -r '.commit // empty' <<< "$channel")" = "$COMMIT" ] && {
-              echo "staging is on $COMMIT"; exit 0; }
-            [ "$(jq -r '.freeze // false' <<< "$channel")" = true ] && {
-              echo "::error::staging is frozen, so this release has not been rehearsed there"; exit 1; }
-            sleep 20
-          done
-          echo "::error::staging did not reach ${COMMIT} — production is not offered an unrehearsed release"
-          exit 1
+        run: node scripts/await-staging.ts
 
   deploy-production:
     needs: [release, awaiting-staging]

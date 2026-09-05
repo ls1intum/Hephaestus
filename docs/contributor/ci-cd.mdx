@@ -2,33 +2,35 @@
 id: ci-cd
 sidebar_position: 4
 title: CI/CD Architecture
-description: Trunk-based CI/CD through the merge queue; releases deploy to staging automatically and to production after approval.
+description: Trunk-based CI/CD through the merge queue; staging follows main, and a release deploys to production after approval.
 ---
 
 # CI/CD Architecture
 
 Hephaestus uses trunk-based delivery through GitHub's merge queue. Pull requests provide early
-feedback, merge groups validate projected `main`, and pushes to `main` produce release images. Releases
-with signed image locks deploy automatically to staging; production requires approval.
+feedback, merge groups validate projected `main`, and pushes to `main` produce release images. Staging
+follows every successful build of `main`; a release with a signed image lock deploys to production
+after approval.
 
 ## Architecture overview
 
 ```mermaid
 flowchart TD
     accTitle: Pull request delivery pipeline
-    accDescr: Pull-request and merge-group validation protect main; final-SHA images become signed releases that deploy to staging before production approval.
+    accDescr: Pull-request and merge-group validation protect main; staging follows every main commit, and final-SHA images become signed releases that deploy to production after approval.
     PR[Pull request] --> PRCI[Pull-request validation]
     PRCI --> Queue[Merge queue]
     Queue --> MG[Projected-main validation]
     MG --> Main[Merge to main]
     Main --> Images[Build and attest images for final commit]
+    Images --> Staging[Staging follows the commit]
     Main --> VP[Maintain Version PR]
     VP --> VPCI[Validate the version commit and preflight its release evidence]
     VPCI -->|Maintainer merges| ReleaseCI[Revalidate the merged version commit]
     ReleaseCI --> Evidence[Build evidence and sign image lock]
     Evidence --> Verify{Verify evidence and image lock}
-    Verify -->|Pass| Staging[Deploy to staging]
-    Staging -->|Approve| Prod[Deploy to production]
+    Verify -->|Pass| Await[Wait for staging to run this commit]
+    Await -->|Approve| Prod[Deploy to production]
 ```
 
 ## Release flow
@@ -161,8 +163,11 @@ SBOM, and release-verification guarantees.
 | Environment | Eligibility | Deploys on | Approval |
 | --- | --- | --- | --- |
 | Preview (Coolify) | same-repository PR with the `preview` label | every push; never waits for tests | none |
-| Staging | every published release | release publication | none |
-| Production | the same release after staging | release publication | required reviewer |
+| Staging | every successful `main` build | `promote.yml`, dispatched by `continuous-staging.yml`; the host pulls the commit the channel names | none |
+| Production | a published release, once staging runs its commit | release publication | required reviewer |
+
+Staging follows `main` and production runs releases — [ADR 0042](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0042-hosts-pull-their-own-releases.md)
+has the reasoning and [Pull-based deployment](../admin/pull-based-deployment) the host side.
 
 ### GitHub environment setup
 
@@ -170,15 +175,13 @@ SBOM, and release-verification guarantees.
 2. Create `Staging` (no rules)
 3. Create `Production` with **Required reviewers**
 
-A deploy brings up `app`, then `core`, then `proxy`: the application server runs the Liquibase
-migration the webhook runtime in `core` reads, and the edge starts last, against routers that are
-already complete. Both deploy paths use this order — the push workflow and the pull reconciler.
-The `proxy` stack publishes :80 and :443. An environment whose host already has an
-edge in front of it sets the environment variable `DEPLOY_EDGE_PROXY=false`, which leaves `proxy`
-out of both the render and the deploy; anything else, including an unset variable, deploys all
-three. Staging sets it, because it shares a host with the Coolify instance that serves preview
-deployments and that proxy holds both ports — a second edge there fails the deploy on a port that
-is already allocated.
+A deploy starts the stacks in the order [Production setup](../admin/production-setup#deployment-steps-reference-stack)
+gives, on the push workflow and the pull reconciler alike. The `proxy` stack publishes :80 and :443,
+so a host that already has an edge in front of it leaves `proxy` out: the push workflow reads the
+environment variable `DEPLOY_EDGE_PROXY=false`, which drops `proxy` from both the render and the
+deploy, and a pulling host omits it from `HEPHAESTUS_STACKS`. Staging is such a host: it shares one
+with the Coolify instance that serves preview deployments, and that proxy holds both ports — a second
+edge there fails the deploy on a port that is already allocated.
 
 Preview environments do not need to be created in advance. The preview workflow registers
 `preview/pr-N` as a transient GitHub environment when Coolify accepts the first deployment.
@@ -205,7 +208,7 @@ is no longer the head; the new push starts the next deployment and nothing needs
 
 A preview runs its own PostgreSQL seeded from staging and reads staging's event stream. What is
 switched off in the copy, how sign-in works, and how the sandbox is enforced are in
-[`docker/preview/README.md`](https://github.com/ls1intum/Hephaestus/blob/main/docker/preview/README.md).
+[`docker/preview/README.md`](https://github.com/hephaestus-build/Hephaestus/blob/main/docker/preview/README.md).
 
 Preview controllers run only for pull requests targeting `main`; this keeps privileged
 `pull_request_target` workflows anchored to the protected branch. A stacked layer becomes eligible
@@ -237,9 +240,9 @@ Coolify rejects the event the job fails and `reconcile-previews.yml` retries nig
 the deployment inventory.
 
 Operator configuration, host capacity and secret scopes live in
-[`docker/preview/README.md`](https://github.com/ls1intum/Hephaestus/blob/main/docker/preview/README.md);
+[`docker/preview/README.md`](https://github.com/hephaestus-build/Hephaestus/blob/main/docker/preview/README.md);
 why the label is the authority, and which alternatives were priced and declined, is
-[ADR 0035](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0035-pull-request-previews-are-label-gated.md).
+[ADR 0035](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0035-pull-request-previews-are-label-gated.md).
 
 ## Workflows
 
@@ -268,9 +271,11 @@ why the label is the authority, and which alternatives were priced and declined,
 | `reconcile-previews.yml` | Nightly, manual | Re-sends teardown for any preview environment whose pull request is closed, drafted or unlabelled |
 | `cd-docs.yml`, `cd-docs-teardown.yml` | `docs/**` on push and pull requests; PR closed | Publishes the docs site and its pull-request previews |
 | `version-pr.yml` | Push to main | Maintains the accumulating Version PR (changesets) and dispatches CI/CD on its branch, release evidence preflight included |
-| `release.yml` | Successful CI/CD push on `main` | Publishes the release and promotes it through the Staging and Production environment gates |
+| `continuous-staging.yml` | Successful CI/CD push on `main` | Dispatches `promote.yml` to follow the commit on staging and watches that run |
+| `promote.yml` | Manual dispatch, or `continuous-staging.yml` | Signs the channel that moves an environment to a release or commit, behind that environment's gate, and waits for the host to converge |
+| `release.yml` | Successful CI/CD push on `main` | Publishes the release, waits for staging to be running its commit, then deploys production behind the Production environment gate |
 | `release-upgrade.yml` | Called by `release.yml`, weekly | Boots the previous stable release with seeded data, then the candidate against the same database |
-| `deploy-staging.yml`, `deploy-prod.yml` | Called by `release.yml` or manual dispatch | Deploy a verified release lock through `deploy-locked-compose.yml` |
+| `deploy-prod.yml` | Called by `release.yml` or manual dispatch | Deploys a verified release lock to production through `deploy-locked-compose.yml` |
 
 ### Commits a workflow makes
 
@@ -314,22 +319,21 @@ action directly rather than checking out the repository only to reach a wrapper.
 
 ## Path filters
 
-`detect-changes` in `cicd.yml` selects legs from the changed paths. Same-repository pull requests run
-`Build` and `Docker` regardless of paths, because previews need every image at the head SHA.
+`detect-changes` in `cicd.yml` owns the filters that select legs from the changed paths; read them
+there. What the list does not say on its own:
 
-| Selects | Paths |
-| --- | --- |
-| Quality → Webapp | `webapp/**`, `docs/images/readme/**`, `docs/src/css/custom.css`, the root oxlint and oxfmt configs, the four `scripts/check-*` files it runs, root package files |
-| Quality → App Server | `server/**` except `AGENTS.md` and `CLAUDE.md`, `scripts/run-mvnw.ts`, `docker/compose.app.yaml`, `docker/compose.core.yaml`, root package files |
-| Quality → Tooling and Docs | `scripts/**`, `docker/agents/**`, `load-tests/**`, `docs/**`, tsconfigs, oxlint and oxfmt configs, `.changeset/**`, `commitlint.config.ts`, instruction files, `renovate.json`, `openapitools.json` |
-| Every quality leg | `vite.config.ts`, `.vite-hooks/**`, `.java-version`, `cicd.yml`, `ci-quality-gates.yml` and the setup actions: the task graph, the hooks and the JDK decide every leg's verdict, so a change to one runs all of them |
-| Build artifact gates | contracts: the App Server paths or `docker/postgres/**`; E2E: webapp source and the server main sources; image: `server/application/src/main/**`, the poms, `server/application/project.toml`, `server/generated-clients/**` |
-| Docker images | `webapp-image`: the webapp build inputs and non-test source; `agent-images`: `docker/agents/**`; `postgres-image`: `docker/postgres/**` |
-| Supported-host boot smoke | `docker/**`, `application*.yml`, and the sources Spring binds configuration from — `**/*Properties.java` and `Application.java`. `ci-contract.test.ts` fails if a source carrying `@ConfigurationProperties` or `@ConfigurationPropertiesScan` is not selected |
-| CI config | one filter per leg naming its own workflow files and actions; any `.github/workflows/**` or `.github/actions/**` change runs Actionlint and Zizmor |
-
-`docker/agents/**` is in both the tooling and the agent-image filters: `test:agents` and
-`typecheck:agents` cover the precompute tree, and the same tree builds the agent image.
+- Same-repository pull requests run `Build` and `Docker` regardless of paths, because previews need
+  every image at the head SHA.
+- `vite.config.ts`, `.vite-hooks/**`, `.java-version`, `cicd.yml`, `ci-quality-gates.yml` and the
+  setup actions select every quality leg: the task graph, the hooks and the JDK decide every leg's
+  verdict, so a change to one runs all of them.
+- `docker/agents/**` is in both the tooling and the agent-image filters: `test:agents` and
+  `typecheck:agents` cover the precompute tree, and the same tree builds the agent image.
+- The boot-smoke filter is the whole tree Spring binds configuration from, and
+  `ci-contract.test.ts` fails if a source carrying `@ConfigurationProperties` or
+  `@ConfigurationPropertiesScan` is not selected.
+- Each leg has a filter naming its own workflow files and actions, and any `.github/workflows/**`
+  or `.github/actions/**` change runs Actionlint and Zizmor.
 
 ## Docker layer caching
 

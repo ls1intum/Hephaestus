@@ -6,7 +6,7 @@
  * container running with that role off, a variable nothing binds: Compose sets it, `docker inspect`
  * shows it, the documented procedure quotes it, and it configures nothing.
  *
- * Five shapes of that one defect, and this file is the only place they are named:
+ * The shapes of that one defect, named only here:
  *
  *   misdelivered — a service sets a variable whose owning role that same service disables.
  *   undelivered  — the deployment forwards the variable somewhere, but no container running the
@@ -73,7 +73,7 @@ const ROLE_SCOPES: readonly RoleScope[] = [
 	{
 		path: "hephaestus.sandbox.gateway.max-request-bytes",
 		role: "worker",
-		why: "SandboxGatewayPayloadSizeFilter enforces it on the gateway chain, which LlmProxySecurityConfig installs gated on hephaestus.runtime.worker.enabled",
+		why: "PayloadSizeFilter enforces it on the gateway chain, which LlmProxySecurityConfig installs gated on hephaestus.runtime.worker.enabled",
 	},
 	{
 		path: "hephaestus.sandbox.gateway.requests-per-minute",
@@ -136,11 +136,11 @@ const PER_CONTAINER = new Map<string, string>([
 ]);
 
 /**
- * Declared rather than derived, and the reason is worth stating because it looks like a weakness.
- * Nothing in Compose separates a setting the receiver must have from one it is right not to have:
- * `GH_APP_PRIVATE_KEY` also reaches two of the three containers, and "deliver it to the third too"
- * would be a private key shipped to a container with no use for it. Only the role gate on the bean
- * that reads it decides, so each entry names that bean and a reader can check it against the Java.
+ * Declared rather than derived: nothing in Compose separates a setting the receiver must have from
+ * one it is right not to have. `GH_APP_PRIVATE_KEY` also reaches only some application containers,
+ * and "deliver it to the rest too" would be a private key shipped to a container with no use for
+ * it. Only the role gate on the bean that reads it decides, so each entry names that bean and a
+ * reader can check it against the Java.
  */
 interface DeploymentWideSetting {
 	readonly variable: string;
@@ -499,7 +499,7 @@ export function analyse(
 	return { failures, delivered, applicationContainers: applicationContainers.map((c) => c.id) };
 }
 
-if (process.argv[1] === import.meta.filename) {
+if (import.meta.main) {
 	const compose: ComposeFile[] = [];
 	for (const file of COMPOSE_FILES) {
 		compose.push([file, await readFile(join(REPO_ROOT, file), "utf8")]);

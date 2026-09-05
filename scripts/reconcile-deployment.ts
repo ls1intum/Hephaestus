@@ -11,7 +11,8 @@ import {
 } from "node:fs/promises";
 import { join } from "node:path";
 
-import { asRecord, asString, parseJson } from "./lib/json.ts";
+import { requiredEnv } from "./lib/env.ts";
+import { asRecord, asString, parseJson, readJsonFile } from "./lib/json.ts";
 import { output, run, succeeds } from "./lib/process.ts";
 
 export type Stack = "proxy" | "core" | "app";
@@ -64,15 +65,19 @@ export type Decision =
 	| { action: "noop"; reason: string }
 	| { action: "refuse"; reason: string };
 
-const RELEASE_TAG = /^v(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/;
+export const RELEASE_TAG = /^v(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/;
 const CHANNEL_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const COMMIT_SHA = /^[0-9a-f]{40}$/;
 const IMAGE_KEY = /^HEPHAESTUS_IMAGE_[A-Z0-9_]+$/;
 const IMAGE_DIGEST = /^[^\s@]+@sha256:[0-9a-f]{64}$/;
 
+export function isCommit(value: string): boolean {
+	return COMMIT_SHA.test(value);
+}
+
 /** What a channel may ask a host to run: a published release, or a commit of the default branch. */
 export function isTarget(value: string): boolean {
-	return RELEASE_TAG.test(value) || COMMIT_SHA.test(value);
+	return RELEASE_TAG.test(value) || isCommit(value);
 }
 
 function optionalBoolean(value: unknown, label: string): boolean {
@@ -99,7 +104,7 @@ export function parseChannel(value: unknown): Channel {
 		if (record.release !== undefined)
 			throw new Error("channel names both a release and a commit; it must name one");
 		const commit = asString(record.commit, "channel.commit");
-		if (!COMMIT_SHA.test(commit))
+		if (!isCommit(commit))
 			throw new Error(`channel.commit must be a full 40-character commit, not ${commit}`);
 		return { release: commit, images: parseImages(record.images), allowRollback, freeze };
 	}
@@ -108,6 +113,15 @@ export function parseChannel(value: unknown): Channel {
 	if (!RELEASE_TAG.test(release))
 		throw new Error(`channel.release must be an immutable vX.Y.Z tag, not ${release}`);
 	return { release, allowRollback, freeze };
+}
+
+/** The channel file the promotion signs, in the shape `parseChannel` reads back. */
+export function serializeChannel(channel: Channel): string {
+	const { release, images, allowRollback = false, freeze = false } = channel;
+	const record = images
+		? { commit: release, images, allowRollback, freeze }
+		: { release, allowRollback, freeze };
+	return `${JSON.stringify(record, null, "\t")}\n`;
 }
 
 /**
@@ -252,7 +266,7 @@ export function lockedReleaseCommit(lockEnv: string): string {
 		.split("\n")
 		.filter((line) => line.startsWith("HEPHAESTUS_RELEASE_COMMIT="))
 		.map((line) => line.slice(line.indexOf("=") + 1));
-	if (values.length !== 1 || !/^[a-f0-9]{40}$/.test(values[0] ?? ""))
+	if (values.length !== 1 || !isCommit(values[0] ?? ""))
 		throw new Error("release lock must contain one source commit");
 	return values[0] ?? "";
 }
@@ -283,12 +297,7 @@ interface HostConfig {
 }
 
 function hostConfig(environment: NodeJS.ProcessEnv): HostConfig {
-	const required = (name: string): string => {
-		const value = environment[name];
-		if (!value) throw new Error(`${name} must be set`);
-		return value;
-	};
-	const channel = required("HEPHAESTUS_CHANNEL");
+	const channel = requiredEnv(environment, "HEPHAESTUS_CHANNEL");
 	if (!CHANNEL_NAME.test(channel))
 		throw new Error("HEPHAESTUS_CHANNEL must contain lowercase letters, digits, and hyphens");
 	const stateDirectory = environment.STATE_DIRECTORY ?? "/var/lib/hephaestus";
@@ -304,13 +313,13 @@ function hostConfig(environment: NodeJS.ProcessEnv): HostConfig {
 		secretsDirectory: environment.HEPHAESTUS_SECRETS ?? "/etc/hephaestus",
 		metricsFile: environment.HEPHAESTUS_METRICS_FILE,
 		waitTimeoutSeconds,
-		promoteIdentity: required("HEPHAESTUS_PROMOTE_IDENTITY"),
+		promoteIdentity: requiredEnv(environment, "HEPHAESTUS_PROMOTE_IDENTITY"),
 	};
 }
 
 export async function readApplied(file: string): Promise<AppliedState | undefined> {
 	try {
-		const record = asRecord(parseJson(await readFile(file, "utf8")), "applied state");
+		const record = asRecord(await readJsonFile(file), "applied state");
 		const applied = {
 			release: asString(record.release, "applied.release"),
 			channelCommit: asString(record.channelCommit, "applied.channelCommit"),
@@ -319,7 +328,7 @@ export async function readApplied(file: string): Promise<AppliedState | undefine
 		};
 		if (!isTarget(applied.release))
 			throw new Error("applied.release must be a vX.Y.Z tag or a commit");
-		if (!/^[a-f0-9]{40}$/.test(applied.channelCommit))
+		if (!isCommit(applied.channelCommit))
 			throw new Error("applied.channelCommit must be a Git commit");
 		if (applied.commit !== undefined && !COMMIT_SHA.test(applied.commit))
 			throw new Error("applied.commit must be a Git commit");
@@ -330,8 +339,7 @@ export async function readApplied(file: string): Promise<AppliedState | undefine
 			throw new Error("applied.appliedAt must be an ISO timestamp");
 		return applied;
 	} catch (error) {
-		if (typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT")
-			return undefined;
+		if (error instanceof Error && "code" in error && error.code === "ENOENT") return undefined;
 		throw error;
 	}
 }

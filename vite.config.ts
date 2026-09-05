@@ -5,8 +5,7 @@ import { parse } from "jsonc-parser";
 import type { OxfmtConfig } from "oxfmt";
 import { defineConfig } from "vite-plus";
 
-const asStringArray = (value: unknown): string[] | undefined =>
-	Array.isArray(value) && value.every((entry) => typeof entry === "string") ? value : undefined;
+import { asRecord, asStringArray } from "./scripts/lib/json.ts";
 
 // oxlint-disable-next-line typescript/no-unsafe-type-assertion
 const formatConfig = parse(
@@ -40,7 +39,7 @@ const cachedOn = <Command extends string>(
 	input: string[],
 	{ env = [], dependsOn = [] }: { env?: string[]; dependsOn?: string[] } = {},
 ) => ({ command, input, output: [], env, dependsOn });
-// A rejection nothing exercises stops rejecting: these two calls must not compile.
+// A rejection nothing exercises stops rejecting: the calls below must not compile.
 // @ts-expect-error `vp run <task>` resolves to another node, which the runner never caches
 void cached("vp run check");
 // @ts-expect-error `vp exec` runs a bundled binary the runner does not fingerprint, wherever it sits
@@ -63,7 +62,8 @@ const nestedConfigSources = "'{.changeset,.vscode,scripts}/*.{cjs,json}'";
 // `as const` keeps the command a literal type, so `cached` can still read what it runs.
 const configFormatCommand = (mode: "--check" | "--write") =>
 	`vp fmt ${mode} ${rootConfigSources} && vp fmt ${mode} ${nestedConfigSources}` as const;
-const oxlintTargets = "server docker scripts .changeset .github commitlint.config.ts";
+const oxlintTargets =
+	"server docker scripts .changeset .github commitlint.config.ts vite.config.ts";
 // Decided when the config loads; a command never uses shell expansion.
 const oxlintFormat = process.env.GITHUB_ACTIONS === "true" ? "-f github " : "";
 const repoRoot = import.meta.dirname;
@@ -82,10 +82,12 @@ const mavenInputs = [
 const mavenEnv = ["JAVA_HOME", "MAVEN_ARGS", "MAVEN_OPTS"];
 // The docs lint's file set, plus the trees markdownlint reaches outside `docs/`, read from its own
 // config so the fingerprint cannot miss a scope change.
-const markdownScope = (
-	asStringArray(
-		parse(readFileSync(new URL("docs/.markdownlint-cli2.jsonc", import.meta.url), "utf8")).globs,
-	) ?? []
+const markdownScope = asStringArray(
+	asRecord(
+		parse(readFileSync(new URL("docs/.markdownlint-cli2.jsonc", import.meta.url), "utf8")),
+		"docs/.markdownlint-cli2.jsonc",
+	).globs,
+	"docs/.markdownlint-cli2.jsonc#globs",
 )
 	.filter((glob) => glob.startsWith("../"))
 	.map((glob) => posix.normalize(`docs/${glob}`));
@@ -163,7 +165,6 @@ export default defineConfig({
 			]),
 			"check:affected": run("node scripts/check-affected.ts"),
 
-			// Formatting
 			format: group([
 				"format:java",
 				"format:webapp",
@@ -194,7 +195,6 @@ export default defineConfig({
 			"format:config:check": group(["gate:config-format"]),
 			"format:achievements": run("node scripts/format-achievements.ts"),
 
-			// Lint and typecheck
 			lint: group(["gate:server-lint", "lint:webapp", "gate:agents-lint", "gate:docs-lint"]),
 			typecheck: group(["typecheck:webapp", "gate:scripts-typecheck", "gate:agents-typecheck"]),
 			"lint:java": group(["gate:server-lint"]),
@@ -214,7 +214,6 @@ export default defineConfig({
 			"check:agents": group(["gate:agents"]),
 			"fix:agents": run(["vp run format:agents", "vp run format:config", "vp run lint:agents:fix"]),
 
-			// Repository policy
 			"gate:toolchain": run("node scripts/check-toolchain.ts"),
 			"sync:toolchain-pins": run("node scripts/sync-toolchain-pins.ts"),
 			"gate:runner-contract": run("node --test scripts/check-runner-contract.ts"),
@@ -236,7 +235,7 @@ export default defineConfig({
 				"node --test scripts/verify-changesets.test.ts scripts/sync-release-version.test.ts",
 			),
 
-			// Application server. One Maven process per checkout: the lint waits for the format check.
+			// One Maven process per checkout: `gate:server` runs the lint after the format check.
 			"gate:java-nullness": run(
 				"node scripts/check-java-nullness.ts && node --test scripts/check-java-nullness.test.ts",
 			),
@@ -270,7 +269,6 @@ export default defineConfig({
 			"test:server:mutation": run("node scripts/run-security-mutations.ts"),
 			"test:postgres-upgrade": run("node scripts/postgres-major-upgrade-test.ts"),
 
-			// Webapp
 			// `vp check` is format plus lint; the format half is `gate:webapp-format`, so one failure
 			// stays one verdict.
 			"gate:webapp": cached("vp -C webapp check --no-fmt"),
@@ -287,7 +285,6 @@ export default defineConfig({
 			"build:webapp": run("vp -C webapp build"),
 			"dev:webapp": run("vp -C webapp dev"),
 
-			// Agent runtime, precompute, repository scripts and tooling config
 			"gate:agents-format": cached(`vp fmt --check ${agentSources}`),
 			"gate:config-format": cached(configFormatCommand("--check")),
 			"gate:agents-lint": run(`vp exec oxlint ${oxlintFormat}${oxlintTargets}`),
@@ -310,14 +307,12 @@ export default defineConfig({
 			),
 			"test:tooling": run("node --test scripts/*.test.ts"),
 
-			// Load tests
 			"gate:load-format": cached(`vp fmt --check ${loadSources}`),
 			"gate:load-syntax": group(["test:load:syntax"]),
 			"test:load:syntax": run(
 				`docker run --rm -v "${repoRoot}/load-tests:/tests:ro" ${k6} inspect -e BASE_URL=http://example.test -e WEBHOOK_SECRET=abcdefghijklmnopqrstuvwxyz123456 /tests/webhook-burst.js >/dev/null && docker run --rm -v "${repoRoot}/load-tests:/tests:ro" ${k6} inspect -e API_BASE_URL=http://example.test/api -e AUTH_TOKEN=test -e WORKSPACE_SLUG=test -e ARTIFACT_IDS=1,2 /tests/detection-mentor.js >/dev/null`,
 			),
 
-			// Docs
 			"gate:docs-format": cached(`vp fmt --check ${docsSources}`),
 			"gate:docs-lint": cachedOn(
 				"vp -C docs lint --type-aware --type-check . && vp -C docs exec markdownlint-cli2",
@@ -330,7 +325,6 @@ export default defineConfig({
 			"docs:build": run("vp run --filter docs build"),
 			"docs:serve": run("vp run --filter docs serve"),
 
-			// What each CI job runs.
 			"ci:server": group(serverGates.concat("gate:contracts", "gate:env")),
 			"ci:tooling": group([
 				// Excluded here because another job or workflow runs them; the Windows leg re-runs what it can.
@@ -349,20 +343,17 @@ export default defineConfig({
 			"ci:webapp": run(["vp run ci:webapp:static", "vp run verification:webapp-build"]),
 			"ci:windows": group(checkTasks.filter((gate) => !linuxOnly.includes(gate))),
 
-			// Scoped selections for check:affected
 			"affected:agents": group(agentGates),
 			"affected:docs": group([...docsGates, "gate:instructions"]),
 			"affected:server": group(serverGates),
 			"affected:webapp": group(webappGates),
 
-			// The credential-free builds and suites that verification adds to quality
 			"verification:storybook-tests": group(["test:webapp:stories"]),
 			"verification:webapp-build": run("node scripts/verify-webapp-build.ts"),
 			"verification:storybook-build": run("vp run --filter webapp build-storybook"),
 			"verification:docs-build": group(["docs:build"]),
 			"verification:server-tests": group(["test:server:verification"]),
 
-			// Generated artefacts, schema and integration schemas
 			"generate:api": run(["vp run generate:api:specs", "vp run generate:api:client"]),
 			"generate:api:specs": run("node scripts/generate-openapi-spec.ts"),
 			"generate:api:client": run(
@@ -378,7 +369,6 @@ export default defineConfig({
 			"report:test-results": run("node scripts/summarize-test-results.ts"),
 			"release:version": run("changeset version && node scripts/sync-release-version.ts"),
 
-			// Local development
 			dev: run("mprocs"),
 			"dev:compose": run("docker compose up -d --wait", { cwd: "server" }),
 			"dev:compose:e2e": run("docker compose up -d --wait postgres nats", { cwd: "server" }),
