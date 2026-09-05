@@ -150,6 +150,7 @@ jobs:
               - '!server/**/CLAUDE.md'
             tooling:
               - 'scripts/**'
+              - 'security/semgrep/**'
               - 'docker/agents/**'
               # format:load:check and test:load:syntax run on this leg.
               - 'load-tests/**'

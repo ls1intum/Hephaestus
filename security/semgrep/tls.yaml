@@ -1,0 +1,23 @@
+rules:
+  - id: node-tls-verification-disabled
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: Keep TLS certificate verification enabled; configure a trusted CA instead.
+    metadata:
+      category: security
+      cwe: ["CWE-295: Improper Certificate Validation"]
+    pattern-either:
+      - pattern: "{..., rejectUnauthorized: false, ...}"
+      - pattern: process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0"
+  - id: java-hostname-verification-disabled
+    languages: [java]
+    severity: ERROR
+    message: Do not install an unconditional hostname verifier; use the default verifier.
+    metadata:
+      category: security
+      cwe: ["CWE-297: Improper Validation of Certificate with Host Mismatch"]
+    pattern-either:
+      - pattern: $CONNECTION.setHostnameVerifier(($HOST, $SESSION) -> true)
+      - pattern: $CONNECTION.setHostnameVerifier(($HOST, $SESSION) -> { return true; })
+      - pattern: $CONNECTION.setDefaultHostnameVerifier(($HOST, $SESSION) -> true)
+      - pattern: $CONNECTION.setDefaultHostnameVerifier(($HOST, $SESSION) -> { return true; })

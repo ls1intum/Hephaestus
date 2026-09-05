@@ -120,6 +120,7 @@ changesets rather than adding one. [Release management](./release-management.mdx
 | CodeQL default setup | managed by GitHub | repository SAST policy | code scanning |
 | TruffleHog and GitHub push protection | pull requests and pushes | block verified secrets | Security workflow and repository protection |
 | Trivy filesystem scan | Security workflow | a scanner error blocks; findings of every severity are report-only | code scanning |
+| Semgrep TLS policy | pull requests, merge groups, and `main` pushes | fails on a rule violation or a scanner error | code scanning and a run artifact |
 | Image vulnerability policy | image build and release | blocks fixable high or critical findings | build summary and release evidence |
 | Weekly image rescans | `rescan-main-images.yml`, `rescan-release-images.yml` | the `main` rescan upserts one tracking issue; the release rescan fails and comments on the vulnerability response issue | issues and run artifacts |
 | OpenSSF Scorecard | `main` pushes, branch-protection changes, and weekly; never on pull requests | reports | code scanning and a run artifact |
@@ -155,6 +156,20 @@ provisions the Node it runs lockfile updates with from `engines`, so `engines.no
 ceiling and approval of an exception, for images and dependencies alike.
 [Release management](./release-management.mdx#supply-chain-evidence) owns artifact signing, provenance,
 SBOM, and release-verification guarantees.
+
+### Semgrep policy
+
+`security/semgrep/` holds this repository's own rule pack: syntax checks for disabled Node
+certificate verification and unconditional Java hostname verifiers, not comprehensive TLS analysis.
+CodeQL keeps the deep dataflow analysis, and the image-reference, `security.txt` and Liquibase guards
+in `ci-security-scan.yml` stay independent. Inline `nosemgrep` suppression is disabled, so an
+exception is a reviewed rule change, and every rule carries a positive and a negative fixture beside
+it.
+
+Semgrep reports; it is not a required check. The digest-pinned scanner runs without network access or
+credentials over a read-only checkout, and `.github/workflows/semgrep.yml` owns the commands that
+reproduce a run locally. A pull request from a fork gets the scan verdict but no code-scanning row,
+because GitHub caps a fork token's `security-events` access at read.
 
 ## Environments
 
@@ -259,6 +274,7 @@ why the label is the authority, and which alternatives were priced and declined,
 | `openapi-autocommit.yml` | `autocommit-openapi` label | Regenerates the OpenAPI spec and client and commits them to the pull request |
 | `security-mutation.yml` | PR touching the suite's inputs, manual | Runs the security mutation suite |
 | `scorecard.yml` | Push to main, branch-protection change, weekly | Publishes the OpenSSF Scorecard |
+| `semgrep.yml` | Pull request, push to main, merge group | Tests and scans the repository's own TLS rule pack |
 | `rescan-main-images.yml` | Weekly, manual | Rescans main's published images against the release vulnerability policy and keeps one tracking issue in step with the findings |
 | `rescan-release-images.yml` | Weekly, manual | Rescans the latest published release's images and reports drift on the vulnerability response issue |
 | `ci-profile.yml` | Weekly, manual | Profiles server integration tests and Spring contexts |
