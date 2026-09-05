@@ -14,6 +14,17 @@ function workspace(): string {
 	mkdirSync(join(root, "inputs", "sources", "scm", "repo", "work"), { recursive: true });
 	mkdirSync(join(root, "work", "precompute-out"), { recursive: true });
 	mkdirSync(join(root, "work", "composition"), { recursive: true });
+	mkdirSync(join(root, "out"), { recursive: true });
+	mkdirSync(join(root, ".pi"), { recursive: true });
+	mkdirSync(join(root, "inputs", "sources", "scm", "repo", "node_modules", "dep"), {
+		recursive: true,
+	});
+	writeFileSync(join(root, "out", "result.json"), '{"API_KEY": 1}\n');
+	writeFileSync(join(root, ".pi", "settings.json"), '{"API_KEY": 1}\n');
+	writeFileSync(
+		join(root, "inputs", "sources", "scm", "repo", "node_modules", "dep", "index.js"),
+		"API_KEY\n",
+	);
 	writeFileSync(join(root, "work", "precompute-out", "summary.md"), "API_KEY appears in a hint\n");
 	writeFileSync(join(root, "work", "composition", "observations.json"), '{"summary":"API_KEY"}\n');
 	writeFileSync(
@@ -131,4 +142,19 @@ void test("an aborted session stops the walk with a note, and temp workspaces ar
 	assert.match(text, /Search stopped/);
 	assert.match(searchFiles(root, { pattern: "x", path: "..foo" }).text, /does not exist/);
 	rmSync(root, { recursive: true, force: true });
+});
+
+void test("the sandbox's own state is not searchable even when named as the path", () => {
+	const root = workspace();
+	for (const path of [
+		".sessions",
+		".pi",
+		"out",
+		"work/composition",
+		".sessions/s.jsonl",
+		"inputs/sources/scm/repo/node_modules",
+	]) {
+		assert.match(searchFiles(root, { pattern: "API_KEY", path }).text, /not searchable/, path);
+	}
+	assert.match(searchFiles(root, { pattern: "API_KEY", path: "work" }).text, /precompute-out/);
 });

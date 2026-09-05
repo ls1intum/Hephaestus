@@ -100,6 +100,17 @@ export function searchFiles(
 			details: { matches: 0, truncated: false },
 		};
 	}
+	// The skips apply to a search rooted inside them as much as to a walk reaching them.
+	const rootSegments = fromWorkspace === "" ? [] : fromWorkspace.split(sep);
+	const rootIsSkipped =
+		rootSegments.some((segment) => SKIPPED_ANYWHERE.has(segment)) ||
+		rootSegments.some((_, index) => SKIPPED_PATHS.has(rootSegments.slice(0, index + 1).join("/")));
+	if (rootIsSkipped) {
+		return {
+			text: `Path ${params.path} is the sandbox's own state, not the reviewed work; it is not searchable.`,
+			details: { matches: 0, truncated: false },
+		};
+	}
 	const flags = params.ignoreCase ? "i" : "";
 	const source = params.literal
 		? params.pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
