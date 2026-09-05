@@ -392,6 +392,43 @@ void describe("CI contract", () => {
 		assert.deepEqual(used, accepted, "Every accepted cache type is requested by a workflow");
 	});
 
+	void test("partitions integration tests without duplicating tiers or bypassing the status gate", async () => {
+		const source = await readFile(".github/workflows/ci-tests.yml", "utf8");
+		const integration = job(source, "server-integration");
+		assert.match(integration, /fail-fast: false/);
+		const selectors = [...integration.matchAll(/tests: "([^"\n]+)"/g)].map((match) => match[1]);
+		assert.deepEqual(selectors, [
+			"de/tum/cit/aet/hephaestus/integration/**",
+			"**/*Test,!de/tum/cit/aet/hephaestus/integration/**",
+		]);
+		// The matrix value reaches Maven through the config's environment read, never through a run: script.
+		assert.match(integration, /HEPHAESTUS_INTEGRATION_TESTS: \$\{\{ matrix.tests \}\}/);
+		assert.doesNotMatch(integration, /run: vp run test:server:integration "-D/);
+		// A shard whose reports carry no test case fails on that fact, not on a step name.
+		assert.match(
+			integration,
+			/grep -ho '<testcase ' server\/application\/target\/surefire-reports\/TEST-\*\.xml \| wc -l/,
+		);
+		assert.match(integration, /test "\$count" -gt 0/);
+		const guardStart = integration.indexOf("Refuse a shard");
+		const guardEnd = integration.indexOf("- name:", guardStart);
+		assert.doesNotMatch(
+			integration.slice(guardStart, guardEnd === -1 ? undefined : guardEnd),
+			/if: always\(\)/,
+		);
+		assert.match(integration, /Test Results - App Server Integration \(\$\{\{ matrix.shard \}\}\)/);
+		assert.equal((source.match(/run: vp run test:server:integration/g) ?? []).length, 1);
+		const tasks = await readFile("vite.config.ts", "utf8");
+		assert.match(tasks, /HEPHAESTUS_INTEGRATION_TESTS/);
+		assert.match(
+			tasks,
+			/"test:server:integration": run\([\s\S]*?-Dsurefire.includedGroups=integration\$\{integrationShard\}/,
+		);
+		const orchestrator = await readFile(".github/workflows/cicd.yml", "utf8");
+		assert.match(job(orchestrator, "Test"), /uses: \.\/\.github\/workflows\/ci-tests.yml/);
+		assert.match(job(orchestrator, "all-ci-passed"), /needs\.Test\.result/);
+	});
+
 	void test("packages the server once and runs every artifact gate against it", async () => {
 		const build = await readFile(".github/workflows/ci-build.yml", "utf8");
 		const packageJob = job(build, "server-package");

@@ -102,6 +102,10 @@ const docsLintInputs = [
 ];
 
 const mvnw = "node scripts/run-mvnw.ts";
+const integrationTests = process.env.HEPHAESTUS_INTEGRATION_TESTS ?? "";
+const integrationShard = integrationTests
+	? ` -Dtest=${integrationTests} -Dsurefire.failIfNoSpecifiedTests=false`
+	: "";
 
 // The gates, by the tree they judge. `quality` runs all of them; each CI job runs one tree's set.
 const policyGates = [
@@ -262,8 +266,12 @@ export default defineConfig({
 			"test:server:verification": run(
 				`${mvnw} -pl application -am package -Dspring-boot.repackage.skip=true -Parchitecture-tests -Dsurefire.includedGroups=unit,architecture -DskipCoverage=false --batch-mode`,
 			),
+			// CI runs the tier as shards. The selector is decided here, at config load, so the workflow
+			// passes a matrix value through the environment rather than into a command; locally the
+			// whole tier runs. failIfNoSpecifiedTests=false is for the generated-clients module, which
+			// has no tests for any selector; a shard that runs nothing is caught by the workflow instead.
 			"test:server:integration": run(
-				`${mvnw} -pl application -am package -Dspring-boot.repackage.skip=true -Dsurefire.includedGroups=integration -Dparallel=none --batch-mode`,
+				`${mvnw} -pl application -am package -Dspring-boot.repackage.skip=true -Dsurefire.includedGroups=integration${integrationShard} -Dparallel=none --batch-mode`,
 			),
 			"test:server:mutation": run("node scripts/run-security-mutations.ts"),
 			"test:postgres-upgrade": run("node scripts/postgres-major-upgrade-test.ts"),

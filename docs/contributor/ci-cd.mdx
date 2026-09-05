@@ -429,6 +429,13 @@ reaches no such commit builds every image itself. `detect-changes` resolves that
 
 - `Quality` legs and `Test` suites start from source; `Build` gates start when `App Server: Package`
   uploads its artifact.
+- `App Server: Integration` runs two matrix shards: `providers` selects the `integration` package
+  and `application` its complement. Both keep the `integration` tag filter and run in their own JVM
+  and Testcontainers database; a new package belongs to one shard by construction. The shard's
+  selector reaches Maven through `HEPHAESTUS_INTEGRATION_TESTS`, which `vite.config.ts` reads when
+  it loads, so the matrix value never appears in a `run:` script; a shard that ran zero test cases
+  fails its job, so a selector that drifts cannot pass green. `fail-fast: false` lets both shards report, and
+  `CI Status Gate` requires the aggregate `Test` result. Locally the tier runs whole.
 - Pull requests and merge groups build `linux/amd64`; pushes to `main`, and every run on the Version
   PR's branch, build both architectures. A pull request also builds only the images its diff touched
   and aliases the rest, while the Version PR's branch builds all of them. `detect-changes` decides
