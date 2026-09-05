@@ -172,6 +172,7 @@ jobs:
               - '.agents/**'
               - 'opencode.json'
               - 'renovate.json'
+              - 'security/scorecard-baseline.json'
               - 'openapitools.json'
               - 'jean.json'
               - 'project.code-workspace'

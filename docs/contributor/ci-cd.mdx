@@ -124,6 +124,7 @@ changesets rather than adding one. [Release management](./release-management.mdx
 | Image vulnerability policy | image build and release | blocks fixable high or critical findings | build summary and release evidence |
 | Weekly image rescans | `rescan-main-images.yml`, `rescan-release-images.yml` | the `main` rescan upserts one tracking issue; the release rescan fails and comments on the vulnerability response issue | issues and run artifacts |
 | OpenSSF Scorecard | `main` pushes, branch-protection changes, and weekly; never on pull requests | reports | code scanning and a run artifact |
+| Scorecard ratchet | the same events, plus on demand | fails when an enforced check scores below `security/scorecard-baseline.json` | job summary and a run artifact |
 | Renovate | configured schedule and vulnerability alerts | pull requests require normal review and CI | dependency dashboard |
 
 One check owns the dependency verdict: the dependency vulnerability gate in `ci-security-scan.yml`,
@@ -170,6 +171,23 @@ Semgrep reports; it is not a required check. The digest-pinned scanner runs with
 credentials over a read-only checkout, and `.github/workflows/semgrep.yml` owns the commands that
 reproduce a run locally. A pull request from a fork gets the scan verdict but no code-scanning row,
 because GitHub caps a fork token's `security-events` access at read.
+
+### Scorecard baseline
+
+`security/scorecard-baseline.json` owns the minimum every enforced Scorecard check must hold and the
+four exclusions, each with its reason. Checks are compared one at a time, so an improvement cannot
+offset a regression, and a check the baseline does not name is not enforced. Lowering a minimum also
+edits the map in `scripts/check-scorecard.test.ts`, so the change is visible in the pull request that
+makes it.
+
+`scripts/check-scorecard.ts` reads the posture OpenSSF publishes for this repository — the latest
+published assessment, not necessarily the current commit — and fails on a regression, a missing
+enforced check, evidence that predates the baseline or is more than eight days old, and on an API or
+parsing failure. `scorecard-ratchet.yml` runs it on `main` pushes, branch-protection changes, weekly
+and on demand, and keeps the fetched assessment as an artifact. It is a workflow of its own because
+[OpenSSF restricts the publishing job](https://github.com/ossf/scorecard-action#workflow-restrictions)
+to allowlisted actions. Reproduce it with `node scripts/check-scorecard.ts`, or
+`node --test scripts/check-scorecard.test.ts` without network access.
 
 ## Environments
 
@@ -279,6 +297,7 @@ why the label is the authority, and which alternatives were priced and declined,
 | `rescan-release-images.yml` | Weekly, manual | Rescans the latest published release's images and reports drift on the vulnerability response issue |
 | `ci-profile.yml` | Weekly, manual | Profiles server integration tests and Spring contexts |
 | `ci-server-clean-reference.yml` | Weekly, manual | Records cold server phases and compares generated JARs |
+| `scorecard-ratchet.yml` | Push to main, branch-protection change, weekly, manual | Fails when a Scorecard check drops below the committed baseline |
 | `deploy-preview.yml` | `preview` label added, or a push, reopen or ready-for-review on a labelled PR | Waits for this commit's attested CI images, deploys them, and registers the native GitHub deployment |
 | `cleanup-preview.yml` | Label removed, PR closed or drafted | Removes and verifies resources, then retains a cleanup tombstone |
 | `reconcile-previews.yml` | Nightly, manual | Re-sends teardown for any preview environment whose pull request is closed, drafted or unlabelled |
