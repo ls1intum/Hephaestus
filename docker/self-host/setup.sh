@@ -68,6 +68,74 @@ set_if_empty() {
 	fi
 }
 
+# A key is generated for a new instance and must never be generated for an existing one: rows the
+# database already holds were encrypted with the key that instance had, and a fresh key makes them
+# unreadable without a word of warning. The supported topology keeps the database in the Compose
+# volume hephaestus_postgresql-data, so that exact volume is the evidence. Docker's own listing is
+# the only answer accepted: anything short of it leaves the question open, and no key is generated.
+database_evidence=
+database_evidence_detail=
+database_evidence() {
+	if [ -n "$database_evidence" ]; then
+		return
+	fi
+	if ! command -v docker >/dev/null 2>&1; then
+		database_evidence=unknown
+		database_evidence_detail='docker is not installed on this host, or not on PATH'
+		return
+	fi
+	if volumes=$(docker volume ls --quiet 2>&1); then
+		if printf '%s\n' "$volumes" | grep -qx 'hephaestus_postgresql-data'; then
+			database_evidence=present
+		else
+			database_evidence=absent
+		fi
+	else
+		database_evidence=unknown
+		database_evidence_detail="docker volume ls failed: $volumes"
+	fi
+}
+refuse_unless_new_database() {
+	key=$1
+	database_evidence
+	case $database_evidence in
+		present)
+			printf '%s\n' "A Hephaestus database already exists on this host (volume hephaestus_postgresql-data). Set $key to the value that database was written with before running setup; a generated key would make what it stores unreadable." >&2
+			exit 1
+			;;
+		unknown)
+			printf '%s\n' "Could not tell whether a Hephaestus database already exists on this host ($database_evidence_detail), so $key was not generated. Start Docker, or give setup a working docker, and run it again; if this host already ran Hephaestus, set $key to the value it used." >&2
+			exit 1
+			;;
+	esac
+}
+# Whether the file carried a master key before anything here touched it. Only such a file is a
+# credible pre-v0.75 configuration, the one shape in which an absent credential key means "the
+# master key": a file that is empty or damaged proves nothing about how the database was written.
+master_key_was_configured=false
+if grep -q '^HEPHAESTUS_SECURITY_ENCRYPTION_KEY=.' "$working_file"; then
+	master_key_was_configured=true
+fi
+credential_key_is_absent=true
+if grep -q '^HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY=.' "$working_file"; then
+	credential_key_is_absent=false
+fi
+credential_key_was_set_separately=false
+if grep -q '^HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY=' "$working_file" \
+	|| grep -qE '^HEPHAESTUS_SECURITY_(CREDENTIAL_ENCRYPTION_KEY_VERSION|PRIOR_CREDENTIAL_ENCRYPTION_KEY|PRIOR_CREDENTIAL_ENCRYPTION_KEY_VERSION|CREDENTIAL_ROTATION_ENABLED)=' "$working_file"; then
+	credential_key_was_set_separately=true
+fi
+if [ "$master_key_was_configured" = false ]; then
+	if [ "$credential_key_is_absent" = true ]; then
+		refuse_unless_new_database 'HEPHAESTUS_SECURITY_ENCRYPTION_KEY and HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY (the same value as the master key on an installation from before v0.75)'
+	else
+		refuse_unless_new_database HEPHAESTUS_SECURITY_ENCRYPTION_KEY
+	fi
+fi
+if [ "$credential_key_is_absent" = true ] && [ "$credential_key_was_set_separately" = true ]; then
+	refuse_unless_new_database HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY
+fi
+
 set_if_empty POSTGRES_PASSWORD hex16
 set_if_empty HEPHAESTUS_SECURITY_ENCRYPTION_KEY hex16
 if ! grep -q '^HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY=.' "$working_file"; then
