@@ -167,6 +167,7 @@ void test("every custom manager reads every file it claims to read", async () =>
 			],
 		],
 		["Track release image tags and digests", ["security/release-images.json"]],
+		["Track the isolated Semgrep scanner image", [".github/workflows/semgrep.yml"]],
 	]);
 	assert.ok(Array.isArray(config.customManagers));
 	assert.ok(config.customManagers.every(isRecord));

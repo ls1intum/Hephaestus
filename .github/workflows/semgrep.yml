@@ -1,0 +1,61 @@
+name: Semgrep
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  merge_group:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scan:
+    name: TLS policy
+    # GitHub's actions are glibc-based, so the musl scanner image runs as a container step rather
+    # than as the job's container.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      security-events: write
+    env:
+      SEMGREP_IMAGE: semgrep/semgrep:1.176.1@sha256:34ab619bf1391a24bfda3f05debd0d8a6ce3093c2d5f9d39cfc00f83c1397823
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Test policy examples
+        run: >-
+          docker run --rm --network none -v "$GITHUB_WORKSPACE:/src:ro" -w /src
+          "$SEMGREP_IMAGE" semgrep scan --test --config security/semgrep security/semgrep --metrics=off --disable-version-check
+      - name: Scan tracked source
+        run: |
+          mkdir -p tmp
+          docker run --rm --network none -v "$GITHUB_WORKSPACE:/src:ro" -w /src \
+            -v "$GITHUB_WORKSPACE/tmp:/out" \
+            "$SEMGREP_IMAGE" semgrep scan --config security/semgrep --metrics=off --disable-version-check \
+            --disable-nosem --strict --error --sarif-output /out/semgrep.sarif \
+            --exclude security/semgrep .
+      # A fork pull request's token cannot hold security-events: write, so the upload would fail on
+      # a clean scan. The scan itself still reports the verdict.
+      - name: Upload code scanning results
+        if: >-
+          ${{ !cancelled() && hashFiles('tmp/semgrep.sarif') != ''
+          && (github.event_name != 'pull_request'
+          || github.event.pull_request.head.repo.full_name == github.repository) }}
+        uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
+        with:
+          sarif_file: tmp/semgrep.sarif
+          category: semgrep-tls
+      - name: Preserve scan evidence
+        if: ${{ !cancelled() && hashFiles('tmp/semgrep.sarif') != '' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: semgrep-${{ github.sha }}
+          path: tmp/semgrep.sarif
+          if-no-files-found: error
+          retention-days: 14

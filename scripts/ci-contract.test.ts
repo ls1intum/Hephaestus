@@ -10,7 +10,7 @@ import { type Document, isMap, isScalar, isSeq, parseDocument, type YAMLMap } fr
 
 import { evaluate as evaluateVulnerabilityPolicy } from "./check-release-vulnerabilities.ts";
 import { versionBranch } from "./dispatch-version-pr-ci.ts";
-import { asRecord, isRecord } from "./lib/json.ts";
+import { asArray, asRecord, asString, isRecord } from "./lib/json.ts";
 import { commandsOf, loadTasks } from "./lib/task-graph.ts";
 import { planRelease, releaseOutputs } from "./plan-release.ts";
 import { planSubjects } from "./scan-main-images.ts";
@@ -1741,4 +1741,57 @@ void test("a change to the task graph or the hooks selects every quality leg", a
 			/'\.java-version'/,
 			`${name} must list .java-version`,
 		);
+});
+
+void test("Semgrep scans PRs, main and merge queues without a privileged trigger or mutable rules", async () => {
+	const source = await readFile(".github/workflows/semgrep.yml", "utf8");
+	const workflow = parseDocument(source);
+	for (const trigger of ["pull_request", "push", "merge_group"])
+		assert.ok(workflow.hasIn(["on", trigger]), `semgrep.yml must run on ${trigger}`);
+	assert.equal(workflow.hasIn(["on", "pull_request_target"]), false);
+	assert.match(
+		String(workflow.getIn(["jobs", "scan", "env", "SEMGREP_IMAGE"])),
+		/^semgrep\/semgrep:[\d.]+@sha256:[a-f0-9]{64}$/,
+	);
+	for (const [command] of source.matchAll(/docker run.*/g))
+		assert.match(command, /--network none/, "the scanner runs without a network");
+	assert.match(source, /--test --config security\/semgrep/);
+	assert.match(source, /--disable-nosem\b/);
+	assert.match(source, /--strict\b/);
+	assert.match(source, /--error\b/);
+	assert.match(source, /--sarif-output\b/);
+	assert.doesNotMatch(source, /continue-on-error|secrets\.|--config (auto|p\/)/);
+	const upload = namedStep(workflow, ["jobs", "scan"], "Upload code scanning results");
+	assert.equal(stepInputs(upload).get("category"), "semgrep-tls");
+	assert.match(
+		String(upload.get("if")),
+		/github\.event\.pull_request\.head\.repo\.full_name == github\.repository/,
+		"a fork pull request cannot upload SARIF and must skip the step",
+	);
+	assert.match(
+		pathFilter(await readFile(".github/workflows/cicd.yml", "utf8"), "tooling"),
+		/security\/semgrep\/\*\*/,
+	);
+});
+
+void test("every Semgrep rule ships a positive and a negative fixture", async () => {
+	const files = await posixGlob("security/semgrep/*");
+	const rulesets = files.filter((file) => file.endsWith(".yaml"));
+	assert.ok(rulesets.length > 0, "security/semgrep holds no ruleset");
+	const fixtures = (
+		await Promise.all(
+			files.filter((file) => !file.endsWith(".yaml")).map((file) => readFile(file, "utf8")),
+		)
+	).join("\n");
+	for (const file of rulesets) {
+		const ruleset = asRecord(parseDocument(await readFile(file, "utf8")).toJSON(), file);
+		const ids = asArray(ruleset.rules, `${file} rules`).map((rule) =>
+			asString(asRecord(rule, "rule").id, "rule.id"),
+		);
+		assert.ok(ids.length > 0, `${file} declares no rule`);
+		for (const id of ids) {
+			assert.match(fixtures, new RegExp(`ruleid: ${id}$`, "m"), `${id} has no violating example`);
+			assert.match(fixtures, new RegExp(`ok: ${id}$`, "m"), `${id} has no compliant example`);
+		}
+	}
 });
