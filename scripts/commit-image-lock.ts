@@ -1,17 +1,7 @@
-/**
- * Builds the images a commit channel pins, so an environment can follow the default branch.
- *
- * A release ships a signed lock listing every image by digest. A commit has no release, but it has
- * everything the lock is made of: the upstream images are pinned in `security/release-images.json`,
- * which is part of the commit, and the first-party images are published by CI under the commit's
- * own tag. Resolving those tags to digests here produces the same pinning without a release.
- *
- * Provenance comes from GitHub's artifact attestations rather than from a signature over the list:
- * `gh attestation verify` fails unless this repository's build workflow signed that exact digest on
- * a GitHub-hosted runner, which is the claim a release lock's signature makes as well.
- */
+/** Resolve commit-tagged images and verify their build provenance before channel signing. */
 import { readFile } from "node:fs/promises";
 
+import { asArray, asRecord, asString, asStringArray, parseJson } from "./lib/json.ts";
 import { CAPTURE_LIMIT_BYTES } from "./lib/process.ts";
 
 export interface ImageInventory {
@@ -23,56 +13,28 @@ export interface ImageInventory {
 	}[];
 }
 
-export interface ResolvedImage {
-	readonly key: string;
-	readonly reference: string;
-}
-
 const COMMIT_SHA = /^[0-9a-f]{40}$/;
 const DIGEST = /^sha256:[0-9a-f]{64}$/;
 
-/** `application-server` is read from the environment as HEPHAESTUS_IMAGE_APPLICATION_SERVER. */
 export function environmentKey(image: string): string {
 	return `HEPHAESTUS_IMAGE_${image.toUpperCase().replaceAll("-", "_")}`;
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function stringField(source: Record<string, unknown>, field: string, label: string): string {
-	const value = source[field];
-	if (typeof value !== "string") throw new Error(`${label} has no ${field}`);
-	return value;
-}
-
 export function parseInventory(value: unknown): ImageInventory {
-	if (!isRecord(value)) throw new Error("image inventory is not an object");
-	const { images, upstream } = value;
-	if (!Array.isArray(images) || !images.every((image) => typeof image === "string"))
-		throw new Error("image inventory lists no first-party images");
-	if (!Array.isArray(upstream)) throw new Error("image inventory lists no upstream images");
+	const record = asRecord(value, "image inventory");
 	return {
-		images,
-		upstream: upstream.map((entry, index) => {
+		images: asStringArray(record.images, "image inventory.images"),
+		upstream: asArray(record.upstream, "image inventory.upstream").map((candidate, index) => {
 			const label = `upstream[${index}]`;
-			if (!isRecord(entry)) throw new Error(`${label} is not an object`);
-			const digest = stringField(entry, "digest", label);
-			if (!DIGEST.test(digest))
-				throw new Error(`upstream ${stringField(entry, "name", label)} is not pinned by digest`);
-			return {
-				name: stringField(entry, "name", label),
-				repository: stringField(entry, "repository", label),
-				digest,
-			};
+			const entry = asRecord(candidate, label);
+			const name = asString(entry.name, `${label}.name`);
+			const digest = asString(entry.digest, `${label}.digest`);
+			if (!DIGEST.test(digest)) throw new Error(`upstream ${name} is not pinned by digest`);
+			return { name, repository: asString(entry.repository, `${label}.repository`), digest };
 		}),
 	};
 }
 
-/**
- * Every image the Compose files read, pinned by digest: the upstream ones as the commit pins them,
- * and the first-party ones as the registry answers for this commit's tag.
- */
 export async function resolveImages(
 	inventory: ImageInventory,
 	commit: string,
@@ -93,14 +55,9 @@ export async function resolveImages(
 }
 
 export async function readInventory(path: string): Promise<ImageInventory> {
-	return parseInventory(JSON.parse(await readFile(path, "utf8")));
+	return parseInventory(parseJson(await readFile(path, "utf8")));
 }
 
-/**
- * Resolves a first-party image and refuses it unless GitHub attests that this repository's build
- * workflow produced that exact digest on a hosted runner. That attestation is what stands in for a
- * release lock's signature: both say "our CI built this", and this one is checked per image.
- */
 async function resolveAndVerify(repository: string, commit: string): Promise<string> {
 	const { execFileSync } = await import("node:child_process");
 	const ghRepository = process.env.GITHUB_REPOSITORY;
@@ -129,12 +86,8 @@ async function resolveAndVerify(repository: string, commit: string): Promise<str
 			ghRepository,
 			"--signer-workflow",
 			`${ghRepository}/.github/workflows/reusable-docker-build.yml`,
-			// The runner is part of what the signature attests to, and no self-hosted runner is in
-			// this repository's build path.
 			"--deny-self-hosted-runners",
-			// Without this the check proves only that this workflow attested this digest at some
-			// point, so an older image retagged onto the commit would pass. This binds the
-			// attestation to the source revision being deployed.
+			// Reject an older attested image retagged onto the requested commit.
 			"--source-digest",
 			commit,
 			"--predicate-type",

@@ -2,6 +2,9 @@
 	"$schema": "https://docs.renovatebot.com/renovate-schema.json",
 	"extends": ["config:best-practices", ":semanticCommitTypeAll(chore)"],
 	"labels": ["dependencies"],
+	"prBodyNotes": [
+		"**Human review required:** Passing CI checks does not approve this dependency update. A maintainer with write access must approve it before it can enter the merge queue; Renovate is not auto-approved. See the [review policy](https://docs.hephaestus.build/contributor/ci-cd#merge-policy)."
+	],
 	"assigneesFromCodeOwners": true,
 	"timezone": "Europe/Berlin",
 	"schedule": ["before 7am every weekday"],

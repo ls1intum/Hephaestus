@@ -90,15 +90,18 @@ to nobody.
 
 Review is a native ruleset requirement with stale approvals dismissed on every push. Authors listed
 in `REVIEW_POLICY_MAINTAINERS` receive an automated approval; every other author needs a human with
-write access. Repository administrators own that allow-list. Remove the automation when independent
-maintainer review is available. The workflow minimizes superseded automatic reviews after approving
-the current commit, so only its current automatic approval remains expanded.
+write access, including Renovate. Green checks and Dependency Dashboard approval do not satisfy this
+review requirement. Renovate includes that reminder in each pull request's body. Repository
+administrators own the allow-list; do not add dependency bots to it. Remove the automation when
+independent maintainer review is available. After approving the current commit, the workflow attempts
+to minimize superseded automatic reviews. A minimization failure is a warning, not a failed approval.
 
-The approval workflow runs on `pull_request_target` with `pull-requests: write`, so it checks out only
-`scripts/` from the default branch, reads the author login and nothing else, and executes no
-pull-request code. An empty allow-list approves nobody. It has no `branches:` filter: a stacked
-layer is approved while it still targets the layer below, because retargeting to `main` after the
-lower layer merges fires no event.
+The approval workflow runs on `pull_request_target` with `pull-requests: write`. It loads the evaluator
+from `scripts/` on the default branch, reads current pull-request metadata and reviews from GitHub,
+and executes no pull-request code. An empty allow-list approves nobody. It has no `branches:` filter:
+a stacked layer is approved while it still targets the layer below, because retargeting to `main` after the
+lower layer merges must not depend on receiving a subsequent event. The `edited` trigger also
+re-evaluates explicit base changes.
 
 The Version PR carries checks like any other pull request. Its updates are pushed with
 `GITHUB_TOKEN`, which starts no workflow run, so `version-pr.yml` dispatches CI/CD on the Version

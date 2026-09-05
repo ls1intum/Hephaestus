@@ -5,29 +5,36 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 
-import { changedPaths, commitInput } from "./commit-via-api.ts";
+import { stageChanges, commitInput } from "./commit-via-api.ts";
 
-/**
- * Git hooks export GIT_DIR, GIT_INDEX_FILE and friends, which would point every command below at the
- * repository being pushed instead of at the fixture. Strip them so the fixtures are self-contained
- * however these tests are invoked.
- */
-const cleanGitEnv = (): NodeJS.ProcessEnv =>
-	Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")));
+// Unset inherited Git hook variables as process helpers merge overrides with the environment.
+const cleanGitEnv = (): NodeJS.ProcessEnv => ({
+	...Object.fromEntries(
+		Object.keys(process.env)
+			.filter((key) => key.startsWith("GIT_"))
+			.map((key) => [key, undefined]),
+	),
+	GIT_CONFIG_NOSYSTEM: "1",
+});
 
 type Git = (...args: string[]) => string;
 
-/** A throwaway repo holding one tracked file per shape of change these tests make. */
-function repoWithCommittedFiles(): { repo: string; git: Git; status: () => string } {
+function repoWithCommittedFiles() {
 	const repo = mkdtempSync(join(tmpdir(), "commit-via-api-"));
+	mkdirSync(join(repo, ".git"));
+	const globalConfig = join(repo, ".git", "test-global-config");
+	writeFileSync(globalConfig, "");
+	const env = { ...process.env, ...cleanGitEnv(), GIT_CONFIG_GLOBAL: globalConfig };
 	const git: Git = (...args) =>
 		execFileSync("git", args, {
 			cwd: repo,
 			encoding: "utf8",
 			stdio: ["ignore", "pipe", "pipe"],
-			env: cleanGitEnv(),
+			env,
 		});
 	git("init", "--quiet", "--initial-branch=main");
+	git("config", "commit.gpgsign", "false");
+	git("config", "core.hooksPath", join(repo, ".git", "disabled-hooks"));
 	git("config", "user.email", "test@example.invalid");
 	git("config", "user.name", "Test");
 	for (const path of ["kept.txt", "edited.txt", "removed.txt", "moved.txt"])
@@ -37,45 +44,60 @@ function repoWithCommittedFiles(): { repo: string; git: Git; status: () => strin
 	return {
 		repo,
 		git,
-		status: () => git("status", "--porcelain=v1", "-z", "--untracked-files=all"),
+		changes: (...paths: string[]) => stageChanges(paths, { cwd: repo, env }),
 	};
 }
 
-await test("enumerates every added, modified and deleted path in the work tree", (t) => {
-	const { repo, status } = repoWithCommittedFiles();
+await test("enumerates every added, modified and deleted path in the work tree", async (t) => {
+	const { repo, changes } = repoWithCommittedFiles();
 	t.after(() => rmSync(repo, { recursive: true, force: true }));
 	writeFileSync(join(repo, "edited.txt"), "edited\n");
 	rmSync(join(repo, "removed.txt"));
 	mkdirSync(join(repo, "generated"));
 	writeFileSync(join(repo, "generated/added.txt"), "added\n");
 
-	// An untracked directory is enumerated file by file: the mutation commits contents, not trees.
-	assert.deepEqual(changedPaths(status()), {
+	assert.deepEqual(await changes(), {
 		additions: ["edited.txt", "generated/added.txt"],
 		deletions: ["removed.txt"],
 	});
 });
 
-await test("splits a rename into the source deleted and the destination added", (t) => {
-	const { repo, git, status } = repoWithCommittedFiles();
+await test("splits a rename into the source deleted and the destination added", async (t) => {
+	const { repo, git, changes } = repoWithCommittedFiles();
 	t.after(() => rmSync(repo, { recursive: true, force: true }));
 	git("mv", "moved.txt", "arrived.txt");
 
-	assert.deepEqual(changedPaths(status()), {
+	assert.deepEqual(await changes(), {
 		additions: ["arrived.txt"],
 		deletions: ["moved.txt"],
 	});
 });
 
-await test("has nothing to commit from a clean work tree", (t) => {
-	const { repo, status } = repoWithCommittedFiles();
+await test("has nothing to commit from a clean work tree", async (t) => {
+	const { repo, changes } = repoWithCommittedFiles();
 	t.after(() => rmSync(repo, { recursive: true, force: true }));
 
-	assert.deepEqual(changedPaths(status()), { additions: [], deletions: [] });
+	assert.deepEqual(await changes(), { additions: [], deletions: [] });
 });
 
-await test("refuses a work tree with a conflict in it", () => {
-	assert.throws(() => changedPaths("UU merged.txt\0"), /merged\.txt is unmerged/);
+await test("refuses scoped conflicts without staging them", async (t) => {
+	const { repo, git, changes } = repoWithCommittedFiles();
+	t.after(() => rmSync(repo, { recursive: true, force: true }));
+	git("checkout", "-qb", "other");
+	writeFileSync(join(repo, "edited.txt"), "other\n");
+	git("commit", "-qam", "other");
+	git("checkout", "-q", "main");
+	writeFileSync(join(repo, "edited.txt"), "main\n");
+	git("commit", "-qam", "main");
+	assert.throws(() => git("merge", "other"));
+	await assert.rejects(changes("edited.txt"), /unmerged/);
+	assert.equal(git("diff", "--name-only", "--diff-filter=U"), "edited.txt\n");
+	mkdirSync(join(repo, "generated"));
+	writeFileSync(join(repo, "generated/added.txt"), "added\n");
+	assert.deepEqual(await changes("generated"), {
+		additions: ["generated/added.txt"],
+		deletions: [],
+	});
 });
 
 await test("builds the mutation input, with file contents base64-encoded", () => {
@@ -106,4 +128,66 @@ await test("builds the mutation input, with file contents base64-encoded", () =>
 		Buffer.from(input.fileChanges.additions[0]?.contents ?? "", "base64").toString("utf8"),
 		'{"release":"v1.2.3"}\n',
 	);
+});
+
+await test("a staged new file removed before committing is not a deletion on the branch", async (t) => {
+	const { repo, git, changes } = repoWithCommittedFiles();
+	t.after(() => rmSync(repo, { recursive: true, force: true }));
+	writeFileSync(join(repo, "temporary.txt"), "temporary\n");
+	git("add", "temporary.txt");
+	rmSync(join(repo, "temporary.txt"));
+	assert.deepEqual(await changes(), { additions: [], deletions: [] });
+});
+
+await test("a renamed file removed before committing deletes only its original path", async (t) => {
+	const { repo, git, changes } = repoWithCommittedFiles();
+	t.after(() => rmSync(repo, { recursive: true, force: true }));
+	git("mv", "moved.txt", "arrived.txt");
+	rmSync(join(repo, "arrived.txt"));
+	assert.deepEqual(await changes(), { additions: [], deletions: ["moved.txt"] });
+});
+
+await test("recreating a staged deletion or rename replaces the original contents", async (t) => {
+	const { repo, git, changes } = repoWithCommittedFiles();
+	t.after(() => rmSync(repo, { recursive: true, force: true }));
+	git("rm", "removed.txt");
+	git("mv", "moved.txt", "arrived.txt");
+	writeFileSync(join(repo, "removed.txt"), "replacement\n");
+	writeFileSync(join(repo, "moved.txt"), "replacement\n");
+	assert.deepEqual(await changes(), {
+		additions: ["arrived.txt", "moved.txt", "removed.txt"],
+		deletions: [],
+	});
+});
+
+await test("staged edits reverted in the work tree produce no commit", async (t) => {
+	const { repo, git, changes } = repoWithCommittedFiles();
+	t.after(() => rmSync(repo, { recursive: true, force: true }));
+	writeFileSync(join(repo, "edited.txt"), "staged\n");
+	git("add", "edited.txt");
+	writeFileSync(join(repo, "edited.txt"), "edited.txt\n");
+	assert.deepEqual(await changes(), { additions: [], deletions: [] });
+});
+
+await test("commits only selected generated paths, excluding staged and unstaged unrelated edits", async (t) => {
+	const { repo, git, changes } = repoWithCommittedFiles();
+	t.after(() => rmSync(repo, { recursive: true, force: true }));
+	writeFileSync(join(repo, "edited.txt"), "staged\n");
+	git("add", "edited.txt");
+	writeFileSync(join(repo, "kept.txt"), "unstaged\n");
+	mkdirSync(join(repo, "generated"));
+	writeFileSync(join(repo, "generated/added.txt"), "added\n");
+	assert.deepEqual(await changes("generated"), {
+		additions: ["generated/added.txt"],
+		deletions: [],
+	});
+	assert.equal(git("diff", "--name-only"), "kept.txt\n");
+});
+
+await test("preserves filenames that require Git's NUL-delimited output", async (t) => {
+	const { repo, changes } = repoWithCommittedFiles();
+	t.after(() => rmSync(repo, { recursive: true, force: true }));
+	const paths = ["space name.txt", ...(process.platform === "win32" ? [] : ["line\nbreak.txt"])];
+	for (const path of paths) writeFileSync(join(repo, path), "added\n");
+	assert.deepEqual(await changes(), { additions: paths.toSorted(), deletions: [] });
 });

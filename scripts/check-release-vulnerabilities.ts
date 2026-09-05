@@ -1,20 +1,16 @@
 import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
 
+import { asString, isRecord as record } from "./lib/json.ts";
+
 type Finding = {
 	FixedVersion?: string;
-	InstalledVersion?: string;
-	PkgName?: string;
-	Severity?: string;
-	VulnerabilityID?: string;
+	InstalledVersion: string;
+	PkgName: string;
+	Severity: string;
+	VulnerabilityID: string;
 };
 
-/**
- * The five `not_affected` justifications from CISA's *Minimum Requirements for Vulnerability
- * Exploitability eXchange (VEX)*. They are taken as a vocabulary only: a claim that a finding does
- * not apply has to name which of the five ways it does not apply, so prose like "not reachable"
- * cannot stand in for an analysis nobody did. VEX itself is not adopted — see
- * `docs/contributor/vulnerability-remediation.mdx`.
- */
+// CISA VEX justification vocabulary; policy: docs/contributor/vulnerability-remediation.mdx.
 const JUSTIFICATION_CATEGORIES = [
 	"component_not_present",
 	"vulnerable_code_not_present",
@@ -28,11 +24,7 @@ export type JustificationCategory = (typeof JUSTIFICATION_CATEGORIES)[number];
 const isJustificationCategory = (value: unknown): value is JustificationCategory =>
 	JUSTIFICATION_CATEGORIES.some((category) => category === value);
 
-// `digest` is recorded so an exception names the artefact it was reviewed against, but it is
-// deliberately not part of the match key: the release digest does not exist until `tag-images`
-// runs, so a digest-keyed exception could only ever be authored after the gate had already
-// failed a release, and would die on the next rebuild. `installedVersion` already gives the
-// "this exception expires when the package moves" property that digest matching was there for.
+// Match package versions, not build digests: exceptions must be authorable before release signing.
 type Exception = {
 	digest: string;
 	evidence: string;
@@ -49,9 +41,6 @@ type Exception = {
 	vulnerability: string;
 };
 type Policy = { exceptions: Exception[]; schemaVersion: 2 };
-
-const record = (value: unknown): value is Record<string, unknown> =>
-	typeof value === "object" && value !== null && !Array.isArray(value);
 
 const isException = (value: unknown): value is Exception =>
 	record(value) &&
@@ -130,9 +119,6 @@ export function evaluate(
 			errors.push(`malformed exception digest: ${exception.digest}`);
 		if (!/^linux\/(?:amd64|arm64)$/.test(exception.platform))
 			errors.push(`unsupported exception platform: ${exception.platform}`);
-		// An unrecognised category is already a malformed policy; what is left to check is that the
-		// category and the status agree. `affected` defers a risk we accept, and saying why the
-		// finding does not apply while conceding that it does is a contradiction, not a detail.
 		if (exception.status === "not_affected" && exception.justificationCategory === undefined)
 			errors.push(
 				`not_affected exception must name a justification category: ${exception.vulnerability}`,
@@ -151,9 +137,12 @@ export function evaluate(
 		if (
 			!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(exception.expires) ||
 			Number.isNaN(expiry.valueOf()) ||
+			expiry.toISOString() !== exception.expires.replace("Z", ".000Z") ||
 			expiry <= now
 		)
-			errors.push(`exception expired: ${exception.vulnerability} (${exception.expires})`);
+			errors.push(
+				`invalid or expired exception: ${exception.vulnerability} (${exception.expires})`,
+			);
 		else if (expiry.valueOf() - now.valueOf() > 90 * 24 * 60 * 60 * 1000)
 			errors.push(
 				`exception exceeds 90-day limit: ${exception.vulnerability} (${exception.expires})`,
@@ -168,21 +157,28 @@ export function evaluate(
 			throw new Error("malformed Trivy result");
 		for (const value of result.Vulnerabilities ?? []) {
 			if (!record(value)) throw new Error("malformed Trivy vulnerability");
-			for (const field of ["InstalledVersion", "PkgName", "Severity", "VulnerabilityID"])
-				if (typeof value[field] !== "string" || value[field].length === 0)
-					throw new Error(`malformed Trivy vulnerability: missing ${field}`);
-			// Trivy omits FixedVersion entirely when upstream has published no fix, so its
-			// absence is data rather than corruption; only a non-string is malformed.
-			if (value.FixedVersion !== undefined && typeof value.FixedVersion !== "string")
-				throw new Error("malformed Trivy vulnerability: FixedVersion must be a string");
+			const required = (field: string) => {
+				const text = asString(value[field], `Trivy vulnerability ${field}`);
+				if (!text.trim()) throw new Error(`malformed Trivy vulnerability: empty ${field}`);
+				return text;
+			};
+			const installedVersion = required("InstalledVersion");
+			const packageName = required("PkgName");
+			const severity = required("Severity");
+			const vulnerability = required("VulnerabilityID");
+			if (!["UNKNOWN", "LOW", "MEDIUM", "HIGH", "CRITICAL"].includes(severity))
+				throw new Error(`malformed Trivy vulnerability: unsupported Severity ${severity}`);
+			// Trivy omits FixedVersion when upstream has published no fix.
+			const fixedVersion =
+				value.FixedVersion === undefined
+					? undefined
+					: asString(value.FixedVersion, "Trivy vulnerability FixedVersion");
 			findings.push({
-				FixedVersion: typeof value.FixedVersion === "string" ? value.FixedVersion : undefined,
-				InstalledVersion:
-					typeof value.InstalledVersion === "string" ? value.InstalledVersion : undefined,
-				PkgName: typeof value.PkgName === "string" ? value.PkgName : undefined,
-				Severity: typeof value.Severity === "string" ? value.Severity : undefined,
-				VulnerabilityID:
-					typeof value.VulnerabilityID === "string" ? value.VulnerabilityID : undefined,
+				FixedVersion: fixedVersion,
+				InstalledVersion: installedVersion,
+				PkgName: packageName,
+				Severity: severity,
+				VulnerabilityID: vulnerability,
 			});
 		}
 	}
@@ -190,11 +186,7 @@ export function evaluate(
 		(finding) => finding.Severity === "HIGH" || finding.Severity === "CRITICAL",
 	);
 	const subjectPlatform = subject?.platform;
-	// Only a finding upstream has published a fix for can block: the upstream images in
-	// security/release-images.json cannot be patched at all, so failing on an unfixable
-	// finding removes no risk and leaves nobody an action. The filter lives here rather than
-	// on Trivy's command line (`--ignore-unfixed`) so unfixable findings stay counted in
-	// `highCritical` and visible in the signed evidence bundle.
+	// Keep unfixable vulnerabilities in the evidence; only published fixes block release.
 	const rejected = highCritical.filter((finding) => {
 		if (!finding.FixedVersion?.trim()) return false;
 		return !policy.exceptions.some(
@@ -216,11 +208,6 @@ export function evaluate(
 
 export type Evaluation = ReturnType<typeof evaluate>;
 
-/**
- * A run summary naming what was rejected. The gate used to fail with nothing but
- * `<image> does not satisfy vulnerability policy`, so diagnosing it meant rebuilding and
- * rescanning the base image by hand.
- */
 export function renderSummary(
 	subject: { digest: string; image: string; platform: string },
 	result: Evaluation,

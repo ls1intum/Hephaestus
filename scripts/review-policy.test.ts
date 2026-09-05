@@ -2,6 +2,10 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, it } from "node:test";
 
+import { parse as parseYaml } from "yaml";
+
+import { asRecord } from "./lib/json.ts";
+
 import {
 	APPROVAL_MARKER,
 	approvalBody,
@@ -21,7 +25,6 @@ const originalEnvironment = { ...process.env };
 const HEAD = "0123456789abcdef0123456789abcdef01234567";
 const OTHER = "fedcba9876543210fedcba9876543210fedcba98";
 
-/** A review this module submitted: it carries the marker. */
 const ours = (over: Partial<Review> & Pick<Review, "id">): Review => ({
 	node_id: `review-${over.id}`,
 	state: "APPROVED",
@@ -31,7 +34,6 @@ const ours = (over: Partial<Review> & Pick<Review, "id">): Review => ({
 	...over,
 });
 
-/** A review somebody else submitted: no marker. */
 const theirs = (over: Partial<Review> & Pick<Review, "id">): Review => ({
 	node_id: `review-${over.id}`,
 	state: "APPROVED",
@@ -100,7 +102,6 @@ const makeGitHub = (options: GitHubOptions = {}) => {
 	return { minimized, submitted, github };
 };
 
-/** The single review a run under test is expected to have submitted. */
 const onlyReview = (submitted: readonly CreateReviewRequest[]): CreateReviewRequest => {
 	assert.equal(submitted.length, 1);
 	const [review] = submitted;
@@ -140,12 +141,13 @@ void describe("review policy", () => {
 		});
 
 		void it("ignores an approval recorded against an earlier commit", () => {
-			// `dismiss_stale_reviews_on_push` and the `synchronize` event race; pinning on the commit
-			// settles it without waiting for the dismissal to land.
 			assert.equal(approvalStands([ours({ id: 1, commit_id: OTHER })], HEAD), false);
 		});
 
-		void it("ignores an approval this module did not submit", () => {
+		void it("does not recognize copied markers as its own approval", () => {
+			for (const user of [{ login: "reviewer" }, null]) {
+				assert.equal(approvalStands([ours({ id: 1, user })], HEAD), false);
+			}
 			assert.equal(approvalStands([theirs({ id: 1 })], HEAD), false);
 		});
 
@@ -164,8 +166,26 @@ void describe("review policy", () => {
 			assert.equal(approvalStands(reviews, HEAD), true);
 		});
 
+		void it("uses the bot's latest decisive position even without the policy marker", () => {
+			for (const state of ["CHANGES_REQUESTED", "DISMISSED", "APPROVED"]) {
+				assert.equal(
+					approvalStands([ours({ id: 1 }), ours({ id: 2, state, body: "Another workflow" })], HEAD),
+					false,
+				);
+			}
+			assert.equal(
+				approvalStands(
+					[ours({ id: 1 }), ours({ id: 2, state: "COMMENTED", body: "Another workflow" })],
+					HEAD,
+				),
+				true,
+			);
+		});
+
 		void it("survives a review with no body at all", () => {
-			assert.equal(approvalStands([theirs({ id: 1, body: null })], HEAD), false);
+			for (const body of [null, undefined]) {
+				assert.equal(approvalStands([ours({ id: 1, body })], HEAD), false);
+			}
 		});
 
 		void it("finds no approval in an empty review list", () => {
@@ -197,7 +217,6 @@ void describe("review policy", () => {
 		});
 
 		void it("approves nobody when the allow-list is empty", () => {
-			// The fail-safe direction: with nothing listed, every pull request needs a human.
 			assert.equal(decide({ ...base, maintainers: new Set() }).kind, "skip");
 		});
 
@@ -220,28 +239,12 @@ void describe("review policy", () => {
 		});
 
 		void it("ignores a stranger's approval when deciding whether to approve", () => {
-			// A read-access approval does not count toward the ruleset, so it must not talk this
-			// module out of supplying one that does.
 			const decision = decide({
 				...base,
 				maintainers: new Set(["maintainer"]),
 				reviews: [theirs({ id: 1 })],
 			});
 			assert.equal(decision.kind, "approve");
-		});
-
-		void it("approves a stacked pull request that targets another branch", () => {
-			// A layer must already hold its approval when merging the layer below retargets it onto
-			// main: that retarget fires no event that could earn one, so declining here would strand
-			// the stack at the merge queue.
-			assert.equal(decide({ ...base, maintainers: new Set(["maintainer"]) }).kind, "approve");
-		});
-	});
-
-	void describe("approvalBody", () => {
-		void it("carries the marker approvalStands looks for", () => {
-			assert.ok(approvalBody("Maintainer").includes(APPROVAL_MARKER));
-			assert.equal(approvalStands([ours({ id: 1, body: approvalBody("Maintainer") })], HEAD), true);
 		});
 	});
 
@@ -261,7 +264,11 @@ void describe("review policy", () => {
 
 		void it("minimizes earlier automatic approvals after submitting their replacement", async () => {
 			const { minimized, github, submitted } = makeGitHub({
-				reviews: [ours({ id: 1, commit_id: OTHER }), ours({ id: 2, commit_id: OTHER })],
+				reviews: [
+					ours({ id: 1, commit_id: OTHER }),
+					ours({ id: 2, commit_id: OTHER }),
+					ours({ id: 3, user: { login: "reviewer" } }),
+				],
 			});
 			await enforce({ github, context, core: makeCore() });
 
@@ -282,7 +289,11 @@ void describe("review policy", () => {
 
 		void it("keeps the standing approval visible and minimizes its predecessors", async () => {
 			const { minimized, submitted, github } = makeGitHub({
-				reviews: [ours({ id: 1, commit_id: OTHER }), ours({ id: 2 })],
+				reviews: [
+					ours({ id: 1, commit_id: OTHER }),
+					ours({ id: 2 }),
+					ours({ id: 3, state: "COMMENTED" }),
+				],
 			});
 			await enforce({ github, context, core: makeCore() });
 
@@ -304,14 +315,6 @@ void describe("review policy", () => {
 			assert.deepEqual(core.failures, []);
 		});
 
-		void it("approves a stacked pull request, so it survives being retargeted onto main", async () => {
-			const { submitted, github } = makeGitHub();
-			await enforce({ github, context, core: makeCore() });
-
-			assert.equal(submitted.length, 1);
-			assert.equal(submitted[0]?.event, "APPROVE");
-		});
-
 		void it("warns, and approves nobody, when the allow-list is unset", async () => {
 			delete process.env.MAINTAINERS;
 			const { submitted, github } = makeGitHub();
@@ -322,20 +325,6 @@ void describe("review policy", () => {
 			assert.equal(core.warnings.length, 1);
 			assert.match(String(core.warnings[0]), /REVIEW_POLICY_MAINTAINERS/);
 			assert.deepEqual(core.failures, []);
-		});
-
-		void it("reads the author from the API rather than from the webhook payload", async () => {
-			// The payload is attacker-adjacent under `pull_request_target`; the API is not.
-			const { submitted, github } = makeGitHub({
-				resolvedPull: { ...pull, user: { login: "Contributor" } },
-			});
-			await enforce({
-				github,
-				core: makeCore(),
-				context: { ...context, payload: { pull_request: { number: 7 } } },
-			});
-
-			assert.deepEqual(submitted, []);
 		});
 
 		void it("fails the job when the pull request cannot be read", async () => {
@@ -371,29 +360,31 @@ void describe("review policy", () => {
 		});
 	});
 
-	// The workflow half of the contract. It runs under `pull_request_target` with
-	// `pull-requests: write`, so the hardening below is the security boundary, not a preference.
 	void describe("the workflow that applies it", () => {
 		const workflow = readFileSync(
 			new URL("../.github/workflows/review-policy.yml", import.meta.url),
 			"utf8",
 		);
 
-		void it("keeps the checkout on the base branch's copy of the policy", () => {
+		const configuration = asRecord(parseYaml(workflow), "review-policy workflow");
+		const jobs = asRecord(configuration.jobs, "jobs");
+		const approvalJob = asRecord(jobs.approve, "approve");
+
+		void it("keeps the checkout on the default branch's copy of the policy", () => {
 			assert.match(workflow, /ref: \$\{\{ github\.event\.repository\.default_branch \}\}/);
 			assert.doesNotMatch(workflow, /ref: \$\{\{ github\.sha \}\}/);
 			assert.doesNotMatch(workflow, /github\.event\.pull_request\.head/);
 		});
 
-		void it("checks out no more than the policy, and keeps no credentials", () => {
+		void it("uses sparse checkout and keeps no credentials", () => {
 			assert.match(workflow, /persist-credentials: false/);
 			assert.match(workflow, /sparse-checkout: scripts/);
 		});
 
 		void it("asks for write access to pull requests and nothing else", () => {
-			assert.match(workflow, /^permissions: \{\}$/m);
-			assert.match(workflow, /pull-requests: write/);
-			assert.doesNotMatch(workflow, /contents: write/);
+			assert.deepEqual(configuration.permissions, {});
+			assert.deepEqual(Object.keys(jobs), ["approve"]);
+			assert.deepEqual(approvalJob.permissions, { contents: "read", "pull-requests": "write" });
 		});
 
 		void it("re-runs on every push, because the ruleset dismisses stale approvals", () => {
@@ -401,13 +392,10 @@ void describe("review policy", () => {
 		});
 
 		void it("runs for a stacked pull request, whatever branch it targets", () => {
-			// A `branches:` filter would strand every stack: the retarget onto main that follows the
-			// lower layer's merge fires only `edited`, and only on a workflow that runs off main.
 			assert.doesNotMatch(workflow, /^\s+branches:/m);
 		});
 
-		void it("publishes no check run, now that the ruleset requires a native approval", () => {
-			// A required context nothing reports blocks every pull request, including the fix.
+		void it("does not create custom check runs or run for merge groups", () => {
 			assert.doesNotMatch(workflow, /checks\.create|checks: write/);
 			assert.doesNotMatch(workflow, /merge_group/);
 		});

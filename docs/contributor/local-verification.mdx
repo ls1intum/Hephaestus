@@ -6,8 +6,8 @@ title: Local verification
 
 | Command | What success proves | Excludes |
 |---|---|---|
-| `vp run check:affected` | Static and policy checks selected for the branch and working tree passed | Tests, builds, unaffected scopes, and CI-only checks |
-| `vp run check` | Every gate the `quality` task in `vite.config.ts` runs passed | Builds, browser and live-service tests, images, mutation analysis, and release security |
+| `vp run check:affected` | Selected gates passed, including any tests they contain | Unselected scopes, verification-only suites and builds, and CI-only checks |
+| `vp run check` | Every gate the `quality` task in `vite.config.ts` runs passed | Distributable builds, browser and live-service tests, images, mutation analysis, and release security |
 | `vp run verify` | The complete credential-free local CI inventory passed | Live-service integration and E2E tests, images, mutation analysis, and release security |
 
 Run `check:affected` while working, `check` before pushing, and `verify` before requesting review.
@@ -33,8 +33,11 @@ rename are evaluated. Git documents the underlying change statuses in
 
 ## Pre-push hook
 
-`vp install` enables the Vite+ hook dispatcher, which runs the project hooks in `.vite-hooks/`. The
-pre-push hook runs `vp run check`; `git push --no-verify` skips it.
+`vp install` configures the Vite+ hook dispatcher, which runs the project hooks in `.vite-hooks/`.
+It preserves a custom `core.hooksPath` and the local preference set by `vp hooks disable`;
+`vp hooks enable` re-enables the dispatcher. `vp hooks status` shows which hooks are active.
+The pre-push hook runs `vp run check`; `git push --no-verify` skips it. With custom hooks, run
+`vp run check` yourself before pushing.
 
 ## Complete local verification
 
@@ -43,8 +46,8 @@ pre-push hook runs `vp run check`; `git push --no-verify` skips it.
 `routeTree.gen.ts` comparison that restores the committed file before exiting, the Storybook build,
 and the docs build.
 
-Checks that need browsers as a service, images, release infrastructure or credentials run only in
-CI: [CI/CD](./ci-cd.mdx).
+Full-application E2E, live-service integration, image builds, mutation analysis and release security
+are outside `verify`; see [CI/CD](./ci-cd.mdx).
 
 ## Vite+ task cache
 
