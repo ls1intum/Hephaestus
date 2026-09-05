@@ -71,32 +71,56 @@ set_if_empty() {
 # A key is generated for a new instance and must never be generated for an existing one: rows the
 # database already holds were encrypted with the key that instance had, and a fresh key makes them
 # unreadable without a word of warning. The supported topology keeps the database in the Compose
-# volume hephaestus_postgresql-data, so that exact volume is the evidence; anything short of a clear
-# "no such volume" answer means the question could not be settled, and the keys are not generated.
+# volume hephaestus_postgresql-data, so that exact volume is the evidence. Docker's own listing is
+# the only answer accepted: anything short of it leaves the question open, and no key is generated.
+database_evidence=
+database_evidence_detail=
 database_evidence() {
-	if ! command -v docker >/dev/null 2>&1; then
-		echo unknown
+	if [ -n "$database_evidence" ]; then
 		return
 	fi
-	if error=$(docker volume inspect --format '{{.Name}}' hephaestus_postgresql-data 2>&1 >/dev/null); then
-		echo present
-	elif printf '%s' "$error" | grep -qi 'no such volume'; then
-		echo absent
+	if ! command -v docker >/dev/null 2>&1; then
+		database_evidence=unknown
+		database_evidence_detail='docker is not installed on this host, or not on PATH'
+		return
+	fi
+	if volumes=$(docker volume ls --quiet 2>&1); then
+		if printf '%s\n' "$volumes" | grep -qx 'hephaestus_postgresql-data'; then
+			database_evidence=present
+		else
+			database_evidence=absent
+		fi
 	else
-		echo unknown
+		database_evidence=unknown
+		database_evidence_detail="docker volume ls failed: $volumes"
 	fi
 }
-if ! grep -q '^HEPHAESTUS_SECURITY_ENCRYPTION_KEY=.' "$working_file"; then
-	case $(database_evidence) in
+refuse_unless_new_database() {
+	key=$1
+	database_evidence
+	case $database_evidence in
 		present)
-			printf '%s\n' 'A Hephaestus database already exists on this host (volume hephaestus_postgresql-data). Set HEPHAESTUS_SECURITY_ENCRYPTION_KEY to the value that database was encrypted with before running setup, and HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY as well if the previous configuration set it separately; a generated key would make the stored credentials unreadable.' >&2
+			printf '%s\n' "A Hephaestus database already exists on this host (volume hephaestus_postgresql-data). Set $key to the value that database was written with before running setup; a generated key would make what it stores unreadable." >&2
 			exit 1
 			;;
 		unknown)
-			printf '%s\n' 'Could not tell whether a Hephaestus database already exists on this host: docker is missing or its daemon did not answer. Start Docker and run setup again, or set HEPHAESTUS_SECURITY_ENCRYPTION_KEY yourself.' >&2
+			printf '%s\n' "Could not tell whether a Hephaestus database already exists on this host ($database_evidence_detail), so $key was not generated. Start Docker, or give setup a working docker, and run it again; if this host already ran Hephaestus, set $key to the value it used." >&2
 			exit 1
 			;;
 	esac
+}
+if ! grep -q '^HEPHAESTUS_SECURITY_ENCRYPTION_KEY=.' "$working_file"; then
+	refuse_unless_new_database HEPHAESTUS_SECURITY_ENCRYPTION_KEY
+fi
+# The credential key derives from the master key only for an installation from before v0.75, which
+# never had an assignment for it. An explicitly blank assignment, or rotation settings, mean the
+# installation set the credential key separately; over an existing database that key is the only
+# right one, and the master key stands in for nothing.
+if ! grep -q '^HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY=.' "$working_file"; then
+	if grep -q '^HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY=' "$working_file" \
+		|| grep -qE '^HEPHAESTUS_SECURITY_(CREDENTIAL_ENCRYPTION_KEY_VERSION|PRIOR_CREDENTIAL_ENCRYPTION_KEY|PRIOR_CREDENTIAL_ENCRYPTION_KEY_VERSION|CREDENTIAL_ROTATION_ENABLED)=.' "$working_file"; then
+		refuse_unless_new_database HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY
+	fi
 fi
 
 set_if_empty POSTGRES_PASSWORD hex16

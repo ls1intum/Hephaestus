@@ -97,15 +97,16 @@ reconcile:
 
 | Setting | What it must be |
 | --- | --- |
-| `HEPHAESTUS_SECURITY_ENCRYPTION_KEY` | the previous deployment's value: everything the server encrypts at rest was written with it |
-| `HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY` | the previous deployment's value, or the master key on an installation that never set it separately: every stored integration credential was encrypted with it, and a different key makes them unreadable without a word of warning |
-| `HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY_VERSION`, `HEPHAESTUS_SECURITY_PRIOR_CREDENTIAL_ENCRYPTION_KEY`, `HEPHAESTUS_SECURITY_PRIOR_CREDENTIAL_ENCRYPTION_KEY_VERSION` | whatever the previous deployment set, if it rotated credential keys: a stored credential names the key version that wrote it |
-| `POSTGRES_PASSWORD` | what the database accepts |
+| `HEPHAESTUS_SECURITY_ENCRYPTION_KEY` | the previous deployment's value: what the server encrypts at rest other than integration credentials was written with it |
+| `HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY` | the previous deployment's value, or the master key on an installation that never set it separately: integration credentials were written with it, and a different key makes them unreadable without a word of warning |
+| `HEPHAESTUS_SECURITY_CREDENTIAL_ROTATION_ENABLED`, `HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY_VERSION`, `HEPHAESTUS_SECURITY_PRIOR_CREDENTIAL_ENCRYPTION_KEY`, `HEPHAESTUS_SECURITY_PRIOR_CREDENTIAL_ENCRYPTION_KEY_VERSION` | whatever the previous deployment set, if it rotated credential keys: each stored credential names the key version that wrote it, and a credential written under the prior key is readable only while that key is configured |
 | `WEBHOOK_SECRET` | what the providers were registered to sign with |
 | `HEPHAESTUS_AUTH_STATE_COOKIE_KEY` | optional; a new one only invalidates sign-ins that are in flight at the moment of the switch |
 
-On the Compose installer, `docker/self-host/setup.sh` refuses to generate the encryption key while
-the volume `hephaestus_postgresql-data` exists, and stops rather than guess when Docker cannot say.
+The pull-based stacks use the bundled database with its fixed credentials, so there is no
+database password to carry. On the Compose installer, `docker/self-host/setup.sh` refuses to
+generate an encryption key while the volume `hephaestus_postgresql-data` exists, and stops rather
+than guess when Docker cannot list volumes.
 
 ### Upgrading a host installed before the tooling link
 

@@ -49,8 +49,8 @@ async function installDockerStub(
 		`#!/bin/sh
 printf '%s\\n' "$*" >> "${join(directory, "docker-args")}"
 case $(cat "${join(directory, "docker-answer")}") in
-	present) printf 'hephaestus_postgresql-data\\n' ;;
-	absent) printf '%s\\n' 'Error response from daemon: get hephaestus_postgresql-data: no such volume' >&2; exit 1 ;;
+	present) printf '%s\\n' 'another-product_postgresql-data' 'hephaestus_postgresql-data' ;;
+	absent) printf '%s\\n' 'another-product_postgresql-data' ;;
 	*) printf '%s\\n' 'Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?' >&2; exit 1 ;;
 esac
 `,
@@ -194,10 +194,7 @@ await test(
 		const directory = await fixture();
 		const result = await setup(directory);
 		assert.equal(result.exitCode, 0);
-		assert.equal(
-			await readFile(join(directory, "docker-args"), "utf8"),
-			"volume inspect --format {{.Name}} hephaestus_postgresql-data\n",
-		);
+		assert.equal(await readFile(join(directory, "docker-args"), "utf8"), "volume ls --quiet\n");
 		assert.match(result.output, /Generated HEPHAESTUS_SECURITY_ENCRYPTION_KEY/);
 	},
 );
@@ -244,7 +241,10 @@ await test("a docker that cannot answer is not taken for an empty host", posixOn
 	const directory = await fixture();
 	const result = await setup(directory, { database: "error" });
 	assert.equal(result.exitCode, 1);
-	assert.match(result.output, /Could not tell whether a Hephaestus database already exists/);
+	assert.match(
+		result.output,
+		/Could not tell whether a Hephaestus database already exists on this host \(docker volume ls failed: Cannot connect to the Docker daemon/,
+	);
 	await assert.rejects(readFile(join(directory, ".env"), "utf8"), { code: "ENOENT" });
 });
 
@@ -258,3 +258,37 @@ await test("docker is not asked when the key is already set", posixOnly, async (
 	assert.equal(result.exitCode, 0);
 	await assert.rejects(readFile(join(directory, "docker-args"), "utf8"), { code: "ENOENT" });
 });
+
+await test(
+	"an existing database refuses a credential key that was set separately and is now missing",
+	posixOnly,
+	async () => {
+		// A post-v0.75 configuration assigns the credential key explicitly; blank, or with rotation
+		// settings beside it, it must not be quietly replaced by the master key.
+		for (const environment of [
+			"HEPHAESTUS_SECURITY_ENCRYPTION_KEY=0123456789abcdef0123456789abcdef\nHEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY=\n",
+			"HEPHAESTUS_SECURITY_ENCRYPTION_KEY=0123456789abcdef0123456789abcdef\nHEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY_VERSION=2\n",
+		]) {
+			const directory = await fixture();
+			await writeFile(join(directory, ".env"), environment);
+			const result = await setup(directory, { database: "present" });
+			assert.equal(result.exitCode, 1);
+			assert.match(result.output, /Set HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY to the value/);
+			assert.equal(await readFile(join(directory, ".env"), "utf8"), environment);
+		}
+	},
+);
+
+await test(
+	"a host without docker on PATH is not taken for an empty host either",
+	posixOnly,
+	async () => {
+		const directory = await fixture();
+		const opensslOnly = join(directory, "openssl-only");
+		await mkdir(opensslOnly);
+		await symlink("/usr/bin/openssl", join(opensslOnly, "openssl"));
+		const result = await setup(directory, { path: `${opensslOnly}:/usr/bin:/bin` });
+		assert.equal(result.exitCode, 1);
+		assert.match(result.output, /docker is not installed on this host, or not on PATH/);
+	},
+);
