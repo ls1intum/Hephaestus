@@ -107,6 +107,46 @@ function escapeRegExp(value: string): string {
 }
 
 /**
+ * Whether a Surefire `-Dtest` value selects one test class, named by its path under the test root
+ * without the extension.
+ *
+ * The value replaces the `includes` and `excludes` parameters outright, and a pattern prefixed with
+ * `!` is an exclusion — so a value carrying only exclusions leaves no inclusion pattern, and every
+ * class Surefire scans is a candidate until an exclusion removes it. That is what lets one shard
+ * select a package and the other select its complement without either restating the four default
+ * include patterns.
+ * https://maven.apache.org/surefire/maven-surefire-plugin/test-mojo.html#test
+ */
+function surefireSelects(selector: string, testClass: string): boolean {
+	const patterns = selector.split(",").map((pattern) => pattern.trim());
+	const matches = (pattern: string) => surefirePattern(pattern.replace(/^!/, "")).test(testClass);
+	const included = patterns.filter((pattern) => !pattern.startsWith("!"));
+	const excluded = patterns.filter((pattern) => pattern.startsWith("!"));
+	return (included.length === 0 || included.some(matches)) && !excluded.some(matches);
+}
+
+/** Surefire's glob dialect: `**` crosses directories, `*` and `?` stay inside one segment. */
+function surefirePattern(pattern: string): RegExp {
+	const unqualified = pattern.replace(/\.(?:java|class)$/, "");
+	const qualified = unqualified.includes("/") ? unqualified : `**/${unqualified}`;
+	const body = qualified.replaceAll(/\*\*\/|\*\*|\*|\?|[^*?]+/g, (token) => {
+		switch (token) {
+			case "**/":
+				return "(?:[^/]+/)*";
+			case "**":
+				return ".*";
+			case "*":
+				return "[^/]*";
+			case "?":
+				return "[^/]";
+			default:
+				return escapeRegExp(token);
+		}
+	});
+	return new RegExp(`^${body}$`);
+}
+
+/**
  * Every repository script a given entry point loads, transitively — its static relative imports,
  * plus any sibling script it names as a string, which is how the scanners reach the policy
  * evaluator (they spawn it rather than importing it, so that its exit status is the verdict).
@@ -392,32 +432,83 @@ void describe("CI contract", () => {
 		assert.deepEqual(used, accepted, "Every accepted cache type is requested by a workflow");
 	});
 
-	void test("partitions integration tests without duplicating tiers or bypassing the status gate", async () => {
-		const source = await readFile(".github/workflows/ci-tests.yml", "utf8");
-		const integration = job(source, "server-integration");
-		assert.match(integration, /fail-fast: false/);
-		const selectors = [...integration.matchAll(/tests: "([^"\n]+)"/g)].map((match) => match[1]);
-		assert.deepEqual(selectors, [
-			"de/tum/cit/aet/hephaestus/integration/**",
-			"**/*Test,!de/tum/cit/aet/hephaestus/integration/**",
+	void test("every class the integration tier can run belongs to exactly one shard", async () => {
+		const workflow = parseDocument(await readFile(".github/workflows/ci-tests.yml", "utf8"));
+		const matrix = workflow.getIn(["jobs", "server-integration", "strategy", "matrix"]);
+		assert.ok(isMap(matrix), "server-integration runs no matrix");
+		const selectors = matrixValues(matrix, "tests");
+		assert.equal(selectors.length, 2, "The tier is sharded in two");
+		for (const selector of selectors)
+			assert.doesNotMatch(
+				selector,
+				/[%#]/,
+				`${selector}: a regex or method selector is outside what surefireSelects models`,
+			);
+
+		// The tier the shards must cover is what Surefire runs when nothing narrows it: the four
+		// default include patterns, filtered by the integration tag. A probe for each pattern, in and
+		// out of the sharded package, keeps the tier's current naming from deciding the verdict — a
+		// class dropped by both shards is invisible in CI and runs locally, so the shape has to be
+		// safe for the name nobody has written yet.
+		const testRoot = "server/application/src/test/java/";
+		const sources = await posixGlob(`${testRoot}**/*.java`);
+		assert.ok(sources.length > 0, `No test sources under ${testRoot}`);
+		const probes = ["TestFoo", "FooTest", "FooTests", "FooTestCase"].flatMap((name) => [
+			`de/tum/cit/aet/hephaestus/integration/github/${name}`,
+			`de/tum/cit/aet/hephaestus/practice/${name}`,
 		]);
-		// The matrix value reaches Maven through the config's environment read, never through a run: script.
-		assert.match(integration, /HEPHAESTUS_INTEGRATION_TESTS: \$\{\{ matrix.tests \}\}/);
-		assert.doesNotMatch(integration, /run: vp run test:server:integration "-D/);
-		// A shard whose reports carry no test case fails on that fact, not on a step name.
+		const defaultIncludes = [
+			"**/Test*.java",
+			"**/*Test.java",
+			"**/*Tests.java",
+			"**/*TestCase.java",
+		];
+		const tier = [
+			...sources.map((file) => file.slice(testRoot.length).replace(/\.java$/, "")),
+			...probes,
+		].filter((candidate) =>
+			defaultIncludes.some((pattern) => surefirePattern(pattern).test(candidate)),
+		);
+		assert.ok(tier.length > probes.length, "The tier is more than its probes");
+
+		const shards = selectors.map(
+			(selector) => new Set(tier.filter((candidate) => surefireSelects(selector, candidate))),
+		);
+		for (const [index, shard] of shards.entries())
+			assert.notEqual(shard.size, 0, `${selectors[index]} selects no class at all`);
+		assert.deepEqual(
+			tier.filter((candidate) => !shards.some((shard) => shard.has(candidate))),
+			[],
+			"Classes the pull request would never run",
+		);
+		assert.deepEqual(
+			tier.filter((candidate) => shards.every((shard) => shard.has(candidate))),
+			[],
+			"Classes both shards would run",
+		);
+	});
+
+	void test("runs the integration tier once, under the status gate, off an untemplated command", async () => {
+		const source = await readFile(".github/workflows/ci-tests.yml", "utf8");
+		const workflow = parseDocument(source);
+		const integration = job(source, "server-integration");
+		assert.match(integration, /fail-fast: false/, "One failing shard must not hide the other");
+		const jobPath = ["jobs", "server-integration"];
+		const run = namedStep(workflow, jobPath, "Run integration tests");
+		const environment = run.get("env");
+		assert.ok(isMap(environment));
 		assert.match(
-			integration,
-			/grep -ho '<testcase ' server\/application\/target\/surefire-reports\/TEST-\*\.xml \| wc -l/,
+			String(environment.get("HEPHAESTUS_INTEGRATION_TESTS")),
+			/matrix\.tests/,
+			"The shard's selector reaches the task as an environment value",
 		);
-		assert.match(integration, /test "\$count" -gt 0/);
-		const guardStart = integration.indexOf("Refuse a shard");
-		const guardEnd = integration.indexOf("- name:", guardStart);
 		assert.doesNotMatch(
-			integration.slice(guardStart, guardEnd === -1 ? undefined : guardEnd),
-			/if: always\(\)/,
+			runScript(workflow, jobPath, "Run integration tests"),
+			/\$\{\{/,
+			"The selector reaches Maven through the environment, never through a run: script",
 		);
-		assert.match(integration, /Test Results - App Server Integration \(\$\{\{ matrix.shard \}\}\)/);
 		assert.equal((source.match(/run: vp run test:server:integration/g) ?? []).length, 1);
+		assert.match(integration, /Test Results - App Server Integration \(\$\{\{ matrix.shard \}\}\)/);
 		const tasks = await readFile("vite.config.ts", "utf8");
 		assert.match(tasks, /HEPHAESTUS_INTEGRATION_TESTS/);
 		assert.match(

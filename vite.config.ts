@@ -269,7 +269,7 @@ export default defineConfig({
 			// CI runs the tier as shards. The selector is decided here, at config load, so the workflow
 			// passes a matrix value through the environment rather than into a command; locally the
 			// whole tier runs. failIfNoSpecifiedTests=false is for the generated-clients module, which
-			// has no tests for any selector; a shard that runs nothing is caught by the workflow instead.
+			// has no tests for any selector.
 			"test:server:integration": run(
 				`${mvnw} -pl application -am package -Dspring-boot.repackage.skip=true -Dsurefire.includedGroups=integration${integrationShard} -Dparallel=none --batch-mode`,
 			),
