@@ -131,12 +131,14 @@ public interface ConnectionRepository extends JpaRepository<Connection, Long> {
 
     /**
      * Records that exactly this ciphertext could not be read, and only once: a credential replaced
-     * since the failed read has a different ciphertext and is left alone.
+     * since the failed read has a different ciphertext and is left alone. Both records advance the
+     * version, so an entity loaded before the record and flushed after it fails its optimistic check
+     * instead of silently writing the stale value back.
      */
     @Modifying
     @Query("""
             UPDATE Connection c
-            SET c.credentialsRotationFailedAt = :at
+            SET c.credentialsRotationFailedAt = :at, c.version = c.version + 1
             WHERE c.id = :id
               AND c.workspace.id = :workspaceId
               AND c.credentialsEncrypted = :ciphertext
@@ -152,7 +154,7 @@ public interface ConnectionRepository extends JpaRepository<Connection, Long> {
     @Modifying
     @Query("""
             UPDATE Connection c
-            SET c.credentialsRotationFailedAt = NULL
+            SET c.credentialsRotationFailedAt = NULL, c.version = c.version + 1
             WHERE c.id = :id
               AND c.workspace.id = :workspaceId
               AND c.credentialsEncrypted = :ciphertext

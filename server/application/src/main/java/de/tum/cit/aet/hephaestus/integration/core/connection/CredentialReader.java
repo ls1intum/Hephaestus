@@ -22,6 +22,11 @@ import org.springframework.transaction.support.TransactionTemplate;
  * that reads again clears the record. A key version this server holds no key for is an instance
  * fault and passes through untouched, as it does for the rotation job.
  *
+ * <p>Every decryption failure other than a missing key is treated the same way: a truncated or
+ * unsupported ciphertext, an authentication failure under the configured keys and an undeserializable
+ * bundle are each a property of the stored row against this server, and only rewriting the row or
+ * restoring the key it was written with changes any of them.
+ *
  * <p>The record is written by a conditional update bound to the exact ciphertext that failed, so a
  * credential replaced between the failed read and the write is never marked, and it runs after the
  * caller's transaction completes rather than inside it, so a burst of failing reads does not hold two

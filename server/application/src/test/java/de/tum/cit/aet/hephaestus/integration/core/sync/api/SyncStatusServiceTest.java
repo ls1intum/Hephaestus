@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.core.sync.api;
 
+import org.springframework.test.util.ReflectionTestUtils;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -150,6 +151,13 @@ class SyncStatusServiceTest extends BaseUnitTest {
     @Test
     void getStatus_activeNoJobsNoResources_healthIsHealthy() {
         assertThat(service.getStatus(WORKSPACE_ID, CONNECTION_ID).health()).isEqualTo(ConnectionHealth.HEALTHY);
+    }
+
+    @Test
+    void shouldReportFailedWhileTheStoredCredentialCannotBeRead() {
+        ReflectionTestUtils.setField(connection, "credentialsRotationFailedAt", Instant.parse("2026-09-05T08:00:00Z"));
+
+        assertThat(service.getStatus(WORKSPACE_ID, CONNECTION_ID).health()).isEqualTo(ConnectionHealth.FAILED);
     }
 
     @Test
