@@ -169,6 +169,30 @@ class WorkspaceStatementInspectorTest extends BaseUnitTest {
     }
 
     @Test
+    void deleteJoinTableRowByAllOfItsKeysIsAllowed() {
+        // Removing one element of a @ManyToMany: Hibernate deletes the join-table row by both
+        // foreign keys. Both are surrogate keys the persistence context already held, so this is
+        // the same argument as delete-by-id; requiring workspace_id here fails every label removal.
+        WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.THROW);
+        inspector.inspect("delete from issue_label where issue_id=? and label_id=?");
+        verifyNoInteractions(reporter, scopedTables);
+    }
+
+    @Test
+    void deleteJoinTableRowWithDisjunctionStillRequiresWorkspaceId() {
+        // A disjunction broadens the row set past the keyed rows, so it is not the shape
+        // Hibernate emits and gets the standard check.
+        WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.LOG);
+        when(scopedTables.isScoped("issue_label")).thenReturn(true);
+        inspector.inspect("delete from issue_label where issue_id=? or label_id=?");
+        verify(reporter)
+                .report(
+                        "delete from issue_label where issue_id=? or label_id=?",
+                        Set.of("issue_label"),
+                        TenancyEnforcement.LOG);
+    }
+
+    @Test
     void optimisticLockUpdateIsAllowed() {
         // Hibernate appends "AND version = ?" to UPDATEs for entities with @Version.
         WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.THROW);
@@ -179,8 +203,8 @@ class WorkspaceStatementInspectorTest extends BaseUnitTest {
 
     @Test
     void deleteWithExtraPredicateStillRequiresWorkspaceId() {
-        // PK-only allowance MUST NOT extend to multi-column deletes — those are likely
-        // hand-written queries where we still want the workspace_id discipline.
+        // The key-only allowance covers conjunctions of keys, never a non-key column: that is a
+        // hand-written query where we still want the workspace_id discipline.
         WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.LOG);
         when(scopedTables.isScoped("practice")).thenReturn(true);
         inspector.inspect("delete from practice where id=? and slug=?");

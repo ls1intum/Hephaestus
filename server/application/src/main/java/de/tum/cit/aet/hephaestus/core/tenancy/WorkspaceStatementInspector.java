@@ -82,24 +82,31 @@ public class WorkspaceStatementInspector implements StatementInspector {
             "(?:\\bFROM\\b|\\bJOIN\\b|\\bUPDATE\\b)\\s+(\"?[A-Za-z_][A-Za-z0-9_]*\"?(?:\\s*\\.\\s*\"?[A-Za-z_][A-Za-z0-9_]*\"?)?)",
             Pattern.CASE_INSENSITIVE);
 
+    /** One surrogate-key predicate: {@code id = ?} or {@code <anything>_id = ?}, optionally quoted. */
+    private static final String KEY_EQUALS_PARAMETER = "\"?(?:id|[A-Za-z_][A-Za-z0-9_]*_id)\"?\\s*=\\s*\\?";
+
     /**
-     * Matches Hibernate-emitted DML on a single row identified solely by primary key —
-     * {@code DELETE FROM table WHERE id = ?} or
-     * {@code UPDATE table SET ... WHERE id = ?} (no other predicate columns).
+     * Matches Hibernate-emitted DML on rows identified solely by surrogate keys —
+     * {@code DELETE FROM table WHERE id = ?}, {@code UPDATE table SET ... WHERE id = ?}, and the
+     * join-table row a many-to-many element removal deletes,
+     * {@code DELETE FROM issue_label WHERE issue_id = ? AND label_id = ?}. Every predicate column
+     * must be a key ({@code id} or {@code *_id}), conjoined; nothing else.
      *
-     * <p>These are tenancy-safe by construction: the row was already loaded into the
-     * persistence context within a workspace-checked transaction, and the surrogate {@code id}
-     * uniquely identifies it. Allowing this pattern aligns with how Spring Data
-     * {@code delete(entity)}/{@code save(entity)} synthesise SQL, without requiring every
-     * scoped repository to wear {@code @WorkspaceAgnostic} just to satisfy the inspector.
+     * <p>These are tenancy-safe by construction: the rows were already loaded into the
+     * persistence context within a workspace-checked transaction, and surrogate keys are opaque
+     * to anything a request could supply. Allowing this pattern aligns with how Spring Data
+     * {@code delete(entity)}/{@code save(entity)} and Hibernate's collection persisters synthesise
+     * SQL, without requiring every scoped repository to wear {@code @WorkspaceAgnostic} just to
+     * satisfy the inspector.
      *
-     * <p>The pattern is intentionally narrow: any additional condition (e.g.
-     * {@code WHERE id = ? AND something_else}) breaks the match and falls through to the
+     * <p>The pattern is intentionally narrow: a non-key column anywhere in the predicate (e.g.
+     * {@code WHERE issue_id = ? AND name = ?}) breaks the match and falls through to the
      * standard {@code workspace_id} check, preserving enforcement for hand-written queries.
      */
     private static final Pattern PK_ONLY_DML_PATTERN = Pattern.compile(
             "^\\s*(?:DELETE\\s+FROM|UPDATE)\\s+\"?[A-Za-z_][A-Za-z0-9_]*\"?" + "(?:\\s+SET\\s+.+?)?"
-                    + "\\s+WHERE\\s+\"?(?:id|[A-Za-z_][A-Za-z0-9_]*_id)\"?\\s*=\\s*\\?"
+                    + "\\s+WHERE\\s+" + KEY_EQUALS_PARAMETER
+                    + "(?:\\s+AND\\s+" + KEY_EQUALS_PARAMETER + ")*"
                     +
                     // Optional @Version optimistic-lock predicate: AND version = ?
                     "(?:\\s+AND\\s+\"?version\"?\\s*=\\s*\\?)?"
