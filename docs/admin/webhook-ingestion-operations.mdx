@@ -7,9 +7,11 @@ description: Metrics, storage bounds, and recovery for the webhook receiver and 
 # Webhook ingestion operations
 
 Hephaestus receives webhooks in a container of its own and buffers every delivery on NATS JetStream
-before anything else reads it. Push events on GitHub and GitLab are **not** redeliverable — the
-provider's "redeliver" button does not apply to them — so a delivery that is dropped between the
-receiver and the consumer is gone.
+before anything else reads it. Providers never retry on their own: GitHub keeps a
+[**Redeliver** button](https://docs.github.com/en/webhooks/testing-and-troubleshooting-webhooks/redelivering-webhooks)
+on deliveries from the past three days and retries nothing automatically. Push events on GitHub and
+GitLab are **not** redeliverable at all — that button does not apply to them — so a delivery that is
+dropped between the receiver and the consumer is gone.
 
 This page is what to watch, what to set, and what to do when it goes wrong. Why it is built this way
 is [ADR 0008](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0008-webhook-runtime-role.md).

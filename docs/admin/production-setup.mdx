@@ -233,7 +233,7 @@ GitLab login, GitLab workspaces, webhook auto-registration, and practice review 
 | `GITLAB_DEFAULT_SERVER_URL` | Default GitLab instance for workspace creation / SCM sync (not auth). Falls back to `GITLAB_OAUTH_BASE_URL` |
 | `GITLAB_ENABLED` | Enables server-side GitLab beans in the application server |
 | `GITLAB_WORKSPACE_CREATION` | Enables GitLab workspace creation in the UI and API |
-| `WEBHOOK_SECRET` | Shared secret used for GitLab webhook verification and auto-registration |
+| `WEBHOOK_SECRET` | Shared secret used for GitLab webhook verification and auto-registration. One instance-wide value: GitHub webhooks are verified against the same secret |
 | `WEBHOOK_EXTERNAL_URL` | Public webhook base URL registered on GitLab. The reference Compose files deliberately leave it unset so auto-registration derives it from the application host URL; add it to the `application-server` service's `environment:` block if you need to override that. |
 
 The login provider is instance-agnostic: gitlab.com works out of the box, and any self-hosted GitLab works by pointing `GITLAB_OAUTH_BASE_URL` at it. Create the GitLab OAuth application on that instance with these settings:
