@@ -20,6 +20,7 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.lang.reflect.Field;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.Set;
@@ -33,6 +34,7 @@ import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.core.task.SyncTaskExecutor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.QueryTimeoutException;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -86,7 +88,11 @@ class ConnectionServiceTest extends BaseUnitTest {
                 syncJobService,
                 transactionManager,
                 new CredentialReader(
-                        connectionRepository, credentialConverter, transactionManager, java.time.Clock.systemUTC()));
+                        connectionRepository,
+                        credentialConverter,
+                        transactionManager,
+                        new SyncTaskExecutor(),
+                        Clock.systemUTC()));
         // Default: the connection is free. Only the disconnect fence ever asks.
         Mockito.lenient()
                 .when(syncJobService.requestCancelForTeardown(anyLong()))

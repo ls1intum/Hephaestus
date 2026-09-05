@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.testconfig;
 
+import de.tum.cit.aet.hephaestus.config.CredentialReadabilityExecutor;
 import de.tum.cit.aet.hephaestus.config.FeedbackLaneExecutor;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
@@ -91,6 +92,15 @@ public class TestAsyncConfiguration implements AsyncConfigurer {
      */
     @Bean(name = FeedbackLaneExecutor.BEAN_NAME)
     public AsyncTaskExecutor feedbackLaneExecutor() {
+        return syncExecutor;
+    }
+
+    /**
+     * The credential readability lane, synchronous here like every other. Must exist by name for the
+     * same reason as {@link #feedbackLaneExecutor()}: the qualifier resolves against the bean factory.
+     */
+    @Bean(name = CredentialReadabilityExecutor.BEAN_NAME)
+    public AsyncTaskExecutor credentialReadabilityExecutor() {
         return syncExecutor;
     }
 

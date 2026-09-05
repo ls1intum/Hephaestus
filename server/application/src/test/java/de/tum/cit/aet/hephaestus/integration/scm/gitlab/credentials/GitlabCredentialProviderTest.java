@@ -5,16 +5,15 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
-import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.CredentialBundleConverter;
-import de.tum.cit.aet.hephaestus.integration.core.connection.CredentialReader;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.CredentialBundle;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import de.tum.cit.aet.hephaestus.testconfig.CredentialReaders;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.util.Optional;
 import java.util.Set;
@@ -36,13 +35,7 @@ class GitlabCredentialProviderTest extends BaseUnitTest {
     void setUp() {
         MockitoAnnotations.openMocks(this);
         converter = new CredentialBundleConverter("0123456789abcdef0123456789abcdef", "dev");
-        provider = new GitlabCredentialProvider(
-                connectionService,
-                new CredentialReader(
-                        org.mockito.Mockito.mock(ConnectionRepository.class),
-                        converter,
-                        org.mockito.Mockito.mock(org.springframework.transaction.PlatformTransactionManager.class),
-                        java.time.Clock.systemUTC()));
+        provider = new GitlabCredentialProvider(connectionService, CredentialReaders.forTests(converter));
     }
 
     @Test
