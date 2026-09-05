@@ -41,10 +41,13 @@ RUN mkdir -p /tmp/abi-check && ln -sf /opt/pi-sdk/node_modules /tmp/abi-check/no
     node --permission --allow-fs-read=/tmp/abi-check --allow-fs-read=/opt/pi-sdk check.ts && \
     mkdir -p /tmp/abi-check/work/nested /tmp/abi-check/agent /tmp/abi-check/home && \
     printf 'SENTINEL-ORCHESTRATOR\n' > /tmp/abi-check/agent/AGENTS.md && \
+    printf '{}\n' > /tmp/abi-check/agent/settings.json && \
+    printf '{}\n' > /tmp/abi-check/agent/auth.json && \
+    printf '{}\n' > /tmp/abi-check/agent/models.json && \
     printf 'DECOY\n' > /tmp/abi-check/work/AGENTS.md && \
     printf '%s\n' \
       'import { readFileSync } from "node:fs";' \
-      'import { DefaultResourceLoader, SettingsManager } from "@earendil-works/pi-coding-agent";' \
+      'import { DefaultResourceLoader, ModelRuntime, SettingsManager } from "@earendil-works/pi-coding-agent";' \
       'const cwd = "/tmp/abi-check/work/nested";' \
       'const agentDir = "/tmp/abi-check/agent";' \
       '// Resolves resources exactly the way the runner does, under the same permissions: an untrusted' \
@@ -64,8 +67,13 @@ RUN mkdir -p /tmp/abi-check && ln -sf /opt/pi-sdk/node_modules /tmp/abi-check/no
       'await loader.reload();' \
       'const { agentsFiles } = loader.getAgentsFiles();' \
       'if (agentsFiles.length !== 1 || !agentsFiles[0].content.includes("SENTINEL-ORCHESTRATOR")) { throw new Error(`expected the staged orchestrator alone, got ${JSON.stringify(agentsFiles.map((f) => f.path))}`); }' \
+      '// Reading a credential takes a lock directory beside auth.json, and a session keeps a models' \
+      '// store beside it: writes in the agent dir that the runner grants and that a model turn needs.' \
+      'const modelRuntime = await ModelRuntime.create({ authPath: `${agentDir}/auth.json`, modelsPath: `${agentDir}/models.json`, allowModelNetwork: false });' \
+      'modelRuntime.registerProvider("gate", { name: "gate", baseUrl: "http://127.0.0.1:9/v1", apiKey: "$GATE_TOKEN", authHeader: true, api: "openai-completions", models: [{ id: "model", name: "model", reasoning: false, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 1000, maxTokens: 100 }] });' \
+      'if (!(await modelRuntime.checkAuth("gate"))) { throw new Error("the credential of the gate provider did not resolve"); }' \
       > runner-path-check.ts && \
-    HOME=/tmp/abi-check/home node --permission --allow-fs-read=/tmp/abi-check --allow-fs-read=/opt/pi-sdk runner-path-check.ts && \
+    HOME=/tmp/abi-check/home GATE_TOKEN=gate node --permission --allow-fs-read=/tmp/abi-check --allow-fs-read=/opt/pi-sdk --allow-fs-write=/tmp/abi-check/agent runner-path-check.ts && \
     ! node --permission --allow-fs-read=/tmp/abi-check --allow-fs-read=/opt/pi-sdk \
       -e 'require("node:fs").readFileSync("/etc/passwd")' 2>/dev/null && \
     ! node --permission --allow-fs-read=/tmp/abi-check --allow-fs-read=/opt/pi-sdk \
