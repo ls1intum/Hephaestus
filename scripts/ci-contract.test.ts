@@ -396,13 +396,22 @@ void describe("CI contract", () => {
 		const integration = job(source, "server-integration");
 		assert.match(integration, /fail-fast: false/);
 		const selectors = [...integration.matchAll(/tests: "([^"\n]+)"/g)].map((match) => match[1]);
-		assert.deepEqual(selectors, ["**/integration/**", "*,!**/integration/**"]);
-		assert.match(integration, /"-Dtest=\$\{\{ matrix.tests \}\}"/);
-		assert.match(integration, /-Dsurefire.failIfNoSpecifiedTests=false/);
+		assert.deepEqual(selectors, [
+			"de/tum/cit/aet/hephaestus/integration/**",
+			"**/*Test,!de/tum/cit/aet/hephaestus/integration/**",
+		]);
+		// vp forwards no arguments, so the selector reaches Maven through the config's environment read.
+		assert.match(integration, /HEPHAESTUS_INTEGRATION_TESTS: \$\{\{ matrix.tests \}\}/);
+		assert.doesNotMatch(integration, /test:server:integration "-D/);
+		assert.match(integration, /Refuse a shard that ran nothing/);
 		assert.match(integration, /Test Results - App Server Integration \(\$\{\{ matrix.shard \}\}\)/);
 		assert.equal((source.match(/run: vp run test:server:integration/g) ?? []).length, 1);
 		const tasks = await readFile("vite.config.ts", "utf8");
-		assert.match(tasks, /"test:server:integration": run\([\s\S]*?-Dsurefire.includedGroups=integration/);
+		assert.match(tasks, /HEPHAESTUS_INTEGRATION_TESTS/);
+		assert.match(
+			tasks,
+			/"test:server:integration": run\([\s\S]*?-Dsurefire.includedGroups=integration\$\{integrationShard\}/,
+		);
 		const orchestrator = await readFile(".github/workflows/cicd.yml", "utf8");
 		assert.match(job(orchestrator, "Test"), /uses: \.\/\.github\/workflows\/ci-tests.yml/);
 		assert.match(job(orchestrator, "all-ci-passed"), /needs\.Test\.result/);

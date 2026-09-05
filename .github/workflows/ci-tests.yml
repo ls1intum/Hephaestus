@@ -60,9 +60,9 @@ jobs:
       matrix:
         include:
           - shard: providers
-            tests: "**/integration/**"
+            tests: "de/tum/cit/aet/hephaestus/integration/**"
           - shard: application
-            tests: "*,!**/integration/**"
+            tests: "**/*Test,!de/tum/cit/aet/hephaestus/integration/**"
     permissions:
       contents: read
       checks: write
@@ -78,8 +78,16 @@ jobs:
           cache-type: application-server-reactor
           os: ${{ runner.os }}
       - name: Run integration tests
-        # The generated-clients reactor module has no tests matching these selectors.
-        run: vp run test:server:integration "-Dtest=${{ matrix.tests }}" -Dsurefire.failIfNoSpecifiedTests=false
+        env:
+          # Read by vite.config.ts when it loads; vp forwards no arguments to a command.
+          HEPHAESTUS_INTEGRATION_TESTS: ${{ matrix.tests }}
+        run: vp run test:server:integration
+      - name: Refuse a shard that ran nothing
+        # A selector that drifts away from every class would otherwise pass green with zero tests.
+        run: |
+          count=$(grep -ho '<testcase ' server/application/target/surefire-reports/TEST-*.xml | wc -l)
+          echo "testcases=$count"
+          test "$count" -gt 0
       - name: Upload test results
         if: always()
         uses: dorny/test-reporter@a43b3a5f7366b97d083190328d2c652e1a8b6aa2 # v3.0.0
