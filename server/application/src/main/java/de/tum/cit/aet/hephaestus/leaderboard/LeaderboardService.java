@@ -407,7 +407,7 @@ public class LeaderboardService {
                 workspace, after, before, "all", LeaderboardSortType.SCORE, LeaderboardMode.INDIVIDUAL);
 
         LeaderboardEntryDTO entry = globalLeaderboard.stream()
-                .filter(e -> e.user() != null && login.equalsIgnoreCase(e.user().login()))
+                .filter(e -> e.user() != null && user.getId().equals(e.user().id()))
                 .findFirst()
                 .orElse(null);
 

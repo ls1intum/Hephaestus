@@ -24,9 +24,10 @@ class LeaderboardControllerIntegrationTest extends AbstractWorkspaceIntegrationT
     @Test
     @WithAdminUser
     void shouldComputeLeagueStatsWhenAnotherUserSharesTheMembersLogin() {
-        // Two users with one login: the member and a namesake elsewhere in the instance.
+        // Two users with one login: the member on GitHub and a namesake on GitLab. Logins are
+        // unique per provider only, which is exactly what a lookup by login alone tripped over.
         User member = persistUser("shared-login");
-        persistUser("shared-login");
+        persistNamesakeOnGitLab("shared-login");
         Workspace workspace =
                 createWorkspace("shared-login-ws", "Shared login", "shared-login-org", AccountType.ORG, member);
         ensureWorkspaceMembership(workspace, member, WorkspaceMembership.WorkspaceRole.MEMBER);
@@ -50,5 +51,20 @@ class LeaderboardControllerIntegrationTest extends AbstractWorkspaceIntegrationT
 
         assertThat(change).isNotNull();
         assertThat(change.login()).isEqualTo("shared-login");
+        assertThat(change.leaguePointsChange()).isZero();
+    }
+
+    private User persistNamesakeOnGitLab(String login) {
+        User user = new User();
+        user.setNativeId(System.nanoTime());
+        user.setProvider(ensureGitLabProvider());
+        user.setLogin(login);
+        user.setName("Namesake " + login);
+        user.setAvatarUrl("https://example.com/" + login + "-gitlab.png");
+        user.setHtmlUrl("https://gitlab.com/" + login);
+        user.setType(User.Type.USER);
+        user.setCreatedAt(Instant.now());
+        user.setUpdatedAt(Instant.now());
+        return userRepository.save(user);
     }
 }
