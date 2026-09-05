@@ -1,8 +1,8 @@
 /** Resolve commit-tagged images and verify their build provenance before channel signing. */
-import { readFile } from "node:fs/promises";
-
-import { asArray, asRecord, asString, asStringArray, parseJson } from "./lib/json.ts";
-import { CAPTURE_LIMIT_BYTES } from "./lib/process.ts";
+import { requiredEnv } from "./lib/env.ts";
+import { asArray, asRecord, asString, asStringArray, readJsonFile } from "./lib/json.ts";
+import { output, run } from "./lib/process.ts";
+import { isCommit } from "./reconcile-deployment.ts";
 
 export interface ImageInventory {
 	readonly images: readonly string[];
@@ -13,8 +13,7 @@ export interface ImageInventory {
 	}[];
 }
 
-const COMMIT_SHA = /^[0-9a-f]{40}$/;
-const DIGEST = /^sha256:[0-9a-f]{64}$/;
+export const DIGEST = /^sha256:[0-9a-f]{64}$/;
 
 export function environmentKey(image: string): string {
 	return `HEPHAESTUS_IMAGE_${image.toUpperCase().replaceAll("-", "_")}`;
@@ -41,7 +40,7 @@ export async function resolveImages(
 	owner: string,
 	resolve: (repository: string, commit: string) => Promise<string>,
 ): Promise<Record<string, string>> {
-	if (!COMMIT_SHA.test(commit)) throw new Error(`expected a full commit, got ${commit}`);
+	if (!isCommit(commit)) throw new Error(`expected a full commit, got ${commit}`);
 	const images: Record<string, string> = {};
 	for (const entry of inventory.upstream)
 		images[environmentKey(entry.name)] = `${entry.repository}@${entry.digest}`;
@@ -55,28 +54,24 @@ export async function resolveImages(
 }
 
 export async function readInventory(path: string): Promise<ImageInventory> {
-	return parseInventory(parseJson(await readFile(path, "utf8")));
+	return parseInventory(await readJsonFile(path));
 }
 
-async function resolveAndVerify(repository: string, commit: string): Promise<string> {
-	const { execFileSync } = await import("node:child_process");
-	const ghRepository = process.env.GITHUB_REPOSITORY;
-	if (!ghRepository) throw new Error("GITHUB_REPOSITORY is required to verify build provenance");
+export async function resolveAndVerify(repository: string, commit: string): Promise<string> {
+	const ghRepository = requiredEnv(process.env, "GITHUB_REPOSITORY");
 
-	const digest = execFileSync(
-		"docker",
-		[
+	const digest = (
+		await output("docker", [
 			"buildx",
 			"imagetools",
 			"inspect",
 			`${repository}:${commit}`,
 			"--format",
 			"{{.Manifest.Digest}}",
-		],
-		{ encoding: "utf8", maxBuffer: CAPTURE_LIMIT_BYTES },
+		])
 	).trim();
 
-	execFileSync(
+	await run(
 		"gh",
 		[
 			"attestation",
@@ -93,17 +88,7 @@ async function resolveAndVerify(repository: string, commit: string): Promise<str
 			"--predicate-type",
 			"https://slsa.dev/provenance/v1",
 		],
-		{ stdio: ["ignore", "ignore", "inherit"], maxBuffer: CAPTURE_LIMIT_BYTES },
+		{ stdin: "ignore", stdout: "ignore" },
 	);
 	return digest;
-}
-
-if (import.meta.main) {
-	const [commit, owner = "hephaestus-build", inventoryPath = "security/release-images.json"] =
-		process.argv.slice(2);
-	if (!commit) throw new Error("usage: commit-image-lock <commit> [owner] [inventory]");
-	// The inventory belongs to the commit being promoted; this file may be newer than it.
-	const inventory = await readInventory(inventoryPath);
-	const images = await resolveImages(inventory, commit, owner, resolveAndVerify);
-	process.stdout.write(`${JSON.stringify(images, null, 2)}\n`);
 }
