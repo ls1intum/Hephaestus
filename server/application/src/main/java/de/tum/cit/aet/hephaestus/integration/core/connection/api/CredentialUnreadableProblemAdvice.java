@@ -1,0 +1,26 @@
+package de.tum.cit.aet.hephaestus.integration.core.connection.api;
+
+import de.tum.cit.aet.hephaestus.integration.core.connection.CredentialUnreadableException;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+/**
+ * An unreadable credential is a state of the connection, so the answer names it and what clears it;
+ * nothing here is a fault of the request or of the server's ability to serve it. Lives beside the
+ * connection API rather than in the core advice, which must not depend on integration types.
+ */
+@RestControllerAdvice
+@Order(Ordered.HIGHEST_PRECEDENCE)
+public class CredentialUnreadableProblemAdvice {
+
+    @ExceptionHandler(CredentialUnreadableException.class)
+    public ProblemDetail handle(CredentialUnreadableException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
+        problem.setTitle("Credential unreadable");
+        return problem;
+    }
+}

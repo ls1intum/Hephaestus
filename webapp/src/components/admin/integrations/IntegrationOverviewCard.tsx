@@ -120,9 +120,10 @@ export function IntegrationOverviewCard({
 							</Link>
 						)}
 					</div>
-				) : !isConnectionActive ? (
+				) : !isConnectionActive || entry.credentialsUnreadableSince ? (
 					<ConnectionStateNotice
 						connectionState={entry.connectionState}
+						credentialsUnreadableSince={entry.credentialsUnreadableSince}
 						displayName={entry.displayName}
 					/>
 				) : isStatusLoading ? (

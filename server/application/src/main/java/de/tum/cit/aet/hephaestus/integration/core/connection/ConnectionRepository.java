@@ -3,11 +3,13 @@ package de.tum.cit.aet.hephaestus.integration.core.connection;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -126,4 +128,36 @@ public interface ConnectionRepository extends JpaRepository<Connection, Long> {
         @Nullable
         String getSigningSecret();
     }
+
+    /**
+     * Records that exactly this ciphertext could not be read, and only once: a credential replaced
+     * since the failed read has a different ciphertext and is left alone.
+     */
+    @Modifying
+    @Query("""
+            UPDATE Connection c
+            SET c.credentialsRotationFailedAt = :at
+            WHERE c.id = :id
+              AND c.workspace.id = :workspaceId
+              AND c.credentialsEncrypted = :ciphertext
+              AND c.credentialsRotationFailedAt IS NULL
+            """)
+    int markCredentialsUnreadable(
+            @Param("id") Long id,
+            @Param("workspaceId") Long workspaceId,
+            @Param("ciphertext") byte[] ciphertext,
+            @Param("at") Instant at);
+
+    /** Clears the record once the same ciphertext reads again, as after the right key is restored. */
+    @Modifying
+    @Query("""
+            UPDATE Connection c
+            SET c.credentialsRotationFailedAt = NULL
+            WHERE c.id = :id
+              AND c.workspace.id = :workspaceId
+              AND c.credentialsEncrypted = :ciphertext
+              AND c.credentialsRotationFailedAt IS NOT NULL
+            """)
+    int markCredentialsReadable(
+            @Param("id") Long id, @Param("workspaceId") Long workspaceId, @Param("ciphertext") byte[] ciphertext);
 }

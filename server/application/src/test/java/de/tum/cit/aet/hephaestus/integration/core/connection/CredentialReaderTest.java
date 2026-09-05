@@ -3,7 +3,10 @@ package de.tum.cit.aet.hephaestus.integration.core.connection;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.core.security.MissingCredentialKeyException;
@@ -14,7 +17,6 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
-import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -46,7 +48,6 @@ class CredentialReaderTest extends BaseUnitTest {
                 "T0974LHQU7K",
                 new ConnectionConfig.SlackConfig("T0974LHQU7K", "hephaestus-test", null, null, null, Set.of()));
         ReflectionTestUtils.setField(connection, "id", 55L);
-        when(connectionRepository.findById(55L)).thenReturn(Optional.of(connection));
     }
 
     private CredentialReader readerWith(CredentialBundleConverter converter) {
@@ -60,7 +61,7 @@ class CredentialReaderTest extends BaseUnitTest {
         connection.setCredentials(TOKEN, converter);
 
         assertThat(readerWith(converter).credentialsOf(connection)).contains(TOKEN);
-        assertThat(connection.getCredentialsRotationFailedAt()).isNull();
+        verify(connectionRepository, never()).markCredentialsReadable(any(), any(), any());
     }
 
     @Test
@@ -77,7 +78,19 @@ class CredentialReaderTest extends BaseUnitTest {
                 })
                 .hasMessageContaining("connection 55")
                 .hasMessageContaining("Re-enter the credential");
-        assertThat(connection.getCredentialsRotationFailedAt()).isEqualTo(NOW);
+        // Outside a transaction the record is written at once, bound to the ciphertext that failed.
+        verify(connectionRepository)
+                .markCredentialsUnreadable(eq(55L), eq(7L), eq(connection.getCredentialsEncrypted()), eq(NOW));
+    }
+
+    @Test
+    void shouldClearTheRecordWhenAMarkedCredentialReadsAgain() {
+        CredentialBundleConverter converter = new CredentialBundleConverter(KEY_A, "dev");
+        connection.setCredentials(TOKEN, converter);
+        connection.markCredentialRotationFailed(NOW.minusSeconds(60));
+
+        assertThat(readerWith(converter).credentialsOf(connection)).contains(TOKEN);
+        verify(connectionRepository).markCredentialsReadable(eq(55L), eq(7L), eq(connection.getCredentialsEncrypted()));
     }
 
     @Test
@@ -89,6 +102,6 @@ class CredentialReaderTest extends BaseUnitTest {
         assertThatThrownBy(() ->
                         readerWith(new CredentialBundleConverter(KEY_A, "dev")).credentialsOf(connection))
                 .isInstanceOf(MissingCredentialKeyException.class);
-        assertThat(connection.getCredentialsRotationFailedAt()).isNull();
+        verify(connectionRepository, never()).markCredentialsUnreadable(any(), any(), any(), any());
     }
 }
