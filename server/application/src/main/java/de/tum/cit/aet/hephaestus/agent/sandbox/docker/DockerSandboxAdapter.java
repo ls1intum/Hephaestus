@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.sandbox.docker;
 
 import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
+import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxCancelledException;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxException;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxManager;
@@ -25,25 +26,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
-/**
- * Docker-based implementation of {@link SandboxManager}.
- *
- * <p>Orchestrates the 4-phase container lifecycle:
- *
- * <ol>
- *   <li><b>PREPARE</b> — create network, connect app-server, create container, inject files
- *   <li><b>EXECUTE</b> — start container, wait for completion with timeout
- *   <li><b>COLLECT</b> — extract output files, capture logs
- *   <li><b>CLEANUP</b> — remove container, disconnect app-server, remove network
- * </ol>
- *
- * <p>Each call to {@link #execute} is self-contained and blocking. Callers submit to {@code
- * sandboxExecutor} (bounded platform thread pool). Cleanup runs in {@code finally} regardless of
- * outcome — partial failures are logged and left for reconciliation.
- *
- * <p>Cancellation uses a simple {@link AtomicBoolean} flag per job. The execute loop checks the
- * flag between phases and stops the container if set.
- */
+/** Blocking Docker execution with cancellation and best-effort resource cleanup. */
 public class DockerSandboxAdapter implements SandboxManager {
 
     private static final Logger log = LoggerFactory.getLogger(DockerSandboxAdapter.class);
@@ -55,22 +38,11 @@ public class DockerSandboxAdapter implements SandboxManager {
     private static final String MDC_JOB_ID = "sandbox.jobId";
     private static final String MDC_CONTAINER_ID = "sandbox.containerId";
 
-    /**
-     * Maximum container log size to emit in a single log event (prevents log aggregator overflow).
-     * This is the <em>emission</em> limit; see {@link DockerClientOperations#MAX_LOG_BYTES} for the
-     * upstream <em>collection</em> limit (1 MB).
-     */
-    private static final int MAX_LOG_EVENT_BYTES = 32 * 1024; // 32 KB
+    /** Limits each diagnostic event separately from the transport collection limit. */
+    private static final int MAX_LOG_EVENT_CHARS = 32 * 1024;
 
     /**
-     * Git config key-value pairs injected via {@code GIT_CONFIG_COUNT}/{@code GIT_CONFIG_KEY_*}/
-     * {@code GIT_CONFIG_VALUE_*} env vars to neutralise code-execution vectors in
-     * {@code .git/config}. Env-based config has the <em>highest</em> precedence in git, so these
-     * override any local, global, or system settings.
-     *
-     * <p>Each entry maps a dangerous git config key to a safe value: empty string disables the
-     * feature, {@code /nonexistent} redirects to a path that does not exist, and {@code cat} is the
-     * canonical no-op pager.
+     * Overrides repository, global and system Git config; explicit {@code git -c} options take precedence.
      *
      * @see <a href="https://git-scm.com/docs/git-config#_environment">git-config environment</a>
      */
@@ -93,7 +65,6 @@ public class DockerSandboxAdapter implements SandboxManager {
     private final ContainerSecurityPolicy securityPolicy;
     private final int gatewayPort;
 
-    // Metrics
     private final Counter executionsSuccess;
     private final Counter executionsFailed;
     private final Counter executionsTimedOut;
@@ -101,10 +72,8 @@ public class DockerSandboxAdapter implements SandboxManager {
     private final MeterRegistry meterRegistry;
     private final Timer executionDuration;
 
-    /** Active cancellation flags — presence indicates a running job. */
     private final ConcurrentHashMap<UUID, AtomicBoolean> cancellationFlags = new ConcurrentHashMap<>();
 
-    /** Active container IDs — allows cancel() to stop running containers. */
     private final ConcurrentHashMap<UUID, String> activeContainers = new ConcurrentHashMap<>();
 
     public DockerSandboxAdapter(
@@ -141,7 +110,6 @@ public class DockerSandboxAdapter implements SandboxManager {
                 .description("Duration of sandbox executions")
                 .register(meterRegistry);
 
-        // Gauge for active containers
         meterRegistry.gaugeMapSize("sandbox.containers.active", Tags.empty(), this.activeContainers);
     }
 
@@ -162,10 +130,8 @@ public class DockerSandboxAdapter implements SandboxManager {
         log.info("Starting sandbox execution: image={}", spec.image());
 
         try {
-            // PHASE 1: PREPARE
             checkCancelled(cancelled, jobId);
 
-            // Create isolated network
             boolean allowInternet =
                     spec.networkPolicy() != null && spec.networkPolicy().internetAccess();
             networkId = networkManager.createJobNetwork(jobId, allowInternet);
@@ -189,10 +155,8 @@ public class DockerSandboxAdapter implements SandboxManager {
 
             checkCancelled(cancelled, jobId);
 
-            // Build environment with LLM proxy URL
             Map<String, String> environment = buildEnvironment(spec, appServerIp);
 
-            // Build container spec with security hardening
             var secProfile = spec.securityProfile() != null ? spec.securityProfile() : SecurityProfile.DEFAULT;
             DockerOperations.HostConfigSpec hostConfig =
                     securityPolicy.buildHostConfig(secProfile, spec.resourceLimits(), spec.networkPolicy());
@@ -214,19 +178,14 @@ public class DockerSandboxAdapter implements SandboxManager {
             MDC.put(MDC_CONTAINER_ID, containerId);
             log.info("Container created: containerId={}", containerId);
 
-            // Check cancellation immediately after container registration —
-            // if cancel() was called during createContainer(), the flag is set
-            // but the container wasn't in activeContainers yet so cancel couldn't
-            // stop it. Now we catch it before doing unnecessary file injection.
+            // Cancellation during creation cannot stop the container until it is registered.
             checkCancelled(cancelled, jobId);
 
-            // Inject input files via docker cp
             if (!spec.inputFiles().isEmpty()) {
                 workspaceManager.injectFiles(containerId, spec.inputFiles(), spec.inputFilesOnDisk());
                 log.debug("Injected {} input files", spec.inputFiles().size());
             }
 
-            // Inject host directories via docker cp (works with local and remote Docker daemons)
             if (spec.volumeMounts() != null && !spec.volumeMounts().isEmpty()) {
                 workspaceManager.injectDirectories(containerId, spec.volumeMounts());
                 log.debug(
@@ -234,23 +193,31 @@ public class DockerSandboxAdapter implements SandboxManager {
                         spec.volumeMounts().size());
             }
 
-            // PHASE 2: EXECUTE
             containerManager.startContainer(containerId);
             log.info("Container started");
 
             Duration timeout = spec.resourceLimits().maxRuntime();
             SandboxContainerManager.WaitOutcome waitOutcome = containerManager.waitForCompletion(containerId, timeout);
 
-            // Check cancellation after wait — cancel() stops the container, so
-            // waitForCompletion returns with exit code 137. Without this check,
-            // the caller would see a normal result instead of SandboxCancelledException.
+            // A cancellation-induced container exit must remain cancellation, not a normal result.
             checkCancelled(cancelled, jobId);
 
-            // PHASE 3: COLLECT
             // Collect output regardless of exit code or timeout — agent may have written partial results
-            Map<String, byte[]> outputFiles = workspaceManager.collectOutput(containerId, spec.outputPath());
+            Map<String, byte[]> outputFiles;
+            try {
+                outputFiles = workspaceManager.collectOutput(containerId, spec.outputPath());
+            } catch (SandboxException e) {
+                if (!waitOutcome.timedOut() && waitOutcome.exitCode() != SandboxLayout.EXIT_ENVELOPE_MISMATCH) {
+                    throw e;
+                }
+                // Collection failure must not hide an already-known timeout or contract drift.
+                log.warn(
+                        "Output unavailable after terminal sandbox failure: jobId={}, exitCode={}",
+                        jobId,
+                        waitOutcome.exitCode());
+                outputFiles = Map.of();
+            }
 
-            // Capture logs before cleanup
             String logs = containerManager.getLogs(containerId, LOG_TAIL_LINES);
 
             if (waitOutcome.timedOut()) {
@@ -286,9 +253,7 @@ public class DockerSandboxAdapter implements SandboxManager {
             log.error("Unexpected error during sandbox execution", e);
             throw new SandboxException("Sandbox execution failed for job: " + jobId, e);
         } finally {
-            // PHASE 4: CLEANUP
-            // Remove from activeContainers FIRST to prevent cancel() from calling
-            // stopContainer() on a container that cleanup is about to force-remove.
+            // Unregister before removal so cancellation cannot race cleanup with stopContainer().
             activeContainers.remove(jobId);
             executionDuration.record(Duration.between(startTime, Instant.now()));
             cleanup(jobId, containerId, networkId);
@@ -305,9 +270,7 @@ public class DockerSandboxAdapter implements SandboxManager {
             flag.set(true);
             log.info("Cancellation requested: jobId={}", jobId);
 
-            // Stop the running container so waitForCompletion returns immediately.
-            // Use computeIfPresent to atomically read the containerId only if
-            // the job is still active (avoids race with cleanup removing the entry).
+            // Keep stopping atomic with unregistration by cleanup.
             activeContainers.computeIfPresent(jobId, (id, containerId) -> {
                 try {
                     containerManager.stopContainer(containerId);
@@ -326,16 +289,10 @@ public class DockerSandboxAdapter implements SandboxManager {
         return containerManager.ping();
     }
 
-    // Internal helpers
-
     private Map<String, String> buildEnvironment(SandboxSpec spec, String appServerIp) {
         Map<String, String> env = new HashMap<>();
 
-        // User environment
-        // User env vars are copied first; security values are injected below and will
-        // overwrite any collisions. This is defense-in-depth — most dangerous vars are
-        // already blocked by SandboxEnvBlocklist, but the ordering ensures new security
-        // vars added below always win even if the blocklist isn't updated simultaneously.
+        // Enforced values must overwrite caller-supplied variables.
         for (var entry : spec.environment().entrySet()) {
             if (SandboxEnvBlocklist.isBlocked(entry.getKey())) {
                 log.warn("Blocked dangerous environment variable: {}", entry.getKey());
@@ -345,10 +302,6 @@ public class DockerSandboxAdapter implements SandboxManager {
         }
         addTraceEnvironment(env);
 
-        // Git security
-        // Env-based config has HIGHEST precedence in git — overrides .git/config in any repo
-        // the agent clones or that was injected via volume mounts. Always injected regardless of
-        // whether volume mounts are present, since the agent can git-clone repos at runtime.
         int idx = 0;
         for (String containerPath : spec.volumeMounts().values()) {
             env.put("GIT_CONFIG_KEY_" + idx, "safe.directory");
@@ -367,14 +320,12 @@ public class DockerSandboxAdapter implements SandboxManager {
         // Prevent system-wide gitattributes from being loaded
         env.put("GIT_ATTR_NOSYSTEM", "1");
 
-        // Inject LLM proxy configuration
         if (spec.networkPolicy() != null) {
             String gatewayUrl = appServerIp != null ? "http://" + appServerIp + ":" + gatewayPort : null;
             if (gatewayUrl != null) {
                 env.put("GATEWAY_URL", gatewayUrl);
             }
             if (spec.networkPolicy().llmProxyUrl() != null) {
-                // Resolve template placeholder or use as-is
                 String proxyUrl = spec.networkPolicy().llmProxyUrl();
                 if (proxyUrl.contains(PROXY_URL_PLACEHOLDER) && appServerIp != null) {
                     proxyUrl = proxyUrl.replace(PROXY_URL_PLACEHOLDER, appServerIp);
@@ -403,10 +354,7 @@ public class DockerSandboxAdapter implements SandboxManager {
         }
     }
 
-    /**
-     * Best-effort log capture on error paths — container is about to be removed by cleanup, so grab
-     * logs while we can. Logs are emitted at WARN for post-mortem debugging.
-     */
+    /** Capture diagnostics before cleanup removes the container. */
     private void captureLogsOnError(@Nullable String containerId) {
         if (containerId == null) {
             return;
@@ -414,11 +362,10 @@ public class DockerSandboxAdapter implements SandboxManager {
         try {
             String logs = containerManager.getLogs(containerId, LOG_TAIL_LINES);
             if (logs != null && !logs.isEmpty()) {
-                // Truncate to prevent log aggregator overflow from large container output
-                String truncated = logs.length() > MAX_LOG_EVENT_BYTES
-                        ? logs.substring(0, MAX_LOG_EVENT_BYTES) + "\n... [truncated, "
+                String truncated = logs.length() > MAX_LOG_EVENT_CHARS
+                        ? logs.substring(0, MAX_LOG_EVENT_CHARS) + "\n... [truncated, "
                                 + logs.length()
-                                + " bytes total]"
+                                + " characters total]"
                         : logs;
                 log.warn("Container logs before cleanup:\n{}", truncated);
             }
@@ -433,22 +380,15 @@ public class DockerSandboxAdapter implements SandboxManager {
         }
     }
 
-    /**
-     * Best-effort cleanup of all resources. Each step is independent — failures are logged but don't
-     * prevent other cleanup steps.
-     */
     private void cleanup(UUID jobId, @Nullable String containerId, @Nullable String networkId) {
-        // 1. Remove container
         if (containerId != null) {
             suppressAndLog("remove container", jobId, () -> containerManager.forceRemove(containerId));
         }
 
-        // 2. Disconnect app-server from job network
         if (networkId != null) {
             suppressAndLog("disconnect app-server", jobId, () -> networkManager.disconnectAppServer(networkId));
         }
 
-        // 3. Remove job network
         if (networkId != null) {
             suppressAndLog("remove network", jobId, () -> networkManager.removeNetwork(networkId));
         }

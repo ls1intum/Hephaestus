@@ -96,6 +96,21 @@ covered by this ABI.
   — internal control surfaces. AI-readable as configured by the orchestrator, but
   *not* part of the public agent ABI; subject to change without a `schemaVersion` bump.
 
+## Output archive validation
+
+Output collection is all-or-nothing. Unavailable or invalid output fails execution even after exit
+code `0`; an already-known timeout or exit code `42` retains its original failure classification.
+
+Output must be an uncompressed tar containing regular files beneath `out/` and zero-length directory
+entries. Links, sparse files, devices, PAX/GNU extensions, invalid checksums, unsafe or duplicate
+normalized paths, truncation, and nonzero data after the end markers are rejected. Docker archives
+requiring PAX extensions for long or non-ASCII names are therefore unsupported.
+
+Limits are 50 MiB for the entire archive, including headers, end markers and padding; 50 MiB of file
+contents in total; 10 MiB per file; and 10,000 entries, including directories. Rejected transfers are
+aborted without draining the remaining body. Files are read into memory, never extracted to the
+worker filesystem.
+
 ## Exit codes
 
 | Code | Meaning |
