@@ -11,15 +11,10 @@ import {
 	isHandwrittenJavaSource,
 	nullnessPolicyViolations,
 } from "./check-java-nullness.ts";
+import { environmentForGitFixture } from "./lib/git-environment.ts";
 
 const execFileAsync = promisify(execFile);
 const REPO_ROOT = resolve(import.meta.dirname, "..");
-const GIT_ENV = {
-	...process.env,
-	GIT_DIR: undefined,
-	GIT_INDEX_FILE: undefined,
-	GIT_WORK_TREE: undefined,
-};
 
 const source = (content: string) => [{ path: "Example.java", content }];
 
@@ -91,7 +86,7 @@ await test("discovers Application.java in the real checkout", async () => {
 await test("fails closed when repository discovery finds no Java sources", async () => {
 	const root = await mkdtemp(join(tmpdir(), "java-nullness-"));
 	try {
-		await execFileAsync("git", ["init", "--quiet"], { cwd: root, env: GIT_ENV });
+		await execFileAsync("git", ["init", "--quiet"], { cwd: root, env: environmentForGitFixture() });
 		await assert.rejects(discoverJavaSourcePaths(root), /No handwritten Java sources found/);
 	} finally {
 		await rm(root, { recursive: true, force: true });

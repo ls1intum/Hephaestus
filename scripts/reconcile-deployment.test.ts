@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 
+import { environmentForGitFixture, GIT_REPOSITORY_VARIABLES } from "./lib/git-environment.ts";
 import {
 	adoptTooling,
 	appliedCommit,
@@ -21,6 +22,11 @@ import {
 	syncUnits,
 	unlockedImages,
 } from "./reconcile-deployment.ts";
+
+// `ensureReleaseTree` runs `git worktree add` in the environment it inherits, which under a hook
+// names the repository being pushed. The fixtures below are isolated only once this process has
+// stopped carrying that repository; node runs each test file in its own process.
+for (const name of GIT_REPOSITORY_VARIABLES) delete process.env[name];
 
 const applied = {
 	release: "v0.75.2",
@@ -366,11 +372,7 @@ await test("a tree is adopted as tooling only when its own unit runs through the
 await test("a release's worktree is rebuilt at the accepted commit and checked before it is used", async () => {
 	const directory = await mkdtemp(join(tmpdir(), "reconcile-tree-"));
 	const git = (cwd: string, ...args: string[]): string =>
-		execFileSync("git", args, {
-			cwd,
-			encoding: "utf8",
-			env: { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_SYSTEM: "/dev/null" },
-		}).trim();
+		execFileSync("git", args, { cwd, encoding: "utf8", env: environmentForGitFixture() }).trim();
 	try {
 		const checkout = join(directory, "checkout");
 		await mkdir(checkout);

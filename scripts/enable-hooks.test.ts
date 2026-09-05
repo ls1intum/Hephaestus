@@ -5,13 +5,14 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { after, test } from "node:test";
 
+import { environmentForGitFixture } from "./lib/git-environment.ts";
 import { CAPTURE_LIMIT_BYTES } from "./lib/process.ts";
 
 const REPO_ROOT = resolve(import.meta.dirname, "..");
 const SCRIPT = join(REPO_ROOT, "scripts", "enable-hooks.ts");
 const temporaries: string[] = [];
 
-function globalConfig(contents = ""): string {
+function globalConfig(contents: string): string {
 	const directory = mkdtempSync(join(tmpdir(), "enable-hooks-config-"));
 	temporaries.push(directory);
 	const path = join(directory, "gitconfig");
@@ -19,19 +20,9 @@ function globalConfig(contents = ""): string {
 	return path;
 }
 
-const EMPTY_GLOBAL_CONFIG = globalConfig();
-
-// Git hook variables override cwd; keep each subprocess inside its isolated fixture.
+// The install reads CI to decide whether to advise on signing; each test states its own answer.
 function hookFreeEnv(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
-	const inherited = Object.fromEntries(
-		Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_") && key !== "CI"),
-	);
-	return {
-		...inherited,
-		GIT_CONFIG_GLOBAL: EMPTY_GLOBAL_CONFIG,
-		GIT_CONFIG_NOSYSTEM: "1",
-		...overrides,
-	};
+	return environmentForGitFixture({ CI: undefined, ...overrides });
 }
 
 after(() => {

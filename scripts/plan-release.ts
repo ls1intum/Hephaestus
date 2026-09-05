@@ -25,6 +25,7 @@
  */
 import { appendFile } from "node:fs/promises";
 
+import { environmentWithoutGitRepository } from "./lib/git-environment.ts";
 import { asRecord, asString, parseJson } from "./lib/json.ts";
 import { output } from "./lib/process.ts";
 
@@ -32,17 +33,6 @@ import { output } from "./lib/process.ts";
 const RELEASE_VERSION = /^(\d+)\.(\d+)\.(\d+)$/;
 
 const MIGRATION_PATH = "server/application/src/main/resources/db/changelog/";
-
-/**
- * Git hooks export `GIT_DIR` and `GIT_INDEX_FILE`, which would point every git command below at
- * whichever repository invoked the hook instead of at the checkout being planned.
- */
-const withoutGitEnvironment = (): Record<string, undefined> =>
-	Object.fromEntries(
-		Object.keys(process.env)
-			.filter((key) => key.startsWith("GIT_"))
-			.map((key) => [key, undefined]),
-	);
 
 export interface ReleaseRef {
 	readonly isDraft: boolean;
@@ -199,7 +189,7 @@ export async function hasSchemaMigrations(
 ): Promise<boolean> {
 	const changed = await output("git", ["diff", "--name-only", from, to, "--", MIGRATION_PATH], {
 		cwd,
-		env: withoutGitEnvironment(),
+		env: environmentWithoutGitRepository(),
 	});
 	return changed.trim() !== "";
 }
@@ -214,7 +204,9 @@ if (import.meta.main) {
 		// The version at the commit CI/CD built, not main's tip, which may carry a newer one.
 		const manifest = asRecord(
 			parseJson(
-				await output("git", ["show", `${sha}:package.json`], { env: withoutGitEnvironment() }),
+				await output("git", ["show", `${sha}:package.json`], {
+					env: environmentWithoutGitRepository(),
+				}),
 			),
 			`${sha}:package.json`,
 		);
