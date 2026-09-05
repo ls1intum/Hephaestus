@@ -1,9 +1,8 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 
-import { getConsentStatusOptions } from "@/api/@tanstack/react-query.gen";
 import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/integrations/auth/AuthContext";
-import { resolveCurrentUser } from "@/integrations/auth/guard";
+import { consentIsPending, resolveCurrentUser } from "@/integrations/auth/guard";
 
 // This route will be a parent for all routes that require authentication
 export const Route = createFileRoute("/_authenticated")({
@@ -19,9 +18,14 @@ export const Route = createFileRoute("/_authenticated")({
 				search: { returnTo: location.href },
 			});
 		}
-		const consent = await context.queryClient.query(getConsentStatusOptions({}));
-		if (!consent.completed) {
-			throw redirect({ to: "/consent", search: { returnTo: location.href } });
+		// The mask keeps the address bar on the page the reader asked for, so the notice reads as an
+		// interruption of that page rather than a trip to somewhere else.
+		if (await consentIsPending(context.queryClient)) {
+			throw redirect({
+				to: "/consent",
+				search: { returnTo: location.href },
+				mask: { to: location.pathname, search: location.search },
+			});
 		}
 	},
 	pendingComponent: () => (
