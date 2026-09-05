@@ -322,6 +322,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
             assertThat(body)
                     .contains("--allow-fs-read=/workspace")
                     .contains("--allow-fs-read=/home/agent")
+                    .contains("--allow-fs-write=/workspace/.pi")
                     .contains("--allow-fs-write=/workspace/out");
         }
 

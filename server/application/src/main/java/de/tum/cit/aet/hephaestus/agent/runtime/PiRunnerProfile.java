@@ -18,6 +18,9 @@ public interface PiRunnerProfile {
             // session; that directory holds nothing, and a read the permission model denies is a
             // thrown error, not an absence, so it must be readable.
             "--allow-fs-read=/home/agent",
+            // The SDK takes a lock directory beside settings.json and auth.json and keeps a models store
+            // in the agent dir; without this every session dies at its first model turn.
+            "--allow-fs-write=/workspace/.pi",
             "--allow-fs-write=/workspace/.sessions",
             "--allow-fs-write=/workspace/out");
     /** Runner script filename under {@code resources/agent/}. */
