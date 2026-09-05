@@ -280,14 +280,16 @@ public class ConnectionService {
      * changed mode.
      */
     @Transactional
-    public Optional<Connection> rotateBearerToken(long workspaceId, IntegrationKind kind, BearerToken bundle) {
+    public Optional<BearerTokenReplacement> rotateBearerToken(
+            long workspaceId, IntegrationKind kind, BearerToken bundle) {
         return connectionRepository.findActive(workspaceId, kind).map(c -> {
             if (c.getConfig() instanceof ConnectionConfig.GitHubAppConfig) {
-                throw new IllegalArgumentException("The GitHub connection of workspace " + workspaceId
+                throw new ConnectionModeConflictException("The GitHub connection of workspace " + workspaceId
                         + " is an App installation, which runs on no stored token; there is nothing to replace.");
             }
+            boolean replacedExisting = c.hasCredentials();
             c.setCredentials(bundle, credentialConverter);
-            return connectionRepository.save(c);
+            return new BearerTokenReplacement(connectionRepository.save(c), replacedExisting);
         });
     }
 

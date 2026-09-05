@@ -650,7 +650,7 @@ class ConnectionServiceTest extends BaseUnitTest {
 
         assertThatThrownBy(
                         () -> service.rotateBearerToken(7L, IntegrationKind.GITHUB, new BearerToken("ghp-new", null)))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(ConnectionModeConflictException.class)
                 .hasMessageContaining("App installation");
         verify(connectionRepository, never()).save(any());
     }
