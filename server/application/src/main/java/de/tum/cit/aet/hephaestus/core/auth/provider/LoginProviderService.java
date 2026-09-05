@@ -357,7 +357,11 @@ public class LoginProviderService {
     }
 
     private LoginProvider persist(LoginProvider provider) {
-        LoginProvider saved = repository.save(provider);
+        // Flush here rather than at commit: an update mutates a managed entity, so a UNIQUE(type,
+        // base_url) violation would otherwise surface after the caller has already recorded a SUCCESS.
+        // That row is written in its own REQUIRES_NEW transaction, so it outlives the rollback and the
+        // trail keeps a change that never happened.
+        LoginProvider saved = repository.saveAndFlush(provider);
         registrationCache.evict(saved.getRegistrationId());
         return saved;
     }

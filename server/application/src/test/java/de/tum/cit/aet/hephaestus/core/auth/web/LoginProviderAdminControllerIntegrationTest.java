@@ -2,6 +2,8 @@ package de.tum.cit.aet.hephaestus.core.auth.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent;
+import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventRepository;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithUser;
@@ -10,6 +12,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 /**
@@ -17,10 +20,14 @@ import org.springframework.test.web.reactive.server.WebTestClient;
  * ({@code app_admin}) may manage login providers, the create response carries the upstream redirect
  * URI, and the sealed client secret is never returned.
  */
+@Sql(scripts = "/db/auth-event-sequence.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 class LoginProviderAdminControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired
     private WebTestClient webTestClient;
+
+    @Autowired
+    private AuthEventRepository authEventRepository;
 
     @Test
     @WithUser
@@ -108,5 +115,71 @@ class LoginProviderAdminControllerIntegrationTest extends AbstractWorkspaceInteg
                 .expectBody()
                 .jsonPath("$[?(@.registrationId == 'gitlab-actest')]")
                 .exists();
+    }
+
+    /**
+     * Moving a provider onto another's base URL violates {@code uq_login_provider_type_base_url}. The
+     * change is flushed at commit, long after the handler has recorded a SUCCESS in its own
+     * {@code REQUIRES_NEW} transaction — so without an explicit flush the trail keeps a row describing
+     * a change that never happened.
+     */
+    @Test
+    @WithAdminUser
+    void aRefusedUpdateLeavesNoSuccessOnTheTrail() {
+        createGitLabProvider("gitlab-taken", "https://gitlab.taken.test")
+                .expectStatus()
+                .isCreated();
+        createGitLabProvider("gitlab-mover", "https://gitlab.mover.test")
+                .expectStatus()
+                .isCreated();
+
+        webTestClient
+                .patch()
+                .uri("/admin/login-providers/gitlab-mover")
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of("baseUrl", "https://gitlab.taken.test"))
+                .exchange()
+                .expectStatus()
+                .is4xxClientError();
+
+        webTestClient
+                .get()
+                .uri("/admin/login-providers")
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$[?(@.registrationId == 'gitlab-mover')].baseUrl")
+                .isEqualTo("https://gitlab.mover.test");
+
+        assertThat(authEventRepository.findAll())
+                .filteredOn(e -> e.getEventType() == AuthEvent.EventType.LOGIN_PROVIDER_UPDATED)
+                .isEmpty();
+    }
+
+    private WebTestClient.ResponseSpec createGitLabProvider(String registrationId, String baseUrl) {
+        return webTestClient
+                .post()
+                .uri("/admin/login-providers")
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of(
+                        "registrationId",
+                        registrationId,
+                        "type",
+                        "GITLAB",
+                        "displayName",
+                        "Duplicate GitLab",
+                        "baseUrl",
+                        baseUrl,
+                        "clientId",
+                        "acme-client-id",
+                        "clientSecret",
+                        "super-secret-value",
+                        "scopes",
+                        "read_user"))
+                .exchange();
     }
 }
