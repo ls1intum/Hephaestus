@@ -97,15 +97,19 @@ public interface UserRepository extends JpaRepository<User, Long> {
         """)
     List<User> findAllByName(@Param("name") String name);
 
+    /**
+     * By id, never by login: a login is not unique across providers, and the caller has already
+     * chosen the member through the workspace.
+     */
     @WorkspaceAgnostic("Pull requests are scoped through repository_id -> repository.workspace_id, and a"
             + " developer's league placement reads their merged pull requests as one history")
     @Query("""
             SELECT DISTINCT u
             FROM User u
             LEFT JOIN FETCH u.mergedPullRequests mpr
-            WHERE LOWER(u.login) = LOWER(:login)
+            WHERE u.id = :id
         """)
-    Optional<User> findByLoginWithEagerMergedPullRequests(@Param("login") String login);
+    Optional<User> findByIdWithEagerMergedPullRequests(@Param("id") Long id);
 
     @Query("""
             SELECT u
