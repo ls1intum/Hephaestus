@@ -12,10 +12,18 @@ public enum SignalState {
     /** Observed. No decision has been taken — either none was due, or one is still owed. */
     RECORDED,
 
+    /** Queued for a coalescing sweep; not yet decided. */
+    DEFERRED,
+
     /** A review job was created for it. */
     TRIGGERED,
 
-    /** We decided not to review, and would decide the same way again. Terminal. */
+    /**
+     * We decided not to review, and would decide the same way again. Terminal — except that a
+     * coalesced ({@link SignalStateReason#COALESCED}) row moves to {@link #DEFERRED}, not back to a
+     * decision, when a later live transition repeats its content: that is a new occurrence arriving,
+     * not this one reopening.
+     */
     SUPPRESSED,
 
     /** We wanted to review and could not yet. The reaper re-offers it until the blocker clears. */

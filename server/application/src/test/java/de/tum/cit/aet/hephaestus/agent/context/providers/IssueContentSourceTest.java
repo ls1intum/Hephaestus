@@ -16,6 +16,7 @@ import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
 import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
 import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueComment;
@@ -24,6 +25,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.issuetype.IssueType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.Milestone;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.nio.charset.StandardCharsets;
@@ -54,6 +56,7 @@ class IssueContentSourceTest extends BaseUnitTest {
     private static final String METADATA_KEY = "inputs/context/metadata.json";
     private static final String COMMENTS_KEY = "inputs/context/comments.json";
     private static final String SUMMARY_KEY = "inputs/context/issue_summary.md";
+    private static final SourceKind CORE = new SourceKind("scm.issue.core");
     private static final SourceKind COMMENTS = new SourceKind("scm.issue.comments");
 
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -72,6 +75,50 @@ class IssueContentSourceTest extends BaseUnitTest {
         lenient()
                 .when(issueCommentRepository.findRecentByIssueIdWithAuthor(eq(ISSUE_ID), any()))
                 .thenReturn(List.of());
+    }
+
+    @Test
+    void shouldReportUnavailableRatherThanCaptureChangedMetadataUnderTheAdmittedRevision() {
+        Issue issue = richIssue();
+        when(issueRepository.findByIdWithRepository(ISSUE_ID)).thenReturn(Optional.of(issue));
+        ObjectNode metadata = sampleMetadata();
+        metadata.put("signal", "scm.issue.updated");
+        metadata.put(AgentJob.SIGNAL_REVISION_METADATA_KEY, "digest~old");
+
+        var captured = provider.capture(request(metadata), Set.of(CORE, COMMENTS));
+
+        assertThat(captured.files()).isEmpty();
+        assertThat(captured.stateOverrides())
+                .containsEntry(CORE, new SourceCaptureState.Unavailable(SourceAbsenceReason.NOT_FOUND))
+                .containsEntry(COMMENTS, new SourceCaptureState.Unavailable(SourceAbsenceReason.NOT_FOUND));
+    }
+
+    @Test
+    void shouldReportUnavailableForAnUpdateWithoutAdmissionIdentityWithoutClaimingTheIssueChanged() {
+        when(issueRepository.findByIdWithRepository(ISSUE_ID)).thenReturn(Optional.of(richIssue()));
+        ObjectNode metadata = sampleMetadata();
+        metadata.put("signal", "scm.issue.updated");
+
+        var captured = provider.capture(request(metadata), Set.of(CORE));
+
+        assertThat(captured.files()).isEmpty();
+        assertThat(captured.stateOverrides())
+                .containsEntry(CORE, new SourceCaptureState.Unavailable(SourceAbsenceReason.NOT_FOUND));
+    }
+
+    @Test
+    void shouldCaptureMetadataWhenItStillMatchesTheAdmittedRevision() {
+        Issue issue = richIssue();
+        when(issueRepository.findByIdWithRepository(ISSUE_ID)).thenReturn(Optional.of(issue));
+        ObjectNode metadata = sampleMetadata();
+        metadata.put("signal", "scm.issue.updated");
+        metadata.put(
+                AgentJob.SIGNAL_REVISION_METADATA_KEY,
+                ScmSignals.issueUpdatedRevision(ScmEventPayload.IssueData.from(issue))
+                        .value());
+        Map<String, byte[]> files = new java.util.HashMap<>();
+        provider.contribute(request(metadata), files);
+        assertThat(files).containsKey(METADATA_KEY);
     }
 
     private ObjectNode sampleMetadata() {
@@ -141,6 +188,7 @@ class IssueContentSourceTest extends BaseUnitTest {
         issue.setIssueType(issueType);
 
         Repository repo = new Repository();
+        repo.setId(1L);
         repo.setNameWithOwner("owner/repo");
         issue.setRepository(repo);
 

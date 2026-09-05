@@ -136,6 +136,16 @@ class ScmSignalResubmitterTest extends BaseUnitTest {
         verify(signalRecorder, never()).markRefused(any(), any());
     }
 
+    @Test
+    void shouldNotRetryAnUpdateAgainstADifferentIssueSnapshot() {
+        ArtifactSignal signal = signal(ScmSignals.ISSUE_UPDATED.value());
+        when(issueRepository.findByIdWithRepositoryAndAssignees(ARTIFACT_ID)).thenReturn(Optional.of(issue()));
+        new IssueSignalResubmitter(agentJobService, issueRepository, gate, signalRecorder).resubmit(signal);
+        verify(signalRecorder).markRefused(signal.key(), SignalStateReason.COALESCED);
+        verify(gate, never()).evaluateIssue(any(), any(), any());
+        verify(agentJobService, never()).submit(any(), any(), any(), any(), any());
+    }
+
     private GateDecision.Detect detection() {
         return new GateDecision.Detect(workspace, List.of(), 1, TriggerMode.AUTO);
     }

@@ -71,6 +71,7 @@ class GitRepositoryManagerTest extends BaseUnitTest {
 
     private String commit(Git git, String message) throws GitAPIException {
         return git.commit()
+                .setSign(false)
                 .setMessage(message)
                 .setAuthor(new PersonIdent("Test Author", "author@test.com"))
                 .setCommitter(new PersonIdent("Test Committer", "committer@test.com"))
@@ -85,6 +86,7 @@ class GitRepositoryManagerTest extends BaseUnitTest {
         Files.writeString(file, "# Test Repository\n");
         git.add().addFilepattern("README.md").call();
         git.commit()
+                .setSign(false)
                 .setMessage("Initial commit")
                 .setAuthor(new PersonIdent("Test Author", "author@test.com"))
                 .setCommitter(new PersonIdent("Test Committer", "committer@test.com"))
@@ -176,6 +178,7 @@ class GitRepositoryManagerTest extends BaseUnitTest {
                 sourceGit.add().addFilepattern("file2.txt").call();
                 String newSha = sourceGit
                         .commit()
+                        .setSign(false)
                         .setMessage("Second commit")
                         .setAuthor(new PersonIdent("Test Author", "author@test.com"))
                         .setCommitter(new PersonIdent("Test Committer", "committer@test.com"))
@@ -209,6 +212,7 @@ class GitRepositoryManagerTest extends BaseUnitTest {
                     replacement.add().addFilepattern("replacement.txt").call();
                     replacementHead = replacement
                             .commit()
+                            .setSign(false)
                             .setMessage("Replacement repository")
                             .setAuthor(new PersonIdent("Test Author", "author@test.com"))
                             .setCommitter(new PersonIdent("Test Committer", "committer@test.com"))
@@ -256,6 +260,7 @@ class GitRepositoryManagerTest extends BaseUnitTest {
                 Files.writeString(sourceRepoPath.resolve("review.txt"), "review\n");
                 source.add().addFilepattern("review.txt").call();
                 String reviewHead = source.commit()
+                        .setSign(false)
                         .setMessage("Review head")
                         .setAuthor(new PersonIdent("Test Author", "author@test.com"))
                         .setCommitter(new PersonIdent("Test Committer", "committer@test.com"))
@@ -311,6 +316,7 @@ class GitRepositoryManagerTest extends BaseUnitTest {
                 sourceGit.add().addFilepattern("file2.txt").call();
                 sourceGit
                         .commit()
+                        .setSign(false)
                         .setMessage("Second commit")
                         .setAuthor(new PersonIdent("Test Author", "author@test.com"))
                         .setCommitter(new PersonIdent("Test Committer", "committer@test.com"))
@@ -321,6 +327,7 @@ class GitRepositoryManagerTest extends BaseUnitTest {
                 sourceGit.add().addFilepattern("file3.txt").call();
                 String thirdSha = sourceGit
                         .commit()
+                        .setSign(false)
                         .setMessage("Third commit")
                         .setAuthor(new PersonIdent("Test Author", "author@test.com"))
                         .setCommitter(new PersonIdent("Test Committer", "committer@test.com"))
@@ -400,6 +407,7 @@ class GitRepositoryManagerTest extends BaseUnitTest {
                 sourceGit.add().addFilepattern("README.md").call();
                 String secondSha = sourceGit
                         .commit()
+                        .setSign(false)
                         .setMessage("Update README")
                         .setAuthor(new PersonIdent("Test Author", "author@test.com"))
                         .setCommitter(new PersonIdent("Test Committer", "committer@test.com"))
@@ -427,6 +435,7 @@ class GitRepositoryManagerTest extends BaseUnitTest {
                 sourceGit.rm().addFilepattern("README.md").call();
                 String secondSha = sourceGit
                         .commit()
+                        .setSign(false)
                         .setMessage("Remove README")
                         .setAuthor(new PersonIdent("Test Author", "author@test.com"))
                         .setCommitter(new PersonIdent("Test Committer", "committer@test.com"))
@@ -497,6 +506,7 @@ class GitRepositoryManagerTest extends BaseUnitTest {
                 sourceGit.add().addFilepattern("file2.txt").call();
                 String newSha = sourceGit
                         .commit()
+                        .setSign(false)
                         .setMessage("Second commit")
                         .setAuthor(new PersonIdent("Test Author", "author@test.com"))
                         .setCommitter(new PersonIdent("Test Committer", "committer@test.com"))
@@ -585,6 +595,7 @@ class GitRepositoryManagerTest extends BaseUnitTest {
                 sourceGit.add().addFilepattern("file2.txt").call();
                 sourceGit
                         .commit()
+                        .setSign(false)
                         .setMessage("Add file2")
                         .setAuthor(new PersonIdent("Test Author", "author@test.com"))
                         .setCommitter(new PersonIdent("Test Committer", "committer@test.com"))
@@ -608,6 +619,7 @@ class GitRepositoryManagerTest extends BaseUnitTest {
                 sourceGit.add().addFilepattern("escape.txt").call();
                 String sha = sourceGit
                         .commit()
+                        .setSign(false)
                         .setMessage("Add a symlink pointing out of the repository")
                         .setAuthor(new PersonIdent("Test Author", "author@test.com"))
                         .setCommitter(new PersonIdent("Test Committer", "committer@test.com"))
@@ -765,6 +777,7 @@ class GitRepositoryManagerTest extends BaseUnitTest {
                 sourceGit.add().addFilepattern("new-file.java").call();
                 sourceGit
                         .commit()
+                        .setSign(false)
                         .setMessage("Add new file on feature branch")
                         .setAuthor(new PersonIdent("Test Author", "author@test.com"))
                         .setCommitter(new PersonIdent("Test Committer", "committer@test.com"))

@@ -70,11 +70,14 @@ answer is "two of them", the reason is really two reasons.
 An occasion is one named signal on one revision of one artifact. It is recorded in
 `artifact_signal` before admission, so a review that does not start still has an auditable outcome.
 
-`SignalState` has five values: `RECORDED` for an occurrence nobody has decided on yet, `TRIGGERED` for one
-that started a review, terminal `SUPPRESSED`, retryable `PENDING`, and retired `LAPSED`. Terminal rows
-never reopen; pending rows are re-offered until their reason clears or their deadline passes. Retryability
-belongs to the reason, not to the caller: each `SignalStateReason` declares the state it resolves to. Which
-reason to reach for, and the two that are easy to confuse, are in
+`SignalState` has six values: `RECORDED` for an occurrence nobody has decided on yet, `DEFERRED` for one
+queued in the [update coalescer](#durable-update-coalescing), `TRIGGERED` for one that started a review,
+terminal `SUPPRESSED`, retryable `PENDING`, and retired `LAPSED`. Terminal rows never reopen — a coalesced
+`SUPPRESSED` row is the one exception, moving to `DEFERRED` rather than reopening when a later live
+transition repeats its content, because that content has never itself been decided on. Pending rows are
+re-offered until their reason clears or their deadline passes. Retryability belongs to the reason, not to
+the caller: each `SignalStateReason` declares the state it resolves to. Which reason to reach for, and the
+two that are easy to confuse, are in
 [Signal state reasons](./practice-review-glossary.mdx#signal-state-reasons); provenance mapping and UI
 labels are in [How a review was occasioned](./practice-review-glossary.mdx#how-a-review-was-occasioned).
 Operator remediation is in [When a workspace goes quiet](/admin/practice-review#when-a-workspace-goes-quiet).
@@ -119,9 +122,10 @@ Two consequences are worth stating because neither is obvious:
   Reverse states are symmetric in what they raise, not in what they spend. A reopen is the exception: it
   moves the state field, so it occasions an update review, and the close after it occasions its own close
   review because that close is a different moment.
-- **Each distinct intermediate snapshot in a burst spends a review.** Deduplication is by content, not by
-  time: five triage actions on one issue arrive as five deliveries carrying five different snapshots, and
-  are five occasions. There is no temporal debounce, so do not read this section as a coalescing guarantee.
+- **A burst of distinct intermediate snapshots is coalesced, not deduplicated by content alone.** Five
+  triage actions on one issue arrive as five deliveries carrying five different snapshots; only the
+  snapshot still current when the burst settles is submitted — see
+  [Durable update coalescing](#durable-update-coalescing).
 
 | Transition | GitHub webhook action | GitLab webhook action | Review decision |
 | --- | --- | --- | --- |
@@ -147,6 +151,33 @@ snapshot through the mirror, so it lands in the digest of whichever later `updat
 Every practice bound to `scm.issue.updated` is reevaluated. Practice bindings declare occasions and evidence
 sources, not dependencies on individual issue fields. Reevaluating the bounded issue evidence avoids
 retaining observations whose inputs changed without introducing a second dependency model.
+
+#### Durable update coalescing
+
+`IssueAgentJobEventListener` records live updates in the mirror transaction. `IssueUpdateCoalescer` consumes
+those `DEFERRED` rows on a locked, single-replica sweep in the server role. Sync-only rows are ineligible
+until a live delivery promotes them. [Queue timing](/admin/practice-review-operations#issue-update-queue) is
+based on newly queued snapshots, not every transition or provider timestamps.
+
+Each artifact's queued rows are locked and eligibility is rechecked in the settlement transaction, which
+also re-resolves the issue's workspace: a repository re-keyed to a different workspace inside the queue's
+window (§ re-keying,
+[ADR 0024](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0024-integration-sync-lifecycle-and-two-deletion-semantics.md))
+settles as `SUPPRESSED / OUT_OF_REVIEW_SCOPE` rather than under the workspace that recorded it. Submission
+and settlement commit together; a rollback leaves the occasions available. Locks cover the whole group
+because [skipping individual locked rows](https://www.postgresql.org/docs/current/sql-select.html#SQL-FOR-UPDATE-SHARE)
+could split a burst between consumers. Attempt timestamps order retries independently of eligibility,
+so a repeatedly failing artifact does not monopolize a batch.
+
+Only a revision matching the current mirror reaches admission. Displaced revisions become
+`SUPPRESSED / COALESCED`, including updates overtaken by a close. Missing work lapses; tombstoned work
+is held as `PENDING / ARTIFACT_NOT_VISIBLE`. Pending retries also compare revisions before admission.
+See [Signal state reasons](./practice-review-glossary.mdx#signal-state-reasons) for retry semantics.
+
+Issue-update jobs retain the admitted revision. Capture compares it against the issue's canonical digest and
+reports the source unavailable (`SourceAbsenceReason.NOT_FOUND`) on a missing or mismatched revision, rather
+than making an observation about the developer. This check does not fence edits after capture or invalidate
+earlier observations and feedback.
 
 ## Capture
 

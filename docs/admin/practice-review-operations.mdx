@@ -65,8 +65,12 @@ The job queue exposes its own signals — alert off these rather than reading ap
 - **`agent.job.retention.stripped`** / **`agent.job.retention.deleted`** — rows pruned by the retention
   sweep.
 - **`llm.budget.exhausted`** / **`llm.budget.blocked`** — a cap crossed, and work refused at a cap.
+- **`practice.review.occasions`** — live issue-update recording attempts, tagged by `signal` and
+  `outcome` (`deferred` or `duplicate`). Opening and closing are not included.
 - **`practice.review.refused`** — refused reviews, tagged by `phase` (`submission` or `execution`) and
-  `reason`.
+  `reason`. Submission reason `coalesced` counts displaced issue-update snapshots, not review failures.
+  These counters measure attempts, including rolled-back transactions; inspect the occasion trace for
+  committed outcomes.
 - **`practice.feedback.dispatch`** — durable-dispatch outcomes, tagged by bounded `destination` and
   `state`. Alert on sustained `UNCERTAIN` or `FAILED` outcomes. `UNCERTAIN` means delivery is not yet
   confirmed; `FAILED` is terminal after the retry limit or an unrecoverable dispatch record.
@@ -79,6 +83,15 @@ visible in **Review activity** and the refusal counter; they do not remove the w
 
 Gauges are sampled periodically; timers and counters are recorded when the corresponding event occurs.
 Metric names in the instrumented code are the source of truth for dashboards and alerts.
+
+### Issue-update queue
+
+Live issue updates become eligible 30 seconds after the last newly queued snapshot, or when the oldest
+reaches five minutes. The server checks every five seconds, handling at most 100 issues per sweep.
+Opening and closing are separate occasions and do not wait in this queue.
+
+Returning to an already-pending snapshot does not reset eligibility. Queue load, contention and failures
+can delay submission beyond eligibility. Job-queue gauges exclude these pre-submission occasions.
 
 ### Log correlation
 

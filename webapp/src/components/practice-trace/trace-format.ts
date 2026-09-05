@@ -17,6 +17,7 @@ export const OUTCOMES = statusValues(TRACE_OUTCOME_DEFS);
 
 export const SIGNAL_STATE_LABELS: Record<SignalState, string> = {
 	RECORDED: "Recorded",
+	DEFERRED: "Waiting to see if this keeps changing",
 	TRIGGERED: "Started a review",
 	SUPPRESSED: "No review started",
 	PENDING: "Queued for review",
@@ -33,6 +34,7 @@ export const SIGNAL_STATE_REASON_LABELS: Record<SignalStateReason, string> = {
 	REQUEST_COOLDOWN_ACTIVE: "A review of this was already asked for a moment ago",
 	REQUESTER_QUOTA_EXHAUSTED: "Whoever asked had used up their hour's allowance, which refills",
 	CONCURRENT_DUPLICATE: "The same review was already running",
+	COALESCED: "Later issue changes replaced this update before a review started",
 	OUT_OF_REVIEW_SCOPE:
 		"The author, repository, or base branch is outside the workspace's review coverage",
 	WORKSPACE_INACTIVE: "The workspace was not active",

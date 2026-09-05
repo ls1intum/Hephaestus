@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.job;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.handler.IssueReviewSubmissionRequest;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactSignal;
 import de.tum.cit.aet.hephaestus.integration.core.signal.PendingSignalResubmitter;
@@ -18,7 +19,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /** Issue-side mirror of {@link PullRequestSignalResubmitter}, with the same replay-the-decision rule. */
@@ -49,8 +49,13 @@ public class IssueSignalResubmitter implements PendingSignalResubmitter {
         return ScmSignals.ISSUE;
     }
 
+    /**
+     * Joins the caller's transaction, unlike {@link PullRequestSignalResubmitter#resubmit}: called from
+     * {@link IssueUpdateCoalescer#drain}, this settlement must commit or roll back with the rest of the
+     * burst it is part of, not on its own.
+     */
     @Override
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional
     public void resubmit(ArtifactSignal signal) {
         SignalKey key = signal.key();
         Issue issue = issueRepository
@@ -64,6 +69,14 @@ public class IssueSignalResubmitter implements PendingSignalResubmitter {
         if (issue == null || issue.getRepository() == null) {
             log.debug("Pending signal has no reviewable issue left: issueId={}", key.artifactId());
             signalRecorder.markRefused(key, SignalStateReason.ARTIFACT_GONE);
+            return;
+        }
+
+        if (key.signalName().equals(ScmSignals.ISSUE_UPDATED)
+                && (issue.getState() == Issue.State.CLOSED
+                        || !key.revision()
+                                .equals(ScmSignals.issueUpdatedRevision(ScmEventPayload.IssueData.from(issue))))) {
+            signalRecorder.markRefused(key, SignalStateReason.COALESCED);
             return;
         }
 

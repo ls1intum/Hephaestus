@@ -4,6 +4,7 @@ import static de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent.T
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.handler.PullRequestReviewSubmissionRequest;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
@@ -45,6 +46,9 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * anywhere. The source governs only whether a review is <em>triggered</em>; both sources reach the ledger.
  */
 @Component
+// Ledger rows this listener writes are only ever drained by the server-role PendingSignalReaper;
+// recording one anywhere else would queue work nothing consumes.
+@ConditionalOnServerRole
 @ConditionalOnProperty(prefix = "hephaestus.agent", name = "enabled", havingValue = "true")
 public class AgentJobEventListener {
 

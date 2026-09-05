@@ -170,7 +170,7 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
     class TombstonedWorkTests {
 
         @ParameterizedTest
-        @ValueSource(strings = {"created", "updated", "closed"})
+        @ValueSource(strings = {"created", "closed"})
         void shouldHoldOccasionBeforeAdmissionWhenIssueIsTombstoned(String event) {
             Issue.State state = event.equals("closed") ? Issue.State.CLOSED : Issue.State.OPEN;
             Issue issue = createIssue(state);
@@ -180,8 +180,6 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
             var context = webhookContext(WORKSPACE_ID);
             switch (event) {
                 case "created" -> listener.onIssueCreated(new ScmDomainEvent.IssueCreated(data, context));
-                case "updated" ->
-                    listener.onIssueUpdated(new ScmDomainEvent.IssueUpdated(data, Set.of("body"), context));
                 case "closed" -> listener.onIssueClosed(new ScmDomainEvent.IssueClosed(data, null, context));
                 default -> throw new AssertionError(event);
             }
@@ -383,17 +381,6 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldPassIssueUpdatedTriggerEventName() {
-            Issue issue = setupHappyPath();
-            var issueData = createIssueData(Issue.State.OPEN);
-
-            listener.onIssueUpdated(
-                    new ScmDomainEvent.IssueUpdated(issueData, Set.of("relationships"), webhookContext(1L)));
-
-            verify(practiceReviewDetectionGate).evaluateIssue(issue, ScmSignals.ISSUE_UPDATED, TriggerMode.AUTO);
-        }
-
-        @Test
         void shouldNotPropagateExceptionsFromGate() {
             var issueData = createIssueData(Issue.State.OPEN);
             var event = new ScmDomainEvent.IssueCreated(issueData, webhookContext(1L));
@@ -469,38 +456,41 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
     class IssueUpdatedTests {
 
         @Test
-        void shouldSubmitWhenGatePasses() {
-            var issueData = createIssueData(Issue.State.OPEN);
-            var event = new ScmDomainEvent.IssueUpdated(issueData, Set.of("relationships"), webhookContext(1L));
-
-            setupHappyPath();
-
-            listener.onIssueUpdated(event);
-
-            var request = captureSubmission(WORKSPACE_ID);
-            assertThat(request.triggerSignal()).isEqualTo(ScmSignals.ISSUE_UPDATED);
-            assertThat(request.issueId()).isEqualTo(ISSUE_ID);
-        }
-
-        /**
-         * The ledger, not the listener, is what stops a redelivery: the second call reaches the recorder
-         * with the identical key, the unique constraint refuses it, and nothing downstream runs. Reviews
-         * are the expensive half, so the assertion that matters is that the gate is never asked twice.
-         */
-        @Test
-        void shouldNotReachTheGateForAnUpdateTheLedgerHasAlreadySettled() {
-            setupHappyPath();
+        void shouldDeferUpdatesWithoutReadingTheMirrorOrSubmitting() {
             var issueData = createIssueData(Issue.State.OPEN);
             var context = webhookContext(1L);
-            when(signalRecorder.record(any(), any(), any())).thenReturn(true).thenReturn(false);
+            listener.onIssueUpdated(new ScmDomainEvent.IssueUpdated(issueData, Set.of("relationships"), context));
 
+            verify(signalRecorder)
+                    .defer(
+                            ScmSignals.issueKey(WORKSPACE_ID, ScmSignals.ISSUE_UPDATED, issueData)
+                                    .orElseThrow(),
+                            context.occurredAt());
+            verify(issueRepository, never()).findByIdWithRepositoryAndAssignees(anyLong());
+            verify(practiceReviewDetectionGate, never()).evaluateIssue(any(), any(), any());
+            verify(agentJobService, never()).submit(any(), any(), any(), any(), any());
+        }
+
+        @Test
+        void shouldUseTheSameDurableIdentityForReplayedUpdates() {
+            var issueData = createIssueData(Issue.State.OPEN);
+            var context = webhookContext(1L);
             listener.onIssueUpdated(new ScmDomainEvent.IssueUpdated(issueData, Set.of("title"), context));
             listener.onIssueUpdated(new ScmDomainEvent.IssueUpdated(issueData, Set.of("title"), context));
 
             ArgumentCaptor<SignalKey> keys = ArgumentCaptor.forClass(SignalKey.class);
-            verify(signalRecorder, times(2)).record(keys.capture(), any(), any());
+            verify(signalRecorder, times(2)).defer(keys.capture(), any());
             assertThat(keys.getAllValues().get(1)).isEqualTo(keys.getAllValues().getFirst());
-            verify(practiceReviewDetectionGate, times(1)).evaluateIssue(any(), any(), any());
+            verify(practiceReviewDetectionGate, never()).evaluateIssue(any(), any(), any());
+        }
+
+        @Test
+        void shouldPropagateRecordingFailureSoTheMirrorTransactionCannotCommit() {
+            var event = new ScmDomainEvent.IssueUpdated(
+                    createIssueData(Issue.State.OPEN), Set.of("title"), webhookContext(1L));
+            when(signalRecorder.defer(any(), any())).thenThrow(new IllegalStateException("database unavailable"));
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> listener.onIssueUpdated(event))
+                    .isInstanceOf(IllegalStateException.class);
         }
 
         /**
@@ -516,19 +506,9 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
                     new ScmDomainEvent.IssueUpdated(issueData, Set.of("locked", "commentsCount"), webhookContext(1L)));
 
             verify(signalRecorder, never()).record(any(), any(), any());
+            verify(signalRecorder, never()).defer(any(), any());
             verify(practiceReviewDetectionGate, never()).evaluateIssue(any(), any(), any());
             verify(agentJobService, never()).submit(any(), any(), any(), any(), any());
-        }
-
-        @Test
-        void shouldOccasionAReviewWhenLabelsOrAssigneesMoved() {
-            Issue issue = setupHappyPath();
-            var issueData = createIssueData(Issue.State.OPEN);
-
-            listener.onIssueUpdated(
-                    new ScmDomainEvent.IssueUpdated(issueData, Set.of("relationships"), webhookContext(1L)));
-
-            verify(practiceReviewDetectionGate).evaluateIssue(issue, ScmSignals.ISSUE_UPDATED, TriggerMode.AUTO);
         }
 
         @Test
@@ -556,22 +536,6 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
             listener.onIssueUpdated(event);
 
             verify(issueRepository, never()).findByIdWithRepositoryAndAssignees(anyLong());
-            verify(practiceReviewDetectionGate, never()).evaluateIssue(any(), any(), any());
-            verify(agentJobService, never()).submit(any(), any(), any(), any(), any());
-        }
-
-        @Test
-        void shouldSkipWhenIssueHasNullRepository() {
-            var issueData = createIssueData(Issue.State.OPEN);
-            var event = new ScmDomainEvent.IssueUpdated(issueData, Set.of("relationships"), webhookContext(1L));
-
-            Issue issue = createIssue(Issue.State.OPEN);
-            org.springframework.test.util.ReflectionTestUtils.setField(issue, "repository", null);
-            when(issueRepository.findByIdWithRepositoryAndAssignees(ISSUE_ID)).thenReturn(Optional.of(issue));
-
-            listener.onIssueUpdated(event);
-
-            verify(signalRecorder).markRefused(any(), eq(SignalStateReason.ARTIFACT_GONE));
             verify(practiceReviewDetectionGate, never()).evaluateIssue(any(), any(), any());
             verify(agentJobService, never()).submit(any(), any(), any(), any(), any());
         }

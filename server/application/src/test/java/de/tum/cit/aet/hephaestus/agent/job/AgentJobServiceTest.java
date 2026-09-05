@@ -24,7 +24,9 @@ import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.core.security.EncryptedStringConverter;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalKey;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalRecorder;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalRevision;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalStateReason;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
@@ -463,6 +465,33 @@ class AgentJobServiceTest extends BaseUnitTest {
 
             assertThat(result).isEmpty();
             verify(agentJobRepository, never()).saveAndFlush(any());
+        }
+
+        @Test
+        void shouldPersistTheAdmittedRevisionWithoutMutatingHandlerMetadata() {
+            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
+            JobTypeHandler handler = mock(JobTypeHandler.class);
+            when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
+            var submission = createSubmission();
+            when(handler.createSubmission(any())).thenReturn(submission);
+            when(agentJobRepository.findRecentJobByKeyPrefix(eq(1L), any(), any()))
+                    .thenReturn(Optional.empty());
+            when(agentJobRepository.saveAndFlush(any())).thenAnswer(inv -> {
+                AgentJob job = inv.getArgument(0);
+                job.prePersist();
+                return job;
+            });
+            var key = new SignalKey(1L, 42L, ScmSignals.PULL_REQUEST_OPENED, SignalRevision.ofHeadCommit("abc123"));
+
+            var job = service.submit(1L, AgentJobType.PULL_REQUEST_REVIEW, mock(JobSubmissionRequest.class), key)
+                    .orElseThrow();
+
+            assertThat(java.util.Objects.requireNonNull(job.getMetadata())
+                            .path(AgentJob.SIGNAL_REVISION_METADATA_KEY)
+                            .asText())
+                    .isEqualTo(key.revision().value());
+            assertThat(submission.metadata().has(AgentJob.SIGNAL_REVISION_METADATA_KEY))
+                    .isFalse();
         }
 
         @Test

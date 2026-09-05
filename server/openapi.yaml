@@ -14492,6 +14492,7 @@ components:
           - REQUEST_COOLDOWN_ACTIVE
           - REQUESTER_QUOTA_EXHAUSTED
           - CONCURRENT_DUPLICATE
+          - COALESCED
           - OUT_OF_REVIEW_SCOPE
           - STALE_ROLLOUT_REVISION
           - WORKSPACE_INACTIVE
@@ -15323,6 +15324,7 @@ components:
           type: string
           enum:
           - RECORDED
+          - DEFERRED
           - TRIGGERED
           - SUPPRESSED
           - PENDING
@@ -15336,6 +15338,7 @@ components:
           - REQUEST_COOLDOWN_ACTIVE
           - REQUESTER_QUOTA_EXHAUSTED
           - CONCURRENT_DUPLICATE
+          - COALESCED
           - OUT_OF_REVIEW_SCOPE
           - STALE_ROLLOUT_REVISION
           - WORKSPACE_INACTIVE

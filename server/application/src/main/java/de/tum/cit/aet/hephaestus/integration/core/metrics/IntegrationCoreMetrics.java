@@ -24,5 +24,7 @@ public final class IntegrationCoreMetrics {
     public static final String WEBHOOK_STREAM_UNACKNOWLEDGED_DELETIONS = "webhook.stream.unacknowledged.deletions";
     public static final String WEBHOOK_STREAM_UNACKNOWLEDGED_GAP = "webhook.stream.unacknowledged.gap";
 
+    public static final String REVIEW_OCCASIONS = "practice.review.occasions";
+
     private IntegrationCoreMetrics() {}
 }

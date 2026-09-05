@@ -40,9 +40,7 @@ public interface ArtifactSignalRepository extends JpaRepository<ArtifactSignal, 
             @Param("now") Instant now);
 
     /**
-     * Takes over a row that was merely observed and never decided on, so a reconciliation pass that ran
-     * just before the provider announced the same transition cannot make the live announcement lose its
-     * insert. The {@code WHERE} clause stops that from also letting a redelivery re-run a decided signal.
+     * Claims a new or undecided occasion; decided rows cannot be reclaimed.
      *
      * @return 1 when this call now owns the signal, 0 when someone already decided it
      */
@@ -69,6 +67,95 @@ public interface ArtifactSignalRepository extends JpaRepository<ArtifactSignal, 
             @Param("discoveredVia") String discoveredVia,
             @Param("now") Instant now,
             @Param("requestedByUserId") @Nullable Long requestedByUserId);
+
+    @Modifying
+    @Query(value = """
+        INSERT INTO artifact_signal (
+            id, workspace_id, artifact_kind, artifact_id, signal_name, revision,
+            occurred_at, discovered_via, state, state_changed_at
+        ) VALUES (
+            :id, :#{#key.workspaceId()}, :#{#key.artifactKind().value()}, :#{#key.artifactId()},
+            :#{#key.signalName().value()}, :#{#key.revision().value()},
+            :occurredAt, 'EVENT', 'DEFERRED', :now
+        ) ON CONFLICT (workspace_id, artifact_kind, artifact_id, signal_name, revision) DO UPDATE
+        SET discovered_via = 'EVENT', occurred_at = EXCLUDED.occurred_at,
+            state = 'DEFERRED', state_reason = NULL, last_attempted_at = NULL,
+            state_changed_at = EXCLUDED.state_changed_at
+        WHERE (artifact_signal.state = 'RECORDED' AND artifact_signal.discovered_via = 'SYNC')
+           OR (artifact_signal.state = 'SUPPRESSED' AND artifact_signal.state_reason = 'COALESCED')
+        """, nativeQuery = true)
+    int insertDeferred(
+            @Param("key") SignalKey key,
+            @Param("id") UUID id,
+            @Param("occurredAt") Instant occurredAt,
+            @Param("now") Instant now);
+
+    /** Candidates only: consumers must lock each group and recheck eligibility. */
+    @WorkspaceAgnostic("Discovers deferred occasions across the instance; settlement is workspace-scoped")
+    @Query(value = """
+        SELECT workspace_id AS "workspaceId", artifact_id AS "artifactId"
+        FROM artifact_signal
+        WHERE state = 'DEFERRED' AND signal_name = :signalName
+        GROUP BY workspace_id, artifact_id
+        HAVING MAX(state_changed_at) <= :quietBefore OR MIN(state_changed_at) <= :deadline
+        ORDER BY MIN(COALESCE(last_attempted_at, state_changed_at)), workspace_id, artifact_id
+        LIMIT :batchSize
+        """, nativeQuery = true)
+    List<DeferredArtifact> findDueDeferred(
+            @Param("signalName") String signalName,
+            @Param("quietBefore") Instant quietBefore,
+            @Param("deadline") Instant deadline,
+            @Param("batchSize") int batchSize);
+
+    /** Commit separately from settlement so a failed artifact does not monopolize the batch. */
+    @Transactional
+    @Modifying
+    @Query(value = """
+        UPDATE artifact_signal SET last_attempted_at = :now
+        WHERE workspace_id = :workspaceId AND artifact_id = :artifactId AND signal_name = :signalName
+          AND state = 'DEFERRED'
+        """, nativeQuery = true)
+    int noteDeferredAttempt(
+            @Param("workspaceId") Long workspaceId,
+            @Param("artifactId") Long artifactId,
+            @Param("signalName") String signalName,
+            @Param("now") Instant now);
+
+    /**
+     * Do not use SKIP LOCKED: consumers must settle whole groups, not competing subsets.
+     *
+     * <p>The second line of defence, not the first: a scheduled sweeper takes a {@code SchedulerLock}
+     * so only one replica ever calls this, but should two callers still race, PostgreSQL re-evaluates
+     * this predicate against each row after the lock is granted (EvalPlanQual) — the loser's rows are
+     * by then no longer {@code DEFERRED} and it locks nothing.
+     */
+    @Query(value = """
+        SELECT * FROM artifact_signal
+        WHERE workspace_id = :workspaceId AND artifact_id = :artifactId AND signal_name = :signalName
+          AND state = 'DEFERRED'
+        ORDER BY revision
+        FOR UPDATE
+        """, nativeQuery = true)
+    List<ArtifactSignal> lockDeferred(
+            @Param("workspaceId") Long workspaceId,
+            @Param("artifactId") Long artifactId,
+            @Param("signalName") String signalName);
+
+    @Query(value = """
+        SELECT EXISTS (
+            SELECT 1 FROM artifact_signal
+            WHERE workspace_id = :#{#key.workspaceId()} AND artifact_kind = :#{#key.artifactKind().value()}
+              AND artifact_id = :#{#key.artifactId()} AND signal_name = :#{#key.signalName().value()}
+              AND revision = :#{#key.revision().value()} AND state = 'DEFERRED'
+        )
+        """, nativeQuery = true)
+    boolean isDeferred(@Param("key") SignalKey key);
+
+    interface DeferredArtifact {
+        Long getWorkspaceId();
+
+        Long getArtifactId();
+    }
 
     /**
      * The artifact half of the limit on hand-requested reviews. The workspace's ordinary cooldown cannot
@@ -113,7 +200,7 @@ public interface ArtifactSignalRepository extends JpaRepository<ArtifactSignal, 
           AND artifact_id = :#{#key.artifactId()}
           AND signal_name = :#{#key.signalName().value()}
           AND revision = :#{#key.revision().value()}
-          AND state IN ('RECORDED', 'PENDING')
+          AND state IN ('RECORDED', 'DEFERRED', 'PENDING')
         """, nativeQuery = true)
     int markTriggered(@Param("key") SignalKey key, @Param("jobId") UUID jobId, @Param("now") Instant now);
 
@@ -138,7 +225,7 @@ public interface ArtifactSignalRepository extends JpaRepository<ArtifactSignal, 
           AND artifact_id = :#{#key.artifactId()}
           AND signal_name = :#{#key.signalName().value()}
           AND revision = :#{#key.revision().value()}
-          AND state IN ('RECORDED', 'PENDING')
+          AND state IN ('RECORDED', 'DEFERRED', 'PENDING')
         """, nativeQuery = true)
     int markRefused(
             @Param("key") SignalKey key,

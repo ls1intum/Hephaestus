@@ -178,10 +178,12 @@ public final class ScmSignals {
         if (!signal.equals(ISSUE_UPDATED)) {
             return issueKey(workspaceId, issue.id(), signal, issue.title(), issue.body());
         }
-        return issueKey(
-                workspaceId,
-                issue.id(),
-                signal,
+        return Optional.of(new SignalKey(workspaceId, issue.id(), signal, issueUpdatedRevision(issue)));
+    }
+
+    /** Canonical issue evidence identity, shared by occasion discovery and the capture fence. */
+    public static SignalRevision issueUpdatedRevision(ScmEventPayload.IssueData issue) {
+        return SignalRevision.ofContentDigest(
                 issue.title(),
                 issue.body(),
                 issue.state().name(),

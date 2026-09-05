@@ -1,7 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect } from "storybook/test";
 
+import { minutesBefore } from "@/components/common/story-clock";
+
 import { tracedSignals } from "./story-mock-data";
+import { SIGNAL_STATE_REASON_LABELS } from "./trace-format";
 import { TraceSignalTimeline } from "./TraceSignalTimeline";
 
 /**
@@ -82,5 +85,48 @@ export const NothingRecorded: Story = {
 	args: { signals: [] },
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText("Nothing was recorded about this work")).toBeVisible();
+	},
+};
+
+/** A live update still inside its quiet period: queued, not yet decided, no reason to explain. */
+export const DeferredIssueUpdate: Story = {
+	args: {
+		signals: [
+			{
+				id: "deferred-issue-update",
+				signal: "scm.issue.updated",
+				displayName: "Issue metadata changed",
+				revision: "digest~latest",
+				occurredAt: minutesBefore(0),
+				discoveredVia: "EVENT",
+				state: "DEFERRED",
+			},
+		],
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("Waiting to see if this keeps changing")).toBeVisible();
+		await expect(canvas.queryByRole("link")).toBeNull();
+	},
+};
+
+export const CoalescedIssueUpdate: Story = {
+	args: {
+		signals: [
+			{
+				id: "coalesced-issue-update",
+				signal: "scm.issue.updated",
+				displayName: "Issue metadata changed",
+				revision: "digest~intermediate",
+				occurredAt: minutesBefore(2),
+				discoveredVia: "EVENT",
+				state: "SUPPRESSED",
+				stateReason: "COALESCED",
+			},
+		],
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText(`${SIGNAL_STATE_REASON_LABELS.COALESCED}.`)).toBeVisible();
+		await expect(canvas.getByText("No review started")).toBeVisible();
+		await expect(canvas.queryByRole("link")).toBeNull();
 	},
 };
