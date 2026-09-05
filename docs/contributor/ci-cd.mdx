@@ -389,6 +389,13 @@ the browser E2E suite and the application-server image download that artifact an
 from the same JAR. The unit, architecture and integration suites are the exception: they produce
 nothing that ships, so they compile from source in `Test` and do not wait for packaging.
 
+An image a pull request did not change is not rebuilt either: `Tag unchanged images` verifies the
+digest an earlier run published and re-tags it to this run's head SHA. It is aliased from the
+nearest commit the default branch contains, found by walking up the chain of bases — a layer of a
+stacked pull request is based on another branch's head, which published nothing — and a run that
+reaches no such commit builds every image itself. `detect-changes` resolves that commit once, with
+`scripts/resolve-alias-base.ts`, and hands it to the image jobs as `alias_base`.
+
 ## Parallelism and concurrency
 
 - `Quality` legs and `Test` suites start from source; `Build` gates start when `App Server: Package`

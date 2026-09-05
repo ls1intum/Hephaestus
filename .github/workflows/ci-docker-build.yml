@@ -44,6 +44,11 @@ on:
         required: false
         type: string
         default: "true"
+      alias_base:
+        description: "The published commit an unchanged image is aliased from; empty when the caller builds every image"
+        required: false
+        type: string
+        default: ""
 
 permissions: {}
 
@@ -131,7 +136,10 @@ jobs:
         org.opencontainers.image.licenses=MIT
         hephaestus.component=postgres
 
-  # Preview stacks resolve every component by PR head SHA; alias verified base digests for unchanged components.
+  # Preview stacks resolve every component by PR head SHA; alias verified digests for the components
+  # this pull request left alone. They are aliased from the published commit `detect-changes`
+  # resolved, which is the pull request's base only when the default branch contains it —
+  # docs/contributor/ci-cd.mdx has the rule.
   tag-unchanged-images:
     name: "Tag unchanged images"
     if: >-
@@ -165,21 +173,26 @@ jobs:
           AGENT_IMAGES_CHANGED: ${{ inputs.agent_images_changed }}
           POSTGRES_IMAGE_CHANGED: ${{ inputs.postgres_image_changed }}
           PR_NUMBER: ${{ github.event.number }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          ALIAS_BASE: ${{ inputs.alias_base }}
           REPOSITORY: ${{ github.repository }}
           REPOSITORY_OWNER: ${{ github.repository_owner }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
 
+          [ -n "$ALIAS_BASE" ] || {
+            echo "::error::No published commit to alias from; the caller must build every image"; exit 1; }
+
           tag_image() {
             local image="ghcr.io/hephaestus-build/$1"
-            local source="$image:$BASE_SHA"
+            local source="$image:$ALIAS_BASE"
             local digest
             digest=$(docker buildx imagetools inspect --format '{{.Manifest.Digest}}' "$source" 2>/dev/null || true)
             if [[ ! "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]; then
+              # The default branch's own push run may not have published yet; the pull request that
+              # merged the commit tagged the same images under its head.
               local merged_head
-              merged_head=$(gh api "repos/$REPOSITORY/commits/$BASE_SHA/pulls" \
+              merged_head=$(gh api "repos/$REPOSITORY/commits/$ALIAS_BASE/pulls" \
                 --jq '[.[] | select(.merged_at != null)][0].head.sha // empty')
               if [ -n "$merged_head" ]; then
                 source="$image:$merged_head"
