@@ -7,6 +7,8 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.agent.conversation.ConversationSourceLiveness;
+import de.tum.cit.aet.hephaestus.agent.documentation.DocumentProjection;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountPreferencesQuery;
 import de.tum.cit.aet.hephaestus.core.settings.spi.SilentModeQuery;
@@ -45,6 +47,9 @@ import de.tum.cit.aet.hephaestus.workspace.settings.ReviewRepositoryMode;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 
@@ -56,6 +61,12 @@ class PracticeFeedbackDeliveryPolicyTest extends BaseUnitTest {
     private static final long AUTHOR_ID = 43L;
     private static final long REVIEWER_ID = 44L;
     private static final long REVIEW_ID = 45L;
+
+    @Mock
+    private ConversationSourceLiveness conversationSourceLiveness;
+
+    @Mock
+    private DocumentProjection documentProjection;
 
     @Mock
     private WorkspaceRepository workspaceRepository;
@@ -202,7 +213,7 @@ class PracticeFeedbackDeliveryPolicyTest extends BaseUnitTest {
         when(practiceRepository.findByWorkspaceIdAndSlugIn(WORKSPACE_ID, java.util.Set.of("review-quality")))
                 .thenReturn(java.util.List.of(practice));
 
-        var decision = policy().evaluateRepositoryless(
+        var decision = policy().evaluateForRecipient(
                         job,
                         DeliveryPolicyStage.EGRESS,
                         feedbackId,
@@ -225,7 +236,7 @@ class PracticeFeedbackDeliveryPolicyTest extends BaseUnitTest {
         when(practiceRepository.findByWorkspaceIdAndSlugIn(WORKSPACE_ID, java.util.Set.of("review-quality")))
                 .thenReturn(java.util.List.of(practice));
 
-        var decision = policy().evaluateRepositoryless(
+        var decision = policy().evaluateForRecipient(
                         job,
                         DeliveryPolicyStage.EGRESS,
                         feedbackId,
@@ -300,6 +311,33 @@ class PracticeFeedbackDeliveryPolicyTest extends BaseUnitTest {
         assertThat(recordedRefusal()).isEqualTo(FeedbackSuppressionReason.RECIPIENT_OPTED_OUT);
         org.mockito.Mockito.verify(coverageService)
                 .assess(any(), eq("owner/repo"), eq("main"), eq(new ReviewSubject(REVIEWER_ID, true)), eq(true));
+
+        when(accountPreferencesQuery.practiceFeedbackDeliveryEnabled(REVIEWER_ID))
+                .thenReturn(true);
+        Practice practice = new Practice();
+        practice.setSlug("review-quality");
+        practice.setAutonomy(PracticeAutonomy.AUTOMATIC);
+        when(practiceRepository.findByWorkspaceIdAndSlugIn(WORKSPACE_ID, java.util.Set.of("review-quality")))
+                .thenReturn(java.util.List.of(practice));
+
+        assertThat(policy().evaluateForRecipient(
+                                job,
+                                DeliveryPolicyStage.EGRESS,
+                                UUID.randomUUID(),
+                                DeliveryPolicySurface.CONVERSATION,
+                                REVIEWER_ID,
+                                java.util.Set.of("review-quality"))
+                        .allowed())
+                .isTrue();
+        assertThat(policy().evaluateForRecipient(
+                                job,
+                                DeliveryPolicyStage.EGRESS,
+                                UUID.randomUUID(),
+                                DeliveryPolicySurface.CONVERSATION,
+                                AUTHOR_ID,
+                                java.util.Set.of("review-quality"))
+                        .refusal())
+                .isEqualTo(FeedbackSuppressionReason.ARTIFACT_GONE);
     }
 
     private FeedbackSuppressionReason recordedRefusal() {
@@ -326,6 +364,12 @@ class PracticeFeedbackDeliveryPolicyTest extends BaseUnitTest {
         job.setPracticeRolloutRevision(workspace.getReviewSettings().getRolloutRevision());
         var metadata = tools.jackson.databind.json.JsonMapper.builder().build().createObjectNode();
         metadata.put("about_user_id", AUTHOR_ID);
+        metadata.put("slack_thread_id", 50L);
+        metadata.put("slack_channel_id", "C123");
+        metadata.put("slack_thread_ts", "123.456");
+        lenient()
+                .when(conversationSourceLiveness.isDeliverableThread(WORKSPACE_ID, 50L, "C123", "123.456", AUTHOR_ID))
+                .thenReturn(true);
         job.setMetadata(metadata);
         lenient().when(coverageService.assessRepositoryless(any(), any())).thenReturn(coverage(true));
         lenient()
@@ -397,6 +441,104 @@ class PracticeFeedbackDeliveryPolicyTest extends BaseUnitTest {
                 coverageService,
                 evaluationRecorder,
                 practiceRepository,
-                approvalRepository);
+                approvalRepository,
+                conversationSourceLiveness,
+                documentProjection);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "scm.pull_request, false, 43, true",
+        "scm.pull_request, true, 43, false",
+        "scm.pull_request, false, 44, false",
+        "scm.issue, false, 43, true",
+        "scm.issue, true, 43, false",
+        "scm.issue, false, 44, false"
+    })
+    void shouldRequireLiveWorkAndItsRecipientForPreparedScmFeedback(
+            String artifactKind, boolean deleted, long recipientId, boolean allowed) {
+        var job = pullRequestJob();
+        job.setArtifactKind(ArtifactKind.of(artifactKind));
+        var artifact = openPullRequest();
+        if (deleted) artifact.setDeletedAt(java.time.Instant.now());
+        if ("scm.issue".equals(artifactKind)) {
+            var metadata =
+                    tools.jackson.databind.json.JsonMapper.builder().build().createObjectNode();
+            metadata.put("issue_id", PULL_REQUEST_ID);
+            metadata.put("issue_number", 17);
+            metadata.put("repository_id", REPOSITORY_ID);
+            metadata.put("repository_full_name", "owner/repo");
+            job.setMetadata(metadata);
+            Issue issue = new Issue();
+            issue.setId(artifact.getId());
+            issue.setNumber(artifact.getNumber());
+            issue.setAuthor(artifact.getAuthor());
+            issue.setRepository(artifact.getRepository());
+            issue.setState(artifact.getState());
+            issue.setDeletedAt(artifact.getDeletedAt());
+            when(issueRepository.findByIdWithAuthorAndRepository(PULL_REQUEST_ID))
+                    .thenReturn(Optional.of(issue));
+            when(coverageService.assess(any(), eq("owner/repo"), eq(null), any(), eq(false)))
+                    .thenReturn(coverage(true));
+        } else {
+            stubPullRequestEvaluation(artifact, coverage(true));
+        }
+        lenient()
+                .when(repositoryToMonitorRepository.existsByWorkspaceIdAndNameWithOwner(WORKSPACE_ID, "owner/repo"))
+                .thenReturn(true);
+        Practice practice = new Practice();
+        practice.setSlug("review-quality");
+        practice.setAutonomy(PracticeAutonomy.AUTOMATIC);
+        when(practiceRepository.findByWorkspaceIdAndSlugIn(WORKSPACE_ID, java.util.Set.of("review-quality")))
+                .thenReturn(java.util.List.of(practice));
+        var decision = policy().evaluateForRecipient(
+                        job,
+                        DeliveryPolicyStage.EGRESS,
+                        UUID.randomUUID(),
+                        DeliveryPolicySurface.CONVERSATION,
+                        recipientId,
+                        java.util.Set.of("review-quality"));
+        assertThat(decision.allowed()).isEqualTo(allowed);
+        if (!allowed) assertThat(decision.refusal()).isEqualTo(FeedbackSuppressionReason.ARTIFACT_GONE);
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = DeliveryPolicySurface.class,
+            names = {"IN_APP", "CONVERSATION"})
+    void shouldRefuseNewConversationFeedbackWhenThreadVanishes(DeliveryPolicySurface surface) {
+        var job = conversationJob();
+        when(conversationSourceLiveness.isDeliverableThread(WORKSPACE_ID, 50L, "C123", "123.456", AUTHOR_ID))
+                .thenReturn(false);
+        var decision = policy().evaluateForRecipient(
+                        job, DeliveryPolicyStage.COMPOSITION, null, surface, AUTHOR_ID, java.util.Set.of());
+        assertThat(decision.allowed()).isFalse();
+        assertThat(decision.refusal()).isEqualTo(FeedbackSuppressionReason.ARTIFACT_GONE);
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = DeliveryPolicySurface.class,
+            names = {"IN_APP", "CONVERSATION"})
+    void shouldRefuseDeletedDocumentAndAllowResurrection(DeliveryPolicySurface surface) {
+        var job = conversationJob();
+        job.setArtifactKind(ArtifactKind.of("docs.document"));
+        var metadata = tools.jackson.databind.json.JsonMapper.builder().build().createObjectNode();
+        metadata.put("about_user_id", AUTHOR_ID);
+        metadata.put("docs_document_id", 51L);
+        job.setMetadata(metadata);
+        when(documentProjection.documentById(WORKSPACE_ID, 51L))
+                .thenReturn(Optional.of(DocumentProjection.ProjectedDocument.withoutAuthors(
+                        "collection", "document", "Title", null, true)));
+        var decision = policy().evaluateForRecipient(
+                        job, DeliveryPolicyStage.COMPOSITION, null, surface, AUTHOR_ID, java.util.Set.of());
+        assertThat(decision.refusal()).isEqualTo(FeedbackSuppressionReason.ARTIFACT_GONE);
+        when(documentProjection.documentById(WORKSPACE_ID, 51L))
+                .thenReturn(Optional.of(DocumentProjection.ProjectedDocument.withoutAuthors(
+                        "collection", "document", "Title", "Body", false)));
+        assertThat(policy().evaluateForRecipient(
+                                job, DeliveryPolicyStage.COMPOSITION, null, surface, AUTHOR_ID, java.util.Set.of())
+                        .allowed())
+                .isTrue();
     }
 }

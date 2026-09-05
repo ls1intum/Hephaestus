@@ -4,14 +4,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.EvidenceCollectionException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
+import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
 import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueComment;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueCommentRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -38,11 +42,17 @@ class GeneralReviewCommentContentSourceTest extends BaseUnitTest {
     @Mock
     private IssueCommentRepository issueCommentRepository;
 
+    @Mock
+    private PullRequestRepository pullRequestRepository;
+
     private GeneralReviewCommentContentSource provider;
 
     @BeforeEach
     void setUp() {
-        provider = new GeneralReviewCommentContentSource(objectMapper, issueCommentRepository);
+        lenient()
+                .when(pullRequestRepository.existsByIdAndDeletedAtIsNull(PR_ID))
+                .thenReturn(true);
+        provider = new GeneralReviewCommentContentSource(objectMapper, issueCommentRepository, pullRequestRepository);
         lenient()
                 .when(issueCommentRepository.findRecentHumanByIssueIdWithAuthor(any(), any(), any()))
                 .thenReturn(List.of());
@@ -85,7 +95,7 @@ class GeneralReviewCommentContentSourceTest extends BaseUnitTest {
         // work rather than the collection — so a missing pull_request_id must throw instead.
         assertThatThrownBy(() -> provider.contribute(request(metadata), new HashMap<>()))
                 .isInstanceOf(EvidenceCollectionException.class)
-                .hasRootCauseMessage("Review-comment collection has no pull_request_id");
+                .hasMessage("Review-comment collection has no pull_request_id");
     }
 
     /**
@@ -281,5 +291,19 @@ class GeneralReviewCommentContentSourceTest extends BaseUnitTest {
     @Test
     void required_isFalse_bestEffort() {
         assertThat(provider.required()).isFalse();
+    }
+
+    @Test
+    void shouldRefuseUnavailableDiscussionAndAllowItWhenTheParentReturns() {
+        when(pullRequestRepository.existsByIdAndDeletedAtIsNull(PR_ID)).thenReturn(false);
+        var captured = provider.capture(request(metadataWithPr()), provider.sourceKinds());
+        assertThat(captured.files()).isEmpty();
+        assertThat(captured.stateOverrides())
+                .containsValue(new SourceCaptureState.Unavailable(SourceAbsenceReason.NOT_FOUND));
+        verifyNoInteractions(issueCommentRepository);
+        when(pullRequestRepository.existsByIdAndDeletedAtIsNull(PR_ID)).thenReturn(true);
+        var restored = provider.capture(request(metadataWithPr()), provider.sourceKinds());
+        assertThat(restored.stateOverrides()).isEmpty();
+        assertThat(restored.files()).isNotEmpty();
     }
 }

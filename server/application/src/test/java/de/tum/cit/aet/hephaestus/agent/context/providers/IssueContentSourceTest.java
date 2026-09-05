@@ -6,11 +6,14 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
+import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
 import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
@@ -38,6 +41,8 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -400,15 +405,6 @@ class IssueContentSourceTest extends BaseUnitTest {
         }
 
         @Test
-        void throwsWhenIssueNotFound() {
-            when(issueRepository.findByIdWithRepository(ISSUE_ID)).thenReturn(Optional.empty());
-
-            assertThatThrownBy(() -> provider.contribute(request(sampleMetadata()), new LinkedHashMap<>()))
-                    .isInstanceOf(JobPreparationException.class)
-                    .hasMessageContaining("Issue not found");
-        }
-
-        @Test
         void rendersEmptyBodyPlaceholderInSummary() {
             Issue issue = richIssue();
             issue.setBody(null);
@@ -422,5 +418,29 @@ class IssueContentSourceTest extends BaseUnitTest {
             // An empty body still produces a valid metadata body field (empty string, not null).
             assertThat(files).containsKey(METADATA_KEY);
         }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void shouldReportUnavailableThenAllowCaptureWhenArtifactReturns(boolean tombstoned) {
+        var artifact = new Issue();
+        artifact.setDeletedAt(Instant.parse("2026-09-05T00:00:00Z"));
+        when(issueRepository.findByIdWithRepository(ISSUE_ID))
+                .thenReturn(tombstoned ? Optional.of(artifact) : Optional.empty());
+        for (var kind : provider.sourceKinds()) {
+            var captured = provider.capture(request(sampleMetadata()), Set.of(kind));
+            assertThat(captured.files()).isEmpty();
+            assertThat(captured.completeness()).isEmpty();
+            assertThat(captured.contentStates()).isEmpty();
+            assertThat(captured.stateOverrides())
+                    .containsExactlyEntriesOf(
+                            Map.of(kind, new SourceCaptureState.Unavailable(SourceAbsenceReason.NOT_FOUND)));
+        }
+        verifyNoInteractions(issueCommentRepository);
+        artifact.setDeletedAt(null);
+        when(issueRepository.findByIdWithRepository(ISSUE_ID)).thenReturn(Optional.of(artifact));
+        var restored = provider.capture(request(sampleMetadata()), Set.of(COMMENTS));
+        assertThat(restored.stateOverrides()).isEmpty();
+        assertThat(restored.files()).isNotEmpty();
     }
 }

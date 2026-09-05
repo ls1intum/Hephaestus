@@ -115,7 +115,7 @@ public class PreparedConversationFeedbackContentSource implements ContentSource 
                         fact.getFeedbackId(), workspaceId, FeedbackSuppressionReason.ARTIFACT_GONE.name());
                 continue;
             }
-            var decision = deliveryPolicy.evaluateRepositoryless(
+            var decision = deliveryPolicy.evaluateForRecipient(
                     job,
                     DeliveryPolicyStage.EGRESS,
                     fact.getFeedbackId(),

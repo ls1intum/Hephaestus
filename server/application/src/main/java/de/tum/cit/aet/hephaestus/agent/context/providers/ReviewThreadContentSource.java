@@ -5,7 +5,8 @@ import de.tum.cit.aet.hephaestus.agent.context.EvidenceCollectionException;
 import de.tum.cit.aet.hephaestus.agent.context.EvidenceContribution;
 import de.tum.cit.aet.hephaestus.agent.context.EvidenceLimits;
 import de.tum.cit.aet.hephaestus.agent.context.EvidenceSource;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
+import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
 import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
@@ -24,7 +25,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.core.annotation.Order;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
-import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
@@ -81,23 +81,16 @@ public class ReviewThreadContentSource implements EvidenceSource {
 
     @Override
     public void contribute(ContextRequest request, Map<String, byte[]> files) {
-        if (!(request instanceof ContextRequest.PracticeReviewRequest pr)) {
-            return;
-        }
+        contributeSelected(request, sourceKinds(), files);
+    }
+
+    @Override
+    public void contributeSelected(ContextRequest request, Set<SourceKind> selectedKinds, Map<String, byte[]> files) {
+        files.putAll(capture(request, selectedKinds).files());
+    }
+
+    private ObjectNode collect(long pullRequestId, PullRequest pullRequest) {
         try {
-            AgentJob job = pr.job();
-            JsonNode m = job.getMetadata();
-            // Missing metadata is a malformed job, not a PR with no review threads — the two must not
-            // collapse into the same "collection found nothing" fact.
-            if (m == null || m.isNull() || m.isMissingNode()) {
-                throw new EvidenceCollectionException("Review-thread collection has no job metadata", null);
-            }
-
-            Long pullRequestId = MetaJson.optLong(m, "pull_request_id");
-            if (pullRequestId == null) {
-                throw new EvidenceCollectionException("Review-thread collection has no pull_request_id", null);
-            }
-
             List<Long> threadIds = new java.util.ArrayList<>(
                     threadRepository.findRecentIdsByPullRequestId(pullRequestId, PageRequest.of(0, MAX_THREADS + 1)));
             boolean threadsTruncated = threadIds.size() > MAX_THREADS;
@@ -114,9 +107,6 @@ public class ReviewThreadContentSource implements EvidenceSource {
             }
             boolean decisionsTruncated = reviews.size() > MAX_DECISIONS;
             if (decisionsTruncated) reviews.remove(reviews.size() - 1);
-
-            PullRequest pullRequest =
-                    pullRequestRepository.findByIdWithAllForGate(pullRequestId).orElse(null);
 
             ObjectNode root = objectMapper.createObjectNode();
 
@@ -156,7 +146,6 @@ public class ReviewThreadContentSource implements EvidenceSource {
 
             root.put("mergeState", mergeState(pullRequest));
 
-            files.put(OUTPUT_PREFIX + FILE_NAME, objectMapper.writeValueAsBytes(root));
             log.info(
                     "ReviewThreads: prId={} threads={} unresolved={} decisions={} mergeState={}",
                     pullRequestId,
@@ -164,6 +153,7 @@ public class ReviewThreadContentSource implements EvidenceSource {
                     unresolved,
                     decisionArray.size(),
                     root.get("mergeState").asString());
+            return root;
         } catch (Exception e) {
             throw new EvidenceCollectionException("Review-thread collection failed", e);
         }
@@ -171,25 +161,34 @@ public class ReviewThreadContentSource implements EvidenceSource {
 
     @Override
     public EvidenceContribution capture(ContextRequest request, Set<SourceKind> selectedKinds) {
-        EvidenceContribution captured = EvidenceSource.super.capture(request, selectedKinds);
-        byte[] reviewState = captured.files().get(OUTPUT_PREFIX + FILE_NAME);
-        if (!selectedKinds.contains(KIND) || reviewState == null) {
-            return captured;
+        if (!selectedKinds.contains(KIND) || !(request instanceof ContextRequest.PracticeReviewRequest review)) {
+            return new EvidenceContribution(Map.of(), Map.of());
         }
-        try {
-            JsonNode root = objectMapper.readTree(reviewState);
-            boolean empty = root.path("threads").isEmpty()
-                    && root.path("reviewDecisions").isEmpty();
-            return new EvidenceContribution(
-                    captured.files(),
-                    captured.completeness(),
-                    captured.immutableIdentities(),
-                    captured.observedAt(),
-                    captured.sourceEffectiveAt(),
-                    Map.of(KIND, empty ? SourceContentState.EMPTY : SourceContentState.NON_EMPTY));
-        } catch (Exception exception) {
-            throw new IllegalStateException("Serialized review threads could not be read", exception);
+        var metadata = review.job().getMetadata();
+        // Missing metadata is a malformed job, not a PR with no review threads — the two must not
+        // collapse into the same "collection found nothing" fact.
+        if (metadata == null || metadata.isNull() || metadata.isMissingNode()) {
+            throw new EvidenceCollectionException("Review-thread collection has no job metadata", null);
         }
+        Long pullRequestId = MetaJson.optLong(metadata, "pull_request_id");
+        if (pullRequestId == null) {
+            throw new EvidenceCollectionException("Review-thread collection has no pull_request_id", null);
+        }
+        var pullRequest = pullRequestRepository.findById(pullRequestId).orElse(null);
+        if (pullRequest == null || pullRequest.getDeletedAt() != null) {
+            return EvidenceContribution.unavailable(selectedKinds, SourceAbsenceReason.NOT_FOUND);
+        }
+        ObjectNode root = collect(pullRequestId, pullRequest);
+        boolean empty =
+                root.path("threads").isEmpty() && root.path("reviewDecisions").isEmpty();
+        boolean truncated = root.path("truncated").asBoolean();
+        return new EvidenceContribution(
+                Map.of(OUTPUT_PREFIX + FILE_NAME, objectMapper.writeValueAsBytes(root)),
+                Map.of(KIND, truncated ? SourceCompleteness.PARTIAL : SourceCompleteness.COMPLETE),
+                Map.of(),
+                Map.of(),
+                Map.of(),
+                Map.of(KIND, empty ? SourceContentState.EMPTY : SourceContentState.NON_EMPTY));
     }
 
     /**
@@ -259,10 +258,7 @@ public class ReviewThreadContentSource implements EvidenceSource {
         return node;
     }
 
-    private static String mergeState(@Nullable PullRequest pullRequest) {
-        if (pullRequest == null) {
-            return "UNKNOWN";
-        }
+    private static String mergeState(PullRequest pullRequest) {
         if (pullRequest.isMerged()) {
             return "MERGED";
         }

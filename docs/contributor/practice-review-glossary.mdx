@@ -262,17 +262,15 @@ two checks read the stage:
   being honoured. There is deliberately no separate `HUMAN_APPROVAL` check — it could only ever report
   `PASSED` or `NOT_APPLICABLE`, and approval authority is exactly what this check already resolves.
 - **At `COMPOSITION` the contributing practices are not yet known**, so `PRACTICE_AUTHORITY` is
-  `NOT_APPLICABLE` on every lane. When the review has no artifact at all — a document or a conversation —
-  coverage, recipient consent and artifact eligibility are `NOT_APPLICABLE` too, because there is no
-  repository, no author and no unsolicited destination to judge. Workspace-enabled and rollout-revision
-  checks still apply. External surfaces also apply Silent Mode and the delivery pause; `IN_APP` does not,
-  because it never leaves Hephaestus.
+  `NOT_APPLICABLE`. A document or conversation still has a review subject: repository-less coverage,
+  recipient consent and target eligibility are checked when that subject is resolved. External surfaces
+  also apply Silent Mode and the delivery pause; `IN_APP` does not, because it never leaves Hephaestus.
 
 The artifact lane is evaluated again at `AUTOMATIC`, at `APPROVED` when a person released it, and at `EGRESS`
-immediately before the provider call — by which point every fact is known. The `IN_APP` and `CONVERSATION`
-surfaces are evaluated exactly once, at `COMPOSITION`; from there each lane's own router applies the
-origin-and-autonomy predicate and its per-lane rules, and those refusals are recorded as routing decisions
-rather than as policy evaluations.
+immediately before the provider call. The `IN_APP` and `CONVERSATION` surfaces are checked at `COMPOSITION`;
+each lane's router also applies its origin-and-autonomy predicate and per-lane rules, recording routing
+refusals separately. Prepared conversation feedback must pass an `EGRESS` policy evaluation before it
+enters mentor context; source visibility and Slack consent gates can exclude it before that evaluation.
 
 Each evaluation appends an immutable `delivery_policy_evaluation` row: the resolver version, the admitted
 and evaluated rollout revisions, the `surface` (`ARTIFACT`, `IN_APP`, `CONVERSATION`), the stage, whether

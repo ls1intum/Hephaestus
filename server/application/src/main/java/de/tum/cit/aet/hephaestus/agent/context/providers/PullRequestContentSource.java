@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.agent.context.EvidenceLimits;
 import de.tum.cit.aet.hephaestus.agent.context.EvidenceSource;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
 import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
 import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
@@ -39,7 +40,6 @@ import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.diff.Edit;
 import org.eclipse.jgit.patch.FormatError;
 import org.eclipse.jgit.patch.Patch;
-import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.annotation.Order;
@@ -128,6 +128,7 @@ public class PullRequestContentSource implements EvidenceSource, ReviewContextBu
         if (!selectedKinds.contains(DIFF)) return;
         JsonNode metadata = practiceReview.job().getMetadata();
         if (metadata == null || metadata.isNull() || metadata.isMissingNode()) return;
+        if (!pullRequestRepository.existsByIdAndDeletedAtIsNull(requireLong(metadata, "pull_request_id"))) return;
         long repositoryId = requireLong(metadata, "repository_id");
         if (!gitRepositoryManager.isEnabled() || !gitRepositoryManager.isRepositoryCloned(repositoryId)) return;
         String headSha = metadata.path("commit_sha").asString(null);
@@ -156,6 +157,12 @@ public class PullRequestContentSource implements EvidenceSource, ReviewContextBu
         }
         long repositoryId = requireLong(metadata, "repository_id");
         long pullRequestId = requireLong(metadata, "pull_request_id");
+        PullRequest pullRequest = pullRequestRepository
+                .findByIdWithAuthorAndRepository(pullRequestId)
+                .orElse(null);
+        if (pullRequest == null || pullRequest.getDeletedAt() != null) {
+            return EvidenceContribution.unavailable(selectedKinds, SourceAbsenceReason.NOT_FOUND);
+        }
         Map<String, byte[]> files = new HashMap<>();
         Map<SourceKind, SourceCompleteness> completeness = new HashMap<>();
         Map<SourceKind, String> identities = new HashMap<>();
@@ -171,11 +178,9 @@ public class PullRequestContentSource implements EvidenceSource, ReviewContextBu
                     headSha != null && !headSha.isBlank() && gitRepositoryManager.commitExists(repositoryId, headSha);
         }
         if (selectedKinds.contains(CORE)) {
-            PullRequest pullRequest =
-                    pullRequestRepository.findByIdWithAllForGate(pullRequestId).orElse(null);
             storeMetadata(files, pullRequest, metadata);
-            completeness.put(CORE, pullRequest == null ? SourceCompleteness.PARTIAL : SourceCompleteness.COMPLETE);
-            if (pullRequest != null && pullRequest.getLastSyncAt() != null) {
+            completeness.put(CORE, SourceCompleteness.COMPLETE);
+            if (pullRequest.getLastSyncAt() != null) {
                 observedAt.put(CORE, pullRequest.getLastSyncAt());
             }
         }
@@ -276,7 +281,7 @@ public class PullRequestContentSource implements EvidenceSource, ReviewContextBu
         return false;
     }
 
-    private void storeMetadata(Map<String, byte[]> files, @Nullable PullRequest pullRequest, JsonNode metadata) {
+    private void storeMetadata(Map<String, byte[]> files, PullRequest pullRequest, JsonNode metadata) {
         ObjectNode pullRequestMetadata = buildPullRequestMetadata(pullRequest, metadata);
         try {
             files.put(
@@ -298,7 +303,7 @@ public class PullRequestContentSource implements EvidenceSource, ReviewContextBu
         }
     }
 
-    private ObjectNode buildPullRequestMetadata(@Nullable PullRequest pullRequest, JsonNode jobMetadata) {
+    private ObjectNode buildPullRequestMetadata(PullRequest pullRequest, JsonNode jobMetadata) {
         ObjectNode result = objectMapper.createObjectNode();
         result.put("pr_number", requireInt(jobMetadata, "pr_number"));
         result.put("pr_url", requireText(jobMetadata, "pr_url"));
@@ -307,12 +312,6 @@ public class PullRequestContentSource implements EvidenceSource, ReviewContextBu
         result.put("target_branch", requireText(jobMetadata, "target_branch"));
         result.put("commit_sha", requireText(jobMetadata, "commit_sha"));
 
-        if (pullRequest == null) {
-            log.warn("Pull request not found in database during context preparation");
-            result.put("enriched", false);
-            return result;
-        }
-        result.put("enriched", true);
         result.put("title", pullRequest.getTitle());
         result.put("body", pullRequest.getBody());
         if (pullRequest.getState() != null) {

@@ -242,6 +242,25 @@ class ContextManifestBuilderTest extends BaseUnitTest {
     }
 
     @Test
+    void shouldRefuseReadinessWhenCoreReportsAnUpstreamDeletion() {
+        var unavailable = new SourceCaptureState.Unavailable(SourceAbsenceReason.NOT_FOUND);
+        ArtifactSourceManifest manifest = builder.augment(
+                new LinkedHashMap<>(),
+                Map.of(),
+                "job-deleted-core",
+                plan(),
+                new ContextManifestBuilder.CaptureMetadata(
+                        Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(CORE, unavailable), Set.of(CORE)));
+
+        var readiness =
+                builder.checkAutomatedReviewReadinessAsOfNow(manifest, List.of(practiceRequiring(CORE, "needs-core")));
+
+        assertThat(readiness.readyPractices()).isEmpty();
+        assertThat(readiness.decisions().getFirst().sourceChecks().getFirst().reasonCodes())
+                .containsExactly(SourceReadinessReason.SOURCE_NOT_AVAILABLE);
+    }
+
+    @Test
     void shouldNameNoReasonWhenACompleteCaptureHeldSomething() {
         Map<String, byte[]> files = new LinkedHashMap<>();
         String path = "inputs/context/diff.patch";

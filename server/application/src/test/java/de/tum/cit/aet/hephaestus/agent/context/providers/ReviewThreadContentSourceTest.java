@@ -5,11 +5,14 @@ import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.EvidenceCollectionException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
+import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
 import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
@@ -32,6 +35,8 @@ import java.util.Set;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.springframework.test.util.ReflectionTestUtils;
 import tools.jackson.databind.JsonNode;
@@ -60,7 +65,7 @@ class ReviewThreadContentSourceTest extends BaseUnitTest {
     void setUp() {
         provider =
                 new ReviewThreadContentSource(objectMapper, pullRequestRepository, threadRepository, reviewRepository);
-        lenient().when(pullRequestRepository.findByIdWithAllForGate(any())).thenReturn(Optional.empty());
+        lenient().when(pullRequestRepository.findById(any())).thenReturn(Optional.of(new PullRequest()));
         lenient()
                 .when(threadRepository.findRecentIdsByPullRequestId(any(), any()))
                 .thenReturn(List.of());
@@ -150,12 +155,12 @@ class ReviewThreadContentSourceTest extends BaseUnitTest {
         // "No unresolved threads" is a finding about the author; a missing key is a broken job.
         assertThatThrownBy(() -> provider.contribute(request(metadata), new HashMap<>()))
                 .isInstanceOf(EvidenceCollectionException.class)
-                .hasRootCauseMessage("Review-thread collection has no pull_request_id");
+                .hasMessage("Review-thread collection has no pull_request_id");
     }
 
     @Test
     void contribute_noThreadsNoReviews_writesCanonicalEmptyState() throws Exception {
-        when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(mergedPr()));
+        when(pullRequestRepository.findById(PR_ID)).thenReturn(Optional.of(mergedPr()));
         Map<String, byte[]> files = new HashMap<>();
         provider.contribute(request(metadataWithPr()), files);
 
@@ -172,7 +177,7 @@ class ReviewThreadContentSourceTest extends BaseUnitTest {
                         PullRequestReview.State.CHANGES_REQUESTED,
                         "reviewer-a",
                         Instant.parse("2025-06-01T10:00:00Z"))));
-        when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(mergedPr()));
+        when(pullRequestRepository.findById(PR_ID)).thenReturn(Optional.of(mergedPr()));
 
         Map<String, byte[]> files = new HashMap<>();
         provider.contribute(request(metadataWithPr()), files);
@@ -196,7 +201,7 @@ class ReviewThreadContentSourceTest extends BaseUnitTest {
                                 "reviewer-a",
                                 Instant.parse("2025-06-01T10:00:00Z")),
                         review(PullRequestReview.State.APPROVED, "reviewer-a", Instant.parse("2025-06-01T12:00:00Z"))));
-        when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(mergedPr()));
+        when(pullRequestRepository.findById(PR_ID)).thenReturn(Optional.of(mergedPr()));
 
         Map<String, byte[]> files = new HashMap<>();
         provider.contribute(request(metadataWithPr()), files);
@@ -232,7 +237,7 @@ class ReviewThreadContentSourceTest extends BaseUnitTest {
         }
         when(reviewRepository.findRecentByPullRequestIdWithAuthor(any(), any(), any()))
                 .thenReturn(newestFirst);
-        when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(mergedPr()));
+        when(pullRequestRepository.findById(PR_ID)).thenReturn(Optional.of(mergedPr()));
 
         Map<String, byte[]> files = new HashMap<>();
         provider.contribute(request(metadataWithPr()), files);
@@ -299,7 +304,7 @@ class ReviewThreadContentSourceTest extends BaseUnitTest {
                                 "drafting-reviewer",
                                 Instant.parse("2025-05-01T12:00:00Z")),
                         review(PullRequestReview.State.APPROVED, "reviewer-a", Instant.parse("2025-06-01T12:00:00Z"))));
-        when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(mergedPr()));
+        when(pullRequestRepository.findById(PR_ID)).thenReturn(Optional.of(mergedPr()));
 
         Map<String, byte[]> files = new HashMap<>();
         provider.contribute(request(metadataWithPr()), files);
@@ -343,8 +348,8 @@ class ReviewThreadContentSourceTest extends BaseUnitTest {
     }
 
     @Test
-    void contribute_prLookupEmpty_mergeStateUnknown() throws Exception {
-        // findByIdWithAllForGate returns empty (default stub) — mergeState degrades to UNKNOWN, never throws.
+    void contribute_prStateMissing_mergeStateUnknown() throws Exception {
+        // A mirrored row with neither merge flag nor state degrades to UNKNOWN, never throws.
         when(reviewRepository.findRecentByPullRequestIdWithAuthor(any(), any(), any()))
                 .thenReturn(List.of(
                         review(PullRequestReview.State.APPROVED, "reviewer-a", Instant.parse("2025-06-01T12:00:00Z"))));
@@ -366,7 +371,7 @@ class ReviewThreadContentSourceTest extends BaseUnitTest {
         PullRequest openPr = new PullRequest();
         openPr.setMerged(false);
         openPr.setState(Issue.State.OPEN);
-        when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(openPr));
+        when(pullRequestRepository.findById(PR_ID)).thenReturn(Optional.of(openPr));
 
         Map<String, byte[]> files = new HashMap<>();
         provider.contribute(request(metadataWithPr()), files);
@@ -389,5 +394,28 @@ class ReviewThreadContentSourceTest extends BaseUnitTest {
     @Test
     void required_isFalse_bestEffort() {
         assertThat(provider.required()).isFalse();
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void shouldReportUnavailableThenAllowCaptureWhenArtifactReturns(boolean tombstoned) {
+        var artifact = new PullRequest();
+        artifact.setDeletedAt(Instant.parse("2026-09-05T00:00:00Z"));
+        when(pullRequestRepository.findById(PR_ID)).thenReturn(tombstoned ? Optional.of(artifact) : Optional.empty());
+        for (var kind : provider.sourceKinds()) {
+            var captured = provider.capture(request(metadataWithPr()), Set.of(kind));
+            assertThat(captured.files()).isEmpty();
+            assertThat(captured.completeness()).isEmpty();
+            assertThat(captured.contentStates()).isEmpty();
+            assertThat(captured.stateOverrides())
+                    .containsExactlyEntriesOf(
+                            Map.of(kind, new SourceCaptureState.Unavailable(SourceAbsenceReason.NOT_FOUND)));
+        }
+        verifyNoInteractions(threadRepository, reviewRepository);
+        artifact.setDeletedAt(null);
+        when(pullRequestRepository.findById(PR_ID)).thenReturn(Optional.of(artifact));
+        var restored = provider.capture(request(metadataWithPr()), provider.sourceKinds());
+        assertThat(restored.stateOverrides()).isEmpty();
+        assertThat(restored.files()).isNotEmpty();
     }
 }

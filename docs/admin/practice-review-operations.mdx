@@ -144,6 +144,11 @@ behaviors matter independently of their exact defaults:
   review resolves documents *linked from* the work first and only tops up a small number by search; the
   mentor searches the whole corpus and truncates each document. Neither path can report that it found
   everything, and neither is a substitute for the other when you are diagnosing missing context.
+- **Work that has been deleted at the provider yields a review with no evidence, not an empty one.**
+  Once a reconciliation pass finds work missing upstream, evidence capture reports its sources as
+  unavailable and the review stops without recording anything about that work. That is the instance
+  working as intended, not a capture failure to chase. If the work reappears, the next ordinary sync
+  clears the mark and a later review reads it again.
 - **No screen edits what the model is told.** What Hephaestus observes is shaped by each practice's
   criteria; the wording it then chooses is shaped by a prompt that ships with the release. Changing the
   latter is a code change.
