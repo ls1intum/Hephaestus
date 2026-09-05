@@ -85,9 +85,6 @@ public class WorkspaceStatementInspector implements StatementInspector {
     /** One surrogate-key predicate: {@code id = ?} or {@code <anything>_id = ?}, optionally quoted. */
     private static final String KEY_EQUALS_PARAMETER = "\"?(?:id|[A-Za-z_][A-Za-z0-9_]*_id)\"?\\s*=\\s*\\?";
 
-    /** One foreign-key predicate, {@code <anything>_id = ?}, optionally quoted. */
-    private static final String FOREIGN_KEY_EQUALS_PARAMETER = "\"?[A-Za-z_][A-Za-z0-9_]*_id\"?\\s*=\\s*\\?";
-
     /**
      * Matches Hibernate-emitted DML on a single row identified solely by primary key —
      * {@code DELETE FROM table WHERE id = ?} or
@@ -122,8 +119,9 @@ public class WorkspaceStatementInspector implements StatementInspector {
      * {@code *_id} columns never qualifies however it is named.
      */
     private static final Pattern JOIN_TABLE_ROW_DELETE_PATTERN = Pattern.compile(
-            "^\\s*DELETE\\s+FROM\\s+\"?([A-Za-z_][A-Za-z0-9_]*)\"?\\s+WHERE\\s+" + FOREIGN_KEY_EQUALS_PARAMETER
-                    + "\\s+AND\\s+" + FOREIGN_KEY_EQUALS_PARAMETER + "\\s*$",
+            "^\\s*DELETE\\s+FROM\\s+\"?([A-Za-z_][A-Za-z0-9_]*)\"?\\s+WHERE\\s+"
+                    + "\"?([A-Za-z_][A-Za-z0-9_]*_id)\"?\\s*=\\s*\\?\\s+AND\\s+"
+                    + "\"?([A-Za-z_][A-Za-z0-9_]*_id)\"?\\s*=\\s*\\?\\s*$",
             Pattern.CASE_INSENSITIVE);
 
     /**
@@ -217,6 +215,8 @@ public class WorkspaceStatementInspector implements StatementInspector {
         }
         Matcher joinTableRowDelete = JOIN_TABLE_ROW_DELETE_PATTERN.matcher(sql);
         if (joinTableRowDelete.matches()
+                // Two different foreign keys: the row's whole key, not one key named twice.
+                && !joinTableRowDelete.group(2).equalsIgnoreCase(joinTableRowDelete.group(3))
                 && scopedTables.isManyToManyJoinTable(unqualify(joinTableRowDelete.group(1)))) {
             return Decision.ok();
         }

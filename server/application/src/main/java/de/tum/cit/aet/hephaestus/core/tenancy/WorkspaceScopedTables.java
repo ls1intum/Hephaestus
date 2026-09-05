@@ -153,7 +153,11 @@ public class WorkspaceScopedTables {
 
     private static void addIfScoped(Set<String> tables, String rawName) {
         if (rawName == null || rawName.isBlank()) return;
-        String name = rawName.toLowerCase(Locale.ROOT);
+        // The inspector compares bare, lowercase names; a schema-qualified or quoted metamodel
+        // name must land in the same form or it never matches.
+        String name = rawName.substring(rawName.lastIndexOf('.') + 1)
+                .replace("\"", "")
+                .toLowerCase(Locale.ROOT);
         if (!GLOBAL_TABLES.contains(name)) {
             tables.add(name);
         }

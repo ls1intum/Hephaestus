@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.label;
 import static org.assertj.core.api.Assertions.*;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+import de.tum.cit.aet.hephaestus.core.tenancy.WorkspaceScopedTables;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
@@ -86,6 +87,9 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private IssueRepository issueRepository;
+
+    @Autowired
+    private WorkspaceScopedTables workspaceScopedTables;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -482,6 +486,58 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
                 });
             });
         }
+    }
+
+    @Test
+    void shouldRemoveALabelFromAnIssueUnderTenancyEnforcement() throws Exception {
+        // Hibernate unlinks the label with "delete from issue_label where issue_id=? and
+        // label_id=?", the one statement the inspector allows on a declared join table. This runs
+        // against the real mapping metamodel and the enforcement mode the tests boot with, so a
+        // regression fails the commit here the way it failed the sync on staging.
+        assertThat(workspaceScopedTables.isManyToManyJoinTable("issue_label")).isTrue();
+        assertThat(workspaceScopedTables.isManyToManyJoinTable("issue")).isFalse();
+
+        handler.handleEvent(loadPayload("label.created"));
+        Label label = labelRepository
+                .findByNativeIdAndProviderId(FIXTURE_LABEL_ID, providerId())
+                .orElseThrow();
+        // A second label stays on the issue: with the collection still non-empty after the
+        // removal, Hibernate deletes the one row by both keys rather than clearing the issue's
+        // rows by owner key, which the single-key path allowed all along.
+        Label keptLabel = new Label();
+        keptLabel.setNativeId(FIXTURE_LABEL_ID + 1);
+        keptLabel.setProvider(gitProvider);
+        keptLabel.setRepository(testRepository);
+        keptLabel.setName("kept");
+        keptLabel.setColor("00ff00");
+        keptLabel.setCreatedAt(Instant.now());
+        keptLabel.setUpdatedAt(Instant.now());
+        keptLabel = labelRepository.save(keptLabel);
+
+        Issue issue = new Issue();
+        issue.setNativeId(67890L);
+        issue.setNumber(2);
+        issue.setTitle("Labelled, then less so");
+        issue.setState(Issue.State.OPEN);
+        issue.setRepository(testRepository);
+        issue.setCreatedAt(Instant.now());
+        issue.setUpdatedAt(Instant.now());
+        issue.setProvider(gitProvider);
+        issue.getLabels().add(label);
+        issue.getLabels().add(keptLabel);
+        Long issueId = issueRepository.save(issue).getId();
+
+        Long removedLabelId = label.getId();
+        transactionTemplate.executeWithoutResult(status -> {
+            Issue labelled = issueRepository.findById(issueId).orElseThrow();
+            labelled.getLabels().removeIf(l -> removedLabelId.equals(l.getId()));
+        });
+
+        Long keptLabelId = keptLabel.getId();
+        transactionTemplate.executeWithoutResult(status -> assertThat(
+                        issueRepository.findById(issueId).orElseThrow().getLabels())
+                .singleElement()
+                .satisfies(l -> assertThat(l.getId()).isEqualTo(keptLabelId)));
     }
 
     private Long providerId() {
