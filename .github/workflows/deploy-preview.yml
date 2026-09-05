@@ -43,8 +43,6 @@ jobs:
           sparse-checkout: |
             .github/actions/setup-toolchain
             package.json
-            pnpm-lock.yaml
-            pnpm-workspace.yaml
             scripts
       - uses: ./.github/actions/setup-toolchain
         with:

@@ -233,12 +233,15 @@ if (withOf(setupStep(usesAction("actions/setup-node")))["node-version-file"] !==
 // Every expression below is derived from the id of the step it reads, so renaming a step is not a
 // drift; changing what a step does is.
 const steps = setupSteps.filter(isRecord);
+const frozenOnly = "inputs.install == 'frozen'";
 const idOf = (step: Record<string, unknown>): string => {
 	if (typeof step.id !== "string") throw new Error("setup-toolchain step must carry an id");
 	return step.id;
 };
 const pnpmPin = setupStep((step) => String(step.run).includes("devEngines.packageManager.version"));
 const versionOutput = `steps.${idOf(pnpmPin)}.outputs.version`;
+if (pnpmPin.if !== frozenOnly)
+	throw new Error("setup-toolchain must read the pnpm pin only when it installs pnpm");
 // Git Bash gives Windows an MSYS $HOME that the Windows PATH cannot resolve, so the destination has
 // to be resolved the way pnpm/setup and actions/cache resolve it.
 if (!String(pnpmPin.run).includes("dest=$(node "))
@@ -247,18 +250,29 @@ const destOutput = `\${{ steps.${idOf(pnpmPin)}.outputs.dest }}`;
 const pnpmCache = setupStep(usesAction("actions/cache/restore"));
 const cacheHit = `steps.${idOf(pnpmCache)}.outputs.cache-hit`;
 if (
-	withOf(pnpmCache).path !== "~/setup-pnpm" ||
+	!isDeepStrictEqual(String(withOf(pnpmCache).path).trim().split(/\s+/).toSorted(), [
+		"~/setup-pnpm/pnpm",
+		"~/setup-pnpm/pnpm.exe",
+	]) ||
+	"restore-keys" in withOf(pnpmCache) ||
 	!["runner.os", "runner.arch", versionOutput].every((part) =>
 		String(withOf(pnpmCache).key).includes(part),
 	)
 )
 	throw new Error("setup-toolchain must cache the platform-specific pinned pnpm binary");
+if (pnpmCache.if !== frozenOnly)
+	throw new Error("setup-toolchain must restore the pnpm binary only when it installs pnpm");
 // Without PNPM_HOME and PATH the hit path leaves the job no pnpm at all, and setup-node's store
-// cache fails looking for it.
+// cache fails looking for it. pnpm/setup creates its bin directory upfront and prepends the
+// destination ahead of it, so a restored install has to arrive in the same shape.
 const restored = steps.find((step) => step.if === `${cacheHit} == 'true'`) ?? {};
+const restoredPath = String(restored.run)
+	.split("\n")
+	.flatMap((line) => /^\s*echo "(\$PNPM_DEST[^"]*)" >> "\$GITHUB_PATH"$/.exec(line)?.[1] ?? []);
 if (
 	!String(restored.run).includes("PNPM_HOME=") ||
-	!String(restored.run).includes('>> "$GITHUB_PATH"')
+	!String(restored.run).includes('mkdir -p "$PNPM_DEST/bin"') ||
+	!isDeepStrictEqual(restoredPath, ["$PNPM_DEST", "$PNPM_DEST/bin"])
 )
 	throw new Error("setup-toolchain must put the restored pnpm on PATH and in PNPM_HOME");
 if (
@@ -275,7 +289,7 @@ if (pnpmSetupOrder.length !== 3)
 	throw new Error("setup-toolchain must retry pnpm setup twice before failing");
 const pnpmSetups = pnpmSetupOrder.map((index) => steps[index] ?? {});
 const firstAttempt = pnpmSetups[0] ?? {};
-if (firstAttempt.if !== `${cacheHit} != 'true'`)
+if (firstAttempt.if !== `${frozenOnly} && ${cacheHit} != 'true'`)
 	throw new Error("setup-toolchain must skip pnpm setup entirely when the binary cache hits");
 for (const [attempt, index] of pnpmSetupOrder.slice(1).entries()) {
 	const previous = pnpmSetups[attempt] ?? {};
@@ -300,7 +314,11 @@ for (const step of pnpmSetups)
 		throw new Error("setup-toolchain must retry the same pnpm setup operation");
 // A cache key cannot be overwritten, so an unproven tree saved once is served to every job.
 const proof = steps.find((step) => String(step.run).includes("pnpm --version")) ?? {};
-if ("if" in proof || !isRecord(proof.env) || proof.env.PNPM_VERSION !== `\${{ ${versionOutput} }}`)
+if (
+	proof.if !== frozenOnly ||
+	!isRecord(proof.env) ||
+	proof.env.PNPM_VERSION !== `\${{ ${versionOutput} }}`
+)
 	throw new Error("setup-toolchain must prove the pinned pnpm answers on both setup paths");
 const pnpmCacheSave = setupStep(usesAction("actions/cache/save"));
 if (steps.indexOf(proof) > steps.indexOf(pnpmCacheSave))
@@ -309,26 +327,40 @@ if (!isDeepStrictEqual(withOf(pnpmCacheSave), withOf(pnpmCache)))
 	throw new Error("setup-toolchain must save the pnpm binary under its exact restore identity");
 if (
 	pnpmCacheSave.if !==
-	`${cacheHit} != 'true' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)`
+	`${frozenOnly} && ${cacheHit} != 'true' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)`
 )
 	throw new Error("setup-toolchain must write the pnpm binary cache only from the default branch");
-const nodeSetup = withOf(setupStep(usesAction("actions/setup-node")));
+const nodeSetupStep = setupStep(usesAction("actions/setup-node"));
+const nodeSetup = withOf(nodeSetupStep);
+// One cache scheme for the pnpm store: pnpm/setup's would key on a different digest, and which of
+// the two ran would then depend on the binary cache's outcome.
 if (
-	nodeSetup.cache !== `\${{ ${cacheHit} == 'true' && inputs.install == 'frozen' && 'pnpm' || '' }}`
+	pnpmSetup.cache !== false ||
+	nodeSetup.cache !== `\${{ ${frozenOnly} && 'pnpm' || '' }}` ||
+	nodeSetup["cache-dependency-path"] !== "pnpm-lock.yaml"
 )
-	throw new Error(
-		"setup-toolchain must cache the pnpm store through setup-node exactly when pnpm/setup did not",
-	);
-const vpSetup = withOf(setupStep(usesAction("voidzero-dev/setup-vp")));
+	throw new Error("setup-node must own the pnpm store cache on both setup paths");
+if ("if" in nodeSetupStep)
+	throw new Error("setup-toolchain must select the pinned Node version in either install mode");
+const vpSetupStep = setupStep(usesAction("voidzero-dev/setup-vp"));
+const vpSetup = withOf(vpSetupStep);
 if (vpSetup["node-manager"] !== false || vpSetup["run-install"] !== false)
 	throw new Error("setup-toolchain must let setup-vp neither manage Node nor install");
+if (vpSetupStep.if !== frozenOnly)
+	throw new Error("setup-toolchain must install Vite+ only for a job that runs it");
 const frozenInstall = setupStep(
 	(step) => step.run === "pnpm install --frozen-lockfile --ignore-scripts",
 );
-if (frozenInstall.if !== "inputs.install == 'frozen'")
+if (frozenInstall.if !== frozenOnly)
 	throw new Error(
 		"setup-toolchain must install from the lockfile without scripts, only when asked",
 	);
+// pnpm/setup installs a runtime of its own, and the frozen install must run under the pinned one.
+if (
+	steps.indexOf(nodeSetupStep) <= Math.max(...pnpmSetupOrder) ||
+	steps.indexOf(nodeSetupStep) > steps.indexOf(frozenInstall)
+)
+	throw new Error("setup-toolchain must select Node after pnpm/setup and before it installs");
 setupStep((step) => step.if === "inputs.install != 'none' && inputs.install != 'frozen'");
 for (const step of setupSteps.filter(isRecord)) {
 	const inputs = isRecord(step.with) ? step.with : {};

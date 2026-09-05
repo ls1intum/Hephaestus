@@ -29,14 +29,8 @@ jobs:
           ref: ${{ github.sha }}
           persist-credentials: false
           sparse-checkout: |
-            .github/actions/setup-toolchain
             package.json
-            pnpm-lock.yaml
-            pnpm-workspace.yaml
             scripts
-      - uses: ./.github/actions/setup-toolchain
-        with:
-          install: "none"
 
       - name: Find the previews that still hold a slot
         id: candidates
@@ -78,8 +72,6 @@ jobs:
           sparse-checkout: |
             .github/actions/setup-toolchain
             package.json
-            pnpm-lock.yaml
-            pnpm-workspace.yaml
             scripts
       - uses: ./.github/actions/setup-toolchain
         with:

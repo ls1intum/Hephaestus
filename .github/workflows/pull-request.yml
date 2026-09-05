@@ -26,44 +26,92 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - name: "Checkout repository"
+      - name: Load trusted title policy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: ./.github/actions/setup-toolchain
         with:
-          install: "frozen"
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+          # package.json is what makes the policy module load as ESM; without it Node parses it as
+          # CommonJS first and warns on the reparse.
+          sparse-checkout: |
+            commitlint.config.ts
+            package.json
+          sparse-checkout-cone-mode: false
 
-      - name: "Validate PR title with commitlint"
-        id: commitlint
+      - name: Read title policy and validate header limits
+        id: policy
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          retries: 2
+          script: |
+            const { pathToFileURL } = await import("node:url");
+            const { pullRequestTitlePolicy: policy } = await import(pathToFileURL(`${process.env.GITHUB_WORKSPACE}/commitlint.config.ts`).href);
+            for (const [name, value] of Object.entries(policy)) core.setOutput(name, value);
+            // A rerun keeps its original payload even after the title has been edited.
+            const { data: { title } } = await github.rest.pulls.get({
+              ...context.repo, pull_number: context.payload.pull_request.number,
+            });
+            // The action below reads a header pattern and a subject pattern; what those cannot
+            // express is checked here, against the same policy the commit-msg hook enforces.
+            const problem = title.length > policy.headerMaxLength
+              ? `The title is ${title.length} characters long; the limit is ${policy.headerMaxLength}.`
+              : /[\r\n]/.test(title)
+                ? 'The title must be a single line.'
+                : new RegExp(policy.breakingMarkerPattern).test(title)
+                  ? 'A breaking change is carried by a changeset, so the title takes no ! marker.'
+                  : '';
+            if (problem) {
+              core.setOutput('error_message', problem);
+              core.setFailed(problem);
+            }
+
+      - name: Validate PR title
+        id: title
+        uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6.1.1
+        continue-on-error: true
         env:
-          PR_TITLE: ${{ github.event.pull_request.title }}
-        run: |
-          printf '%s\n' "$PR_TITLE" | vp exec commitlint 2>&1 | tee "$RUNNER_TEMP/commitlint-output.txt"
-          exit_code=${PIPESTATUS[1]}
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          types: ${{ steps.policy.outputs.types }}
+          scopes: ${{ steps.policy.outputs.scopes }}
+          headerPattern: ${{ steps.policy.outputs.headerPattern }}
+          headerPatternCorrespondence: type, scope, subject
+          subjectPattern: ${{ steps.policy.outputs.subjectPattern }}
 
+      # Through the environment and a file: the message quotes the title, which is the author's text.
+      - name: Explain the validation failure
+        id: explain
+        if: ${{ !cancelled() && (steps.policy.outputs.error_message != '' || steps.title.outputs.error_message != '') }}
+        env:
+          POLICY_ERROR: ${{ steps.policy.outputs.error_message }}
+          TITLE_ERROR: ${{ steps.title.outputs.error_message }}
+          GUIDANCE: >-
+            Use `type(scope): description`, at most ${{ steps.policy.outputs.headerMaxLength }}
+            characters, with no final period and no breaking-change `!` marker. The allowed types and
+            scopes are in [the contribution guidelines](${{ steps.policy.outputs.helpUrl }}).
+        run: |
           {
             printf '## PR title validation failed\n\n'
-            sed 's/^/    /' "$RUNNER_TEMP/commitlint-output.txt"
-          } > "$RUNNER_TEMP/commitlint-comment.md"
+            printf '%s\n\n' "${POLICY_ERROR:-$TITLE_ERROR}"
+            printf '%s\n' "$GUIDANCE"
+          } > "$RUNNER_TEMP/title-error.md"
 
-          exit "$exit_code"
-        continue-on-error: true
-
-      - name: "Comment on PR with validation error"
+      - name: Comment on PR with validation error
         uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
-        if: steps.commitlint.outcome == 'failure'
+        if: ${{ !cancelled() && steps.explain.outcome == 'success' }}
         with:
           header: pr-title-lint-error
-          path: ${{ runner.temp }}/commitlint-comment.md
+          path: ${{ runner.temp }}/title-error.md
 
-      - name: "Remove error comment on success"
+      - name: Remove error comment on success
         uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
-        if: steps.commitlint.outcome == 'success'
+        if: steps.title.outcome == 'success'
         with:
           header: pr-title-lint-error
           delete: true
 
-      - name: "Fail workflow if commitlint failed"
-        if: steps.commitlint.outcome == 'failure'
+      - name: Fail workflow if title validation failed
+        if: steps.title.outcome == 'failure'
         run: exit 1
 
   # Squash-merge hides a commit's author on `main`, but a pull request's commit list keeps it

@@ -1,54 +1,40 @@
-/**
- * Commitlint Configuration
- *
- * This config validates commit messages and PR titles against Conventional Commits.
- * Primary use case: CI validation of PR titles (which become commit messages after squash merge).
- *
- * @see https://commitlint.js.org
- * @see CONTRIBUTING.md for guidelines
- */
+// Keep this module dependency-free: PR validation imports it without a workspace install.
 
 // Allowed commit types. Types categorize history for readers only — versioning
 // and changelog entries come from changesets (.changeset/*.md), not commit types.
 const TYPES = [
-	"feat", // New feature
-	"fix", // Bug fix
-	"docs", // Documentation only
-	"style", // Code style (formatting, semicolons, etc.)
-	"refactor", // Code refactoring (no feature/fix)
-	"perf", // Performance improvement
-	"test", // Test changes
-	"build", // Build system or dependencies
-	"ci", // CI/CD changes
-	"chore", // Maintenance tasks
-	"revert", // Revert previous commit
+	"feat",
+	"fix",
+	"docs",
+	"style",
+	"refactor",
+	"perf",
+	"test",
+	"build",
+	"ci",
+	"chore",
+	"revert",
 ];
 
-// Allowed scopes (aligned with pull-request.yml)
 const SCOPES = [
-	// === SERVICE SCOPES (where the code lives) ===
-	"webapp", // React frontend, webapp Dockerfile
-	"server", // Java backend (includes in-process Pi mentor agent + webhook receiver), server Dockerfile
-	"docs", // Documentation site
+	"webapp",
+	"server",
+	"docs",
 
-	// === INFRASTRUCTURE SCOPES (affect runtime) ===
-	"deps", // Production dependencies (security patches, bug fixes)
-	"security", // Security fixes (CRITICAL - must release)
-	"db", // Database migrations (affect runtime)
-	"docker", // Dockerfiles, production compose (affect deployed containers)
+	"deps",
+	"security",
+	"db",
+	"docker",
 
-	// === INFRASTRUCTURE SCOPES (tooling and process) ===
-	"ci", // GitHub Actions, CI workflows only
-	"config", // Developer tooling configuration
-	//          NOT for: application.yml (use 'server'), Dockerfiles (use service scope)
-	"deps-dev", // Dev dependencies only (test libs, linters)
-	"scripts", // Build/dev helper scripts
-	"release", // Release engineering (also used by the automated Version PR)
+	"ci",
+	"config", //  NOT for: application.yml (use 'server'), Dockerfiles (use service scope)
+	"deps-dev",
+	"scripts",
+	"release",
 
-	// === FEATURE SCOPES (domain-specific) ===
-	"auth", // Authentication / identity (Account, IdentityLink, JWT, oauth2Login)
-	"integration", // Cross-cutting integration framework (webhook, oauth, registry, SPI)
-	"scm", // Source-control management (GitHub, GitLab) — formerly 'gitprovider'
+	"auth",
+	"integration",
+	"scm",
 	"leaderboard",
 	"mentor",
 	"notifications",
@@ -57,16 +43,21 @@ const SCOPES = [
 	"workspace",
 ];
 
-/** The slice of commitlint's parsed header these two rules read. */
+// A breaking change is carried by a changeset, which is what sets the next version; a marker in the
+// title only says so where nothing reads it.
+const BREAKING_MARKER = /^[^:]*!:/;
+const SUBJECT_SHAPE = /^(?!.*\.$).*\S$/;
+const HELP_URL = "https://github.com/hephaestus-build/Hephaestus/blob/main/CONTRIBUTING.md";
+
 interface ParsedCommit {
 	readonly type?: string | null;
 	readonly scope?: string | null;
+	readonly subject?: string | null;
+	readonly header?: string | null;
 }
 
-/** What a commitlint rule answers: whether the header passes, and what to say when it does not. */
 type RuleOutcome = [valid: boolean, message?: string];
 
-// Custom plugin to provide helpful error messages
 const helpfulErrorsPlugin = {
 	rules: {
 		"type-enum-helpful": (parsed: ParsedCommit): RuleOutcome => {
@@ -86,7 +77,7 @@ const helpfulErrorsPlugin = {
 		},
 		"scope-enum-helpful": (parsed: ParsedCommit): RuleOutcome => {
 			const { scope } = parsed;
-			if (!scope) return [true]; // Scope is optional
+			if (!scope) return [true];
 			const valid = SCOPES.includes(scope);
 			return [
 				valid,
@@ -94,47 +85,55 @@ const helpfulErrorsPlugin = {
 					? ""
 					: `scope "${scope}" is not allowed.\n\n` +
 						`Allowed scopes:\n` +
-						`  Services:  webapp, server, docs\n` +
-						`  Infra:     deps, security, db, docker, ci, config, deps-dev, scripts, release\n` +
-						`  Features:  auth, integration, scm, leaderboard, mentor, notifications, profile, teams, workspace\n\n` +
+						`  ${SCOPES.join(", ")}\n\n` +
 						`⚠️  'config' is for developer tooling\n` +
 						`    For runtime config use 'server', for Dockerfiles use service scope\n\n` +
 						`Format: <type>(<scope>): <description>\n` +
-						`Example: fix(server): resolve null pointer exception\n` +
-						`         feat(auth): wire oauth2Login against gitlab.lrz.de`,
+						`Example: fix(server): reject invalid requests`,
 			];
 		},
+		"subject-shape": (parsed: ParsedCommit): RuleOutcome => [
+			SUBJECT_SHAPE.test(parsed.subject ?? ""),
+			"description must not be empty or end with a period",
+		],
+		"breaking-marker-absent": (parsed: ParsedCommit): RuleOutcome => [
+			!BREAKING_MARKER.test(parsed.header ?? ""),
+			"drop the ! marker and describe the breaking change in a changeset",
+		],
 	},
+};
+
+// The one home for what CI enforces on a pull request title: it reads this object from the default
+// branch without a workspace install, and the rules below hold a commit message to the same shapes.
+export const pullRequestTitlePolicy = {
+	types: TYPES.join("\n"),
+	scopes: SCOPES.join("\n"),
+	headerMaxLength: 100,
+	headerPattern: String.raw`^(\w+)(?:\(([\w-]+)\))?: (.+)$`,
+	subjectPattern: SUBJECT_SHAPE.source,
+	breakingMarkerPattern: BREAKING_MARKER.source,
+	helpUrl: HELP_URL,
 };
 
 const configuration = {
 	extends: ["@commitlint/config-conventional"],
 	plugins: [helpfulErrorsPlugin],
-	helpUrl: "https://github.com/hephaestus-build/Hephaestus/blob/main/CONTRIBUTING.md",
+	helpUrl: HELP_URL,
 	rules: {
-		// Use custom rules for helpful error messages
 		"type-enum-helpful": [2, "always"],
 		"scope-enum-helpful": [2, "always"],
-		// Disable default enum rules (replaced by helpful versions)
+		"subject-shape": [2, "always"],
+		"breaking-marker-absent": [2, "always"],
 		"type-enum": [0],
 		"scope-enum": [0],
-		// Allow empty scope (scope is optional per CONTRIBUTING.md)
 		"scope-empty": [0],
-		// Disable subject-case: lower-case is too strict for technical terms
-		// (API, URL, GraphQL, OAuth, class names, env vars like APPLICATION_HOST_URL).
-		// Angular convention says "don't capitalize first letter" which we enforce
-		// via convention/review, not tooling. This avoids false positives.
+		// Preserve technical names such as GraphQL and OAuth.
 		"subject-case": [0],
-		// No period at end of subject
-		"subject-full-stop": [2, "never", "."],
-		// Subject shouldn't be empty
-		"subject-empty": [2, "never"],
-		// Type shouldn't be empty
+		"subject-full-stop": [0],
+		"subject-empty": [0],
 		"type-empty": [2, "never"],
-		// Type must be lowercase
 		"type-case": [2, "always", "lower-case"],
-		// Header (full first line) max length
-		"header-max-length": [2, "always", 100],
+		"header-max-length": [2, "always", pullRequestTitlePolicy.headerMaxLength],
 	},
 };
 

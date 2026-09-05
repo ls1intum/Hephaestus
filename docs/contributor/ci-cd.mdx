@@ -247,7 +247,7 @@ why the label is the authority, and which alternatives were priced and declined,
 | --- | --- | --- |
 | `cicd.yml` | PR, merge group, push to main, manual | Validates changes before merge and builds final-SHA images after merge; the release evidence gate runs over the images the run built on the Version PR's branch, and wherever the `release-preflight` dispatch input asks for it |
 | `review-policy.yml` | PR opened, reopened, synchronized, ready for review, edited | Approves a listed maintainer's pull request so the ruleset's required approval is met; does nothing for anyone else |
-| `pull-request.yml` | PR opened, edited, synchronized, reopened, ready for review | Validates the title with commitlint, checks that every commit resolves to the pull request's author, and assigns the author when the pull request opens |
+| `pull-request.yml` | PR opened, edited, synchronized, reopened, ready for review | Validates the title against the policy `commitlint.config.ts` exports, without installing the workspace, checks that every commit resolves to the pull request's author, and assigns the author when the pull request opens |
 | `ci-quality-gates.yml` | Called by cicd.yml | Formatting, lint, type checks, webapp unit and story tests: everything verifiable from source |
 | `ci-build.yml` | Called by cicd.yml | Packages the server reactor once, then runs the OpenAPI, schema, database and browser E2E gates and the application-server image against that artifact |
 | `ci-tests.yml` | Called by cicd.yml | The server unit, architecture and integration suites, compiled from source |
@@ -292,7 +292,7 @@ credential is still `GITHUB_TOKEN`, so these commits start no further workflow r
 
 | Action | Contract |
 | --- | --- |
-| `setup-toolchain` | Installs the Node.js and pnpm versions pinned in `package.json`, caching the pnpm executable by runner platform and pinned version and retrying its download twice on a miss, restores the pnpm store cache, and installs the launcher through the SHA-pinned `setup-vp` with `node-manager: false`, which then runs the lockfile's `vite-plus`; `install` is `none` or `frozen` |
+| `setup-toolchain` | Installs the Node.js version pinned in `package.json`, and nothing else when `install` is `none`, so a job that only runs `node scripts/…` reaches no package registry; `frozen` adds the pinned pnpm — caching its executable by runner platform and pinned version and retrying the download twice on a miss — restores the pnpm store cache, and installs the launcher through the SHA-pinned `setup-vp` with `node-manager: false`, which then runs the lockfile's `vite-plus` |
 | `setup-caches` | Sets up the JDK from `.java-version` and restores the Maven dependency cache with a prefix fallback; `application-server-reactor` also restores the generated-client build cache and is the only type that writes caches, on default-branch push, schedule and dispatch runs |
 | `restore-server-build` | Downloads the packaged reactor and installs its generated-clients JAR and parent pom so single-module Maven goals resolve them; outputs the executable JAR path |
 | `setup-browsers` | Restores the exact Playwright browser version and installs Chromium system dependencies |

@@ -101,7 +101,8 @@ are not awaited, and removing the label tears it down.
 
 ## Pull Request Title Guidelines
 
-`pull-request.yml` validates the title with commitlint (`commitlint.config.ts`). Titles follow the [Conventional Commits](https://www.conventionalcommits.org/) specification.
+PR titles follow the [Conventional Commits](https://www.conventionalcommits.org/) specification.
+`commitlint.config.ts` defines the allowed types and scopes shared by CI and local commit hooks.
 
 ### Format
 

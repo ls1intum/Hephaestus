@@ -1,25 +1,34 @@
 name: "Setup toolchain"
-description: "The Node.js, pnpm and Vite+ versions package.json pins, with the pinned pnpm executable and, for a frozen install, the pnpm store cached; install is none or frozen."
+description: "The Node.js version package.json pins and, for a frozen install, its pnpm and Vite+ pins with the pnpm executable and the pnpm store cached; install is none or frozen."
 inputs:
   install:
-    description: "none, or frozen: pnpm install --frozen-lockfile --ignore-scripts. No lifecycle script runs in CI, so pnpm-workspace.yaml#allowBuilds is exercised only by a contributor's install."
+    description: "none: the Node.js runtime alone, for a job that runs node scripts/… or shell; frozen: pnpm and Vite+ as well, then pnpm install --frozen-lockfile --ignore-scripts. No lifecycle script runs in CI, so pnpm-workspace.yaml#allowBuilds is exercised only by a contributor's install."
     required: false
     default: "none"
 runs:
   using: "composite"
   steps:
+    - if: inputs.install != 'none' && inputs.install != 'frozen'
+      shell: bash
+      run: |
+        echo "::error::setup-toolchain: install must be none or frozen"
+        exit 1
     - id: pnpm
+      if: inputs.install == 'frozen'
       shell: bash
       run: |
         echo "version=$(jq -r '.devEngines.packageManager.version' package.json)" >> "$GITHUB_OUTPUT"
         # Use the native home directory, not Git Bash's MSYS path, on Windows.
         echo "dest=$(node -p 'require("node:path").join(require("node:os").homedir(), "setup-pnpm")')" >> "$GITHUB_OUTPUT"
-    # Cache pnpm/setup's default installation directory.
+    # Only the executable: pnpm/setup installs a Node runtime beside it, and setup-node owns Node.
     - id: pnpm-cache
+      if: inputs.install == 'frozen'
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
-        path: ~/setup-pnpm
-        key: pnpm-bin-${{ runner.os }}-${{ runner.arch }}-${{ steps.pnpm.outputs.version }}
+        path: |
+          ~/setup-pnpm/pnpm
+          ~/setup-pnpm/pnpm.exe
+        key: pnpm-bin-v2-${{ runner.os }}-${{ runner.arch }}-${{ steps.pnpm.outputs.version }}
     # A hit skips pnpm/setup, so it has to reproduce what that action exports: PNPM_HOME, and both
     # the destination and its bin directory on PATH.
     - if: steps.pnpm-cache.outputs.cache-hit == 'true'
@@ -27,29 +36,20 @@ runs:
       env:
         PNPM_DEST: ${{ steps.pnpm.outputs.dest }}
       run: |
+        mkdir -p "$PNPM_DEST/bin"
         echo "PNPM_HOME=$PNPM_DEST" >> "$GITHUB_ENV"
-        echo "$PNPM_DEST/bin" >> "$GITHUB_PATH"
         echo "$PNPM_DEST" >> "$GITHUB_PATH"
-    - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-      with:
-        node-version-file: package.json
-        cache: ${{ steps.pnpm-cache.outputs.cache-hit == 'true' && inputs.install == 'frozen' && 'pnpm' || '' }}
-        cache-dependency-path: pnpm-lock.yaml
-    - if: inputs.install != 'none' && inputs.install != 'frozen'
-      shell: bash
-      run: |
-        echo "::error::setup-toolchain: install must be none or frozen"
-        exit 1
+        echo "$PNPM_DEST/bin" >> "$GITHUB_PATH"
     # GitHub Actions has no retry for a `uses:` step and pnpm/setup has no retry input, so the
     # attempts are written out; a loop would mean re-implementing the installer and giving up npm's
     # signature verification of the executable. pnpm/setup does not separate a registry blip from a
     # bad pin, so a deterministic failure also costs all three attempts.
     - id: pnpm-setup-1
-      if: steps.pnpm-cache.outputs.cache-hit != 'true'
+      if: inputs.install == 'frozen' && steps.pnpm-cache.outputs.cache-hit != 'true'
       continue-on-error: true
       uses: pnpm/setup@703c52620218391530e48b9e8870d5c0082e1b9b # v2.1.0
       with:
-        cache: ${{ inputs.install == 'frozen' }}
+        cache: false
         cache-dependency-path: pnpm-lock.yaml
         install: false
         require-lockfile: true
@@ -61,7 +61,7 @@ runs:
       continue-on-error: true
       uses: pnpm/setup@703c52620218391530e48b9e8870d5c0082e1b9b # v2.1.0
       with:
-        cache: ${{ inputs.install == 'frozen' }}
+        cache: false
         cache-dependency-path: pnpm-lock.yaml
         install: false
         require-lockfile: true
@@ -71,22 +71,33 @@ runs:
     - if: steps.pnpm-setup-2.outcome == 'failure'
       uses: pnpm/setup@703c52620218391530e48b9e8870d5c0082e1b9b # v2.1.0
       with:
-        cache: ${{ inputs.install == 'frozen' }}
+        cache: false
         cache-dependency-path: pnpm-lock.yaml
         install: false
         require-lockfile: true
     # Cache entries are immutable: validate the executable before publishing a new entry.
-    - shell: bash
+    - if: inputs.install == 'frozen'
+      shell: bash
       env:
         PNPM_VERSION: ${{ steps.pnpm.outputs.version }}
       run: test "$(pnpm --version)" = "$PNPM_VERSION"
     # Default-branch caches are reusable across PRs; merge-ref caches are scoped to that PR.
-    - if: steps.pnpm-cache.outputs.cache-hit != 'true' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    - if: inputs.install == 'frozen' && steps.pnpm-cache.outputs.cache-hit != 'true' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
       uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
-        path: ~/setup-pnpm
-        key: pnpm-bin-${{ runner.os }}-${{ runner.arch }}-${{ steps.pnpm.outputs.version }}
-    - uses: voidzero-dev/setup-vp@1b32467adbe183473499fd9d5d372c3ed9641754 # v1.18.0
+        path: |
+          ~/setup-pnpm/pnpm
+          ~/setup-pnpm/pnpm.exe
+        key: pnpm-bin-v2-${{ runner.os }}-${{ runner.arch }}-${{ steps.pnpm.outputs.version }}
+    # Both modes end here: pnpm/setup installs a Node runtime of its own, so the pinned one is
+    # selected last to win on PATH. setup-node reads `pnpm store path`, which needs pnpm installed.
+    - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      with:
+        node-version-file: package.json
+        cache: ${{ inputs.install == 'frozen' && 'pnpm' || '' }}
+        cache-dependency-path: pnpm-lock.yaml
+    - if: inputs.install == 'frozen'
+      uses: voidzero-dev/setup-vp@1b32467adbe183473499fd9d5d372c3ed9641754 # v1.18.0
       with:
         node-manager: false
         cache: false
