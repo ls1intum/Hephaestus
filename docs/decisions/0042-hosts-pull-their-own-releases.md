@@ -68,6 +68,21 @@ been running that commit since it merged, which is a longer and more honest rehe
 minutes a pre-production promotion bought. Holding an environment still is what the channel's
 `freeze` is for, signed and carried with the channel rather than configured beside it.
 
+**The host runs the tooling of the release it applied.** The reconciler and the verifier run from
+the host's own tooling directory, never from the release being verified: the tick that verifies a
+channel runs the tooling of the last release this host accepted, and only once the next release is
+verified and applied does the host move its tooling to that release's tree and bring the two systemd
+units in `/etc/systemd/system` to the same tree, reloading systemd itself. So a release cannot
+supply its own verifier, and the host runs no tooling a signed channel did not name, with two
+exceptions: the tooling an operator installs or upgrades by hand runs until the first apply after
+it, and a release that predates the tooling link is never adopted, so a host rolled back to one
+keeps the tooling it has, while a rollback to a release that carries the link moves the tooling back
+with it. That makes a rule for the promoter:
+a change to what `promote.yml` writes must stay readable by the tooling of every release a rollback
+can still reach, and nothing checks this for it. Standing still is not safe either: a host stranded
+on old tooling fails every tick until someone logs in, which is the silent failure this design exists
+to avoid.
+
 **A failed apply stops.** It does not roll back. Schema changes are forward-only here, so restoring
 the previous images would leave old code on a migrated database. Host monitoring reads the failure
 and staleness metrics instead.

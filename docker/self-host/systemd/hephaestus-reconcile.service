@@ -10,7 +10,13 @@ Type=oneshot
 EnvironmentFile=/etc/hephaestus/reconcile.env
 StateDirectory=hephaestus
 StateDirectoryMode=0750
-ExecStart=/usr/bin/env node /var/lib/hephaestus/checkout/scripts/reconcile-deployment.ts
+# The reconciler runs the tooling of the release this host last applied: `tooling` is a link the
+# reconciler moves only after it has verified and applied a release, so a release never supplies
+# its own verifier. The tooling this host runs is what a signed channel named, except for what an
+# operator installed or upgraded by hand until the first apply after it, and except that a release
+# older than this link keeps the tooling the host has. The reconciler also keeps this unit and its
+# timer in /etc/systemd/system at that release and reloads systemd itself.
+ExecStart=/usr/bin/env node /var/lib/hephaestus/tooling/scripts/reconcile-deployment.ts
 TimeoutStartSec=30min
 
 NoNewPrivileges=yes
@@ -18,6 +24,7 @@ ProtectSystem=strict
 ProtectHome=yes
 PrivateTmp=yes
 ReadWritePaths=-/var/lib/node_exporter
+ReadWritePaths=/etc/systemd/system
 # The Docker socket is reached over AF_UNIX; omitting it here breaks connect(2). Read-only
 # directory protections do not block Unix sockets, so ProtectSystem=strict leaves it reachable.
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6

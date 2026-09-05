@@ -1,5 +1,14 @@
-import { existsSync } from "node:fs";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import {
+	lstat,
+	mkdir,
+	readFile,
+	readlink,
+	rename,
+	rm,
+	stat,
+	symlink,
+	writeFile,
+} from "node:fs/promises";
 import { join } from "node:path";
 
 import { asRecord, asString, parseJson } from "./lib/json.ts";
@@ -23,6 +32,16 @@ const FOUNDATION: Partial<Record<Stack, readonly string[]>> = {
 	core: ["nats-server"],
 };
 
+/**
+ * A black-holed connection must not hold a tick until the unit's start timeout; the next tick
+ * retries, and the failure metric says why this one did not.
+ */
+const FETCH_TIMEOUT_MS = 5 * 60_000;
+
+/** The units this host runs, kept at the applied release by `syncUnits`. */
+const UNIT_FILES = ["hephaestus-reconcile.service", "hephaestus-reconcile.timer"] as const;
+const SYSTEMD_UNITS = "/etc/systemd/system";
+
 export interface Channel {
 	/** What this channel asks the host to run: a release tag, or the commit a build came from. */
 	release: string;
@@ -36,6 +55,8 @@ export interface AppliedState {
 	release: string;
 	channelCommit: string;
 	appliedAt: string;
+	/** The release's source commit as the signed lock named it; absent in records written earlier. */
+	commit?: string;
 }
 
 export type Decision =
@@ -184,6 +205,8 @@ export function renderMetrics(state: {
 	success: boolean;
 	now: Date;
 	lastSuccessAt?: Date;
+	/** The applied record predates the kept commit, so the tooling waits for the next apply. */
+	toolingPending?: boolean;
 }): string {
 	const seconds = (date: Date) => Math.floor(date.getTime() / 1000);
 	const lines = [
@@ -196,10 +219,13 @@ export function renderMetrics(state: {
 		"# HELP hephaestus_deploy_reconcile_timestamp_seconds When the last reconcile attempt ran.",
 		"# TYPE hephaestus_deploy_reconcile_timestamp_seconds gauge",
 		`hephaestus_deploy_reconcile_timestamp_seconds ${seconds(state.now)}`,
+		"# HELP hephaestus_deploy_tooling_pending Whether the host still waits for an apply to record the tooling it should run.",
+		"# TYPE hephaestus_deploy_tooling_pending gauge",
+		`hephaestus_deploy_tooling_pending ${state.toolingPending ? 1 : 0}`,
 	];
 	if (state.lastSuccessAt) {
 		lines.push(
-			"# HELP hephaestus_deploy_last_success_timestamp_seconds When this host last converged.",
+			"# HELP hephaestus_deploy_last_success_timestamp_seconds When the release this host runs was applied.",
 			"# TYPE hephaestus_deploy_last_success_timestamp_seconds gauge",
 			`hephaestus_deploy_last_success_timestamp_seconds ${seconds(state.lastSuccessAt)}`,
 		);
@@ -247,6 +273,8 @@ interface HostConfig {
 	channel: string;
 	stacks: Stack[];
 	checkout: string;
+	/** A link to the tree whose tooling this host runs: the checkout until the first apply. */
+	tooling: string;
 	stateDirectory: string;
 	secretsDirectory: string;
 	metricsFile?: string;
@@ -271,6 +299,7 @@ function hostConfig(environment: NodeJS.ProcessEnv): HostConfig {
 		channel,
 		stacks: parseStacks(environment.HEPHAESTUS_STACKS),
 		checkout: join(stateDirectory, "checkout"),
+		tooling: join(stateDirectory, "tooling"),
 		stateDirectory,
 		secretsDirectory: environment.HEPHAESTUS_SECRETS ?? "/etc/hephaestus",
 		metricsFile: environment.HEPHAESTUS_METRICS_FILE,
@@ -286,11 +315,14 @@ export async function readApplied(file: string): Promise<AppliedState | undefine
 			release: asString(record.release, "applied.release"),
 			channelCommit: asString(record.channelCommit, "applied.channelCommit"),
 			appliedAt: asString(record.appliedAt, "applied.appliedAt"),
+			...(record.commit === undefined ? {} : { commit: asString(record.commit, "applied.commit") }),
 		};
 		if (!isTarget(applied.release))
 			throw new Error("applied.release must be a vX.Y.Z tag or a commit");
 		if (!/^[a-f0-9]{40}$/.test(applied.channelCommit))
 			throw new Error("applied.channelCommit must be a Git commit");
+		if (applied.commit !== undefined && !COMMIT_SHA.test(applied.commit))
+			throw new Error("applied.commit must be a Git commit");
 		if (
 			!Number.isFinite(Date.parse(applied.appliedAt)) ||
 			new Date(applied.appliedAt).toISOString() !== applied.appliedAt
@@ -311,6 +343,10 @@ async function writeAtomic(file: string, contents: string): Promise<void> {
 	await rename(temporary, file);
 }
 
+function fetchOptions(config: HostConfig): { cwd: string; signal: AbortSignal } {
+	return { cwd: config.checkout, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) };
+}
+
 async function main(): Promise<void> {
 	const config = hostConfig(process.env);
 	const appliedFile = join(config.stateDirectory, "applied.json");
@@ -318,13 +354,39 @@ async function main(): Promise<void> {
 	const startedAt = new Date();
 
 	await mkdir(config.stateDirectory, { recursive: true });
+	// Before anything else, and in particular before the channel is parsed: a tick that stopped between
+	// recording a release and adopting its tooling would otherwise read the next channel with the
+	// tooling that release replaced. The recorded release's tree is rebuilt at the commit the signed
+	// lock named if it is gone and checked either way, so what is adopted is that release and nothing
+	// that happens to sit at its path. Node keeps running the module it loaded, so when the link
+	// moved, this tick ends here and the next one runs the adopted tooling.
+	if (applied) {
+		const commit = appliedCommit(applied);
+		if (commit === undefined) {
+			// Nothing on disk tells an accepted tree from one a failed re-promotion staged, so a record
+			// from before the commit was kept is never completed from a tree or a lock: the next apply
+			// records the commit, and until then the host reports the tooling as pending.
+			console.log(
+				`${applied.release} was recorded before its commit was kept; keeping the current tooling until the next apply`,
+			);
+		} else {
+			const { tree } = await ensureReleaseTree(
+				config.checkout,
+				releasesDirectory(config),
+				applied.release,
+				commit,
+			);
+			if (await followTooling(config, tree)) {
+				console.log(`Adopted the tooling of ${applied.release}; the next run uses it`);
+				return;
+			}
+		}
+	}
 
 	await run(
 		"git",
 		["fetch", "--quiet", "origin", "+refs/heads/deploy-state:refs/remotes/origin/deploy-state"],
-		{
-			cwd: config.checkout,
-		},
+		fetchOptions(config),
 	);
 	// Trimmed because the SHA is compared and interpolated; the blobs below are not, since the
 	// channel must reach cosign byte for byte as it was signed.
@@ -378,9 +440,11 @@ async function main(): Promise<void> {
 	// as "not behind", which is the wrong way for this check to be wrong.
 	let targetPrecedesApplied = false;
 	if (applied && !RELEASE_TAG.test(channel.release) && !RELEASE_TAG.test(applied.release)) {
-		await run("git", ["fetch", "--quiet", "origin", "+refs/heads/main:refs/remotes/origin/main"], {
-			cwd: config.checkout,
-		});
+		await run(
+			"git",
+			["fetch", "--quiet", "origin", "+refs/heads/main:refs/remotes/origin/main"],
+			fetchOptions(config),
+		);
 		for (const commit of [channel.release, applied.release])
 			if (
 				!(await succeeds("git", ["cat-file", "-e", `${commit}^{commit}`], { cwd: config.checkout }))
@@ -415,13 +479,13 @@ async function main(): Promise<void> {
 					success: true,
 					now: startedAt,
 					lastSuccessAt: new Date(applied.appliedAt),
+					toolingPending: appliedCommit(applied) === undefined,
 				}),
 			);
 		}
 		return;
 	}
 
-	const releaseTree = join(config.stateDirectory, "releases", decision.release);
 	// A release arrives as a tag; a commit is only reachable through the branch it is on, because a
 	// server does not serve an arbitrary object by name unless it is configured to.
 	await run(
@@ -429,34 +493,17 @@ async function main(): Promise<void> {
 		RELEASE_TAG.test(decision.release)
 			? ["fetch", "--quiet", "origin", "tag", decision.release, "--no-tags"]
 			: ["fetch", "--quiet", "origin", "+refs/heads/main:refs/remotes/origin/main"],
-		{ cwd: config.checkout },
+		fetchOptions(config),
 	);
 	const releaseCommit = (
 		await output("git", ["rev-parse", `${decision.release}^{commit}`], { cwd: config.checkout })
 	).trim();
-	if (existsSync(releaseTree)) {
-		const worktreeCommit = (
-			await output("git", ["rev-parse", "HEAD"], { cwd: releaseTree })
-		).trim();
-		if (worktreeCommit !== releaseCommit)
-			throw new Error(`${releaseTree} is not the worktree for ${decision.release}`);
-	} else {
-		await run("git", ["worktree", "add", "--detach", "--quiet", releaseTree, decision.release], {
-			cwd: config.checkout,
-		});
-	}
-	// Tracked content only: Compose writes into the worktree it renders from — the proxy stack's ACME
-	// store is `docker/letsencrypt/` — so counting untracked files would turn every retry after a
-	// partial apply into a permanent refusal. An untracked file cannot alter a tracked Compose file,
-	// and anyone who can write here already has the Docker socket.
-	const worktreeChanges = await output(
-		"git",
-		["status", "--porcelain=v1", "--untracked-files=no"],
-		{
-			cwd: releaseTree,
-		},
+	const { tree: releaseTree } = await ensureReleaseTree(
+		config.checkout,
+		releasesDirectory(config),
+		decision.release,
+		releaseCommit,
 	);
-	if (worktreeChanges) throw new Error(`${releaseTree} differs from ${decision.release}`);
 
 	const lockDirectory = join(config.stateDirectory, "release-locks");
 	await mkdir(lockDirectory, { recursive: true });
@@ -469,10 +516,10 @@ async function main(): Promise<void> {
 			mode: 0o600,
 		});
 	} else {
-		// A release must not supply the code that decides whether that same release is trusted.
+		// The verifier is the tooling this tick runs, never the release's own copy of it.
 		await run(
 			process.execPath,
-			[join(config.checkout, "scripts/prepare-release-lock.ts"), decision.release, lockFile],
+			[join(import.meta.dirname, "prepare-release-lock.ts"), decision.release, lockFile],
 			{ cwd: releaseTree },
 		);
 	}
@@ -551,7 +598,7 @@ async function main(): Promise<void> {
 	const finishedAt = new Date();
 	await writeAtomic(
 		appliedFile,
-		`${JSON.stringify({ release: decision.release, channelCommit, appliedAt: finishedAt.toISOString() }, null, "\t")}\n`,
+		`${JSON.stringify({ release: decision.release, channelCommit, appliedAt: finishedAt.toISOString(), commit: releaseCommit }, null, "\t")}\n`,
 	);
 	if (config.metricsFile)
 		await writeAtomic(
@@ -566,6 +613,134 @@ async function main(): Promise<void> {
 			}),
 		);
 	console.log(`Applied ${decision.release} to ${config.stacks.join(", ")}`);
+	// Only now, with the release verified and running, does the host run that release's tooling.
+	await followTooling(config, releaseTree);
+}
+
+/**
+ * The host runs the tooling of the tree it applied: its reconciler through the `tooling` link and its
+ * units in systemd. A tree that predates the link is never adopted — its unit would run the checkout
+ * and its reconciler could not read a current channel — so a rollback to one keeps the tooling the
+ * host has. Every step is idempotent, because a tick can stop between any two of them.
+ */
+async function followTooling(config: HostConfig, tree: string): Promise<boolean> {
+	if (!(await carriesToolingLink(tree))) {
+		console.log(`Keeping the current tooling: ${tree} predates the tooling link`);
+		return false;
+	}
+	const moved = await adoptTooling(config.tooling, tree);
+	const changed = await syncUnits(tree, SYSTEMD_UNITS);
+	if (changed.length > 0) console.log(`Updated ${changed.join(", ")}`);
+	// systemd itself knows whether the units it loaded match the files, so a tick that stopped
+	// between writing a unit and reloading is finished by the next one.
+	const stale = await output("systemctl", [
+		"show",
+		"--property=NeedDaemonReload",
+		"--value",
+		...UNIT_FILES,
+	]);
+	if (stale.split("\n").includes("yes")) await run("systemctl", ["daemon-reload"]);
+	return moved;
+}
+
+function releasesDirectory(config: HostConfig): string {
+	return join(config.stateDirectory, "releases");
+}
+
+/** The accepted source commit a record names: kept since it was recorded, or the release itself. */
+export function appliedCommit(applied: AppliedState): string | undefined {
+	return applied.commit ?? (COMMIT_SHA.test(applied.release) ? applied.release : undefined);
+}
+
+/**
+ * The worktree for `release` under `releases`, created at `commit` when it is missing and checked
+ * either way: its HEAD is that commit and no tracked file differs. The commit is what was accepted,
+ * never re-read from a tag, so a moved tag changes nothing. `--force` twice lets git recreate a path
+ * it still has registered — even locked — after someone deleted the directory.
+ */
+export async function ensureReleaseTree(
+	checkout: string,
+	releases: string,
+	release: string,
+	commit: string,
+): Promise<{ tree: string; commit: string }> {
+	const tree = join(releases, release);
+	if (await isDirectory(tree)) {
+		const head = (await output("git", ["rev-parse", "HEAD"], { cwd: tree })).trim();
+		if (head !== commit)
+			throw new Error(`${tree} is at ${head}, not the ${commit} accepted for ${release}`);
+	} else {
+		await run(
+			"git",
+			["worktree", "add", "--detach", "--force", "--force", "--quiet", tree, commit],
+			{
+				cwd: checkout,
+			},
+		);
+	}
+	// Tracked content only: Compose writes into the worktree it renders from — the proxy stack's ACME
+	// store is `docker/letsencrypt/` — so counting untracked files would turn every retry after a
+	// partial apply into a permanent refusal. An untracked file cannot alter a tracked Compose file,
+	// and anyone who can write here already has the Docker socket.
+	const changes = await output("git", ["status", "--porcelain=v1", "--untracked-files=no"], {
+		cwd: tree,
+	});
+	if (changes) throw new Error(`${tree} differs from ${release}`);
+	return { tree, commit };
+}
+
+/** Unlike `existsSync`, this reports a lookup that failed for any reason other than absence. */
+async function isDirectory(path: string): Promise<boolean> {
+	try {
+		return (await stat(path)).isDirectory();
+	} catch (error) {
+		if (error instanceof Error && "code" in error && error.code === "ENOENT") return false;
+		throw error;
+	}
+}
+
+/** Whether a tree's own unit starts the reconciler through the tooling link, i.e. carries this model. */
+export async function carriesToolingLink(tree: string): Promise<boolean> {
+	let unit: string;
+	try {
+		unit = await readFile(join(tree, "docker/self-host/systemd", UNIT_FILES[0]), "utf8");
+	} catch (error) {
+		if (error instanceof Error && "code" in error && error.code === "ENOENT") return false;
+		throw error;
+	}
+	return /^ExecStart=.*\/var\/lib\/hephaestus\/tooling\//m.test(unit);
+}
+
+/**
+ * Moves the tooling link to `tree` in one rename, so a failure leaves the current tooling in place,
+ * and reports whether it moved.
+ */
+export async function adoptTooling(link: string, tree: string): Promise<boolean> {
+	if ((await readlink(link).catch(() => undefined)) === tree) return false;
+	const staged = `${link}.next`;
+	await rm(staged, { force: true });
+	await symlink(tree, staged);
+	await rename(staged, link);
+	return true;
+}
+
+/**
+ * Brings the units systemd reads to the copies in `tree` and returns the names it rewrote. They are
+ * copies rather than links because systemd needs them on the root filesystem at boot, and each is
+ * replaced by one rename, which also retires a link an earlier install may have left.
+ */
+export async function syncUnits(tree: string, unitsDirectory: string): Promise<string[]> {
+	const changed: string[] = [];
+	for (const name of UNIT_FILES) {
+		const wanted = await readFile(join(tree, "docker/self-host/systemd", name), "utf8");
+		const unit = join(unitsDirectory, name);
+		const installed = await lstat(unit).catch(() => undefined);
+		if (installed && !installed.isSymbolicLink() && (await readFile(unit, "utf8")) === wanted)
+			continue;
+		await writeAtomic(unit, wanted);
+		changed.push(name);
+	}
+	return changed;
 }
 
 /** Without a series on failure, a broken reconcile is indistinguishable from a host running none. */
@@ -585,11 +760,15 @@ async function reportFailure(): Promise<void> {
 			success: false,
 			now: new Date(),
 			lastSuccessAt: applied ? new Date(applied.appliedAt) : undefined,
+			// Pending is a fact about the record, so a failed run must not read as the apply that ends it.
+			toolingPending: applied !== undefined && appliedCommit(applied) === undefined,
 		}),
 	);
 }
 
-if (process.argv[1] === import.meta.filename) {
+// The unit runs this file through the tooling link, and `process.argv[1]` keeps that path while
+// `import.meta.filename` is the resolved one; only `import.meta.main` compares nothing.
+if (import.meta.main) {
 	try {
 		await main();
 	} catch (error) {
