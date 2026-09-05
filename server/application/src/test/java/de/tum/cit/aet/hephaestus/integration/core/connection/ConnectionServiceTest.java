@@ -82,7 +82,9 @@ class ConnectionServiceTest extends BaseUnitTest {
                 credentialConverter,
                 eventPublisher,
                 syncJobService,
-                transactionManager);
+                transactionManager,
+                new CredentialReader(
+                        connectionRepository, credentialConverter, transactionManager, java.time.Clock.systemUTC()));
         // Default: the connection is free. Only the disconnect fence ever asks.
         Mockito.lenient()
                 .when(syncJobService.requestCancelForTeardown(anyLong()))

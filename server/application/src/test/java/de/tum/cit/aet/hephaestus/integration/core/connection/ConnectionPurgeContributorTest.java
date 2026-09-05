@@ -66,7 +66,12 @@ class ConnectionPurgeContributorTest extends BaseUnitTest {
                 credentialConverter,
                 eventPublisher,
                 syncJobService,
-                transactionManager);
+                transactionManager,
+                new CredentialReader(
+                        org.mockito.Mockito.mock(ConnectionRepository.class),
+                        credentialConverter,
+                        org.mockito.Mockito.mock(org.springframework.transaction.PlatformTransactionManager.class),
+                        java.time.Clock.systemUTC()));
         Mockito.lenient().when(connectionRepository.save(any(Connection.class))).thenAnswer(inv -> inv.getArgument(0));
         Mockito.lenient().when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
         Mockito.lenient().when(connectionStrategy.kind()).thenReturn(IntegrationKind.GITHUB);

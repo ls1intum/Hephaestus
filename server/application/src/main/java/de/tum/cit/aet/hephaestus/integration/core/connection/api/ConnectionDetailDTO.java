@@ -45,7 +45,8 @@ public record ConnectionDetailDTO(
         Instant createdAt,
         Instant updatedAt,
         Set<Capability> capabilities,
-        @Nullable Map<String, Object> config) {
+        @Nullable Map<String, Object> config,
+        @Nullable Instant credentialsUnreadableSince) {
     /**
      * Config keys whose values are secrets and must never cross the API boundary — matched
      * case-insensitively against the serialized config map.
@@ -76,7 +77,8 @@ public record ConnectionDetailDTO(
                 c.getCreatedAt(),
                 c.getUpdatedAt(),
                 manifests.capabilitiesFor(c.getKind()),
-                configMap);
+                configMap,
+                c.getCredentialsRotationFailedAt());
     }
 
     /**

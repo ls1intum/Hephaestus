@@ -26,7 +26,8 @@ public record ConnectionSummaryDTO(
         @Nullable String stateReason,
         Instant createdAt,
         Instant updatedAt,
-        Set<Capability> capabilities) {
+        Set<Capability> capabilities,
+        @Nullable Instant credentialsUnreadableSince) {
     public static ConnectionSummaryDTO from(Connection c, IntegrationManifestRegistry manifests) {
         return new ConnectionSummaryDTO(
                 c.getId(),
@@ -38,6 +39,7 @@ public record ConnectionSummaryDTO(
                 c.getStateReason(),
                 c.getCreatedAt(),
                 c.getUpdatedAt(),
-                manifests.capabilitiesFor(c.getKind()));
+                manifests.capabilitiesFor(c.getKind()),
+                c.getCredentialsRotationFailedAt());
     }
 }

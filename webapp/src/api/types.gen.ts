@@ -718,6 +718,7 @@ export type ConnectionDetail = {
     [key: string]: unknown;
   };
   createdAt?: Date;
+  credentialsUnreadableSince?: Date;
   displayName?: string;
   family?: 'SCM' | 'MESSAGING' | 'DOCUMENTATION';
   id?: number;
@@ -737,6 +738,7 @@ export type ConnectionDetail = {
 export type ConnectionSummary = {
   capabilities?: Array<'WEBHOOK_INGEST' | 'TOKEN_REFRESH' | 'FEEDBACK_DELIVERY' | 'INLINE_FEEDBACK' | 'APPROVAL_WORKFLOW' | 'SCOPE_CHANGES'>;
   createdAt?: Date;
+  credentialsUnreadableSince?: Date;
   displayName?: string;
   family?: 'SCM' | 'MESSAGING' | 'DOCUMENTATION';
   id?: number;
@@ -1879,6 +1881,10 @@ export type IntegrationCatalogEntry = {
    * Connection state, if connected
    */
   connectionState?: 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'UNINSTALLED';
+  /**
+   * When the stored credential was last found unreadable with the server's keys; absent while it reads
+   */
+  credentialsUnreadableSince?: Date;
   /**
    * Human-readable display name
    */

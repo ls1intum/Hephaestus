@@ -1,4 +1,4 @@
-import { CircleAlertIcon, CircleDashedIcon, PlugZapIcon } from "lucide-react";
+import { CircleAlertIcon, CircleDashedIcon, KeyRoundIcon, PlugZapIcon } from "lucide-react";
 import type * as React from "react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -47,6 +47,12 @@ const STATE_COPY: Partial<Record<ConnectionState, StateCopy>> = {
 
 export interface ConnectionStateNoticeProps {
 	connectionState?: ConnectionState;
+	/**
+	 * When the stored credential was last found unreadable with the server's encryption key. Set on
+	 * an ACTIVE connection as much as on any other, which is why it is not a state of its own: the
+	 * connection is fine, the key that wrote its credential is gone.
+	 */
+	credentialsUnreadableSince?: Date | null;
 	/** The integration as the admin knows it — "Slack", "GitHub", "Outline". */
 	displayName: string;
 	className?: string;
@@ -57,23 +63,41 @@ export interface ConnectionStateNoticeProps {
  * so a suspended Slack and a suspended Outline read identically. Severity tracks consequence:
  * SUSPENDED/UNINSTALLED mean sync is stopped, so they warn; PENDING resolves on its own and stays quiet.
  *
- * Renders nothing for ACTIVE or for a connection that doesn't exist — neither has anything to explain.
+ * A credential the server's key cannot read is explained here too, on top of whatever state the
+ * connection is in: it is the one condition that leaves a connection ACTIVE while everything that
+ * needs its token fails, so it must be said wherever the state would be.
+ *
+ * Renders nothing for an ACTIVE connection whose credential reads, or for a connection that doesn't
+ * exist — neither has anything to explain.
  */
 export function ConnectionStateNotice({
 	connectionState,
+	credentialsUnreadableSince,
 	displayName,
 	className,
 }: ConnectionStateNoticeProps) {
 	const copy = connectionState ? STATE_COPY[connectionState] : undefined;
-	if (!copy) {
+	if (!copy && !credentialsUnreadableSince) {
 		return null;
 	}
-
 	return (
-		<Alert variant={copy.variant} className={className}>
-			{copy.icon}
-			<AlertTitle>{copy.title}</AlertTitle>
-			<AlertDescription>{copy.describe(displayName)}</AlertDescription>
-		</Alert>
+		<div className={className}>
+			{credentialsUnreadableSince && (
+				<Alert variant="warning">
+					<KeyRoundIcon />
+					<AlertTitle>The stored token can't be read</AlertTitle>
+					<AlertDescription>
+						{`${displayName}'s stored token was encrypted with a key this server no longer has, so nothing that needs it can run. Re-enter the token, or reconnect, to replace it — or restore the key if it was changed by mistake.`}
+					</AlertDescription>
+				</Alert>
+			)}
+			{copy && (
+				<Alert variant={copy.variant} className={credentialsUnreadableSince ? "mt-3" : undefined}>
+					{copy.icon}
+					<AlertTitle>{copy.title}</AlertTitle>
+					<AlertDescription>{copy.describe(displayName)}</AlertDescription>
+				</Alert>
+			)}
+		</div>
 	);
 }

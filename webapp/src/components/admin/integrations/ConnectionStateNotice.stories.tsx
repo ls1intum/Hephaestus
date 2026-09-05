@@ -55,6 +55,30 @@ export const SuspendedOutline: Story = {
 	},
 };
 
+/**
+ * The credential was written with a key the server no longer has. The connection is ACTIVE, so this
+ * is the only notice; it says what happened and what replaces the token.
+ */
+export const CredentialUnreadable: Story = {
+	args: { connectionState: "ACTIVE", credentialsUnreadableSince: new Date("2026-09-05T08:00:00Z") },
+	play: async ({ canvas }) => {
+		canvas.getByText(/the stored token can't be read/i);
+		await expect(canvas.getByText(/re-enter the token, or reconnect/i)).toBeVisible();
+	},
+};
+
+/** Both conditions at once: the state notice follows the credential notice, each in its own words. */
+export const CredentialUnreadableWhileSuspended: Story = {
+	args: {
+		connectionState: "SUSPENDED",
+		credentialsUnreadableSince: new Date("2026-09-05T08:00:00Z"),
+	},
+	play: async ({ canvas }) => {
+		canvas.getByText(/the stored token can't be read/i);
+		await expect(canvas.getByText(/syncing is paused/i)).toBeVisible();
+	},
+};
+
 /** ACTIVE has nothing to explain, so the notice renders nothing at all. */
 export const Active: Story = {
 	args: { connectionState: "ACTIVE" },

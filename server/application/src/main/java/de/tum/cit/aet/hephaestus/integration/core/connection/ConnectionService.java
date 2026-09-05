@@ -40,6 +40,7 @@ public class ConnectionService {
     private final SyncJobService syncJobService;
 
     private final TransactionTemplate revokeTransactionTemplate;
+    private final CredentialReader credentialReader;
 
     public ConnectionService(
             ConnectionRepository connectionRepository,
@@ -47,8 +48,10 @@ public class ConnectionService {
             CredentialBundleConverter credentialConverter,
             ApplicationEventPublisher eventPublisher,
             SyncJobService syncJobService,
-            PlatformTransactionManager transactionManager) {
+            PlatformTransactionManager transactionManager,
+            CredentialReader credentialReader) {
         this.connectionRepository = connectionRepository;
+        this.credentialReader = credentialReader;
         this.auditRepository = auditRepository;
         this.credentialConverter = credentialConverter;
         this.eventPublisher = eventPublisher;
@@ -194,7 +197,7 @@ public class ConnectionService {
     public Optional<BearerToken> findActiveBearerToken(long workspaceId, IntegrationKind kind) {
         return connectionRepository
                 .findActive(workspaceId, kind)
-                .flatMap(c -> c.credentials(credentialConverter))
+                .flatMap(credentialReader::credentialsOf)
                 .flatMap(b -> b instanceof BearerToken bt ? Optional.of(bt) : Optional.empty());
     }
 
@@ -240,7 +243,7 @@ public class ConnectionService {
     public Optional<BearerToken> findBearerToken(long workspaceId, long connectionId) {
         return connectionRepository
                 .findByIdAndWorkspaceId(connectionId, workspaceId)
-                .flatMap(c -> c.credentials(credentialConverter))
+                .flatMap(credentialReader::credentialsOf)
                 .flatMap(b -> b instanceof BearerToken bt ? Optional.of(bt) : Optional.empty());
     }
 

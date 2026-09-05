@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.core.exception;
 
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditUnavailableException;
 import de.tum.cit.aet.hephaestus.core.tenancy.TenancyViolationException;
+import de.tum.cit.aet.hephaestus.integration.core.connection.CredentialUnreadableException;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Path;
@@ -37,6 +38,13 @@ public class GlobalControllerAdvice {
     private static final Logger log = LoggerFactory.getLogger(GlobalControllerAdvice.class);
 
     // STANDARD EXCEPTIONS
+
+    @ExceptionHandler(CredentialUnreadableException.class)
+    public ProblemDetail handleCredentialUnreadable(CredentialUnreadableException exception) {
+        // A state of the connection, so the answer names it and what clears it; nothing here is a fault
+        // of the request or of the server's ability to serve it.
+        return problem(HttpStatus.CONFLICT, "Credential unreadable", messageOf(exception));
+    }
 
     @ExceptionHandler(EntityNotFoundException.class)
     ProblemDetail handleNotFound(EntityNotFoundException exception) {

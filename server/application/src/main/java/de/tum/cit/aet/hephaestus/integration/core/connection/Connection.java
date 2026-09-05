@@ -247,6 +247,7 @@ public class Connection {
         this.credentialsRotationFailedAt = null;
     }
 
+    /** The stored credential could not be read with the configured keys; cleared when it is replaced. */
     void markCredentialRotationFailed(Instant failedAt) {
         this.credentialsRotationFailedAt = failedAt;
     }

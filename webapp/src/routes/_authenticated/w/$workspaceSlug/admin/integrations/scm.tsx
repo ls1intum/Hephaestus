@@ -216,8 +216,12 @@ function ScmIntegrationPage() {
 				description={`Connection health, repositories and sync activity for this workspace's ${label} connection.`}
 			/>
 
-			{hasConnection && !isConnectionActive && (
-				<ConnectionStateNotice connectionState={entry.connectionState} displayName={label} />
+			{hasConnection && (
+				<ConnectionStateNotice
+					connectionState={entry.connectionState}
+					credentialsUnreadableSince={entry.credentialsUnreadableSince}
+					displayName={label}
+				/>
 			)}
 
 			<SyncStatusHeader

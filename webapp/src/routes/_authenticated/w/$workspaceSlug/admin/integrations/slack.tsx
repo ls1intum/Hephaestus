@@ -264,8 +264,12 @@ function SlackIntegrationPage() {
 				/>
 			)}
 
-			{!routeLoading && !routeError && hasConnection && !isConnectionActive && (
-				<ConnectionStateNotice connectionState={entry.connectionState} displayName="Slack" />
+			{!routeLoading && !routeError && hasConnection && (
+				<ConnectionStateNotice
+					connectionState={entry.connectionState}
+					credentialsUnreadableSince={entry.credentialsUnreadableSince}
+					displayName="Slack"
+				/>
 			)}
 
 			{!routeLoading && !routeError && status && (

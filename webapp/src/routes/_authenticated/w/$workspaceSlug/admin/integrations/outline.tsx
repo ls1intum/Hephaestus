@@ -90,9 +90,10 @@ function OutlineIntegrationPage() {
 						/>
 					)}
 
-					{outline.hasConnection && !outline.isConnectionActive && (
+					{outline.hasConnection && (
 						<ConnectionStateNotice
 							connectionState={outline.connectionState}
+							credentialsUnreadableSince={outline.credentialsUnreadableSince}
 							displayName="Outline"
 						/>
 					)}

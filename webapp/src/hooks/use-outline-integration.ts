@@ -284,6 +284,7 @@ export function useOutlineIntegration(workspaceSlug: string) {
 		hasConnection,
 		isConnectionActive,
 		connectionState: outlineConnection?.state,
+		credentialsUnreadableSince: outlineConnection?.credentialsUnreadableSince,
 		// Lets the route poll its job-history query on the same adaptive cadence as the rest.
 		hasActiveJob: connectionStatus?.activeJob != null,
 		isLoading: connectionsQuery.isLoading,
@@ -314,6 +315,7 @@ export function useOutlineIntegration(workspaceSlug: string) {
 		connectCardProps: {
 			connected: hasConnection,
 			connectionState: outlineConnection?.state,
+		credentialsUnreadableSince: outlineConnection?.credentialsUnreadableSince,
 			connectionLabel: outlineConnection?.displayName,
 			tokenStatus,
 			isTokenStatusLoading: hasConnection && isTokenStatusLoading,

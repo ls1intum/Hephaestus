@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.credentials;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
-import de.tum.cit.aet.hephaestus.integration.core.connection.CredentialBundleConverter;
+import de.tum.cit.aet.hephaestus.integration.core.connection.CredentialReader;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
@@ -17,12 +17,11 @@ public class GitlabCredentialProvider implements ApiCredentialProvider {
     private static final Logger log = LoggerFactory.getLogger(GitlabCredentialProvider.class);
 
     private final ConnectionService connectionService;
-    private final CredentialBundleConverter credentialConverter;
+    private final CredentialReader credentialReader;
 
-    public GitlabCredentialProvider(
-            ConnectionService connectionService, CredentialBundleConverter credentialConverter) {
+    public GitlabCredentialProvider(ConnectionService connectionService, CredentialReader credentialReader) {
         this.connectionService = connectionService;
-        this.credentialConverter = credentialConverter;
+        this.credentialReader = credentialReader;
     }
 
     @Override
@@ -45,6 +44,6 @@ public class GitlabCredentialProvider implements ApiCredentialProvider {
             log.warn("GitLab Connection {} has no credentials_encrypted blob; cannot resolve PAT", ref.instanceKey());
             return Optional.empty();
         }
-        return conn.credentials(credentialConverter);
+        return credentialReader.credentialsOf(conn);
     }
 }
