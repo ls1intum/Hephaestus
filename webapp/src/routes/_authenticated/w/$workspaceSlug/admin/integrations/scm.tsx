@@ -231,7 +231,7 @@ function ScmIntegrationPage() {
 				isLoading={workspaceQuery.isLoading || catalogQuery.isLoading || statusQuery.isLoading}
 				error={workspaceQuery.error ?? catalogQuery.error ?? statusQuery.error}
 				isConnectionActive={isConnectionActive}
-				credentialsUnreadableSince={entry.credentialsUnreadableSince}
+				credentialsUnreadableSince={entry?.credentialsUnreadableSince}
 				triggeringType={triggeringType}
 				actions={
 					isAppInstallationWorkspace && (

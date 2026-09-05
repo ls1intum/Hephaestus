@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.workspace.adapter;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.AuthMode;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InstallationTokenProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
@@ -41,11 +42,13 @@ public class WorkspaceInstallationTokenProvider implements InstallationTokenProv
 
     @Override
     public Optional<String> getPersonalAccessToken(Long scopeId) {
-        // Prefer GITHUB (PAT mode) → GITLAB. Pure App-mode workspaces have no
-        // bearer credential blob; the caller must use the App-token mint path.
-        return connectionService
-                .findActiveBearerToken(scopeId, IntegrationKind.GITHUB)
-                .or(() -> connectionService.findActiveBearerToken(scopeId, IntegrationKind.GITLAB))
+        // Prefer GITHUB (PAT mode) → GITLAB. An App workspace's stored blob is installation identity
+        // that nothing runs on, so it is not read here: the caller must use the App-token mint path.
+        Optional<BearerToken> github =
+                connectionService.findActiveGitHubPatConfig(scopeId).isPresent()
+                        ? connectionService.findActiveBearerToken(scopeId, IntegrationKind.GITHUB)
+                        : Optional.empty();
+        return github.or(() -> connectionService.findActiveBearerToken(scopeId, IntegrationKind.GITLAB))
                 .map(b -> b.token())
                 .filter(token -> token != null && !token.isBlank());
     }

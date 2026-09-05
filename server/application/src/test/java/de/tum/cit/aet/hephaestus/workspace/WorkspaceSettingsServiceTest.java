@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -56,10 +57,7 @@ class WorkspaceSettingsServiceTest extends BaseUnitTest {
                 Clock.fixed(Instant.parse("2026-09-05T08:00:00Z"), ZoneOffset.UTC));
         Workspace workspace = TestEntities.workspace(7L);
         Connection connection = new Connection(
-                workspace,
-                IntegrationKind.GITHUB,
-                "acme",
-                new ConnectionConfig.GitHubAppConfig(100L, null, null, Set.of()));
+                workspace, IntegrationKind.GITHUB, "acme", new ConnectionConfig.GitHubPatConfig("x", "x", Set.of()));
         connection.setCredentials(new BearerToken("ghp-old", null), new CredentialBundleConverter(KEY, "test"));
         when(workspaceRepository.findById(7L)).thenReturn(Optional.of(workspace));
         when(connectionService.findActiveProviderKind(7L)).thenReturn(Optional.of(IntegrationKind.GITHUB));
@@ -69,5 +67,30 @@ class WorkspaceSettingsServiceTest extends BaseUnitTest {
 
         verify(connectionService).rotateBearerToken(eq(7L), eq(IntegrationKind.GITHUB), any(BearerToken.class));
         verify(connectionService, never()).findActiveBearerToken(any(Long.class), any());
+    }
+
+    /** An App installation runs on no stored token, so there is nothing to rotate and nothing to overwrite. */
+    @Test
+    void shouldRefuseToRotateForAnAppInstallation() {
+        WorkspaceSettingsService service = new WorkspaceSettingsService(
+                workspaceRepository,
+                configAudit,
+                connectionService,
+                eventPublisher,
+                Clock.fixed(Instant.parse("2026-09-05T08:00:00Z"), ZoneOffset.UTC));
+        Workspace workspace = TestEntities.workspace(7L);
+        Connection app = new Connection(
+                workspace,
+                IntegrationKind.GITHUB,
+                "acme",
+                new ConnectionConfig.GitHubAppConfig(100L, null, null, Set.of()));
+        when(workspaceRepository.findById(7L)).thenReturn(Optional.of(workspace));
+        when(connectionService.findActiveProviderKind(7L)).thenReturn(Optional.of(IntegrationKind.GITHUB));
+        when(connectionService.findActive(7L, IntegrationKind.GITHUB)).thenReturn(Optional.of(app));
+
+        assertThatThrownBy(() -> service.updateToken(7L, "ghp-new"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("App installation");
+        verify(connectionService, never()).rotateBearerToken(any(Long.class), any(), any());
     }
 }
