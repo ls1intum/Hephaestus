@@ -4,8 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -18,6 +20,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -50,6 +53,27 @@ class CredentialReaderTest extends BaseUnitTest {
         ReflectionTestUtils.setField(connection, "id", 55L);
     }
 
+    @Test
+    void shouldRecordOffTheCallersThread() {
+        CredentialBundleConverter writer = new CredentialBundleConverter(KEY_A, "dev");
+        connection.setCredentials(TOKEN, writer);
+        CredentialBundleConverter reader = new CredentialBundleConverter(KEY_B, "dev");
+        AtomicReference<String> recordedOn = new AtomicReference<>();
+        doAnswer(invocation -> {
+                    recordedOn.set(Thread.currentThread().getName());
+                    return 1;
+                })
+                .when(connectionRepository)
+                .markCredentialsUnreadable(any(), any(), any(), any());
+
+        assertThatThrownBy(() -> readerWith(reader).credentialsOf(connection))
+                .isInstanceOf(CredentialUnreadableException.class);
+
+        verify(connectionRepository, timeout(2000))
+                .markCredentialsUnreadable(eq(55L), eq(7L), eq(connection.getCredentialsEncrypted()), eq(NOW));
+        assertThat(recordedOn.get()).isEqualTo(CredentialReader.RECORDER_THREAD);
+    }
+
     private CredentialReader readerWith(CredentialBundleConverter converter) {
         return new CredentialReader(
                 connectionRepository, converter, transactionManager, Clock.fixed(NOW, ZoneOffset.UTC));
@@ -78,7 +102,7 @@ class CredentialReaderTest extends BaseUnitTest {
                 })
                 .hasMessageContaining("connection 55")
                 .hasMessageContaining("Replace the credential");
-        // Outside a transaction the record is written at once, bound to the ciphertext that failed.
+        // The record arrives from the recorder, bound to the ciphertext that failed.
         verify(connectionRepository)
                 .markCredentialsUnreadable(eq(55L), eq(7L), eq(connection.getCredentialsEncrypted()), eq(NOW));
     }
@@ -90,7 +114,8 @@ class CredentialReaderTest extends BaseUnitTest {
         connection.markCredentialRotationFailed(NOW.minusSeconds(60));
 
         assertThat(readerWith(converter).credentialsOf(connection)).contains(TOKEN);
-        verify(connectionRepository).markCredentialsReadable(eq(55L), eq(7L), eq(connection.getCredentialsEncrypted()));
+        verify(connectionRepository, timeout(2000))
+                .markCredentialsReadable(eq(55L), eq(7L), eq(connection.getCredentialsEncrypted()));
     }
 
     @Test

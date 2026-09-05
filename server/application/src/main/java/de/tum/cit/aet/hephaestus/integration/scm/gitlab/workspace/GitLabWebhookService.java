@@ -139,7 +139,7 @@ public class GitLabWebhookService {
         } catch (WebClientResponseException | IllegalStateException e) {
             // Non-fatal for the scheduler: a failure before the provider rotated leaves the old token
             // valid until it expires; a failure after it is what the warning below is for.
-            log.warn("Token rotation failed: workspaceId={}, error={}", workspace.getId(), e.getMessage());
+            log.warn("Token rotation failed: workspaceId={}", workspace.getId(), e);
         }
     }
 

@@ -45,7 +45,7 @@ class CredentialReaderIntegrationTest extends AbstractWorkspaceIntegrationTest {
         assertThatThrownBy(() -> credentialReader.credentialsOf(connection))
                 .isInstanceOf(CredentialUnreadableException.class);
 
-        Connection marked = connectionRepository.findById(connection.getId()).orElseThrow();
+        Connection marked = awaitMark(connection.getId());
         assertThat(marked.getCredentialsRotationFailedAt()).isNotNull();
         assertThat(marked.getVersion()).isEqualTo(version + 1);
 
@@ -90,6 +90,23 @@ class CredentialReaderIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
         assertThat(connectionRepository.findById(id).orElseThrow().getCredentialsRotationFailedAt())
                 .isNull();
+    }
+
+    /** The record is written by the reader's own worker, so the row is read until it carries it. */
+    private Connection awaitMark(long id) {
+        Instant deadline = Instant.now().plusSeconds(5);
+        while (true) {
+            Connection row = connectionRepository.findById(id).orElseThrow();
+            if (row.getCredentialsRotationFailedAt() != null || Instant.now().isAfter(deadline)) {
+                return row;
+            }
+            try {
+                Thread.sleep(50);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return row;
+            }
+        }
     }
 
     private Connection writtenUnderAnotherKey(Workspace workspace, String instanceKey) {
