@@ -54,12 +54,16 @@ redirects may use additional hosts; an allowlist limited to `github.com` and `gh
 
 ## Install
 
-1. Install the trusted reconciler checkout. Update it separately from application releases.
+1. Install the trusted reconciler checkout. This clone is the first tooling the host runs: from the
+   first release it applies onward, the host runs the reconciler and verifier of the release it
+   applied, reached through the `/var/lib/hephaestus/tooling` link that the reconciler moves only
+   after it has verified and applied a release. A release never replaces the tooling that verifies it.
 
    ```bash
    sudo install -d -m 0750 /var/lib/hephaestus
    sudo git clone --branch main --single-branch \
      https://github.com/hephaestus-build/Hephaestus.git /var/lib/hephaestus/checkout
+   sudo ln -sfn /var/lib/hephaestus/checkout /var/lib/hephaestus/tooling
    ```
 
 2. Copy `docker/self-host/systemd/reconcile.env.example` to `/etc/hephaestus/reconcile.env`
@@ -77,7 +81,48 @@ redirects may use additional hosts; an allowlist limited to `github.com` and `gh
    sudo systemctl enable --now hephaestus-reconcile.timer
    ```
 
+   The units are copies, because systemd needs them on the root filesystem at boot. The reconciler
+   keeps both at the release the host runs and reloads systemd when it rewrites one, so this is the
+   last time they are installed by hand.
+
 5. Watch the first run: `journalctl -fu hephaestus-reconcile.service`.
+
+### Upgrading a host installed before the tooling link
+
+A host set up before `/var/lib/hephaestus/tooling` existed runs the reconciler straight from its
+checkout, and that checkout is exactly what stood still. Bring it forward once by hand; from then
+on the reconciler maintains the link and the units.
+
+```bash
+sudo systemctl stop hephaestus-reconcile.timer
+while [ "$(systemctl show --property=ActiveState --value hephaestus-reconcile.service)" = activating ]; do sleep 5; done
+sudo git -C /var/lib/hephaestus/checkout fetch --quiet origin main
+sudo git -C /var/lib/hephaestus/checkout reset --quiet --hard origin/main
+sudo ln -sfn /var/lib/hephaestus/checkout /var/lib/hephaestus/tooling
+sudo install -m 0644 \
+  /var/lib/hephaestus/checkout/docker/self-host/systemd/hephaestus-reconcile.service \
+  /var/lib/hephaestus/checkout/docker/self-host/systemd/hephaestus-reconcile.timer \
+  /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl start hephaestus-reconcile.service
+sudo systemctl start hephaestus-reconcile.timer
+sudo readlink /var/lib/hephaestus/tooling
+```
+
+Then run the **Promote** workflow for the release the host already runs. A record written before
+the release commit was kept is never completed from what is on disk — nothing there tells the tree
+the host accepted from one a failed promotion left behind — so the host keeps the tooling from the
+checkout, reports `hephaestus_deploy_tooling_pending 1`, and only the next apply records the commit
+and adopts that release's tooling.
+
+The timer is stopped first and a tick already running is waited out — a oneshot service is
+`activating` while it runs, and stopping its timer does not stop it — because nothing may change the
+checkout underneath a tick. The last line names the worktree of the release the host runs once a
+tick has adopted it. The service starts only through that link: if it is ever missing or points at
+a directory that is gone, recreate it with the `ln` line above. A recorded release whose worktree
+under `releases/` has been deleted is rebuilt before anything else, at the commit the host accepted
+for it rather than wherever its tag points now; if that cannot be done, because the checkout
+has lost that commit, say, the tick stops with the reason.
 
 `HEPHAESTUS_STACKS` selects the Compose projects this host manages. If another proxy provides its
 ingress, omit `proxy` and use `core app`.
@@ -106,12 +151,14 @@ The reconciler refuses a release checkout with modified tracked files.
 ## Watching it
 
 Set `HEPHAESTUS_METRICS_FILE` to a `.prom` file in an existing node_exporter textfile collector
-directory. After a deployment has succeeded, the metrics include:
+directory. After a deployment has succeeded, every run writes these, except one that only adopted
+the tooling of the applied release, which leaves them as they were:
 
 ```text
 hephaestus_deploy_info{channel="staging",release="v1.2.3",channel_commit="…"} 1
 hephaestus_deploy_reconcile_success 1
 hephaestus_deploy_reconcile_timestamp_seconds …
+hephaestus_deploy_tooling_pending 0
 hephaestus_deploy_last_success_timestamp_seconds …
 ```
 
@@ -119,6 +166,8 @@ Alert when `time() - hephaestus_deploy_reconcile_timestamp_seconds` exceeds ten 
 `hephaestus_deploy_reconcile_success` is `0`, or when the host's reconciliation metrics are absent.
 `hephaestus_deploy_last_success_timestamp_seconds` records the last successful **apply**; unchanged
 and frozen channels do not advance it, so its age is not a reconciliation-liveness check.
+Alert as well when `hephaestus_deploy_tooling_pending` stays `1`: the host runs tooling no apply has
+recorded yet, and a promotion of the release it runs ends that.
 
 A promotion without **freeze** waits for the public webapp to report the requested version. This
 checks the webapp version, not the readiness of every service; use host metrics and logs for the

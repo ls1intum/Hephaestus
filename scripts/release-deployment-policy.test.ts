@@ -134,8 +134,12 @@ await test("promotion refuses a draft but reaches any published release, and the
 	assert.match(promotion, /--json isDraft --jq \.isDraft/);
 	// Rollback must support releases predating immutable tags; the signed lock binds their digests.
 	assert.doesNotMatch(promotion, /isImmutable/);
-	assert.match(reconciler, /join\(config\.checkout, "scripts\/prepare-release-lock\.ts"\)/);
+	// The verifier is the tooling this tick runs — resolved from the running script, which Node pins
+	// to the tree it loaded — never the release under review.
+	assert.match(reconciler, /join\(import\.meta\.dirname, "prepare-release-lock\.ts"\)/);
 	assert.doesNotMatch(reconciler, /join\(releaseTree, "scripts\/prepare-release-lock\.ts"\)/);
+	// Run through the tooling link, argv[1] and import.meta.filename differ; only import.meta.main holds.
+	assert.match(reconciler, /^if \(import\.meta\.main\) \{/m);
 });
 
 await test("derives the canonical signer identity and refuses missing CI identity", () => {

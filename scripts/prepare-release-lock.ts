@@ -2,6 +2,9 @@ import { mkdtemp, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 
+/** A stalled download must not hold a host's reconcile tick until its unit gives up. */
+const DOWNLOAD_TIMEOUT_MS = 5 * 60_000;
+
 import { run } from "./lib/process.ts";
 import { releaseCertificateIdentity, releaseRepository } from "./lib/release-identities.ts";
 import { isRelease } from "./release-image-lock.ts";
@@ -18,7 +21,7 @@ async function downloadReleaseAsset(
 	into: string,
 ): Promise<void> {
 	const url = `https://github.com/${repository}/releases/download/${tag}/${name}`;
-	const response = await fetch(url);
+	const response = await fetch(url, { signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) });
 	if (!response.ok) throw new Error(`GET ${url} returned ${response.status}`);
 	await writeFile(join(into, name), Buffer.from(await response.arrayBuffer()));
 }
