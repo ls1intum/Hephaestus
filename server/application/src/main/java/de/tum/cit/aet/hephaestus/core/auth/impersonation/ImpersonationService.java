@@ -82,10 +82,18 @@ public class ImpersonationService {
      * Begin impersonating {@code targetAccountId} as {@code operatorAccountId}. The operator
      * MUST be an {@code APP_ADMIN} (the controller enforces this via method security too;
      * we re-check here as defence in depth). A {@code reason} is mandatory and audited.
+     *
+     * @param operatorSessionExpiresAt the operator's absolute session deadline, carried onto the
+     *     impersonation token so impersonating cannot outlive the session that started it.
      */
     @Transactional
     public Result begin(
-            Long operatorAccountId, Long targetAccountId, String reason, @Nullable HttpServletRequest request) {
+            Long operatorAccountId,
+            Long targetAccountId,
+            String reason,
+            @Nullable Instant operatorSessionExpiresAt,
+            @Nullable HttpServletRequest request) {
+        requireLiveSession(operatorSessionExpiresAt);
         if (reason == null || reason.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "impersonation reason is required");
         }
@@ -115,8 +123,12 @@ public class ImpersonationService {
         // the operator. Issued via the principal factory so preferred_username = target login.
         // imp_exp stamps the absolute time-box so silent refresh can't renew it indefinitely.
         Instant impersonationExpiresAt = clock.instant().plus(properties.impersonationMaxLifetime());
-        HephaestusJwtIssuer.Token token =
-                jwtIssuer.issue(principalFactory.forAccount(target), operator.getId(), impersonationExpiresAt, request);
+        HephaestusJwtIssuer.Token token = jwtIssuer.issue(
+                principalFactory.forAccount(target),
+                operator.getId(),
+                impersonationExpiresAt,
+                operatorSessionExpiresAt,
+                request);
 
         authEventLogger
                 .event(AuthEvent.EventType.IMPERSONATION_BEGIN, AuthEvent.Result.SUCCESS)
@@ -136,10 +148,20 @@ public class ImpersonationService {
      */
     @Transactional
     public Result exit(
-            Long operatorAccountId, Long targetAccountId, UUID currentJti, @Nullable HttpServletRequest request) {
-        issuedJwtRepository.revoke(currentJti, clock.instant(), IssuedJwt.RevokedReason.IMPERSONATION_EXIT);
-        HephaestusJwtIssuer.Token token =
-                jwtIssuer.issue(principalFactory.forAccountId(operatorAccountId), null, request);
+            Long operatorAccountId,
+            Long targetAccountId,
+            UUID currentJti,
+            @Nullable Instant operatorSessionExpiresAt,
+            @Nullable HttpServletRequest request) {
+        requireLiveSession(operatorSessionExpiresAt);
+        // The conditional revoke affects 0 rows when this jti was already ended — by a concurrent exit,
+        // a force sign-out, or the auto-exit on refresh. Minting an operator token anyway would hand
+        // back a session that something else deliberately closed.
+        if (issuedJwtRepository.revoke(currentJti, clock.instant(), IssuedJwt.RevokedReason.IMPERSONATION_EXIT) == 0) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "impersonation session is no longer active");
+        }
+        HephaestusJwtIssuer.Token token = jwtIssuer.issue(
+                principalFactory.forAccountId(operatorAccountId), null, null, operatorSessionExpiresAt, request);
 
         authEventLogger
                 .event(AuthEvent.EventType.IMPERSONATION_END, AuthEvent.Result.SUCCESS)
@@ -152,6 +174,17 @@ public class ImpersonationService {
                 targetAccountId);
 
         return new Result(token, operatorAccountId, null);
+    }
+
+    /**
+     * The operator's absolute session deadline governs both ends of an impersonation. Without it, an
+     * operator whose own session has lapsed could still start one — or return from one into a session
+     * that no longer exists.
+     */
+    private void requireLiveSession(@Nullable Instant operatorSessionExpiresAt) {
+        if (operatorSessionExpiresAt == null || !clock.instant().isBefore(operatorSessionExpiresAt)) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "operator session has expired");
+        }
     }
 
     /**

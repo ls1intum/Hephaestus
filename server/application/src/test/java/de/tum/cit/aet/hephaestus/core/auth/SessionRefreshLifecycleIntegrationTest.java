@@ -73,8 +73,14 @@ class SessionRefreshLifecycleIntegrationTest extends RealAuthIntegrationTest {
     @Test
     void refreshRotatesTheSessionAndKeepsAppRequestsWorkingAcrossManyCycles() {
         Account account = accountRepository.save(new Account("Rolling Rosa"));
+        // Every real login stamps the absolute ceiling; a rotation is only allowed to roll within it.
         String current = jwtIssuer
-                .issue(principalFactory.forAccount(account), null, null)
+                .issue(
+                        principalFactory.forAccount(account),
+                        null,
+                        null,
+                        java.time.Instant.now().plus(java.time.Duration.ofHours(12)),
+                        null)
                 .value();
         String csrf = fetchCsrfToken();
 

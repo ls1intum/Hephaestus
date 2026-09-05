@@ -73,8 +73,12 @@ public class AuthLifecycleController {
     @Audited(ledger = AuditLedger.AUTH_EVENT, type = "IMPERSONATION_BEGIN")
     public ResponseEntity<Void> impersonate(
             @Valid @RequestBody ImpersonateRequestDTO body, HttpServletRequest request, HttpServletResponse response) {
-        ImpersonationService.Result result =
-                impersonationService.begin(CurrentAccount.requireId(), body.targetAccountId(), body.reason(), request);
+        ImpersonationService.Result result = impersonationService.begin(
+                CurrentAccount.requireId(),
+                body.targetAccountId(),
+                body.reason(),
+                CurrentAccount.sessionExpiresAt(),
+                request);
         sessionService.setCookie(response, result.token());
         return ResponseEntity.noContent().build();
     }
@@ -88,7 +92,11 @@ public class AuthLifecycleController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "not currently impersonating");
         }
         ImpersonationService.Result result = impersonationService.exit(
-                impersonatorId, CurrentAccount.requireId(), CurrentAccount.requireJti(), request);
+                impersonatorId,
+                CurrentAccount.requireId(),
+                CurrentAccount.requireJti(),
+                CurrentAccount.sessionExpiresAt(),
+                request);
         sessionService.setCookie(response, result.token());
         return ResponseEntity.noContent().build();
     }
