@@ -1692,6 +1692,35 @@ void test("installs dependencies in every job that calls vp", async () => {
 	assert.deepEqual(offenders, [], "A job that calls vp must install dependencies first");
 });
 
+void test("the Scorecard ratchet runs on every event that can move a score, outside publishing", async () => {
+	const workflow = parseDocument(await readFile(".github/workflows/scorecard-ratchet.yml", "utf8"));
+	for (const trigger of ["push", "branch_protection_rule", "schedule", "workflow_dispatch"])
+		assert.ok(workflow.hasIn(["on", trigger]), `the ratchet must run on ${trigger}`);
+	assert.equal(workflow.getIn(["jobs", "ratchet", "permissions", "contents"]), "read");
+	assert.equal(workflow.hasIn(["jobs", "ratchet", "permissions", "id-token"]), false);
+	assert.equal(
+		step(workflow, ["jobs", "ratchet"], "actions/upload-artifact").get("path"),
+		"tmp/scorecard-assessment.json",
+	);
+	assert.match(
+		pathFilter(await readFile(".github/workflows/cicd.yml", "utf8"), "tooling"),
+		/security\/scorecard-baseline\.json/,
+	);
+
+	// The publishing workflow may only run allowlisted actions, which is why the ratchet is not a job in it.
+	const publishing = parseDocument(await readFile(".github/workflows/scorecard.yml", "utf8"));
+	const steps = publishing.getIn(["jobs", "analysis", "steps"]);
+	assert.ok(isSeq(steps));
+	for (const item of steps.items) {
+		assert.ok(isMap(item));
+		assert.equal(item.get("run"), undefined);
+		assert.match(
+			String(item.get("uses")),
+			/^(actions\/(checkout|upload-artifact)|github\/codeql-action\/upload-sarif|ossf\/scorecard-action)@/,
+		);
+	}
+});
+
 // A toolchain claim is a job: every leg of the task graph is one matrix entry of one job, the Vite+
 // shell and the hook dispatcher run on Windows as one of them, and the documented first command of
 // a contributor runs from a clone that has nothing but the launcher.
@@ -1772,6 +1801,35 @@ void test("Semgrep scans PRs, main and merge queues without a privileged trigger
 		pathFilter(await readFile(".github/workflows/cicd.yml", "utf8"), "tooling"),
 		/security\/semgrep\/\*\*/,
 	);
+});
+
+void test("CodeQL runs advanced setup and excludes the Semgrep fixtures it would otherwise flag", async () => {
+	const source = await readFile(".github/workflows/codeql.yml", "utf8");
+	const workflow = parseDocument(source);
+	for (const trigger of ["pull_request", "push", "merge_group", "schedule"])
+		assert.ok(workflow.hasIn(["on", trigger]), `codeql.yml must run on ${trigger}`);
+	assert.equal(workflow.hasIn(["on", "pull_request_target"]), false);
+	const permissions = workflow.getIn(["jobs", "analyze", "permissions"]);
+	assert.ok(isMap(permissions));
+	assert.deepEqual(permissions.toJSON(), {
+		actions: "read",
+		contents: "read",
+		"security-events": "write",
+	});
+	for (const action of ["github/codeql-action/init", "github/codeql-action/analyze"])
+		for (const match of source.matchAll(new RegExp(`uses: ${action}@([\\w.-]+)`, "g")))
+			assert.match(match[1] ?? "", /^[a-f0-9]{40}$/, `${action} must be pinned by commit`);
+	const init = step(workflow, ["jobs", "analyze"], "github/codeql-action/init");
+	assert.equal(init.get("build-mode"), "none");
+	assert.equal(init.get("config-file"), "./.github/codeql/codeql-config.yml");
+	assert.match(String(init.get("languages")), /^\$\{\{ *matrix\.language *\}\}$/);
+	const analyze = step(workflow, ["jobs", "analyze"], "github/codeql-action/analyze");
+	assert.match(String(analyze.get("category")), /^\/language:\$\{\{ *matrix\.language *\}\}$/);
+	const config = asRecord(
+		parseDocument(await readFile(".github/codeql/codeql-config.yml", "utf8")).toJSON(),
+		"codeql-config.yml",
+	);
+	assert.deepEqual(config["paths-ignore"], ["security/semgrep/**"]);
 });
 
 void test("every Semgrep rule ships a positive and a negative fixture", async () => {

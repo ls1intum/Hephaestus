@@ -1,0 +1,42 @@
+name: Scorecard ratchet
+
+# Separate from scorecard.yml: OpenSSF allows the publishing job only allowlisted actions, and its
+# publishing is supported on the events that workflow already declares.
+on:
+  push:
+    branches: [main]
+  branch_protection_rule:
+  schedule:
+    - cron: "23 4 * * 1"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ratchet:
+    name: Scorecard regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: package.json
+      - name: Enforce the published baseline
+        run: node scripts/check-scorecard.ts
+      - name: Preserve ratchet evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: scorecard-ratchet-${{ github.sha }}
+          path: tmp/scorecard-assessment.json
+          if-no-files-found: warn
+          retention-days: 14

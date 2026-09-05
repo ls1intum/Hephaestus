@@ -1,0 +1,84 @@
+{
+	"repository": "github.com/hephaestus-build/Hephaestus",
+	"date": "2026-09-04T19:00:22Z",
+	"checks": [
+		{
+			"name": "Binary-Artifacts",
+			"score": 10
+		},
+		{
+			"name": "CI-Tests",
+			"score": 10
+		},
+		{
+			"name": "Code-Review",
+			"score": 10
+		},
+		{
+			"name": "Dangerous-Workflow",
+			"score": 10
+		},
+		{
+			"name": "Dependency-Update-Tool",
+			"score": 10
+		},
+		{
+			"name": "License",
+			"score": 10
+		},
+		{
+			"name": "Maintained",
+			"score": 10
+		},
+		{
+			"name": "Pinned-Dependencies",
+			"score": 10
+		},
+		{
+			"name": "SAST",
+			"score": 10
+		},
+		{
+			"name": "Security-Policy",
+			"score": 10
+		},
+		{
+			"name": "Token-Permissions",
+			"score": 10
+		},
+		{
+			"name": "Vulnerabilities",
+			"score": 10
+		},
+		{
+			"name": "Signed-Releases",
+			"score": 8
+		},
+		{
+			"name": "Branch-Protection",
+			"score": 4
+		},
+		{
+			"name": "Contributors",
+			"score": 3
+		},
+		{
+			"name": "CII-Best-Practices",
+			"score": 0
+		},
+		{
+			"name": "Fuzzing",
+			"score": 0
+		},
+		{
+			"name": "Packaging",
+			"score": -1
+		}
+	],
+	"excluded": {
+		"Contributors": "Organization diversity is not a repository engineering control.",
+		"CII-Best-Practices": "An OpenSSF badge is a separate adoption decision.",
+		"Fuzzing": "Fuzzing adoption is a separate policy decision.",
+		"Packaging": "Releases publish images rather than registry packages."
+	}
+}
