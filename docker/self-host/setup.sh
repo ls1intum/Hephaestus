@@ -109,18 +109,31 @@ refuse_unless_new_database() {
 			;;
 	esac
 }
-if ! grep -q '^HEPHAESTUS_SECURITY_ENCRYPTION_KEY=.' "$working_file"; then
-	refuse_unless_new_database HEPHAESTUS_SECURITY_ENCRYPTION_KEY
+# Whether the file carried a master key before anything here touched it. Only such a file is a
+# credible pre-v0.75 configuration, the one shape in which an absent credential key means "the
+# master key": a file that is empty or damaged proves nothing about how the database was written.
+master_key_was_configured=false
+if grep -q '^HEPHAESTUS_SECURITY_ENCRYPTION_KEY=.' "$working_file"; then
+	master_key_was_configured=true
 fi
-# The credential key derives from the master key only for an installation from before v0.75, which
-# never had an assignment for it. An explicitly blank assignment, or rotation settings, mean the
-# installation set the credential key separately; over an existing database that key is the only
-# right one, and the master key stands in for nothing.
-if ! grep -q '^HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY=.' "$working_file"; then
-	if grep -q '^HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY=' "$working_file" \
-		|| grep -qE '^HEPHAESTUS_SECURITY_(CREDENTIAL_ENCRYPTION_KEY_VERSION|PRIOR_CREDENTIAL_ENCRYPTION_KEY|PRIOR_CREDENTIAL_ENCRYPTION_KEY_VERSION|CREDENTIAL_ROTATION_ENABLED)=.' "$working_file"; then
-		refuse_unless_new_database HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY
+credential_key_is_absent=true
+if grep -q '^HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY=.' "$working_file"; then
+	credential_key_is_absent=false
+fi
+credential_key_was_set_separately=false
+if grep -q '^HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY=' "$working_file" \
+	|| grep -qE '^HEPHAESTUS_SECURITY_(CREDENTIAL_ENCRYPTION_KEY_VERSION|PRIOR_CREDENTIAL_ENCRYPTION_KEY|PRIOR_CREDENTIAL_ENCRYPTION_KEY_VERSION|CREDENTIAL_ROTATION_ENABLED)=' "$working_file"; then
+	credential_key_was_set_separately=true
+fi
+if [ "$master_key_was_configured" = false ]; then
+	if [ "$credential_key_is_absent" = true ]; then
+		refuse_unless_new_database 'HEPHAESTUS_SECURITY_ENCRYPTION_KEY and HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY (the same value as the master key on an installation from before v0.75)'
+	else
+		refuse_unless_new_database HEPHAESTUS_SECURITY_ENCRYPTION_KEY
 	fi
+fi
+if [ "$credential_key_is_absent" = true ] && [ "$credential_key_was_set_separately" = true ]; then
+	refuse_unless_new_database HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY
 fi
 
 set_if_empty POSTGRES_PASSWORD hex16

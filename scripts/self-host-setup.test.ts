@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { execFile } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
 import {
 	chmod,
 	copyFile,
@@ -284,11 +284,57 @@ await test(
 	posixOnly,
 	async () => {
 		const directory = await fixture();
-		const opensslOnly = join(directory, "openssl-only");
-		await mkdir(opensslOnly);
-		await symlink("/usr/bin/openssl", join(opensslOnly, "openssl"));
-		const result = await setup(directory, { path: `${opensslOnly}:/usr/bin:/bin` });
+		const tools = join(directory, "tools-without-docker");
+		await mkdir(tools);
+		for (const tool of [
+			"openssl",
+			"grep",
+			"sed",
+			"mktemp",
+			"cp",
+			"chmod",
+			"mv",
+			"rm",
+			"dirname",
+			"head",
+			"cat",
+			"sh",
+		]) {
+			const resolved = execFileSync("sh", ["-c", `command -v ${tool}`], {
+				encoding: "utf8",
+			}).trim();
+			await symlink(resolved, join(tools, tool));
+		}
+		const result = await setup(directory, { path: tools });
 		assert.equal(result.exitCode, 1);
 		assert.match(result.output, /docker is not installed on this host, or not on PATH/);
+	},
+);
+
+await test("an empty env file over an existing database names both keys", posixOnly, async () => {
+	// Nothing in an empty or damaged file says whether the credential key was the master key
+	// or set separately, so the instruction must not lead the operator to restore one and have
+	// the other quietly derived on the next run.
+	const directory = await fixture();
+	const result = await setup(directory, { database: "present" });
+	assert.equal(result.exitCode, 1);
+	assert.match(
+		result.output,
+		/Set HEPHAESTUS_SECURITY_ENCRYPTION_KEY and HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY \(the same value as the master key on an installation from before v0\.75\)/,
+	);
+});
+
+await test(
+	"a blank rotation setting counts as a separately set credential key",
+	posixOnly,
+	async () => {
+		const directory = await fixture();
+		await writeFile(
+			join(directory, ".env"),
+			"HEPHAESTUS_SECURITY_ENCRYPTION_KEY=0123456789abcdef0123456789abcdef\nHEPHAESTUS_SECURITY_PRIOR_CREDENTIAL_ENCRYPTION_KEY=\n",
+		);
+		const result = await setup(directory, { database: "present" });
+		assert.equal(result.exitCode, 1);
+		assert.match(result.output, /Set HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY to the value/);
 	},
 );
