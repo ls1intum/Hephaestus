@@ -19,8 +19,13 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -30,6 +35,13 @@ import org.springframework.transaction.support.SimpleTransactionStatus;
 
 @Tag("unit")
 class CredentialReaderTest extends BaseUnitTest {
+
+    private final List<CredentialReader> readers = new ArrayList<>();
+
+    @AfterEach
+    void shutDownReaders() {
+        readers.forEach(CredentialReader::shutdown);
+    }
 
     private static final String KEY_A = "0123456789abcdef0123456789abcdef";
     private static final String KEY_B = "ABCDEFabcdef0123ABCDEFabcdef0123";
@@ -54,13 +66,15 @@ class CredentialReaderTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldRecordOffTheCallersThread() {
+    void shouldRecordOffTheCallersThread() throws InterruptedException {
         CredentialBundleConverter writer = new CredentialBundleConverter(KEY_A, "dev");
         connection.setCredentials(TOKEN, writer);
         CredentialBundleConverter reader = new CredentialBundleConverter(KEY_B, "dev");
         AtomicReference<String> recordedOn = new AtomicReference<>();
+        CountDownLatch recorded = new CountDownLatch(1);
         doAnswer(invocation -> {
                     recordedOn.set(Thread.currentThread().getName());
+                    recorded.countDown();
                     return 1;
                 })
                 .when(connectionRepository)
@@ -69,14 +83,15 @@ class CredentialReaderTest extends BaseUnitTest {
         assertThatThrownBy(() -> readerWith(reader).credentialsOf(connection))
                 .isInstanceOf(CredentialUnreadableException.class);
 
-        verify(connectionRepository, timeout(2000))
-                .markCredentialsUnreadable(eq(55L), eq(7L), eq(connection.getCredentialsEncrypted()), eq(NOW));
+        assertThat(recorded.await(2, TimeUnit.SECONDS)).isTrue();
         assertThat(recordedOn.get()).isEqualTo(CredentialReader.RECORDER_THREAD);
     }
 
     private CredentialReader readerWith(CredentialBundleConverter converter) {
-        return new CredentialReader(
+        CredentialReader reader = new CredentialReader(
                 connectionRepository, converter, transactionManager, Clock.fixed(NOW, ZoneOffset.UTC));
+        readers.add(reader);
+        return reader;
     }
 
     @Test
@@ -103,7 +118,7 @@ class CredentialReaderTest extends BaseUnitTest {
                 .hasMessageContaining("connection 55")
                 .hasMessageContaining("Replace the credential");
         // The record arrives from the recorder, bound to the ciphertext that failed.
-        verify(connectionRepository)
+        verify(connectionRepository, timeout(2000))
                 .markCredentialsUnreadable(eq(55L), eq(7L), eq(connection.getCredentialsEncrypted()), eq(NOW));
     }
 
