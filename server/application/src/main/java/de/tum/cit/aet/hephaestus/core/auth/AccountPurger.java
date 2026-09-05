@@ -3,7 +3,9 @@ package de.tum.cit.aet.hephaestus.core.auth;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountErasureContributor;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -11,12 +13,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Single-account hard-delete unit of work. Separate bean from {@link AccountHardDeleteSweeper} so the
- * {@code REQUIRES_NEW} boundary is a real proxy hop (a self-invocation would bypass it — the same
- * reason {@code AuthEventWriter} is split from {@code AuthEventLogger}). Each account purges in its own
- * transaction so one bad row never blocks the rest of the GDPR erasure backlog.
- */
+/** Separate bean so each account purge crosses the transactional proxy and rolls back independently. */
 @ConditionalOnServerRole
 @Component
 @WorkspaceAgnostic("Account hard-delete is account-scoped; the sweep is global, not tenant data")
@@ -29,13 +26,17 @@ public class AccountPurger {
 
     private final AccountRepository accountRepository;
     private final JdbcTemplate jdbcTemplate;
+    private final List<AccountErasureContributor> erasureContributors;
 
-    public AccountPurger(AccountRepository accountRepository, JdbcTemplate jdbcTemplate) {
+    public AccountPurger(
+            AccountRepository accountRepository,
+            JdbcTemplate jdbcTemplate,
+            List<AccountErasureContributor> erasureContributors) {
         this.accountRepository = accountRepository;
         this.jdbcTemplate = jdbcTemplate;
+        this.erasureContributors = erasureContributors;
     }
 
-    /** Purge one account in its OWN transaction. Throws on failure so the caller can isolate it. */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void purge(Long accountId) {
         // Children carry ON DELETE CASCADE on account_id, but we keep the account tombstone, so the
@@ -46,29 +47,28 @@ public class AccountPurger {
         jdbcTemplate.update("DELETE FROM account_export WHERE account_id = ?", accountId);
         jdbcTemplate.update("UPDATE consent_decision SET account_id = NULL WHERE account_id = ?", accountId);
         anonymizeAuditRows(accountId);
+        // Rows another module owns are erased by that module, inside this transaction.
+        erasureContributors.forEach(contributor -> contributor.eraseAccount(accountId));
 
         Account account = accountRepository.findById(accountId).orElse(null);
         if (account == null) {
             return;
         }
-        // Clear PII on the surviving tombstone and flip to the terminal state.
         account.setStatus(Account.Status.DELETED);
         account.setDisplayName(TOMBSTONE_DISPLAY_NAME);
         account.setPrimaryEmail(null);
         account.setPrimaryEmailVerifiedAt(null);
         accountRepository.save(account);
-        log.info("auth.account: hard-deleted accountId={} (purged auth rows, status=DELETED)", accountId);
+        log.info("auth.account: hard-deleted accountId={} (purged account-owned rows, status=DELETED)", accountId);
     }
 
     /**
-     * GDPR Art. 17 erasure for the retained audit trails. The {@code auth_event} rows are kept under the
-     * Art. 30 / Art. 17(3)(b) records-of-processing carve-out, but the personal data they carry has no
-     * retention basis once the subject is erased: the raw {@code ip_inet}, the {@code user_agent}
-     * fingerprint, and — for {@code IMPERSONATION_*} rows — the operator-supplied free-text {@code reason}
-     * plus another account's id embedded in {@code details}. Anonymize those to {@code NULL} while
-     * preserving the non-identifying skeleton ({@code event_type}, {@code result}, {@code occurred_at}) so
-     * the proof-of-deletion event and the Art. 30 trail survive. Covers rows where the erased subject is
-     * either the event's subject ({@code account_id}) OR the impersonator ({@code acting_account_id}).
+     * {@code auth_event} and {@code config_audit_event} rows survive erasure: they are the security and
+     * settings-change trail, and their non-identifying skeleton ({@code event_type}, {@code result},
+     * {@code occurred_at}) is what the trail is. Only the personal columns are nulled — {@code ip_inet},
+     * {@code user_agent}, and {@code details}, which carries the operator's free-text reason and a second
+     * account id on {@code IMPERSONATION_*} rows. The {@code WHERE} covers the erased subject in both
+     * roles: event subject ({@code account_id}) and impersonator ({@code acting_account_id}).
      */
     private void anonymizeAuditRows(Long accountId) {
         int redacted = jdbcTemplate.update(
@@ -80,9 +80,7 @@ public class AccountPurger {
             log.info("auth.account: anonymized {} auth_event row(s) for erased accountId={}", redacted, accountId);
         }
 
-        // config_audit_event carries no free-text or network identifiers, so only the account references
-        // need clearing. The append-only trigger permits exactly this per-column nulling; the change
-        // itself stays, which is what the Art. 17(3)(b) basis retains.
+        // The append-only audit trigger permits nulling account references for erasure.
         int unlinked = jdbcTemplate.update(
                 "UPDATE config_audit_event SET actor_account_id = NULL, acting_account_id = NULL "
                         + "WHERE actor_account_id = ? OR acting_account_id = ?",

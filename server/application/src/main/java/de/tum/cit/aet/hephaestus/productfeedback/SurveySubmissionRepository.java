@@ -9,4 +9,6 @@ interface SurveySubmissionRepository extends JpaRepository<SurveySubmission, UUI
     Page<SurveySubmission> findAllByOrderByCreatedAtDesc(Pageable pageable);
 
     void deleteAllByWorkspaceId(Long workspaceId);
+
+    void deleteAllByAccountId(long accountId);
 }
