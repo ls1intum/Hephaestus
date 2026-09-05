@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, test } from "node:test";
 
+import { environmentForGitFixture } from "./lib/git-environment.ts";
 import {
 	hasSchemaMigrations,
 	planRelease,
@@ -147,23 +148,11 @@ after(() => {
 void test("reads schema migrations from the diff between the two releases", async () => {
 	const repo = mkdtempSync(join(tmpdir(), "plan-release-"));
 	repositories.push(repo);
-	// A developer's own `tag.gpgSign` would turn the lightweight tag below into an annotated one and
-	// send git looking for an editor, so the fixture reads an empty global config instead.
-	const configDirectory = mkdtempSync(join(tmpdir(), "plan-release-config-"));
-	repositories.push(configDirectory);
-	const globalConfig = join(configDirectory, "gitconfig");
-	writeFileSync(globalConfig, "");
 	const git = (...args: string[]): string =>
 		execFileSync("git", args, {
 			cwd: repo,
 			encoding: "utf8",
-			env: {
-				...Object.fromEntries(
-					Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")),
-				),
-				GIT_CONFIG_GLOBAL: globalConfig,
-				GIT_CONFIG_NOSYSTEM: "1",
-			},
+			env: environmentForGitFixture(),
 			stdio: ["ignore", "pipe", "pipe"],
 		}).trim();
 	const changelog = "server/application/src/main/resources/db/changelog";

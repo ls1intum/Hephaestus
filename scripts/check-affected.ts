@@ -1,24 +1,10 @@
 import { spawnSync } from "node:child_process";
 
+import { environmentWithoutGitRepository } from "./lib/git-environment.ts";
 import { CAPTURE_LIMIT_BYTES } from "./lib/process.ts";
 
 export type Scope = "agents" | "docs" | "full" | "server" | "webapp";
 export type Command = readonly [string, ...string[]];
-
-export function environmentWithoutGitRepository(): NodeJS.ProcessEnv {
-	const environment = { ...process.env };
-	for (const name of [
-		"GIT_ALTERNATE_OBJECT_DIRECTORIES",
-		"GIT_COMMON_DIR",
-		"GIT_DIR",
-		"GIT_INDEX_FILE",
-		"GIT_OBJECT_DIRECTORY",
-		"GIT_PREFIX",
-		"GIT_WORK_TREE",
-	])
-		delete environment[name];
-	return environment;
-}
 
 export function parseBase(args: string[]): string {
 	if (args.length === 0) return "origin/main";

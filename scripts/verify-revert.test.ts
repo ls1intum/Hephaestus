@@ -5,16 +5,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, test } from "node:test";
 
+import { environmentForGitFixture } from "./lib/git-environment.ts";
 import { verifyRevert } from "./verify-revert.ts";
 
 const SCRIPT = join(import.meta.dirname, "verify-revert.ts");
-
-/**
- * Git hooks export GIT_DIR, GIT_INDEX_FILE and friends, which would point every command below at
- * the repository being pushed instead of at the fixture.
- */
-const cleanGitEnv = (): NodeJS.ProcessEnv =>
-	Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")));
 
 type Git = (...args: string[]) => string;
 
@@ -33,7 +27,7 @@ function fixture(): { repo: string; git: Git; write: (file: string, content: str
 			cwd: repo,
 			encoding: "utf8",
 			stdio: ["ignore", "pipe", "pipe"],
-			env: cleanGitEnv(),
+			env: environmentForGitFixture(),
 		}).trim();
 	const write = (file: string, content: string): void => writeFileSync(join(repo, file), content);
 	git("init", "--quiet", "--initial-branch=main");
@@ -248,7 +242,7 @@ void test("reports the verdict to GITHUB_OUTPUT", () => {
 	const stdout = execFileSync(process.execPath, [SCRIPT, base, "HEAD"], {
 		cwd: repo,
 		encoding: "utf8",
-		env: { ...cleanGitEnv(), GITHUB_OUTPUT: output },
+		env: environmentForGitFixture({ GITHUB_OUTPUT: output }),
 	});
 	assert.match(stdout, /::notice::Verified revert of/);
 	assert.equal(readFileSync(output, "utf8"), "verified-revert=true\n");
@@ -257,7 +251,7 @@ void test("reports the verdict to GITHUB_OUTPUT", () => {
 	const denied = execFileSync(process.execPath, [SCRIPT, base, "HEAD"], {
 		cwd: repo,
 		encoding: "utf8",
-		env: { ...cleanGitEnv(), GITHUB_OUTPUT: output },
+		env: environmentForGitFixture({ GITHUB_OUTPUT: output }),
 	});
 	assert.match(denied, /Not a verified revert/);
 	assert.equal(readFileSync(output, "utf8"), "verified-revert=true\nverified-revert=false\n");

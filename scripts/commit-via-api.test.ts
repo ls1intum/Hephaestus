@@ -6,25 +6,13 @@ import { join } from "node:path";
 import { test } from "node:test";
 
 import { stageChanges, commitInput } from "./commit-via-api.ts";
-
-// Unset inherited Git hook variables as process helpers merge overrides with the environment.
-const cleanGitEnv = (): NodeJS.ProcessEnv => ({
-	...Object.fromEntries(
-		Object.keys(process.env)
-			.filter((key) => key.startsWith("GIT_"))
-			.map((key) => [key, undefined]),
-	),
-	GIT_CONFIG_NOSYSTEM: "1",
-});
+import { environmentForGitFixture } from "./lib/git-environment.ts";
 
 type Git = (...args: string[]) => string;
 
 function repoWithCommittedFiles() {
 	const repo = mkdtempSync(join(tmpdir(), "commit-via-api-"));
-	mkdirSync(join(repo, ".git"));
-	const globalConfig = join(repo, ".git", "test-global-config");
-	writeFileSync(globalConfig, "");
-	const env = { ...process.env, ...cleanGitEnv(), GIT_CONFIG_GLOBAL: globalConfig };
+	const env = environmentForGitFixture();
 	const git: Git = (...args) =>
 		execFileSync("git", args, {
 			cwd: repo,

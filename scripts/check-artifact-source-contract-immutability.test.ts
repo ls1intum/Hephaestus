@@ -5,15 +5,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 
+import { environmentForGitFixture } from "./lib/git-environment.ts";
+
 const CHECKER = join(import.meta.dirname, "check-artifact-source-contract-immutability.ts");
 
-/**
- * Git hooks export GIT_DIR, GIT_INDEX_FILE and friends, which would point every command below at the
- * repository being pushed instead of at the fixture. Strip them so the fixtures are self-contained
- * however these tests are invoked.
- */
-const cleanGitEnv = (): NodeJS.ProcessEnv =>
-	Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")));
 const CONTRACTS = "server/application/src/main/resources/contracts/artifact-source";
 
 type Git = (...args: string[]) => string;
@@ -26,7 +21,7 @@ function repoWithPublishedContract(): { repo: string; git: Git } {
 			cwd: repo,
 			encoding: "utf8",
 			stdio: ["ignore", "pipe", "pipe"],
-			env: cleanGitEnv(),
+			env: environmentForGitFixture(),
 		});
 	git("init", "--quiet", "--initial-branch=main");
 	git("config", "user.email", "test@example.invalid");
@@ -46,7 +41,7 @@ function runChecker(repo: string): string {
 		cwd: repo,
 		encoding: "utf8",
 		stdio: ["ignore", "pipe", "pipe"],
-		env: { ...cleanGitEnv(), CONTRACT_BASE_REF: "main", GITHUB_BASE_REF: "" },
+		env: environmentForGitFixture({ CONTRACT_BASE_REF: "main", GITHUB_BASE_REF: "" }),
 	});
 }
 
@@ -101,7 +96,7 @@ await test("reports honestly when nothing is published at the merge base", (t) =
 			cwd: repo,
 			encoding: "utf8",
 			stdio: ["ignore", "pipe", "pipe"],
-			env: cleanGitEnv(),
+			env: environmentForGitFixture(),
 		});
 	git("init", "--quiet", "--initial-branch=main");
 	git("config", "user.email", "test@example.invalid");

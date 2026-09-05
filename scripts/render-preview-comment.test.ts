@@ -5,13 +5,16 @@ import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { test } from "node:test";
 
+import { environmentForGitFixture } from "./lib/git-environment.ts";
+
 const script = resolve("scripts/render-preview-comment.ts");
-const environment = Object.fromEntries(
-	Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")),
-);
 
 function git(root: string, ...arguments_: string[]): string {
-	return execFileSync("git", arguments_, { cwd: root, encoding: "utf8", env: environment }).trim();
+	return execFileSync("git", arguments_, {
+		cwd: root,
+		encoding: "utf8",
+		env: environmentForGitFixture(),
+	}).trim();
 }
 
 async function repository(changedFile: string): Promise<{ base: string; root: string }> {
@@ -39,13 +42,12 @@ async function render(
 	execFileSync("node", [script, kind, directory, "https://preview.example/", base, "comment.md"], {
 		cwd: root,
 		stdio: "pipe",
-		env: {
-			...environment,
+		env: environmentForGitFixture({
 			GITHUB_SERVER_URL: "https://github.com",
 			GITHUB_REPOSITORY: "example/project",
 			GITHUB_RUN_ID: "123",
 			GITHUB_SHA: "not-the-checked-out-commit",
-		},
+		}),
 	});
 	return readFile(resolve(root, "comment.md"), "utf8");
 }

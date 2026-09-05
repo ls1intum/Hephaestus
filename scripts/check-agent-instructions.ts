@@ -32,6 +32,7 @@ import { fromMarkdown } from "mdast-util-from-markdown";
 import { mdxFromMarkdown } from "mdast-util-mdx";
 import { mdxjs } from "micromark-extension-mdxjs";
 
+import { environmentWithoutGitRepository } from "./lib/git-environment.ts";
 import { asRecord, asStringArray, parseJson } from "./lib/json.ts";
 
 /** Resolved from this file, so the gate answers the same whatever the working directory is. */
@@ -746,7 +747,7 @@ export async function scan(root: string = REPO_ROOT): Promise<Snapshot> {
 	const { stdout } = await promisify(execFile)(
 		"git",
 		["ls-files", "-z", "--cached", "--others", "--exclude-standard"],
-		{ cwd: root, maxBuffer: 64 * 1024 * 1024 },
+		{ cwd: root, env: environmentWithoutGitRepository(), maxBuffer: 64 * 1024 * 1024 },
 	);
 	// Sorted, so the failures print in the same sequence locally and in CI.
 	const listed = [...new Set(stdout.split("\0").filter((path) => path !== ""))].toSorted();

@@ -5,13 +5,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 
-import {
-	changedPaths,
-	commandsFor,
-	environmentWithoutGitRepository,
-	parseBase,
-	scopesFor,
-} from "./check-affected.ts";
+import { changedPaths, commandsFor, parseBase, scopesFor } from "./check-affected.ts";
+import { environmentForGitFixture } from "./lib/git-environment.ts";
 
 await test("accepts only the documented arguments", () => {
 	assert.equal(parseBase([]), "origin/main");
@@ -85,7 +80,7 @@ await test("a full-gate input overrides scoped inputs", () => {
 await test("discovers committed, staged, unstaged, untracked, deleted, and renamed paths", async () => {
 	const directory = await mkdtemp(join(tmpdir(), "check-affected-"));
 	const git = (...args: string[]) =>
-		execFileSync("git", args, { cwd: directory, env: environmentWithoutGitRepository() });
+		execFileSync("git", args, { cwd: directory, env: environmentForGitFixture() });
 	const put = async (path: string, content = path) => {
 		await mkdir(join(directory, path, ".."), { recursive: true });
 		await writeFile(join(directory, path), content);
