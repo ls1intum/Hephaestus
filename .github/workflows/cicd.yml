@@ -14,9 +14,11 @@ on:
   merge_group:
 
 # A dispatch never shares a group with a push on the same ref: the Version PR is validated by
-# dispatch while `main` is validated by push, and a push produces the images a release promotes, so
-# it is the one run that must never be cancelled by another. A pull request or a dispatch validates
-# a branch that is still moving, where the newest run is the only one whose answer is wanted.
+# dispatch while `main` is validated by push. A pending push run is replaced by the next merge
+# rather than held; `queue: max` would hold every one, which is not wanted, because only main's tip
+# is deployed and `plan-release.ts` re-cuts a consumed version from a later commit. A pull request
+# or a dispatch validates a branch that is still moving, where the newest run is the only one whose
+# answer is wanted.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' }}
@@ -62,7 +64,13 @@ jobs:
       # Aliasing an unchanged image falls back to main's own push run, which has published nothing
       # yet when the Version PR head is written, so that branch builds the whole set itself; so does
       # a pull request whose chain of bases reaches no published commit at all.
-      all-images: ${{ github.event_name != 'pull_request' || steps.version_branch.outputs.version-branch == 'true' || steps.alias_base.outputs.commit == '' }}
+      all-images: ${{ steps.alias_base.outputs.commit == '' || steps.version_branch.outputs.version-branch == 'true' }}
+      # A push and a dispatch validate a commit whole; a pull request and a merge group are each a
+      # diff, which paths-filter reads for a group from `merge_group.base_sha..head_sha` without
+      # being told.
+      unfiltered: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+      publishable: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+      previews: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
       # A skipped duplicate would skip the image builds the release evidence preflight needs, and
       # the gate refuses to pass the Version PR without one.
       should_skip: ${{ steps.skip_check.outputs.should_skip == 'true' && steps.version_branch.outputs.version-branch != 'true' }}
@@ -107,17 +115,17 @@ jobs:
           [ "$current" = "$previous" ] || changed=true
           echo "changed=$changed" >> "$GITHUB_OUTPUT"
 
-      - if: github.event_name == 'pull_request'
+      - if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
         uses: ./.github/actions/setup-toolchain
         with:
           install: "none"
 
       - name: Resolve the commit unchanged images are aliased from
         id: alias_base
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
         env:
           GH_TOKEN: ${{ github.token }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: node scripts/resolve-alias-base.ts
 
@@ -262,6 +270,7 @@ jobs:
               - '.github/actions/setup-caches/**'
               - '.github/actions/setup-browsers/**'
               - '.github/actions/restore-server-build/**'
+              - '.github/actions/postgres-image/**'
             test-config:
               - '.github/workflows/cicd.yml'
               - '.java-version'
@@ -307,6 +316,8 @@ jobs:
               - '!webapp/src/**/*.stories.*'
               - '!webapp/src/test/**'
 
+  # `Actionlint` and `Zizmor` are required contexts, and a required context that skips still
+  # satisfies the ruleset — docs/contributor/ci-cd.mdx § Merge policy says why.
   workflow-lint:
     name: "Actionlint"
     timeout-minutes: 10
@@ -316,7 +327,7 @@ jobs:
       (github.event_name != 'push' || needs.detect-changes.outputs.version-bump == 'true') &&
       needs.detect-changes.outputs.should_skip != 'true' && (
         needs.detect-changes.outputs.ci-config == 'true' ||
-        github.event_name != 'pull_request'
+        needs.detect-changes.outputs.unfiltered == 'true'
       )
     permissions:
       checks: write
@@ -341,7 +352,7 @@ jobs:
     needs: [detect-changes]
     if: |
       (github.event_name != 'push' || needs.detect-changes.outputs.version-bump == 'true') &&
-      (github.event_name != 'pull_request' || needs.detect-changes.outputs.ci-config == 'true')
+      (needs.detect-changes.outputs.unfiltered == 'true' || needs.detect-changes.outputs.ci-config == 'true')
     permissions:
       contents: read
       security-events: write
@@ -369,7 +380,7 @@ jobs:
       needs.detect-changes.outputs.should_skip != 'true' && (
         needs.detect-changes.outputs.any-code == 'true' ||
         needs.detect-changes.outputs.quality-config == 'true' ||
-        github.event_name != 'pull_request'
+        needs.detect-changes.outputs.unfiltered == 'true'
       )
     secrets:
       CHROMATIC_PROJECT_TOKEN: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
@@ -381,10 +392,10 @@ jobs:
       statuses: write
     with:
       should_skip: ${{ needs.detect-changes.outputs.should_skip }}
-      webapp_changed: ${{ (needs.detect-changes.outputs.webapp == 'true' || needs.detect-changes.outputs.quality-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
-      application_server_changed: ${{ (needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.quality-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
-      tooling_changed: ${{ (needs.detect-changes.outputs.tooling == 'true' || needs.detect-changes.outputs.quality-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
-      pmd_canary: ${{ (needs.detect-changes.outputs.pmd-canary == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+      webapp_changed: ${{ (needs.detect-changes.outputs.webapp == 'true' || needs.detect-changes.outputs.quality-config == 'true' || needs.detect-changes.outputs.unfiltered == 'true') && 'true' || 'false' }}
+      application_server_changed: ${{ (needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.quality-config == 'true' || needs.detect-changes.outputs.unfiltered == 'true') && 'true' || 'false' }}
+      tooling_changed: ${{ (needs.detect-changes.outputs.tooling == 'true' || needs.detect-changes.outputs.quality-config == 'true' || needs.detect-changes.outputs.unfiltered == 'true') && 'true' || 'false' }}
+      pmd_canary: ${{ (needs.detect-changes.outputs.pmd-canary == 'true' || needs.detect-changes.outputs.unfiltered == 'true') && 'true' || 'false' }}
 
   # Same-repository pull requests run Build regardless of paths: previews need the application
   # image at the head SHA on every push.
@@ -393,8 +404,8 @@ jobs:
     needs: [detect-changes]
     if: |
       needs.detect-changes.outputs.should_skip != 'true' && (
-        github.event_name != 'pull_request' ||
-        github.event.pull_request.head.repo.full_name == github.repository ||
+        needs.detect-changes.outputs.unfiltered == 'true' ||
+        needs.detect-changes.outputs.previews == 'true' ||
         needs.detect-changes.outputs.any-code == 'true' ||
         needs.detect-changes.outputs.build-config == 'true'
       )
@@ -406,12 +417,13 @@ jobs:
       attestations: write
     with:
       should_skip: ${{ needs.detect-changes.outputs.should_skip }}
-      publish: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+      publish: ${{ needs.detect-changes.outputs.publishable == 'true' }}
       single_arch: ${{ needs.detect-changes.outputs.single-arch }}
+      postgres_base_sha: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.sha }}
       server_changed: ${{ (needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.e2e == 'true' || needs.detect-changes.outputs.postgres-image == 'true' || needs.detect-changes.outputs.build-config == 'true' || needs.detect-changes.outputs.application-server-image == 'true' || needs.detect-changes.outputs.supported-host-smoke == 'true' || needs.detect-changes.outputs.all-images == 'true') && 'true' || 'false' }}
-      contracts_changed: ${{ (github.event_name != 'push' || needs.detect-changes.outputs.version-bump == 'true') && (needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.postgres-image == 'true' || needs.detect-changes.outputs.build-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
-      e2e_changed: ${{ (github.event_name != 'push' || needs.detect-changes.outputs.version-bump == 'true') && (needs.detect-changes.outputs.e2e == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
-      postgres_image_changed: ${{ (needs.detect-changes.outputs.postgres-image == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+      contracts_changed: ${{ (github.event_name != 'push' || needs.detect-changes.outputs.version-bump == 'true') && (needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.postgres-image == 'true' || needs.detect-changes.outputs.build-config == 'true' || needs.detect-changes.outputs.unfiltered == 'true') && 'true' || 'false' }}
+      e2e_changed: ${{ (github.event_name != 'push' || needs.detect-changes.outputs.version-bump == 'true') && (needs.detect-changes.outputs.e2e == 'true' || needs.detect-changes.outputs.unfiltered == 'true') && 'true' || 'false' }}
+      postgres_image_changed: ${{ (needs.detect-changes.outputs.postgres-image == 'true' || needs.detect-changes.outputs.unfiltered == 'true') && 'true' || 'false' }}
       server_image_changed: ${{ (needs.detect-changes.outputs.application-server-image == 'true' || needs.detect-changes.outputs.supported-host-smoke == 'true' || needs.detect-changes.outputs.all-images == 'true') && 'true' || 'false' }}
 
   Security:
@@ -423,14 +435,14 @@ jobs:
         needs.detect-changes.outputs.any-code == 'true' ||
         needs.detect-changes.outputs.security-config == 'true' ||
         needs.detect-changes.outputs.release-images == 'true' ||
-        github.event_name != 'pull_request'
+        needs.detect-changes.outputs.unfiltered == 'true'
       )
     permissions:
       contents: read
       security-events: write
     with:
       should_skip: ${{ needs.detect-changes.outputs.should_skip }}
-      release_images_changed: ${{ (needs.detect-changes.outputs.release-images == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+      release_images_changed: ${{ (needs.detect-changes.outputs.release-images == 'true' || needs.detect-changes.outputs.unfiltered == 'true') && 'true' || 'false' }}
 
   Test:
     uses: ./.github/workflows/ci-tests.yml
@@ -440,14 +452,14 @@ jobs:
       needs.detect-changes.outputs.should_skip != 'true' && (
         needs.detect-changes.outputs.application-server == 'true' ||
         needs.detect-changes.outputs.test-config == 'true' ||
-        github.event_name != 'pull_request'
+        needs.detect-changes.outputs.unfiltered == 'true'
       )
     permissions:
       contents: read
       checks: write
     with:
       should_skip: ${{ needs.detect-changes.outputs.should_skip }}
-      application_server_changed: ${{ (needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.test-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+      application_server_changed: ${{ (needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.test-config == 'true' || needs.detect-changes.outputs.unfiltered == 'true') && 'true' || 'false' }}
 
   Changesets:
     if: github.event_name == 'pull_request'
@@ -470,12 +482,12 @@ jobs:
       SENTRY_PROJECT: ${{ github.event_name == 'push' && secrets.SENTRY_PROJECT || '' }}
     needs: [detect-changes]
     # Same-repository previews require every image at the PR head tag; unchanged images are aliased
-    # here and the application image is built by Build. Forks cannot preview, so their image builds
-    # remain path-filtered.
+    # here and the application image is built by Build. A fork and a merge group have no preview, so
+    # their image builds stay path-filtered.
     if: |
       needs.detect-changes.outputs.should_skip != 'true' && (
-        github.event_name != 'pull_request' ||
-        github.event.pull_request.head.repo.full_name == github.repository ||
+        needs.detect-changes.outputs.unfiltered == 'true' ||
+        needs.detect-changes.outputs.previews == 'true' ||
         needs.detect-changes.outputs.any-code == 'true' ||
         needs.detect-changes.outputs.ci-config == 'true'
       )
@@ -486,7 +498,7 @@ jobs:
       attestations: write
     with:
       should_skip: ${{ needs.detect-changes.outputs.should_skip }}
-      publish: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+      publish: ${{ needs.detect-changes.outputs.publishable == 'true' }}
       single_arch: ${{ needs.detect-changes.outputs.single-arch }}
       webapp_changed: ${{ (needs.detect-changes.outputs.webapp-image == 'true' || needs.detect-changes.outputs.docker-config == 'true' || needs.detect-changes.outputs.all-images == 'true') && 'true' || 'false' }}
       application_server_changed: ${{ (needs.detect-changes.outputs.application-server-image == 'true' || needs.detect-changes.outputs.supported-host-smoke == 'true' || needs.detect-changes.outputs.all-images == 'true') && 'true' || 'false' }}
@@ -502,8 +514,7 @@ jobs:
     # A fork pull request builds its images without publishing them, so there is nothing to pull
     # and no boot to check; the release path exercises a fork's install path once it is on `main`.
     if: >-
-      github.event_name == 'pull_request' &&
-      github.event.pull_request.head.repo.full_name == github.repository &&
+      needs.detect-changes.outputs.previews == 'true' &&
       needs.detect-changes.outputs.should_skip != 'true' &&
       needs.detect-changes.outputs.supported-host-smoke == 'true'
     runs-on: ubuntu-24.04
