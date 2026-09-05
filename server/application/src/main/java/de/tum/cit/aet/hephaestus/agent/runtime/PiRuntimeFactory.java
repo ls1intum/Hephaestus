@@ -82,7 +82,7 @@ public class PiRuntimeFactory {
 
         env.put("HOME", "/home/agent");
         env.put("XDG_CONFIG_HOME", "/home/agent/.config");
-        env.put("TMPDIR", "/home/agent/.local/tmp");
+        env.put("TMPDIR", PiRunnerProfile.AGENT_TMPDIR);
         env.put("PI_CODING_AGENT_DIR", SandboxLayout.PI_AGENT_DIR);
 
         String workspaceRoot = SandboxLayout.WORKSPACE_ROOT;

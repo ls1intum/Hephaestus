@@ -35,13 +35,15 @@ vs writable is decided by *where* a file lives, not by convention. Three top-lev
 ├── work/                            # AGENT + PRECOMPUTE SCRATCH. Never collected back into SQL.
 │   ├── precompute/                  #   Per-practice precompute scripts (TypeScript, run on Node).
 │   ├── precompute-out/              #   Precompute runtime output (logs, structured hints).
-│   └── analysis/practices/          #   Per-practice analysis output (holds the .gitkeep marker).
+│   ├── analysis/practices/          #   Per-practice analysis output (holds the .gitkeep marker).
+│   └── composition/                 #   observations.json — the admitted observations feedback is composed from.
 ├── out/                             # THE ONLY collected directory — result.json, review-state.json,
 │                                    #   usage.json, runner-debug.json, watchdog-killed.json
 ├── task.json                        # TaskEnvelope<…> — runtime contract between handler and runner.
 ├── .pi/                             # Pi SDK agent dir — $PI_CODING_AGENT_DIR resolves here.
 │   ├── AGENTS.md                    #   Orchestrator instructions
 │   └── settings.json                #   Pi SDK config (provider, model, compaction)
+├── .sessions/                       # Pi SDK session JSONL, one file per session.
 ├── pi-provider.json                 # Provider/model routing for the runner.
 ├── pi-provider.ts                   # Provider/model helper imported by both runners.
 ├── pi-error-text.ts                 # Shared error-message helper.
