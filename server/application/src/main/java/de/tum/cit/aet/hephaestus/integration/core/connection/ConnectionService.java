@@ -186,6 +186,15 @@ public class ConnectionService {
 
     public record OutlineSubscription(long workspaceId, String serverUrl, String signingSecret) {}
 
+    /** Whether the workspace's ACTIVE Connection holds credentials, without decrypting them. */
+    @Transactional(readOnly = true)
+    public boolean hasActiveCredentials(long workspaceId, IntegrationKind kind) {
+        return connectionRepository
+                .findActive(workspaceId, kind)
+                .map(Connection::hasCredentials)
+                .orElse(false);
+    }
+
     /**
      * Decrypts the stored {@link BearerToken} for the workspace's ACTIVE Connection,
      * if any. Tampering/cross-row substitution surfaces as {@code EncryptionException}.

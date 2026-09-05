@@ -127,18 +127,13 @@ public record WorkspaceDTO(
                 .map(c -> c.getCreatedAt())
                 .orElse(null);
 
-        boolean hasPat = connectionService
-                .findActiveBearerToken(workspaceId, IntegrationKind.GITHUB)
-                .map(b -> b.token() != null && !b.token().isEmpty())
-                .orElseGet(() -> connectionService
-                        .findActiveBearerToken(workspaceId, IntegrationKind.GITLAB)
-                        .map(b -> b.token() != null && !b.token().isEmpty())
-                        .orElse(false));
+        // Presence only: this view must not decrypt anything, or a credential the running key cannot
+        // read takes the whole workspace page down with it.
+        boolean hasPat = (gitHubPat.isPresent()
+                        && connectionService.hasActiveCredentials(workspaceId, IntegrationKind.GITHUB))
+                || (gitLab.isPresent() && connectionService.hasActiveCredentials(workspaceId, IntegrationKind.GITLAB));
 
-        boolean hasSlackToken = connectionService
-                .findActiveBearerToken(workspaceId, IntegrationKind.SLACK)
-                .map(b -> b.token() != null && !b.token().isEmpty())
-                .orElse(false);
+        boolean hasSlackToken = connectionService.hasActiveCredentials(workspaceId, IntegrationKind.SLACK);
 
         Long slackConnectionId = connectionService
                 .findActive(workspaceId, IntegrationKind.SLACK)

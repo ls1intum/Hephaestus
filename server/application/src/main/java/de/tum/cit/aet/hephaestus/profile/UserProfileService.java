@@ -109,7 +109,7 @@ public class UserProfileService {
         List<RepositoryInfoDTO> contributedRepositories = workspaceId == null
                 ? List.of()
                 : profileRepositoryQueryRepository.findContributedByLogin(login, workspaceId).stream()
-                        .map(RepositoryInfoDTO::fromRepository)
+                        .map(RepositoryInfoDTO::fromRepositoryWithoutLabels)
                         .sorted(Comparator.comparing(RepositoryInfoDTO::name))
                         .toList();
 

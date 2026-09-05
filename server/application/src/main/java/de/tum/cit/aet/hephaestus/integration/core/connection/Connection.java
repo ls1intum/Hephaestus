@@ -251,6 +251,15 @@ public class Connection {
         this.credentialsRotationFailedAt = failedAt;
     }
 
+    /**
+     * Whether credentials are stored, without touching a key. Presence must not depend on the running
+     * key being the one that wrote the row: a credential it cannot read is a state to surface, not a
+     * reason to fail whatever page asked.
+     */
+    public boolean hasCredentials() {
+        return credentialsEncrypted != null;
+    }
+
     /** Returns the decrypted credentials, if configured. */
     public Optional<CredentialBundle> credentials(CredentialBundleConverter converter) {
         if (credentialsEncrypted == null) {
