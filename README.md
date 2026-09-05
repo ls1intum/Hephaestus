@@ -112,12 +112,9 @@ The feedback is advisory: it does not approve a change for merge or grade anyone
 
 ## Contributing
 
-Contributions are welcome. Hephaestus is a research project and
-[@FelixTJDietrich](https://github.com/FelixTJDietrich) is its core maintainer, so issues and pull
-requests are triaged on a best-effort basis; security reports get priority.
-[CONTRIBUTING.md](./CONTRIBUTING.md) explains how to set up the project, propose a change, run the
-quality checks, and open a pull request. Participation in the project is governed by the
-[Code of Conduct](./CODE_OF_CONDUCT.md).
+Contributions are welcome. [CONTRIBUTING.md](./CONTRIBUTING.md) explains how to set up the project,
+propose a change, run the quality checks and open a pull request, and what to expect from triage.
+Participation in the project is governed by the [Code of Conduct](./CODE_OF_CONDUCT.md).
 
 ## Project origins
 

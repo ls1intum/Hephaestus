@@ -246,7 +246,7 @@ Hephaestus supports two GitHub authentication modes. Pick the one that fits your
      workspace:
        init-default: true
        default:
-         login: your-github-org # e.g., "ls1intum" or "HephaestusTest"
+         login: your-github-org # e.g., "hephaestus-build" or "HephaestusTest"
          token: ghp_your_token
          repositories-to-monitor:
            - your-github-org/repo1
@@ -286,11 +286,10 @@ hephaestus:
   sync:
     filters:
       allowed-organizations:
-        - ls1intum
+        - hephaestus-build
         - HephaestusTest
       allowed-repositories:
-        - ls1intum/Hephaestus
-        - ls1intum/Artemis
+        - hephaestus-build/Hephaestus
         - HephaestusTest/demo-repository
 ```
 
@@ -323,15 +322,17 @@ rejected outright. To point a connection at a local OpenAI-compatible gateway du
 set:
 
 ```yaml
-# server/.env or application-local.yml
+# application-local.yml
 hephaestus.llm.egress.allow-loopback: true
 ```
 
-This is off by default everywhere except `application-local.yml`/`application-e2e.yml`; never enable it in a deployed environment.
+or `HEPHAESTUS_LLM_EGRESS_ALLOW_LOOPBACK=true` in `server/.env`. It is off by default and
+`application-e2e.yml` is the only shipped profile that turns it on; never enable it in a deployed
+environment.
 
 ### Authentication (local)
 
-Authentication is Hephaestus-native (no Keycloak — see [ADR 0017](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0017-replace-keycloak-with-spring-native-auth.md)). The server federates to GitHub (and optionally GitLab — gitlab.com or a self-hosted instance) via Spring Security `oauth2Login`, then issues its own short-lived ES256 cookie-session JWT. The webapp reads `GET /user` and redirects to `/auth/login` — there is no token in the browser.
+Authentication is Hephaestus-native (no Keycloak — see [ADR 0017](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0017-replace-keycloak-with-spring-native-auth.md)). The server federates to GitHub (and optionally GitLab — gitlab.com or a self-hosted instance) via Spring Security `oauth2Login`, then issues its own short-lived ES256 cookie-session JWT. The webapp reads `GET /user` and redirects to `/auth/login` — there is no token in the browser.
 
 #### Configure GitHub login
 
@@ -370,10 +371,8 @@ development the monolith default boots all three runtime roles (`server`, `worke
 so `vp run dev:server` exposes the unified `/webhooks/{kind}` endpoint (kinds: `github`,
 `gitlab`, `slack`, `outline`) alongside the rest of the API.
 
-In production the receiver is deployed as a separate `webhook-server` container from the same
-image, activated with `SPRING_PROFILES_ACTIVE=prod,webhook`. The app-server's deploy cycle does
-NOT interrupt webhook reception — push events on GitHub/GitLab are not manually redeliverable,
-so restart independence is operationally required. See ADR 0008.
+Production runs the receiver in its own container — [Runtime roles](../admin/runtime-roles#monolith-vs-split-pod)
+and [ADR 0008](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0008-webhook-runtime-role.md).
 
 When you run `docker/compose.core.yaml` set the webhook secret up front so signature checks
 succeed (the same secret is used by both auto-registration and the receiver):
@@ -424,8 +423,8 @@ vp run --filter webapp chromatic:ci        # Visual regression in CI
 ```
 
 - Every new UI component ships with at least one story covering empty, loading, and error states.
-- Chromatic runs on every pull request – review visual diffs before merging.
-- Reference [ui.shadcn.com](https://ui.shadcn.com/) for composition patterns; stick to headless Radix primitives when you need new widgets.
+- CI runs Chromatic for same-repository pull requests that change the webapp – review visual diffs before merging.
+- Reference [ui.shadcn.com](https://ui.shadcn.com/) for composition patterns; a new widget builds on the Base UI primitives already wrapped under `src/components/ui/**`.
 
 ### OpenAPI client
 

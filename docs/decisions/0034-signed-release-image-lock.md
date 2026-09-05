@@ -29,9 +29,10 @@ Rollback selects an earlier published lock and never rebuilds metadata or resolv
 
 ## Consequences
 
-- Production and staging no longer deploy branch, channel, or version tags.
+- Production and staging deploy no branch, channel, or version tag.
 - The former release-pin init container and production pin-file import are removed.
-- Operators need GitHub CLI, Cosign, and the repository-pinned Bun version to prepare self-hosted
+- Operators need Cosign and the Node.js version the repository pins
+  ([ADR 0037](0037-node-24-and-pnpm-12-are-the-javascript-toolchain.md)) to prepare self-hosted
   deployment inputs.
 - Preview and local development remain non-release paths and may use build-specific tags.
 

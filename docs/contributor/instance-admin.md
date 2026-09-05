@@ -20,7 +20,7 @@ deployment — distinct from a **workspace admin**, whose powers are scoped to a
   (`app_admin`/`admin`) that might arrive via a grantable `account_feature` row, so an
   `/admin/users`-granted flag can never escalate to instance admin.
 - First-admin bootstrap (no DB seed required) is covered separately in the
-  [auth-cutover runbook](https://github.com/ls1intum/Hephaestus/blob/main/docs/runbooks/auth-cutover.md#first-instance-admin-bootstrap).
+  [auth-cutover runbook](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/runbooks/auth-cutover.md#first-instance-admin-bootstrap).
 
 ## The shell
 
@@ -76,20 +76,12 @@ Silent Mode is engaged.
 alive across access-token expiry (`use-session-keep-alive.ts`, mounted from `main.tsx`), so an
 impersonation ends at the ceiling rather than at `accessTtl`.
 
-## Deferred / follow-up
+## LLM governance
 
-- **Step-up re-auth gate** for impersonate-begin + role-change. Hephaestus owns no first factor for
-  GitHub (plain OAuth2, no `prompt=login`), so a local fresh-re-auth gate is a deliberate-second-step
-  / audit control, not a true second factor. Deferred to a focused PR.
-- **Elevation tagging** (`elevated_via_instance_admin`): make an instance admin's cross-workspace
-  access distinguishable in the audit trail. Needs a new `auth_event` type (a CHECK-constraint
-  migration) + a log-volume decision — its own slice.
-- **`APP_AUDITOR`** read-only tier: not built. A single-operator instance has no second audience for
-  it, and the enum + authority design does not stand in the way of adding one.
-LLM governance is not on this list — it is built. An instance admin registers connections and models
+An instance admin registers connections and models
 under `/admin/llm/*`, prices them, and grants them to workspaces; a workspace may add its own
 connection when instance settings permit it. Usage is metered into `llm_usage_event` and capped by two
 independent monthly budgets — the instance's cap on shared-model spend and the workspace's cap on its
 own provider — which are never summed.
-[ADR 0026](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0026-per-purpose-agent-bindings-and-llm-governance.md)
+[ADR 0026](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0026-per-purpose-agent-bindings-and-llm-governance.md)
 records the decision.

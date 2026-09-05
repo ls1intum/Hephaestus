@@ -46,7 +46,7 @@ const config: Config = {
 
 	url: "https://docs.hephaestus.build",
 	baseUrl,
-	organizationName: "ls1intum",
+	organizationName: "hephaestus-build",
 	projectName: "Hephaestus",
 
 	onBrokenLinks: "throw",
@@ -61,7 +61,7 @@ const config: Config = {
 
 	customFields: {
 		productUrl: "https://hephaestus.build",
-		repoUrl: "https://github.com/ls1intum/Hephaestus",
+		repoUrl: "https://github.com/hephaestus-build/Hephaestus",
 	},
 
 	markdown: {
@@ -102,7 +102,7 @@ const config: Config = {
 				path: "./user",
 				routeBasePath: "user",
 				sidebarPath: "./sidebars.user.ts",
-				editUrl: "https://github.com/ls1intum/Hephaestus/tree/main/docs/",
+				editUrl: "https://github.com/hephaestus-build/Hephaestus/tree/main/docs/",
 				showLastUpdateAuthor: true,
 				showLastUpdateTime: true,
 			},
@@ -114,7 +114,7 @@ const config: Config = {
 				path: "./contributor",
 				routeBasePath: "contributor",
 				sidebarPath: "./sidebars.contributor.ts",
-				editUrl: "https://github.com/ls1intum/Hephaestus/tree/main/docs/",
+				editUrl: "https://github.com/hephaestus-build/Hephaestus/tree/main/docs/",
 				showLastUpdateAuthor: true,
 				showLastUpdateTime: true,
 			},
@@ -126,7 +126,7 @@ const config: Config = {
 				path: "./admin",
 				routeBasePath: "admin",
 				sidebarPath: "./sidebars.admin.ts",
-				editUrl: "https://github.com/ls1intum/Hephaestus/tree/main/docs/",
+				editUrl: "https://github.com/hephaestus-build/Hephaestus/tree/main/docs/",
 				showLastUpdateAuthor: true,
 				showLastUpdateTime: true,
 			},
@@ -206,7 +206,7 @@ const config: Config = {
 					position: "right",
 				},
 				{
-					href: "https://github.com/ls1intum/Hephaestus",
+					href: "https://github.com/hephaestus-build/Hephaestus",
 					position: "right",
 					className: "navbarGithubLink",
 					"aria-label": "Hephaestus on GitHub",
@@ -229,7 +229,7 @@ const config: Config = {
 						},
 						{
 							label: "Release Notes",
-							href: "https://github.com/ls1intum/Hephaestus/releases",
+							href: "https://github.com/hephaestus-build/Hephaestus/releases",
 						},
 						{
 							label: "Accessibility",
@@ -254,7 +254,7 @@ const config: Config = {
 						},
 						{
 							label: "Bug Tracker",
-							href: "https://github.com/ls1intum/Hephaestus/issues",
+							href: "https://github.com/hephaestus-build/Hephaestus/issues",
 						},
 					],
 				},
@@ -267,7 +267,7 @@ const config: Config = {
 						},
 						{
 							label: "GitHub Repository",
-							href: "https://github.com/ls1intum/Hephaestus",
+							href: "https://github.com/hephaestus-build/Hephaestus",
 						},
 						{
 							label: "Imprint",
@@ -280,7 +280,7 @@ const config: Config = {
 					],
 				},
 			],
-			copyright: `Built by <a href="https://github.com/ls1intum">AET Team</a> at <a href="https://www.tum.de/en/">TUM</a>. Source on <a href="https://github.com/ls1intum/Hephaestus">GitHub</a>.`,
+			copyright: `Built by <a href="https://github.com/ls1intum">AET Team</a> at <a href="https://www.tum.de/en/">TUM</a>. Source on <a href="https://github.com/hephaestus-build/Hephaestus">GitHub</a>.`,
 		},
 		announcementBar: {
 			id: "pre-1-0",

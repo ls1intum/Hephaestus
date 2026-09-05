@@ -2,8 +2,8 @@
 "hephaestus": patch
 ---
 
-An instance now sends `Strict-Transport-Security` whatever proxy sits in front of it. The header was
-attached to the reverse proxy shipped with Hephaestus, so a deployment fronted by a different proxy —
-a PaaS, or an existing ingress — served without it, and the omission was easy to miss because every
-other security header comes from the responses themselves. Nothing changes for a deployment that uses
-the bundled proxy.
+A deployment that leaves the bundled proxy stack out and fronts the application with its own
+proxy reading the stacks' routing rules served without `Strict-Transport-Security`, while every
+other security header, set by the responses themselves, was present. The header comes with the
+application stacks' routing rules, so such a deployment sends it too. Nothing changes for a
+deployment that runs the bundled proxy stack.

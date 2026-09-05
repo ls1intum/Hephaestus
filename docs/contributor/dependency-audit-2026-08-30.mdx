@@ -6,7 +6,7 @@ description: 1.0 dispositions for dependencies flagged by Renovate release inact
 
 # 1.0 dependency abandonment audit
 
-Source: [Dependency Dashboard #709](https://github.com/ls1intum/Hephaestus/issues/709), audited
+Source: [Dependency Dashboard #709](https://github.com/hephaestus-build/Hephaestus/issues/709), audited
 2026-08-30. The dashboard displayed 18 identifiable package rows; all are covered below.
 
 Renovate's abandonment threshold measures release cadence; it does not establish deprecation or a
@@ -23,14 +23,9 @@ maintained platform or ecosystem replacements.
 | `class-variance-authority` | Retain as mature and stable | Directly provides the component layer's typed variant API. |
 | `clsx` | Retain as mature and stable | Directly used by the SPA's shared class-composition utility and Docusaurus. |
 | `fast-deep-equal` | Retain as mature and stable | Directly used for structural dirty-state comparisons in complex forms. |
-| `husky` | Retain as mature and stable | Owns Git-hook installation and remains maintained in the [typicode repository](https://github.com/typicode/husky). |
+| `husky` | Remove | [ADR 0040](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0040-vite-plus-is-the-command-surface.md) moved Git hooks to the Vite+ dispatcher; the project hooks live in `.vite-hooks/`. |
 | `mdast-util-mdx`, `micromark-extension-mdxjs` | Retain as mature and stable | Direct parser dependencies of repository MDX validation, maintained in the [unified syntax ecosystem](https://github.com/syntax-tree/mdast-util-mdx). |
 | `prism-react-renderer` | Retain as mature and stable | Docusaurus theme configuration imports its supported Prism themes. It is part of the framework's documented integration rather than application-owned syntax-highlighting code. |
-| `raw-loader` | Remove | Upstream is [archived](https://github.com/webpack-contrib/raw-loader) and recommends webpack 5 asset modules. The documentation now imports Mermaid text through the bundler-native `asset/source` module type. |
+| `raw-loader` | Remove | Upstream is [archived](https://github.com/webpack-contrib/raw-loader) and recommends webpack 5 asset modules. The documentation imports Mermaid text through the bundler-native `asset/source` module type. |
 | `tailwindcss-animate` | Replace | Replaced by maintained [`tw-animate-css`](https://github.com/Wombosvideo/tw-animate-css), which provides the same Tailwind 4 CSS-first utility contract. |
 | `usehooks-ts` | Retain as mature and stable | Directly supplies `useWindowSize` to the responsive mentor input; [upstream remains active](https://github.com/juliencrn/usehooks-ts). |
-
-## Update — 2026-09-03
-
-`husky` is no longer a dependency: ADR 0040 moved Git hooks to the Vite+ dispatcher, and the project
-hooks live in `.vite-hooks/`. The 2026-08-30 dispositions above stand as recorded.

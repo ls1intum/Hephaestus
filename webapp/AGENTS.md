@@ -16,6 +16,7 @@ already tells you are not here.
 | Lint + format | `vp run check:webapp` — does **not** type-check; that is the separate leg above |
 | Tests | `vp run test:webapp` |
 | Storybook | `vp run --filter webapp storybook:dev` |
+| Story tests | `vp run --filter webapp test:storybook` |
 
 ## Ask first
 
@@ -60,8 +61,7 @@ derives URL segments from the filenames there and the router owns that naming.
 
 **oxlint lints, oxfmt formats.** `.oxlintrc.json` is the whole rule set, every rule it turns off
 carries the reason beside it, and every restriction states itself at the call site when it fires. None
-of that is repeated here, and the repo-root `AGENTS.md` § Lint and format scopes explains why `lint`
-is spelled `cd .. && oxlint webapp`. What follows is what no diagnostic will ever tell you.
+of that is repeated here. What follows is what no diagnostic will ever tell you.
 
 - **Suppress with `// oxlint-disable-next-line <rule> -- <why>`**, above the line the diagnostic
   points at, spelling the rule the way the **diagnostic** prints it — `plugin(rule)` becomes
@@ -270,7 +270,7 @@ Never re-invent `role === "ADMIN"`; use the shared pieces:
   rest is a boolean the route reads once — which then gets drilled: `canAdminister` reaches
   `RefusalFixLink` through `TracePage` and either `TraceRefusalAlert` or `TraceSignalTimeline`, two
   hops for one leaf. Before adding a third, render the gated leaf in the route and pass it down as
-  `children`. When a role-assignment UI lands, its mutation must invalidate the membership query key.
+  `children`.
 
 ## Styling
 
@@ -306,10 +306,9 @@ an assertion out of a story into a route test is exactly how this bites.
 ## Type checking
 
 **A dot-directory is invisible to a `**/*` include.** `tsconfig.json`'s `**/*.ts` does not match
-`.storybook/`, so a file there is type-checked only if something names the directory explicitly —
-which `.storybook/**/*.tsx` does, and nothing does for `.ts`. So `preview.tsx` is checked while
-`main.ts`, `manager.ts` and `vitest.setup.ts` are not. Confirm with
-`tsc -p webapp/tsconfig.json --listFiles` before assuming a config file is covered.
+`.storybook/`, which is why the directory is named explicitly in `include`; a new dot-directory
+needs its own entry. Confirm with `tsc -p webapp/tsconfig.json --listFiles` before assuming a config
+file is covered.
 
 ## Generated files
 
@@ -440,8 +439,7 @@ sets it on the Playwright context so play functions are deterministic. Every `mo
 therefore the branch under test, and no story can assert travel distance, an easing curve or a peek
 width: those are exactly the values reduced motion zeroes. A motion regression has to be pinned on
 something reduced motion leaves alone — the presence of `data-starting-style`, an attribute's
-sequence over frames, or the class list itself. Three separate drawer bugs shipped green through this
-suite before that was written down.
+sequence over frames, or the class list itself.
 
 **A drawer that mounts already open never animates in.** Base UI's `useTransitionStatus` seeds
 `mounted` from `open`, so `open && !mounted` — the branch that sets `starting` — cannot run on the
@@ -458,26 +456,17 @@ page throws the reader back to the top.
 
 ## Vocabulary
 
-`docs/contributor/practice-feedback-language.md` is normative. The rulings this branch settled:
-
-| Concept | The word | Not |
-|---|---|---|
-| What an instance offers | **catalog** / instance catalog | library |
-| Availability to workspaces | **include / exclude** | offer, retire |
-| A grouping of practices | **group**, at every layer — copy, code, types and the API alike | area, section |
-| A practice with no group | **Unassigned** | No area, Not in an area, Belong to no area |
-| Inputs and criteria | **review rules** | review behavior, detection config |
-
-Prefer dropping the class noun where the thing's own name is already on screen: "No practices here",
-not "No practices in this area".
+`docs/contributor/practice-feedback-language.md` is normative, and a word it retires is retired in
+code, types and story titles as well as in copy. Prefer dropping the class noun where the thing's own
+name is already on screen: "No practices here", not "No practices in this group".
 
 ## Status vocabularies
 
 Every enum a practice surface renders goes in `components/practice-vocabulary/` as `StatusDefs` and
 renders through `StatusBadge`. The icon is required and unique within its enum because badge variants
 collapse, and colour alone fails WCAG 2.2 SC 1.4.1. **Nothing else may hold words, a colour or an
-icon for an enum value** — a bare `<Badge>` next to a registry badge reads as the same family and is
-how a *setting* came to look identical to a *provenance state*.
+icon for an enum value** — a bare `<Badge>` next to a registry badge reads as the same family, so a
+*setting* becomes indistinguishable from a *provenance state*.
 
 A registry entry that would be identical for every value is not information. Say what to do about it
 in a sentence instead.
