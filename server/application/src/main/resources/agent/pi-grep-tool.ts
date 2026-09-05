@@ -25,10 +25,14 @@ export interface GrepDetails {
 }
 
 const DEFAULT_LIMIT = 100;
+const MAX_CONTEXT = 20;
 const MAX_FILE_BYTES = 2 * 1024 * 1024;
 const MAX_LINE_LENGTH = 240;
-/** Directories that hold runtime state rather than evidence. */
-const SKIPPED_DIRECTORIES = new Set(["node_modules", ".git", ".pi", ".sessions", "out", "work"]);
+const MAX_OUTPUT_BYTES = 50 * 1024;
+/** Never evidence, at any depth. */
+const SKIPPED_ANYWHERE = new Set(["node_modules", ".git"]);
+/** The sandbox's own state, which sits at the workspace root; a reviewed repository may use these names. */
+const SKIPPED_AT_ROOT = new Set([".pi", ".sessions", "out", "work"]);
 
 function globToRegExp(glob: string): RegExp {
 	let source = "";
@@ -58,7 +62,7 @@ function truncateLine(text: string): { text: string; wasTruncated: boolean } {
 		: { text, wasTruncated: false };
 }
 
-function listFiles(root: string, out: string[]): void {
+function listFiles(root: string, out: string[], atWorkspaceRoot: boolean): void {
 	let entries: import("node:fs").Dirent[];
 	try {
 		entries = readdirSync(root, { withFileTypes: true });
@@ -68,7 +72,9 @@ function listFiles(root: string, out: string[]): void {
 	entries.sort((a, b) => a.name.localeCompare(b.name));
 	for (const entry of entries) {
 		if (entry.isDirectory()) {
-			if (!SKIPPED_DIRECTORIES.has(entry.name)) listFiles(join(root, entry.name), out);
+			if (SKIPPED_ANYWHERE.has(entry.name)) continue;
+			if (atWorkspaceRoot && SKIPPED_AT_ROOT.has(entry.name)) continue;
+			listFiles(join(root, entry.name), out, false);
 		} else if (entry.isFile()) {
 			out.push(join(root, entry.name));
 		}
@@ -101,7 +107,8 @@ export function searchFiles(
 		};
 	}
 	const globMatcher = params.glob ? globToRegExp(params.glob) : null;
-	const context = params.context && params.context > 0 ? Math.floor(params.context) : 0;
+	const context =
+		params.context && params.context > 0 ? Math.min(MAX_CONTEXT, Math.floor(params.context)) : 0;
 	const limit = Math.max(1, params.limit ?? DEFAULT_LIMIT);
 
 	let rootStat: import("node:fs").Stats;
@@ -114,7 +121,7 @@ export function searchFiles(
 		};
 	}
 	const files: string[] = [];
-	if (rootStat.isDirectory()) listFiles(searchRoot, files);
+	if (rootStat.isDirectory()) listFiles(searchRoot, files, searchRoot === resolve(cwd));
 	else files.push(searchRoot);
 
 	const blocks: string[] = [];
@@ -170,7 +177,15 @@ export function searchFiles(
 			`[Output truncated at ${limit} matches; narrow the pattern, path or glob to see more]`,
 		);
 	if (linesTruncated) notes.push(`[Some lines were truncated at ${MAX_LINE_LENGTH} characters]`);
-	const text = blocks.length === 0 ? "No matches found" : [...blocks, ...notes].join("\n");
+	let body = blocks.join("\n");
+	if (body.length > MAX_OUTPUT_BYTES) {
+		body = body.slice(0, MAX_OUTPUT_BYTES);
+		notes.push(
+			`[Output truncated at ${MAX_OUTPUT_BYTES} characters; narrow the pattern, path or glob to see more]`,
+		);
+		truncated = true;
+	}
+	const text = blocks.length === 0 ? "No matches found" : [body, ...notes].join("\n");
 	return { text, details: { matches, truncated } };
 }
 
@@ -204,6 +219,7 @@ export function buildGrepTool(cwd: string) {
 	return defineTool({
 		name: "grep",
 		label: "Grep",
+		promptSnippet: "Search file contents for a pattern within the reviewed work",
 		description:
 			"Search file contents for a pattern. Returns matching lines with file paths and line numbers. " +
 			`Output is truncated to ${DEFAULT_LIMIT} matches by default; use limit, path or glob to narrow it.`,

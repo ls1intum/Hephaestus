@@ -11,6 +11,11 @@ function workspace(): string {
 	mkdirSync(join(root, "inputs", "context"), { recursive: true });
 	mkdirSync(join(root, "inputs", "sources", "scm", "repo", "src"), { recursive: true });
 	mkdirSync(join(root, ".sessions"), { recursive: true });
+	mkdirSync(join(root, "inputs", "sources", "scm", "repo", "work"), { recursive: true });
+	writeFileSync(
+		join(root, "inputs", "sources", "scm", "repo", "work", "queue.py"),
+		"API_KEY = load()\n",
+	);
 	writeFileSync(
 		join(root, "inputs", "context", "diff.patch"),
 		"+API_KEY = 'sk-live'\n context\n+print(API_KEY)\n",
@@ -34,20 +39,22 @@ void test("matches carry the SDK grep tool's path:line: shape and skip runtime s
 		"inputs/context/diff.patch:1: +API_KEY = 'sk-live'",
 		"inputs/context/diff.patch:3: +print(API_KEY)",
 		"inputs/sources/scm/repo/src/app.py:2:     return API_KEY",
+		// A reviewed repository's own `work` directory is evidence; only the sandbox's root-level one is not.
+		"inputs/sources/scm/repo/work/queue.py:1: API_KEY = load()",
 	]);
-	assert.deepEqual(details, { matches: 3, truncated: false });
+	assert.deepEqual(details, { matches: 4, truncated: false });
 });
 
 void test("path, glob, literal, ignoreCase and context narrow and widen the output as the SDK tool's do", () => {
 	const root = workspace();
-	assert.equal(
+	assert.deepEqual(
 		searchFiles(root, {
 			pattern: "api_key",
 			ignoreCase: true,
 			path: "inputs/sources",
 			glob: "*.py",
-		}).text,
-		"scm/repo/src/app.py:2:     return API_KEY",
+		}).text.split("\n"),
+		["scm/repo/src/app.py:2:     return API_KEY", "scm/repo/work/queue.py:1: API_KEY = load()"],
 	);
 	assert.equal(
 		searchFiles(root, {
@@ -88,4 +95,23 @@ void test("arguments of the wrong shape are dropped rather than trusted", () => 
 		limit: undefined,
 	});
 	assert.equal(readGrepParams(null).pattern, "");
+});
+
+void test("context is clamped and the output has a size ceiling", () => {
+	const root = workspace();
+	const wide = searchFiles(root, {
+		pattern: "print",
+		path: "inputs/context/diff.patch",
+		context: 500,
+	});
+	assert.equal(wide.text.split("\n").length, 4);
+	mkdirSync(join(root, "inputs", "big"), { recursive: true });
+	writeFileSync(
+		join(root, "inputs", "big", "log.txt"),
+		Array.from({ length: 400 }, (_, i) => `match ${i} ${"x".repeat(200)}`).join("\n"),
+	);
+	const capped = searchFiles(root, { pattern: "match", path: "inputs/big", limit: 400 });
+	assert.ok(capped.text.length < 52 * 1024);
+	assert.match(capped.text, /truncated at 51200 characters/);
+	assert.equal(capped.details.truncated, true);
 });

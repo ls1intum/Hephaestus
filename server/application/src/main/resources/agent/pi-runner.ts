@@ -174,8 +174,9 @@ function isAdmittedObservation(value: unknown): value is AdmittedObservation {
 // Overridable so a harness with no /workspace can drive the runner. Production never sets it.
 const WORKSPACE_ROOT = "/workspace";
 // The SDK's grep spawns ripgrep, which the sandbox forbids; the runner's own search tool takes its
-// place in every session, with the same name, parameters and output.
-const EVIDENCE_TOOLS = ["read"] as const;
+// place in every session under the same name. "grep" stays listed: the SDK filters custom tools
+// through this list too, and a listed custom definition replaces the built-in of that name.
+const EVIDENCE_TOOLS = ["read", "grep"] as const;
 const CWD = process.env.PI_RUNNER_CWD ?? WORKSPACE_ROOT;
 const OUTPUT = `${CWD}/out`;
 const RESULT_PATH = outputPath(OUTPUT, "result.json");
@@ -1661,7 +1662,7 @@ async function main() {
 			await createAgentSession({
 				cwd: CWD,
 				agentDir: AGENT_DIR,
-				tools: ["read", "report_feedback", "report_summary"],
+				tools: ["read", "grep", "report_feedback", "report_summary"],
 				customTools: [grepTool, feedbackTool, buildSummaryTool()],
 				sessionManager: SessionManager.inMemory(),
 				settingsManager,
