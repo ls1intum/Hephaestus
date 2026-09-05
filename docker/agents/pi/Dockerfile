@@ -51,11 +51,16 @@ RUN mkdir -p /tmp/abi-check && ln -sf /opt/pi-sdk/node_modules /tmp/abi-check/no
       '// project so the SDK never walks the ancestors of the working directory for skills, discovery of' \
       '// context files off, and the staged orchestrator handed over by name. The working directory sits' \
       '// below ancestors outside the allowlist and beside a decoy AGENTS.md: an SDK that reaches out fails' \
-      '// the build, and so does a loader that carries anything but the staged orchestrator.' \
+      '// the build, so does one that discovers the decoy, and so does a loader that carries anything but' \
+      '// the staged orchestrator.' \
       'const settingsManager = SettingsManager.create(cwd, agentDir, { projectTrusted: false });' \
       'const orchestratorPath = `${agentDir}/AGENTS.md`;' \
       'const orchestrator = readFileSync(orchestratorPath, "utf8");' \
-      'const loader = new DefaultResourceLoader({ cwd, agentDir, settingsManager, noContextFiles: true, agentsFilesOverride: () => ({ agentsFiles: [{ path: orchestratorPath, content: orchestrator }] }) });' \
+      'const loader = new DefaultResourceLoader({ cwd, agentDir, settingsManager, noContextFiles: true, agentsFilesOverride: (base) => {' \
+      '  // The decoy must not be in the base list: an SDK that discovers context files with discovery off is the regression this gate exists for.' \
+      '  if (base.agentsFiles.length !== 0) { throw new Error(`context files were discovered with discovery off: ${JSON.stringify(base.agentsFiles.map((f) => f.path))}`); }' \
+      '  return { agentsFiles: [{ path: orchestratorPath, content: orchestrator }] };' \
+      '} });' \
       'await loader.reload();' \
       'const { agentsFiles } = loader.getAgentsFiles();' \
       'if (agentsFiles.length !== 1 || !agentsFiles[0].content.includes("SENTINEL-ORCHESTRATOR")) { throw new Error(`expected the staged orchestrator alone, got ${JSON.stringify(agentsFiles.map((f) => f.path))}`); }' \
