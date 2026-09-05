@@ -207,6 +207,12 @@ export interface SyncStatusHeaderProps {
 	error?: unknown;
 	isConnectionActive: boolean;
 	/**
+	 * When the stored credential was first found unreadable. Health is what sync reports and a trigger
+	 * would run on the token nothing can read, so both are withheld while this is set; cancelling a
+	 * job that is already running needs no credential and stays. The notice above the header explains.
+	 */
+	credentialsUnreadableSince?: Date | null;
+	/**
 	 * Which trigger the admin just pressed, or `null` when none is in flight. Sync and Backfill are
 	 * served by one mutation, so a bare `isPending` cannot name the operation the button should
 	 * announce; the caller discriminates on the in-flight variables and passes the answer here.
@@ -238,6 +244,7 @@ export function SyncStatusHeader({
 	isLoading = false,
 	error,
 	isConnectionActive,
+	credentialsUnreadableSince,
 	triggeringType = null,
 	isCancelling = false,
 	onRetry,
@@ -284,7 +291,9 @@ export function SyncStatusHeader({
 				) : (
 					<>
 						<div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-							<ConnectionHealthBadge health={status.health} isSyncing={activeJob != null} />
+							{!credentialsUnreadableSince && (
+								<ConnectionHealthBadge health={status.health} isSyncing={activeJob != null} />
+							)}
 							<p className="text-sm">
 								{status.lastSuccessfulSyncAt ? (
 									<>
@@ -316,16 +325,19 @@ export function SyncStatusHeader({
 
 						<ActiveJobProgress job={activeJob} />
 
-						{isConnectionActive && (
+						{isConnectionActive && (!credentialsUnreadableSince || activeJob) && (
 							<div className="flex flex-wrap items-center gap-2 pt-2">
 								{/* Sync / Backfill / Cancel act on one connection, so they read as one control. */}
 								<ButtonGroup>
-									<SyncNowButton
-										onClick={onSync}
-										triggeringType={triggeringType}
-										activeJob={activeJob}
-									/>
-									{canBackfill && (
+									{/* A trigger would run on the credential nothing can read; cancelling a running job needs none. */}
+									{!credentialsUnreadableSince && (
+										<SyncNowButton
+											onClick={onSync}
+											triggeringType={triggeringType}
+											activeJob={activeJob}
+										/>
+									)}
+									{canBackfill && !credentialsUnreadableSince && (
 										<DropdownMenu>
 											<DropdownMenuTrigger
 												render={

@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.slack.credentials;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
-import de.tum.cit.aet.hephaestus.integration.core.connection.CredentialBundleConverter;
+import de.tum.cit.aet.hephaestus.integration.core.connection.CredentialReader;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
@@ -19,11 +19,11 @@ public class SlackCredentialProvider implements ApiCredentialProvider {
     private static final Logger log = LoggerFactory.getLogger(SlackCredentialProvider.class);
 
     private final ConnectionService connectionService;
-    private final CredentialBundleConverter credentialConverter;
+    private final CredentialReader credentialReader;
 
-    public SlackCredentialProvider(ConnectionService connectionService, CredentialBundleConverter credentialConverter) {
+    public SlackCredentialProvider(ConnectionService connectionService, CredentialReader credentialReader) {
         this.connectionService = connectionService;
-        this.credentialConverter = credentialConverter;
+        this.credentialReader = credentialReader;
     }
 
     @Override
@@ -43,6 +43,6 @@ public class SlackCredentialProvider implements ApiCredentialProvider {
             log.warn("Slack Connection {} has no credentials blob — cannot resolve bot token", conn.getId());
             return Optional.empty();
         }
-        return conn.credentials(credentialConverter);
+        return credentialReader.credentialsOf(conn);
     }
 }

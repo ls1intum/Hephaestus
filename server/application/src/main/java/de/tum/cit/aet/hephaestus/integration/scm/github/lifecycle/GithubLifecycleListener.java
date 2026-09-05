@@ -315,10 +315,12 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
                 boolean isPatWorkspace = connectionService
                         .findActiveGitHubPatConfig(existingByLogin.getId())
                         .isPresent();
-                boolean hasPatToken = connectionService
-                        .findActiveBearerToken(existingByLogin.getId(), IntegrationKind.GITHUB)
-                        .map(b -> b.token() != null && !b.token().isBlank())
-                        .orElse(false);
+                // Only a PAT workspace runs on a stored token; an App row's blob is not read here.
+                boolean hasPatToken = isPatWorkspace
+                        && connectionService
+                                .findActiveBearerToken(existingByLogin.getId(), IntegrationKind.GITHUB)
+                                .map(b -> b.token() != null && !b.token().isBlank())
+                                .orElse(false);
 
                 if (isPatWorkspace && hasPatToken) {
                     log.info(

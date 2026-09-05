@@ -70,6 +70,30 @@ export const Healthy: Story = {
 	},
 };
 
+/** ACTIVE, but the stored credential cannot be read: no health verdict and no trigger to run on it. */
+export const CredentialUnreadable: Story = {
+	args: { credentialsUnreadableSince: new Date("2026-09-05T08:00:00Z") },
+	play: async ({ canvas }) => {
+		await expect(canvas.queryByText(/healthy/i)).not.toBeInTheDocument();
+		await expect(canvas.queryByRole("button", { name: /sync now/i })).not.toBeInTheDocument();
+	},
+};
+
+/** The credential cannot be read while a job still runs: no new trigger, but the job can be cancelled. */
+export const CredentialUnreadableWithRunningJob: Story = {
+	args: {
+		credentialsUnreadableSince: new Date("2026-09-05T08:00:00Z"),
+		status: { ...baseStatus, activeJob: runningJob },
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("button", { name: /cancel/i })).toBeVisible();
+		await expect(canvas.queryByRole("button", { name: /sync now/i })).not.toBeInTheDocument();
+		await expect(
+			canvas.queryByRole("button", { name: /more sync options/i }),
+		).not.toBeInTheDocument();
+	},
+};
+
 export const StaleFreshness: Story = {
 	args: {
 		status: { ...baseStatus, health: "DEGRADED", lastSuccessfulSyncAt: minutesBefore(150) },

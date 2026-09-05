@@ -216,8 +216,13 @@ function ScmIntegrationPage() {
 				description={`Connection health, repositories and sync activity for this workspace's ${label} connection.`}
 			/>
 
-			{hasConnection && !isConnectionActive && (
-				<ConnectionStateNotice connectionState={entry.connectionState} displayName={label} />
+			{hasConnection && (
+				<ConnectionStateNotice
+					connectionState={entry.connectionState}
+					credentialsUnreadableSince={entry.credentialsUnreadableSince}
+					credentialRecovery="Replace it by submitting a new personal access token to the workspace token endpoint, which the console has no form for yet"
+					displayName={label}
+				/>
 			)}
 
 			<SyncStatusHeader
@@ -226,6 +231,7 @@ function ScmIntegrationPage() {
 				isLoading={workspaceQuery.isLoading || catalogQuery.isLoading || statusQuery.isLoading}
 				error={workspaceQuery.error ?? catalogQuery.error ?? statusQuery.error}
 				isConnectionActive={isConnectionActive}
+				credentialsUnreadableSince={entry?.credentialsUnreadableSince}
 				triggeringType={triggeringType}
 				actions={
 					isAppInstallationWorkspace && (

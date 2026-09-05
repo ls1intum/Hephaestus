@@ -16,6 +16,8 @@ import de.tum.cit.aet.hephaestus.core.webhook.WebhookProperties.Publish;
 import de.tum.cit.aet.hephaestus.core.webhook.WebhookProperties.Shutdown;
 import de.tum.cit.aet.hephaestus.core.webhook.WebhookProperties.TokenRotation;
 import de.tum.cit.aet.hephaestus.core.webhook.WebhookPropertiesFixture;
+import de.tum.cit.aet.hephaestus.integration.core.connection.BearerTokenReplacement;
+import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
@@ -29,6 +31,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabWebhookClie
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabWebhookClient.WebhookConfig;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabWebhookClient.WebhookInfo;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.nio.charset.StandardCharsets;
@@ -36,6 +39,7 @@ import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.UnaryOperator;
@@ -159,7 +163,13 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
                     long id = inv.getArgument(0);
                     BearerToken token = inv.getArgument(2);
                     gitLabBearerTokens.put(id, token);
-                    return Optional.empty();
+                    // The write reports the row it stored the token on; these tests only need one to exist.
+                    Connection stored = new Connection(
+                            TestEntities.workspace(id),
+                            IntegrationKind.GITLAB,
+                            "gitlab",
+                            Objects.requireNonNull(gitLabConfigs.get(id)));
+                    return Optional.of(new BearerTokenReplacement(stored, true));
                 });
     }
 

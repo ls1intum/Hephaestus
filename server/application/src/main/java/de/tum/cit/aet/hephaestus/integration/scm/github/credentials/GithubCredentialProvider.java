@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.credentials;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
-import de.tum.cit.aet.hephaestus.integration.core.connection.CredentialBundleConverter;
+import de.tum.cit.aet.hephaestus.integration.core.connection.CredentialReader;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
@@ -22,7 +22,7 @@ import org.springframework.stereotype.Component;
  * (installation identity only; actual installation token is minted by
  * {@link GithubTokenRefresher}),
  * {@code GitHubPatConfig} → {@link ApiCredentialProvider.BearerToken} (decrypted from
- * the per-row credential blob via {@link CredentialBundleConverter}).
+ * the per-row credential blob via {@link de.tum.cit.aet.hephaestus.integration.core.connection.CredentialReader}).
  *
  * <p>Returns {@link Optional#empty()} when no Connection exists, the Connection is not
  * ACTIVE, the persisted config is not a GitHub variant, or the PAT row has no credential
@@ -35,15 +35,15 @@ public class GithubCredentialProvider implements ApiCredentialProvider {
     private static final Logger log = LoggerFactory.getLogger(GithubCredentialProvider.class);
 
     private final ConnectionService connectionService;
-    private final CredentialBundleConverter credentialConverter;
+    private final CredentialReader credentialReader;
     private final GitHubAppTokenService appTokenService;
 
     public GithubCredentialProvider(
             ConnectionService connectionService,
-            CredentialBundleConverter credentialConverter,
+            CredentialReader credentialReader,
             GitHubAppTokenService appTokenService) {
         this.connectionService = connectionService;
-        this.credentialConverter = credentialConverter;
+        this.credentialReader = credentialReader;
         this.appTokenService = appTokenService;
     }
 
@@ -84,7 +84,7 @@ public class GithubCredentialProvider implements ApiCredentialProvider {
                             connection.getInstanceKey());
                     yield Optional.empty();
                 }
-                yield connection.credentials(credentialConverter);
+                yield credentialReader.credentialsOf(connection);
             }
             case ConnectionConfig.GitLabConfig ignored -> Optional.empty();
             case ConnectionConfig.SlackConfig ignored -> Optional.empty();

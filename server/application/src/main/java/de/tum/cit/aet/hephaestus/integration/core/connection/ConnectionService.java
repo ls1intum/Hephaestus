@@ -40,6 +40,7 @@ public class ConnectionService {
     private final SyncJobService syncJobService;
 
     private final TransactionTemplate revokeTransactionTemplate;
+    private final CredentialReader credentialReader;
 
     public ConnectionService(
             ConnectionRepository connectionRepository,
@@ -47,8 +48,10 @@ public class ConnectionService {
             CredentialBundleConverter credentialConverter,
             ApplicationEventPublisher eventPublisher,
             SyncJobService syncJobService,
-            PlatformTransactionManager transactionManager) {
+            PlatformTransactionManager transactionManager,
+            CredentialReader credentialReader) {
         this.connectionRepository = connectionRepository;
+        this.credentialReader = credentialReader;
         this.auditRepository = auditRepository;
         this.credentialConverter = credentialConverter;
         this.eventPublisher = eventPublisher;
@@ -188,13 +191,13 @@ public class ConnectionService {
 
     /**
      * Decrypts the stored {@link BearerToken} for the workspace's ACTIVE Connection,
-     * if any. Tampering/cross-row substitution surfaces as {@code EncryptionException}.
+     * if any. A credential the configured keys cannot read surfaces as {@link CredentialUnreadableException}.
      */
     @Transactional(readOnly = true)
     public Optional<BearerToken> findActiveBearerToken(long workspaceId, IntegrationKind kind) {
         return connectionRepository
                 .findActive(workspaceId, kind)
-                .flatMap(c -> c.credentials(credentialConverter))
+                .flatMap(credentialReader::credentialsOf)
                 .flatMap(b -> b instanceof BearerToken bt ? Optional.of(bt) : Optional.empty());
     }
 
@@ -240,7 +243,7 @@ public class ConnectionService {
     public Optional<BearerToken> findBearerToken(long workspaceId, long connectionId) {
         return connectionRepository
                 .findByIdAndWorkspaceId(connectionId, workspaceId)
-                .flatMap(c -> c.credentials(credentialConverter))
+                .flatMap(credentialReader::credentialsOf)
                 .flatMap(b -> b instanceof BearerToken bt ? Optional.of(bt) : Optional.empty());
     }
 
@@ -271,14 +274,22 @@ public class ConnectionService {
     }
 
     /**
-     * Replace the credential blob on the workspace's ACTIVE Connection. Empty when
-     * no ACTIVE row exists.
+     * Replace the credential blob on the workspace's ACTIVE Connection. Empty when no ACTIVE row
+     * exists. A GitHub App connection runs on its installation, not on a stored token, so it refuses
+     * one here, inside the write, rather than in a caller's earlier look at a row that may since have
+     * changed mode.
      */
     @Transactional
-    public Optional<Connection> rotateBearerToken(long workspaceId, IntegrationKind kind, BearerToken bundle) {
+    public Optional<BearerTokenReplacement> rotateBearerToken(
+            long workspaceId, IntegrationKind kind, BearerToken bundle) {
         return connectionRepository.findActive(workspaceId, kind).map(c -> {
+            if (c.getConfig() instanceof ConnectionConfig.GitHubAppConfig) {
+                throw new ConnectionModeConflictException("The GitHub connection of workspace " + workspaceId
+                        + " is an App installation, which runs on no stored token; there is nothing to replace.");
+            }
+            boolean replacedExisting = c.hasCredentials();
             c.setCredentials(bundle, credentialConverter);
-            return connectionRepository.save(c);
+            return new BearerTokenReplacement(connectionRepository.save(c), replacedExisting);
         });
     }
 

@@ -119,8 +119,11 @@ public class GitLabWebhookService {
             // Persist new token immediately — old token is already revoked. The token lives on the
             // GitLab Connection's credential blob; rotateBearerToken re-encrypts with the per-row AAD
             // so cross-row substitution is prevented.
-            connectionService.rotateBearerToken(
-                    workspace.getId(), IntegrationKind.GITLAB, new BearerToken(rotatedToken.token(), null));
+            connectionService
+                    .rotateBearerToken(
+                            workspace.getId(), IntegrationKind.GITLAB, new BearerToken(rotatedToken.token(), null))
+                    .orElseThrow(() -> new IllegalStateException("The GitLab token of workspace " + workspace.getId()
+                            + " was rotated at the provider but no active GitLab connection was there to store it"));
 
             // Invalidate token cache so subsequent calls use the new token
             var tokenService = tokenServiceProvider.getIfAvailable();
@@ -134,8 +137,9 @@ public class GitLabWebhookService {
                     tokenInfo.expiresAt(),
                     rotatedToken.expiresAt());
         } catch (WebClientResponseException | IllegalStateException e) {
-            // Token rotation failure is non-fatal — the token still works until actual expiry
-            log.warn("Token rotation failed: workspaceId={}, error={}", workspace.getId(), e.getMessage());
+            // Non-fatal for the scheduler: a failure before the provider rotated leaves the old token
+            // valid until it expires; a failure after it is what the warning below is for.
+            log.warn("Token rotation failed: workspaceId={}", workspace.getId(), e);
         }
     }
 

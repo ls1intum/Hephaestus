@@ -92,7 +92,8 @@ export function IntegrationOverviewCard({
 					{KIND_ICON[entry.kind]}
 					{entry.displayName}
 				</IntegrationCardHeading>
-				{entry.connected && status && (
+				{/* Health is what sync reports; beside a token the server cannot read it would only mislead. */}
+				{entry.connected && status && !entry.credentialsUnreadableSince && (
 					<CardAction>
 						<ConnectionHealthBadge health={status.health} isSyncing={status.activeJob != null} />
 					</CardAction>
@@ -120,9 +121,10 @@ export function IntegrationOverviewCard({
 							</Link>
 						)}
 					</div>
-				) : !isConnectionActive ? (
+				) : !isConnectionActive || entry.credentialsUnreadableSince ? (
 					<ConnectionStateNotice
 						connectionState={entry.connectionState}
+						credentialsUnreadableSince={entry.credentialsUnreadableSince}
 						displayName={entry.displayName}
 					/>
 				) : isStatusLoading ? (
@@ -177,13 +179,22 @@ export function IntegrationOverviewCard({
 				)}
 			</CardContent>
 			{isConnectionActive && (
-				<CardFooter className="mt-auto justify-between gap-2">
-					{/* This card's trigger only ever enqueues a reconciliation, so that is what it announces. */}
-					<SyncNowButton
-						onClick={onSync}
-						triggeringType={isTriggering ? "RECONCILIATION" : null}
-						activeJob={status?.activeJob}
-					/>
+				<CardFooter
+					className={
+						entry.credentialsUnreadableSince
+							? "mt-auto justify-end gap-2"
+							: "mt-auto justify-between gap-2"
+					}
+				>
+					{/* This card's trigger only ever enqueues a reconciliation, so that is what it announces.
+					    A sync cannot use a token the server cannot read, so the trigger is not offered then. */}
+					{!entry.credentialsUnreadableSince && (
+						<SyncNowButton
+							onClick={onSync}
+							triggeringType={isTriggering ? "RECONCILIATION" : null}
+							activeJob={status?.activeJob}
+						/>
+					)}
 					<Link
 						to={detailTo}
 						params={{ workspaceSlug }}

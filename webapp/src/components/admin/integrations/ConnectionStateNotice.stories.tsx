@@ -4,7 +4,8 @@ import { expect } from "storybook/test";
 import { ConnectionStateNotice } from "./ConnectionStateNotice";
 
 /**
- * The one place a non-ACTIVE connection state is explained.
+ * The one place a non-ACTIVE connection state, or a stored credential the server cannot read, is
+ * explained.
  *
  * Every integration shares this component, so the states read identically wherever they appear.
  * Severity is graded on consequence, not on enum: SUSPENDED and UNINSTALLED mean *nothing is syncing*
@@ -52,6 +53,30 @@ export const SuspendedOutline: Story = {
 	args: { connectionState: "SUSPENDED", displayName: "Outline" },
 	play: async ({ canvas }) => {
 		canvas.getByText(/outline was suspended by the provider/i);
+	},
+};
+
+/**
+ * The credential was written with a key the server no longer has. The connection is ACTIVE, so this
+ * is the only notice; it says what happened and what replaces the token.
+ */
+export const CredentialUnreadable: Story = {
+	args: { connectionState: "ACTIVE", credentialsUnreadableSince: new Date("2026-09-05T08:00:00Z") },
+	play: async ({ canvas }) => {
+		canvas.getByText(/the stored token can't be read/i);
+		await expect(canvas.getByText(/the connection's page says how to replace it/i)).toBeVisible();
+	},
+};
+
+/** Both conditions at once: the state notice follows the credential notice, each in its own words. */
+export const CredentialUnreadableWhileSuspended: Story = {
+	args: {
+		connectionState: "SUSPENDED",
+		credentialsUnreadableSince: new Date("2026-09-05T08:00:00Z"),
+	},
+	play: async ({ canvas }) => {
+		canvas.getByText(/the stored token can't be read/i);
+		await expect(canvas.getByText(/syncing is paused/i)).toBeVisible();
 	},
 };
 

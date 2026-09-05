@@ -6,8 +6,10 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.CredentialBundleConverter;
+import de.tum.cit.aet.hephaestus.integration.core.connection.CredentialReader;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.CredentialBundle;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.InstallationCredential;
@@ -46,7 +48,14 @@ class GithubCredentialProviderTest extends BaseUnitTest {
         MockitoAnnotations.openMocks(this);
         converter = new CredentialBundleConverter("0123456789abcdef0123456789abcdef", "dev");
         lenient().when(appTokenService.getConfiguredAppId()).thenReturn(42L);
-        provider = new GithubCredentialProvider(connectionService, converter, appTokenService);
+        provider = new GithubCredentialProvider(
+                connectionService,
+                new CredentialReader(
+                        org.mockito.Mockito.mock(ConnectionRepository.class),
+                        converter,
+                        org.mockito.Mockito.mock(org.springframework.transaction.PlatformTransactionManager.class),
+                        java.time.Clock.systemUTC()),
+                appTokenService);
     }
 
     @Test

@@ -17,9 +17,11 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobService;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.lang.reflect.Field;
 import java.time.Instant;
+import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -82,7 +84,9 @@ class ConnectionServiceTest extends BaseUnitTest {
                 credentialConverter,
                 eventPublisher,
                 syncJobService,
-                transactionManager);
+                transactionManager,
+                new CredentialReader(
+                        connectionRepository, credentialConverter, transactionManager, java.time.Clock.systemUTC()));
         // Default: the connection is free. Only the disconnect fence ever asks.
         Mockito.lenient()
                 .when(syncJobService.requestCancelForTeardown(anyLong()))
@@ -632,5 +636,22 @@ class ConnectionServiceTest extends BaseUnitTest {
         } catch (ReflectiveOperationException e) {
             throw new AssertionError(e);
         }
+    }
+
+    /** A GitHub App connection runs on no stored token: the write refuses one rather than overwriting its identity. */
+    @Test
+    void shouldRefuseToReplaceTheTokenOfAnAppInstallation() {
+        Connection app = new Connection(
+                TestEntities.workspace(7L),
+                IntegrationKind.GITHUB,
+                "acme",
+                new ConnectionConfig.GitHubAppConfig(100L, null, null, Set.of()));
+        when(connectionRepository.findActive(7L, IntegrationKind.GITHUB)).thenReturn(Optional.of(app));
+
+        assertThatThrownBy(
+                        () -> service.rotateBearerToken(7L, IntegrationKind.GITHUB, new BearerToken("ghp-new", null)))
+                .isInstanceOf(ConnectionModeConflictException.class)
+                .hasMessageContaining("App installation");
+        verify(connectionRepository, never()).save(any());
     }
 }

@@ -3,11 +3,13 @@ package de.tum.cit.aet.hephaestus.integration.core.connection;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -126,4 +128,48 @@ public interface ConnectionRepository extends JpaRepository<Connection, Long> {
         @Nullable
         String getSigningSecret();
     }
+
+    /**
+     * Records that exactly this ciphertext could not be read, and only once: a credential replaced
+     * since the failed read has a different ciphertext and is left alone. The record advances the
+     * version, so an entity loaded before it and flushed after it fails its optimistic check instead
+     * of silently writing the stale value back. It never waits on the target row: one another transaction holds
+     * locked, as disconnect does while it revokes the credential it just read, is skipped and the
+     * record is left for a later read.
+     */
+    @Modifying
+    @Query(value = """
+                    UPDATE connection
+                    SET credentials_rotation_failed_at = :at, version = version + 1
+                    WHERE workspace_id = :workspaceId
+                      AND id = (
+                          SELECT id FROM connection
+                          WHERE id = :id
+                            AND workspace_id = :workspaceId
+                            AND credentials_encrypted = :ciphertext
+                            AND credentials_rotation_failed_at IS NULL
+                          FOR UPDATE SKIP LOCKED)
+                    """, nativeQuery = true)
+    int markCredentialsUnreadable(
+            @Param("id") Long id,
+            @Param("workspaceId") Long workspaceId,
+            @Param("ciphertext") byte[] ciphertext,
+            @Param("at") Instant at);
+
+    /** Clears the record once the same ciphertext reads again, as after the right key is restored. */
+    @Modifying
+    @Query(value = """
+                    UPDATE connection
+                    SET credentials_rotation_failed_at = NULL, version = version + 1
+                    WHERE workspace_id = :workspaceId
+                      AND id = (
+                          SELECT id FROM connection
+                          WHERE id = :id
+                            AND workspace_id = :workspaceId
+                            AND credentials_encrypted = :ciphertext
+                            AND credentials_rotation_failed_at IS NOT NULL
+                          FOR UPDATE SKIP LOCKED)
+                    """, nativeQuery = true)
+    int markCredentialsReadable(
+            @Param("id") Long id, @Param("workspaceId") Long workspaceId, @Param("ciphertext") byte[] ciphertext);
 }

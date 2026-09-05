@@ -264,8 +264,13 @@ function SlackIntegrationPage() {
 				/>
 			)}
 
-			{!routeLoading && !routeError && hasConnection && !isConnectionActive && (
-				<ConnectionStateNotice connectionState={entry.connectionState} displayName="Slack" />
+			{!routeLoading && !routeError && hasConnection && (
+				<ConnectionStateNotice
+					connectionState={entry.connectionState}
+					credentialsUnreadableSince={entry.credentialsUnreadableSince}
+					credentialRecovery="Replace it by disconnecting and connecting again"
+					displayName="Slack"
+				/>
 			)}
 
 			{!routeLoading && !routeError && status && (
@@ -273,6 +278,7 @@ function SlackIntegrationPage() {
 					label="Slack"
 					status={status}
 					isConnectionActive={isConnectionActive}
+					credentialsUnreadableSince={entry?.credentialsUnreadableSince}
 					triggeringType={triggerSync.isPending ? "RECONCILIATION" : null}
 					isCancelling={cancelJob.isPending}
 					onRetry={() => void statusQuery.refetch()}

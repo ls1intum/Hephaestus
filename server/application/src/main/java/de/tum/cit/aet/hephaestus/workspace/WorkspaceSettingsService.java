@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntry;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.cit.aet.hephaestus.integration.core.connection.BearerTokenReplacement;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
@@ -159,9 +160,14 @@ public class WorkspaceSettingsService {
                 .filter(k -> k == IntegrationKind.GITHUB || k == IntegrationKind.GITLAB)
                 .orElseThrow(() -> new IllegalStateException("Cannot rotate PAT for workspace " + workspaceId
                         + ": no active GitHub or GitLab Connection. Bind a provider first."));
-        boolean hadToken =
-                connectionService.findActiveBearerToken(workspaceId, kind).isPresent();
-        connectionService.rotateBearerToken(workspaceId, kind, new BearerToken(token, null));
+        // The write says whether a token was there to replace; it never reads the old one, since this
+        // is the way out for a token the server can no longer read, and it refuses a row whose mode
+        // takes no token.
+        BearerTokenReplacement rotation = connectionService
+                .rotateBearerToken(workspaceId, kind, new BearerToken(token, null))
+                .orElseThrow(() -> new IllegalStateException(
+                        "Cannot rotate PAT for workspace " + workspaceId + ": no active " + kind + " Connection."));
+        boolean hadToken = rotation.replacedExisting();
         // rotatedAt is what makes this row exist at all: rotating an already-set token leaves every
         // other component identical, and ConfigAuditRecorder drops an UPDATE whose diff is empty — so
         // a presence-only snapshot would silently record nothing for the most sensitive change here.

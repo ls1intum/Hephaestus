@@ -321,7 +321,8 @@ public class SyncStatusService {
                             displayName,
                             connected,
                             c == null ? null : c.getId(),
-                            c == null ? null : c.getState());
+                            c == null ? null : c.getState(),
+                            c == null ? null : c.credentialsUnreadableSince());
                 })
                 .toList();
     }

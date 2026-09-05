@@ -44,6 +44,28 @@ class ConnectionTest extends BaseUnitTest {
                 .isInstanceOf(EncryptionException.class);
     }
 
+    @Test
+    void shouldReportTheMarkOnlyForAConnectionThatRunsOnItsStoredCredential() {
+        Instant failedAt = Instant.parse("2026-09-05T08:00:00Z");
+        Connection pat = new Connection(
+                new Workspace(),
+                IntegrationKind.GITHUB,
+                "acme",
+                new ConnectionConfig.GitHubPatConfig("x", "x", Set.of()));
+        pat.markCredentialRotationFailed(failedAt);
+        Connection app = new Connection(
+                new Workspace(),
+                IntegrationKind.GITHUB,
+                "acme",
+                new ConnectionConfig.GitHubAppConfig(100L, null, null, Set.of()));
+        app.markCredentialRotationFailed(failedAt);
+
+        assertThat(pat.credentialsUnreadableSince()).isEqualTo(failedAt);
+        // The App connection runs on its installation, not on the stored blob.
+        assertThat(app.credentialsUnreadableSince()).isNull();
+        assertThat(app.getCredentialsRotationFailedAt()).isEqualTo(failedAt);
+    }
+
     private static Connection connection() {
         Workspace workspace = new Workspace();
         workspace.setId(7L);

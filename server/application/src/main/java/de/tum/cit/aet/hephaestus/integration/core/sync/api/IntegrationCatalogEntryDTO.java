@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.core.sync.api;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.time.Instant;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
@@ -25,4 +26,10 @@ public record IntegrationCatalogEntryDTO(
         Long connectionId,
 
         @Schema(description = "Connection state, if connected") @Nullable
-        IntegrationState connectionState) {}
+        IntegrationState connectionState,
+
+        @Schema(
+                description =
+                        "When the stored credential was first found unreadable with the server's keys; absent while it reads")
+        @Nullable
+        Instant credentialsUnreadableSince) {}

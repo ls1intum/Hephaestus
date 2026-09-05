@@ -159,6 +159,28 @@ export const StatusErrorForbidden: Story = {
 	},
 };
 
+/**
+ * ACTIVE, but the stored token cannot be read with the server's key: the overview must say so where
+ * it would otherwise show a healthy status strip.
+ */
+export const CredentialUnreadable: Story = {
+	args: {
+		entry: {
+			...meta.args.entry,
+			connectionState: "ACTIVE",
+			credentialsUnreadableSince: new Date("2026-09-05T08:00:00Z"),
+		},
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText(/the stored token can't be read/i)).toBeVisible();
+		// The overview does not know the provider's door, so it points at the page that does.
+		await expect(canvas.getByText(/the connection's page says how to replace it/i)).toBeVisible();
+		// Neither a health verdict nor a sync trigger beside a token nothing can use.
+		await expect(canvas.queryByText(/healthy/i)).not.toBeInTheDocument();
+		await expect(canvas.queryByRole("button", { name: /sync now/i })).not.toBeInTheDocument();
+	},
+};
+
 export const ConnectionSuspended: Story = {
 	args: {
 		entry: {
