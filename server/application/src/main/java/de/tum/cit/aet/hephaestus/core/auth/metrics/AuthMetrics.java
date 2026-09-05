@@ -81,6 +81,7 @@ public class AuthMetrics {
     private static final String AUDIT_WRITE_FAILED_METRIC = "auth.audit.write_failed";
     private static final String REFRESH_RESULT_METRIC = "auth.token.refresh.result";
     private static final String REVOCATION_CHECK_FAILED_METRIC = "auth.revocation.check_failed";
+    private static final String STEP_UP_DENIED_METRIC = "auth.step_up.denied";
 
     private final MeterRegistry registry;
     private final Counter loginSuccess;
@@ -186,5 +187,18 @@ public class AuthMetrics {
      */
     public void recordAuditWriteFailed() {
         auditWriteFailed.increment();
+    }
+
+    /**
+     * Count one instance-admin action refused for want of a recent sign-in. {@code action} is the audit
+     * event type, a fixed enum, so cardinality stays bounded. A steady low rate is the gate working as
+     * designed — administrators are prompted; only a spike on one action is worth looking at.
+     */
+    public void recordStepUpDenied(String action) {
+        Counter.builder(STEP_UP_DENIED_METRIC)
+                .description("Instance-admin actions refused for want of a recent sign-in, tagged by action.")
+                .tag("action", action)
+                .register(registry)
+                .increment();
     }
 }
