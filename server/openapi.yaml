@@ -10794,8 +10794,8 @@ components:
         credentialsUnreadableSince:
           type: string
           format: date-time
-          description: When the stored credential was last found unreadable with the
-            server's keys; absent while it reads
+          description: When the stored credential was first found unreadable with
+            the server's keys; absent while it reads
         displayName:
           type: string
           description: Human-readable display name

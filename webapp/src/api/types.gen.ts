@@ -1882,7 +1882,7 @@ export type IntegrationCatalogEntry = {
    */
   connectionState?: 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'UNINSTALLED';
   /**
-   * When the stored credential was last found unreadable with the server's keys; absent while it reads
+   * When the stored credential was first found unreadable with the server's keys; absent while it reads
    */
   credentialsUnreadableSince?: Date;
   /**

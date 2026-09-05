@@ -337,9 +337,8 @@ public class SyncStatusService {
     }
 
     /**
-     * Connection health derivation: PENDING/SUSPENDED/UNINSTALLED map directly; ACTIVE is FAILED while
-     * the stored credential cannot be read, and otherwise folds in the last finished job's outcome,
-     * errored resources, and vendor-reported degradation.
+     * Connection health derivation: PENDING/SUSPENDED/UNINSTALLED map directly;
+     * ACTIVE folds in the last finished job's outcome, errored resources, and vendor-reported degradation.
      */
     private static ConnectionHealth deriveHealth(
             Connection connection,
@@ -352,10 +351,6 @@ public class SyncStatusService {
             // health enum — closest semantic is SUSPENDED ("not usable right now").
             case SUSPENDED, UNINSTALLED -> ConnectionHealth.SUSPENDED;
             case ACTIVE -> {
-                // No sync can run on a credential the server cannot read, whatever the last job said.
-                if (connection.getCredentialsRotationFailedAt() != null) {
-                    yield ConnectionHealth.FAILED;
-                }
                 if (lastFinishedJob
                         .map(SyncJob::getStatus)
                         .filter(s -> s == SyncJobStatus.FAILED)

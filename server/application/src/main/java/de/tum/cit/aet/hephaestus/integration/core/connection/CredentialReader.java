@@ -30,7 +30,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <p>The record is written by a conditional update bound to the exact ciphertext that failed, so a
  * credential replaced between the failed read and the write is never marked, and it runs after the
  * caller's transaction completes rather than inside it, so a burst of failing reads does not hold two
- * pooled connections each. A failure to write the record is logged and never replaces the answer.
+ * pooled connections each. It skips a row another transaction holds locked rather than waiting, and
+ * a failure to write it is logged; neither ever replaces the answer.
  */
 @Service
 public class CredentialReader {

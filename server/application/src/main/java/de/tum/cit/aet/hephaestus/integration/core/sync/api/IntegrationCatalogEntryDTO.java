@@ -30,6 +30,6 @@ public record IntegrationCatalogEntryDTO(
 
         @Schema(
                 description =
-                        "When the stored credential was last found unreadable with the server's keys; absent while it reads")
+                        "When the stored credential was first found unreadable with the server's keys; absent while it reads")
         @Nullable
         Instant credentialsUnreadableSince) {}

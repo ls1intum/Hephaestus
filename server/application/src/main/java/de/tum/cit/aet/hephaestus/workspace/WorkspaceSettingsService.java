@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntry;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
@@ -159,8 +160,12 @@ public class WorkspaceSettingsService {
                 .filter(k -> k == IntegrationKind.GITHUB || k == IntegrationKind.GITLAB)
                 .orElseThrow(() -> new IllegalStateException("Cannot rotate PAT for workspace " + workspaceId
                         + ": no active GitHub or GitLab Connection. Bind a provider first."));
-        boolean hadToken =
-                connectionService.findActiveBearerToken(workspaceId, kind).isPresent();
+        // Presence only, without reading the old token: this is the way out for a token the server
+        // can no longer read, so decrypting it here would close that door.
+        boolean hadToken = connectionService
+                .findActive(workspaceId, kind)
+                .map(Connection::hasCredentials)
+                .orElse(false);
         connectionService.rotateBearerToken(workspaceId, kind, new BearerToken(token, null));
         // rotatedAt is what makes this row exist at all: rotating an already-set token leaves every
         // other component identical, and ConfigAuditRecorder drops an UPDATE whose diff is empty — so

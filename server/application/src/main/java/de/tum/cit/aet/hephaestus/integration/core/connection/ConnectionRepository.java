@@ -131,19 +131,25 @@ public interface ConnectionRepository extends JpaRepository<Connection, Long> {
 
     /**
      * Records that exactly this ciphertext could not be read, and only once: a credential replaced
-     * since the failed read has a different ciphertext and is left alone. Both records advance the
-     * version, so an entity loaded before the record and flushed after it fails its optimistic check
-     * instead of silently writing the stale value back.
+     * since the failed read has a different ciphertext and is left alone. The record advances the
+     * version, so an entity loaded before it and flushed after it fails its optimistic check instead
+     * of silently writing the stale value back. It never waits: a row another transaction holds
+     * locked, as disconnect does while it revokes the credential it just read, is skipped and the
+     * record is left for a later read.
      */
     @Modifying
-    @Query("""
-            UPDATE Connection c
-            SET c.credentialsRotationFailedAt = :at, c.version = c.version + 1
-            WHERE c.id = :id
-              AND c.workspace.id = :workspaceId
-              AND c.credentialsEncrypted = :ciphertext
-              AND c.credentialsRotationFailedAt IS NULL
-            """)
+    @Query(value = """
+                    UPDATE connection
+                    SET credentials_rotation_failed_at = :at, version = version + 1
+                    WHERE workspace_id = :workspaceId
+                      AND id = (
+                          SELECT id FROM connection
+                          WHERE id = :id
+                            AND workspace_id = :workspaceId
+                            AND credentials_encrypted = :ciphertext
+                            AND credentials_rotation_failed_at IS NULL
+                          FOR UPDATE SKIP LOCKED)
+                    """, nativeQuery = true)
     int markCredentialsUnreadable(
             @Param("id") Long id,
             @Param("workspaceId") Long workspaceId,
@@ -152,14 +158,18 @@ public interface ConnectionRepository extends JpaRepository<Connection, Long> {
 
     /** Clears the record once the same ciphertext reads again, as after the right key is restored. */
     @Modifying
-    @Query("""
-            UPDATE Connection c
-            SET c.credentialsRotationFailedAt = NULL, c.version = c.version + 1
-            WHERE c.id = :id
-              AND c.workspace.id = :workspaceId
-              AND c.credentialsEncrypted = :ciphertext
-              AND c.credentialsRotationFailedAt IS NOT NULL
-            """)
+    @Query(value = """
+                    UPDATE connection
+                    SET credentials_rotation_failed_at = NULL, version = version + 1
+                    WHERE workspace_id = :workspaceId
+                      AND id = (
+                          SELECT id FROM connection
+                          WHERE id = :id
+                            AND workspace_id = :workspaceId
+                            AND credentials_encrypted = :ciphertext
+                            AND credentials_rotation_failed_at IS NOT NULL
+                          FOR UPDATE SKIP LOCKED)
+                    """, nativeQuery = true)
     int markCredentialsReadable(
             @Param("id") Long id, @Param("workspaceId") Long workspaceId, @Param("ciphertext") byte[] ciphertext);
 }

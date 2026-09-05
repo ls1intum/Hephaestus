@@ -48,7 +48,7 @@ const STATE_COPY: Partial<Record<ConnectionState, StateCopy>> = {
 export interface ConnectionStateNoticeProps {
 	connectionState?: ConnectionState;
 	/**
-	 * When the stored credential was last found unreadable with the server's encryption key. Set on
+	 * When the stored credential was first found unreadable with the server's encryption key. Set on
 	 * an ACTIVE connection as much as on any other, which is why it is not a state of its own: the
 	 * connection is fine, the key that wrote its credential is gone.
 	 */
