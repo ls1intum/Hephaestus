@@ -227,7 +227,72 @@ class AccountHardDeleteSweeperIntegrationTest extends BaseIntegrationTest {
         });
     }
 
+    // ── Case 6: product submissions the account owns are erased with it ───────────────────────
+
+    @Test
+    void shouldEraseProductSubmissionsWhenAccountIsPurged() {
+        Long erasedId = persistedId(
+                newAccount("Erased", "erased-submissions@example.com").getId());
+        Long retainedId = persistedId(
+                newAccount("Retained", "retained-submissions@example.com").getId());
+        UUID erasedFeedback = seedProductFeedback(erasedId);
+        UUID retainedFeedback = seedProductFeedback(retainedId);
+        UUID erasedResponse = seedSurveySubmission(erasedId, "RESPONDED");
+        UUID erasedDismissal = seedSurveySubmission(erasedId, "DISMISSED");
+        UUID retainedResponse = seedSurveySubmission(retainedId, "RESPONDED");
+        markDeleting(
+                erasedId, clock.instant().minus(authProperties.deleteCooldown()).minus(Duration.ofHours(1)));
+
+        sweeper.sweepNow();
+
+        assertThat(jdbcTemplate.queryForList(
+                        "SELECT id FROM product_feedback WHERE id IN (?, ?)",
+                        UUID.class,
+                        erasedFeedback,
+                        retainedFeedback))
+                .as("the erased account's feedback is gone and another account's is untouched")
+                .containsExactly(retainedFeedback);
+        assertThat(jdbcTemplate.queryForList(
+                        "SELECT id FROM product_survey_submission WHERE id IN (?, ?, ?)",
+                        UUID.class,
+                        erasedResponse,
+                        erasedDismissal,
+                        retainedResponse))
+                .as("both a response and a dismissal are erased; another account's response is untouched")
+                .containsExactly(retainedResponse);
+        assertThat(accountRepository.findById(erasedId).orElseThrow().getStatus())
+                .isEqualTo(Account.Status.DELETED);
+    }
+
     // ── Fixtures ──────────────────────────────────────────────────────────────────────────────
+
+    private UUID seedProductFeedback(Long accountId) {
+        UUID id = UUID.randomUUID();
+        jdbcTemplate.update(
+                "INSERT INTO product_feedback (id, account_id, kind, message, created_at, submission_minute) "
+                        + "VALUES (?, ?, 'FEEDBACK', 'Personal submission', now(), now())",
+                id,
+                accountId);
+        return id;
+    }
+
+    private UUID seedSurveySubmission(Long accountId, String disposition) {
+        UUID id = UUID.randomUUID();
+        UUID surveyId = UUID.randomUUID();
+        jdbcTemplate.update(
+                "INSERT INTO product_survey (id, title, description, questions_json, starts_at, active, created_at) "
+                        + "VALUES (?, 'Survey', 'Description', CAST('[]' AS jsonb), now(), true, now())",
+                surveyId);
+        jdbcTemplate.update(
+                "INSERT INTO product_survey_submission (id, survey_id, account_id, disposition, answers_json, created_at) "
+                        + "VALUES (?, ?, ?, ?, CAST(? AS jsonb), now())",
+                id,
+                surveyId,
+                accountId,
+                disposition,
+                disposition.equals("RESPONDED") ? "{\"answer\":\"Personal response\"}" : null);
+        return id;
+    }
 
     private void seedAuthEvent(
             long id,

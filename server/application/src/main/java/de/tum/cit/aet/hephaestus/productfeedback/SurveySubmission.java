@@ -17,7 +17,10 @@ import tools.jackson.databind.JsonNode;
         uniqueConstraints =
                 @UniqueConstraint(
                         name = "uk_survey_submission_account",
-                        columnNames = {"survey_id", "account_id"}))
+                        columnNames = {"survey_id", "account_id"}),
+        // Account erasure filters on account_id alone, which the unique constraint above cannot serve:
+        // its leading column is survey_id.
+        indexes = @Index(name = "idx_survey_submission_account", columnList = "account_id"))
 @Getter
 @NoArgsConstructor
 public class SurveySubmission {
