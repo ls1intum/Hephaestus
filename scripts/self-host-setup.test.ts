@@ -4,8 +4,8 @@ import {
 	chmod,
 	copyFile,
 	lstat,
-	mkdtemp,
 	mkdir,
+	mkdtemp,
 	readFile,
 	rm,
 	symlink,
@@ -157,4 +157,44 @@ await test("refuses to write through an environment symlink", posixOnly, async (
 
 	assert.notEqual((await setup(directory)).exitCode, 0);
 	assert.equal(await readFile(target, "utf8"), "unchanged");
+});
+
+async function stubbedDocker(directory: string, volumes: string): Promise<string> {
+	const bin = join(directory, "bin");
+	await mkdir(bin);
+	await writeFile(join(bin, "docker"), `#!/bin/sh\nprintf '%s' '${volumes}'\n`, { mode: 0o755 });
+	return `${bin}:${process.env.PATH ?? ""}`;
+}
+
+await test("refuses to generate encryption keys over an existing database", posixOnly, async () => {
+	const directory = await fixture();
+	const path = await stubbedDocker(directory, "hephaestus_postgresql-data\n");
+
+	const refused = await setup(directory, path);
+	assert.equal(refused.exitCode, 1);
+	assert.doesNotMatch(refused.output, /Generated/);
+	await assert.rejects(readFile(join(directory, ".env"), "utf8"), { code: "ENOENT" });
+
+	// With both keys carried over, the rest of the secrets are generated as for a new instance.
+	await writeFile(
+		join(directory, ".env"),
+		"HEPHAESTUS_SECURITY_ENCRYPTION_KEY=0123456789abcdef0123456789abcdef\n" +
+			"HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY=fedcba9876543210fedcba9876543210\n",
+	);
+	const accepted = await setup(directory, path);
+	assert.equal(accepted.exitCode, 0);
+	const environment = await readFile(join(directory, ".env"), "utf8");
+	assert.match(
+		environment,
+		/^HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY=fedcba9876543210fedcba9876543210$/m,
+	);
+	assert.match(environment, /^POSTGRES_PASSWORD=.+$/m);
+});
+
+await test("generates every key when no database exists on the host", posixOnly, async () => {
+	const directory = await fixture();
+	const path = await stubbedDocker(directory, "");
+	const result = await setup(directory, path);
+	assert.equal(result.exitCode, 0);
+	assert.match(result.output, /Generated HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY/);
 });

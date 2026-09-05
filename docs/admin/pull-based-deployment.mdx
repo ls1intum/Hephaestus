@@ -87,6 +87,24 @@ redirects may use additional hosts; an allowlist limited to `github.com` and `gh
 
 5. Watch the first run: `journalctl -fu hephaestus-reconcile.service`.
 
+### Moving an existing host
+
+A host that already has a Hephaestus database keeps the secrets that database was written with;
+nothing about pull-based deployment changes them. Before the first reconcile, carry these over from
+the previous deployment, identical to the value it used, into the stack's env file in
+`/etc/hephaestus`:
+
+| Secret | Why it must be identical |
+| --- | --- |
+| `HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY` | every stored integration credential — GitHub App key, tokens, Slack bot token — was encrypted with it, and a different key makes them unreadable without a word of warning |
+| `HEPHAESTUS_SECURITY_ENCRYPTION_KEY` | the same for everything else the server encrypts at rest |
+| `POSTGRES_PASSWORD` | the database it connects to |
+| `WEBHOOK_SECRET` | the providers keep signing with the secret they were registered with |
+| `HEPHAESTUS_AUTH_STATE_COOKIE_KEY` | optional; a new one only signs every user out once |
+
+`docker/self-host/setup.sh` refuses to generate either encryption key when a Hephaestus database
+volume already exists on the host, and names the key to carry over.
+
 ### Upgrading a host installed before the tooling link
 
 A host set up before `/var/lib/hephaestus/tooling` existed runs the reconciler straight from its

@@ -68,6 +68,22 @@ set_if_empty() {
 	fi
 }
 
+# A key is generated for a new instance and must never be generated for an existing one: rows
+# the database already holds were encrypted with the key that instance had, and a fresh key makes
+# them unreadable without a word of warning. The database is a Docker volume, so an existing volume
+# is the evidence; when docker is not on PATH there is no database on this host to protect.
+if command -v docker >/dev/null 2>&1; then
+	existing_volume=$(docker volume ls --quiet --filter name=postgresql-data 2>/dev/null | head -n 1 || true)
+	if [ -n "$existing_volume" ]; then
+		for key in HEPHAESTUS_SECURITY_ENCRYPTION_KEY HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY; do
+			if ! grep -q "^${key}=." "$working_file"; then
+				printf 'A Hephaestus database already exists on this host (volume %s). Set %s to the value that database was encrypted with before running setup; a generated key would make its stored credentials unreadable.\n' "$existing_volume" "$key" >&2
+				exit 1
+			fi
+		done
+	fi
+fi
+
 set_if_empty POSTGRES_PASSWORD hex16
 set_if_empty HEPHAESTUS_SECURITY_ENCRYPTION_KEY hex16
 if ! grep -q '^HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY=.' "$working_file"; then
