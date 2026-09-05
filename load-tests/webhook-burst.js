@@ -1,8 +1,11 @@
 import { check } from "k6";
-import crypto from "k6/crypto";
+// A default import of `k6/crypto` shadows the global WebCrypto that owns randomUUID.
+import { hmac } from "k6/crypto";
 import http from "k6/http";
 
-import { baseUrl, integer, required, sharedThresholds } from "./lib/config.js";
+import { baseUrl, integer, jsonField, required, sharedThresholds } from "./lib/config.js";
+
+export { handleSummary } from "./lib/summary.js";
 
 const rate = integer("WEBHOOK_RATE", 100);
 const duration = __ENV.DURATION ?? "2m";
@@ -13,6 +16,7 @@ const webhookSecret = required("WEBHOOK_SECRET");
 
 export const options = {
 	discardResponseBodies: true,
+	maxRedirects: 0,
 	scenarios: {
 		webhook_burst: {
 			executor: "constant-arrival-rate",
@@ -36,17 +40,28 @@ const payload = JSON.stringify({
 	padding: "x".repeat(integer("WEBHOOK_PADDING_BYTES", 4096)),
 });
 
+export function webhookAccepted(response) {
+	return response.status === 202 && jsonField(response, "status") === "ok";
+}
+
+export function signedDelivery() {
+	return {
+		id: crypto.randomUUID(),
+		signature: hmac("sha256", webhookSecret, payload, "hex"),
+	};
+}
+
 export default function webhookBurst() {
-	const delivery = crypto.randomUUID();
-	const signature = crypto.hmac("sha256", webhookSecret, payload, "hex");
+	const delivery = signedDelivery();
 	const response = http.post(target, payload, {
 		headers: {
 			"Content-Type": "application/json",
-			"X-GitHub-Delivery": delivery,
+			"X-GitHub-Delivery": delivery.id,
 			"X-GitHub-Event": event,
-			"X-Hub-Signature-256": `sha256=${signature}`,
+			"X-Hub-Signature-256": `sha256=${delivery.signature}`,
 		},
 		tags: { operation: "webhook_ingest" },
+		responseType: "text",
 	});
-	check(response, { "webhook accepted": (result) => result.status >= 200 && result.status < 300 });
+	check(response, { "webhook published": webhookAccepted });
 }

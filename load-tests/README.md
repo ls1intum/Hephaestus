@@ -1,6 +1,6 @@
 # Compose capacity qualification
 
-These [Grafana k6](https://grafana.com/docs/k6/latest/) scenarios qualify the supported single-host
+These [Grafana k6](https://grafana.com/docs/k6/latest/) scenarios measure the supported single-host
 Compose topology. They spend LLM budget and create durable rows; run them only on an isolated host.
 
 Webhook traffic uses a [constant arrival rate](https://grafana.com/docs/k6/latest/using-k6/scenarios/concepts/arrival-rate-vu-allocation/).
@@ -17,66 +17,96 @@ both service objectives and saturation, following Google's SLO guidance
 - Bind practice review and mentor to a deterministic OpenAI-compatible test provider. Record its
   response latency separately: provider time is not host capacity.
 - Use a short-lived workspace-admin token. Never commit it or the webhook secret.
-- Stop background sync and other tenants, then reset PostgreSQL and JetStream to the same snapshot
-  before every candidate. Run three times; publish the median and retain every raw result.
+- Disable background sync and unrelated traffic. Restore PostgreSQL and JetStream from the same
+  snapshot before every repetition at each candidate host and load step. Run three times; publish
+  the median and retain every raw result.
 
 ## Run
 
-Use the digest-pinned k6 image:
+The two load scenarios are uncached and manual. CI runs `test:load:syntax`, which inspects both
+scenarios and tests their contracts using the same digest-pinned k6 image, with networking disabled.
+`vp run check` runs the runner's own tests.
 
 ```bash
 vp run test:load:syntax
-```
-
-```bash
 export BASE_URL=https://hephaestus-load.example.test
+export LOAD_TEST_ACKNOWLEDGE=isolated-host
 export WEBHOOK_SECRET=...
-export K6_IMAGE=grafana/k6:1.2.3@sha256:4f82892217f3110cb233e2b2622bcc97fabc70f14bd241fbfbfe7305105c68aa
-mkdir -p load-results
-docker run --rm -i \
-  -e BASE_URL -e WEBHOOK_SECRET -e WEBHOOK_RATE=100 -e DURATION=2m \
-  -v "$PWD/load-tests:/tests:ro" -v "$PWD/load-results:/results" \
-  "$K6_IMAGE" \
-  run --summary-export=/results/webhook-summary.json /tests/webhook-burst.js
-```
+vp run test:load:webhook-burst
 
-The mixed scenario runs long-lived mentor HTTP responses while distinct practice reviews execute. It
-requires every review request and job to complete:
-
-```bash
-export API_BASE_URL=https://hephaestus-load.example.test/api
 export AUTH_TOKEN=... WORKSPACE_SLUG=capacity-test
 export ARTIFACT_IDS=101,102,103,104,105
-docker run --rm -i \
-  -e API_BASE_URL -e AUTH_TOKEN -e WORKSPACE_SLUG -e ARTIFACT_IDS \
-  -e MENTOR_VUS=5 -e REVIEW_VUS=2 -e REVIEW_REQUESTS=5 -e DURATION=10m \
-  -v "$PWD/load-tests:/tests:ro" -v "$PWD/load-results:/results" \
-  "$K6_IMAGE" \
-  run --summary-export=/results/mixed-summary.json /tests/detection-mentor.js
+export REVIEW_REQUESTS=5 MENTOR_VUS=5 REVIEW_VUS=2
+# Copy the actual deployed values from the isolated host; neither value changes that host.
+export SANDBOX_API_MAX_REQUEST_BYTES=4194304
+export SANDBOX_API_REQUESTS_PER_MINUTE=120
+vp run test:load:detection-mentor
 ```
+
+`BASE_URL` is the externally reachable application root (without `/api`); both scenarios use it.
+The gateway remains private, and only the detection+mentor workload crosses it, so only that
+scenario takes and records the gateway limits.
+Optional workload inputs are documented by the scenario's defaults.
+Keep mentor traffic running long enough to overlap practice reviews; the default mentor phase is
+10 minutes, while slow reviews can take longer. This is a finite concurrent-session workload,
+not an arrival-rate claim for mentor throughput ([open versus closed models](https://grafana.com/docs/k6/latest/using-k6/scenarios/concepts/open-vs-closed/)).
+
+Each invocation prints a fresh `load-results/<scenario>-<timestamp>` directory. Set `LOAD_RESULTS_DIR`
+to choose another **unused** directory. It contains `summary.json`, `run.json` (inputs, image,
+start time, effective scenarios/thresholds from `k6 inspect`, and exit status), the baseline template,
+and a `scripts/` snapshot. k6 inspects and runs that snapshot, not a mutable checkout. Keep the whole
+directory so defaults and workload code remain reproducible after the checkout changes.
+Secret values are not written to metadata or command arguments.
+Artifacts can still contain sensitive workspace identifiers: inspect them before publication.
+A failed k6 threshold preserves k6's nonzero exit status; keep failed runs, too.
+
+Generate the document from that directory, including failed runs:
+
+```bash
+vp run report:load:baseline load-results/<scenario>-<timestamp>
+```
+
+This renders the saved `baseline-template.md` to `<run-directory>/baseline.md`, reporting every
+threshold and metric without recomputing k6's verdict. It requires every threshold captured by
+`k6 inspect`, valid runner metadata, and the gateway limits the scenario records. A setup failure or
+interrupted export with missing evidence is rejected. Any digest-pinned run stays renderable, and
+the document names the k6 image the run used and whether the checkout has moved on since. A passing
+k6 result alone does not qualify a host: supply the companion operator evidence listed in the
+document. Do not commit tokens, environment files or unredacted Compose configuration.
 
 The pinned k6 client buffers each `text/event-stream` response. This scenario measures concurrent
 full-response completion, not time to first event or per-event latency.
 
-In separate terminals collect container and host samples. Docker defines the container fields and
-their semantics in [`docker stats`](https://docs.docker.com/reference/cli/docker/container/stats/);
-in particular, its Linux CLI memory figure subtracts cache, so retain the raw output rather than
-copying only a peak percentage:
+## Collect host evidence
+
+Webhook bursts land on the `webhook-server` container and detection+mentor traffic on
+`application-server`, so collect both containers and read the busy one against the scenario you ran.
+
+On the **Compose host**, create a fresh evidence directory for each run. From that directory, start
+these collectors in separate terminals before starting k6 on the load-generator host:
 
 ```bash
-(cd docker/self-host && \
-  docker compose --env-file .env --env-file release-lock.env stats --format json \
-    application-server webhook-server postgres nats-server) \
-  > load-results/container-stats.jsonl
+docker stats --format json > container-stats.jsonl
 ```
 
 ```bash
-vmstat 1 > load-results/host-vmstat.txt
+vmstat -y -t 1 > host-vmstat.txt
 ```
 
-Stop both collectors when k6 exits. Capture `df -h` before and after the run. Retain `docker compose
-ps`, `docker info`, the release lock, k6 summaries, provider latency, PostgreSQL size, JetStream state,
-and application metrics/logs. The increase in `webhook.publish{outcome="success"}` must equal accepted
+Collect all containers, including review sandboxes. Docker's Linux CLI memory figure subtracts
+cache; retain the raw samples rather than only a peak percentage
+([`docker stats` semantics](https://docs.docker.com/reference/cli/docker/container/stats/)).
+The [`vmstat` options](https://man7.org/linux/man-pages/man8/vmstat.8.html) timestamp samples and
+omit the since-boot report. Also configure your host monitor to record `MemAvailable` from
+`/proc/meminfo` throughout the run; `vmstat` reports free memory, not available memory. Retain
+timestamped samples so the qualification rule below can be checked.
+
+After load stops, keep the collectors running until the review queue drains or the five-minute
+drain deadline expires.
+Capture `df -h` before and after the run. Retain `docker compose ps`, `docker info`, the release lock,
+provider latency, PostgreSQL size, JetStream state, and application metrics/logs. Copy the evidence
+into its matching k6 run directory; never overwrite another repetition's samples.
+The increase in `webhook.publish{outcome="success"}` must equal accepted
 webhook iterations while the failure counter remains unchanged. Reject a run with a reconciliation
 mismatch, dropped iterations, provider throttling, a container restart/OOM, or swap activity.
 
@@ -91,4 +121,31 @@ The documented size qualifies only when all three repeated runs meet thresholds,
 the data filesystem has at least 20% free before and after, no swap/OOM/restart occurs, and the review
 queue drains within five minutes after load stops. Publish the first failing step as the ceiling.
 
-Copy `baseline-template.md` for every release. Record every repetition and link its raw artifacts.
+Generate a baseline for every repetition and link its raw artifacts. Publish measured minimum and
+recommended sizing and the JetStream durability throughput delta with the recorded baseline under
+the [release capacity gate](https://github.com/hephaestus-build/Hephaestus/issues/1377).
+Qualification must measure the release candidate, including its job-folder implementation.
+
+## What the thresholds prove (and do not prove)
+
+The scenario `options.thresholds` own the numerical budgets; generated baselines report them with
+k6's verdict. Do not maintain a second set of threshold values in documentation.
+
+- Webhook burst offers constant-arrival-rate ingress traffic and fails on dropped iterations.
+  Synthetic `capacity_test` events measure authenticated publication, **not** downstream sync of
+  real provider events. Acceptance requires `202` with `status: "ok"`; intentionally dropped events
+  also return `202` but must not count as published. Neither scenario follows redirects.
+- Only GitHub deliveries are measured. GitLab and Outline share the ingest path, so their capacity
+  is read from this scenario rather than measured separately; Slack is not measured, because its
+  publish gate and fast-path timeout make it a different workload that needs its own scenario.
+- The mixed scenario requires every requested review to finish successfully. Exact completion
+  counts catch interrupted iterations that never add a sample to a completion-rate metric.
+- Mentor HTTP failures and whole-turn success are independent of polling traffic. Streams must
+  contain a finish chunk and the terminal sentinel, without error/abort/tool-error chunks;
+  the server sends `[DONE]` on errors too.
+- These are workload budgets, not an isolated gateway latency SLO or time-to-first-token SLO.
+  Inspect gateway metrics for [the dedicated connector](https://github.com/hephaestus-build/Hephaestus/issues/1730)
+  and reject capacity qualification on `429`/`413` or provider throttling, including failures hidden
+  inside streamed responses. Do not raise the production limiter just to make a benchmark pass.
+- k6 cannot prove CPU, memory, disk, queue drain or ingest reconciliation from HTTP summaries.
+  The operator evidence and qualification rule above remain mandatory.

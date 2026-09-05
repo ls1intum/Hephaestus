@@ -102,8 +102,6 @@ const docsLintInputs = [
 ];
 
 const mvnw = "node scripts/run-mvnw.ts";
-const k6 =
-	"grafana/k6:1.2.3@sha256:4f82892217f3110cb233e2b2622bcc97fabc70f14bd241fbfbfe7305105c68aa";
 
 // The gates, by the tree they judge. `quality` runs all of them; each CI job runs one tree's set.
 const policyGates = [
@@ -313,9 +311,10 @@ export default defineConfig({
 			// Load tests
 			"gate:load-format": cached(`vp fmt --check ${loadSources}`),
 			"gate:load-syntax": group(["test:load:syntax"]),
-			"test:load:syntax": run(
-				`docker run --rm -v "${repoRoot}/load-tests:/tests:ro" ${k6} inspect -e BASE_URL=http://example.test -e WEBHOOK_SECRET=abcdefghijklmnopqrstuvwxyz123456 /tests/webhook-burst.js >/dev/null && docker run --rm -v "${repoRoot}/load-tests:/tests:ro" ${k6} inspect -e API_BASE_URL=http://example.test/api -e AUTH_TOKEN=test -e WORKSPACE_SLUG=test -e ARTIFACT_IDS=1,2 /tests/detection-mentor.js >/dev/null`,
-			),
+			"test:load:webhook-burst": run("node scripts/load-test.ts webhook-burst"),
+			"test:load:detection-mentor": run("node scripts/load-test.ts detection-mentor"),
+			"report:load:baseline": run("node scripts/load-test.ts report"),
+			"test:load:syntax": run("node scripts/load-test.ts syntax"),
 
 			// Docs
 			"gate:docs-format": cached(`vp fmt --check ${docsSources}`),
