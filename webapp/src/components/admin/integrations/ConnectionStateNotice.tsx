@@ -53,6 +53,11 @@ export interface ConnectionStateNoticeProps {
 	 * connection is fine, the key that wrote its credential is gone.
 	 */
 	credentialsUnreadableSince?: Date | null;
+	/**
+	 * How this integration's credential gets replaced, as one sentence without a trailing period: the
+	 * doors differ by provider, and the notice must name only the one that exists.
+	 */
+	credentialRecovery?: string;
 	/** The integration as the admin knows it — "Slack", "GitHub", "Outline". */
 	displayName: string;
 	className?: string;
@@ -73,6 +78,7 @@ export interface ConnectionStateNoticeProps {
 export function ConnectionStateNotice({
 	connectionState,
 	credentialsUnreadableSince,
+	credentialRecovery = "Replace it by disconnecting and connecting again",
 	displayName,
 	className,
 }: ConnectionStateNoticeProps) {
@@ -87,7 +93,7 @@ export function ConnectionStateNotice({
 					<KeyRoundIcon />
 					<AlertTitle>The stored token can't be read</AlertTitle>
 					<AlertDescription>
-						{`${displayName}'s stored token can't be read with this server's current keys — after a key change, or a database restored under another key — so nothing that needs it can run. Replace it by disconnecting and connecting again, or restore the key it was written with if that was changed by mistake.`}
+						{`${displayName}'s stored token can't be read with this server's current keys — after a key change, or a database restored under another key — so nothing that needs it can run. ${credentialRecovery}, or restore the key it was written with if that was changed by mistake.`}
 					</AlertDescription>
 				</Alert>
 			)}

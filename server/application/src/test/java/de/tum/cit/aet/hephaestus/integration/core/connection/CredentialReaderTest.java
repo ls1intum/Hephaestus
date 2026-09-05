@@ -77,7 +77,7 @@ class CredentialReaderTest extends BaseUnitTest {
                     assertThat(unreadable.kind()).isEqualTo(IntegrationKind.SLACK);
                 })
                 .hasMessageContaining("connection 55")
-                .hasMessageContaining("Re-enter the credential");
+                .hasMessageContaining("Replace the credential");
         // Outside a transaction the record is written at once, bound to the ciphertext that failed.
         verify(connectionRepository)
                 .markCredentialsUnreadable(eq(55L), eq(7L), eq(connection.getCredentialsEncrypted()), eq(NOW));

@@ -76,7 +76,7 @@ public class CredentialReader {
                 afterCurrentTransaction(
                         () -> connectionRepository.markCredentialsUnreadable(id, workspaceId, ciphertext, now));
             }
-            throw new CredentialUnreadableException(id == null ? -1 : id, connection.getKind());
+            throw new CredentialUnreadableException(id == null ? -1 : id, connection.getKind(), undecryptable);
         }
     }
 

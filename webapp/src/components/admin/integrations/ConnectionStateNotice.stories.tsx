@@ -4,7 +4,8 @@ import { expect } from "storybook/test";
 import { ConnectionStateNotice } from "./ConnectionStateNotice";
 
 /**
- * The one place a non-ACTIVE connection state is explained.
+ * The one place a non-ACTIVE connection state, or a stored credential the server cannot read, is
+ * explained.
  *
  * Every integration shares this component, so the states read identically wherever they appear.
  * Severity is graded on consequence, not on enum: SUSPENDED and UNINSTALLED mean *nothing is syncing*

@@ -2,28 +2,36 @@ package de.tum.cit.aet.hephaestus.workspace;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.core.connection.CredentialBundleConverter;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Optional;
+import java.util.Set;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
+@Tag("unit")
 @ExtendWith(MockitoExtension.class)
-class WorkspaceSettingsServiceTest {
+class WorkspaceSettingsServiceTest extends BaseUnitTest {
+
+    private static final String KEY = "0123456789abcdef0123456789abcdef";
 
     @Mock
     private WorkspaceRepository workspaceRepository;
@@ -46,16 +54,20 @@ class WorkspaceSettingsServiceTest {
                 connectionService,
                 eventPublisher,
                 Clock.fixed(Instant.parse("2026-09-05T08:00:00Z"), ZoneOffset.UTC));
-        Workspace workspace = mock(Workspace.class);
-        Connection connection = mock(Connection.class);
+        Workspace workspace = TestEntities.workspace(7L);
+        Connection connection = new Connection(
+                workspace,
+                IntegrationKind.GITHUB,
+                "acme",
+                new ConnectionConfig.GitHubAppConfig(100L, null, null, Set.of()));
+        connection.setCredentials(new BearerToken("ghp-old", null), new CredentialBundleConverter(KEY, "test"));
         when(workspaceRepository.findById(7L)).thenReturn(Optional.of(workspace));
-        when(connectionService.findActiveProviderKind(7L)).thenReturn(Optional.of(IntegrationKind.GITLAB));
-        when(connectionService.findActive(7L, IntegrationKind.GITLAB)).thenReturn(Optional.of(connection));
-        when(connection.hasCredentials()).thenReturn(true);
+        when(connectionService.findActiveProviderKind(7L)).thenReturn(Optional.of(IntegrationKind.GITHUB));
+        when(connectionService.findActive(7L, IntegrationKind.GITHUB)).thenReturn(Optional.of(connection));
 
-        service.updateToken(7L, "glpat-new");
+        service.updateToken(7L, "ghp-new");
 
-        verify(connectionService).rotateBearerToken(eq(7L), eq(IntegrationKind.GITLAB), any(BearerToken.class));
+        verify(connectionService).rotateBearerToken(eq(7L), eq(IntegrationKind.GITHUB), any(BearerToken.class));
         verify(connectionService, never()).findActiveBearerToken(any(Long.class), any());
     }
 }
