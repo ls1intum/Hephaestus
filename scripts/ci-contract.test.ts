@@ -8,6 +8,7 @@ import { describe, test } from "node:test";
 
 import { type Document, isMap, isScalar, isSeq, parseDocument, type YAMLMap } from "yaml";
 
+import { evaluate as evaluateVulnerabilityPolicy } from "./check-release-vulnerabilities.ts";
 import { versionBranch } from "./dispatch-version-pr-ci.ts";
 import { asRecord, isRecord } from "./lib/json.ts";
 import { commandsOf, loadTasks } from "./lib/task-graph.ts";
@@ -899,6 +900,16 @@ void describe("CI contract", () => {
 		assert.deepEqual(await posixGlob("security/*vulnerability*.json"), [
 			"security/vulnerability-policy.json",
 		]);
+	});
+
+	void test("holds the committed exceptions to the policy every scan applies", async () => {
+		// The gate reads this file only while scanning an image, so a mistyped platform, a malformed
+		// digest or a lapsed expiry would surface as a red image scan instead of a failed check.
+		// An empty report exercises the validation half of the evaluator on its own.
+		const policy: unknown = JSON.parse(
+			await readFile("security/vulnerability-policy.json", "utf8"),
+		);
+		assert.deepEqual(evaluateVulnerabilityPolicy("webapp", { Results: [] }, policy).errors, []);
 	});
 
 	void test("scans every release subject before the release, not only at the release gate", async () => {
