@@ -2,6 +2,8 @@ package de.tum.cit.aet.hephaestus.integration.core.connection.api;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionModeConflictException;
 import de.tum.cit.aet.hephaestus.integration.core.connection.CredentialUnreadableException;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -11,11 +13,13 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
  * An unreadable credential, or a write the connection's mode cannot take, is a state of the
  * connection, so the answer names it and what clears it; nothing here is a fault of the request or of
  * the server's ability to serve it. Lives beside the connection API rather than in the core advice,
- * which must not depend on integration types. Unordered: {@code GlobalControllerAdvice} sits at
- * {@code LOWEST_PRECEDENCE}, so these handlers already win over its catch-all without outranking a
- * future advice more specific than they are.
+ * which must not depend on integration types. One step above {@code GlobalControllerAdvice}, which
+ * sits at {@code LOWEST_PRECEDENCE}: an advice without an order has that same value, and among equals
+ * the first registered wins, so its catch-all would answer 500 before these handlers were asked. Still
+ * below every other advice, so a future one more specific than these outranks them.
  */
 @RestControllerAdvice
+@Order(Ordered.LOWEST_PRECEDENCE - 1)
 public class CredentialUnreadableProblemAdvice {
 
     @ExceptionHandler(CredentialUnreadableException.class)

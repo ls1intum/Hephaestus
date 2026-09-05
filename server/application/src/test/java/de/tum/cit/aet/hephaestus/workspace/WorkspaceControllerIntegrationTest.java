@@ -22,6 +22,7 @@ import de.tum.cit.aet.hephaestus.workspace.dto.UpdateWorkspaceFeaturesRequestDTO
 import de.tum.cit.aet.hephaestus.workspace.dto.UpdateWorkspaceNotificationsRequestDTO;
 import de.tum.cit.aet.hephaestus.workspace.dto.UpdateWorkspaceScheduleRequestDTO;
 import de.tum.cit.aet.hephaestus.workspace.dto.UpdateWorkspaceStatusRequestDTO;
+import de.tum.cit.aet.hephaestus.workspace.dto.UpdateWorkspaceTokenRequestDTO;
 import de.tum.cit.aet.hephaestus.workspace.dto.WorkspaceDTO;
 import de.tum.cit.aet.hephaestus.workspace.dto.WorkspaceListItemDTO;
 import java.util.List;
@@ -418,6 +419,46 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
                         () -> new AssertionError("Expected ACTIVE Slack Connection on workspace " + workspace.getId()));
         assertThat(slackConfig.teamLabel()).isEqualTo("core-team");
         assertThat(slackConfig.notificationChannelId()).isEqualTo("C12345678");
+    }
+
+    @Test
+    @WithAdminUser
+    void updateTokenOnAGitHubAppConnectionReturnsConnectionModeConflictProblemDetail() {
+        User owner = persistUser("app-token-owner");
+        Workspace workspace = createWorkspace("app-token-space", "App Token", "app-token", AccountType.ORG, owner);
+        ensureAdminMembership(workspace);
+        seedGitHubAppConnection(workspace);
+
+        ProblemDetail problem = webTestClient
+                .patch()
+                .uri("/workspaces/{workspaceSlug}/token", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(new UpdateWorkspaceTokenRequestDTO("ghp_replacement_token_for_test"))
+                .exchange()
+                .expectStatus()
+                .isEqualTo(HttpStatus.CONFLICT)
+                .expectHeader()
+                .contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON)
+                .expectBody(ProblemDetail.class)
+                .returnResult()
+                .getResponseBody();
+
+        assertThat(problem).isNotNull();
+        assertThat(problem.getTitle()).isEqualTo("Connection mode conflict");
+        assertThat(problem.getDetail()).contains("App installation");
+    }
+
+    /** An App installation runs on no stored token; the install flow activates this row in production. */
+    private void seedGitHubAppConnection(Workspace workspace) {
+        Connection connection = new Connection(
+                workspace,
+                IntegrationKind.GITHUB,
+                "100",
+                new ConnectionConfig.GitHubAppConfig(100L, "app-token", null, Set.of()));
+        connection.setDisplayName("app-token");
+        connection.setState(IntegrationState.ACTIVE);
+        connectionRepository.save(connection);
     }
 
     private void seedSlackConnection(Workspace workspace) {

@@ -4,11 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.config.SpringAsyncConfig;
 import de.tum.cit.aet.hephaestus.core.security.MissingCredentialKeyException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
@@ -20,11 +22,15 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.springframework.core.task.SyncTaskExecutor;
 import org.springframework.core.task.TaskExecutor;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.SimpleTransactionStatus;
@@ -78,6 +84,65 @@ class CredentialReaderTest extends BaseUnitTest {
         handedOver.forEach(Runnable::run);
         verify(connectionRepository)
                 .markCredentialsUnreadable(eq(55L), eq(7L), eq(connection.getCredentialsEncrypted()), eq(NOW));
+    }
+
+    /** The lane production writes the record on: one worker, a queue of 64, and a discard beyond that. */
+    private static ThreadPoolTaskExecutor productionRecorder() {
+        ThreadPoolTaskExecutor recorder =
+                (ThreadPoolTaskExecutor) new SpringAsyncConfig().credentialReadabilityExecutor();
+        recorder.initialize();
+        return recorder;
+    }
+
+    @Test
+    @Timeout(10)
+    void shouldStillAnswerAtOnceWhenTheRecorderIsStalledAndItsQueueIsFull() throws InterruptedException {
+        connection.setCredentials(TOKEN, new CredentialBundleConverter(KEY_A, "dev"));
+        CountDownLatch recording = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        doAnswer(invocation -> {
+                    recording.countDown();
+                    release.await(10, TimeUnit.SECONDS);
+                    return 1;
+                })
+                .when(connectionRepository)
+                .markCredentialsUnreadable(any(), any(), any(), any());
+        ThreadPoolTaskExecutor recorder = productionRecorder();
+        try {
+            CredentialReader reader = readerWith(new CredentialBundleConverter(KEY_B, "dev"), recorder);
+            int queueCapacity = recorder.getQueueCapacity();
+
+            // The first record occupies the only worker until released; the next fill the queue.
+            assertThatThrownBy(() -> reader.credentialsOf(connection))
+                    .isExactlyInstanceOf(CredentialUnreadableException.class);
+            assertThat(recording.await(10, TimeUnit.SECONDS)).isTrue();
+            for (int i = 0; i < queueCapacity + 1; i++) {
+                assertThatThrownBy(() -> reader.credentialsOf(connection))
+                        .isExactlyInstanceOf(CredentialUnreadableException.class);
+            }
+
+            // The recorder is still stalled and its queue full: the answer neither waits nor changes.
+            assertThatThrownBy(() -> reader.credentialsOf(connection))
+                    .isExactlyInstanceOf(CredentialUnreadableException.class);
+            assertThat(recorder.getThreadPoolExecutor().getQueue()).hasSize(queueCapacity);
+            assertThat(release.getCount()).isEqualTo(1);
+        } finally {
+            release.countDown();
+            recorder.shutdown();
+        }
+    }
+
+    @Test
+    void shouldStillAnswerWithTheUnreadableCredentialWhenTheRecorderHasShutDown() {
+        connection.setCredentials(TOKEN, new CredentialBundleConverter(KEY_A, "dev"));
+        ThreadPoolTaskExecutor recorder = productionRecorder();
+        recorder.shutdown();
+
+        assertThatThrownBy(() -> readerWith(new CredentialBundleConverter(KEY_B, "dev"), recorder)
+                        .credentialsOf(connection))
+                .isExactlyInstanceOf(CredentialUnreadableException.class);
+        // A record submitted after shutdown is discarded, not run and not thrown.
+        verify(connectionRepository, never()).markCredentialsUnreadable(any(), any(), any(), any());
     }
 
     @Test
