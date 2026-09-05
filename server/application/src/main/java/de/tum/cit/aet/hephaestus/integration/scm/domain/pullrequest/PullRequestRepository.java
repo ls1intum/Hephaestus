@@ -26,6 +26,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Repository
 @WorkspaceAgnostic("Pull requests scoped through repository_id -> repository.workspace_id")
 public interface PullRequestRepository extends JpaRepository<PullRequest, Long> {
+    boolean existsByIdAndDeletedAtIsNull(Long id);
+
     @Query("""
         SELECT p
         FROM PullRequest p

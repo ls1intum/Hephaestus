@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.agent.context.EvidenceLimits;
 import de.tum.cit.aet.hephaestus.agent.context.EvidenceSource;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
 import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
 import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
@@ -43,8 +44,9 @@ import tools.jackson.databind.node.ObjectNode;
  *   <li>{@code issue_summary.md} — a single AI-readable rendering of the issue + thread</li>
  * </ul>
  *
- * <p>Required: a missing issue aborts the build (prevents hollow positives). Runs read-only
- * transactionally so the lazy collections (labels, assignees, comments) load within the same tx.
+ * <p>An issue that is missing or tombstoned makes the source unavailable rather than empty (prevents
+ * hollow positives). Runs read-only transactionally so the lazy collections (labels, assignees,
+ * comments) load within the same tx.
  */
 @Component
 public class IssueContentSource implements EvidenceSource, ReviewContextBuilder {
@@ -114,12 +116,11 @@ public class IssueContentSource implements EvidenceSource, ReviewContextBuilder 
             throw new JobPreparationException("Job has no metadata: jobId=" + job.getId());
         }
         long issueId = requireLong(metadata, "issue_id");
-        // TYPE(i)=Issue finder: a target_type=ISSUE job must resolve to an Issue, never a PullRequest
-        // (both share the single inheritance table + id space).
-        Issue issue = issueRepository
-                .findByIdWithRepository(issueId)
-                .orElseThrow(() ->
-                        new JobPreparationException("Issue not found: issueId=" + issueId + ", jobId=" + job.getId()));
+        // TYPE(i)=Issue excludes pull requests, which share this table and ID space.
+        Issue issue = issueRepository.findByIdWithRepository(issueId).orElse(null);
+        if (issue == null || issue.getDeletedAt() != null) {
+            return EvidenceContribution.unavailable(selectedKinds, SourceAbsenceReason.NOT_FOUND);
+        }
         Map<String, byte[]> files = new java.util.LinkedHashMap<>();
         Map<SourceKind, SourceCompleteness> completeness = new java.util.HashMap<>();
         Map<SourceKind, java.time.Instant> observedAt = new java.util.HashMap<>();

@@ -56,35 +56,8 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Handler for {@link AgentJobType#PULL_REQUEST_REVIEW} jobs.
- *
- * <p>Delegates workspace-context materialisation to {@link WorkspaceContextBuilder} (which
- * orchestrates {@code PullRequestContentSource} → {@code inputs/context/...} files) and the
- * task envelope to {@link TaskEnvelopeWriter}. Retains practice catalog injection ({@code inputs/practices/})
- * and delivery-phase post-processing here — catalog injection is per-job and not provider-shaped.
- *
- * <p>Container workspace layout — read-only vs writable by LOCATION per ADR 0020 (see
- * {@code docs/developer/agent/workspace-abi.mdx} for the full ABI):
- * <pre>
- * /workspace/
- * ├── inputs/                            # read-only — the path-guard whitelists exactly this subtree
- * │   ├── manifest.json                  #   telescope: integration-agnostic index (path/connector/sha256)
- * │   ├── sources/scm/repo/              #   optional materialized repository tree
- * │   ├── context/                       #   workspace context (this handler populates via WorkspaceContextBuilder)
- * │   │   ├── metadata.json              #     PR metadata + commits
- * │   │   ├── comments.json              #     review comments
- * │   │   ├── diff.patch                 #     diff with [L&lt;n&gt;] annotations
- * │   │   ├── diff_summary.md            #     per-file diff chunks
- * │   └── practices/{index.json, {slug}.md, all-criteria.md}
- * ├── work/                              # scratch the agent + precompute write; NEVER collected
- * │   ├── precompute/practices/{slug}.ts
- * │   ├── precompute-out/
- * │   └── analysis/
- * ├── out/                               # the ONLY directory collected back into SQL
- * ├── task.json                          # Task envelope (TaskEnvelope around Task.PracticeReview)
- * ├── .pi/{AGENTS.md, settings.json, extensions/} # Pi SDK agent dir ($PI_CODING_AGENT_DIR)
- * └── .run-pi.ts                          # runner entry point
- * </pre>
+ * Handles {@link AgentJobType#PULL_REQUEST_REVIEW} jobs.
+ * The workspace layout is defined in {@code docs/contributor/agent/workspace-abi.mdx}.
  */
 public class PullRequestReviewHandler implements JobTypeHandler {
 

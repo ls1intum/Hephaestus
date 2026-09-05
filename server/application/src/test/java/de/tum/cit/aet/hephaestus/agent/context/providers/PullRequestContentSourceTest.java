@@ -13,6 +13,8 @@ import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.EvidenceContribution;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
+import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
 import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
 import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
@@ -36,6 +38,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import org.eclipse.jgit.util.QuotedString;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -78,6 +81,10 @@ class PullRequestContentSourceTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(pullRequestRepository.existsByIdAndDeletedAtIsNull(456L)).thenReturn(true);
+        lenient()
+                .when(pullRequestRepository.findByIdWithAuthorAndRepository(456L))
+                .thenReturn(Optional.of(new PullRequest()));
         lenient().when(scmTokenSource.kind()).thenReturn(IntegrationKind.GITLAB);
         provider = new PullRequestContentSource(
                 objectMapper,
@@ -154,8 +161,6 @@ class PullRequestContentSourceTest extends BaseUnitTest {
 
         @Test
         void capturesCoreWithoutARepositoryClone() {
-            when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.empty());
-
             EvidenceContribution contribution = provider.capture(request(sampleMetadata()), java.util.Set.of(CORE));
 
             assertThat(contribution.files()).containsKey("inputs/context/metadata.json");
@@ -165,7 +170,6 @@ class PullRequestContentSourceTest extends BaseUnitTest {
         @Test
         void writesMetadataJson() throws Exception {
             stubGit();
-            when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.empty());
             when(reviewCommentRepository.findRecentByPullRequestIdWithAuthor(eq(456L), any()))
                     .thenReturn(List.of());
 
@@ -176,7 +180,6 @@ class PullRequestContentSourceTest extends BaseUnitTest {
             JsonNode metadataJson = objectMapper.readTree(files.get("inputs/context/metadata.json"));
             assertThat(metadataJson.get("pr_number").asInt()).isEqualTo(42);
             assertThat(metadataJson.get("repository_full_name").asString()).isEqualTo("owner/repo");
-            assertThat(metadataJson.get("enriched").asBoolean()).isFalse();
         }
 
         @Test
@@ -191,7 +194,7 @@ class PullRequestContentSourceTest extends BaseUnitTest {
             pr.setAuthor(author);
 
             stubGit();
-            when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.of(pr));
+            when(pullRequestRepository.findByIdWithAuthorAndRepository(456L)).thenReturn(Optional.of(pr));
             when(reviewCommentRepository.findRecentByPullRequestIdWithAuthor(eq(456L), any()))
                     .thenReturn(List.of());
 
@@ -199,7 +202,6 @@ class PullRequestContentSourceTest extends BaseUnitTest {
             provider.contribute(request(sampleMetadata()), files);
 
             JsonNode metadataJson = objectMapper.readTree(files.get("inputs/context/metadata.json"));
-            assertThat(metadataJson.get("enriched").asBoolean()).isTrue();
             assertThat(metadataJson.get("title").asString()).isEqualTo("Fix authentication bug");
             assertThat(metadataJson.get("author").asString()).isEqualTo("testuser");
             assertThat(metadataJson.get("additions").asInt()).isEqualTo(10);
@@ -222,7 +224,6 @@ class PullRequestContentSourceTest extends BaseUnitTest {
             minimal.setBody("Old comment");
 
             stubGit();
-            when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.empty());
             when(reviewCommentRepository.findRecentByPullRequestIdWithAuthor(eq(456L), any()))
                     .thenReturn(List.of(full, minimal));
 
@@ -250,7 +251,6 @@ class PullRequestContentSourceTest extends BaseUnitTest {
             java.util.Collections.reverse(comments);
 
             stubGit();
-            when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.empty());
             when(reviewCommentRepository.findRecentByPullRequestIdWithAuthor(eq(456L), any()))
                     .thenReturn(comments);
 
@@ -433,7 +433,6 @@ class PullRequestContentSourceTest extends BaseUnitTest {
         @Test
         void headVerifiedButRangeUnresolvable_abortsWithJobPreparationException() {
             stubGit();
-            when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.empty());
             lenient()
                     .when(reviewCommentRepository.findRecentByPullRequestIdWithAuthor(eq(456L), any()))
                     .thenReturn(List.of());
@@ -449,7 +448,6 @@ class PullRequestContentSourceTest extends BaseUnitTest {
         @Test
         void missingPinnedHead_abortsBeforeSandboxLaunch() {
             stubGit();
-            when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.empty());
             lenient()
                     .when(reviewCommentRepository.findRecentByPullRequestIdWithAuthor(eq(456L), any()))
                     .thenReturn(List.of());
@@ -465,7 +463,6 @@ class PullRequestContentSourceTest extends BaseUnitTest {
         @Test
         void unexpectedGitError_abortsWithJobPreparationException() {
             stubGit();
-            when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.empty());
             lenient()
                     .when(reviewCommentRepository.findRecentByPullRequestIdWithAuthor(eq(456L), any()))
                     .thenReturn(List.of());
@@ -485,7 +482,6 @@ class PullRequestContentSourceTest extends BaseUnitTest {
         @Test
         void realDiff_writesAnnotatedPatchAndSummary() throws Exception {
             stubGit();
-            when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.empty());
             when(reviewCommentRepository.findRecentByPullRequestIdWithAuthor(eq(456L), any()))
                     .thenReturn(List.of());
             when(gitDiffOperations.resolveDiffRange(Path.of(repoPath), "main", "feature/auth-fix", "abc123def456"))
@@ -516,7 +512,6 @@ class PullRequestContentSourceTest extends BaseUnitTest {
             when(scmTokenSource.reviewHeadRef(42)).thenReturn(Optional.of("refs/merge-requests/42/head"));
             when(gitRepositoryManager.fetchRemoteCommit(123L, "refs/merge-requests/42/head", "abc123def456", "token"))
                     .thenReturn(true);
-            when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.empty());
             lenient()
                     .when(reviewCommentRepository.findRecentByPullRequestIdWithAuthor(eq(456L), any()))
                     .thenReturn(List.of());
@@ -550,5 +545,53 @@ class PullRequestContentSourceTest extends BaseUnitTest {
                     .isInstanceOf(JobPreparationException.class)
                     .hasMessageContaining("no metadata");
         }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void shouldReportUnavailableThenAllowCaptureWhenArtifactReturns(boolean tombstoned) {
+        var artifact = new PullRequest();
+        artifact.setDeletedAt(Instant.parse("2026-09-05T00:00:00Z"));
+        when(pullRequestRepository.findByIdWithAuthorAndRepository(456L))
+                .thenReturn(tombstoned ? Optional.of(artifact) : Optional.empty());
+        for (var kind : provider.sourceKinds()) {
+            var captured = provider.capture(request(sampleMetadata()), Set.of(kind));
+            assertThat(captured.files()).isEmpty();
+            assertThat(captured.completeness()).isEmpty();
+            assertThat(captured.contentStates()).isEmpty();
+            assertThat(captured.stateOverrides())
+                    .containsExactlyEntriesOf(
+                            Map.of(kind, new SourceCaptureState.Unavailable(SourceAbsenceReason.NOT_FOUND)));
+        }
+        verifyNoInteractions(reviewCommentRepository, gitDiffOperations, gitRepositoryManager);
+        artifact.setDeletedAt(null);
+        when(pullRequestRepository.findByIdWithAuthorAndRepository(456L)).thenReturn(Optional.of(artifact));
+        var restored = provider.capture(request(sampleMetadata()), Set.of(COMMENTS));
+        assertThat(restored.stateOverrides()).isEmpty();
+        assertThat(restored.files()).isNotEmpty();
+    }
+
+    @Test
+    void shouldSkipGitPreparationWhenTheParentIsUnavailable() {
+        when(pullRequestRepository.existsByIdAndDeletedAtIsNull(456L)).thenReturn(false);
+
+        provider.prepareCapture(request(sampleMetadata()), Set.of(DIFF));
+
+        verifyNoInteractions(gitRepositoryManager, gitDiffOperations, connectionService);
+    }
+
+    @Test
+    void shouldRecheckAvailabilityAfterGitPreparation() {
+        when(gitRepositoryManager.isEnabled()).thenReturn(true);
+        provider.prepareCapture(request(sampleMetadata()), Set.of(DIFF));
+        var deleted = new PullRequest();
+        deleted.setDeletedAt(Instant.parse("2026-09-05T00:00:00Z"));
+        when(pullRequestRepository.findByIdWithAuthorAndRepository(456L)).thenReturn(Optional.of(deleted));
+
+        var captured = provider.capture(request(sampleMetadata()), Set.of(CORE));
+
+        assertThat(captured.files()).isEmpty();
+        assertThat(captured.stateOverrides())
+                .containsEntry(CORE, new SourceCaptureState.Unavailable(SourceAbsenceReason.NOT_FOUND));
     }
 }

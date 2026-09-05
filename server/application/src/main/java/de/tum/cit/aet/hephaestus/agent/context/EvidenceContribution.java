@@ -1,13 +1,16 @@
 package de.tum.cit.aet.hephaestus.agent.context;
 
+import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
 import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
 import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
 import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 public record EvidenceContribution(
         Map<String, byte[]> files,
@@ -118,6 +121,13 @@ public record EvidenceContribution(
                 Map.of(),
                 null,
                 Map.of());
+    }
+
+    /** An unavailable source has no files and makes no claim about its content or completeness. */
+    public static EvidenceContribution unavailable(Set<SourceKind> kinds, SourceAbsenceReason reason) {
+        Map<SourceKind, SourceCaptureState> states = new HashMap<>();
+        kinds.forEach(kind -> states.put(kind, new SourceCaptureState.Unavailable(reason)));
+        return new EvidenceContribution(Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), states);
     }
 
     public EvidenceContribution {

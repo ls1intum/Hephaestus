@@ -281,3 +281,45 @@ and retry behavior.
 
 This does not serialize admission with later deletion, query upstream synchronously, or cancel
 in-flight reviews. Slack's irreversible deletion and Outline's lack of a resubmitter remain unchanged.
+
+## Update — 2026-09-05 (issue #1404): capture, new feedback and the two non-SCM kinds
+
+Supersedes the **Slack and Outline are out of scope of this update** paragraph of the 2026-09-03
+update above; that paragraph stays standing as the record of what was open and why. Both of its tables
+still hold, and so does the 2026-09-04 hold on a re-offered signal.
+
+**Capture.** Each SCM artifact content source checks its own parent before it reads anything, whatever
+kinds the caller selected — the capture-stage refusal the 2026-09-03 **Consequence** paragraph named as
+the alternative to a free-text job failure. A missing or tombstoned parent reports
+`SourceAbsenceReason.NOT_FOUND` with no files, no completeness claim and no content state, so an
+unavailable source cannot be read as an empty one. Outline document capture already worked this way.
+Clearing the tombstone permits a later capture; it does not rewrite evidence already recorded.
+[The pipeline](../contributor/practice-review-pipeline.mdx#where-a-review-can-stop) owns each stage's
+refusal vocabulary and the
+[artifact-source contract](../contributor/artifact-source-contract.mdx#capture-state) owns capture
+states.
+
+**New feedback.** `PracticeFeedbackDeliveryPolicy` checks the current target on the artifact, in-app and
+conversation surfaces alike, including feedback prepared for a conversation before the developer asks
+for it, and refuses an unavailable target with `FeedbackSuppressionReason.ARTIFACT_GONE` in the
+[delivery policy check order](../contributor/practice-review-glossary.mdx#the-delivery-policy-check-order).
+Feedback already delivered stays readable, per the `practices` row of the 2026-09-03 table.
+
+**The two non-SCM kinds** the superseded paragraph left open are answered the same way, through the same
+mechanism:
+
+| Kind | What decides a new delivery | Limit |
+| --- | --- | --- |
+| `scm.issue`, `scm.pull_request` | The row's tombstone, and that the recipient is the subject of the work | — |
+| `docs.document` | The document still exists and is not tombstoned | Archiving a document, or evicting its body, is not deletion |
+| `chat.conversation_thread` | The thread row, its channel's consent and the recipient's participation, through `ConversationSourceLiveness` | `SlackThread` has no tombstone column, so this is thread eligibility, not proof that every captured message still exists |
+
+Integration-owned projections supply these facts, so `practices` still names no integration table.
+
+**What these checks are not.** They observe the mirror at the moment they run. They neither lock sync
+across Git I/O and external delivery nor take an atomic snapshot with the provider, so a successful
+capture does not by itself authorize a later delivery.
+
+**Revisit trigger.** A content source captures an artifact kind without checking its parent; Slack gains
+a message-level tombstone; or delivery needs a reason other than `ARTIFACT_GONE` to tell "the work is
+gone" apart from "this channel cannot carry it".

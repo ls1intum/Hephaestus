@@ -79,7 +79,6 @@ export interface PullRequestMetadata {
 	source_branch: string;
 	target_branch: string;
 	commit_sha: string;
-	enriched: boolean;
 	title?: string;
 	body?: string;
 	state?: string;

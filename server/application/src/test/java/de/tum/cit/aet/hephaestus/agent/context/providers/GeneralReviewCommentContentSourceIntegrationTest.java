@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
+import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
@@ -23,6 +25,8 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import tools.jackson.databind.JsonNode;
@@ -133,6 +137,36 @@ class GeneralReviewCommentContentSourceIntegrationTest extends BaseIntegrationTe
 
         assertThat(staged.get("count").asInt()).isEqualTo(1);
         assertThat(staged.get("comments").get(0).get("body").asString()).isEqualTo("on the pull request under review");
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = IdentityProviderType.class,
+            names = {"GITHUB", "GITLAB"})
+    void shouldExcludeTombstonedDiscussionAndIncludeItAfterResurrection(IdentityProviderType type) {
+        String serverUrl = type == IdentityProviderType.GITHUB ? "https://github.com" : "https://gitlab.example.com";
+        provider = gitProviderRepository
+                .findByTypeAndServerUrl(type, serverUrl)
+                .orElseGet(() -> gitProviderRepository.save(new IdentityProvider(type, serverUrl)));
+        repository.setProvider(provider);
+        repositoryRepository.saveAndFlush(repository);
+        PullRequest pr = persistPullRequest(15);
+        persistComment(pr, persistUser("reviewer"), "Retained discussion", at("10:00"));
+        ObjectNode metadata = objectMapper.createObjectNode();
+        metadata.put("pull_request_id", pr.getId());
+        AgentJob job = new AgentJob();
+        job.setMetadata(metadata);
+        var request = new ContextRequest.PracticeReviewRequest(job);
+        pr.setDeletedAt(Instant.now());
+        pullRequestRepository.saveAndFlush(pr);
+
+        var captured = source.capture(request, source.sourceKinds());
+        assertThat(captured.files()).isEmpty();
+        assertThat(captured.stateOverrides().values())
+                .containsExactly(new SourceCaptureState.Unavailable(SourceAbsenceReason.NOT_FOUND));
+        pr.setDeletedAt(null);
+        pullRequestRepository.saveAndFlush(pr);
+        assertThat(stage(pr).path("comments").get(0).path("body").asString()).isEqualTo("Retained discussion");
     }
 
     private JsonNode stage(PullRequest pullRequest) {

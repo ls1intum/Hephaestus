@@ -1,5 +1,8 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
+import de.tum.cit.aet.hephaestus.agent.context.providers.DocumentContentSource;
+import de.tum.cit.aet.hephaestus.agent.conversation.ConversationSourceLiveness;
+import de.tum.cit.aet.hephaestus.agent.documentation.DocumentProjection;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountPreferencesQuery;
@@ -21,6 +24,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicySurface;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.feedback.approval.FeedbackApprovalDecision;
 import de.tum.cit.aet.hephaestus.practices.feedback.approval.FeedbackApprovalRepository;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewCoverageService;
@@ -45,6 +49,8 @@ import tools.jackson.databind.JsonNode;
 @Service
 public class PracticeFeedbackDeliveryPolicy {
 
+    private final ConversationSourceLiveness conversationSourceLiveness;
+    private final DocumentProjection documentProjection;
     private final IssueRepository issueRepository;
     private final PullRequestRepository pullRequestRepository;
     private final PullRequestReviewRepository pullRequestReviewRepository;
@@ -70,7 +76,11 @@ public class PracticeFeedbackDeliveryPolicy {
             PracticeReviewCoverageService coverageService,
             DeliveryPolicyEvaluationRecorder evaluationRecorder,
             PracticeRepository practiceRepository,
-            FeedbackApprovalRepository approvalRepository) {
+            FeedbackApprovalRepository approvalRepository,
+            ConversationSourceLiveness conversationSourceLiveness,
+            DocumentProjection documentProjection) {
+        this.conversationSourceLiveness = conversationSourceLiveness;
+        this.documentProjection = documentProjection;
         this.issueRepository = issueRepository;
         this.pullRequestRepository = pullRequestRepository;
         this.pullRequestReviewRepository = pullRequestReviewRepository;
@@ -87,12 +97,12 @@ public class PracticeFeedbackDeliveryPolicy {
 
     @Transactional(readOnly = true)
     public Decision<Issue> evaluateIssue(AgentJob job) {
-        return evaluateIssue(job, DeliveryPolicyStage.AUTOMATIC, null, DeliveryPolicySurface.ARTIFACT, Set.of());
+        return evaluateIssue(job, DeliveryPolicyStage.AUTOMATIC, null, DeliveryPolicySurface.ARTIFACT, Set.of(), null);
     }
 
     @Transactional(readOnly = true)
     public Decision<Issue> evaluateIssue(AgentJob job, DeliveryPolicyStage stage, @Nullable UUID feedbackId) {
-        return evaluateIssue(job, stage, feedbackId, DeliveryPolicySurface.ARTIFACT, Set.of());
+        return evaluateIssue(job, stage, feedbackId, DeliveryPolicySurface.ARTIFACT, Set.of(), null);
     }
 
     @Transactional(readOnly = true)
@@ -101,7 +111,7 @@ public class PracticeFeedbackDeliveryPolicy {
             DeliveryPolicyStage stage,
             @Nullable UUID feedbackId,
             Collection<String> contributingPracticeSlugs) {
-        return evaluateIssue(job, stage, feedbackId, DeliveryPolicySurface.ARTIFACT, contributingPracticeSlugs);
+        return evaluateIssue(job, stage, feedbackId, DeliveryPolicySurface.ARTIFACT, contributingPracticeSlugs, null);
     }
 
     private Decision<Issue> evaluateIssue(
@@ -109,7 +119,8 @@ public class PracticeFeedbackDeliveryPolicy {
             DeliveryPolicyStage stage,
             @Nullable UUID feedbackId,
             DeliveryPolicySurface surface,
-            Collection<String> contributingPracticeSlugs) {
+            Collection<String> contributingPracticeSlugs,
+            @Nullable Long recipientUserId) {
         long workspaceId = requireWorkspaceId(job);
         Workspace workspace = activePracticeWorkspace(workspaceId);
         boolean instanceMayDeliver = !silentModeQuery.isSilentModeEngaged();
@@ -159,6 +170,8 @@ public class PracticeFeedbackDeliveryPolicy {
                         && isEligibleTarget(issue, metadata, "issue_number", workspaceId)
                         && issue != null
                         && issue.getAuthor() != null
+                        && (recipientUserId == null
+                                || recipientUserId.equals(issue.getAuthor().getId()))
                 ? issue
                 : null;
         boolean closedWhenQueued = metadata != null
@@ -198,13 +211,14 @@ public class PracticeFeedbackDeliveryPolicy {
 
     @Transactional(readOnly = true)
     public Decision<PullRequest> evaluatePullRequest(AgentJob job) {
-        return evaluatePullRequest(job, DeliveryPolicyStage.AUTOMATIC, null, DeliveryPolicySurface.ARTIFACT, Set.of());
+        return evaluatePullRequest(
+                job, DeliveryPolicyStage.AUTOMATIC, null, DeliveryPolicySurface.ARTIFACT, Set.of(), null);
     }
 
     @Transactional(readOnly = true)
     public Decision<PullRequest> evaluatePullRequest(
             AgentJob job, DeliveryPolicyStage stage, @Nullable UUID feedbackId) {
-        return evaluatePullRequest(job, stage, feedbackId, DeliveryPolicySurface.ARTIFACT, Set.of());
+        return evaluatePullRequest(job, stage, feedbackId, DeliveryPolicySurface.ARTIFACT, Set.of(), null);
     }
 
     @Transactional(readOnly = true)
@@ -213,7 +227,8 @@ public class PracticeFeedbackDeliveryPolicy {
             DeliveryPolicyStage stage,
             @Nullable UUID feedbackId,
             Collection<String> contributingPracticeSlugs) {
-        return evaluatePullRequest(job, stage, feedbackId, DeliveryPolicySurface.ARTIFACT, contributingPracticeSlugs);
+        return evaluatePullRequest(
+                job, stage, feedbackId, DeliveryPolicySurface.ARTIFACT, contributingPracticeSlugs, null);
     }
 
     private Decision<PullRequest> evaluatePullRequest(
@@ -221,7 +236,8 @@ public class PracticeFeedbackDeliveryPolicy {
             DeliveryPolicyStage stage,
             @Nullable UUID feedbackId,
             DeliveryPolicySurface surface,
-            Collection<String> contributingPracticeSlugs) {
+            Collection<String> contributingPracticeSlugs,
+            @Nullable Long recipientUserId) {
         long workspaceId = requireWorkspaceId(job);
         Workspace workspace = activePracticeWorkspace(workspaceId);
         boolean instanceMayDeliver = !silentModeQuery.isSilentModeEngaged();
@@ -273,6 +289,7 @@ public class PracticeFeedbackDeliveryPolicy {
                         && isEligibleTarget(pullRequest, metadata, "pr_number", workspaceId)
                         && pullRequest != null
                         && subjectUserId != null
+                        && (recipientUserId == null || recipientUserId.equals(subjectUserId))
                 ? pullRequest
                 : null;
         PracticeReviewSettings settings = workspace == null ? null : workspace.getReviewSettings();
@@ -325,11 +342,11 @@ public class PracticeFeedbackDeliveryPolicy {
         }
         JsonNode metadata = job.getMetadata();
         if (metadata != null && metadata.path("issue_id").isIntegralNumber()) {
-            return evaluateIssue(job, DeliveryPolicyStage.COMPOSITION, null, surface, Set.of())
+            return evaluateIssue(job, DeliveryPolicyStage.COMPOSITION, null, surface, Set.of(), null)
                     .allowed();
         }
         if (metadata != null && metadata.path("pull_request_id").isIntegralNumber()) {
-            return evaluatePullRequest(job, DeliveryPolicyStage.COMPOSITION, null, surface, Set.of())
+            return evaluatePullRequest(job, DeliveryPolicyStage.COMPOSITION, null, surface, Set.of(), null)
                     .allowed();
         }
         Long aboutUserId = integralId(metadata, "about_user_id").orElse(null);
@@ -359,16 +376,30 @@ public class PracticeFeedbackDeliveryPolicy {
         return resolution.result().allowed();
     }
 
+    /** Decides one recipient's non-artifact delivery, whatever kind of work the feedback is about. */
     @Transactional(readOnly = true)
-    public Decision<Long> evaluateRepositoryless(
+    public DeliveryDecision evaluateForRecipient(
             AgentJob job,
             DeliveryPolicyStage stage,
             @Nullable UUID feedbackId,
             DeliveryPolicySurface surface,
             long aboutUserId,
             Collection<String> contributingPracticeSlugs) {
+        if (surface == DeliveryPolicySurface.ARTIFACT) {
+            throw new IllegalArgumentException(
+                    "ARTIFACT delivery is decided by evaluateIssue/evaluatePullRequest, not by recipient");
+        }
+        if (ArtifactKinds.ISSUE.equals(job.getArtifactKind())) {
+            return evaluateIssue(job, stage, feedbackId, surface, contributingPracticeSlugs, aboutUserId)
+                    .verdict();
+        }
+        if (ArtifactKinds.PULL_REQUEST.equals(job.getArtifactKind())) {
+            return evaluatePullRequest(job, stage, feedbackId, surface, contributingPracticeSlugs, aboutUserId)
+                    .verdict();
+        }
         return evaluateRepositorylessWithinTransaction(
-                job, stage, feedbackId, surface, aboutUserId, contributingPracticeSlugs);
+                        job, stage, feedbackId, surface, aboutUserId, contributingPracticeSlugs)
+                .verdict();
     }
 
     private Decision<Long> evaluateRepositorylessWithinTransaction(
@@ -378,9 +409,6 @@ public class PracticeFeedbackDeliveryPolicy {
             DeliveryPolicySurface surface,
             long aboutUserId,
             Collection<String> contributingPracticeSlugs) {
-        if (surface == DeliveryPolicySurface.ARTIFACT) {
-            throw new IllegalArgumentException("Repository-less feedback must name a non-artifact surface");
-        }
         long workspaceId = requireWorkspaceId(job);
         Workspace workspace = activePracticeWorkspace(workspaceId);
         JsonNode metadata = job.getMetadata();
@@ -390,6 +418,7 @@ public class PracticeFeedbackDeliveryPolicy {
         CoverageAssessment coverage = workspace == null
                 ? null
                 : coverageService.assessRepositoryless(workspace, new ReviewSubject(aboutUserId, true));
+        boolean targetEligible = subjectMatches && repositorylessTargetEligible(job, workspaceId, aboutUserId);
         Resolution resolution = resolve(
                 job,
                 surface,
@@ -399,8 +428,8 @@ public class PracticeFeedbackDeliveryPolicy {
                 subjectMatches
                         ? FactAnswer.of(accountPreferencesQuery.practiceFeedbackDeliveryEnabled(aboutUserId))
                         : FactAnswer.NOT_APPLICABLE,
-                FactAnswer.of(subjectMatches),
-                subjectMatches ? null : FeedbackSuppressionReason.ARTIFACT_GONE,
+                FactAnswer.of(targetEligible),
+                targetEligible ? null : FeedbackSuppressionReason.ARTIFACT_GONE,
                 stage,
                 feedbackId,
                 contributingPracticeSlugs,
@@ -411,6 +440,28 @@ public class PracticeFeedbackDeliveryPolicy {
         return resolution.result().allowed()
                 ? Decision.allowed(aboutUserId)
                 : Decision.suppressed(resolution.result().refusal());
+    }
+
+    private boolean repositorylessTargetEligible(AgentJob job, long workspaceId, long aboutUserId) {
+        JsonNode metadata = job.getMetadata();
+        if (metadata == null) return false;
+        if (ArtifactKinds.DOCUMENT.equals(job.getArtifactKind())) {
+            return integralId(metadata, DocumentContentSource.DOCUMENT_ID_METADATA_KEY)
+                    .flatMap(id -> documentProjection.documentById(workspaceId, id))
+                    .filter(document -> !document.deleted())
+                    .isPresent();
+        }
+        if (ArtifactKinds.CONVERSATION_THREAD.equals(job.getArtifactKind())) {
+            Long threadId = integralId(metadata, "slack_thread_id").orElse(null);
+            String channelId = metadata.path("slack_channel_id").asString("");
+            String threadTs = metadata.path("slack_thread_ts").asString("");
+            return threadId != null
+                    && !channelId.isBlank()
+                    && !threadTs.isBlank()
+                    && conversationSourceLiveness.isDeliverableThread(
+                            workspaceId, threadId, channelId, threadTs, aboutUserId);
+        }
+        return false;
     }
 
     static boolean matchesArtifact(Issue artifact, @Nullable JsonNode metadata, String numberKey) {
@@ -651,6 +702,18 @@ public class PracticeFeedbackDeliveryPolicy {
 
         public boolean allowed() {
             return artifact != null;
+        }
+
+        DeliveryDecision verdict() {
+            return new DeliveryDecision(allowed(), suppressionReason);
+        }
+    }
+
+    /** A delivery verdict for a caller that needs the answer rather than the work it was decided about. */
+    public record DeliveryDecision(
+            boolean allowed, @Nullable FeedbackSuppressionReason suppressionReason) {
+        public FeedbackSuppressionReason refusal() {
+            return java.util.Objects.requireNonNull(suppressionReason, "a suppressed decision always names its reason");
         }
     }
 }
