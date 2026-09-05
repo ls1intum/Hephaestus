@@ -220,7 +220,7 @@ function ScmIntegrationPage() {
 				<ConnectionStateNotice
 					connectionState={entry.connectionState}
 					credentialsUnreadableSince={entry.credentialsUnreadableSince}
-					credentialRecovery="Replace it by submitting a new personal access token to the workspace token endpoint, which the console has no form for yet"
+					credentialRecovery="Replace it by storing a new personal access token for this workspace"
 					displayName={label}
 				/>
 			)}

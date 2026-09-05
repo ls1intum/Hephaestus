@@ -94,7 +94,7 @@ export function ConnectionStateNotice({
 					<KeyRoundIcon />
 					<AlertTitle>The stored token can't be read</AlertTitle>
 					<AlertDescription>
-						{`${displayName}'s stored token can't be read with this server's current keys — after a key change, or a database restored under another key — so nothing that needs it can run. ${credentialRecovery}, or restore the key it was written with if that was changed by mistake.`}
+						{`${displayName}'s stored token can't be read with this server's current keys — usually after a key change, or a database restored under another key — so nothing that needs it can run. ${credentialRecovery}, or restore the key it was written with if that was changed by mistake.`}
 					</AlertDescription>
 				</Alert>
 			)}
