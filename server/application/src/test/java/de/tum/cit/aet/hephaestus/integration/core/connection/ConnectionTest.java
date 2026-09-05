@@ -1,7 +1,9 @@
 package de.tum.cit.aet.hephaestus.integration.core.connection;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import de.tum.cit.aet.hephaestus.core.security.EncryptionException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -28,6 +30,18 @@ class ConnectionTest extends BaseUnitTest {
 
         assertThat(connection.getCredentialsRotationFailedAt()).isNull();
         assertThat(connection.getCredentialsKeyVersion()).isEqualTo(2);
+    }
+
+    @Test
+    void shouldReportStoredCredentialsWithoutAKeyThatReadsThem() {
+        Connection connection = connection();
+        assertThat(connection.hasCredentials()).isFalse();
+
+        connection.setCredentials(TOKEN, new CredentialBundleConverter(OLD_KEY, "dev"));
+
+        assertThat(connection.hasCredentials()).isTrue();
+        assertThatThrownBy(() -> connection.credentials(new CredentialBundleConverter(NEW_KEY, "dev")))
+                .isInstanceOf(EncryptionException.class);
     }
 
     private static Connection connection() {

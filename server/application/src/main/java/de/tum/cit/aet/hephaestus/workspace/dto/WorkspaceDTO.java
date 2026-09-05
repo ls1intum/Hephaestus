@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.workspace.dto;
 
+import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
@@ -127,18 +128,13 @@ public record WorkspaceDTO(
                 .map(c -> c.getCreatedAt())
                 .orElse(null);
 
-        boolean hasPat = connectionService
-                .findActiveBearerToken(workspaceId, IntegrationKind.GITHUB)
-                .map(b -> b.token() != null && !b.token().isEmpty())
-                .orElseGet(() -> connectionService
-                        .findActiveBearerToken(workspaceId, IntegrationKind.GITLAB)
-                        .map(b -> b.token() != null && !b.token().isEmpty())
-                        .orElse(false));
+        // Presence only: this view must not decrypt anything, or a credential the running key cannot
+        // read takes the whole workspace page down with it.
+        boolean hasPat = (gitHubPat.isPresent()
+                        && storesCredentials(connectionService, workspaceId, IntegrationKind.GITHUB))
+                || (gitLab.isPresent() && storesCredentials(connectionService, workspaceId, IntegrationKind.GITLAB));
 
-        boolean hasSlackToken = connectionService
-                .findActiveBearerToken(workspaceId, IntegrationKind.SLACK)
-                .map(b -> b.token() != null && !b.token().isEmpty())
-                .orElse(false);
+        boolean hasSlackToken = storesCredentials(connectionService, workspaceId, IntegrationKind.SLACK);
 
         Long slackConnectionId = connectionService
                 .findActive(workspaceId, IntegrationKind.SLACK)
@@ -184,5 +180,13 @@ public record WorkspaceDTO(
                 workspace.getFeatures().getLeaguesEnabled(),
                 workspace.getFeatures().getPracticeReviewAutoTriggerEnabled(),
                 workspace.getFeatures().getPracticeReviewManualTriggerEnabled());
+    }
+
+    private static boolean storesCredentials(
+            ConnectionService connectionService, long workspaceId, IntegrationKind kind) {
+        return connectionService
+                .findActive(workspaceId, kind)
+                .map(Connection::hasCredentials)
+                .orElse(false);
     }
 }

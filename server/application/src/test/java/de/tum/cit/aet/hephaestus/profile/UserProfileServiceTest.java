@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.activity.ActivityEvent;
 import de.tum.cit.aet.hephaestus.activity.ActivityEventRepository;
 import de.tum.cit.aet.hephaestus.activity.ActivityEventType;
 import de.tum.cit.aet.hephaestus.activity.ActivityTargetType;
+import de.tum.cit.aet.hephaestus.core.tenancy.TenancyViolationException;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueComment;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueCommentRepository;
@@ -20,6 +21,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.profile.dto.ProfileActivityMonitorDTO;
 import de.tum.cit.aet.hephaestus.profile.dto.ProfileActivityStatsDTO;
+import de.tum.cit.aet.hephaestus.profile.dto.ProfileDTO;
 import de.tum.cit.aet.hephaestus.profile.dto.ProfileReviewActivityDTO;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceContributionActivityService;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembershipService;
@@ -393,6 +395,41 @@ class UserProfileServiceTest {
             verify(pullRequestReviewCommentRepository).findAllByIdWithRelations(Set.of(700L));
             verify(reviewActivityAssembler).assemble(eq(issueComment), eq(0));
             verify(reviewActivityAssembler, never()).assemble(eq(reviewComment), eq(0));
+        }
+    }
+
+    @Nested
+    @DisplayName("getUserProfile")
+    class UserProfileTests {
+
+        @Test
+        @DisplayName("lists contributed repositories without loading their labels")
+        void listsContributedRepositoriesWithoutLoadingLabels() {
+            User user = createUser(USER_ID, USER_LOGIN);
+            Repository repository = spy(createRepository(200L));
+            repository.setName("hephaestus");
+            // A lazy label load runs on a workspace-scoped table outside any scoped query, which
+            // tenancy enforcement rejects with exactly this exception.
+            lenient()
+                    .doThrow(new TenancyViolationException(Set.of("label")))
+                    .when(repository)
+                    .getLabels();
+
+            when(workspaceMembershipService.findMemberByLogin(WORKSPACE_ID, USER_LOGIN))
+                    .thenReturn(Optional.of(user));
+            when(workspaceContributionActivityService.findFirstContributionInstant(eq(WORKSPACE_ID), any()))
+                    .thenReturn(Optional.empty());
+            when(profileRepositoryQueryRepository.findContributedByLogin(eq(USER_LOGIN), eq(WORKSPACE_ID)))
+                    .thenReturn(List.of(repository));
+
+            Optional<ProfileDTO> result = service.getUserProfile(USER_LOGIN, WORKSPACE_ID, AFTER, BEFORE);
+
+            assertThat(result).isPresent();
+            assertThat(result.get().contributedRepositories()).singleElement().satisfies(dto -> {
+                assertThat(dto.name()).isEqualTo("hephaestus");
+                assertThat(dto.labels()).isNull();
+            });
+            verify(repository, never()).getLabels();
         }
     }
 

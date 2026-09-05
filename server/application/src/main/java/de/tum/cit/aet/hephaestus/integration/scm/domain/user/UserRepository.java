@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.scm.domain.user;
 
+import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
 import java.time.Instant;
@@ -96,6 +97,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
         """)
     List<User> findAllByName(@Param("name") String name);
 
+    @WorkspaceAgnostic("Pull requests are scoped through repository_id -> repository.workspace_id, and a"
+            + " developer's league placement reads their merged pull requests as one history")
     @Query("""
             SELECT DISTINCT u
             FROM User u

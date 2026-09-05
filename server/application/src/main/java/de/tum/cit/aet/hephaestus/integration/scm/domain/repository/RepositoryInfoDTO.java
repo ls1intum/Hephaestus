@@ -60,14 +60,27 @@ public record RepositoryInfoDTO(
                         .map(l -> new LabelInfoDTO(l.getId(), l.getName(), l.getColor(), null))
                         .toList()
                 : List.of();
+        return fromRepository(repository, labelDtos);
+    }
 
+    /**
+     * The repository without its labels. Reading them here loads a workspace-scoped table lazily,
+     * outside any scoped query, which tenancy enforcement rejects; a caller that renders no labels
+     * must not ask for them.
+     */
+    @Nullable
+    public static RepositoryInfoDTO fromRepositoryWithoutLabels(@Nullable Repository repository) {
+        return repository == null ? null : fromRepository(repository, null);
+    }
+
+    private static RepositoryInfoDTO fromRepository(Repository repository, @Nullable List<LabelInfoDTO> labels) {
         return new RepositoryInfoDTO(
                 repository.getId(),
                 repository.getName(),
                 repository.getNameWithOwner(),
                 repository.getDescription(),
                 repository.getHtmlUrl(),
-                labelDtos,
+                labels,
                 Boolean.FALSE);
     }
 
