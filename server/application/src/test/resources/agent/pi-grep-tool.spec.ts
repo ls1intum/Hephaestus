@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -12,6 +12,10 @@ function workspace(): string {
 	mkdirSync(join(root, "inputs", "sources", "scm", "repo", "src"), { recursive: true });
 	mkdirSync(join(root, ".sessions"), { recursive: true });
 	mkdirSync(join(root, "inputs", "sources", "scm", "repo", "work"), { recursive: true });
+	mkdirSync(join(root, "work", "precompute-out"), { recursive: true });
+	mkdirSync(join(root, "work", "composition"), { recursive: true });
+	writeFileSync(join(root, "work", "precompute-out", "summary.md"), "API_KEY appears in a hint\n");
+	writeFileSync(join(root, "work", "composition", "observations.json"), '{"summary":"API_KEY"}\n');
 	writeFileSync(
 		join(root, "inputs", "sources", "scm", "repo", "work", "queue.py"),
 		"API_KEY = load()\n",
@@ -41,8 +45,10 @@ void test("matches carry the SDK grep tool's path:line: shape and skip runtime s
 		"inputs/sources/scm/repo/src/app.py:2:     return API_KEY",
 		// A reviewed repository's own `work` directory is evidence; only the sandbox's root-level one is not.
 		"inputs/sources/scm/repo/work/queue.py:1: API_KEY = load()",
+		// The precompute summary the orchestrator points at is evidence; the runner's composition state is not.
+		"work/precompute-out/summary.md:1: API_KEY appears in a hint",
 	]);
-	assert.deepEqual(details, { matches: 4, truncated: false });
+	assert.deepEqual(details, { matches: 5, truncated: false });
 });
 
 void test("path, glob, literal, ignoreCase and context narrow and widen the output as the SDK tool's do", () => {
@@ -114,4 +120,15 @@ void test("context is clamped and the output has a size ceiling", () => {
 	assert.ok(capped.text.length < 52 * 1024);
 	assert.match(capped.text, /truncated at 51200 characters/);
 	assert.equal(capped.details.truncated, true);
+});
+
+void test("an aborted session stops the walk with a note, and temp workspaces are removed", () => {
+	const root = workspace();
+	const controller = new AbortController();
+	controller.abort();
+	const { text, details } = searchFiles(root, { pattern: "API_KEY" }, controller.signal);
+	assert.equal(details.matches, 0);
+	assert.match(text, /Search stopped/);
+	assert.match(searchFiles(root, { pattern: "x", path: "..foo" }).text, /does not exist/);
+	rmSync(root, { recursive: true, force: true });
 });

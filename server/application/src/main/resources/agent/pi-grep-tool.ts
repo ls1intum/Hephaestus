@@ -31,8 +31,11 @@ const MAX_LINE_LENGTH = 240;
 const MAX_OUTPUT_BYTES = 50 * 1024;
 /** Never evidence, at any depth. */
 const SKIPPED_ANYWHERE = new Set(["node_modules", ".git"]);
-/** The sandbox's own state, which sits at the workspace root; a reviewed repository may use these names. */
-const SKIPPED_AT_ROOT = new Set([".pi", ".sessions", "out", "work"]);
+/**
+ * The sandbox's own state, by its path from the workspace root; a reviewed repository may use these
+ * names. `work` itself stays searchable: the precompute summary the orchestrator points at lives there.
+ */
+const SKIPPED_PATHS = new Set([".pi", ".sessions", "out", "work/composition"]);
 
 function globToRegExp(glob: string): RegExp {
 	let source = "";
@@ -62,7 +65,8 @@ function truncateLine(text: string): { text: string; wasTruncated: boolean } {
 		: { text, wasTruncated: false };
 }
 
-function listFiles(root: string, out: string[], atWorkspaceRoot: boolean): void {
+function listFiles(cwd: string, root: string, out: string[], signal?: AbortSignal): void {
+	if (signal?.aborted) return;
 	let entries: import("node:fs").Dirent[];
 	try {
 		entries = readdirSync(root, { withFileTypes: true });
@@ -73,8 +77,9 @@ function listFiles(root: string, out: string[], atWorkspaceRoot: boolean): void 
 	for (const entry of entries) {
 		if (entry.isDirectory()) {
 			if (SKIPPED_ANYWHERE.has(entry.name)) continue;
-			if (atWorkspaceRoot && SKIPPED_AT_ROOT.has(entry.name)) continue;
-			listFiles(join(root, entry.name), out, false);
+			const child = join(root, entry.name);
+			if (SKIPPED_PATHS.has(relative(cwd, child).split(sep).join("/"))) continue;
+			listFiles(cwd, child, out, signal);
 		} else if (entry.isFile()) {
 			out.push(join(root, entry.name));
 		}
@@ -85,9 +90,11 @@ function listFiles(root: string, out: string[], atWorkspaceRoot: boolean): void 
 export function searchFiles(
 	cwd: string,
 	params: GrepParams,
+	signal?: AbortSignal,
 ): { text: string; details: GrepDetails } {
 	const searchRoot = resolve(cwd, params.path ?? ".");
-	if (relative(cwd, searchRoot).startsWith("..")) {
+	const fromWorkspace = relative(cwd, searchRoot);
+	if (fromWorkspace === ".." || fromWorkspace.startsWith(`..${sep}`)) {
 		return {
 			text: `Path ${params.path} is outside the workspace.`,
 			details: { matches: 0, truncated: false },
@@ -121,14 +128,19 @@ export function searchFiles(
 		};
 	}
 	const files: string[] = [];
-	if (rootStat.isDirectory()) listFiles(searchRoot, files, searchRoot === resolve(cwd));
+	if (rootStat.isDirectory()) listFiles(resolve(cwd), searchRoot, files, signal);
 	else files.push(searchRoot);
 
 	const blocks: string[] = [];
 	let matches = 0;
 	let truncated = false;
 	let linesTruncated = false;
+	let aborted = signal?.aborted ?? false;
 	for (const file of files) {
+		if (signal?.aborted) {
+			aborted = true;
+			break;
+		}
 		if (matches >= limit) {
 			truncated = true;
 			break;
@@ -172,6 +184,7 @@ export function searchFiles(
 		}
 	}
 	const notes: string[] = [];
+	if (aborted) notes.push("[Search stopped: the session's time is up]");
 	if (truncated)
 		notes.push(
 			`[Output truncated at ${limit} matches; narrow the pattern, path or glob to see more]`,
@@ -185,7 +198,7 @@ export function searchFiles(
 		);
 		truncated = true;
 	}
-	const text = blocks.length === 0 ? "No matches found" : [body, ...notes].join("\n");
+	const text = [blocks.length === 0 ? "No matches found" : body, ...notes].join("\n");
 	return { text, details: { matches, truncated } };
 }
 
@@ -252,8 +265,8 @@ export function buildGrepTool(cwd: string) {
 				},
 			},
 		},
-		execute: (_toolCallId, params): Promise<AgentToolResult<GrepDetails>> => {
-			const { text, details } = searchFiles(cwd, readGrepParams(params));
+		execute: (_toolCallId, params, signal): Promise<AgentToolResult<GrepDetails>> => {
+			const { text, details } = searchFiles(cwd, readGrepParams(params), signal);
 			return Promise.resolve({ content: [{ type: "text", text }], details });
 		},
 	});
