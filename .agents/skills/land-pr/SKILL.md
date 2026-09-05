@@ -42,7 +42,8 @@ vp run format
 vp run check
 ```
 
-`check` is the complete local quality gate: every gate in the `quality` group in `vite.config.ts`.config.ts`, and every one also runs in CI. CI additionally runs service tests, builds, images,
+`check` is the complete local quality gate: every gate in the `quality` group in `vite.config.ts`,
+and every one also runs in CI. CI additionally runs service tests, builds, images,
 security checks, and workflow-specific gates. Formatting must never be the reason a remote build
 fails.
 

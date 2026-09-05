@@ -182,7 +182,7 @@ propose work here.
 Nearly every file carries `tags: ["autodocs"]`, so a JSDoc block above `meta` or above an exported story
 **is** the component's documentation page.
 
-- **D** — Prose restating the story's name (`/** Moving an area's worth in one action */` above `BulkSet`),
+- **D** — Prose restating the story's name (`/** Moving a group's worth in one action */` above `BulkSet`),
   or explaining how the assertion reaches the DOM — that belongs in a `//` inside the play function.
 - **C** — Accurate description of what the story shows.
 - **B** — Records something the reader cannot derive from the code below it: a rejected alternative, a trap,
