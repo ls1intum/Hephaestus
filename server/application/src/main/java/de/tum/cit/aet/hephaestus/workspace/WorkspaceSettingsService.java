@@ -160,17 +160,13 @@ public class WorkspaceSettingsService {
                 .filter(k -> k == IntegrationKind.GITHUB || k == IntegrationKind.GITLAB)
                 .orElseThrow(() -> new IllegalStateException("Cannot rotate PAT for workspace " + workspaceId
                         + ": no active GitHub or GitLab Connection. Bind a provider first."));
-        Connection connection = connectionService
-                .findActive(workspaceId, kind)
-                .orElseThrow(() -> new IllegalStateException(
-                        "Cannot rotate PAT for workspace " + workspaceId + ": no active " + kind + " Connection."));
-        if (connection.getConfig() instanceof ConnectionConfig.GitHubAppConfig) {
-            throw new IllegalStateException("Cannot rotate PAT for workspace " + workspaceId
-                    + ": its GitHub connection is an App installation, which runs on no stored token.");
-        }
         // Presence only, without reading the old token: this is the way out for a token the server
-        // can no longer read, so decrypting it here would close that door.
-        boolean hadToken = connection.hasCredentials();
+        // can no longer read, so decrypting it here would close that door. Whether the row may take
+        // a token at all is decided where it is written.
+        boolean hadToken = connectionService
+                .findActive(workspaceId, kind)
+                .map(Connection::hasCredentials)
+                .orElse(false);
         connectionService.rotateBearerToken(workspaceId, kind, new BearerToken(token, null));
         // rotatedAt is what makes this row exist at all: rotating an already-set token leaves every
         // other component identical, and ConfigAuditRecorder drops an UPDATE whose diff is empty — so

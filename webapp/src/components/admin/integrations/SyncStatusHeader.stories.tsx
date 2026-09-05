@@ -88,6 +88,9 @@ export const CredentialUnreadableWithRunningJob: Story = {
 	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("button", { name: /cancel/i })).toBeVisible();
 		await expect(canvas.queryByRole("button", { name: /sync now/i })).not.toBeInTheDocument();
+		await expect(
+			canvas.queryByRole("button", { name: /more sync options/i }),
+		).not.toBeInTheDocument();
 	},
 };
 

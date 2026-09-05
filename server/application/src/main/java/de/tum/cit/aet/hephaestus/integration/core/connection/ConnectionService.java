@@ -274,12 +274,18 @@ public class ConnectionService {
     }
 
     /**
-     * Replace the credential blob on the workspace's ACTIVE Connection. Empty when
-     * no ACTIVE row exists.
+     * Replace the credential blob on the workspace's ACTIVE Connection. Empty when no ACTIVE row
+     * exists. A GitHub App connection runs on its installation, not on a stored token, so it refuses
+     * one here, inside the write, rather than in a caller's earlier look at a row that may since have
+     * changed mode.
      */
     @Transactional
     public Optional<Connection> rotateBearerToken(long workspaceId, IntegrationKind kind, BearerToken bundle) {
         return connectionRepository.findActive(workspaceId, kind).map(c -> {
+            if (c.getConfig() instanceof ConnectionConfig.GitHubAppConfig) {
+                throw new IllegalArgumentException("The GitHub connection of workspace " + workspaceId
+                        + " is an App installation, which runs on no stored token; there is nothing to replace.");
+            }
             c.setCredentials(bundle, credentialConverter);
             return connectionRepository.save(c);
         });
