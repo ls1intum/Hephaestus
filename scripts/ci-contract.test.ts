@@ -455,6 +455,24 @@ void describe("CI contract", () => {
 		assert.match(storybook, /storybookBuildDir: storybook-static/);
 		assert.match(storybook, /onlyChanged: true/);
 		assert.match(storybook, /surge \.\/webapp\/storybook-static/);
+		assert.match(storybook, /render-preview-comment\.ts storybook webapp\/storybook-static/);
+		assert.match(storybook, /github\.event\.pull_request\.base\.sha/);
+		assert.match(storybook, /path: \$\{\{ runner\.temp \}\}\/storybook-preview\.md/);
+		assert.match(storybook, /name: Create Storybook status check\s+if: >-\s+success\(\)/);
+	});
+
+	void test("publishes documentation links derived from the built pages", async () => {
+		const docs = await readFile(".github/workflows/cd-docs.yml", "utf8");
+		assert.ok(
+			String(parseDocument(docs).getIn(["on", "pull_request", "paths"])).includes(
+				"scripts/render-preview-comment.ts",
+			),
+		);
+		const buildPreview = job(docs, "build-preview");
+		assert.match(buildPreview, /fetch-depth: 0/);
+		assert.match(buildPreview, /render-preview-comment\.ts docs docs\/\.docusaurus/);
+		assert.match(buildPreview, /github\.event\.pull_request\.base\.sha/);
+		assert.match(job(docs, "preview"), /path: preview-comment\/docs-preview-comment\.md/);
 	});
 
 	void test("routes tooling-only changes away from server infrastructure", async () => {

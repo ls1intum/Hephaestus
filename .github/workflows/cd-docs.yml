@@ -10,6 +10,9 @@ on:
     types: [opened, synchronize, reopened]
     paths:
       - "docs/**"
+      - "scripts/render-preview-comment.ts"
+      - "scripts/lib/json.ts"
+      - "scripts/lib/process.ts"
       - ".github/workflows/cd-docs.yml"
   workflow_dispatch:
 
@@ -29,6 +32,8 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
       - uses: ./.github/actions/setup-toolchain
         with:
           install: "frozen"
@@ -44,10 +49,20 @@ jobs:
       - run: vp run --filter docs build
         env:
           DOCUSAURUS_BASE_URL: "/"
+      - name: Prepare preview links
+        run: >-
+          node scripts/render-preview-comment.ts docs docs/.docusaurus
+          https://ls1intum-hephaestus-docs-pr-${{ github.event.number }}.surge.sh
+          ${{ github.event.pull_request.base.sha }} docs-preview-comment.md
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: docs-build-preview
           path: docs/build
+          retention-days: 1
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: docs-preview-comment
+          path: docs-preview-comment.md
           retention-days: 1
 
   build-production:
@@ -98,6 +113,10 @@ jobs:
         with:
           name: docs-build-preview
           path: docs-build
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: docs-preview-comment
+          path: preview-comment
       - uses: ./.github/actions/setup-toolchain
         with:
           install: "frozen"
@@ -108,14 +127,7 @@ jobs:
       - uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
         with:
           header: docs-preview
-          message: |
-            ## 📚 Documentation Preview
-
-            This PR includes documentation changes. A preview has been deployed:
-
-            🔗 **[View Docs Preview](https://${{ env.PREVIEW_URL }})**
-
-            <sub>Preview for commit ${{ github.event.pull_request.head.sha }}. Updates automatically on new commits.</sub>
+          path: preview-comment/docs-preview-comment.md
       - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           TARGET_URL: https://${{ env.PREVIEW_URL }}
