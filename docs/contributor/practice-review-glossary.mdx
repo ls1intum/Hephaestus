@@ -126,12 +126,11 @@ it resolves to, so the enum itself is the list. What the enum cannot say is whic
 reason is retryable exactly when the condition it names can clear on its own — an operator action, a budget
 refill, or an ordinary sync — without the work occurring again.
 
-Two values are easy to confuse. `ARTIFACT_GONE` is for work that is not there or cannot be reviewed at all,
-and it is terminal. `ARTIFACT_NOT_VISIBLE` is for work the mirror has tombstoned, which the next ordinary
-sync can clear
-([ADR 0024](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0024-integration-sync-lifecycle-and-two-deletion-semantics.md)),
-so it is retryable: the occasion is held and re-offered rather than retired, and a reconciliation sweep
-that guessed wrong costs a delay instead of a review.
+`ARTIFACT_GONE` is terminal: the work is missing or unreviewable, or a person requested a review while
+it was tombstoned. `ARTIFACT_NOT_VISIBLE` holds automatic occasions for a reversible mirror tombstone,
+including live events and pending retries. Ordinary sync can restore the row
+([ADR 0024](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0024-integration-sync-lifecycle-and-two-deletion-semantics.md)).
+A manual request is not retried after restoration; the person can request another review.
 
 ## Practice autonomy
 

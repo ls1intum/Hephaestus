@@ -79,6 +79,12 @@ reason to reach for, and the two that are easy to confuse, are in
 labels are in [How a review was occasioned](./practice-review-glossary.mdx#how-a-review-was-occasioned).
 Operator remediation is in [When a workspace goes quiet](/admin/practice-review#when-a-workspace-goes-quiet).
 
+A live GitHub or GitLab event whose work is tombstoned holds its occasion with
+`ARTIFACT_NOT_VISIBLE` (`PENDING`) instead of starting a review, so the pending-signal reaper
+re-offers it and an ordinary sync can restore reviewability without another webhook. The check reads
+committed mirror state at admission; work deleted during capture or delivery belongs to that stage's
+refusal policy.
+
 The occurrence ledger has no pruning job; capacity planning must treat it as append-only. Retry and lapse
 thresholds are documented in the admin guide.
 

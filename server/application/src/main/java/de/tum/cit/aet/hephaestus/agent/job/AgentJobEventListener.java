@@ -173,6 +173,13 @@ public class AgentJobEventListener {
                 return;
             }
 
+            // A tombstone the next ordinary sync can lift, so the occasion is held rather than retired:
+            // the reaper re-offers it, and a sweep that guessed wrong costs a delay instead of a review.
+            if (pr.getDeletedAt() != null) {
+                signalRecorder.markRefused(key, SignalStateReason.ARTIFACT_NOT_VISIBLE);
+                return;
+            }
+
             // A merged PR keeps its stored refs, so this holds post-merge too: without them there is
             // nothing to clone or diff against. Left RECORDED rather than refused on purpose: no
             // decision was reached, so a later delivery of the same occurrence can still claim it once
