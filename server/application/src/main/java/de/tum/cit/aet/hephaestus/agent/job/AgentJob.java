@@ -70,6 +70,8 @@ import tools.jackson.databind.JsonNode;
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class AgentJob {
 
+    public static final String SIGNAL_REVISION_METADATA_KEY = "signal_revision";
+
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private static final int TOKEN_BYTES = 32;

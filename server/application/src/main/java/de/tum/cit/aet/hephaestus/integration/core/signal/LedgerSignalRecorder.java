@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.core.signal;
 
+import de.tum.cit.aet.hephaestus.integration.core.metrics.IntegrationCoreMetrics;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Instant;
 import java.util.Locale;
 import java.util.UUID;
@@ -24,10 +26,15 @@ public class LedgerSignalRecorder implements SignalRecorder {
 
     private final ArtifactSignalRepository repository;
     private final PracticeReviewRefusalMetrics refusalMetrics;
+    private final MeterRegistry meterRegistry;
 
-    public LedgerSignalRecorder(ArtifactSignalRepository repository, PracticeReviewRefusalMetrics refusalMetrics) {
+    public LedgerSignalRecorder(
+            ArtifactSignalRepository repository,
+            PracticeReviewRefusalMetrics refusalMetrics,
+            MeterRegistry meterRegistry) {
         this.repository = repository;
         this.refusalMetrics = refusalMetrics;
+        this.meterRegistry = meterRegistry;
     }
 
     @Override
@@ -39,6 +46,7 @@ public class LedgerSignalRecorder implements SignalRecorder {
         // so it may only ever add a row; a live or requested observation may also take over one nobody
         // has decided yet. BACKFILL takes that second branch on purpose — a first sync leaves its rows
         // RECORDED-but-undecided so it fires nothing, and a confirmed campaign is what may claim them.
+        boolean owned;
         if (discoveredVia == DiscoveredVia.SYNC) {
             // A sync notices what already happened; nobody asked it to. Attributing one to a requester
             // would let a person's request quota be spent by a background pass they never triggered.
@@ -46,11 +54,36 @@ public class LedgerSignalRecorder implements SignalRecorder {
                 throw new IllegalArgumentException("A sync-discovered signal has no requester to attribute it to");
             }
             int recorded = repository.insertIfAbsent(key, UUID.randomUUID(), occurredAt, discoveredVia.name(), now);
-            return ownsSignal(recorded, key);
+            owned = ownsSignal(recorded, key);
+        } else {
+            int affected = repository.insertOrClaimUndecided(
+                    key, UUID.randomUUID(), occurredAt, discoveredVia.name(), now, requestedByUserId);
+            owned = ownsSignal(affected, key);
         }
-        int affected = repository.insertOrClaimUndecided(
-                key, UUID.randomUUID(), occurredAt, discoveredVia.name(), now, requestedByUserId);
-        return ownsSignal(affected, key);
+        meterRegistry
+                .counter(
+                        IntegrationCoreMetrics.REVIEW_OCCASIONS,
+                        "signal",
+                        key.signalName().value(),
+                        "outcome",
+                        owned ? "recorded" : "duplicate")
+                .increment();
+        return owned;
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public boolean defer(SignalKey key, Instant occurredAt) {
+        int affected = repository.insertDeferred(key, UUID.randomUUID(), occurredAt, Instant.now());
+        meterRegistry
+                .counter(
+                        IntegrationCoreMetrics.REVIEW_OCCASIONS,
+                        "signal",
+                        key.signalName().value(),
+                        "outcome",
+                        affected == 1 ? "deferred" : "duplicate")
+                .increment();
+        return affected == 1;
     }
 
     private boolean ownsSignal(int affected, SignalKey key) {

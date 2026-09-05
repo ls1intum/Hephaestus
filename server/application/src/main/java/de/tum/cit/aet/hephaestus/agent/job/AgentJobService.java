@@ -13,6 +13,7 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmission;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetService;
+import de.tum.cit.aet.hephaestus.core.TransactionCallbacks;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
@@ -51,6 +52,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 @Service
 public class AgentJobService {
@@ -179,9 +181,10 @@ public class AgentJobService {
      * Submit the workspace's practice-review job for one reviewable artifact, if it has an enabled
      * binding and the purse funding that binding still has room.
      *
-     * <p><strong>Callers MUST NOT wrap this in a transaction.</strong> {@link #submitForBinding} opens
-     * its own so the idempotency-key race it absorbs rolls back only that insert; joined to an outer
-     * transaction, the same race would poison the caller's whole unit of work.
+     * <p>Runs inside a transaction: the caller's, if one is already open, or one of its own otherwise.
+     * A caller with its own open transaction must be prepared to retry the whole unit of work if
+     * submission marks it rollback-only — {@link IssueUpdateCoalescer#drain} does, so the whole
+     * burst's settlement commits or rolls back together with the one job it admits.
      *
      * @param signalKey the ledger entry this submission answers, already won by the caller. Every
      *     refusal is recorded against it, so a review refused for a liftable reason can happen later
@@ -310,7 +313,6 @@ public class AgentJobService {
                     .filter(WorkspaceAgentBinding::isEnabled)
                     .orElse(null);
             if (binding == null) {
-                // Unbound or disabled since discovery.
                 return refuseInTransaction(signalKey, SignalStateReason.REVIEW_MODEL_UNBOUND);
             }
 
@@ -357,7 +359,16 @@ public class AgentJobService {
             job.setArtifactKind(artifactKind);
             job.setPracticeRolloutRevision(currentWorkspace.getReviewSettings().getRolloutRevision());
             job.setPracticeTriggerMode(admission == null ? TriggerMode.MANUAL : admission.triggerMode());
-            job.setMetadata(submission.metadata());
+            var metadata = submission.metadata().deepCopy();
+            if (signalKey != null) {
+                if (!(metadata instanceof ObjectNode objectMetadata)) {
+                    throw new IllegalArgumentException("Keyed review metadata must be an object");
+                }
+                objectMetadata.put(
+                        AgentJob.SIGNAL_REVISION_METADATA_KEY,
+                        signalKey.revision().value());
+            }
+            job.setMetadata(metadata);
             job.setIdempotencyKey(detectionKey);
             job.setTraceId(resolveTraceId());
             try {
@@ -369,8 +380,6 @@ public class AgentJobService {
                         workspace.getId());
                 return refuseInTransaction(signalKey, SignalStateReason.MODEL_UNAVAILABLE);
             }
-            // Resolved here rather than per-path so EVERY submission carries a delivery channel; without
-            // one the job still costs LLM spend but its feedback is dropped at the poster.
             var resolvedKind = connectionService.findActiveProviderKind(workspace.getId());
             if (resolvedKind.isPresent()) {
                 job.setIntegrationKind(resolvedKind.get());
@@ -381,9 +390,6 @@ public class AgentJobService {
                         workspace.getId(),
                         jobType);
             }
-
-            // The credential is NEVER frozen onto the job: the proxy resolves it live from the snapshot's
-            // catalog connection reference on every call.
 
             try {
                 agentJobRepository.saveAndFlush(job);
@@ -402,12 +408,12 @@ public class AgentJobService {
 
             return SubmissionOutcome.created(job);
         });
-        SubmissionOutcome committed = Objects.requireNonNull(outcome, "submission outcome");
-        AgentJob job = committed.job();
-        if (job != null && committed.created()) {
-            AgentJobTelemetry.queued(job);
+        SubmissionOutcome result = Objects.requireNonNull(outcome, "submission outcome");
+        AgentJob job = result.job();
+        if (job != null && result.created()) {
+            TransactionCallbacks.afterCommit(() -> AgentJobTelemetry.queued(job));
         }
-        return committed;
+        return result;
     }
 
     private String resolveTraceId() {
@@ -416,7 +422,6 @@ public class AgentJobService {
                 () -> UUID.randomUUID().toString().replace("-", ""));
     }
 
-    /** Settle a refused signal inside the submission transaction, so the two stand or fall together. */
     private SubmissionOutcome refuseInTransaction(@Nullable SignalKey signalKey, SignalStateReason reason) {
         if (signalKey != null) {
             signalRecorder.markRefused(signalKey, reason);

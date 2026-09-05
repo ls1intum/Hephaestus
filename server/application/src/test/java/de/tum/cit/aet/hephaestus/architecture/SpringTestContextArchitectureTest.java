@@ -27,6 +27,8 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
 
     private static final Map<String, String> FULL_CONTEXT_ASSIGNMENTS = Map.ofEntries(
             assignment("testconfig.BaseIntegrationTest", "base"),
+            assignment("agent.job.DeferredIssueEventIntegrationTest", "issue-event-transaction"),
+            assignment("agent.job.IssueUpdateCoalescerIntegrationTest", "issue-coalescer-transaction"),
             assignment("testconfig.RealAuthIntegrationTest", "real-auth"),
             assignment("StartupBudgetIntegrationTest", "startup"),
             assignment("core.auth.dev.DevLoginIntegrationTest", "dev-login"),
@@ -45,6 +47,12 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
 
     private static final Map<String, String> FULL_CONTEXT_JUSTIFICATIONS = Map.ofEntries(
             Map.entry("base", "shared PostgreSQL, HTTP, security, and application acceptance context"),
+            Map.entry(
+                    "issue-event-transaction",
+                    "real transactional event listener with controlled workspace resolution"),
+            Map.entry(
+                    "issue-coalescer-transaction",
+                    "real proxied job submission with controlled issue admission and bounded database lock waits"),
             Map.entry("real-auth", "real OAuth and authentication wiring without test security"),
             Map.entry("startup", "production main-method startup instrumentation"),
             Map.entry("dev-login", "dev-login feature-property behavior"),
@@ -73,6 +81,7 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
             "testconfig.RealAuthIntegrationTest");
 
     private static final Set<String> PROPERTY_SOURCE_TESTS = names(
+            "agent.job.IssueUpdateCoalescerIntegrationTest",
             "core.auth.dev.DevLoginIntegrationTest",
             "integration.outline.OutlineFrameworkRegistrationIntegrationTest",
             "integration.outline.collection.OutlineCollectionAdminControllerIntegrationTest",

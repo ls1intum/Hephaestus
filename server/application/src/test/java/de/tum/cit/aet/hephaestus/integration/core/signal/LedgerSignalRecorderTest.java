@@ -24,7 +24,50 @@ class LedgerSignalRecorderTest extends BaseUnitTest {
     private final io.micrometer.core.instrument.simple.SimpleMeterRegistry meterRegistry =
             new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
     private final LedgerSignalRecorder recorder =
-            new LedgerSignalRecorder(repository, new PracticeReviewRefusalMetrics(meterRegistry));
+            new LedgerSignalRecorder(repository, new PracticeReviewRefusalMetrics(meterRegistry), meterRegistry);
+
+    @Test
+    void shouldCountDurablyDeferredOccasionsSeparatelyFromDuplicates() {
+        when(repository.insertDeferred(eq(KEY), any(), any(), any())).thenReturn(1, 0);
+
+        assertThat(recorder.defer(KEY, Instant.now())).isTrue();
+        assertThat(recorder.defer(KEY, Instant.now())).isFalse();
+
+        assertThat(meterRegistry
+                        .get("practice.review.occasions")
+                        .tags("signal", KEY.signalName().value(), "outcome", "deferred")
+                        .counter()
+                        .count())
+                .isOne();
+        assertThat(meterRegistry
+                        .get("practice.review.occasions")
+                        .tags("signal", KEY.signalName().value(), "outcome", "duplicate")
+                        .counter()
+                        .count())
+                .isOne();
+    }
+
+    @Test
+    void shouldCountRecordedOccasionsSeparatelyFromDuplicates() {
+        when(repository.insertOrClaimUndecided(eq(KEY), any(), any(), eq("EVENT"), any(), any()))
+                .thenReturn(1, 0);
+
+        assertThat(recorder.record(KEY, Instant.now(), DiscoveredVia.EVENT)).isTrue();
+        assertThat(recorder.record(KEY, Instant.now(), DiscoveredVia.EVENT)).isFalse();
+
+        assertThat(meterRegistry
+                        .get("practice.review.occasions")
+                        .tags("signal", KEY.signalName().value(), "outcome", "recorded")
+                        .counter()
+                        .count())
+                .isOne();
+        assertThat(meterRegistry
+                        .get("practice.review.occasions")
+                        .tags("signal", KEY.signalName().value(), "outcome", "duplicate")
+                        .counter()
+                        .count())
+                .isOne();
+    }
 
     @Test
     void shouldNotLetAReconciliationPassDisplaceADecisionAlreadyTaken() {

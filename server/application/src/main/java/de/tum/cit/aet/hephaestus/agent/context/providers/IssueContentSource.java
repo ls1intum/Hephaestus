@@ -12,6 +12,7 @@ import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
 import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
 import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewContextBuilder;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
@@ -44,9 +45,9 @@ import tools.jackson.databind.node.ObjectNode;
  *   <li>{@code issue_summary.md} — a single AI-readable rendering of the issue + thread</li>
  * </ul>
  *
- * <p>An issue that is missing or tombstoned makes the source unavailable rather than empty (prevents
- * hollow positives). Runs read-only transactionally so the lazy collections (labels, assignees,
- * comments) load within the same tx.
+ * <p>An issue that is missing, tombstoned, or changed since its review was admitted makes the source
+ * unavailable rather than empty (prevents hollow positives). Runs read-only transactionally so the
+ * lazy collections (labels, assignees, comments) load within the same tx.
  */
 @Component
 public class IssueContentSource implements EvidenceSource, ReviewContextBuilder {
@@ -116,10 +117,25 @@ public class IssueContentSource implements EvidenceSource, ReviewContextBuilder 
             throw new JobPreparationException("Job has no metadata: jobId=" + job.getId());
         }
         long issueId = requireLong(metadata, "issue_id");
-        // TYPE(i)=Issue excludes pull requests, which share this table and ID space.
+        // TYPE(i)=Issue finder: a target_type=ISSUE job must resolve to an Issue, never a PullRequest
+        // (both share the single inheritance table + id space).
         Issue issue = issueRepository.findByIdWithRepository(issueId).orElse(null);
         if (issue == null || issue.getDeletedAt() != null) {
             return EvidenceContribution.unavailable(selectedKinds, SourceAbsenceReason.NOT_FOUND);
+        }
+        if (ScmSignals.ISSUE_UPDATED.value().equals(metadata.path("signal").asText())) {
+            String admittedRevision =
+                    metadata.path(AgentJob.SIGNAL_REVISION_METADATA_KEY).asText("");
+            String currentRevision = ScmSignals.issueUpdatedRevision(ScmEventPayload.IssueData.from(issue))
+                    .value();
+            // A keyed job with no admission revision predates this fence and cannot be checked against
+            // it; refuse the same way a mismatch does rather than guess which snapshot it meant.
+            // NOT_FOUND rather than a dedicated code: reasonCode is a published artifact-source
+            // contract vocabulary, frozen per version once shipped (immutability check on the 1.0.0
+            // directory), so a new value needs its own contract version, not a quiet addition.
+            if (admittedRevision.isBlank() || !currentRevision.equals(admittedRevision)) {
+                return EvidenceContribution.unavailable(selectedKinds, SourceAbsenceReason.NOT_FOUND);
+            }
         }
         Map<String, byte[]> files = new java.util.LinkedHashMap<>();
         Map<SourceKind, SourceCompleteness> completeness = new java.util.HashMap<>();

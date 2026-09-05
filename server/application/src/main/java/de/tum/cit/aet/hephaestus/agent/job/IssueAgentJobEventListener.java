@@ -4,6 +4,7 @@ import static de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent.T
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.handler.IssueReviewSubmissionRequest;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
@@ -40,9 +41,13 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * cost for PR-only workspaces (no matching practices → skip before any agent-config / role work).
  *
  * <p>Same transaction + async contract as the PR listener ({@code @Async},
- * {@code @TransactionalEventListener(AFTER_COMMIT)}, {@code REQUIRES_NEW}).
+ * {@code @TransactionalEventListener(AFTER_COMMIT)}, {@code REQUIRES_NEW}) except {@link
+ * #onIssueUpdated}, which queues into {@link IssueUpdateCoalescer}'s ledger instead.
  */
 @Component
+// Ledger rows this listener writes are only ever drained by the server-role PendingSignalReaper and
+// IssueUpdateCoalescer; recording one anywhere else would queue work nothing consumes.
+@ConditionalOnServerRole
 @ConditionalOnProperty(prefix = "hephaestus.agent", name = "enabled", havingValue = "true")
 public class IssueAgentJobEventListener {
 
@@ -83,14 +88,28 @@ public class IssueAgentJobEventListener {
         handleIssueEvent(event.issue(), event.context(), TriggerEventNames.ISSUE_CREATED);
     }
 
-    @Async
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    /**
+     * BEFORE_COMMIT and on the caller's thread: the queued occasion and the mirror row it describes
+     * must commit together, or a snapshot the coalescer will review is one the mirror does not have.
+     * The price is that a ledger failure NAKs the delivery; {@code insertDeferred} must therefore
+     * never raise on a conflict, only decline it.
+     */
+    @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
     public void onIssueUpdated(ScmDomainEvent.IssueUpdated event) {
-        if (Collections.disjoint(event.changedFields(), REVIEWABLE_ISSUE_FIELDS)) {
+        if (event.issue().isPullRequest()
+                || event.issue().state() == Issue.State.CLOSED
+                || Collections.disjoint(event.changedFields(), REVIEWABLE_ISSUE_FIELDS)) {
             return;
         }
-        handleIssueEvent(event.issue(), event.context(), TriggerEventNames.ISSUE_UPDATED);
+        SignalKey key = signalKeyFor(event.issue(), TriggerEventNames.ISSUE_UPDATED);
+        if (key == null) {
+            return;
+        }
+        if (event.context().isSync()) {
+            signalRecorder.record(key, event.context().occurredAt(), DiscoveredVia.SYNC);
+        } else {
+            signalRecorder.defer(key, event.context().occurredAt());
+        }
     }
 
     @Async

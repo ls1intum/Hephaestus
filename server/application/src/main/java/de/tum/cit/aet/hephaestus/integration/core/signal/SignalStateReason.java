@@ -31,6 +31,13 @@ public enum SignalStateReason {
     CONCURRENT_DUPLICATE(SignalState.SUPPRESSED),
 
     /**
+     * Superseded before admission; unlike the other {@link SignalState#SUPPRESSED} reasons, {@link
+     * SignalRecorder#defer} may re-arm a coalesced row when a later live transition repeats its
+     * content, since that content has never itself been decided on.
+     */
+    COALESCED(SignalState.SUPPRESSED),
+
+    /**
      * Terminal rather than pending, unlike configuration reasons: it turns on facts belonging to the artifact
      * that cannot change, so widening the scope alters what happens next, not what already did.
      */
@@ -98,6 +105,7 @@ public enum SignalStateReason {
             case REQUESTER_QUOTA_EXHAUSTED ->
                 "You have asked for as many reviews as an hour allows; the allowance refills.";
             case CONCURRENT_DUPLICATE -> "Another submission for the same work carries this review.";
+            case COALESCED -> "A newer issue snapshot replaced this review occasion before submission.";
             case OUT_OF_REVIEW_SCOPE ->
                 "This artifact is outside the branches and repositories this workspace reviews.";
             case STALE_ROLLOUT_REVISION ->
