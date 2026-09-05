@@ -32,6 +32,11 @@ hold, each enforced before Coolify is asked to deploy:
   (`login_provider`, `jwt_signing_key`, `issued_jwt`) is dropped so the preview signs its own tokens.
   The seed loader verifies that against the database and refuses to mark the preview seeded
   otherwise, so a policy that silently did not apply leaves the preview un-booted rather than live.
+- Staging's provider credentials do not survive the clone either: the instance and workspace AI
+  catalog keys are cleared and those connections disabled, every integration connection loses its
+  credential bundle and the webhook signing secret its config carries, and the job tokens staging
+  minted for its own review jobs are replaced. The same verification covers all of them, so a
+  preview that would hold something able to act as staging never boots.
 - The application server reads staging's JetStream, so a preview sees the events a shared GitHub App
   delivers there. Its durable is named per deploy, so previews never compete for one consumer, and
   it expires 72h after the preview stops reading — a preview is deleted, not shut down, so it never

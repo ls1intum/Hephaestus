@@ -77,6 +77,7 @@ services:
       - -c
       - |
         set -eu
+        trap 'rm -f /tmp/seed.dump' EXIT
 
         APP_FQDN="$${SERVICE_FQDN_APPSERVER:-$${SERVICE_FQDN_WEBAPP:-}}"
         if ! echo "$$APP_FQDN" | grep -Eq "^pr[0-9]+"; then
@@ -175,6 +176,28 @@ services:
         DELETE FROM issued_jwt;
         DELETE FROM jwt_signing_key;
         DELETE FROM login_provider;
+
+        -- 3. Forget provider secrets; catalogs, integrations and their state stay as they were, so the
+        --    preview looks like staging without holding anything that can act as staging.
+        UPDATE llm_connection SET api_key = NULL, enabled = FALSE, updated_at = NOW()
+         WHERE api_key IS NOT NULL OR enabled;
+        UPDATE workspace_llm_connection SET api_key = NULL, enabled = FALSE, updated_at = NOW()
+         WHERE api_key IS NOT NULL OR enabled;
+        UPDATE connection
+           SET credentials_encrypted = NULL,
+               credentials_alg = NULL,
+               credentials_key_version = NULL,
+               credentials_rotation_failed_at = NULL,
+               -- the Outline signing secret lives in the config document, not in the credential bundle
+               config = config - 'webhookSecret',
+               updated_at = NOW()
+         WHERE credentials_encrypted IS NOT NULL OR credentials_alg IS NOT NULL
+            OR credentials_key_version IS NOT NULL OR credentials_rotation_failed_at IS NOT NULL
+            OR config ? 'webhookSecret';
+        -- A job token is a credential staging minted; the jobs are cancelled or finished, so the
+        -- token has nothing left to authorise. The column is unique, hence a marker per row.
+        UPDATE agent_job SET job_token = 'cleared-by-preview-clone:' || id, job_token_hash = NULL
+         WHERE job_token NOT LIKE 'cleared-by-preview-clone:%';
         SQL
 
         # Every statement above succeeds when it matches nothing, so the marker is earned by
@@ -191,7 +214,15 @@ services:
                + (SELECT count(*) FROM sync_job WHERE status IN ('PENDING', 'RUNNING'))
                + (SELECT count(*) FROM login_provider)
                + (SELECT count(*) FROM jwt_signing_key)
-               + (SELECT count(*) FROM issued_jwt)")
+               + (SELECT count(*) FROM issued_jwt)
+               + (SELECT count(*) FROM llm_connection WHERE api_key IS NOT NULL OR enabled)
+               + (SELECT count(*) FROM workspace_llm_connection WHERE api_key IS NOT NULL OR enabled)
+               + (SELECT count(*) FROM connection
+                   WHERE credentials_encrypted IS NOT NULL OR credentials_alg IS NOT NULL
+                      OR credentials_key_version IS NOT NULL OR credentials_rotation_failed_at IS NOT NULL
+                      OR config ? 'webhookSecret')
+               + (SELECT count(*) FROM agent_job
+                   WHERE job_token NOT LIKE 'cleared-by-preview-clone:%' OR job_token_hash IS NOT NULL)")
         if [ "$$LIVE" != "0" ]; then
           echo "Preview policy did not take effect ($$LIVE rows still live); refusing to mark this preview seeded"
           exit 1

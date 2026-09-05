@@ -164,6 +164,10 @@ jobs:
               # gate:env validates these deployment inputs against application.yml.
               - 'docker/compose.app.yaml'
               - 'docker/compose.core.yaml'
+              # PreviewSeedPolicyIntegrationTest runs this file's clone policy against the migrated
+              # schema; a preview cannot rehearse it, because the controller refuses to deploy a
+              # head that changes docker/preview/.
+              - 'docker/preview/compose.app.yaml'
               - '!server/**/AGENTS.md'
               - '!server/**/CLAUDE.md'
             tooling:
