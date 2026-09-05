@@ -26,7 +26,7 @@ To ensure a transparent and trustworthy environment, we have established differe
 
 ### Signed Commits
 
-A commit pushed to a branch in this repository is signed, and its commit email is an address verified on your GitHub account; a push carrying an unsigned commit is refused. A pull request from a fork needs none of this — the commit that lands on `main` is created and signed by GitHub.
+A commit pushed to a branch in this repository is signed, and its commit email resolves to the GitHub account that opened the pull request, so set `git config user.email` to an address verified on your account before you commit; a push carrying an unsigned commit is refused. A pull request from a fork needs none of this — the commit that lands on `main` is created and signed by GitHub.
 
 Sign with the SSH key you already push with — [GitHub accepts an authentication key a second time as a signing key](https://docs.github.com/en/authentication/managing-commit-signature-verification/about-commit-signature-verification):
 
@@ -45,8 +45,6 @@ git rebase --exec 'git commit --amend --no-edit -S' origin/main
 ```
 
 ### Compliance
-
-Every commit on a pull request must be authored by an email address that resolves to the GitHub account that opened it, so set `git config user.email` accordingly before you commit.
 
 Contributions that do not adhere to these guidelines will be rejected. We align with [GitHub Acceptable Use Policies](https://docs.github.com/en/site-policy/acceptable-use-policies).
 
@@ -199,4 +197,4 @@ If your pull request is still in progress, please open it as a **Draft Pull Requ
   - Think of it as completing the sentence: "If applied, this commit will ..."
   - ✅ "fix authentication bug" → "If applied, this commit will fix authentication bug"
   - ❌ "fixed authentication bug" or "fixes authentication bug"
-- Keep the entire title under 72 characters when possible
+- Keep the entire title to at most 100 characters; commitlint rejects a longer one

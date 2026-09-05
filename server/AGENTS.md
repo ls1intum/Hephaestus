@@ -10,18 +10,14 @@ are not here: write code that reads like the file you are editing.
 
 ## Local development loop
 
-`vp run dev` from the repo root launches `mprocs` with server and webapp in separate panes and brings up
-the Postgres container. For plain terminals: `vp run dev:server` and `vp run dev:webapp`.
-
 - **No devtools.** Hot reload is JVM HotSwap via the IDE — IntelliJ's Spring Boot run config with
   *Update Classes and Resources* on save. Method-body edits reload; signature changes, new methods and
   `@Configuration` edits need a full restart
   ([ref](https://docs.spring.io/spring-boot/how-to/hotswapping.html)).
 - **`ddl-auto: validate`** locally — Liquibase owns DDL. If the validator fails on boot your DB has
   drifted: `vp run dev:reset`.
-- **`BufferingApplicationStartup`** is wired in `Application.main()`. With `app.profiles=local`,
-  `GET /actuator/startup` returns the timeline; `StartupBudgetIntegrationTest` catches per-step
-  regressions in CI.
+- **`BufferingApplicationStartup`** is wired in `Application.main()`; `StartupBudgetIntegrationTest`
+  reads its timeline and fails on a slow step. `/actuator/startup` is not exposed.
 
 ## Build traps
 
@@ -123,7 +119,7 @@ or on "the only" result, and never write cleanup that another test depends on ha
 
 - Workspace-scoped controllers carry `@WorkspaceScopedController` and take a `WorkspaceContext`.
   Authorization is declared, never assumed: `@RequireAtLeastWorkspaceAdmin`, `@RequireWorkspaceOwner`,
-  `@RequireMentorAccess`, `@PreAuthorize("hasAuthority('app_admin')")` for instance-admin routes.
+  `@PreAuthorize("hasAuthority('app_admin')")` for instance-admin routes.
   Anything reachable while impersonating goes through `ImpersonationGuard`. Admin mutations declare
   `@Audited` or `@AuditExempt` — an ArchUnit rule enforces it.
 - Express lifecycle transitions as HTTP methods (`PATCH /workspaces/{slug}/status`), not RPC verbs.
@@ -153,10 +149,12 @@ Procedure: `docs/contributor/database-migration.mdx`. What the drift gate reads 
 
 ## Webhook receiver
 
-`integration/core/webhook/`. Pure verifier and builder classes (HMAC, GitLab token, subject builders,
-dedup id) sit beside the Spring-backed controllers, the JetStream publisher and the stream bootstrap —
-all gated together on `RuntimeRole.WEBHOOK_PROPERTY`. Configuration binds to `hephaestus.webhook.*`
-through `core.webhook.WebhookProperties`, shared with auto-registration in `workspace/GitLabWebhookService`.
+`integration/core/webhook/` is the receive-side substrate: one `POST /webhooks/{kind}` entry point
+resolves the kind through `IntegrationKindRouting` and hands it to `WebhookIngestPipeline`, which
+selects that adapter's `WebhookSignatureVerifier` and `SubjectKeyDeriver` and publishes the verified
+envelope to JetStream, all gated on `RuntimeRole.WEBHOOK_PROPERTY`. Configuration binds to `hephaestus.webhook.*` through
+`core.webhook.WebhookProperties`, shared with auto-registration in
+`integration/scm/gitlab/workspace/GitLabWebhookService`.
 
 - **Production runs it in its own `webhook-server` container** — the same image as `application-server`
   with `SPRING_PROFILES_ACTIVE=prod,webhook` — so an app-server deploy does not interrupt reception.

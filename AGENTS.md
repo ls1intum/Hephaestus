@@ -155,9 +155,8 @@ for byte and `gate:instructions` fails when a half drifts. Copy a skill nowhere 
 - Test observable behaviour. A story proves what a component renders from its props and installs
   no network; a route test owns the wire contract. Do not assert callback wiring or mirror the
   implementation.
-- Backend behaviour changes ship with focused tests in the right tier (`server/AGENTS.md` § Test
-  tiers). Integration tests share a database with earlier tests: assert on the row you created,
-  never on a count.
+- Backend behaviour changes ship with focused tests in the right tier, asserting on the rows they
+  created (`server/AGENTS.md` § Test tiers).
 - Before pushing, `vp run format` then `vp run check`; the pre-push hook runs `check` again.
   `vp run verify` adds the credential-free builds and suites before review. CI owns images,
   browser and live-service suites — `docs/contributor/local-verification.mdx`.

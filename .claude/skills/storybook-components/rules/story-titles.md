@@ -23,7 +23,7 @@ Two conventions live side by side, and which one applies is a property of the co
   `Instance admin/…` for the `isAppAdmin`-guarded `webapp/src/routes/_authenticated/admin.*`. Never a
   bare `Admin/…` — the reader cannot tell which console it is. A presentational component **both**
   consoles render belongs to neither: file it under `Shared/…`, as
-  `Shared/Practice catalog/Area visual picker` does.
+  `Shared/Practice catalog/Group visual picker` does.
 
 - **A leaf and a folder must not share a name.** If `Foo` gains children, the leaf becomes `Foo/Overview`.
 
