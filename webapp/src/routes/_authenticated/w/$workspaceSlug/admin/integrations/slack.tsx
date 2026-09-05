@@ -324,7 +324,6 @@ function SlackIntegrationPage() {
 					key={`slack:${workspaceData?.slackConnectionId ?? "none"}:${workspaceData?.leaderboardNotificationChannelId ?? ""}:${workspaceData?.leaderboardNotificationEnabled ?? false}:${workspaceData?.leaderboardScheduleDay ?? ""}:${workspaceData?.leaderboardScheduleTime ?? ""}:${workspaceData?.leaderboardNotificationTeam ?? ""}`}
 					workspaceSlug={slug}
 					hasSlackConnection={isConnectionActive}
-					credentialsUnreadableSince={entry.credentialsUnreadableSince}
 					slackConnectionId={workspaceData?.slackConnectionId ?? undefined}
 					channelId={workspaceData?.leaderboardNotificationChannelId ?? undefined}
 					teamLabel={workspaceData?.leaderboardNotificationTeam ?? undefined}

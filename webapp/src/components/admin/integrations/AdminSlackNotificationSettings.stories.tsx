@@ -39,19 +39,6 @@ export const NotConnected: Story = {
 };
 
 /** OAuth completed, but no digest channel is selected yet. */
-/** Connected, but the stored bot token can't be read: reconnecting is the way to replace it. */
-export const CredentialUnreadable: Story = {
-	args: {
-		hasSlackConnection: true,
-		slackConnectionId: 7,
-		credentialsUnreadableSince: new Date("2026-09-05T08:00:00Z"),
-	},
-	play: async ({ canvas }) => {
-		await expect(canvas.getByRole("button", { name: /reconnect slack workspace/i })).toBeVisible();
-		await expect(canvas.getByRole("button", { name: /disconnect slack/i })).toBeVisible();
-	},
-};
-
 export const ConnectedNoChannel: Story = {
 	args: { hasSlackConnection: true },
 	play: async ({ canvas }) => {

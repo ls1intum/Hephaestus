@@ -191,7 +191,7 @@ public class ConnectionService {
 
     /**
      * Decrypts the stored {@link BearerToken} for the workspace's ACTIVE Connection,
-     * if any. Tampering/cross-row substitution surfaces as {@code EncryptionException}.
+     * if any. A credential the configured keys cannot read surfaces as {@link CredentialUnreadableException}.
      */
     @Transactional(readOnly = true)
     public Optional<BearerToken> findActiveBearerToken(long workspaceId, IntegrationKind kind) {
