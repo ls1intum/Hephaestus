@@ -39,6 +39,20 @@ RUN mkdir -p /tmp/abi-check && ln -sf /opt/pi-sdk/node_modules /tmp/abi-check/no
     cd /tmp/abi-check && \
     printf 'const sdk = await import("@earendil-works/pi-coding-agent");\nif (!sdk || typeof sdk !== "object") { throw new Error("Pi SDK import yielded no module namespace"); }\nconsole.log("pi sdk exports:", Object.keys(sdk).length);\n' > check.ts && \
     node --permission --allow-fs-read=/tmp/abi-check --allow-fs-read=/opt/pi-sdk check.ts && \
+    mkdir -p /tmp/abi-check/work/nested && \
+    printf '%s\n' \
+      'import { DefaultResourceLoader, SettingsManager } from "@earendil-works/pi-coding-agent";' \
+      'const cwd = "/tmp/abi-check/work/nested";' \
+      'const agentDir = "/tmp/abi-check/agent";' \
+      '// The runner opens every session with an untrusted project so the SDK never walks the' \
+      '// ancestors of the working directory for skills, which the fs-read allowlist forbids. This' \
+      '// resolves resources exactly the way the runner does, under the same permissions, from a' \
+      '// directory whose ancestors are outside the allowlist; an SDK that reaches out fails the build.' \
+      'const settingsManager = SettingsManager.create(cwd, agentDir, { projectTrusted: false });' \
+      'await new DefaultResourceLoader({ cwd, agentDir, settingsManager, noContextFiles: true }).reload();' \
+      > runner-path-check.ts && \
+    mkdir -p /tmp/abi-check/home && \
+    HOME=/tmp/abi-check/home node --permission --allow-fs-read=/tmp/abi-check --allow-fs-read=/opt/pi-sdk runner-path-check.ts && \
     ! node --permission --allow-fs-read=/tmp/abi-check --allow-fs-read=/opt/pi-sdk \
       -e 'require("node:fs").readFileSync("/etc/passwd")' 2>/dev/null && \
     ! node --permission --allow-fs-read=/tmp/abi-check --allow-fs-read=/opt/pi-sdk \

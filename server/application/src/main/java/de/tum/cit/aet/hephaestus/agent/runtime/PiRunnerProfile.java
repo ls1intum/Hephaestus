@@ -14,6 +14,10 @@ public interface PiRunnerProfile {
             "--permission",
             "--allow-fs-read=/workspace",
             "--allow-fs-read=/opt/pi-sdk",
+            // The SDK looks for user-level skills under $HOME (/home/agent in the image) on every
+            // session; that directory holds nothing, and a read the permission model denies is a
+            // thrown error, not an absence, so it must be readable.
+            "--allow-fs-read=/home/agent",
             "--allow-fs-write=/workspace/.sessions",
             "--allow-fs-write=/workspace/out");
     /** Runner script filename under {@code resources/agent/}. */
