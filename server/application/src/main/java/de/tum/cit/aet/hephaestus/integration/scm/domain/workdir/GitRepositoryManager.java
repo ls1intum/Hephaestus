@@ -5,6 +5,7 @@ import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -22,6 +23,7 @@ import java.util.stream.Stream;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.api.errors.InvalidRemoteException;
 import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.diff.DiffFormatter;
 import org.eclipse.jgit.diff.Edit;
@@ -44,6 +46,7 @@ import org.eclipse.jgit.util.FileUtils;
 import org.eclipse.jgit.util.io.DisabledOutputStream;
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.core.NestedExceptionUtils;
 import org.springframework.stereotype.Service;
 
 @Slf4j
@@ -184,7 +187,27 @@ public class GitRepositoryManager {
                     log.warn("Repository origin changed; rebuilding checkout: repoId={}", repositoryId);
                     cloneRepository(repoPath, cloneUrl, token);
                 } else {
-                    fetchRepository(repoPath, token);
+                    try {
+                        fetchRepository(repoPath, token);
+                    } catch (InvalidRemoteException e) {
+                        // JGit reports two faults as "invalid remote": the checkout's own remote
+                        // configuration does not parse (a URISyntaxException cause), which only a rebuild
+                        // fixes, or the remote answered that the repository is not there, which a rebuild
+                        // would only turn into a lost cache; a transport or authentication failure is a
+                        // different exception and stays visible.
+                        if (!(NestedExceptionUtils.getMostSpecificCause(e) instanceof URISyntaxException)) {
+                            log.error(
+                                    "Repository not found upstream; keeping checkout: repoId={}, error={}",
+                                    repositoryId,
+                                    e.getMessage(),
+                                    e);
+                            throw new GitOperationException("Repository not found upstream: " + repositoryId, e);
+                        }
+                        log.warn(
+                                "Repository remote configuration does not parse; rebuilding checkout: repoId={}",
+                                repositoryId);
+                        cloneRepository(repoPath, cloneUrl, token);
+                    }
                 }
                 return repoPath;
             } catch (GitAPIException | IOException e) {
@@ -194,10 +217,15 @@ public class GitRepositoryManager {
         });
     }
 
+    /**
+     * Whether the checkout's origin is exactly the clone URL. JGit fetches from the first {@code url}
+     * value of a remote but reads the last one back, so a stale value left ahead of the current URL
+     * is an origin change, not a match.
+     */
     private static boolean hasOrigin(Path repoPath, String cloneUrl) throws IOException {
         try (Git git = Git.open(repoPath.toFile())) {
-            String configuredUrl = git.getRepository().getConfig().getString("remote", "origin", "url");
-            return cloneUrl.equals(configuredUrl);
+            String[] configuredUrls = git.getRepository().getConfig().getStringList("remote", "origin", "url");
+            return configuredUrls.length == 1 && cloneUrl.equals(configuredUrls[0]);
         }
     }
 
