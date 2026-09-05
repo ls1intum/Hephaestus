@@ -23,7 +23,8 @@ class LedgerSignalRecorderTest extends BaseUnitTest {
     private final ArtifactSignalRepository repository = mock(ArtifactSignalRepository.class);
     private final io.micrometer.core.instrument.simple.SimpleMeterRegistry meterRegistry =
             new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
-    private final LedgerSignalRecorder recorder = new LedgerSignalRecorder(repository, meterRegistry);
+    private final LedgerSignalRecorder recorder =
+            new LedgerSignalRecorder(repository, new PracticeReviewRefusalMetrics(meterRegistry));
 
     @Test
     void shouldNotLetAReconciliationPassDisplaceADecisionAlreadyTaken() {

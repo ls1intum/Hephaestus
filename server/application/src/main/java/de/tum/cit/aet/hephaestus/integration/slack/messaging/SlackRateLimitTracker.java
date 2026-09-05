@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.slack.messaging;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.integration.core.spi.RateLimitSnapshot;
+import de.tum.cit.aet.hephaestus.integration.slack.metrics.SlackMetrics;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.Meter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -138,11 +139,11 @@ public class SlackRateLimitTracker {
 
     private void registerMetrics(long workspaceId, WorkspaceThrottleState state) {
         Tags tags = Tags.of("workspace_id", String.valueOf(workspaceId));
-        Gauge.builder(METRIC_PREFIX + ".throttles", state, s -> s.throttleCount.doubleValue())
+        Gauge.builder(SlackMetrics.SLACK_API_RATELIMIT_THROTTLES, state, s -> s.throttleCount.doubleValue())
                 .tags(tags)
                 .description("Number of Slack API throttle (429) responses observed for this workspace")
                 .register(meterRegistry);
-        Gauge.builder(METRIC_PREFIX + ".throttled_until_seconds", state, s -> {
+        Gauge.builder(SlackMetrics.SLACK_API_RATELIMIT_THROTTLED_UNTIL_SECONDS, state, s -> {
                     Instant until = s.throttledUntil.get();
                     if (until == null) {
                         return 0.0;

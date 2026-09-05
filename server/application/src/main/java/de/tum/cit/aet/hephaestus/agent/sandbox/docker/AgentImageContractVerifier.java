@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.sandbox.docker;
 
+import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -31,8 +32,6 @@ public class AgentImageContractVerifier {
 
     private static final Logger log = LoggerFactory.getLogger(AgentImageContractVerifier.class);
 
-    private static final String METRIC = "agent.image.contract";
-
     /** Informational labels quoted back in a drift report, because they name what actually differs. */
     private static final String NODE_VERSION_LABEL = "hephaestus.agent.node-version";
 
@@ -60,7 +59,10 @@ public class AgentImageContractVerifier {
     public Outcome verify(String image) {
         Outcome outcome = evaluate(image);
         meterRegistry
-                .counter(METRIC, "outcome", outcome.name().toLowerCase(Locale.ROOT))
+                .counter(
+                        AgentMetrics.AGENT_IMAGE_CONTRACT,
+                        "outcome",
+                        outcome.name().toLowerCase(Locale.ROOT))
                 .increment();
         return outcome;
     }

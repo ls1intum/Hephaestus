@@ -87,12 +87,15 @@ public class SyncEventHub {
         this.objectMapper = objectMapper;
         this.coalesceWindow = coalesceWindow;
         this.emitterFactory = emitterFactory;
-        this.subscriptionsAccepted = counter(meterRegistry, "integration.sync.sse.subscriptions", "accepted");
-        this.subscriptionsRejected = counter(meterRegistry, "integration.sync.sse.subscriptions", "rejected");
-        this.subscriptionsFailed = counter(meterRegistry, "integration.sync.sse.subscriptions", "failed");
-        this.eventsDelivered = counter(meterRegistry, "integration.sync.sse.events", "delivered");
-        this.eventsDropped = counter(meterRegistry, "integration.sync.sse.events", "dropped");
-        this.eventsFailed = counter(meterRegistry, "integration.sync.sse.events", "error");
+        this.subscriptionsAccepted =
+                counter(meterRegistry, IntegrationCoreMetrics.INTEGRATION_SYNC_SSE_SUBSCRIPTIONS, "accepted");
+        this.subscriptionsRejected =
+                counter(meterRegistry, IntegrationCoreMetrics.INTEGRATION_SYNC_SSE_SUBSCRIPTIONS, "rejected");
+        this.subscriptionsFailed =
+                counter(meterRegistry, IntegrationCoreMetrics.INTEGRATION_SYNC_SSE_SUBSCRIPTIONS, "failed");
+        this.eventsDelivered = counter(meterRegistry, IntegrationCoreMetrics.INTEGRATION_SYNC_SSE_EVENTS, "delivered");
+        this.eventsDropped = counter(meterRegistry, IntegrationCoreMetrics.INTEGRATION_SYNC_SSE_EVENTS, "dropped");
+        this.eventsFailed = counter(meterRegistry, IntegrationCoreMetrics.INTEGRATION_SYNC_SSE_EVENTS, "error");
         Gauge.builder(IntegrationCoreMetrics.INTEGRATION_SYNC_SSE_SUBSCRIBERS, this, SyncEventHub::totalSubscriberCount)
                 .description("Currently active sync-observability SSE subscribers on this server replica")
                 .register(meterRegistry);

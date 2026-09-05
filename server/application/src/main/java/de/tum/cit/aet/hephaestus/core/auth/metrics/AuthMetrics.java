@@ -75,13 +75,6 @@ public class AuthMetrics {
         }
     }
 
-    private static final String LOGIN_METRIC = "auth.login";
-    private static final String RATELIMIT_BLOCKED_METRIC = "auth.ratelimit.blocked";
-    private static final String RATELIMIT_BACKEND_ERROR_METRIC = "auth.ratelimit.backend_error";
-    private static final String AUDIT_WRITE_FAILED_METRIC = "auth.audit.write_failed";
-    private static final String REFRESH_RESULT_METRIC = "auth.token.refresh.result";
-    private static final String REVOCATION_CHECK_FAILED_METRIC = "auth.revocation.check_failed";
-
     private final MeterRegistry registry;
     private final Counter loginSuccess;
     private final Counter loginFailure;
@@ -98,15 +91,15 @@ public class AuthMetrics {
                 .description("Wall-clock latency of the access-token rotation in AuthSessionService.refresh.")
                 .publishPercentileHistogram()
                 .register(registry);
-        this.revocationCheckFailed = Counter.builder(REVOCATION_CHECK_FAILED_METRIC)
+        this.revocationCheckFailed = Counter.builder(CoreMetrics.AUTH_REVOCATION_CHECK_FAILED)
                 .description("Fail-closed revocation lookups in RevocationAwareJwtDecoder (DB unreachable → 401). "
                         + "A spike means a DB outage is mass-rejecting otherwise-valid cookie-JWTs.")
                 .register(registry);
-        this.rateLimitBackendError = Counter.builder(RATELIMIT_BACKEND_ERROR_METRIC)
+        this.rateLimitBackendError = Counter.builder(CoreMetrics.AUTH_RATELIMIT_BACKEND_ERROR)
                 .description(
                         "Rate-limit bucket-store failures. Authentication fails open; costly operations fail closed.")
                 .register(registry);
-        this.auditWriteFailed = Counter.builder(AUDIT_WRITE_FAILED_METRIC)
+        this.auditWriteFailed = Counter.builder(CoreMetrics.AUTH_AUDIT_WRITE_FAILED)
                 .description(
                         "Auth-audit persist failures in AuthEventWriter (the sequence value was already consumed → "
                                 + "a permanent gap in auth_event.id). Swallowed so audit never breaks the request, but a "
@@ -115,7 +108,7 @@ public class AuthMetrics {
     }
 
     private static Counter login(MeterRegistry registry, LoginResult result) {
-        return Counter.builder(LOGIN_METRIC)
+        return Counter.builder(CoreMetrics.AUTH_LOGIN)
                 .description("Interactive OAuth logins, tagged by terminal result.")
                 .tag("result", result.tag())
                 .register(registry);
@@ -135,7 +128,7 @@ public class AuthMetrics {
      * a fixed handful of meters.
      */
     public void recordRateLimitBlocked(String bucket) {
-        Counter.builder(RATELIMIT_BLOCKED_METRIC)
+        Counter.builder(CoreMetrics.AUTH_RATELIMIT_BLOCKED)
                 .description("Requests rejected with HTTP 429 by the rate limiter, tagged by bucket namespace.")
                 .tag("bucket", bucket)
                 .register(registry)
@@ -156,7 +149,7 @@ public class AuthMetrics {
      * this is a fixed handful of meters.
      */
     public void recordRefreshResult(RefreshResult result) {
-        Counter.builder(REFRESH_RESULT_METRIC)
+        Counter.builder(CoreMetrics.AUTH_TOKEN_REFRESH_RESULT)
                 .description("Token-refresh attempts in AuthSessionService.refresh, tagged by terminal result.")
                 .tag("result", result.tag())
                 .register(registry)

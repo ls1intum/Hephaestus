@@ -45,7 +45,9 @@ class AgentImagePullBootstrapperTest extends BaseUnitTest {
         verify(imageOps).ping();
         verify(imageOps).imageLabels(IMAGE);
         verifyNoMoreInteractions(imageOps);
-        assertThat(registry.counter("agent.image.pull.skipped", "reason", "docker_unreachable")
+        assertThat(registry.get("agent.image.pull.skipped")
+                        .tag("reason", "docker_unreachable")
+                        .counter()
                         .count())
                 .isEqualTo(1d);
     }
@@ -62,10 +64,17 @@ class AgentImagePullBootstrapperTest extends BaseUnitTest {
 
         verify(imageOps, never()).imageIsPresent(IMAGE);
         verify(imageOps).pullImage(IMAGE);
-        assertThat(registry.timer("agent.image.pull.duration", "outcome", outcomeTag)
+        assertThat(registry.get("agent.image.pull.duration")
+                        .tag("outcome", outcomeTag)
+                        .timer()
                         .count())
                 .isEqualTo(1L);
-        assertThat(registry.counter("agent.image.pull.failure").count()).isEqualTo(expectedFailureCount);
+        if (expectedFailureCount == 0) {
+            assertThat(registry.find("agent.image.pull.failure").counter()).isNull();
+        } else {
+            assertThat(registry.get("agent.image.pull.failure").counter().count())
+                    .isEqualTo(expectedFailureCount);
+        }
     }
 
     @ParameterizedTest(name = "IF_NOT_PRESENT, imageIsPresent={0} → pullImage invoked={1}")

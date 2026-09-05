@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.proxy;
 
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobLlmUsageDelta;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
+import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.agent.proxy.ProxyRouting.BilledAttempt;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -60,7 +61,9 @@ public class ProxyUsageAccumulator {
             }
         } catch (RuntimeException e) {
             log.warn("Lost proxy usage accounting for job {} — this call may go unbilled", jobId, e);
-            meterRegistry.counter("llm.proxy.usage.accumulate.failure").increment();
+            meterRegistry
+                    .counter(AgentMetrics.LLM_PROXY_USAGE_ACCUMULATE_FAILURE)
+                    .increment();
         }
     }
 
@@ -75,6 +78,8 @@ public class ProxyUsageAccumulator {
                         + "this call goes unbilled rather than being charged to whoever owns the row now",
                 attempt.sourceId(),
                 attempt.number());
-        meterRegistry.counter("llm.proxy.usage.accumulate.superseded").increment();
+        meterRegistry
+                .counter(AgentMetrics.LLM_PROXY_USAGE_ACCUMULATE_SUPERSEDED)
+                .increment();
     }
 }

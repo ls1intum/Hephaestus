@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.context;
 
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceManifest;
 import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
 import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
@@ -39,8 +40,6 @@ import tools.jackson.databind.JsonNode;
 public class WorkspaceContextBuilder {
 
     private static final Logger log = LoggerFactory.getLogger(WorkspaceContextBuilder.class);
-    private static final String METRIC_BUILD = "agent.context.build";
-    private static final String METRIC_REQUIRED_FAILURE = "agent.context.provider.required.failure";
 
     /** Bounded stripes avoid retaining repository identifiers indefinitely. */
     private static final int LOCK_STRIPES = 64;
@@ -97,7 +96,7 @@ public class WorkspaceContextBuilder {
             }
             meterRegistry
                     .timer(
-                            METRIC_BUILD + ".duration",
+                            AgentMetrics.AGENT_CONTEXT_BUILD_DURATION,
                             Tags.of("kind", request.getClass().getSimpleName()))
                     .record(System.nanoTime() - startNs, TimeUnit.NANOSECONDS);
         }
@@ -132,7 +131,7 @@ public class WorkspaceContextBuilder {
             if (lock != null) lock.unlock();
             meterRegistry
                     .timer(
-                            METRIC_BUILD + ".duration",
+                            AgentMetrics.AGENT_CONTEXT_BUILD_DURATION,
                             Tags.of("kind", request.getClass().getSimpleName()))
                     .record(System.nanoTime() - startNs, TimeUnit.NANOSECONDS);
         }
@@ -218,7 +217,9 @@ public class WorkspaceContextBuilder {
                     if (!(e instanceof EvidenceCollectionException)) throw e;
                     if (provider.required()) {
                         meterRegistry
-                                .counter(METRIC_REQUIRED_FAILURE, Tags.of("provider", providerName))
+                                .counter(
+                                        AgentMetrics.AGENT_CONTEXT_PROVIDER_REQUIRED_FAILURE,
+                                        Tags.of("provider", providerName))
                                 .increment();
                         throw new JobPreparationException("Required content provider failed: " + providerName, e);
                     }
@@ -339,7 +340,8 @@ public class WorkspaceContextBuilder {
                 // below still propagate.
                 stateOverrides.put(kind, new SourceCaptureState.CollectionError(SourceAbsenceReason.PROVIDER_FAILURE));
                 meterRegistry
-                        .counter(METRIC_REQUIRED_FAILURE, Tags.of("provider", providerName))
+                        .counter(
+                                AgentMetrics.AGENT_CONTEXT_PROVIDER_REQUIRED_FAILURE, Tags.of("provider", providerName))
                         .increment();
                 log.warn(
                         "Evidence source failed; recording collection error: {} {} — {}",

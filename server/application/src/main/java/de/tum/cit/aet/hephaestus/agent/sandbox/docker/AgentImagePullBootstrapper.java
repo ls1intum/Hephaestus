@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.sandbox.docker;
 
+import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.agent.runtime.AgentImageProperties;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -42,7 +43,14 @@ public class AgentImagePullBootstrapper {
     @Order(0)
     public void pullOnStartup() {
         ImagePullBootstrapperSupport.applyPolicy(
-                properties.reference(), properties.pullPolicy(), imageOps, "agent.image.pull", meterRegistry, log);
+                properties.reference(),
+                properties.pullPolicy(),
+                imageOps,
+                AgentMetrics.AGENT_IMAGE_PULL_DURATION,
+                AgentMetrics.AGENT_IMAGE_PULL_FAILURE,
+                AgentMetrics.AGENT_IMAGE_PULL_SKIPPED,
+                meterRegistry,
+                log);
         contractVerifier.verify(properties.reference());
     }
 }

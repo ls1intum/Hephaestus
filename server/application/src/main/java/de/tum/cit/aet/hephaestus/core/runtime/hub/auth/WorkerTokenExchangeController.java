@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.core.runtime.hub.auth;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.core.metrics.CoreMetrics;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.swagger.v3.oas.annotations.Hidden;
@@ -35,8 +36,6 @@ public class WorkerTokenExchangeController {
     private static final Logger log = LoggerFactory.getLogger(WorkerTokenExchangeController.class);
     private static final int MAX_FAILURES_PER_IP_PER_MINUTE = 10;
 
-    private static final String AUDIT_METRIC = "worker.token.exchange";
-
     private final WorkerJwtIssuer issuer;
     private final WorkerTokenProperties properties;
     private final MeterRegistry meterRegistry;
@@ -63,7 +62,7 @@ public class WorkerTokenExchangeController {
         if (!properties.isExchangeEnabled()) {
             log.warn("worker token exchange attempted but no registration token is configured");
             meterRegistry
-                    .counter(AUDIT_METRIC, "outcome", "failed", "reason", "disabled")
+                    .counter(CoreMetrics.WORKER_TOKEN_EXCHANGE, "outcome", "failed", "reason", "disabled")
                     .increment();
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
@@ -72,14 +71,14 @@ public class WorkerTokenExchangeController {
         if (failures.get() >= MAX_FAILURES_PER_IP_PER_MINUTE) {
             log.warn("worker token exchange throttled: too many failures from sourceIp={}", sourceIp);
             meterRegistry
-                    .counter(AUDIT_METRIC, "outcome", "failed", "reason", "throttled")
+                    .counter(CoreMetrics.WORKER_TOKEN_EXCHANGE, "outcome", "failed", "reason", "throttled")
                     .increment();
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).build();
         }
         if (request == null || request.workerId() == null || request.workerId().isBlank()) {
             failures.incrementAndGet();
             meterRegistry
-                    .counter(AUDIT_METRIC, "outcome", "failed", "reason", "bad-payload")
+                    .counter(CoreMetrics.WORKER_TOKEN_EXCHANGE, "outcome", "failed", "reason", "bad-payload")
                     .increment();
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
         }
@@ -90,12 +89,14 @@ public class WorkerTokenExchangeController {
                     request.workerId(),
                     sourceIp);
             meterRegistry
-                    .counter(AUDIT_METRIC, "outcome", "failed", "reason", "bad-token")
+                    .counter(CoreMetrics.WORKER_TOKEN_EXCHANGE, "outcome", "failed", "reason", "bad-token")
                     .increment();
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
         WorkerJwtIssuer.IssuedWorkerJwt issued = issuer.issue(request.workerId().trim());
-        meterRegistry.counter(AUDIT_METRIC, "outcome", "success").increment();
+        meterRegistry
+                .counter(CoreMetrics.WORKER_TOKEN_EXCHANGE, "outcome", "success")
+                .increment();
         log.info(
                 "worker token exchange ok: workerId={} sourceIp={} jti={} exp={}",
                 request.workerId(),

@@ -126,7 +126,7 @@ public class DockerSandboxAdapter implements SandboxManager {
                 .description("Duration of sandbox executions")
                 .register(meterRegistry);
 
-        meterRegistry.gaugeMapSize("sandbox.containers.active", Tags.empty(), this.activeContainers);
+        meterRegistry.gaugeMapSize(AgentMetrics.SANDBOX_CONTAINERS_ACTIVE, Tags.empty(), this.activeContainers);
     }
 
     @Override
@@ -422,7 +422,9 @@ public class DockerSandboxAdapter implements SandboxManager {
             if (e instanceof InterruptedException) {
                 Thread.currentThread().interrupt();
             }
-            meterRegistry.counter("sandbox.cleanup.failures", "step", operation).increment();
+            meterRegistry
+                    .counter(AgentMetrics.SANDBOX_CLEANUP_FAILURES, "step", operation)
+                    .increment();
             log.warn("Cleanup failed ({}): jobId={}, error={}", operation, jobId, e.getMessage());
         }
     }

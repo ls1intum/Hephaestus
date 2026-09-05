@@ -36,7 +36,7 @@ public class TenancyConfiguration {
         return (sql, unguardedTables, mode) -> {
             for (String table : unguardedTables) {
                 registry.counter(
-                                "tenancy.violation.total",
+                                CoreMetrics.TENANCY_VIOLATION_TOTAL,
                                 "module",
                                 "tenancy",
                                 "table",

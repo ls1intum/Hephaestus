@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.agent.handler.conversation.ConversationalDelive
 import de.tum.cit.aet.hephaestus.agent.handler.inapp.InAppCompositionListener;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.UnpreparedFeedbackLanes;
+import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -151,7 +152,7 @@ public class FeedbackLanePreparationSweeper {
                         case IN_APP -> inAppLane.prepare(job.agentJobId(), job.workspaceId());
                     };
             meterRegistry
-                    .counter("feedback.lane.sweep.recovered", "lane", lane.tag)
+                    .counter(AgentMetrics.FEEDBACK_LANE_SWEEP_RECOVERED, "lane", lane.tag)
                     .increment();
             return new LaneResult(true, units);
         } catch (RuntimeException e) {
@@ -163,7 +164,7 @@ public class FeedbackLanePreparationSweeper {
                     job.agentJobId(),
                     e.toString());
             meterRegistry
-                    .counter("feedback.lane.sweep.failure", "lane", lane.tag)
+                    .counter(AgentMetrics.FEEDBACK_LANE_SWEEP_FAILURE, "lane", lane.tag)
                     .increment();
             return new LaneResult(false, 0);
         }
