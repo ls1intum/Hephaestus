@@ -35,8 +35,10 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import org.eclipse.jgit.diff.DiffEntry;
+import org.eclipse.jgit.diff.Edit;
+import org.eclipse.jgit.patch.FormatError;
+import org.eclipse.jgit.patch.Patch;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -78,9 +80,6 @@ public class PullRequestContentSource implements EvidenceSource, ReviewContextBu
     private static final Logger log = LoggerFactory.getLogger(PullRequestContentSource.class);
 
     static final int MAX_COMMENTS = EvidenceLimits.MAX_ITEMS_PER_SOURCE;
-
-    /** Captures the b-side path of a git diff header — robust against renames and paths containing " b/". */
-    private static final Pattern DIFF_GIT_HEADER = Pattern.compile("^diff --git a/.* b/(.+)$");
 
     private final ObjectMapper objectMapper;
     private final GitRepositoryManager gitRepositoryManager;
@@ -189,7 +188,6 @@ public class PullRequestContentSource implements EvidenceSource, ReviewContextBu
         }
         if (selectedKinds.contains(DIFF)) {
             computeAndStoreDiff(files, repositoryId, metadata, headVerified);
-            computeAndStoreDiffSummary(files);
             completeness.put(DIFF, SourceCompleteness.COMPLETE);
             String headSha = metadata.path("commit_sha").asString();
             if (!headSha.isBlank()) identities.put(DIFF, headSha);
@@ -408,6 +406,7 @@ public class PullRequestContentSource implements EvidenceSource, ReviewContextBu
                         + ", repoId="
                         + repositoryId);
             }
+            computeAndStoreDiffSummary(files, diff);
             if (!diff.isBlank()) {
                 String annotatedDiff = GitDiffOperations.annotateDiffWithLineNumbers(diff);
                 files.put(OUTPUT_PREFIX + "diff.patch", annotatedDiff.getBytes(StandardCharsets.UTF_8));
@@ -444,79 +443,42 @@ public class PullRequestContentSource implements EvidenceSource, ReviewContextBu
         }
     }
 
-    void computeAndStoreDiffSummary(Map<String, byte[]> files) {
-        byte[] diffBytes = files.get(OUTPUT_PREFIX + "diff.patch");
-        if (diffBytes == null) {
-            return;
+    void computeAndStoreDiffSummary(Map<String, byte[]> files, String diff) {
+        byte[] rawDiff = diff.getBytes(StandardCharsets.UTF_8);
+        Patch patch = new Patch();
+        patch.parse(rawDiff, 0, rawDiff.length);
+        // JGit records recoverable oddities as warnings on the same list; only an ERROR means the
+        // headers cannot be trusted to name the files they claim.
+        boolean unreadable =
+                patch.getErrors().stream().anyMatch(error -> error.getSeverity() == FormatError.Severity.ERROR);
+        if (unreadable || (!diff.isBlank() && patch.getFiles().isEmpty())) {
+            throw new JobPreparationException("Diff could not be parsed for its summary");
         }
 
-        String diff = new String(diffBytes, StandardCharsets.UTF_8);
-
-        List<String> fileDiffs = new ArrayList<>();
-        List<String> filePaths = new ArrayList<>();
-        StringBuilder currentChunk = new StringBuilder();
-        String currentPath = null;
-
-        for (String line : diff.split("\n", -1)) {
-            String effectiveLine = line;
-            if (line.startsWith("[L") && line.contains("] diff --git")) {
-                effectiveLine = line.substring(line.indexOf("] ") + 2);
-            }
-            if (effectiveLine.startsWith("diff --git")) {
-                if (currentPath != null) {
-                    fileDiffs.add(currentChunk.toString());
-                    filePaths.add(currentPath);
-                }
-                currentChunk = new StringBuilder();
-                Matcher m = DIFF_GIT_HEADER.matcher(effectiveLine);
-                // A malformed header remains attacker-controlled; escape it before rendering Markdown.
-                currentPath = m.matches() ? m.group(1) : sanitizePathCell(effectiveLine);
-            }
-            currentChunk.append(line).append('\n');
-        }
-        if (currentPath != null) {
-            fileDiffs.add(currentChunk.toString());
-            filePaths.add(currentPath);
-        }
-
-        StringBuilder summary = new StringBuilder();
-        summary.append("# Diff Summary\n\n");
-        summary.append("**").append(filePaths.size()).append(" files changed**\n\n");
-
-        summary.append("| # | File | +Lines |\n");
-        summary.append("|---|------|--------|\n");
-        for (int i = 0; i < filePaths.size(); i++) {
-            int added = countAddedLines(fileDiffs.get(i));
-            summary.append("| ")
-                    .append(i + 1)
-                    .append(" | `")
-                    .append(filePaths.get(i))
-                    .append("` | +")
+        StringBuilder summary = new StringBuilder("# Diff Summary\n\n");
+        summary.append("**")
+                .append(patch.getFiles().size())
+                .append(patch.getFiles().size() == 1 ? " file changed" : " files changed")
+                .append("**\n\n");
+        int ordinal = 0;
+        for (var file : patch.getFiles()) {
+            String path = file.getChangeType() == DiffEntry.ChangeType.DELETE ? file.getOldPath() : file.getNewPath();
+            int added = file.getHunks().stream()
+                    .flatMap(hunk -> hunk.toEditList().stream())
+                    .mapToInt(Edit::getLengthB)
+                    .sum();
+            summary.append("File ")
+                    .append(++ordinal)
+                    .append(": +")
                     .append(added)
-                    .append(" |\n");
+                    .append(added == 1 ? " line\n\n    " : " lines\n\n    ")
+                    .append(objectMapper.writeValueAsString(path))
+                    .append("\n\n");
         }
 
-        // Deliberately an index, not the diffs themselves: this copy carries no [L<n>] line markers, so
-        // appending them here would put the change in context twice and leave the worse copy to quote from.
-        summary.append("\nThe change itself is in `diff.patch`, annotated with line numbers for citation.\n");
-
-        byte[] summaryBytes = summary.toString().getBytes(StandardCharsets.UTF_8);
-        files.put(OUTPUT_PREFIX + "diff_summary.md", summaryBytes);
-        log.info("Diff summary: {} files, {} bytes", filePaths.size(), summaryBytes.length);
-    }
-
-    private static String sanitizePathCell(String rawHeader) {
-        String stripped = rawHeader.startsWith("diff --git ") ? rawHeader.substring("diff --git ".length()) : rawHeader;
-        return stripped.replace("|", "").replace("`", "").trim();
-    }
-
-    private static int countAddedLines(String fileDiff) {
-        int count = 0;
-        for (String line : fileDiff.split("\n", -1)) {
-            if (line.startsWith("[L") && line.contains("] +")) {
-                count++;
-            }
-        }
-        return count;
+        // Keep one line-annotated copy of the change for citation; this file is only its index, so it
+        // carries no [L<n>] markers to quote from.
+        summary.append("The change itself is in `diff.patch`, annotated with line numbers for citation.\n");
+        files.put(OUTPUT_PREFIX + "diff_summary.md", summary.toString().getBytes(StandardCharsets.UTF_8));
     }
 }
