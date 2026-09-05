@@ -56,8 +56,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * looking straight at the work is better served by a reason they can read than by a 404. Terminal is right
  * here and wrong for an automatically re-offered signal, which the resubmitters hold under
  * {@link SignalStateReason#ARTIFACT_NOT_VISIBLE} instead: nobody is waiting on this answer, so a tombstone
- * a later sync reverses must not have retired the occasion. ADR 0024 § Update — 2026-09-04 (issue #1806):
- * a re-offered signal is held, not retired.
+ * a later sync reverses must not have retired the occasion (ADR 0024).
  */
 @Service
 public class ManualReviewRequests {

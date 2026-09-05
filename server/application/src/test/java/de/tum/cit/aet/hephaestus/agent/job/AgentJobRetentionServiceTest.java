@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.time.Clock;
 import java.time.Duration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -45,7 +46,8 @@ class AgentJobRetentionServiceTest extends BaseUnitTest {
             TransactionCallback<Object> cb = inv.getArgument(0);
             return cb.doInTransaction(mock(TransactionStatus.class));
         });
-        service = new AgentJobRetentionService(jobRepository, AGENT_PROPS, transactionTemplate, meterRegistry);
+        service = new AgentJobRetentionService(
+                jobRepository, AGENT_PROPS, Clock.systemUTC(), transactionTemplate, meterRegistry);
     }
 
     @Nested

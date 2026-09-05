@@ -9,12 +9,10 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.support.TransactionTemplate;
 
-@Tag("integration")
 class LlmUsageRetentionIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired

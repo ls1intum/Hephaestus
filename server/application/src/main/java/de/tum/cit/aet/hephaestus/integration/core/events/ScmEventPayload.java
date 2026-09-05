@@ -77,10 +77,7 @@ public final class ScmEventPayload {
                     issue.getIssueType() != null ? issue.getIssueType().getName() : null,
                     issue.getMilestone() != null ? issue.getMilestone().getTitle() : null,
                     issue.getLabels().stream().map(Label::getName).toList(),
-                    issue.getAssignees().stream()
-                            .map(User::getLogin)
-                            .filter(Objects::nonNull)
-                            .toList(),
+                    issue.getAssignees().stream().map(User::getLogin).toList(),
                     issue.getCreatedAt(),
                     issue.getUpdatedAt(),
                     issue.getClosedAt());

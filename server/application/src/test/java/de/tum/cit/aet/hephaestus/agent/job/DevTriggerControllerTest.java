@@ -161,14 +161,14 @@ class DevTriggerControllerTest extends BaseUnitTest {
     }
 
     /**
-     * An issue whose repository the mirror never resolved is not reviewable, and a signal key cannot be
-     * built for one — so the endpoint has to answer that before it asks the gate anything, rather than
-     * settling a ledger row for an artifact nobody can fetch.
+     * An issue no request can be built for — one whose repository the mirror never resolved — is not
+     * reviewable, and a signal key cannot be built for one either, so the endpoint has to answer that
+     * before it asks the gate anything, rather than settling a ledger row for an artifact nobody can
+     * fetch.
      */
     @Test
-    void shouldRefuseAnIssueWithNoRepositoryBeforeConsultingTheGate() {
+    void shouldRefuseBeforeConsultingTheGateWhenNoRequestCanBeBuilt() {
         Issue issue = issue();
-        org.springframework.test.util.ReflectionTestUtils.setField(issue, "repository", null);
         when(artifactLoader.findIssueForGate(WORKSPACE_ID, ISSUE_ID)).thenReturn(Optional.of(issue));
         when(agentJobService.buildIssueRequest(any(), any())).thenReturn(null);
 

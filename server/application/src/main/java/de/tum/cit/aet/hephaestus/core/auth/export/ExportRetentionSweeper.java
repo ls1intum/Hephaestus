@@ -12,8 +12,8 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * Hourly sweep that enforces the {@link ExportGenerationWorker#RETENTION} window: READY exports past
- * {@code expires_at} flip to EXPIRED and have their payload nulled.
+ * Enforces the {@link ExportGenerationWorker#RETENTION} window: READY exports past {@code expires_at}
+ * flip to EXPIRED and have their payload nulled.
  *
  * <p>The bulk {@code @Modifying} update needs an active transaction, which only a real proxy hop into
  * {@link AccountExportService} opens.

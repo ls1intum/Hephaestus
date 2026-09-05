@@ -270,8 +270,7 @@ public class SecurityConfig {
             requests.requestMatchers("/error").permitAll();
             // NOTE: /webhooks/**, /oauth/callback/**, /api/workers/** and /actuator/health|info are
             // claimed by higher-precedence chains and NEVER reach this fallback chain:
-            //   - /webhooks/** + /oauth/callback/**  → workerHubSecurityFilterChain (the
-            //     highest-precedence chain that matches by path)
+            //   - /webhooks/** + /oauth/callback/**  → workerHubSecurityFilterChain
             //   - /oauth2/authorization/** + /login/oauth2/code/** + /auth/login|error → AuthSecurityConfig
             // Spring dispatches to the FIRST matching SecurityFilterChain only, so permitAll rules for
             // those paths here would be dead code. Their controller/handshake-layer auth (HMAC, shared

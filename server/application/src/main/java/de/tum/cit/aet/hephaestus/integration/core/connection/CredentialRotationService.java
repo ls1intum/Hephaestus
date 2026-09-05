@@ -63,13 +63,13 @@ public class CredentialRotationService {
         List<Quarantined> quarantined = new ArrayList<>();
         for (Connection connection : connectionRepository.findAllById(ids)) {
             CredentialBundle credentials;
-            // The decrypt call is inside the try and the re-encrypt below is not: a failure to
-            // re-encrypt is an instance fault and must roll the batch back.
+            // Only a decryption failure is the row's own fault; a re-encrypt failure is an instance fault
+            // and must roll the batch back.
             try {
                 credentials = connection.credentials(converter).orElseThrow();
             } catch (MissingCredentialKeyException unconfiguredKey) {
-                // A key version this instance holds no key for is an instance fault as well; rolling
-                // back leaves its rows unmarked for a later tick, once the key is configured.
+                // An unconfigured key version is an instance fault as well: rolling back leaves the row
+                // unmarked for a later tick, once the key is configured.
                 throw unconfiguredKey;
             } catch (EncryptionException undecryptable) {
                 connection.markCredentialRotationFailed(clock.instant());

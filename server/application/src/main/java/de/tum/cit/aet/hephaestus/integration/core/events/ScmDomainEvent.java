@@ -77,8 +77,24 @@ public final class ScmDomainEvent {
 
     public record IssueCreated(ScmEventPayload.IssueData issue, EventContext context) implements IssueEvent {}
 
+    /**
+     * @param changedFields what the update moved, in the vocabulary of the constants below — the one
+     *     spelling every producer writes and every consumer reads
+     */
     public record IssueUpdated(ScmEventPayload.IssueData issue, Set<String> changedFields, EventContext context)
-            implements IssueEvent {}
+            implements IssueEvent {
+        public static final String TITLE = "title";
+        public static final String BODY = "body";
+        public static final String STATE = "state";
+        public static final String STATE_REASON = "stateReason";
+        public static final String COMMENTS_COUNT = "commentsCount";
+        public static final String LOCKED = "locked";
+        public static final String CLOSED_AT = "closedAt";
+        public static final String MILESTONE = "milestone";
+        public static final String ISSUE_TYPE = "issueType";
+        /** Labels and assignees, which the mirror tracks as associations rather than columns. */
+        public static final String RELATIONSHIPS = "relationships";
+    }
 
     public record IssueClosed(
             ScmEventPayload.IssueData issue, @Nullable String stateReason, EventContext context)

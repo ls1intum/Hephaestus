@@ -50,6 +50,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.springframework.context.ApplicationEventPublisher;
+import tools.jackson.databind.node.JsonNodeFactory;
 
 @Tag("unit")
 class GitLabIssueProcessorTest extends BaseUnitTest {
@@ -443,7 +444,6 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
             when(gitLabUserService.findOrCreateUser(any(GitLabWebhookUser.class), eq(PROVIDER_ID)))
                     .thenReturn(createUserEntity());
 
-            // An ordinary title/description edit (no changes.labels) must not trigger label-based detection.
             processor.processUpdated(createUpdateEventWithChanges(titleChanged()), createContext());
 
             verify(eventPublisher, never()).publishEvent(any(ScmDomainEvent.IssueLabeled.class));
@@ -503,7 +503,7 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                             new GitLabIssueEventDTO.LabelsChange(List.of(), List.of()),
                             null,
                             null,
-                            new GitLabIssueEventDTO.AttributeChange(),
+                            JsonNodeFactory.instance.objectNode(),
                             null,
                             null)),
                     createContext());
@@ -515,8 +515,7 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
         }
 
         private GitLabIssueEventDTO.Changes titleChanged() {
-            return new GitLabIssueEventDTO.Changes(
-                    null, new GitLabIssueEventDTO.AttributeChange(), null, null, null, null);
+            return new GitLabIssueEventDTO.Changes(null, JsonNodeFactory.instance.objectNode(), null, null, null, null);
         }
     }
 

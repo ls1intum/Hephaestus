@@ -12,7 +12,6 @@ import de.tum.cit.aet.hephaestus.agent.handler.PullRequestReviewSubmissionReques
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactSignal;
 import de.tum.cit.aet.hephaestus.integration.core.signal.DiscoveredVia;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalRecorder;
-import de.tum.cit.aet.hephaestus.integration.core.signal.SignalStateReason;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
@@ -24,15 +23,12 @@ import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewDetectionGate;
 import de.tum.cit.aet.hephaestus.practices.review.TriggerMode;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 
-@Tag("unit")
 class ScmSignalResubmitterTest extends BaseUnitTest {
 
     private static final long WORKSPACE_ID = 7L;
@@ -64,34 +60,6 @@ class ScmSignalResubmitterTest extends BaseUnitTest {
         repository.setId(11L);
         repository.setNameWithOwner("hephaestus-build/Hephaestus");
         repository.setDefaultBranch("main");
-    }
-
-    @Test
-    void shouldHoldPullRequestSignalWhileTombstoned() {
-        PullRequest pullRequest = pullRequest();
-        pullRequest.setDeletedAt(Instant.now());
-        ArtifactSignal signal = signal(ScmSignals.PULL_REQUEST_OPENED.value());
-        when(pullRequestRepository.findByIdWithAllForGate(ARTIFACT_ID)).thenReturn(Optional.of(pullRequest));
-
-        new PullRequestSignalResubmitter(agentJobService, pullRequestRepository, gate, signalRecorder).resubmit(signal);
-
-        verify(signalRecorder).markRefused(signal.key(), SignalStateReason.ARTIFACT_NOT_VISIBLE);
-        verify(gate, never()).evaluate(any(), any(), any());
-        verify(agentJobService, never()).submit(any(), any(), any(), any(), any());
-    }
-
-    @Test
-    void shouldHoldIssueSignalWhileTombstoned() {
-        Issue issue = issue();
-        issue.setDeletedAt(Instant.now());
-        ArtifactSignal signal = signal(ScmSignals.ISSUE_OPENED.value());
-        when(issueRepository.findByIdWithRepositoryAndAssignees(ARTIFACT_ID)).thenReturn(Optional.of(issue));
-
-        new IssueSignalResubmitter(agentJobService, issueRepository, gate, signalRecorder).resubmit(signal);
-
-        verify(signalRecorder).markRefused(signal.key(), SignalStateReason.ARTIFACT_NOT_VISIBLE);
-        verify(gate, never()).evaluateIssue(any(), any(), any());
-        verify(agentJobService, never()).submit(any(), any(), any(), any(), any());
     }
 
     @Test

@@ -1,3 +1,4 @@
+import { classifyIssue } from "../lib/issue-classification.ts";
 import type { Hint } from "../lib/types.ts";
 
 interface IssueMeta {
@@ -28,20 +29,12 @@ export default function issueHasCheckableOutcome(
 		/\bso that\b/i.test(body) || /\bas an?\b[\s\S]{0,60}\bi (want|need|would like)\b/i.test(body);
 	const isStub = body.length < 40;
 
-	const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
-	const titleNorm = norm(title);
-	const bodyNorm = norm(body);
-	const titleEcho =
-		bodyNorm.length > 0 &&
-		(bodyNorm === titleNorm || titleNorm.includes(bodyNorm) || bodyNorm.includes(titleNorm));
-	const emptyOrTitleEcho = body.length < 25 || titleEcho;
-	const deliverableType =
-		/\b(user ?story|story|bug|defect|feature|enhancement|task|chore|requirement|artifact|epic|spike)\b/;
-	const hasDeliverableType =
-		deliverableType.test(issueType) || labels.some((l) => deliverableType.test(l));
-	const looksUmbrella =
-		labels.some((l) => /\b(epic|umbrella|meta|initiative|requirement)\b/.test(l)) ||
-		/\b(epic|umbrella|initiative)\b/i.test(title);
+	const { emptyOrTitleEcho, hasDeliverableType, looksUmbrella } = classifyIssue(
+		title,
+		body,
+		issueType,
+		labels,
+	);
 
 	const directions: string[] = [];
 	if (emptyOrTitleEcho && hasDeliverableType) {

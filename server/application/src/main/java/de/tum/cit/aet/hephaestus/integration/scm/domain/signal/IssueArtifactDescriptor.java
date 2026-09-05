@@ -27,8 +27,8 @@ public class IssueArtifactDescriptor implements ArtifactDescriptor {
     private static final List<Signal> SIGNALS = List.of(
             declareRecommended(ScmSignals.ISSUE_OPENED, "Opened", Set.of(GITHUB_ISSUES, GITLAB_ISSUE)),
             // Both providers raise it, but from different vocabularies: GitHub has an action per edit,
-            // GitLab one update action whose changes diff says what moved. Neither can report a type
-            // change on GitLab, which is why the display name does not promise one.
+            // GitLab one update action whose changes diff says what moved. GitLab cannot report a type
+            // change, which is why the display name does not promise one.
             declareRecommended(ScmSignals.ISSUE_UPDATED, "Details changed", Set.of(GITHUB_ISSUES, GITLAB_ISSUE)),
             declare(ScmSignals.ISSUE_CLOSED, "Closed", Set.of(GITHUB_ISSUES, GITLAB_ISSUE)),
             declareManualRequest(ScmSignals.ISSUE_MANUAL_REVIEW, "Review requested by hand"));

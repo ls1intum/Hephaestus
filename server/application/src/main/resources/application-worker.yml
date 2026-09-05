@@ -25,7 +25,8 @@ spring:
 server:
     # A real port, never -1: the actuator probe and the management endpoints answer on this one
     # connector, and disabling it leaves every bean wired while nothing can reach them. Loopback-bound,
-    # so only in-container callers (thc) get there; sandboxes use the gateway connector instead.
+    # so only in-container callers such as the image's health probe get there; sandboxes use the
+    # gateway connector instead.
     # No management.server.address belongs here: Spring Boot refuses a management-specific address
     # while the management endpoints share the server's port, which is the shipped topology.
     port: ${SERVER_PORT:8080}

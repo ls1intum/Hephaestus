@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.usage;
 
 import jakarta.validation.constraints.NotNull;
 import java.time.Duration;
+import org.hibernate.validator.constraints.time.DurationMin;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
@@ -16,13 +17,5 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "hephaestus.llm.usage")
 public record LlmUsageProperties(
-        @DefaultValue("P400D") @NotNull Duration retention) {
-    /** Bean Validation has no duration-sign constraint, so the bound is checked here. */
-    public LlmUsageProperties {
-        if (retention == null || retention.isNegative() || retention.isZero()) {
-            throw new IllegalArgumentException(
-                    "hephaestus.llm.usage.retention (HEPHAESTUS_LLM_USAGE_RETENTION) must be positive, got: "
-                            + retention);
-        }
-    }
-}
+        @DefaultValue("P400D") @NotNull @DurationMin(nanos = 1)
+        Duration retention) {}

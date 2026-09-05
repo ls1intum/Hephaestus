@@ -7,12 +7,12 @@ import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.stereotype.Component;
 
 /**
- * The single owner of the two privacy-job meters. Micrometer registers a meter once per name and tag
+ * The single owner of the privacy-job meters. Micrometer registers a meter once per name and tag
  * set, so a second registration site would decide the description by whichever job scraped first;
  * the enums below are also the only thing keeping the tag values bounded.
  *
  * <p>Lives in the {@code core} base package rather than beside the auth jobs because the jobs that
- * publish these meters sit in two application modules, and a module reaches {@code core.auth} only
+ * publish these meters span application modules, and a module reaches {@code core.auth} only
  * through its {@code auth-spi} named interface.
  */
 @ConditionalOnServerRole

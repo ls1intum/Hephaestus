@@ -81,11 +81,11 @@ public class AccountHardDeleteSweeper {
         }
     }
 
-    /** Each account is purged in its own transaction so one failure does not block the backlog. */
     public int sweepNow() {
         return purgeEligibleAccounts().purged();
     }
 
+    /** Each account is purged in its own transaction so one failure does not block the backlog. */
     private SweepResult purgeEligibleAccounts() {
         Instant cutoff = clock.instant().minus(properties.deleteCooldown());
         int purged = 0;

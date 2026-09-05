@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import com.github.dockerjava.core.DefaultDockerClientConfig;
 import com.github.dockerjava.core.DockerClientImpl;
 import com.github.dockerjava.httpclient5.ApacheDockerHttpClient;
+import de.tum.cit.aet.hephaestus.agent.gateway.SandboxGatewayProperties;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.sandbox.SandboxProperties;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.NetworkPolicy;
@@ -91,7 +92,7 @@ class RepositoryTreeStagingLiveTest {
                 new SandboxWorkspaceManager(dockerOps),
                 containerManager,
                 new ContainerSecurityPolicy(properties, null),
-                8080,
+                new SandboxGatewayProperties(8080, 4_194_304, 120),
                 new SimpleMeterRegistry());
     }
 

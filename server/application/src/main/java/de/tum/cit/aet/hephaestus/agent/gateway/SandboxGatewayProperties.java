@@ -11,4 +11,10 @@ import org.springframework.validation.annotation.Validated;
 public record SandboxGatewayProperties(
         @DefaultValue("8081") @Min(1) @Max(65535) int port,
         @DefaultValue("4194304") @Min(1) int maxRequestBytes,
-        @DefaultValue("120") @Min(1) int requestsPerMinute) {}
+        @DefaultValue("120") @Min(1) int requestsPerMinute) {
+
+    /** Where a sandbox reaches the gateway, given the address the worker has on the sandbox's network. */
+    public String urlFor(String appServerIp) {
+        return "http://" + appServerIp + ":" + port;
+    }
+}

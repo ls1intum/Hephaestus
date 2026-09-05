@@ -116,8 +116,7 @@ public class Issue extends BaseGitServiceEntity {
      * pending signal re-offered while this is set is held rather than retired.
      *
      * <p>Which surfaces filter and which deliberately do not, and why there is no entity-level
-     * {@code @SQLRestriction}, is decided in ADR 0024 § Update — 2026-09-03 (issue #1404): which reads honour a
-     * drift tombstone.
+     * {@code @SQLRestriction}, is decided in ADR 0024.
      */
     @Column(name = "deleted_at")
     private @Nullable Instant deletedAt;

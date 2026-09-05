@@ -54,8 +54,14 @@ public class IssueAgentJobEventListener {
      * mirror still records it, but every practice bound to the occasion would read byte-identical
      * evidence and reach the conclusion it already published.
      */
-    private static final Set<String> REVIEWABLE_ISSUE_FIELDS =
-            Set.of("title", "body", "state", "stateReason", "issueType", "milestone", "relationships");
+    private static final Set<String> REVIEWABLE_ISSUE_FIELDS = Set.of(
+            ScmDomainEvent.IssueUpdated.TITLE,
+            ScmDomainEvent.IssueUpdated.BODY,
+            ScmDomainEvent.IssueUpdated.STATE,
+            ScmDomainEvent.IssueUpdated.STATE_REASON,
+            ScmDomainEvent.IssueUpdated.ISSUE_TYPE,
+            ScmDomainEvent.IssueUpdated.MILESTONE,
+            ScmDomainEvent.IssueUpdated.RELATIONSHIPS);
 
     private final AgentJobService agentJobService;
     private final IssueRepository issueRepository;

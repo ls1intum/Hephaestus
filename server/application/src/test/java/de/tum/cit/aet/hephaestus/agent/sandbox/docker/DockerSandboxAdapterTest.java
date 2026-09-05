@@ -13,6 +13,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.agent.gateway.SandboxGatewayProperties;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.NetworkPolicy;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.ResourceLimits;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxCancelledException;
@@ -83,7 +84,12 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
     void setUp() {
         meterRegistry = new SimpleMeterRegistry();
         sandboxAdapter = new DockerSandboxAdapter(
-                networkManager, workspaceManager, containerManager, securityPolicy, 8081, meterRegistry);
+                networkManager,
+                workspaceManager,
+                containerManager,
+                securityPolicy,
+                new SandboxGatewayProperties(8081, 16, 120),
+                meterRegistry);
     }
 
     private SandboxSpec createSpec() {
@@ -177,14 +183,18 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
             Map<String, String> env = captor.getValue().environment();
             // No per-provider path segment — the connection is identified from the authenticated token, not the URL.
             assertThat(env).containsEntry("LLM_PROXY_URL", "http://172.18.0.2:8081/internal/llm");
-            assertThat(env).containsEntry("GATEWAY_URL", "http://172.18.0.2:8081");
             assertThat(env).containsEntry("LLM_PROXY_TOKEN", "token-123");
         }
 
         @Test
         void shouldPointTheSandboxAtTheConfiguredGatewayPort() {
             sandboxAdapter = new DockerSandboxAdapter(
-                    networkManager, workspaceManager, containerManager, securityPolicy, 8090, meterRegistry);
+                    networkManager,
+                    workspaceManager,
+                    containerManager,
+                    securityPolicy,
+                    new SandboxGatewayProperties(8090, 16, 120),
+                    meterRegistry);
             setupHappyPath();
 
             SandboxSpec spec = new SandboxSpec(

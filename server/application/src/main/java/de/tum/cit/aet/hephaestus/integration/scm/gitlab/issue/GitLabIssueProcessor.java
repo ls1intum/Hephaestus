@@ -397,8 +397,8 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
         Issue issue = processInternal(event, context);
         if (issue != null) {
             ScmEventPayload.IssueData issueData = ScmEventPayload.IssueData.from(issue);
-            eventPublisher.publishEvent(
-                    new ScmDomainEvent.IssueUpdated(issueData, Set.of("state"), EventContext.from(context)));
+            eventPublisher.publishEvent(new ScmDomainEvent.IssueUpdated(
+                    issueData, Set.of(ScmDomainEvent.IssueUpdated.STATE), EventContext.from(context)));
             eventPublisher.publishEvent(new ScmDomainEvent.IssueReopened(issueData, EventContext.from(context)));
             log.debug("Reopened issue: issueId={}", issue.getId());
         }

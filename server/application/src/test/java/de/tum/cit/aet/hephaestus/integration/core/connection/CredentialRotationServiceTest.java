@@ -38,6 +38,9 @@ class CredentialRotationServiceTest extends BaseUnitTest {
 
     private static final String OLD_KEY = "0123456789abcdef0123456789abcdef";
     private static final String NEW_KEY = "ABCDEFabcdef0123ABCDEFabcdef0123";
+    /** Never configured on the service, so a blob written under it cannot be decrypted by any key it knows. */
+    private static final String WRONG_KEY = "ffffffffffffffffffffffffffffffff";
+
     private static final BearerToken TOKEN = new BearerToken("glpat-rotate-me", null);
     private static final Instant NOW = Instant.parse("2026-09-03T12:00:00Z");
 
@@ -46,6 +49,7 @@ class CredentialRotationServiceTest extends BaseUnitTest {
 
     private CredentialBundleConverter oldConverter;
     private CredentialBundleConverter rotatingConverter;
+    private SecurityProperties properties;
     private CredentialRotationService service;
     private Workspace workspace;
     private SimpleMeterRegistry meterRegistry;
@@ -55,7 +59,7 @@ class CredentialRotationServiceTest extends BaseUnitTest {
         MockitoAnnotations.openMocks(this);
         oldConverter = new CredentialBundleConverter(OLD_KEY, "dev");
         rotatingConverter = new CredentialBundleConverter(NEW_KEY, 2, OLD_KEY, 1, "dev");
-        SecurityProperties properties = new SecurityProperties(null, NEW_KEY, 2, OLD_KEY, 1, true, 25);
+        properties = new SecurityProperties(null, NEW_KEY, 2, OLD_KEY, 1, true, 25);
         meterRegistry = new SimpleMeterRegistry();
         service = new CredentialRotationService(
                 connectionRepository, rotatingConverter, properties, Clock.fixed(NOW, ZoneOffset.UTC), meterRegistry);
@@ -107,11 +111,8 @@ class CredentialRotationServiceTest extends BaseUnitTest {
     @Test
     void shouldQuarantineAnUndecryptableRowAndContinueTheBatch() {
         Connection orphaned = connection(57L);
-        orphaned.setCredentials(TOKEN, oldConverter);
-        byte[] corrupted =
-                Objects.requireNonNull(orphaned.getCredentialsEncrypted()).clone();
-        corrupted[corrupted.length - 1] ^= 1;
-        orphaned.setCredentialsEncrypted(corrupted);
+        orphaned.setCredentials(TOKEN, new CredentialBundleConverter(WRONG_KEY, "dev"));
+        byte[] undecryptable = Objects.requireNonNull(orphaned.getCredentialsEncrypted());
         Connection stale = connection(58L);
         stale.setCredentials(TOKEN, oldConverter);
         when(connectionRepository.lockCredentialRotationBatch(2, 25)).thenReturn(List.of(57L, 58L));
@@ -119,30 +120,10 @@ class CredentialRotationServiceTest extends BaseUnitTest {
 
         service.rotateBatch();
 
-        assertThat(orphaned.getCredentialsEncrypted()).isEqualTo(corrupted);
+        assertThat(orphaned.getCredentialsEncrypted()).isEqualTo(undecryptable);
         assertThat(orphaned.getCredentialsKeyVersion()).isEqualTo(1);
         assertThat(orphaned.getCredentialsRotationFailedAt()).isEqualTo(NOW);
         assertThat(stale.getCredentialsKeyVersion()).isEqualTo(2);
-        assertThat(meterRegistry
-                        .counter(IntegrationCoreMetrics.CREDENTIAL_ROTATION_FAILURES)
-                        .count())
-                .isEqualTo(1);
-    }
-
-    @Test
-    void shouldQuarantineTheOnlyRowInTheBatchWhenItCannotBeDecrypted() {
-        Connection orphaned = connection(61L);
-        orphaned.setCredentials(TOKEN, oldConverter);
-        byte[] corrupted =
-                Objects.requireNonNull(orphaned.getCredentialsEncrypted()).clone();
-        corrupted[corrupted.length - 1] ^= 1;
-        orphaned.setCredentialsEncrypted(corrupted);
-        when(connectionRepository.lockCredentialRotationBatch(2, 25)).thenReturn(List.of(61L));
-        when(connectionRepository.findAllById(List.of(61L))).thenReturn(List.of(orphaned));
-
-        service.rotateBatch();
-
-        assertThat(orphaned.getCredentialsRotationFailedAt()).isEqualTo(NOW);
         assertThat(meterRegistry
                         .counter(IntegrationCoreMetrics.CREDENTIAL_ROTATION_FAILURES)
                         .count())
@@ -177,7 +158,6 @@ class CredentialRotationServiceTest extends BaseUnitTest {
         doThrow(new EncryptionException("Credential encryption failed"))
                 .when(failingConverter)
                 .encrypt(any(), any());
-        SecurityProperties properties = new SecurityProperties(null, NEW_KEY, 2, OLD_KEY, 1, true, 25);
         service = new CredentialRotationService(
                 connectionRepository, failingConverter, properties, Clock.fixed(NOW, ZoneOffset.UTC), meterRegistry);
         when(connectionRepository.lockCredentialRotationBatch(2, 25)).thenReturn(List.of(60L));

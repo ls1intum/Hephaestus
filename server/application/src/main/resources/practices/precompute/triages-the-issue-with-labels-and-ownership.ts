@@ -6,7 +6,7 @@ interface IssueMeta {
 	state?: string;
 }
 
-export default function triagesTheIssueWithMetadata(
+export default function triagesTheIssueWithLabelsAndOwnership(
 	_repo: string,
 	_diff: Map<string, unknown>,
 	m: IssueMeta,

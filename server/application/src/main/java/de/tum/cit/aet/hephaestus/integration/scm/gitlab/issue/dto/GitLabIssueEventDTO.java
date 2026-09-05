@@ -2,16 +2,18 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.issue.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabEventAction;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.dto.GitLabWebhookLabel;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.dto.GitLabWebhookProject;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.dto.GitLabWebhookUser;
-import java.util.LinkedHashSet;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
+import tools.jackson.databind.JsonNode;
 
 /**
  * DTO for GitLab issue webhook events.
@@ -43,24 +45,18 @@ public record GitLabIssueEventDTO(
      * what an {@code update} was — without it a due-date edit is indistinguishable from a retitling.
      *
      * <p>Only the attributes the shared domain has a field name for are declared; the rest (due date,
-     * weight, time tracking, confidentiality) are what {@code ignoreUnknown} drops.
+     * weight, time tracking, confidentiality) are what {@code ignoreUnknown} drops. The mirror is
+     * refreshed from {@code object_attributes} either way, so all that is read of an attribute's
+     * {@code previous}/{@code current} pair is that the key was present.
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record Changes(
             @Nullable LabelsChange labels,
-            @Nullable AttributeChange title,
-            @Nullable AttributeChange description,
-            @Nullable AttributeChange assignees,
-            @JsonProperty("milestone_id") @Nullable AttributeChange milestoneId,
-            @JsonProperty("state_id") @Nullable AttributeChange stateId) {}
-
-    /**
-     * An attribute GitLab reported as changed. Its {@code previous}/{@code current} values are
-     * deliberately not bound: the mirror is refreshed from {@code object_attributes} either way, so the
-     * only thing read here is that the key was present.
-     */
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public record AttributeChange() {}
+            @Nullable JsonNode title,
+            @Nullable JsonNode description,
+            @Nullable JsonNode assignees,
+            @JsonProperty("milestone_id") @Nullable JsonNode milestoneId,
+            @JsonProperty("state_id") @Nullable JsonNode stateId) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record LabelsChange(
@@ -75,29 +71,28 @@ public record GitLabIssueEventDTO(
         if (changes == null) {
             return Set.of();
         }
-        Set<String> fields = new LinkedHashSet<>();
+        Set<String> fields = new HashSet<>();
         if (changes.title() != null) {
-            fields.add("title");
+            fields.add(ScmDomainEvent.IssueUpdated.TITLE);
         }
         if (changes.description() != null) {
-            fields.add("body");
+            fields.add(ScmDomainEvent.IssueUpdated.BODY);
         }
         if (changes.stateId() != null) {
-            fields.add("state");
+            fields.add(ScmDomainEvent.IssueUpdated.STATE);
         }
         if (changes.milestoneId() != null) {
-            fields.add("milestone");
+            fields.add(ScmDomainEvent.IssueUpdated.MILESTONE);
         }
         if (changes.labels() != null || changes.assignees() != null) {
-            fields.add("relationships");
+            fields.add(ScmDomainEvent.IssueUpdated.RELATIONSHIPS);
         }
         return Set.copyOf(fields);
     }
 
     /**
      * Labels newly added in this update (current minus previous, keyed by id). Empty when the update
-     * carried no label change — so an ordinary title/description edit never spuriously triggers
-     * label-based detection.
+     * carried no label change, so an ordinary title/description edit adds no activity entry.
      */
     public List<GitLabWebhookLabel> addedLabels() {
         if (changes == null || changes.labels() == null || changes.labels().current() == null) {

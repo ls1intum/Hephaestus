@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.sandbox.docker.interactive;
 
+import de.tum.cit.aet.hephaestus.agent.gateway.SandboxGatewayProperties;
 import de.tum.cit.aet.hephaestus.agent.proxy.MentorProxyCredentialRegistry;
 import de.tum.cit.aet.hephaestus.agent.sandbox.InteractiveSandboxProperties;
 import de.tum.cit.aet.hephaestus.agent.sandbox.docker.ContainerSecurityPolicy;
@@ -66,7 +67,7 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
     private final InteractiveSandboxMetrics metrics;
     private final ObjectMapper mapper;
     private final String dockerCli;
-    private final int gatewayPort;
+    private final SandboxGatewayProperties gateway;
     private final Executor closeExecutor;
     private final MentorProxyCredentialRegistry mentorProxyCredentialRegistry;
     private final Object[] attachLocks = new Object[64];
@@ -82,7 +83,7 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
             ObjectMapper mapper,
             Executor closeExecutor,
             String dockerCli,
-            int gatewayPort,
+            SandboxGatewayProperties gateway,
             MentorProxyCredentialRegistry mentorProxyCredentialRegistry) {
         this.properties = properties;
         this.networkManager = networkManager;
@@ -94,7 +95,7 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
         this.mapper = mapper;
         this.closeExecutor = closeExecutor;
         this.dockerCli = dockerCli;
-        this.gatewayPort = gatewayPort;
+        this.gateway = gateway;
         this.mentorProxyCredentialRegistry = mentorProxyCredentialRegistry;
         java.util.Arrays.setAll(attachLocks, ignored -> new Object());
     }
@@ -283,18 +284,14 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
             env.put("TRACE_ID", traceId);
             env.put("TRACEPARENT", "00-" + traceId + "-" + spanId + "-00");
         }
-        String gatewayUrl = appServerIp != null ? "http://" + appServerIp + ":" + gatewayPort : null;
-        if (spec.networkPolicy() != null && gatewayUrl != null) {
-            env.put("GATEWAY_URL", gatewayUrl);
-        }
         if (spec.networkPolicy() != null && spec.networkPolicy().llmProxyUrl() != null) {
             String url = spec.networkPolicy().llmProxyUrl();
             if (url.contains(PROXY_URL_PLACEHOLDER)) {
                 url = url.replace(PROXY_URL_PLACEHOLDER, appServerIp);
             }
             env.put("LLM_PROXY_URL", url);
-        } else if (spec.networkPolicy() != null && gatewayUrl != null) {
-            env.put("LLM_PROXY_URL", gatewayUrl + "/internal/llm");
+        } else if (spec.networkPolicy() != null) {
+            env.put("LLM_PROXY_URL", gateway.urlFor(appServerIp) + "/internal/llm");
         }
         if (spec.networkPolicy() != null && spec.networkPolicy().llmProxyToken() != null) {
             env.put("LLM_PROXY_TOKEN", spec.networkPolicy().llmProxyToken());

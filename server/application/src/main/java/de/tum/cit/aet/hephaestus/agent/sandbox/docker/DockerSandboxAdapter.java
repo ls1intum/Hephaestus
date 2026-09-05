@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.sandbox.docker;
 
+import de.tum.cit.aet.hephaestus.agent.gateway.SandboxGatewayProperties;
 import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxCancelledException;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxException;
@@ -91,9 +92,8 @@ public class DockerSandboxAdapter implements SandboxManager {
     private final SandboxWorkspaceManager workspaceManager;
     private final SandboxContainerManager containerManager;
     private final ContainerSecurityPolicy securityPolicy;
-    private final int gatewayPort;
+    private final SandboxGatewayProperties gateway;
 
-    // Metrics
     private final Counter executionsSuccess;
     private final Counter executionsFailed;
     private final Counter executionsTimedOut;
@@ -112,13 +112,13 @@ public class DockerSandboxAdapter implements SandboxManager {
             SandboxWorkspaceManager workspaceManager,
             SandboxContainerManager containerManager,
             ContainerSecurityPolicy securityPolicy,
-            int gatewayPort,
+            SandboxGatewayProperties gateway,
             MeterRegistry meterRegistry) {
         this.networkManager = networkManager;
         this.workspaceManager = workspaceManager;
         this.containerManager = containerManager;
         this.securityPolicy = securityPolicy;
-        this.gatewayPort = gatewayPort;
+        this.gateway = gateway;
 
         this.executionsSuccess = Counter.builder(AgentMetrics.SANDBOX_EXECUTIONS)
                 .tag("outcome", "success")
@@ -369,21 +369,16 @@ public class DockerSandboxAdapter implements SandboxManager {
 
         // Inject LLM proxy configuration
         if (spec.networkPolicy() != null) {
-            String gatewayUrl = appServerIp != null ? "http://" + appServerIp + ":" + gatewayPort : null;
-            if (gatewayUrl != null) {
-                env.put("GATEWAY_URL", gatewayUrl);
-            }
             if (spec.networkPolicy().llmProxyUrl() != null) {
-                // Resolve template placeholder or use as-is
                 String proxyUrl = spec.networkPolicy().llmProxyUrl();
-                if (proxyUrl.contains(PROXY_URL_PLACEHOLDER) && appServerIp != null) {
+                if (proxyUrl.contains(PROXY_URL_PLACEHOLDER)) {
                     proxyUrl = proxyUrl.replace(PROXY_URL_PLACEHOLDER, appServerIp);
                 }
                 env.put("LLM_PROXY_URL", proxyUrl);
-            } else if (gatewayUrl != null) {
+            } else {
                 // One route for every provider: the proxy identifies the connection from the
                 // authenticated job token, not the URL.
-                env.put("LLM_PROXY_URL", gatewayUrl + "/internal/llm");
+                env.put("LLM_PROXY_URL", gateway.urlFor(appServerIp) + "/internal/llm");
             }
 
             if (spec.networkPolicy().llmProxyToken() != null) {

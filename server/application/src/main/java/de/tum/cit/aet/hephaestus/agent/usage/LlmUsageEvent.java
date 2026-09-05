@@ -37,8 +37,7 @@ import org.jspecify.annotations.Nullable;
         name = "llm_usage_event",
         indexes = {
             @Index(name = "idx_llm_usage_ws_time", columnList = "workspace_id, occurred_at"),
-            // The retention sweep filters on age alone, which the composite above cannot serve: its
-            // leading column is absent from that predicate.
+            // The retention sweep filters on age alone, which a composite led by workspace_id cannot serve.
             @Index(name = "idx_llm_usage_occurred_at", columnList = "occurred_at")
         },
         uniqueConstraints =

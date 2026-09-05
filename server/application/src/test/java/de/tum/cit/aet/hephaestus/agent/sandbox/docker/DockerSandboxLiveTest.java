@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import com.github.dockerjava.core.DefaultDockerClientConfig;
 import com.github.dockerjava.core.DockerClientImpl;
 import com.github.dockerjava.httpclient5.ApacheDockerHttpClient;
+import de.tum.cit.aet.hephaestus.agent.gateway.SandboxGatewayProperties;
 import de.tum.cit.aet.hephaestus.agent.sandbox.SandboxProperties;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.NetworkPolicy;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.ResourceLimits;
@@ -74,7 +75,12 @@ class DockerSandboxLiveTest {
         ContainerSecurityPolicy securityPolicy = new ContainerSecurityPolicy(properties, null);
 
         sandboxAdapter = new DockerSandboxAdapter(
-                networkManager, workspaceManager, containerManager, securityPolicy, 8080, new SimpleMeterRegistry());
+                networkManager,
+                workspaceManager,
+                containerManager,
+                securityPolicy,
+                new SandboxGatewayProperties(8080, 4_194_304, 120),
+                new SimpleMeterRegistry());
     }
 
     @AfterEach

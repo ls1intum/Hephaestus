@@ -14,7 +14,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UUID> {
-    /** One retention batch. {@code occurred_at} is indexed on its own so this never scans the ledger. */
+    /** One retention batch; {@code idx_llm_usage_occurred_at} serves the age predicate. */
     @WorkspaceAgnostic("Retention removes expired usage rows across all workspaces")
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(

@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import triagesTheIssueWithMetadata from "../../../main/resources/practices/precompute/triages-the-issue-with-labels-and-ownership.ts";
+import triagesTheIssueWithLabelsAndOwnership from "../../../main/resources/practices/precompute/triages-the-issue-with-labels-and-ownership.ts";
 
 void test("a native issue type supplies classification metadata without a label", () => {
-	const result = triagesTheIssueWithMetadata("owner/repository", new Map(), {
+	const result = triagesTheIssueWithLabelsAndOwnership("owner/repository", new Map(), {
 		issue_type: "Bug",
 		labels: [],
 		assignees: [],
@@ -17,7 +17,7 @@ void test("a native issue type supplies classification metadata without a label"
 });
 
 void test("an unclassified issue reports the complete metadata gap", () => {
-	const result = triagesTheIssueWithMetadata("owner/repository", new Map(), {});
+	const result = triagesTheIssueWithLabelsAndOwnership("owner/repository", new Map(), {});
 
 	assert.equal(result.metrics.hasIssueType, 0);
 	assert.equal(

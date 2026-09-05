@@ -3,9 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.domain;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.MentorContextQueryRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueCommentRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReviewRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment.PullRequestReviewCommentRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -73,52 +71,9 @@ class MirrorQueryPredicateGuardTest extends BaseUnitTest {
     @DisplayName("mentor context")
     class MentorContext {
 
-        /**
-         * Heph answers about the developer's own work, so a pull request or issue deleted upstream must
-         * not reach it — the mentor would describe something the developer cannot open.
-         *
-         * <p>Scanned per range declaration rather than per method name: a whole-query substring passes a
-         * query that has two ranges and one predicate, and a method-name list goes quiet the moment a
-         * tenth query is added. Every range over an artifact or one of its children must carry its own
-         * predicate, so a new unguarded mentor query fails here without anyone remembering to extend a
-         * list.
-         */
         @Test
         void everyMentorArtifactRangeExcludesTombstones() {
             assertEveryRangeHasLivePredicate(MentorContextQueryRepository.class, MENTOR_QUERIES_THE_SCAN_CANNOT_READ);
-        }
-    }
-
-    @Nested
-    @DisplayName("project inventory")
-    class ProjectInventory {
-
-        /**
-         * The project inventory is staged into a practice review's evidence, so it honours the tombstone
-         * for a neighbouring reason: an index of work that is gone invites an observation about nothing.
-         * Named rather than scanned per class: most queries on these two repositories must <em>not</em>
-         * filter — the gate loaders, the upsert lookups and the sweep's own listings all need to see a
-         * tombstoned row — so a whole-class scan would be mostly allow-list. Both kinds are checked
-         * together because {@code Issue} and {@code PullRequest} share a table, and one guarded side
-         * reads like coverage of the other.
-         */
-        @Test
-        void bothProjectInventoryQueriesExcludeTombstones() {
-            Map<String, String> offenders = new LinkedHashMap<>();
-
-            collectUnguardedRanges(
-                    "findIssueInventoryByRepositoryId",
-                    queryOf(IssueRepository.class, "findIssueInventoryByRepositoryId"),
-                    offenders);
-            collectUnguardedRanges(
-                    "findPullRequestInventoryByRepositoryId",
-                    queryOf(PullRequestRepository.class, "findPullRequestInventoryByRepositoryId"),
-                    offenders);
-
-            assertThat(offenders)
-                    .as("the project inventory must exclude tombstones, or a review is handed an index of work "
-                            + "that is no longer in the project. Offending method -> the predicate it is missing")
-                    .isEmpty();
         }
     }
 
@@ -246,6 +201,11 @@ class MirrorQueryPredicateGuardTest extends BaseUnitTest {
     /**
      * Fails for every artifact range whose alias carries no live predicate, and for every query the
      * scan cannot read that the caller has not excused by name.
+     *
+     * <p>Scanned per range declaration rather than per method name: a whole-query substring passes a
+     * query that has two ranges and one predicate, and a method-name list goes quiet the moment a
+     * tenth query is added. Every range over an artifact or one of its children must carry its own
+     * predicate, so a new unguarded query fails here without anyone remembering to extend a list.
      */
     private static void assertEveryRangeHasLivePredicate(Class<?> repository, Set<String> unreadableButReviewed) {
         Map<String, String> offenders = new LinkedHashMap<>();

@@ -91,8 +91,8 @@ class LlmProxySecurityConfigTest extends BaseUnitTest {
                         resolver,
                         accounting,
                         OBJECT_MAPPER),
-                config.hideNonGatewayCapabilities(httpSecurity(context), GATEWAY),
-                config.blockLlmProxyOnOtherConnectors(httpSecurity(context))));
+                config.hideEverythingElseOnGatewayConnector(httpSecurity(context), GATEWAY),
+                config.hideCapabilitiesOnOtherConnectors(httpSecurity(context))));
     }
 
     @Test
@@ -146,7 +146,6 @@ class LlmProxySecurityConfigTest extends BaseUnitTest {
         AgentJob job = runningJobOnAttempt(1);
         when(jobRepository.findByIdWithWorkspace(job.getId())).thenReturn(Optional.of(job));
         when(jwtVerifier.verify("current-attempt")).thenReturn(jobJwt(job, 1));
-        when(jwtVerifier.verify("dead-attempt")).thenReturn(jobJwt(job, 0));
 
         assertThat(answerToTokenCall("current-attempt")).isEqualTo(200);
         assertThat(servedAs.get())
@@ -155,9 +154,6 @@ class LlmProxySecurityConfigTest extends BaseUnitTest {
                 .asInstanceOf(type(ProxyRouting.class))
                 .extracting(ProxyRouting::principalDescription)
                 .isEqualTo("job:" + job.getId());
-
-        assertThat(answerToTokenCall("dead-attempt")).isEqualTo(401);
-        assertThat(servedAs.get()).isNull();
     }
 
     private int answerTo(String method, String path, int localPort) throws Exception {

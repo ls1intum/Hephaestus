@@ -293,26 +293,28 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
     }
 
     /**
-     * The two {@code core.auth.spi} read-only query impls are the cross-role data-access part of auth
-     * (account identity/role lookups), consumed by the connection-identity service and the workspace /
-     * notification modules on every role. They carry no hard prod env and must stay ungated — unlike the
+     * The cross-role part of auth: the {@code core.auth.spi} read-only query impls (account
+     * identity/role lookups, consumed by the connection-identity service and the workspace /
+     * notification modules on every role) and the bucket store the sandbox gateway's limiter shares
+     * with the auth endpoints. They carry no hard prod env and must stay ungated — unlike the
      * web/OAuth/issuance layer.
      */
-    private static final List<String> CROSS_ROLE_AUTH_SPI_IMPLS = List.of(
+    private static final List<String> CROSS_ROLE_AUTH_BEANS = List.of(
             "de.tum.cit.aet.hephaestus.core.auth.AccountIdentityQueryService",
-            "de.tum.cit.aet.hephaestus.core.auth.AccountRoleQueryService");
+            "de.tum.cit.aet.hephaestus.core.auth.AccountRoleQueryService",
+            "de.tum.cit.aet.hephaestus.core.auth.ratelimit.BucketResolverConfig");
 
     @Test
     void allAuthStereotypeBeansAreServerGated() {
         // The whole core.auth module is the user-facing web/auth surface — server-role only, EXCEPT the
-        // cross-role SPI query impls (see CROSS_ROLE_AUTH_SPI_IMPLS). This is the real drift guard: any new
+        // cross-role beans (see CROSS_ROLE_AUTH_BEANS). This is the real drift guard: any new
         // auth stereotype bean added without @ConditionalOnServerRole would re-break the worker/webhook
         // pods (server.enabled=false). Repositories (interfaces, JPA-only) and @ConfigurationProperties
         // records are not stereotypes.
         List<String> ungated = classes.stream()
                 .filter(c -> c.getPackageName().startsWith("de.tum.cit.aet.hephaestus.core.auth"))
                 .filter(c -> !c.isInterface())
-                .filter(c -> !CROSS_ROLE_AUTH_SPI_IMPLS.contains(c.getFullName()))
+                .filter(c -> !CROSS_ROLE_AUTH_BEANS.contains(c.getFullName()))
                 .filter(c -> c.isMetaAnnotatedWith(Component.class))
                 .filter(clazz -> conditionalOnPropertyAnnotations(clazz)
                         .map(ann -> new ConditionalRef(clazz, ann))

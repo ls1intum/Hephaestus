@@ -9,9 +9,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.core.PrivacyJobMetrics;
-import de.tum.cit.aet.hephaestus.core.PrivacyJobMetrics.Job;
-import de.tum.cit.aet.hephaestus.core.PrivacyJobMetrics.Outcome;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -38,7 +37,7 @@ class ExportGenerationWorkerTest extends BaseUnitTest {
     private AccountExportRepository repository;
     private ExportBundleAssembler assembler;
     private ObjectMapper objectMapper;
-    private PrivacyJobMetrics metrics;
+    private SimpleMeterRegistry registry;
     private ExportGenerationWorker worker;
 
     @BeforeEach
@@ -46,9 +45,9 @@ class ExportGenerationWorkerTest extends BaseUnitTest {
         repository = mock(AccountExportRepository.class);
         assembler = mock(ExportBundleAssembler.class);
         objectMapper = mock(ObjectMapper.class);
-        metrics = mock(PrivacyJobMetrics.class);
+        registry = new SimpleMeterRegistry();
         worker = new ExportGenerationWorker(
-                repository, assembler, objectMapper, Clock.fixed(NOW, ZoneOffset.UTC), metrics);
+                repository, assembler, objectMapper, Clock.fixed(NOW, ZoneOffset.UTC), new PrivacyJobMetrics(registry));
     }
 
     private AccountExport existingExport() {
@@ -71,8 +70,12 @@ class ExportGenerationWorkerTest extends BaseUnitTest {
         assertThat(export.getPayload()).containsExactly(1, 2, 3);
         assertThat(export.getCompletedAt()).isEqualTo(NOW);
         assertThat(export.getExpiresAt()).isEqualTo(NOW.plus(Duration.ofHours(48)));
-        verify(metrics).record(Job.EXPORT_GENERATION, Outcome.SUCCESS);
-        verify(metrics).recordAffected(Job.EXPORT_GENERATION, 1);
+        assertThat(completed("success")).isEqualTo(1);
+        assertThat(registry.get("privacy.job.affected")
+                        .tag("job", "export_generation")
+                        .counter()
+                        .count())
+                .isEqualTo(1);
     }
 
     @Test
@@ -85,7 +88,7 @@ class ExportGenerationWorkerTest extends BaseUnitTest {
         assertThat(export.getStatus()).isEqualTo(AccountExport.Status.FAILED);
         assertThat(export.getFailureReason()).isEqualTo("assembly_failed");
         assertThat(export.getPayload()).isNull();
-        verify(metrics).record(Job.EXPORT_GENERATION, Outcome.FAILURE);
+        assertThat(completed("failure")).isEqualTo(1);
     }
 
     @Test
@@ -96,6 +99,13 @@ class ExportGenerationWorkerTest extends BaseUnitTest {
 
         verify(repository, never()).save(any());
         verify(assembler, never()).assemble(eq(ACCOUNT_ID));
-        verify(metrics).record(Job.EXPORT_GENERATION, Outcome.FAILURE);
+        assertThat(completed("failure")).isEqualTo(1);
+    }
+
+    private double completed(String outcome) {
+        return registry.get("privacy.job.completed")
+                .tags("job", "export_generation", "outcome", outcome)
+                .counter()
+                .count();
     }
 }

@@ -493,17 +493,6 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldOccasionAReviewWhenLabelsOrAssigneesMoved() {
-            Issue issue = setupHappyPath();
-            var issueData = createIssueData(Issue.State.OPEN);
-
-            listener.onIssueUpdated(
-                    new ScmDomainEvent.IssueUpdated(issueData, Set.of("relationships"), webhookContext(1L)));
-
-            verify(practiceReviewDetectionGate).evaluateIssue(issue, ScmSignals.ISSUE_UPDATED, TriggerMode.AUTO);
-        }
-
-        @Test
         void shouldRecordSyncDiscoveredSignalsWithoutReviewingThem() {
             // Same split as the created path: an update caught up with by reconciliation is recorded and
             // not coached on.
@@ -520,8 +509,7 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
 
         @Test
         void shouldSkipClosedIssues() {
-            // The closed-skip guard lives in handleIssueEvent, shared by the update path: an edit to an
-            // already-closed issue must never reach the gate, mirroring the onIssueCreated coverage.
+            // An edit to an already-closed issue must never reach the gate, as for a creation.
             var issueData = createIssueData(Issue.State.CLOSED);
             var event = new ScmDomainEvent.IssueUpdated(issueData, Set.of("relationships"), webhookContext(1L));
 

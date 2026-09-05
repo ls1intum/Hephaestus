@@ -24,6 +24,9 @@ class CredentialRotationServiceIntegrationTest extends AbstractWorkspaceIntegrat
 
     private static final String OLD_KEY = "0123456789abcdef0123456789abcdef";
     private static final String NEW_KEY = "ABCDEFabcdef0123ABCDEFabcdef0123";
+    /** Never configured on the service, so a blob written under it cannot be decrypted by any key it knows. */
+    private static final String WRONG_KEY = "ffffffffffffffffffffffffffffffff";
+
     private static final BearerToken TOKEN = new BearerToken("glpat-rotate-me", null);
     private static final Instant QUARANTINED_AT = Instant.parse("2026-09-03T12:00:00Z");
 
@@ -42,11 +45,8 @@ class CredentialRotationServiceIntegrationTest extends AbstractWorkspaceIntegrat
         CredentialBundleConverter rotatingConverter = new CredentialBundleConverter(NEW_KEY, 2, OLD_KEY, 1, "test");
 
         Connection corrupt = connectionRepository.save(connection(workspace, "corrupt"));
-        corrupt.setCredentials(TOKEN, oldConverter);
-        byte[] corrupted =
-                Objects.requireNonNull(corrupt.getCredentialsEncrypted()).clone();
-        corrupted[corrupted.length - 1] ^= 1;
-        corrupt.setCredentialsEncrypted(corrupted);
+        corrupt.setCredentials(TOKEN, new CredentialBundleConverter(WRONG_KEY, "test"));
+        byte[] undecryptable = Objects.requireNonNull(corrupt.getCredentialsEncrypted());
         corrupt = connectionRepository.save(corrupt);
         Connection healthy = connectionRepository.save(connection(workspace, "healthy"));
         healthy.setCredentials(TOKEN, oldConverter);
@@ -66,7 +66,7 @@ class CredentialRotationServiceIntegrationTest extends AbstractWorkspaceIntegrat
                 connectionRepository.findById(corrupt.getId()).orElseThrow();
         Connection persistedHealthy =
                 connectionRepository.findById(healthy.getId()).orElseThrow();
-        assertThat(persistedCorrupt.getCredentialsEncrypted()).isEqualTo(corrupted);
+        assertThat(persistedCorrupt.getCredentialsEncrypted()).isEqualTo(undecryptable);
         assertThat(persistedCorrupt.getCredentialsKeyVersion()).isEqualTo(1);
         assertThat(persistedCorrupt.getCredentialsRotationFailedAt()).isEqualTo(QUARANTINED_AT);
         assertThat(persistedHealthy.getCredentialsKeyVersion()).isEqualTo(2);

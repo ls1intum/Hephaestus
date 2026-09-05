@@ -85,7 +85,7 @@ class NoPerRequestAccessLogTest extends BaseUnitTest {
 
     /**
      * The maintenance page's nginx config is inlined into the compose file rather than shipped as a
-     * file, so a key that stops resolving would silently narrow both tests that read it to the webapp
+     * file, so a key that stops resolving would silently narrow every test that reads it to the webapp
      * config alone. Asserting here names that as the failure instead.
      */
     private static String maintenancePageConf() throws IOException {

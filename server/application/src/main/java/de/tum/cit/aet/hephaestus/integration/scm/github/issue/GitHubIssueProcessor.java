@@ -193,7 +193,7 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
                 Set<String> changedFields = computeChangedFields(existingOpt.get(), issue);
                 if (!changedFields.isEmpty() || relationshipsChanged) {
                     if (relationshipsChanged) {
-                        changedFields.add("relationships");
+                        changedFields.add(ScmDomainEvent.IssueUpdated.RELATIONSHIPS);
                     }
                     eventPublisher.publishEvent(new ScmDomainEvent.IssueUpdated(
                             ScmEventPayload.IssueData.from(issue), changedFields, EventContext.from(context)));
@@ -230,31 +230,31 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
         Set<String> changedFields = new HashSet<>();
 
         if (!Objects.equals(oldIssue.getTitle(), newIssue.getTitle())) {
-            changedFields.add("title");
+            changedFields.add(ScmDomainEvent.IssueUpdated.TITLE);
         }
         if (!Objects.equals(oldIssue.getBody(), newIssue.getBody())) {
-            changedFields.add("body");
+            changedFields.add(ScmDomainEvent.IssueUpdated.BODY);
         }
         if (oldIssue.getState() != newIssue.getState()) {
-            changedFields.add("state");
+            changedFields.add(ScmDomainEvent.IssueUpdated.STATE);
         }
         if (!Objects.equals(oldIssue.getStateReason(), newIssue.getStateReason())) {
-            changedFields.add("stateReason");
+            changedFields.add(ScmDomainEvent.IssueUpdated.STATE_REASON);
         }
         if (oldIssue.getCommentsCount() != newIssue.getCommentsCount()) {
-            changedFields.add("commentsCount");
+            changedFields.add(ScmDomainEvent.IssueUpdated.COMMENTS_COUNT);
         }
         if (oldIssue.isLocked() != newIssue.isLocked()) {
-            changedFields.add("locked");
+            changedFields.add(ScmDomainEvent.IssueUpdated.LOCKED);
         }
         if (!Objects.equals(oldIssue.getClosedAt(), newIssue.getClosedAt())) {
-            changedFields.add("closedAt");
+            changedFields.add(ScmDomainEvent.IssueUpdated.CLOSED_AT);
         }
         if (!Objects.equals(oldIssue.getMilestone(), newIssue.getMilestone())) {
-            changedFields.add("milestone");
+            changedFields.add(ScmDomainEvent.IssueUpdated.MILESTONE);
         }
         if (!Objects.equals(oldIssue.getIssueType(), newIssue.getIssueType())) {
-            changedFields.add("issueType");
+            changedFields.add(ScmDomainEvent.IssueUpdated.ISSUE_TYPE);
         }
 
         return changedFields;

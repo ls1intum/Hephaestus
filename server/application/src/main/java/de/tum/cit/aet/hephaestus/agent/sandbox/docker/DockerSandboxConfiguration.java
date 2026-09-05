@@ -193,12 +193,7 @@ public class DockerSandboxConfiguration {
             SandboxGatewayProperties gatewayProperties,
             MeterRegistry meterRegistry) {
         return new DockerSandboxAdapter(
-                networkManager,
-                workspaceManager,
-                containerManager,
-                securityPolicy,
-                gatewayProperties.port(),
-                meterRegistry);
+                networkManager, workspaceManager, containerManager, securityPolicy, gatewayProperties, meterRegistry);
     }
 
     @Bean
@@ -266,7 +261,7 @@ public class DockerSandboxConfiguration {
                 mapper,
                 dockerWaitExecutor,
                 dockerCli,
-                gatewayProperties.port(),
+                gatewayProperties,
                 mentorProxyCredentialRegistry);
     }
 

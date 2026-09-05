@@ -1,11 +1,12 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
+import de.tum.cit.aet.hephaestus.agent.BoundedBatchPass;
 import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
-import java.time.Duration;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.concurrent.TimeUnit;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
@@ -21,8 +22,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * {@link AgentProperties#payloadRetention} keep everything but their bulky {@code container_logs} /
  * {@code output}, and unreferenced rows older than {@link AgentProperties#rowRetention} go entirely.
  *
- * <p>Both are batched rather than issued as one unbounded statement, so no single transaction holds
- * locks or generates WAL/dead-tuple pressure long enough to hurt the queue sharing this table.
+ * <p>Both run as {@link BoundedBatchPass} batches so the queue sharing this table is not held up.
  */
 @ConditionalOnServerRole
 @Component
@@ -32,12 +32,10 @@ public class AgentJobRetentionService {
 
     private static final Logger log = LoggerFactory.getLogger(AgentJobRetentionService.class);
 
-    private static final int BATCH_SIZE = 500;
-
-    private static final Duration MAX_PASS_DURATION = Duration.ofMinutes(5);
-
     private final AgentJobRepository jobRepository;
     private final AgentProperties agentProperties;
+    private final Clock clock;
+    private final BoundedBatchPass pass;
     private final TransactionTemplate transactionTemplate;
     private final Counter stripped;
     private final Counter deleted;
@@ -45,10 +43,13 @@ public class AgentJobRetentionService {
     public AgentJobRetentionService(
             AgentJobRepository jobRepository,
             AgentProperties agentProperties,
+            Clock clock,
             TransactionTemplate transactionTemplate,
             MeterRegistry meterRegistry) {
         this.jobRepository = jobRepository;
         this.agentProperties = agentProperties;
+        this.clock = clock;
+        this.pass = new BoundedBatchPass(clock);
         this.transactionTemplate = transactionTemplate;
         this.stripped = Counter.builder(AgentMetrics.AGENT_JOB_RETENTION_STRIPPED)
                 .description("Terminal agent_job rows whose heavy payload columns were stripped to NULL")
@@ -61,7 +62,7 @@ public class AgentJobRetentionService {
     /**
      * {@code @SchedulerLock} single-flights this across replicas: concurrent passes cannot go faster (the
      * batches serialize on row-level contention anyway) and only multiply lock/WAL pressure.
-     * {@code lockAtMostFor} must stay above both passes' {@link #MAX_PASS_DURATION} budgets.
+     * {@code lockAtMostFor} must stay above both passes' {@link BoundedBatchPass#DEFAULT_BUDGET}.
      */
     @Scheduled(fixedDelay = 6, initialDelay = 1, timeUnit = TimeUnit.HOURS)
     @SchedulerLock(name = "agent-job-retention", lockAtMostFor = "PT20M", lockAtLeastFor = "PT10S")
@@ -71,55 +72,37 @@ public class AgentJobRetentionService {
     }
 
     private void stripPayloads() {
-        Instant cutoff = Instant.now().minus(agentProperties.payloadRetention());
-        Instant deadline = Instant.now().plus(MAX_PASS_DURATION);
-        int total = 0;
-        int batchUpdated;
-        do {
-            Integer result =
-                    transactionTemplate.execute(status -> jobRepository.stripTerminalPayloads(cutoff, BATCH_SIZE));
-            batchUpdated = result != null ? result : 0;
-            total += batchUpdated;
+        Instant cutoff = clock.instant().minus(agentProperties.payloadRetention());
+        BoundedBatchPass.Result result = pass.run("strip", () -> {
+            Integer updated = transactionTemplate.execute(
+                    status -> jobRepository.stripTerminalPayloads(cutoff, pass.batchSize()));
+            int batchUpdated = updated != null ? updated : 0;
             if (batchUpdated > 0) {
                 stripped.increment(batchUpdated);
             }
-            if (batchUpdated == BATCH_SIZE && Instant.now().isAfter(deadline)) {
-                log.warn(
-                        "Retention: strip pass hit its {} time budget with backlog remaining — resuming next run",
-                        MAX_PASS_DURATION);
-                break;
-            }
-        } while (batchUpdated == BATCH_SIZE);
-        if (total > 0) {
+            return batchUpdated;
+        });
+        if (result.affected() > 0) {
             log.info(
                     "Retention: stripped payloads from {} terminal agent_job row(s) completed before {}",
-                    total,
+                    result.affected(),
                     cutoff);
         }
     }
 
     private void deleteOldRows() {
-        Instant cutoff = Instant.now().minus(agentProperties.rowRetention());
-        Instant deadline = Instant.now().plus(MAX_PASS_DURATION);
-        int total = 0;
-        int batchDeleted;
-        do {
-            Integer result = transactionTemplate.execute(
-                    status -> jobRepository.deleteUnreferencedTerminalRowsOlderThan(cutoff, BATCH_SIZE));
-            batchDeleted = result != null ? result : 0;
-            total += batchDeleted;
+        Instant cutoff = clock.instant().minus(agentProperties.rowRetention());
+        BoundedBatchPass.Result result = pass.run("delete", () -> {
+            Integer removed = transactionTemplate.execute(
+                    status -> jobRepository.deleteUnreferencedTerminalRowsOlderThan(cutoff, pass.batchSize()));
+            int batchDeleted = removed != null ? removed : 0;
             if (batchDeleted > 0) {
                 deleted.increment(batchDeleted);
             }
-            if (batchDeleted == BATCH_SIZE && Instant.now().isAfter(deadline)) {
-                log.warn(
-                        "Retention: delete pass hit its {} time budget with backlog remaining — resuming next run",
-                        MAX_PASS_DURATION);
-                break;
-            }
-        } while (batchDeleted == BATCH_SIZE);
-        if (total > 0) {
-            log.info("Retention: deleted {} terminal agent_job row(s) completed before {}", total, cutoff);
+            return batchDeleted;
+        });
+        if (result.affected() > 0) {
+            log.info("Retention: deleted {} terminal agent_job row(s) completed before {}", result.affected(), cutoff);
         }
     }
 }

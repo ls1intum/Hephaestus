@@ -1,4 +1,5 @@
 import { type InventoryItem, readProjectInventory } from "../lib/context.ts";
+import { classifyIssue } from "../lib/issue-classification.ts";
 import type { Hint } from "../lib/types.ts";
 
 /** Title-token overlap (Jaccard) — a coarse near-duplicate signal across the project inventory. */
@@ -50,20 +51,12 @@ export default async function issueStatesAnActionableProblem(
 			.replace(/^#{1,3}.*$/gm, "")
 			.trim().length < 60;
 
-	const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
-	const titleNorm = norm(title);
-	const bodyNorm = norm(body);
-	const titleEcho =
-		bodyNorm.length > 0 &&
-		(bodyNorm === titleNorm || titleNorm.includes(bodyNorm) || bodyNorm.includes(titleNorm));
-	const emptyOrTitleEcho = body.length < 25 || titleEcho;
-	const deliverableType =
-		/\b(user ?story|story|bug|defect|feature|enhancement|task|chore|requirement|artifact|epic|spike)\b/;
-	const hasDeliverableType =
-		deliverableType.test(issueType) || labels.some((l) => deliverableType.test(l));
-	const looksUmbrella =
-		labels.some((l) => /\b(epic|umbrella|meta|initiative|requirement)\b/.test(l)) ||
-		/\b(epic|umbrella|initiative)\b/i.test(title);
+	const { emptyOrTitleEcho, hasDeliverableType, looksUmbrella } = classifyIssue(
+		title,
+		body,
+		issueType,
+		labels,
+	);
 
 	const typeBug = /bug|defect/.test(issueType) || labels.some((l) => /bug|defect|fix/.test(l));
 	const typeStory =
@@ -98,7 +91,7 @@ export default async function issueStatesAnActionableProblem(
 	const directions: string[] = [];
 	if (emptyOrTitleEcho && hasDeliverableType) {
 		directions.push(
-			`Classification fact: the body is empty or just echoes the title, yet the issue carries a deliverable type [${labels.join(", ")}]. A reader has nothing to build from; the deliverable label means this is not a board placeholder — investigate whether a maintainer can actually act on it.`,
+			`Classification fact: the body is empty or just echoes the title, yet the issue carries a deliverable type [${[issueType, ...labels].filter(Boolean).join(", ")}]. A reader has nothing to build from; the deliverable type means this is not a board placeholder — investigate whether a maintainer can actually act on it.`,
 		);
 	} else if (emptyOrTitleEcho && !hasDeliverableType) {
 		directions.push(

@@ -51,9 +51,8 @@ public class ExportGenerationWorker {
     }
 
     /**
-     * Generate the bundle for {@code exportId} (owned by {@code accountId}) and persist the outcome.
-     * PROCESSING → READY on success (payload + expiry set), → FAILED on any error. Never throws to the
-     * caller (it's fire-and-forget); failures are recorded on the row and on the privacy-job counters.
+     * Never throws: the caller is fire-and-forget, so every outcome is recorded on the row and on the
+     * privacy-job counters instead.
      */
     @Async
     @Transactional
