@@ -95,8 +95,9 @@ public class PiRuntimeFactory {
         if (precomputeStep == null || jobToken == null) {
             throw new IllegalStateException("validated Pi plan contains null fields");
         }
-        String command = "mkdir -p " + SandboxLayout.OUTPUT_PATH
-                + " /home/agent/.config /home/agent/.local/tmp && "
+        // Every directory the runner may write exists before Node starts; PiRunnerProfile says why.
+        String command = "mkdir -p " + String.join(" ", PiRunnerProfile.WRITABLE_DIRECTORIES)
+                + " /home/agent/.config && "
                 +
                 // The runner imports the Pi SDK by bare specifier, which resolves from <workspace>/node_modules,
                 // so the SDK the image exposes at /opt/pi-sdk must be symlinked into place.

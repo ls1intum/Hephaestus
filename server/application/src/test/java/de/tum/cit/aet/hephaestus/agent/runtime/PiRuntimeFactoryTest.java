@@ -309,6 +309,20 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
             assertThat(body.substring(sliceStart, nodeIdx)).isBlank();
         }
 
+        /** A write grant is resolved when Node starts, so every granted directory is created first. */
+        @Test
+        void shouldCreateEveryWritableDirectoryBeforeNodeStarts() {
+            String body = factory.build(spec(PRACTICE)).command().get(2);
+            int mkdir = body.indexOf("mkdir -p ");
+            int node = body.indexOf("node ");
+            assertThat(mkdir).isNotNegative();
+            assertThat(node).isGreaterThan(mkdir);
+            for (String directory : PiRunnerProfile.WRITABLE_DIRECTORIES) {
+                assertThat(body.substring(mkdir, node)).contains(" " + directory + " ");
+                assertThat(body).contains("--allow-fs-write=" + directory);
+            }
+        }
+
         @Test
         void mentorProfileContributesMentorFlags() {
             String body = factory.build(spec(MENTOR)).command().get(2);

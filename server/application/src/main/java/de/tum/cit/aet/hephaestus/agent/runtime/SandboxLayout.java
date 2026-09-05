@@ -134,7 +134,9 @@ public final class SandboxLayout {
     public static final String MENTOR_SYSTEM_PROMPT_PATH = "agent/mentor/system.md";
 
     /** Workspace-relative directory for restored Pi SDK session JSONL files (matches the mentor runner's {@code SESSIONS_DIR}). */
-    public static final String SESSIONS_DIR_PREFIX = ".sessions/";
+    public static final String SESSIONS_DIR = ".sessions";
+
+    public static final String SESSIONS_DIR_PREFIX = SESSIONS_DIR + "/";
 
     /** Exit code emitted by the Pi runner on envelope/image drift (unsupported {@code schemaVersion} or {@code kind}). */
     public static final int EXIT_ENVELOPE_MISMATCH = 42;

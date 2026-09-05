@@ -9,6 +9,14 @@ import java.util.Map;
  * they MUST NOT capture spec-level state (provider, credentials, baseUrl).
  */
 public interface PiRunnerProfile {
+    /** Directories the runner may write, each created before Node starts; the grants below say why. */
+    List<String> WRITABLE_DIRECTORIES = List.of(
+            "/workspace/.pi",
+            "/workspace/.sessions",
+            "/workspace/work/composition",
+            "/workspace/out",
+            "/home/agent/.local/tmp");
+
     List<String> BASE_RUNTIME_FLAGS = List.of(
             "--max-old-space-size=256",
             "--permission",
@@ -18,10 +26,16 @@ public interface PiRunnerProfile {
             // session; that directory holds nothing, and a read the permission model denies is a
             // thrown error, not an absence, so it must be readable.
             "--allow-fs-read=/home/agent",
+            // Every path granted for writing exists before Node starts: a grant is resolved at startup,
+            // and a directory created afterwards accepts mkdir and then denies every write inside it.
+            // WRITABLE_DIRECTORIES is that list, and PiRuntimeFactory creates it.
             // The SDK takes a lock directory beside settings.json and auth.json and keeps a models store
             // in the agent dir; without this every session dies at its first model turn.
             "--allow-fs-write=/workspace/.pi",
             "--allow-fs-write=/workspace/.sessions",
+            // The runner writes the admitted observations it composes from, and Node's temp dir.
+            "--allow-fs-write=/workspace/work/composition",
+            "--allow-fs-write=/home/agent/.local/tmp",
             "--allow-fs-write=/workspace/out");
     /** Runner script filename under {@code resources/agent/}. */
     String runnerScript();
