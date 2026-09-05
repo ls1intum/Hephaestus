@@ -73,7 +73,7 @@ public class ProxyAccounting {
             return false;
         }
         meterRegistry
-                .counter("llm.proxy.budget.blocked", "apiProtocol", routing.apiProtocol())
+                .counter(AgentMetrics.LLM_PROXY_BUDGET_BLOCKED, "apiProtocol", routing.apiProtocol())
                 .increment();
         return true;
     }
@@ -84,7 +84,7 @@ public class ProxyAccounting {
      */
     public void recordUnbillableRefusal(String apiProtocol) {
         meterRegistry
-                .counter("llm.proxy.unbillable.refused", "apiProtocol", apiProtocol)
+                .counter(AgentMetrics.LLM_PROXY_UNBILLABLE_REFUSED, "apiProtocol", apiProtocol)
                 .increment();
     }
 
@@ -116,7 +116,7 @@ public class ProxyAccounting {
     public void recordMalformedUsage(ProxyRouting.BilledAttempt attempt) {
         meterRegistry
                 .counter(
-                        "llm.proxy.usage.unparseable",
+                        AgentMetrics.LLM_PROXY_USAGE_UNPARSEABLE,
                         "sourceType",
                         attempt.sourceType().name())
                 .increment();
@@ -153,7 +153,9 @@ public class ProxyAccounting {
     }
 
     public void recordError(String apiProtocol) {
-        meterRegistry.counter("llm.proxy.errors", "apiProtocol", apiProtocol).increment();
+        meterRegistry
+                .counter(AgentMetrics.LLM_PROXY_ERRORS, "apiProtocol", apiProtocol)
+                .increment();
     }
 
     /**
@@ -162,7 +164,7 @@ public class ProxyAccounting {
      */
     public void recordStreamUsageUnsupported(String apiProtocol) {
         meterRegistry
-                .counter("llm.proxy.stream.usage.unsupported", "apiProtocol", apiProtocol)
+                .counter(AgentMetrics.LLM_PROXY_STREAM_USAGE_UNSUPPORTED, "apiProtocol", apiProtocol)
                 .increment();
     }
 }

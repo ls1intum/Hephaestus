@@ -89,10 +89,15 @@ class WebhookStreamMonitor {
         for (String name : WebhookJetStreamBootstrap.STREAMS) {
             usage.put(name, UNKNOWN);
             Tags tags = Tags.of("stream", name);
-            gauge(meterRegistry, "webhook.stream.bytes", tags, name, Usage::bytes);
-            gauge(meterRegistry, "webhook.stream.bytes.limit", tags, name, Usage::maxBytes);
-            gauge(meterRegistry, "webhook.stream.bytes.utilization", tags, name, Usage::utilization);
-            gauge(meterRegistry, "webhook.stream.messages", tags, name, Usage::messages);
+            gauge(meterRegistry, IntegrationCoreMetrics.WEBHOOK_STREAM_BYTES, tags, name, Usage::bytes);
+            gauge(meterRegistry, IntegrationCoreMetrics.WEBHOOK_STREAM_BYTES_LIMIT, tags, name, Usage::maxBytes);
+            gauge(
+                    meterRegistry,
+                    IntegrationCoreMetrics.WEBHOOK_STREAM_BYTES_UTILIZATION,
+                    tags,
+                    name,
+                    Usage::utilization);
+            gauge(meterRegistry, IntegrationCoreMetrics.WEBHOOK_STREAM_MESSAGES, tags, name, Usage::messages);
             // Effective retention, measured rather than claimed: max-age is a ceiling and max-bytes is
             // the floor under it, so which one a deployment actually gets is a function of its volume.
             Gauge.builder(
@@ -103,7 +108,7 @@ class WebhookStreamMonitor {
                     .baseUnit("seconds")
                     .register(meterRegistry);
             // A durable nobody deletes shows up here as a count that only ever climbs.
-            gauge(meterRegistry, "webhook.stream.consumers", tags, name, Usage::consumers);
+            gauge(meterRegistry, IntegrationCoreMetrics.WEBHOOK_STREAM_CONSUMERS, tags, name, Usage::consumers);
 
             AtomicLong gap = new AtomicLong();
             unacknowledgedGap.put(name, gap);

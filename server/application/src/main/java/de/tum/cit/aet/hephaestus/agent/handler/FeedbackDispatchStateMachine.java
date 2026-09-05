@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
+import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackAnchor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFeedbackChannel.DeliveredSignal;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFeedbackChannel.Disposition;
@@ -157,7 +158,7 @@ class FeedbackDispatchStateMachine {
         if (affected == null || affected != 1) return false;
         meterRegistry
                 .counter(
-                        "practice.feedback.dispatch",
+                        AgentMetrics.PRACTICE_FEEDBACK_DISPATCH,
                         "destination",
                         dispatch.getDestination().name(),
                         "state",

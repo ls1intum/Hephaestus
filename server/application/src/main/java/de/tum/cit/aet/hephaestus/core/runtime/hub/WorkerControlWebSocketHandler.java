@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.core.runtime.hub;
 
+import de.tum.cit.aet.hephaestus.core.metrics.CoreMetrics;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwt;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtHandshakeInterceptor;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerSessionJwt;
@@ -79,7 +80,7 @@ public class WorkerControlWebSocketHandler extends TextWebSocketHandler {
                 () -> {
                     if (!rawTransport.isOpen()) return;
                     log.warn("WorkerHello timeout for workerId={} sessionId={}; closing.", workerId, sessionId);
-                    meterRegistry.counter("worker.hub.hello.timeout").increment();
+                    meterRegistry.counter(CoreMetrics.WORKER_HUB_HELLO_TIMEOUT).increment();
                     close(rawTransport, CloseStatus.SESSION_NOT_RELIABLE);
                 },
                 HubProperties.HELLO_TIMEOUT.toMillis(),
@@ -102,7 +103,7 @@ public class WorkerControlWebSocketHandler extends TextWebSocketHandler {
         WorkerSession session = (WorkerSession) transport.getAttributes().get(ATTR_WORKER_SESSION);
         String workerId = session != null ? session.workerId() : "<unauthenticated>";
         log.warn("Refusing binary frame from workerId={}: text-only protocol", workerId);
-        meterRegistry.counter("worker.hub.binary.refused").increment();
+        meterRegistry.counter(CoreMetrics.WORKER_HUB_BINARY_REFUSED).increment();
         close(transport, CloseStatus.NOT_ACCEPTABLE);
     }
 
@@ -121,7 +122,7 @@ public class WorkerControlWebSocketHandler extends TextWebSocketHandler {
                     "Frame decode failed for workerId={}: {}",
                     session.workerId(),
                     e.getClass().getSimpleName());
-            meterRegistry.counter("worker.hub.frame.decode.failed").increment();
+            meterRegistry.counter(CoreMetrics.WORKER_HUB_FRAME_DECODE_FAILED).increment();
             close(transport, CloseStatus.BAD_DATA);
             return;
         }
@@ -136,7 +137,7 @@ public class WorkerControlWebSocketHandler extends TextWebSocketHandler {
                     session.workerId(),
                     frame.getClass().getSimpleName(),
                     e);
-            meterRegistry.counter("worker.hub.frame.dispatch.failed").increment();
+            meterRegistry.counter(CoreMetrics.WORKER_HUB_FRAME_DISPATCH_FAILED).increment();
         }
     }
 
@@ -152,7 +153,9 @@ public class WorkerControlWebSocketHandler extends TextWebSocketHandler {
             case Heartbeat heartbeat -> {
                 if (heartbeat.draining()) {
                     log.info("Worker {} signalled draining", session.workerId());
-                    meterRegistry.counter("worker.hub.draining.signalled").increment();
+                    meterRegistry
+                            .counter(CoreMetrics.WORKER_HUB_DRAINING_SIGNALLED)
+                            .increment();
                 }
             }
             case WorkerWelcome w -> warnUnexpectedFrame(session, w);
@@ -190,7 +193,7 @@ public class WorkerControlWebSocketHandler extends TextWebSocketHandler {
         registry.register(session);
         WorkerWelcome welcome = new WorkerWelcome(FrameEnvelope.CURRENT_VERSION, session.sessionId());
         session.send(welcome);
-        meterRegistry.counter("worker.hub.handshake.completed").increment();
+        meterRegistry.counter(CoreMetrics.WORKER_HUB_HANDSHAKE_COMPLETED).increment();
     }
 
     private void maybeForceReconnect(WorkerSession session) {
@@ -223,7 +226,7 @@ public class WorkerControlWebSocketHandler extends TextWebSocketHandler {
                 "WSS transport error for workerId={}: {}",
                 workerId,
                 exception.getClass().getSimpleName());
-        meterRegistry.counter("worker.hub.transport.errors").increment();
+        meterRegistry.counter(CoreMetrics.WORKER_HUB_TRANSPORT_ERRORS).increment();
     }
 
     private static void close(WebSocketSession transport, CloseStatus status) {

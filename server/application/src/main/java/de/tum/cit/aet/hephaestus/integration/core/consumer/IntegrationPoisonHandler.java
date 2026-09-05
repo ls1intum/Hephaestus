@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.core.consumer;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
+import de.tum.cit.aet.hephaestus.integration.core.metrics.IntegrationCoreMetrics;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.nats.client.Message;
@@ -33,9 +34,6 @@ import org.springframework.stereotype.Component;
 public class IntegrationPoisonHandler {
 
     private static final Logger log = LoggerFactory.getLogger(IntegrationPoisonHandler.class);
-
-    static final String NAK_COUNTER = "integration.consumer.nak";
-    static final String POISON_COUNTER = "integration.consumer.poison";
     private static final String UNKNOWN_KIND_TAG = "unknown";
 
     /**
@@ -170,13 +168,19 @@ public class IntegrationPoisonHandler {
     private Counter nakCounter(Message msg) {
         String kindTag = kindTag(msg);
         return nakCounters.computeIfAbsent(
-                kindTag, k -> Counter.builder(NAK_COUNTER).tag("kind", k).register(meterRegistry));
+                kindTag,
+                k -> Counter.builder(IntegrationCoreMetrics.INTEGRATION_CONSUMER_NAK)
+                        .tag("kind", k)
+                        .register(meterRegistry));
     }
 
     private Counter poisonCounter(Message msg) {
         String kindTag = kindTag(msg);
         return poisonCounters.computeIfAbsent(
-                kindTag, k -> Counter.builder(POISON_COUNTER).tag("kind", k).register(meterRegistry));
+                kindTag,
+                k -> Counter.builder(IntegrationCoreMetrics.INTEGRATION_CONSUMER_POISON)
+                        .tag("kind", k)
+                        .register(meterRegistry));
     }
 
     /**

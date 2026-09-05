@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.proxy;
 
 import static de.tum.cit.aet.hephaestus.core.TransactionCallbacks.afterCommit;
 
+import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.agent.proxy.ProxyRouting.BilledAttempt;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import de.tum.cit.aet.hephaestus.mentor.ChatMessageRepository;
@@ -69,7 +70,7 @@ public class MentorTurnUsageAccumulator {
             mirrorOntoMeterAfterCommit(turnId, usage);
         } catch (RuntimeException e) {
             log.warn("Lost proxy usage accounting for mentor turn {} — this call may go unbilled", turnId, e);
-            meterRegistry.counter("llm.proxy.usage.mentor.failure").increment();
+            meterRegistry.counter(AgentMetrics.LLM_PROXY_USAGE_MENTOR_FAILURE).increment();
         }
     }
 
@@ -91,6 +92,6 @@ public class MentorTurnUsageAccumulator {
                 "Dropping proxy usage from a finished mentor turn — turn {} is no longer in flight; "
                         + "this call goes unbilled rather than being added to a turn that has already been billed",
                 turnId);
-        meterRegistry.counter("llm.proxy.usage.mentor.superseded").increment();
+        meterRegistry.counter(AgentMetrics.LLM_PROXY_USAGE_MENTOR_SUPERSEDED).increment();
     }
 }

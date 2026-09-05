@@ -59,7 +59,8 @@ public class InteractiveSandboxRegistry {
         Gauge.builder(AgentMetrics.MENTOR_SESSION_ACTIVE, sessions, ConcurrentHashMap::size)
                 .description("Currently attached mentor sandbox sessions on this replica")
                 .register(meterRegistry);
-        meterRegistry.gauge("mentor.watchdog.targets", Tags.empty(), watchdog, StdinWriteWatchdog::activeTargets);
+        meterRegistry.gauge(
+                AgentMetrics.MENTOR_WATCHDOG_TARGETS, Tags.empty(), watchdog, StdinWriteWatchdog::activeTargets);
     }
 
     @Nullable

@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.usage;
 
+import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -62,7 +63,7 @@ public class LlmBudgetService {
                 workspace.getId(),
                 jobType);
         meterRegistry
-                .counter("llm.budget.blocked", "surface", "agent_job", "cap", capTag(block.purse()))
+                .counter(AgentMetrics.LLM_BUDGET_BLOCKED, "surface", "agent_job", "cap", capTag(block.purse()))
                 .increment();
         return true;
     }

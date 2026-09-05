@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.outline.client;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.integration.core.spi.RateLimitSnapshot;
+import de.tum.cit.aet.hephaestus.integration.outline.metrics.OutlineMetrics;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.Meter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -246,15 +247,15 @@ public class OutlineRateLimitTracker {
     private void registerMetrics(String scope, ScopeState state) {
         Tags tags = Tags.of("scope", scope);
         // NaN, not 0, while unobserved: a gauge is a measurement too, and 0 would read as "exhausted".
-        Gauge.builder(METRIC_PREFIX + ".remaining", state, s -> asDouble(s.remaining.get()))
+        Gauge.builder(OutlineMetrics.OUTLINE_API_RATELIMIT_REMAINING, state, s -> asDouble(s.remaining.get()))
                 .tags(tags)
                 .description("Outline API rate-limit requests remaining, as reported by the last 429")
                 .register(meterRegistry);
-        Gauge.builder(METRIC_PREFIX + ".limit", state, s -> asDouble(s.limit.get()))
+        Gauge.builder(OutlineMetrics.OUTLINE_API_RATELIMIT_LIMIT, state, s -> asDouble(s.limit.get()))
                 .tags(tags)
                 .description("Outline API rate-limit requests allowed per window, as reported by the last 429")
                 .register(meterRegistry);
-        Gauge.builder(METRIC_PREFIX + ".seconds_until_reset", state, s -> {
+        Gauge.builder(OutlineMetrics.OUTLINE_API_RATELIMIT_SECONDS_UNTIL_RESET, state, s -> {
                     Instant reset = s.resetAt.get();
                     if (reset == null) {
                         return 0.0;
@@ -264,7 +265,7 @@ public class OutlineRateLimitTracker {
                 .tags(tags)
                 .description("Seconds until the Outline API rate-limit window resets")
                 .register(meterRegistry);
-        Gauge.builder(METRIC_PREFIX + ".throttles", state, s -> s.throttleCount.doubleValue())
+        Gauge.builder(OutlineMetrics.OUTLINE_API_RATELIMIT_THROTTLES, state, s -> s.throttleCount.doubleValue())
                 .tags(tags)
                 .description("Number of Outline API throttle (429) responses observed for this scope")
                 .register(meterRegistry);

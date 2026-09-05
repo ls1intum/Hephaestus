@@ -8,6 +8,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+import de.tum.cit.aet.hephaestus.integration.core.metrics.IntegrationCoreMetrics;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -81,11 +82,11 @@ class IntegrationPoisonHandlerTest extends BaseUnitTest {
             handler.nakWithBackoff(gl);
 
             assertThat(meterRegistry
-                            .counter(IntegrationPoisonHandler.NAK_COUNTER, "kind", "github")
+                            .counter(IntegrationCoreMetrics.INTEGRATION_CONSUMER_NAK, "kind", "github")
                             .count())
                     .isEqualTo(1.0);
             assertThat(meterRegistry
-                            .counter(IntegrationPoisonHandler.NAK_COUNTER, "kind", "gitlab")
+                            .counter(IntegrationCoreMetrics.INTEGRATION_CONSUMER_NAK, "kind", "gitlab")
                             .count())
                     .isEqualTo(1.0);
         }
@@ -106,7 +107,9 @@ class IntegrationPoisonHandlerTest extends BaseUnitTest {
             // No exception, no counter increment — keeps the consumer's error path
             // null-safe so an upstream NPE doesn't get rethrown out of the NAK handler.
             handler.nakWithBackoff(null);
-            assertThat(meterRegistry.find(IntegrationPoisonHandler.NAK_COUNTER).counter())
+            assertThat(meterRegistry
+                            .find(IntegrationCoreMetrics.INTEGRATION_CONSUMER_NAK)
+                            .counter())
                     .isNull();
         }
     }
@@ -133,7 +136,7 @@ class IntegrationPoisonHandlerTest extends BaseUnitTest {
             verify(msg).ack();
             verify(msg, never()).nakWithDelay(any());
             assertThat(meterRegistry
-                            .counter(IntegrationPoisonHandler.POISON_COUNTER, "kind", "github")
+                            .counter(IntegrationCoreMetrics.INTEGRATION_CONSUMER_POISON, "kind", "github")
                             .count())
                     .isEqualTo(1.0);
         }
@@ -146,7 +149,7 @@ class IntegrationPoisonHandlerTest extends BaseUnitTest {
 
             verify(msg).ack();
             assertThat(meterRegistry
-                            .counter(IntegrationPoisonHandler.POISON_COUNTER, "kind", "github")
+                            .counter(IntegrationCoreMetrics.INTEGRATION_CONSUMER_POISON, "kind", "github")
                             .count())
                     .isEqualTo(1.0);
         }
@@ -158,7 +161,7 @@ class IntegrationPoisonHandlerTest extends BaseUnitTest {
             handler.nakWithBackoff(msg);
 
             assertThat(meterRegistry
-                            .counter(IntegrationPoisonHandler.POISON_COUNTER, "kind", "unknown")
+                            .counter(IntegrationCoreMetrics.INTEGRATION_CONSUMER_POISON, "kind", "unknown")
                             .count())
                     .isEqualTo(1.0);
         }

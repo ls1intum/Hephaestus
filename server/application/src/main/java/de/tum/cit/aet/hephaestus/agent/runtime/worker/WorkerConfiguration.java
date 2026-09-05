@@ -6,7 +6,6 @@ import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.FrameCodec;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
-import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -54,43 +53,62 @@ public class WorkerConfiguration {
     }
 
     private static void registerCapacityGauges(MeterRegistry registry, WorkerCapacityState state) {
-        record G(String name, String type, ToDoubleFunction<WorkerCapacityState> f, String desc) {}
-        List.of(
-                        new G(
-                                "worker.capacity.total",
-                                "review",
-                                s -> s.reviewMax(),
-                                "Configured maximum concurrent review jobs"),
-                        new G(
-                                "worker.capacity.total",
-                                "mentor",
-                                s -> s.mentorMax(),
-                                "Configured maximum concurrent mentor sessions"),
-                        new G(
-                                "worker.capacity.in_flight",
-                                "review",
-                                s -> s.snapshot().inFlightReview(),
-                                "Review jobs currently executing"),
-                        new G(
-                                "worker.capacity.in_flight",
-                                "mentor",
-                                s -> s.snapshot().inFlightMentor(),
-                                "Mentor sessions currently open"),
-                        new G(
-                                "worker.capacity.spare",
-                                "review",
-                                s -> s.snapshot().spareReview(),
-                                "Spare review slots"),
-                        new G(
-                                "worker.capacity.spare",
-                                "mentor",
-                                s -> s.snapshot().spareMentor(),
-                                "Spare mentor slots"))
-                .forEach(g -> Gauge.builder(g.name(), state, g.f())
-                        .description(g.desc())
-                        .tag("type", g.type())
-                        .strongReference(true)
-                        .register(registry));
+        capacityGauge(
+                registry,
+                state,
+                AgentMetrics.WORKER_CAPACITY_TOTAL,
+                "review",
+                s -> s.reviewMax(),
+                "Configured maximum concurrent review jobs");
+        capacityGauge(
+                registry,
+                state,
+                AgentMetrics.WORKER_CAPACITY_TOTAL,
+                "mentor",
+                s -> s.mentorMax(),
+                "Configured maximum concurrent mentor sessions");
+        capacityGauge(
+                registry,
+                state,
+                AgentMetrics.WORKER_CAPACITY_IN_FLIGHT,
+                "review",
+                s -> s.snapshot().inFlightReview(),
+                "Review jobs currently executing");
+        capacityGauge(
+                registry,
+                state,
+                AgentMetrics.WORKER_CAPACITY_IN_FLIGHT,
+                "mentor",
+                s -> s.snapshot().inFlightMentor(),
+                "Mentor sessions currently open");
+        capacityGauge(
+                registry,
+                state,
+                AgentMetrics.WORKER_CAPACITY_SPARE,
+                "review",
+                s -> s.snapshot().spareReview(),
+                "Spare review slots");
+        capacityGauge(
+                registry,
+                state,
+                AgentMetrics.WORKER_CAPACITY_SPARE,
+                "mentor",
+                s -> s.snapshot().spareMentor(),
+                "Spare mentor slots");
+    }
+
+    private static void capacityGauge(
+            MeterRegistry registry,
+            WorkerCapacityState state,
+            String name,
+            String type,
+            ToDoubleFunction<WorkerCapacityState> value,
+            String description) {
+        Gauge.builder(name, state, value)
+                .description(description)
+                .tag("type", type)
+                .strongReference(true)
+                .register(registry);
     }
 
     @Bean

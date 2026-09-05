@@ -36,6 +36,7 @@ import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtIssuer;
 import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessReport;
+import de.tum.cit.aet.hephaestus.integration.core.signal.PracticeReviewRefusalMetrics;
 import de.tum.cit.aet.hephaestus.observability.StructuredLogKeys;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -156,6 +157,7 @@ public class AgentJobExecutor {
     private final TransactionTemplate transactionTemplate;
     private final ObjectMapper objectMapper;
     private final MeterRegistry meterRegistry;
+    private final PracticeReviewRefusalMetrics practiceReviewRefusalMetrics;
     private final LlmUsageRecorder usageRecorder;
     private final LlmBudgetService llmBudgetService;
     private final @Nullable LlmAdmissionService llmAdmissionService;
@@ -195,6 +197,7 @@ public class AgentJobExecutor {
             TransactionTemplate transactionTemplate,
             ObjectMapper objectMapper,
             MeterRegistry meterRegistry,
+            PracticeReviewRefusalMetrics practiceReviewRefusalMetrics,
             AgentJobTelemetry jobTelemetry,
             LlmUsageRecorder usageRecorder,
             LlmBudgetService llmBudgetService,
@@ -212,6 +215,7 @@ public class AgentJobExecutor {
         this.transactionTemplate = transactionTemplate;
         this.objectMapper = objectMapper;
         this.meterRegistry = meterRegistry;
+        this.practiceReviewRefusalMetrics = practiceReviewRefusalMetrics;
         this.jobTelemetry = jobTelemetry;
         this.usageRecorder = usageRecorder;
         this.llmBudgetService = llmBudgetService;
@@ -1085,7 +1089,7 @@ public class AgentJobExecutor {
                     job.getWorkspace().getId(),
                     blockReason);
             recordPracticeReviewRefusal(job, "budget_exhausted");
-            meterRegistry.counter("agent.job.budget.refused").increment();
+            meterRegistry.counter(AgentMetrics.AGENT_JOB_BUDGET_REFUSED).increment();
             return new TerminalClaim(job, AgentJobStatus.CANCELLED);
         }
         job.setAvailableAt(now.plus(BUDGET_HOLD_INTERVAL));
@@ -1099,7 +1103,7 @@ public class AgentJobExecutor {
                 job.getId(),
                 job.getWorkspace().getId(),
                 job.getAvailableAt());
-        meterRegistry.counter("agent.job.budget.held").increment();
+        meterRegistry.counter(AgentMetrics.AGENT_JOB_BUDGET_HELD).increment();
         return ClaimOutcome.BUDGET_HELD;
     }
 
@@ -1110,7 +1114,7 @@ public class AgentJobExecutor {
         job.setErrorMessage(message);
         job.setCancellationReason(AgentJobCancellationReason.MODEL_UNAVAILABLE);
         jobRepository.save(job);
-        meterRegistry.counter("agent.job.model.refused").increment();
+        meterRegistry.counter(AgentMetrics.AGENT_JOB_MODEL_REFUSED).increment();
         recordPracticeReviewRefusal(job, "model_unavailable");
         log.info("Refusing claim — configured model unavailable: jobId={}", job.getId());
         return new TerminalClaim(job, AgentJobStatus.CANCELLED);
@@ -1118,9 +1122,7 @@ public class AgentJobExecutor {
 
     private void recordPracticeReviewRefusal(AgentJob job, String reason) {
         if (job.getPurpose() == AgentPurpose.PRACTICE_REVIEW) {
-            meterRegistry
-                    .counter("practice.review.refused", "phase", "execution", "reason", reason)
-                    .increment();
+            practiceReviewRefusalMetrics.recordExecutionRefusal(reason);
         }
     }
 
@@ -1177,7 +1179,7 @@ public class AgentJobExecutor {
                     "Pi runner rejected task envelope (exit {}) — server/image schemaVersion or kind drift. "
                             + "Rebuild the agent-pi image or roll back the server.",
                     SandboxLayout.EXIT_ENVELOPE_MISMATCH);
-            meterRegistry.counter("agent.pi.envelope.mismatch").increment();
+            meterRegistry.counter(AgentMetrics.AGENT_PI_ENVELOPE_MISMATCH).increment();
             return AgentJobStatus.FAILED;
         }
         if (agentResult != null && agentResult.output() != null) {
@@ -1354,7 +1356,7 @@ public class AgentJobExecutor {
                         AgentJobTelemetry.Phase.DELIVERY,
                         AgentJobTelemetry.Outcome.DELIVERY_FAILED,
                         Duration.between(deliveryStarted, Instant.now()));
-                meterRegistry.counter("agent.job.delivery.failure").increment();
+                meterRegistry.counter(AgentMetrics.AGENT_JOB_DELIVERY_FAILURE).increment();
             }
         }
     }

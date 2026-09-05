@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.mentor.chat;
 
 import de.tum.cit.aet.hephaestus.agent.config.AgentBindingLimits;
+import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.mentor.ChatMessage;
@@ -79,7 +80,9 @@ public class MentorInFlightReaper {
                         "Mentor in-flight reaper could not account turn {}; leaving it for the next tick",
                         messageId,
                         e);
-                meterRegistry.counter("mentor.in_flight.reaper.failure").increment();
+                meterRegistry
+                        .counter(AgentMetrics.MENTOR_IN_FLIGHT_REAPER_FAILURE)
+                        .increment();
             }
         }
         if (!stale.isEmpty())

@@ -6,6 +6,7 @@ import com.github.dockerjava.core.DockerClientImpl;
 import com.github.dockerjava.httpclient5.ApacheDockerHttpClient;
 import de.tum.cit.aet.hephaestus.agent.gateway.SandboxGatewayProperties;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
+import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.agent.proxy.MentorProxyCredentialRegistry;
 import de.tum.cit.aet.hephaestus.agent.runtime.AgentImageProperties;
 import de.tum.cit.aet.hephaestus.agent.sandbox.InteractiveSandboxProperties;
@@ -172,7 +173,14 @@ public class DockerSandboxConfiguration {
     public SandboxImageGuard sandboxImageGuard(
             DockerClientOperations ops, AgentImageProperties agentImageProperties, MeterRegistry meterRegistry) {
         return image -> ImagePullBootstrapperSupport.applyPolicy(
-                image, agentImageProperties.pullPolicy(), ops, "sandbox.image.pull", meterRegistry, log);
+                image,
+                agentImageProperties.pullPolicy(),
+                ops,
+                AgentMetrics.SANDBOX_IMAGE_PULL_DURATION,
+                AgentMetrics.SANDBOX_IMAGE_PULL_FAILURE,
+                AgentMetrics.SANDBOX_IMAGE_PULL_SKIPPED,
+                meterRegistry,
+                log);
     }
 
     @Bean

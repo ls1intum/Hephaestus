@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.usage;
 
+import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRepricer.Outcome;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
@@ -95,12 +96,14 @@ public class LlmUsageRepricingSweeper {
                 // the whole purpose of this pass is to unblock a workspace, and a partial unblock is
                 // still no unblock.
                 log.warn("llm.usage.reprice: event {} could not be repriced: {}", row.id(), e.toString());
-                meterRegistry.counter("llm.usage.reprice.failure").increment();
+                meterRegistry.counter(AgentMetrics.LLM_USAGE_REPRICE_FAILURE).increment();
                 continue;
             }
             tally.merge(outcome, 1, Integer::sum);
         }
-        meterRegistry.counter("llm.usage.reprice.unresolved").increment(tally.getOrDefault(Outcome.UNIDENTIFIABLE, 0));
+        meterRegistry
+                .counter(AgentMetrics.LLM_USAGE_REPRICE_UNRESOLVED)
+                .increment(tally.getOrDefault(Outcome.UNIDENTIFIABLE, 0));
         log.info(
                 "llm.usage.reprice: {} unpriced event(s) this month; {} repriced, {} still awaiting a catalogue price, "
                         + "{} name a model this instance cannot identify",

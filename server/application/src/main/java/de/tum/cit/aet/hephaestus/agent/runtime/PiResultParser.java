@@ -33,7 +33,6 @@ public class PiResultParser {
 
     private static final Logger log = LoggerFactory.getLogger(PiResultParser.class);
     private static final int MAX_BRACE_ATTEMPTS = 5;
-    private static final String METRIC_PARSE_FAILURE = "agent.pi.result.parse.failure";
 
     private final ObjectMapper objectMapper;
     private final MeterRegistry meterRegistry;
@@ -308,6 +307,8 @@ public class PiResultParser {
 
     private void recordFailure(String stage, Exception e) {
         log.warn("Failed to parse Pi {} output: {}", stage, e.getMessage());
-        meterRegistry.counter(METRIC_PARSE_FAILURE, Tags.of("stage", stage)).increment();
+        meterRegistry
+                .counter(AgentMetrics.AGENT_PI_RESULT_PARSE_FAILURE, Tags.of("stage", stage))
+                .increment();
     }
 }

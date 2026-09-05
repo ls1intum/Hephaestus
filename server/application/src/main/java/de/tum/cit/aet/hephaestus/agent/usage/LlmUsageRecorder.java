@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.usage;
 
+import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.core.TransactionCallbacks;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.math.BigDecimal;
@@ -59,7 +60,7 @@ public class LlmUsageRecorder {
     @Transactional(propagation = Propagation.MANDATORY)
     public void recordUnverifiable(Long workspaceId, LlmUsageSample sample) {
         if (persist(workspaceId, sample, asUnpriced(sample.price()))) {
-            meterRegistry.counter("llm.usage.unverifiable").increment();
+            meterRegistry.counter(AgentMetrics.LLM_USAGE_UNVERIFIABLE).increment();
         }
     }
 
@@ -126,7 +127,7 @@ public class LlmUsageRecorder {
             return false;
         }
         if (price.pricingState() == PricingState.UNPRICED) {
-            meterRegistry.counter("llm.usage.uncosted").increment();
+            meterRegistry.counter(AgentMetrics.LLM_USAGE_UNCOSTED).increment();
         }
         registerBudgetAlert(workspaceId, price, cost);
         return true;
@@ -148,7 +149,7 @@ public class LlmUsageRecorder {
                 sample.sourceId(),
                 sample.sourceAttempt());
         meterRegistry
-                .counter("llm.usage.cost.clamped", "direction", clampTag(computed.clamp()))
+                .counter(AgentMetrics.LLM_USAGE_COST_CLAMPED, "direction", clampTag(computed.clamp()))
                 .increment();
     }
 
@@ -171,7 +172,7 @@ public class LlmUsageRecorder {
                 alertIfBudgetCrossed(workspaceId, cost);
             } catch (RuntimeException e) {
                 log.warn("Post-commit LLM budget alert failed for workspaceId={}", workspaceId, e);
-                meterRegistry.counter("llm.budget.alert.failure").increment();
+                meterRegistry.counter(AgentMetrics.LLM_BUDGET_ALERT_FAILURE).increment();
             }
         });
     }
@@ -195,7 +196,7 @@ public class LlmUsageRecorder {
                     workspaceId,
                     budget,
                     monthToDate);
-            meterRegistry.counter("llm.budget.exhausted").increment();
+            meterRegistry.counter(AgentMetrics.LLM_BUDGET_EXHAUSTED).increment();
         }
     }
 }

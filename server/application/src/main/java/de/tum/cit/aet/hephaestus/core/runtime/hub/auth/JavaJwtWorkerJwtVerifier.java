@@ -5,6 +5,7 @@ import com.auth0.jwt.algorithms.Algorithm;
 import com.auth0.jwt.exceptions.JWTVerificationException;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.auth0.jwt.interfaces.JWTVerifier;
+import de.tum.cit.aet.hephaestus.core.metrics.CoreMetrics;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Instant;
 import java.util.HashMap;
@@ -17,7 +18,6 @@ import org.jspecify.annotations.Nullable;
 public class JavaJwtWorkerJwtVerifier implements WorkerJwtVerifier {
 
     private static final String EXPECTED_ALG = "RS256";
-    private static final String AUDIT_METRIC = "worker.jwt.verify";
 
     private final Map<String, JWTVerifier> verifiersByKid;
     private final WorkerTokenDenylistService denylist;
@@ -47,11 +47,13 @@ public class JavaJwtWorkerJwtVerifier implements WorkerJwtVerifier {
     public WorkerJwt verify(String token) {
         try {
             WorkerJwt jwt = verifyInternal(token);
-            meterRegistry.counter(AUDIT_METRIC, "outcome", "success").increment();
+            meterRegistry
+                    .counter(CoreMetrics.WORKER_JWT_VERIFY, "outcome", "success")
+                    .increment();
             return jwt;
         } catch (WorkerJwtInvalidException e) {
             meterRegistry
-                    .counter(AUDIT_METRIC, "outcome", "failed", "reason", e.getReasonTag())
+                    .counter(CoreMetrics.WORKER_JWT_VERIFY, "outcome", "failed", "reason", e.getReasonTag())
                     .increment();
             throw e;
         }

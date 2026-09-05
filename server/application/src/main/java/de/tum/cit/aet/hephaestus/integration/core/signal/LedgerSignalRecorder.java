@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.integration.core.signal;
 
-import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Instant;
 import java.util.Locale;
 import java.util.UUID;
@@ -24,11 +23,11 @@ public class LedgerSignalRecorder implements SignalRecorder {
     private static final Logger log = LoggerFactory.getLogger(LedgerSignalRecorder.class);
 
     private final ArtifactSignalRepository repository;
-    private final MeterRegistry meterRegistry;
+    private final PracticeReviewRefusalMetrics refusalMetrics;
 
-    public LedgerSignalRecorder(ArtifactSignalRepository repository, MeterRegistry meterRegistry) {
+    public LedgerSignalRecorder(ArtifactSignalRepository repository, PracticeReviewRefusalMetrics refusalMetrics) {
         this.repository = repository;
-        this.meterRegistry = meterRegistry;
+        this.refusalMetrics = refusalMetrics;
     }
 
     @Override
@@ -90,14 +89,7 @@ public class LedgerSignalRecorder implements SignalRecorder {
             logUnsettled("refused", key);
             return;
         }
-        meterRegistry
-                .counter(
-                        "practice.review.refused",
-                        "phase",
-                        "submission",
-                        "reason",
-                        reason.name().toLowerCase(Locale.ROOT))
-                .increment();
+        refusalMetrics.recordSubmissionRefusal(reason.name().toLowerCase(Locale.ROOT));
         log.debug(
                 "Signal refused: workspaceId={}, signal={}, artifactId={}, reason={}, state={}",
                 key.workspaceId(),
