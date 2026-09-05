@@ -1570,16 +1570,28 @@ async function main() {
 	// the model is ever called. Nothing project-local is wanted here anyway: every resource this run
 	// uses is injected by the runner, never discovered from the checkout.
 	const settingsManager = SettingsManager.create(CWD, AGENT_DIR, { projectTrusted: false });
-	// One resource loader for every session, and it discovers nothing: no context files, because
-	// that walk climbs to `/` looking for AGENTS.md and dies on the first ancestor the allowlist
-	// forbids; the review's context is what the server staged under the working directory.
-	const resourceLoader = new DefaultResourceLoader({
-		cwd: CWD,
-		agentDir: AGENT_DIR ?? getAgentDir(),
-		settingsManager,
-		noContextFiles: true,
-	});
-	await resourceLoader.reload();
+	// The only instructions a session carries beyond its prompt are the orchestrator the server staged
+	// in the agent dir. The SDK's own context-file discovery would climb from the working directory
+	// to `/` looking for AGENTS.md and die on the first ancestor the allowlist forbids, and it would
+	// read the reviewed checkout's AGENTS.md as instructions rather than as evidence; so discovery is
+	// off and the staged file is handed over by name. A run without it does not start.
+	const orchestratorPath = `${AGENT_DIR}/AGENTS.md`;
+	const orchestrator = readFileSync(orchestratorPath, "utf8");
+	// One loader per session: a loader owns the extension runtime a session binds its tools into, and
+	// disposing one session must not pull that runtime out from under another.
+	const loadResources = async () => {
+		const loader = new DefaultResourceLoader({
+			cwd: CWD,
+			agentDir: AGENT_DIR ?? getAgentDir(),
+			settingsManager,
+			noContextFiles: true,
+			agentsFilesOverride: () => ({
+				agentsFiles: [{ path: orchestratorPath, content: orchestrator }],
+			}),
+		});
+		await loader.reload();
+		return loader;
+	};
 	const modelRuntime = await ModelRuntime.create({
 		authPath: `${AGENT_DIR}/auth.json`,
 		modelsPath: `${AGENT_DIR}/models.json`,
@@ -1644,7 +1656,7 @@ async function main() {
 				customTools: [feedbackTool, buildSummaryTool()],
 				sessionManager: SessionManager.inMemory(),
 				settingsManager,
-				resourceLoader,
+				resourceLoader: await loadResources(),
 				modelRuntime,
 				model,
 			});
@@ -1721,7 +1733,7 @@ async function main() {
 			customTools: [],
 			sessionManager: manager,
 			settingsManager,
-			resourceLoader,
+			resourceLoader: await loadResources(),
 			modelRuntime,
 			model,
 		});
@@ -1782,7 +1794,7 @@ async function main() {
 					customTools: [scopedTool],
 					sessionManager: manager,
 					settingsManager,
-					resourceLoader,
+					resourceLoader: await loadResources(),
 					modelRuntime,
 					model,
 				});
@@ -1915,7 +1927,7 @@ async function main() {
 						? SessionManager.open(priorSessionFile, sessionDir)
 						: SessionManager.inMemory(),
 					settingsManager,
-					resourceLoader,
+					resourceLoader: await loadResources(),
 					modelRuntime,
 					model,
 				});
