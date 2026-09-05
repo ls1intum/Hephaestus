@@ -400,10 +400,21 @@ void describe("CI contract", () => {
 			"de/tum/cit/aet/hephaestus/integration/**",
 			"**/*Test,!de/tum/cit/aet/hephaestus/integration/**",
 		]);
-		// vp forwards no arguments, so the selector reaches Maven through the config's environment read.
+		// The matrix value reaches Maven through the config's environment read, never through a run: script.
 		assert.match(integration, /HEPHAESTUS_INTEGRATION_TESTS: \$\{\{ matrix.tests \}\}/);
-		assert.doesNotMatch(integration, /test:server:integration "-D/);
-		assert.match(integration, /Refuse a shard that ran nothing/);
+		assert.doesNotMatch(integration, /run: vp run test:server:integration "-D/);
+		// A shard whose reports carry no test case fails on that fact, not on a step name.
+		assert.match(
+			integration,
+			/grep -ho '<testcase ' server\/application\/target\/surefire-reports\/TEST-\*\.xml \| wc -l/,
+		);
+		assert.match(integration, /test "\$count" -gt 0/);
+		const guardStart = integration.indexOf("Refuse a shard");
+		const guardEnd = integration.indexOf("- name:", guardStart);
+		assert.doesNotMatch(
+			integration.slice(guardStart, guardEnd === -1 ? undefined : guardEnd),
+			/if: always\(\)/,
+		);
 		assert.match(integration, /Test Results - App Server Integration \(\$\{\{ matrix.shard \}\}\)/);
 		assert.equal((source.match(/run: vp run test:server:integration/g) ?? []).length, 1);
 		const tasks = await readFile("vite.config.ts", "utf8");

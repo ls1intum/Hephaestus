@@ -426,8 +426,8 @@ nothing that ships, so they compile from source in `Test` and do not wait for pa
   and `application` its complement. Both keep the `integration` tag filter and run in their own JVM
   and Testcontainers database; a new package belongs to one shard by construction. The shard's
   selector reaches Maven through `HEPHAESTUS_INTEGRATION_TESTS`, which `vite.config.ts` reads when
-  it loads, since `vp run` forwards no arguments; a shard that ran zero test cases fails its job, so
-  a selector that drifts cannot pass green. `fail-fast: false` lets both shards report, and
+  it loads, so the matrix value never appears in a `run:` script; a shard that ran zero test cases
+  fails its job, so a selector that drifts cannot pass green. `fail-fast: false` lets both shards report, and
   `CI Status Gate` requires the aggregate `Test` result. Locally the tier runs whole.
 - Pull requests and merge groups build `linux/amd64`; pushes to `main`, and every run on the Version
   PR's branch, build both architectures. A pull request also builds only the images its diff touched
