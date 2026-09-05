@@ -6,7 +6,9 @@ import de.tum.cit.aet.hephaestus.agent.mentor.MentorRunnerProfile;
 import de.tum.cit.aet.hephaestus.agent.practice.PracticeRunnerProfile;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -309,17 +311,32 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
             assertThat(body.substring(sliceStart, nodeIdx)).isBlank();
         }
 
-        /** A write grant is resolved when Node starts, so every granted directory is created first. */
+        /**
+         * A write grant is resolved when Node starts, so a directory the command grants but does not
+         * create first accepts its own {@code mkdir} and denies every write inside it.
+         */
         @Test
-        void shouldCreateEveryWritableDirectoryBeforeNodeStarts() {
-            String body = factory.build(spec(PRACTICE)).command().get(2);
-            int mkdir = body.indexOf("mkdir -p ");
-            int node = body.indexOf("node ");
-            assertThat(mkdir).isNotNegative();
-            assertThat(node).isGreaterThan(mkdir);
-            for (String directory : PiRunnerProfile.WRITABLE_DIRECTORIES) {
-                assertThat(body.substring(mkdir, node)).contains(" " + directory + " ");
-                assertThat(body).contains("--allow-fs-write=" + directory);
+        void shouldCreateEveryDirectoryTheRunnerIsGrantedBeforeNodeStarts() {
+            for (PiRunnerProfile profile : List.of(PRACTICE, MENTOR)) {
+                String body = factory.build(spec(profile)).command().get(2);
+                // The precompute step runs its own `node` first, with a grant of its own.
+                int runner = body.lastIndexOf("node ");
+                int mkdir = body.indexOf("mkdir -p ");
+                assertThat(mkdir).isNotNegative();
+                assertThat(runner).isGreaterThan(mkdir);
+
+                String staging = body.substring(mkdir, runner);
+                List<String> granted = Pattern.compile("--allow-fs-write=(\\S+)")
+                        .matcher(body.substring(runner))
+                        .results()
+                        .map(match -> match.group(1))
+                        .toList();
+                assertThat(granted).isNotEmpty();
+                for (String directory : granted) {
+                    assertThat(staging)
+                            .as("%s creates %s before node starts", profile.runnerScript(), directory)
+                            .contains(" " + directory + " ");
+                }
             }
         }
 
