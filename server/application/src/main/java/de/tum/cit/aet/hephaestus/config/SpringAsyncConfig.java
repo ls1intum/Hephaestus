@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.config;
 
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.task.TaskExecutionAutoConfiguration;
 import org.springframework.context.annotation.Bean;
@@ -74,6 +75,32 @@ public class SpringAsyncConfig implements AsyncConfigurer {
         // EntityManagerFactory closes.
         executor.setWaitForTasksToCompleteOnShutdown(true);
         executor.setAwaitTerminationSeconds(30);
+        return executor;
+    }
+
+    /**
+     * The lane every record of a stored credential's readability is written on.
+     *
+     * <p>One worker and a shallow queue that discards: the record is best effort, a later read of the
+     * same credential makes it again, and a stalled database must not turn a burst of failing reads
+     * into retained work or into a second pooled connection per caller. Off {@link
+     * #applicationTaskExecutor} so it neither queues behind the activity listeners a provider sync
+     * fans out nor competes with them for the same 500-deep queue.
+     *
+     * <p>Waits only briefly on shutdown, so a record already in flight lands before the
+     * EntityManagerFactory closes while a stalled one is abandoned like any other.
+     */
+    @Bean(name = CredentialReadabilityExecutor.BEAN_NAME)
+    public AsyncTaskExecutor credentialReadabilityExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(1);
+        executor.setMaxPoolSize(1);
+        executor.setQueueCapacity(64);
+        executor.setThreadNamePrefix("credential-readability-");
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.DiscardPolicy());
+        executor.setTaskDecorator(new ContextPropagatingTaskDecorator());
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(2);
         return executor;
     }
 

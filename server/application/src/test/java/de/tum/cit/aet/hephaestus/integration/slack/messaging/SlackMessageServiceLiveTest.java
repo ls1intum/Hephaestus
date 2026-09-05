@@ -10,15 +10,14 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
-import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.CredentialBundleConverter;
-import de.tum.cit.aet.hephaestus.integration.core.connection.CredentialReader;
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.slack.credentials.SlackCredentialProvider;
+import de.tum.cit.aet.hephaestus.testconfig.CredentialReaders;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.Optional;
@@ -67,13 +66,8 @@ class SlackMessageServiceLiveTest {
         ConnectionService connectionService = mock(ConnectionService.class);
         when(connectionService.findActive(workspaceId, IntegrationKind.SLACK)).thenReturn(Optional.of(connection));
 
-        SlackCredentialProvider credentialProvider = new SlackCredentialProvider(
-                connectionService,
-                new CredentialReader(
-                        org.mockito.Mockito.mock(ConnectionRepository.class),
-                        converter,
-                        org.mockito.Mockito.mock(org.springframework.transaction.PlatformTransactionManager.class),
-                        java.time.Clock.systemUTC()));
+        SlackCredentialProvider credentialProvider =
+                new SlackCredentialProvider(connectionService, CredentialReaders.forTests(converter));
         SlackMessageService service = new SlackMessageService(
                 credentialProvider,
                 new SlackRateLimitTracker(new SimpleMeterRegistry()),

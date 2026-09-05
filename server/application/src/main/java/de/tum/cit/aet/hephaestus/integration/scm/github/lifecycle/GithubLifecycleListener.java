@@ -322,7 +322,7 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
                                 .map(b -> b.token() != null && !b.token().isBlank())
                                 .orElse(false);
 
-                if (isPatWorkspace && hasPatToken) {
+                if (hasPatToken) {
                     log.info(
                             "Skipped GitHub App installation linking, PAT workspace has stored token: workspaceId={}, accountLogin={}, installationId={}",
                             existingByLogin.getId(),

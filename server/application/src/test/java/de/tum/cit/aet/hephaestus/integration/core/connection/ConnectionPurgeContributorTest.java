@@ -17,6 +17,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobService;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import de.tum.cit.aet.hephaestus.testconfig.CredentialReaders;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.spi.WorkspacePurgeBlockedException;
 import java.lang.reflect.Field;
@@ -67,11 +68,7 @@ class ConnectionPurgeContributorTest extends BaseUnitTest {
                 eventPublisher,
                 syncJobService,
                 transactionManager,
-                new CredentialReader(
-                        org.mockito.Mockito.mock(ConnectionRepository.class),
-                        credentialConverter,
-                        org.mockito.Mockito.mock(org.springframework.transaction.PlatformTransactionManager.class),
-                        java.time.Clock.systemUTC()));
+                CredentialReaders.forTests(credentialConverter));
         Mockito.lenient().when(connectionRepository.save(any(Connection.class))).thenAnswer(inv -> inv.getArgument(0));
         Mockito.lenient().when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
         Mockito.lenient().when(connectionStrategy.kind()).thenReturn(IntegrationKind.GITHUB);

@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.core.connection;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import java.util.Locale;
 
 /**
  * A stored credential exists but cannot be decrypted with the keys this server runs with. That is a
@@ -15,7 +16,7 @@ public class CredentialUnreadableException extends RuntimeException {
 
     public CredentialUnreadableException(long connectionId, IntegrationKind kind, Throwable cause) {
         super(
-                "The stored " + kind.name().toLowerCase(java.util.Locale.ROOT) + " credential of connection "
+                "The stored " + kind.name().toLowerCase(Locale.ROOT) + " credential of connection "
                         + connectionId
                         + " cannot be read with the server's current encryption keys. Replace the credential, or restore the"
                         + " key it was written with if that was changed by mistake.",
