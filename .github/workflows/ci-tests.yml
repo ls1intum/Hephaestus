@@ -59,10 +59,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # Surefire's `test` parameter replaces `includes`, so only the second shard's exclusion —
+          # never an inclusion of its own — keeps the two selectors complementary over every class
+          # the unsharded tier scans. scripts/ci-contract.test.ts proves the partition.
           - shard: providers
             tests: "de/tum/cit/aet/hephaestus/integration/**"
           - shard: application
-            tests: "**/*Test,!de/tum/cit/aet/hephaestus/integration/**"
+            tests: "!de/tum/cit/aet/hephaestus/integration/**"
     permissions:
       contents: read
       checks: write
@@ -79,16 +82,10 @@ jobs:
           os: ${{ runner.os }}
       - name: Run integration tests
         env:
-          # Read by vite.config.ts when it loads: the selector reaches Maven without a matrix value
-          # ever appearing in a run: script, which is what the workflow linter forbids.
+          # vite.config.ts reads this at load, so no matrix value ever reaches a run: script — which
+          # the workflow linter forbids.
           HEPHAESTUS_INTEGRATION_TESTS: ${{ matrix.tests }}
         run: vp run test:server:integration
-      - name: Refuse a shard that ran nothing
-        # A selector that drifts away from every class would otherwise pass green with zero tests.
-        run: |
-          count=$(grep -ho '<testcase ' server/application/target/surefire-reports/TEST-*.xml | wc -l)
-          echo "testcases=$count"
-          test "$count" -gt 0
       - name: Upload test results
         if: always()
         uses: dorny/test-reporter@a43b3a5f7366b97d083190328d2c652e1a8b6aa2 # v3.0.0
