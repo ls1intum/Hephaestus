@@ -1,11 +1,10 @@
 package de.tum.cit.aet.hephaestus.integration.schema;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.testconfig.PostgreSQLTestContainer;
 import de.tum.cit.aet.hephaestus.testconfig.PostgreSQLTestContainer.TestDatabase;
-import java.util.HashMap;
+import de.tum.cit.aet.hephaestus.testconfig.SchemaRowSeeder;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -26,6 +25,7 @@ class ObservationAssessmentBackfillIntegrationTest {
 
     private final JdbcTemplate jdbcTemplate = new JdbcTemplate(
             new SingleConnectionDataSource(DATABASE.jdbcUrl(), DATABASE.username(), DATABASE.password(), true));
+    private final SchemaRowSeeder seeder = new SchemaRowSeeder(jdbcTemplate);
 
     /**
      * The four backfill UPDATE statements, copied VERBATIM from changeSet {@code 1781092589259-60}
@@ -71,8 +71,9 @@ class ObservationAssessmentBackfillIntegrationTest {
 
         long desirablePracticeId = 9_000_001L;
         long undesirablePracticeId = 9_000_002L;
-        insertRow("practice", Map.of("id", desirablePracticeId, "slug", "backfill-desirable", "polarity", "DESIRABLE"));
-        insertRow(
+        seeder.insert(
+                "practice", Map.of("id", desirablePracticeId, "slug", "backfill-desirable", "polarity", "DESIRABLE"));
+        seeder.insert(
                 "practice",
                 Map.of("id", undesirablePracticeId, "slug", "backfill-undesirable", "polarity", "UNDESIRABLE"));
 
@@ -134,80 +135,13 @@ class ObservationAssessmentBackfillIntegrationTest {
         // dummy filler can't know that, so pin a valid value explicitly.
         overrides.put("artifact_kind", "scm.pull_request");
         // assessment intentionally omitted -> NULL (the pre-backfill state).
-        insertRow("observation", overrides);
+        seeder.insert("observation", overrides);
         return id;
-    }
-
-    /**
-     * Generic insert that satisfies the table's full NOT-NULL surface: every NOT-NULL column without
-     * a default and not supplied in {@code overrides} is filled with a type-appropriate dummy. FK
-     * targets are not seeded — this runs under {@code session_replication_role = replica}. Keeps the
-     * seed resilient to schema evolution (new NOT-NULL columns won't break this test).
-     */
-    private void insertRow(String table, Map<String, ?> overrides) {
-        List<Map<String, @Nullable Object>> columns = jdbcTemplate.queryForList(
-                "SELECT column_name, data_type, is_nullable, column_default " + "FROM information_schema.columns "
-                        + "WHERE table_schema = 'public' AND table_name = ?",
-                table);
-
-        Map<String, Object> values = new LinkedHashMap<>(overrides);
-        Map<String, String> dataTypes = new HashMap<>();
-        for (Map<String, Object> col : columns) {
-            String name = (String) col.get("column_name");
-            String dataType = (String) col.get("data_type");
-            assertNotNull(name);
-            assertNotNull(dataType);
-            dataTypes.put(name, dataType);
-            if (values.containsKey(name)) {
-                continue;
-            }
-            boolean nullable = "YES".equals(col.get("is_nullable"));
-            boolean hasDefault = col.get("column_default") != null;
-            if (nullable || hasDefault) {
-                continue; // leave to NULL / DB default
-            }
-            values.put(name, dummyFor(dataType, name));
-        }
-
-        String cols = String.join(", ", values.keySet());
-        String placeholders = String.join(
-                ", ",
-                values.keySet().stream()
-                        .map(name -> switch (required(dataTypes.get(name))) {
-                            case "json" -> "?::json";
-                            case "jsonb" -> "?::jsonb";
-                            default -> "?";
-                        })
-                        .toList());
-        jdbcTemplate.update(
-                "INSERT INTO " + table + " (" + cols + ") VALUES (" + placeholders + ")",
-                values.values().toArray());
-    }
-
-    /** Type-appropriate dummy for a NOT-NULL column the test does not otherwise care about. */
-    private Object dummyFor(String dataType, String columnName) {
-        return switch (dataType) {
-            case "uuid" -> UUID.randomUUID();
-            case "bigint", "integer", "smallint" -> 1L;
-            case "real", "double precision", "numeric" -> 0.0;
-            case "boolean" -> Boolean.FALSE;
-            case "jsonb", "json" -> "{}";
-            case "timestamp with time zone", "timestamp without time zone" ->
-                java.sql.Timestamp.from(java.time.Instant.now());
-            // character varying / text: keep it unique so any UNIQUE NOT-NULL column (e.g.
-            // observation.occurrence_key) doesn't collide across the seeded rows.
-            default -> "seed-" + columnName + "-" + UUID.randomUUID();
-        };
     }
 
     private @Nullable String assessmentOf(UUID observationId) {
         return jdbcTemplate.queryForObject(
                 "SELECT assessment FROM observation WHERE id = ?", String.class, observationId);
-    }
-
-    private static <T> T required(@org.jspecify.annotations.Nullable T value) {
-        assertNotNull(value);
-        return value;
     }
 
     private boolean columnExists(String table, String column) {

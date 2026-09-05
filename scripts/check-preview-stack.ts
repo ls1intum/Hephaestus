@@ -1,5 +1,6 @@
 /**
- * Asserts that the preview stack cannot leave its sandbox.
+ * Asserts that the preview stack cannot leave its sandbox, and that the seed policy which strips
+ * staging out of a clone verifies every store it touches.
  *
  * Coolify re-reads docker/preview/compose.app.yaml from the commit it deploys, so a pull request's
  * own copy of that file defines its stack. The preview controller refuses to deploy a head that
@@ -110,6 +111,42 @@ export function findStaleOmissions(referenceText: string): string[] {
 		.map(
 			(key) => `${key} is recorded as deliberately omitted but ${REFERENCE_FILE} no longer sets it`,
 		);
+}
+
+/** The heredoc the seed loader pipes into psql, and the query that decides whether it took effect. */
+const SEED_POLICY = /<<'SQL'\n([\s\S]*?)\n[ \t]*SQL\n/;
+const SEED_VERIFICATION = /LIVE=\$\$\(psql[^\n]*-c "([\s\S]*?)"\)/;
+const CHANGED_TABLE = /\b(?:UPDATE|DELETE FROM)[\s\n]+([a-z_]+)/g;
+const COUNTED_TABLE = /\bFROM[\s\n]+([a-z_]+)/g;
+
+function tablesIn(sql: string, pattern: RegExp): Set<string> {
+	return new Set([...sql.matchAll(pattern)].flatMap((match) => match[1] ?? []));
+}
+
+/**
+ * A clone of staging earns its seed marker by being counted, not by psql's exit status — every
+ * statement in the policy succeeds when it matches nothing. The policy and the count are written far
+ * apart in the same shell block, so a store the policy clears and the count forgets turns a policy
+ * that silently did not apply into a live preview holding staging's secrets, and a store the count
+ * watches and the policy never clears leaves every preview un-booted.
+ */
+export function findSeedPolicyGaps(previewText: string): string[] {
+	const policy = SEED_POLICY.exec(previewText)?.[1];
+	if (policy === undefined) return ["the seed loader applies no SQL policy"];
+	const verification = SEED_VERIFICATION.exec(previewText)?.[1];
+	if (verification === undefined) {
+		return ["the seed loader marks a clone seeded without verifying its policy"];
+	}
+	const changed = tablesIn(policy, CHANGED_TABLE);
+	const counted = tablesIn(verification, COUNTED_TABLE);
+	return [
+		...[...changed.difference(counted)]
+			.toSorted()
+			.map((table) => `the policy changes ${table} but the verification query never counts it`),
+		...[...counted.difference(changed)]
+			.toSorted()
+			.map((table) => `the verification query counts ${table} but the policy never changes it`),
+	];
 }
 
 /** Only has to let Compose interpolate; Coolify supplies the real values per pull request. */
@@ -289,12 +326,12 @@ export function renderStack(): unknown {
 
 if (import.meta.main) {
 	try {
-		const drift = findEnvDrift(
-			readFileSync(REFERENCE_FILE, "utf8"),
-			readFileSync(COMPOSE_FILE, "utf8"),
-		);
+		const previewText = readFileSync(COMPOSE_FILE, "utf8");
+		const drift = findEnvDrift(readFileSync(REFERENCE_FILE, "utf8"), previewText);
 		for (const problem of drift) console.error(`error: ${problem}`);
-		if (drift.length > 0) process.exitCode = 1;
+		const gaps = findSeedPolicyGaps(previewText);
+		for (const gap of gaps) console.error(`error: ${COMPOSE_FILE}: ${gap}`);
+		if (drift.length + gaps.length > 0) process.exitCode = 1;
 
 		const stack = renderStack();
 		if (stack === undefined) {

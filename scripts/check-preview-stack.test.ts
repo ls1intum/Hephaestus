@@ -3,6 +3,7 @@ import { describe, test } from "node:test";
 
 import {
 	findEnvDrift,
+	findSeedPolicyGaps,
 	findStaleOmissions,
 	findViolations,
 	REQUIRED_SWITCHES,
@@ -242,6 +243,60 @@ void describe("preview drift from the reference stack", () => {
 
 	void test("stays quiet for a variable recorded as deliberately omitted", () => {
 		assert.deepEqual(findEnvDrift(reference("      SANDBOX_CPUS: 2"), preview), []);
+	});
+});
+
+void describe("preview seed policy", () => {
+	const seedLoader = (policy: string, counted: string[]) =>
+		[
+			"        psql -h target -v ON_ERROR_STOP=1 <<'SQL'",
+			policy,
+			"        SQL",
+			"",
+			'        LIVE=$$(psql -h target -tAX -v ON_ERROR_STOP=1 -c "',
+			`          SELECT ${counted.map((table) => `(SELECT count(*) FROM ${table})`).join(" + ")}")`,
+			'        if [ "$$LIVE" != "0" ]; then exit 1; fi',
+		].join("\n");
+
+	void test("passes when the policy clears exactly what the verification counts", () => {
+		const stack = seedLoader(
+			"        UPDATE llm_connection SET api_key = NULL;\n        DELETE FROM issued_jwt;",
+			["llm_connection", "issued_jwt"],
+		);
+
+		assert.deepEqual(findSeedPolicyGaps(stack), []);
+	});
+
+	void test("names a credential store the policy clears and nothing counts", () => {
+		const stack = seedLoader(
+			"        UPDATE llm_connection SET api_key = NULL;\n        UPDATE workspace_llm_connection SET api_key = NULL;",
+			["llm_connection"],
+		);
+
+		assert.deepEqual(findSeedPolicyGaps(stack), [
+			"the policy changes workspace_llm_connection but the verification query never counts it",
+		]);
+	});
+
+	void test("names a store the verification counts and the policy never clears", () => {
+		const stack = seedLoader("        UPDATE llm_connection SET api_key = NULL;", [
+			"llm_connection",
+			"connection",
+		]);
+
+		assert.deepEqual(findSeedPolicyGaps(stack), [
+			"the verification query counts connection but the policy never changes it",
+		]);
+	});
+
+	void test("refuses a seed loader that applies or verifies nothing", () => {
+		assert.deepEqual(findSeedPolicyGaps("services:\n  seed-loader:\n"), [
+			"the seed loader applies no SQL policy",
+		]);
+		assert.deepEqual(
+			findSeedPolicyGaps("        psql <<'SQL'\n        DELETE FROM issued_jwt;\n        SQL\n"),
+			["the seed loader marks a clone seeded without verifying its policy"],
+		);
 	});
 });
 
