@@ -39,6 +39,33 @@ RUN mkdir -p /tmp/abi-check && ln -sf /opt/pi-sdk/node_modules /tmp/abi-check/no
     cd /tmp/abi-check && \
     printf 'const sdk = await import("@earendil-works/pi-coding-agent");\nif (!sdk || typeof sdk !== "object") { throw new Error("Pi SDK import yielded no module namespace"); }\nconsole.log("pi sdk exports:", Object.keys(sdk).length);\n' > check.ts && \
     node --permission --allow-fs-read=/tmp/abi-check --allow-fs-read=/opt/pi-sdk check.ts && \
+    mkdir -p /tmp/abi-check/work/nested /tmp/abi-check/agent /tmp/abi-check/home && \
+    printf 'SENTINEL-ORCHESTRATOR\n' > /tmp/abi-check/agent/AGENTS.md && \
+    printf 'DECOY\n' > /tmp/abi-check/work/AGENTS.md && \
+    printf '%s\n' \
+      'import { readFileSync } from "node:fs";' \
+      'import { DefaultResourceLoader, SettingsManager } from "@earendil-works/pi-coding-agent";' \
+      'const cwd = "/tmp/abi-check/work/nested";' \
+      'const agentDir = "/tmp/abi-check/agent";' \
+      '// Resolves resources exactly the way the runner does, under the same permissions: an untrusted' \
+      '// project so the SDK never walks the ancestors of the working directory for skills, discovery of' \
+      '// context files off, and the staged orchestrator handed over by name. The working directory sits' \
+      '// below ancestors outside the allowlist and beside a decoy AGENTS.md: an SDK that reaches out fails' \
+      '// the build, so does one that discovers the decoy, and so does a loader that carries anything but' \
+      '// the staged orchestrator.' \
+      'const settingsManager = SettingsManager.create(cwd, agentDir, { projectTrusted: false });' \
+      'const orchestratorPath = `${agentDir}/AGENTS.md`;' \
+      'const orchestrator = readFileSync(orchestratorPath, "utf8");' \
+      'const loader = new DefaultResourceLoader({ cwd, agentDir, settingsManager, noContextFiles: true, agentsFilesOverride: (base) => {' \
+      '  // The decoy must not be in the base list: an SDK that discovers context files with discovery off is the regression this gate exists for.' \
+      '  if (base.agentsFiles.length !== 0) { throw new Error(`context files were discovered with discovery off: ${JSON.stringify(base.agentsFiles.map((f) => f.path))}`); }' \
+      '  return { agentsFiles: [{ path: orchestratorPath, content: orchestrator }] };' \
+      '} });' \
+      'await loader.reload();' \
+      'const { agentsFiles } = loader.getAgentsFiles();' \
+      'if (agentsFiles.length !== 1 || !agentsFiles[0].content.includes("SENTINEL-ORCHESTRATOR")) { throw new Error(`expected the staged orchestrator alone, got ${JSON.stringify(agentsFiles.map((f) => f.path))}`); }' \
+      > runner-path-check.ts && \
+    HOME=/tmp/abi-check/home node --permission --allow-fs-read=/tmp/abi-check --allow-fs-read=/opt/pi-sdk runner-path-check.ts && \
     ! node --permission --allow-fs-read=/tmp/abi-check --allow-fs-read=/opt/pi-sdk \
       -e 'require("node:fs").readFileSync("/etc/passwd")' 2>/dev/null && \
     ! node --permission --allow-fs-read=/tmp/abi-check --allow-fs-read=/opt/pi-sdk \

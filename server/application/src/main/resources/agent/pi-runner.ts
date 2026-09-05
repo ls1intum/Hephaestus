@@ -5,6 +5,8 @@ import {
 	type AgentSessionEvent,
 	type AgentToolResult,
 	createAgentSession,
+	DefaultResourceLoader,
+	getAgentDir,
 	defineTool,
 	ModelRuntime,
 	SessionManager,
@@ -1567,7 +1569,34 @@ async function main() {
 	);
 
 	// Pi filters custom tools through this allowlist; omit filesystem mutation tools.
-	const settingsManager = SettingsManager.create(CWD, AGENT_DIR);
+	// Untrusted on purpose: a trusted project makes the SDK look for `.agents/skills` in every ancestor
+	// of the working directory, up to `/`, and the sandbox lets Node read only /workspace and the SDK
+	// itself (PiRunnerProfile), so that walk dies on the first ancestor with a permission error before
+	// the model is ever called. Nothing project-local is wanted here anyway: every resource this run
+	// uses is injected by the runner, never discovered from the checkout.
+	const settingsManager = SettingsManager.create(CWD, AGENT_DIR, { projectTrusted: false });
+	// The only instructions a session carries beyond its prompt are the orchestrator the server staged
+	// in the agent dir. The SDK's own context-file discovery would climb from the working directory
+	// to `/` looking for AGENTS.md and die on the first ancestor the allowlist forbids, and it would
+	// read the reviewed checkout's AGENTS.md as instructions rather than as evidence; so discovery is
+	// off and the staged file is handed over by name. A run without it does not start.
+	const orchestratorPath = `${AGENT_DIR}/AGENTS.md`;
+	const orchestrator = readFileSync(orchestratorPath, "utf8");
+	// One loader per session: a loader owns the extension runtime a session binds its tools into, and
+	// disposing one session must not pull that runtime out from under another.
+	const loadResources = async () => {
+		const loader = new DefaultResourceLoader({
+			cwd: CWD,
+			agentDir: AGENT_DIR ?? getAgentDir(),
+			settingsManager,
+			noContextFiles: true,
+			agentsFilesOverride: () => ({
+				agentsFiles: [{ path: orchestratorPath, content: orchestrator }],
+			}),
+		});
+		await loader.reload();
+		return loader;
+	};
 	const modelRuntime = await ModelRuntime.create({
 		authPath: `${AGENT_DIR}/auth.json`,
 		modelsPath: `${AGENT_DIR}/models.json`,
@@ -1632,6 +1661,7 @@ async function main() {
 				customTools: [feedbackTool, buildSummaryTool()],
 				sessionManager: SessionManager.inMemory(),
 				settingsManager,
+				resourceLoader: await loadResources(),
 				modelRuntime,
 				model,
 			});
@@ -1708,6 +1738,7 @@ async function main() {
 			customTools: [],
 			sessionManager: manager,
 			settingsManager,
+			resourceLoader: await loadResources(),
 			modelRuntime,
 			model,
 		});
@@ -1768,6 +1799,7 @@ async function main() {
 					customTools: [scopedTool],
 					sessionManager: manager,
 					settingsManager,
+					resourceLoader: await loadResources(),
 					modelRuntime,
 					model,
 				});
@@ -1900,6 +1932,7 @@ async function main() {
 						? SessionManager.open(priorSessionFile, sessionDir)
 						: SessionManager.inMemory(),
 					settingsManager,
+					resourceLoader: await loadResources(),
 					modelRuntime,
 					model,
 				});

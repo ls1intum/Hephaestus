@@ -319,7 +319,10 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                     .contains("--max-old-space-size=256")
                     .contains("--expose-gc")
                     .contains("--permission");
-            assertThat(body).contains("--allow-fs-read=/workspace").contains("--allow-fs-write=/workspace/out");
+            assertThat(body)
+                    .contains("--allow-fs-read=/workspace")
+                    .contains("--allow-fs-read=/home/agent")
+                    .contains("--allow-fs-write=/workspace/out");
         }
 
         @Test
