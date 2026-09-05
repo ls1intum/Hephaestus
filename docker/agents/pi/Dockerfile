@@ -78,8 +78,15 @@ RUN mkdir -p /tmp/abi-check && ln -sf /opt/pi-sdk/node_modules /tmp/abi-check/no
     # A write grant on a directory absent at startup covers its mkdir but nothing inside it; the
     # server therefore creates every writable directory before Node starts, and this build fails
     # the day Node changes that, so the pre-creation can be revisited rather than cargo-culted.
-    ! node --permission --allow-fs-read=/tmp/abi-check --allow-fs-write=/tmp/abi-check/absent \
-      -e 'const fs = require("node:fs"); fs.mkdirSync("/tmp/abi-check/absent"); fs.writeFileSync("/tmp/abi-check/absent/x", "1")' 2>/dev/null && \
+    printf '%s\n' \
+      'const fs = require("node:fs");' \
+      'const dir = process.argv[2];' \
+      'fs.mkdirSync(dir);' \
+      'let denied = false;' \
+      'try { fs.writeFileSync(`${dir}/x`, "1"); } catch (error) { denied = error.code === "ERR_ACCESS_DENIED"; }' \
+      'if (!denied) { throw new Error("a write inside a directory granted before it existed was allowed; revisit the pre-creation in PiRuntimeFactory"); }' \
+      > absent-grant-check.cjs && \
+    node --permission --allow-fs-read=/tmp/abi-check --allow-fs-write=/tmp/abi-check/absent absent-grant-check.cjs /tmp/abi-check/absent && \
     ! node --permission --allow-fs-read=/tmp/abi-check --allow-fs-read=/opt/pi-sdk \
       -e 'require("node:child_process").spawnSync("true")' 2>/dev/null && \
     rm -rf /tmp/abi-check

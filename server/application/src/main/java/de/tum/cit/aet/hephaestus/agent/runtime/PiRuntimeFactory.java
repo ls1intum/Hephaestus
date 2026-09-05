@@ -95,13 +95,9 @@ public class PiRuntimeFactory {
         if (precomputeStep == null || jobToken == null) {
             throw new IllegalStateException("validated Pi plan contains null fields");
         }
-        // Every directory the runner's Node process may write must exist before Node starts: the
-        // permission model resolves a grant at startup, and a directory created afterwards accepts
-        // mkdir but denies every write inside it (PiRunnerProfile). The session directory is the one
-        // the SDK would otherwise create itself, on the first message of the first session.
-        String command = "mkdir -p " + SandboxLayout.OUTPUT_PATH
-                + " " + workspaceRoot + "/" + SandboxLayout.SESSIONS_DIR
-                + " /home/agent/.config /home/agent/.local/tmp && "
+        // Every directory the runner may write exists before Node starts; PiRunnerProfile says why.
+        String command = "mkdir -p " + String.join(" ", PiRunnerProfile.WRITABLE_DIRECTORIES)
+                + " /home/agent/.config && "
                 +
                 // The runner imports the Pi SDK by bare specifier, which resolves from <workspace>/node_modules,
                 // so the SDK the image exposes at /opt/pi-sdk must be symlinked into place.

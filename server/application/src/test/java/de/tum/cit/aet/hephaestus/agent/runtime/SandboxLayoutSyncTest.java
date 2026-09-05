@@ -82,7 +82,7 @@ class SandboxLayoutSyncTest extends BaseUnitTest {
 
         assertThat(body)
                 .as("mentor runner references SandboxLayout.SESSIONS_DIR_PREFIX dir name (.sessions)")
-                .contains("/" + SandboxLayout.SESSIONS_DIR_PREFIX.replaceFirst("/$", ""));
+                .contains("/" + SandboxLayout.SESSIONS_DIR);
 
         assertThat(body)
                 .as("mentor runner falls back to SandboxLayout.PI_AGENT_DIR when PI_CODING_AGENT_DIR is unset")
