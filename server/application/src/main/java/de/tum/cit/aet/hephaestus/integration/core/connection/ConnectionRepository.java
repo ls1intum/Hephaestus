@@ -133,7 +133,7 @@ public interface ConnectionRepository extends JpaRepository<Connection, Long> {
      * Records that exactly this ciphertext could not be read, and only once: a credential replaced
      * since the failed read has a different ciphertext and is left alone. The record advances the
      * version, so an entity loaded before it and flushed after it fails its optimistic check instead
-     * of silently writing the stale value back. It never waits: a row another transaction holds
+     * of silently writing the stale value back. It never waits on the target row: one another transaction holds
      * locked, as disconnect does while it revokes the credential it just read, is skipped and the
      * record is left for a later read.
      */

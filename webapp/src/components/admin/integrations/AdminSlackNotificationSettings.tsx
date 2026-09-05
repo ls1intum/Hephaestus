@@ -62,6 +62,11 @@ import { SlackChannelPasteField } from "./slack-channels/SlackChannelPasteField"
 export interface AdminSlackNotificationSettingsProps {
 	workspaceSlug: string;
 	hasSlackConnection: boolean;
+	/**
+	 * When the stored bot token was first found unreadable with the server's keys. Reconnecting is
+	 * the way to replace it, so the connect button shows for a connected workspace too while set.
+	 */
+	credentialsUnreadableSince?: Date | null;
 	slackConnectionId?: number;
 	channelId?: string;
 	teamLabel?: string;
@@ -89,6 +94,7 @@ const DAYS = [
 export function AdminSlackNotificationSettings({
 	workspaceSlug,
 	hasSlackConnection,
+	credentialsUnreadableSince,
 	slackConnectionId,
 	channelId,
 	teamLabel,
@@ -98,6 +104,8 @@ export function AdminSlackNotificationSettings({
 	channelCandidates = [],
 	onSaved,
 }: AdminSlackNotificationSettingsProps) {
+	// The channel settings need a token the server can read; without one the way out is reconnecting.
+	const canUseConnection = hasSlackConnection && !credentialsUnreadableSince;
 	const selectableDigestChannels = channelCandidates.filter((candidate) => !candidate.archived);
 
 	// The persisted value is a stable Slack id. Anything that does not parse (legacy garbage, a
@@ -226,7 +234,7 @@ export function AdminSlackNotificationSettings({
 					</CardDescription>
 				</CardHeader>
 
-				{hasSlackConnection && (
+				{canUseConnection && (
 					<CardContent className="space-y-4">
 						<Item variant="outline" size="sm">
 							<ItemMedia variant="icon">
@@ -374,7 +382,7 @@ export function AdminSlackNotificationSettings({
 				)}
 
 				<CardFooter className="justify-between gap-2">
-					{hasSlackConnection ? (
+					{canUseConnection ? (
 						<>
 							<ButtonGroup>
 								<Button
@@ -408,16 +416,6 @@ export function AdminSlackNotificationSettings({
 									{test.isPending ? "Sending…" : "Send test message"}
 								</Button>
 							</ButtonGroup>
-
-							{slackConnectionId != null && (
-								<Button
-									variant="destructive-outline"
-									onClick={() => setDisconnectOpen(true)}
-									disabled={disconnect.isPending}
-								>
-									{disconnect.isPending ? "Disconnecting…" : "Disconnect Slack…"}
-								</Button>
-							)}
 						</>
 					) : (
 						<Button
@@ -430,7 +428,7 @@ export function AdminSlackNotificationSettings({
 								});
 							}}
 							disabled={connect.isPending}
-							className="w-full"
+							className={slackConnectionId != null ? undefined : "w-full"}
 						>
 							{connect.isPending ? (
 								<>
@@ -439,10 +437,21 @@ export function AdminSlackNotificationSettings({
 								</>
 							) : (
 								<>
-									Connect Slack workspace
+									{credentialsUnreadableSince
+										? "Reconnect Slack workspace"
+										: "Connect Slack workspace"}
 									<ExternalLinkIcon className="size-3.5" />
 								</>
 							)}
+						</Button>
+					)}
+					{slackConnectionId != null && (
+						<Button
+							variant="destructive-outline"
+							onClick={() => setDisconnectOpen(true)}
+							disabled={disconnect.isPending}
+						>
+							{disconnect.isPending ? "Disconnecting…" : "Disconnect Slack…"}
 						</Button>
 					)}
 				</CardFooter>

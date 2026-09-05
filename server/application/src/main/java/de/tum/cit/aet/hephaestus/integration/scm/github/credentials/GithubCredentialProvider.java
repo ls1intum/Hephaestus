@@ -22,7 +22,7 @@ import org.springframework.stereotype.Component;
  * (installation identity only; actual installation token is minted by
  * {@link GithubTokenRefresher}),
  * {@code GitHubPatConfig} → {@link ApiCredentialProvider.BearerToken} (decrypted from
- * the per-row credential blob via {@link CredentialBundleConverter}).
+ * the per-row credential blob via {@link de.tum.cit.aet.hephaestus.integration.core.connection.CredentialReader}).
  *
  * <p>Returns {@link Optional#empty()} when no Connection exists, the Connection is not
  * ACTIVE, the persisted config is not a GitHub variant, or the PAT row has no credential

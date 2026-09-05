@@ -315,7 +315,7 @@ export function useOutlineIntegration(workspaceSlug: string) {
 		connectCardProps: {
 			connected: hasConnection,
 			connectionState: outlineConnection?.state,
-		credentialsUnreadableSince: outlineConnection?.credentialsUnreadableSince,
+			credentialsUnreadableSince: outlineConnection?.credentialsUnreadableSince,
 			connectionLabel: outlineConnection?.displayName,
 			tokenStatus,
 			isTokenStatusLoading: hasConnection && isTokenStatusLoading,

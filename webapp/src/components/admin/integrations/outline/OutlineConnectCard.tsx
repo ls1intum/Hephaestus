@@ -42,6 +42,11 @@ export interface OutlineConnectCardProps {
 	 * each state is a lookup the compiler checks, instead of whatever `toLowerCase()` happens to emit.
 	 */
 	connectionState?: ConnectionState;
+	/**
+	 * When the stored token was first found unreadable with the server's keys. The connect form is
+	 * the way to replace it, so it shows for a connected instance too while this is set.
+	 */
+	credentialsUnreadableSince?: Date | null;
 	connectionLabel?: string;
 	tokenStatus?: OutlineTokenStatus;
 	isTokenStatusLoading?: boolean;
@@ -74,6 +79,7 @@ const EXPIRY_WARNING_DAYS = 14;
 export function OutlineConnectCard({
 	connected,
 	connectionState,
+	credentialsUnreadableSince,
 	connectionLabel,
 	tokenStatus,
 	isTokenStatusLoading = false,
@@ -110,7 +116,7 @@ export function OutlineConnectCard({
 				</CardHeader>
 
 				<CardContent className="space-y-4">
-					{!connected ? (
+					{!connected || credentialsUnreadableSince ? (
 						<FieldGroup>
 							<Field data-invalid={serverUrlInvalid}>
 								<FieldLabel htmlFor="outline-server-url">Server URL</FieldLabel>

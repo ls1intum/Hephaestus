@@ -36,6 +36,20 @@ const healthyToken = {
 };
 
 /** Cold start — no prefilled server URL (a prefill would ship a self-host token to Outline Cloud). */
+/** Connected, but the stored token can't be read: the form is the way to replace it. */
+export const CredentialUnreadable: Story = {
+	args: {
+		connected: true,
+		connectionState: "ACTIVE",
+		connectionLabel: "Acme Outline",
+		credentialsUnreadableSince: new Date("2026-09-05T08:00:00Z"),
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByLabelText(/api token/i)).toBeVisible();
+		await expect(canvas.getByRole("button", { name: /disconnect outline/i })).toBeVisible();
+	},
+};
+
 export const Disconnected: Story = {
 	args: { connected: false },
 	play: async ({ canvas }) => {

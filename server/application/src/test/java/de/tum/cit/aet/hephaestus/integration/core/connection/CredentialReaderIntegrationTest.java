@@ -9,6 +9,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.Set;
@@ -77,9 +78,12 @@ class CredentialReaderIntegrationTest extends AbstractWorkspaceIntegrationTest {
         holder.start();
         assertThat(locked.await(10, TimeUnit.SECONDS)).isTrue();
         try {
+            long started = System.nanoTime();
             Integer marked = transactionTemplate.execute(__ -> connectionRepository.markCredentialsUnreadable(
                     id, workspaceId, Objects.requireNonNull(connection.getCredentialsEncrypted()), Instant.now()));
             assertThat(marked).isZero();
+            // The holder keeps the lock for ten seconds; a mark that waited for it would not be back yet.
+            assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofSeconds(5));
         } finally {
             release.countDown();
             holder.join(10_000);
