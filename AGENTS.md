@@ -281,7 +281,9 @@ change that ships, never a measurement or a verdict alone.
   unavailable, kept POSIX-compatible.
 - Comments say what the code cannot — a constraint, a platform behaviour, a rejected alternative —
   and move when the code moves. Nothing in them is a run number, a measured duration or an
-  incident.
+  incident. Deleting one of these needs the same justification as adding one: either the code now
+  says it, or it moved to its one home. A pass that strips comments across files is its own pull
+  request, never a rider on a fix.
 - Our users read feedback about their own work. A wrong claim, a stale label or a lying spinner
   costs trust that a fast fix does not buy back.
 
