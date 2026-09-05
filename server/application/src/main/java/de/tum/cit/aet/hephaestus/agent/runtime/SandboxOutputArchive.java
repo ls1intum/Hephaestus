@@ -16,6 +16,8 @@ import org.apache.commons.io.input.BoundedInputStream;
 /**
  * Reads bounded output files without filesystem extraction. Metadata extensions are refused before
  * Commons Compress processes them, preventing hidden entries and sparse expansion from evading limits.
+ * A writer therefore has to stay inside USTAR: every archive member name, {@code out/} prefix included,
+ * is at most {@link org.apache.commons.compress.archivers.tar.TarConstants#NAMELEN} ASCII bytes.
  */
 public final class SandboxOutputArchive {
 
@@ -149,14 +151,34 @@ public final class SandboxOutputArchive {
             } catch (IllegalArgumentException e) {
                 throw new IOException("Invalid output archive header", e);
             }
+            if (!header.isCheckSumOK()) {
+                throw new IOException("Output archive header has an invalid checksum");
+            }
             byte type = header.getLinkFlag();
+            if (isNameExtension(type)) {
+                throw new IOException("Output archive paths must be at most " + TarConstants.NAMELEN
+                        + " ASCII bytes; tar name extension records are not read");
+            }
             boolean regular =
                     (type == TarConstants.LF_NORMAL || type == TarConstants.LF_OLDNORM) && !header.isDirectory();
             boolean directory = type == TarConstants.LF_DIR && header.getSize() == 0;
-            if (!header.isCheckSumOK() || (!regular && !directory)) {
-                throw new IOException("Output archive requires regular files and valid checksums");
+            if (!regular && !directory) {
+                throw new IOException("Output archive requires regular files");
             }
             return record;
+        }
+
+        /**
+         * A producer encodes a name longer than {@link TarConstants#NAMELEN} bytes, or a name outside
+         * ASCII, as one of these records. Reading them would hand Commons Compress the PAX keys that
+         * expand a sparse entry past the size its header declares, so writers stay inside USTAR instead.
+         */
+        private static boolean isNameExtension(byte type) {
+            return type == TarConstants.LF_PAX_EXTENDED_HEADER_LC
+                    || type == TarConstants.LF_PAX_EXTENDED_HEADER_UC
+                    || type == TarConstants.LF_PAX_GLOBAL_EXTENDED_HEADER
+                    || type == TarConstants.LF_GNUTYPE_LONGNAME
+                    || type == TarConstants.LF_GNUTYPE_LONGLINK;
         }
     }
 }

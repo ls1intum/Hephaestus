@@ -25,7 +25,12 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** Transfers sandbox files through the Docker archive API. */
+/**
+ * Transfers sandbox files through the Docker archive API.
+ *
+ * <p>Every transfer goes through {@code docker cp} rather than a bind mount, so the same code path
+ * serves a local and a remote daemon.
+ */
 public class SandboxWorkspaceManager {
 
     private static final Logger log = LoggerFactory.getLogger(SandboxWorkspaceManager.class);
@@ -123,6 +128,9 @@ public class SandboxWorkspaceManager {
     /**
      * Inject host directories into a container via {@code docker cp}.
      *
+     * <p>The tar is built here rather than by docker-java, whose internal tar creation binds a
+     * commons-compress version that conflicts with this application's.
+     *
      * @param containerId the target container (must be created but can be stopped)
      * @param directoryMounts map of host path to container path
      */
@@ -140,7 +148,13 @@ public class SandboxWorkspaceManager {
         }
     }
 
-    /** Prefix entries with the destination basename so extraction at its parent preserves the layout. */
+    /**
+     * Prefix entries with the destination basename so extraction at its parent preserves the layout.
+     *
+     * <p>The archive is staged on a temporary file rather than in a {@link java.io.ByteArrayOutputStream}
+     * so heap use stays independent of the directory's size; docker-java streams the file to the daemon
+     * with chunked transfer encoding and adds no buffering of its own.
+     */
     private void injectDirectoryViaTar(String containerId, String hostPath, String containerPath) {
         Path hostDir = Path.of(hostPath);
         Path containerParent = Path.of(containerPath).getParent();
@@ -227,6 +241,8 @@ public class SandboxWorkspaceManager {
                         }
                         tar.closeArchiveEntry();
                     }
+                    // Anything else — a symlink, a device, a socket — is left out: both predicates above
+                    // answer false for it once links are not followed.
                 } catch (IOException e) {
                     throw new SandboxInfrastructureException("Failed to add file to tar: " + path, e);
                 }
@@ -236,6 +252,13 @@ public class SandboxWorkspaceManager {
         }
     }
 
+    /**
+     * Copy at most {@code limit} bytes from {@code source} into {@code out}, returning the number actually
+     * read. Bounding the copy to the size the caller stat'd means a file that grew since is truncated to
+     * the declared length, keeping the tar entry valid, and one that shrank returns fewer bytes, letting
+     * the caller raise a concurrent-modification error — where an open-ended copy would leave the entry's
+     * declared size wrong and fail opaquely at {@code finish()}.
+     */
     private static long copyFilePrefix(Path source, OutputStream out, long limit) throws IOException {
         try (InputStream in = Files.newInputStream(source, LinkOption.NOFOLLOW_LINKS)) {
             return IOUtils.copyLarge(in, out, 0, limit);
@@ -254,8 +277,11 @@ public class SandboxWorkspaceManager {
                 MAX_OUTPUT_BYTES, maxOutputBytes, maxSingleFileBytes, SandboxOutputArchive.MAX_ENTRIES);
         try (InputStream tarStream = fileOps.copyArchiveFromContainer(containerId, outputPath)) {
             return reader.read(tarStream, Path.of(outputPath).getFileName().toString());
+        } catch (SandboxInfrastructureException e) {
+            // A dropped transfer can self-heal, so the completed execution stays worth retrying.
+            throw e;
         } catch (IOException | SandboxException e) {
-            // Execution already happened; collection failure must not trigger an infrastructure retry.
+            // A rejected archive fails identically on every retry, so it must not be classified as one.
             throw new SandboxException("Invalid or incomplete sandbox output archive", e);
         }
     }
@@ -338,6 +364,10 @@ public class SandboxWorkspaceManager {
         return dirs;
     }
 
+    /**
+     * Validate a directory mount path pair. A symlinked host path is refused because the daemon would
+     * resolve it and copy whatever it points at, which is a symlink escape out of the staged tree.
+     */
     private static void validateDirectoryMount(String hostPath, String containerPath) {
         if (hostPath == null || hostPath.isEmpty()) {
             throw new SandboxException("Host path must not be empty");
@@ -361,7 +391,7 @@ public class SandboxWorkspaceManager {
         }
     }
 
-    /** Returns a normalized relative path that does not escape the archive root. */
+    /** Returns a normalized relative path that does not escape the archive root (tar-slip). */
     private static String validatePath(String path) {
         if (path == null || path.isEmpty()) {
             throw new SandboxException("File path must not be empty");

@@ -39,6 +39,7 @@ import {
 	undeliverableUnits,
 	validateFeedbackEvidence,
 } from "./pi-runner-composition.ts";
+import { outputPath } from "./pi-runner-output.ts";
 import { deriveTimeouts, deriveTurnTiming, deriveWorkstreamBudget } from "./pi-runner-timings.ts";
 import {
 	addAssistantUsage,
@@ -172,8 +173,12 @@ const WORKSPACE_ROOT = "/workspace";
 const EVIDENCE_TOOLS = ["read", "grep"] as const;
 const CWD = process.env.PI_RUNNER_CWD ?? WORKSPACE_ROOT;
 const OUTPUT = `${CWD}/out`;
-const RESULT_PATH = `${OUTPUT}/result.json`;
-const REVIEW_STATE_PATH = `${OUTPUT}/review-state.json`;
+const RESULT_PATH = outputPath(OUTPUT, "result.json");
+const REVIEW_STATE_PATH = outputPath(OUTPUT, "review-state.json");
+const WATCHDOG_PATH = outputPath(OUTPUT, "watchdog-killed.json");
+const USAGE_PATH = outputPath(OUTPUT, "usage.json");
+const RUNNER_DEBUG_PATH = outputPath(OUTPUT, "runner-debug.json");
+const PRACTICE_COVERAGE_PATH = outputPath(OUTPUT, "practice-coverage.json");
 const AGENT_BUDGET_MS = Number(process.env.AGENT_BUDGET_MS);
 if (!Number.isFinite(AGENT_BUDGET_MS) || AGENT_BUDGET_MS <= 0) {
 	throw new Error(
@@ -194,7 +199,7 @@ setTimeout(() => {
 	console.error(`[pi-runner] Watchdog: ${AGENT_BUDGET_MS + 30_000}ms elapsed, hard-exiting`);
 	try {
 		writeFileSync(
-			`${OUTPUT}/watchdog-killed.json`,
+			WATCHDOG_PATH,
 			JSON.stringify({
 				budgetMs: AGENT_BUDGET_MS,
 				elapsedMs: AGENT_BUDGET_MS + 30_000,
@@ -460,10 +465,10 @@ const observationSchema = {
 } as const;
 
 function persistUsage() {
-	writeFileSync(`${OUTPUT}/usage.json`, JSON.stringify(usageTotals, null, 2));
+	writeFileSync(USAGE_PATH, JSON.stringify(usageTotals, null, 2));
 }
 function persistRunnerDebug() {
-	writeFileSync(`${OUTPUT}/runner-debug.json`, JSON.stringify(runnerDebug, null, 2));
+	writeFileSync(RUNNER_DEBUG_PATH, JSON.stringify(runnerDebug, null, 2));
 }
 function persistReviewState() {
 	writeFileSync(
@@ -798,7 +803,7 @@ console.error(
 );
 
 const COMPOSITION_REQUEST_PATH = `${CWD}/inputs/feedback-composition.json`;
-const FEEDBACK_PATH = `${OUTPUT}/feedback.json`;
+const FEEDBACK_PATH = outputPath(OUTPUT, "feedback.json");
 const COMPOSER_PROMPT_PATH = `${CWD}/feedback-composer.md`;
 const PREPARED_FEEDBACK_PATH = `${CWD}/inputs/history/prepared.json`;
 const COMPOSITION_OBSERVATIONS_PATH = `${CWD}/work/composition/observations.json`;
@@ -1677,7 +1682,7 @@ async function main() {
 	const startMs = Date.now();
 
 	const allSlugs = loadPracticeSlugs();
-	practiceCoverageLedger = new PracticeCoverageLedger(`${OUTPUT}/practice-coverage.json`, allSlugs);
+	practiceCoverageLedger = new PracticeCoverageLedger(PRACTICE_COVERAGE_PATH, allSlugs);
 	const groupCapacity = process.env.PI_PRACTICE_BATCH_SIZE
 		? Number(process.env.PI_PRACTICE_BATCH_SIZE)
 		: 6;

@@ -63,6 +63,7 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
     private static final String CONTAINER_ID = "container-456def";
     private static final String APP_SERVER_IP = "172.18.0.2";
 
+    /** Reusable default host config — avoids 14-arg constructor duplication across tests. */
     private static final DockerOperations.HostConfigSpec DEFAULT_HOST_CONFIG = new DockerOperations.HostConfigSpec(
             4L * 1024 * 1024 * 1024,
             4L * 1024 * 1024 * 1024,
@@ -544,6 +545,7 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
                     .isInstanceOf(SandboxException.class)
                     .hasMessageContaining("Docker daemon lost");
 
+            // 500 mirrors DockerSandboxAdapter.LOG_TAIL_LINES; a truncated tail is no diagnostics at all.
             InOrder inOrder = inOrder(containerManager);
             inOrder.verify(containerManager).getLogs(CONTAINER_ID, 500);
             inOrder.verify(containerManager).forceRemove(CONTAINER_ID);
@@ -615,6 +617,7 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
                 cancelDone.await(5, TimeUnit.SECONDS);
                 return new SandboxContainerManager.WaitOutcome(137, false);
             });
+            // No getLogs stub: cancel() throws before the COLLECT phase or captureLogsOnError() run.
 
             Thread bg = new Thread(() -> {
                 try {
@@ -888,6 +891,7 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
 
         @Test
         void shouldBlockCaseVariants() {
+            // Some tools and shells inject lowercase variants.
             assertThat(SandboxEnvBlocklist.isBlocked("aws_access_key_id")).isTrue();
             assertThat(SandboxEnvBlocklist.isBlocked("docker_host")).isTrue();
             assertThat(SandboxEnvBlocklist.isBlocked("Google_Cloud_Project")).isTrue();

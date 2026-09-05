@@ -26,7 +26,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
-/** Blocking Docker execution with cancellation and best-effort resource cleanup. */
+/**
+ * Blocking Docker execution with cancellation and best-effort resource cleanup.
+ *
+ * <p>Each {@link #execute} call is self-contained and blocks its caller's thread, so callers submit it
+ * to the bounded {@code sandboxExecutor} pool. Cleanup runs in {@code finally} whatever the outcome,
+ * and a step that fails there is logged and left for reconciliation rather than propagated.
+ */
 public class DockerSandboxAdapter implements SandboxManager {
 
     private static final Logger log = LoggerFactory.getLogger(DockerSandboxAdapter.class);
@@ -38,11 +44,19 @@ public class DockerSandboxAdapter implements SandboxManager {
     private static final String MDC_JOB_ID = "sandbox.jobId";
     private static final String MDC_CONTAINER_ID = "sandbox.containerId";
 
-    /** Limits each diagnostic event separately from the transport collection limit. */
+    /**
+     * Limits each diagnostic event so a large container log cannot overflow the aggregator. This is the
+     * <em>emission</em> limit; {@link DockerClientOperations#MAX_LOG_BYTES} is the upstream
+     * <em>collection</em> limit.
+     */
     private static final int MAX_LOG_EVENT_CHARS = 32 * 1024;
 
     /**
      * Overrides repository, global and system Git config; explicit {@code git -c} options take precedence.
+     *
+     * <p>Each entry pairs a git config key that can execute code with a value that neutralises it: an
+     * empty string disables the feature, {@code /nonexistent} points it at a path that cannot exist, and
+     * {@code cat} is the canonical no-op pager.
      *
      * @see <a href="https://git-scm.com/docs/git-config#_environment">git-config environment</a>
      */
@@ -72,8 +86,10 @@ public class DockerSandboxAdapter implements SandboxManager {
     private final MeterRegistry meterRegistry;
     private final Timer executionDuration;
 
+    /** Presence of a flag is what marks a job as running. */
     private final ConcurrentHashMap<UUID, AtomicBoolean> cancellationFlags = new ConcurrentHashMap<>();
 
+    /** Only a registered container can be stopped by {@link #cancel}. */
     private final ConcurrentHashMap<UUID, String> activeContainers = new ConcurrentHashMap<>();
 
     public DockerSandboxAdapter(
@@ -202,7 +218,6 @@ public class DockerSandboxAdapter implements SandboxManager {
             // A cancellation-induced container exit must remain cancellation, not a normal result.
             checkCancelled(cancelled, jobId);
 
-            // Collect output regardless of exit code or timeout — agent may have written partial results
             Map<String, byte[]> outputFiles;
             try {
                 outputFiles = workspaceManager.collectOutput(containerId, spec.outputPath());
@@ -292,7 +307,8 @@ public class DockerSandboxAdapter implements SandboxManager {
     private Map<String, String> buildEnvironment(SandboxSpec spec, String appServerIp) {
         Map<String, String> env = new HashMap<>();
 
-        // Enforced values must overwrite caller-supplied variables.
+        // Enforced values must overwrite caller-supplied variables: SandboxEnvBlocklist already drops the
+        // dangerous ones, and this ordering keeps a value added below winning even if it is not listed there.
         for (var entry : spec.environment().entrySet()) {
             if (SandboxEnvBlocklist.isBlocked(entry.getKey())) {
                 log.warn("Blocked dangerous environment variable: {}", entry.getKey());
@@ -302,6 +318,8 @@ public class DockerSandboxAdapter implements SandboxManager {
         }
         addTraceEnvironment(env);
 
+        // Injected whether or not a volume mount is present, because the agent can clone a repository at
+        // runtime and carry a hostile .git/config in with it.
         int idx = 0;
         for (String containerPath : spec.volumeMounts().values()) {
             env.put("GIT_CONFIG_KEY_" + idx, "safe.directory");
@@ -380,6 +398,7 @@ public class DockerSandboxAdapter implements SandboxManager {
         }
     }
 
+    /** Each step is independent, so one that fails still leaves the others to run. */
     private void cleanup(UUID jobId, @Nullable String containerId, @Nullable String networkId) {
         if (containerId != null) {
             suppressAndLog("remove container", jobId, () -> containerManager.forceRemove(containerId));

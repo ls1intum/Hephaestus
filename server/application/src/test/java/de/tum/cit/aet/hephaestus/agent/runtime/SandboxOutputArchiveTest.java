@@ -63,7 +63,7 @@ class SandboxOutputArchiveTest extends BaseUnitTest {
     }
 
     @ParameterizedTest
-    @ValueSource(ints = {'1', '2', '3', '4', '6', '7', 'S', 'x', 'g', 'L', 'K'})
+    @ValueSource(ints = {'1', '2', '3', '4', '6', '7', 'S'})
     void shouldRejectUnsupportedHeaderBeforeReadingItsPayloadWhenTypeIsNotRegular(int type) {
         var entry = new TarArchiveEntry("out/entry", (byte) type);
         // Header only: the reader must refuse metadata before a library buffers or expands it.
@@ -72,6 +72,35 @@ class SandboxOutputArchiveTest extends BaseUnitTest {
         assertThatThrownBy(() -> reader.read(new ByteArrayInputStream(header), "out"))
                 .isInstanceOf(IOException.class)
                 .hasMessageContaining("regular files");
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {'x', 'X', 'g', 'L', 'K'})
+    void shouldNameTheLengthLimitWhenHeaderIsANameExtensionRecord(int type) {
+        var entry = new TarArchiveEntry("out/entry", (byte) type);
+        byte[] header = new byte[512];
+        entry.writeEntryHeader(header);
+        assertThatThrownBy(() -> reader.read(new ByteArrayInputStream(header), "out"))
+                .isInstanceOf(IOException.class)
+                .hasMessageContaining("at most 100 ASCII bytes");
+    }
+
+    @Test
+    void shouldNameTheLengthLimitWhenAProducerWritesAnOverlongPath() throws IOException {
+        // A member name past 100 bytes is only expressible as a PAX record, which is what Docker emits.
+        byte[] bytes = archive(file("out/" + "a".repeat(97) + ".json", 0));
+        assertThatThrownBy(() -> reader.read(new ByteArrayInputStream(bytes), "out"))
+                .isInstanceOf(IOException.class)
+                .hasMessageContaining("at most 100 ASCII bytes");
+    }
+
+    @Test
+    void shouldAcceptALongPathThatStaysInsideUstar() throws IOException {
+        // Commons Compress reserves a terminating NUL and switches to PAX at 100 bytes, where Docker's Go
+        // producer still fits the field exactly, so the longest fixture writable here is one byte short.
+        String name = "b".repeat(95);
+        var output = reader.read(new ByteArrayInputStream(archive(file("out/" + name, 2))), "out");
+        assertThat(output).containsOnlyKeys(name);
     }
 
     @Test
@@ -176,7 +205,7 @@ class SandboxOutputArchiveTest extends BaseUnitTest {
         bytes[0] ^= 1;
         assertThatThrownBy(() -> reader.read(new ByteArrayInputStream(bytes), "out"))
                 .isInstanceOf(IOException.class)
-                .hasMessageContaining("checksums");
+                .hasMessageContaining("invalid checksum");
     }
 
     @ParameterizedTest
@@ -242,6 +271,8 @@ class SandboxOutputArchiveTest extends BaseUnitTest {
     private static byte[] archive(TarArchiveEntry... entries) throws IOException {
         var bytes = new ByteArrayOutputStream();
         try (var tar = new TarArchiveOutputStream(bytes)) {
+            // As Docker's Go producer does: a name past the USTAR field becomes a PAX record rather than an error.
+            tar.setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
             for (var entry : entries) {
                 tar.putArchiveEntry(entry);
                 byte[] content = new byte[(int) entry.getSize()];

@@ -155,6 +155,8 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
 
         @Test
         void shouldStreamLargeInputsFromDisk(@TempDir Path tempDir) throws Exception {
+            // The archive is written to a temp file and on-disk entries stream through a fixed buffer,
+            // so total staged size is bounded by disk, not by heap.
             Path large = tempDir.resolve("large.bin");
             byte[] chunk = new byte[1024 * 1024];
             java.util.Arrays.fill(chunk, (byte) 'x');
@@ -233,17 +235,33 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldFailWithoutInfrastructureRetryWhenOutputCannotBeCollected() {
+        void shouldStayRetryableWhenTheOutputTransferFails() {
             when(fileOps.copyArchiveFromContainer(CONTAINER_ID, "/workspace/out"))
-                    .thenThrow(new SandboxInfrastructureException("No such path"));
+                    .thenThrow(new SandboxInfrastructureException("Docker daemon socket closed"));
 
             assertThatThrownBy(() -> manager.collectOutput(CONTAINER_ID, "/workspace/out"))
+                    .as("AgentJobExecutor.isRetryableInfraFailure requeues on this type, and a daemon that"
+                            + " dropped a completed run's transfer is exactly what it is for")
+                    .isInstanceOf(SandboxInfrastructureException.class)
+                    .hasMessage("Docker daemon socket closed");
+        }
+
+        @Test
+        void shouldFailWithoutInfrastructureRetryWhenTheOutputArchiveIsInvalid() throws Exception {
+            byte[] tarBytes = createTestTar(Map.of("out/result.json", "{}".getBytes()));
+            tarBytes[0] ^= 1;
+            when(fileOps.copyArchiveFromContainer(CONTAINER_ID, "/workspace/out"))
+                    .thenReturn(new ByteArrayInputStream(tarBytes));
+
+            assertThatThrownBy(() -> manager.collectOutput(CONTAINER_ID, "/workspace/out"))
+                    .as("a rejected archive is rejected identically on every retry")
                     .isExactlyInstanceOf(SandboxException.class)
-                    .hasCauseInstanceOf(SandboxInfrastructureException.class);
+                    .hasMessageContaining("Invalid or incomplete sandbox output archive");
         }
 
         @Test
         void shouldEnforceOutputSizeLimit() throws Exception {
+            // A 1 KB budget keeps the fixture out of the megabytes while still crossing the limit.
             var limitedManager = new SandboxWorkspaceManager(
                     fileOps,
                     1024,
@@ -295,6 +313,7 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
 
         @Test
         void shouldRejectWholeOutputWhenSingleFileExceedsLimit() throws Exception {
+            // A 10-byte per-file budget keeps the fixture out of the megabytes.
             var limitedManager = new SandboxWorkspaceManager(
                     fileOps,
                     10_000,
@@ -363,6 +382,7 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
 
         @Test
         void shouldRejectDirectoryExceedingSizeLimit() throws Exception {
+            // A 1 KB budget keeps the fixture out of the megabytes while still crossing the limit.
             var limitedManager = new SandboxWorkspaceManager(
                     fileOps, 50L * 1024 * 1024, 10L * 1024 * 1024, 1024, SandboxWorkspaceManager.MAX_DIRECTORY_ENTRIES);
 

@@ -37,6 +37,7 @@ import com.github.dockerjava.api.exception.NotModifiedException;
 import com.github.dockerjava.api.model.Container;
 import com.github.dockerjava.api.model.Network;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxException;
+import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxInfrastructureException;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
@@ -383,13 +384,25 @@ class DockerClientOperationsTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldThrowOnCopyFromFailure() {
+        void shouldThrowRetryableWhenCopyFromFails() {
             CopyArchiveFromContainerCmd cmd = mock(CopyArchiveFromContainerCmd.class);
             when(dockerClient.copyArchiveFromContainerCmd("ctr-1", "/output")).thenReturn(cmd);
-            when(cmd.exec()).thenThrow(new DockerException("No such path", 404));
+            when(cmd.exec()).thenThrow(new DockerException("Connection reset", 500));
 
             assertThatThrownBy(() -> ops.copyArchiveFromContainer("ctr-1", "/output"))
-                    .isInstanceOf(SandboxException.class)
+                    .isInstanceOf(SandboxInfrastructureException.class)
+                    .hasMessageContaining("/output");
+        }
+
+        @Test
+        void shouldThrowWithoutRetryWhenTheCopiedPathDoesNotExist() {
+            CopyArchiveFromContainerCmd cmd = mock(CopyArchiveFromContainerCmd.class);
+            when(dockerClient.copyArchiveFromContainerCmd("ctr-1", "/output")).thenReturn(cmd);
+            when(cmd.exec()).thenThrow(new NotFoundException("No such path"));
+
+            assertThatThrownBy(() -> ops.copyArchiveFromContainer("ctr-1", "/output"))
+                    .as("a directory the container never wrote is missing again on every retry")
+                    .isExactlyInstanceOf(SandboxException.class)
                     .hasMessageContaining("/output");
         }
     }
