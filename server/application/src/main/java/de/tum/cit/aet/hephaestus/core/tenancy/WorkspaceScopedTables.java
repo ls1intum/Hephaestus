@@ -92,6 +92,7 @@ public class WorkspaceScopedTables {
             "databasechangeloglock");
 
     private volatile Set<String> scopedTables = Set.of();
+    private volatile Set<String> manyToManyJoinTables = Set.of();
     private final ObjectProvider<EntityManagerFactory> entityManagerFactoryProvider;
 
     /**
@@ -126,7 +127,13 @@ public class WorkspaceScopedTables {
         // and a bare SELECT against them leaks cross-workspace if not joined to a scoped
         // parent. Collections owned via a foreign-key column on the child entity resolve
         // to the child's own table — already added in the entity walk above.
-        metamodel.forEachCollectionDescriptor(collection -> addIfScoped(tables, collection.getTableName()));
+        Set<String> joinTables = new TreeSet<>();
+        metamodel.forEachCollectionDescriptor(collection -> {
+            addIfScoped(tables, collection.getTableName());
+            // A many-to-many join table is the one shape whose rows Hibernate deletes by both
+            // foreign keys; the inspector allows exactly that statement, for exactly these tables.
+            if (collection.isManyToMany()) addIfScoped(joinTables, collection.getTableName());
+        });
 
         // Fail-fast: zero scoped tables from a non-empty entity set means the Hibernate
         // mapping metamodel call chain regressed. A silently-empty set would turn the
@@ -137,6 +144,7 @@ public class WorkspaceScopedTables {
                     + "Check Hibernate MappingMetamodel API compatibility.");
         }
         this.scopedTables = Set.copyOf(tables);
+        this.manyToManyJoinTables = Set.copyOf(joinTables);
         log.info(
                 "WorkspaceScopedTables populated: {} workspace-scoped tables (incl. join tables), {} global",
                 scopedTables.size(),
@@ -154,6 +162,11 @@ public class WorkspaceScopedTables {
     /** Workspace-scoped physical table names (lowercase). Empty until ApplicationReady fires. */
     public Set<String> scopedTables() {
         return scopedTables;
+    }
+
+    /** True iff the table is a {@code @ManyToMany} join table, per the mapping metamodel. */
+    public boolean isManyToManyJoinTable(String tableName) {
+        return tableName != null && manyToManyJoinTables.contains(tableName.toLowerCase(Locale.ROOT));
     }
 
     /** True iff the table requires a {@code workspace_id} predicate on every query. */

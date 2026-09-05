@@ -85,33 +85,46 @@ public class WorkspaceStatementInspector implements StatementInspector {
     /** One surrogate-key predicate: {@code id = ?} or {@code <anything>_id = ?}, optionally quoted. */
     private static final String KEY_EQUALS_PARAMETER = "\"?(?:id|[A-Za-z_][A-Za-z0-9_]*_id)\"?\\s*=\\s*\\?";
 
+    /** One foreign-key predicate, {@code <anything>_id = ?}, optionally quoted. */
+    private static final String FOREIGN_KEY_EQUALS_PARAMETER = "\"?[A-Za-z_][A-Za-z0-9_]*_id\"?\\s*=\\s*\\?";
+
     /**
-     * Matches Hibernate-emitted DML on rows identified solely by surrogate keys —
-     * {@code DELETE FROM table WHERE id = ?}, {@code UPDATE table SET ... WHERE id = ?}, and the
-     * join-table row a many-to-many element removal deletes,
-     * {@code DELETE FROM issue_label WHERE issue_id = ? AND label_id = ?}. Every predicate column
-     * must be a key ({@code id} or {@code *_id}), conjoined; nothing else.
+     * Matches Hibernate-emitted DML on a single row identified solely by primary key —
+     * {@code DELETE FROM table WHERE id = ?} or
+     * {@code UPDATE table SET ... WHERE id = ?} (no other predicate columns).
      *
-     * <p>These are tenancy-safe by construction: the rows were already loaded into the
-     * persistence context within a workspace-checked transaction, and surrogate keys are opaque
-     * to anything a request could supply. Allowing this pattern aligns with how Spring Data
-     * {@code delete(entity)}/{@code save(entity)} and Hibernate's collection persisters synthesise
-     * SQL, without requiring every scoped repository to wear {@code @WorkspaceAgnostic} just to
-     * satisfy the inspector.
+     * <p>These are tenancy-safe by construction: the row was already loaded into the
+     * persistence context within a workspace-checked transaction, and the surrogate {@code id}
+     * uniquely identifies it. Allowing this pattern aligns with how Spring Data
+     * {@code delete(entity)}/{@code save(entity)} synthesise SQL, without requiring every
+     * scoped repository to wear {@code @WorkspaceAgnostic} just to satisfy the inspector.
      *
-     * <p>The pattern is intentionally narrow: a non-key column anywhere in the predicate (e.g.
-     * {@code WHERE issue_id = ? AND name = ?}) breaks the match and falls through to the
+     * <p>The pattern is intentionally narrow: any additional condition (e.g.
+     * {@code WHERE id = ? AND something_else}) breaks the match and falls through to the
      * standard {@code workspace_id} check, preserving enforcement for hand-written queries.
      */
     private static final Pattern PK_ONLY_DML_PATTERN = Pattern.compile(
             "^\\s*(?:DELETE\\s+FROM|UPDATE)\\s+\"?[A-Za-z_][A-Za-z0-9_]*\"?" + "(?:\\s+SET\\s+.+?)?"
                     + "\\s+WHERE\\s+" + KEY_EQUALS_PARAMETER
-                    + "(?:\\s+AND\\s+" + KEY_EQUALS_PARAMETER + ")*"
                     +
                     // Optional @Version optimistic-lock predicate: AND version = ?
                     "(?:\\s+AND\\s+\"?version\"?\\s*=\\s*\\?)?"
                     + "\\s*$",
             Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+
+    /**
+     * Matches the one statement Hibernate emits to remove an element of a {@code @ManyToMany}:
+     * the join-table row deleted by both of its foreign keys,
+     * {@code DELETE FROM issue_label WHERE issue_id = ? AND label_id = ?}. Fully anchored, DELETE
+     * only, exactly two key predicates, so neither a comment nor a SET clause can hide anything
+     * in it. Which tables it may apply to is not a naming convention: the captured table must be
+     * a many-to-many join table in the mapping metamodel, so an entity table with two
+     * {@code *_id} columns never qualifies however it is named.
+     */
+    private static final Pattern JOIN_TABLE_ROW_DELETE_PATTERN = Pattern.compile(
+            "^\\s*DELETE\\s+FROM\\s+\"?([A-Za-z_][A-Za-z0-9_]*)\"?\\s+WHERE\\s+" + FOREIGN_KEY_EQUALS_PARAMETER
+                    + "\\s+AND\\s+" + FOREIGN_KEY_EQUALS_PARAMETER + "\\s*$",
+            Pattern.CASE_INSENSITIVE);
 
     /**
      * Matches a Hibernate-emitted load that pins the result set to a single row (or a
@@ -200,6 +213,11 @@ public class WorkspaceStatementInspector implements StatementInspector {
         // Hibernate-emitted single-row PK DML is safe: the row was already loaded
         // within a workspace-checked scope and identified by a surrogate primary key.
         if (PK_ONLY_DML_PATTERN.matcher(sql).matches()) {
+            return Decision.ok();
+        }
+        Matcher joinTableRowDelete = JOIN_TABLE_ROW_DELETE_PATTERN.matcher(sql);
+        if (joinTableRowDelete.matches()
+                && scopedTables.isManyToManyJoinTable(unqualify(joinTableRowDelete.group(1)))) {
             return Decision.ok();
         }
         // Hibernate-emitted entity load / lazy-fetch by PK is safe for the same reason —

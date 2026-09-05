@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.micrometer.core.instrument.Counter;
+import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -169,27 +170,40 @@ class WorkspaceStatementInspectorTest extends BaseUnitTest {
     }
 
     @Test
-    void deleteJoinTableRowByAllOfItsKeysIsAllowed() {
+    void deleteManyToManyJoinTableRowByBothKeysIsAllowed() {
         // Removing one element of a @ManyToMany: Hibernate deletes the join-table row by both
-        // foreign keys. Both are surrogate keys the persistence context already held, so this is
-        // the same argument as delete-by-id; requiring workspace_id here fails every label removal.
+        // foreign keys. The table is known from the mapping metamodel, not from its name.
         WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.THROW);
+        when(scopedTables.isManyToManyJoinTable("issue_label")).thenReturn(true);
         inspector.inspect("delete from issue_label where issue_id=? and label_id=?");
-        verifyNoInteractions(reporter, scopedTables);
+        inspector.inspect("DELETE FROM \"issue_label\" WHERE \"issue_id\"=? AND \"label_id\"=?");
+        verifyNoInteractions(reporter);
     }
 
     @Test
-    void deleteJoinTableRowWithDisjunctionStillRequiresWorkspaceId() {
-        // A disjunction broadens the row set past the keyed rows, so it is not the shape
-        // Hibernate emits and gets the standard check.
+    void twoForeignKeysOnAnEntityTableStillRequireWorkspaceId() {
+        // feedback.id is the key; recipient_user_id and about_user_id are ordinary columns, so
+        // this shape must not pass on the strength of two *_id names.
+        WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.LOG);
+        when(scopedTables.isScoped("feedback")).thenReturn(true);
+        String sql = "delete from feedback where recipient_user_id=? and about_user_id=?";
+        inspector.inspect(sql);
+        verify(reporter).report(sql, Set.of("feedback"), TenancyEnforcement.LOG);
+    }
+
+    @Test
+    void joinTableAllowanceIsDeleteByBothKeysAndNothingElse() {
         WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.LOG);
         when(scopedTables.isScoped("issue_label")).thenReturn(true);
-        inspector.inspect("delete from issue_label where issue_id=? or label_id=?");
-        verify(reporter)
-                .report(
-                        "delete from issue_label where issue_id=? or label_id=?",
-                        Set.of("issue_label"),
-                        TenancyEnforcement.LOG);
+        when(scopedTables.isManyToManyJoinTable("issue_label")).thenReturn(true);
+        for (String sql : List.of(
+                "delete from issue_label where issue_id=? or label_id=?",
+                "delete from issue_label where issue_id=? and name=?",
+                "update issue_label set label_id=? where issue_id=? and label_id=?",
+                "delete from issue_label where issue_id=? and label_id=? and version=?")) {
+            inspector.inspect(sql);
+            verify(reporter).report(sql, Set.of("issue_label"), TenancyEnforcement.LOG);
+        }
     }
 
     @Test
