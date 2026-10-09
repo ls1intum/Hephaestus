@@ -41,7 +41,8 @@ public interface DocumentProjection {
      *
      * <p>{@code archived} is Outline's recoverable "archived in the wiki" state, distinct from
      * {@code deleted}: an archived document keeps its body. {@code collectionName} is the display name;
-     * {@code collectionSlug} is the stable identity.
+     * {@code collectionSlug} is the stable identity. {@code url} is the link of the document on its server, when
+     * the connection names the server and the document is not deleted.
      */
     record ProjectedDocument(
             String collectionSlug,
@@ -61,7 +62,8 @@ public interface DocumentProjection {
             boolean archived,
             @Nullable String collectionName,
             @Nullable Instant syncedAt,
-            @Nullable String sourceId) {
+            @Nullable String sourceId,
+            @Nullable String url) {
         public ProjectedDocument {
             collaborators = List.copyOf(collaborators);
         }
@@ -90,6 +92,7 @@ public interface DocumentProjection {
                     null,
                     List.of(),
                     false,
+                    null,
                     null,
                     null,
                     null);

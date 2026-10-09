@@ -53,7 +53,7 @@ async function fetchWithTimeout(input: string, init?: RequestInit): Promise<Resp
 	return fetch(input, { ...init, signal: AbortSignal.timeout(HTTP_TIMEOUT_MS) });
 }
 
-function startApplication(name: string, image: string): number {
+function startApplication(name: string, image: string, database = "hephaestus"): number {
 	docker(
 		"run",
 		"--detach",
@@ -68,7 +68,7 @@ function startApplication(name: string, image: string): number {
 		"--env",
 		"SPRING_LIQUIBASE_CONTEXTS=prod",
 		"--env",
-		"SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/hephaestus",
+		`SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/${database}`,
 		"--env",
 		"SPRING_DATASOURCE_USERNAME=root",
 		"--env",
@@ -389,13 +389,13 @@ function linkWorkspaceIdentity(layout: PeopleLayout): void {
 	}
 }
 
-function query(sql: string): string {
+function query(sql: string, database = "hephaestus"): string {
 	return docker(
 		"exec",
 		postgres,
 		"psql",
 		"--username=root",
-		"--dbname=hephaestus",
+		`--dbname=${database}`,
 		"--set=ON_ERROR_STOP=1",
 		// Without it a write's command tag follows the rows it returns.
 		"--quiet",
@@ -421,12 +421,12 @@ function preservedPeople(layout: PeopleLayout): PreservedPeopleIds {
 	};
 }
 
-function executeFixture(name: "released-seed.sql" | "assert-migrated.sql"): void {
+function executeFixture(
+	name: "released-seed.sql" | "assert-migrated.sql" | "assert-upgraded.sql",
+	directory: "practice-cutover" | "heph-upgrade" = "practice-cutover",
+): void {
 	const input = readFileSync(
-		new URL(
-			`../server/application/src/test/resources/db/practice-cutover/${name}`,
-			import.meta.url,
-		),
+		new URL(`../server/application/src/test/resources/db/${directory}/${name}`, import.meta.url),
 		"utf8",
 	);
 	const result = spawnSync(
@@ -477,6 +477,65 @@ function workspacePracticeCount(workspaceSlug: string): number {
 			to_jsonb(workspace)->>'slug'
 		) = '${workspaceSlug}';
 	`);
+}
+
+/** Whether the previous release keeps Heph chat history that conversation copies point to. */
+function keepsHephChatHistory(): boolean {
+	return (
+		count(`SELECT count(*) FROM information_schema.columns
+			WHERE table_schema = 'public' AND table_name = 'feedback_copy' AND column_name = 'chat_message_id';`) ===
+		1
+	);
+}
+
+/**
+ * Every column, constraint, index, trigger and function of the application schema, one sorted line each. Liquibase's
+ * own tables and runtime partitions are left out: they are not part of what a changelog decides.
+ */
+function schemaFingerprint(database: string): string[] {
+	const facts = query(
+		`SELECT line FROM (
+			SELECT 'column|' || table_name || '|' || column_name || '|' || data_type || '|'
+				|| coalesce(character_maximum_length::text, '') || '|' || is_nullable || '|' || coalesce(column_default, '')
+				AS line
+			FROM information_schema.columns WHERE table_schema = 'public'
+			UNION ALL
+			SELECT 'constraint|' || conrelid::regclass || '|' || conname || '|' || pg_get_constraintdef(oid)
+			FROM pg_constraint WHERE connamespace = 'public'::regnamespace AND conrelid <> 0
+			UNION ALL
+			SELECT 'index|' || tablename || '|' || indexname || '|' || indexdef FROM pg_indexes WHERE schemaname = 'public'
+			UNION ALL
+			SELECT 'trigger|' || tgrelid::regclass || '|' || tgname || '|' || pg_get_triggerdef(oid)
+			FROM pg_trigger WHERE NOT tgisinternal
+			UNION ALL
+			SELECT 'function|' || proname || '|' || md5(prosrc) FROM pg_proc WHERE pronamespace = 'public'::regnamespace
+		) facts
+		WHERE line NOT LIKE '%databasechangelog%' AND line !~ '\\|auth_event_(p[0-9]+|default)\\|'
+		ORDER BY line;`,
+		database,
+	);
+	return facts === "" ? [] : facts.split("\n");
+}
+
+/** Starts the candidate once on an empty database and compares its schema with the upgraded one. */
+async function assertFreshSchemaEqualsUpgraded(image: string): Promise<void> {
+	docker("exec", postgres, "createdb", "--username=root", "hephaestus_fresh");
+	const fresh = `${runId}-fresh`;
+	try {
+		await waitUntilReady(fresh, startApplication(fresh, image, "hephaestus_fresh"));
+	} finally {
+		spawnSync("docker", ["rm", "--force", fresh], { stdio: "ignore" });
+	}
+	const upgraded = schemaFingerprint("hephaestus");
+	const created = schemaFingerprint("hephaestus_fresh");
+	const onlyUpgraded = upgraded.filter((line) => !created.includes(line));
+	const onlyFresh = created.filter((line) => !upgraded.includes(line));
+	if (onlyUpgraded.length > 0 || onlyFresh.length > 0) {
+		throw new Error(
+			`The upgraded schema differs from a fresh one:\n- only upgraded:\n${onlyUpgraded.join("\n")}\n- only fresh:\n${onlyFresh.join("\n")}`,
+		);
+	}
+	console.log(`Fresh and upgraded schemas match (${upgraded.length} facts).`);
 }
 
 function appliedChangeCount(): number {
@@ -665,6 +724,10 @@ try {
 	if (exactMainSource) {
 		executeFixture("released-seed.sql");
 	}
+	const hephChatSource = upgradePath === "latest" && keepsHephChatHistory();
+	if (hephChatSource) {
+		executeFixture("released-seed.sql", "heph-upgrade");
+	}
 	const preserved = preservedPeople(layout);
 	// Legacy stays unfiltered so a refused start that adds people is still detected.
 	const seededData =
@@ -695,6 +758,9 @@ try {
 		}
 		const upgradedData = dataFingerprint("native", preserved);
 		executeFixture("assert-migrated.sql");
+		if (hephChatSource) {
+			executeFixture("assert-upgraded.sql", "heph-upgrade");
+		}
 		if (upgradedData !== seededData) {
 			throw new Error("Seeded application data changed during upgrade");
 		}
@@ -729,8 +795,11 @@ try {
 			throw new Error("Workspace practice counts changed after restart");
 		}
 
+		if (upgradePath === "latest") {
+			await assertFreshSchemaEqualsUpgraded(candidateImage);
+		}
 		console.log(
-			`Seeded ${upgradePath} release upgrade passed (origin/main review seed: ${exactMainSource}).`,
+			`Seeded ${upgradePath} release upgrade passed (origin/main review seed: ${exactMainSource}, Heph chat seed: ${hephChatSource}).`,
 		);
 	}
 } catch (error) {

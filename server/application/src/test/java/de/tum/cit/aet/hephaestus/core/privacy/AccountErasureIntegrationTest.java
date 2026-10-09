@@ -9,8 +9,8 @@ import de.tum.cit.aet.hephaestus.agent.context.PreparedEvidence;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobExecutor;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobLifecycleService;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
-import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorChatService;
-import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorRefusal;
+import de.tum.cit.aet.hephaestus.agent.mentor.turn.MentorAdmission;
+import de.tum.cit.aet.hephaestus.agent.mentor.turn.MentorRefusal;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AiChoice;
@@ -42,10 +42,16 @@ import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMessage;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMessageRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThread;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadRepository;
-import de.tum.cit.aet.hephaestus.mentor.ChatMessage;
-import de.tum.cit.aet.hephaestus.mentor.ChatMessageRepository;
-import de.tum.cit.aet.hephaestus.mentor.ChatThread;
-import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
+import de.tum.cit.aet.hephaestus.mentor.MentorConversation;
+import de.tum.cit.aet.hephaestus.mentor.MentorConversationService;
+import de.tum.cit.aet.hephaestus.mentor.MentorEntry;
+import de.tum.cit.aet.hephaestus.mentor.MentorEntryDraft;
+import de.tum.cit.aet.hephaestus.mentor.MentorEntryRepository;
+import de.tum.cit.aet.hephaestus.mentor.MentorEntryService;
+import de.tum.cit.aet.hephaestus.mentor.MentorLedgerFixtures;
+import de.tum.cit.aet.hephaestus.mentor.MentorTimeline;
+import de.tum.cit.aet.hephaestus.mentor.MentorTurn;
+import de.tum.cit.aet.hephaestus.mentor.MentorTurnService;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackCopy;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackCopyRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
@@ -82,6 +88,8 @@ import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -95,6 +103,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 class AccountErasureIntegrationTest extends BaseIntegrationTest {
@@ -120,7 +129,7 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
     private PersonProcessingSuppression suppression;
 
     @Autowired
-    private MentorChatService mentor;
+    private MentorAdmission mentor;
 
     @Autowired
     private ResultMarkRepository resultMarks;
@@ -171,10 +180,19 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
     private SlackThreadRepository slackThreads;
 
     @Autowired
-    private ChatThreadRepository chatThreadRepository;
+    private MentorConversationService mentorConversations;
 
     @Autowired
-    private ChatMessageRepository chatMessageRepository;
+    private MentorEntryService mentorEntries;
+
+    @Autowired
+    private MentorEntryRepository mentorEntryRepository;
+
+    @Autowired
+    private MentorTimeline mentorTimeline;
+
+    @Autowired
+    private MentorTurnService mentorTurns;
 
     @Autowired
     private ReviewJobRepository agentJobRepository;
@@ -189,7 +207,14 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
     private FeedbackCopyRepository feedbackCopyRepository;
 
     private static final Set<String> RETAINED_AFTER_ERASURE = Set.of(
-            "account", "user", "identity_restriction", "person_data_request", "person_evidence_copy", "slack_thread");
+            "account",
+            "user",
+            "identity_restriction",
+            "person_data_request",
+            "person_evidence_copy",
+            "slack_thread",
+            // The frozen selection names workspaces, not entries.
+            MentorEntryRepository.COPIES_PERSON_DATA_STORE);
 
     @BeforeEach
     void clearRows() {
@@ -390,6 +415,7 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
         List<DerivedConversation> targetDerived = new ArrayList<>();
         List<DerivedConversation> otherDerived = new ArrayList<>();
         List<Long> sharedThreads = new ArrayList<>();
+        List<ConversationFeedbackCopy> copiedFeedback = new ArrayList<>();
         for (int index = 1; index <= 2; index++) {
             String team = "T" + index;
             Workspace workspace = workspaces.saveAndFlush(WorkspaceTestFixtures.activeWorkspace("privacy-" + index));
@@ -430,6 +456,7 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
             message(workspace, team, "300.1", "300.1", "UOTHER", other, "Unrelated conversation");
             targetDerived.add(seedDerivedConversation(workspace, shared.getId(), target));
             otherDerived.add(seedDerivedConversation(workspace, unrelated.getId(), other));
+            copiedFeedback.add(seedFeedbackCopy(targetDerived.getLast(), otherDerived.getLast()));
             targetFolders.add(captureMountedEvidence(worker, recorder, targetDerived.getLast(), target));
             otherFolders.add(captureMountedEvidence(worker, recorder, otherDerived.getLast(), other));
         }
@@ -490,10 +517,12 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
         otherFolders.forEach(path -> assertThat(path).exists());
         assertThat(counts.get("feedback")).isEqualTo(4L);
         assertThat(preview.externalDeliveries()).isEmpty();
+        // Each delivered feedback has its own conversation copy and the copy in another person's conversation.
         assertThat(export.path("stores").path("feedback_copy"))
                 .extracting(row -> row.path("feedback_id").asString())
                 .containsExactlyInAnyOrderElementsOf(targetDerived.stream()
-                        .map(derived -> derived.deliveredId().toString())
+                        .flatMap(derived -> Stream.of(derived.deliveredId(), derived.deliveredId()))
+                        .map(UUID::toString)
                         .toList());
         assertThat(counts.get("result")).isEqualTo(4L);
         assertThat(export.path("stores").path("result"))
@@ -506,37 +535,23 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
                 .allSatisfy(
                         row -> assertThat(row.path("reason").asString()).isEqualTo("Correction before access request"));
         assertThat(counts.get("config_audit_event_membership_subject")).isEqualTo(2L);
-        assertThat(counts.get("chat_thread")).isEqualTo(2L);
-        assertThat(counts.get("chat_thread_runtime_journal")).isEqualTo(2L);
+        assertThat(counts.get("mentor_conversation")).isEqualTo(2L);
+        assertThat(counts.get("mentor_entry")).isEqualTo(2L);
+        assertThat(counts.get(MentorEntryRepository.COPIES_PERSON_DATA_STORE)).isEqualTo(2L);
+        assertThat(counts.get("mentor_entry_feedback_copy")).isEqualTo(2L);
+        assertThat(export.path("stores").path("mentor_entry_feedback_copy").toString())
+                .contains("Target guidance copied into another conversation")
+                .doesNotContain("Other reply to erased feedback", "account_id", "credential-canary");
         assertThat(counts.get("slack_message")).isEqualTo(2L);
         counts.forEach((store, count) -> assertThat(
                         (long) export.path("stores").path(store).size())
                 .as("Frozen preview/export parity for %s", store)
-                // Another member's hidden runtime journal is cleared, never
-                // exported.
-                .isEqualTo(store.equals("chat_thread_runtime_journal") ? 0L : count));
-        assertThat(export.path("stores").path("chat_thread").toString()).doesNotContain("session_jsonl");
-        assertThat(export.path("stores")
-                        .path("chat_message")
-                        .get(0)
-                        .path("parts")
-                        .size())
-                .isEqualTo(1);
-        assertThat(export.path("stores")
-                        .path("chat_message")
-                        .get(0)
-                        .path("parts")
-                        .get(0)
-                        .path("text")
-                        .asString())
-                .isEqualTo("Delivered guidance");
-        assertThat(export.path("stores")
-                        .path("chat_message")
-                        .get(0)
-                        .path("metadata")
-                        .path("inputTokens")
-                        .asLong())
-                .isEqualTo(12L);
+                // Tool results in another member's conversation are redacted, never exported.
+                .isEqualTo(store.equals(MentorEntryRepository.COPIES_PERSON_DATA_STORE) ? 0L : count));
+        assertThat(export.path("stores").path("mentor_entry"))
+                .allSatisfy(row -> assertThat(row.path("text").asString()).isEqualTo("Delivered guidance"));
+        assertThat(export.path("stores").path("mentor_entry").toString())
+                .doesNotContain("payload", "runtime-credential-canary");
         assertThat(export.toString())
                 .doesNotContain(
                         "Unrelated conversation",
@@ -650,11 +665,28 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
                             threadId))
                     .isEqualTo(1);
         }
+        for (var copy : copiedFeedback) {
+            MentorEntry erased =
+                    mentorEntryRepository.findById(copy.messageId()).orElseThrow();
+            assertThat(erased.isRedacted()).isTrue();
+            assertThat(erased.getText()).isEmpty();
+            assertThat(String.valueOf(erased.getPayload())).doesNotContain("Target guidance");
+            assertThat(mentorEntryRepository
+                            .findById(copy.replyId())
+                            .orElseThrow()
+                            .getText())
+                    .isEqualTo("Other reply to erased feedback");
+        }
         for (var contributor : registry.stores()) {
-            assertThat(contributor.export(
-                            Objects.requireNonNull(otherSelection.get(contributor.store())), otherPrimaryScope))
+            // Only the Heph messages that copied the erased person's feedback change in another conversation.
+            assertThat(withoutErasedCopies(
+                            contributor.store(),
+                            contributor.export(
+                                    Objects.requireNonNull(otherSelection.get(contributor.store())), otherPrimaryScope),
+                            copiedFeedback))
                     .as("Another person's %s rows", contributor.store())
-                    .isEqualTo(otherRows.get(contributor.store()));
+                    .isEqualTo(withoutErasedCopies(
+                            contributor.store(), otherRows.get(contributor.store()), copiedFeedback));
         }
         personData.requestErasure(requestId, administratorId, false);
         personData.run(requestId);
@@ -824,16 +856,25 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
                         copiedJobs.stream().map(UUID::toString).toList());
         assertThat(export.path("stores").path("review_job"))
                 .allSatisfy(row -> assertThat(row.has("capture")).isFalse());
-        assertThat(export.path("stores").path("chat_thread_runtime_journal")).isEmpty();
+        assertThat(export.path("stores").path(MentorEntryRepository.COPIES_PERSON_DATA_STORE))
+                .isEmpty();
         assertThat(export.toString())
                 .doesNotContain(
                         "OTHER-PROFILE-CANARY",
                         "credential-canary",
                         "Practice guidance for developer",
                         "context/conversation.json");
-        UUID laterThread = seedJournal(
-                        workspaces.findById(affected.getFirst().workspaceId()).orElseThrow(), other)
-                .getId();
+        // The frozen selection names workspaces, so a tool result written after the preview is redacted too.
+        Workspace firstAffected =
+                workspaces.findById(affected.getFirst().workspaceId()).orElseThrow();
+        UUID laterToolResult = seedToolResult(firstAffected, other);
+        // The context folder's tools copy data as fetch_context did.
+        List<UUID> folderResults = List.of(
+                seedToolResult(firstAffected, other, "read"),
+                seedToolResult(firstAffected, other, "bash"),
+                seedToolResult(firstAffected, other, "load_context"));
+        UUID linkedAnswer =
+                seedFeedbackAnswer(firstAffected, other, affected.getFirst().deliveredId());
         personData.requestErasure(requestId, administratorId, true);
         personData.run(requestId);
         assertThat(personData.get(requestId).request().getState()).isEqualTo(PersonDataRequest.State.COMPLETE);
@@ -851,23 +892,38 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
                     .isPresent();
             assertThat(feedbackRepository.findById(derived.preparedId())).isEmpty();
             assertThat(feedbackRepository.findById(derived.deliveredId())).isPresent();
-            assertThat(chatMessageRepository
+            assertThat(mentorEntryRepository
                             .findById(derived.messageId())
                             .orElseThrow()
-                            .getParts()
-                            .toString())
-                    .contains("Delivered guidance");
+                            .getText())
+                    .isEqualTo("Delivered guidance");
             assertThat(agentJobRepository.findById(derived.jobId())).isEmpty();
-            assertThat(jdbc.queryForObject(
-                            "SELECT length(session_jsonl) = 0 FROM chat_thread t JOIN"
-                                    + " chat_message m ON m.thread_id=t.id WHERE m.id=?",
-                            Boolean.class,
-                            derived.messageId()))
+            assertThat(mentorEntryRepository
+                            .findById(derived.toolResultId())
+                            .orElseThrow()
+                            .isRedacted())
                     .isTrue();
         }
-        assertThat(jdbc.queryForObject(
-                        "SELECT length(session_jsonl) = 0 FROM chat_thread WHERE id=?", Boolean.class, laterThread))
+        assertThat(mentorEntryRepository.findById(laterToolResult).orElseThrow().isRedacted())
                 .isTrue();
+        assertThat(folderResults)
+                .allSatisfy(result -> assertThat(mentorEntryRepository
+                                .findById(result)
+                                .orElseThrow()
+                                .isRedacted())
+                        .as("a context folder result is erased with the person")
+                        .isTrue());
+        // A tool result that copies no one's data stays, so the other developer still sees the feedback Heph showed.
+        assertThat(mentorTimeline
+                        .entries(
+                                firstAffected.getId(),
+                                Objects.requireNonNull(accountFor(other).getId()),
+                                null,
+                                MentorTimeline.MAX_PAGE)
+                        .entries())
+                .filteredOn(entry -> entry.id().equals(linkedAnswer))
+                .singleElement()
+                .satisfies(entry -> assertThat(entry.links()).isNotEmpty());
         assertThat(jdbc.queryForObject(
                         "SELECT count(*) FROM person_evidence_copy WHERE" + " payload<>'{}'::jsonb", Long.class))
                 .isZero();
@@ -878,12 +934,11 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
                         Integer.class,
                         unrelated.jobId()))
                 .isEqualTo(1);
-        assertThat(jdbc.queryForObject(
-                        "SELECT length(session_jsonl) > 0 FROM chat_thread t JOIN"
-                                + " chat_message m ON m.thread_id=t.id WHERE m.id=?",
-                        Boolean.class,
-                        unrelated.messageId()))
-                .isTrue();
+        assertThat(mentorEntryRepository
+                        .findById(unrelated.toolResultId())
+                        .orElseThrow()
+                        .isRedacted())
+                .isFalse();
         assertThat(users.findById(other.getId()).orElseThrow().getLogin()).isEqualTo("OTHER-PROFILE-CANARY");
         assertThat(suppression.isSuppressed(
                         Objects.requireNonNull(target.getProvider().getId()),
@@ -989,46 +1044,161 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
             UUID preparedId,
             UUID deliveredId,
             UUID messageId,
+            UUID toolResultId,
             UUID jobId,
             long workspaceId) {}
 
-    private ChatThread seedJournal(Workspace workspace, User owner) {
-        ChatThread chatThread = new ChatThread();
-        chatThread.setSessionJsonl(
-                "{\"type\":\"toolResult\",\"body\":\"runtime-credential-canary unrelated-profile-canary\"}"
-                        .getBytes(StandardCharsets.UTF_8));
-        chatThread.setId(UUID.randomUUID());
-        chatThread.setWorkspace(workspace);
-        chatThread.setAccountId(Objects.requireNonNull(accountFor(owner).getId()));
-        return chatThreadRepository.save(chatThread);
+    private record ConversationFeedbackCopy(UUID messageId, UUID replyId) {}
+
+    /** The export of another person's rows without the Heph messages that the erasure redacts. */
+    private static @Nullable Object withoutErasedCopies(
+            String store, @Nullable Object rows, List<ConversationFeedbackCopy> copies) {
+        if (!store.equals("mentor_entry") || !(rows instanceof List<?> list)) return rows;
+        var copiedIds = copies.stream().map(copy -> copy.messageId().toString()).collect(Collectors.toSet());
+        return list.stream()
+                .filter(row -> !(row instanceof JsonNode node
+                        && copiedIds.contains(node.path("id").asString())))
+                .toList();
+    }
+
+    /**
+     * A Heph message in another person's conversation that carries the target's delivered feedback through a
+     * conversation copy, and that person's reply to it. The claim path cannot write such a copy; the store still
+     * redacts it, because the feedback ledger names the message.
+     */
+    private ConversationFeedbackCopy seedFeedbackCopy(DerivedConversation target, DerivedConversation other) {
+        MentorEntry otherAnswer =
+                mentorEntryRepository.findById(other.messageId()).orElseThrow();
+        MentorEntry copied = mentorEntries.append(
+                otherAnswer.getWorkspaceId(),
+                otherAnswer.getConversationId(),
+                entry(
+                        MentorEntry.Kind.HEPH,
+                        "Target guidance copied into another conversation",
+                        piAnswer("Target guidance copied into another conversation")));
+        MentorEntry reply = mentorEntries.append(
+                otherAnswer.getWorkspaceId(),
+                otherAnswer.getConversationId(),
+                entry(MentorEntry.Kind.USER, "Other reply to erased feedback", null));
+        UUID copyId = FeedbackIds.copy(target.deliveredId(), FeedbackCopyKind.CHAT_TURN, 1);
+        feedbackCopyRepository.saveAndFlush(FeedbackCopy.builder()
+                .id(copyId)
+                .writeKey(copyId.toString())
+                .writeMarker(FeedbackIds.writeMarker(copyId))
+                .workspaceId(target.workspaceId())
+                .feedbackId(target.deliveredId())
+                .kind(FeedbackCopyKind.CHAT_TURN)
+                .position(1)
+                .state(FeedbackCopyState.POSTED)
+                .body("Target guidance copied into another conversation")
+                .writeStartedAt(Instant.now())
+                .mentorEntryId(copied.getId())
+                .postedAt(Instant.now())
+                .createdAt(Instant.now())
+                .build());
+        return new ConversationFeedbackCopy(copied.getId(), reply.getId());
+    }
+
+    private static MentorEntryDraft entry(MentorEntry.Kind kind, String text, @Nullable JsonNode payload) {
+        return new MentorEntryDraft(kind, MentorEntry.Surface.APP, text, payload, null, null, null);
+    }
+
+    /** Heph's answer as the end of its turn stores it, with a tool call whose arguments hold a credential. */
+    private JsonNode piAnswer(String text) {
+        return MentorLedgerFixtures.toolCall(
+                MentorLedgerFixtures.piId(),
+                "context-call",
+                "fetch_context",
+                mapper.createObjectNode().put("authorization", "credential-canary " + text));
+    }
+
+    private MentorConversation conversationOf(Workspace workspace, User owner) {
+        return mentorConversations.findOrCreateMain(
+                workspace.getId(), Objects.requireNonNull(accountFor(owner).getId()));
+    }
+
+    /** A tool result in the owner's conversation that read data without recording whose. */
+    private UUID seedToolResult(Workspace workspace, User owner) {
+        return seedToolResult(workspace, owner, "fetch_context");
+    }
+
+    private UUID seedToolResult(Workspace workspace, User owner, String tool) {
+        return mentorEntries
+                .append(
+                        workspace.getId(),
+                        conversationOf(workspace, owner).getId(),
+                        entry(
+                                MentorEntry.Kind.TOOL_RESULT,
+                                "runtime-credential-canary unrelated-profile-canary",
+                                MentorLedgerFixtures.toolResult(
+                                        MentorLedgerFixtures.piId(),
+                                        "context-call",
+                                        tool,
+                                        "runtime-credential-canary unrelated-profile-canary",
+                                        false)))
+                .getId();
+    }
+
+    /**
+     * A Heph message in the owner's conversation that showed prepared feedback, with its successful
+     * {@code show_feedback} result, which copies no one's data.
+     */
+    private UUID seedFeedbackAnswer(Workspace workspace, User owner, UUID feedbackId) {
+        MentorConversation conversation = conversationOf(workspace, owner);
+        UUID turnId = mentorTurns
+                .submit(
+                        workspace.getId(),
+                        conversation.getId(),
+                        new MentorTurnService.Question(
+                                MentorTurn.Surface.APP,
+                                "What did my review say?",
+                                UUID.randomUUID().toString(),
+                                null,
+                                null))
+                .turn()
+                .getId();
+        MentorEntry answer = mentorEntries.append(
+                workspace.getId(),
+                conversation.getId(),
+                new MentorEntryDraft(
+                        MentorEntry.Kind.HEPH,
+                        MentorEntry.Surface.APP,
+                        "",
+                        MentorLedgerFixtures.toolCall(
+                                MentorLedgerFixtures.piId(),
+                                "show-call",
+                                "show_feedback",
+                                mapper.createObjectNode()
+                                        .put("feedbackId", feedbackId.toString())
+                                        .put("text", "Shown guidance")),
+                        turnId,
+                        null,
+                        null));
+        mentorEntries.append(
+                workspace.getId(),
+                conversation.getId(),
+                new MentorEntryDraft(
+                        MentorEntry.Kind.TOOL_RESULT,
+                        MentorEntry.Surface.APP,
+                        "",
+                        MentorLedgerFixtures.toolResult(
+                                MentorLedgerFixtures.piId(),
+                                "show-call",
+                                "show_feedback",
+                                "Shown to the developer: feedback " + feedbackId,
+                                false),
+                        turnId,
+                        null,
+                        null));
+        return answer.getId();
     }
 
     private DerivedConversation seedDerivedConversation(Workspace workspace, long threadId, User owner) {
-        ChatThread chatThread = seedJournal(workspace, owner);
-        ChatMessage message = new ChatMessage();
-        message.setId(UUID.randomUUID());
-        message.setThread(chatThread);
-        message.setRole(ChatMessage.Role.ASSISTANT);
-        message.setStatus(ChatMessage.Status.completed);
-        message.setParts(mapper.valueToTree(List.of(
-                Map.of("type", "text", "text", "Delivered guidance", "privateCredential", "credential-canary"),
-                Map.of(
-                        "type",
-                        "tool-fetchContext",
-                        "toolCallId",
-                        "context-call",
-                        "input",
-                        Map.of("authorization", "credential-canary"),
-                        "output",
-                        Map.of("profile", "unrelated-profile-canary")))));
-        message.setMetadata(mapper.valueToTree(Map.of(
-                "inputTokens",
-                12,
-                "error",
-                Map.of("secret", "credential-canary"),
-                "toolCalls",
-                List.of(Map.of("profile", "unrelated-profile-canary")))));
-        chatMessageRepository.save(message);
+        UUID toolResult = seedToolResult(workspace, owner);
+        MentorEntry message = mentorEntries.append(
+                workspace.getId(),
+                conversationOf(workspace, owner).getId(),
+                entry(MentorEntry.Kind.HEPH, "Delivered guidance", piAnswer("Delivered guidance")));
 
         var work = modelFixtures.work(
                 workspace, "conv-practice-" + workspace.getId() + "-" + owner.getId(), "chat.thread", threadId);
@@ -1070,7 +1240,7 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
                 .state(FeedbackCopyState.POSTED)
                 .body("Delivered guidance")
                 .writeStartedAt(Instant.now())
-                .chatMessageId(message.getId())
+                .mentorEntryId(message.getId())
                 .postedAt(Instant.now())
                 .createdAt(Instant.now())
                 .build());
@@ -1079,6 +1249,7 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
                 prepared.getId(),
                 delivered.getId(),
                 message.getId(),
+                toolResult,
                 job.getId(),
                 workspace.getId());
     }

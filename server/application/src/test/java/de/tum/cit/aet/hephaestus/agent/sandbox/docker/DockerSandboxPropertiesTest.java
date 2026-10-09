@@ -110,7 +110,7 @@ class DockerSandboxPropertiesTest {
                     var sandbox = context.getBean(SandboxProperties.class);
                     assertThat(docker.host()).isEqualTo("unix:///var/run/docker.sock");
                     assertThat(docker.tlsVerify()).isFalse();
-                    var configuration = new DockerSandboxConfiguration(Clock.systemUTC());
+                    var configuration = new DockerSandboxConfiguration(Clock.systemUTC(), new MockEnvironment());
                     assertThatCode(() -> {
                                 configuration.dockerClient(sandbox, docker).close();
                                 configuration

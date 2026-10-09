@@ -543,21 +543,60 @@ class FeedbackPrivateHistoryIntegrationTest extends BaseIntegrationTest {
                 .orElseThrow();
     }
 
+    /** A completed Heph answer that showed {@code words} through {@code show_feedback}, and its posted copy. */
     private void postedConversation(Feedback feedback, String words) {
-        var thread = UUID.randomUUID();
-        var message = UUID.randomUUID();
+        var conversation = UUID.randomUUID();
+        var turn = UUID.randomUUID();
+        var answer = UUID.randomUUID();
+        var callId = "call-" + feedback.getId();
         jdbc.update(
-                "INSERT INTO chat_thread(id,workspace_id,account_id,created_at,surface) VALUES (?,?,?,now(),'WEB')",
-                thread,
+                "INSERT INTO mentor_conversation(id,workspace_id,account_id,created_at,last_activity_at)"
+                        + " VALUES (?,?,?,now(),now())",
+                conversation,
                 feedback.getWorkspaceId(),
                 feedback.getDeveloperId());
         jdbc.update(
-                "INSERT INTO chat_message(id,thread_id,workspace_id,role,status,created_at,parts,version)"
-                        + " VALUES (?,?,?,'ASSISTANT','completed',now(),?::jsonb,0)",
-                message,
-                thread,
+                "INSERT INTO mentor_turn(id,workspace_id,conversation_id,request_id,status,surface,attempt,created_at,"
+                        + "finished_at) VALUES (?,?,?,?,'DONE','APP',1,now(),now())",
+                turn,
                 feedback.getWorkspaceId(),
-                mapper.writeValueAsString(List.of(Map.of("type", "text", "text", words))));
+                conversation,
+                turn.toString());
+        var call = Map.of(
+                "type",
+                "toolCall",
+                "id",
+                callId,
+                "name",
+                "show_feedback",
+                "arguments",
+                Map.of("feedbackId", feedback.getId().toString(), "text", words));
+        jdbc.update(
+                "INSERT INTO mentor_entry(id,workspace_id,conversation_id,seq,turn_id,kind,surface,text,payload,"
+                        + "created_at) VALUES (?,?,?,1,?,'HEPH','APP','',?::jsonb,now())",
+                answer,
+                feedback.getWorkspaceId(),
+                conversation,
+                turn,
+                mapper.writeValueAsString(Map.of("message", Map.of("role", "assistant", "content", List.of(call)))));
+        jdbc.update(
+                "INSERT INTO mentor_entry(id,workspace_id,conversation_id,seq,turn_id,kind,surface,text,payload,"
+                        + "created_at) VALUES (?,?,?,2,?,'TOOL_RESULT','APP','',?::jsonb,now())",
+                UUID.randomUUID(),
+                feedback.getWorkspaceId(),
+                conversation,
+                turn,
+                mapper.writeValueAsString(Map.of(
+                        "message",
+                        Map.of(
+                                "role",
+                                "toolResult",
+                                "toolCallId",
+                                callId,
+                                "toolName",
+                                "show_feedback",
+                                "isError",
+                                false))));
         var id = FeedbackIds.copy(feedback.getId(), FeedbackCopyKind.CHAT_TURN, 0);
         var at = Objects.requireNonNull(feedback.getDeliveredAt());
         copies.saveAndFlush(FeedbackCopy.builder()
@@ -571,7 +610,8 @@ class FeedbackPrivateHistoryIntegrationTest extends BaseIntegrationTest {
                 .writeKey(id.toString())
                 .writeStartedAt(at)
                 .postedAt(at)
-                .chatMessageId(message)
+                .mentorTurnId(turn)
+                .mentorEntryId(answer)
                 .createdAt(at)
                 .build());
     }

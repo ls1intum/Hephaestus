@@ -827,7 +827,7 @@ class SurveyEmailInvitationIntegrationTest extends AbstractWorkspaceIntegrationT
         var current = subscriptions.get(accountId);
         subscriptions.update(
                 accountId,
-                new UpdateNotificationPreferencesDTO(false, true, true, false, enabled),
+                new UpdateNotificationPreferencesDTO(false, true, true, false, enabled, false),
                 EntityTagPrecondition.parse(current.etag()),
                 true);
     }
@@ -852,7 +852,7 @@ class SurveyEmailInvitationIntegrationTest extends AbstractWorkspaceIntegrationT
         var current = subscriptions.get(accountId);
         subscriptions.update(
                 accountId,
-                new UpdateNotificationPreferencesDTO(false, enabled, enabled, false, false),
+                new UpdateNotificationPreferencesDTO(false, enabled, enabled, false, false, false),
                 EntityTagPrecondition.parse(current.etag()),
                 false);
     }

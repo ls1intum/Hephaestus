@@ -783,7 +783,7 @@ function feedbackTechnical(feedback: FeedbackRecord): TechnicalFact[] {
 	}
 	const copies = inOrder(feedback.copies);
 	for (const copy of copies) {
-		const ref = copy.externalRef ?? copy.chatMessageId;
+		const ref = copy.externalRef ?? copy.mentorEntryId;
 		if (hasText(ref)) {
 			const sameKind = copies.filter((other) => other.kind === copy.kind);
 			const kind = FEEDBACK_COPY_KIND_DEFS[copy.kind].label;

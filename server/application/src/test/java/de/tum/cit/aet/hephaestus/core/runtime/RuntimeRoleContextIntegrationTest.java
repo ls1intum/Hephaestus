@@ -24,8 +24,10 @@ import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewCoverageService;
 import de.tum.cit.aet.hephaestus.testconfig.NatsTestContainer;
 import de.tum.cit.aet.hephaestus.testconfig.PostgreSQLTestContainer;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
+import io.nats.client.Nats;
 import java.util.Arrays;
 import java.util.Locale;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -39,6 +41,23 @@ import org.springframework.test.context.ContextConfiguration;
 @Tag("integration")
 @ContextConfiguration(classes = Application.class)
 class RuntimeRoleContextIntegrationTest {
+    /**
+     * The webhook role creates its JetStream streams on the shared NATS container at startup. Left there, they
+     * make a later test that creates a stream of the same name with its own configuration fail.
+     */
+    @AfterEach
+    void deleteTheStreamsTheRoleCreated() throws Exception {
+        var connection = Nats.connect(NatsTestContainer.getServerUrl());
+        try {
+            var streams = connection.jetStreamManagement();
+            for (String name : streams.getStreamNames()) {
+                streams.deleteStream(name);
+            }
+        } finally {
+            connection.close();
+        }
+    }
+
     @ParameterizedTest
     @EnumSource(RuntimeRole.class)
     void shouldResolveEveryApplicationBeanWhenOnlyOneRuntimeRoleIsEnabled(RuntimeRole role) {

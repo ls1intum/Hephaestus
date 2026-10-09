@@ -10,6 +10,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.core.event.AgentContextChangedEvent;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
@@ -289,6 +290,8 @@ class OutlineCollectionAdminServiceTest extends BaseUnitTest {
 
         verify(documentRepository).deleteByWorkspaceIdAndConnectionIdAndCollectionId(WS, CONNECTION_ID, COLLECTION_ID);
         verify(collectionRepository).delete(row);
+        // Running Heph turns drop the erased documents from their context folders.
+        verify(eventPublisher).publishEvent(new AgentContextChangedEvent(WS));
     }
 
     @Test

@@ -4,7 +4,9 @@ import de.tum.cit.aet.hephaestus.agent.context.HistoryCopies;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.evidence.capture.ContentSource;
 import de.tum.cit.aet.hephaestus.evidence.capture.MentorContextRequest;
+import de.tum.cit.aet.hephaestus.integration.core.framework.RegisteredItemLabels;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLabel;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultHistoryEntry;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultHistoryQuery;
 import java.time.Instant;
@@ -15,8 +17,10 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -26,7 +30,12 @@ import tools.jackson.databind.node.ObjectNode;
 @RequiredArgsConstructor
 public class ResultHistoryContentSource implements ContentSource {
     public static final String OUTPUT_KEY = OUTPUT_PREFIX + "results_history.json";
-    private static final Pattern DETAIL_KEY = Pattern.compile("inputs/context/results_history/([0-9a-f-]{36})\\.json");
+    /**
+     * One item path, which a {@code read} of the turn's context folder stages on demand: one canonical lowercase id.
+     */
+    private static final Pattern DETAIL_KEY = Pattern.compile(
+            "inputs/context/results_history/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\\.json");
+
     static final int OVERVIEW_MAX_CHARS = 48_000;
     static final int DETAIL_MAX_CHARS = 32_000;
     private static final int LIMIT = 90;
@@ -34,6 +43,7 @@ public class ResultHistoryContentSource implements ContentSource {
     private final ObjectMapper objectMapper;
     private final HistoryCopies copies;
     private final ConversationConsentGate consentGate;
+    private final RegisteredItemLabels labels;
 
     @Override
     public boolean supports(MentorContextRequest request) {
@@ -45,6 +55,13 @@ public class ResultHistoryContentSource implements ContentSource {
     public void contribute(MentorContextRequest request, Map<String, byte[]> files) {
         files.put(
                 OUTPUT_KEY, objectMapper.writeValueAsBytes(buildPayload(request.workspaceId(), request.developerId())));
+    }
+
+    /** One listed result's detail, read now for the developer; {@code NOT_FOUND} when it is not theirs to read. */
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<JsonNode> read(long workspaceId, long accountId, String path) {
+        return resultIdOf(path).map(id -> inspect(workspaceId, accountId, id));
     }
 
     public static String resourceOf(UUID resultId) {
@@ -73,8 +90,11 @@ public class ResultHistoryContentSource implements ContentSource {
         consentGate.writeUntrustedEnvelope(root);
         var rows = root.putArray("results");
         int omitted = Math.max(0, selected.size() - LIMIT);
-        for (var entry : selected.stream().limit(LIMIT).toList()) {
-            var row = describe(entry, false);
+        var listed = selected.stream().limit(LIMIT).toList();
+        var named = labels.labels(
+                workspaceId, listed.stream().map(ResultHistoryEntry::item).toList());
+        for (var entry : listed) {
+            var row = describe(entry, named.get(entry.itemId()), false);
             rows.add(row);
             if (objectMapper.writeValueAsString(root).length() > OVERVIEW_MAX_CHARS) {
                 rows.remove(rows.size() - 1);
@@ -85,15 +105,16 @@ public class ResultHistoryContentSource implements ContentSource {
         return root;
     }
 
-    @Transactional(readOnly = true)
-    public ObjectNode inspect(long workspaceId, long developerId, UUID resultId) {
+    ObjectNode inspect(long workspaceId, long developerId, UUID resultId) {
         var root = objectMapper.createObjectNode().put("readAt", Instant.now().toString());
         var selected = results.find(workspaceId, resultId, developerId, SourceUsePurpose.CONVERSATIONAL_MENTORING)
                 .filter(entry -> Long.valueOf(developerId).equals(entry.developerAccountId()));
         if (selected.isEmpty()) return root.put("status", "NOT_FOUND");
         consentGate.writeUntrustedEnvelope(root);
         root.put("status", "FOUND");
-        var row = describe(selected.get(), true);
+        var entry = selected.get();
+        var row = describe(
+                entry, labels.labels(workspaceId, List.of(entry.item())).get(entry.itemId()), true);
         root.set("result", row);
         if (objectMapper.writeValueAsString(root).length() > DETAIL_MAX_CHARS) {
             row.remove(List.of("evidence", "example", "explanation", "criteria", "problems", "openQuestions"));
@@ -103,7 +124,8 @@ public class ResultHistoryContentSource implements ContentSource {
         return root;
     }
 
-    private ObjectNode describe(ResultHistoryEntry entry, boolean detail) {
+    /** @param work how the work's source names it now; {@code null} when it no longer can */
+    private ObjectNode describe(ResultHistoryEntry entry, @Nullable ItemLabel work, boolean detail) {
         var row = objectMapper
                 .createObjectNode()
                 .put("resultId", entry.resultId().toString())
@@ -116,6 +138,11 @@ public class ResultHistoryContentSource implements ContentSource {
                 .put("outcome", entry.outcome().name())
                 .put("recordedAt", entry.recordedAt().toString())
                 .put("resource", resourceOf(entry.resultId()));
+        if (work != null) {
+            var named = row.putObject("work").put("title", work.title());
+            if (work.number() != null) named.put("number", work.number());
+            if (work.url() != null) named.put("url", work.url());
+        }
         row.set("activeMarks", objectMapper.valueToTree(entry.activeMarks()));
         if (!copies.record(copies.of(entry))) return row.put("wordsUnavailable", "COPY_AUTHORITY_UNAVAILABLE");
         row.put("summary", entry.summary());

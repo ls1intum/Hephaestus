@@ -93,6 +93,7 @@ class DocumentCaptureSourceTest extends BaseUnitTest {
                 false,
                 null,
                 null,
+                null,
                 null);
     }
 
@@ -115,6 +116,7 @@ class DocumentCaptureSourceTest extends BaseUnitTest {
                 List.of(),
                 false,
                 collectionName,
+                null,
                 null,
                 null);
     }
@@ -240,6 +242,44 @@ class DocumentCaptureSourceTest extends BaseUnitTest {
         assertThat(bare.has("created")).isFalse();
         assertThat(bare.has("last_updated")).isFalse();
         assertThat(bare.has("collaborators")).isFalse();
+    }
+
+    @Test
+    void mentorPathGivesTheDocumentLinkAndSaysWhenTheBodyWasCut() throws Exception {
+        String longBody = "a".repeat(DocumentCaptureSource.MENTOR_BODY_CHARS + 500);
+        ProjectedDocument linked = new ProjectedDocument(
+                "engineering",
+                "release-guide",
+                "Release guide",
+                longBody,
+                false,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                List.of(),
+                false,
+                null,
+                null,
+                null,
+                "https://docs.example/doc/release-guide-abc123");
+        when(projection.documentsForWorkspace(WORKSPACE_ID))
+                .thenReturn(List.of(linked, doc("Product", "roadmap", "Roadmap", "Q3 plans.")));
+
+        Map<String, byte[]> files = new LinkedHashMap<>();
+        provider.contribute(mentorRequest(), files);
+
+        JsonNode root = objectMapper.readTree(Objects.requireNonNull(files.get("inputs/context/outline_docs.json")));
+        assertThat(root.path(0).path("url").asString()).isEqualTo("https://docs.example/doc/release-guide-abc123");
+        assertThat(root.path(0).path("body").asString()).hasSize(DocumentCaptureSource.MENTOR_BODY_CHARS);
+        assertThat(root.path(0).path("bodyTruncated").asBoolean()).isTrue();
+        assertThat(root.path(0).path("bodyChars").asInt()).isEqualTo(longBody.length());
+        assertThat(root.path(1).has("url")).as("no link was captured").isFalse();
+        assertThat(root.path(1).has("bodyTruncated")).isFalse();
     }
 
     @Test

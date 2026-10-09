@@ -7,7 +7,7 @@ description: Register an OpenAI-compatible provider. Test it. Price and share it
 Hephaestus ships with **no** provider, model, or key.
 Provider configuration does not use environment variables.
 Connections, models, prices, and grants are runtime catalog data you enter in the UI.
-Practice review and the mentor stay inactive until a model is registered, priced, and assigned to a purpose.
+Practice review and Heph stay inactive until a model is registered, priced, and assigned to a purpose.
 
 The catalog you use determines whose provider account pays:
 
@@ -225,7 +225,7 @@ Any other failure of such a probe, such as HTTP 401 or no answer, shows as a fai
 
 ### Reasoning effort
 
-**Reasoning effort** sets how hard a reasoning model thinks on every review or mentor call.
+**Reasoning effort** sets how hard a reasoning model thinks on every review or Heph call.
 It uses OpenAI's scale:
 
 - **None**.
@@ -251,6 +251,46 @@ The same field exists on workspace-owned models.
 Higher efforts use more output tokens.
 Each job's usage records the reasoning share and prices it as output, never twice.
 A model marked as supporting reasoning before this field existed keeps its previous value: **Medium**.
+
+### Models that think by default
+
+Some model servers make a model think unless the request turns thinking off with a field of their own.
+An example is Qwen3 on vLLM, which reads `chat_template_kwargs.enable_thinking`.
+Hephaestus sends only the standard reasoning effort: `reasoning_effort` on Chat Completions and `reasoning.effort` on the Responses API.
+Such a chat template ignores that field.
+Thus, **Provider default** and **None** do not turn the model's thinking off, and Heph cannot turn it off for one request.
+This also applies to the summary that Heph writes when a conversation becomes long.
+
+A model that thinks on every call can spend its whole output limit on thinking, and the turn then fails.
+To turn thinking off, set the default on the model server.
+For vLLM or SGLang, set the server's default chat template arguments so that `enable_thinking` is `false`.
+
+### Gateways that buffer answers
+
+**Symptom:** Heph shows no text for a long time and then the whole answer at once.
+Or a Heph answer fails after 2 minutes with no text, but the provider's log shows a complete answer.
+
+The worker's LLM proxy fails a Heph model call whose stream sends no byte for 2 minutes.
+It also fails a call whose provider sends no response headers for 5 minutes ([Runtime roles](./runtime-roles.mdx#lease-retry-and-deadline)).
+A gateway that buffers the whole answer sends nothing until the answer is complete.
+Configure every proxy between Hephaestus and the model to stream:
+
+- For nginx, set `proxy_buffering off` on the completions path.
+- Or let the upstream send the response header `X-Accel-Buffering: no`, which turns buffering off for that response in nginx.
+- For other gateways, turn off response buffering for `text/event-stream`, or send SSE keep-alive comments while the model works.
+
+A provider whose calls stall or fail repeatedly is paused for 60 seconds ([Provider breaker](./runtime-roles.mdx#provider-breaker)).
+
+### The smallest model for Heph
+
+Heph needs a context window of at least 32,768 tokens and an output limit of at least 4,096 tokens.
+Its fixed instructions, tools, and situation take about 9,000 tokens.
+A conversation summary is one reply of the model.
+
+Heph refuses to use a model whose stated limits are smaller, with a message that names the limit.
+A model that states no limit is not checked.
+If a bound model's limits change below these values, each Heph turn fails at its start.
+The developer then sees that Heph's model is too small.
 
 ## 4. Pricing a model
 
@@ -278,7 +318,7 @@ Four rates, all **US dollars per 1,000,000 tokens**, stored as `NUMERIC(18,8)`:
 
 | Field                 | Required for `PRICED` | Notes                                                                                                   |
 | --------------------- | --------------------- | ------------------------------------------------------------------------------------------------------- |
-| **Input (USD)**       | yes                   | Prompt tokens.                                                                                          |
+| **Input (USD)**       | yes                   | Prompt tokens that are neither cache reads nor cache writes.                                            |
 | **Output (USD)**      | yes                   | Completion tokens. **Reasoning tokens are already inside this count** and are not priced a second time. |
 | **Cache read (USD)**  | no                    | Prompt-cache hits, where the provider reports them.                                                     |
 | **Cache write (USD)** | no                    | Prompt-cache writes, where the provider reports them.                                                   |
@@ -546,7 +586,7 @@ Reconnect the developer's identity to restore their own choice.
 
 This does not change another identified member's choice.
 Members may choose **No AI** even if model configuration or required account links are unavailable.
-It stops new practice reviews about them and new Heph conversations across every workspace.
+It stops new practice reviews about them and Heph answers to them in every workspace.
 It does not stop membership or access to existing feedback.
 A review checks the developer whose work it reviews, not the requesting admin.
 

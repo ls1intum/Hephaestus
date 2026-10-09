@@ -6,6 +6,7 @@ import type {
 } from "@/api/types.gen";
 import {
 	type FeedbackTextSegment,
+	group as groupSegment,
 	practice as practiceSegment,
 	practices as practiceSegments,
 	refs,
@@ -403,6 +404,38 @@ function composePracticeSentences(
 	return sentences;
 }
 
+/**
+ * The subject as itself: a practice as its grey pill, a group as its own icon and colour. A group
+ * written as words would read as a practice whose pill went missing.
+ */
+const subject = (event: ProfileEvent): FeedbackTextSegment =>
+	event.level === "practice"
+		? practiceSegment(event.slug, event.name)
+		: groupSegment(event.slug, event.name);
+
+/**
+ * What changed, one sentence per subject, in the order the "All practice groups" table reads: the
+ * weekly digest's list. The same events, precedence and words as the profile, so the profile and
+ * the digest cannot tell one change two ways.
+ */
+export function composeChangeSentences(changes: ProfileChange[]): FeedbackTextSegment[][] {
+	const events = changeEventsOf(changes);
+	return SENTENCE_ORDER.flatMap((kind) =>
+		events
+			.filter((event) => event.kind === kind)
+			.map((event) =>
+				sentence(
+					subject(event),
+					" ",
+					predicate(event),
+					onWork(event, wordingOf(event).seenOn),
+					".",
+				),
+			),
+	);
+}
+
+/** What the page itself shows from one overview: the latest-run chip and the table's sentences. */
 export function composeOverview(overview: OverviewInput): ComposedOverview {
 	return {
 		latestReview: overview.latestReview ?? undefined,

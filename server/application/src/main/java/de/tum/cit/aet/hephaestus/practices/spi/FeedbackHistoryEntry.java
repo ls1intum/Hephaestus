@@ -19,6 +19,7 @@ public record FeedbackHistoryEntry(
         @Nullable Instant deliveredAt,
         List<UUID> resultIds,
         List<UUID> problemIds,
+        List<String> practiceSlugs,
         @Nullable FeedbackResolution resolution,
         @Nullable FeedbackUsefulness usefulness,
         List<UUID> sourceJobIds,
@@ -30,6 +31,7 @@ public record FeedbackHistoryEntry(
     public FeedbackHistoryEntry {
         resultIds = List.copyOf(resultIds);
         problemIds = List.copyOf(problemIds);
+        practiceSlugs = List.copyOf(practiceSlugs);
         sourceJobIds = List.copyOf(sourceJobIds);
         copiedIdentities = List.copyOf(copiedIdentities);
         repositoryIds = List.copyOf(repositoryIds);

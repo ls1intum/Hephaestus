@@ -26,7 +26,7 @@ import org.jspecify.annotations.Nullable;
  * Source identity and usage stay frozen; an operator can price an unpriced row.
  *
  * <p>{@code sourceId} is a soft reference (no FK) to the originating {@code review_job.id} or
- * {@code chat_message.id}: accounting must survive source-row deletion. Source kind, id, and
+ * {@code mentor_turn.id}: accounting must survive source-row deletion. Source kind, id, and
  * attempt form the idempotency key, so retries are billed once each without collapsing distinct
  * provider calls.
  */

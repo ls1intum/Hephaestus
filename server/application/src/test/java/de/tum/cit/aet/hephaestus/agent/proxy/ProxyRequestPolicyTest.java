@@ -13,7 +13,7 @@ import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewMemberAiPolicy;
 import de.tum.cit.aet.hephaestus.agent.usage.UsageFundingSource;
 import de.tum.cit.aet.hephaestus.agent.usage.UsageSourceType;
-import de.tum.cit.aet.hephaestus.mentor.ChatMessageRepository;
+import de.tum.cit.aet.hephaestus.mentor.MentorTurnRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -33,7 +33,7 @@ class ProxyRequestPolicyTest extends BaseUnitTest {
     private ReviewJobRepository jobs;
 
     @Mock
-    private ChatMessageRepository messages;
+    private MentorTurnRepository turns;
 
     @Mock
     private ReviewMemberAiPolicy reviews;
@@ -48,7 +48,7 @@ class ProxyRequestPolicyTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        policy = new ProxyRequestPolicy(egress, jobs, messages, reviews, routing);
+        policy = new ProxyRequestPolicy(egress, jobs, turns, reviews, routing);
     }
 
     private ProxyRouting request(UsageSourceType source) {
@@ -95,8 +95,8 @@ class ProxyRequestPolicyTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldUseTheDurableMentorTurnDeveloperNotASuppliedUserId() {
-        when(messages.findDeveloperIdByIdAndWorkspaceId(id, 1L)).thenReturn(Optional.of(20L));
+    void shouldUseTheDurableMentorTurnAccountNotASuppliedUserId() {
+        when(turns.findAccountIdByIdAndWorkspaceId(id, 1L)).thenReturn(Optional.of(20L));
         when(routing.allows(1L, 20L, model)).thenReturn(false);
         assertThat(policy.allows(request(UsageSourceType.MENTOR_TURN))).isFalse();
         verify(routing).allows(1L, 20L, model);
@@ -104,7 +104,7 @@ class ProxyRequestPolicyTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldRequireABillableExecution() {
+    void shouldRefuseARequestWhenItCarriesNoWorkspace() {
         var request = new ProxyRouting(
                 "test",
                 "openai-completions",
@@ -112,12 +112,12 @@ class ProxyRequestPolicyTest extends BaseUnitTest {
                 UsageFundingSource.INSTANCE,
                 7L,
                 8L,
-                1L,
                 null,
+                new ProxyRouting.BilledAttempt(UsageSourceType.MENTOR_TURN, id, 0, BigDecimal.ZERO, "worker-1"),
                 null,
                 null,
                 null);
         assertThat(policy.allows(request)).isFalse();
-        verifyNoInteractions(jobs, messages, routing, reviews);
+        verifyNoInteractions(jobs, turns, routing, reviews);
     }
 }

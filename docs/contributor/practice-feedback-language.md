@@ -159,7 +159,7 @@ Hephaestus never sends an open question as feedback.
 | **Practice feedback** | The full name for feedback when the surrounding text does not establish its context. | message, AI feedback, feedback item, ledger unit |
 | **Destination** | Where feedback is intended to appear: on the work, on the practice page, or in conversation. | channel, location, surface |
 | **Delivery** | Whether feedback is awaiting approval, ready, delivered, withheld, rejected, replaced, failed or unconfirmed. | surface |
-| **Copy** | One appearance of feedback: a summary, line note, file note or chat turn. | placement |
+| **Copy** | One appearance of feedback: a summary, line note, file note or Heph answer. | placement |
 | **Decision** | An admin action on feedback: approve, reject, withdraw or restore. |  |
 | **Response** | The developer's answer to feedback. Resolution and usefulness are separate dimensions. |  |
 | **Disagreement** | A response that says the feedback is wrong and gives a reason. | dispute, disputed |
@@ -234,6 +234,18 @@ It has no minimum count that prevents that disclosure.
 Hidden members and repositories do not contribute to those counts.
 The [Practice profile guide](/user/practice-profile) owns the user procedures and visibility details.
 
+### Heph
+
+| Term | Meaning | Avoid for this concept |
+| --- | --- | --- |
+| **Heph conversation** | The one conversation that an account has with Heph in a workspace. The app shows all of it. A Slack direct message shows the part that the developer asked in Slack. | chat, session, chat history |
+| **Heph thread** | A conversation that starts at one top-level message of the Heph conversation. It is one level deep. Each message has at most one. A Heph thread started in Slack also appears in Slack. UI and user docs say thread. | fork, branch, sub-chat |
+| **Message** (Heph) | One question, answer or weekly digest in a Heph conversation. It never counts feedback. | chat message, entry (in UI), turn (in UI) |
+| **Weekly digest** | A message that Hephaestus writes into a developer's Heph conversation at most once a week, when the developer turned it on. It links to feedback that reached the developer and says what changed on the Practice profile. It is not a destination and delivers no feedback. | summary, report, newsletter, recap |
+
+The [review glossary](./practice-review-glossary.mdx#runtime-terms) defines the turn, the Heph host, the context folder, the context document, the context loader and the turn sandbox.
+[ADR 0057](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0057-one-heph-conversation-per-developer.md) owns the decisions behind these terms.
+
 ### Member onboarding and AI choices
 
 An account's AI choice applies in every workspace.
@@ -298,7 +310,7 @@ A workspace admin cannot grant another person's research consent.
 | --- | --- | --- |
 | **Runtime role** | Server, worker or webhook: the part of one application JAR that a container starts. |  |
 | **Server** | The service that handles application requests. |  |
-| **Worker** | The runtime role that executes reviews and mentor sessions. |  |
+| **Worker** | The runtime role that executes reviews and Heph turns. |  |
 | **Webhook** | A provider's HTTP request that reports an event. Also the runtime role that receives it. |  |
 | **API** | An interface for software calls. |  |
 | **UI** | The interface that a person uses. |  |

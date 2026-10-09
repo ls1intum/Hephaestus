@@ -50,7 +50,7 @@ public class DockerSandboxAdapter implements SandboxManager {
     private static final int WHOLE_TRANSCRIPT = 0;
 
     /** The error-path echo is cut to {@link #MAX_LOG_EVENT_CHARS} before it is logged, so it reads a tail. */
-    private static final int ERROR_ECHO_TAIL_LINES = 500;
+    static final int ERROR_ECHO_TAIL_LINES = 500;
 
     private static final String PROXY_URL_PLACEHOLDER = "{appServerIp}";
 
@@ -264,7 +264,8 @@ public class DockerSandboxAdapter implements SandboxManager {
                         true,
                         Duration.between(startTime, Instant.now()));
             }
-            var command = new ArrayList<>(List.of("node", "/opt/pi-sdk/gateway-run.ts"));
+            // The wrapper holds the gateway token: a process of the sandbox must not open its inspector with SIGUSR1.
+            var command = new ArrayList<>(List.of("node", "--disable-sigusr1", "/opt/pi-sdk/gateway-run.ts"));
             command.addAll(spec.command());
             DockerOperations.ContainerSpec containerSpec = attempt.runtime(template, command);
 
@@ -457,11 +458,15 @@ public class DockerSandboxAdapter implements SandboxManager {
         if (logs == null || logs.isEmpty()) {
             return;
         }
-        String truncated = logs.length() > MAX_LOG_EVENT_CHARS
+        log.warn("Container logs before cleanup:\n{}", eventTail(logs));
+    }
+
+    /** The end of a container's logs that fits one diagnostic event. */
+    static String eventTail(String logs) {
+        return logs.length() > MAX_LOG_EVENT_CHARS
                 ? "[" + logs.length() + " characters total, tail follows] ...\n"
                         + logs.substring(logs.length() - MAX_LOG_EVENT_CHARS)
                 : logs;
-        log.warn("Container logs before cleanup:\n{}", truncated);
     }
 
     /**
@@ -477,7 +482,6 @@ public class DockerSandboxAdapter implements SandboxManager {
                     || !owner.equals(labels.get(SandboxLabels.OWNER))
                     || !jobId.toString().equals(labels.get(SandboxLabels.JOB_ID))
                     || labels.containsKey(SandboxLabels.SESSION_ID)
-                    || SandboxLabels.KIND_INTERACTIVE.equals(labels.get(SandboxLabels.KIND))
                     || recorded == null
                     || !recorded.matches("[0-9]{1,10}")
                     || Long.parseLong(recorded) >= attempt) {

@@ -89,6 +89,15 @@ public class Account {
     @ColumnDefault("true")
     private boolean feedbackDeliveryEnabled = true;
 
+    /**
+     * IANA time zone the developer's own week runs in, for example {@code Europe/Berlin}, as the developer chose it
+     * in User settings; {@code null} means {@link
+     * de.tum.cit.aet.hephaestus.core.auth.spi.AccountDirectory#DEFAULT_TIME_ZONE}.
+     */
+    @Column(name = "time_zone", length = 64)
+    @Nullable
+    private String timeZone;
+
     @Version
     @Column(nullable = false)
     @ColumnDefault("0")

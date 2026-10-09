@@ -88,7 +88,9 @@ public class JavaJwtWorkerJwtVerifier implements WorkerJwtVerifier {
             throw new WorkerJwtInvalidException("verify failed: " + e.getClass().getSimpleName(), "sig", e);
         }
         String tokenType = verified.getType();
-        if (!WorkerJwtIssuer.WORKER_TOKEN_TYPE.equals(tokenType) && !WorkerJwtIssuer.JOB_TOKEN_TYPE.equals(tokenType)) {
+        if (!WorkerJwtIssuer.WORKER_TOKEN_TYPE.equals(tokenType)
+                && !WorkerJwtIssuer.JOB_TOKEN_TYPE.equals(tokenType)
+                && !WorkerJwtIssuer.TURN_TOKEN_TYPE.equals(tokenType)) {
             throw new WorkerJwtInvalidException("token type not allowed", "typ");
         }
         String workerId = verified.getSubject();
@@ -106,6 +108,9 @@ public class JavaJwtWorkerJwtVerifier implements WorkerJwtVerifier {
         }
         if (denylist.isRevoked(jti)) {
             throw new WorkerJwtInvalidException("token revoked", "revoked");
+        }
+        if (WorkerJwtIssuer.TURN_TOKEN_TYPE.equals(tokenType)) {
+            return turnJwt(verified, workerId, jti, issuedAt, expiresAt);
         }
         UUID jobId = uuidClaim(verified, "job_id");
         if (WorkerJwtIssuer.WORKER_TOKEN_TYPE.equals(tokenType)) {
@@ -152,6 +157,36 @@ public class JavaJwtWorkerJwtVerifier implements WorkerJwtVerifier {
         } catch (RuntimeException e) {
             throw new WorkerJwtInvalidException("invalid " + name + " claim", "claim", e);
         }
+    }
+
+    private static TurnJwt turnJwt(
+            DecodedJWT verified, @Nullable String workerId, String jti, Instant issuedAt, Instant expiresAt) {
+        if (workerId != null || verified.getClaim("job_id").asString() != null) {
+            throw new WorkerJwtInvalidException("turn token contains worker or job claims", "claim");
+        }
+        UUID turnId = uuidClaim(verified, "turn_id");
+        UUID conversationId = uuidClaim(verified, "conversation_id");
+        Long workspaceId = longClaim(verified, "workspace_id");
+        Long accountId = longClaim(verified, "account_id");
+        Integer attempt = intClaim(verified, "attempt");
+        if (turnId == null
+                || conversationId == null
+                || workspaceId == null
+                || accountId == null
+                || attempt == null
+                || attempt < 1) {
+            throw new WorkerJwtInvalidException("missing or invalid turn binding claim", "claim");
+        }
+        return new TurnJwt(
+                turnId,
+                workspaceId,
+                accountId,
+                conversationId,
+                attempt,
+                scopeClaim(verified),
+                jti,
+                issuedAt,
+                expiresAt);
     }
 
     private static @Nullable UUID uuidClaim(DecodedJWT jwt, String name) {

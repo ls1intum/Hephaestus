@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.slack.channel;
 
+import de.tum.cit.aet.hephaestus.core.event.AgentContextChangedEvent;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
@@ -289,6 +290,10 @@ public class SlackChannelConsentService {
         Long actorAccountId = SecurityUtils.getCurrentAccountId().orElse(null);
         consentEventRepository.save(
                 new SlackChannelConsentEvent(workspaceId, slackChannelId, from, to, actorAccountId, reason));
+        if (to == ConsentState.PAUSED || to == ConsentState.REVOKED) {
+            // A running Heph turn may hold the channel's threads in its context folder.
+            eventPublisher.publishEvent(new AgentContextChangedEvent(workspaceId));
+        }
     }
 
     /** Transition guard. The same-state case ({@code from == target}) is already handled as an idempotent no-op by callers. */

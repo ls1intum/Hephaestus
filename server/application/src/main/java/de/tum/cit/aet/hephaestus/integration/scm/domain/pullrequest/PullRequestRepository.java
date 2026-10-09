@@ -10,6 +10,7 @@ import java.util.Optional;
 import java.util.stream.Stream;
 import org.hibernate.jpa.HibernateHints;
 import org.jspecify.annotations.Nullable;
+import org.springframework.data.domain.Limit;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -35,6 +36,16 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
     long countStoredByRepositoryId(@Param("repositoryId") long repositoryId);
 
     boolean existsByIdAndDeletedAtIsNull(Long id);
+
+    /** The numbers of the repository's open pull requests, newest first. */
+    @Query("""
+        SELECT p.number
+        FROM PullRequest p
+        WHERE p.repository.id = :repositoryId AND p.state = :state AND p.deletedAt IS NULL
+        ORDER BY p.number DESC
+        """)
+    List<Integer> findNumbersByRepositoryIdAndState(
+            @Param("repositoryId") long repositoryId, @Param("state") Issue.State state, Limit limit);
 
     @Query("""
         SELECT p

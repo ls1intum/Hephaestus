@@ -18,12 +18,12 @@ class PiPlanSpecValidationTest extends BaseUnitTest {
 
     private static PiPlanSpec specWith(Map<String, byte[]> extraInputs) {
         return new PiPlanSpec(
-                "openai-completions", "gpt-5.4-mini", null, null, null, "job-token", true, 600, PROFILE, extraInputs);
+                "openai-completions", "gpt-5.4-mini", null, null, null, "job-token", 600, PROFILE, extraInputs);
     }
 
     @Test
     void allowlistedPathAccepted() {
-        assertThatNoException().isThrownBy(() -> specWith(Map.of(SandboxLayout.MENTOR_SYSTEM_PROMPT_PATH, BYTES)));
+        assertThatNoException().isThrownBy(() -> specWith(Map.of(SandboxLayout.PRACTICE_SCRIPT_MODELS_FILE, BYTES)));
     }
 
     @ParameterizedTest
@@ -43,7 +43,7 @@ class PiPlanSpecValidationTest extends BaseUnitTest {
     @Test
     void jobTokenIsAlwaysRequired() {
         assertThatThrownBy(() -> new PiPlanSpec(
-                        "openai-completions", "gpt-5.4-mini", null, null, null, null, false, 600, PROFILE, Map.of()))
+                        "openai-completions", "gpt-5.4-mini", null, null, null, null, 600, PROFILE, Map.of()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("jobToken");
     }
@@ -51,15 +51,15 @@ class PiPlanSpecValidationTest extends BaseUnitTest {
     @Test
     void blankJobTokenRejected() {
         assertThatThrownBy(() -> new PiPlanSpec(
-                        "openai-completions", "gpt-5.4-mini", null, null, null, "  ", false, 600, PROFILE, Map.of()))
+                        "openai-completions", "gpt-5.4-mini", null, null, null, "  ", 600, PROFILE, Map.of()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("jobToken");
     }
 
     @Test
     void blankApiProtocolRejected() {
-        assertThatThrownBy(() -> new PiPlanSpec(
-                        "", "gpt-5.4-mini", null, null, null, "job-token", false, 600, PROFILE, Map.of()))
+        assertThatThrownBy(
+                        () -> new PiPlanSpec("", "gpt-5.4-mini", null, null, null, "job-token", 600, PROFILE, Map.of()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("apiProtocol");
     }
@@ -67,7 +67,7 @@ class PiPlanSpecValidationTest extends BaseUnitTest {
     @Test
     void blankUpstreamModelIdRejected() {
         assertThatThrownBy(() -> new PiPlanSpec(
-                        "openai-completions", "  ", null, null, null, "job-token", false, 600, PROFILE, Map.of()))
+                        "openai-completions", "  ", null, null, null, "job-token", 600, PROFILE, Map.of()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("upstreamModelId");
     }
@@ -81,7 +81,6 @@ class PiPlanSpecValidationTest extends BaseUnitTest {
                         null,
                         null,
                         "job-token",
-                        true,
                         PiRuntimeFactory.TIMEOUT_BUFFER_SECONDS,
                         PROFILE,
                         Map.of()))
@@ -116,7 +115,6 @@ class PiPlanSpecValidationTest extends BaseUnitTest {
                         null,
                         null,
                         "job-token",
-                        true,
                         600,
                         BLANK_SCRIPT_PROFILE,
                         Map.of()))
@@ -134,7 +132,6 @@ class PiPlanSpecValidationTest extends BaseUnitTest {
                         null,
                         null,
                         "job-token",
-                        false,
                         600,
                         PROFILE,
                         Map.of()));
@@ -143,7 +140,8 @@ class PiPlanSpecValidationTest extends BaseUnitTest {
     @Test
     void traversalRejected() {
         // Only exact paths pass, so a key that merely starts like one never reaches the workspace manager.
-        assertThatThrownBy(() -> specWith(Map.of("agent/mentor/system.md/../../../etc/passwd", BYTES)))
+        assertThatThrownBy(() ->
+                        specWith(Map.of(SandboxLayout.PRACTICE_SCRIPT_MODELS_FILE + "/../../../etc/passwd", BYTES)))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 }

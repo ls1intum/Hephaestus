@@ -12,51 +12,90 @@ import org.junit.jupiter.params.provider.ValueSource;
 @Tag("database")
 class PracticeV1ConversationReceiptDatabaseTest {
     private static final String COPY = "00000000-0000-0000-0000-000000998172";
-    private static final String MESSAGE = "00000000-0000-0000-0000-000000998192";
+    private static final String TURN = "00000000-0000-0000-0000-000000978053";
+    private static final String ANSWER = "00000000-0000-0000-0000-000000998192";
+    private static final String OTHER_ANSWER = "00000000-0000-0000-0000-000000978052";
+    private static final String FOREIGN_TURN = "00000000-0000-0000-0000-000000998195";
+    private static final String FOREIGN_ANSWER = "00000000-0000-0000-0000-000000998194";
+    private static final String TOOL_RESULT = "00000000-0000-0000-0000-000000998196";
+    private static final String SHOWN = "'Actual shown words.'";
 
     @ParameterizedTest
     @ValueSource(strings = {"prod", "dev"})
-    void shouldBindTheClaimAndRecordOnlyItsCompletedAssistantWords(String context) throws Exception {
+    void shouldBindTheClaimAndRecordOnlyItsCompletedAnswerWords(String context) throws Exception {
         var database = prepared(context);
         reject(
                 database,
+                "UPDATE feedback_copy SET state='WRITE_STARTED',write_started_at='2026-02-01T00:00:00Z' WHERE id='"
+                        + COPY + "'",
+                "23514");
+        reject(
+                database,
                 "UPDATE feedback_copy SET state='WRITE_STARTED',write_started_at='2026-02-01T00:00:00Z',"
-                        + "chat_message_id='00000000-0000-0000-0000-000000998194' WHERE id='" + COPY + "'",
+                        + "mentor_turn_id='" + FOREIGN_TURN + "' WHERE id='" + COPY + "'",
                 "23514");
         claim(database);
         var digest = PracticeMigrationFixture.column(
                 database, "SELECT feedback_content_digest('00000000-0000-0000-0000-000000998161')");
         reject(
                 database,
-                "UPDATE feedback_copy SET chat_message_id='00000000-0000-0000-0000-000000978052'" + " WHERE id='" + COPY
-                        + "'",
+                "UPDATE feedback_copy SET mentor_turn_id='" + FOREIGN_TURN + "' WHERE id='" + COPY + "'",
                 "55000");
-        reject(database, "UPDATE feedback_copy SET chat_message_id=NULL WHERE id='" + COPY + "'", "55000");
+        reject(database, "UPDATE feedback_copy SET mentor_turn_id=NULL WHERE id='" + COPY + "'", "55000");
+        reject(
+                database,
+                "UPDATE feedback_copy SET mentor_entry_id='" + FOREIGN_ANSWER + "' WHERE id='" + COPY + "'",
+                "23514");
+        PracticeMigrationFixture.execute(
+                database, "UPDATE feedback_copy SET mentor_entry_id='" + ANSWER + "' WHERE id='" + COPY + "'");
+        reject(
+                database,
+                "UPDATE feedback_copy SET mentor_entry_id='" + OTHER_ANSWER + "' WHERE id='" + COPY + "'",
+                "55000");
+        reject(database, "UPDATE feedback_copy SET mentor_entry_id=NULL WHERE id='" + COPY + "'", "55000");
         reject(database, "UPDATE feedback_copy SET body='Prepared brief.' WHERE id='" + COPY + "'", "55000");
-        reject(database, receipt("Actual shown words."), "23514");
+        answer(database);
+        // The turn is still running, so its answer is not complete.
+        reject(database, receipt(SHOWN), "23514");
+        complete(database);
+        reject(database, receipt("'Some context.'"), "23514");
+        // The answer's own words are not the words its show_feedback call showed.
+        reject(database, receipt("E'Some context.\\n\\nActual shown words.'"), "23514");
+        reject(database, receipt("'Prepared brief.'"), "23514");
+        // A failed show_feedback call shows nothing.
         PracticeMigrationFixture.execute(
                 database,
-                "UPDATE chat_message SET status='completed',parts='[{\"type\":\"text\",\"text\":\"Actual shown"
-                        + " \"},{\"type\":\"text\",\"text\":\"words.\"}]'::jsonb WHERE id='" + MESSAGE + "'");
-        reject(database, receipt("Prepared brief."), "23514");
+                "UPDATE mentor_entry SET payload=jsonb_set(payload,'{message,isError}','true')" + " WHERE id='"
+                        + TOOL_RESULT + "'");
+        reject(database, receipt(SHOWN), "23514");
+        PracticeMigrationFixture.execute(
+                database,
+                "UPDATE mentor_entry SET payload=jsonb_set(payload,'{message,isError}','false')" + " WHERE id='"
+                        + TOOL_RESULT + "'");
         reject(
                 database,
                 "UPDATE feedback_copy SET state='POSTED',posted_at='2026-02-01T00:01:00Z'" + " WHERE id='" + COPY + "'",
                 "23514");
         reject(
                 database,
-                "UPDATE feedback_copy SET state='POSTED',body='Actual shown words.',"
+                "UPDATE feedback_copy SET state='POSTED',body=" + SHOWN + ","
                         + "posted_at='2026-01-01T00:01:00Z' WHERE id='" + COPY + "'",
                 "55000");
+        PracticeMigrationFixture.execute(
+                database, "UPDATE mentor_entry SET redacted_at='2026-02-01T00:00:30Z' WHERE id='" + ANSWER + "'");
+        reject(database, receipt(SHOWN), "23514");
+        PracticeMigrationFixture.execute(
+                database, "UPDATE mentor_entry SET redacted_at=NULL WHERE id='" + ANSWER + "'");
         // A failed transport can later supply confirmation, without another claim or a new fence.
         PracticeMigrationFixture.execute(database, "UPDATE feedback_copy SET state='FAILED' WHERE id='" + COPY + "'");
-        PracticeMigrationFixture.execute(database, receipt("Actual shown words."));
+        PracticeMigrationFixture.execute(database, receipt(SHOWN));
         assertThat(PracticeMigrationFixture.column(
                         database,
-                        "SELECT state || '|' || body || '|' || chat_message_id || '|' ||"
+                        "SELECT state || '|' || (body=" + SHOWN + ")::text || '|' || mentor_turn_id || '|' ||"
+                                + " mentor_entry_id || '|' ||"
                                 + " (write_started_at='2026-02-01T00:00:00Z'::timestamptz)::text"
                                 + " FROM feedback_copy WHERE id='" + COPY + "'"))
-                .containsExactly("POSTED|Actual shown words.|" + MESSAGE + "|true");
+                .containsExactly("POSTED|true|" + TURN + "|" + ANSWER + "|true");
         assertThat(PracticeMigrationFixture.column(
                         database, "SELECT feedback_content_digest('00000000-0000-0000-0000-000000998161')"))
                 .isEqualTo(digest);
@@ -82,26 +121,42 @@ class PracticeV1ConversationReceiptDatabaseTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"prod", "dev"})
-    void shouldKeepReceiptCustodyWhenTheBoundMessageIsDeleted(String context) throws Exception {
+    void shouldKeepReceiptCustodyWhenTheBoundAnswerAndTurnAreDeleted(String context) throws Exception {
         var database = prepared(context);
         claim(database);
+        answer(database);
+        complete(database);
         PracticeMigrationFixture.execute(
                 database,
-                "UPDATE chat_message SET status='completed',"
-                        + "parts='[{\"type\":\"text\",\"text\":\"Actual shown words.\"}]'::jsonb WHERE id='" + MESSAGE
-                        + "'");
-        PracticeMigrationFixture.execute(database, receipt("Actual shown words."));
-        PracticeMigrationFixture.execute(database, "DELETE FROM chat_message WHERE id='" + MESSAGE + "'");
+                "UPDATE feedback_copy SET state='POSTED',posted_at='2026-02-01T00:01:00Z',body=" + SHOWN
+                        + ",mentor_entry_id='" + ANSWER + "' WHERE id='" + COPY + "'");
+        PracticeMigrationFixture.execute(database, "DELETE FROM mentor_entry WHERE id='" + ANSWER + "'");
         assertThat(PracticeMigrationFixture.column(
                         database,
-                        "SELECT (chat_message_id IS NULL)::text || '|' || state || '|' || body || '|' ||"
+                        "SELECT (mentor_entry_id IS NULL)::text || '|' || mentor_turn_id || '|' || state || '|' ||"
+                                + " (body=" + SHOWN + ")::text || '|' ||"
                                 + " (write_started_at IS NOT NULL AND posted_at IS NOT NULL)::text"
                                 + " FROM feedback_copy WHERE id='" + COPY + "'"))
-                .containsExactly("true|POSTED|Actual shown words.|true");
+                .containsExactly("true|" + TURN + "|POSTED|true|true");
         reject(
                 database,
-                "UPDATE feedback_copy SET chat_message_id='00000000-0000-0000-0000-000000978052'" + " WHERE id='" + COPY
-                        + "'",
+                "UPDATE feedback_copy SET mentor_entry_id='" + OTHER_ANSWER + "' WHERE id='" + COPY + "'",
+                "55000");
+        PracticeMigrationFixture.execute(database, "DELETE FROM mentor_turn WHERE id='" + TURN + "'");
+        assertThat(PracticeMigrationFixture.column(
+                        database,
+                        "SELECT (mentor_entry_id IS NULL AND mentor_turn_id IS NULL)::text || '|' || state || '|' ||"
+                                + " (body=" + SHOWN + ")::text || '|' ||"
+                                + " (write_started_at IS NOT NULL AND posted_at IS NOT NULL)::text"
+                                + " FROM feedback_copy WHERE id='" + COPY + "'"))
+                .containsExactly("true|POSTED|true|true");
+        reject(
+                database,
+                "UPDATE feedback_copy SET mentor_entry_id='" + OTHER_ANSWER + "' WHERE id='" + COPY + "'",
+                "55000");
+        reject(
+                database,
+                "UPDATE feedback_copy SET mentor_turn_id='" + FOREIGN_TURN + "' WHERE id='" + COPY + "'",
                 "55000");
         reject(
                 database,
@@ -150,15 +205,17 @@ class PracticeV1ConversationReceiptDatabaseTest {
             INSERT INTO feedback_copy(id,workspace_id,feedback_id,kind,position,state,write_key,write_marker)
             VALUES('00000000-0000-0000-0000-000000998172',978001,'00000000-0000-0000-0000-000000998161',
                 'CHAT_TURN',0,'PLANNED','fixed-chat-key','fixed-chat-marker');
-            INSERT INTO chat_message(id,workspace_id,thread_id,role,status,parts,created_at)
-            VALUES('00000000-0000-0000-0000-000000998192',978001,'00000000-0000-0000-0000-000000978051',
-                'ASSISTANT','in_flight','[]'::jsonb,'2026-02-01T00:00:00Z');
-            INSERT INTO chat_thread(id,workspace_id,account_id,surface,created_at)
-            SELECT '00000000-0000-0000-0000-000000998193',978001,account_id,'WEB','2026-02-01T00:00:00Z'
-                FROM membership WHERE workspace_id=978001 AND account_id<>978003 LIMIT 1;
-            INSERT INTO chat_message(id,workspace_id,thread_id,role,status,parts,created_at)
-            VALUES('00000000-0000-0000-0000-000000998194',978001,'00000000-0000-0000-0000-000000998193',
-                'ASSISTANT','completed','[{"type":"text","text":"Another developer."}]'::jsonb,'2026-02-01T00:00:00Z');
+            INSERT INTO mentor_entry(id,workspace_id,conversation_id,seq,kind,surface,text,payload,turn_id,created_at)
+            VALUES('00000000-0000-0000-0000-000000998192',978001,'00000000-0000-0000-0000-000000978051',2,'HEPH','APP',
+                '',NULL,'00000000-0000-0000-0000-000000978053','2026-02-01T00:00:00Z');
+            INSERT INTO mentor_conversation(id,workspace_id,account_id,created_at,last_activity_at)
+            VALUES('00000000-0000-0000-0000-000000998193',978001,978007,'2026-02-01T00:00:00Z','2026-02-01T00:00:00Z');
+            INSERT INTO mentor_turn(id,workspace_id,conversation_id,request_id,status,surface,attempt,started_at,created_at)
+            VALUES('00000000-0000-0000-0000-000000998195',978001,'00000000-0000-0000-0000-000000998193',
+                'foreign-turn','RUNNING','APP',1,'2026-02-01T00:00:00Z','2026-02-01T00:00:00Z');
+            INSERT INTO mentor_entry(id,workspace_id,conversation_id,seq,kind,surface,text,turn_id,created_at)
+            VALUES('00000000-0000-0000-0000-000000998194',978001,'00000000-0000-0000-0000-000000998193',1,'HEPH','APP',
+                'Another developer.','00000000-0000-0000-0000-000000998195','2026-02-01T00:00:00Z');
             """);
         return database;
     }
@@ -167,12 +224,40 @@ class PracticeV1ConversationReceiptDatabaseTest {
         PracticeMigrationFixture.execute(
                 database,
                 "UPDATE feedback_copy SET state='WRITE_STARTED',"
-                        + "write_started_at='2026-02-01T00:00:00Z',chat_message_id='" + MESSAGE + "' WHERE id='" + COPY
+                        + "write_started_at='2026-02-01T00:00:00Z',mentor_turn_id='" + TURN + "' WHERE id='" + COPY
                         + "'");
     }
 
+    /**
+     * Heph's answer: its own words, its show_feedback calls for this and another feedback, and the successful result
+     * of the call for this feedback.
+     */
+    private static void answer(TestDatabase database) {
+        PracticeMigrationFixture.execute(database, """
+            UPDATE mentor_entry SET text='Some context.',payload='{"type":"message","id":"a1","message":{
+                "role":"assistant","content":[{"type":"text","text":"Some context."},
+                {"type":"toolCall","id":"call-1","name":"show_feedback","arguments":{
+                    "feedbackId":"00000000-0000-0000-0000-000000998161","text":"Actual shown words."}},
+                {"type":"toolCall","id":"call-2","name":"show_feedback","arguments":{
+                    "feedbackId":"00000000-0000-0000-0000-000000978044","text":"Other feedback."}}]}}'::jsonb
+            WHERE id='00000000-0000-0000-0000-000000998192';
+            INSERT INTO mentor_entry(id,workspace_id,conversation_id,seq,kind,surface,text,payload,turn_id,created_at)
+            VALUES('00000000-0000-0000-0000-000000998196',978001,'00000000-0000-0000-0000-000000978051',3,
+                'TOOL_RESULT','APP','','{"type":"message","id":"r1","message":{"role":"toolResult",
+                "toolCallId":"call-1","toolName":"show_feedback","isError":false,
+                "content":[{"type":"text","text":"Shown"}]}}'::jsonb,
+                '00000000-0000-0000-0000-000000978053','2026-02-01T00:00:00Z');
+            """);
+    }
+
+    private static void complete(TestDatabase database) {
+        PracticeMigrationFixture.execute(
+                database,
+                "UPDATE mentor_turn SET status='DONE',finished_at='2026-02-01T00:00:50Z' WHERE id='" + TURN + "'");
+    }
+
     private static String receipt(String body) {
-        return "UPDATE feedback_copy SET state='POSTED',posted_at='2026-02-01T00:01:00Z',body='" + body + "' WHERE id='"
+        return "UPDATE feedback_copy SET state='POSTED',posted_at='2026-02-01T00:01:00Z',body=" + body + " WHERE id='"
                 + COPY + "'";
     }
 

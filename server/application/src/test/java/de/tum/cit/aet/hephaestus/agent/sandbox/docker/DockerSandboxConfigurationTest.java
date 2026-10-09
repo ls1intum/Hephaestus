@@ -13,6 +13,7 @@ import java.time.Clock;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.springframework.mock.env.MockEnvironment;
 
 class DockerSandboxConfigurationTest extends BaseUnitTest {
 
@@ -26,7 +27,7 @@ class DockerSandboxConfigurationTest extends BaseUnitTest {
         }
         var registry = new SimpleMeterRegistry();
         try {
-            var guard = new DockerSandboxConfiguration(Clock.systemUTC())
+            var guard = new DockerSandboxConfiguration(Clock.systemUTC(), new MockEnvironment())
                     .sandboxImageGuard(
                             operations, new AgentImageProperties("test-image", ImagePullPolicy.ALWAYS), registry);
             assertThat(registry.getMeters()).isEmpty();

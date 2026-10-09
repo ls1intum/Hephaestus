@@ -78,6 +78,34 @@ class MirrorQueryPredicateGuardTest extends BaseUnitTest {
         void everyMentorArtifactRangeExcludesTombstones() {
             assertEveryRangeHasLivePredicate(MentorContextQueryRepository.class, Set.of());
         }
+
+        /**
+         * The monitor matches a repository by path alone, so each monitored range also needs the connected
+         * instance, or a same-path project on another instance reaches Heph. A repository a team hides from
+         * contributions stays out of every list, as it does in Activity and the review history.
+         */
+        @Test
+        void everyMonitoredMentorRangeIsOnTheConnectedInstanceAndNotHidden() {
+            Map<String, String> offenders = new LinkedHashMap<>();
+            for (Method method : MentorContextQueryRepository.class.getDeclaredMethods()) {
+                Query query = method.getAnnotation(Query.class);
+                if (query == null || query.nativeQuery()) {
+                    continue;
+                }
+                String jpql = normalize(query.value());
+                int monitors = countOccurrences(jpql, "JOIN RepositoryToMonitor ");
+                if (countOccurrences(jpql, "wtrs.hiddenFromContributions = true") < monitors) {
+                    offenders.put(method.getName(), "the hidden-repository exclusion");
+                } else if (countOccurrences(jpql, ".provider.id = :providerId") < monitors) {
+                    offenders.put(method.getName(), "the connected-instance predicate");
+                }
+            }
+
+            assertThat(offenders)
+                    .as("every monitored mentor range must be on the connected instance and not hidden. "
+                            + "Offending method -> the predicate it is missing")
+                    .isEmpty();
+        }
     }
 
     @Nested

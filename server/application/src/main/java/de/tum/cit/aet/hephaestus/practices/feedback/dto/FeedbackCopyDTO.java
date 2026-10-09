@@ -44,8 +44,11 @@ public record FeedbackCopyDTO(
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
         String externalRef,
 
-        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
-        UUID chatMessageId,
+        @Schema(
+                requiredMode = Schema.RequiredMode.REQUIRED,
+                description = "The Heph answer that showed a conversation copy")
+        @Nullable
+        UUID mentorEntryId,
 
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
         Instant postedAt,
@@ -73,7 +76,7 @@ public record FeedbackCopyDTO(
                 copy.getWriteStartedAt(),
                 copy.getExternalUrl(),
                 copy.getExternalRef(),
-                copy.getChatMessageId(),
+                copy.getMentorEntryId(),
                 copy.getPostedAt(),
                 copy.getStopReason(),
                 copy.getLastError(),

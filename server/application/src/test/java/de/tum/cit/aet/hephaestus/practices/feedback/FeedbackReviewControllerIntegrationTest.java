@@ -4,8 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.integration.core.framework.RegisteredItemLabels;
 import de.tum.cit.aet.hephaestus.practices.feedback.response.FeedbackResponse;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyKind;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyState;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackIds;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackResolution;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackState;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
@@ -13,7 +15,10 @@ import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Membership;
+import java.sql.Timestamp;
 import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
@@ -212,6 +217,69 @@ class FeedbackReviewControllerIntegrationTest extends AbstractFeedbackIntegratio
                 .expectStatus()
                 .isBadRequest()
                 .expectBody(Void.class);
+    }
+
+    @Test
+    @WithAdminUser
+    void shouldLocateConversationFeedbackByTheOriginOfTheHephMessageThatShowedIt() {
+        var inApp = piece(FeedbackDestination.CONVERSATION, FeedbackState.DELIVERED, AT);
+        var inSlack = piece(FeedbackDestination.CONVERSATION, FeedbackState.DELIVERED, AT);
+        var waiting = piece(FeedbackDestination.CONVERSATION, FeedbackState.READY, null);
+        UUID conversation = UUID.randomUUID();
+        jdbc.update(
+                "INSERT INTO mentor_conversation(id,workspace_id,account_id,created_at,last_activity_at)"
+                        + " VALUES (?,?,?,?,?)",
+                conversation,
+                workspace.getId(),
+                developerId,
+                Timestamp.from(AT),
+                Timestamp.from(AT));
+        shownIn(inApp, conversation, 1, "APP");
+        shownIn(inSlack, conversation, 2, "SLACK");
+
+        for (var expected : List.of(
+                Map.entry("HEPH", inApp), Map.entry("SLACK", inSlack), Map.entry("NEXT_CONVERSATION", waiting))) {
+            client.get()
+                    .uri(route() + "?location=" + expected.getKey())
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$.totalElements")
+                    .isEqualTo(1)
+                    .jsonPath("$.content[0].id")
+                    .isEqualTo(expected.getValue().getId().toString());
+        }
+    }
+
+    /** A conversation copy of {@code parent} posted in a Heph message written on {@code surface}. */
+    private void shownIn(Feedback parent, UUID conversation, int seq, String surface) {
+        UUID entry = UUID.randomUUID();
+        jdbc.update(
+                "INSERT INTO mentor_entry(id,workspace_id,conversation_id,seq,kind,surface,text,created_at)"
+                        + " VALUES (?,?,?,?,'HEPH',?,'Add a focused regression test.',?)",
+                entry,
+                workspace.getId(),
+                conversation,
+                seq,
+                surface,
+                Timestamp.from(AT));
+        UUID id = FeedbackIds.copy(parent.getId(), FeedbackCopyKind.CHAT_TURN, 0);
+        jdbc.update(
+                "INSERT INTO feedback_copy(id,workspace_id,feedback_id,kind,position,state,write_key,write_marker,"
+                        + "write_started_at,posted_at,external_ref,body,mentor_entry_id,created_at)"
+                        + " VALUES (?,?,?,'CHAT_TURN',0,'POSTED',?,?,?,?,?,'Add a focused regression test.',?,?)",
+                id,
+                workspace.getId(),
+                parent.getId(),
+                id.toString(),
+                FeedbackIds.writeMarker(id),
+                Timestamp.from(AT),
+                Timestamp.from(AT),
+                entry.toString(),
+                entry,
+                Timestamp.from(AT));
     }
 
     @Test

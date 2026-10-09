@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.result;
 
-import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
@@ -37,8 +37,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.json.JsonMapper;
 
+/** Heph's context on a worker reads the developer's standings too, so this lives wherever reviews are prepared. */
 @Service
-@ConditionalOnServerRole
+@ConditionalOnCaptureRole
 @RequiredArgsConstructor
 public class PracticeStandingService {
 

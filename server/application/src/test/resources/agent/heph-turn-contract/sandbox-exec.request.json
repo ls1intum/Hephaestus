@@ -1,0 +1,4 @@
+{
+	"command": "git -C repos/github.com/acme/api log --oneline -5",
+	"timeoutMs": 30000
+}

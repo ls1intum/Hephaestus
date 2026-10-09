@@ -6,23 +6,26 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-import tools.jackson.databind.json.JsonMapper;
 
+/**
+ * The words of one message the developer wrote to Heph: a {@code USER} entry of a conversation the account owns, not
+ * redacted. Any other entry, or one of another account or workspace, has no text here.
+ */
 @Component
 @RequiredArgsConstructor
 class MentorMessageQueryAdapter implements MentorMessageQuery {
-    private final ChatMessageRepository messages;
+    private final MentorEntryRepository entries;
+    private final MentorConversationRepository conversations;
 
     @Override
     @Transactional(readOnly = true)
     public Optional<String> textForMessage(long workspaceId, long accountId, UUID messageId) {
-        return messages.findTextForMessage(workspaceId, accountId, messageId).map(serialized -> {
-            var parts = new JsonMapper().readTree(serialized);
-            var text = new StringBuilder();
-            for (var part : parts)
-                if ("text".equals(part.path("type").asString()))
-                    text.append(part.path("text").asString());
-            return text.toString();
-        });
+        return entries.findByIdAndWorkspaceId(messageId, workspaceId)
+                .filter(entry -> entry.getKind() == MentorEntry.Kind.USER && !entry.isRedacted())
+                .filter(entry -> conversations
+                        .findByIdAndWorkspaceId(entry.getConversationId(), workspaceId)
+                        .filter(conversation -> conversation.getAccountId() == accountId)
+                        .isPresent())
+                .map(MentorEntry::getText);
     }
 }

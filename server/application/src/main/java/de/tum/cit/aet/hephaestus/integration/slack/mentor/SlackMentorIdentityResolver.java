@@ -59,6 +59,19 @@ public class SlackMentorIdentityResolver {
         return resolveAccountIdInternal(workspaceId, teamId, slackUserId, true);
     }
 
+    /**
+     * The account a Slack user is linked to, whatever its status or memberships: an account may always turn a
+     * notification off.
+     */
+    @Transactional(readOnly = true)
+    public Optional<Long> resolveLinkedAccountId(@Nullable String teamId, String slackUserId) {
+        if (slackUserId.isBlank() || teamId == null || teamId.isBlank()) {
+            return Optional.empty();
+        }
+        return accountIdentityQuery.resolveAccountId(
+                gitProviderRegistry.resolveProviderId("SLACK", SLACK_SERVER_URL), slackUserId, teamId);
+    }
+
     private Optional<Long> resolveAccountIdInternal(
             long workspaceId, @Nullable String teamId, String slackUserId, boolean activeAccountOnly) {
         if (slackUserId.isBlank() || teamId == null || teamId.isBlank()) {

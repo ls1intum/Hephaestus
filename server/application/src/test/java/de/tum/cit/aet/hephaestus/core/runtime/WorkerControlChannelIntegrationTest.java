@@ -90,7 +90,7 @@ class WorkerControlChannelIntegrationTest extends BaseIntegrationTest {
                     });
 
             // Publish a CapacityReport; verify the hub records it against the session.
-            CapacityReport report = new CapacityReport(4, 2, 0, 0, 4, 2);
+            CapacityReport report = new CapacityReport(4, 0, 4);
             String reportJson = codec.encode(FrameEnvelope.of(report));
             ws.sendText(reportJson, true).get(5, TimeUnit.SECONDS);
 
@@ -150,9 +150,10 @@ class WorkerControlChannelIntegrationTest extends BaseIntegrationTest {
             var codec = new FrameCodec(objectMapper);
             ws.sendText(
                             codec.encode(new FrameEnvelope(
-                                    2,
+                                    FrameEnvelope.CURRENT_VERSION - 1,
                                     UUID.randomUUID().toString(),
-                                    new WorkerHello(workerId, List.of(2), "previous-release"))),
+                                    new WorkerHello(
+                                            workerId, List.of(FrameEnvelope.CURRENT_VERSION - 1), "previous-release"))),
                             true)
                     .get(5, TimeUnit.SECONDS);
             assertThat(closed.get(10, TimeUnit.SECONDS)).isEqualTo(4400);

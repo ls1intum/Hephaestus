@@ -580,7 +580,7 @@ export const richReviewFixture = (() => {
 			writeStartedAt: state === "WITHHELD" ? null : new Date(composedAt.getTime() + 10_000),
 			externalRef: null,
 			externalUrl: null,
-			chatMessageId: null,
+			mentorEntryId: null,
 			path: null,
 			startLine: null,
 			endLine: null,

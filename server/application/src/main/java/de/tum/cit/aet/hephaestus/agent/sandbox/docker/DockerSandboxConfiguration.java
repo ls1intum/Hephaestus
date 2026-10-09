@@ -8,14 +8,9 @@ import de.tum.cit.aet.hephaestus.agent.gateway.SandboxGatewayProperties;
 import de.tum.cit.aet.hephaestus.agent.gateway.SandboxGatewaySessions;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
 import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
-import de.tum.cit.aet.hephaestus.agent.proxy.MentorProxyCredentialRegistry;
 import de.tum.cit.aet.hephaestus.agent.runtime.AgentImageProperties;
-import de.tum.cit.aet.hephaestus.agent.sandbox.InteractiveSandboxProperties;
 import de.tum.cit.aet.hephaestus.agent.sandbox.SandboxProperties;
-import de.tum.cit.aet.hephaestus.agent.sandbox.docker.interactive.DockerInteractiveSandboxAdapter;
-import de.tum.cit.aet.hephaestus.agent.sandbox.docker.interactive.InteractiveSandboxMetrics;
-import de.tum.cit.aet.hephaestus.agent.sandbox.docker.interactive.InteractiveSandboxRegistry;
-import de.tum.cit.aet.hephaestus.agent.sandbox.docker.interactive.StdinWriteWatchdog;
+import de.tum.cit.aet.hephaestus.agent.sandbox.spi.HostSandbox;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.ResourceLimits;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxException;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxManager;
@@ -35,10 +30,10 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
-import tools.jackson.databind.ObjectMapper;
 
 /**
  * Spring configuration for the Docker sandbox subsystem.
@@ -52,19 +47,17 @@ import tools.jackson.databind.ObjectMapper;
 @Configuration
 @ConditionalOnWorkerRole
 @ConditionalOnClass(DockerClient.class)
-@EnableConfigurationProperties({
-    SandboxProperties.class,
-    DockerSandboxProperties.class,
-    InteractiveSandboxProperties.class
-})
+@EnableConfigurationProperties({SandboxProperties.class, DockerSandboxProperties.class})
 public class DockerSandboxConfiguration {
 
     private static final Logger log = LoggerFactory.getLogger(DockerSandboxConfiguration.class);
 
     private final Clock clock;
+    private final Environment environment;
 
-    public DockerSandboxConfiguration(Clock clock) {
+    public DockerSandboxConfiguration(Clock clock, Environment environment) {
         this.clock = clock;
+        this.environment = environment;
     }
 
     /** RPC connections per container: create/start, logs and the wait. */
@@ -88,6 +81,12 @@ public class DockerSandboxConfiguration {
      * docker-java's reader thread only ever gets an interrupt, which a blocking read ignores.
      */
     static final Duration HTTP_STREAMING_RESPONSE_TIMEOUT = ResourceLimits.MAX_RUNTIME.plusMinutes(10);
+
+    /** Idle bound of a turn sandbox call: a command is silent for at most its one-minute timeout and the kill after. */
+    private static final Duration TURN_SANDBOX_RESPONSE_TIMEOUT = Duration.ofMinutes(5);
+
+    /** Turn sandbox calls at once: a few per running Heph turn, and the pool refill. */
+    private static final int TURN_SANDBOX_CONNECTIONS = 32;
 
     /** Calls whose response body is the stream: the wait on every container. */
     @Bean(name = "dockerStreamingClient", destroyMethod = "close")
@@ -228,6 +227,54 @@ public class DockerSandboxConfiguration {
     }
 
     @Bean
+    public HostSandbox dockerHostSandbox(
+            SandboxNetworkManager networkManager,
+            SandboxWorkspaceManager workspaceManager,
+            SandboxContainerManager containerManager,
+            ContainerSecurityPolicy securityPolicy,
+            SandboxCreator creator,
+            SandboxGatewaySessions gatewaySessions,
+            DockerClientOperations volumeOperations,
+            AgentImageProperties agentImageProperties,
+            DockerSandboxProperties dockerProperties,
+            SandboxGatewayProperties gatewayProperties) {
+        return new DockerHostSandbox(
+                networkManager,
+                workspaceManager,
+                containerManager,
+                securityPolicy,
+                creator,
+                gatewaySessions,
+                volumeOperations,
+                agentImageProperties.reference(),
+                dockerProperties.owner(),
+                gatewayProperties.port());
+    }
+
+    /**
+     * Heph's turn sandboxes, with a Docker client of their own: a command can wait for output for a minute, and its
+     * connections must not take the ones that the practice reviews wait on.
+     */
+    @Bean(destroyMethod = "close")
+    public DockerExecSandboxes dockerExecSandboxes(
+            DockerSandboxProperties dockerProperties,
+            DockerClientOperations operations,
+            ContainerSecurityPolicy securityPolicy,
+            SandboxImageGuard imageGuard,
+            SandboxCreator creator,
+            AgentImageProperties agentImageProperties) {
+        return new DockerExecSandboxes(
+                buildClient(dockerProperties, TURN_SANDBOX_RESPONSE_TIMEOUT, TURN_SANDBOX_CONNECTIONS, "turn-sandbox"),
+                operations,
+                securityPolicy,
+                imageGuard,
+                creator,
+                agentImageProperties.reference(),
+                dockerProperties.owner(),
+                environment.getProperty("server.port", Integer.class, 8080));
+    }
+
+    @Bean
     public SandboxVolumeManager sandboxVolumeManager(DockerClientOperations ops, DockerSandboxProperties properties) {
         return new SandboxVolumeManager(ops, properties);
     }
@@ -250,65 +297,6 @@ public class DockerSandboxConfiguration {
             SandboxProperties properties,
             DockerSandboxProperties dockerProperties) {
         return new DockerHealthIndicator(containerManager, properties, dockerProperties);
-    }
-
-    // Interactive (mentor) sandbox — sibling of SandboxManager.
-
-    @Bean
-    public InteractiveSandboxMetrics interactiveSandboxMetrics(MeterRegistry meterRegistry) {
-        return new InteractiveSandboxMetrics(meterRegistry);
-    }
-
-    @Bean
-    public StdinWriteWatchdog stdinWriteWatchdog() {
-        return new StdinWriteWatchdog();
-    }
-
-    @Bean
-    public InteractiveSandboxRegistry interactiveSandboxRegistry(
-            InteractiveSandboxProperties properties,
-            SandboxContainerManager containerManager,
-            StdinWriteWatchdog watchdog,
-            MeterRegistry meterRegistry,
-            SandboxCreator creator) {
-        return new InteractiveSandboxRegistry(properties, containerManager, watchdog, meterRegistry, creator);
-    }
-
-    @Bean
-    public DockerInteractiveSandboxAdapter dockerInteractiveSandboxAdapter(
-            InteractiveSandboxProperties interactiveProperties,
-            SandboxNetworkManager networkManager,
-            SandboxWorkspaceManager workspaceManager,
-            SandboxContainerManager containerManager,
-            ContainerSecurityPolicy securityPolicy,
-            InteractiveSandboxRegistry registry,
-            InteractiveSandboxMetrics metrics,
-            ObjectMapper mapper,
-            // Shared platform-thread executor (declared above for the sync sandbox); the interactive
-            // adapter runs runClose() here too — docker-java sync calls pin virtual carriers on JDK 21.
-            ExecutorService dockerWaitExecutor,
-            DockerSandboxProperties dockerProperties,
-            SandboxGatewayProperties gatewayProperties,
-            MentorProxyCredentialRegistry mentorProxyCredentialRegistry,
-            SandboxGatewaySessions gatewaySessions,
-            DockerClientOperations volumeOperations,
-            SandboxCreator creator) {
-        return new DockerInteractiveSandboxAdapter(
-                interactiveProperties,
-                networkManager,
-                workspaceManager,
-                containerManager,
-                securityPolicy,
-                registry,
-                metrics,
-                mapper,
-                dockerWaitExecutor,
-                dockerProperties,
-                gatewayProperties.port(),
-                mentorProxyCredentialRegistry,
-                gatewaySessions,
-                volumeOperations,
-                creator);
     }
 
     /**

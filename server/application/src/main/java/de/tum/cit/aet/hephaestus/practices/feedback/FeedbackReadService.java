@@ -243,7 +243,7 @@ public class FeedbackReadService {
                 copy.getWriteStartedAt(),
                 copy.getExternalUrl(),
                 copy.getExternalRef(),
-                copy.getChatMessageId(),
+                copy.getMentorEntryId(),
                 copy.getPostedAt(),
                 copy.getStopReason(),
                 copy.getLastError(),

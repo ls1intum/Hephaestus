@@ -148,10 +148,10 @@ public final class SandboxLayout {
     /** Workspace-relative path of the orchestrator instructions (combination of prefix + filename). */
     public static final String ORCHESTRATOR_PATH = PI_AGENT_PREFIX + ORCHESTRATOR_FILENAME;
 
-    /** Mentor system prompt path — pinned by {@code SandboxLayoutSyncTest} against pi-mentor-runner.ts. */
+    /** Heph's system prompt, staged for the Heph host — pinned by {@code SandboxLayoutSyncTest} against heph-host.ts. */
     public static final String MENTOR_SYSTEM_PROMPT_PATH = "agent/mentor/system.md";
 
-    /** Workspace-relative directory for Pi SDK session JSONL files (matches the mentor runner's {@code SESSIONS_DIR}). */
+    /** Workspace-relative directory for Pi SDK session JSONL files. */
     public static final String SESSIONS_DIR = ".sessions";
 
     /**
@@ -198,7 +198,7 @@ public final class SandboxLayout {
     public static final String RUNTIME_CONTRACT_LABEL = "hephaestus.agent.runtime-contract";
 
     /** Runtime contract required by the staged runners. */
-    public static final int RUNTIME_CONTRACT_VERSION = 7;
+    public static final int RUNTIME_CONTRACT_VERSION = 8;
 
     /** Node major required by the staged runners. */
     public static final int NODE_MAJOR = 24;
@@ -211,6 +211,6 @@ public final class SandboxLayout {
 
     /** Exact workspace paths an adapter may pass in {@link PiPlanSpec#extraInputs()}. */
     public static Set<String> allowedExtraInputPaths() {
-        return Set.of(MENTOR_SYSTEM_PROMPT_PATH, PRACTICE_SCRIPT_MODELS_FILE);
+        return Set.of(PRACTICE_SCRIPT_MODELS_FILE);
     }
 }

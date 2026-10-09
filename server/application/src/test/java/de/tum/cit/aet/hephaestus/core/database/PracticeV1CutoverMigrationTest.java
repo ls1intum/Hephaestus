@@ -220,14 +220,13 @@ class PracticeV1CutoverMigrationTest {
                         "SELECT count(*)::text FROM feedback_send WHERE"
                                 + " feedback_id='00000000-0000-0000-0000-000000992193'"))
                 .containsExactly("0");
+        // The Heph ledger replaces the chat history (ADR 0057): the copy keeps its words without the message.
         assertThat(column(
                         database,
-                        "SELECT workspace_id || '|' || (parts->0->>'text') || '|' || (parts->1->>'type') ||"
-                                + " '|' || (parts->1->'data'->>'resultId') || '|' || jsonb_exists(parts->1->'data',"
-                                + " 'observationId') FROM chat_message WHERE"
-                                + " id='00000000-0000-0000-0000-000000992192'"))
-                .containsExactly(
-                        "992101|Unrelated assistant text.|data-result|00000000-0000-0000-0000-000000992141|false");
+                        "SELECT (to_regclass('chat_message') IS NULL)::text || '|' || (mentor_entry_id IS NULL) ||"
+                                + " '|' || (mentor_turn_id IS NULL) FROM feedback_copy WHERE"
+                                + " feedback_id='00000000-0000-0000-0000-000000992193'"))
+                .containsExactly("true|true|true");
     }
 
     @ParameterizedTest

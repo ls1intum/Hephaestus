@@ -85,6 +85,7 @@ public class AccountPurger {
         account.setAiChoiceAt(null);
         account.setFeedbackDeliveryEnabled(false);
         account.setPublicActivityVisible(false);
+        account.setTimeZone(null);
         accountRepository.save(account);
         log.info("auth.account: hard-deleted accountId={} (purged account-owned rows," + " status=DELETED)", accountId);
     }

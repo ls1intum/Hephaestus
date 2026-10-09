@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.core.proxy;
 
+import io.netty.handler.timeout.ReadTimeoutException;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -14,6 +15,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
+import java.util.function.UnaryOperator;
 import java.util.stream.Stream;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -112,6 +114,15 @@ public final class ProxyStreamingUtils {
      *     whole exchange is the only one
      */
     public static Flux<Part> parts(ClientResponse clientResp, @Nullable Duration bodyLimit) {
+        return parts(clientResp, bodyLimit, UnaryOperator.identity());
+    }
+
+    /**
+     * As {@link #parts(ClientResponse, Duration)}, but reads an SSE body through {@code body}: a caller bounds or
+     * cancels the stream there, and the response ends with what it relayed.
+     */
+    public static Flux<Part> parts(
+            ClientResponse clientResp, @Nullable Duration bodyLimit, UnaryOperator<Flux<DataBuffer>> body) {
         MediaType contentType = clientResp.headers().contentType().orElse(null);
         var head = new Head(
                 clientResp.statusCode().value(),
@@ -125,11 +136,10 @@ public final class ProxyStreamingUtils {
                             .defaultIfEmpty(new byte[0])
                             .map(Body::new));
         }
-        Flux<Part> body = clientResp
-                .bodyToFlux(DataBuffer.class)
+        Flux<Part> chunks = body.apply(clientResp.bodyToFlux(DataBuffer.class))
                 .doOnDiscard(DataBuffer.class, DataBufferUtils::release)
                 .map(ProxyStreamingUtils::copyAndRelease);
-        return Flux.<Part>concat(Mono.just(head), bodyLimit == null ? body : endingAfter(body, bodyLimit));
+        return Flux.<Part>concat(Mono.just(head), bodyLimit == null ? chunks : endingAfter(chunks, bodyLimit));
     }
 
     /**
@@ -204,6 +214,7 @@ public final class ProxyStreamingUtils {
 
             response.flushBuffer();
             OutputStream outputStream = response.getOutputStream();
+            EventBoundary events = new EventBoundary();
             for (Part part = nextPart(parts); part != null; part = nextPart(parts)) {
                 if (!(part instanceof Body chunk)) continue;
                 byte[] bytes = chunk.bytes();
@@ -214,15 +225,22 @@ public final class ProxyStreamingUtils {
                         log.warn("SSE tap failed; stream continues: {}", tapFailure.toString());
                     }
                 }
-                outputStream.write(bytes);
+                outputStream.write(events.complete(bytes));
                 outputStream.flush();
             }
+            // A stream that ended cleanly may end without a blank line; what it sent is relayed whole.
+            byte[] rest = events.rest();
+            if (rest.length > 0) outputStream.write(rest);
             outputStream.flush();
             return StreamOutcome.COMPLETED;
         } catch (IOException e) {
             log.debug("SSE client disconnected");
             return StreamOutcome.CLIENT_DISCONNECTED;
         } catch (RuntimeException e) {
+            if (readTimedOut(e)) {
+                log.debug("SSE upstream sent nothing for its read timeout");
+                return StreamOutcome.UPSTREAM_IDLE;
+            }
             // A passed limit is thrown as a RuntimeException whose direct cause is the TimeoutException. The
             // direct typed cause is the only signal used; it does not say which hop timed out.
             if (e.getCause() instanceof TimeoutException typed) {
@@ -235,6 +253,102 @@ public final class ProxyStreamingUtils {
             log.warn("SSE stream failed: type={}", e.getClass().getSimpleName());
             return StreamOutcome.STREAM_FAILED;
         }
+    }
+
+    /** The most bytes of one unfinished upstream event the relay holds; a longer event fails the stream. */
+    static final int MAX_PENDING_EVENT_BYTES = 1024 * 1024;
+
+    /**
+     * Relays whole server-sent events only: the bytes after the last blank line wait for the rest of their event. A
+     * provider can stop inside an event; a stream that then ends with an error event of the proxy's own would
+     * otherwise glue that event to half an event, and the client could read neither. A stream cut short drops its
+     * unfinished event. Lines end with LF, CRLF or CR, as the SSE format allows, also across chunks.
+     */
+    static final class EventBoundary {
+
+        private final ByteArrayOutputStream pending = new ByteArrayOutputStream();
+        /** No byte of the current line arrived yet: a line ending now ends the event. */
+        private boolean lineEmpty = true;
+        /** The last byte was a CR, so an LF next completes its CRLF rather than ending another line. */
+        private boolean afterCr;
+
+        /**
+         * The held bytes and those of {@code chunk} up to and including the last event boundary.
+         *
+         * @throws IllegalStateException when one unfinished event outgrows {@link #MAX_PENDING_EVENT_BYTES}
+         */
+        byte[] complete(byte[] chunk) {
+            int boundary = -1;
+            for (int i = 0; i < chunk.length; i++) {
+                byte b = chunk[i];
+                if (b == '\n' && afterCr) {
+                    afterCr = false;
+                    if (boundary == i) {
+                        boundary = i + 1;
+                    }
+                } else if (b == '\n' || b == '\r') {
+                    if (lineEmpty) {
+                        boundary = i + 1;
+                    }
+                    lineEmpty = true;
+                    afterCr = b == '\r';
+                } else {
+                    lineEmpty = false;
+                    afterCr = false;
+                }
+            }
+            byte[] complete = new byte[0];
+            if (boundary < 0) {
+                pending.write(chunk, 0, chunk.length);
+            } else {
+                pending.write(chunk, 0, boundary);
+                complete = pending.toByteArray();
+                pending.reset();
+                pending.write(chunk, boundary, chunk.length - boundary);
+            }
+            if (pending.size() > MAX_PENDING_EVENT_BYTES) {
+                throw new IllegalStateException(
+                        "an upstream event exceeded " + MAX_PENDING_EVENT_BYTES + " bytes without ending");
+            }
+            return complete;
+        }
+
+        /** What is held after the last boundary, once the stream ended. */
+        byte[] rest() {
+            byte[] rest = pending.toByteArray();
+            pending.reset();
+            return rest;
+        }
+    }
+
+    /**
+     * Ends {@code source} with an {@link UpstreamIdleException} when no item arrives for {@code idle}. A read bound is
+     * kept apart from a total limit, which ends with a {@link TimeoutException}.
+     */
+    public static <T> Flux<T> endingWhenIdle(Flux<T> source, Duration idle) {
+        return source.timeout(idle, Flux.error(UpstreamIdleException::new));
+    }
+
+    /** The upstream sent no byte for a read bound that a caller put on the body. */
+    public static final class UpstreamIdleException extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+
+        public UpstreamIdleException() {
+            super("The upstream sent nothing for its idle bound", null, false, false);
+        }
+    }
+
+    /**
+     * Whether a read bound ended the exchange: the client's read timeout, or {@link #endingWhenIdle}. Either way the
+     * upstream sent no byte for that long. A total limit is not a read bound.
+     */
+    public static boolean readTimedOut(Throwable failure) {
+        for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
+            if (cause instanceof ReadTimeoutException || cause instanceof UpstreamIdleException) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -287,6 +401,8 @@ public final class ProxyStreamingUtils {
         CLIENT_DISCONNECTED,
         /** The stream ended with a typed timeout, such as the total stream deadline. */
         TIMED_OUT,
+        /** The upstream sent no byte for a read bound, so the exchange was cut. */
+        UPSTREAM_IDLE,
         STREAM_FAILED
     }
 }

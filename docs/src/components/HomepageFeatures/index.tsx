@@ -26,7 +26,7 @@ const FeatureList: FeatureItem[] = [
 		cta: { label: "How practice feedback works", to: "/user/ai-code-review" },
 	},
 	{
-		title: "Chat with Heph",
+		title: "Talk with Heph",
 		kicker: "Talk through feedback and recent work",
 		description: "Heph can use recent project activity and feedback you have received as context.",
 		bullets: [
@@ -34,7 +34,7 @@ const FeatureList: FeatureItem[] = [
 			"Question a suggestion or compare possible next steps",
 			"Use the web app or a Slack direct message",
 		],
-		cta: { label: "How to chat with Heph", to: "/user/ai-mentor" },
+		cta: { label: "How to talk with Heph", to: "/user/ai-mentor" },
 	},
 	{
 		title: "Practice profile",

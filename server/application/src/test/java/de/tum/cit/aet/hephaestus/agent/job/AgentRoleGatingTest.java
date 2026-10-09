@@ -5,8 +5,8 @@ import static org.mockito.Mockito.mock;
 
 import de.tum.cit.aet.hephaestus.agent.handler.PublicReviewEligibility;
 import de.tum.cit.aet.hephaestus.agent.handler.ResultAdmissionService;
-import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorChatController;
-import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorSandboxController;
+import de.tum.cit.aet.hephaestus.agent.mentor.web.MentorConversationController;
+import de.tum.cit.aet.hephaestus.agent.mentor.web.MentorLiveController;
 import de.tum.cit.aet.hephaestus.agent.scan.ScanDriver;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventLogger;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
@@ -79,8 +79,8 @@ class AgentRoleGatingTest extends BaseUnitTest {
                     .hasSingleBean(ResultAdmissionService.class)
                     .hasSingleBean(PublicReviewEligibility.class)
                     .hasSingleBean(ReviewCompositionContinuation.class)
-                    .doesNotHaveBean(MentorChatController.class)
-                    .doesNotHaveBean(MentorSandboxController.class);
+                    .doesNotHaveBean(MentorConversationController.class)
+                    .doesNotHaveBean(MentorLiveController.class);
         });
     }
 
@@ -92,8 +92,8 @@ class AgentRoleGatingTest extends BaseUnitTest {
                         .doesNotHaveBean(ResultAdmissionService.class)
                         .doesNotHaveBean(PublicReviewEligibility.class)
                         .doesNotHaveBean(ReviewCompositionContinuation.class)
-                        .doesNotHaveBean(MentorChatController.class)
-                        .doesNotHaveBean(MentorSandboxController.class));
+                        .doesNotHaveBean(MentorConversationController.class)
+                        .doesNotHaveBean(MentorLiveController.class));
     }
 
     private static ApplicationContextRunner roleContext(boolean server, boolean worker, boolean webhook) {
@@ -101,8 +101,8 @@ class AgentRoleGatingTest extends BaseUnitTest {
                 ResultAdmissionService.class,
                 PublicReviewEligibility.class,
                 ReviewCompositionContinuation.class,
-                MentorChatController.class,
-                MentorSandboxController.class);
+                MentorConversationController.class,
+                MentorLiveController.class);
         return new ApplicationContextRunner()
                 .withPropertyValues(
                         RuntimeRole.SERVER_PROPERTY + "=" + server,

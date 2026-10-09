@@ -56,6 +56,10 @@ class ConfigSnapshotTest extends BaseUnitTest {
         assertThat(snapshot.contextWindow()).isEqualTo(16000);
         assertThat(snapshot.maxOutputTokens()).isEqualTo(1000);
         assertThat(snapshot.model().apiProtocol()).isEqualTo(LlmApiProtocol.OPENAI_RESPONSES);
+        assertThat(snapshot.schemaVersion()).isEqualTo(8);
+        assertThat(snapshot.allowInternet())
+                .as("no sandbox reaches the Internet")
+                .isFalse();
         assertThat(snapshot.withPriceSnapshot(LlmPriceSnapshot.unpricedInstance())
                         .model()
                         .connectionRef())

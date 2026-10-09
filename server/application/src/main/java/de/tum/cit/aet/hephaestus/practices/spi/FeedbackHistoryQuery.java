@@ -20,6 +20,9 @@ public interface FeedbackHistoryQuery {
     Optional<PrivateFeedbackHistory> forPrivateComposition(
             long workspaceId, long developerAccountId, Collection<PrivateFeedbackHistory.Route> routes, int limit);
 
+    /** One piece of the developer's own feedback, as {@link #forDeveloper} reads it; empty when it is not theirs. */
+    Optional<FeedbackHistoryEntry> find(long workspaceId, UUID feedbackId, long developerAccountId);
+
     /** The publication context of the same read; issue it inside the snapshot that reads the history page. */
     String publicationContext(long workspaceId, long itemId, UUID reviewId, Collection<Long> developerIds);
 

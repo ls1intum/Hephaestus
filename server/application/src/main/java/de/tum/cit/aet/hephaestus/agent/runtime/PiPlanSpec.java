@@ -23,7 +23,6 @@ public record PiPlanSpec(
         @Nullable Integer maxOutputTokens,
         @Nullable ReasoningEffort reasoningEffort,
         @Nullable String jobToken,
-        boolean allowInternet,
         int timeoutSeconds,
         PiRunnerProfile runnerProfile,
         Map<String, byte[]> extraInputs) {

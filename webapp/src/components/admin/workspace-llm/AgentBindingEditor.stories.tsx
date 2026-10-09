@@ -18,7 +18,6 @@ const meta = {
 			ready: true,
 			timeoutSeconds: 600,
 			maxConcurrentJobs: 3,
-			allowInternet: false,
 			servedTiers: ["IN_HOUSE", "CLOUD"],
 		},
 		availableModels: mockAvailableModels,

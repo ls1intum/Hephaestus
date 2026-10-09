@@ -342,25 +342,23 @@ class MigratedHistoryReadIntegrationTest extends BaseIntegrationTest {
                 feedbackId,
                 result.getId(),
                 scenario.account().getId());
-        var thread = UUID.randomUUID();
+        var conversation = UUID.randomUUID();
         var message = UUID.randomUUID();
         if (destination == FeedbackDestination.CONVERSATION) {
             jdbc.update(
-                    "INSERT INTO chat_thread(id,workspace_id,account_id,title,created_at,surface) VALUES (?,?,?,'Private feedback',now(),'WEB')",
-                    thread,
+                    "INSERT INTO mentor_conversation(id,workspace_id,account_id,created_at,last_activity_at) VALUES (?,?,?,now(),now())",
+                    conversation,
                     scenario.workspace().getId(),
                     scenario.account().getId());
-            var parts = json.createArrayNode();
-            parts.addObject().put("type", "text").put("text", body);
             jdbc.update(
-                    "INSERT INTO chat_message(id,workspace_id,thread_id,role,status,parts,created_at) VALUES (?,?,?,'ASSISTANT','completed',CAST(? AS jsonb),now())",
+                    "INSERT INTO mentor_entry(id,workspace_id,conversation_id,seq,kind,surface,text,created_at) VALUES (?,?,?,1,'HEPH','APP',?,now())",
                     message,
                     scenario.workspace().getId(),
-                    thread,
-                    parts.toString());
+                    conversation,
+                    body);
         }
         jdbc.update(
-                "INSERT INTO feedback_copy(id,workspace_id,feedback_id,kind,position,body,path,state,posted_at,chat_message_id) VALUES (?,?,?,?,0,?,?,'POSTED',now(),?)",
+                "INSERT INTO feedback_copy(id,workspace_id,feedback_id,kind,position,body,path,state,posted_at,mentor_entry_id) VALUES (?,?,?,?,0,?,?,'POSTED',now(),?)",
                 UUID.randomUUID(),
                 scenario.workspace().getId(),
                 feedbackId,
@@ -424,13 +422,15 @@ class MigratedHistoryReadIntegrationTest extends BaseIntegrationTest {
                     .jsonPath("$")
                     .isEmpty();
         } else if (destination == FeedbackDestination.CONVERSATION) {
-            get("/mentor/threads/" + thread)
+            get("/mentor/entries")
                     .expectStatus()
                     .isOk()
                     .expectBody()
-                    .jsonPath("$.messages[0].parts[0].text")
+                    .jsonPath("$.entries[0].id")
+                    .isEqualTo(message.toString())
+                    .jsonPath("$.entries[0].text")
                     .isEqualTo(body);
-            get(operator, "/mentor/threads/" + thread)
+            get(operator, "/mentor/entries/" + message + "/thread")
                     .expectStatus()
                     .isNotFound()
                     .expectBody(Void.class);

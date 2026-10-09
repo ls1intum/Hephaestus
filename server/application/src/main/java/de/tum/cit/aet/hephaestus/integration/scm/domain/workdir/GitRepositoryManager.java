@@ -18,7 +18,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.Semaphore;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Stream;
@@ -30,6 +32,7 @@ import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.diff.DiffFormatter;
 import org.eclipse.jgit.diff.Edit;
 import org.eclipse.jgit.diff.RawTextComparator;
+import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
@@ -128,8 +131,36 @@ public class GitRepositoryManager {
     }
 
     public void ensureRepository(RepositoryKey repository, String cloneUrl, @Nullable String token) {
+        ensure(repository, cloneUrl, token, () -> false, 0);
+    }
+
+    /**
+     * How long a reader's fetch may wait for the provider in one read or write, in seconds. A capture's fetch has no
+     * such bound.
+     */
+    public static final int READER_TRANSPORT_TIMEOUT_SECONDS = 60;
+
+    /**
+     * As {@link #ensureRepository(RepositoryKey, String, String)}, for a reader that may stop waiting: when
+     * {@code abandoned} holds once the mirror's lock is taken, nothing is fetched and the call throws
+     * {@link CancellationException}. Its fetch fails when the provider is silent for
+     * {@link #READER_TRANSPORT_TIMEOUT_SECONDS}, so it releases the mirror's lock.
+     */
+    public void ensureRepository(
+            RepositoryKey repository, String cloneUrl, @Nullable String token, BooleanSupplier abandoned) {
+        ensure(repository, cloneUrl, token, abandoned, READER_TRANSPORT_TIMEOUT_SECONDS);
+    }
+
+    /** @param timeoutSeconds JGit's transport timeout; 0 waits as long as the provider takes */
+    private void ensure(
+            RepositoryKey repository,
+            String cloneUrl,
+            @Nullable String token,
+            BooleanSupplier abandoned,
+            int timeoutSeconds) {
         requireEnabled();
-        locks.withWriteLock(repository, () -> {
+        locks.withWriteLock(repository, abandoned, () -> {
+            if (abandoned.getAsBoolean()) throw new CancellationException("The reader stopped waiting for the mirror");
             Path mirror = mirror(repository);
             try {
                 if (!isRepositoryCloned(repository) || !hasOrigin(mirror, cloneUrl)) {
@@ -160,6 +191,7 @@ public class GitRepositoryManager {
                             .setTagOpt(TagOpt.NO_TAGS)
                             .setRemoveDeletedRefs(true)
                             .setCredentialsProvider(credentials(token))
+                            .setTimeout(timeoutSeconds)
                             .call();
                 }
                 return null;
@@ -174,6 +206,21 @@ public class GitRepositoryManager {
     /** Fetches the provider's review ref for a head no branch reaches, such as a fork's, and pins it. */
     public boolean fetchRemoteCommit(
             RepositoryKey repository, String cloneUrl, String remoteRef, String expectedSha, @Nullable String token) {
+        return fetchRemoteCommit(repository, cloneUrl, remoteRef, expectedSha, token, 0);
+    }
+
+    /**
+     * As {@link #fetchRemoteCommit(RepositoryKey, String, String, String, String)}, for a reader: the fetch fails when
+     * the provider is silent for {@code timeoutSeconds} ({@link #READER_TRANSPORT_TIMEOUT_SECONDS}), so it releases
+     * the mirror's lock.
+     */
+    public boolean fetchRemoteCommit(
+            RepositoryKey repository,
+            String cloneUrl,
+            String remoteRef,
+            String expectedSha,
+            @Nullable String token,
+            int timeoutSeconds) {
         requireEnabled();
         if (!Repository.isValidRefName(remoteRef) || !ObjectId.isId(expectedSha)) {
             throw new IllegalArgumentException("Invalid remote review ref or expected commit SHA");
@@ -187,6 +234,7 @@ public class GitRepositoryManager {
                         .setRefSpecs(new RefSpec("+" + remoteRef + ":" + localRef))
                         .setTagOpt(TagOpt.NO_TAGS)
                         .setCredentialsProvider(credentials(token))
+                        .setTimeout(timeoutSeconds)
                         .call();
                 ObjectId resolved = git.getRepository().resolve(localRef);
                 return resolved != null && resolved.getName().equals(expectedSha.toLowerCase(Locale.ROOT));
@@ -205,6 +253,20 @@ public class GitRepositoryManager {
             return ref == null || ref.getObjectId() == null
                     ? null
                     : ref.getObjectId().getName();
+        });
+    }
+
+    /** The commit a tag names, peeled; null when the tag is absent or names no commit. */
+    public @Nullable String resolveTag(RepositoryKey repository, String tag) {
+        if (!isEnabled() || !Repository.isValidRefName(Constants.R_TAGS + tag)) return null;
+        return read(repository, repo -> {
+            Ref ref = repo.exactRef(Constants.R_TAGS + tag);
+            if (ref == null || ref.getObjectId() == null) return null;
+            try (RevWalk walk = new RevWalk(repo)) {
+                return walk.parseCommit(ref.getObjectId()).getName();
+            } catch (IncorrectObjectTypeException e) {
+                return null;
+            }
         });
     }
 
