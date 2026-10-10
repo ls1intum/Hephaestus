@@ -12,6 +12,7 @@ import {
 	planRelease,
 	type ReleaseRef,
 	releaseOutputs,
+	renderReleaseNotes,
 } from "./plan-release.ts";
 
 const SHA = "1111111111111111111111111111111111111111";
@@ -164,6 +165,76 @@ void test("holds a same-source draft but preserves a different-source draft refu
 	const otherSource = planRelease(SHA, "0.75.0", [...RELEASED, draft("v0.75.0", OTHER_SHA)], true);
 	assert.equal(otherSource.kind, "refuse");
 	assert.match(otherSource.reason, /delete the draft to re-cut/u);
+});
+
+const section = (version: string, body: string): string =>
+	`## ${version}\n\n### Patch Changes\n\n- ${body}\n\n`;
+
+const CHANGELOG = [
+	"# hephaestus\n\n",
+	section("0.89.1", "Fixed the review queue."),
+	// A heading inside a fenced example is text, not a section boundary.
+	"## 0.89.0\n\n### Minor Changes\n\n- Added a setting:\n\n  ```md\n  ## 0.88.0\n  ```\n\n",
+	section("0.88.0", "Published already."),
+	section("0.87.0", "Older history."),
+].join("");
+
+void test("release notes carry every section since the published release, as the source has them", async () => {
+	// 0.89.0 never published, so 0.89.1 is the first release operators see after 0.88.0.
+	const notes = await renderReleaseNotes(CHANGELOG, "0.88.0", "0.89.1");
+	assert.equal(
+		notes,
+		CHANGELOG.slice(CHANGELOG.indexOf("## 0.89.1"), CHANGELOG.indexOf("## 0.88.0\n\n### Patch")),
+	);
+	assert.match(
+		notes,
+		/Fixed the review queue[\s\S]*Added a setting[\s\S]*```md\n {2}## 0\.88\.0\n {2}```/u,
+	);
+	assert.doesNotMatch(notes, /Published already|Older history/u);
+
+	assert.equal(
+		await renderReleaseNotes(CHANGELOG, "0.89.0", "0.89.1"),
+		section("0.89.1", "Fixed the review queue."),
+	);
+	assert.match(
+		await renderReleaseNotes(CHANGELOG, "0.87.0", "0.89.1"),
+		/Published already\.\n\n$/u,
+	);
+});
+
+const refused = async (changelog: string, previous: string, version: string, reason: RegExp) =>
+	assert.rejects(renderReleaseNotes(changelog, previous, version), reason);
+
+void test("release notes refuse boundaries they cannot place exactly", async () => {
+	await refused(CHANGELOG, "0.86.0", "0.89.1", /0 "## 0\.86\.0" sections/u);
+	await refused(CHANGELOG, "0.88.0", "0.89.2", /0 "## 0\.89\.2" sections/u);
+	// The CHANGELOG of an older commit: its newest section is not the version being released.
+	await refused(
+		section("0.89.2", "Later.") + CHANGELOG,
+		"0.88.0",
+		"0.89.1",
+		/newest CHANGELOG section is "## 0\.89\.2"/u,
+	);
+	await refused(
+		CHANGELOG + section("0.88.0", "Again."),
+		"0.88.0",
+		"0.89.1",
+		/2 "## 0\.88\.0" sections/u,
+	);
+	await refused(
+		CHANGELOG.replace("## 0.89.0", "## 0.89.5"),
+		"0.88.0",
+		"0.89.1",
+		/"## 0\.89\.5" is not a stable release older than 0\.89\.1/u,
+	);
+	await refused(
+		CHANGELOG.replace("## 0.89.0", "## 0.89.1-rc.1"),
+		"0.88.0",
+		"0.89.1",
+		/"## 0\.89\.1-rc\.1" is not a stable release/u,
+	);
+	await refused(CHANGELOG, "0.88.0", "0.89.1-rc.1", /must both be major\.minor\.patch/u);
+	await refused(CHANGELOG, "0.89.1", "0.89.1", /not newer than 0\.89\.1/u);
 });
 
 const repositories: string[] = [];

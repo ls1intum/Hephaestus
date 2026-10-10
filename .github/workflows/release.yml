@@ -72,8 +72,44 @@ jobs:
           echo "## Preparing ${{ steps.cut.outputs.tag_name }}" >> "$GITHUB_STEP_SUMMARY"
           echo "Evidence verification is in progress; the draft is created once it passes." >> "$GITHUB_STEP_SUMMARY"
 
-  tag-images:
+  # The notes need the Markdown parser, so they are rendered here, with the dependencies installed
+  # and read-only access, and not in the job that signs and creates the release.
+  release-notes:
     needs: release
+    if: needs.release.outputs.released == 'true'
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      notes: ${{ steps.render.outputs.notes }}
+    steps:
+      - name: Check out the released tree
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.release.outputs.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          install: "frozen"
+
+      # CHANGELOG.md as checked out at the released commit: every section since the release the
+      # upgrade test seeds from, so the notes of a version that never published are not lost.
+      - name: Render the release notes
+        id: render
+        env:
+          VERSION: ${{ needs.release.outputs.version }}
+          PREVIOUS_VERSION: ${{ needs.release.outputs.previous_version }}
+        run: |
+          set -euo pipefail
+          node scripts/plan-release.ts --notes "$PREVIOUS_VERSION" "$VERSION" CHANGELOG.md notes.md
+          delimiter="notes-$(openssl rand -hex 16)"
+          { echo "notes<<$delimiter"; cat notes.md; echo "$delimiter"; } >> "$GITHUB_OUTPUT"
+
+  tag-images:
+    needs: [release, release-notes]
     if: needs.release.outputs.released == 'true'
     # Moves `X.Y`, `latest` and the version tags; two releases must never interleave here.
     concurrency:
@@ -243,6 +279,7 @@ jobs:
           VERSION: ${{ needs.release.outputs.version }}
           SHA: ${{ needs.release.outputs.sha }}
           MIGRATIONS: ${{ needs.release.outputs.migrations }}
+          RELEASE_NOTES: ${{ needs.release-notes.outputs.notes }}
         run: |
           set -euo pipefail
           # The release job has already proved that any existing release is a draft at this commit.
@@ -257,16 +294,13 @@ jobs:
           if [ "$MIGRATIONS" = true ]; then
             {
               echo "> [!WARNING]"
-              echo "> This release contains **schema migrations**. They run automatically on startup — back up your database before upgrading. See the [migration guide](${{ github.server_url }}/${{ github.repository }}/blob/main/MIGRATION.md)."
+              echo "> This release contains **schema migrations**. They run automatically on startup — back up your database before upgrading. See the [migration guide](${{ github.server_url }}/${{ github.repository }}/blob/$SHA/MIGRATION.md)."
               echo ""
             } >> "$NOTES"
           fi
-          # CHANGELOG.md as checked out at the released commit; awk exits at the next section.
-          awk -v ver="## $VERSION" '
-                $0 == ver { on=1; next }
-                on && /^## / { exit }
-                on { print }
-              ' CHANGELOG.md >> "$NOTES"
+          # Rendered by the release-notes job; an empty body means its output did not arrive.
+          [ -n "$RELEASE_NOTES" ] || { echo "::error::No release notes for $TAG_NAME"; exit 1; }
+          printf '%s\n' "$RELEASE_NOTES" >> "$NOTES"
           echo "----- release notes -----"; cat "$NOTES"; echo "-------------------------"
 
           gh release create "$TAG_NAME" --draft \

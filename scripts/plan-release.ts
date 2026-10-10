@@ -8,8 +8,9 @@
  *
  * The upgrade seed is the latest published stable release, not the parent commit's version.
  * The new version must be newer than that release before image aliases can move forward.
+ * The release notes start from the same release (`--notes`).
  */
-import { appendFile } from "node:fs/promises";
+import { appendFile, readFile } from "node:fs/promises";
 
 import { isSet } from "./lib/env.ts";
 import { environmentWithoutGitRepository } from "./lib/git-environment.ts";
@@ -158,6 +159,71 @@ export function releaseOutputs(plan: ReleasePlan, migrations = false): Record<st
 	};
 }
 
+/**
+ * The release notes of `version`: every CHANGELOG section newer than the published release
+ * `previousVersion`, newest first, as the source has them. A version that never published reaches
+ * operators through the next one that does. Only top-level `##` headings bound a section, so a
+ * heading inside a fenced example is text. Throws, before any release exists, where the sections
+ * from `version` down to `previousVersion` are missing, repeated, out of order or not stable.
+ */
+export async function renderReleaseNotes(
+	changelog: string,
+	previousVersion: string,
+	version: string,
+): Promise<string> {
+	// Loaded here, not at the top: the planner itself runs where no dependency is installed.
+	const { fromMarkdown } = await import("mdast-util-from-markdown");
+	const previous = parseVersion(previousVersion);
+	const current = parseVersion(version);
+	if (!previous || !current) {
+		throw new Error(
+			`release notes: "${previousVersion}" and "${version}" must both be major.minor.patch`,
+		);
+	}
+	if (compareVersions(current, previous) <= 0) {
+		throw new Error(`release notes: ${version} is not newer than ${previousVersion}`);
+	}
+	const sections = fromMarkdown(changelog).children.flatMap((node) => {
+		if (node.type !== "heading" || node.depth !== 2) {
+			return [];
+		}
+		const start = node.position?.start.offset;
+		const end = node.position?.end.offset;
+		if (start === undefined || end === undefined) {
+			throw new Error("release notes: a CHANGELOG heading has no source position");
+		}
+		const heading = changelog.slice(start, end);
+		const named = /^## (?<version>\S+)$/u.exec(heading)?.groups?.version;
+		return [{ heading, start, version: named === undefined ? undefined : parseVersion(named) }];
+	});
+	for (const bound of [`## ${version}`, `## ${previousVersion}`]) {
+		const count = sections.filter((section) => section.heading === bound).length;
+		if (count !== 1) {
+			throw new Error(`release notes: CHANGELOG has ${count} "${bound}" sections, not one`);
+		}
+	}
+	const [newest, ...older] = sections;
+	if (newest?.heading !== `## ${version}`) {
+		throw new Error(
+			`release notes: the newest CHANGELOG section is "${newest?.heading ?? "none"}", not "## ${version}"`,
+		);
+	}
+	let newer = current;
+	for (const section of older) {
+		if (!section.version || compareVersions(section.version, newer) >= 0) {
+			throw new Error(
+				`release notes: "${section.heading}" is not a stable release older than ${formatVersion(newer)}`,
+			);
+		}
+		if (compareVersions(section.version, previous) === 0) {
+			return changelog.slice(newest.start, section.start);
+		}
+		newer = section.version;
+	}
+	// Unreachable while the seed heading exists once and every section above it descends.
+	throw new Error(`release notes: no "## ${previousVersion}" section below "## ${version}"`);
+}
+
 /** Every release, drafts included — which the listing carries only for a token with push access. */
 async function listReleases(repository: string): Promise<ReleaseRef[]> {
 	const listed = await output("gh", [
@@ -215,7 +281,26 @@ export async function hasPendingChangesets(sha: string, cwd?: string): Promise<b
 		.some((file) => /^\.changeset\/[^/]+\.md$/u.test(file) && file !== ".changeset/README.md");
 }
 
-if (import.meta.main) {
+if (import.meta.main && process.argv[2] === "--notes") {
+	// Appends to a file rather than stdout, so a refusal reaches the log and not the notes.
+	const [, previousVersion, version, changelog, notes] = process.argv.slice(2);
+	if (!isSet(previousVersion) || !isSet(version) || !isSet(changelog) || !isSet(notes)) {
+		console.log(
+			"::error::usage: plan-release.ts --notes <previous-version> <version> <CHANGELOG.md> <notes-file>",
+		);
+		process.exitCode = 1;
+	} else {
+		try {
+			await appendFile(
+				notes,
+				await renderReleaseNotes(await readFile(changelog, "utf8"), previousVersion, version),
+			);
+		} catch (error) {
+			console.log(`::error::${error instanceof Error ? error.message : String(error)}`);
+			process.exitCode = 1;
+		}
+	}
+} else if (import.meta.main) {
 	const [sha] = process.argv.slice(2);
 	const repository = process.env.GITHUB_REPOSITORY;
 	if (!isSet(sha) || !isSet(repository)) {
