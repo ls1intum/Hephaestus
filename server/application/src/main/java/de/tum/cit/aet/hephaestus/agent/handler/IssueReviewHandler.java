@@ -205,6 +205,7 @@ public class IssueReviewHandler implements JobTypeHandler {
                     return validated(observation);
                 })
                 .toList();
+        feedbackDeliveryService.requestPrivatePreparation(job);
         if (feedbackDeliveryService.recoverAutomaticPackageIfPresent(job)) return;
         Set<UUID> publicIds = publicReviewEligibility.publicObservationIds(job, persisted);
         ComposedReview review = PullRequestReviewHandler.reviewToDeliver(

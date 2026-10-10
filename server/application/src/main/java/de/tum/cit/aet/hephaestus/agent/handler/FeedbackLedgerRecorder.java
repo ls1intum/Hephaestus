@@ -408,6 +408,15 @@ public class FeedbackLedgerRecorder {
     }
 
     /**
+     * Delivery handlers have no transaction. Commit the preparation request before public dispatch, including
+     * when public recovery fails. The after-commit listeners run asynchronously and own request idempotency.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void requestPreparation(AgentJob job) {
+        publishFeedbackLaneTrigger(job);
+    }
+
+    /**
      * Close a review that composed nothing to put on the work: wake the longitudinal lanes, which do not depend
      * on a public note, and record each observation the composer explicitly withheld. Opens no approval item.
      */

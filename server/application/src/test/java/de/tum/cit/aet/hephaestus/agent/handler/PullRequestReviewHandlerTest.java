@@ -984,6 +984,16 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         }
 
         @Test
+        void shouldRequestNoPrivatePreparationForOutputComposedFromAnotherAdmission() {
+            AgentJob job = jobAwaitingDelivery(1, 1);
+            ((ObjectNode) Objects.requireNonNull(job.getOutput()).get("feedback")).put("admissionDigest", "digest-2");
+
+            assertThatThrownBy(() -> handler.deliver(job)).isInstanceOf(RuntimeException.class);
+
+            verifyNoInteractions(feedbackService);
+        }
+
+        @Test
         void throwsWhenNoValidObservations() {
             AgentJob job = jobWithOutput("{\"observations\":[]}");
             assertThatThrownBy(() -> admit(job, "{\"observations\":[]}"))

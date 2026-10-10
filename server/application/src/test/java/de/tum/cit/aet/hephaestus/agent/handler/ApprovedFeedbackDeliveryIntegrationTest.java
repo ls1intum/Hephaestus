@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 import static org.mockito.AdditionalAnswers.delegatesTo;
 import static org.mockito.ArgumentMatchers.any;
@@ -21,7 +22,10 @@ import de.tum.cit.aet.hephaestus.agent.context.JobFolderIndex;
 import de.tum.cit.aet.hephaestus.agent.context.ReviewedWork;
 import de.tum.cit.aet.hephaestus.agent.context.ReviewedWorkFixtures;
 import de.tum.cit.aet.hephaestus.agent.handler.ReviewResultParser.DeliveryContent;
+import de.tum.cit.aet.hephaestus.agent.handler.conversation.PracticeFeedbackPreparationRequestedEvent;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.core.EntityTagPrecondition;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountPreferencesQuery;
@@ -72,8 +76,12 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.JsonNodeFactory;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -151,6 +159,15 @@ class ApprovedFeedbackDeliveryIntegrationTest extends AbstractPracticeReviewInte
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private ApplicationEventPublisher eventPublisher;
+
+    @Autowired
+    private TransactionTemplate transactions;
+
+    @Autowired
+    private FeedbackLanePreparationSweeper laneSweeper;
 
     private boolean silenced;
     private Workspace workspace;
@@ -331,6 +348,250 @@ class ApprovedFeedbackDeliveryIntegrationTest extends AbstractPracticeReviewInte
     @WithAdminUser
     void shouldRecordALostGitHubIssueCommentWithoutPostingAgain() {
         shouldRecordALostIssueNoteWithoutPostingAgain(onGitHub());
+    }
+
+    @Test
+    void shouldPreparePrivateFeedbackWithoutAPublicWriteWhenTheIssueLookupIsUnknown() {
+        IssueReview issue = reviewBesideTriage(Outcome.NOT_APPLICABLE);
+        compose(issue, issue.gap());
+        addPrivateBrief(issue.job(), issue.gap());
+        AgentJob prior = reviewIssue(issue.host(), ISSUE + 1);
+        prior.setStatus(AgentJobStatus.COMPLETED);
+        agentJobRepository.saveAndFlush(prior);
+        UUID earlier = observe(
+                practice,
+                prior,
+                ArtifactKinds.ISSUE.value(),
+                Objects.requireNonNull(prior.getMetadata()).path("issue_id").asLong(),
+                developer,
+                "The earlier issue also omitted the rationale",
+                Outcome.NOT_MET,
+                Severity.MINOR,
+                Instant.now().minusSeconds(60),
+                AdmittedObservationFixtures.evidence(prior.getId(), "scm.issue.core")
+                        .toString(),
+                null);
+        ObjectNode feedback =
+                (ObjectNode) Objects.requireNonNull(issue.job().getOutput()).path("feedback");
+        ObjectNode card = ((ArrayNode) feedback.path("units"))
+                .addObject()
+                .put("channel", "IN_APP")
+                .put("practiceSlug", practice.getSlug())
+                .put("action", "NEW")
+                .put("title", "Explain the rationale")
+                .put("body", "Two issues omit the rationale for the requested change.")
+                .put("nextStep", "Name the reason for the next requested change.");
+        card.putArray("basedOn").add(issue.gap().toString());
+        agentJobRepository.saveAndFlush(issue.job());
+        issue.host().threads().failLookups(true);
+
+        assertPrivatePreparationBeforeUncertainDelivery(
+                issue.job(), issue.host().threads(), issue.host().thread());
+
+        assertThat(jdbcTemplate.queryForList(
+                        "SELECT recipient_user_id, delivery_state FROM feedback WHERE agent_job_id = ? AND channel = 'IN_APP'",
+                        issue.job().getId()))
+                .containsExactly(Map.of("recipient_user_id", developer.getId(), "delivery_state", "PREPARED"));
+        assertThat(jdbcTemplate.queryForList(
+                        "SELECT fo.observation_id FROM feedback_observation fo JOIN feedback f ON f.id = fo.feedback_id WHERE f.agent_job_id = ? AND f.channel = 'IN_APP'",
+                        UUID.class,
+                        issue.job().getId()))
+                .containsExactlyInAnyOrder(issue.gap(), earlier);
+    }
+
+    @Test
+    void shouldPreparePrivateFeedbackWithoutAPublicWriteWhenTheMergeRequestLookupIsUnknown() {
+        practice.setAutonomy(PracticeAutonomy.AUTOMATIC);
+        practiceRepository.saveAndFlush(practice);
+        AgentJob job = reviewedPullRequest(HEAD);
+        UUID observation = observe(
+                practice,
+                job,
+                ArtifactKinds.PULL_REQUEST.value(),
+                mergeRequestId,
+                developer,
+                "The migration rationale is missing",
+                Outcome.NOT_MET,
+                Severity.MINOR,
+                Instant.now(),
+                AdmittedObservationFixtures.evidence(job.getId(), "scm.pull-request.core")
+                        .toString(),
+                null);
+        composePrivateReview(job, observation);
+        gitlab.threads().failLookups(true);
+
+        assertPrivatePreparationBeforeUncertainDelivery(job, gitlab.threads(), ScriptedGitLabNotes.mergeRequest(1));
+    }
+
+    @Test
+    void shouldPreparePrivateFeedbackWhenThePublicCompositionIsMalformed() {
+        IssueReview issue = reviewBesideTriage(Outcome.NOT_APPLICABLE);
+        compose(issue, issue.gap());
+        addPrivateBrief(issue.job(), issue.gap());
+        ((ObjectNode) Objects.requireNonNull(issue.job().getOutput()).path("feedback")).put("review", "malformed");
+        agentJobRepository.saveAndFlush(issue.job());
+
+        assertThatThrownBy(() ->
+                        handlerRegistry.getHandler(AgentJobType.ISSUE_REVIEW).deliver(issue.job()))
+                .isInstanceOf(JobDeliveryException.class);
+
+        assertPrivateBrief(issue.job());
+        assertThat(jdbcTemplate.queryForList(
+                        "SELECT id FROM feedback_dispatch WHERE agent_job_id = ?",
+                        UUID.class,
+                        issue.job().getId()))
+                .isEmpty();
+        assertThat(issue.host().threads().on(issue.host().thread())).isEmpty();
+    }
+
+    @Test
+    void shouldPrepareNoRowsForAnIssueWithoutRecipients() {
+        AgentJob job = reviewIssue(onGitLab());
+        job.setStatus(AgentJobStatus.COMPLETED);
+        ((ObjectNode) Objects.requireNonNull(job.getMetadata()))
+                .put(ObservationAdmissionService.DIGEST_METADATA_KEY, "quiet");
+        ObjectNode output = objectMapper.createObjectNode();
+        output.putObject("feedback").put("admissionDigest", "quiet").put("contractVersion", 2);
+        job.setOutput(output);
+        agentJobRepository.saveAndFlush(job);
+
+        handlerRegistry.getHandler(AgentJobType.ISSUE_REVIEW).deliver(job);
+
+        assertThat(jdbcTemplate.queryForList("SELECT id FROM feedback WHERE agent_job_id = ?", UUID.class, job.getId()))
+                .isEmpty();
+        assertLaneMarks(job);
+        assertThat(gitlab.threads().on(ScriptedGitLabNotes.issue(ISSUE))).isEmpty();
+    }
+
+    @Test
+    void shouldNotPreparePrivateFeedbackWhenAPersistedCitationIsUnverified() {
+        IssueReview issue = reviewBesideTriage(Outcome.NOT_APPLICABLE);
+        compose(issue, issue.gap());
+        addPrivateBrief(issue.job(), issue.gap());
+        jdbcTemplate.update("UPDATE observation SET evidence = '{}'::jsonb WHERE id = ?", issue.gap());
+
+        assertThatThrownBy(() ->
+                        handlerRegistry.getHandler(AgentJobType.ISSUE_REVIEW).deliver(issue.job()))
+                .isInstanceOf(JobDeliveryException.class);
+
+        assertThat(jdbcTemplate.queryForList(
+                        "SELECT id FROM feedback WHERE agent_job_id = ?",
+                        UUID.class,
+                        issue.job().getId()))
+                .isEmpty();
+        var untouched = agentJobRepository.findById(issue.job().getId()).orElseThrow();
+        assertThat(untouched.getInAppPreparedAt()).isNull();
+        assertThat(untouched.getInChatPreparedAt()).isNull();
+        verifyNoInteractions(commentPoster);
+    }
+
+    @Test
+    void shouldNotPreparePrivateRowsForAnEventWhoseTransactionRollsBack() {
+        IssueReview issue = reviewBesideTriage(Outcome.NOT_APPLICABLE);
+        compose(issue, issue.gap());
+        addPrivateBrief(issue.job(), issue.gap());
+
+        transactions.executeWithoutResult(status -> {
+            eventPublisher.publishEvent(
+                    new PracticeFeedbackPreparationRequestedEvent(issue.job().getId(), workspace.getId()));
+            status.setRollbackOnly();
+        });
+
+        assertThat(jdbcTemplate.queryForList(
+                        "SELECT id FROM feedback WHERE agent_job_id = ?",
+                        UUID.class,
+                        issue.job().getId()))
+                .isEmpty();
+        var untouched = agentJobRepository.findById(issue.job().getId()).orElseThrow();
+        assertThat(untouched.getInAppPreparedAt()).isNull();
+        assertThat(untouched.getInChatPreparedAt()).isNull();
+    }
+
+    private void assertPrivatePreparationBeforeUncertainDelivery(
+            AgentJob job, ScriptedCommentThreads threads, String thread) {
+        assertThat(TransactionSynchronizationManager.isActualTransactionActive())
+                .isFalse();
+        assertThatThrownBy(() -> handlerRegistry.getHandler(job.getJobType()).deliver(job))
+                .isInstanceOf(JobDeliveryException.class)
+                .hasMessageContaining("waits for reconciliation");
+        assertPrivateBrief(job);
+        FeedbackDispatch dispatch = dispatchService.automaticPackage(job);
+        assertThat(dispatch.getState()).isEqualTo(FeedbackDispatchState.UNCERTAIN);
+        assertThat(dispatch.getWriteStarted()).isFalse();
+        assertThat(threads.on(thread)).isEmpty();
+        assertThat(jdbcTemplate.queryForList(
+                        "SELECT id FROM feedback WHERE agent_job_id = ? AND channel = 'IN_CONTEXT'",
+                        UUID.class,
+                        job.getId()))
+                .isEmpty();
+
+        var privateIds = jdbcTemplate.queryForList(
+                "SELECT id FROM feedback WHERE agent_job_id = ? ORDER BY id", UUID.class, job.getId());
+        assertThatThrownBy(() -> handlerRegistry.getHandler(job.getJobType()).deliver(job))
+                .isInstanceOf(JobDeliveryException.class);
+        laneSweeper.sweepNow(Instant.now().plusSeconds(1200));
+        assertPrivateBrief(job);
+        assertThat(jdbcTemplate.queryForList(
+                        "SELECT id FROM feedback WHERE agent_job_id = ? ORDER BY id", UUID.class, job.getId()))
+                .isEqualTo(privateIds);
+        assertThat(threads.on(thread)).isEmpty();
+    }
+
+    private void assertPrivateBrief(AgentJob job) {
+        assertThat(jdbcTemplate.queryForList(
+                        "SELECT channel, delivery_state, recipient_user_id FROM feedback WHERE agent_job_id = ? AND channel = 'IN_CHAT'",
+                        job.getId()))
+                .containsExactly(Map.of(
+                        "channel", "IN_CHAT", "delivery_state", "PREPARED", "recipient_user_id", developer.getId()));
+        assertLaneMarks(job);
+    }
+
+    private void assertLaneMarks(AgentJob job) {
+        var prepared = agentJobRepository.findById(job.getId()).orElseThrow();
+        assertThat(prepared.getInAppPreparedAt()).isNotNull();
+        assertThat(prepared.getInChatPreparedAt()).isNotNull();
+    }
+
+    private void composePrivateReview(AgentJob job, UUID observation) {
+        ((ObjectNode) Objects.requireNonNull(job.getMetadata()))
+                .put(ObservationAdmissionService.DIGEST_METADATA_KEY, "private-digest");
+        ObjectNode output = objectMapper.createObjectNode();
+        ObjectNode feedback = output.putObject("feedback")
+                .put("admissionDigest", "private-digest")
+                .put("contractVersion", 2);
+        feedback.putArray("observations")
+                .addObject()
+                .put("id", observation.toString())
+                .put("practiceSlug", practice.getSlug())
+                .put("outcome", "NOT_MET")
+                .put("anchorable", false)
+                .putArray("citations");
+        feedback.putObject("review")
+                .putObject("summary")
+                .put("body", NOTE)
+                .putArray("basedOn")
+                .add(observation.toString());
+        job.setOutput(output);
+        addPrivateBrief(job, observation);
+    }
+
+    private void addPrivateBrief(AgentJob job, UUID observation) {
+        job.setStatus(AgentJobStatus.COMPLETED);
+        ObjectNode feedback =
+                (ObjectNode) Objects.requireNonNull(job.getOutput()).path("feedback");
+        ObjectNode unit = feedback.putArray("units")
+                .addObject()
+                .put("channel", "IN_CHAT")
+                .put("practiceSlug", practice.getSlug())
+                .put("action", "NEW")
+                .put("title", "Explain the migration");
+        unit.putArray("basedOn").add(observation.toString());
+        unit.putObject("notes")
+                .put("situation", "The rationale is missing.")
+                .put("capability", "Explain the migration decision.")
+                .put("evidenceSummary", "The captured description does not give its reason.")
+                .put("inConversationSignal", "They can explain the decision.");
+        agentJobRepository.saveAndFlush(job);
     }
 
     private void shouldPostApprovedFeedbackOnceOnTheIssue(IssueHost host) {
@@ -569,6 +830,12 @@ class ApprovedFeedbackDeliveryIntegrationTest extends AbstractPracticeReviewInte
 
     /** Records the proposal a review of the merge request at {@code reviewedCommit} leaves for approval. */
     private Feedback propose(String reviewedCommit) {
+        AgentJob review = reviewedPullRequest(reviewedCommit);
+        UUID observation = observe(practice, review, mergeRequestId, developer, Outcome.MET, null, Instant.now());
+        return recordProposal(review, observation);
+    }
+
+    private AgentJob reviewedPullRequest(String reviewedCommit) {
         Instant now = Instant.now();
         AgentJob job = persistPullRequestReview(workspace, 1, now);
         job.setIntegrationKind(repository.getProvider().getType().kind());
@@ -602,9 +869,7 @@ class ApprovedFeedbackDeliveryIntegrationTest extends AbstractPracticeReviewInte
         snapshot.set("manifest", objectMapper.valueToTree(manifest));
         snapshot.set(ReviewedWork.SNAPSHOT_KEY, objectMapper.valueToTree(captured));
         job.setEvidenceSnapshot(snapshot);
-        AgentJob review = agentJobRepository.save(job);
-        UUID observation = observe(practice, review, mergeRequestId, developer, Outcome.MET, null, now);
-        return recordProposal(review, observation);
+        return agentJobRepository.save(job);
     }
 
     /** The issue a review is about, on the provider hosting its repository, and the thread its feedback lands on. */
@@ -648,17 +913,21 @@ class ApprovedFeedbackDeliveryIntegrationTest extends AbstractPracticeReviewInte
     }
 
     private AgentJob reviewIssue(IssueHost host) {
+        return reviewIssue(host, ISSUE);
+    }
+
+    private AgentJob reviewIssue(IssueHost host, int number) {
         Instant now = Instant.now();
         Repository hosted = host.repository();
         issueRepository.upsertCore(
-                7201L,
+                7201L + number - ISSUE,
                 Objects.requireNonNull(hosted.getProvider().getId()),
-                ISSUE,
+                number,
                 "Why is the migration split?",
                 "",
                 "OPEN",
                 null,
-                hosted.getHtmlUrl() + "/issues/" + ISSUE,
+                hosted.getHtmlUrl() + "/issues/" + number,
                 false,
                 null,
                 0,
@@ -674,7 +943,7 @@ class ApprovedFeedbackDeliveryIntegrationTest extends AbstractPracticeReviewInte
                 null,
                 null);
         long issueId = issueRepository
-                .findByRepositoryIdAndNumber(hosted.getId(), ISSUE)
+                .findByRepositoryIdAndNumber(hosted.getId(), number)
                 .orElseThrow()
                 .getId();
         UUID snapshot = UUID.randomUUID();
@@ -701,7 +970,7 @@ class ApprovedFeedbackDeliveryIntegrationTest extends AbstractPracticeReviewInte
                 .put("repository_id", hosted.getId())
                 .put("repository_full_name", hosted.getNameWithOwner())
                 .put("issue_id", issueId)
-                .put("issue_number", ISSUE)
+                .put("issue_number", number)
                 .put("state", "open")
                 .put("review_snapshot_id", snapshot.toString()));
         return agentJobRepository.save(job);
