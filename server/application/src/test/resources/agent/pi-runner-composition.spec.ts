@@ -28,7 +28,6 @@ import {
 	readReview,
 	readablePractices,
 	reviewToolParameters,
-	sameLinesNote,
 	notMetReference,
 	publicQualifications,
 	undeliverableUnits,
@@ -104,21 +103,98 @@ void test("a review names the practices it never settled and forbids a verdict o
 	assert.match(many, /Say nothing about them, for or against/u);
 });
 
-const cite = (path: string, startLine: number) => ({ path, startLine });
+// Two practices citing one line can record separate gaps with separate remedies; the line alone decides neither.
+const sharedLine = { path: "App/LocationModel.swift", startLine: 28, anchorable: true };
 
-void test("negatives that quote the same line are named as one likely event", () => {
-	const note = sameLinesNote([
-		{ id: "a", practiceSlug: "scope", outcome: "NOT_MET", citations: [cite("metadata.json", 18)] },
-		{
-			id: "b",
-			practiceSlug: "handoff",
-			outcome: "NOT_MET",
-			citations: [cite("metadata.json", 18)],
-		},
-		{ id: "e", practiceSlug: "describe", outcome: "MET", citations: [cite("metadata.json", 18)] },
+void test("negatives that quote the same line each keep their own standard, rationale and quote", () => {
+	const reference = notMetReference(
+		[
+			{
+				id: "swallowed",
+				practiceSlug: "handles-errors",
+				outcome: "NOT_MET",
+				publicEligible: true,
+				rationale: "The failure callback drops its error and nothing records it.",
+				citations: [{ ...sharedLine, quote: "func didFail(error: any Error) {}" }],
+			},
+			{
+				id: "unfinished",
+				practiceSlug: "ready-handoff",
+				outcome: "NOT_MET",
+				publicEligible: true,
+				rationale: "The promised terminal preview state is not reached when this callback fails.",
+				citations: [
+					{ ...sharedLine, quote: "func didFail(error: any Error) {}" },
+					{
+						path: "description.md",
+						startLine: 5,
+						quote: "This change completes loading with a ready or failed preview state.",
+					},
+				],
+			},
+		],
+		(slug) =>
+			slug === "handles-errors"
+				? "Record or handle a dropped failure; logging or deliberate safe recovery may suffice."
+				: "Complete the terminal preview state promised within this change; follow-up work is not owed here.",
+	);
+
+	for (const shown of [
+		"### Criteria of `handles-errors`",
+		"Record or handle a dropped failure; logging or deliberate safe recovery may suffice.",
+		"### Criteria of `ready-handoff`",
+		"Complete the terminal preview state promised within this change; follow-up work is not owed here.",
+		"The failure callback drops its error and nothing records it.",
+		"The promised terminal preview state is not reached when this callback fails.",
+		"This change completes loading with a ready or failed preview state.",
+		'"id": "swallowed"',
+		'"id": "unfinished"',
+	]) {
+		assert.ok(reference.includes(shown), shown);
+	}
+	assert.equal(reference.match(/"path": "App\/LocationModel\.swift"/gu)?.length, 2);
+	assert.equal(reference.match(/"startLine": 28/gu)?.length, 2);
+	assert.equal(reference.match(/func didFail\(error: any Error\) \{\}/gu)?.length, 2);
+});
+
+void test("negatives that quote the same line may take separate remedies or one shared one", () => {
+	const sameLine = new Map<string, ReviewedObservation>([
+		["swallowed", { practiceSlug: "handles-errors", outcome: "NOT_MET", citations: [sharedLine] }],
+		["unfinished", { practiceSlug: "ready-handoff", outcome: "NOT_MET", citations: [sharedLine] }],
 	]);
-	assert.match(note, /- metadata\.json:18: scope \(a\), handoff \(b\)\n/u);
-	assert.match(note, /say it once, resting on all of them in basedOn/u);
+	const context: ReviewContext = {
+		witnesses: new Map<string, PriorAdviceWitness>(),
+		standardsInView: new Set(),
+	};
+	const decisions = [
+		{ observationId: "swallowed", disposition: "RAISE" },
+		{ observationId: "unfinished", disposition: "RAISE" },
+	];
+
+	// Separate remedies: the handoff ask in the summary, the handler's own repair on its line.
+	const summary = {
+		body: "Complete the promised failed preview state so loading ends on this path.",
+		basedOn: ["unfinished"],
+	};
+	const repair = {
+		body: "This handler drops the failure; record it or establish why safe recovery needs no report.",
+		basedOn: ["swallowed"],
+		anchor: { observationId: "swallowed", citationIndex: 0 },
+	};
+	assert.deepEqual(readReview({ decisions, summary, inline: [repair] }, sameLine, true, context), {
+		review: { summary, inline: [repair], withheld: [] },
+	});
+
+	// One remedy that genuinely answers both stays one point resting on both.
+	const shared = {
+		body: "Handle this callback by recording the failure and setting the promised failed preview state.",
+		basedOn: ["swallowed", "unfinished"],
+		anchor: { observationId: "swallowed", citationIndex: 0 },
+	};
+	assert.deepEqual(
+		readReview({ decisions, summary: null, inline: [shared] }, sameLine, true, context),
+		{ review: { summary: null, inline: [shared], withheld: [] } },
+	);
 });
 
 // --- The review on the work -------------------------------------------------------------------

@@ -91,51 +91,12 @@ export interface ComposedFeedbackEnvelope {
 	review?: ComposedReview | null;
 }
 
-/** The fields of an admitted observation the same-lines grouping reads. */
-export interface CitedObservation {
-	id: string;
-	practiceSlug: string;
-	citations: readonly Record<string, unknown>[];
-	[key: string]: unknown;
-}
-
 /** The fields of an admitted observation a review is checked against. */
 export interface ReviewedObservation {
 	summaryOnly?: boolean;
 	practiceSlug: string;
 	outcome: unknown;
 	citations: readonly Record<string, unknown>[];
-}
-
-/**
- * The NOT_MET observations that quote the same lines, grouped: two practices that cite one line
- * usually measured one event from two angles, and the review says one thing about one event. The
- * grouping names the candidates; whether they are one event is the composer's call.
- */
-export function sameLinesNote(observations: readonly CitedObservation[]): string {
-	const byLine = new Map<string, CitedObservation[]>();
-	for (const observation of observations) {
-		if (observation.outcome !== "NOT_MET") {
-			continue;
-		}
-		const lines = new Set(
-			observation.citations
-				.filter((c) => typeof c.path === "string" && typeof c.startLine === "number")
-				.map((c) => `${String(c.path)}:${String(c.startLine)}`),
-		);
-		for (const line of lines) {
-			byLine.set(line, [...(byLine.get(line) ?? []), observation]);
-		}
-	}
-	const groups = [...byLine.entries()]
-		.filter(([, members]) => new Set(members.map((m) => m.practiceSlug)).size > 1)
-		.map(
-			([line, members]) =>
-				`${line}: ${members.map((m) => `${m.practiceSlug} (${m.id})`).join(", ")}`,
-		);
-	return groups.length === 0
-		? ""
-		: `NOT_MET measurements that quote the same line, so likely one event seen from two practices — say it once, resting on all of them in basedOn, unless they are separate events:\n${groups.map((g) => `- ${g}`).join("\n")}\n\n`;
 }
 
 /** Unevaluated practices support neither positive nor negative claims. */
@@ -1304,20 +1265,6 @@ ${JSON.stringify({ observations: input.qualifications }, null, 1)}
 			"`citationIndex`. On GitHub it is a review comment on that line; on GitLab it is its own comment " +
 			"headed by a link to the line. Each body stands on its own, and each placement can fail independently.\n"
 		: "- This work has no lines a note can sit on; everything goes in the summary.\n";
-	const cited: CitedObservation[] = input.observations
-		.filter(
-			(observation) => observation.publicEligible === true && observation.outcome === "NOT_MET",
-		)
-		.map((observation) => ({
-			id: String(observation.id),
-			practiceSlug: String(observation.practiceSlug),
-			outcome: observation.outcome,
-			citations: Array.isArray(observation.citations)
-				? observation.citations.filter((citation: unknown): citation is Record<string, unknown> =>
-						isObject(citation),
-					)
-				: [],
-		}));
 	const concerns = notMetReference(
 		input.observations,
 		input.stagedCriteria,
@@ -1346,7 +1293,7 @@ ${qualifications}
 ### Where the words go
 - The summary: one comment on the work.
 ${placement}
-${sameLinesNote(cited)}${notReachedNote(input.notReached)}${recognition.length > 0 ? "Before the review acknowledges a MET observation, use read_practice for its complete grounds and reference, including when its standard is already shown with a concern. A read is in view from your next turn. Then store" : "Store"} the whole review with one report_review call. It decides first: each NOT_MET observation is RAISE, and a text speaks about it, or withheld with its reason, and no text speaks about it. Writing nothing for the work is a decision too: it is still one final report_review call.
+${notReachedNote(input.notReached)}${recognition.length > 0 ? "Before the review acknowledges a MET observation, use read_practice for its complete grounds and reference, including when its standard is already shown with a concern. A read is in view from your next turn. Then store" : "Store"} the whole review with one report_review call. It decides first: each NOT_MET observation is RAISE, and a text speaks about it, or withheld with its reason, and no text speaks about it. Writing nothing for the work is a decision too: it is still one final report_review call.
 
 ${WRITE_CONTRACT}`;
 }
