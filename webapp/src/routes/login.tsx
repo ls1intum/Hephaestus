@@ -7,7 +7,7 @@ import { useSignInProviders } from "@/hooks/use-sign-in-providers";
 import { pageHead } from "@/lib/page-title";
 import { ACCOUNT_DELETED_NOTICE_KEY } from "@/runtime/auth/account-deleted-notice";
 import { useAuth } from "@/runtime/auth/AuthContext";
-import { safeReturnTo } from "@/runtime/auth/guard";
+import { safeReturnTo } from "@/runtime/auth/return-to";
 
 interface LoginSearch {
 	returnTo?: string;

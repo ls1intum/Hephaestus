@@ -21,7 +21,7 @@ import { openRequiredLinks } from "@/lib/onboarding-links";
 import { pageHead } from "@/lib/page-title";
 import { problemDetailOf } from "@/lib/problem-detail";
 import { useAuth } from "@/runtime/auth/AuthContext";
-import { safeReturnTo } from "@/runtime/auth/guard";
+import { safeReturnTo } from "@/runtime/auth/return-to";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/onboarding")({
 	head: pageHead("Choose your AI"),

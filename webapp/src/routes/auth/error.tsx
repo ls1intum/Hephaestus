@@ -8,7 +8,7 @@ import { useConfirmAccess } from "@/hooks/use-confirm-access";
 import { pageHead } from "@/lib/page-title";
 import { hasText } from "@/lib/text";
 import { useAuth } from "@/runtime/auth/AuthContext";
-import { safeReturnTo } from "@/runtime/auth/guard";
+import { safeReturnTo } from "@/runtime/auth/return-to";
 
 interface ErrorSearch {
 	code?: string;

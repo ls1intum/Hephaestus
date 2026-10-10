@@ -26,6 +26,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.core.webhook.IntegrationKindRouting;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import jakarta.persistence.EntityNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Instant;
 import java.util.HashMap;
@@ -74,6 +75,7 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
+        lenient().when(callbackService.workspaceSlug(42L)).thenReturn("team");
         // Real routing — its behaviour is unit-tested separately; using the real bean
         // here gives the test exact parity with production path resolution.
         routing = new IntegrationKindRouting();
@@ -111,7 +113,7 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
         assertThat(response.getHeaders().getLocation()).isNotNull();
         var location0 = response.getHeaders().getLocation();
         assertNotNull(location0);
-        assertThat(location0.toString()).isEqualTo(PROPS.successRedirect());
+        assertThat(location0.toString()).isEqualTo(PROPS.successRedirect() + "&workspaceSlug=team");
 
         ArgumentCaptor<ConnectFinalization.Completed> completed =
                 ArgumentCaptor.forClass(ConnectFinalization.Completed.class);
@@ -163,11 +165,69 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
         assertThat(body.getProperties()).containsEntry("kind", "SLACK").containsEntry("error", "access_denied");
         assertThat(body.getDetail()).isEqualTo("The user denied the request");
 
-        // State was never consumed — the user might retry without re-issuing.
+        // An unbound callback cannot name a return workspace.
         verify(oauthStateService, never()).consume(any());
         // Strategy never called.
         assertThat(slackStrategy.finalizeCalls).isEqualTo(0);
         verify(callbackService, never()).findOrCreatePendingConnection(anyLong(), any());
+    }
+
+    @Test
+    void cancelledSlackConnectReturnsToTheWorkspaceBoundBySignedState() {
+        when(oauthStateService.consume("signed-state"))
+                .thenReturn(new StateBinding(42L, IntegrationKind.SLACK, Instant.now(), 42L));
+        var response = controller.callbackGet(
+                "slack",
+                "signed-state",
+                "access_denied",
+                "Connection cancelled",
+                Map.of("workspaceSlug", "forged-team"),
+                htmlRequest());
+        assertThat(response.getHeaders().getLocation())
+                .hasToString(
+                        "/integrations?status=error&reason=access_denied&description=Connection+cancelled&kind=SLACK&workspaceSlug=team");
+        verify(callbackService, never()).findOrCreatePendingConnection(anyLong(), any());
+    }
+
+    @Test
+    void vendorCancellationKeepsItsReasonWhenStateExpired() {
+        when(oauthStateService.consume("expired")).thenThrow(new IllegalArgumentException("Expired state"));
+        var response = controller.callbackGet("slack", "expired", "access_denied", null, Map.of(), htmlRequest());
+        assertThat(response.getHeaders().getLocation())
+                .hasToString(PROPS.resolvedFailureRedirect() + "&reason=access_denied&kind=SLACK");
+        verify(callbackService, never()).findOrCreatePendingConnection(anyLong(), any());
+    }
+
+    @Test
+    void vendorCancellationDoesNotRequireStateForOtherIntegrations() {
+        var response = controller.callbackGet("github", "expired", "access_denied", null, Map.of(), htmlRequest());
+        assertThat(response.getHeaders().getLocation())
+                .hasToString(PROPS.resolvedFailureRedirect() + "&reason=access_denied&kind=GITHUB");
+        verify(oauthStateService, never()).consume(any());
+    }
+
+    @Test
+    void workspaceDeletedBeforeConnectionCreationReturnsFailure() {
+        when(oauthStateService.consume("signed-state"))
+                .thenReturn(new StateBinding(42L, IntegrationKind.SLACK, Instant.now(), 42L));
+        when(callbackService.findOrCreatePendingConnection(42L, IntegrationKind.SLACK))
+                .thenThrow(new EntityNotFoundException("Workspace does not exist"));
+        var response = controller.callbackGet("slack", "signed-state", null, null, Map.of(), htmlRequest());
+        var location = response.getHeaders().getLocation();
+        assertNotNull(location);
+        assertThat(location.toString()).contains("reason=workspace_not_found");
+        assertThat(slackStrategy.finalizeCalls).isZero();
+    }
+
+    @Test
+    void deletedWorkspaceReturnsFailureInsteadOfThrowing() {
+        when(oauthStateService.consume("signed-state"))
+                .thenReturn(new StateBinding(42L, IntegrationKind.SLACK, Instant.now(), 42L));
+        when(callbackService.workspaceSlug(42L)).thenThrow(new EntityNotFoundException("Workspace does not exist"));
+        var response = controller.callbackGet("slack", "signed-state", "access_denied", null, Map.of(), htmlRequest());
+        var location = response.getHeaders().getLocation();
+        assertNotNull(location);
+        assertThat(location.toString()).contains("reason=workspace_not_found").doesNotContain("workspaceSlug=");
     }
 
     @Test
@@ -458,7 +518,7 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FOUND);
         var location6 = response.getHeaders().getLocation();
         assertNotNull(location6);
-        assertThat(location6.toString()).isEqualTo(PROPS.successRedirect());
+        assertThat(location6.toString()).isEqualTo(PROPS.successRedirect() + "&workspaceSlug=team");
         verify(callbackService).completeConnection(any(), any(), any());
     }
 

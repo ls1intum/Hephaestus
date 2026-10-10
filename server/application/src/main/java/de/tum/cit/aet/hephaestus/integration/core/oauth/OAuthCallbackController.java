@@ -9,6 +9,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionStrategy.Connect
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.webhook.IntegrationKindRouting;
+import jakarta.persistence.EntityNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -34,6 +35,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.util.UriComponentsBuilder;
 
 /**
  * Vendor OAuth redirect ingress at {@code /oauth/callback/{kind}}. Unauthenticated —
@@ -119,12 +121,19 @@ public class OAuthCallbackController {
         IntegrationKind kind = kindOpt.get();
 
         if (vendorError != null && !vendorError.isBlank()) {
-            log.info(
-                    "OAuth callback for kind={} returned vendor error={} description={}",
-                    kind,
-                    sanitize(vendorError),
-                    sanitize(vendorErrorDescription));
-            return failure(kind.name(), vendorError, vendorErrorDescription, HttpStatus.BAD_REQUEST, wantsJson);
+            var response = failure(kind.name(), vendorError, vendorErrorDescription, HttpStatus.BAD_REQUEST, wantsJson);
+            // Cancellation needs no state; only a verified binding can supply workspace return context.
+            if (kind == IntegrationKind.SLACK && !wantsJson && state != null && !state.isBlank()) {
+                try {
+                    var binding = oauthStateService.consume(state);
+                    if (binding.kind() == kind) {
+                        return workspaceRedirect(response, binding);
+                    }
+                } catch (IllegalArgumentException ignored) {
+                    return response;
+                }
+            }
+            return response;
         }
 
         if (state == null || state.isBlank()) {
@@ -176,7 +185,17 @@ public class OAuthCallbackController {
                     HttpStatus.INTERNAL_SERVER_ERROR);
         }
 
-        Connection connection = callbackService.findOrCreatePendingConnection(binding.workspaceId(), kind);
+        Connection connection;
+        try {
+            connection = callbackService.findOrCreatePendingConnection(binding.workspaceId(), kind);
+        } catch (EntityNotFoundException e) {
+            return failure(
+                    kind.name(),
+                    "workspace_not_found",
+                    "The workspace no longer exists.",
+                    HttpStatus.NOT_FOUND,
+                    wantsJson);
+        }
         IntegrationRef ref = connection.toRef();
 
         ConnectFinalization result;
@@ -190,13 +209,16 @@ public class OAuthCallbackController {
                     kind,
                     binding.workspaceId(),
                     e.toString());
-            return failure(kind.name(), "strategy_error", e.getMessage(), HttpStatus.BAD_REQUEST, wantsJson);
+            return workspaceRedirect(
+                    failure(kind.name(), "strategy_error", e.getMessage(), HttpStatus.BAD_REQUEST, wantsJson), binding);
         }
 
-        return switch (result) {
-            case ConnectFinalization.Completed c -> handleCompleted(connection, c, binding, kind, wantsJson);
-            case ConnectFinalization.Failed f -> handleFailed(kind, binding, f, wantsJson);
-        };
+        return workspaceRedirect(
+                switch (result) {
+                    case ConnectFinalization.Completed c -> handleCompleted(connection, c, binding, kind, wantsJson);
+                    case ConnectFinalization.Failed f -> handleFailed(kind, binding, f, wantsJson);
+                },
+                binding);
     }
 
     private ResponseEntity<?> handleCompleted(
@@ -255,6 +277,29 @@ public class OAuthCallbackController {
             sb.append("&kind=").append(URLEncoder.encode(kind, StandardCharsets.UTF_8));
         }
         return sb.toString();
+    }
+
+    private ResponseEntity<?> workspaceRedirect(ResponseEntity<?> response, StateBinding binding) {
+        var location = response.getHeaders().getLocation();
+        if (location == null || binding.kind() != IntegrationKind.SLACK) {
+            return response;
+        }
+        String slug;
+        try {
+            slug = callbackService.workspaceSlug(binding.workspaceId());
+        } catch (EntityNotFoundException e) {
+            return failure(
+                    binding.kind().name(),
+                    "workspace_not_found",
+                    "The workspace no longer exists.",
+                    HttpStatus.NOT_FOUND,
+                    false);
+        }
+        String target = UriComponentsBuilder.fromUri(location)
+                .queryParam("workspaceSlug", slug)
+                .build(true)
+                .toUriString();
+        return redirect(target);
     }
 
     private ResponseEntity<?> redirect(String location) {

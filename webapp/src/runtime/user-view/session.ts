@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { apiBasePath } from "@/runtime/api-base-path";
+import { workspaceAddressConfig, publicHref } from "@/runtime/workspace-address";
 
 export const USER_VIEW_STORAGE_KEY = "hephaestus.user-view";
 
@@ -35,17 +36,20 @@ export function getUserViewSession(): UserViewSession | undefined {
 
 export function startUserView(session: UserViewSession): void {
 	sessionStorage.setItem(USER_VIEW_STORAGE_KEY, JSON.stringify(userViewSchema.parse(session)));
-	window.location.assign(`/w/${session.workspaceSlug}/user/${encodeURIComponent(session.login)}`);
+	const path = `/w/${session.workspaceSlug}/user/${encodeURIComponent(session.login)}`;
+	window.location.assign(publicHref(path));
 }
 
 export function exitUserView(): void {
 	const workspaceSlug = getUserViewSession()?.workspaceSlug;
 	clearUserView();
-	if (workspaceSlug === undefined) {
-		window.location.assign("/admin/workspaces");
-	} else {
-		window.location.assign(`/admin/workspaces/${workspaceSlug}/users`);
+	let path = "/admin/workspaces";
+	if (workspaceSlug !== undefined) {
+		path = workspaceAddressConfig.enabled
+			? `/w/${workspaceSlug}/view-as`
+			: `/admin/workspaces/${workspaceSlug}/users`;
 	}
+	window.location.assign(publicHref(path));
 }
 
 export function clearUserView(): void {

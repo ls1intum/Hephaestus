@@ -2,7 +2,9 @@ import { logout } from "@/api/sdk.gen";
 import type { CurrentUserView } from "@/api/types.gen";
 import environment from "@/environment";
 import { hasText } from "@/lib/text";
-import { safeReturnTo } from "@/runtime/auth/guard";
+import { safeReturnTo } from "@/runtime/auth/return-to";
+import { workspaceAddressConfig, workspaceReturnTo } from "@/runtime/workspace-address";
+import { csrfFetch } from "./csrf";
 import { withSessionLock } from "./session-lock";
 
 export interface UserProfile {
@@ -47,7 +49,7 @@ export const authClient = {
 		const provider = hasText(idpHint) && idpHint.length > 0 ? idpHint : "github";
 		const url = new URL(`${serverUrl()}/auth/login`);
 		url.searchParams.set("provider", provider);
-		url.searchParams.set("returnTo", safeReturnTo(returnTo));
+		url.searchParams.set("returnTo", workspaceReturnTo(safeReturnTo(returnTo)));
 		window.location.assign(url.toString());
 	},
 
@@ -55,13 +57,12 @@ export const authClient = {
 		const url = new URL(`${serverUrl()}/auth/login`);
 		url.searchParams.set("provider", providerAlias);
 		url.searchParams.set("mode", "link");
-		url.searchParams.set("returnTo", safeReturnTo(returnTo));
+		url.searchParams.set("returnTo", workspaceReturnTo(safeReturnTo(returnTo)));
 		window.location.assign(url.toString());
 	},
 
 	async devLogin(username: string, admin: boolean, returnTo?: string): Promise<void> {
-		// oxlint-disable-next-line no-restricted-globals -- The development-only endpoint has no generated SDK operation.
-		const response = await fetch(`${serverUrl()}/auth/dev-login`, {
+		const response = await csrfFetch(`${serverUrl()}/auth/dev-login`, {
 			method: "POST",
 			credentials: "include",
 			headers: { "Content-Type": "application/json", ...csrfHeaders() },
@@ -70,7 +71,11 @@ export const authClient = {
 		if (!response.ok) {
 			throw new Error(`Dev sign-in failed (${response.status})`);
 		}
-		window.location.assign(safeReturnTo(returnTo));
+		window.location.assign(
+			workspaceAddressConfig.enabled
+				? new URL(workspaceReturnTo(safeReturnTo(returnTo)), workspaceAddressConfig.apexOrigin).href
+				: safeReturnTo(returnTo),
+		);
 	},
 
 	async logout(): Promise<void> {
