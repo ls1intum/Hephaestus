@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.90.0
+
+### Minor Changes
+
+- Workspaces can now use their own subdomains for public activity and signed-in pages. Sign-in, account settings, and the API stay on the instance address. The browser extension also accepts a workspace address.
+
+  Operators can turn on workspace subdomains after they configure DNS-only wildcard records, a DNS-01 wildcard certificate, and exact OAuth callbacks on the instance address. Use the same workspace-subdomain switch and base domain for the server, web app, and proxy. The switch remains off by default. Set `APPLICATION_CLIENT_URL` to the apex app origin before you turn it on.
+
+### Patch Changes
+
+- Error-handling review standards judge severity from a path's source-established role and consequence. An optional or best-effort operation does not automatically count as a major shortfall.
+- Public practice reviews no longer receive a suggestion to combine concerns solely because they cite the same lines. Each concern keeps its full standard and evidence.
+- Unpublished releases wait for pending release notes to be included in a version.
+- Private feedback for practice pages and conversations is prepared promptly after a pull request, merge request or issue review, even while the public comment on the work still awaits reconciliation.
+- The notes of a GitHub release now include every change since the previously published stable release. When a version was never published, its changes, upgrade warnings and migration notes appear in the next release that is published.
+- Public review feedback can again be compared with the reviewed pull request or merge request after the review's private working files are removed. Feedback whose reviewed commit, base, title or description cannot be confirmed still waits instead of posting.
+
 ## 0.89.0
 
 ### Minor Changes
