@@ -3089,6 +3089,15 @@ void describe("CI contract", () => {
 		assert.ok(gated !== -1, "tag-images must run the evidence verifier");
 		assert.ok(created > gated, "the draft must be created after the evidence gate");
 		assert.ok(uploaded > created, "release assets need a draft to upload to");
+		// The notes start at the release the upgrade test seeds from, in the released tree, and the
+		// signing job installs no dependency to render them.
+		const notes = job(source, "release-notes");
+		assert.match(notes, /ref: \$\{\{ needs\.release\.outputs\.sha \}\}/u);
+		assert.match(notes, /PREVIOUS_VERSION: \$\{\{ needs\.release\.outputs\.previous_version \}\}/u);
+		assert.match(notes, /--notes "\$PREVIOUS_VERSION" "\$VERSION" CHANGELOG\.md/u);
+		assert.doesNotMatch(notes, /contents: write|id-token|packages: write/u);
+		assert.match(gate, /RELEASE_NOTES: \$\{\{ needs\.release-notes\.outputs\.notes \}\}/u);
+		assert.doesNotMatch(gate, /awk|CHANGELOG\.md|install: "frozen"/u);
 		const publication = job(source, "publish-release");
 		const published = publication.indexOf('gh release edit "$TAG_NAME"');
 		const immutable = publication.indexOf("--json isImmutable");

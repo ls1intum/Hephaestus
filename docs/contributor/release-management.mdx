@@ -92,6 +92,12 @@ A fix with no pending changesets can recut the same unpublished version from its
 Alternatively, merge the next Version PR.
 A release follows the latest *published* release, not the version its parent commit carried.
 The upgrade seed skips unpublished intermediate versions.
+
+The release notes start from the same published release.
+They contain every `CHANGELOG.md` section above that release, newest first, as the released commit has them.
+Thus, the notes of an unpublished version appear in the next published release.
+The draft is not created when these sections are missing, repeated, out of order, or not stable versions.
+
 An ordinary merge of an already-published version does not cut a release.
 
 The resume path covers failures *after* draft creation: seeded-upgrade, supported-host, or publication failures.
