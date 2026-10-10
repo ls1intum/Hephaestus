@@ -10,6 +10,7 @@ import {
 	reviewFeedback,
 	reviewJob,
 	reviewObservations,
+	reviewPrecompute,
 	reviewRuns,
 } from "@/components/admin/practice-reviews/fixtures";
 import {
@@ -326,6 +327,24 @@ describe("a review's sheet", () => {
 		await expect(phase("Wait to start")).resolves.toBe("12 seconds");
 		await expect(phase("Preparation")).resolves.toBe("30 seconds");
 		await expect(phase("Execution")).resolves.toBe("5 minutes");
+	});
+
+	/**
+	 * Its own read, by this review's id, so a slow or failed one costs the reader that section alone.
+	 * What the section shows of the answer is its stories' to prove.
+	 */
+	it("asks for what this review's precompute scripts did", async () => {
+		server.use(
+			http.get("*/workspaces/:workspaceSlug/agents/jobs/:jobId/precompute", () =>
+				HttpResponse.json([reviewPrecompute.found]),
+			),
+		);
+
+		renderRouteAtWithRouter(`${REVIEWS}/runs?detail=review:${REVIEW}`);
+		const sheet = await screen.findByRole("dialog", undefined, ROUTE_RENDER_WAIT);
+		await within(sheet).findByRole("region", { name: "Precompute scripts" }, ROUTE_RENDER_WAIT);
+
+		expect(requestsTo(`/agents/jobs/${REVIEW}/precompute`)).toHaveLength(1);
 	});
 });
 

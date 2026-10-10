@@ -15,7 +15,7 @@ export const PRACTICE_DEFINITION_FIELDS = {
 	SUBJECT: { label: "Person judged", key: "subject" },
 	PRECONDITION: { label: "Only review when", key: "precondition" },
 	CRITERIA: { label: "Review criteria", key: "criteria" },
-	PRECOMPUTE_SCRIPT: { label: "Static analysis", key: "precomputeScript" },
+	PRECOMPUTE_SCRIPT: { label: "Precompute script", key: "precomputeScript" },
 	AUTOMATED_REVIEW_POLICY: { label: "Automated review settings", key: "automatedReviewPolicy" },
 	WHY_IT_MATTERS: { label: "Why it matters", key: "whyItMatters" },
 	WHAT_GOOD_LOOKS_LIKE: { label: "What good looks like", key: "whatGoodLooksLike" },

@@ -2,7 +2,7 @@
 
 import { readFile } from "node:fs/promises";
 
-import { isJsonObject } from "./practice-contract.ts";
+import { isJsonObject, optionalBoolean, optionalNumber, optionalString } from "./json.ts";
 
 /** A citation path inside the context root declared by task.json. */
 export function contextFile(contextReference: string, name: string): string {
@@ -52,20 +52,8 @@ export interface InventoryItem {
 	isDraft?: boolean;
 }
 
-function optionalString(value: unknown): string | undefined {
-	return typeof value === "string" ? value : undefined;
-}
-
-function optionalNumber(value: unknown): number | undefined {
-	return typeof value === "number" && Number.isFinite(value) ? value : undefined;
-}
-
 function optionalIdentity(value: unknown): number | undefined {
 	return typeof value === "number" && Number.isSafeInteger(value) && value > 0 ? value : undefined;
-}
-
-function optionalBoolean(value: unknown): boolean | undefined {
-	return typeof value === "boolean" ? value : undefined;
 }
 
 function parseInventoryItems(value: unknown): InventoryItem[] | undefined {
@@ -78,8 +66,8 @@ function parseInventoryItems(value: unknown): InventoryItem[] | undefined {
 			continue;
 		}
 		const number = optionalNumber(entry.number);
-		const title = optionalString(entry.title);
-		if (number === undefined || title === undefined) {
+		// An empty title still names an item that the inventory holds.
+		if (number === undefined || typeof entry.title !== "string") {
 			continue;
 		}
 		items.push({
@@ -87,7 +75,7 @@ function parseInventoryItems(value: unknown): InventoryItem[] | undefined {
 			repositoryId: optionalIdentity(entry.repository_id),
 			providerId: optionalIdentity(entry.provider_id),
 			number,
-			title,
+			title: entry.title,
 			state: optionalString(entry.state),
 			author: optionalString(entry.author),
 			milestone: optionalString(entry.milestone),
@@ -98,7 +86,7 @@ function parseInventoryItems(value: unknown): InventoryItem[] | undefined {
 	return items;
 }
 
-export function parseProjectInventory(value: unknown): ProjectInventory | null {
+function parseProjectInventory(value: unknown): ProjectInventory | null {
 	if (!isJsonObject(value)) {
 		return null;
 	}

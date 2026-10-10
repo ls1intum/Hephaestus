@@ -699,6 +699,7 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
                         600,
                         false,
                         null,
+                        null,
                         null)
                 .withPriceSnapshot(new LlmPriceSnapshot(
                         FundingSource.INSTANCE, PricingState.NO_CHARGE, null, null, null, null, null, null))

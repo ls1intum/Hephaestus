@@ -1,17 +1,21 @@
-import { ArrowRightIcon, ChevronRightIcon } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { ArrowRightIcon, ChevronRightIcon, ScanSearchIcon } from "lucide-react";
 import { Fragment, type ReactNode, useId, useState } from "react";
 
 import type {
 	ObservationDetail,
 	PracticeGroup,
 	PracticeTraceEntry,
+	PrecomputeRun,
 	TracedSignal,
 } from "@/api/types.gen";
+import { reviewLevel } from "@/components/admin/practice-reviews/review-levels";
 import { FilterToolbar } from "@/components/common/FilterToolbar";
 import { InlineLink } from "@/components/common/InlineLink";
 import { ResultCount } from "@/components/common/ResultCount";
 import { SelectFilter } from "@/components/common/SelectFilter";
 import { StatusBadge } from "@/components/common/StatusBadge";
+import { detailSearch } from "@/components/layout/detail-drawer/detail-stack";
 import { AutonomyBadge } from "@/components/practice-vocabulary/AutonomyBadge";
 import {
 	getGroupVisual,
@@ -20,6 +24,10 @@ import {
 import { GroupName } from "@/components/practice-vocabulary/GroupName";
 import { MARKED_INCORRECT_DEF } from "@/components/practice-vocabulary/observation-invalidation-defs";
 import { PracticePill } from "@/components/practice-vocabulary/PracticePill";
+import {
+	precomputeFix,
+	precomputeRunSentence,
+} from "@/components/practice-vocabulary/precompute-run-status-defs";
 import { StatusLabel, StatusTooltip } from "@/components/practice-vocabulary/StatusTooltip";
 import {
 	TRACE_OUTCOME_DEFS,
@@ -39,6 +47,7 @@ import {
 } from "@/components/ui/table";
 import { hasText } from "@/lib/text";
 
+import { PrecomputeFixLink } from "./PrecomputeFixLink";
 import { deliveryLabel, REVIEW_FILTER_MAX_LENGTH } from "./trace-format";
 import { TraceOutcomeBadge } from "./TraceOutcomeBadge";
 
@@ -59,6 +68,8 @@ export type PracticeRowObservation = Pick<ObservationDetail, "id" | "summary" | 
 	Partial<Pick<ObservationDetail, "invalidationReason">>;
 
 export interface ReviewRunPracticeTableProps {
+	/** Where an admin's fix links lead, such as the AI models page for a missing precompute model. */
+	workspaceSlug: string;
 	/** Each practice's answer on the work: one review's, or the latest across every review of it. */
 	entries: PracticeTraceEntry[];
 	/** The occurrences this work's activity carries, so "Rests on" can name one. */
@@ -87,6 +98,12 @@ export interface ReviewRunPracticeTableProps {
 	reviewId?: string;
 	/** How a row answered by an earlier review links to it; the caller owns where reviews open. */
 	earlierReviewLink?: (reviewId: string) => ReactNode;
+	/**
+	 * How a precompute line's *Details* opens its review, where the table sits in a stack that a
+	 * review opens over. The label carries a trailing icon, so the link lays it out inline. Absent,
+	 * it opens the review on Practice reviews.
+	 */
+	reviewLink?: (reviewId: string, label: ReactNode) => ReactNode;
 	/**
 	 * One observation in full, with its evidence. Given, a row with observations opens in place to
 	 * show them; the caller reads each one only when its row opens.
@@ -165,6 +182,7 @@ function groupNameOf(entry: PracticeTraceEntry): string {
  * it said something about the reader, or the recorded reason where it did not.
  */
 export function ReviewRunPracticeTable({
+	workspaceSlug,
 	entries,
 	signals,
 	observationsByPractice,
@@ -177,6 +195,7 @@ export function ReviewRunPracticeTable({
 	emptyMessage,
 	reviewId,
 	earlierReviewLink,
+	reviewLink,
 	renderObservation,
 	focusPracticeSlug,
 	plainState = false,
@@ -324,6 +343,7 @@ export function ReviewRunPracticeTable({
 								</TableCell>
 								<TableCell className="align-top whitespace-normal">
 									<WhatItSaw
+										workspaceSlug={workspaceSlug}
 										entry={entry}
 										observations={observations}
 										occurrenceName={
@@ -336,6 +356,7 @@ export function ReviewRunPracticeTable({
 										canAdminister={canAdminister}
 										earlierReview={earlierReviewOf(entry, reviewId)}
 										earlierReviewLink={earlierReviewLink}
+										reviewLink={reviewLink}
 									/>
 									{expandable && (
 										<Button
@@ -460,6 +481,7 @@ export function ReviewRunPracticeTableSkeleton({
 }
 
 interface WhatItSawProps {
+	workspaceSlug: string;
 	entry: PracticeTraceEntry;
 	observations: PracticeRowObservation[];
 	occurrenceName: string | undefined;
@@ -467,6 +489,7 @@ interface WhatItSawProps {
 	canAdminister: boolean;
 	earlierReview: string | undefined;
 	earlierReviewLink: ((reviewId: string) => ReactNode) | undefined;
+	reviewLink: ((reviewId: string, label: ReactNode) => ReactNode) | undefined;
 }
 
 /**
@@ -475,6 +498,7 @@ interface WhatItSawProps {
  * this review made of this work. The operating facts under it are the admin's.
  */
 function WhatItSaw({
+	workspaceSlug,
 	entry,
 	observations,
 	occurrenceName,
@@ -482,6 +506,7 @@ function WhatItSaw({
 	canAdminister,
 	earlierReview,
 	earlierReviewLink,
+	reviewLink,
 }: WhatItSawProps) {
 	// Narrowed here: the closure below would not keep a narrowing made in the JSX guard.
 	const occasionedById = hasText(entry.occasionedById) ? entry.occasionedById : undefined;
@@ -528,6 +553,14 @@ function WhatItSaw({
 						</span>
 						<AutonomyBadge autonomy={entry.autonomy} />
 					</span>
+					{entry.precompute !== undefined && (
+						<PrecomputeTraceLine
+							workspaceSlug={workspaceSlug}
+							entry={entry}
+							run={entry.precompute}
+							reviewLink={reviewLink}
+						/>
+					)}
 					{occasionedById !== undefined &&
 						occurrenceName !== undefined && (
 							// Not an anchor: the occurrence is drawn on the other tab, which has to open first.
@@ -541,6 +574,64 @@ function WhatItSaw({
 						)}
 				</span>
 			)}
+		</span>
+	);
+}
+
+/**
+ * What the practice's precompute script did before the review, in one muted line: how it ended, the
+ * one change that would help it, and *Details*, which opens the review's Precompute scripts
+ * section with the reasons behind any unrated call. The links name the practice for a screen
+ * reader, which lists every row's links together.
+ */
+function PrecomputeTraceLine({
+	workspaceSlug,
+	entry,
+	run,
+	reviewLink,
+}: {
+	workspaceSlug: string;
+	entry: PracticeTraceEntry;
+	run: PrecomputeRun;
+	reviewLink: ((reviewId: string, label: ReactNode) => ReactNode) | undefined;
+}) {
+	const fix = precomputeFix(run);
+	const { reviewId, practiceName } = entry;
+	const details = (
+		<>
+			Details <span className="sr-only">of the precompute script for {practiceName}</span>
+			<ArrowRightIcon className="size-3 shrink-0" aria-hidden />
+		</>
+	);
+	return (
+		<span className="flex min-w-0 items-start gap-1.5 text-pretty">
+			<ScanSearchIcon className="mt-px size-3.5 shrink-0" aria-hidden />
+			<span className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
+				<span>{precomputeRunSentence(run)}</span>
+				{fix !== undefined && (
+					<PrecomputeFixLink
+						workspaceSlug={workspaceSlug}
+						practiceSlug={entry.practiceSlug}
+						practiceName={practiceName}
+						fix={fix}
+					/>
+				)}
+				{hasText(reviewId) &&
+					(reviewLink?.(reviewId, details) ?? (
+						<InlineLink
+							render={
+								<Link
+									to="/w/$workspaceSlug/admin/practices/reviews"
+									params={{ workspaceSlug }}
+									search={detailSearch(reviewLevel(reviewId))}
+								/>
+							}
+							className="inline-flex items-center gap-1 font-medium"
+						>
+							{details}
+						</InlineLink>
+					))}
+			</span>
 		</span>
 	);
 }

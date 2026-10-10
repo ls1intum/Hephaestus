@@ -128,6 +128,7 @@ export function PracticeForm(props: PracticeFormProps) {
 			groupSlug ?? null,
 		);
 	};
+	const modelsLink = <Link to="/w/$workspaceSlug/admin/models" params={{ workspaceSlug }} />;
 	const withdrawal = mode === "edit" ? props.initialData.automatedReviewWithdrawal : undefined;
 	const reviewResults =
 		mode === "edit" ? (
@@ -184,6 +185,7 @@ export function PracticeForm(props: PracticeFormProps) {
 			isPending={isPending}
 			definitionOptions={definitionOptions}
 			cancelAction={cancel}
+			precomputeModelsLink={modelsLink}
 			onSubmit={submit}
 		/>
 	) : (
@@ -196,6 +198,7 @@ export function PracticeForm(props: PracticeFormProps) {
 			cancelAction={cancel}
 			afterFields={reviewResults}
 			evidenceOutcome={props.evidenceOutcome}
+			precomputeModelsLink={modelsLink}
 			onSubmit={submit}
 		/>
 	);

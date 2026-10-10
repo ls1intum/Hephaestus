@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import {
 	cancelAgentJobMutation,
 	getAgentJobOptions,
+	getAgentJobPrecomputeOptions,
 	getAgentJobQueryKey,
 	getAgentJobUsageOptions,
 	getArtifactTraceOptions,
@@ -12,7 +13,12 @@ import {
 	listPracticeReviewsQueryKey,
 	retryAgentJobDeliveryMutation,
 } from "@/api/@tanstack/react-query.gen";
-import type { AgentJob, AgentJobUsage, DeliveryPolicyTrace } from "@/api/types.gen";
+import type {
+	AgentJob,
+	AgentJobUsage,
+	DeliveryPolicyTrace,
+	ReviewPrecompute,
+} from "@/api/types.gen";
 import type { RunTraceState } from "@/components/admin/practice-reviews/review-run-sections";
 import {
 	ACTIVE_REVIEW_POLL_MS,
@@ -25,8 +31,8 @@ import { retryUnlessNotFound } from "@/runtime/tanstack-query/query-defaults";
 
 /**
  * Everything the review's sheet needs, already resolved: the review, how it answered each practice,
- * the delivery checks it ran for itself, what it cost, and the two actions an operator can take on
- * it. Its
+ * the delivery checks it ran for itself, what its precompute scripts did, what it cost, and the two
+ * actions an operator can take on it. Its
  * observations and feedback are other records: the sheet does not read them.
  *
  * The screen is handed states, not queries. That a running review is re-asked for on a timer, and
@@ -36,6 +42,7 @@ export interface ReviewRunController {
 	job: PanelState<{ job: AgentJob }>;
 	trace: RunTraceState;
 	deliveryChecks: PanelState<{ checks: DeliveryPolicyTrace[] }>;
+	precompute: PanelState<{ scripts: ReviewPrecompute[] }>;
 	usage: PanelState<{ usage: AgentJobUsage }>;
 	onCancel: () => void;
 	cancelPending: boolean;
@@ -79,6 +86,15 @@ export function useReviewRunController(workspaceSlug: string, jobId: string): Re
 	const checksQuery = useQuery({ ...checksOptions, retry: retryUnlessNotFound });
 	const usageOptions = getAgentJobUsageOptions({ path: { workspaceSlug, jobId } });
 	const usageQuery = useQuery({ ...usageOptions, retry: retryUnlessNotFound });
+
+	// The endpoint shows only the current attempt, and nothing until that attempt ends. Thus, its answer
+	// is final once the job is terminal, and it is asked for only then. A retry starts a new attempt.
+	// When that attempt ends, the query is enabled again, and it asks again only if its last answer is
+	// older than the client's stale time (`QUERY_STALE_TIME_MS`).
+	const precomputeQuery = useQuery({
+		...getAgentJobPrecomputeOptions({ path: { workspaceSlug, jobId } }),
+		enabled: jobQuery.data !== undefined && !runIsActive,
+	});
 
 	// The trace polls only while the review runs, the checks are written when its results are
 	// processed and its cost when an attempt ends, and the review's row (its counts and developers,
@@ -143,6 +159,7 @@ export function useReviewRunController(workspaceSlug: string, jobId: string): Re
 				? { status: "none" }
 				: panelState(traceQuery, (trace) => ({ status: "ready" as const, trace })),
 		deliveryChecks: panelState(checksQuery, (checks) => ({ status: "ready" as const, checks })),
+		precompute: panelState(precomputeQuery, (scripts) => ({ status: "ready" as const, scripts })),
 		usage: panelState(usageQuery, (usage) => ({ status: "ready" as const, usage })),
 		onCancel: () => cancelJob.mutate({ path: { workspaceSlug, jobId } }),
 		cancelPending: cancelJob.isPending,

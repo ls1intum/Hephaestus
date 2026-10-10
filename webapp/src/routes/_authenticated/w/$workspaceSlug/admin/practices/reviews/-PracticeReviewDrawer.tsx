@@ -453,11 +453,13 @@ function ReviewLevelRead({
 	return (
 		<ReviewLevel
 			{...props}
+			workspaceSlug={workspaceSlug}
 			job={run.job}
 			summary={summary}
 			trace={run.trace}
 			groups={groups}
 			deliveryChecks={run.deliveryChecks}
+			precompute={run.precompute}
 			usage={run.usage}
 			onCancel={run.onCancel}
 			cancelPending={run.cancelPending}

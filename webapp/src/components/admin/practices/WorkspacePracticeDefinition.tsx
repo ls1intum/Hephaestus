@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 import type { Practice, PracticeDefinitionOptions } from "@/api/types.gen";
 import { CatalogOriginNote } from "@/components/admin/practices/CatalogOriginBadge";
 import { PracticeDefinitionPreview } from "@/components/admin/practices/PracticeDefinitionPreview";
@@ -18,6 +20,10 @@ export interface WorkspacePracticeDefinitionProps {
 	 * already says the autonomy, so it is said once.
 	 */
 	showStanding?: boolean;
+	/** A notice under the autonomy, such as the members a precompute script does not run for. */
+	notice?: ReactNode;
+	/** What the precompute script needs, beside its code; see `PracticeDefinitionPreview`. */
+	precompute?: ReactNode;
 }
 
 /**
@@ -31,6 +37,8 @@ export function WorkspacePracticeDefinition({
 	definitionOptions,
 	groupName,
 	showStanding = true,
+	notice,
+	precompute,
 }: WorkspacePracticeDefinitionProps) {
 	const autonomy = AUTONOMY_DEFS[practice.autonomy.effective];
 	const autonomySource = autonomySourceOf(practice.autonomy, groupName ?? null);
@@ -55,10 +63,15 @@ export function WorkspacePracticeDefinition({
 							</ItemContent>
 						</Item>
 					</ItemGroup>
+					{notice}
 					<Separator />
 				</>
 			)}
-			<PracticeDefinitionPreview definition={practice} options={definitionOptions} />
+			<PracticeDefinitionPreview
+				definition={practice}
+				options={definitionOptions}
+				precompute={precompute}
+			/>
 		</div>
 	);
 }

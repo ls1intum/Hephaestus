@@ -16,6 +16,7 @@ import {
 	mockJobUsageUnpriced,
 	reviewDeliveryChecksOf,
 	reviewJob,
+	reviewPrecompute,
 	reviewRuns,
 	reviewTraceOf,
 } from "./fixtures";
@@ -50,12 +51,14 @@ const meta = {
 	decorators: [withPageBehind],
 	tags: ["autodocs"],
 	args: {
+		workspaceSlug: "demo",
 		path: { behind: [{ label: "Practice reviews", depth: 0 }], onClose: fn() },
 		job: { status: "ready", job },
 		summary,
 		trace: { status: "ready", trace: reviewTraceOf(job) },
 		groups,
 		deliveryChecks: { status: "ready", checks: [] },
+		precompute: { status: "ready", scripts: [] },
 		usage: {
 			status: "ready",
 			usage: { ...mockJobUsageTwoAttempts, attempts: mockJobUsageTwoAttempts.attempts.slice(1) },
@@ -66,7 +69,7 @@ const meta = {
 		retryResultProcessingPending: false,
 		onRequestReview: fn(),
 	},
-	argTypes: { path: { control: false } },
+	argTypes: { path: { control: false }, precompute: { control: false } },
 	render: (args) => (
 		<InLevelStack
 			entry={reviewLevel(args.job.status === "ready" ? args.job.job.id : job.id)}
@@ -497,5 +500,76 @@ export const Loading: Story = {
 	play: async () => {
 		const panel = within(await settledDrawerPanel());
 		await expect(panel.queryByRole("heading", { name: SHEET_SECTIONS.what })).toBeNull();
+	},
+};
+
+/** The model with the tier of the assignment it ran on, so a reader sees where the work went. */
+export const ModelWithTier: Story = {
+	args: { job: { status: "ready", job: { ...job, model: "gpt-5-nano", dataHandlingTier: "CLOUD" } } },
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		const model = panel.getAllByRole("term").find((term) => term.textContent === "Model");
+		// The tier is its icon, as on every other surface; its name is for a screen reader.
+		await expect(model?.nextElementSibling).toHaveTextContent(/gpt-5-nano\s*Cloud$/u);
+		await expect(panel.getByText("Cloud")).toHaveClass("sr-only");
+		// The calls are the review model's: a precompute script's own models are counted elsewhere.
+		await expect(panel.getByText("Review model calls")).toBeVisible();
+	},
+};
+
+/**
+ * What the precompute scripts did sits with the practices the review answered: it explains how
+ * each practice was prepared, and its calls are not the review's technical facts.
+ */
+export const WithPrecomputeScripts: Story = {
+	args: {
+		precompute: {
+			status: "ready",
+			scripts: [reviewPrecompute.found, reviewPrecompute.callsNotRated, reviewPrecompute.failed],
+		},
+	},
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		const section = panel.getByRole("region", { name: "Precompute scripts" });
+		await expect(
+			within(section).getByText("What each practice’s script did before this review."),
+		).toBeVisible();
+		await expect(within(section).getByRole("link", { name: "AI usage" })).toHaveAttribute(
+			"href",
+			"/w/demo/admin/usage",
+		);
+	},
+};
+
+/** No script ran, so there is no section about scripts. */
+export const WithoutPrecomputeScripts: Story = {
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		await expect(
+			panel.queryByRole("region", { name: "Precompute scripts" }),
+		).not.toBeInTheDocument();
+	},
+};
+
+/** A failed read is said, never shown as a review without scripts. */
+export const PrecomputeFailedToLoad: Story = {
+	args: {
+		precompute: {
+			status: "error",
+			error: { status: 503, detail: "The precompute record is unavailable." },
+			onRetry: fn(),
+		},
+	},
+	play: async ({ args, userEvent }) => {
+		const panel = within(await settledDrawerPanel());
+		const section = panel.getByRole("region", { name: "Precompute scripts" });
+		await expect(
+			within(section).getByText("We could not load what the precompute scripts did"),
+		).toBeVisible();
+		await userEvent.click(within(section).getByRole("button", { name: "Retry" }));
+		if (args.precompute?.status !== "error") {
+			throw new Error("This story is the error branch");
+		}
+		await expect(args.precompute.onRetry).toHaveBeenCalledOnce();
 	},
 };

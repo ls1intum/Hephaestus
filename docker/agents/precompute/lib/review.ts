@@ -3,7 +3,7 @@
 import type { ChangeCommit } from "./change.ts";
 import { contextFile, readContextJson } from "./context.ts";
 import { subIssueSource, type SubIssueSource } from "./issue-classification.ts";
-import { isJsonObject, text } from "./practice-contract.ts";
+import { isJsonObject, optionalNumber, optionalString, text } from "./json.ts";
 import type { DiffFile, Hint, PullRequestMetadata } from "./types.ts";
 
 export interface LinkedWorkItem {
@@ -74,14 +74,6 @@ export interface ReviewDecision {
 	dismissed?: boolean;
 }
 
-function optionalString(value: unknown): string | undefined {
-	return typeof value === "string" && value !== "" ? value : undefined;
-}
-
-function optionalNumber(value: unknown): number | undefined {
-	return typeof value === "number" && Number.isFinite(value) ? value : undefined;
-}
-
 function linkHow(value: unknown): LinkedWorkItem["how"] {
 	return value === "closesOnMerge" || value === "mentions" ? value : undefined;
 }
@@ -91,7 +83,7 @@ function objects(value: unknown): Record<string, unknown>[] {
 }
 
 /** What `linked_work_items.json` records: the resolved items and the numbers this repository holds no issue for. */
-export interface LinkedWorkItemCapture {
+interface LinkedWorkItemCapture {
 	items: LinkedWorkItem[];
 	unresolved: number[];
 }
@@ -215,7 +207,7 @@ export async function readReviewThreads(
 }
 
 /** One task-list item of an issue or description body, as written. */
-export interface CheckableItem {
+interface CheckableItem {
 	line: number;
 	text: string;
 	checked: boolean;
@@ -271,7 +263,7 @@ export function changeNear(
 }
 
 /** A comment by someone other than the author, with what the record shows beside it. */
-export interface ReviewerCommentRow {
+interface ReviewerCommentRow {
 	comment: ReviewComment;
 	/** No earlier comment by others in the same thread: this one opens it. */
 	opensThread: boolean;
@@ -337,7 +329,7 @@ export function commitsAfter(
 }
 
 /** What the pull request metadata says about its merge, for the practices that judge one. */
-export interface MergeFacts {
+interface MergeFacts {
 	merged: boolean;
 	mergedAt?: string;
 	mergedBy?: string;

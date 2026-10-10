@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { CopyIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -8,9 +9,11 @@ import type {
 	AgentJobUsage,
 	AgentJobUsageAttempt,
 	DeliveryPolicyTrace as DeliveryCheck,
+	ReviewPrecompute,
 	ReviewRunSummary,
 } from "@/api/types.gen";
 import { formatTokens, JOB_TYPE_LABELS } from "@/components/admin/usage/usage-utils";
+import { InlineLink } from "@/components/common/InlineLink";
 import type { PanelState } from "@/components/common/panel-state";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { useNow } from "@/components/common/use-now";
@@ -22,6 +25,7 @@ import {
 	DISCOVERED_VIA_DESCRIPTIONS,
 	DISCOVERED_VIA_LABELS,
 } from "@/components/practice-trace/trace-format";
+import { DataHandlingMark } from "@/components/practice-vocabulary/DataHandlingMark";
 import { OBSERVATION_ORIGIN_DEFS } from "@/components/practice-vocabulary/observation-origin-defs";
 import { REVIEW_CANCELLATION_DEFS } from "@/components/practice-vocabulary/review-cancellation-defs";
 import {
@@ -68,9 +72,11 @@ import { ReviewStatusMark } from "./ReviewBadges";
 import { ReviewDayTime } from "./ReviewDayTime";
 import { ReviewFact, ReviewFactGrid } from "./ReviewFactGrid";
 import { ReviewLevelHeader } from "./ReviewLevelHeader";
+import { ReviewPrecomputeTable } from "./ReviewPrecomputeTable";
 import { ReviewRunActions } from "./ReviewRunActions";
 
 export interface ReviewLevelProps {
+	workspaceSlug: string;
 	nested?: boolean;
 	path: LevelPath;
 	job: PanelState<{ job: AgentJob }>;
@@ -81,6 +87,8 @@ export interface ReviewLevelProps {
 	groups?: readonly PracticeGroupLook[] | undefined;
 	/** The delivery checks the review ran for itself rather than for one piece of feedback. */
 	deliveryChecks?: PanelState<{ checks: DeliveryCheck[] }>;
+	/** What each practice's precompute script did before the review; the section shows only with one. */
+	precompute?: PanelState<{ scripts: ReviewPrecompute[] }>;
 	/** What the review spent on the model, attempt by attempt. */
 	usage?: PanelState<{ usage: AgentJobUsage }>;
 	onCancel: () => void;
@@ -131,6 +139,7 @@ function between(from: Date | undefined, to: Date | undefined): string | undefin
  * out to its provider.
  */
 export function ReviewLevel({
+	workspaceSlug,
 	nested,
 	path,
 	job: state,
@@ -138,6 +147,7 @@ export function ReviewLevel({
 	trace,
 	groups,
 	deliveryChecks,
+	precompute,
 	usage,
 	onCancel,
 	cancelPending,
@@ -223,6 +233,9 @@ export function ReviewLevel({
 					<ReviewPractices job={job} trace={trace} summary={summary} groups={groups} />
 				</SheetSection>
 				{deliveryChecks !== undefined && <ReviewDeliveryChecks state={deliveryChecks} />}
+				{precompute !== undefined && (
+					<PrecomputeScripts workspaceSlug={workspaceSlug} state={precompute} />
+				)}
 				<SheetTechnical facts={technicalFacts(job, usage)}>
 					{usage?.status === "error" && (
 						<QueryErrorAlert
@@ -547,8 +560,18 @@ function technicalFacts(
 	const facts: TechnicalFact[] = [
 		{ label: "Review ID", value: <code>{job.id}</code>, copy: job.id },
 		{ label: "Cost", value: costText(usage) },
-		{ label: "Model", value: model.length > 0 ? model.join(" · ") : "—" },
-		{ label: "Model calls", value: formatTokens(job.llmTotalCalls) },
+		{
+			label: "Model",
+			value: (
+				<span className="flex min-w-0 items-center gap-2">
+					<span className="min-w-0 truncate">{model.length > 0 ? model.join(" · ") : "—"}</span>
+					{job.dataHandlingTier !== undefined && <DataHandlingMark tier={job.dataHandlingTier} />}
+				</span>
+			),
+		},
+		// The review's own calls: a precompute script's decision, embedding and reranking calls are on
+		// the Precompute scripts section above.
+		{ label: "Review model calls", value: formatTokens(job.llmTotalCalls) },
 		{ label: "Tokens read", value: formatTokens(job.llmTotalInputTokens) },
 		{
 			label: "Tokens written",
@@ -582,6 +605,50 @@ function technicalFacts(
 		});
 	}
 	return facts;
+}
+
+/**
+ * Absent while it loads and when no script ran: a skeleton for a section that may not exist would
+ * hold space that the technical facts then jump into.
+ */
+function PrecomputeScripts({
+	workspaceSlug,
+	state,
+}: {
+	workspaceSlug: string;
+	state: PanelState<{ scripts: ReviewPrecompute[] }>;
+}) {
+	if (state.status === "loading" || (state.status === "ready" && state.scripts.length === 0)) {
+		return null;
+	}
+	return (
+		<SheetSection
+			part="details"
+			title="Precompute scripts"
+			description="What each practice’s script did before this review."
+		>
+			{state.status === "error" ? (
+				<QueryErrorAlert
+					error={state.error}
+					title="We could not load what the precompute scripts did"
+					onRetry={state.onRetry}
+				/>
+			) : (
+				<>
+					<ReviewPrecomputeTable workspaceSlug={workspaceSlug} scripts={state.scripts} />
+					<p className="text-xs text-muted-foreground">
+						Spend is on{" "}
+						<InlineLink
+							render={<Link to="/w/$workspaceSlug/admin/usage" params={{ workspaceSlug }} />}
+						>
+							AI usage
+						</InlineLink>
+						.
+					</p>
+				</>
+			)}
+		</SheetSection>
+	);
 }
 
 /** The paths the review kept as generated output, and the copy of its configuration. */
