@@ -857,6 +857,11 @@ The server checks each composed part and checks the persisted package's exact ci
 These exclusions can leave a review with no public composition.
 `PUBLIC_SUBJECT_INELIGIBLE` records a saved package refused by the public subject or support check.
 
+Private preparation starts after the stored output matches its admission digest and every persisted citation passes verification.
+Pull request and issue delivery request it in a separate committed transaction.
+This request precedes public dispatch and recovery, so an unresolved public package does not delay
+private preparation. The preparation sweep recovers a failed request, and each lane retains idempotency.
+
 Private feedback retains its own recipient, consent, recurrence and visibility checks.
 Suppression on the work does not promise that private feedback will be written.
 

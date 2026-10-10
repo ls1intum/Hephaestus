@@ -1,10 +1,12 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.nullable;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -68,6 +70,18 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
     void setUp() {
         service = new FeedbackDeliveryService(
                 deliveryPolicy, ledgerRecorder, commentFormatter, dispatchService, jobRepository);
+    }
+
+    @Test
+    void shouldLeavePublicDeliveryAvailableWhenPrivatePreparationCannotOpenItsTransaction() {
+        AgentJob job = job();
+        doThrow(new IllegalStateException("transaction unavailable"))
+                .when(ledgerRecorder)
+                .requestPreparation(job);
+
+        assertThatCode(() -> service.requestPrivatePreparation(job)).doesNotThrowAnyException();
+
+        verifyNoInteractions(deliveryPolicy, dispatchService, commentFormatter, jobRepository);
     }
 
     @Test

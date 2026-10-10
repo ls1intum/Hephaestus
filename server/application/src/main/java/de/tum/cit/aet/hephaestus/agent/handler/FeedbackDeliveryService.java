@@ -54,6 +54,17 @@ class FeedbackDeliveryService {
         feedbackLedgerRecorder.recordProposal(job, delivery);
     }
 
+    /**
+     * A transaction-open failure must not hold back public delivery; the preparation sweeper recovers the lanes.
+     */
+    void requestPrivatePreparation(AgentJob job) {
+        try {
+            feedbackLedgerRecorder.requestPreparation(job);
+        } catch (RuntimeException e) {
+            log.warn("Feedback-lane preparation request failed (delivery continues): jobId={}", job.getId(), e);
+        }
+    }
+
     boolean recoverAutomaticPackageIfPresent(AgentJob job) {
         FeedbackDispatch existing = dispatchService.findAutomaticPackage(job).orElse(null);
         if (existing == null) return false;

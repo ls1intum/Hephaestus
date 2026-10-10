@@ -253,6 +253,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
                 })
                 .toList();
         if (scopedObservations.isEmpty()) throw new JobDeliveryException("Admitted observation set is empty");
+        feedbackService.requestPrivatePreparation(job);
         if (feedbackService.recoverAutomaticPackageIfPresent(job)) return;
         Set<UUID> publicIds = publicReviewEligibility.publicObservationIds(job, persisted);
         ComposedReview review = reviewToDeliver(
