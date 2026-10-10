@@ -18,7 +18,7 @@ vi.mock("./session-refresh", () => ({ refreshAccessToken: vi.fn() }));
 const refreshMock = vi.mocked(refreshAccessToken);
 vi.mock(import("@/environment"), async (importOriginal) => {
 	const actual = await importOriginal();
-	return { default: { ...actual.default, serverUrl: "http://localhost/api" } };
+	return { default: Object.assign(actual.default, { serverUrl: "http://localhost/api" }) };
 });
 function stubLocation(
 	pathname: string,
@@ -218,16 +218,16 @@ describe("handlePossibleSessionExpiry", () => {
 
 it("returns tenant sign-in through a relative apex workspace path", () => {
 	const { assigned } = stubLocation("/activity", "?range=1y", "https://acme.hephaestus.build");
-	const previous = { ...workspaceAddressConfig };
-	const wasEnabled = environment.workspaceSubdomains.enabled;
+	const previous = {
+		enabled: workspaceAddressConfig.enabled,
+		baseDomain: workspaceAddressConfig.baseDomain,
+	};
 	const { clientUrl } = environment;
 	try {
 		Object.assign(workspaceAddressConfig, {
 			enabled: true,
 			baseDomain: "hephaestus.build",
-			apexOrigin: "https://hephaestus.build",
 		});
-		environment.workspaceSubdomains.enabled = true;
 		environment.clientUrl = "https://hephaestus.build";
 		redirectToLogin();
 		expect(assigned).toStrictEqual([
@@ -235,7 +235,6 @@ it("returns tenant sign-in through a relative apex workspace path", () => {
 		]);
 	} finally {
 		Object.assign(workspaceAddressConfig, previous);
-		environment.workspaceSubdomains.enabled = wasEnabled;
 		environment.clientUrl = clientUrl;
 	}
 });

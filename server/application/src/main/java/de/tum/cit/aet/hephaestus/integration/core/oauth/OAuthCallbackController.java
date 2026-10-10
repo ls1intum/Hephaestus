@@ -9,6 +9,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionStrategy.Connect
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.webhook.IntegrationKindRouting;
+import jakarta.persistence.EntityNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -119,6 +120,22 @@ public class OAuthCallbackController {
         }
         IntegrationKind kind = kindOpt.get();
 
+        if (vendorError != null && !vendorError.isBlank()) {
+            var response = failure(kind.name(), vendorError, vendorErrorDescription, HttpStatus.BAD_REQUEST, wantsJson);
+            // Cancellation needs no state; only a verified binding can supply workspace return context.
+            if (kind == IntegrationKind.SLACK && !wantsJson && state != null && !state.isBlank()) {
+                try {
+                    var binding = oauthStateService.consume(state);
+                    if (binding.kind() == kind) {
+                        return workspaceRedirect(response, binding);
+                    }
+                } catch (IllegalArgumentException ignored) {
+                    return response;
+                }
+            }
+            return response;
+        }
+
         if (state == null || state.isBlank()) {
             ConnectionStrategy strategy = strategies.get(kind);
             if (strategy != null && strategy.isProviderInitiated(allParams == null ? Map.of() : allParams)) {
@@ -156,17 +173,6 @@ public class OAuthCallbackController {
                     wantsJson);
         }
 
-        if (vendorError != null && !vendorError.isBlank()) {
-            log.info(
-                    "OAuth callback for kind={} returned vendor error={} description={}",
-                    kind,
-                    sanitize(vendorError),
-                    sanitize(vendorErrorDescription));
-            return workspaceRedirect(
-                    failure(kind.name(), vendorError, vendorErrorDescription, HttpStatus.BAD_REQUEST, wantsJson),
-                    binding);
-        }
-
         ConnectionStrategy strategy = strategies.get(kind);
         if (strategy == null) {
             log.error("No ConnectionStrategy bean for kind={} but routing accepted it — wiring bug", kind);
@@ -179,7 +185,17 @@ public class OAuthCallbackController {
                     HttpStatus.INTERNAL_SERVER_ERROR);
         }
 
-        Connection connection = callbackService.findOrCreatePendingConnection(binding.workspaceId(), kind);
+        Connection connection;
+        try {
+            connection = callbackService.findOrCreatePendingConnection(binding.workspaceId(), kind);
+        } catch (EntityNotFoundException e) {
+            return failure(
+                    kind.name(),
+                    "workspace_not_found",
+                    "The workspace no longer exists.",
+                    HttpStatus.NOT_FOUND,
+                    wantsJson);
+        }
         IntegrationRef ref = connection.toRef();
 
         ConnectFinalization result;
@@ -268,8 +284,19 @@ public class OAuthCallbackController {
         if (location == null || binding.kind() != IntegrationKind.SLACK) {
             return response;
         }
+        String slug;
+        try {
+            slug = callbackService.workspaceSlug(binding.workspaceId());
+        } catch (EntityNotFoundException e) {
+            return failure(
+                    binding.kind().name(),
+                    "workspace_not_found",
+                    "The workspace no longer exists.",
+                    HttpStatus.NOT_FOUND,
+                    false);
+        }
         String target = UriComponentsBuilder.fromUri(location)
-                .queryParam("workspaceSlug", callbackService.workspaceSlug(binding.workspaceId()))
+                .queryParam("workspaceSlug", slug)
                 .build(true)
                 .toUriString();
         return redirect(target);

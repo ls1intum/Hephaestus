@@ -82,11 +82,11 @@ import { stepUpChallengeOf } from "@/lib/problem-detail";
 import { toScmProviderType } from "@/lib/provider/provider-terms";
 import { useSearchState } from "@/lib/search-params";
 import { type AuthContextType, useAuth } from "@/runtime/auth/AuthContext";
-import { safeReturnTo } from "@/runtime/auth/guard";
+import { safeReturnTo } from "@/runtime/auth/return-to";
 import { FeatureFlagDevTools } from "@/runtime/feature-flags/FeatureFlagDevTools";
 import { useProviderColors } from "@/runtime/theme/provider-colors";
 import { exitUserView } from "@/runtime/user-view/session";
-import { workspaceAddressConfig, workspaceRewrite } from "@/runtime/workspace-address";
+import { workspaceAddressConfig, publicHref } from "@/runtime/workspace-address";
 import { isCopilotExcludedRoute } from "./-copilot-route";
 
 const GlobalCopilot = lazy(async () => import("./-GlobalCopilot"));
@@ -352,11 +352,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 		if (!workspaceAddressConfig.enabled) {
 			return;
 		}
-		const url = new URL(location.href, window.location.origin);
-		const rewritten = workspaceRewrite(workspaceAddressConfig, window.location.origin).output?.({
-			url,
-		});
-		const target = new URL(rewritten ?? url);
+		const target = new URL(publicHref(location.href), window.location.origin);
 		if (target.origin !== window.location.origin) {
 			throw redirect({ href: target.href, reloadDocument: true });
 		}

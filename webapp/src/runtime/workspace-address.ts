@@ -1,6 +1,7 @@
 import type { AnyRouter, LocationRewrite } from "@tanstack/react-router";
 
 import environment from "@/environment";
+import { safeReturnTo } from "@/runtime/auth/return-to";
 
 export interface WorkspaceAddressConfig {
 	enabled: boolean;
@@ -8,6 +9,7 @@ export interface WorkspaceAddressConfig {
 	apexOrigin: string;
 }
 
+// /admin is shared: tenant input means workspace admin; internal /admin output means instance admin.
 const APEX_PATHS = [
 	"/login",
 	"/consent",
@@ -20,6 +22,8 @@ const APEX_PATHS = [
 	"/integrations",
 	"/about",
 	"/landing",
+	"/workspaces",
+	// Do not prefix explicit workspace paths; output rewrites handle their target workspace.
 	"/w",
 ];
 
@@ -62,7 +66,7 @@ export function workspaceRewrite(config: WorkspaceAddressConfig, origin: string)
 	};
 }
 
-/** Links already honor rewritten origins; imperative navigation and route redirects need the same boundary. */
+/** TanStack router-core 1.171 navigate({ to }) ignores location.external, so commitLocation must force document navigation. */
 export function installWorkspaceNavigation(
 	router: AnyRouter,
 	config: WorkspaceAddressConfig,
@@ -86,20 +90,32 @@ export function installWorkspaceNavigation(
 	};
 }
 
-export const workspaceAddressConfig: WorkspaceAddressConfig = {
-	enabled: environment.workspaceSubdomains.enabled,
-	baseDomain: environment.workspaceSubdomains.baseDomain,
-	apexOrigin: new URL(environment.clientUrl).origin,
-};
+export const workspaceAddressConfig: WorkspaceAddressConfig = environment.workspaceSubdomains;
 
-export function workspaceReturnTo(path: string): string {
+export function currentTenantSlug(): string | undefined {
+	return tenantSlug(new URL(window.location.origin), workspaceAddressConfig);
+}
+
+export function publicHref(path: string): string {
 	if (!workspaceAddressConfig.enabled) {
 		return path;
 	}
 	const url = new URL(path, window.location.origin);
+	const rewritten = workspaceRewrite(workspaceAddressConfig, window.location.origin).output?.({
+		url,
+	});
+	return new URL(rewritten ?? url).href;
+}
+
+export function workspaceReturnTo(path: string): string {
+	const safePath = safeReturnTo(path);
+	if (!workspaceAddressConfig.enabled) {
+		return safePath;
+	}
+	const url = new URL(safePath, window.location.origin);
 	const rewritten = workspaceRewrite(workspaceAddressConfig, window.location.origin).input?.({
 		url,
 	});
-	const target = rewritten === undefined ? url : new URL(rewritten);
-	return target.pathname + target.search + target.hash;
+	const target = new URL(rewritten ?? url);
+	return safeReturnTo(target.pathname + target.search + target.hash);
 }

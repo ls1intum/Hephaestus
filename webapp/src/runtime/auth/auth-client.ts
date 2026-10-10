@@ -2,9 +2,9 @@ import { logout } from "@/api/sdk.gen";
 import type { CurrentUserView } from "@/api/types.gen";
 import environment from "@/environment";
 import { hasText } from "@/lib/text";
-import { safeReturnTo } from "@/runtime/auth/guard";
-import { workspaceReturnTo } from "@/runtime/workspace-address";
-import { csrfFetch, refetchCsrfToken } from "./csrf";
+import { safeReturnTo } from "@/runtime/auth/return-to";
+import { workspaceAddressConfig, workspaceReturnTo } from "@/runtime/workspace-address";
+import { csrfFetch } from "./csrf";
 import { withSessionLock } from "./session-lock";
 
 export interface UserProfile {
@@ -71,12 +71,9 @@ export const authClient = {
 		if (!response.ok) {
 			throw new Error(`Dev sign-in failed (${response.status})`);
 		}
-		if (environment.workspaceSubdomains.enabled) {
-			await refetchCsrfToken();
-		}
 		window.location.assign(
-			environment.workspaceSubdomains.enabled
-				? new URL(workspaceReturnTo(safeReturnTo(returnTo)), environment.clientUrl).href
+			workspaceAddressConfig.enabled
+				? new URL(workspaceReturnTo(safeReturnTo(returnTo)), workspaceAddressConfig.apexOrigin).href
 				: safeReturnTo(returnTo),
 		);
 	},
@@ -88,9 +85,6 @@ export const authClient = {
 				throw new Error("Could not sign out.", { cause: response ?? error });
 			}
 		});
-		if (environment.workspaceSubdomains.enabled) {
-			await refetchCsrfToken();
-		}
 		window.location.assign("/");
 	},
 };

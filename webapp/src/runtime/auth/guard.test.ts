@@ -6,7 +6,8 @@ import { currentUser } from "@/mocks/fixtures/auth";
 import { server } from "@/mocks/server";
 import { deferred } from "@/test/async";
 
-import { currentUserQueryOptions, isAppAdmin, resolveCurrentUser, safeReturnTo } from "./guard";
+import { safeReturnTo } from "@/runtime/auth/return-to";
+import { currentUserQueryOptions, isAppAdmin, resolveCurrentUser } from "./guard";
 
 describe("safeReturnTo", () => {
 	describe("accepts same-origin absolute paths", () => {

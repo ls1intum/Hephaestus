@@ -10,7 +10,8 @@ import {
 import { ConsentPage, type ConsentSubmission } from "@/components/auth/ConsentPage";
 import { pageHead } from "@/lib/page-title";
 import { useAuth } from "@/runtime/auth/AuthContext";
-import { resolveCurrentUser, safeReturnTo } from "@/runtime/auth/guard";
+import { resolveCurrentUser } from "@/runtime/auth/guard";
+import { safeReturnTo } from "@/runtime/auth/return-to";
 
 interface ConsentSearch {
 	returnTo?: string;

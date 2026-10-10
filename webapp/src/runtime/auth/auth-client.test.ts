@@ -4,6 +4,7 @@ import { afterEach, assert, describe, expect, it } from "vitest";
 import type { CurrentUserView } from "@/api/types.gen";
 import { hasText } from "@/lib/text";
 import { server } from "@/mocks/server";
+import { workspaceAddressConfig } from "@/runtime/workspace-address";
 
 import { applyStateChangingHeaders, authClient, toUserProfile } from "./auth-client";
 
@@ -97,6 +98,7 @@ function captureNavigation(): string[] {
 	Object.defineProperty(window, "location", {
 		configurable: true,
 		value: {
+			origin: "http://localhost:4200",
 			assign: (url: string) => {
 				assigned.push(url);
 			},
@@ -199,5 +201,40 @@ describe("authClient.logout", () => {
 		server.use(http.post("*/auth/logout", () => new HttpResponse(null, { status: 204 })));
 		await authClient.logout();
 		expect(assigned).toStrictEqual(["/"]);
+	});
+});
+
+describe("document navigation after session changes", () => {
+	const originalEnabled = workspaceAddressConfig.enabled;
+	afterEach(() => {
+		workspaceAddressConfig.enabled = originalEnabled;
+		restoreLocation();
+	});
+
+	it("leaves after successful logout even when CSRF discovery is unavailable", async () => {
+		workspaceAddressConfig.enabled = true;
+		server.use(
+			http.post("*/auth/logout", () => new HttpResponse(null, { status: 204 })),
+			http.get("*/auth/csrf", () => new HttpResponse(null, { status: 503 })),
+		);
+		const assigned = captureNavigation();
+		await authClient.logout();
+		expect(assigned).toStrictEqual(["/"]);
+	});
+
+	it("reloads after dev sign-in without fetching a second CSRF token", async () => {
+		workspaceAddressConfig.enabled = true;
+		let discoveries = 0;
+		server.use(
+			http.get("*/auth/csrf", () => {
+				discoveries += 1;
+				return HttpResponse.json({ token: "initial-token", headerName: "X-XSRF-TOKEN" });
+			}),
+			http.post("*/auth/dev-login", () => new HttpResponse(null, { status: 204 })),
+		);
+		const assigned = captureNavigation();
+		await authClient.devLogin("ada", false, "/x/..//evil.com");
+		expect(assigned).toStrictEqual([`${workspaceAddressConfig.apexOrigin}/`]);
+		expect(discoveries).toBe(1);
 	});
 });

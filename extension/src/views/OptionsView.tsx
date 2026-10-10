@@ -89,7 +89,11 @@ function Setup({ developmentBuild }: { developmentBuild: boolean }) {
 						removePermission = false;
 						await browser.permissions.remove(permission);
 					}
-					setState({ status: "confirm-apex", origin: resolved.origin });
+					setState({
+						status: "confirm-apex",
+						origin: resolved.origin,
+						webAppOrigin: input.webAppOrigin,
+					});
 					return;
 				}
 				await ask({
@@ -121,7 +125,7 @@ function Setup({ developmentBuild }: { developmentBuild: boolean }) {
 			hostedHost={HOSTED_HOST}
 			developmentBuild={developmentBuild}
 			state={state}
-			onConnectApex={(origin) => connect("custom", { origin })}
+			onConnectApex={(input) => connect("custom", input)}
 			onConnectHosted={() => connect("hosted", { origin: HOSTED_INSTANCE_ORIGIN })}
 			onConnectCustom={(input) => connect("custom", input)}
 			privacyUrl={EXTENSION_PRIVACY_URL}

@@ -4,6 +4,7 @@ import { createClient } from "@/api/client/client.gen";
 import { getCsrfToken } from "@/api/sdk.gen";
 import environment from "@/environment";
 import { isRecord } from "@/lib/is-record";
+import { workspaceAddressConfig } from "@/runtime/workspace-address";
 
 const csrfClient = createClient({ baseUrl: environment.serverUrl, credentials: "include" });
 const tokenSchema = z.object({ token: z.string().min(1), headerName: z.string().min(1) });
@@ -51,8 +52,7 @@ async function isCsrfRefusal(response: Response): Promise<boolean> {
 export const csrfFetch: typeof globalThis.fetch = async (input, init) => {
 	const request = new Request(input, init);
 	const unsafe = !["GET", "HEAD", "OPTIONS"].includes(request.method);
-	const { enabled } = environment.workspaceSubdomains;
-	if (!enabled) {
+	if (!workspaceAddressConfig.enabled) {
 		// oxlint-disable-next-line no-restricted-globals -- Transport for the generated API client.
 		return fetch(request);
 	}

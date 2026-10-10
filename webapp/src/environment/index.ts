@@ -98,6 +98,9 @@ const environment = {
 	workspaceSubdomains: {
 		enabled: env("HEPHAESTUS_WORKSPACE_SUBDOMAINS_ENABLED") === "true",
 		baseDomain: env("HEPHAESTUS_WORKSPACE_SUBDOMAINS_BASE_DOMAIN"),
+		get apexOrigin(): string {
+			return this.enabled ? new URL(environment.clientUrl).origin : "";
+		},
 	},
 	clientUrl: env("APPLICATION_CLIENT_URL"),
 	serverUrl: env("APPLICATION_SERVER_URL"),

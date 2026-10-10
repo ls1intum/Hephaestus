@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
+import { hasText } from "@/lib/text";
 
 import { ConnectionStateNotice } from "@/components/admin/integrations/ConnectionStateNotice";
 import { IntegrationCardHeading } from "@/components/admin/integrations/IntegrationCardHeading";
@@ -43,7 +44,7 @@ function SlackIntegrationPage() {
 		} else {
 			toast.error("We could not connect Slack", {
 				id: "slack-connect-result",
-				description: description ?? reason,
+				description: hasText(description) ? description : reason,
 			});
 		}
 		void navigate({ search: {}, replace: true });

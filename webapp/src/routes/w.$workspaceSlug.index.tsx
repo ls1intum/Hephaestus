@@ -1,5 +1,5 @@
 import { createFileRoute, redirect, useRouter, useRouterState } from "@tanstack/react-router";
-import { workspaceAddressConfig, tenantSlug } from "@/runtime/workspace-address";
+import { currentTenantSlug } from "@/runtime/workspace-address";
 
 import { getPublicActivityOptions, listWorkspacesOptions } from "@/api/@tanstack/react-query.gen";
 import type { PublicActivity } from "@/api/types.gen";
@@ -51,7 +51,7 @@ export const Route = createFileRoute("/w/$workspaceSlug/")({
 				to: "/consent",
 				search: { returnTo: location.href },
 				mask:
-					tenantSlug(new URL(window.location.origin), workspaceAddressConfig) === undefined
+					currentTenantSlug() === undefined
 						? { to: location.pathname, search: location.search, hash: location.hash }
 						: undefined,
 			});

@@ -263,7 +263,7 @@ it.each([
 	"asks for the apex on a fresh click and preserves existing access: $alreadyGranted",
 	async ({ alreadyGranted, removed }) => {
 		platform.contains.mockResolvedValue(alreadyGranted);
-		answer(() => SIGNED_OUT, "https://heph.example.test");
+		answer(() => ({ ...SIGNED_OUT, developmentBuild: true }), "https://heph.example.test");
 		platform.request.mockResolvedValue(true);
 		await render();
 		await until(() => expect(container.textContent).toContain("Use a self-hosted instance"));
@@ -271,6 +271,7 @@ it.each([
 			required(container.querySelector("details"), "the self-hosted disclosure").open = true;
 		});
 		await fill("Hephaestus address", "https://acme.heph.example.test");
+		await fill("Web app address", "http://localhost:14280");
 		await click(button("Connect instance"));
 		await until(() =>
 			expect(container.textContent).toContain("This workspace uses heph.example.test"),
@@ -286,7 +287,7 @@ it.each([
 				{
 					type: "configure-instance",
 					origin: "https://heph.example.test",
-					webAppOrigin: undefined,
+					webAppOrigin: "http://localhost:14280",
 				},
 			]),
 		);

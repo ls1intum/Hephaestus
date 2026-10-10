@@ -1,18 +1,18 @@
 import { http, HttpResponse } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ZodError } from "zod";
+import { workspaceAddressConfig } from "@/runtime/workspace-address";
 
-import environment from "@/environment";
 import { server } from "@/mocks/server";
 import { deferred } from "@/test/async";
 import { csrfFetch, refetchCsrfToken } from "./csrf";
 
 const api = "http://localhost:8080";
-const originalEnabled = environment.workspaceSubdomains.enabled;
+const originalEnabled = workspaceAddressConfig.enabled;
 let issued = 0;
 
 beforeEach(() => {
-	environment.workspaceSubdomains.enabled = true;
+	workspaceAddressConfig.enabled = true;
 	issued = 0;
 	server.use(
 		http.get(`${api}/auth/csrf`, () => {
@@ -22,7 +22,7 @@ beforeEach(() => {
 	);
 });
 afterEach(() => {
-	environment.workspaceSubdomains.enabled = originalEnabled;
+	workspaceAddressConfig.enabled = originalEnabled;
 });
 
 async function mutation() {
@@ -150,7 +150,7 @@ describe("apex CSRF transport", () => {
 		expect(calls).toBe(2);
 	});
 	it("leaves the transport unchanged with the switch off", async () => {
-		environment.workspaceSubdomains.enabled = false;
+		workspaceAddressConfig.enabled = false;
 		server.use(http.get(`${api}/user`, () => HttpResponse.json({ id: 1 })));
 		const response = await csrfFetch(`${api}/user`);
 		expect(response.status).toBe(200);

@@ -45,6 +45,7 @@ describe("workspace URL rewrites", () => {
 		"/terms",
 		"/unsubscribe",
 		"/settings",
+		"/workspaces/new",
 		"/integrations",
 		"/w/other/activity",
 	])("keeps %s on the apex", (path) => {

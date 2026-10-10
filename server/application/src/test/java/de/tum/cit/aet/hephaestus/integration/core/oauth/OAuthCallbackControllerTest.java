@@ -26,6 +26,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.core.webhook.IntegrationKindRouting;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import jakarta.persistence.EntityNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Instant;
 import java.util.HashMap;
@@ -161,8 +162,8 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
         assertThat(response.getHeaders().getContentType()).isEqualTo(MediaType.APPLICATION_PROBLEM_JSON);
         ProblemDetail body = (ProblemDetail) response.getBody();
         assertThat(body).isNotNull();
-        assertThat(body.getProperties()).containsEntry("kind", "SLACK").containsEntry("error", "missing_state");
-        assertThat(body.getDetail()).isEqualTo("The state parameter is required.");
+        assertThat(body.getProperties()).containsEntry("kind", "SLACK").containsEntry("error", "access_denied");
+        assertThat(body.getDetail()).isEqualTo("The user denied the request");
 
         // An unbound callback cannot name a return workspace.
         verify(oauthStateService, never()).consume(any());
@@ -189,6 +190,47 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
     }
 
     @Test
+    void vendorCancellationKeepsItsReasonWhenStateExpired() {
+        when(oauthStateService.consume("expired")).thenThrow(new IllegalArgumentException("Expired state"));
+        var response = controller.callbackGet("slack", "expired", "access_denied", null, Map.of(), htmlRequest());
+        assertThat(response.getHeaders().getLocation())
+                .hasToString(PROPS.resolvedFailureRedirect() + "&reason=access_denied&kind=SLACK");
+        verify(callbackService, never()).findOrCreatePendingConnection(anyLong(), any());
+    }
+
+    @Test
+    void vendorCancellationDoesNotRequireStateForOtherIntegrations() {
+        var response = controller.callbackGet("github", "expired", "access_denied", null, Map.of(), htmlRequest());
+        assertThat(response.getHeaders().getLocation())
+                .hasToString(PROPS.resolvedFailureRedirect() + "&reason=access_denied&kind=GITHUB");
+        verify(oauthStateService, never()).consume(any());
+    }
+
+    @Test
+    void workspaceDeletedBeforeConnectionCreationReturnsFailure() {
+        when(oauthStateService.consume("signed-state"))
+                .thenReturn(new StateBinding(42L, IntegrationKind.SLACK, Instant.now(), 42L));
+        when(callbackService.findOrCreatePendingConnection(42L, IntegrationKind.SLACK))
+                .thenThrow(new EntityNotFoundException("Workspace does not exist"));
+        var response = controller.callbackGet("slack", "signed-state", null, null, Map.of(), htmlRequest());
+        var location = response.getHeaders().getLocation();
+        assertNotNull(location);
+        assertThat(location.toString()).contains("reason=workspace_not_found");
+        assertThat(slackStrategy.finalizeCalls).isZero();
+    }
+
+    @Test
+    void deletedWorkspaceReturnsFailureInsteadOfThrowing() {
+        when(oauthStateService.consume("signed-state"))
+                .thenReturn(new StateBinding(42L, IntegrationKind.SLACK, Instant.now(), 42L));
+        when(callbackService.workspaceSlug(42L)).thenThrow(new EntityNotFoundException("Workspace does not exist"));
+        var response = controller.callbackGet("slack", "signed-state", "access_denied", null, Map.of(), htmlRequest());
+        var location = response.getHeaders().getLocation();
+        assertNotNull(location);
+        assertThat(location.toString()).contains("reason=workspace_not_found").doesNotContain("workspaceSlug=");
+    }
+
+    @Test
     void vendorError_browserRequest_redirectsToFailure() {
         ResponseEntity<?> response = controller.callbackGet(
                 "slack",
@@ -203,7 +245,7 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
         assertNotNull(location1);
         String location = location1.toString();
         assertThat(location).contains("status=error");
-        assertThat(location).contains("reason=missing_state");
+        assertThat(location).contains("reason=access_denied");
         assertThat(location).contains("kind=SLACK");
         verify(oauthStateService, never()).consume(any());
         assertThat(slackStrategy.finalizeCalls).isEqualTo(0);

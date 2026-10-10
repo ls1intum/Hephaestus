@@ -87,6 +87,10 @@ main() {
 
   local subdomains="${HEPHAESTUS_WORKSPACE_SUBDOMAINS_ENABLED:-false}"
   case "$subdomains" in true|false) ;; *) log "Invalid workspace subdomains switch"; exit 1 ;; esac
+  if [[ "$subdomains" == true && -z "${APPLICATION_CLIENT_URL:-}" ]]; then
+    log "ERROR: APPLICATION_CLIENT_URL is required when workspace subdomains are enabled."
+    exit 1
+  fi
   mkdir -p "${HTML_DIR}/.well-known"
   printf '{"apexOrigin":"%s","baseDomain":"%s","workspaceSubdomainsEnabled":%s}\n' \
     "$(escape_for_js "${APPLICATION_CLIENT_URL:-}")" \

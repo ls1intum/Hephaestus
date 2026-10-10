@@ -1,10 +1,9 @@
 import type { QueryClient } from "@tanstack/react-query";
 
-import environment from "@/environment";
 import { apiBasePath } from "@/runtime/api-base-path";
-import { safeReturnTo } from "@/runtime/auth/guard";
+import { safeReturnTo } from "@/runtime/auth/return-to";
 import { refreshAccessToken } from "@/runtime/auth/session-refresh";
-import { workspaceReturnTo } from "@/runtime/workspace-address";
+import { workspaceAddressConfig, workspaceReturnTo } from "@/runtime/workspace-address";
 
 // Identity probes can return 401 anonymously; auth requests must not trigger recursive recovery.
 function isExemptFromSessionExpiry(pathname: string, url: string): boolean {
@@ -81,7 +80,7 @@ export function redirectToLogin(
 ): void {
 	const target = new URL(
 		"/login",
-		environment.workspaceSubdomains.enabled ? environment.clientUrl : window.location.origin,
+		workspaceAddressConfig.enabled ? workspaceAddressConfig.apexOrigin : window.location.origin,
 	);
 	target.searchParams.set("returnTo", workspaceReturnTo(safeReturnTo(currentPath)));
 	window.location.assign(target.toString());
