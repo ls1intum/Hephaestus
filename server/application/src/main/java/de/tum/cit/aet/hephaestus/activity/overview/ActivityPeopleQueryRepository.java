@@ -73,7 +73,6 @@ interface ActivityPeopleQueryRepository extends Repository<ActivityEvent, UUID> 
     String SOURCE_HEAD = """
                 FROM activity_event e
                 JOIN "user" u ON u.id = e.actor_id
-                JOIN monitored mr ON mr.id = e.repository_id AND mr.provider_id = u.provider_id
                 LEFT JOIN workspace_membership wm ON wm.workspace_id = e.workspace_id AND wm.user_id = e.actor_id
                 LEFT JOIN pull_request_review prr ON e.target_type = 'review' AND prr.id = e.target_id
                 LEFT JOIN issue pr ON pr.id = prr.pull_request_id
@@ -81,6 +80,7 @@ interface ActivityPeopleQueryRepository extends Repository<ActivityEvent, UUID> 
                 LEFT JOIN activity_automation author_machine ON author_machine.workspace_id = :#{#scope.workspaceId()} AND author_machine.user_id = pr.author_id
                 WHERE e.workspace_id = :#{#scope.workspaceId()}
                   AND u.type IN ('USER', 'BOT')
+                  AND EXISTS (SELECT 1 FROM monitored mr WHERE mr.id = e.repository_id AND mr.provider_id = u.provider_id)
             """;
     String PUBLIC_SOURCE = """
                   AND u.id IN (SELECT id FROM public_people)
