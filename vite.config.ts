@@ -245,7 +245,7 @@ export default defineConfig({
 				"node scripts/check-agent-instructions.ts && node --test scripts/check-agent-instructions.test.ts",
 			),
 			"gate:changesets": run(
-				"node --test scripts/verify-changesets.test.ts scripts/sync-release-version.test.ts",
+				"node scripts/verify-changesets.ts --local && node --test scripts/verify-changesets.test.ts scripts/sync-release-version.test.ts",
 			),
 
 			// Gradle owns Java task inputs and cached outputs; Vite starts it once per quality run.

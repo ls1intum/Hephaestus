@@ -12,6 +12,8 @@ title: Local verification
 
 While you work, run `check:affected`.
 Before you push, run `check`.
+It validates the contents of all pending changeset files through `gate:changesets`.
+CI also checks release-note presence and changes against the tested merge base.
 Before you request review, run `verify`.
 `vp run` with no task name lists every task, and `vite.config.ts` is where each one is defined.
 
