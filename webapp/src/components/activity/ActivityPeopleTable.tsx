@@ -192,8 +192,12 @@ export function ActivityPeopleTable({
 			}),
 			columnHelper.display({
 				id: "trend",
-				// The line shows what it is; its name is for a screen reader.
-				header: () => <span className="sr-only">Weekly trend</span>,
+				header: () => (
+					<>
+						<span aria-hidden>Trend</span>
+						<span className="sr-only">Weekly trend</span>
+					</>
+				),
 				meta: { className: "w-px pr-3" },
 				cell: ({ row }) =>
 					from && to && <ActivitySparkline weeks={row.original.weeks} span={{ from, to }} />,
@@ -355,8 +359,8 @@ export function PeopleSkeletonRows({ colSpan }: { colSpan?: number }) {
  * The name is the row's link and its keyboard stop, stretched over its pinned cell so the identity is
  * the pointer target. A person whose first contribution to the workspace is in the range is new here.
  *
- * The identity has a set width, so a long name truncates instead of widening the pinned columns; the
- * New marker sits on the login line, so it never takes room from the name.
+ * The identity has a set width, so a long name wraps to two lines and is then cut, instead of widening
+ * the pinned columns; the New marker sits on the login line, so it never takes room from the name.
  */
 function PersonCell({
 	person,
@@ -373,7 +377,7 @@ function PersonCell({
 			<div className="min-w-0 flex-1">
 				<InlineLink
 					render={link(person)}
-					className="block truncate font-medium after:absolute after:inset-0"
+					className="line-clamp-2 font-medium break-words whitespace-normal after:absolute after:inset-0"
 				>
 					{person.name}
 				</InlineLink>

@@ -79,6 +79,8 @@ export const Default: Story = {
 		await expect(
 			within(table).getByRole("columnheader", { name: /^Contributions/u }),
 		).toHaveAttribute("aria-sort", "descending");
+		const trend = within(table).getByRole("columnheader", { name: "Weekly trend" });
+		await expect(within(trend).getByText("Trend")).toBeVisible();
 	},
 };
 
@@ -255,23 +257,33 @@ export const GitLabDark: Story = {
 };
 
 const LONG_NAME = "Maximiliane Alexandra Featherstonehaugh-Wolfeschlegelsteinhausen";
+const TWO_WORD_NAME = "Konstantin Abernathy";
 const large = peopleOf(LARGE_PEOPLE);
-const longFirst = [...large.people].sort(
+const [longFirst, twoWordSecond] = [...large.people].sort(
 	(a, b) => b.counts.contributions - a.counts.contributions,
-)[0];
+);
+
+function renamed(row: (typeof large.people)[number]) {
+	if (row === longFirst) {
+		return { ...row, person: { ...row.person, name: LONG_NAME } };
+	}
+	if (row === twoWordSecond) {
+		return { ...row, person: { ...row.person, name: TWO_WORD_NAME } };
+	}
+	return row;
+}
 
 /**
  * In a narrow column the figures scroll under the pinned position and name. Past row 100 a position has
- * three digits, and a long name with the New marker still keeps its set width.
+ * three digits. A name wraps to two lines in its set width, so a first and last name read whole, and
+ * a longer one with the New marker is cut after the second line.
  */
 export const NarrowScroll: Story = {
 	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
 	args: {
 		state: readyPeople({
 			...large,
-			people: large.people.map((row) =>
-				row === longFirst ? { ...row, person: { ...row.person, name: LONG_NAME } } : row,
-			),
+			people: large.people.map(renamed),
 			highlights: {
 				...large.highlights,
 				firstContributors: longFirst ? [longFirst.person.id] : [],
@@ -320,8 +332,14 @@ export const NarrowScroll: Story = {
 			);
 			await expect(name.contains(hit)).toBe(true);
 		}
-		const link = within(longRow).getByRole("link");
-		await expect(link.scrollWidth).toBeGreaterThan(link.clientWidth);
+		const link = within(longRow).getByRole("link", { name: LONG_NAME });
+		const lineHeight = Number.parseFloat(getComputedStyle(link).lineHeight);
+		await expect(link.clientHeight).toBeLessThanOrEqual(2 * lineHeight + 1);
+		await expect(link.clientHeight).toBeGreaterThan(lineHeight + 1);
+		await expect(link.scrollHeight).toBeGreaterThan(link.clientHeight);
+		const twoWord = within(table).getByRole("link", { name: TWO_WORD_NAME });
+		await expect(twoWord.clientHeight).toBeGreaterThan(lineHeight + 1);
+		await expect(twoWord.scrollHeight).toBeLessThanOrEqual(twoWord.clientHeight + 1);
 		await expect(
 			within(longRow).getByRole("img", { name: "First contribution in this range" }),
 		).toBeVisible();

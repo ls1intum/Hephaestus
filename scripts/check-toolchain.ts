@@ -545,6 +545,13 @@ for (const file of tracked) {
 	if (content.includes(0)) {
 		continue;
 	}
+	// Vendored runner examples target other projects; repository notices remain part of this scan.
+	if (
+		/^\.(?:agents|claude)\/skills\/shadcn\//u.test(file) &&
+		!["LICENSE.md", "NOTICE.md"].includes(basename)
+	) {
+		continue;
+	}
 	const text = content.toString("utf8");
 	const runtimeText =
 		file === "pnpm-lock.yaml"
