@@ -72,6 +72,12 @@ describe("feedbackPreviewText", () => {
 		);
 	});
 
+	it.each(["\r\n", "\r"])("removes the transport marker with %j line endings", (ending) => {
+		const body = `${MARKER}${ending}Keep it focused.${ending}`;
+		expect(feedbackDisplayMarkdown(body)).toBe("Keep it focused.\n");
+		expect(preview(body)).toBe("Keep it focused.");
+	});
+
 	it("shows only the authored words of a short posted body", () => {
 		expect(preview(`${MARKER}\nKeep it focused.\n\n---\n${DISCLOSURE}\n${SETTINGS}\n`)).toBe(
 			"Keep it focused.",
@@ -108,6 +114,13 @@ describe("feedbackDisplayMarkdown", () => {
 	it("returns a body with neither as the same string", () => {
 		const body = "Keep it focused.\r\n\r\n  - one   \n\n<sub>authored aside</sub>\n";
 		expect(feedbackDisplayMarkdown(body)).toBe(body);
+	});
+
+	it("preserves unmodified text and a quoted marker with CRLF line endings", () => {
+		const plain = "Keep it focused.\r\n\r\n  - one   \r\n";
+		const quoted = `\`\`\`md\r\n${MARKER}\r\n\`\`\`\r\n`;
+		expect(feedbackDisplayMarkdown(plain)).toBe(plain);
+		expect(feedbackDisplayMarkdown(quoted)).toBe(quoted);
 	});
 
 	it.each([
