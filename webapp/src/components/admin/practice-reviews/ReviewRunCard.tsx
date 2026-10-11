@@ -8,9 +8,10 @@ import { statusToneClass } from "@/components/common/status-def";
 import { REVIEW_STATUS_DEFS } from "@/components/practice-vocabulary/review-status-defs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { copyToClipboard } from "@/lib/clipboard";
 import { hasText } from "@/lib/text";
-import { modelLabel } from "./job-utils";
+import { jobPhases, modelLabel } from "./job-utils";
 
 import { ReviewFact, ReviewFactGrid } from "./ReviewFactGrid";
 
@@ -23,6 +24,7 @@ export interface ReviewRunCardProps {
  * checks when a review costs more than it should or answers worse than it used to.
  */
 export function ReviewRunCard({ job }: ReviewRunCardProps) {
+	const phases = jobPhases(job);
 	return (
 		<section aria-labelledby="run-card-heading" className="space-y-3">
 			<div className="flex flex-wrap items-center justify-between gap-2">
@@ -46,6 +48,18 @@ export function ReviewRunCard({ job }: ReviewRunCardProps) {
 				<ReviewFact label="Finished">
 					{job.completedAt ? <RelativeTime value={job.completedAt} /> : "Not yet"}
 				</ReviewFact>
+				{/* These are wall-clock spans, not model, provider or tool timing. */}
+				<ReviewFact label={phases.retried ? "Request to this attempt" : "Wait to start"}>
+					{phases.wait}
+					{phases.retried && (
+						<span className="text-muted-foreground">
+							{" "}
+							(includes earlier attempts and retry waits)
+						</span>
+					)}
+				</ReviewFact>
+				<ReviewFact label="Preparation">{phases.preparation}</ReviewFact>
+				<ReviewFact label="Execution">{phases.execution}</ReviewFact>
 				<ReviewFact label="Model calls">{formatTokens(job.llmTotalCalls)}</ReviewFact>
 				<ReviewFact label="Tokens read">{formatTokens(job.llmTotalInputTokens)}</ReviewFact>
 				<ReviewFact label="Tokens written">
@@ -93,6 +107,30 @@ export function ReviewRunCard({ job }: ReviewRunCardProps) {
 				</p>
 			)}
 			{hasText(job.errorMessage) && <RunFailure job={job} message={job.errorMessage} />}
+		</section>
+	);
+}
+
+/** The same heading and nine fact cells while the run is being read. */
+export function ReviewRunCardSkeleton() {
+	return (
+		<section aria-hidden className="space-y-3">
+			<div className="flex flex-wrap items-center justify-between gap-2">
+				<Skeleton className="h-7 w-44" />
+				<Skeleton className="h-8 w-40" />
+			</div>
+			<ReviewFactGrid>
+				{Array.from({ length: 9 }, (_, index) => (
+					<div key={index} className="min-w-0 space-y-0.5">
+						<dt>
+							<Skeleton className="h-4 w-24" />
+						</dt>
+						<dd>
+							<Skeleton className="h-5 w-32" />
+						</dd>
+					</div>
+				))}
+			</ReviewFactGrid>
 		</section>
 	);
 }

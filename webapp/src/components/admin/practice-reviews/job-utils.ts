@@ -1,3 +1,4 @@
+import { formatDistanceStrict } from "date-fns";
 import type { AgentJob } from "@/api/types.gen";
 import { asDate } from "@/lib/dates";
 import { hasText } from "@/lib/text";
@@ -60,6 +61,65 @@ export function isResultProcessingRetryable(
 	job: Pick<AgentJob, "status" | "deliveryStatus">,
 ): boolean {
 	return job.status === "COMPLETED" && job.deliveryStatus === "FAILED";
+}
+
+export interface JobPhases {
+	wait: string;
+	preparation: string;
+	execution: string;
+	/** The wait then runs from the request, through every earlier attempt and retry wait. */
+	retried: boolean;
+}
+
+const IN_PROGRESS = "In progress";
+const NOT_STARTED = "Not started";
+const NOT_RECORDED = "Not recorded";
+
+/** `undefined` when the boundary was never recorded, `null` when it was but cannot be read. */
+function instant(value: Parameters<typeof asDate>[0]): Date | null | undefined {
+	return value == null ? undefined : (asDate(value) ?? null);
+}
+
+function elapsed(from: Date | null | undefined, to: Date | null | undefined): string {
+	if (!from || !to || to.getTime() < from.getTime()) {
+		return NOT_RECORDED;
+	}
+	const ms = to.getTime() - from.getTime();
+	if (ms > 0 && ms < 1000) {
+		return "Under 1 s";
+	}
+	return formatDistanceStrict(to, from, { roundingMethod: "floor" });
+}
+
+/**
+ * The current attempt's phases between the boundaries the job records: its claim (`startedAt`), the
+ * moment before the sandbox is invoked (`executionStartedAt`) and its end. A retry clears the first two.
+ * A live phase is in progress, never a figure; a missing, unreadable or out-of-order boundary is not
+ * recorded, and so is every phase that depends on it.
+ */
+export function jobPhases(
+	job: Pick<
+		AgentJob,
+		"status" | "createdAt" | "startedAt" | "executionStartedAt" | "completedAt" | "retryCount"
+	>,
+): JobPhases {
+	const retried = job.retryCount > 0;
+	if (job.status === "QUEUED") {
+		return { wait: IN_PROGRESS, preparation: NOT_STARTED, execution: NOT_STARTED, retried };
+	}
+	const started = instant(job.startedAt);
+	const executing = instant(job.executionStartedAt);
+	const wait = elapsed(instant(job.createdAt), started);
+	if (job.status === "RUNNING" && started && executing === undefined) {
+		return { wait, preparation: IN_PROGRESS, execution: NOT_STARTED, retried };
+	}
+	const preparation = elapsed(started, executing);
+	let execution = NOT_RECORDED;
+	if (preparation !== NOT_RECORDED) {
+		execution =
+			job.status === "RUNNING" ? IN_PROGRESS : elapsed(executing, instant(job.completedAt));
+	}
+	return { wait, preparation, execution, retried };
 }
 
 /** The submit-time snapshot, not the runner-reported `llmModel`, which exists only once it has run. */

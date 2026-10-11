@@ -169,7 +169,8 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
             + "j.exitCode AS exitCode, j.errorMessage AS errorMessage, j.deliveryStatus AS deliveryStatus, "
             + "j.deliveryCommentId AS deliveryCommentId, j.retryCount AS retryCount, "
             + "j.availableAt AS availableAt, j.holdReason AS holdReason, j.createdAt AS createdAt, "
-            + "j.startedAt AS startedAt, j.completedAt AS completedAt, j.llmModel AS llmModel, "
+            + "j.startedAt AS startedAt, j.executionStartedAt AS executionStartedAt, "
+            + "j.completedAt AS completedAt, j.llmModel AS llmModel, "
             + "j.llmModelVersion AS llmModelVersion, j.llmTotalCalls AS llmTotalCalls, "
             + "j.llmTotalInputTokens AS llmTotalInputTokens, j.llmTotalOutputTokens AS llmTotalOutputTokens, "
             + "j.llmTotalReasoningTokens AS llmTotalReasoningTokens, j.llmCacheReadTokens AS llmCacheReadTokens, "
@@ -1377,6 +1378,9 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
 
         @Nullable
         Instant getStartedAt();
+
+        @Nullable
+        Instant getExecutionStartedAt();
 
         @Nullable
         Instant getCompletedAt();

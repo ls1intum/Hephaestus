@@ -10824,6 +10824,12 @@ components:
         errorMessage:
           type: string
           description: Human-readable error message
+        executionStartedAt:
+          type: string
+          format: date-time
+          description: "When the current attempt finished preparation, immediately\
+            \ before its sandbox was invoked, if it got that far. A retry resets it;\
+            \ absent on runs from before it was recorded."
         exitCode:
           type: integer
           format: int32
@@ -10916,7 +10922,8 @@ components:
         startedAt:
           type: string
           format: date-time
-          description: Timestamp when the job started running
+          description: "When a worker claimed the current attempt and began preparing\
+            \ it. A retry resets it, so it never describes an earlier attempt."
         status:
           type: string
           description: Current job status

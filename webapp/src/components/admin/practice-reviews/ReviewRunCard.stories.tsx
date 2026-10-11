@@ -4,7 +4,7 @@ import { expect } from "storybook/test";
 import { expectNoPageOverflow } from "@/stories/reflow";
 
 import { reviewJob } from "./fixtures";
-import { ReviewRunCard } from "./ReviewRunCard";
+import { ReviewRunCard, ReviewRunCardSkeleton } from "./ReviewRunCard";
 
 const COMPLETED_RUN = "11111111-1111-1111-1111-111111111111";
 const FAILED_RUN = "bbbbbbbb-8888-8888-8888-888888888888";
@@ -22,11 +22,20 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/** The value under one fact's label. */
+function fact(canvas: Parameters<NonNullable<Story["play"]>>[0]["canvas"], label: string) {
+	return canvas.getByText(label, { selector: "dt" }).nextElementSibling;
+}
+
 export const Completed: Story = {
 	play: async ({ canvas }) => {
 		// Reasoning is billed as output, so it is named as a part of what was written.
 		await expect(canvas.getByText("(120 of it reasoning)")).toBeVisible();
 		await expect(canvas.queryByText("Not yet")).not.toBeInTheDocument();
+		// Claimed the moment it was requested: an exact zero, not an unknown.
+		await expect(fact(canvas, "Wait to start")).toHaveTextContent("0 seconds");
+		await expect(fact(canvas, "Preparation")).toHaveTextContent("30 seconds");
+		await expect(fact(canvas, "Execution")).toHaveTextContent("4 minutes");
 	},
 };
 
@@ -35,6 +44,56 @@ export const Running: Story = {
 	args: { job: reviewJob(RUNNING_RUN) },
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText("Not yet")).toBeVisible();
+		await expect(fact(canvas, "Preparation")).toHaveTextContent("30 seconds");
+		await expect(fact(canvas, "Execution")).toHaveTextContent("In progress");
+	},
+};
+
+/** Claimed but not yet handed to the sandbox. */
+export const Preparing: Story = {
+	args: { job: { ...reviewJob(RUNNING_RUN), executionStartedAt: undefined } },
+	play: async ({ canvas }) => {
+		await expect(fact(canvas, "Preparation")).toHaveTextContent("In progress");
+		await expect(fact(canvas, "Execution")).toHaveTextContent("Not started");
+	},
+};
+
+export const Queued: Story = {
+	args: {
+		job: {
+			...reviewJob(RUNNING_RUN),
+			status: "QUEUED",
+			startedAt: undefined,
+			executionStartedAt: undefined,
+		},
+	},
+	play: async ({ canvas }) => {
+		await expect(fact(canvas, "Wait to start")).toHaveTextContent("In progress");
+		await expect(fact(canvas, "Preparation")).toHaveTextContent("Not started");
+	},
+};
+
+/** A retry clears the attempt's boundaries, so its wait reaches back to the original request. */
+export const Retried: Story = {
+	args: (() => {
+		const job = reviewJob(COMPLETED_RUN);
+		const requested = new Date(job.createdAt.getTime() - 20 * 60_000);
+		return { job: { ...job, retryCount: 2, createdAt: requested } };
+	})(),
+	play: async ({ canvas }) => {
+		await expect(canvas.queryByText("Wait to start")).not.toBeInTheDocument();
+		await expect(fact(canvas, "Request to this attempt")).toHaveTextContent(
+			"20 minutes (includes earlier attempts and retry waits)",
+		);
+	},
+};
+
+/** A run from before the execution boundary was recorded: its two phases are unknown, never zero. */
+export const BeforeExecutionWasRecorded: Story = {
+	args: { job: { ...reviewJob(COMPLETED_RUN), executionStartedAt: undefined } },
+	play: async ({ canvas }) => {
+		await expect(fact(canvas, "Preparation")).toHaveTextContent("Not recorded");
+		await expect(fact(canvas, "Execution")).toHaveTextContent("Not recorded");
 	},
 };
 
@@ -90,5 +149,13 @@ export const NoGeneratedPathsConfigured: Story = {
 	args: { job: { ...reviewJob(COMPLETED_RUN), generatedPaths: { patterns: [], paths: [] } } },
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText("Patterns: None configured")).toBeVisible();
+	},
+};
+
+export const LoadingNarrow: Story = {
+	render: () => <ReviewRunCardSkeleton />,
+	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
+	play: async () => {
+		await expectNoPageOverflow();
 	},
 };

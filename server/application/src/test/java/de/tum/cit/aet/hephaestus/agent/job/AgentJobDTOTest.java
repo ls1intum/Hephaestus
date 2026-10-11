@@ -95,6 +95,25 @@ class AgentJobDTOTest extends BaseUnitTest {
     }
 
     @Test
+    void carriesTheCurrentAttemptsExecutionBoundaryOnlyWhenItWasRecorded() {
+        AgentJob job = jobWithSnapshot(snapshotWithScope(FundingSource.INSTANCE));
+        Instant started = job.getCreatedAt().plusSeconds(5);
+        Instant executing = started.plusSeconds(30);
+        job.setStartedAt(started);
+        job.setExecutionStartedAt(executing);
+        job.setCompletedAt(executing.plusSeconds(300));
+
+        AgentJobDTO dto = AgentJobDTO.from(job, ReviewRunTargetMapper.from(job));
+        assertThat(dto.startedAt()).isEqualTo(started);
+        assertThat(dto.executionStartedAt()).isEqualTo(executing);
+
+        job.setExecutionStartedAt(null);
+        assertThat(AgentJobDTO.from(job, ReviewRunTargetMapper.from(job)).executionStartedAt())
+                .as("a run from before the boundary was recorded")
+                .isNull();
+    }
+
+    @Test
     void shouldNameTheCoveringReviewOnlyForASupersededRun() {
         AgentJob superseded = jobWithSnapshot(snapshotWithScope(FundingSource.INSTANCE));
         UUID covering = UUID.randomUUID();

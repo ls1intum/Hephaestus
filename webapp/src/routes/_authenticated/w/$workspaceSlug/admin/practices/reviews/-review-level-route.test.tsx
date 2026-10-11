@@ -84,6 +84,32 @@ describe("review level", () => {
 		expect(feedback?.searchParams.get("agentJobId")).toBe(COMPLETED_RUN);
 	});
 
+	/** The real route renders phase boundaries supplied by the job endpoint. */
+	it("shows each phase of the run between the boundaries the server sent", async () => {
+		stub(
+			http.get("*/workspaces/:workspaceSlug/agents/jobs/:jobId", () =>
+				HttpResponse.json({
+					...reviewJob(COMPLETED_RUN),
+					createdAt: "2026-07-28T13:34:48Z",
+					startedAt: "2026-07-28T13:35:00Z",
+					executionStartedAt: "2026-07-28T13:35:30Z",
+					completedAt: "2026-07-28T13:40:30Z",
+				}),
+			),
+		);
+
+		renderRouteAtWithRouter(reviewLevel(COMPLETED_RUN));
+		const level = await screen.findByRole("dialog", {}, ROUTE_RENDER_WAIT);
+		const phase = async (label: string) => {
+			const term = await within(level).findByText(label, { selector: "dt" }, ROUTE_RENDER_WAIT);
+			return term.nextElementSibling?.textContent;
+		};
+
+		await expect(phase("Wait to start")).resolves.toBe("12 seconds");
+		await expect(phase("Preparation")).resolves.toBe("30 seconds");
+		await expect(phase("Execution")).resolves.toBe("5 minutes");
+	});
+
 	/**
 	 * Cancelling answers with the run as it now stands, and that answer is written straight into the
 	 * page rather than refetched: a reader who just stopped a review must not be shown it running.

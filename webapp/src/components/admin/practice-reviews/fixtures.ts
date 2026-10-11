@@ -1067,6 +1067,7 @@ export function reviewJob(runId: string): AgentJob {
 		createdAt: started,
 		availableAt: started,
 		startedAt: started,
+		executionStartedAt: run.status === "FAILED" ? undefined : new Date(started.getTime() + 30_000),
 		completedAt: finished,
 		deliveryStatus: run.status === "COMPLETED" ? "DELIVERED" : undefined,
 		llmModel: "openai/gpt-oss-120b",

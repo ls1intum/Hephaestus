@@ -18,6 +18,7 @@ import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -179,6 +180,60 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
                 .isEqualTo(1)
                 .jsonPath("$.content[0].status")
                 .isEqualTo("RUNNING");
+    }
+
+    /** The listing reads rows, not entities: the execution boundary has to be selected to reach the console. */
+    @Test
+    @WithAdminUser
+    void listJobsCarriesEachAttemptsPhaseBoundariesOnlyToItsOwnWorkspace() {
+        Workspace workspace = setupWorkspace();
+        User ownerB = persistUser("job-owner-b");
+        Workspace workspaceB = createWorkspace("job-ws-b", "Job B", "job-org-b", AccountType.ORG, ownerB);
+        ensureAdminMembership(workspaceB);
+        AgentJob executed = createJob(workspace, AgentJobStatus.COMPLETED);
+        executed.setStartedAt(Instant.parse("2026-01-02T03:04:05Z"));
+        executed.setExecutionStartedAt(Instant.parse("2026-01-02T03:04:35Z"));
+        executed.setCompletedAt(Instant.parse("2026-01-02T03:10:05Z"));
+        agentJobRepository.saveAndFlush(executed);
+        AgentJob legacy = createJob(workspaceB, AgentJobStatus.COMPLETED);
+        legacy.setStartedAt(Instant.parse("2026-01-02T03:04:05Z"));
+        legacy.setCompletedAt(Instant.parse("2026-01-02T03:10:05Z"));
+        agentJobRepository.saveAndFlush(legacy);
+
+        webTestClient
+                .get()
+                .uri("/workspaces/{slug}/agents/jobs", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.content.length()")
+                .isEqualTo(1)
+                .jsonPath("$.content[0].id")
+                .isEqualTo(executed.getId().toString())
+                .jsonPath("$.content[0].startedAt")
+                .isEqualTo("2026-01-02T03:04:05Z")
+                .jsonPath("$.content[0].executionStartedAt")
+                .isEqualTo("2026-01-02T03:04:35Z")
+                .jsonPath("$.content[0].completedAt")
+                .isEqualTo("2026-01-02T03:10:05Z");
+
+        // A run from before the execution boundary was recorded says nothing about it.
+        webTestClient
+                .get()
+                .uri("/workspaces/{slug}/agents/jobs", workspaceB.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.content.length()")
+                .isEqualTo(1)
+                .jsonPath("$.content[0].id")
+                .isEqualTo(legacy.getId().toString())
+                .jsonPath("$.content[0].executionStartedAt")
+                .doesNotExist();
     }
 
     @Test

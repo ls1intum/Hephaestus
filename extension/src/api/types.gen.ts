@@ -364,6 +364,10 @@ export type AgentJob = {
      */
     errorMessage?: string;
     /**
+     * When the current attempt finished preparation, immediately before its sandbox was invoked, if it got that far. A retry resets it; absent on runs from before it was recorded.
+     */
+    executionStartedAt?: string;
+    /**
      * Container exit code
      */
     exitCode?: number;
@@ -436,7 +440,7 @@ export type AgentJob = {
      */
     reviewOutcome: 'REVIEWED' | 'INSUFFICIENT_EVIDENCE' | 'COALESCED' | 'SUPERSEDED';
     /**
-     * Timestamp when the job started running
+     * When a worker claimed the current attempt and began preparing it. A retry resets it, so it never describes an earlier attempt.
      */
     startedAt?: string;
     /**
