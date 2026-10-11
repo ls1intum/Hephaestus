@@ -330,10 +330,9 @@ jobs:
           IMAGE_REF: ${{ inputs.registry }}/${{ inputs.image-name }}@${{ steps.single-digest.outputs.manifest-digest }}
         run: |
           set -euo pipefail
-          mapfile -t tags < <(jq -er '.tags[]' <<< "$DOCKER_METADATA_OUTPUT_JSON")
-          (( ${#tags[@]} > 0 ))
+          tags=$(jq -er '.tags[]' <<< "$DOCKER_METADATA_OUTPUT_JSON")
           args=()
-          for tag in "${tags[@]}"; do args+=(--tag "$tag"); done
+          while IFS= read -r tag; do args+=(--tag "$tag"); done <<< "$tags"
           docker buildx imagetools create --prefer-index=false "${args[@]}" \
             --metadata-file "$RUNNER_TEMP/published-image.json" "$IMAGE_REF"
           PUBLISHED_DIGEST=$(jq -er '."containerimage.descriptor".digest' "$RUNNER_TEMP/published-image.json")
@@ -458,10 +457,9 @@ jobs:
           IMAGE_REF: ${{ inputs.registry }}/${{ inputs.image-name }}@${{ steps.digest.outputs.manifest-digest }}
         run: |
           set -euo pipefail
-          mapfile -t tags < <(jq -er '.tags[]' <<< "$DOCKER_METADATA_OUTPUT_JSON")
-          (( ${#tags[@]} > 0 ))
+          tags=$(jq -er '.tags[]' <<< "$DOCKER_METADATA_OUTPUT_JSON")
           args=()
-          for tag in "${tags[@]}"; do args+=(--tag "$tag"); done
+          while IFS= read -r tag; do args+=(--tag "$tag"); done <<< "$tags"
           docker buildx imagetools create --prefer-index=false "${args[@]}" \
             --metadata-file "$RUNNER_TEMP/published-image.json" "$IMAGE_REF"
           PUBLISHED_DIGEST=$(jq -er '."containerimage.descriptor".digest' "$RUNNER_TEMP/published-image.json")
