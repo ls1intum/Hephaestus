@@ -791,7 +791,7 @@ class PracticeReviewPipelineIntegrationTest extends BaseIntegrationTest {
     private ConversationalDeliveryListener conversationLane;
 
     @Test
-    void shouldPrepareBothPrivateChannelsWhenTheIssueCommentIsSuppressedAsClosed() {
+    void shouldPrepareBothPrivateChannelsWhenTheIssueClosedAfterAdmission() {
         Practice practice = createPractice("record-issue-outcome", "Record the issue outcome");
         PracticeTestEvidence.configure(practice, ArtifactKinds.ISSUE);
         practice = practiceRepository.saveAndFlush(practice);
@@ -825,7 +825,7 @@ class PracticeReviewPipelineIntegrationTest extends BaseIntegrationTest {
                     .createObjectNode()
                     .put("issue_id", issue.getId())
                     .put("issue_number", number)
-                    .put("state", "closed")
+                    .put("state", "open")
                     .put(ObservationAdmissionService.DIGEST_METADATA_KEY, "private-lifecycle-digest")
                     .put("repository_id", repository.getId())
                     .put("repository_full_name", repository.getNameWithOwner()));

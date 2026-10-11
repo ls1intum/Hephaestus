@@ -559,9 +559,20 @@ test.describe("scrolling across the report", () => {
 		await page.mouse.wheel(0, 300);
 		await expect.poll(async () => frame.evaluate(() => window.scrollY)).toBeGreaterThan(100);
 		expect(await page.evaluate(() => window.scrollY)).toBe(0);
-		await frame.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-		await page.mouse.wheel(0, 300);
-		await expect.poll(async () => page.evaluate(() => window.scrollY)).toBeGreaterThan(100);
+		// Wheel input returns before native scrolling settles; continue the user's input through the boundary.
+		await expect
+			.poll(async () => {
+				await page.mouse.wheel(0, 300);
+				return page.evaluate(() => window.scrollY);
+			})
+			.toBeGreaterThan(100);
+		await expect
+			.poll(async () =>
+				frame.evaluate(
+					() => document.documentElement.scrollHeight - window.innerHeight - window.scrollY,
+				),
+			)
+			.toBeLessThanOrEqual(1);
 	});
 });
 

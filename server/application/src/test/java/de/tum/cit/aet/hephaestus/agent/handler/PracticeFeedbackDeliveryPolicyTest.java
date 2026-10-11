@@ -575,6 +575,109 @@ class PracticeFeedbackDeliveryPolicyTest extends BaseUnitTest {
         }
     }
 
+    /**
+     * Closed work can be what a review was about. A note reaches an issue captured closed while it is still closed
+     * under the reviewed snapshot, whichever signal occasioned the review; a change of state either way, or a changed
+     * or missing snapshot, refuses it.
+     */
+    @ParameterizedTest
+    @CsvSource({
+        "closed, CLOSED, REVIEWED, scm.issue.closed,",
+        "CLOSED, CLOSED, REVIEWED, scm.issue.updated,",
+        "open, OPEN, REVIEWED, scm.issue.updated,",
+        "open, CLOSED, REVIEWED, scm.issue.updated, ARTIFACT_CLOSED",
+        ", CLOSED, REVIEWED, scm.issue.closed, ARTIFACT_CLOSED",
+        "closed, OPEN, REVIEWED, scm.issue.updated, ISSUE_SNAPSHOT_CHANGED",
+        "closed, CLOSED, ROTATED, scm.issue.updated, ISSUE_SNAPSHOT_CHANGED",
+        "closed, CLOSED, MISSING, scm.issue.closed, ISSUE_SNAPSHOT_CHANGED"
+    })
+    void shouldDeliverOnIssueWorkCapturedClosedOnlyWhileItStaysClosedAndUnchanged(
+            @Nullable String capturedState,
+            Issue.State currentState,
+            String snapshot,
+            String signal,
+            @Nullable FeedbackSuppressionReason expected) {
+        AgentJob job = issueCapturedAs(capturedState, currentState, snapshot, signal);
+        stubAutomaticPractice();
+        when(accountPreferencesQuery.practiceFeedbackDeliveryEnabled(AUTHOR_ID)).thenReturn(true);
+
+        var decision = policy().evaluateIssue(job, DeliveryPolicyStage.EGRESS, null, Set.of("review-quality"));
+
+        if (expected == null) {
+            assertThat(decision.allowed()).isTrue();
+            assertThat(decision.target().getId()).isEqualTo(PULL_REQUEST_ID);
+        } else {
+            assertThat(decision.refusal()).isEqualTo(expected);
+        }
+    }
+
+    @Test
+    void shouldKeepTheRecipientAndAuthorGatesForIssueWorkCapturedClosed() {
+        AgentJob job = issueCapturedAs("closed", Issue.State.CLOSED, "REVIEWED", "scm.issue.closed");
+        stubAutomaticPractice();
+        when(accountPreferencesQuery.practiceFeedbackDeliveryEnabled(AUTHOR_ID)).thenReturn(true, false, true);
+        Set<String> slugs = Set.of("review-quality");
+
+        assertThat(policy().evaluateIssue(job, DeliveryPolicyStage.EGRESS, null, slugs)
+                        .allowed())
+                .isTrue();
+        assertThat(policy().evaluateIssue(job, DeliveryPolicyStage.EGRESS, null, slugs)
+                        .refusal())
+                .isEqualTo(FeedbackSuppressionReason.RECIPIENT_OPTED_OUT);
+        assertThat(policy().evaluateForRecipient(
+                                job,
+                                DeliveryPolicyStage.EGRESS,
+                                UUID.randomUUID(),
+                                DeliveryPolicySurface.CONVERSATION,
+                                REVIEWER_ID,
+                                slugs)
+                        .refusal())
+                .isEqualTo(FeedbackSuppressionReason.ARTIFACT_GONE);
+        assertInstanceOf(ObjectNode.class, job.getMetadata()).put("subject_role", "REVIEWER");
+        assertThat(policy().evaluateIssue(job, DeliveryPolicyStage.EGRESS, null, slugs)
+                        .refusal())
+                .isEqualTo(FeedbackSuppressionReason.PUBLIC_SUBJECT_INELIGIBLE);
+    }
+
+    /** An author job about a monitored, covered issue, captured in {@code capturedState} under a reviewed snapshot. */
+    private AgentJob issueCapturedAs(
+            @Nullable String capturedState, Issue.State currentState, String snapshot, String signal) {
+        AgentJob job = pullRequestJob();
+        job.setArtifactKind(ArtifactKind.of("scm.issue"));
+        PullRequest work = openPullRequest();
+        UUID reviewed = UUID.randomUUID();
+        var metadata = JsonMapper.builder().build().createObjectNode();
+        metadata.put("issue_id", PULL_REQUEST_ID);
+        metadata.put("issue_number", 17);
+        metadata.put("repository_id", REPOSITORY_ID);
+        metadata.put("repository_full_name", "owner/repo");
+        metadata.put(PracticeCatalogInjector.SIGNAL_METADATA_KEY, signal);
+        if (capturedState != null) metadata.put("state", capturedState);
+        if (!"MISSING".equals(snapshot)) metadata.put("review_snapshot_id", reviewed.toString());
+        job.setMetadata(metadata);
+        Issue issue = new Issue();
+        issue.setId(work.getId());
+        issue.setNumber(work.getNumber());
+        issue.setAuthor(work.getAuthor());
+        issue.setRepository(work.getRepository());
+        issue.setState(currentState);
+        issue.setReviewSnapshotId("ROTATED".equals(snapshot) ? UUID.randomUUID() : reviewed);
+        when(issueRepository.findByIdWithAuthorAndRepository(PULL_REQUEST_ID)).thenReturn(Optional.of(issue));
+        when(repositoryToMonitorRepository.existsByWorkspaceIdAndNameWithOwner(WORKSPACE_ID, "owner/repo"))
+                .thenReturn(true);
+        when(coverageService.assess(any(), eq("owner/repo"), eq(null), any(), eq(false)))
+                .thenReturn(coverage(true));
+        return job;
+    }
+
+    private void stubAutomaticPractice() {
+        Practice practice = new Practice();
+        practice.setSlug("review-quality");
+        practice.setAutonomy(PracticeAutonomy.AUTOMATIC);
+        when(practiceRepository.findByWorkspaceIdAndSlugIn(WORKSPACE_ID, Set.of("review-quality")))
+                .thenReturn(List.of(practice));
+    }
+
     private FeedbackSuppressionReason recordedRefusal() {
         return recordedEvaluation().result().refusal();
     }
