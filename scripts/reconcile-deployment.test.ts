@@ -449,6 +449,12 @@ await test("the database image is kept while git says nothing rebuilt it that da
 		const ran = { release: first, channelCommit: "e".repeat(40), appliedAt: applied.appliedAt };
 
 		assert.deepEqual(await commitImages(checkout, lockDirectory, ran, unrelated, channel), carried);
+		// Promoting the commit the host already runs is still the same day as itself.
+		assert.deepEqual(await commitImages(checkout, lockDirectory, ran, first, channel), carried);
+		assert.deepEqual(
+			await commitImages(checkout, lockDirectory, ran, first, channel, true),
+			channel,
+		);
 		// CI rebuilds the image for either tree, so a host that watched only one would run neither
 		// rebuild; the day after, it takes the rebuild every push earns whatever the diff says.
 		assert.deepEqual(await commitImages(checkout, lockDirectory, ran, rebuild, channel), channel);
@@ -466,6 +472,16 @@ await test("the database image is kept while git says nothing rebuilt it that da
 		// never applied anything.
 		assert.deepEqual(
 			await commitImages(checkout, lockDirectory, ran, "f".repeat(40), channel),
+			channel,
+		);
+		// Naming an unknown commit twice does not make git vouch for it.
+		const unknown = "f".repeat(40);
+		await writeFile(
+			path.join(lockDirectory, `${unknown}.env`),
+			commitLockEnvironment(unknown, carried),
+		);
+		assert.deepEqual(
+			await commitImages(checkout, lockDirectory, { ...ran, release: unknown }, unknown, channel),
 			channel,
 		);
 		assert.deepEqual(
