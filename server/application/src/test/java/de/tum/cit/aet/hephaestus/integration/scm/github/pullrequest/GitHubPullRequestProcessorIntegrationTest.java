@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.pullrequest;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
@@ -10,6 +11,7 @@ import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueCommentRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.LabelRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.MilestoneRepository;
@@ -30,6 +32,9 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHActor;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHPullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHPullRequestState;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHReviewRequestConnection;
+import de.tum.cit.aet.hephaestus.integration.scm.github.issue.dto.GitHubIssueDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.github.issuecomment.GitHubIssueCommentProcessor;
+import de.tum.cit.aet.hephaestus.integration.scm.github.issuecomment.dto.GitHubIssueCommentEventDTO.GitHubCommentDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.label.dto.GitHubLabelDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.milestone.dto.GitHubMilestoneDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.pullrequest.dto.GitHubPullRequestDTO;
@@ -52,7 +57,9 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.support.TransactionTemplate;
 
 class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
@@ -71,6 +78,12 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private PullRequestRepository pullRequestRepository;
+
+    @Autowired
+    private GitHubIssueCommentProcessor commentProcessor;
+
+    @Autowired
+    private IssueCommentRepository commentRepository;
 
     @Autowired
     private RepositoryRepository repositoryRepository;
@@ -450,6 +463,211 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             // Verify Created event was published (treated as new from PR perspective)
             assertThat(eventListener.ofType(ScmDomainEvent.PullRequestCreated.class))
                     .hasSize(1);
+        }
+    }
+
+    @Nested
+    class CanonicalNativeId {
+
+        private static final long ISSUE_RESOURCE_ID = 880_001L;
+        private static final long PULL_REQUEST_ID = 990_001L;
+        private final Instant stubUpdatedAt = Instant.parse("2025-11-01T21:42:45Z");
+
+        private GitHubCommentDTO comment(int number) {
+            return new GitHubCommentDTO(
+                    770_000L + number,
+                    "comment-" + number,
+                    "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/pull/" + number + "#issuecomment-" + number,
+                    "Comment first",
+                    null,
+                    "OWNER",
+                    stubUpdatedAt,
+                    stubUpdatedAt);
+        }
+
+        private GitHubIssueDTO issueEnvelope(int number) {
+            return new GitHubIssueDTO(
+                    ISSUE_RESOURCE_ID + number,
+                    ISSUE_RESOURCE_ID + number,
+                    "issue-" + number,
+                    number,
+                    "Comment-first title",
+                    "stub body",
+                    "open",
+                    null,
+                    "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/pull/" + number,
+                    0,
+                    stubUpdatedAt,
+                    stubUpdatedAt,
+                    null,
+                    false,
+                    null,
+                    List.of(),
+                    List.of(),
+                    null,
+                    null,
+                    null,
+                    new GitHubIssueDTO.PullRequestRef(
+                            "https://api.github.com/repos/" + FIXTURE_REPO_FULL_NAME + "/pulls/" + number,
+                            "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/pull/" + number),
+                    null);
+        }
+
+        private PullRequest stub(int number) {
+            assertNotNull(commentProcessor.processWithParentCreation(
+                    comment(number), issueEnvelope(number), createContext()));
+            return stored(number);
+        }
+
+        private PullRequest stored(int number) {
+            return pullRequestRepository
+                    .findByRepositoryIdAndNumber(testRepository.getId(), number)
+                    .orElseThrow();
+        }
+
+        @ParameterizedTest
+        @ValueSource(longs = {-60, 0, 60})
+        void shouldAdoptThePullRequestIdAtAnyAgeAndKeepTheRowAndItsNewerContent(long seconds) {
+            PullRequest stubbed = stub(30);
+            Long commentId = Objects.requireNonNull(commentRepository
+                    .findByNativeIdAndProviderId(770_030L, providerId())
+                    .orElseThrow()
+                    .getId());
+            stubbed.setState(Issue.State.CLOSED);
+            stubbed.setHeadRefOid("a".repeat(40));
+            pullRequestRepository.saveAndFlush(stubbed);
+            eventListener.clear();
+
+            var full = createBasicPullRequestDto(PULL_REQUEST_ID, 30, "full body", stubUpdatedAt.plusSeconds(seconds));
+            processor.process(full, createContext());
+            processor.process(full, createContext());
+
+            PullRequest hydrated = stored(30);
+            assertThat(hydrated.getId()).isEqualTo(stubbed.getId());
+            assertThat(hydrated.getNativeId()).isEqualTo(PULL_REQUEST_ID);
+            commentProcessor.processWithParentCreation(comment(30), issueEnvelope(30), createContext());
+            var retainedComment = commentRepository
+                    .findByNativeIdAndProviderId(770_030L, providerId())
+                    .orElseThrow();
+            assertThat(retainedComment.getId()).isEqualTo(commentId);
+            assertThat(Objects.requireNonNull(retainedComment.getIssue()).getId())
+                    .isEqualTo(stubbed.getId());
+            assertThat(stored(30).getNativeId()).isEqualTo(PULL_REQUEST_ID);
+            // An older or equally old payload repairs the id and leaves the content it would have overwritten.
+            assertThat(hydrated.getBody()).isEqualTo(seconds > 0 ? "full body" : "stub body");
+            assertThat(hydrated.getTitle()).isEqualTo(seconds > 0 ? "Test PR #30" : "Comment-first title");
+            assertThat(hydrated.getState()).isEqualTo(seconds > 0 ? Issue.State.OPEN : Issue.State.CLOSED);
+            assertThat(hydrated.getHeadRefOid()).isEqualTo("a".repeat(40));
+            assertThat(hydrated.getUpdatedAt())
+                    .isEqualTo(seconds > 0 ? stubUpdatedAt.plusSeconds(seconds) : stubUpdatedAt);
+            if (seconds <= 0) {
+                assertThat(eventListener.ofType(ScmDomainEvent.PullRequestUpdated.class))
+                        .isEmpty();
+            }
+        }
+
+        @Test
+        void shouldKeepAPromotedIssueRowWhenItsPullRequestIdDiffers() {
+            Instant now = Instant.now();
+            issueRepository.upsertCore(
+                    ISSUE_RESOURCE_ID,
+                    providerId(),
+                    31,
+                    "Issue first",
+                    "Issue body",
+                    "OPEN",
+                    null,
+                    "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/issues/31",
+                    false,
+                    null,
+                    0,
+                    now,
+                    now,
+                    now,
+                    null,
+                    testRepository.getId(),
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null);
+            Long issueRowId = Objects.requireNonNull(issueRepository
+                    .findByRepositoryIdAndNumber(testRepository.getId(), 31)
+                    .orElseThrow()
+                    .getId());
+
+            var originalComment = Objects.requireNonNull(commentProcessor.process(comment(31), 31, createContext()));
+            processor.process(createBasicPullRequestDto(PULL_REQUEST_ID, 31), createContext());
+
+            PullRequest promoted = stored(31);
+            assertThat(promoted.getId()).isEqualTo(issueRowId);
+            assertThat(promoted.getNativeId()).isEqualTo(PULL_REQUEST_ID);
+            var retainedComment = commentRepository
+                    .findById(Objects.requireNonNull(originalComment.getId()))
+                    .orElseThrow();
+            assertThat(Objects.requireNonNull(retainedComment.getIssue()).getId())
+                    .isEqualTo(issueRowId);
+        }
+
+        @Test
+        void shouldKeepTheSameNumericIdOwnedByAnotherProviderSeparate() {
+            IdentityProvider otherProvider = gitProviderRepository.save(
+                    new IdentityProvider(IdentityProviderType.GITLAB, "https://gitlab.example.com"));
+            Repository otherRepository = new Repository();
+            otherRepository.setProvider(otherProvider);
+            otherRepository.setNativeId(730_001L);
+            otherRepository.setName("OtherRepository");
+            otherRepository.setNameWithOwner("other/OtherRepository");
+            otherRepository.setHtmlUrl("https://gitlab.example.com/other/OtherRepository");
+            otherRepository.setVisibility(Repository.Visibility.PUBLIC);
+            otherRepository = repositoryRepository.save(otherRepository);
+            Issue otherIssue = new Issue();
+            otherIssue.setProvider(otherProvider);
+            otherIssue.setNativeId(PULL_REQUEST_ID);
+            otherIssue.setRepository(otherRepository);
+            otherIssue.setNumber(30);
+            otherIssue.setTitle("Other provider issue");
+            otherIssue.setState(Issue.State.OPEN);
+            otherIssue.setHtmlUrl("https://gitlab.example.com/other/OtherRepository/-/issues/30");
+            otherIssue = issueRepository.saveAndFlush(otherIssue);
+            PullRequest stubbed = stub(30);
+
+            processor.process(createBasicPullRequestDto(PULL_REQUEST_ID, 30), createContext());
+
+            assertThat(stored(30).getId()).isEqualTo(stubbed.getId());
+            assertThat(stored(30).getNativeId()).isEqualTo(PULL_REQUEST_ID);
+            assertThat(issueRepository
+                            .findById(Objects.requireNonNull(otherIssue.getId()))
+                            .orElseThrow()
+                            .getNativeId())
+                    .isEqualTo(PULL_REQUEST_ID);
+            assertThat(stored(30).getProvider().getId()).isEqualTo(providerId());
+        }
+
+        @Test
+        void shouldRefuseAPullRequestIdAnotherRowOfTheProviderOwns() {
+            PullRequest owner = Objects.requireNonNull(
+                    processor.process(createBasicPullRequestDto(PULL_REQUEST_ID, 32), createContext()));
+            PullRequest stubbed = stub(33);
+
+            assertThatThrownBy(() -> processor.process(
+                            createBasicPullRequestDto(PULL_REQUEST_ID, 33, "full body", stubUpdatedAt.plusSeconds(60)),
+                            createContext()))
+                    .isInstanceOf(DataIntegrityViolationException.class);
+
+            assertThat(stored(32).getId()).isEqualTo(owner.getId());
+            assertThat(stored(32).getNativeId()).isEqualTo(PULL_REQUEST_ID);
+            assertThat(stored(33).getId()).isEqualTo(stubbed.getId());
+            assertThat(stored(33).getNativeId()).isEqualTo(ISSUE_RESOURCE_ID + 33);
+            assertThat(stored(33).getBody()).isEqualTo("stub body");
+            assertThat(commentRepository
+                            .findByNativeIdAndProviderId(770_033L, providerId())
+                            .orElseThrow()
+                            .getIssue())
+                    .isNotNull()
+                    .extracting(Issue::getId)
+                    .isEqualTo(stubbed.getId());
         }
     }
 

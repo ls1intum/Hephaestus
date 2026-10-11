@@ -171,10 +171,12 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
                         existing.getId(),
                         existing.getUpdatedAt(),
                         dto.updatedAt());
+                // The provider's id for the pull request does not age: an older payload still carries it.
+                boolean identityChanged = adoptCanonicalNativeId(existing, dbId, providerId);
                 boolean changed = !dto.updatedAt().isBefore(existing.getUpdatedAt())
                         && updateReviewRequests(dto, existing, providerId, context.observedAt());
                 changed |= applySyncOnlyFacts(dto, existing, repository);
-                return changed ? pullRequestRepository.save(existing) : existing;
+                return changed || identityChanged ? pullRequestRepository.save(existing) : existing;
             }
         }
 
@@ -234,11 +236,15 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
                                 + ", number="
                                 + dto.number()));
 
+        // The upsert keeps the selected row's native id on a natural-key conflict: a promoted issue, a
+        // stale row, or a comment stub inserted after the lookup above. This row is the one it locked.
+        boolean identityChanged = adoptCanonicalNativeId(pr, dbId, providerId);
+
         // Handle ManyToMany relationships (labels, assignees, requestedReviewers)
         boolean relationshipsChanged = updateRelationships(dto, pr, repository, providerId, context.observedAt());
 
-        // Save relationship changes
-        if (relationshipsChanged) {
+        // Save identity and relationship changes; only relationships are a change of the work.
+        if (identityChanged || relationshipsChanged) {
             pr = pullRequestRepository.save(pr);
         }
 
@@ -280,6 +286,21 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         }
 
         return pr;
+    }
+
+    /**
+     * Full PR payloads carry the canonical PR id; comment stubs carry a different issue-resource id.
+     * The existing provider-native-id constraint refuses collisions without merging internal rows.
+     */
+    private static boolean adoptCanonicalNativeId(PullRequest pr, long canonicalId, Long providerId) {
+        if (!providerId.equals(pr.getProvider().getId())) {
+            throw new IllegalStateException("Pull request belongs to another provider: prId=" + pr.getId());
+        }
+        if (Objects.equals(pr.getNativeId(), canonicalId)) {
+            return false;
+        }
+        pr.setNativeId(canonicalId);
+        return true;
     }
 
     /**
