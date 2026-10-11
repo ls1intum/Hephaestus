@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 172">
+  <text class="pv-fill-ink" x="0" y="16" font-size="16" font-weight="600">Merged without approval</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="0.75" y="32.75" width="302.5" height="110.5" rx="8" stroke-width="1.5"/>
+  <g transform="translate(16 48)"><circle class="pv-stroke-ink" cx="4" cy="3" r="2.5" fill="none" stroke-width="1.5"/><path class="pv-stroke-ink" d="M4 5.5v5" fill="none" stroke-width="1.5"/><circle class="pv-stroke-ink" cx="4" cy="13" r="2.5" fill="none" stroke-width="1.5"/><circle class="pv-stroke-ink" cx="12" cy="13" r="2.5" fill="none" stroke-width="1.5"/><path class="pv-stroke-ink" d="M12 10.5V6a3 3 0 0 0-3-3H7.5" fill="none" stroke-width="1.5" stroke-linecap="round"/></g>
+  <text class="pv-fill-ink" x="44" y="61" font-size="15">Pull request</text>
+  <rect class="pv-fill-muted" x="16" y="80" width="232" height="6" rx="3"/>
+  <rect class="pv-fill-muted" x="16" y="92" width="176" height="6" rx="3"/>
+  <circle class="pv-fill-muted" cx="24" cy="120" r="8"/>
+  <text class="pv-fill-ink" x="44" y="125" font-size="15">Reviewer</text>
+  <text class="pv-fill-muted" x="140" y="125" font-size="15">“Looks good”</text>
+  <text class="pv-fill-muted" x="0" y="168" font-size="15">Team check skipped</text>
+  <text class="pv-fill-ink" x="336" y="16" font-size="16" font-weight="600">Merged after approval</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="336.75" y="32.75" width="302.5" height="110.5" rx="8" stroke-width="1.5"/>
+  <g transform="translate(352 48)"><circle class="pv-stroke-ink" cx="4" cy="3" r="2.5" fill="none" stroke-width="1.5"/><path class="pv-stroke-ink" d="M4 5.5v5" fill="none" stroke-width="1.5"/><circle class="pv-stroke-ink" cx="4" cy="13" r="2.5" fill="none" stroke-width="1.5"/><circle class="pv-stroke-ink" cx="12" cy="13" r="2.5" fill="none" stroke-width="1.5"/><path class="pv-stroke-ink" d="M12 10.5V6a3 3 0 0 0-3-3H7.5" fill="none" stroke-width="1.5" stroke-linecap="round"/></g>
+  <text class="pv-fill-ink" x="380" y="61" font-size="15">Pull request</text>
+  <rect class="pv-fill-muted" x="352" y="80" width="232" height="6" rx="3"/>
+  <rect class="pv-fill-muted" x="352" y="92" width="176" height="6" rx="3"/>
+  <circle class="pv-fill-muted" cx="360" cy="120" r="8"/>
+  <text class="pv-fill-ink" x="380" y="125" font-size="15">Reviewer</text>
+  <path class="pv-stroke-accent" d="M476 120.5l3.5 3.5 6.5-7" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <text class="pv-fill-accent" x="498" y="125" font-size="15">Approved</text>
+  <text class="pv-fill-ink" x="336" y="168" font-size="15">Team check kept</text>
+</svg>

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 104">
+  <rect class="pv-fill-surface pv-stroke-ink" x="0.75" y="32.75" width="134.5" height="38.5" rx="8" stroke-width="1.5"/>
+  <text class="pv-fill-ink" x="16" y="57" font-size="15">Deferred ask</text>
+  <path class="pv-stroke-muted" d="M136 52h20v-32h28" fill="none" stroke-width="2"/>
+  <path class="pv-fill-muted" d="M192 20l-8-5v10z"/>
+  <rect class="pv-fill-surface pv-stroke-muted" x="200.75" y="0.75" width="214.5" height="38.5" rx="8" stroke-width="1.5"/>
+  <text class="pv-fill-muted" x="216" y="25" font-size="15">“Will do later”</text>
+  <path class="pv-stroke-muted" d="M424 20h16" fill="none" stroke-width="2"/>
+  <path class="pv-fill-muted" d="M448 20l-8-5v10z"/>
+  <text class="pv-fill-muted" x="460" y="25" font-size="15">Lost at merge</text>
+  <path class="pv-stroke-accent" d="M156 52v32h28" fill="none" stroke-width="2"/>
+  <path class="pv-fill-accent" d="M192 84l-8-5v10z"/>
+  <rect class="pv-fill-accent-soft pv-stroke-accent" x="200.75" y="64.75" width="214.5" height="38.5" rx="8" stroke-width="1.5"/>
+  <text class="pv-fill-ink" x="216" y="89" font-size="15" font-weight="600">“Tracked in #482”</text>
+  <path class="pv-stroke-accent" d="M424 84h16" fill="none" stroke-width="2"/>
+  <path class="pv-fill-accent" d="M448 84l-8-5v10z"/>
+  <text class="pv-fill-ink" x="460" y="89" font-size="15">Issue #482 keeps it</text>
+</svg>

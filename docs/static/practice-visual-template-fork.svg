@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 104">
+  <!-- Starter for a Hephaestus practice visual: the fork. See docs/contributor/practice-visuals.md. -->
+  <!-- One trigger, two responses: the lapse on top, the practice below. Replace every label. -->
+
+  <!-- Trigger, x 0 to 136. The fork stem starts at its edge. -->
+  <rect class="pv-fill-surface pv-stroke-ink" x="0.75" y="32.75" width="134.5" height="38.5" rx="8" stroke-width="1.5"/>
+  <text class="pv-fill-ink" x="16" y="57" font-size="15">Trigger</text>
+
+  <!-- Top row: the lapse. Muted path, a missing node with a muted label that names what is missing, muted outcome. A muted node with a muted label also works. -->
+  <path class="pv-stroke-muted" d="M136 52h20v-32h28" fill="none" stroke-width="2"/>
+  <path class="pv-fill-muted" d="M192 20l-8-5v10z"/>
+  <rect class="pv-fill-surface pv-stroke-muted" x="200.75" y="0.75" width="214.5" height="38.5" rx="8" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <text class="pv-fill-muted" x="216" y="25" font-size="15">Lapse</text>
+  <path class="pv-stroke-muted" d="M424 20h16" fill="none" stroke-width="2"/>
+  <path class="pv-fill-muted" d="M448 20l-8-5v10z"/>
+  <text class="pv-fill-muted" x="460" y="25" font-size="15">Cost of the lapse</text>
+
+  <!-- Bottom row: the practice. Accent path and node, ink outcome. The outcome labels end the picture, so write them to reach toward x 640. -->
+  <path class="pv-stroke-accent" d="M156 52v32h28" fill="none" stroke-width="2"/>
+  <path class="pv-fill-accent" d="M192 84l-8-5v10z"/>
+  <rect class="pv-fill-accent-soft pv-stroke-accent" x="200.75" y="64.75" width="214.5" height="38.5" rx="8" stroke-width="1.5"/>
+  <text class="pv-fill-ink" x="216" y="89" font-size="15" font-weight="600">Practice</text>
+  <path class="pv-stroke-accent" d="M424 84h16" fill="none" stroke-width="2"/>
+  <path class="pv-fill-accent" d="M448 84l-8-5v10z"/>
+  <text class="pv-fill-ink" x="460" y="89" font-size="15">Gain of the practice</text>
+</svg>

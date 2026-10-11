@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 156">
+  <text class="pv-fill-ink" x="0" y="16" font-size="16" font-weight="600">Mixed commit</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="0.75" y="32.75" width="302.5" height="94.5" rx="8" stroke-width="1.5"/>
+  <g transform="translate(16 48)"><path class="pv-stroke-ink" d="M0 8h4.5M11.5 8H16" fill="none" stroke-width="1.5"/><circle class="pv-stroke-ink" cx="8" cy="8" r="3.5" fill="none" stroke-width="1.5"/></g>
+  <text class="pv-fill-ink" x="44" y="61" font-size="15">Commit</text>
+  <text class="pv-fill-muted" x="16" y="85" font-size="15">Fix paging, reformat</text>
+  <text class="pv-fill-muted pv-mono" x="16" y="109" font-size="15">paging.ts</text>
+  <text class="pv-fill-muted pv-mono" x="136" y="109" font-size="15">format.ts</text>
+  <text class="pv-fill-muted" x="0" y="152" font-size="15">Revert takes both</text>
+  <text class="pv-fill-ink" x="336" y="16" font-size="16" font-weight="600">Separate commits</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="336.75" y="32.75" width="142.5" height="94.5" rx="8" stroke-width="1.5"/>
+  <g transform="translate(352 48)"><path class="pv-stroke-ink" d="M0 8h4.5M11.5 8H16" fill="none" stroke-width="1.5"/><circle class="pv-stroke-ink" cx="8" cy="8" r="3.5" fill="none" stroke-width="1.5"/></g>
+  <text class="pv-fill-ink" x="380" y="61" font-size="15">Commit</text>
+  <text class="pv-fill-accent" x="352" y="85" font-size="15">Fix paging</text>
+  <text class="pv-fill-muted pv-mono" x="352" y="109" font-size="15">paging.ts</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="496.75" y="32.75" width="142.5" height="94.5" rx="8" stroke-width="1.5"/>
+  <g transform="translate(512 48)"><path class="pv-stroke-ink" d="M0 8h4.5M11.5 8H16" fill="none" stroke-width="1.5"/><circle class="pv-stroke-ink" cx="8" cy="8" r="3.5" fill="none" stroke-width="1.5"/></g>
+  <text class="pv-fill-ink" x="540" y="61" font-size="15">Commit</text>
+  <text class="pv-fill-accent" x="512" y="85" font-size="15">Reformat</text>
+  <text class="pv-fill-muted pv-mono" x="512" y="109" font-size="15">format.ts</text>
+  <text class="pv-fill-ink" x="336" y="152" font-size="15">Each reverts alone</text>
+</svg>

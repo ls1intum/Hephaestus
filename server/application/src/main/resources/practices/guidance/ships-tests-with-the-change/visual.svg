@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 220">
+  <text class="pv-fill-ink" x="0" y="16" font-size="16" font-weight="600">Untested new logic</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="0.75" y="32.75" width="302.5" height="158.5" rx="8" stroke-width="1.5"/>
+  <g transform="translate(16 48)"><circle class="pv-stroke-ink" cx="4" cy="3" r="2.5" fill="none" stroke-width="1.5"/><path class="pv-stroke-ink" d="M4 5.5v5" fill="none" stroke-width="1.5"/><circle class="pv-stroke-ink" cx="4" cy="13" r="2.5" fill="none" stroke-width="1.5"/><circle class="pv-stroke-ink" cx="12" cy="13" r="2.5" fill="none" stroke-width="1.5"/><path class="pv-stroke-ink" d="M12 10.5V6a3 3 0 0 0-3-3H7.5" fill="none" stroke-width="1.5" stroke-linecap="round"/></g>
+  <text class="pv-fill-ink" x="44" y="61" font-size="15">Change</text>
+  <text class="pv-fill-ink pv-mono" x="16" y="92" font-size="15">signIn.ts</text>
+  <rect class="pv-fill-muted" x="32" y="104" width="176" height="10" rx="3"/>
+  <rect class="pv-fill-muted" x="32" y="120" width="128" height="10" rx="3"/>
+  <rect class="pv-fill-surface pv-stroke-muted" x="16.75" y="146.75" width="110.5" height="30.5" rx="8" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <text class="pv-fill-muted" x="28" y="167" font-size="15">No test</text>
+  <text class="pv-fill-muted" x="0" y="216" font-size="15">Breaks unnoticed</text>
+  <text class="pv-fill-ink" x="336" y="16" font-size="16" font-weight="600">Tested new logic</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="336.75" y="32.75" width="302.5" height="158.5" rx="8" stroke-width="1.5"/>
+  <g transform="translate(352 48)"><circle class="pv-stroke-ink" cx="4" cy="3" r="2.5" fill="none" stroke-width="1.5"/><path class="pv-stroke-ink" d="M4 5.5v5" fill="none" stroke-width="1.5"/><circle class="pv-stroke-ink" cx="4" cy="13" r="2.5" fill="none" stroke-width="1.5"/><circle class="pv-stroke-ink" cx="12" cy="13" r="2.5" fill="none" stroke-width="1.5"/><path class="pv-stroke-ink" d="M12 10.5V6a3 3 0 0 0-3-3H7.5" fill="none" stroke-width="1.5" stroke-linecap="round"/></g>
+  <text class="pv-fill-ink" x="380" y="61" font-size="15">Change</text>
+  <text class="pv-fill-ink pv-mono" x="352" y="92" font-size="15">signIn.ts</text>
+  <rect class="pv-fill-muted" x="368" y="104" width="176" height="10" rx="3"/>
+  <rect class="pv-fill-muted" x="368" y="120" width="128" height="10" rx="3"/>
+  <g transform="translate(352 154)"><path class="pv-stroke-ink" d="M5.75 0.75h4.5M6.75 0.75v5L1.6 13.5a1.2 1.2 0 0 0 1 1.75h10.8a1.2 1.2 0 0 0 1-1.75L9.25 5.75v-5" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></g>
+  <text class="pv-fill-accent" x="380" y="167" font-size="15">Test: rejects wrong password</text>
+  <text class="pv-fill-ink" x="336" y="216" font-size="15">Stays checked</text>
+</svg>

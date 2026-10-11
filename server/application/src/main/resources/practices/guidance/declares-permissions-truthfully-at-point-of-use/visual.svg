@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 180">
+  <text class="pv-fill-ink" x="0" y="16" font-size="16" font-weight="600">Asked at launch</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="0.75" y="32.75" width="94.5" height="118.5" rx="12" stroke-width="1.5"/>
+  <rect class="pv-fill-muted" x="32" y="48" width="32" height="6" rx="3"/>
+  <rect class="pv-fill-muted" x="16" y="70" width="64" height="6" rx="3"/>
+  <rect class="pv-fill-muted" x="16" y="82" width="48" height="6" rx="3"/>
+  <rect class="pv-fill-muted" x="16" y="94" width="56" height="6" rx="3"/>
+  <path class="pv-stroke-muted" d="M104 92h16" fill="none" stroke-width="2"/>
+  <path class="pv-fill-muted" d="M128 92l-8-5v10z"/>
+  <rect class="pv-fill-surface pv-stroke-muted" x="136.75" y="32.75" width="166.5" height="118.5" rx="12" stroke-width="1.5"/>
+  <text class="pv-fill-ink" x="152" y="61" font-size="15">Camera</text>
+  <text class="pv-fill-muted" x="152" y="89" font-size="15">Access needed</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="152.75" y="112.75" width="70.5" height="22.5" rx="12" stroke-width="1.5"/>
+  <text class="pv-fill-ink" x="188" y="129" font-size="15" text-anchor="middle">Allow</text>
+  <text class="pv-fill-muted" x="0" y="176" font-size="15">User guesses why</text>
+  <text class="pv-fill-ink" x="336" y="16" font-size="16" font-weight="600">Asked when needed</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="336.75" y="32.75" width="94.5" height="118.5" rx="12" stroke-width="1.5"/>
+  <rect class="pv-fill-muted" x="368" y="48" width="32" height="6" rx="3"/>
+  <rect class="pv-fill-muted" x="352" y="70" width="64" height="6" rx="3"/>
+  <rect class="pv-fill-muted" x="352" y="82" width="48" height="6" rx="3"/>
+  <rect class="pv-fill-surface pv-stroke-ink" x="352.75" y="112.75" width="62.5" height="22.5" rx="12" stroke-width="1.5"/>
+  <text class="pv-fill-ink" x="384" y="129" font-size="15" text-anchor="middle">Scan</text>
+  <path class="pv-stroke-muted" d="M440 124h16" fill="none" stroke-width="2"/>
+  <path class="pv-fill-muted" d="M464 124l-8-5v10z"/>
+  <rect class="pv-fill-surface pv-stroke-muted" x="472.75" y="32.75" width="166.5" height="118.5" rx="12" stroke-width="1.5"/>
+  <text class="pv-fill-ink" x="488" y="61" font-size="15">Camera</text>
+  <text class="pv-fill-accent" x="488" y="89" font-size="15">To scan receipts</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="488.75" y="112.75" width="70.5" height="22.5" rx="12" stroke-width="1.5"/>
+  <text class="pv-fill-ink" x="524" y="129" font-size="15" text-anchor="middle">Allow</text>
+  <text class="pv-fill-ink" x="336" y="176" font-size="15">User sees why</text>
+</svg>

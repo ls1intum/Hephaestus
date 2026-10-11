@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 188">
+  <text class="pv-fill-ink" x="0" y="16" font-size="16" font-weight="600">About the person</text>
+  <path class="pv-fill-surface pv-stroke-ink" d="M12.75 32.75H291.25A12 12 0 0 1 303.25 44.75V67.25A12 12 0 0 1 291.25 79.25H0.75V44.75A12 12 0 0 1 12.75 32.75Z" stroke-width="1.5"/>
+  <text class="pv-fill-muted" x="16" y="61" font-size="15">Did you even test this?</text>
+  <path class="pv-stroke-muted" d="M16 80v32" fill="none" stroke-width="2"/>
+  <circle class="pv-fill-muted" cx="16" cy="80" r="4"/>
+  <circle class="pv-fill-muted" cx="16" cy="112" r="4"/>
+  <rect class="pv-fill-surface pv-stroke-muted" x="0.75" y="112.75" width="106.5" height="46.5" rx="8" stroke-width="1.5"/>
+  <circle class="pv-fill-muted" cx="24" cy="136" r="8"/>
+  <text class="pv-fill-ink" x="44" y="141" font-size="15">Author</text>
+  <text class="pv-fill-muted" x="0" y="184" font-size="15">Breeds defensiveness</text>
+  <text class="pv-fill-ink" x="336" y="16" font-size="16" font-weight="600">About the code</text>
+  <path class="pv-fill-surface pv-stroke-ink" d="M348.75 32.75H627.25A12 12 0 0 1 639.25 44.75V67.25A12 12 0 0 1 627.25 79.25H336.75V44.75A12 12 0 0 1 348.75 32.75Z" stroke-width="1.5"/>
+  <text class="pv-fill-accent" x="352" y="61" font-size="15">What if this runs twice?</text>
+  <path class="pv-stroke-accent" d="M352 80v32" fill="none" stroke-width="2"/>
+  <circle class="pv-fill-accent" cx="352" cy="80" r="4"/>
+  <circle class="pv-fill-accent" cx="352" cy="112" r="4"/>
+  <rect class="pv-fill-surface pv-stroke-accent" x="336.75" y="112.75" width="134.5" height="46.5" rx="8" stroke-width="1.5"/>
+  <text class="pv-fill-muted pv-mono" x="352" y="141" font-size="15">saveOrder()</text>
+  <text class="pv-fill-ink" x="336" y="184" font-size="15">Gets acted on</text>
+</svg>

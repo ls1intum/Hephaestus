@@ -52,7 +52,8 @@ JavaScript strings keep their literal meaning.
 ## Product voice
 
 The [writing standard](../docs/contributor/simplified-technical-english.md) defines the product voice.
-`.vale.ini` scopes it to `docs/user/`, and the `voice` profile in `scripts/lib/ste-words.ts` gives the UI rule the same negative contraction list.
+`.vale.ini` scopes it to `docs/user/` and to the practice guides in `server/application/src/main/resources/practices/guidance/`.
+The `voice` profile in `scripts/lib/ste-words.ts` gives the UI rule the same negative contraction list.
 `.vale/fixtures/docs/user/` repeats the path of the real docs on purpose, because the `**/docs/user/**` glob must match the fixtures.
 Do not move them.
 

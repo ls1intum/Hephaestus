@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 180">
+  <text class="pv-fill-ink" x="0" y="16" font-size="16" font-weight="600">Vague question</text>
+  <path class="pv-fill-surface pv-stroke-ink" d="M36.75 32.75H291.25A12 12 0 0 1 303.25 44.75V83.25A12 12 0 0 1 291.25 95.25H24.75V44.75A12 12 0 0 1 36.75 32.75Z" stroke-width="1.5"/>
+  <text class="pv-fill-muted" x="41" y="60" font-size="15">Why does it fail?</text>
+  <path class="pv-fill-surface pv-stroke-muted" d="M60.75 104.75H291.25A12 12 0 0 1 303.25 116.75V139.25A12 12 0 0 1 291.25 151.25H48.75V116.75A12 12 0 0 1 60.75 104.75Z" stroke-width="1.5"/>
+  <text class="pv-fill-muted" x="65" y="132" font-size="15">What failed?</text>
+  <text class="pv-fill-muted" x="0" y="176" font-size="15">Slow exchange</text>
+  <text class="pv-fill-ink" x="336" y="16" font-size="16" font-weight="600">Answerable question</text>
+  <path class="pv-fill-surface pv-stroke-ink" d="M372.75 32.75H627.25A12 12 0 0 1 639.25 44.75V83.25A12 12 0 0 1 627.25 95.25H360.75V44.75A12 12 0 0 1 372.75 32.75Z" stroke-width="1.5"/>
+  <text class="pv-fill-accent" x="377" y="60" font-size="15">Deploy retry times out.</text>
+  <text class="pv-fill-accent" x="377" y="78" font-size="15">Which setting?</text>
+  <path class="pv-fill-surface pv-stroke-muted" d="M396.75 104.75H627.25A12 12 0 0 1 639.25 116.75V139.25A12 12 0 0 1 627.25 151.25H384.75V116.75A12 12 0 0 1 396.75 104.75Z" stroke-width="1.5"/>
+  <text class="pv-fill-muted" x="401" y="132" font-size="15">Set timeout in <tspan class="pv-mono">deploy.yml</tspan></text>
+  <text class="pv-fill-ink" x="336" y="176" font-size="15">One reply</text>
+</svg>

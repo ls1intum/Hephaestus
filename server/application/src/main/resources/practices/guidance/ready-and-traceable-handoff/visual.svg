@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 172">
+  <text class="pv-fill-ink" x="0" y="16" font-size="16" font-weight="600">Mixed handoff</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="0.75" y="32.75" width="302.5" height="110.5" rx="8" stroke-width="1.5"/>
+  <g transform="translate(16 48)"><circle class="pv-stroke-ink" cx="4" cy="3" r="2.5" fill="none" stroke-width="1.5"/><path class="pv-stroke-ink" d="M4 5.5v5" fill="none" stroke-width="1.5"/><circle class="pv-stroke-ink" cx="4" cy="13" r="2.5" fill="none" stroke-width="1.5"/><circle class="pv-stroke-ink" cx="12" cy="13" r="2.5" fill="none" stroke-width="1.5"/><path class="pv-stroke-ink" d="M12 10.5V6a3 3 0 0 0-3-3H7.5" fill="none" stroke-width="1.5" stroke-linecap="round"/></g>
+  <text class="pv-fill-muted" x="44" y="61" font-size="15">WIP: timeout</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="16.75" y="76.75" width="150.5" height="22.5" rx="8" stroke-width="1.5"/><text class="pv-fill-muted" x="28" y="93" font-size="15">Ready for review</text>
+  <text class="pv-fill-muted" x="16" y="123" font-size="15">No issue linked</text>
+  <text class="pv-fill-muted" x="0" y="168" font-size="15">Reviewers guess</text>
+  <text class="pv-fill-ink" x="336" y="16" font-size="16" font-weight="600">Clear handoff</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="336.75" y="32.75" width="302.5" height="110.5" rx="8" stroke-width="1.5"/>
+  <g transform="translate(352 48)"><circle class="pv-stroke-ink" cx="4" cy="3" r="2.5" fill="none" stroke-width="1.5"/><path class="pv-stroke-ink" d="M4 5.5v5" fill="none" stroke-width="1.5"/><circle class="pv-stroke-ink" cx="4" cy="13" r="2.5" fill="none" stroke-width="1.5"/><circle class="pv-stroke-ink" cx="12" cy="13" r="2.5" fill="none" stroke-width="1.5"/><path class="pv-stroke-ink" d="M12 10.5V6a3 3 0 0 0-3-3H7.5" fill="none" stroke-width="1.5" stroke-linecap="round"/></g>
+  <text class="pv-fill-muted" x="380" y="61" font-size="15">Fix timeout</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="352.75" y="76.75" width="150.5" height="22.5" rx="8" stroke-width="1.5"/><text class="pv-fill-muted" x="364" y="93" font-size="15">Ready for review</text>
+  <text class="pv-fill-accent" x="352" y="123" font-size="15">Fixes issue #482</text>
+  <text class="pv-fill-ink" x="336" y="168" font-size="15">Reviewers know</text>
+</svg>

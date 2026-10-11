@@ -3904,7 +3904,12 @@ void test("the prose gate ratchets on Linux and Windows with the base history", 
 	const source = parseDocument(await readFile(".github/workflows/cicd.yml", "utf8"));
 	const filter = step(source, ["jobs", "detect-changes"], "dorny/paths-filter");
 	const filters = asRecord(parseDocument(String(filter.get("filters"))).toJSON(), "CI filters");
-	for (const file of [".vale/**", ".vale.ini"]) {
+	// The practice guides are enforced prose, so a guide change reaches the leg that runs the gate.
+	for (const file of [
+		".vale/**",
+		".vale.ini",
+		"server/application/src/main/resources/practices/guidance/**",
+	]) {
 		assert.ok(asArray(filters.tooling, "tooling paths").includes(file));
 	}
 	const dockerfile = await readFile("webapp/Dockerfile", "utf8");

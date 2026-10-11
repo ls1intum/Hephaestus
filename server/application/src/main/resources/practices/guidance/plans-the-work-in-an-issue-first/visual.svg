@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 200">
+  <text class="pv-fill-ink" x="0" y="16" font-size="16" font-weight="600">Commit first</text>
+  <circle class="pv-fill-surface pv-stroke-muted" cx="12" cy="44" r="11.25" stroke-width="1.5"/>
+  <text class="pv-fill-muted" x="12" y="49" font-size="15" text-anchor="middle">1</text>
+  <path class="pv-stroke-muted" d="M32 44h288" fill="none" stroke-width="2"/>
+  <path class="pv-fill-muted" d="M328 44l-8-5v10z"/>
+  <g transform="translate(0 66)"><path class="pv-stroke-ink" d="M0 8h4.5M11.5 8H16" fill="none" stroke-width="1.5"/><circle class="pv-stroke-ink" cx="8" cy="8" r="3.5" fill="none" stroke-width="1.5"/></g>
+  <text class="pv-fill-ink" x="28" y="80" font-size="16" font-weight="600">Commit</text>
+  <circle class="pv-fill-surface pv-stroke-muted" cx="348" cy="44" r="11.25" stroke-width="1.5"/>
+  <text class="pv-fill-muted" x="348" y="49" font-size="15" text-anchor="middle">2</text>
+  <g transform="translate(336 66)"><circle class="pv-stroke-ink" cx="8" cy="8" r="6.75" fill="none" stroke-width="1.5"/><circle class="pv-fill-ink" cx="8" cy="8" r="1.75"/></g>
+  <text class="pv-fill-ink" x="364" y="80" font-size="16" font-weight="600">Issue</text>
+  <text class="pv-fill-ink" x="0" y="132" font-size="16" font-weight="600">Issue first</text>
+  <circle class="pv-fill-accent" cx="12" cy="160" r="12"/>
+  <text class="pv-fill-surface" x="12" y="165" font-size="15" font-weight="600" text-anchor="middle">1</text>
+  <path class="pv-stroke-muted" d="M32 160h288" fill="none" stroke-width="2"/>
+  <path class="pv-fill-muted" d="M328 160l-8-5v10z"/>
+  <g transform="translate(0 182)"><circle class="pv-stroke-ink" cx="8" cy="8" r="6.75" fill="none" stroke-width="1.5"/><circle class="pv-fill-ink" cx="8" cy="8" r="1.75"/></g>
+  <text class="pv-fill-ink" x="28" y="196" font-size="16" font-weight="600">Issue</text>
+  <circle class="pv-fill-surface pv-stroke-muted" cx="348" cy="160" r="11.25" stroke-width="1.5"/>
+  <text class="pv-fill-muted" x="348" y="165" font-size="15" text-anchor="middle">2</text>
+  <g transform="translate(336 182)"><path class="pv-stroke-ink" d="M0 8h4.5M11.5 8H16" fill="none" stroke-width="1.5"/><circle class="pv-stroke-ink" cx="8" cy="8" r="3.5" fill="none" stroke-width="1.5"/></g>
+  <text class="pv-fill-ink" x="364" y="196" font-size="16" font-weight="600">Commit</text>
+</svg>

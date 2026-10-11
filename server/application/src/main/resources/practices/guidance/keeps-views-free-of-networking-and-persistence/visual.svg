@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 164">
+  <text class="pv-fill-ink" x="0" y="16" font-size="16" font-weight="600">View fetches and saves</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="0.75" y="32.75" width="142.5" height="102.5" rx="8" stroke-width="1.5"/>
+  <text class="pv-fill-ink pv-mono" x="16" y="61" font-size="15">SearchView</text>
+  <text class="pv-fill-muted pv-mono" x="16" y="93" font-size="15">URLSession</text>
+  <text class="pv-fill-muted pv-mono" x="16" y="117" font-size="15">UserDefaults</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="160.75" y="32.75" width="142.5" height="102.5" rx="8" stroke-width="1.5"/>
+  <text class="pv-fill-ink pv-mono" x="176" y="61" font-size="15">SearchModel</text>
+  <text class="pv-fill-muted" x="0" y="160" font-size="15">Hard to preview</text>
+  <text class="pv-fill-ink" x="336" y="16" font-size="16" font-weight="600">Model fetches and saves</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="336.75" y="32.75" width="142.5" height="102.5" rx="8" stroke-width="1.5"/>
+  <text class="pv-fill-ink pv-mono" x="352" y="61" font-size="15">SearchView</text>
+  <text class="pv-fill-ink pv-mono" x="352" y="93" font-size="15">model.load()</text>
+  <text class="pv-fill-ink pv-mono" x="352" y="117" font-size="15">model.save()</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="496.75" y="32.75" width="142.5" height="102.5" rx="8" stroke-width="1.5"/>
+  <text class="pv-fill-ink pv-mono" x="512" y="61" font-size="15">SearchModel</text>
+  <text class="pv-fill-accent pv-mono" x="512" y="93" font-size="15">URLSession</text>
+  <text class="pv-fill-accent pv-mono" x="512" y="117" font-size="15">UserDefaults</text>
+  <text class="pv-fill-ink" x="336" y="160" font-size="15">Easy to preview</text>
+</svg>

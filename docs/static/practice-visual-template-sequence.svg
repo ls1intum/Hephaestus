@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 76">
+  <!-- Starter for a Hephaestus guide figure: the sequence. See docs/contributor/practice-visuals.md. -->
+  <!-- Three steps in 192-wide columns at x 0, 224 and 448. The solid accent marker is the step that the practice is about. -->
+  <!-- A visual uses the sequence only as two rows that compare two orders. The style guide gives their layout. -->
+
+  <circle class="pv-fill-surface pv-stroke-muted" cx="12" cy="12" r="11.25" stroke-width="1.5"/>
+  <text class="pv-fill-muted" x="12" y="17" font-size="15" text-anchor="middle">1</text>
+  <path class="pv-stroke-muted" d="M32 12h176" fill="none" stroke-width="2"/>
+  <path class="pv-fill-muted" d="M216 12l-8-5v10z"/>
+  <text class="pv-fill-ink" x="0" y="48" font-size="16" font-weight="600">First step</text>
+  <text class="pv-fill-muted" x="0" y="72" font-size="15">Detail</text>
+
+  <circle class="pv-fill-accent" cx="236" cy="12" r="12"/>
+  <text class="pv-fill-surface" x="236" y="17" font-size="15" font-weight="600" text-anchor="middle">2</text>
+  <path class="pv-stroke-muted" d="M256 12h176" fill="none" stroke-width="2"/>
+  <path class="pv-fill-muted" d="M440 12l-8-5v10z"/>
+  <text class="pv-fill-ink" x="224" y="48" font-size="16" font-weight="600">Key step</text>
+  <text class="pv-fill-muted" x="224" y="72" font-size="15">Detail</text>
+
+  <circle class="pv-fill-surface pv-stroke-muted" cx="460" cy="12" r="11.25" stroke-width="1.5"/>
+  <text class="pv-fill-muted" x="460" y="17" font-size="15" text-anchor="middle">3</text>
+  <text class="pv-fill-ink" x="448" y="48" font-size="16" font-weight="600">Last step</text>
+  <text class="pv-fill-muted" x="448" y="72" font-size="15">Detail</text>
+</svg>

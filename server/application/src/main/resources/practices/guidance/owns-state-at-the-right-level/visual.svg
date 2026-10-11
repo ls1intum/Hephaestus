@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 212">
+  <text class="pv-fill-ink" x="0" y="16" font-size="16" font-weight="600">Cart per view</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="0.75" y="32.75" width="126.5" height="150.5" rx="8" stroke-width="1.5"/>
+  <text class="pv-fill-ink pv-mono" x="16" y="61" font-size="15">CartView</text>
+  <rect class="pv-fill-muted" x="16" y="76" width="64" height="10" rx="3"/>
+  <rect class="pv-fill-muted" x="16" y="132" width="88" height="10" rx="3"/>
+  <rect class="pv-fill-muted" x="16" y="148" width="72" height="10" rx="3"/>
+  <rect class="pv-fill-surface pv-stroke-muted" x="160.75" y="32.75" width="142.5" height="70.5" rx="8" stroke-width="1.5"/>
+  <text class="pv-fill-ink pv-mono" x="176" y="61" font-size="15">ListView</text>
+  <text class="pv-fill-muted pv-mono" x="176" y="85" font-size="15">Cart()</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="160.75" y="112.75" width="142.5" height="70.5" rx="8" stroke-width="1.5"/>
+  <text class="pv-fill-ink pv-mono" x="176" y="141" font-size="15">BadgeView</text>
+  <text class="pv-fill-muted pv-mono" x="176" y="165" font-size="15">Cart()</text>
+  <text class="pv-fill-muted" x="0" y="208" font-size="15">Views drift apart</text>
+  <text class="pv-fill-ink" x="336" y="16" font-size="16" font-weight="600">Cart passed down</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="336.75" y="32.75" width="126.5" height="150.5" rx="8" stroke-width="1.5"/>
+  <text class="pv-fill-ink pv-mono" x="352" y="61" font-size="15">CartView</text>
+  <text class="pv-fill-accent pv-mono" x="352" y="85" font-size="15">Cart()</text>
+  <rect class="pv-fill-muted" x="352" y="132" width="88" height="10" rx="3"/>
+  <rect class="pv-fill-muted" x="352" y="148" width="72" height="10" rx="3"/>
+  <path class="pv-stroke-muted" d="M472 68h8" fill="none" stroke-width="2"/>
+  <path class="pv-fill-muted" d="M488 68l-8-5v10z"/>
+  <path class="pv-stroke-muted" d="M472 148h8" fill="none" stroke-width="2"/>
+  <path class="pv-fill-muted" d="M488 148l-8-5v10z"/>
+  <rect class="pv-fill-surface pv-stroke-muted" x="496.75" y="32.75" width="142.5" height="70.5" rx="8" stroke-width="1.5"/>
+  <text class="pv-fill-ink pv-mono" x="512" y="61" font-size="15">ListView</text>
+  <text class="pv-fill-ink pv-mono" x="512" y="85" font-size="15">cart</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="496.75" y="112.75" width="142.5" height="70.5" rx="8" stroke-width="1.5"/>
+  <text class="pv-fill-ink pv-mono" x="512" y="141" font-size="15">BadgeView</text>
+  <text class="pv-fill-ink pv-mono" x="512" y="165" font-size="15">cart</text>
+  <text class="pv-fill-ink" x="336" y="208" font-size="15">Views agree</text>
+</svg>

@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 186">
+  <text class="pv-fill-ink" x="0" y="16" font-size="16" font-weight="600">Sprawling pull request</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="0.75" y="32.75" width="78.5" height="152.5" rx="8" stroke-width="1.5"/>
+  <text class="pv-fill-accent" x="16" y="58" font-size="15">Auth</text>
+  <rect class="pv-fill-accent" x="16" y="64" width="32" height="10" rx="3"/>
+  <rect class="pv-fill-accent" x="16" y="80" width="40" height="10" rx="3"/>
+  <text class="pv-fill-muted" x="16" y="114" font-size="15">Cache</text>
+  <rect class="pv-fill-muted" x="16" y="120" width="48" height="10" rx="3"/>
+  <text class="pv-fill-muted" x="16" y="154" font-size="15">Retry</text>
+  <rect class="pv-fill-muted" x="16" y="160" width="24" height="10" rx="3"/>
+  <path class="pv-stroke-accent" d="M88 48h8v42h-8" fill="none" stroke-width="2"/>
+  <text class="pv-fill-ink" x="108" y="74" font-size="15">Read carefully</text>
+  <path class="pv-stroke-muted" d="M88 104h9M88 170h9" fill="none" stroke-width="2"/>
+  <path class="pv-stroke-muted" d="M96 105v64" fill="none" stroke-width="2" stroke-dasharray="5 4"/>
+  <text class="pv-fill-muted" x="108" y="142" font-size="15">Skimmed</text>
+  <text class="pv-fill-ink" x="336" y="16" font-size="16" font-weight="600">Focused pull requests</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="336.75" y="32.75" width="78.5" height="72.5" rx="8" stroke-width="1.5"/>
+  <text class="pv-fill-accent" x="352" y="58" font-size="15">Auth</text>
+  <rect class="pv-fill-accent" x="352" y="64" width="32" height="10" rx="3"/>
+  <rect class="pv-fill-accent" x="352" y="80" width="40" height="10" rx="3"/>
+  <rect class="pv-fill-surface pv-stroke-muted" x="448.75" y="88.75" width="78.5" height="56.5" rx="8" stroke-width="1.5"/>
+  <text class="pv-fill-accent" x="464" y="114" font-size="15">Cache</text>
+  <rect class="pv-fill-accent" x="464" y="120" width="48" height="10" rx="3"/>
+  <rect class="pv-fill-surface pv-stroke-muted" x="560.75" y="128.75" width="78.5" height="56.5" rx="8" stroke-width="1.5"/>
+  <text class="pv-fill-accent" x="576" y="154" font-size="15">Retry</text>
+  <rect class="pv-fill-accent" x="576" y="160" width="24" height="10" rx="3"/>
+  <text class="pv-fill-accent" x="448" y="74" font-size="15" font-weight="600">Each read carefully</text>
+</svg>

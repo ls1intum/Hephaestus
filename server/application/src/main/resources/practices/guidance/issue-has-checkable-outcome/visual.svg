@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 182">
+  <text class="pv-fill-ink" x="0" y="16" font-size="16" font-weight="600">Open-ended wish</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="0.75" y="32.75" width="302.5" height="120.5" rx="8" stroke-width="1.5"/>
+  <g transform="translate(16 48)"><circle class="pv-stroke-ink" cx="8" cy="8" r="6.75" fill="none" stroke-width="1.5"/><circle class="pv-fill-ink" cx="8" cy="8" r="1.75"/></g>
+  <text class="pv-fill-ink" x="44" y="61" font-size="15">Issue</text>
+  <rect class="pv-fill-muted" x="16" y="80" width="144" height="10" rx="3"/>
+  <text class="pv-fill-muted" x="16" y="111" font-size="15">Make export better</text>
+  <text class="pv-fill-muted" x="0" y="178" font-size="15">Done is unclear</text>
+  <text class="pv-fill-ink" x="336" y="16" font-size="16" font-weight="600">Checkable outcome</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="336.75" y="32.75" width="302.5" height="120.5" rx="8" stroke-width="1.5"/>
+  <g transform="translate(352 48)"><circle class="pv-stroke-ink" cx="8" cy="8" r="6.75" fill="none" stroke-width="1.5"/><circle class="pv-fill-ink" cx="8" cy="8" r="1.75"/></g>
+  <text class="pv-fill-ink" x="380" y="61" font-size="15">Issue</text>
+  <rect class="pv-fill-muted" x="352" y="80" width="144" height="10" rx="3"/>
+  <rect class="pv-fill-surface pv-stroke-muted" x="352.75" y="98.75" width="14.5" height="14.5" rx="3" stroke-width="1.5"/>
+  <text class="pv-fill-accent" x="380" y="111" font-size="15">Downloads a valid CSV</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="352.75" y="122.75" width="14.5" height="14.5" rx="3" stroke-width="1.5"/>
+  <text class="pv-fill-accent" x="380" y="135" font-size="15">Empty results show a message</text>
+  <text class="pv-fill-ink" x="336" y="178" font-size="15">Done is clear</text>
+</svg>

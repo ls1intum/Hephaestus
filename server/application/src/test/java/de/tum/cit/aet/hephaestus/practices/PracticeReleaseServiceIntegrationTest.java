@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.curated.CuratedCatalogLock;
 import de.tum.cit.aet.hephaestus.practices.curated.CuratedCatalogService;
 import de.tum.cit.aet.hephaestus.practices.curated.adoption.CatalogAdoptionService;
+import de.tum.cit.aet.hephaestus.practices.dto.PracticeReleaseFieldDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeReleaseProposalDTO;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeGroup;
@@ -43,6 +44,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 class PracticeReleaseServiceIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     private static final String SLUG = "describe-what-and-why";
+    private static final String GUIDED = "scope-one-reviewable-change";
 
     /** Another catalogue practice of the same group, adopted into the deciding workspace while the decision waits. */
     private static final String ADOPTED_SLUG = "scope-one-reviewable-change";
@@ -248,6 +250,47 @@ class PracticeReleaseServiceIntegrationTest extends AbstractWorkspaceIntegration
         }
     }
 
+    @Test
+    void shouldApplyTheOfferedGuideAndKeepTheCurrentVisualWhenOnlyTheGuidanceChanged() {
+        WorkspaceContext ctx = workspace("guidance-release");
+        PracticeDefinition offered = catalog.practice(GUIDED).effective();
+        var earlierVisual = new PracticeVisual(
+                "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 32\">"
+                        + "<rect class=\"pv-fill-accent\" x=\"0\" y=\"0\" width=\"64\" height=\"32\"/></svg>",
+                "One wide box.");
+        var earlierGuide = new PracticeGuide("## Earlier guide\n\nSplit the work by goal.", Map.of());
+        createGroup(ctx, offered);
+        practiceService.createPracticeFromCatalog(ctx, GUIDED, withGuidance(offered, earlierVisual, earlierGuide));
+        Practice before = practices.findByWorkspaceIdAndSlug(ctx.id(), GUIDED).orElseThrow();
+        int oldRevision = before.getCurrentRevision().getRevisionNumber();
+        String oldFingerprint = before.getCurrentRevision().getReviewRuleFingerprint();
+
+        PracticeReleaseProposalDTO proposal = releases.get(ctx, GUIDED);
+        assertThat(proposal.fields())
+                .extracting(PracticeReleaseFieldDTO::field)
+                .containsExactlyInAnyOrder(PracticeDefinitionField.VISUAL, PracticeDefinitionField.GUIDE);
+        assertThat(proposal.fields()).noneMatch(PracticeReleaseFieldDTO::conflict);
+
+        releases.accept(
+                ctx,
+                GUIDED,
+                match(proposal),
+                Map.of(
+                        PracticeDefinitionField.GUIDE, PracticeReleaseChoice.OFFERED,
+                        PracticeDefinitionField.VISUAL, PracticeReleaseChoice.CURRENT));
+
+        Practice accepted = practices.findByWorkspaceIdAndSlug(ctx.id(), GUIDED).orElseThrow();
+        assertThat(accepted.getGuide()).isEqualTo(offered.guide());
+        assertThat(accepted.getVisual()).isEqualTo(earlierVisual);
+        assertThat(accepted.getAdoptedBase()).isEqualTo(offered);
+        var revision = accepted.getCurrentRevision();
+        assertThat(revision.getRevisionNumber()).isEqualTo(oldRevision + 1);
+        assertThat(revision.getGuide()).isEqualTo(offered.guide());
+        assertThat(revision.getVisual()).isEqualTo(earlierVisual);
+        assertThat(revision.getReviewRuleFingerprint()).isEqualTo(oldFingerprint);
+        assertThat(releases.list(ctx)).isEmpty();
+    }
+
     private WorkspaceContext workspace(String slug) {
         User owner = persistUser(slug + "-owner");
         Workspace workspace = createWorkspace(slug, slug, slug + "-org", AccountType.ORG, owner);
@@ -256,16 +299,20 @@ class PracticeReleaseServiceIntegrationTest extends AbstractWorkspaceIntegration
 
     private void adoptOldVersion(WorkspaceContext ctx) {
         PracticeDefinition offered = catalog.practice(SLUG).effective();
-        PracticeGroup group = new PracticeGroup();
-        group.setWorkspace(workspaces.findById(ctx.id()).orElseThrow());
-        group.setSlug(Objects.requireNonNull(offered.groupSlug()));
-        group.setName("Review ready work");
-        groups.save(group);
+        createGroup(ctx, offered);
         PracticeDefinition old = withCriteria(offered, "Earlier criteria");
         practiceService.createPracticeFromCatalog(ctx, SLUG, old);
         Practice practice = practices.findByWorkspaceIdAndSlug(ctx.id(), SLUG).orElseThrow();
         practice.setCriteria("Local criteria");
         practices.save(practice);
+    }
+
+    private void createGroup(WorkspaceContext ctx, PracticeDefinition offered) {
+        PracticeGroup group = new PracticeGroup();
+        group.setWorkspace(workspaces.findById(ctx.id()).orElseThrow());
+        group.setSlug(Objects.requireNonNull(offered.groupSlug()));
+        group.setName("Review ready work");
+        groups.save(group);
     }
 
     private static EntityTagPrecondition match(PracticeReleaseProposalDTO proposal) {
@@ -286,7 +333,29 @@ class PracticeReleaseServiceIntegrationTest extends AbstractWorkspaceIntegration
                 source.whyItMatters(),
                 source.whatGoodLooksLike(),
                 source.groupSlug(),
-                source.deliveryBehavior());
+                source.deliveryBehavior(),
+                source.visual(),
+                source.guide());
+    }
+
+    private static PracticeDefinition withGuidance(
+            PracticeDefinition source, PracticeVisual visual, PracticeGuide guide) {
+        return new PracticeDefinition(
+                source.name(),
+                source.signals(),
+                source.evidenceRequirements(),
+                source.reviewWhen(),
+                source.subject(),
+                source.precondition(),
+                source.criteria(),
+                source.precomputeScript(),
+                source.automatedReviewPolicy(),
+                source.whyItMatters(),
+                source.whatGoodLooksLike(),
+                source.groupSlug(),
+                source.deliveryBehavior(),
+                visual,
+                guide);
     }
 
     private long revisionCountFor(Practice practice) {

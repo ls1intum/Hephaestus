@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 152">
+  <text class="pv-fill-ink" x="0" y="16" font-size="16" font-weight="600">Nested checks</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="0.75" y="32.75" width="302.5" height="86.5" rx="8" stroke-width="1.5"/>
+  <rect class="pv-fill-muted" x="16" y="48" width="112" height="10" rx="3"/>
+  <rect class="pv-fill-muted" x="32" y="64" width="128" height="10" rx="3"/>
+  <rect class="pv-fill-muted" x="48" y="80" width="104" height="10" rx="3"/>
+  <path class="pv-stroke-muted" d="M65 96v16" fill="none" stroke-width="2"/>
+  <text class="pv-fill-muted pv-mono" x="78" y="109" font-size="15">save(order)</text>
+  <text class="pv-fill-muted" x="0" y="148" font-size="15">Main action buried</text>
+  <text class="pv-fill-ink" x="336" y="16" font-size="16" font-weight="600">Early returns</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="336.75" y="32.75" width="302.5" height="86.5" rx="8" stroke-width="1.5"/>
+  <rect class="pv-fill-muted" x="352" y="48" width="160" height="10" rx="3"/>
+  <rect class="pv-fill-muted" x="352" y="64" width="176" height="10" rx="3"/>
+  <rect class="pv-fill-muted" x="352" y="80" width="152" height="10" rx="3"/>
+  <path class="pv-stroke-accent" d="M353 96v16" fill="none" stroke-width="2"/>
+  <text class="pv-fill-accent pv-mono" x="366" y="109" font-size="15">save(order)</text>
+  <text class="pv-fill-ink" x="336" y="148" font-size="15">Main action easy to find</text>
+</svg>

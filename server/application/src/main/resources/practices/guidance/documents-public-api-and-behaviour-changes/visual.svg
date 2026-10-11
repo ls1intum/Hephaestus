@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 180">
+  <text class="pv-fill-ink" x="0" y="16" font-size="16" font-weight="600">Rename undocumented</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="0.75" y="32.75" width="302.5" height="118.5" rx="8" stroke-width="1.5"/>
+  <text class="pv-fill-muted pv-mono" x="16" y="61" font-size="15">-getUser(id)</text>
+  <text class="pv-fill-ink pv-mono" x="16" y="85" font-size="15">+fetchUser(id)</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="16.75" y="104.75" width="126.5" height="30.5" rx="8" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <text class="pv-fill-muted" x="28" y="125" font-size="15">No changelog</text>
+  <text class="pv-fill-muted" x="0" y="176" font-size="15">Callers break</text>
+  <text class="pv-fill-ink" x="336" y="16" font-size="16" font-weight="600">Rename documented</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="336.75" y="32.75" width="302.5" height="118.5" rx="8" stroke-width="1.5"/>
+  <text class="pv-fill-muted pv-mono" x="352" y="61" font-size="15">-getUser(id)</text>
+  <text class="pv-fill-ink pv-mono" x="352" y="85" font-size="15">+fetchUser(id)</text>
+  <text class="pv-fill-accent" x="352" y="125" font-size="15">Changelog: <tspan class="pv-mono">getUser</tspan> → <tspan class="pv-mono">fetchUser</tspan></text>
+  <text class="pv-fill-ink" x="336" y="176" font-size="15">Callers adapt</text>
+</svg>

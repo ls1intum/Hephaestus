@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 140">
+  <text class="pv-fill-ink" x="0" y="16" font-size="16" font-weight="600">Vague update</text>
+  <path class="pv-fill-surface pv-stroke-ink" d="M36.75 32.75H291.25A12 12 0 0 1 303.25 44.75V99.25A12 12 0 0 1 291.25 111.25H24.75V44.75A12 12 0 0 1 36.75 32.75Z" stroke-width="1.5"/>
+  <rect class="pv-fill-surface pv-stroke-muted" x="40.75" y="48.75" width="78.5" height="22.5" rx="8" stroke-width="1.5"/>
+  <text class="pv-fill-muted" x="52" y="65" font-size="15">Blocked</text>
+  <text class="pv-fill-muted" x="41" y="94" font-size="15">Still stuck on this</text>
+  <text class="pv-fill-muted" x="0" y="136" font-size="15">Team keeps waiting</text>
+  <text class="pv-fill-ink" x="336" y="16" font-size="16" font-weight="600">Clear update</text>
+  <path class="pv-fill-surface pv-stroke-ink" d="M372.75 32.75H627.25A12 12 0 0 1 639.25 44.75V99.25A12 12 0 0 1 627.25 111.25H360.75V44.75A12 12 0 0 1 372.75 32.75Z" stroke-width="1.5"/>
+  <rect class="pv-fill-surface pv-stroke-muted" x="376.75" y="48.75" width="78.5" height="22.5" rx="8" stroke-width="1.5"/>
+  <text class="pv-fill-muted" x="388" y="65" font-size="15">Blocked</text>
+  <text class="pv-fill-accent" x="377" y="94" font-size="15">Need the API key from Maya</text>
+  <text class="pv-fill-ink" x="336" y="136" font-size="15">Team can help</text>
+</svg>

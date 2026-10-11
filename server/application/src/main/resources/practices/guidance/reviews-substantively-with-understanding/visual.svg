@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 164">
+  <text class="pv-fill-ink" x="0" y="16" font-size="16" font-weight="600">Bare approval</text>
+  <path class="pv-fill-surface pv-stroke-muted" d="M12.75 32.75H247.25A12 12 0 0 1 259.25 44.75V67.25A12 12 0 0 1 247.25 79.25H0.75V44.75A12 12 0 0 1 12.75 32.75Z" stroke-width="1.5"/>
+  <text class="pv-fill-ink" x="16" y="61" font-size="15">Can non-admins delete users?</text>
+  <path class="pv-fill-surface pv-stroke-ink" d="M36.75 88.75H291.25A12 12 0 0 1 303.25 100.75V123.25A12 12 0 0 1 291.25 135.25H24.75V100.75A12 12 0 0 1 36.75 88.75Z" stroke-width="1.5"/>
+  <path class="pv-stroke-ink" d="M41 112.5l3.5 3.5 6.5-7" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <text class="pv-fill-muted" x="64" y="117" font-size="15">LGTM</text>
+  <text class="pv-fill-muted" x="0" y="160" font-size="15">Basis hidden</text>
+  <text class="pv-fill-ink" x="336" y="16" font-size="16" font-weight="600">Approval with a reason</text>
+  <path class="pv-fill-surface pv-stroke-muted" d="M348.75 32.75H583.25A12 12 0 0 1 595.25 44.75V67.25A12 12 0 0 1 583.25 79.25H336.75V44.75A12 12 0 0 1 348.75 32.75Z" stroke-width="1.5"/>
+  <text class="pv-fill-ink" x="352" y="61" font-size="15">Can non-admins delete users?</text>
+  <path class="pv-fill-surface pv-stroke-ink" d="M372.75 88.75H627.25A12 12 0 0 1 639.25 100.75V123.25A12 12 0 0 1 627.25 135.25H360.75V100.75A12 12 0 0 1 372.75 88.75Z" stroke-width="1.5"/>
+  <path class="pv-stroke-ink" d="M377 112.5l3.5 3.5 6.5-7" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <text class="pv-fill-accent" x="400" y="117" font-size="15">Blocked by <tspan class="pv-mono">requireAdmin</tspan></text>
+  <text class="pv-fill-ink" x="336" y="160" font-size="15">Basis visible</text>
+</svg>

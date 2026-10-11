@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 148">
+  <text class="pv-fill-ink" x="0" y="16" font-size="16" font-weight="600">Unexplained pull request</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="0.75" y="32.75" width="302.5" height="86.5" rx="8" stroke-width="1.5"/>
+  <text class="pv-fill-ink" x="16" y="59" font-size="15">Add <tspan class="pv-mono">EventQueue</tspan></text>
+  <text class="pv-fill-muted" x="16" y="85" font-size="15">Orders use it</text>
+  <text class="pv-fill-muted" x="0" y="144" font-size="15">Maintainer guesses</text>
+  <text class="pv-fill-ink" x="336" y="16" font-size="16" font-weight="600">Explained pull request</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="336.75" y="32.75" width="302.5" height="86.5" rx="8" stroke-width="1.5"/>
+  <text class="pv-fill-ink" x="352" y="59" font-size="15">Add <tspan class="pv-mono">EventQueue</tspan></text>
+  <text class="pv-fill-accent" x="352" y="85" font-size="15">Why: slow consumers</text>
+  <text class="pv-fill-accent" x="352" y="103" font-size="15">never block checkout</text>
+  <text class="pv-fill-ink" x="336" y="144" font-size="15">Maintainer knows why</text>
+</svg>

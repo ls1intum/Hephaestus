@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 140">
+  <text class="pv-fill-ink" x="0" y="16" font-size="16" font-weight="600">Text in <tspan class="pv-mono">.black</tspan></text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="0.75" y="32.75" width="134.5" height="78.5" rx="12" stroke-width="1.5"/>
+  <text class="pv-fill-ink" x="16" y="77" font-size="15">Coffee €3</text>
+  <rect class="pv-fill-ink pv-stroke-ink" x="168.75" y="32.75" width="134.5" height="78.5" rx="12" stroke-width="1.5"/>
+  <text class="pv-fill-muted" x="0" y="136" font-size="15">Vanishes in one appearance</text>
+  <text class="pv-fill-ink" x="336" y="16" font-size="16" font-weight="600">Text in <tspan class="pv-fill-accent pv-mono">.primary</tspan></text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="336.75" y="32.75" width="134.5" height="78.5" rx="12" stroke-width="1.5"/>
+  <text class="pv-fill-ink" x="352" y="77" font-size="15">Coffee €3</text>
+  <rect class="pv-fill-ink pv-stroke-ink" x="504.75" y="32.75" width="134.5" height="78.5" rx="12" stroke-width="1.5"/>
+  <text class="pv-fill-surface" x="520" y="77" font-size="15">Coffee €3</text>
+  <text class="pv-fill-ink" x="336" y="136" font-size="15">Shows in both appearances</text>
+</svg>

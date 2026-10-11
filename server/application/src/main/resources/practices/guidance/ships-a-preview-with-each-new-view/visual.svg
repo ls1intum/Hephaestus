@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 172">
+  <text class="pv-fill-ink" x="0" y="16" font-size="16" font-weight="600">Code only</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="0.75" y="32.75" width="158.5" height="110.5" rx="8" stroke-width="1.5"/>
+  <text class="pv-fill-ink pv-mono" x="16" y="61" font-size="15">ReceiptList</text>
+  <rect class="pv-fill-muted" x="16" y="80" width="112" height="10" rx="3"/>
+  <rect class="pv-fill-muted" x="32" y="96" width="96" height="10" rx="3"/>
+  <rect class="pv-fill-surface pv-stroke-muted" x="192.75" y="32.75" width="110.5" height="110.5" rx="12" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <text class="pv-fill-muted" x="248" y="93" font-size="15" text-anchor="middle">No preview</text>
+  <text class="pv-fill-muted" x="0" y="168" font-size="15">Unseen until run</text>
+  <text class="pv-fill-ink" x="336" y="16" font-size="16" font-weight="600">Code and preview</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="336.75" y="32.75" width="158.5" height="110.5" rx="8" stroke-width="1.5"/>
+  <text class="pv-fill-ink pv-mono" x="352" y="61" font-size="15">ReceiptList</text>
+  <rect class="pv-fill-muted" x="352" y="80" width="112" height="10" rx="3"/>
+  <rect class="pv-fill-muted" x="368" y="96" width="96" height="10" rx="3"/>
+  <text class="pv-fill-accent pv-mono" x="352" y="129" font-size="15">#Preview</text>
+  <path class="pv-stroke-muted" d="M504 88h8" fill="none" stroke-width="2"/>
+  <path class="pv-fill-muted" d="M520 88l-8-5v10z"/>
+  <rect class="pv-fill-surface pv-stroke-accent" x="528.75" y="32.75" width="110.5" height="110.5" rx="12" stroke-width="1.5"/>
+  <rect class="pv-fill-muted" x="568" y="48" width="32" height="6" rx="3"/>
+  <text class="pv-fill-ink" x="544" y="85" font-size="15">Coffee €3</text>
+  <text class="pv-fill-ink" x="544" y="109" font-size="15">Bagel €2</text>
+  <text class="pv-fill-ink" x="336" y="168" font-size="15">Seen in review</text>
+</svg>

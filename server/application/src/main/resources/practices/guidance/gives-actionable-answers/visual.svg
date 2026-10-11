@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 180">
+  <text class="pv-fill-ink" x="0" y="16" font-size="16" font-weight="600">Vague reply</text>
+  <path class="pv-fill-surface pv-stroke-muted" d="M36.75 32.75H267.25A12 12 0 0 1 279.25 44.75V67.25A12 12 0 0 1 267.25 79.25H24.75V44.75A12 12 0 0 1 36.75 32.75Z" stroke-width="1.5"/>
+  <text class="pv-fill-muted" x="41" y="60" font-size="15">Deploy times out. Why?</text>
+  <path class="pv-fill-surface pv-stroke-ink" d="M60.75 88.75H291.25A12 12 0 0 1 303.25 100.75V139.25A12 12 0 0 1 291.25 151.25H48.75V100.75A12 12 0 0 1 60.75 88.75Z" stroke-width="1.5"/>
+  <text class="pv-fill-muted" x="65" y="116" font-size="15">See the docs</text>
+  <text class="pv-fill-muted" x="0" y="176" font-size="15">Still stuck</text>
+  <text class="pv-fill-ink" x="336" y="16" font-size="16" font-weight="600">Concrete reply</text>
+  <path class="pv-fill-surface pv-stroke-muted" d="M372.75 32.75H603.25A12 12 0 0 1 615.25 44.75V67.25A12 12 0 0 1 603.25 79.25H360.75V44.75A12 12 0 0 1 372.75 32.75Z" stroke-width="1.5"/>
+  <text class="pv-fill-muted" x="377" y="60" font-size="15">Deploy times out. Why?</text>
+  <path class="pv-fill-surface pv-stroke-ink" d="M396.75 88.75H627.25A12 12 0 0 1 639.25 100.75V139.25A12 12 0 0 1 627.25 151.25H384.75V100.75A12 12 0 0 1 396.75 88.75Z" stroke-width="1.5"/>
+  <text class="pv-fill-accent" x="401" y="116" font-size="15">Raise timeout in</text>
+  <text class="pv-fill-accent pv-mono" x="401" y="134" font-size="15">deploy.yml</text>
+  <text class="pv-fill-ink" x="336" y="176" font-size="15">Can act now</text>
+</svg>

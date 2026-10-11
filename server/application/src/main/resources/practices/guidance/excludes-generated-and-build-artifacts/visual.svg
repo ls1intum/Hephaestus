@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 164">
+  <text class="pv-fill-ink" x="0" y="16" font-size="16" font-weight="600">Unwanted output committed</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="0.75" y="32.75" width="302.5" height="102.5" rx="8" stroke-width="1.5"/>
+  <g transform="translate(16 48)"><path class="pv-stroke-ink" d="M0 8h4.5M11.5 8H16" fill="none" stroke-width="1.5"/><circle class="pv-stroke-ink" cx="8" cy="8" r="3.5" fill="none" stroke-width="1.5"/></g>
+  <text class="pv-fill-ink" x="44" y="61" font-size="15">Committed files</text>
+  <text class="pv-fill-muted pv-mono" x="16" y="92" font-size="15">src/cart.ts</text>
+  <text class="pv-fill-muted pv-mono" x="16" y="116" font-size="15">dist/cart.min.js</text>
+  <text class="pv-fill-muted" x="0" y="160" font-size="15">Machine noise</text>
+  <text class="pv-fill-ink" x="336" y="16" font-size="16" font-weight="600">Unwanted output ignored</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="336.75" y="32.75" width="302.5" height="102.5" rx="8" stroke-width="1.5"/>
+  <g transform="translate(352 48)"><path class="pv-stroke-ink" d="M0 8h4.5M11.5 8H16" fill="none" stroke-width="1.5"/><circle class="pv-stroke-ink" cx="8" cy="8" r="3.5" fill="none" stroke-width="1.5"/></g>
+  <text class="pv-fill-ink" x="380" y="61" font-size="15">Committed files</text>
+  <text class="pv-fill-muted pv-mono" x="352" y="92" font-size="15">src/cart.ts</text>
+  <text class="pv-fill-muted pv-mono" x="352" y="116" font-size="15">.gitignore</text>
+  <text class="pv-fill-accent" x="472" y="116" font-size="15">ignores <tspan class="pv-mono">dist/</tspan></text>
+  <text class="pv-fill-ink" x="336" y="160" font-size="15">Source only</text>
+</svg>
