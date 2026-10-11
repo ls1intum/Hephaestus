@@ -22,7 +22,7 @@ const meta = {
 			allowSearchEngines: false,
 			live: false,
 			hiddenPeople: undefined,
-			hiddenContributors: [],
+			hiddenContributors: { status: "ready", people: [] },
 			restoring: undefined,
 			pending: undefined,
 		},
@@ -50,7 +50,7 @@ const live = {
 	allowSearchEngines: false,
 	live: true,
 	hiddenPeople: 3,
-	hiddenContributors: [],
+	hiddenContributors: { status: "ready", people: [] },
 	restoring: undefined,
 	pending: undefined,
 } as const;
@@ -122,10 +122,13 @@ export const HiddenByAnAdmin: Story = {
 		state: {
 			...live,
 			hiddenPeople: 2,
-			hiddenContributors: [
-				{ id: 11, login: "ada", name: "Ada Lovelace", avatarUrl: "" },
-				{ id: 12, login: "bob", name: "Bob Brenner", avatarUrl: "" },
-			],
+			hiddenContributors: {
+				status: "ready",
+				people: [
+					{ id: 11, login: "ada", name: "Ada Lovelace", avatarUrl: "" },
+					{ id: 12, login: "bob", name: "Bob Brenner", avatarUrl: "" },
+				],
+			},
 		},
 	},
 	play: async ({ args, canvas, userEvent }) => {
@@ -141,7 +144,10 @@ export const ShowingAgain: Story = {
 	args: {
 		state: {
 			...live,
-			hiddenContributors: [{ id: 11, login: "ada", name: "Ada Lovelace", avatarUrl: "" }],
+			hiddenContributors: {
+				status: "ready",
+				people: [{ id: 11, login: "ada", name: "Ada Lovelace", avatarUrl: "" }],
+			},
 			restoring: 11,
 		},
 	},
@@ -150,6 +156,31 @@ export const ShowingAgain: Story = {
 			"aria-disabled",
 			"true",
 		);
+	},
+};
+
+/** While the hidden people are read, the settings stand and nothing claims nobody is hidden. */
+export const HiddenContributorsLoading: Story = {
+	args: { state: { ...live, hiddenContributors: { status: "loading" } } },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("switch", { name: PAGE })).toBeChecked();
+		await expect(canvas.queryByRole("region", { name: "Hidden by an admin" })).toBeNull();
+		await expect(canvas.queryByRole("alert")).toBeNull();
+	},
+};
+
+/** A failed read of the hidden people is said beside settings that still work. */
+export const HiddenContributorsFailed: Story = {
+	args: {
+		state: {
+			...live,
+			hiddenContributors: { status: "error", error: new Error("Network down"), onRetry: fn() },
+		},
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("We could not load hidden contributors")).toBeVisible();
+		await expect(canvas.getByRole("switch", { name: PAGE })).toBeChecked();
+		await expect(canvas.getByRole("button", { name: /Retry/u })).toBeEnabled();
 	},
 };
 
