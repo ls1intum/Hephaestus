@@ -76,6 +76,14 @@ export type ActivityCoverage = {
 };
 
 /**
+ * The repositories and teams that workspace activity can be narrowed to: the lists the people read also carries.
+ */
+export type ActivityFacets = {
+    repositories: Array<ActivityRepository>;
+    teams: Array<ActivityTeam>;
+};
+
+/**
  * Identifiers refer only to the people in the same response.
  */
 export type ActivityHighlights = {
@@ -10075,6 +10083,44 @@ export type GetWorkspaceResponses = {
 };
 
 export type GetWorkspaceResponse = GetWorkspaceResponses[keyof GetWorkspaceResponses];
+
+export type GetActivityFacetsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/activity/facets';
+};
+
+export type GetActivityFacetsErrors = {
+    /**
+     * A request parameter is not valid
+     */
+    400: ProblemDetail;
+    /**
+     * The caller is not a member of the workspace
+     */
+    403: ProblemDetail;
+    /**
+     * Workspace, contributor, team or repository not found
+     */
+    404: ProblemDetail;
+};
+
+export type GetActivityFacetsError = GetActivityFacetsErrors[keyof GetActivityFacetsErrors];
+
+export type GetActivityFacetsResponses = {
+    /**
+     * Repositories and teams listed
+     */
+    200: ActivityFacets;
+};
+
+export type GetActivityFacetsResponse = GetActivityFacetsResponses[keyof GetActivityFacetsResponses];
 
 export type ListHiddenContributorsData = {
     body?: never;

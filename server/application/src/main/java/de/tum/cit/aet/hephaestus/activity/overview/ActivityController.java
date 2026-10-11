@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.activity.overview;
 
+import de.tum.cit.aet.hephaestus.activity.overview.dto.ActivityFacetsDTO;
 import de.tum.cit.aet.hephaestus.activity.overview.dto.ActivityPeopleDTO;
 import de.tum.cit.aet.hephaestus.activity.overview.dto.ActivityPersonDetailDTO;
 import de.tum.cit.aet.hephaestus.activity.overview.dto.ActivityWorkPageDTO;
@@ -134,6 +135,17 @@ public class ActivityController {
             @RequestParam(required = false) @Nullable Set<String> repo) {
         return ResponseEntity.ok(
                 peopleService.people(workspaceContext.id(), range, team, repo == null ? Set.of() : repo));
+    }
+
+    @GetMapping("/facets")
+    @Operation(
+            operationId = "getActivityFacets",
+            summary = "List the repositories and teams that activity can be narrowed to",
+            description = "The same lists the people read carries, without counting anyone. No period, team or"
+                    + " repository changes them.")
+    @ApiResponse(responseCode = "200", description = "Repositories and teams listed")
+    public ResponseEntity<ActivityFacetsDTO> getActivityFacets(WorkspaceContext workspaceContext) {
+        return ResponseEntity.ok(peopleService.facets(workspaceContext.id()));
     }
 
     @GetMapping("/people/{userId}")

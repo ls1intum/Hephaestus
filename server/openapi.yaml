@@ -3193,6 +3193,49 @@ paths:
       summary: Fetch a workspace by slug
       tags:
       - workspace
+  /workspaces/{workspaceSlug}/activity/facets:
+    get:
+      description: "The same lists the people read carries, without counting anyone.\
+        \ No period, team or repository changes them."
+      operationId: getActivityFacets
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          maxLength: 51
+          minLength: 3
+          pattern: "^(?!.*--)[a-z0-9][a-z0-9-]{1,49}[a-z0-9]$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActivityFacets"
+          description: Repositories and teams listed
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: A request parameter is not valid
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The caller is not a member of the workspace
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: "Workspace, contributor, team or repository not found"
+      summary: List the repositories and teams that activity can be narrowed to
+      tags:
+      - Activity
   /workspaces/{workspaceSlug}/activity/hidden-contributors:
     get:
       operationId: listHiddenContributors
@@ -10340,6 +10383,22 @@ components:
       required:
       - completeRepositories
       - totalRepositories
+    ActivityFacets:
+      type: object
+      description: "The repositories and teams that workspace activity can be narrowed\
+        \ to: the lists the people read also carries."
+      properties:
+        repositories:
+          type: array
+          items:
+            $ref: "#/components/schemas/ActivityRepository"
+        teams:
+          type: array
+          items:
+            $ref: "#/components/schemas/ActivityTeam"
+      required:
+      - repositories
+      - teams
     ActivityHighlights:
       type: object
       description: Identifiers refer only to the people in the same response.

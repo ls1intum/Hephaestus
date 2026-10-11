@@ -1,6 +1,7 @@
 import { skipToken, useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
+	getActivityFacetsOptions,
 	getActivityPeopleOptions,
 	getActivityPersonOptions,
 	getActivityPersonWorkInfiniteOptions,
@@ -23,7 +24,6 @@ import type { ActivityPeopleState } from "@/components/activity/ActivityPeopleTa
 import type { ActivityWorkLogState } from "@/components/activity/ActivityWorkLog";
 import type { OpenWorkState } from "@/components/activity/OpenWorkSections";
 import { workLogMarkdown } from "@/components/activity/work-log-markdown";
-import type { ActivityFacets } from "@/components/activity/WorkspaceActivityPage";
 import { panelState } from "@/components/common/panel-state";
 import { copyRichText } from "@/lib/clipboard";
 import type { ProviderType } from "@/lib/provider/provider-terms";
@@ -79,22 +79,37 @@ export function useActivityPeople({
 
 /**
  * The teams and repositories the scope picks from, which no scope changes. While another scope
- * loads, the previous one's stand in, so a picker keeps its options. It shares the people query's
- * cache entry; a cold timeline also reads it to obtain the filter options.
+ * loads, the previous one's stand in, so a picker keeps its options. They come from the people
+ * query's cache entry when it has one; otherwise, as on a cold timeline, from the facets alone, so
+ * nobody is counted only to fill a picker.
  */
-export function useActivityFacets({
-	enabled = true,
-	...scope
-}: ActivityRequest): ActivityFacets | undefined {
+export function useActivityFacets({ enabled = true, ...scope }: ActivityRequest) {
 	const { workspaceSlug } = scope;
-	const query = useQuery({
+	const people = useQuery({
 		...getActivityPeopleOptions({ path: { workspaceSlug }, query: scopeQuery(scope) }),
 		placeholderData: (previous, previousQuery) =>
 			previousQuery?.queryKey[0].path.workspaceSlug === workspaceSlug ? previous : undefined,
 		select: ({ teams, repositories }: ActivityPeople) => ({ teams, repositories }),
-		enabled: (cached) => enabled || cached.state.data === undefined,
+		enabled,
 	});
-	return query.data;
+	const facets = useQuery({
+		...getActivityFacetsOptions({ path: { workspaceSlug } }),
+		enabled: !enabled && people.data === undefined,
+	});
+	const query = enabled || people.data !== undefined ? people : facets;
+	return {
+		data: query.data,
+		error:
+			!enabled && query.isError
+				? {
+						error: query.error,
+						pending: query.isFetching,
+						onRetry: () => {
+							void query.refetch();
+						},
+					}
+				: undefined,
+	};
 }
 
 /**
