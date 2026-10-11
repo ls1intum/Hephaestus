@@ -41,6 +41,9 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.spi.LoggingEventBuilder;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.jdbc.core.JdbcOperations;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -58,6 +61,8 @@ import tools.jackson.databind.node.ObjectNode;
 @PersonDataStores({"person_evidence_copy"})
 @WorkspaceAgnostic("Exact-person receipts span workspaces; every job mutation also pins its workspace key")
 public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, WorkspacePurgeContributor {
+    private static final Logger log = LoggerFactory.getLogger(EvidenceFolderPersonDataCatalog.class);
+
     private final FabricLayout layout;
     private final JdbcTemplate jdbc;
     private final NamedParameterJdbcTemplate namedJdbc;
@@ -76,6 +81,7 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
 
     private static final String INHERITED_REPOSITORIES = "inheritedRepositories";
     private static final String UNKNOWN = "UNKNOWN";
+    private static final String INCOMPLETE_ASSESSMENT = "Copied evidence dependency assessment is incomplete";
     private static final RowMapper<CopiedRow> COPIED_ROW_MAPPER = (rs, row) ->
             new CopiedRow(Objects.requireNonNull(rs.getObject(1, UUID.class)), rs.getLong(2), rs.getLong(3));
     private @Nullable UUID localStoreId;
@@ -235,12 +241,46 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
         capture.receipt().set("repositories", mapper.valueToTree(repositories));
         capture.receipt().set("copiedJobs", mapper.valueToTree(sources));
         capture.receipt().put(DEPENDENCIES, dependencies.complete() ? COMPLETE : UNKNOWN);
+        if (!dependencies.complete())
+            incomplete(Assessment.CAPTURE, dependencies.counts()).log(INCOMPLETE_ASSESSMENT);
     }
 
-    private record Dependencies(boolean complete, List<JsonNode> identities, List<JsonNode> repositories) {}
+    private record Dependencies(
+            boolean complete, List<JsonNode> identities, List<JsonNode> repositories, DependencyCounts counts) {}
+
+    private enum Assessment {
+        CAPTURE,
+        LATE_READ
+    }
+
+    /**
+     * What one dependency assessment read. Jobs are the distinct direct source jobs whose rows were copied; receipts
+     * are their rows, and one job can own several. A receipt that is not READY and a READY receipt whose dependencies
+     * are not COMPLETE are counted apart, never both.
+     */
+    private record DependencyCounts(
+            int sourceJobs,
+            int sourceJobsWithoutReceipts,
+            int receipts,
+            int notReadyReceipts,
+            int unvouchedReadyReceipts) {}
+
+    /**
+     * The added fields are counts only; the existing logging context remains. This reports what the assessment
+     * read, not whether the receipt update that follows still found the attempt's receipt.
+     */
+    private static LoggingEventBuilder incomplete(Assessment assessment, DependencyCounts counts) {
+        return log.atInfo()
+                .addKeyValue("evidence.assessment", assessment.name())
+                .addKeyValue("evidence.sourceJobs", counts.sourceJobs())
+                .addKeyValue("evidence.sourceJobsWithoutReceipts", counts.sourceJobsWithoutReceipts())
+                .addKeyValue("evidence.receipts", counts.receipts())
+                .addKeyValue("evidence.notReadyReceipts", counts.notReadyReceipts())
+                .addKeyValue("evidence.unvouchedReadyReceipts", counts.unvouchedReadyReceipts());
+    }
 
     private Dependencies dependencies(JdbcOperations controls, long workspaceId, Collection<UUID> sources) {
-        if (sources.isEmpty()) return new Dependencies(true, List.of(), List.of());
+        if (sources.isEmpty()) return new Dependencies(true, List.of(), List.of(), new DependencyCounts(0, 0, 0, 0, 0));
         var receipts = controls.query(
                 """
             SELECT job_id,state,payload::text FROM person_evidence_copy
@@ -252,21 +292,30 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
                         mapper.readTree(Objects.requireNonNull(rs.getString(3)))),
                 workspaceId,
                 new SqlArrayValue("uuid", sources.toArray()));
-        boolean complete = receipts.stream()
-                        .map(SourceReceipt::jobId)
-                        .collect(Collectors.toSet())
-                        .containsAll(sources)
+        var covered = receipts.stream().map(SourceReceipt::jobId).collect(Collectors.toSet());
+        boolean complete = covered.containsAll(sources)
                 && receipts.stream()
                         .allMatch(receipt -> receipt.state().equals("READY")
                                 && COMPLETE.equals(
                                         receipt.payload().path(DEPENDENCIES).asString()));
         var identities = new ArrayList<JsonNode>();
         var repositories = new ArrayList<JsonNode>();
+        int notReady = 0;
+        int unvouched = 0;
         for (var receipt : receipts) {
+            if (!receipt.state().equals("READY")) notReady++;
+            else if (!COMPLETE.equals(receipt.payload().path(DEPENDENCIES).asString())) unvouched++;
             receipt.payload().path("identities").forEach(identities::add);
             receipt.payload().path("repositories").forEach(repositories::add);
         }
-        return new Dependencies(complete, identities, repositories);
+        var requested = Set.copyOf(sources);
+        var counts = new DependencyCounts(
+                requested.size(),
+                (int) requested.stream().filter(job -> !covered.contains(job)).count(),
+                receipts.size(),
+                notReady,
+                unvouched);
+        return new Dependencies(complete, identities, repositories, counts);
     }
 
     private record SourceReceipt(UUID jobId, String state, JsonNode payload) {}
@@ -323,6 +372,10 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
             direct.forEach(identity -> identities.add(mapper.valueToTree(identity)));
             // A row the read returned that this lookup no longer finds has no provenance to vouch for it.
             boolean complete = dependencies.complete() && found == observations.size() + feedback.size();
+            if (!complete)
+                incomplete(Assessment.LATE_READ, dependencies.counts())
+                        .addKeyValue("evidence.missingRows", observations.size() + feedback.size() - found)
+                        .log(INCOMPLETE_ASSESSMENT);
             // One statement: concurrent unions serialize on the row, and a receipt only ever gains people.
             controls.update(
                     """
