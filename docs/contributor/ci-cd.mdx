@@ -9,14 +9,14 @@ description: Trunk-based CI/CD through the merge queue. Staging follows main, an
 
 Hephaestus uses trunk-based delivery through GitHub's merge queue. Pull requests provide early
 feedback, merge groups validate projected `main`, and pushes to `main` produce release images.
-Staging follows each successful build of `main`. Production runs a release only after an approved promotion.
+Staging follows successful builds of `main` under the [automatic promotion policy](../admin/pull-based-deployment). Production runs a release only after an approved promotion.
 
 ## Architecture overview
 
 ```mermaid
 flowchart TD
     accTitle: Pull request delivery pipeline
-    accDescr: Pull-request and merge-group validation protect main. Staging follows each main build. Final-SHA images become signed releases that production runs after an approved promotion.
+    accDescr: Pull-request and merge-group validation protect main. Staging follows qualified main builds. Final-SHA images become signed releases that production runs after an approved promotion.
     PR[Pull request] --> PRCI[Pull-request validation]
     PRCI --> Queue[Merge queue]
     Queue --> MG[Projected-main validation]
@@ -427,7 +427,7 @@ change its score.
 | Environment       | Eligibility                                 | Deploys on                        | Approval          |
 | ----------------- | ------------------------------------------- | --------------------------------- | ----------------- |
 | Preview (Coolify) | same-repository PR with the `preview` label | every push. Never waits for tests | none              |
-| Staging           | every commit of `main`                      | successful CI/CD on `main`        | none              |
+| Staging           | qualified commits of `main`                  | automatic promotion policy        | none              |
 | Production        | a published release                         | manual promotion                  | required reviewer |
 
 ### GitHub environment setup
