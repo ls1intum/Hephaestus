@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.90.4
+
+### Patch Changes
+
+- Public practice reviews retain captured reply relationships and line positions as discussion context.
+- The security practice standard now distinguishes confidential credentials from public identifiers and shared provider-published keys. Its precomputed leads identify values to inspect without declaring them secret.
+- Automatic staging promotion skips an older target when a newer descendant has already passed CI/CD on `main`.
+
 ## 0.90.3
 
 ### Patch Changes
