@@ -1,46 +1,34 @@
 import assert from "node:assert/strict";
-import { cpSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { fileURLToPath } from "node:url";
 
-import { isPracticeModule } from "../../../../../../docker/agents/practice-scripts/lib/practice-contract.ts";
-
-const repositoryRoot = fileURLToPath(new URL("../../../../../../", import.meta.url));
+import { runBundled } from "../../../../../../docker/agents/practice-scripts/run-bundled.ts";
 
 /**
- * Stages the script beside a `lib/` link, as the runner does, so its runtime `../lib` imports resolve.
- * The commit record is written where the script reads it: `context/commits.json` under the root.
+ * A context folder with the commit record where the script reads it, `commits.json`, and a run of the
+ * script on a pull request with it.
  */
-async function stage(commits: { sha: string; message: string }[]) {
+function stage(commits: { sha: string; message: string }[]) {
 	const root = mkdtempSync(path.join(tmpdir(), "handoff-practice-script-"));
-	mkdirSync(path.join(root, "practices"));
-	mkdirSync(path.join(root, "context"), { recursive: true });
-	writeFileSync(path.join(root, "package.json"), '{"type":"module"}\n');
-	symlinkSync(
-		path.join(repositoryRoot, "docker/agents/practice-scripts/lib"),
-		path.join(root, "lib"),
-	);
+	const contextDir = path.join(root, "context");
+	mkdirSync(contextDir, { recursive: true });
 	writeFileSync(
-		path.join(root, "context/commits.json"),
+		path.join(contextDir, "commits.json"),
 		JSON.stringify({
 			commits: commits.map((commit) => ({ ...commit, parents: ["p"], files: [] })),
 		}),
 	);
-	const staged = path.join(root, "practices/ready-and-traceable-handoff.ts");
-	cpSync(
-		path.join(
-			repositoryRoot,
-			"server/application/src/main/resources/practices/scripts/ready-and-traceable-handoff.ts",
-		),
-		staged,
-	);
-	const mod: unknown = await import(staged);
-	if (!isPracticeModule(mod)) {
-		throw new Error("script does not export a default function");
-	}
-	return { root, script: mod.default, contextDir: path.join(root, "context") };
+	return {
+		root,
+		script: async (work: Record<string, unknown>) =>
+			runBundled("ready-and-traceable-handoff", {
+				repo: path.join(root, "repo"),
+				work,
+				contextDir,
+			}),
+	};
 }
 
 const metadata = {
@@ -49,40 +37,39 @@ const metadata = {
 	repository_full_name: "team/project",
 	source_branch: "42-quiz-flow",
 	target_branch: "main",
-	commit_sha: "abc123",
 	body: "Closes #42\n- [x] Tested locally\nOpen the quiz and finish ten questions.",
 };
 
 void test("a testing checklist does not turn a traceable handoff into a test-absence claim", async () => {
-	const { root, script, contextDir } = await stage([]);
+	const { root, script } = stage([]);
 	try {
-		const result = await script(path.join(root, "repo"), new Map(), metadata, contextDir);
-		assert.equal(result.metrics.issueMentionSyntaxCandidateCount, 1);
-		assert.match(result.directions[0] ?? "", /#42/u);
+		const result = await script(metadata);
+		assert.equal(result.facts?.issueMentionSyntaxCandidateCount, 1);
+		assert.match(result.directions?.[0] ?? "", /#42/u);
 		// The checklist is counted as written, so a tick is a fact rather than a guess.
-		assert.equal(result.metrics.checklistTicked, 1);
-		assert.equal(result.metrics.checklistUnticked, 0);
+		assert.equal(result.facts.checklistTicked, 1);
+		assert.equal(result.facts.checklistUnticked, 0);
 		// The counts claim nothing about whose lines they are; the direction says so.
-		assert.match(result.directions[1] ?? "", /neither whose lines they are nor what was done/u);
+		assert.match(
+			(result.directions ?? []).join("\n"),
+			/neither whose lines they are nor what was done/u,
+		);
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}
 });
 
 void test("a reference in a commit message of the change counts, read from the staged commit record", async () => {
-	const { root, script, contextDir } = await stage([
-		{ sha: "a".repeat(40), message: "Fix quiz flow\n\nRefs #7" },
-	]);
+	const { root, script } = stage([{ sha: "a".repeat(40), message: "Fix quiz flow\n\nRefs #7" }]);
 	try {
-		const result = await script(
-			path.join(root, "repo"),
-			new Map(),
-			{ ...metadata, body: "No mention here.", source_branch: "quiz-flow" },
-			contextDir,
-		);
-		assert.equal(result.metrics.issueMentionSyntaxCandidateCount, 1);
-		assert.equal(result.metrics.commitCount, 1);
-		assert.match(result.directions[0] ?? "", /#7/u);
+		const result = await script({
+			...metadata,
+			body: "No mention here.",
+			source_branch: "quiz-flow",
+		});
+		assert.equal(result.facts?.issueMentionSyntaxCandidateCount, 1);
+		assert.equal(result.facts.commitCount, 1);
+		assert.match(result.directions?.[0] ?? "", /#7/u);
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}

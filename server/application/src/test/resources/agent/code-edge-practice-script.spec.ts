@@ -1,34 +1,28 @@
 import assert from "node:assert/strict";
-import { cpSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { rmSync } from "node:fs";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { fileURLToPath } from "node:url";
 
-import { isPracticeModule } from "../../../../../../docker/agents/practice-scripts/lib/practice-contract.ts";
 import type { DiffFile } from "../../../../../../docker/agents/practice-scripts/lib/types.ts";
+import { runBundled } from "../../../../../../docker/agents/practice-scripts/run-bundled.ts";
 
-const repositoryRoot = fileURLToPath(new URL("../../../../../../", import.meta.url));
-
+/**
+ * A folder with an empty checkout at `repo`, and a run of the script on a pull request with the
+ * checkout, the change and the record that a test gives.
+ */
 async function stage(slug: string) {
-	const root = mkdtempSync(path.join(tmpdir(), "code-edge-practice-script-"));
-	mkdirSync(path.join(root, "practices"));
-	mkdirSync(path.join(root, "repo"));
-	writeFileSync(path.join(root, "package.json"), '{"type":"module"}\n');
-	symlinkSync(
-		path.join(repositoryRoot, "docker/agents/practice-scripts/lib"),
-		path.join(root, "lib"),
-	);
-	const staged = path.join(root, `practices/${slug}.ts`);
-	cpSync(
-		path.join(repositoryRoot, `server/application/src/main/resources/practices/scripts/${slug}.ts`),
-		staged,
-	);
-	const mod: unknown = await import(staged);
-	if (!isPracticeModule(mod)) {
-		throw new Error("script does not export a default function");
-	}
-	return { root, script: mod.default };
+	const root = await mkdtemp(path.join(tmpdir(), "code-edge-practice-script-"));
+	await mkdir(path.join(root, "repo"));
+	return {
+		root,
+		script: async (
+			repo: string,
+			change: ReadonlyMap<string, DiffFile>,
+			work: Record<string, unknown>,
+		) => runBundled(slug, { repo, change, work }),
+	};
 }
 
 const metadata = {
@@ -95,6 +89,15 @@ const movies = [
 	"if let first = items.first {",
 ];
 
+/** The lead of one Swift line that spells a crash operator. */
+function crash(file: string, line: number, operators: string, inPreview = false) {
+	return {
+		at: { change: file, line },
+		kind: "crash-operator",
+		facts: { language: "swift", operators, inPreview, testFile: file.startsWith("AppTests/") },
+	};
+}
+
 void test("the crash practice lists the operators the author wrote, with where each runs, and no implicit trap", async () => {
 	const { root, script } = await stage("avoids-unsafe-panics-and-chosen-crashes");
 	try {
@@ -112,21 +115,13 @@ void test("the crash practice lists the operators the author wrote, with where e
 			]),
 			metadata,
 		);
-		assert.deepEqual(
-			result.hints.map((h) => [h.file, h.line, h.pattern, h.flags]),
-			[
-				["App/Services/Movies.swift", 4, "swift:try!", { inPreview: false, testFile: false }],
-				[
-					"App/Services/Movies.swift",
-					6,
-					"swift:force unwrap",
-					{ inPreview: false, testFile: false },
-				],
-				["App/Views/NoteRowView.swift", 41, "swift:try!", { inPreview: true, testFile: false }],
-				["AppTests/ParserTests.swift", 1, "swift:try!", { inPreview: false, testFile: true }],
-			],
-		);
-		const directions = result.directions.join(" ");
+		assert.deepEqual(result.leads, [
+			crash("App/Services/Movies.swift", 4, "try!"),
+			crash("App/Services/Movies.swift", 6, "force unwrap"),
+			crash("App/Views/NoteRowView.swift", 41, "try!", true),
+			crash("AppTests/ParserTests.swift", 1, "try!"),
+		]);
+		const directions = (result.directions ?? []).join(" ");
 		assert.match(directions, /1 sit inside a preview block and 1 in test files/u);
 		assert.doesNotMatch(directions, /deliberate-crash|investigate whether|should handle/u);
 	} finally {
@@ -137,8 +132,8 @@ void test("the crash practice lists the operators the author wrote, with where e
 void test("a preview opener outside the hunk is read from the pinned file", async () => {
 	const { root, script } = await stage("avoids-unsafe-panics-and-chosen-crashes");
 	try {
-		mkdirSync(path.join(root, "repo/App"));
-		writeFileSync(
+		await mkdir(path.join(root, "repo/App"));
+		await writeFile(
 			path.join(root, "repo/App/GameView.swift"),
 			[
 				"#Preview {",
@@ -163,7 +158,12 @@ void test("a preview opener outside the hunk is read from the pinned file", asyn
 			]),
 			metadata,
 		);
-		assert.deepEqual(result.hints[0]?.flags, { inPreview: true, testFile: false });
+		assert.deepEqual(result.leads[0]?.facts, {
+			language: "swift",
+			operators: "fatalError",
+			inPreview: true,
+			testFile: false,
+		});
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}
@@ -186,17 +186,49 @@ void test("the input practice lists edge constructs in code only, and none the l
 			metadata,
 		);
 		assert.deepEqual(
-			result.hints.map((h) => [h.file, h.line, h.pattern]),
+			result.leads.map((lead) => [
+				lead.at,
+				lead.kind,
+				lead.facts?.language,
+				lead.facts?.constructs,
+			]),
 			[
-				["App/Services/Movies.swift", 1, "swift:subscript or slice"],
-				["App/Services/Movies.swift", 3, "swift:division or remainder by a name"],
-				["App/Services/Movies.swift", 4, "swift:payload decode"],
-				["App/Services/Movies.swift", 9, "swift:division or remainder by a name"],
-				["App/Services/Movies.swift", 10, "swift:extreme sentinel"],
-				["server/routes.ts", 1, "typescript:request input"],
+				[
+					{ change: "App/Services/Movies.swift", line: 1 },
+					"edge-construct",
+					"swift",
+					"subscript or slice",
+				],
+				[
+					{ change: "App/Services/Movies.swift", line: 3 },
+					"edge-construct",
+					"swift",
+					"division or remainder by a name",
+				],
+				[
+					{ change: "App/Services/Movies.swift", line: 4 },
+					"edge-construct",
+					"swift",
+					"payload decode",
+				],
+				[
+					{ change: "App/Services/Movies.swift", line: 9 },
+					"edge-construct",
+					"swift",
+					"division or remainder by a name",
+				],
+				[
+					{ change: "App/Services/Movies.swift", line: 10 },
+					"edge-construct",
+					"swift",
+					"extreme sentinel",
+				],
+				[{ change: "server/routes.ts", line: 1 }, "edge-construct", "typescript", "request input"],
 			],
 		);
-		const directions = result.directions.join(" ");
+		assert.equal(result.facts?.divisionOrRemainderByAName, 2);
+		assert.equal(result.facts.requestInput, 1);
+		const directions = (result.directions ?? []).join(" ");
 		assert.match(directions, /not an observation/u);
 		assert.doesNotMatch(directions, /investigate whether|is absent|exported-function/u);
 	} finally {
@@ -239,15 +271,31 @@ void test("the untrusted-input practice pairs a source with a rendering call, ne
 			metadata,
 		);
 		assert.deepEqual(
-			result.hints.map((h) => [h.file, h.line, h.pattern]),
+			result.leads.map((lead) => [
+				lead.at,
+				lead.kind,
+				lead.facts?.sourceToken,
+				lead.facts?.sinkToken,
+			]),
 			[
 				[
-					"App/Page.swift",
-					2,
-					"source→sink: UserDefaults / FileManager / env → WKWebView loadHTMLString / evaluateJavaScript",
+					{ change: "App/Page.swift", line: 2 },
+					"source-near-sink",
+					"UserDefaults / FileManager / env",
+					"WKWebView loadHTMLString / evaluateJavaScript",
 				],
-				["server/views.py", 2, "source→sink: request/req param → template render"],
-				["server/page.py", 3, "source→sink: request/req param → template render"],
+				[
+					{ change: "server/views.py", line: 2 },
+					"source-near-sink",
+					"request/req param",
+					"template render",
+				],
+				[
+					{ change: "server/page.py", line: 3 },
+					"source-near-sink",
+					"request/req param",
+					"template render",
+				],
 			],
 		);
 	} finally {
@@ -268,10 +316,14 @@ void test("the error practice lists the fallbacks and bare returns its criteria 
 			metadata,
 		);
 		assert.deepEqual(
-			result.hints.map((h) => [h.file, h.line, h.pattern]),
+			result.leads.map((lead) => [lead.at, lead.kind, lead.facts]),
 			[
-				["App/Parsing.swift", 1, "swift:?? fallback on a failable conversion"],
-				["App/Loader.swift", 1, "swift:guard … else { return }"],
+				[
+					{ change: "App/Parsing.swift", line: 1 },
+					"fallback-on-a-failable-conversion",
+					{ language: "swift" },
+				],
+				[{ change: "App/Loader.swift", line: 1 }, "guard-else-return", { language: "swift" }],
 			],
 		);
 	} finally {
@@ -291,12 +343,10 @@ void test("a fixed URL remains a lead, not proof of an unhandled runtime failure
 			]),
 			metadata,
 		);
-		assert.equal(result.hints.length, 1);
-		assert.match(
-			result.directions.join(" "),
-			/A valid fixed URL has no runtime-dependent parse failure/u,
-		);
-		assert.match(result.directions.join(" "), /already recorded by its handler/u);
+		assert.equal(result.leads.length, 1);
+		const directions = (result.directions ?? []).join(" ");
+		assert.match(directions, /A valid fixed URL has no runtime-dependent parse failure/u);
+		assert.match(directions, /already recorded by its handler/u);
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}
@@ -320,19 +370,20 @@ void test("public, private and unknown credential-named values remain inspection
 			]),
 			metadata,
 		);
-		assert.equal(result.metrics.insecureDefaultCandidates, 7);
+		assert.equal(result.facts?.insecureDefaultCandidates, 7);
 		assert.deepEqual(
-			result.hints.map(({ file, line, pattern }) => ({ file, line, pattern })),
+			result.leads.map((lead) => [lead.at, lead.kind]),
 			[
-				{ file: "Client.swift", line: 1, pattern: "credential-named literal" },
-				{ file: "Client.swift", line: 2, pattern: "credential-named literal" },
-				{ file: "Client.swift", line: 3, pattern: "credential-named literal" },
-				{ file: "Client.swift", line: 4, pattern: "credential-named value in URL path/query" },
-				{ file: "Client.swift", line: 5, pattern: "credential-named value in URL path/query" },
-				{ file: "Client.swift", line: 6, pattern: "logs credential-named value / response body" },
-				{ file: "Client.swift", line: 7, pattern: "logs credential-named value / response body" },
+				[{ change: "Client.swift", line: 1 }, "credential-named-literal"],
+				[{ change: "Client.swift", line: 2 }, "credential-named-literal"],
+				[{ change: "Client.swift", line: 3 }, "credential-named-literal"],
+				[{ change: "Client.swift", line: 4 }, "credential-named-value-in-url-path-query"],
+				[{ change: "Client.swift", line: 5 }, "credential-named-value-in-url-path-query"],
+				[{ change: "Client.swift", line: 6 }, "logs-credential-named-value-response-body"],
+				[{ change: "Client.swift", line: 7 }, "logs-credential-named-value-response-body"],
 			],
 		);
+		assert.match((result.directions ?? []).join(" "), /under class 5 of the standard/u);
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}

@@ -1,34 +1,29 @@
 import assert from "node:assert/strict";
-import { cpSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdir, mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { fileURLToPath } from "node:url";
 
-import { isPracticeModule } from "../../../../../../docker/agents/practice-scripts/lib/practice-contract.ts";
 import type { DiffFile } from "../../../../../../docker/agents/practice-scripts/lib/types.ts";
+import { runBundled } from "../../../../../../docker/agents/practice-scripts/run-bundled.ts";
 
-const repositoryRoot = fileURLToPath(new URL("../../../../../../", import.meta.url));
-
+/**
+ * A folder with an empty checkout at `repo/App`, and a run of the script on a pull request with the
+ * checkout, the change and the record that a test gives.
+ */
 async function stage(slug: string) {
-	const root = mkdtempSync(path.join(tmpdir(), "swift-practice-script-"));
-	mkdirSync(path.join(root, "practices"));
-	mkdirSync(path.join(root, "repo/App"), { recursive: true });
-	writeFileSync(path.join(root, "package.json"), '{"type":"module"}\n');
-	symlinkSync(
-		path.join(repositoryRoot, "docker/agents/practice-scripts/lib"),
-		path.join(root, "lib"),
-	);
-	const staged = path.join(root, `practices/${slug}.ts`);
-	cpSync(
-		path.join(repositoryRoot, `server/application/src/main/resources/practices/scripts/${slug}.ts`),
-		staged,
-	);
-	const mod: unknown = await import(staged);
-	if (!isPracticeModule(mod)) {
-		throw new Error("script does not export a default function");
-	}
-	return { root, script: mod.default };
+	const root = await mkdtemp(path.join(tmpdir(), "swift-practice-script-"));
+	await mkdir(path.join(root, "repo/App"), { recursive: true });
+	return {
+		root,
+		script: async (
+			repo: string,
+			change: ReadonlyMap<string, DiffFile>,
+			work: Record<string, unknown>,
+			contextDir?: string,
+		) => runBundled(slug, { repo, change, work, contextDir }),
+	};
 }
 
 const metadata = {
@@ -86,20 +81,20 @@ void test("an I/O call is placed in the type that encloses it: the view's counts
 			metadata,
 		);
 		assert.deepEqual(
-			result.hints.map((h) => [h.line, h.pattern, h.flags.enclosing]),
+			result.leads.map((lead) => [lead.at, lead.kind, lead.facts?.enclosing]),
 			[
-				[8, "URLSession request", "struct EventList"],
-				[9, "JSON coding", "struct EventList"],
+				[{ change: "App/EventList.swift", line: 8 }, "urlsession-request", "struct EventList"],
+				[{ change: "App/EventList.swift", line: 9 }, "json-coding", "struct EventList"],
 			],
 		);
-		assert.equal(result.metrics.ioCallsInViews, 2);
-		assert.equal(result.metrics.filesWithoutCheckout, 0);
+		assert.equal(result.facts?.ioCallsInViews, 2);
+		assert.equal(result.facts.filesWithoutCheckout, 0);
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}
 });
 
-void test("without a checkout the placing is unknown, and the hint is still reported", async () => {
+void test("without a checkout the placing is unknown, and the lead is still reported", async () => {
 	const { root, script } = await stage("keeps-views-free-of-networking-and-persistence");
 	try {
 		const result = await script(
@@ -107,16 +102,16 @@ void test("without a checkout the placing is unknown, and the hint is still repo
 			new Map([whole("App/EventList.swift", view)]),
 			metadata,
 		);
-		assert.equal(result.metrics.filesWithoutCheckout, 1);
-		assert.ok(result.hints.every((h) => h.flags.enclosing === "unknown"));
+		assert.equal(result.facts?.filesWithoutCheckout, 1);
+		assert.ok(result.leads.every((lead) => lead.facts?.enclosing === "unknown"));
 		// The store's call is a candidate too when nothing says which type it lies in.
-		assert.equal(result.hints.length, 3);
+		assert.equal(result.leads.length, 3);
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}
 });
 
-void test("a new view without a preview is counted per file, a preview elsewhere in the change is a hint", async () => {
+void test("a new view without a preview is counted per file, a preview elsewhere in the change is a lead", async () => {
 	const { root, script } = await stage("ships-a-preview-with-each-new-view");
 	try {
 		const result = await script(
@@ -130,17 +125,17 @@ void test("a new view without a preview is counted per file, a preview elsewhere
 			]),
 			metadata,
 		);
-		assert.deepEqual(result.metrics, {
+		assert.deepEqual(result.facts, {
 			newViews: 2,
 			previewsAdded: 1,
 			filesWithNewViewAndNoPreview: 1,
 		});
 		assert.deepEqual(
-			result.hints.map((h) => [h.file, h.pattern]),
+			result.leads.map((lead) => [lead.at, lead.kind]),
 			[
-				["App/EventList.swift", "new view type"],
-				["App/EventRow.swift", "new view type"],
-				["App/EventRow.swift", "preview"],
+				[{ change: "App/EventList.swift", line: 3 }, "new-view-type"],
+				[{ change: "App/EventRow.swift", line: 1 }, "new-view-type"],
+				[{ change: "App/EventRow.swift", line: 5 }, "preview"],
 			],
 		);
 	} finally {
@@ -162,9 +157,9 @@ void test("an API use is shown with the usage keys located for it and where, nev
 			new Map([whole("App/Scanner.swift", source)]),
 			metadata,
 		);
-		assert.equal(result.metrics.permissionReferenceKinds, 2);
-		assert.equal(result.metrics.authorizationRequests, 1);
-		const said = result.directions.join("\n");
+		assert.equal(result.facts?.permissionReferenceKinds, 2);
+		assert.equal(result.facts.authorizationRequests, 1);
+		const said = (result.directions ?? []).join("\n");
 		assert.match(said, /Location — keys located: none/u);
 		assert.match(said, /Camera — keys located: NSCameraUsageDescription \(project\.yml\)/u);
 		assert.match(said, /does not show the target declares it/u);
@@ -191,16 +186,17 @@ void test("a system picker, an import or an image picker on the library is not p
 			new Map([whole("App/Picker.swift", source)]),
 			metadata,
 		);
-		assert.equal(result.metrics.permissionReferenceKinds, 0);
-		assert.deepEqual(result.directions, []);
+		assert.equal(result.facts?.permissionReferenceKinds, 0);
+		assert.deepEqual(result.leads, []);
+		assert.doesNotMatch((result.directions ?? []).join("\n"), /Permission-related|authorization/u);
 		// Choosing the camera as the picker's source is the access it is.
 		const camera = await script(
 			path.join(root, "repo"),
 			new Map([whole("App/Picker.swift", `${source}\nlibrary.sourceType = .camera\n`)]),
 			metadata,
 		);
-		assert.equal(camera.metrics.permissionReferenceKinds, 1);
-		assert.match(camera.directions.join("\n"), /Camera — keys located: none/u);
+		assert.equal(camera.facts?.permissionReferenceKinds, 1);
+		assert.match((camera.directions ?? []).join("\n"), /Camera — keys located: none/u);
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}
@@ -221,11 +217,11 @@ void test("a location type named in a delegate signature is a reference to inspe
 			metadata,
 		);
 		assert.deepEqual(
-			typeOnly.hints.map((h) => [h.line, h.pattern]),
-			[[3, "permission-related reference Location"]],
+			typeOnly.leads.map((lead) => [lead.at, lead.kind]),
+			[[{ change: "App/Preview.swift", line: 3 }, "permission-reference-location"]],
 		);
-		assert.equal(typeOnly.metrics.permissionReferenceKinds, 1);
-		assert.equal(typeOnly.metrics.authorizationRequests, 0);
+		assert.equal(typeOnly.facts?.permissionReferenceKinds, 1);
+		assert.equal(typeOnly.facts.authorizationRequests, 0);
 
 		const requesting = [
 			"import CoreLocation",
@@ -240,17 +236,14 @@ void test("a location type named in a delegate signature is a reference to inspe
 			metadata,
 		);
 		assert.deepEqual(
-			request.hints
-				.filter((h) => h.pattern === "permission-related reference Location")
-				.map((h) => h.line),
-			[3],
+			request.leads.map((lead) => [lead.at, lead.kind]),
+			[
+				[{ change: "App/Preview.swift", line: 3 }, "permission-reference-location"],
+				[{ change: "App/Preview.swift", line: 4 }, "authorization-request"],
+			],
 		);
-		assert.deepEqual(
-			request.hints.filter((h) => h.pattern === "authorization request").map((h) => h.line),
-			[4],
-		);
-		assert.equal(request.metrics.permissionReferenceKinds, 1);
-		assert.equal(request.metrics.authorizationRequests, 1);
+		assert.equal(request.facts?.permissionReferenceKinds, 1);
+		assert.equal(request.facts.authorizationRequests, 1);
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}
@@ -274,14 +267,14 @@ void test("a custom font given a size scales, one given a fixed size does not, a
 			metadata,
 		);
 		assert.deepEqual(
-			result.hints.map((h) => [h.line, h.pattern]),
+			result.leads.map((lead) => [lead.at.line, lead.kind]),
 			[
-				[3, "scaled custom font"],
-				[4, "fixed-size custom font"],
-				[5, "system font with a point size"],
+				[3, "scaled-custom-font"],
+				[4, "fixed-size-custom-font"],
+				[5, "system-font-with-a-point-size"],
 			],
 		);
-		const said = result.directions.join("\n");
+		const said = result.directions?.join("\n") ?? "";
 		assert.match(said, /^1 custom font\(s\) with fixedSize: added/mu);
 		assert.match(said, /^1 system font\(s\) with a point size added/mu);
 		assert.doesNotMatch(said, /scaled only with relativeTo/u);
@@ -306,11 +299,11 @@ void test("rows beyond the cap are counted by kind and said to be unlisted", asy
 			new Map([whole("App/Stars.swift", source)]),
 			metadata,
 		);
-		assert.equal(result.hints.length, 60);
-		assert.equal(result.metrics.symbolImages, 65);
-		assert.equal(result.metrics.interfaceLinesAdded, 65);
+		assert.equal(result.leads.length, 60);
+		assert.equal(result.facts?.symbolImages, 65);
+		assert.equal(result.facts.interfaceLinesAdded, 65);
 		assert.match(
-			result.directions[0] ?? "",
+			result.directions?.[0] ?? "",
 			/^65 matching added line\(s\); the first 60 are listed and 5 are not\./u,
 		);
 	} finally {
@@ -332,7 +325,7 @@ void test("detached work needs no written reason, and default isolation text is 
 		writeFileSync(path.join(root, "repo/App/Feed.swift"), source);
 		const diff = new Map([whole("App/Feed.swift", source)]);
 		const plain = await script(path.join(root, "repo"), diff, metadata);
-		const said = plain.directions.join("\n");
+		const said = (plain.directions ?? []).join("\n");
 		assert.match(said, /no written reason is required/u);
 		assert.doesNotMatch(said, /stated reason|whether \.task was available/u);
 		assert.match(said, /missing @MainActor on an added line does not by itself/u);
@@ -357,15 +350,74 @@ void test("detached work needs no written reason, and default isolation text is 
 			'// .target(name: "Core", swiftSettings: [.defaultIsolation(MainActor.self)])\n',
 		);
 		const withSettings = await script(path.join(root, "repo"), diff, metadata);
-		const leads = withSettings.directions.join("\n");
-		assert.match(leads, /project\.yml:4 SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor/u);
-		assert.match(leads, /project\.yml:7 SWIFT_DEFAULT_ACTOR_ISOLATION: nonisolated/u);
-		assert.match(leads, /Package\.swift:1 \/\/ \.target/u);
+		assert.deepEqual(
+			withSettings.leads
+				.filter((lead) => lead.kind === "default-isolation-setting")
+				.map((lead) => lead.at),
+			[
+				{ file: "project.yml", line: 4 },
+				{ file: "project.yml", line: 7 },
+				{ file: "Package.swift", line: 1 },
+			],
+		);
+		const directions = (withSettings.directions ?? []).join("\n");
 		assert.match(
-			leads,
+			directions,
 			/applies only to its own target or SwiftPM module and build configuration/u,
 		);
-		assert.doesNotMatch(leads, /sets MainActor as the default|is on the main actor unless/u);
+		assert.doesNotMatch(directions, /sets MainActor as the default|is on the main actor unless/u);
+	} finally {
+		rmSync(root, { recursive: true, force: true });
+	}
+});
+
+void test("each state declaration is a lead with its enclosing type, and a plain var in a view is a place to read, not a lapse", async () => {
+	const { root, script } = await stage("owns-state-at-the-right-level");
+	try {
+		const source = [
+			"struct Parent: View {",
+			"    @State private var store = Store()",
+			"    @State private var count = 0",
+			"    var title: String",
+			"    var body: some View {",
+			"        Child(count: $count).environment(store)",
+			"    }",
+			"}",
+			"",
+			"struct Child: View {",
+			"    @Binding var count: Int",
+			'    var body: some View { Text("") }',
+			"}",
+		].join("\n");
+		writeFileSync(path.join(root, "repo/App/Parent.swift"), source);
+		const result = await script(
+			path.join(root, "repo"),
+			new Map([whole("App/Parent.swift", source)]),
+			metadata,
+		);
+		assert.deepEqual(
+			result.leads.map((lead) => [lead.at.line, lead.kind, lead.facts?.enclosing]),
+			[
+				[2, "state-creating-an-object", "struct Parent"],
+				[3, "state-property", "struct Parent"],
+				[4, "mutable-stored-property", "struct Parent"],
+				[6, "environment-injection", "struct Parent"],
+				[11, "binding", "struct Child"],
+			],
+		);
+		assert.equal(result.facts?.objectsCreatedInViews, 1);
+		assert.equal(result.facts.storedVarsInViews, 1);
+		const said = (result.directions ?? []).join("\n");
+		assert.match(said, /Read whether the view mutates each one/u);
+		assert.doesNotMatch(said, /lapse|rule-1/u);
+
+		const none = await script(
+			path.join(root, "repo"),
+			new Map([whole("App/Plain.swift", "let answer = 42")]),
+			metadata,
+		);
+		assert.deepEqual(none.leads, []);
+		assert.match(none.directions?.[0] ?? "", /^Scanned 1 added lines in 1 files .*none matched\./u);
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}
@@ -402,9 +454,9 @@ void test("a change with no reference anywhere says what it scanned and what the
 			},
 			path.join(root, "context"),
 		);
-		assert.equal(result.metrics.referencesFound, 0);
-		assert.equal(result.metrics.inventoryOpenIssues, 1);
-		assert.equal(result.metrics.linkedWorkItems, -1);
+		assert.equal(result.facts?.referencesFound, 0);
+		assert.equal(result.facts.inventoryOpenIssues, 1);
+		assert.equal(result.facts.linkedWorkItems, -1);
 		const referenced = await script(
 			path.join(root, "repo"),
 			new Map(),
@@ -417,8 +469,8 @@ void test("a change with no reference anywhere says what it scanned and what the
 			},
 			path.join(root, "context"),
 		);
-		assert.equal(referenced.metrics.referencesFound, 1);
-		assert.equal(referenced.metrics.closingReferences, 1);
+		assert.equal(referenced.facts?.referencesFound, 1);
+		assert.equal(referenced.facts.closingReferences, 1);
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}
@@ -454,7 +506,7 @@ void test("native platform logging is a logger and standard output a print, a pr
 			]),
 			metadata,
 		);
-		assert.deepEqual(result.metrics, {
+		assert.deepEqual(result.facts, {
 			printsAdded: 5,
 			loggerCallsAdded: 6,
 			printsInToolPaths: 1,
@@ -463,19 +515,24 @@ void test("native platform logging is a logger and standard output a print, a pr
 			linesAdded: 30,
 		});
 		assert.deepEqual(
-			result.hints.map((h) => [h.pattern, h.flags.kind, h.flags.toolPath]),
+			result.leads.map((lead) => [
+				lead.kind,
+				lead.facts?.language,
+				lead.facts?.call,
+				lead.facts?.toolPath,
+			]),
 			[
-				["swift:print(", "print", false],
-				["swift:Logger", "logger", false],
-				["swift:NSLog", "logger", false],
-				["objective-c:NSLog", "logger", false],
-				["objective-c:os_log", "logger", false],
-				["objective-c:printf(", "print", false],
-				["kotlin:android.util.Log", "logger", false],
-				["kotlin:println(", "print", false],
-				["java:android.util.Log", "logger", false],
-				["java:System.out/err", "print", false],
-				["python:print(", "print", true],
+				["print-call", "swift", "print(", false],
+				["logger-call", "swift", "Logger", false],
+				["logger-call", "swift", "NSLog", false],
+				["logger-call", "objective-c", "NSLog", false],
+				["logger-call", "objective-c", "os_log", false],
+				["print-call", "objective-c", "printf(", false],
+				["logger-call", "kotlin", "android.util.Log", false],
+				["print-call", "kotlin", "println(", false],
+				["logger-call", "java", "android.util.Log", false],
+				["print-call", "java", "System.out/err", false],
+				["print-call", "python", "print(", true],
 			],
 		);
 	} finally {
@@ -493,13 +550,15 @@ void test("a print in another language beyond the shared row cap is counted but 
 			new Map([whole("App/Store.swift", swift), whole("scripts/report.py", 'print("done")\n')]),
 			metadata,
 		);
-		assert.equal(result.hints.length, 40);
-		assert.ok(result.hints.every((h) => h.pattern === "swift:print("));
-		assert.equal(result.metrics.printsAdded, 41);
-		// The script's own print is past the 40 rows returned, so no listed row is under a tool path.
-		assert.equal(result.metrics.printsInToolPaths, 0);
-		assert.match(result.directions[0] ?? "", /^41 diagnostic line\(s\) added; 40 are listed\./u);
-		assert.match(result.directions[1] ?? "", /\(0 listed under a tool or script path\)/u);
+		assert.equal(result.leads.length, 40);
+		assert.ok(
+			result.leads.every((lead) => lead.kind === "print-call" && lead.facts?.language === "swift"),
+		);
+		assert.equal(result.facts?.printsAdded, 41);
+		// The script's own print is past the 40 leads returned, so no listed lead is under a tool path.
+		assert.equal(result.facts.printsInToolPaths, 0);
+		assert.match(result.directions?.[0] ?? "", /^41 diagnostic line\(s\) added; 40 are listed\./u);
+		assert.match(result.directions?.[1] ?? "", /\(0 listed under a tool or script path\)/u);
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}
@@ -521,17 +580,20 @@ void test("a literal and a named asset color are told apart, and the asset's dar
 			new Map([whole("App/Card.swift", source)]),
 			metadata,
 		);
-		assert.equal(result.metrics.literalColors, 2);
-		assert.match(result.directions.join(" "), /A translucent scrim over an image is content/u);
-		assert.equal(result.metrics.systemAdaptiveColors, 0);
-		assert.equal(result.metrics.namedAssetColors, 1);
-		assert.equal(result.metrics.assetsWithoutDarkAppearance, 0);
+		assert.equal(result.facts?.literalColors, 2);
+		assert.match(
+			(result.directions ?? []).join(" "),
+			/A translucent scrim over an image is content/u,
+		);
+		assert.equal(result.facts.systemAdaptiveColors, 0);
+		assert.equal(result.facts.namedAssetColors, 1);
+		assert.equal(result.facts.assetsWithoutDarkAppearance, 0);
 		assert.deepEqual(
-			result.hints.map((h) => [h.line, h.pattern, h.flags.hasDarkAppearance ?? null]),
+			result.leads.map((lead) => [lead.at.line, lead.kind, lead.facts?.hasDarkAppearance ?? null]),
 			[
-				[4, "literal white/black", null],
-				[5, "named asset", true],
-				[7, "fixed components", null],
+				[4, "literal-white-or-black", null],
+				[5, "named-asset", true],
+				[7, "fixed-components", null],
 			],
 		);
 	} finally {
@@ -573,7 +635,7 @@ void test("a colorset's appearances are read as JSON whatever the key order, and
 			metadata,
 		);
 		assert.deepEqual(
-			result.hints.map((h) => [h.flags.asset, h.flags.hasDarkAppearance]),
+			result.leads.map((lead) => [lead.facts?.asset, lead.facts?.hasDarkAppearance]),
 			[
 				["Reordered", true],
 				["Single", false],
@@ -585,8 +647,8 @@ void test("a colorset's appearances are read as JSON whatever the key order, and
 				["TextAppearances", "unknown"],
 			],
 		);
-		assert.equal(result.metrics.assetsWithoutDarkAppearance, 2);
-		const said = result.directions.join("\n");
+		assert.equal(result.facts?.assetsWithoutDarkAppearance, 2);
+		const said = (result.directions ?? []).join("\n");
 		assert.match(said, /no dark luminosity entry/u);
 		assert.doesNotMatch(said, /literal in disguise/u);
 	} finally {
@@ -618,7 +680,7 @@ void test("a named color resolves only to one colorset, exact name first; two ca
 			metadata,
 		);
 		assert.deepEqual(
-			result.hints.map((h) => [h.flags.asset, h.flags.hasDarkAppearance]),
+			result.leads.map((lead) => [lead.facts?.asset, lead.facts?.hasDarkAppearance]),
 			[
 				["Brand", true],
 				["brand", "unknown"],
@@ -659,20 +721,20 @@ void test("a named color given a bundle is a named asset; the main bundle resolv
 			metadata,
 		);
 		assert.deepEqual(
-			result.hints.map((h) => [
-				h.line,
-				h.pattern,
-				h.flags.bundle ?? null,
-				h.flags.hasDarkAppearance,
+			result.leads.map((lead) => [
+				lead.at.line,
+				lead.kind,
+				lead.facts?.bundle ?? null,
+				lead.facts?.hasDarkAppearance,
 			]),
 			[
-				[3, "named asset", null, true],
-				[4, "named asset", null, true],
-				[5, "named asset", ".module", "unknown"],
+				[3, "named-asset", null, true],
+				[4, "named-asset", null, true],
+				[5, "named-asset", ".module", "unknown"],
 			],
 		);
-		assert.equal(result.metrics.namedAssetColors, 3);
-		assert.ok(result.directions.some((d) => /bundle other than the main one/u.test(d)));
+		assert.equal(result.facts?.namedAssetColors, 3);
+		assert.ok((result.directions ?? []).some((d) => /bundle other than the main one/u.test(d)));
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}
@@ -689,9 +751,9 @@ void test("no gray is literal or adaptive by its spelling: each is left to the r
 			new Map([whole("App/Card.swift", source)]),
 			metadata,
 		);
-		assert.equal(result.metrics.literalColors, 0);
-		assert.equal(result.metrics.systemAdaptiveColors, 0);
-		assert.equal(result.metrics.colorsToClassify, 4);
+		assert.equal(result.facts?.literalColors, 0);
+		assert.equal(result.facts.systemAdaptiveColors, 0);
+		assert.equal(result.facts.colorsToClassify, 4);
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}
@@ -727,28 +789,28 @@ void test("only spellings that fix the kind are counted literal or adaptive; sta
 			metadata,
 		);
 		assert.deepEqual(
-			result.hints.map((h) => [h.line, h.pattern]),
+			result.leads.map((lead) => [lead.at.line, lead.kind]),
 			[
-				[3, "member given to a color modifier"],
-				[4, "SwiftUI Color member"],
-				[5, "SwiftUI Color member"],
-				[6, "SwiftUI Color member"],
-				[7, "UIKit color"],
-				[8, "UIKit color"],
-				[9, "UIKit color"],
-				[10, "Color from a value"],
-				[11, "member given to a color modifier"],
-				[12, "fixed components"],
-				[13, "fixed components"],
-				[14, "literal white/black"],
-				[15, "semantic"],
+				[3, "color-modifier-member"],
+				[4, "color-member"],
+				[5, "color-member"],
+				[6, "color-member"],
+				[7, "uikit-color"],
+				[8, "uikit-color"],
+				[9, "uikit-color"],
+				[10, "color-from-a-value"],
+				[11, "color-modifier-member"],
+				[12, "fixed-components"],
+				[13, "fixed-components"],
+				[14, "literal-white-or-black"],
+				[15, "semantic-style"],
 				[16, "material"],
 				[17, "accent"],
 			],
 		);
-		assert.equal(result.metrics.literalColors, 3);
-		assert.equal(result.metrics.systemAdaptiveColors, 3);
-		assert.equal(result.metrics.colorsToClassify, 9);
+		assert.equal(result.facts?.literalColors, 3);
+		assert.equal(result.facts.systemAdaptiveColors, 3);
+		assert.equal(result.facts.colorsToClassify, 9);
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}
@@ -772,8 +834,9 @@ struct Settings: View {
 			new Map([whole("App/Settings.swift", source)]),
 			metadata,
 		);
-		assert.equal(result.metrics.ioCallsInViews, 0);
-		assert.deepEqual(result.hints, []);
+		assert.equal(result.facts?.ioCallsInViews, 0);
+		assert.deepEqual(result.leads, []);
+		assert.match(result.directions?.join("\n") ?? "", /^Scanned 9 added lines in 1 files/mu);
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}

@@ -1,9 +1,8 @@
 import assert from "node:assert/strict";
-import { cpSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { fileURLToPath } from "node:url";
 
 import {
 	readCapturedCommits,
@@ -11,7 +10,7 @@ import {
 	type ChangedFile,
 } from "../../../../../../docker/agents/practice-scripts/lib/change.ts";
 import { subjectFacts } from "../../../../../../docker/agents/practice-scripts/lib/commit-subjects.ts";
-import { isPracticeModule } from "../../../../../../docker/agents/practice-scripts/lib/practice-contract.ts";
+import { runBundled } from "../../../../../../docker/agents/practice-scripts/run-bundled.ts";
 
 void test("captured commits distinguish empty history from missing or malformed records", async () => {
 	const root = mkdtempSync(path.join(tmpdir(), "captured-commits-"));
@@ -36,8 +35,6 @@ void test("captured commits distinguish empty history from missing or malformed 
 		rmSync(root, { recursive: true, force: true });
 	}
 });
-
-const repositoryRoot = fileURLToPath(new URL("../../../../../../", import.meta.url));
 
 const commit = (sha: string, message: string, parents = ["p"], files: ChangedFile[] = []) => ({
 	sha,
@@ -85,47 +82,16 @@ void test("a subject's shape is a fact — bare, repeated, listed, cut off — a
 	assert.equal(by["6666666"]?.merge, true);
 });
 
-async function stage(slug: string, commits: unknown[]) {
-	const root = mkdtempSync(path.join(tmpdir(), "commit-practice-script-"));
-	mkdirSync(path.join(root, "practices"));
-	mkdirSync(path.join(root, "context"), { recursive: true });
-	writeFileSync(path.join(root, "package.json"), '{"type":"module"}\n');
-	symlinkSync(
-		path.join(repositoryRoot, "docker/agents/practice-scripts/lib"),
-		path.join(root, "lib"),
-	);
-	writeFileSync(path.join(root, "context/commits.json"), JSON.stringify({ commits }));
-	const staged = path.join(root, `practices/${slug}.ts`);
-	cpSync(
-		path.join(repositoryRoot, `server/application/src/main/resources/practices/scripts/${slug}.ts`),
-		staged,
-	);
-	const mod: unknown = await import(staged);
-	if (!isPracticeModule(mod)) {
-		throw new Error("script does not export a default function");
-	}
-	const script: typeof mod.default = async (repo, diff, metadata, contextDir, changeDir) => {
-		const result = await mod.default(
-			repo,
-			diff,
-			metadata,
-			contextDir,
-			changeDir,
-			"areas/changed-work",
-		);
-		return result;
+/** A context folder whose `commits.json` holds `commits`, and a run of the script on it. */
+function stage(slug: string, commits: unknown[]) {
+	const contextDir = mkdtempSync(path.join(tmpdir(), "commit-practice-script-"));
+	writeFileSync(path.join(contextDir, "commits.json"), JSON.stringify({ commits }));
+	return {
+		root: contextDir,
+		contextDir,
+		script: async () => runBundled(slug, { contextDir, contextReference: "areas/changed-work" }),
 	};
-	return { root, script, contextDir: path.join(root, "context") };
 }
-
-const metadata = {
-	pr_number: 1,
-	pr_url: "https://example.org/team/project/pull/1",
-	repository_full_name: "team/project",
-	source_branch: "f",
-	target_branch: "main",
-	commit_sha: "abc123",
-};
 
 void test("both commit practices read the subjects from the commit record and state shapes, not verdicts", async () => {
 	const commits = [
@@ -134,25 +100,21 @@ void test("both commit practices read the subjects from the commit record and st
 		commit("3333333", "Merge branch 'main'\n", ["p1", "p2"]),
 	];
 	for (const slug of ["commit-subjects-explain-each-change", "commits-are-atomic-and-cohesive"]) {
-		const { root, script, contextDir } = await stage(slug, commits);
+		const { root, script } = stage(slug, commits);
 		try {
-			const result = await script(path.join(root, "repo"), new Map(), metadata, contextDir);
-			assert.equal(result.metrics.authoredCommits, 2);
-			assert.equal(result.metrics.mergeCommits, 1);
+			const result = await script();
+			assert.equal(result.facts?.authoredCommits, 2);
+			assert.equal(result.facts.mergeCommits, 1);
 			assert.match(
-				result.directions[0] ?? "",
+				result.directions?.[0] ?? "",
 				/2 authored commit\(s\), 1 merge commit\(s\) excluded/u,
 			);
-			// One record row per authored commit; the merge is set aside.
+			// One lead per authored commit, named by its sha; the merge is set aside.
 			assert.deepEqual(
-				result.hints.map((h) => [h.file, h.pattern, h.context]),
+				result.leads.map((lead) => [lead.at, lead.kind, lead.facts?.sha]),
 				[
-					["areas/changed-work/commits.json", "commit", "1111111 Add button to start run"],
-					[
-						"areas/changed-work/commits.json",
-						"commit",
-						"2222222 add location manager, SwiftData persistence, and UI color cleanup",
-					],
+					[{ record: "commits.json" }, "commit", "1111111"],
+					[{ record: "commits.json" }, "commit", "2222222"],
 				],
 			);
 		} finally {
@@ -163,28 +125,28 @@ void test("both commit practices read the subjects from the commit record and st
 
 void test("a terse subject that names its object is not a shape to check, whatever files its commit touched", async () => {
 	const image: ChangedFile = { status: "M", path: "docs/screenshot.png" };
-	const { root, script, contextDir } = await stage("commit-subjects-explain-each-change", [
+	const { root, script } = stage("commit-subjects-explain-each-change", [
 		commit("1111111", "Update Readme\n", ["p"], [image]),
 		commit("2222222", "update\n", ["p"], [image]),
 	]);
 	try {
-		const result = await script(path.join(root, "repo"), new Map(), metadata, contextDir);
+		const result = await script();
 		assert.deepEqual(
-			result.hints.map((h) => [h.context, h.flags.bare]),
+			result.leads.map((lead) => [lead.facts?.sha, lead.facts?.bare]),
 			[
-				["1111111 Update Readme", false],
-				["2222222 update", true],
+				["1111111", false],
+				["2222222", true],
 			],
 		);
-		assert.equal("paths" in (result.hints[0]?.flags ?? {}), false);
-		assert.doesNotMatch(result.directions[1] ?? "", /about the files it touched/u);
+		assert.equal("paths" in (result.leads[0]?.facts ?? {}), false);
+		assert.doesNotMatch(result.directions?.[1] ?? "", /about the files it touched/u);
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}
 });
 
-void test("subject hints keep informative conjunctions and vague subjects separate from commit scope", async () => {
-	const { root, script, contextDir } = await stage("commit-subjects-explain-each-change", [
+void test("subject leads keep informative conjunctions and vague subjects separate from commit scope", async () => {
+	const { root, script } = stage("commit-subjects-explain-each-change", [
 		commit(
 			"1111111",
 			"Restore request failures and remove the HTTP status check",
@@ -195,17 +157,14 @@ void test("subject hints keep informative conjunctions and vague subjects separa
 		commit("3333333", "Merge branch 'main'", ["p1", "p2"]),
 	]);
 	try {
-		const result = await script(path.join(root, "repo"), new Map(), metadata, contextDir);
-		assert.equal(result.metrics.authoredCommits, 2);
-		assert.equal(result.metrics.mergeCommits, 1);
+		const result = await script();
+		assert.equal(result.facts?.authoredCommits, 2);
+		assert.equal(result.facts.mergeCommits, 1);
 		assert.deepEqual(
-			result.hints.map((hint) => ({ context: hint.context, flags: hint.flags })),
+			result.leads.map((lead) => lead.facts),
 			[
-				{
-					context: "1111111 Restore request failures and remove the HTTP status check",
-					flags: { bare: false, repeat: false, cutOff: false },
-				},
-				{ context: "2222222 fix", flags: { bare: true, repeat: false, cutOff: false } },
+				{ sha: "1111111", bare: false, repeat: false, cutOff: false },
+				{ sha: "2222222", bare: true, repeat: false, cutOff: false },
 			],
 		);
 	} finally {
@@ -215,15 +174,15 @@ void test("subject hints keep informative conjunctions and vague subjects separa
 
 void test("one authored commit is still a history to judge, and an unread commit record is a collection gap", async () => {
 	for (const slug of ["commit-subjects-explain-each-change", "commits-are-atomic-and-cohesive"]) {
-		const { root, script, contextDir } = await stage(slug, [
+		const { root, script, contextDir } = stage(slug, [
 			commit("1111111", "Add the quiz view and reformat the project\n"),
 		]);
 		try {
-			const single = await script(path.join(root, "repo"), new Map(), metadata, contextDir);
-			assert.equal(single.metrics.authoredCommits, 1);
-			assert.equal(single.hints.length, 1);
-			assert.match(single.directions[0] ?? "", /^1 authored commit\(s\), one row each/u);
-			assert.doesNotMatch(single.directions.join(" "), /no partition|nothing to judge/u);
+			const single = await script();
+			assert.equal(single.facts?.authoredCommits, 1);
+			assert.equal(single.leads.length, 1);
+			assert.match(single.directions?.[0] ?? "", /^1 authored commit\(s\), one lead each/u);
+			assert.doesNotMatch((single.directions ?? []).join(" "), /no partition|nothing to judge/u);
 			for (const source of [
 				"{",
 				'{"commits":[null]}',
@@ -232,24 +191,24 @@ void test("one authored commit is still a history to judge, and an unread commit
 				'{"commits":[{"sha":"1234567","message":"","parents":[],"files":[{}]}]}',
 			]) {
 				writeFileSync(path.join(contextDir, "commits.json"), source);
-				const unread = await script(path.join(root, "repo"), new Map(), metadata, contextDir);
-				assert.deepEqual(unread.hints, []);
-				assert.deepEqual(unread.metrics, {});
-				assert.match(unread.directions[0] ?? "", /missing or malformed: a collection gap/u);
+				const unread = await script();
+				assert.deepEqual(unread.leads, []);
+				assert.equal(unread.facts, undefined);
+				assert.match(unread.directions?.[0] ?? "", /missing or malformed: a collection gap/u);
 			}
 			writeFileSync(path.join(contextDir, "commits.json"), '{"commits":[]}');
-			const empty = await script(path.join(root, "repo"), new Map(), metadata, contextDir);
-			assert.match(empty.directions[0] ?? "", /^No authored commit in the reviewed range/u);
-			assert.equal(empty.metrics.authoredCommits, 0);
-			assert.equal(empty.metrics.mergeCommits, 0);
+			const empty = await script();
+			assert.match(empty.directions?.[0] ?? "", /^No authored commit in the reviewed range/u);
+			assert.equal(empty.facts?.authoredCommits, 0);
+			assert.equal(empty.facts.mergeCommits, 0);
 			writeFileSync(
 				path.join(contextDir, "commits.json"),
 				JSON.stringify({ commits: [commit("3333333", "Merge branch 'main'", ["p1", "p2"])] }),
 			);
-			const merges = await script(path.join(root, "repo"), new Map(), metadata, contextDir);
-			assert.deepEqual(merges.hints, []);
-			assert.equal(merges.metrics.authoredCommits, 0);
-			assert.equal(merges.metrics.mergeCommits, 1);
+			const merges = await script();
+			assert.deepEqual(merges.leads, []);
+			assert.equal(merges.facts?.authoredCommits, 0);
+			assert.equal(merges.facts.mergeCommits, 1);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -264,7 +223,7 @@ const renamed = (name: string) => ({
 	deletions: 0,
 });
 
-void test("a commit row lists the edited files with their line counts before the moves, and names no kinds", async () => {
+void test("a commit lead lists the edited files with their line counts before the moves, and names no kinds", async () => {
 	const commits = [
 		// A README subject whose commit also moves the source tree and adds a view: only the edited files
 		// and their counts show the second piece of work, so the moves must not push them out of view.
@@ -298,28 +257,28 @@ void test("a commit row lists the edited files with their line counts before the
 			],
 		),
 	];
-	const { root, script, contextDir } = await stage("commits-are-atomic-and-cohesive", commits);
+	const { root, script } = stage("commits-are-atomic-and-cohesive", commits);
 	try {
-		const result = await script(path.join(root, "repo"), new Map(), metadata, contextDir);
-		const [readme, feature] = result.hints;
+		const result = await script();
+		const [readme, feature] = result.leads.map((lead) => lead.facts ?? {});
 		assert.ok(readme && feature);
-		assert.equal(readme.flags.moved, 6);
+		assert.equal(readme.moved, 6);
 		assert.match(
-			String(readme.flags.paths),
+			String(readme.paths),
 			/^PillApp\/WelcomeView\.swift \+18\/-0, README\.md \+20\/-5, PillApp\//u,
 		);
 		// A rename that edits lines is not a move.
-		assert.equal(feature.flags.moved, 0);
-		assert.equal(feature.flags.joinedClauses, true);
+		assert.equal(feature.moved, 0);
+		assert.equal(feature.joinedClauses, true);
 		assert.equal(
-			feature.flags.paths,
+			feature.paths,
 			"Orders/HistoryViewModel.swift +40/-2, project.yml +3/-0, Orders/InvoiceListResponse.swift +3/-3",
 		);
-		for (const hint of result.hints) {
-			assert.equal("kinds" in hint.flags, false);
+		for (const lead of result.leads) {
+			assert.equal("kinds" in (lead.facts ?? {}), false);
 		}
 		// The directions describe the record; none of them counts concerns or names a lapse.
-		assert.doesNotMatch(result.directions.join(" "), /literally|concern|tangle|lapse/u);
+		assert.doesNotMatch((result.directions ?? []).join(" "), /literally|concern|tangle|lapse/u);
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}

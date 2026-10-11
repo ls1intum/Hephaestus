@@ -1,47 +1,22 @@
 import assert from "node:assert/strict";
-import { cpSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { fileURLToPath } from "node:url";
 
-import { isPracticeModule } from "../../../../../../docker/agents/practice-scripts/lib/practice-contract.ts";
 import type { DiffFile } from "../../../../../../docker/agents/practice-scripts/lib/types.ts";
+import { runBundled } from "../../../../../../docker/agents/practice-scripts/run-bundled.ts";
 
-const repositoryRoot = fileURLToPath(new URL("../../../../../../", import.meta.url));
-
-async function stage() {
+/** An empty checkout at `repo`, and a run of the script on a pull request with the change. */
+function stage() {
 	const root = mkdtempSync(path.join(tmpdir(), "dependency-practice-script-"));
-	mkdirSync(path.join(root, "practices"));
 	mkdirSync(path.join(root, "repo"), { recursive: true });
-	writeFileSync(path.join(root, "package.json"), '{"type":"module"}\n');
-	symlinkSync(
-		path.join(repositoryRoot, "docker/agents/practice-scripts/lib"),
-		path.join(root, "lib"),
-	);
-	const staged = path.join(root, "practices/changes-dependencies-deliberately.ts");
-	cpSync(
-		path.join(
-			repositoryRoot,
-			"server/application/src/main/resources/practices/scripts/changes-dependencies-deliberately.ts",
-		),
-		staged,
-	);
-	const mod: unknown = await import(staged);
-	if (!isPracticeModule(mod)) {
-		throw new Error("script does not export a default function");
-	}
-	return { root, script: mod.default };
+	return {
+		root,
+		script: async (change: ReadonlyMap<string, DiffFile>) =>
+			runBundled("changes-dependencies-deliberately", { repo: path.join(root, "repo"), change }),
+	};
 }
-
-const metadata = {
-	pr_number: 1,
-	pr_url: "https://example.org/team/project/pull/1",
-	repository_full_name: "team/project",
-	source_branch: "f",
-	target_branch: "main",
-	commit_sha: "abc123",
-};
 
 function diffFile(file: string, added: string[], removed: string[] = []): DiffFile {
 	return {
@@ -53,10 +28,9 @@ function diffFile(file: string, added: string[], removed: string[] = []): DiffFi
 }
 
 void test("an XcodeGen project.yml edit lists its changed package lines without calling the package new", async () => {
-	const { root, script } = await stage();
+	const { root, script } = stage();
 	try {
 		const result = await script(
-			path.join(root, "repo"),
 			new Map([
 				[
 					"project.yml",
@@ -72,35 +46,32 @@ void test("an XcodeGen project.yml edit lists its changed package lines without 
 					),
 				],
 			]),
-			metadata,
 		);
 		// The url may be unchanged and merely re-added beside the new bound: nothing here says the package is new.
 		assert.deepEqual(
-			result.hints.map((h) => [h.pattern, h.context, h.flags.side]),
+			result.leads.map((lead) => [lead.kind, lead.at, lead.facts?.side]),
 			[
-				["candidate:raw manifest line", "- from: 1.3.0", "removed"],
-				[
-					"candidate:raw manifest line",
-					"+ url: https://github.com/simibac/ConfettiSwiftUI",
-					"added",
-				],
-				["candidate:raw manifest line", "+ from: 2.0.0", "added"],
+				["raw-manifest-line", { change: "project.yml", line: 10, side: "OLD" }, "removed"],
+				["raw-manifest-line", { change: "project.yml", line: 11, side: "NEW" }, "added"],
+				["raw-manifest-line", { change: "project.yml", line: 12, side: "NEW" }, "added"],
 			],
 		);
-		assert.equal(result.metrics.manifestsChanged, 1);
-		assert.equal(result.metrics.onlyAdded, 0);
-		assert.equal(result.metrics.unpairedManifestLines, 3);
-		assert.doesNotMatch(result.directions.join("\n"), /No changed line in these manifests/u);
+		assert.equal(result.facts?.manifestsChanged, 1);
+		assert.equal(result.facts.onlyAdded, 0);
+		assert.equal(result.facts.unpairedManifestLines, 3);
+		assert.doesNotMatch(
+			(result.directions ?? []).join("\n"),
+			/No changed line in these manifests/u,
+		);
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}
 });
 
 void test("internal XcodeGen test-target and scheme wiring offers no dependency line and says the name is no occasion", async () => {
-	const { root, script } = await stage();
+	const { root, script } = stage();
 	try {
 		const result = await script(
-			path.join(root, "repo"),
 			new Map([
 				[
 					"project.yml",
@@ -114,12 +85,11 @@ void test("internal XcodeGen test-target and scheme wiring offers no dependency 
 					]),
 				],
 			]),
-			metadata,
 		);
-		assert.deepEqual(result.hints, []);
-		assert.equal(result.metrics.manifestsChanged, 1);
-		assert.equal(result.metrics.unpairedManifestLines, 0);
-		const said = result.directions.join("\n");
+		assert.deepEqual(result.leads, []);
+		assert.equal(result.facts?.manifestsChanged, 1);
+		assert.equal(result.facts.unpairedManifestLines, 0);
+		const said = (result.directions ?? []).join("\n");
 		assert.match(said, /The name alone is no occasion/u);
 		assert.match(
 			said,
@@ -131,10 +101,9 @@ void test("internal XcodeGen test-target and scheme wiring offers no dependency 
 });
 
 void test("a pom.xml version moved away from its artifactId is not a dropped pin; a requirement that loses its pin is", async () => {
-	const { root, script } = await stage();
+	const { root, script } = stage();
 	try {
 		const result = await script(
-			path.join(root, "repo"),
 			new Map([
 				[
 					"pom.xml",
@@ -154,15 +123,24 @@ void test("a pom.xml version moved away from its artifactId is not a dropped pin
 					diffFile("requirements.txt", ["requests"], ["requests==2.31.0", "urllib3==2.2.1"]),
 				],
 			]),
-			metadata,
 		);
-		assert.equal(result.metrics.unpairedManifestLines, 4);
-		assert.equal(result.metrics.pinsDropped, 1);
+		assert.equal(result.facts?.unpairedManifestLines, 4);
+		assert.equal(result.facts.pinsDropped, 1);
 		assert.deepEqual(
-			result.hints.filter((h) => h.file === "requirements.txt").map((h) => [h.pattern, h.context]),
+			result.leads
+				.filter((lead) => "change" in lead.at && lead.at.change === "requirements.txt")
+				.map((lead) => [lead.kind, lead.at, lead.facts]),
 			[
-				["candidate:PIN_DROPPED", "requests: ==2.31.0 -> "],
-				["candidate:ONLY_REMOVED", "- urllib3 ==2.2.1"],
+				[
+					"pin-dropped",
+					{ change: "requirements.txt", line: 10, side: "NEW" },
+					{ ecosystem: "requirements.txt", name: "requests", oldConstraint: "==2.31.0" },
+				],
+				[
+					"only-removed",
+					{ change: "requirements.txt", line: 11, side: "OLD" },
+					{ ecosystem: "requirements.txt", name: "urllib3" },
+				],
 			],
 		);
 	} finally {
@@ -170,15 +148,14 @@ void test("a pom.xml version moved away from its artifactId is not a dropped pin
 	}
 });
 
-void test("raw manifest lines beyond the hint cap are counted but reported as not listed", async () => {
-	const { root, script } = await stage();
+void test("raw manifest lines beyond the lead cap are counted but reported as not listed", async () => {
+	const { root, script } = stage();
 	try {
 		const artifacts = Array.from(
 			{ length: 45 },
 			(_, i) => `      <artifactId>lib-${i}</artifactId>`,
 		);
 		const result = await script(
-			path.join(root, "repo"),
 			new Map([
 				[
 					"package.json",
@@ -190,25 +167,24 @@ void test("raw manifest lines beyond the hint cap are counted but reported as no
 				],
 				["pom.xml", diffFile("pom.xml", artifacts)],
 			]),
-			metadata,
 		);
-		const raw = result.hints.filter((h) => h.pattern === "candidate:raw manifest line");
-		assert.equal(result.hints.length, 40);
-		assert.equal(result.metrics.onlyAdded, 3);
-		assert.equal(result.metrics.unpairedManifestLines, 45);
-		assert.equal(result.metrics.rawLinesListed, 37);
+		const raw = result.leads.filter((lead) => lead.kind === "raw-manifest-line");
+		assert.equal(result.leads.length, 40);
+		assert.equal(result.facts?.onlyAdded, 3);
+		assert.equal(result.facts.unpairedManifestLines, 45);
+		assert.equal(result.facts.rawLinesListed, 37);
 		assert.equal(raw.length, 37);
-		assert.equal(raw.at(-1)?.context, "+ <artifactId>lib-36</artifactId>");
+		// The 37th artifact line, lib-36, is the last one listed.
+		assert.deepEqual(raw.at(-1)?.at, { change: "pom.xml", line: 46, side: "NEW" });
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}
 });
 
 void test("metadata lines shaped like dependencies stay candidates with their constraint delta", async () => {
-	const { root, script } = await stage();
+	const { root, script } = stage();
 	try {
 		const result = await script(
-			path.join(root, "repo"),
 			new Map([
 				["package.json", diffFile("package.json", ['    "node": ">=22"'], ['    "node": ">=20"'])],
 				[
@@ -216,14 +192,26 @@ void test("metadata lines shaped like dependencies stay candidates with their co
 					diffFile("Cargo.toml", ['rust-version = "1.80"'], ['rust-version = "1.78"']),
 				],
 			]),
-			metadata,
 		);
 		// An engines entry and a toolchain floor: the delta is real, the dependency identity is not established.
 		assert.deepEqual(
-			result.hints.map((h) => [h.file, h.pattern, h.context]),
+			result.leads.map((lead) => [lead.at, lead.kind, lead.facts]),
 			[
-				["package.json", "candidate:BUMPED", "node: >=20 -> >=22"],
-				["Cargo.toml", "candidate:BUMPED", "rust-version: 1.78 -> 1.80"],
+				[
+					{ change: "package.json", line: 10, side: "NEW" },
+					"bumped",
+					{ ecosystem: "package.json", name: "node", oldConstraint: ">=20", newConstraint: ">=22" },
+				],
+				[
+					{ change: "Cargo.toml", line: 10, side: "NEW" },
+					"bumped",
+					{
+						ecosystem: "cargo.toml",
+						name: "rust-version",
+						oldConstraint: "1.78",
+						newConstraint: "1.80",
+					},
+				],
 			],
 		);
 	} finally {
@@ -232,17 +220,15 @@ void test("metadata lines shaped like dependencies stay candidates with their co
 });
 
 void test("a lockfile elsewhere in the checkout is reported by its path, not as the changed manifest's", async () => {
-	const { root, script } = await stage();
+	const { root, script } = stage();
 	try {
 		mkdirSync(path.join(root, "repo/tools/docs"), { recursive: true });
 		writeFileSync(path.join(root, "repo/tools/docs/package-lock.json"), "{}\n");
 		const result = await script(
-			path.join(root, "repo"),
 			new Map([["app/package.json", diffFile("app/package.json", ['    "left-pad": "^1.3.0",'])]]),
-			metadata,
 		);
 		assert.match(
-			result.directions.join("\n"),
+			(result.directions ?? []).join("\n"),
 			/in the checkout: tools\/docs\/package-lock\.json; touched in this diff: none/u,
 		);
 	} finally {

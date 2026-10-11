@@ -1,16 +1,13 @@
-// Precompute HINTS for documents-public-api-and-behaviour-changes. Surfaces FACTS ONLY — the LLM judges.
-//
-// Two STRUCTURAL leads a diff hunk alone cannot reveal: whether a manifest declares a library/framework
-// product, and whether the declarations the diff adds are EXPORTED or internal/private. Neither settles the
-// public surface: an app without a library product can still expose an HTTP, configuration or wire contract
-// to separate consumers, which the review investigates. A modifier-less Swift declaration is INTERNAL — not
-// public — so the export-status table classifies it as internal. We surface {hasPublicProduct,
-// changedPublicSymbols, changedInternalSymbols} and let the model decide whether documentation was owed. The
-// table is keyed off file extension: adding a language = one row, no engine change.
+// Finds two facts that a hunk alone does not show: if a manifest of the repository declares a library
+// or framework product, and if each declaration that the change adds is exported or internal. Neither
+// fact settles the public surface. An app without a library product can still expose an HTTP,
+// configuration or wire contract to other consumers, which the review investigates. A Swift
+// declaration without a modifier is internal, not public. To add a language, add a row.
+import { noMatchDirections } from "../lib/bounded-text.ts";
 import { isCommentLine } from "../lib/declarations.ts";
 import { findFiles, readFileLines } from "../lib/grep.ts";
 import { languageOf } from "../lib/languages.ts";
-import type { DiffFile, Hint, PullRequestMetadata } from "../lib/types.ts";
+import { definePracticeScript, expectKind, type Lead } from "../lib/practice-script.ts";
 
 // ── (1) Public-product manifest scan ──────────────────────────────────────────────────────────────────────
 // Each manifest filename maps to a predicate over its raw text that answers "does this declare a consumable
@@ -107,82 +104,91 @@ async function declaresPublicProduct(repoPath: string): Promise<boolean> {
 	return false;
 }
 
-export default async function documentsPublicApiAndBehaviourChanges(
-	repoPath: string,
-	diffFiles: Map<string, DiffFile>,
-	_m: PullRequestMetadata,
-) {
-	const hasPublicProduct = await declaresPublicProduct(repoPath);
-
-	// (2) Classify each declaration ADDED in the diff as public (exported) or internal.
-	const hints: Hint[] = [];
-	let changedPublicSymbols = 0;
-	let changedInternalSymbols = 0;
-	let filesScanned = 0;
-	let linesAdded = 0;
-	for (const [path, df] of diffFiles) {
-		const lang = languageOf(path);
-		if (lang === null) {
-			continue;
-		}
-		const rule = EXPORT_RULES[lang];
-		if (!rule) {
-			continue;
-		}
-		filesScanned += 1;
-		for (const [line, content] of df.addedLines) {
-			if (isCommentLine(content, lang)) {
-				continue;
-			}
-			linesAdded += 1;
-			if (!rule.decl.test(content)) {
-				continue;
-			}
-			const isPublic = rule.isPublic(content);
-			if (isPublic) {
-				changedPublicSymbols += 1;
-			} else {
-				changedInternalSymbols += 1;
-			}
-			if (hints.length < 40) {
-				hints.push({
-					file: path,
-					line,
-					pattern: `${lang}:${isPublic ? "public-decl" : "internal-decl"}`,
-					context: content.trim().slice(0, 160),
-					inDiff: true,
-					flags: { exported: isPublic },
-				});
-			}
-		}
-	}
-
-	const directions: string[] = [];
-	if (!hasPublicProduct) {
-		directions.push(
-			"No public library/framework product was detected in the repo manifests (no SwiftPM .library, non-private package.json entry, publishable Maven/Gradle artifact, distributable Python package, or Go module) — investigate whether this repo exposes any public API surface a consumer depends on before deciding documentation was owed.",
-		);
-	}
-	if (changedPublicSymbols > 0) {
-		directions.push(
-			`The diff adds ${changedPublicSymbols} exported/public declaration(s)${hasPublicProduct ? " in a repo that ships a public product" : ""} — investigate whether their documented behaviour or signature changed and whether that change is reflected in docs/comments.`,
-		);
-	}
-	if (changedInternalSymbols > 0 && changedPublicSymbols === 0) {
-		directions.push(
-			`The diff adds ${changedInternalSymbols} declaration(s) but none are exported/public (e.g. modifier-less Swift is internal, non-exported TS, package-private Java, leading-underscore Python) — investigate whether any public-facing behaviour actually changed before expecting public-API documentation.`,
-		);
-	}
-
-	return {
-		hints,
-		metrics: {
-			hasPublicProduct: hasPublicProduct ? 1 : 0,
-			changedPublicSymbols,
-			changedInternalSymbols,
-			filesScanned,
-			linesAdded,
+export default definePracticeScript({
+	meta: {
+		kinds: {
+			"public-declaration":
+				"A declaration that the change adds and that the rules of its language export.",
+			"internal-declaration":
+				"A declaration that the change adds and that the rules of its language keep internal or private.",
 		},
-		directions,
-	};
-}
+	},
+	async run(ctx) {
+		expectKind(ctx, "scm.pull_request");
+		const hasPublicProduct = await declaresPublicProduct(ctx.repo);
+
+		// (2) Classify each declaration ADDED in the diff as public (exported) or internal.
+		const leads: Lead[] = [];
+		let changedPublicSymbols = 0;
+		let changedInternalSymbols = 0;
+		let filesScanned = 0;
+		let linesAdded = 0;
+		for (const [path, df] of ctx.change) {
+			const lang = languageOf(path);
+			if (lang === null) {
+				continue;
+			}
+			const rule = EXPORT_RULES[lang];
+			if (!rule) {
+				continue;
+			}
+			filesScanned += 1;
+			for (const [line, content] of df.addedLines) {
+				if (isCommentLine(content, lang)) {
+					continue;
+				}
+				linesAdded += 1;
+				if (!rule.decl.test(content)) {
+					continue;
+				}
+				const isPublic = rule.isPublic(content);
+				if (isPublic) {
+					changedPublicSymbols += 1;
+				} else {
+					changedInternalSymbols += 1;
+				}
+				if (leads.length < 40) {
+					leads.push({
+						at: { change: path, line },
+						kind: isPublic ? "public-declaration" : "internal-declaration",
+						facts: { language: lang, exported: isPublic },
+					});
+				}
+			}
+		}
+
+		const directions: string[] = [];
+		if (!hasPublicProduct) {
+			directions.push(
+				"No public library/framework product was detected in the repo manifests (no SwiftPM .library, non-private package.json entry, publishable Maven/Gradle artifact, distributable Python package, or Go module).",
+				"Investigate whether this repo exposes any public API surface a consumer depends on before deciding documentation was owed.",
+			);
+		}
+		if (changedPublicSymbols > 0) {
+			directions.push(
+				`The diff adds ${changedPublicSymbols} exported/public declaration(s)${hasPublicProduct ? " in a repo that ships a public product" : ""} — investigate whether their documented behaviour or signature changed and whether that change is reflected in docs/comments.`,
+			);
+		}
+		if (changedInternalSymbols > 0 && changedPublicSymbols === 0) {
+			directions.push(
+				`The diff adds ${changedInternalSymbols} declaration(s) but none are exported/public (e.g. modifier-less Swift is internal, non-exported TS, package-private Java, leading-underscore Python).`,
+				"Investigate whether any public-facing behaviour actually changed before expecting public-API documentation.",
+			);
+		}
+		if (leads.length === 0) {
+			directions.push(...noMatchDirections(linesAdded, filesScanned));
+		}
+
+		return {
+			leads,
+			facts: {
+				hasPublicProduct: hasPublicProduct ? 1 : 0,
+				changedPublicSymbols,
+				changedInternalSymbols,
+				filesScanned,
+				linesAdded,
+			},
+			directions,
+		};
+	},
+});

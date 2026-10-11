@@ -1,14 +1,13 @@
-// Precompute FACTS for validates-inputs-and-edge-cases-at-the-boundary: the added lines of source code
-// that hold a construct which can fail or mislead on an edge value — a subscript or slice, a division by
-// a name, a parse the language does not force the author to handle, an extreme sentinel, a payload
-// decode, a request's own input — across languages. A row marks where a consuming site may be, never an
-// observation: whether its value comes from outside the local logic, and what already handles its bad case,
-// is read from the code, and the criteria decide. String-literal text and comments are not scanned; a
-// lookup or parse whose result the language makes optional is not listed, and a crash operator the author
-// wrote (`!`, `try!`, `unwrap()`) is the crash practice's. Adding a language = adding a row.
+// Finds the added lines of source code with a construct that can fail or mislead on an edge value: a
+// subscript or slice, a division by a name, a parse that the language does not force the author to
+// handle, an extreme sentinel, a payload decode, or the input of a request. A lead is a place where a
+// value can be used, never an observation. The scan skips string literals and comments, a lookup or
+// parse whose result the language makes optional, and a crash operator that the author wrote, such as
+// `!`, `try!` or `unwrap()`, which the crash practice reads. Each language adds rows to the table.
+import { DIRECTION_CHARS, factsOf, listWithin } from "../lib/bounded-text.ts";
 import { codeLines, isCommentLine } from "../lib/declarations.ts";
 import { isTestPath, languageOf } from "../lib/languages.ts";
-import type { DiffFile, Hint, PullRequestMetadata } from "../lib/types.ts";
+import { definePracticeScript, expectKind, type Facts, type Lead } from "../lib/practice-script.ts";
 
 const COMMON: [string, RegExp][] = [
 	// `items[i]`, `cast[0..<2]`; not a lookup already made safe (`dict[k] ?? d`, `[k, default: 0]`,
@@ -90,71 +89,90 @@ const REQUEST_INPUT: Record<string, RegExp> = {
 	swift: /\breq\.(?:parameters|query|content)\b/u,
 };
 
-export default function validatesInputsAndEdgeCasesAtTheBoundary(
-	_repo: string,
-	diffFiles: Map<string, DiffFile>,
-	_m: PullRequestMetadata,
-) {
-	const hints: Hint[] = [];
-	const byKind: Record<string, number> = {};
-	let filesScanned = 0;
-	let linesScanned = 0;
-
-	for (const [path, df] of diffFiles) {
-		const lang = languageOf(path);
-		const own = lang === null ? undefined : LANG_PATTERNS[lang];
-		// A test's fixtures are not a boundary.
-		if (lang === null || !own || isTestPath(path)) {
-			continue;
-		}
-		const request = REQUEST_INPUT[lang];
-		const patterns: [string, RegExp][] =
-			request === undefined ? [...COMMON, ...own] : [["request input", request], ...COMMON, ...own];
-		const code = codeLines(lang, df.addedLines);
-		filesScanned += 1;
-		for (const [line, content] of df.addedLines) {
-			if (isCommentLine(content, lang)) {
-				continue;
-			}
-			linesScanned += 1;
-			const labels = patterns
-				.filter(([, re]) => re.test(code.get(line) ?? ""))
-				.map(([name]) => name);
-			if (labels.length === 0) {
-				continue;
-			}
-			for (const label of labels) {
-				byKind[label] = (byKind[label] ?? 0) + 1;
-			}
-			hints.push({
-				file: path,
-				line,
-				pattern: `${lang}:${labels.join(" + ")}`,
-				context: content.trim().slice(0, 160),
-				inDiff: true,
-				flags: {},
-			});
-		}
-	}
-
-	const kinds = Object.entries(byKind)
-		.map(([kind, count]) => `${String(count)} ${kind}`)
-		.join(", ");
-	const directions =
-		hints.length > 0
-			? [
-					`${hints.length} added line(s) hold a construct that can fail or mislead on an edge value (${kinds}). String-literal text, comments and test files were not scanned; lookups and parses whose result the language makes optional, and crash operators, are not listed. A listed line marks where a consuming site may be, not an observation: whether its value comes from outside the local logic, and what already handles its bad case, is read from the code.`,
-				]
-			: [];
-
-	return {
-		hints: hints.slice(0, 40),
-		metrics: {
-			edgeConstructLines: hints.length,
-			filesScanned,
-			linesScanned,
-			...byKind,
-		},
-		directions,
-	};
+/** The fact key of a construct label: `subscript or slice` → `subscriptOrSlice`. */
+function factKey(label: string): string {
+	const words = label.match(/[A-Za-z0-9]+/gu) ?? [];
+	return words
+		.map((word, index) =>
+			index === 0 ? word.toLowerCase() : `${word.charAt(0).toUpperCase()}${word.slice(1)}`,
+		)
+		.join("");
 }
+
+export default definePracticeScript({
+	meta: {
+		kinds: {
+			"edge-construct":
+				"An added line of code with a construct that can fail or mislead on an edge value, with its language and constructs.",
+		},
+	},
+	async run(ctx) {
+		expectKind(ctx, "scm.pull_request");
+		const leads: Lead[] = [];
+		const byKind = new Map<string, number>();
+		let filesScanned = 0;
+		let linesScanned = 0;
+
+		for (const [path, df] of ctx.change) {
+			const lang = languageOf(path);
+			const own = lang === null ? undefined : LANG_PATTERNS[lang];
+			// A test's fixtures are not a boundary.
+			if (lang === null || !own || isTestPath(path)) {
+				continue;
+			}
+			const request = REQUEST_INPUT[lang];
+			const patterns: [string, RegExp][] =
+				request === undefined
+					? [...COMMON, ...own]
+					: [["request input", request], ...COMMON, ...own];
+			const code = codeLines(lang, df.addedLines);
+			filesScanned += 1;
+			for (const [line, content] of df.addedLines) {
+				if (isCommentLine(content, lang)) {
+					continue;
+				}
+				linesScanned += 1;
+				const labels = patterns
+					.filter(([, re]) => re.test(code.get(line) ?? ""))
+					.map(([name]) => name);
+				if (labels.length === 0) {
+					continue;
+				}
+				for (const label of labels) {
+					byKind.set(label, (byKind.get(label) ?? 0) + 1);
+				}
+				leads.push({
+					at: { change: path, line },
+					kind: "edge-construct",
+					facts: factsOf({ language: lang, constructs: labels.join(" + ") }),
+				});
+			}
+		}
+
+		const counts: Facts = {};
+		for (const [label, count] of byKind) {
+			counts[factKey(label)] = count;
+		}
+		const kinds = [...byKind].map(([kind, count]) => `${String(count)} ${kind}`);
+		const opening = `${String(leads.length)} added line(s) hold a construct that can fail or mislead on an edge value`;
+		const directions =
+			leads.length > 0
+				? [
+						`${opening} (${listWithin(kinds, DIRECTION_CHARS - opening.length - 3)}).`,
+						"String-literal text, comments and test files were not scanned; lookups and parses whose result the language makes optional, and crash operators, are not listed.",
+						"A listed line marks where a consuming site may be, not an observation: whether its value comes from outside the local logic, and what already handles its bad case, is read from the code.",
+					]
+				: [];
+
+		return {
+			leads: leads.slice(0, 40),
+			facts: {
+				edgeConstructLines: leads.length,
+				filesScanned,
+				linesScanned,
+				...counts,
+			},
+			directions,
+		};
+	},
+});

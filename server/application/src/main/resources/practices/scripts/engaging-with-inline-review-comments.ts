@@ -1,11 +1,12 @@
-// Precompute FACTS for engaging-with-inline-review-comments: every note by someone other than the
-// author, inline and in the conversation, one row each, with what the record shows beside it — the
-// author's later reply, the thread's resolution and who resolved it, the reviewer's own later note,
-// whether and how soon the same reviewer approved afterwards, whether the note came after the work
-// merged or closed, and the authored commits that came after it. The review decides for each row
-// whether the note asked something of this change and whether the author engaged; the script never does.
+// Finds each note by someone other than the author, inline and in the conversation, one lead each, with
+// what the record shows beside it: the author's later reply, the resolution of the thread and who
+// resolved it, the reviewer's own later note, if and how soon the same reviewer approved after it, if
+// the note came after the work merged or closed, and the authored commits after it. The review decides
+// for each note if it asked something of this change and if the author engaged. The script never does.
+import { factsOf } from "../lib/bounded-text.ts";
 import { type ChangeCommit, readCapturedCommits } from "../lib/change.ts";
 import { contextFile } from "../lib/context.ts";
+import { definePracticeScript, expectKind, type Facts, type Lead } from "../lib/practice-script.ts";
 import {
 	type GeneralComment,
 	type ReviewDecision,
@@ -19,7 +20,6 @@ import {
 	readReviewThreads,
 	reviewerCommentRows,
 } from "../lib/review.ts";
-import type { DiffFile, Hint, PullRequestMetadata } from "../lib/types.ts";
 
 /** An instant strictly between two others; false when any is missing. */
 function between(
@@ -64,43 +64,57 @@ function approvalAfter(
 	return `${String(seconds)}s later; ${commits === null ? "unknown commit count" : `${String(commitsBetween)} commit(s)`} and ${String(notesBetween)} author note(s) between`;
 }
 
-export default async function engagingWithInlineReviewComments(
-	_repoPath: string,
-	diffFiles: Map<string, DiffFile>,
-	metadata: PullRequestMetadata,
-	contextDir: string | undefined,
-	_changeDir: string | undefined,
-	contextReference: string,
-) {
-	const author = metadata.author ?? "";
-	const inline = await readReviewComments(contextDir);
-	const general = await readGeneralComments(contextDir);
-	const record = await readReviewThreads(contextDir);
-	const capturedCommits = await readCapturedCommits(contextDir);
-	const commits = capturedCommits ?? [];
-	const decisions = record?.decisions ?? [];
-	const handOff = metadata.merged_at ?? metadata.closed_at;
-	const byOthers = (note: { author?: string }) =>
-		note.author !== undefined && note.author !== author;
-	const authorNotes = [
-		...(inline ?? []).filter((c) => c.author === author),
-		...(general ?? []).filter((c) => c.author === author),
-	];
-	/** The reviewer's next conversation note after `at`, where a settling "thank you" usually sits. */
-	const reviewerNextNote = (reviewer: string | undefined, at: string | undefined) =>
-		(general ?? []).find((c) => c.author === reviewer && later(c.createdAt, at))?.body ?? "";
+/** One note, as a lead, with the facts that the counts read. */
+interface Note {
+	lead: Lead;
+	bot: boolean;
+	replied: boolean;
+	committedOnFile: boolean;
+	afterHandOff: boolean;
+}
 
-	const inlineHints: Hint[] = reviewerCommentRows(inline ?? [], record?.threads ?? [], author).map(
-		({ comment, replies, followUps, thread }) => ({
-			file: comment.path,
-			line: comment.line ?? 0,
-			pattern: "reviewer comment",
-			context: excerpt(comment.body),
-			inDiff: false,
-			flags: {
+export default definePracticeScript({
+	meta: {
+		kinds: {
+			"reviewer-comment": "An inline comment by someone other than the author.",
+			"conversation-comment": "A conversation comment by someone other than the author.",
+		},
+	},
+	async run(ctx) {
+		expectKind(ctx, "scm.pull_request");
+		const author = ctx.work.author ?? "";
+		const inline = await readReviewComments(ctx.context.dir);
+		const general = await readGeneralComments(ctx.context.dir);
+		const record = await readReviewThreads(ctx.context.dir);
+		const capturedCommits = await readCapturedCommits(ctx.context.dir);
+		const commits = capturedCommits ?? [];
+		const decisions = record?.decisions ?? [];
+		const handOff = ctx.work.merged_at ?? ctx.work.closed_at;
+		const byOthers = (note: { author?: string }) =>
+			note.author !== undefined && note.author !== author;
+		const authorNotes = [
+			...(inline ?? []).filter((c) => c.author === author),
+			...(general ?? []).filter((c) => c.author === author),
+		];
+		/** The reviewer's next conversation note after `at`, where a settling "thank you" usually sits. */
+		const reviewerNextNote = (reviewer: string | undefined, at: string | undefined) =>
+			(general ?? []).find((c) => c.author === reviewer && later(c.createdAt, at))?.body ?? "";
+
+		const inlineNotes: Note[] = reviewerCommentRows(
+			inline ?? [],
+			record?.threads ?? [],
+			author,
+		).map(({ comment, replies, followUps, thread }) => {
+			const commitsAfterTouchingFile =
+				capturedCommits === null
+					? "unknown"
+					: commitsAfter(commits, comment.createdAt, comment.path);
+			const afterHandOff = later(comment.createdAt, handOff);
+			const facts: Facts = factsOf({
 				by: comment.author ?? "",
 				bot: comment.bot,
 				at: comment.createdAt ?? "",
+				path: comment.path,
 				side: comment.side ?? "",
 				outdated: comment.outdated,
 				authorReplied: replies.length > 0,
@@ -119,86 +133,104 @@ export default async function engagingWithInlineReviewComments(
 					capturedCommits,
 					authorNotes,
 				),
-				afterHandOff: later(comment.createdAt, handOff),
-				fileInChange: diffFiles.has(comment.path),
-				changeNearLine: changeNear(diffFiles.get(comment.path), comment.line),
+				afterHandOff,
+				fileInChange: ctx.change.has(comment.path),
+				changeNearLine: changeNear(ctx.change.get(comment.path), comment.line),
 				commitsAfter:
 					capturedCommits === null ? "unknown" : commitsAfter(commits, comment.createdAt),
-				commitsAfterTouchingFile:
-					capturedCommits === null
-						? "unknown"
-						: commitsAfter(commits, comment.createdAt, comment.path),
-			},
-		}),
-	);
-	const conversationHints: Hint[] = (general ?? []).filter(byOthers).map((note: GeneralComment) => {
-		const authorAfter = (general ?? []).filter(
-			(c) => c.author === author && later(c.createdAt, note.createdAt),
-		);
+				commitsAfterTouchingFile,
+			});
+			if (comment.line !== undefined) {
+				facts.line = comment.line;
+			}
+			return {
+				lead: {
+					at: { record: "comments.json", line: comment.recordLine },
+					kind: "reviewer-comment",
+					facts,
+				},
+				bot: comment.bot,
+				replied: replies.length > 0,
+				committedOnFile: Number(commitsAfterTouchingFile) > 0,
+				afterHandOff,
+			};
+		});
+		const conversationNotes: Note[] = (general ?? [])
+			.filter(byOthers)
+			.map((note: GeneralComment) => {
+				const authorAfter = (general ?? []).filter(
+					(c) => c.author === author && later(c.createdAt, note.createdAt),
+				);
+				const afterHandOff = later(note.createdAt, handOff);
+				return {
+					lead: {
+						at: { record: "general_comments.json", line: note.recordLine },
+						kind: "conversation-comment",
+						facts: factsOf({
+							by: note.author ?? "",
+							bot: note.bot,
+							at: note.createdAt ?? "",
+							authorNotesAfter: authorAfter.length,
+							authorNoteExcerpt: excerpt(authorAfter[0]?.body ?? "", 80),
+							reviewerLaterNote: excerpt(reviewerNextNote(note.author, note.createdAt), 80),
+							reviewerApprovedAfter: approvalAfter(
+								decisions,
+								note.author,
+								note.createdAt,
+								capturedCommits,
+								authorNotes,
+							),
+							afterHandOff,
+							commitsAfter:
+								capturedCommits === null ? "unknown" : commitsAfter(commits, note.createdAt),
+						}),
+					},
+					bot: note.bot,
+					replied: authorAfter.length > 0,
+					committedOnFile: false,
+					afterHandOff,
+				};
+			});
+		const notes = [...inlineNotes, ...conversationNotes];
+		const byPeople = notes.filter((note) => !note.bot);
+		const inlineByPeople = inlineNotes.filter((note) => !note.bot).length;
+		const conversationByPeople = conversationNotes.filter((note) => !note.bot).length;
+		const replied = byPeople.filter((note) => note.replied).length;
+		// Without the commit record each note's count is unknown, and so is their sum: never a measured 0.
+		const committedAfter =
+			capturedCommits === null ? null : byPeople.filter((note) => note.committedOnFile).length;
+		const afterHandOff = byPeople.filter((note) => note.afterHandOff).length;
+		const directions: string[] = [];
+		if (inline === null && general === null) {
+			directions.push(
+				"No comments file was captured (neither comments.json nor general_comments.json): the record of reviewer notes is not available here.",
+			);
+		} else if (notes.length === 0) {
+			directions.push(
+				`No note by anyone other than the author in the captured record (${inline === null ? "comments.json not captured" : `${String(inline.length)} inline comment(s)`}, ${general === null ? "general_comments.json not captured" : `${String(general.length)} conversation comment(s)`}).`,
+			);
+		} else {
+			const bots = notes.length - byPeople.length;
+			directions.push(
+				`${String(byPeople.length)} reviewer note(s) (${String(inlineByPeople)} inline, ${String(conversationByPeople)} conversation)${bots > 0 ? `, ${String(bots)} more by bots` : ""}; ${String(replied)} have a later author note.`,
+				`${committedAfter === null ? "How many have a later authored commit touching the commented file is unknown" : `${String(committedAfter)} have a later authored commit touching the commented file`}; ${String(afterHandOff)} were posted after the work merged or closed.`,
+				`Commit capture: ${capturedCommits === null ? "unavailable" : `${String(commits.length)} captured commit(s)`} in ${contextFile(ctx.context.reference, "commits.json")}.`,
+			);
+		}
 		return {
-			file: contextFile(contextReference, "general_comments.json"),
-			line: 0,
-			pattern: "conversation comment",
-			context: excerpt(note.body),
-			inDiff: false,
-			flags: {
-				by: note.author ?? "",
-				bot: note.bot,
-				at: note.createdAt ?? "",
-				authorNotesAfter: authorAfter.length,
-				authorNoteExcerpt: excerpt(authorAfter[0]?.body ?? "", 80),
-				reviewerLaterNote: excerpt(reviewerNextNote(note.author, note.createdAt), 80),
-				reviewerApprovedAfter: approvalAfter(
-					decisions,
-					note.author,
-					note.createdAt,
-					capturedCommits,
-					authorNotes,
-				),
-				afterHandOff: later(note.createdAt, handOff),
-				commitsAfter: capturedCommits === null ? "unknown" : commitsAfter(commits, note.createdAt),
+			leads: notes.slice(0, 200).map((note) => note.lead),
+			facts: {
+				commentsFileAbsent: inline === null ? 1 : 0,
+				generalCommentsFileAbsent: general === null ? 1 : 0,
+				reviewerComments: inlineByPeople,
+				conversationComments: conversationByPeople,
+				botComments: notes.length - byPeople.length,
+				withAuthorReply: replied,
+				...(committedAfter === null ? {} : { withLaterCommitOnFile: committedAfter }),
+				afterHandOff,
+				commitsFileAbsent: capturedCommits === null ? 1 : 0,
 			},
+			directions,
 		};
-	});
-	const hints = [...inlineHints, ...conversationHints];
-	const byPeople = hints.filter((h) => h.flags.bot !== true);
-	const replied = byPeople.filter(
-		(h) => h.flags.authorReplied === true || Number(h.flags.authorNotesAfter) > 0,
-	).length;
-	// Without the commit record each note's count is unknown, and so is their sum: never a measured 0.
-	const committedAfter =
-		capturedCommits === null
-			? null
-			: byPeople.filter((h) => Number(h.flags.commitsAfterTouchingFile) > 0).length;
-	const afterHandOff = byPeople.filter((h) => h.flags.afterHandOff === true).length;
-	const directions: string[] = [];
-	if (inline === null && general === null) {
-		directions.push(
-			"No comments file was captured (neither comments.json nor general_comments.json): the record of reviewer notes is not available here.",
-		);
-	} else if (hints.length === 0) {
-		directions.push(
-			`No note by anyone other than the author in the captured record (${inline === null ? "comments.json not captured" : `${String(inline.length)} inline comment(s)`}, ${general === null ? "general_comments.json not captured" : `${String(general.length)} conversation comment(s)`}).`,
-		);
-	} else {
-		const bots = hints.length - byPeople.length;
-		directions.push(
-			`${String(byPeople.length)} reviewer note(s) (${String(inlineHints.filter((h) => h.flags.bot !== true).length)} inline, ${String(conversationHints.filter((h) => h.flags.bot !== true).length)} conversation)${bots > 0 ? `, ${String(bots)} more by bots` : ""}; ${String(replied)} have a later author note; ${committedAfter === null ? "how many have a later authored commit touching the commented file is unknown" : `${String(committedAfter)} have a later authored commit touching the commented file`}; ${String(afterHandOff)} were posted after the work merged or closed. Commit capture: ${capturedCommits === null ? "unavailable" : `${String(commits.length)} captured commit(s)`} in ${contextFile(contextReference, "commits.json")}.`,
-		);
-	}
-	return {
-		hints,
-		metrics: {
-			commentsFileAbsent: inline === null ? 1 : 0,
-			generalCommentsFileAbsent: general === null ? 1 : 0,
-			reviewerComments: inlineHints.filter((h) => h.flags.bot !== true).length,
-			conversationComments: conversationHints.filter((h) => h.flags.bot !== true).length,
-			botComments: hints.length - byPeople.length,
-			withAuthorReply: replied,
-			...(committedAfter === null ? {} : { withLaterCommitOnFile: committedAfter }),
-			afterHandOff,
-			commitsFileAbsent: capturedCommits === null ? 1 : 0,
-		},
-		directions,
-	};
-}
+	},
+});

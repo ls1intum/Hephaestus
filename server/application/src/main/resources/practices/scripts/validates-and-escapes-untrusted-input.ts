@@ -1,15 +1,12 @@
-// Precompute HINTS for validates-and-escapes-untrusted-input: surface ADDED lines where an untrusted-INPUT
-// token (a SOURCE) and a dangerous OPERATION token (a SINK) co-occur in the same file within a small line
-// window — i.e. the taint flow a reviewer is most likely to miss by eye. CANDIDATES only: the LLM traces
-// whether the source actually reaches the sink unvalidated/unescaped and decides. General by design: a
-// per-language SOURCE table + a SINK table keyed off the file extension. Adding a language = adding rows,
-// no engine change. The taint flow spans lines, so we pair each source to nearby sinks and hand the LLM
-// the exact span to trace.
+// Finds each added line with a dangerous operation (a sink) that has an untrusted input (a source)
+// within a small window of added lines in the same file. The review traces if the source reaches the
+// sink without validation or escaping. Each language adds rows to the source and sink tables.
+import { factsOf, noMatchDirections } from "../lib/bounded-text.ts";
 import { isCommentLine } from "../lib/declarations.ts";
 import { languageOf } from "../lib/languages.ts";
-import type { DiffFile, Hint, PullRequestMetadata } from "../lib/types.ts";
+import { definePracticeScript, expectKind, type Lead } from "../lib/practice-script.ts";
 
-/** A label -> pattern table row. The label is what a hint reports, so it is rendered verbatim. */
+/** A label -> pattern table row. The label is a fact of the lead, so it is rendered verbatim. */
 type PatternRows = [string, RegExp][];
 
 /**
@@ -173,74 +170,76 @@ function firstMatch(rows: PatternRows, content: string): string | null {
 	return null;
 }
 
-export default function validatesAndEscapesUntrustedInput(
-	_repo: string,
-	diffFiles: Map<string, DiffFile>,
-	_m: PullRequestMetadata,
-) {
-	const hints: Hint[] = [];
-	let flowCount = 0;
-	let linesAdded = 0;
+export default definePracticeScript({
+	meta: {
+		kinds: {
+			"source-near-sink": `An added line with a dangerous operation (a sink) and an untrusted input (a source) at most ${String(WINDOW)} added lines away.`,
+		},
+	},
+	async run(ctx) {
+		expectKind(ctx, "scm.pull_request");
+		const leads: Lead[] = [];
+		let flowCount = 0;
+		let linesAdded = 0;
 
-	for (const [path, df] of diffFiles) {
-		const lang = languageOf(path);
-		const sourceRows = rowsFor(SOURCES, rowsLanguage(lang));
-		const sinkRows = rowsFor(SINKS, rowsLanguage(lang));
+		for (const [path, df] of ctx.change) {
+			const lang = languageOf(path);
+			const sourceRows = rowsFor(SOURCES, rowsLanguage(lang));
+			const sinkRows = rowsFor(SINKS, rowsLanguage(lang));
 
-		// Collect source / sink positions on ADDED lines only.
-		const srcLines: { line: number; label: string; content: string }[] = [];
-		const sinkLines: { line: number; label: string; content: string }[] = [];
-		for (const [line, content] of df.addedLines) {
-			if (isCommentLine(content, lang ?? "")) {
+			// Collect source / sink positions on ADDED lines only.
+			const srcLines: { line: number; label: string }[] = [];
+			const sinkLines: { line: number; label: string }[] = [];
+			for (const [line, content] of df.addedLines) {
+				if (isCommentLine(content, lang ?? "")) {
+					continue;
+				}
+				linesAdded += 1;
+				const s = firstMatch(sourceRows, content);
+				if (s !== null) {
+					srcLines.push({ line, label: s });
+				}
+				const k = firstMatch(sinkRows, content);
+				if (k !== null) {
+					sinkLines.push({ line, label: k });
+				}
+			}
+			if (srcLines.length === 0 || sinkLines.length === 0) {
 				continue;
 			}
-			linesAdded += 1;
-			const s = firstMatch(sourceRows, content);
-			if (s !== null) {
-				srcLines.push({ line, label: s, content });
-			}
-			const k = firstMatch(sinkRows, content);
-			if (k !== null) {
-				sinkLines.push({ line, label: k, content });
+
+			// Each sink that has a source within WINDOW lines is a flow to trace.
+			for (const sink of sinkLines) {
+				const near = srcLines.find((s) => Math.abs(s.line - sink.line) <= WINDOW);
+				if (!near) {
+					continue;
+				}
+				flowCount += 1;
+				leads.push({
+					at: { change: path, line: sink.line },
+					kind: "source-near-sink",
+					facts: factsOf({
+						sourceLine: near.line,
+						sourceToken: near.label,
+						sinkToken: sink.label,
+						lineDistance: Math.abs(near.line - sink.line),
+					}),
+				});
 			}
 		}
-		if (srcLines.length === 0 || sinkLines.length === 0) {
-			continue;
-		}
 
-		// Surface each sink that has a source within WINDOW lines — that pairing is the flow to trace.
-		for (const sink of sinkLines) {
-			const near = srcLines.find((s) => Math.abs(s.line - sink.line) <= WINDOW);
-			if (!near) {
-				continue;
-			}
-			flowCount += 1;
-			hints.push({
-				file: path,
-				line: sink.line,
-				pattern: `source→sink: ${near.label} → ${sink.label}`,
-				context: sink.content.trim().slice(0, 160),
-				inDiff: true,
-				flags: {
-					sourceLine: near.line,
-					sourceToken: near.label,
-					sinkToken: sink.label,
-					lineDistance: Math.abs(near.line - sink.line),
-				},
-			});
-		}
-	}
+		const directions =
+			flowCount > 0
+				? [
+						`Found ${flowCount} added line(s) where an untrusted-input source (request/params/env/file/stdin/argv) and a dangerous sink (raw SQL concat, exec/eval/system, innerHTML, path join, template render, deserialize) co-occur within ${WINDOW} lines.`,
+						"Trace whether the source reaches the sink without validation/escaping/parameterization, and confirm before deciding.",
+					]
+				: noMatchDirections(linesAdded, ctx.change.size);
 
-	const directions =
-		flowCount > 0
-			? [
-					`Found ${flowCount} added line(s) where an untrusted-input source (request/params/env/file/stdin/argv) and a dangerous sink (raw SQL concat, exec/eval/system, innerHTML, path join, template render, deserialize) co-occur within ${WINDOW} lines — trace whether the source reaches the sink without validation/escaping/parameterization, and confirm before deciding.`,
-				]
-			: [];
-
-	return {
-		hints: hints.slice(0, 40),
-		metrics: { sourceSinkFlows: flowCount, filesScanned: diffFiles.size, linesAdded },
-		directions,
-	};
-}
+		return {
+			leads: leads.slice(0, 40),
+			facts: { sourceSinkFlows: flowCount, filesScanned: ctx.change.size, linesAdded },
+			directions,
+		};
+	},
+});

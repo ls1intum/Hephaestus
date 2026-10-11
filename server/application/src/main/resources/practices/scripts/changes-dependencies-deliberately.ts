@@ -1,21 +1,43 @@
-// Precompute HINTS for changes-dependencies-deliberately. Surfaces candidates only — the LLM judges whether a
-// dependency edit was deliberate (intentional add/remove/bump with an appropriate constraint) or careless
-// (loosened pin, dropped version, no lockfile). General by design: a per-manifest pattern table keyed off
-// the file basename, NOT a single ecosystem. Adding an ecosystem = adding a row, no engine change.
+// Finds the changed lines of dependency manifests, for the review to judge if each dependency edit was
+// deliberate: an intended add, remove or bump with a fitting constraint. A careless edit loosens a pin,
+// drops a version, or leaves no lockfile. A table of manifests, keyed by the file name, covers all
+// ecosystems. To add an ecosystem, add a row.
 //
-// The table reads changed lines, not manifest sections, so a match is a CANDIDATE dependency line: a
-// package.json `engines` entry or a Cargo `[package]` `rust-version` has a dependency line's shape too, and
-// only the section around it says which it is. We pair an added line against a removed line for the SAME
-// name and label the constraint delta between the two lines:
-//   ONLY_ADDED    — the name matches only on a + line (new, or moved or reformatted from outside the diff)
-//   ONLY_REMOVED  — the name matches only on a - line (dropped, or moved or reformatted)
-//   PIN_LOOSENED  — exact/narrower constraint became a range/caret/tilde (==1.2.3 -> >=1.2, 1.2.3 -> ^1.2.3)
-//   PIN_DROPPED   — a version constraint was present and is now entirely absent
-//   BUMPED        — same constraint shape, different version value
-// Manifests that spread one dependency over several lines (Maven, XcodeGen) get no such label; their changed
-// dependency lines are surfaced as raw leads.
+// The table reads changed lines, not manifest sections, so a match is a candidate dependency line. A
+// package.json `engines` entry or a Cargo `[package]` `rust-version` has the shape of a dependency line
+// too, and only the section around it tells which it is. An added line and a removed line with the same
+// name are a pair, and the lead kind tells the constraint delta between them:
+//   only-added    the name matches only on an added line (new, or moved or reformatted)
+//   only-removed  the name matches only on a removed line (dropped, or moved or reformatted)
+//   pin-loosened  an exact or narrower constraint became a range, a caret or a tilde
+//   pin-dropped   a version constraint was present and is now absent
+//   bumped        the same constraint shape with a different version
+// A manifest that spreads one dependency over several lines (Maven, XcodeGen) gets no such kind. Its
+// changed dependency lines are raw-manifest-line leads.
+import { DIRECTION_CHARS, factsOf, oneLine } from "../lib/bounded-text.ts";
 import { globFilesSync } from "../lib/files.ts";
-import type { DiffFile, Hint, PullRequestMetadata } from "../lib/types.ts";
+import {
+	definePracticeScript,
+	expectKind,
+	type DiffFile,
+	type Lead,
+} from "../lib/practice-script.ts";
+
+const KINDS = {
+	"only-added":
+		"A dependency name that matches only on an added line of a manifest: new, or moved or reformatted.",
+	"only-removed":
+		"A dependency name that matches only on a removed line of a manifest: dropped, or moved or reformatted.",
+	"pin-loosened":
+		"A dependency whose exact or narrower constraint became a range, a caret or a tilde.",
+	"pin-dropped": "A dependency whose version constraint was present and is now absent.",
+	bumped: "A dependency whose constraint keeps its shape with a different version.",
+	unchanged:
+		"A dependency line pair whose constraint text did not change, such as a reflowed line.",
+	"raw-manifest-line":
+		"A changed line of a pom.xml or an XcodeGen project.yml that is part of a dependency over several lines.",
+};
+type DependencyKind = keyof typeof KINDS;
 
 // ecosystem key -> how to recognise its manifest + lockfile, and how to read a "name => constraint" line.
 interface Ecosystem {
@@ -57,11 +79,11 @@ function isVersionish(c: string): boolean {
 	return VERSIONISH.test(c.trim());
 }
 
-// --- per-ecosystem line parsers (kept deliberately small + tolerant; the LLM reads full context) ---
+// --- per-ecosystem line parsers (kept deliberately small + tolerant; the review reads full context) ---
 
 // JSON "name": "constraint"  (package.json dependency blocks)
 const reJsonDep = /^\s*"(?<name>[^"]+)"\s*:\s*"(?<constraint>[^"]*)"\s*,?\s*$/u;
-// Well-known package.json scalar keys that are NOT dependencies — skip so we don't emit a "dep" hint for the
+// Well-known package.json scalar keys that are NOT dependencies — skip so we don't emit a lead for the
 // package's own name/version/etc. Generic to npm manifests, not repo-specific.
 const NPM_NON_DEP_KEYS = new Set([
 	"name",
@@ -275,24 +297,24 @@ function ecosystemFor(path: string): Ecosystem | null {
 }
 
 // Classify the constraint delta for a dependency present on both sides (added + removed for same name).
-function classifyDelta(oldC: string, newC: string): string {
+function classifyDelta(oldC: string, newC: string): DependencyKind {
 	const o = oldC.trim();
 	const n = newC.trim();
 	// Identical constraint text on both sides means the -X/+X pair differs only by whitespace/newline (e.g. a
 	// trailing-newline reflow): there is no version change, so surface a neutral no-change fact rather than a
-	// phantom version bump. UNCHANGED is informational only and is never counted toward the bump tally.
+	// phantom version bump. `unchanged` is informational only and is never counted toward the bump tally.
 	if (o === n) {
-		return "UNCHANGED";
+		return "unchanged";
 	}
 	const oExact = !isLoose(o);
 	const nLoose = isLoose(n);
 	if (n === "" && o !== "") {
-		return "PIN_DROPPED";
+		return "pin-dropped";
 	}
 	if (oExact && nLoose) {
-		return "PIN_LOOSENED";
+		return "pin-loosened";
 	}
-	return "BUMPED";
+	return "bumped";
 }
 
 // Collect { name -> constraint } from added/removed manifest lines for a single ecosystem file.
@@ -316,180 +338,182 @@ function namedPaths(paths: readonly string[]): string {
 	return paths.length > PATHS_NAMED ? `${named} and ${paths.length - PATHS_NAMED} more` : named;
 }
 
-/** The hint's context line: the matched name and constraint on its side, or the delta between the two. */
-function dependencyContext(fact: string, name: string, oldC: string, newC: string): string {
-	if (fact === "ONLY_ADDED") {
-		return `+ ${name} ${newC}`.trim();
-	}
-	return fact === "ONLY_REMOVED" ? `- ${name} ${oldC}`.trim() : `${name}: ${oldC} -> ${newC}`;
-}
+export default definePracticeScript({
+	meta: { kinds: KINDS },
+	async run(ctx) {
+		expectKind(ctx, "scm.pull_request");
+		const leads: Lead[] = [];
+		const changedManifests = new Set<string>();
+		const touchedLockfiles = new Set<string>();
+		let onlyAdded = 0;
+		let onlyRemoved = 0;
+		let pinsLoosened = 0;
+		let pinsDropped = 0;
+		let bumped = 0;
+		let unpairedManifestLines = 0;
 
-export default function changesDependenciesDeliberately(
-	repoPath: string,
-	diffFiles: Map<string, DiffFile>,
-	_m: PullRequestMetadata,
-) {
-	const hints: Hint[] = [];
-	const changedManifests = new Set<string>();
-	const touchedLockfiles = new Set<string>();
-	let onlyAdded = 0;
-	let onlyRemoved = 0;
-	let pinsLoosened = 0;
-	let pinsDropped = 0;
-	let bumped = 0;
-	let unpairedManifestLines = 0;
-
-	// Where the checkout holds a file with a lockfile's name. A path anywhere in the repository is not
-	// evidence that it belongs to a changed manifest; the paths are reported for the review to relate.
-	const allLockfileNames = new Set(
-		ECOSYSTEMS.flatMap((e) => e.lockfiles.map((l) => l.toLowerCase())),
-	);
-	const checkoutLockfiles: string[] = [];
-	for (const ext of ["json", "lock", "yaml", "resolved", "lockfile", "sum"]) {
-		for (const f of globFilesSync(`**/*.${ext}`, repoPath)) {
-			if (allLockfileNames.has(basenameLower(f))) {
-				checkoutLockfiles.push(f);
+		// Where the checkout holds a file with a lockfile's name. A path anywhere in the repository is not
+		// evidence that it belongs to a changed manifest; the paths are reported for the review to relate.
+		const allLockfileNames = new Set(
+			ECOSYSTEMS.flatMap((e) => e.lockfiles.map((l) => l.toLowerCase())),
+		);
+		const checkoutLockfiles: string[] = [];
+		for (const ext of ["json", "lock", "yaml", "resolved", "lockfile", "sum"]) {
+			for (const f of globFilesSync(`**/*.${ext}`, ctx.repo)) {
+				if (allLockfileNames.has(basenameLower(f))) {
+					checkoutLockfiles.push(f);
+				}
 			}
 		}
-	}
 
-	for (const [path, df] of diffFiles) {
-		const base = basenameLower(path);
-		if (allLockfileNames.has(base)) {
-			touchedLockfiles.add(path);
-			continue;
-		}
-		const eco = ecosystemFor(path);
-		if (!eco) {
-			continue;
-		}
-		changedManifests.add(path);
+		for (const [path, df] of ctx.change) {
+			const base = basenameLower(path);
+			if (allLockfileNames.has(base)) {
+				touchedLockfiles.add(path);
+				continue;
+			}
+			const eco = ecosystemFor(path);
+			if (!eco) {
+				continue;
+			}
+			changedManifests.add(path);
 
-		const { dependencyLine } = eco;
-		if (dependencyLine !== undefined) {
-			for (const side of ["removed", "added"] as const) {
-				const lines = [...(side === "added" ? df.addedLines : df.removedLines)];
-				for (const [ln, content] of lines.filter(([, c]) => dependencyLine.test(c))) {
-					unpairedManifestLines += 1;
-					hints.push({
-						file: path,
-						line: ln,
-						pattern: "candidate:raw manifest line",
-						context: `${side === "added" ? "+" : "-"} ${content.trim()}`.slice(0, 160),
-						inDiff: true,
-						flags: { ecosystem: base, side },
+			const { dependencyLine } = eco;
+			if (dependencyLine !== undefined) {
+				for (const side of ["removed", "added"] as const) {
+					const lines = [...(side === "added" ? df.addedLines : df.removedLines)];
+					for (const [ln] of lines.filter(([, c]) => dependencyLine.test(c))) {
+						unpairedManifestLines += 1;
+						leads.push({
+							at: { change: path, line: ln, side: side === "added" ? "NEW" : "OLD" },
+							kind: "raw-manifest-line",
+							facts: { ecosystem: base, side },
+						});
+					}
+				}
+				continue;
+			}
+			const added = collectDeps(df, eco, "added");
+			const removed = collectDeps(df, eco, "removed");
+
+			// helper to find the diff line for a dependency name on a given side (for lead placement). Match on a
+			// quote/word/coordinate boundary, not a bare substring, so a prefix-sharing sibling (react vs
+			// react-dom, or a scoped name appearing inside another package's URL) doesn't grab the wrong line.
+			const lineFor = (name: string, side: "added" | "removed"): number => {
+				const lines = side === "added" ? df.addedLines : df.removedLines;
+				const bounded = new RegExp(`(?:^|[^\\w.\\-/])${escapeRegExp(name)}(?:[^\\w.\\-/]|$)`, "u");
+				for (const [ln, content] of lines) {
+					if (bounded.test(content)) {
+						return ln;
+					}
+				}
+				// Fallback: a constructed key (e.g. a Gradle group:name coordinate) may not survive the boundary
+				// test against the raw line — keep the substring scan so the lead still lands on a real line.
+				for (const [ln, content] of lines) {
+					if (content.includes(name)) {
+						return ln;
+					}
+				}
+				return 0;
+			};
+
+			const allNames = new Set<string>([...added.keys(), ...removed.keys()]);
+			for (const name of allNames) {
+				const inAdded = added.has(name);
+				const inRemoved = removed.has(name);
+				let kind: DependencyKind;
+				let side: "added" | "removed" = "added";
+				if (inAdded && !inRemoved) {
+					kind = "only-added";
+					onlyAdded += 1;
+				} else if (!inAdded && inRemoved) {
+					kind = "only-removed";
+					side = "removed";
+					onlyRemoved += 1;
+				} else {
+					kind = classifyDelta(removed.get(name) ?? "", added.get(name) ?? "");
+					if (kind === "pin-loosened") {
+						pinsLoosened += 1;
+					} else if (kind === "pin-dropped") {
+						pinsDropped += 1;
+					} else if (kind === "unchanged") {
+						// whitespace/newline-only line pair — not a version change, count nothing
+					} else {
+						bumped += 1;
+					}
+				}
+				const line = lineFor(name, side);
+				if (line > 0) {
+					leads.push({
+						at: { change: path, line, side: side === "added" ? "NEW" : "OLD" },
+						kind,
+						facts: factsOf({
+							ecosystem: base,
+							name,
+							oldConstraint: inAdded && inRemoved ? (removed.get(name) ?? "") : "",
+							newConstraint: inAdded && inRemoved ? (added.get(name) ?? "") : "",
+						}),
 					});
 				}
 			}
-			continue;
 		}
-		const added = collectDeps(df, eco, "added");
-		const removed = collectDeps(df, eco, "removed");
 
-		// helper to find the diff line for a dependency name on a given side (for hint placement). Match on a
-		// quote/word/coordinate boundary, not a bare substring, so a prefix-sharing sibling (react vs
-		// react-dom, or a scoped name appearing inside another package's URL) doesn't grab the wrong line.
-		const lineFor = (name: string, side: "added" | "removed"): number => {
-			const lines = side === "added" ? df.addedLines : df.removedLines;
-			const bounded = new RegExp(`(?:^|[^\\w.\\-/])${escapeRegExp(name)}(?:[^\\w.\\-/]|$)`, "u");
-			for (const [ln, content] of lines) {
-				if (bounded.test(content)) {
-					return ln;
-				}
-			}
-			// Fallback: a constructed key (e.g. a Gradle group:name coordinate) may not survive the boundary
-			// test against the raw line — keep the substring scan so the hint still lands on a real line.
-			for (const [ln, content] of lines) {
-				if (content.includes(name)) {
-					return ln;
-				}
-			}
-			return 0;
-		};
+		const lockfilePresent = checkoutLockfiles.length > 0 || touchedLockfiles.size > 0;
+		const listed = leads.slice(0, 40);
+		const rawLinesListed = listed.filter((lead) => lead.kind === "raw-manifest-line").length;
 
-		const allNames = new Set<string>([...added.keys(), ...removed.keys()]);
-		for (const name of allNames) {
-			const inAdded = added.has(name);
-			const inRemoved = removed.has(name);
-			let fact: string;
-			let side: "added" | "removed" = "added";
-			if (inAdded && !inRemoved) {
-				fact = "ONLY_ADDED";
-				onlyAdded += 1;
-			} else if (!inAdded && inRemoved) {
-				fact = "ONLY_REMOVED";
-				side = "removed";
-				onlyRemoved += 1;
+		const directions: string[] = [];
+		if (changedManifests.size > 0) {
+			directions.push(
+				`Manifest-named file(s) changed (${changedManifests.size}). The name alone is no occasion: a changed external dependency declaration, resolution, source or pin inside one is, and internal target, test-target, scheme or build-setting wiring alone is not.`,
+				`Candidate lines, matched by shape and not yet placed in a dependency section: ${onlyAdded} only on an added line, ${onlyRemoved} only on a removed line, ${pinsLoosened} pin(s) loosened, ${pinsDropped} pin(s) dropped, ${bumped} version bump(s).`,
+				"A metadata field such as a package.json engines entry or a Cargo rust-version has the same shape, and a name on one side only may be a moved or reformatted line rather than a new or dropped dependency.",
+				`Read the section around each before treating it as a dependency change${unpairedManifestLines > 0 ? `; the ${unpairedManifestLines} raw multi-line manifest line(s) are not in these counts, so a zero here does not show that nothing changed` : ""}. Then investigate whether each dependency constraint change is deliberate and appropriately bounded.`,
+			);
+			if (leads.length === 0) {
+				directions.push(
+					"No changed line in these manifests has the dependency shape this script reads. Read the changed sections before deciding.",
+					"A declaration spread over lines can escape a per-line reading, while internal wiring such as a target dependency, a test target or a scheme entry declares no external dependency.",
+				);
+			}
+			if (unpairedManifestLines > 0) {
+				directions.push(
+					`${unpairedManifestLines} changed dependency line(s) in a pom.xml or XcodeGen project.yml carry no added, removed or pin label${rawLinesListed < unpairedManifestLines ? `, and only ${rawLinesListed} of them are listed as raw lines here — read the manifest diffs for the other ${unpairedManifestLines - rawLinesListed}` : " and are listed as raw lines"}.`,
+					"These manifests spread one dependency over several lines and the diff shows only the changed ones. Read the manifest around each to tell an addition from a version change or a reordering.",
+					"A pom.xml coordinate may also be a build plugin or a parent/BOM rather than a dependency.",
+				);
+			}
+			if (lockfilePresent) {
+				directions.push(
+					oneLine(
+						`Lockfile-named file(s) in the checkout: ${checkoutLockfiles.length === 0 ? "none" : namedPaths(checkoutLockfiles)}; touched in this diff: ${touchedLockfiles.size === 0 ? "none" : namedPaths([...touchedLockfiles])}.`,
+						DIRECTION_CHARS,
+					),
+					"A lockfile answers for a changed manifest when the ecosystem resolves that manifest through it: beside it, or at a parent workspace root whose configuration includes it.",
+					"Read the paths and that configuration before expecting a matching update.",
+				);
 			} else {
-				fact = classifyDelta(removed.get(name) ?? "", added.get(name) ?? "");
-				if (fact === "PIN_LOOSENED") {
-					pinsLoosened += 1;
-				} else if (fact === "PIN_DROPPED") {
-					pinsDropped += 1;
-				} else if (fact === "UNCHANGED") {
-					// whitespace/newline-only line pair — not a version change, count nothing
-				} else {
-					bumped += 1;
-				}
+				directions.push(
+					"No file with a lockfile name these ecosystems write was found in the checkout or touched in the diff — investigate whether the ecosystem expects a committed lockfile to make the resolved versions reproducible.",
+				);
 			}
-			const oldC = removed.get(name) ?? "";
-			const newC = added.get(name) ?? "";
-			const ctx = dependencyContext(fact, name, oldC, newC);
-			hints.push({
-				file: path,
-				line: lineFor(name, side),
-				pattern: `candidate:${fact}`,
-				context: ctx.slice(0, 160),
-				inDiff: true,
-				flags: { ecosystem: base, name },
-			});
 		}
-	}
 
-	const lockfilePresent = checkoutLockfiles.length > 0 || touchedLockfiles.size > 0;
-	const listed = hints.slice(0, 40);
-	const rawLinesListed = listed.filter((h) => h.pattern === "candidate:raw manifest line").length;
-
-	const directions: string[] = [];
-	if (changedManifests.size > 0) {
-		directions.push(
-			`Manifest-named file(s) changed (${changedManifests.size}). The name alone is no occasion: a changed external dependency declaration, resolution, source or pin inside one is, and internal target, test-target, scheme or build-setting wiring alone is not. Candidate lines, matched by shape and not yet placed in a dependency section: ${onlyAdded} only on an added line, ${onlyRemoved} only on a removed line, ${pinsLoosened} pin(s) loosened, ${pinsDropped} pin(s) dropped, ${bumped} version bump(s). A metadata field such as a package.json engines entry or a Cargo rust-version has the same shape, and a name on one side only may be a moved or reformatted line rather than a new or dropped dependency — read the section around each before treating it as a dependency change${unpairedManifestLines > 0 ? `; the ${unpairedManifestLines} raw multi-line manifest line(s) are not in these counts, so a zero here does not show that nothing changed` : ""}. Then investigate whether each dependency constraint change is deliberate and appropriately bounded.`,
-		);
-		if (hints.length === 0) {
-			directions.push(
-				"No changed line in these manifests has the dependency shape this script reads. Read the changed sections before deciding: a declaration spread over lines can escape a per-line reading, while internal wiring such as a target dependency, a test target or a scheme entry declares no external dependency.",
-			);
-		}
-		if (unpairedManifestLines > 0) {
-			directions.push(
-				`${unpairedManifestLines} changed dependency line(s) in a pom.xml or XcodeGen project.yml carry no added, removed or pin label${rawLinesListed < unpairedManifestLines ? `, and only ${rawLinesListed} of them are listed as raw lines here — read the manifest diffs for the other ${unpairedManifestLines - rawLinesListed}` : " and are listed as raw lines"}: these manifests spread one dependency over several lines and the diff shows only the changed ones. Read the manifest around each to tell an addition from a version change or a reordering; a pom.xml coordinate may also be a build plugin or a parent/BOM rather than a dependency.`,
-			);
-		}
-		if (lockfilePresent) {
-			directions.push(
-				`Lockfile-named file(s) in the checkout: ${checkoutLockfiles.length === 0 ? "none" : namedPaths(checkoutLockfiles)}; touched in this diff: ${touchedLockfiles.size === 0 ? "none" : namedPaths([...touchedLockfiles])}. A lockfile answers for a changed manifest when the ecosystem resolves that manifest through it — beside it, or at a parent workspace root whose configuration includes it — so read the paths and that configuration before expecting a matching update.`,
-			);
-		} else {
-			directions.push(
-				"No file with a lockfile name these ecosystems write was found in the checkout or touched in the diff — investigate whether the ecosystem expects a committed lockfile to make the resolved versions reproducible.",
-			);
-		}
-	}
-
-	return {
-		hints: listed,
-		metrics: {
-			manifestsChanged: changedManifests.size,
-			onlyAdded,
-			onlyRemoved,
-			pinsLoosened,
-			pinsDropped,
-			bumped,
-			unpairedManifestLines,
-			rawLinesListed,
-			lockfilesTouched: touchedLockfiles.size,
-			lockfilePresent: lockfilePresent ? 1 : 0,
-		},
-		directions,
-	};
-}
+		return {
+			leads: listed,
+			facts: {
+				manifestsChanged: changedManifests.size,
+				onlyAdded,
+				onlyRemoved,
+				pinsLoosened,
+				pinsDropped,
+				bumped,
+				unpairedManifestLines,
+				rawLinesListed,
+				lockfilesTouched: touchedLockfiles.size,
+				lockfilePresent: lockfilePresent ? 1 : 0,
+			},
+			directions,
+		};
+	},
+});

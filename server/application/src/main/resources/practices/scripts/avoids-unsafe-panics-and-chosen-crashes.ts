@@ -1,15 +1,20 @@
-// Precompute FACTS for avoids-unsafe-panics-and-chosen-crashes: the added lines that spell a crash
-// operator the author wrote — a force unwrap, `try!`, a force cast, an abort — across languages, each
-// with where it runs: inside a preview block or in a test file. A row matches spelling on one line; it
-// does not know the operand's type, where the value came from, or what bounds it, and the criteria
-// decide which rows are lapses. Implicit traps (a subscript, an integer division) are the input
-// practice's, so they are not listed here. Adding a language = adding a row, no engine change.
+// Finds the added lines that spell a crash operator that the author wrote, in all languages: a force
+// unwrap, `try!`, a force cast or an abort. Each lead tells if the line is inside a preview block or in
+// a test file. A lead matches spelling on one line. It does not know the type of the operand, where the
+// value came from, or what bounds it, so the review decides which leads are lapses. The input practice
+// owns implicit traps, such as a subscript or an integer division. To add a language, add a row.
 import { readFile } from "node:fs/promises";
 import nodePath from "node:path";
 
+import { DIRECTION_CHARS, listWithin, oneLine } from "../lib/bounded-text.ts";
 import { blockExtents, codeLines, isCommentLine } from "../lib/declarations.ts";
 import { isTestPath, languageOf } from "../lib/languages.ts";
-import type { DiffFile, Hint, PullRequestMetadata } from "../lib/types.ts";
+import {
+	definePracticeScript,
+	expectKind,
+	type DiffFile,
+	type Lead,
+} from "../lib/practice-script.ts";
 
 // language key -> [label, regex] of crash operators the author writes, matched against the line's code.
 const LANG_PATTERNS: Record<string, [string, RegExp][]> = {
@@ -124,65 +129,85 @@ async function previewLines(
 	return lines;
 }
 
-export default async function avoidsUnsafePanicsAndChosenCrashes(
-	repoPath: string,
-	diffFiles: Map<string, DiffFile>,
-	_m: PullRequestMetadata,
-) {
-	const hints: Hint[] = [];
-	const byKind: Record<string, number> = {};
-	for (const [path, df] of diffFiles) {
-		const lang = languageOf(path);
-		const patterns = lang === null ? undefined : LANG_PATTERNS[lang];
-		if (lang === null || !patterns) {
-			continue;
-		}
-		const code = codeLines(lang, df.addedLines);
-		const preview = lang === "swift" ? await previewLines(repoPath, df, lang) : new Set<number>();
-		const testFile = isTestPath(path);
-		for (const [line, content] of df.addedLines) {
-			if (isCommentLine(content, lang)) {
-				continue;
-			}
-			const labels = patterns
-				.filter(([, re]) => re.test(code.get(line) ?? ""))
-				.map(([name]) => name);
-			if (labels.length === 0) {
-				continue;
-			}
-			for (const label of labels) {
-				byKind[label] = (byKind[label] ?? 0) + 1;
-			}
-			hints.push({
-				file: path,
-				line,
-				pattern: `${lang}:${labels.join(" + ")}`,
-				context: content.trim().slice(0, 160),
-				inDiff: true,
-				flags: { inPreview: preview.has(line), testFile },
-			});
-		}
-	}
-	// Rows on an ordinary path first, so preview and test rows cannot push them out of a shown sample.
-	hints.sort(
-		(a, b) =>
-			Number(a.flags.inPreview === true || a.flags.testFile === true) -
-			Number(b.flags.inPreview === true || b.flags.testFile === true),
-	);
-	const inPreview = hints.filter((h) => h.flags.inPreview === true).length;
-	const inTests = hints.filter((h) => h.flags.testFile === true).length;
-	const kinds = Object.entries(byKind)
-		.map(([kind, count]) => `${String(count)} ${kind}`)
-		.join(", ");
-	const directions =
-		hints.length > 0
-			? [
-					`${hints.length} added line(s) spell a crash operator (${kinds}); ${inPreview} sit inside a preview block and ${inTests} in test files. String-literal text and comments were not scanned. A row matches spelling on one line: it does not know the operand's type, where the value came from, or what bounds it.`,
-				]
-			: [];
-	return {
-		hints: hints.slice(0, 40),
-		metrics: { crashOperatorLines: hints.length, inPreview, inTests, ...byKind },
-		directions,
-	};
+/** One added line that spells a crash operator, with where it runs. */
+interface CrashLine {
+	path: string;
+	line: number;
+	language: string;
+	operators: string;
+	inPreview: boolean;
+	testFile: boolean;
 }
+
+export default definePracticeScript({
+	meta: {
+		kinds: {
+			"crash-operator":
+				"An added line that spells a crash operator; its facts name the language, the operators, and if it runs in a preview block or a test file.",
+		},
+	},
+	async run(ctx) {
+		expectKind(ctx, "scm.pull_request");
+		const rows: CrashLine[] = [];
+		const byKind: Record<string, number> = {};
+		for (const [path, df] of ctx.change) {
+			const lang = languageOf(path);
+			const patterns = lang === null ? undefined : LANG_PATTERNS[lang];
+			if (lang === null || !patterns) {
+				continue;
+			}
+			const code = codeLines(lang, df.addedLines);
+			const preview = lang === "swift" ? await previewLines(ctx.repo, df, lang) : new Set<number>();
+			const testFile = isTestPath(path);
+			for (const [line, content] of df.addedLines) {
+				if (isCommentLine(content, lang)) {
+					continue;
+				}
+				const labels = patterns
+					.filter(([, re]) => re.test(code.get(line) ?? ""))
+					.map(([name]) => name);
+				if (labels.length === 0) {
+					continue;
+				}
+				for (const label of labels) {
+					byKind[label] = (byKind[label] ?? 0) + 1;
+				}
+				rows.push({
+					path,
+					line,
+					language: lang,
+					operators: labels.join(" + "),
+					inPreview: preview.has(line),
+					testFile,
+				});
+			}
+		}
+		// Rows on an ordinary path first, so preview and test rows cannot push them out of the leads.
+		rows.sort((a, b) => Number(a.inPreview || a.testFile) - Number(b.inPreview || b.testFile));
+		const inPreview = rows.filter((row) => row.inPreview).length;
+		const inTests = rows.filter((row) => row.testFile).length;
+		const kinds = Object.entries(byKind).map(([kind, count]) => `${String(count)} ${kind}`);
+		const directions =
+			rows.length > 0
+				? [
+						oneLine(
+							`${rows.length} added line(s) spell a crash operator: ${listWithin(kinds, DIRECTION_CHARS - 60)}.`,
+							DIRECTION_CHARS,
+						),
+						`${inPreview} sit inside a preview block and ${inTests} in test files. String-literal text and comments were not scanned.`,
+						"A lead matches spelling on one line: it does not know the operand's type, where the value came from, or what bounds it.",
+					]
+				: [];
+		const leads: Lead[] = rows.slice(0, 40).map((row) => ({
+			at: { change: row.path, line: row.line },
+			kind: "crash-operator",
+			facts: {
+				language: row.language,
+				operators: row.operators,
+				inPreview: row.inPreview,
+				testFile: row.testFile,
+			},
+		}));
+		return { leads, facts: { crashOperatorLines: rows.length, inPreview, inTests }, directions };
+	},
+});

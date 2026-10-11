@@ -1,8 +1,7 @@
-/** Commit-subject shapes are review hints, not practice verdicts. */
+/** Commit-subject shapes are leads for the review, not practice verdicts. */
 
 import type { ChangeCommit, ChangedFile } from "./change.ts";
-import { contextFile } from "./context.ts";
-import type { Hint } from "./types.ts";
+import type { Lead } from "./contract.ts";
 
 interface SubjectFacts {
 	sha: string;
@@ -21,8 +20,6 @@ interface SubjectFacts {
 	cutOff: boolean;
 	bodyLines: number;
 	files: ChangedFile[];
-	/** The line of commits.json carrying the commit's `sha`; 0 when unknown. */
-	line: number;
 }
 
 const FILLER =
@@ -76,23 +73,25 @@ export function subjectFacts(commits: readonly ChangeCommit[]): SubjectFacts[] {
 			cutOff: !merge && DANGLING.test(subject),
 			bodyLines: body.length,
 			files: commit.files,
-			line: commit.line,
 		});
 	}
 	return facts;
 }
 
+/**
+ * The lead kind of one authored commit. The server writes `commits.json` on one line, so a lead cites
+ * the whole record and names the commit by its short `sha`.
+ */
+export const COMMIT_KIND = "commit";
+
 /** Subject clarity uses the words and their shapes, not a commit's code or scope. */
-export function subjectRows(facts: readonly SubjectFacts[], contextReference: string): Hint[] {
+export function subjectLeads(facts: readonly SubjectFacts[]): Lead[] {
 	return facts
 		.filter((fact) => !fact.merge)
 		.map((fact) => ({
-			file: contextFile(contextReference, "commits.json"),
-			line: fact.line,
-			pattern: "commit",
-			context: `${fact.sha} ${fact.subject}`,
-			inDiff: false,
-			flags: { bare: fact.bare, repeat: fact.repeat, cutOff: fact.cutOff },
+			at: { record: "commits.json" },
+			kind: COMMIT_KIND,
+			facts: { sha: fact.sha, bare: fact.bare, repeat: fact.repeat, cutOff: fact.cutOff },
 		}));
 }
 
@@ -111,10 +110,10 @@ function describeFile(file: ChangedFile): string {
 }
 
 /**
- * One record row per authored commit — its subject's shape and what it touched — for the model to read.
+ * One lead per authored commit — its subject's shape and what it touched — for the model to read.
  * The files with content changes come first, each with its line counts, then the moves.
  */
-export function commitRows(facts: readonly SubjectFacts[], contextReference: string): Hint[] {
+export function commitLeads(facts: readonly SubjectFacts[]): Lead[] {
 	return facts
 		.filter((f) => !f.merge)
 		.map((f) => {
@@ -122,13 +121,12 @@ export function commitRows(facts: readonly SubjectFacts[], contextReference: str
 			const ordered = [...f.files.filter((file) => !isMove(file)), ...moved];
 			const shown = ordered.slice(0, LISTED_FILES).map(describeFile).join(", ");
 			const more = ordered.length - LISTED_FILES;
+			const paths = more > 0 ? `${shown}, +${String(more)} more` : shown;
 			return {
-				file: contextFile(contextReference, "commits.json"),
-				line: f.line,
-				pattern: "commit",
-				context: `${f.sha} ${f.subject}`,
-				inDiff: false,
-				flags: {
+				at: { record: "commits.json" },
+				kind: COMMIT_KIND,
+				facts: {
+					sha: f.sha,
 					bare: f.bare,
 					repeat: f.repeat,
 					joinedClauses: f.joinedClauses,
@@ -136,7 +134,8 @@ export function commitRows(facts: readonly SubjectFacts[], contextReference: str
 					bodyLines: f.bodyLines,
 					files: f.files.length,
 					moved: moved.length,
-					paths: more > 0 ? `${shown}, +${String(more)} more` : shown,
+					// A fact holds at most 200 characters; an empty one is no fact.
+					...(paths === "" ? {} : { paths: paths.slice(0, 200) }),
 				},
 			};
 		});
@@ -145,5 +144,5 @@ export function commitRows(facts: readonly SubjectFacts[], contextReference: str
 export function describeCommitCount(facts: readonly SubjectFacts[]): string {
 	const authored = facts.filter((f) => !f.merge).length;
 	const merges = facts.length - authored;
-	return `${authored} authored commit(s)${merges ? `, ${merges} merge commit(s) excluded` : ""}, one row each under Record facts.`;
+	return `${authored} authored commit(s)${merges ? `, ${merges} merge commit(s) excluded` : ""}, one lead each.`;
 }

@@ -65,7 +65,7 @@ function place(decls: Declaration[] | null, line: number, scope: RegExp | undefi
 
 export async function scanAddedLines(
 	repoPath: string,
-	diffFiles: Map<string, DiffFile>,
+	diffFiles: ReadonlyMap<string, DiffFile>,
 	options: SourceScanOptions,
 ): Promise<SourceScan> {
 	const scan: SourceScan = {

@@ -1,36 +1,37 @@
-// Precompute FACTS for issue-has-checkable-outcome: the task-list items the body carries and how the
-// issue is labelled and typed. Whether any of the text is a finish line is the criteria's to decide.
-import { bodyFact, classifyIssue, type IssueMetadata } from "../lib/issue-classification.ts";
+// Counts the task-list items in the issue body and reads the labels and the type of the issue.
+// The review decides if any of the text is a finish line.
+import { DIRECTION_CHARS, oneLine } from "../lib/bounded-text.ts";
+import { bodyFact, classifyIssue } from "../lib/issue-classification.ts";
+import { definePracticeScript, expectKind } from "../lib/practice-script.ts";
 import { checkableItems } from "../lib/review.ts";
-import type { Hint } from "../lib/types.ts";
 
-export default function issueHasCheckableOutcome(
-	_repo: string,
-	_diff: Map<string, unknown>,
-	m: IssueMetadata,
-) {
-	const shape = classifyIssue(m);
-	const { body, issueType, labels, emptyOrTitleEcho, hasDeliverableType, looksUmbrella } = shape;
-	const items = checkableItems(body);
-	const checkedBoxes = items.filter((item) => item.checked).length;
-
-	const directions = [
-		...bodyFact(shape),
-		`Captured: ${String(items.length)} task-list item(s) in the body (${String(checkedBoxes)} ticked); labels ${labels.join(", ") || "none"}; native type ${issueType || "none"}. Judge the standard once over the title, the whole body, the comments and any materialised document; these counts locate text and decide nothing.`,
-	];
-
-	const hints: Hint[] = [];
-	return {
-		hints,
-		metrics: {
-			bodyLength: body.length,
-			taskCheckboxes: items.length,
-			uncheckedBoxes: items.length - checkedBoxes,
-			checkedBoxes,
-			emptyOrTitleEcho: emptyOrTitleEcho ? 1 : 0,
-			hasDeliverableType: hasDeliverableType ? 1 : 0,
-			looksUmbrella: looksUmbrella ? 1 : 0,
-		},
-		directions,
-	};
-}
+export default definePracticeScript({
+	meta: { kinds: {} },
+	async run(ctx) {
+		expectKind(ctx, "scm.issue");
+		const shape = classifyIssue(ctx.work);
+		const { body, issueType, labels, emptyOrTitleEcho, hasDeliverableType, looksUmbrella } = shape;
+		const items = checkableItems(body);
+		const checkedBoxes = items.filter((item) => item.checked).length;
+		return {
+			leads: [],
+			facts: {
+				bodyLength: body.length,
+				taskCheckboxes: items.length,
+				uncheckedBoxes: items.length - checkedBoxes,
+				checkedBoxes,
+				emptyOrTitleEcho: emptyOrTitleEcho ? 1 : 0,
+				hasDeliverableType: hasDeliverableType ? 1 : 0,
+				looksUmbrella: looksUmbrella ? 1 : 0,
+			},
+			directions: [
+				...bodyFact(shape),
+				oneLine(
+					`Captured: ${String(items.length)} task-list item(s) in the body (${String(checkedBoxes)} ticked); labels ${labels.join(", ") || "none"}; native type ${issueType || "none"}.`,
+					DIRECTION_CHARS,
+				),
+				"Judge the standard once over the title, the whole body, the comments and any materialised document; these counts locate text and decide nothing.",
+			],
+		};
+	},
+});

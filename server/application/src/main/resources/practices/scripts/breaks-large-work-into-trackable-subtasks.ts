@@ -1,41 +1,36 @@
-// Precompute FACTS for breaks-large-work-into-trackable-subtasks: the task-list items and issue-number
-// mentions the body carries, its labels, and the captured sub-issue rollup with its source. Whether the
-// work is large and whether it is broken down are the criteria's to decide from the text.
-import {
-	bodyFact,
-	classifyIssue,
-	subIssueRollup,
-	type IssueMetadata,
-} from "../lib/issue-classification.ts";
+// Finds the task-list items and the issue-number mentions in the body of an issue, its labels, and the
+// sub-issue rollup with its source. The criteria decide from the text if the work is large and if it
+// is broken down.
+import { DIRECTION_CHARS, listWithin } from "../lib/bounded-text.ts";
+import { bodyFact, classifyIssue, subIssueRollup } from "../lib/issue-classification.ts";
+import { definePracticeScript, expectKind } from "../lib/practice-script.ts";
 import { checkableItems } from "../lib/review.ts";
-import type { Hint } from "../lib/types.ts";
 
-export default function breaksLargeWorkIntoTrackableSubtasks(
-	_repo: string,
-	_diff: Map<string, unknown>,
-	m: IssueMetadata,
-) {
-	const shape = classifyIssue(m);
-	const { body, labels } = shape;
-	const items = checkableItems(body);
-	const checked = items.filter((item) => item.checked).length;
-	const issueMentions = new Set((body.match(/(?:^|\s)#\d+\b/gu) ?? []).map((s) => s.trim())).size;
-	const rollup = subIssueRollup(m);
+export default definePracticeScript({
+	meta: { kinds: {} },
+	async run(ctx) {
+		expectKind(ctx, "scm.issue");
+		const shape = classifyIssue(ctx.work);
+		const { body, labels } = shape;
+		const items = checkableItems(body);
+		const checked = items.filter((item) => item.checked).length;
+		const issueMentions = new Set((body.match(/(?:^|\s)#\d+\b/gu) ?? []).map((s) => s.trim())).size;
+		const rollup = subIssueRollup(ctx.work);
 
-	const directions = [
-		...bodyFact(shape),
-		`Captured: ${String(items.length)} task-list item(s) (${String(checked)} ticked), ${String(issueMentions)} issue-number mention(s), ${rollup.text}; labels ${labels.join(", ") || "none"}. Judge the standard once: whether the work is large and whether these items or mentions break it down is read from what they say, never from how many there are.`,
-	];
-
-	const hints: Hint[] = [];
-	return {
-		hints,
-		metrics: {
-			bodyLength: body.length,
-			taskCheckboxes: items.length,
-			childIssueRefs: issueMentions,
-			...rollup.metrics,
-		},
-		directions,
-	};
-}
+		return {
+			leads: [],
+			facts: {
+				bodyLength: body.length,
+				taskCheckboxes: items.length,
+				childIssueRefs: issueMentions,
+				...rollup.metrics,
+			},
+			directions: [
+				...bodyFact(shape),
+				`Captured: ${String(items.length)} task-list item(s) (${String(checked)} ticked), ${String(issueMentions)} issue-number mention(s); labels ${listWithin(labels, DIRECTION_CHARS - 120) || "none"}.`,
+				`Sub-issues: ${rollup.text}.`,
+				"Judge the standard once: whether the work is large and whether these items or mentions break it down is read from what they say, never from how many there are.",
+			],
+		};
+	},
+});

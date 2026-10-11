@@ -1,17 +1,15 @@
-import { contextFile } from "../lib/context.ts";
+// Finds each captured linked issue of a merged pull request: its task-list items as captured, ticked
+// and unticked, its sub-issue rollup, its state, and how the change names it. The review decides which
+// of them this change implements. A lead is a candidate, not a claim.
+import { factsOf } from "../lib/bounded-text.ts";
 import { subIssueRollup } from "../lib/issue-classification.ts";
-import { text } from "../lib/practice-contract.ts";
-// Precompute FACTS for merge-confirms-the-linked-issue-outcome: every captured linked issue, one row
-// each — its task-list items as captured, ticked and unticked, its state, and how the change names it.
-// Which of them this change implements is the criteria's to decide; a row is a candidate, not an
-// occasion.
+import { definePracticeScript, expectKind, type Lead } from "../lib/practice-script.ts";
 import {
 	branchIssueReferences,
 	closingReferences,
 	issueNumberReferences,
 } from "../lib/references.ts";
-import { checkableItems, mergeFacts, readLinkedWorkItems } from "../lib/review.ts";
-import type { DiffFile, Hint, PullRequestMetadata } from "../lib/types.ts";
+import { checkableItems, readLinkedWorkItems, reviewsMergedWork } from "../lib/review.ts";
 
 /** Headings under which an issue states what "done" means without a task list. */
 const OUTCOME_HEADING =
@@ -31,89 +29,111 @@ function howLinked(
 		: "linked through a commit or another item";
 }
 
-export default async function mergeConfirmsTheLinkedIssueOutcome(
-	_repoPath: string,
-	_diffFiles: Map<string, DiffFile>,
-	metadata: PullRequestMetadata,
-	contextDir: string | undefined,
-	_changeDir: string | undefined,
-	contextReference: string,
-) {
-	const body = text(metadata.body);
-	const closing = new Set(closingReferences(body));
-	const named = new Set([
-		...issueNumberReferences(text(metadata.title)),
-		...issueNumberReferences(body),
-		...branchIssueReferences(metadata.source_branch),
-	]);
-	const captured = await readLinkedWorkItems(contextDir);
-	const linked = captured ?? [];
-	const hints: Hint[] = [];
-	for (const item of linked) {
-		const items = checkableItems(item.body);
-		const ticked = items.filter((i) => i.checked).length;
-		const heading = OUTCOME_HEADING.test(item.body);
-		const rollup = subIssueRollup({
-			sub_issues_total: item.subIssuesTotal,
-			sub_issues_completed: item.subIssuesCompleted,
-			sub_issues_source: item.subIssuesSource,
-		});
-		const subIssues = rollup.total;
-		const checkable = items.length > 0 || heading || (subIssues ?? 0) > 0;
-		let pattern = checkable ? "checkable outcome" : "no checkable outcome";
-		if (subIssues === undefined || (item.subIssuesSource === "children" && subIssues === 0)) {
-			pattern = checkable ? pattern : "no task list or outcome heading";
-		}
-		const rollupFlags: Hint["flags"] = subIssues === undefined ? {} : { subIssuesTotal: subIssues };
-		// The provider's own link outranks what the text says: a link made in the UI matches no `#N`.
-		const how =
-			item.how === "closesOnMerge"
-				? "a provider closing candidate"
-				: howLinked(item.number, closing, named);
-		hints.push({
-			file: contextFile(contextReference, `linked_work_items/${String(item.number)}.md`),
-			line: items[0]?.line ?? 0,
-			pattern,
-			context: `#${String(item.number)} ${item.title} — ${how}; ${String(items.length)} task-list item(s), ${String(ticked)} ticked as captured${heading ? "; an outcome heading" : ""}; ${rollup.text}; state ${item.state ?? "unknown"}`,
-			inDiff: false,
-			flags: {
-				number: item.number,
-				how,
-				taskItems: items.length,
-				ticked,
-				unticked: items.length - ticked,
-				outcomeHeading: heading,
-				...rollupFlags,
-				state: item.state ?? "",
-			},
-		});
-	}
-	const candidates = hints.filter((h) => h.pattern === "checkable outcome");
-	const directions: string[] = [];
-	if (!mergeFacts(metadata).merged) {
-		directions.push("The change is not merged; the practice's occasion is the merge.");
-	} else if (captured === null) {
-		directions.push(
-			"linked_work_items.json was not captured: a collection gap, not a change without a linked issue.",
-		);
-	} else if (candidates.length === 0) {
-		directions.push(
-			linked.length === 0
-				? "The capture holds no linked issue; there is no stated outcome to confirm."
-				: "No captured linked issue carries a task list, an acceptance or Definition-of-Done heading or a positive captured sub-issue count; a rollup the provider does not report says nothing about sub-issues.",
-		);
-	} else {
-		directions.push(
-			`${String(candidates.length)} captured linked issue(s) state a checkable outcome. Each is a candidate: the criteria decide which of them this change implements, from the provider's closing link and the author's own words; a mention alone asks nothing of it. For an issue it implements, assess confirmation in the captured record: its items ticked as captured, or the description or a closing comment naming which items are done and where the rest moves. Work delivered in the diff but neither ticked nor named is unconfirmed. A confirmation captured after the merge counts; when it was written is unknown unless independently dated evidence establishes it.`,
-		);
-	}
-	return {
-		hints,
-		metrics: {
-			linkedItems: linked.length,
-			checkableItems: candidates.length,
-			untickedItems: candidates.reduce((sum, h) => sum + Number(h.flags.unticked), 0),
+export default definePracticeScript({
+	meta: {
+		kinds: {
+			"checkable-outcome":
+				"A linked issue with a task list, an outcome heading or a positive sub-issue count.",
+			"no-checkable-outcome":
+				"A linked issue with no task list, no outcome heading and a sub-issue count of zero.",
+			"no-task-list-or-outcome-heading":
+				"A linked issue with no task list, no outcome heading, and no count that shows it has no sub-issues.",
 		},
-		directions,
-	};
-}
+	},
+	async run(ctx) {
+		expectKind(ctx, "scm.pull_request");
+		if (!reviewsMergedWork(ctx.cause)) {
+			return {
+				leads: [],
+				directions: [
+					"The pull request is not merged. This practice reviews the merge, so it has nothing to check yet.",
+				],
+			};
+		}
+		const { work } = ctx;
+		const body = work.body ?? "";
+		const closing = new Set(closingReferences(body));
+		const named = new Set([
+			...issueNumberReferences(work.title ?? ""),
+			...issueNumberReferences(body),
+			...branchIssueReferences(work.source_branch),
+		]);
+		const captured = await readLinkedWorkItems(ctx.context.dir);
+		const linked = captured ?? [];
+		const leads: Lead[] = [];
+		let untickedItems = 0;
+		for (const item of linked) {
+			const items = checkableItems(item.body);
+			const ticked = items.filter((i) => i.checked).length;
+			const heading = OUTCOME_HEADING.test(item.body);
+			const rollup = subIssueRollup({
+				sub_issues_total: item.subIssuesTotal,
+				sub_issues_completed: item.subIssuesCompleted,
+				sub_issues_source: item.subIssuesSource,
+			});
+			const subIssues = rollup.total;
+			const checkable = items.length > 0 || heading || (subIssues ?? 0) > 0;
+			let kind = checkable ? "checkable-outcome" : "no-checkable-outcome";
+			if (subIssues === undefined || (item.subIssuesSource === "children" && subIssues === 0)) {
+				kind = checkable ? kind : "no-task-list-or-outcome-heading";
+			}
+			if (checkable) {
+				untickedItems += items.length - ticked;
+			}
+			// The provider's own link outranks what the text says: a link made in the UI matches no `#N`.
+			const how =
+				item.how === "closesOnMerge"
+					? "a provider closing candidate"
+					: howLinked(item.number, closing, named);
+			leads.push({
+				at: { record: `linked_work_items/${String(item.number)}.md` },
+				kind,
+				facts: factsOf({
+					number: item.number,
+					how,
+					taskItems: items.length,
+					ticked,
+					unticked: items.length - ticked,
+					outcomeHeading: heading,
+					...(subIssues === undefined ? {} : { subIssuesTotal: subIssues }),
+					...(rollup.completed === undefined ? {} : { subIssuesCompleted: rollup.completed }),
+					subIssuesSource: item.subIssuesSource ?? "",
+					state: item.state ?? "",
+				}),
+			});
+		}
+		const candidates = leads.filter((lead) => lead.kind === "checkable-outcome");
+		const directions: string[] = [];
+		if (captured === null) {
+			directions.push(
+				"linked_work_items.json was not captured: a collection gap, not a change without a linked issue.",
+			);
+		} else if (candidates.length === 0) {
+			directions.push(
+				linked.length === 0
+					? "The capture holds no linked issue; there is no stated outcome to confirm."
+					: "No captured linked issue carries a task list, an acceptance or Definition-of-Done heading or a positive captured sub-issue count; a rollup the provider does not report says nothing about sub-issues.",
+			);
+		} else {
+			directions.push(
+				`${String(candidates.length)} captured linked issue(s) state a checkable outcome. Each is a candidate: the criteria decide which of them this change implements, from the provider's closing link and the author's own words; a mention alone asks nothing of it.`,
+				"For an issue it implements, assess confirmation in the captured record: its items ticked as captured, or the description or a closing comment naming which items are done and where the rest moves.",
+				"Work delivered in the diff but neither ticked nor named is unconfirmed. A confirmation captured after the merge counts; when it was written is unknown unless independently dated evidence establishes it.",
+			);
+		}
+		if (leads.some((lead) => lead.facts?.subIssuesSource === "children")) {
+			directions.push(
+				"subIssuesSource=children counts only the child issues stored at capture. That mirror may omit other children, so all of them closed does not show that the whole hierarchy is complete.",
+			);
+		}
+		return {
+			leads,
+			facts: {
+				linkedItems: linked.length,
+				checkableItems: candidates.length,
+				untickedItems,
+			},
+			directions,
+		};
+	},
+});

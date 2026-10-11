@@ -1,39 +1,49 @@
-// Precompute HINTS for avoids-insecure-defaults-and-over-broad-permissions: locate insecure-default /
-// over-broad-permission / secret-exposure constructs ADDED in the diff, across languages. CANDIDATES only —
-// the LLM confirms whether each is a real, exploitable insecure default on a reachable path. General by
-// design: a pattern table keyed off the construct, applied to every added code line regardless of language.
-import type { DiffFile, Hint, PullRequestMetadata } from "../lib/types.ts";
+// Finds the added code lines that match a pattern of an insecure default, an over-broad permission or
+// an exposed secret, in all languages. Each lead is a candidate: the review decides if it is real and
+// exploitable on a reachable path.
+import { definePracticeScript, expectKind, type Lead } from "../lib/practice-script.ts";
 
-// [label, regex] — each fires on an ADDED line. Tuned to the auth/transport/secret surface a login or API
-// change touches, where a "looks fine" review most often misses the real insecure default.
-const PATTERNS: [string, RegExp][] = [
-	// A credential-named value interpolated into a URL path or query. Matches
-	// ${...}/#{...} (JS/Ruby/Kotlin) and Swift's \(...) interpolation of a credential-named variable into a path.
+const KINDS = {
+	"credential-named-value-in-url-path-query":
+		"An added line that puts a credential-named value into a URL path or query.",
+	"keychain-write":
+		"An added keychain write, whose accessibility class comes from kSecAttrAccessible.",
+	"logs-credential-named-value-response-body":
+		"An added log or print call whose arguments name a token, a password, a credential or a response body.",
+	"insecure-transport-tls-off":
+		"An added line that allows plain HTTP or turns off the verification of TLS certificates.",
+	"over-broad-permission-wildcard":
+		"An added line that grants world-writable file modes, permits all requests, or allows every origin.",
+	"credential-named-literal": "An added line that assigns a literal value to a credential-named field.",
+};
+type InsecureKind = keyof typeof KINDS;
+
+// Each pattern fires on an added line. They are tuned to the surface of authentication, transport and
+// secrets that a login or API change touches, where a quick review most often misses an insecure default.
+const PATTERNS: [InsecureKind, RegExp][] = [
+	// A credential-named value interpolated into a URL path or query. Matches ${...} and #{...} (JS,
+	// Ruby, Kotlin) and Swift's \(...) interpolation of a credential-named variable into a path.
 	[
-		"credential-named value in URL path/query",
+		"credential-named-value-in-url-path-query",
 		/["'`](?:https?:\/\/|\/)[^"'`\n]*(?:\\\(|[$#]\{)[^"'`\n)}]*\b(?:token|secret|password|api[_-]?key|auth|session|refresh)\w*/iu,
 	],
-	// Keychain write — an omitted kSecAttrAccessible defaults to WhenUnlocked; whether the effective class,
-	// synchronization and backup migration fit the stored secret is the review's.
-	["keychain write", /\bSecItemAdd\b|kSecValueData\b/u],
-	// Logging a credential-named value or response body to console/log.
+	// An omitted kSecAttrAccessible defaults to WhenUnlocked. Whether the effective class, the
+	// synchronization and the backup migration fit the stored secret is the review's decision.
+	["keychain-write", /\bSecItemAdd\b|kSecValueData\b/u],
 	[
-		"logs credential-named value / response body",
+		"logs-credential-named-value-response-body",
 		/\b(?:print|NSLog|console\.(?:log|debug|info)|System\.out\.print\w*|log\.(?:debug|info|warn))\s*\([^)]*\b(?:token|password|secret|credential|response|body|account)\b/iu,
 	],
-	// Insecure transport / disabled TLS verification.
 	[
-		"insecure transport / TLS off",
+		"insecure-transport-tls-off",
 		/NSAllowsArbitraryLoads|allowsArbitraryLoads|rejectUnauthorized\s*:\s*false|InsecureSkipVerify\s*:\s*true|verify\s*=\s*False|\.insecure\(\)|http:\/\/(?!localhost|127\.0\.0\.1|0\.0\.0\.0)/u,
 	],
-	// Over-broad permissions / wildcard access.
 	[
-		"over-broad permission / wildcard",
+		"over-broad-permission-wildcard",
 		/chmod\s+0?777|\b0o?777\b|permitAll\(\)|\.anyRequest\(\)\.permitAll|Access-Control-Allow-Origin["'\s:]*\*|allowedOrigins?["'\s:]*\*/u,
 	],
-	// A literal assigned to a credential-named field.
 	[
-		"credential-named literal",
+		"credential-named-literal",
 		/\b(?:password|secret|api[_-]?key|token)\s*[:=]\s*["'`][A-Za-z0-9_\-/+]{8,}["'`]/iu,
 	],
 ];
@@ -42,44 +52,43 @@ function isComment(t: string): boolean {
 	return t.startsWith("//") || t.startsWith("#") || t.startsWith("*") || t.startsWith("/*");
 }
 
-export default function avoidsInsecureDefaultsAndOverBroadPermissions(
-	_repo: string,
-	diffFiles: Map<string, DiffFile>,
-	_m: PullRequestMetadata,
-) {
-	const hints: Hint[] = [];
-	const byKind: Record<string, number> = {};
-	for (const [path, df] of diffFiles) {
-		for (const [line, content] of df.addedLines) {
-			const trimmed = content.trimStart();
-			if (isComment(trimmed)) {
-				continue;
-			}
-			for (const [label, re] of PATTERNS) {
-				if (re.test(content)) {
-					hints.push({
-						file: path,
-						line,
-						pattern: label,
-						context: content.trim().slice(0, 160),
-						inDiff: true,
-						flags: {},
-					});
-					byKind[label] = (byKind[label] ?? 0) + 1;
-					break;
+/** The fact that counts the leads of a kind: `keychain-write` becomes `keychainWrite`. */
+function countFact(kind: InsecureKind): string {
+	return kind.replaceAll(/-(?<letter>[a-z])/gu, (_, letter: string) => letter.toUpperCase());
+}
+
+export default definePracticeScript({
+	meta: { kinds: KINDS },
+	async run(ctx) {
+		expectKind(ctx, "scm.pull_request");
+		const leads: Lead[] = [];
+		const byKind: Record<string, number> = {};
+		for (const [path, df] of ctx.change) {
+			for (const [line, content] of df.addedLines) {
+				if (isComment(content.trimStart())) {
+					continue;
+				}
+				const match = PATTERNS.find(([, re]) => re.test(content));
+				if (match !== undefined) {
+					const [kind] = match;
+					leads.push({ at: { change: path, line }, kind });
+					byKind[countFact(kind)] = (byKind[countFact(kind)] ?? 0) + 1;
 				}
 			}
 		}
-	}
-	const directions =
-		hints.length > 0
-			? [
-					`Found ${hints.length} insecure-default / secret-exposure candidate(s) on added lines — investigate each on the reachable auth/transport surface: for credential-named URL, literal and logging leads, establish the value’s role under class 5 of the standard before deciding whether it exposes credential material; a keychain write takes its accessibility from kSecAttrAccessible, WhenUnlocked when omitted, which is not a defect by itself; disabled TLS / wildcard CORS / world-writable perms are over-broad. Confirm whether each is real and exploitable before deciding.`,
-				]
-			: [];
-	return {
-		hints: hints.slice(0, 40),
-		metrics: { insecureDefaultCandidates: hints.length, ...byKind },
-		directions,
-	};
-}
+		const directions =
+			leads.length > 0
+				? [
+						`Found ${leads.length} insecure-default or secret-exposure candidate(s) on added lines. Investigate each on the reachable auth and transport surface.`,
+						"For credential-named URL, literal and logging leads, establish the value’s role under class 5 of the standard before deciding whether it exposes credential material.",
+						"A keychain write takes its accessibility from kSecAttrAccessible, WhenUnlocked when omitted, which is not a defect by itself.",
+						"Disabled TLS, wildcard CORS and world-writable permissions are over-broad. Confirm whether each is real and exploitable before deciding.",
+					]
+				: [];
+		return {
+			leads: leads.slice(0, 40),
+			facts: { insecureDefaultCandidates: leads.length, ...byKind },
+			directions,
+		};
+	},
+});
