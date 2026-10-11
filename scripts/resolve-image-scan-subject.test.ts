@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+	chmodSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	symlinkSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -103,6 +111,46 @@ for (const scenario of [
 		imageName: "webapp\n",
 		noInspect: true,
 	},
+	{
+		name: "resolves the immutable build artifact before the final index exists",
+		artifactNames: ["c".repeat(64)],
+		raw: { manifests: [{ digest: amd64, platform: { os: "linux", architecture: "amd64" } }] },
+		expected: amd64,
+	},
+	{
+		name: "resolves a Buildpacks leaf from its own platform artifact",
+		artifactNames: ["c".repeat(64)],
+		raw: { config: {}, layers: [] },
+		expected: index,
+		formatLookup: true,
+	},
+	{ name: "rejects a missing build digest", artifactNames: [], raw: {}, noInspect: true },
+	{
+		name: "rejects multiple build digests",
+		artifactNames: ["a".repeat(64), "b".repeat(64)],
+		raw: {},
+		noInspect: true,
+	},
+	{
+		name: "rejects a malformed digest file name",
+		artifactNames: ["bad"],
+		raw: {},
+		noInspect: true,
+	},
+	{
+		name: "rejects a digest symlink",
+		artifactNames: ["c".repeat(64)],
+		artifactSymlink: true,
+		raw: {},
+		noInspect: true,
+	},
+	{
+		name: "rejects ambiguous artifact and image inputs",
+		artifactNames: ["c".repeat(64)],
+		imageRef: reference,
+		raw: {},
+		noInspect: true,
+	},
 ] as const) {
 	void test(scenario.name, { skip: process.platform === "win32" }, (t) => {
 		const directory = mkdtempSync(path.join(tmpdir(), "image-scan-subject-"));
@@ -123,6 +171,18 @@ process.stdout.write(args.includes('--raw') ? process.env.RAW : process.env.SING
 		const callLog = path.join(directory, "calls");
 		writeFileSync(output, "");
 		writeFileSync(callLog, "");
+		const artifactDirectory = path.join(directory, "digest");
+		const artifactNames = "artifactNames" in scenario ? scenario.artifactNames : undefined;
+		if (artifactNames !== undefined) {
+			mkdirSync(artifactDirectory);
+			for (const name of artifactNames) {
+				if ("artifactSymlink" in scenario) {
+					symlinkSync(output, path.join(artifactDirectory, name));
+				} else {
+					writeFileSync(path.join(artifactDirectory, name), "");
+				}
+			}
+		}
 		const imageRef = "imageRef" in scenario ? scenario.imageRef : reference;
 		const platform = ("platform" in scenario ? scenario.platform : undefined) ?? "linux/amd64";
 		const result = spawnSync(process.execPath, [checker], {
@@ -130,7 +190,9 @@ process.stdout.write(args.includes('--raw') ? process.env.RAW : process.env.SING
 			env: {
 				...process.env,
 				PATH: `${directory}${path.delimiter}${process.env.PATH ?? ""}`,
-				IMAGE_REF: imageRef,
+				IMAGE_REF: artifactNames === undefined || "imageRef" in scenario ? imageRef : "",
+				DIGEST_DIRECTORY: artifactNames === undefined ? "" : artifactDirectory,
+				IMAGE_REPOSITORY: "ghcr.io/example/webapp",
 				SCAN_PLATFORM: platform,
 				INPUT_IMAGE_NAME: "imageName" in scenario ? scenario.imageName : "example/webapp",
 				GITHUB_OUTPUT: output,
@@ -184,6 +246,30 @@ void test("the image workflow shares the resolver and retains its immutable subj
 	assert.equal(subject.getIn(["env", "INPUT_IMAGE_NAME"]), `\${{ inputs.image-name }}`);
 	assert.equal(
 		subject.getIn(["env", "IMAGE_REF"]),
-		`\${{ inputs.registry }}/\${{ inputs.image-name }}@\${{ inputs.single-arch && needs.build.outputs.manifest-digest || needs.merge.outputs.manifest-digest }}`,
+		`\${{ inputs.single-arch && format('{0}/{1}@{2}', inputs.registry, inputs.image-name, needs.build.outputs.manifest-digest) || '' }}`,
 	);
+});
+
+void test("platform scans read their exact build artifact while merge retains platform directories", () => {
+	const workflow = parseDocument(
+		readFileSync(".github/workflows/reusable-docker-build.yml", "utf8"),
+	);
+	assert.equal(workflow.getIn(["jobs", "scan", "needs"]), "build");
+	for (const job of ["scan", "merge"]) {
+		const steps = workflow.getIn(["jobs", job, "steps"]);
+		assert.ok(isSeq(steps));
+		const download = steps.items.find(
+			(item) =>
+				isMap(item) &&
+				item.get("name") === (job === "scan" ? "Download platform digest" : "Download digests"),
+		);
+		assert.ok(isMap(download));
+		assert.notEqual(download.getIn(["with", "merge-multiple"]), true);
+		if (job === "scan") {
+			assert.equal(
+				download.getIn(["with", "name"]),
+				`digests-\${{ steps.prep.outputs.image_name }}-\${{ steps.prep.outputs.platform_pair }}`,
+			);
+		}
+	}
 });

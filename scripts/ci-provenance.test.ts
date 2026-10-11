@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -365,3 +365,195 @@ void test("canonical tags are withheld until verification for both image builder
 		}
 	}
 });
+
+const armLeaf = `sha256:${"b".repeat(64)}`;
+const buildIndex = `sha256:${"c".repeat(64)}`;
+const mergedIndex = `sha256:${"d".repeat(64)}`;
+const platformLeaf = (architecture: string, selected: string) => ({
+	platform: { os: "linux", architecture },
+	digest: selected,
+});
+const finalLeaves = [platformLeaf("arm64", armLeaf), platformLeaf("amd64", digest)];
+for (const scenario of [
+	{ name: "Dockerfile index and Buildpacks leaf match the final index", final: finalLeaves },
+	{
+		name: "changed final leaf",
+		final: [platformLeaf("amd64", buildIndex), platformLeaf("arm64", armLeaf)],
+		refused: true,
+	},
+	{ name: "missing final platform", final: [platformLeaf("amd64", digest)], refused: true },
+	{
+		name: "duplicate final platform",
+		final: [...finalLeaves, platformLeaf("amd64", digest)],
+		refused: true,
+	},
+	{
+		name: "unexpected real platform",
+		final: [...finalLeaves, platformLeaf("386", digest)],
+		refused: true,
+	},
+	{
+		name: "source index missing its platform",
+		final: finalLeaves,
+		source: [platformLeaf("arm64", digest)],
+		refused: true,
+		beforeCreate: true,
+	},
+	{
+		name: "source index duplicates its platform",
+		final: finalLeaves,
+		source: [platformLeaf("amd64", digest), platformLeaf("amd64", digest)],
+		refused: true,
+		beforeCreate: true,
+	},
+	{
+		name: "source leaf has malformed digest",
+		final: finalLeaves,
+		source: [platformLeaf("amd64", "bad")],
+		refused: true,
+		beforeCreate: true,
+	},
+	{
+		name: "missing build artifact",
+		final: finalLeaves,
+		artifact: "missing",
+		refused: true,
+		beforeCreate: true,
+	},
+	{
+		name: "multiple build digest files",
+		final: finalLeaves,
+		artifact: "multiple",
+		refused: true,
+		beforeCreate: true,
+	},
+	{
+		name: "malformed build digest filename",
+		final: finalLeaves,
+		artifact: "malformed",
+		refused: true,
+		beforeCreate: true,
+	},
+	{
+		name: "extra artifact directory",
+		final: finalLeaves,
+		artifact: "extra",
+		refused: true,
+		beforeCreate: true,
+	},
+] as const) {
+	void test(
+		`manifest leaf custody: ${scenario.name}`,
+		{ skip: process.platform === "win32" },
+		async (t) => {
+			const workflow = parseDocument(
+				await readFile(".github/workflows/reusable-docker-build.yml", "utf8"),
+			);
+			const steps = workflow.getIn(["jobs", "merge", "steps"]);
+			assert.ok(isSeq(steps));
+			const create = steps.items.find(
+				(step) => isMap(step) && step.get("name") === "Create manifest and push",
+			);
+			assert.ok(isMap(create));
+			const directory = await mkdtemp(path.join(tmpdir(), "manifest-leaf-custody-"));
+			t.after(async () => rm(directory, { recursive: true, force: true }));
+			const artifactRoot = path.join(directory, "digests");
+			await mkdir(artifactRoot);
+			for (const [arch, sourceDigest] of [
+				["amd64", buildIndex],
+				["arm64", armLeaf],
+			] as const) {
+				const artifactDirectory = path.join(
+					artifactRoot,
+					`digests-hephaestus-build-webapp-linux-${arch}`,
+				);
+				await mkdir(artifactDirectory);
+				if ("artifact" in scenario && scenario.artifact === "missing" && arch === "amd64") {
+					continue;
+				}
+				const file =
+					"artifact" in scenario && scenario.artifact === "malformed" && arch === "amd64"
+						? "bad"
+						: sourceDigest.slice(7);
+				await writeFile(path.join(artifactDirectory, file), "");
+				if ("artifact" in scenario && scenario.artifact === "multiple" && arch === "amd64") {
+					await writeFile(path.join(artifactDirectory, digest.slice(7)), "");
+				}
+			}
+			if ("artifact" in scenario && scenario.artifact === "extra") {
+				await mkdir(path.join(artifactRoot, "unexpected"));
+			}
+			const docker = path.join(directory, "docker");
+			await writeFile(
+				docker,
+				String.raw`#!/usr/bin/env node
+const fs = require('node:fs');
+const args = process.argv.slice(2);
+fs.appendFileSync(process.env.CALL_LOG, JSON.stringify(args) + '\n');
+if (args[2] === 'create') {
+  const at = args.indexOf('--metadata-file');
+  fs.writeFileSync(args[at + 1], JSON.stringify({'containerimage.descriptor': {digest: process.env.MERGED_DIGEST}}));
+  process.exit(0);
+}
+const ref = args[3];
+process.stdout.write(ref.endsWith(process.env.MERGED_DIGEST) ? process.env.FINAL_RAW : ref.endsWith(process.env.BUILD_INDEX) ? process.env.SOURCE_RAW : JSON.stringify({schemaVersion: 2, config: {}, layers: []}));
+`,
+			);
+			await chmod(docker, 0o755);
+			const callLog = path.join(directory, "calls");
+			await writeFile(callLog, "");
+			const result = spawnSync("bash", ["-e", "-c", String(create.get("run"))], {
+				cwd: artifactRoot,
+				encoding: "utf8",
+				env: {
+					...process.env,
+					PATH: `${directory}${path.delimiter}${process.env.PATH ?? ""}`,
+					RUNNER_TEMP: directory,
+					INPUTS_REGISTRY: "ghcr.io",
+					INPUTS_IMAGE_NAME: "hephaestus-build/webapp",
+					STAGING_IMAGE: `${image}:ci-test-index`,
+					CALL_LOG: callLog,
+					BUILD_INDEX: buildIndex,
+					MERGED_DIGEST: mergedIndex,
+					SOURCE_RAW: JSON.stringify({
+						manifests:
+							"source" in scenario
+								? scenario.source
+								: [platformLeaf("amd64", digest), platformLeaf("unknown", buildIndex)],
+					}),
+					FINAL_RAW: JSON.stringify({
+						manifests: [
+							...scenario.final,
+							{ platform: { os: "unknown", architecture: "unknown" }, digest: buildIndex },
+						],
+					}),
+				},
+			});
+			assert.equal(result.status === 0, !("refused" in scenario), result.stderr);
+			const callText = await readFile(callLog, "utf8");
+			const calls = callText
+				.trim()
+				.split("\n")
+				.filter(Boolean)
+				.map((line) => asArray(JSON.parse(line), "Docker arguments"));
+			const created = calls.find((args) => args[2] === "create");
+			assert.equal(created === undefined, "beforeCreate" in scenario);
+			if (created !== undefined) {
+				assert.deepEqual(created.slice(-2), [`${image}@${buildIndex}`, `${image}@${armLeaf}`]);
+				assert.deepEqual(calls.at(-1), [
+					"buildx",
+					"imagetools",
+					"inspect",
+					`${image}@${mergedIndex}`,
+					"--raw",
+				]);
+			}
+			assert.ok(
+				steps.items.indexOf(create) <
+					steps.items.findIndex(
+						(step) => isMap(step) && step.get("name") === "Generate build provenance attestation",
+					),
+			);
+		},
+	);
+}

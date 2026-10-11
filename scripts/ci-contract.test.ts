@@ -1930,9 +1930,8 @@ void describe("CI contract", () => {
 	void test("enforces the release vulnerability policy where images are built", async () => {
 		const reusable = await readFile(".github/workflows/reusable-docker-build.yml", "utf8");
 		const scan = job(reusable, "scan");
-		// Blocking, and after the push: it needs both build paths, and a skipped `merge`
-		// (single-architecture builds) must not skip it.
-		assert.match(scan, /needs: \[build, merge\]/u);
+		// Scans start from immutable platform build artifacts alongside manifest signing.
+		assert.match(scan, /needs: build/u);
 		assert.match(scan, /!cancelled\(\)/u);
 		assert.match(scan, /needs\.build\.result == 'success'/u);
 		// The same script and the same policy file the release and the rescan call. A second
@@ -1942,8 +1941,9 @@ void describe("CI contract", () => {
 			/node scripts\/check-release-vulnerabilities\.ts[\s\S]*security\/vulnerability-policy\.json/u,
 		);
 		assert.match(scan, /needs\.build\.outputs\.manifest-digest/u);
-		assert.match(scan, /needs\.merge\.outputs\.manifest-digest/u);
-		assert.match(scan, /IMAGE_REF:.*@\$\{\{/u);
+		assert.doesNotMatch(scan, /needs\.merge/u);
+		assert.match(scan, /DIGEST_DIRECTORY:/u);
+		assert.match(scan, /IMAGE_REF:.*format/u);
 		assert.doesNotMatch(scan, /github\.(?:run_id|run_attempt)/u);
 		assert.match(scan, /linux\/amd64/u);
 		assert.match(scan, /linux\/arm64/u);
