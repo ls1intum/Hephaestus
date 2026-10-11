@@ -319,6 +319,16 @@ export function SyncStatusHeader({
 	const { activeJob } = status;
 	const canBackfill = status.backfillSupported && onBackfill != null;
 	const isTriggerBusy = triggeringType != null || activeJob != null;
+	// A stopping job may be retried only as its own type: INITIAL is the server's to run, and a
+	// backfill is never replayed as a reconciliation.
+	let onRecover: (() => void) | undefined;
+	if (activeJob?.cancelRequested === true && !isCancelling) {
+		if (activeJob.type === "RECONCILIATION") {
+			onRecover = onSync;
+		} else if (activeJob.type === "BACKFILL" && canBackfill) {
+			onRecover = onBackfill;
+		}
+	}
 	const nextRun = nextRunLabel(status.nextScheduledSyncAt, now);
 
 	return (
@@ -366,6 +376,7 @@ export function SyncStatusHeader({
 								onClick={onSync}
 								triggeringType={triggeringType}
 								activeJob={activeJob}
+								onRecover={onRecover}
 							/>
 						)}
 						{canBackfill && !credentialsUnreadableSince && (

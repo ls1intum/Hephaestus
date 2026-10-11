@@ -1,6 +1,7 @@
 import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
+import { toast } from "sonner";
 import { describe, expect, it, vi } from "vitest";
 
 import { getIntegrationCatalogQueryKey } from "@/api/@tanstack/react-query.gen";
@@ -425,6 +426,101 @@ describe("integration job history", () => {
 				response.resolve();
 			}
 			await screen.findByText("No sync jobs yet");
+		},
+	);
+});
+
+describe("canceled sync recovery on the integration overview", () => {
+	const stopping: Wire<SyncJob> = {
+		id: 91,
+		type: "RECONCILIATION",
+		status: "RUNNING",
+		trigger: "MANUAL",
+		cancelRequested: true,
+		createdAt: "2026-09-01T00:00:00Z",
+	};
+
+	it.each([
+		{ returned: stopping, httpStatus: 200, message: "GitLab: Still stopping; no new sync started" },
+		{
+			returned: { ...stopping, id: 92, status: "PENDING", cancelRequested: false },
+			httpStatus: 202,
+			message: "GitLab: Sync queued",
+		},
+		{
+			returned: { ...stopping, id: 93, cancelRequested: false },
+			httpStatus: 200,
+			message: "GitLab: Sync in progress",
+		},
+	] satisfies { returned: Wire<SyncJob>; httpStatus: number; message: string }[])(
+		"checks the server and describes its actual response: $message",
+		async ({ returned, message, httpStatus }) => {
+			const { entry } = mockConnection("GITLAB");
+			entry.credentialsUnreadableSince = undefined;
+			const requests: unknown[] = [];
+			const response = deferred();
+			const announced = vi.spyOn(toast, "message");
+			server.use(
+				http.get("*/workspaces/acme/connections/7/sync", () =>
+					HttpResponse.json({
+						connectionId: 7,
+						connectionState: "ACTIVE",
+						kind: "GITLAB",
+						health: "HEALTHY",
+						resourceCounts: { total: 1, errored: 0, pending: 0, stale: 0 },
+						backfillSupported: true,
+						activeJob: stopping,
+					} satisfies Wire<ConnectionSyncStatus>),
+				),
+				http.post("*/workspaces/acme/connections/7/sync/jobs", async ({ request }) => {
+					requests.push(await request.json());
+					await response.promise;
+					return HttpResponse.json(returned, { status: httpStatus });
+				}),
+			);
+			try {
+				renderRouteAt("/w/acme/admin/integrations");
+				const user = userEvent.setup();
+				await user.click(
+					await screen.findByRole("button", { name: "Check and retry sync" }, ROUTE_RENDER_WAIT),
+				);
+				await waitFor(() => expect(requests).toStrictEqual([{ type: "RECONCILIATION" }]));
+				expect(screen.getByRole("button", { name: "Checking…" })).toHaveProperty("disabled", true);
+				response.resolve();
+				await waitFor(() => expect(announced).toHaveBeenCalledWith(message));
+			} finally {
+				response.resolve();
+				announced.mockRestore();
+			}
+		},
+	);
+
+	it.each(["BACKFILL", "INITIAL"] as const)(
+		"does not replay a stopping %s as a reconciliation",
+		async (type) => {
+			const { entry } = mockConnection("GITLAB");
+			entry.credentialsUnreadableSince = undefined;
+			server.use(
+				http.get("*/workspaces/acme/connections/7/sync", () =>
+					HttpResponse.json({
+						connectionId: 7,
+						connectionState: "ACTIVE",
+						kind: "GITLAB",
+						health: "HEALTHY",
+						resourceCounts: { total: 1, errored: 0, pending: 0, stale: 0 },
+						backfillSupported: true,
+						activeJob: { ...stopping, type },
+					} satisfies Wire<ConnectionSyncStatus>),
+				),
+			);
+			renderRouteAt("/w/acme/admin/integrations");
+			const stoppingButton = await screen.findByRole(
+				"button",
+				{ name: "Stopping…" },
+				ROUTE_RENDER_WAIT,
+			);
+			expect(stoppingButton).toHaveProperty("disabled", true);
+			expect(screen.queryByRole("button", { name: /check and retry/iu })).toBeNull();
 		},
 	);
 });

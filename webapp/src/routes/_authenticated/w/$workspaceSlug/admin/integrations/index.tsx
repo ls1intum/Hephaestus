@@ -11,7 +11,7 @@ import {
 	triggerSyncJobMutation,
 } from "@/api/@tanstack/react-query.gen";
 import { IntegrationOverviewCard } from "@/components/admin/integrations/IntegrationOverviewCard";
-import { syncPollInterval } from "@/components/admin/integrations/sync-format";
+import { returnedJobMessage, syncPollInterval } from "@/components/admin/integrations/sync-format";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { PageLayout } from "@/components/layout/PageLayout";
@@ -96,14 +96,14 @@ function IntegrationOverviewCardContainer({
 
 	const triggerSync = useMutation({
 		...triggerSyncJobMutation(),
-		onSuccess: () => {
+		onSuccess: async (job) => {
 			if (connectionId == null) {
 				return;
 			}
-			void queryClient.invalidateQueries({
+			toast.message(`${entry.displayName}: ${returnedJobMessage(job)}`);
+			await queryClient.invalidateQueries({
 				queryKey: getConnectionSyncStatusQueryKey({ path: { workspaceSlug, connectionId } }),
 			});
-			toast.success(`${entry.displayName} sync started`);
 		},
 		onError: (e) => {
 			toast.error(`We could not start the ${entry.displayName} sync`, {

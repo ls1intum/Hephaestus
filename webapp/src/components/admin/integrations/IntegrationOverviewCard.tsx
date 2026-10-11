@@ -128,6 +128,14 @@ export function IntegrationOverviewCard({
 							onClick={onSync}
 							triggeringType={isTriggering ? "RECONCILIATION" : null}
 							activeJob={status?.activeJob}
+							// Only a stopping reconciliation is this trigger's to retry; a backfill or initial
+							// sync stays with its detail page.
+							onRecover={
+								status?.activeJob?.cancelRequested === true &&
+								status.activeJob.type === "RECONCILIATION"
+									? onSync
+									: undefined
+							}
 						/>
 					)}
 					<Link

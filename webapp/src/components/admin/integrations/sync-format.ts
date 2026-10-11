@@ -102,6 +102,28 @@ export const JOB_TYPE_LABEL: Record<SyncJob["type"], string> = {
 	BACKFILL: "Backfill",
 };
 
+/**
+ * What the job a trigger returned says, never that this request created it: the server answers an
+ * active job of the same type with that job, so a request can come back with a run someone else
+ * started, or with the run that is still stopping.
+ */
+export function returnedJobMessage(
+	job: Pick<SyncJob, "type" | "status" | "cancelRequested">,
+): string {
+	const noun = job.type === "BACKFILL" ? "Backfill" : "Sync";
+	const active = job.status === "PENDING" || job.status === "RUNNING";
+	if (active && job.cancelRequested) {
+		return `Still stopping; no new ${noun.toLowerCase()} started`;
+	}
+	if (job.status === "PENDING") {
+		return `${noun} queued`;
+	}
+	if (job.status === "RUNNING") {
+		return `${noun} in progress`;
+	}
+	return `${noun} ${JOB_STATUS_LABEL[job.status].toLowerCase()}`;
+}
+
 export const JOB_TRIGGER_LABEL: Record<SyncJob["trigger"], string> = {
 	SCHEDULED: "Scheduled",
 	MANUAL: "Manual",
