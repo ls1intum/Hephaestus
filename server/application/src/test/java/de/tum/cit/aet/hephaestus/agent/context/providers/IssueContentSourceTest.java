@@ -335,6 +335,10 @@ class IssueContentSourceTest extends BaseUnitTest {
     }
 
     private Issue richIssue() {
+        return richIssue(4, 3);
+    }
+
+    private Issue richIssue(@Nullable Integer total, @Nullable Integer completed) {
         Issue issue = new Issue();
         issue.setId(ISSUE_ID);
         issue.setNumber(123);
@@ -345,8 +349,8 @@ class IssueContentSourceTest extends BaseUnitTest {
         issue.setHtmlUrl("https://github.com/owner/repo/issues/123");
         issue.setLocked(true);
         issue.setCommentsCount(2);
-        issue.setSubIssuesTotal(4);
-        issue.setSubIssuesCompleted(3);
+        if (total != null) issue.setSubIssuesTotal(total);
+        if (completed != null) issue.setSubIssuesCompleted(completed);
         issue.setAuthor(user("felix"));
 
         IssueType issueType = new IssueType();
@@ -411,6 +415,64 @@ class IssueContentSourceTest extends BaseUnitTest {
             JsonNode meta = objectMapper.readTree(files.get(METADATA_KEY));
             assertThat(meta.get("sub_issues_total").asInt()).isEqualTo(4);
             assertThat(meta.get("sub_issues_completed").asInt()).isEqualTo(3);
+            assertThat(meta.get("sub_issues_source").asString()).isEqualTo("provider");
+        }
+
+        @ParameterizedTest
+        @ValueSource(ints = {0, 4})
+        void shouldKeepTheProviderCountWhenItsPairIsComplete(int total) throws Exception {
+            Issue issue = richIssue();
+            issue.setSubIssuesTotal(total);
+            issue.setSubIssuesCompleted(0);
+            when(issueRepository.findByIdWithRepository(ISSUE_ID)).thenReturn(Optional.of(issue));
+
+            JsonNode meta = objectMapper.readTree(provider.capture(request(sampleMetadata()), Set.of(CORE))
+                    .files()
+                    .get(METADATA_KEY));
+
+            assertThat(meta.get("sub_issues_total").asInt()).isEqualTo(total);
+            assertThat(meta.get("sub_issues_completed").asInt()).isZero();
+            assertThat(meta.get("sub_issues_source").asString()).isEqualTo("provider");
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = {"total", "completed", "both"})
+        void shouldCapturePositiveStoredChildrenWhenTheProviderPairIsIncomplete(String missing) throws Exception {
+            Issue issue = richIssue("completed".equals(missing) ? 4 : null, "total".equals(missing) ? 3 : null);
+            when(issueRepository.findByIdWithRepository(ISSUE_ID)).thenReturn(Optional.of(issue));
+            IssueRepository.ChildRollup children = mock(IssueRepository.ChildRollup.class);
+            when(children.getTotal()).thenReturn(2L);
+            when(children.getCompleted()).thenReturn(1L);
+            when(issueRepository.countChildrenByParentIssueId(ISSUE_ID, Issue.State.CLOSED))
+                    .thenReturn(children);
+
+            JsonNode meta = objectMapper.readTree(provider.capture(request(sampleMetadata()), Set.of(CORE))
+                    .files()
+                    .get(METADATA_KEY));
+
+            assertThat(meta.get("sub_issues_total").asInt()).isEqualTo(2);
+            assertThat(meta.get("sub_issues_completed").asInt()).isEqualTo(1);
+            assertThat(meta.get("sub_issues_source").asString()).isEqualTo("children");
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = {"total", "completed", "both"})
+        void shouldLeaveTheCountUnknownWhenAnIncompleteProviderPairHasNoStoredChildren(String missing)
+                throws Exception {
+            Issue issue = richIssue("completed".equals(missing) ? 0 : null, "total".equals(missing) ? 0 : null);
+            when(issueRepository.findByIdWithRepository(ISSUE_ID)).thenReturn(Optional.of(issue));
+            IssueRepository.ChildRollup children = mock(IssueRepository.ChildRollup.class);
+            when(children.getTotal()).thenReturn(0L);
+            when(issueRepository.countChildrenByParentIssueId(ISSUE_ID, Issue.State.CLOSED))
+                    .thenReturn(children);
+
+            JsonNode meta = objectMapper.readTree(provider.capture(request(sampleMetadata()), Set.of(CORE))
+                    .files()
+                    .get(METADATA_KEY));
+
+            assertThat(meta.get("sub_issues_total").isNull()).isTrue();
+            assertThat(meta.get("sub_issues_completed").isNull()).isTrue();
+            assertThat(meta.has("sub_issues_source")).isFalse();
         }
 
         @Test

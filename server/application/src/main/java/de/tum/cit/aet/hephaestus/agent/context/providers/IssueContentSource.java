@@ -185,8 +185,22 @@ public class IssueContentSource implements EvidenceSource, ReviewContextBuilder 
                     "issue_type",
                     issue.getIssueType() != null ? issue.getIssueType().getName() : null);
             meta.put("is_locked", issue.isLocked());
-            meta.put("sub_issues_total", issue.getSubIssuesTotal());
-            meta.put("sub_issues_completed", issue.getSubIssuesCompleted());
+            meta.putNull("sub_issues_total");
+            meta.putNull("sub_issues_completed");
+            if (issue.getSubIssuesTotal() != null && issue.getSubIssuesCompleted() != null) {
+                meta.put("sub_issues_total", issue.getSubIssuesTotal());
+                meta.put("sub_issues_completed", issue.getSubIssuesCompleted());
+                meta.put("sub_issues_source", "provider");
+            } else if (issue.getId() != null) {
+                // A positive stored count witnesses children; zero does not prove a complete hierarchy.
+                IssueRepository.ChildRollup children =
+                        issueRepository.countChildrenByParentIssueId(issue.getId(), Issue.State.CLOSED);
+                if (children.getTotal() > 0) {
+                    meta.put("sub_issues_total", children.getTotal());
+                    meta.put("sub_issues_completed", children.getCompleted());
+                    meta.put("sub_issues_source", "children");
+                }
+            }
             meta.put(
                     "milestone",
                     issue.getMilestone() != null ? issue.getMilestone().getTitle() : null);
