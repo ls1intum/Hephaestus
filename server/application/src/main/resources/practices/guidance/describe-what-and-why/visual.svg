@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 188">
+  <text class="pv-fill-ink" x="0" y="16" font-size="16" font-weight="600">What only</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="0.75" y="32.75" width="302.5" height="126.5" rx="8" stroke-width="1.5"/>
+  <g transform="translate(16 48)"><circle class="pv-stroke-ink" cx="4" cy="3" r="2.5" fill="none" stroke-width="1.5"/><path class="pv-stroke-ink" d="M4 5.5v5" fill="none" stroke-width="1.5"/><circle class="pv-stroke-ink" cx="4" cy="13" r="2.5" fill="none" stroke-width="1.5"/><circle class="pv-stroke-ink" cx="12" cy="13" r="2.5" fill="none" stroke-width="1.5"/><path class="pv-stroke-ink" d="M12 10.5V6a3 3 0 0 0-3-3H7.5" fill="none" stroke-width="1.5" stroke-linecap="round"/></g>
+  <text class="pv-fill-ink" x="44" y="61" font-size="15">Cache user lookups</text>
+  <rect class="pv-fill-muted" x="16" y="124" width="232" height="6" rx="3"/>
+  <rect class="pv-fill-muted" x="16" y="136" width="168" height="6" rx="3"/>
+  <rect class="pv-fill-surface pv-stroke-muted" x="16.75" y="80.75" width="110.5" height="30.5" rx="8" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <text class="pv-fill-muted" x="28" y="101" font-size="15">No reason</text>
+  <text class="pv-fill-muted" x="0" y="184" font-size="15">Reviewer guesses why</text>
+  <text class="pv-fill-ink" x="336" y="16" font-size="16" font-weight="600">What and why</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="336.75" y="32.75" width="302.5" height="126.5" rx="8" stroke-width="1.5"/>
+  <g transform="translate(352 48)"><circle class="pv-stroke-ink" cx="4" cy="3" r="2.5" fill="none" stroke-width="1.5"/><path class="pv-stroke-ink" d="M4 5.5v5" fill="none" stroke-width="1.5"/><circle class="pv-stroke-ink" cx="4" cy="13" r="2.5" fill="none" stroke-width="1.5"/><circle class="pv-stroke-ink" cx="12" cy="13" r="2.5" fill="none" stroke-width="1.5"/><path class="pv-stroke-ink" d="M12 10.5V6a3 3 0 0 0-3-3H7.5" fill="none" stroke-width="1.5" stroke-linecap="round"/></g>
+  <text class="pv-fill-ink" x="380" y="61" font-size="15">Cache user lookups</text>
+  <rect class="pv-fill-muted" x="352" y="124" width="232" height="6" rx="3"/>
+  <rect class="pv-fill-muted" x="352" y="136" width="168" height="6" rx="3"/>
+  <text class="pv-fill-accent" x="352" y="101" font-size="15">Dashboard stalls on big teams</text>
+  <text class="pv-fill-ink" x="336" y="184" font-size="15">Reviewer knows why</text>
+</svg>

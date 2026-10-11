@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 132">
+  <text class="pv-fill-ink" x="0" y="16" font-size="16" font-weight="600">Comment says what</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="0.75" y="32.75" width="302.5" height="70.5" rx="8" stroke-width="1.5"/>
+  <text class="pv-fill-muted pv-mono" x="16" y="61" font-size="15">// sleep for 250 ms</text>
+  <text class="pv-fill-ink pv-mono" x="16" y="81" font-size="15">sleep(250)</text>
+  <text class="pv-fill-muted" x="0" y="128" font-size="15">Adds noise</text>
+  <text class="pv-fill-ink" x="336" y="16" font-size="16" font-weight="600">Comment says why</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="336.75" y="32.75" width="302.5" height="70.5" rx="8" stroke-width="1.5"/>
+  <text class="pv-fill-accent pv-mono" x="352" y="61" font-size="15">// stay under the rate limit</text>
+  <text class="pv-fill-ink pv-mono" x="352" y="81" font-size="15">sleep(250)</text>
+  <text class="pv-fill-ink" x="336" y="128" font-size="15">Reason is clear</text>
+</svg>

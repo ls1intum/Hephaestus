@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 212">
+  <text class="pv-fill-ink" x="0" y="16" font-size="16" font-weight="600">Check left out</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="0.75" y="32.75" width="302.5" height="150.5" rx="8" stroke-width="1.5"/>
+  <g transform="translate(16 48)"><circle class="pv-stroke-ink" cx="4" cy="3" r="2.5" fill="none" stroke-width="1.5"/><path class="pv-stroke-ink" d="M4 5.5v5" fill="none" stroke-width="1.5"/><circle class="pv-stroke-ink" cx="4" cy="13" r="2.5" fill="none" stroke-width="1.5"/><circle class="pv-stroke-ink" cx="12" cy="13" r="2.5" fill="none" stroke-width="1.5"/><path class="pv-stroke-ink" d="M12 10.5V6a3 3 0 0 0-3-3H7.5" fill="none" stroke-width="1.5" stroke-linecap="round"/></g>
+  <rect class="pv-fill-muted" x="44" y="51" width="160" height="10" rx="3"/>
+  <rect class="pv-fill-muted" x="16" y="80" width="232" height="6" rx="3"/>
+  <rect class="pv-fill-muted" x="16" y="92" width="168" height="6" rx="3"/>
+  <text class="pv-fill-muted" x="16" y="123" font-size="15">Fixed the login flow</text>
+  <text class="pv-fill-muted" x="0" y="208" font-size="15">Change waits</text>
+  <text class="pv-fill-ink" x="336" y="16" font-size="16" font-weight="600">Check spelled out</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="336.75" y="32.75" width="302.5" height="150.5" rx="8" stroke-width="1.5"/>
+  <g transform="translate(352 48)"><circle class="pv-stroke-ink" cx="4" cy="3" r="2.5" fill="none" stroke-width="1.5"/><path class="pv-stroke-ink" d="M4 5.5v5" fill="none" stroke-width="1.5"/><circle class="pv-stroke-ink" cx="4" cy="13" r="2.5" fill="none" stroke-width="1.5"/><circle class="pv-stroke-ink" cx="12" cy="13" r="2.5" fill="none" stroke-width="1.5"/><path class="pv-stroke-ink" d="M12 10.5V6a3 3 0 0 0-3-3H7.5" fill="none" stroke-width="1.5" stroke-linecap="round"/></g>
+  <rect class="pv-fill-muted" x="380" y="51" width="160" height="10" rx="3"/>
+  <rect class="pv-fill-muted" x="352" y="80" width="232" height="6" rx="3"/>
+  <rect class="pv-fill-muted" x="352" y="92" width="168" height="6" rx="3"/>
+  <text class="pv-fill-accent" x="352" y="123" font-size="15">Open login</text>
+  <text class="pv-fill-accent" x="352" y="143" font-size="15">Enter wrong password</text>
+  <text class="pv-fill-accent" x="352" y="163" font-size="15">Expect error message</text>
+  <text class="pv-fill-ink" x="336" y="208" font-size="15">Checked in minutes</text>
+</svg>

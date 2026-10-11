@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 180">
+  <text class="pv-fill-ink" x="0" y="16" font-size="16" font-weight="600">Icon with no label</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="0.75" y="32.75" width="110.5" height="118.5" rx="12" stroke-width="1.5"/>
+  <rect class="pv-fill-muted" x="40" y="48" width="32" height="6" rx="3"/>
+  <rect class="pv-fill-muted" x="16" y="70" width="80" height="6" rx="3"/>
+  <rect class="pv-fill-muted" x="16" y="82" width="56" height="6" rx="3"/>
+  <circle class="pv-fill-surface pv-stroke-ink" cx="56" cy="120" r="15.25" stroke-width="1.5"/>
+  <path class="pv-stroke-ink" d="M52 117h-3v10h14v-10h-3M56 122v-11M52.5 114.5 56 111l3.5 3.5" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path class="pv-stroke-muted" d="M120 120h8" fill="none" stroke-width="2"/>
+  <path class="pv-fill-muted" d="M136 120l-8-5v10z"/>
+  <text class="pv-fill-ink" x="144" y="81" font-size="15">Screen reader says</text>
+  <path class="pv-fill-surface pv-stroke-muted" d="M156.75 96.75H291.25A12 12 0 0 1 303.25 108.75V131.25A12 12 0 0 1 291.25 143.25H144.75V108.75A12 12 0 0 1 156.75 96.75Z" stroke-width="1.5"/>
+  <text class="pv-fill-muted" x="160" y="125" font-size="15">“Button”</text>
+  <text class="pv-fill-muted" x="0" y="176" font-size="15">User guesses</text>
+  <text class="pv-fill-ink" x="336" y="16" font-size="16" font-weight="600">Icon with a label</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="336.75" y="32.75" width="110.5" height="118.5" rx="12" stroke-width="1.5"/>
+  <rect class="pv-fill-muted" x="376" y="48" width="32" height="6" rx="3"/>
+  <rect class="pv-fill-muted" x="352" y="70" width="80" height="6" rx="3"/>
+  <rect class="pv-fill-muted" x="352" y="82" width="56" height="6" rx="3"/>
+  <circle class="pv-fill-surface pv-stroke-ink" cx="392" cy="120" r="15.25" stroke-width="1.5"/>
+  <path class="pv-stroke-ink" d="M388 117h-3v10h14v-10h-3M392 122v-11M388.5 114.5 392 111l3.5 3.5" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path class="pv-stroke-muted" d="M456 120h8" fill="none" stroke-width="2"/>
+  <path class="pv-fill-muted" d="M472 120l-8-5v10z"/>
+  <text class="pv-fill-ink" x="480" y="81" font-size="15">Screen reader says</text>
+  <path class="pv-fill-surface pv-stroke-ink" d="M492.75 96.75H627.25A12 12 0 0 1 639.25 108.75V131.25A12 12 0 0 1 627.25 143.25H480.75V108.75A12 12 0 0 1 492.75 96.75Z" stroke-width="1.5"/>
+  <text class="pv-fill-accent" x="496" y="125" font-size="15">“Share, button”</text>
+  <text class="pv-fill-ink" x="336" y="176" font-size="15">User can share</text>
+</svg>

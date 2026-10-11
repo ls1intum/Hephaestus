@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 188">
+  <text class="pv-fill-ink" x="0" y="16" font-size="16" font-weight="600">One big ask</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="0.75" y="32.75" width="302.5" height="126.5" rx="8" stroke-width="1.5"/>
+  <g transform="translate(16 48)"><circle class="pv-stroke-ink" cx="8" cy="8" r="6.75" fill="none" stroke-width="1.5"/><circle class="pv-fill-ink" cx="8" cy="8" r="1.75"/></g>
+  <text class="pv-fill-ink" x="44" y="61" font-size="15">Issue #42</text>
+  <text class="pv-fill-muted" x="16" y="93" font-size="15">Schema, endpoint and UI</text>
+  <rect class="pv-fill-muted" x="16" y="110" width="256" height="6" rx="3"/>
+  <rect class="pv-fill-muted" x="16" y="122" width="224" height="6" rx="3"/>
+  <rect class="pv-fill-muted" x="16" y="134" width="168" height="6" rx="3"/>
+  <text class="pv-fill-muted" x="0" y="184" font-size="15">All or nothing</text>
+  <text class="pv-fill-ink" x="336" y="16" font-size="16" font-weight="600">Checkable steps</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="336.75" y="32.75" width="302.5" height="126.5" rx="8" stroke-width="1.5"/>
+  <g transform="translate(352 48)"><circle class="pv-stroke-ink" cx="8" cy="8" r="6.75" fill="none" stroke-width="1.5"/><circle class="pv-fill-ink" cx="8" cy="8" r="1.75"/></g>
+  <text class="pv-fill-ink" x="380" y="61" font-size="15">Issue #42</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="352.75" y="80.75" width="14.5" height="14.5" rx="3" stroke-width="1.5"/>
+  <path class="pv-stroke-ink" d="M356 88.5l3 3 5.5-6" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <text class="pv-fill-accent" x="380" y="93" font-size="15">Schema</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="352.75" y="104.75" width="14.5" height="14.5" rx="3" stroke-width="1.5"/>
+  <text class="pv-fill-accent" x="380" y="117" font-size="15">Endpoint</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="352.75" y="128.75" width="14.5" height="14.5" rx="3" stroke-width="1.5"/>
+  <text class="pv-fill-accent" x="380" y="141" font-size="15">UI</text>
+  <text class="pv-fill-ink" x="336" y="184" font-size="15">Progress shows</text>
+</svg>

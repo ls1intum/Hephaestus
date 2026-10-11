@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 140">
+  <text class="pv-fill-ink" x="0" y="16" font-size="16" font-weight="600">Wiki disagrees</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="0.75" y="32.75" width="110.5" height="78.5" rx="8" stroke-width="1.5"/>
+  <g transform="translate(16 48)"><circle class="pv-stroke-ink" cx="4" cy="3" r="2.5" fill="none" stroke-width="1.5"/><path class="pv-stroke-ink" d="M4 5.5v5" fill="none" stroke-width="1.5"/><circle class="pv-stroke-ink" cx="4" cy="13" r="2.5" fill="none" stroke-width="1.5"/><circle class="pv-stroke-ink" cx="12" cy="13" r="2.5" fill="none" stroke-width="1.5"/><path class="pv-stroke-ink" d="M12 10.5V6a3 3 0 0 0-3-3H7.5" fill="none" stroke-width="1.5" stroke-linecap="round"/></g>
+  <text class="pv-fill-ink" x="44" y="61" font-size="15">Change</text>
+  <text class="pv-fill-ink pv-mono" x="16" y="93" font-size="15">retries=5</text>
+  <path class="pv-stroke-muted" d="M112 56h32" fill="none" stroke-width="2"/>
+  <circle class="pv-fill-muted" cx="112" cy="56" r="4"/>
+  <circle class="pv-fill-muted" cx="144" cy="56" r="4"/>
+  <rect class="pv-fill-surface pv-stroke-muted" x="144.75" y="32.75" width="158.5" height="78.5" rx="8" stroke-width="1.5"/>
+  <g transform="translate(160 48)"><path class="pv-stroke-ink" d="M2.75 0.75h7l3.5 3.5v11h-10.5z" fill="none" stroke-width="1.5" stroke-linejoin="round"/><path class="pv-stroke-ink" d="M9.75 0.75v3.5h3.5" fill="none" stroke-width="1.5" stroke-linejoin="round"/></g>
+  <text class="pv-fill-ink" x="188" y="61" font-size="15">Linked wiki</text>
+  <text class="pv-fill-muted" x="160" y="93" font-size="15">Retries: 3</text>
+  <text class="pv-fill-muted" x="0" y="136" font-size="15">Teammates misled</text>
+  <text class="pv-fill-ink" x="336" y="16" font-size="16" font-weight="600">Wiki agrees</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="336.75" y="32.75" width="110.5" height="78.5" rx="8" stroke-width="1.5"/>
+  <g transform="translate(352 48)"><circle class="pv-stroke-ink" cx="4" cy="3" r="2.5" fill="none" stroke-width="1.5"/><path class="pv-stroke-ink" d="M4 5.5v5" fill="none" stroke-width="1.5"/><circle class="pv-stroke-ink" cx="4" cy="13" r="2.5" fill="none" stroke-width="1.5"/><circle class="pv-stroke-ink" cx="12" cy="13" r="2.5" fill="none" stroke-width="1.5"/><path class="pv-stroke-ink" d="M12 10.5V6a3 3 0 0 0-3-3H7.5" fill="none" stroke-width="1.5" stroke-linecap="round"/></g>
+  <text class="pv-fill-ink" x="380" y="61" font-size="15">Change</text>
+  <text class="pv-fill-ink pv-mono" x="352" y="93" font-size="15">retries=5</text>
+  <path class="pv-stroke-muted" d="M448 56h32" fill="none" stroke-width="2"/>
+  <circle class="pv-fill-muted" cx="448" cy="56" r="4"/>
+  <circle class="pv-fill-muted" cx="480" cy="56" r="4"/>
+  <rect class="pv-fill-surface pv-stroke-muted" x="480.75" y="32.75" width="158.5" height="78.5" rx="8" stroke-width="1.5"/>
+  <g transform="translate(496 48)"><path class="pv-stroke-ink" d="M2.75 0.75h7l3.5 3.5v11h-10.5z" fill="none" stroke-width="1.5" stroke-linejoin="round"/><path class="pv-stroke-ink" d="M9.75 0.75v3.5h3.5" fill="none" stroke-width="1.5" stroke-linejoin="round"/></g>
+  <text class="pv-fill-ink" x="524" y="61" font-size="15">Linked wiki</text>
+  <text class="pv-fill-accent" x="496" y="93" font-size="15">Retries: 5</text>
+  <text class="pv-fill-ink" x="336" y="136" font-size="15">Teammates can trust it</text>
+</svg>

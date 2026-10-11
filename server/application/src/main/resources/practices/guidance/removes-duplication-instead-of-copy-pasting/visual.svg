@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 204">
+  <text class="pv-fill-ink" x="0" y="16" font-size="16" font-weight="600">Copied logic</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="0.75" y="32.75" width="302.5" height="142.5" rx="8" stroke-width="1.5"/>
+  <text class="pv-fill-ink" x="16" y="53" font-size="15">Checkout</text>
+  <text class="pv-fill-muted pv-mono" x="32" y="73" font-size="15">sum*rate</text>
+  <text class="pv-fill-ink" x="16" y="97" font-size="15">Invoice</text>
+  <text class="pv-fill-muted pv-mono" x="32" y="117" font-size="15">sum*rate</text>
+  <text class="pv-fill-muted" x="0" y="200" font-size="15">Copies drift apart</text>
+  <text class="pv-fill-ink" x="336" y="16" font-size="16" font-weight="600">Shared helper</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="336.75" y="32.75" width="302.5" height="142.5" rx="8" stroke-width="1.5"/>
+  <text class="pv-fill-ink" x="352" y="53" font-size="15">Checkout</text>
+  <text class="pv-fill-accent pv-mono" x="368" y="73" font-size="15">taxOf(sum)</text>
+  <text class="pv-fill-ink" x="352" y="97" font-size="15">Invoice</text>
+  <text class="pv-fill-accent pv-mono" x="368" y="117" font-size="15">taxOf(sum)</text>
+  <text class="pv-fill-accent pv-mono" x="352" y="157" font-size="15">taxOf(sum) = sum*rate</text>
+  <text class="pv-fill-ink" x="336" y="200" font-size="15">One fix reaches both</text>
+</svg>

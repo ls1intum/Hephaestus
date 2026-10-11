@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 212">
+  <text class="pv-fill-ink" x="0" y="16" font-size="16" font-weight="600">Closes only</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="0.75" y="32.75" width="302.5" height="150.5" rx="8" stroke-width="1.5"/>
+  <g transform="translate(16 48)"><circle class="pv-stroke-ink" cx="4" cy="3" r="2.5" fill="none" stroke-width="1.5"/><path class="pv-stroke-ink" d="M4 5.5v5" fill="none" stroke-width="1.5"/><circle class="pv-stroke-ink" cx="4" cy="13" r="2.5" fill="none" stroke-width="1.5"/><circle class="pv-stroke-ink" cx="12" cy="13" r="2.5" fill="none" stroke-width="1.5"/><path class="pv-stroke-ink" d="M12 10.5V6a3 3 0 0 0-3-3H7.5" fill="none" stroke-width="1.5" stroke-linecap="round"/></g>
+  <text class="pv-fill-ink" x="44" y="61" font-size="15">PR</text>
+  <text class="pv-fill-ink" x="16" y="93" font-size="15">Closes #57</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="16.75" y="104.75" width="182.5" height="30.5" rx="8" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <text class="pv-fill-muted" x="28" y="125" font-size="15">Criteria unmentioned</text>
+  <text class="pv-fill-muted" x="0" y="208" font-size="15">Assumed done</text>
+  <text class="pv-fill-ink" x="336" y="16" font-size="16" font-weight="600">Notes each item</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="336.75" y="32.75" width="302.5" height="150.5" rx="8" stroke-width="1.5"/>
+  <g transform="translate(352 48)"><circle class="pv-stroke-ink" cx="4" cy="3" r="2.5" fill="none" stroke-width="1.5"/><path class="pv-stroke-ink" d="M4 5.5v5" fill="none" stroke-width="1.5"/><circle class="pv-stroke-ink" cx="4" cy="13" r="2.5" fill="none" stroke-width="1.5"/><circle class="pv-stroke-ink" cx="12" cy="13" r="2.5" fill="none" stroke-width="1.5"/><path class="pv-stroke-ink" d="M12 10.5V6a3 3 0 0 0-3-3H7.5" fill="none" stroke-width="1.5" stroke-linecap="round"/></g>
+  <text class="pv-fill-ink" x="380" y="61" font-size="15">PR</text>
+  <text class="pv-fill-ink" x="352" y="93" font-size="15">Closes #57</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="352.75" y="104.75" width="14.5" height="14.5" rx="3" stroke-width="1.5"/>
+  <path class="pv-stroke-accent" d="M356 112.5l3 3 5.5-6" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <text class="pv-fill-accent" x="380" y="117" font-size="15">Login</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="352.75" y="128.75" width="14.5" height="14.5" rx="3" stroke-width="1.5"/>
+  <path class="pv-stroke-accent" d="M356 136.5l3 3 5.5-6" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <text class="pv-fill-accent" x="380" y="141" font-size="15">Reset</text>
+  <text class="pv-fill-accent" x="352" y="165" font-size="15">Rate limit deferred to #61</text>
+  <text class="pv-fill-ink" x="336" y="208" font-size="15">Nothing dropped</text>
+</svg>

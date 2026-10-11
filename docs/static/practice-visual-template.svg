@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 132">
+  <!-- Starter for a Hephaestus practice visual: the contrast pair. See docs/contributor/practice-visuals.md. -->
+  <!-- Both panes draw the same work with the same skeleton. Only the example differs. -->
+  <!-- Replace every label. Delete what the idea does not need, then set the viewBox height to the lowest mark. -->
+
+  <!-- Left pane, x 0 to 304: the work without the practice. -->
+  <text class="pv-fill-ink" x="0" y="16" font-size="16" font-weight="600">Lapse</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="0.75" y="32.75" width="302.5" height="70.5" rx="8" stroke-width="1.5"/>
+  <text class="pv-fill-ink" x="16" y="57" font-size="15">Name of the work</text>
+  <!-- The lapse: a short, real example in muted text, at the same place as the example on the right. -->
+  <!-- If the lapse is a missing part, draw a dashed outline here, with a muted label that names what is missing. -->
+  <text class="pv-fill-muted" x="16" y="85" font-size="15">Example of the lapse</text>
+  <text class="pv-fill-muted" x="0" y="128" font-size="15">Cost</text>
+
+  <!-- Right pane, x 336 to 640: the same work with the practice. -->
+  <text class="pv-fill-ink" x="336" y="16" font-size="16" font-weight="600">Practice</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="336.75" y="32.75" width="302.5" height="70.5" rx="8" stroke-width="1.5"/>
+  <text class="pv-fill-ink" x="352" y="57" font-size="15">Name of the work</text>
+  <!-- What the practice asks for: a short, real example in accent text, the only accent in the picture. -->
+  <text class="pv-fill-accent" x="352" y="85" font-size="15">Example of the practice</text>
+  <text class="pv-fill-ink" x="336" y="128" font-size="15">Gain</text>
+</svg>

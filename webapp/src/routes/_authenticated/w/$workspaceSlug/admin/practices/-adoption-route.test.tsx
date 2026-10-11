@@ -2,6 +2,7 @@ import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { getPracticeGuidanceOptions } from "@/api/@tanstack/react-query.gen";
 import type { CatalogPracticePreview } from "@/api/types.gen";
 import { mockPractices } from "@/components/admin/practices/fixtures";
 import { stackInSearch } from "@/components/layout/detail-drawer/detail-stack";
@@ -12,7 +13,12 @@ import {
 	mockPullRequestPolicy,
 } from "@/mocks/fixtures/practice";
 import { server } from "@/mocks/server";
-import { ROUTE_RENDER_WAIT, renderRouteAt, renderRouteAtWithRouter } from "@/test/router-harness";
+import {
+	ROUTE_RENDER_WAIT,
+	renderRouteAt,
+	renderRouteAtWithRouter,
+	testQueryClient,
+} from "@/test/router-harness";
 
 vi.setConfig({ testTimeout: 20_000 });
 
@@ -224,6 +230,14 @@ describe("catalog adoption over practice setup", () => {
 	});
 
 	it("pins adoption to the reviewed ETag and returns to the catalog", async () => {
+		const queryClient = testQueryClient();
+		const guidanceOptions = {
+			...getPracticeGuidanceOptions({
+				path: { workspaceSlug: "acme", practiceSlug: preview.slug },
+			}),
+			staleTime: 30_000,
+		};
+		queryClient.setQueryData(guidanceOptions.queryKey, { practiceSlug: preview.slug });
 		const seenIfMatch = vi.fn();
 		server.use(
 			http.get("*/workspaces/:workspaceSlug/practice-catalog/adoption", () =>
@@ -231,6 +245,12 @@ describe("catalog adoption over practice setup", () => {
 			),
 			http.get("*/workspaces/:workspaceSlug/practice-catalog/adoption/:slug", () =>
 				HttpResponse.json(preview),
+			),
+			http.get("*/workspaces/:workspaceSlug/practices/:practiceSlug/guidance", () =>
+				HttpResponse.json({
+					practiceSlug: preview.slug,
+					guide: { markdown: "Adopted guide", figures: {} },
+				}),
 			),
 			http.post("*/workspaces/:workspaceSlug/practice-catalog/adoption/:slug", ({ request }) => {
 				seenIfMatch(request.headers.get("If-Match"));
@@ -241,7 +261,7 @@ describe("catalog adoption over practice setup", () => {
 			}),
 		);
 
-		const { router } = renderRouteAtWithRouter(REVIEWING);
+		const { router } = renderRouteAtWithRouter(REVIEWING, queryClient);
 		fireEvent.click(await screen.findByRole("button", { name: "Add practice" }, ROUTE_RENDER_WAIT));
 
 		await waitFor(() => expect(seenIfMatch).toHaveBeenCalledWith(preview.etag));
@@ -252,6 +272,9 @@ describe("catalog adoption over practice setup", () => {
 		);
 		expect(router.state.location.pathname).toBe("/w/acme/admin/practices");
 		expect(router.state.location.search.library).toBe(true);
+		await expect(queryClient.query(guidanceOptions)).resolves.toMatchObject({
+			guide: { markdown: "Adopted guide" },
+		});
 	});
 
 	it("requires review again after a 412", async () => {

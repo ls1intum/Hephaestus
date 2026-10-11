@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 76">
+  <circle class="pv-fill-surface pv-stroke-ink" cx="12" cy="12" r="11.25" stroke-width="1.5"/>
+  <text class="pv-fill-ink" x="12" y="17" font-size="15" text-anchor="middle">1</text>
+  <path class="pv-stroke-muted" d="M32 12h176" fill="none" stroke-width="2"/>
+  <path class="pv-fill-muted" d="M216 12l-8-5v10z"/>
+  <circle class="pv-fill-surface pv-stroke-ink" cx="236" cy="12" r="11.25" stroke-width="1.5"/>
+  <text class="pv-fill-ink" x="236" y="17" font-size="15" text-anchor="middle">2</text>
+  <path class="pv-stroke-muted" d="M256 12h176" fill="none" stroke-width="2"/>
+  <path class="pv-fill-muted" d="M440 12l-8-5v10z"/>
+  <circle class="pv-fill-surface pv-stroke-ink" cx="460" cy="12" r="11.25" stroke-width="1.5"/>
+  <text class="pv-fill-ink" x="460" y="17" font-size="15" text-anchor="middle">3</text>
+  <text class="pv-fill-ink" x="0" y="48" font-size="16" font-weight="600">Open a draft</text>
+  <text class="pv-fill-muted" x="0" y="72" font-size="15">While work is unfinished</text>
+  <text class="pv-fill-ink" x="224" y="48" font-size="16" font-weight="600">Finish the work</text>
+  <text class="pv-fill-muted" x="224" y="72" font-size="15">Settle your own to-dos</text>
+  <text class="pv-fill-ink" x="448" y="48" font-size="16" font-weight="600">Mark it ready</text>
+  <text class="pv-fill-muted" x="448" y="72" font-size="15">Ask for review now</text>
+</svg>

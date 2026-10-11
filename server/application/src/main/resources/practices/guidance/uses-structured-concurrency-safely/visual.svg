@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 192">
+  <text class="pv-fill-ink" x="0" y="16" font-size="16" font-weight="600">Unscoped task</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="0.75" y="32.75" width="302.5" height="94.5" rx="8" stroke-width="1.5"/>
+  <text class="pv-fill-ink pv-mono" x="16" y="61" font-size="15">DetailView</text>
+  <text class="pv-fill-muted pv-mono" x="16" y="89" font-size="15">.onAppear {</text>
+  <text class="pv-fill-muted pv-mono" x="32" y="109" font-size="15">Task {…}</text>
+  <rect class="pv-fill-surface pv-stroke-ink" x="0.75" y="152.75" width="134.5" height="38.5" rx="8" stroke-width="1.5"/>
+  <text class="pv-fill-ink" x="16" y="177" font-size="15">View closes</text>
+  <path class="pv-stroke-muted" d="M144 172h16" fill="none" stroke-width="2"/>
+  <path class="pv-fill-muted" d="M168 172l-8-5v10z"/>
+  <text class="pv-fill-muted" x="180" y="177" font-size="15">Fetch still runs</text>
+  <text class="pv-fill-ink" x="336" y="16" font-size="16" font-weight="600">View-scoped task</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="336.75" y="32.75" width="302.5" height="94.5" rx="8" stroke-width="1.5"/>
+  <text class="pv-fill-ink pv-mono" x="352" y="61" font-size="15">DetailView</text>
+  <text class="pv-fill-accent pv-mono" x="352" y="89" font-size="15">.task {…}</text>
+  <rect class="pv-fill-surface pv-stroke-ink" x="336.75" y="152.75" width="134.5" height="38.5" rx="8" stroke-width="1.5"/>
+  <text class="pv-fill-ink" x="352" y="177" font-size="15">View closes</text>
+  <path class="pv-stroke-accent" d="M480 172h16" fill="none" stroke-width="2"/>
+  <path class="pv-fill-accent" d="M504 172l-8-5v10z"/>
+  <text class="pv-fill-ink" x="516" y="177" font-size="15">Fetch canceled</text>
+</svg>

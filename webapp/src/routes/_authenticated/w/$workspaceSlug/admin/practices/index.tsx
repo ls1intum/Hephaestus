@@ -78,6 +78,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { DrawerBody } from "@/components/ui/drawer";
 import { practiceCatalogStructureScope } from "@/hooks/practice-catalog-cache";
+import { refreshPracticeGuidance } from "@/hooks/practice-guidance-cache";
 import { usePracticeCatalogMutations } from "@/hooks/use-practice-catalog-mutations";
 import { usePracticeEditor } from "@/hooks/use-practice-editor";
 import { isRecord } from "@/lib/is-record";
@@ -252,7 +253,12 @@ function PracticeCatalogRoute() {
 		...adoptGroupMutation(),
 		onSuccess: async (result) => {
 			stackControls.close(0);
-			await invalidateCatalogQueries();
+			await Promise.all([
+				invalidateCatalogQueries(),
+				...result.added.map(async (practice) =>
+					refreshPracticeGuidance(queryClient, workspaceSlug, practice.slug),
+				),
+			]);
 			const changes = [
 				result.added.length > 0 &&
 					`${result.added.length} ${result.added.length === 1 ? "practice" : "practices"} added`,
@@ -277,12 +283,15 @@ function PracticeCatalogRoute() {
 		}
 		setStaleLevelKey(null);
 		try {
-			await adoptCatalogPractice.mutateAsync({
+			const adopted = await adoptCatalogPractice.mutateAsync({
 				path: { workspaceSlug, slug: entry.id },
 				headers: { "If-Match": preview.etag },
 			});
 			stackControls.close(depth);
-			await invalidateCatalogQueries();
+			await Promise.all([
+				invalidateCatalogQueries(),
+				refreshPracticeGuidance(queryClient, workspaceSlug, adopted.slug),
+			]);
 			toast.success("Practice added", { description: preview.definition.name });
 		} catch (error) {
 			const status = problemStatusOf(error);

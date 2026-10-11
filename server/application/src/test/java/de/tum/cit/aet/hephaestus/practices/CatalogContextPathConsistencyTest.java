@@ -41,7 +41,7 @@ class CatalogContextPathConsistencyTest extends BaseUnitTest {
     private static final Set<String> REAL_CHANGE_FILES =
             Set.of("diff.patch", "diff_stat.txt", "files.json", "description.authored.md");
 
-    private static final Pattern CONTEXT_PATH = Pattern.compile("context/([a-z_]+\\.[a-z]+)");
+    private static final Pattern CONTEXT_PATH = Pattern.compile("(?<![\\w-])context/([a-z_]+\\.[a-z]+)");
 
     private static final Pattern CHANGE_PATH = Pattern.compile("work/change/([a-z_.]+\\.[a-z]+)");
 

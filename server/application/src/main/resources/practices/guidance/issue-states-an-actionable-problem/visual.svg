@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 156">
+  <text class="pv-fill-ink" x="0" y="16" font-size="16" font-weight="600">Vague issue</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="0.75" y="32.75" width="302.5" height="94.5" rx="8" stroke-width="1.5"/>
+  <g transform="translate(16 48)"><circle class="pv-stroke-ink" cx="8" cy="8" r="6.75" fill="none" stroke-width="1.5"/><circle class="pv-fill-ink" cx="8" cy="8" r="1.75"/></g>
+  <text class="pv-fill-ink" x="44" y="61" font-size="15">Issue</text>
+  <text class="pv-fill-muted" x="16" y="92" font-size="15">It doesn’t work</text>
+  <text class="pv-fill-muted" x="0" y="152" font-size="15">Maintainer guesses</text>
+  <text class="pv-fill-ink" x="336" y="16" font-size="16" font-weight="600">Actionable issue</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="336.75" y="32.75" width="302.5" height="94.5" rx="8" stroke-width="1.5"/>
+  <g transform="translate(352 48)"><circle class="pv-stroke-ink" cx="8" cy="8" r="6.75" fill="none" stroke-width="1.5"/><circle class="pv-fill-ink" cx="8" cy="8" r="1.75"/></g>
+  <text class="pv-fill-ink" x="380" y="61" font-size="15">Issue</text>
+  <text class="pv-fill-accent" x="352" y="92" font-size="15">Empty file upload returns 500</text>
+  <text class="pv-fill-accent" x="352" y="110" font-size="15">Expected: validation error</text>
+  <text class="pv-fill-ink" x="336" y="152" font-size="15">Maintainer can start</text>
+</svg>

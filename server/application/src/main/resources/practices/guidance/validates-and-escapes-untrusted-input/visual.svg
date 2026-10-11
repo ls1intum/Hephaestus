@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 124">
+  <text class="pv-fill-ink" x="0" y="16" font-size="16" font-weight="600">Glued in raw</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="0.75" y="32.75" width="302.5" height="62.5" rx="8" stroke-width="1.5"/>
+  <text class="pv-fill-muted pv-mono" x="16" y="61" font-size="15">query("WHERE name='"</text>
+  <text class="pv-fill-muted pv-mono" x="34" y="77" font-size="15">+ name + "'")</text>
+  <text class="pv-fill-muted" x="0" y="120" font-size="15">Input changes the query</text>
+  <text class="pv-fill-ink" x="336" y="16" font-size="16" font-weight="600">Bound as parameter</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="336.75" y="32.75" width="302.5" height="62.5" rx="8" stroke-width="1.5"/>
+  <text class="pv-fill-accent pv-mono" x="352" y="61" font-size="15">query("WHERE name = ?",</text>
+  <text class="pv-fill-accent pv-mono" x="370" y="77" font-size="15">[name])</text>
+  <text class="pv-fill-ink" x="336" y="120" font-size="15">Input stays data</text>
+</svg>

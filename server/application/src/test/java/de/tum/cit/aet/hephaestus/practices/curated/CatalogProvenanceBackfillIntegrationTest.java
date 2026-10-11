@@ -212,9 +212,7 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
         releases.accept(
                 SHIPPED_SLUG,
                 EntityTagPrecondition.parse('"' + proposal.etag() + '"'),
-                Map.of(
-                        PracticeDefinitionField.CRITERIA, PracticeReleaseChoice.CURRENT,
-                        PracticeDefinitionField.DELIVERY_BEHAVIOR, PracticeReleaseChoice.OFFERED));
+                Map.of(PracticeDefinitionField.CRITERIA, PracticeReleaseChoice.CURRENT));
         CuratedPracticeOverride kept =
                 overrideRepository.findBySlug(SHIPPED_SLUG).orElseThrow();
         assertThat(kept.getAdoptedBase()).isEqualTo(bundled);
@@ -280,7 +278,10 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
                 definition.automatedReviewPolicy(),
                 definition.whyItMatters(),
                 definition.whatGoodLooksLike(),
-                definition.groupSlug());
+                definition.groupSlug(),
+                definition.deliveryBehavior(),
+                definition.visual(),
+                definition.guide());
     }
 
     private String baseSource(Workspace workspace) {

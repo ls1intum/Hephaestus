@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 166">
+  <text class="pv-fill-ink" x="0" y="16" font-size="16" font-weight="600">Context assumed</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="0.75" y="32.75" width="190.5" height="104.5" rx="8" stroke-width="1.5"/>
+  <g transform="translate(16 48)"><circle class="pv-stroke-ink" cx="8" cy="8" r="6.75" fill="none" stroke-width="1.5"/><circle class="pv-fill-ink" cx="8" cy="8" r="1.75"/></g>
+  <text class="pv-fill-ink" x="44" y="61" font-size="15">Issue</text>
+  <text class="pv-fill-muted" x="16" y="92" font-size="15">Per the agreed plan</text>
+  <rect class="pv-fill-muted" x="16" y="104" width="152" height="6" rx="3"/>
+  <rect class="pv-fill-muted" x="16" y="116" width="112" height="6" rx="3"/>
+  <rect class="pv-fill-surface pv-stroke-muted" x="224.75" y="32.75" width="78.5" height="104.5" rx="8" stroke-width="1.5"/>
+  <g transform="translate(240 48)"><path class="pv-stroke-ink" d="M2.75 0.75h7l3.5 3.5v11h-10.5z" fill="none" stroke-width="1.5" stroke-linejoin="round"/><path class="pv-stroke-ink" d="M9.75 0.75v3.5h3.5" fill="none" stroke-width="1.5" stroke-linejoin="round"/></g>
+  <text class="pv-fill-ink" x="240" y="92" font-size="15">Plan</text>
+  <rect class="pv-fill-muted" x="240" y="104" width="48" height="6" rx="3"/>
+  <rect class="pv-fill-muted" x="240" y="116" width="32" height="6" rx="3"/>
+  <text class="pv-fill-muted" x="0" y="162" font-size="15">Context guessed</text>
+  <text class="pv-fill-ink" x="336" y="16" font-size="16" font-weight="600">Context linked</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="336.75" y="32.75" width="190.5" height="104.5" rx="8" stroke-width="1.5"/>
+  <g transform="translate(352 48)"><circle class="pv-stroke-ink" cx="8" cy="8" r="6.75" fill="none" stroke-width="1.5"/><circle class="pv-fill-ink" cx="8" cy="8" r="1.75"/></g>
+  <text class="pv-fill-ink" x="380" y="61" font-size="15">Issue</text>
+  <text class="pv-fill-accent" x="352" y="92" font-size="15">Per the rollout plan</text>
+  <rect class="pv-fill-muted" x="352" y="104" width="152" height="6" rx="3"/>
+  <rect class="pv-fill-muted" x="352" y="116" width="112" height="6" rx="3"/>
+  <path class="pv-stroke-accent" d="M528 56h32" fill="none" stroke-width="2"/>
+  <circle class="pv-fill-accent" cx="528" cy="56" r="4"/>
+  <circle class="pv-fill-accent" cx="560" cy="56" r="4"/>
+  <rect class="pv-fill-surface pv-stroke-muted" x="560.75" y="32.75" width="78.5" height="104.5" rx="8" stroke-width="1.5"/>
+  <g transform="translate(576 48)"><path class="pv-stroke-ink" d="M2.75 0.75h7l3.5 3.5v11h-10.5z" fill="none" stroke-width="1.5" stroke-linejoin="round"/><path class="pv-stroke-ink" d="M9.75 0.75v3.5h3.5" fill="none" stroke-width="1.5" stroke-linejoin="round"/></g>
+  <text class="pv-fill-ink" x="576" y="92" font-size="15">Plan</text>
+  <rect class="pv-fill-muted" x="576" y="104" width="48" height="6" rx="3"/>
+  <rect class="pv-fill-muted" x="576" y="116" width="32" height="6" rx="3"/>
+  <text class="pv-fill-ink" x="336" y="162" font-size="15">Context known</text>
+</svg>

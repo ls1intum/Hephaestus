@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 170">
+  <text class="pv-fill-ink" x="0" y="16" font-size="16" font-weight="600">Diagnostic printed</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="0.75" y="32.75" width="302.5" height="46.5" rx="8" stroke-width="1.5"/>
+  <text class="pv-fill-muted pv-mono" x="16" y="61" font-size="15">print("Save failed")</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="0.75" y="96.75" width="302.5" height="46.5" rx="8" stroke-width="1.5"/>
+  <text class="pv-fill-ink" x="16" y="125" font-size="15">Console</text>
+  <text class="pv-fill-muted pv-mono" x="124" y="125" font-size="15">Save failed</text>
+  <text class="pv-fill-muted" x="0" y="166" font-size="15">No level to filter by</text>
+  <text class="pv-fill-ink" x="336" y="16" font-size="16" font-weight="600">Diagnostic logged</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="336.75" y="32.75" width="302.5" height="46.5" rx="8" stroke-width="1.5"/>
+  <text class="pv-fill-accent pv-mono" x="352" y="61" font-size="15">log.error("Save failed")</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="336.75" y="96.75" width="302.5" height="46.5" rx="8" stroke-width="1.5"/>
+  <text class="pv-fill-ink" x="352" y="125" font-size="15">Platform log</text>
+  <text class="pv-fill-accent pv-mono" x="460" y="125" font-size="15">ERROR Save failed</text>
+  <text class="pv-fill-ink" x="336" y="166" font-size="15">Filterable by level</text>
+</svg>

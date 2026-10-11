@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 164">
+  <text class="pv-fill-ink" x="0" y="16" font-size="16" font-weight="600">Outcome unconfirmed</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="0.75" y="32.75" width="150.5" height="102.5" rx="8" stroke-width="1.5"/>
+  <g transform="translate(16 48)"><circle class="pv-stroke-ink" cx="4" cy="3" r="2.5" fill="none" stroke-width="1.5"/><path class="pv-stroke-ink" d="M4 5.5v5" fill="none" stroke-width="1.5"/><circle class="pv-stroke-ink" cx="4" cy="13" r="2.5" fill="none" stroke-width="1.5"/><circle class="pv-stroke-ink" cx="12" cy="13" r="2.5" fill="none" stroke-width="1.5"/><path class="pv-stroke-ink" d="M12 10.5V6a3 3 0 0 0-3-3H7.5" fill="none" stroke-width="1.5" stroke-linecap="round"/></g>
+  <text class="pv-fill-ink" x="44" y="61" font-size="15">Merged</text>
+  <text class="pv-fill-muted" x="16" y="93" font-size="15">Added search</text>
+  <path class="pv-stroke-muted" d="M152 56h32" fill="none" stroke-width="2"/>
+  <circle class="pv-fill-muted" cx="152" cy="56" r="4"/>
+  <circle class="pv-fill-muted" cx="184" cy="56" r="4"/>
+  <rect class="pv-fill-surface pv-stroke-muted" x="184.75" y="32.75" width="118.5" height="102.5" rx="8" stroke-width="1.5"/>
+  <text class="pv-fill-ink" x="200" y="61" font-size="15">Issue #57</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="200.75" y="80.75" width="14.5" height="14.5" rx="3" stroke-width="1.5"/>
+  <text class="pv-fill-ink" x="228" y="93" font-size="15">Search</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="200.75" y="104.75" width="14.5" height="14.5" rx="3" stroke-width="1.5"/>
+  <text class="pv-fill-ink" x="228" y="117" font-size="15">Export</text>
+  <text class="pv-fill-muted" x="0" y="160" font-size="15">Tracker stale</text>
+  <text class="pv-fill-ink" x="336" y="16" font-size="16" font-weight="600">Outcome confirmed</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="336.75" y="32.75" width="150.5" height="102.5" rx="8" stroke-width="1.5"/>
+  <g transform="translate(352 48)"><circle class="pv-stroke-ink" cx="4" cy="3" r="2.5" fill="none" stroke-width="1.5"/><path class="pv-stroke-ink" d="M4 5.5v5" fill="none" stroke-width="1.5"/><circle class="pv-stroke-ink" cx="4" cy="13" r="2.5" fill="none" stroke-width="1.5"/><circle class="pv-stroke-ink" cx="12" cy="13" r="2.5" fill="none" stroke-width="1.5"/><path class="pv-stroke-ink" d="M12 10.5V6a3 3 0 0 0-3-3H7.5" fill="none" stroke-width="1.5" stroke-linecap="round"/></g>
+  <text class="pv-fill-ink" x="380" y="61" font-size="15">Merged</text>
+  <text class="pv-fill-accent" x="352" y="93" font-size="15">Export deferred</text>
+  <text class="pv-fill-accent" x="352" y="111" font-size="15">to #318</text>
+  <path class="pv-stroke-muted" d="M488 56h32" fill="none" stroke-width="2"/>
+  <circle class="pv-fill-muted" cx="488" cy="56" r="4"/>
+  <circle class="pv-fill-muted" cx="520" cy="56" r="4"/>
+  <rect class="pv-fill-surface pv-stroke-muted" x="520.75" y="32.75" width="118.5" height="102.5" rx="8" stroke-width="1.5"/>
+  <text class="pv-fill-ink" x="536" y="61" font-size="15">Issue #57</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="536.75" y="80.75" width="14.5" height="14.5" rx="3" stroke-width="1.5"/>
+  <path class="pv-stroke-accent" d="M540 88.5l3 3 5.5-6" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <text class="pv-fill-ink" x="564" y="93" font-size="15">Search</text>
+  <rect class="pv-fill-surface pv-stroke-muted" x="536.75" y="104.75" width="14.5" height="14.5" rx="3" stroke-width="1.5"/>
+  <text class="pv-fill-ink" x="564" y="117" font-size="15">Export</text>
+  <text class="pv-fill-ink" x="336" y="160" font-size="15">Tracker current</text>
+</svg>

@@ -1229,6 +1229,10 @@ export type CreatePracticeRequest = {
      */
     groupSlug?: string | null;
     /**
+     * Guide text and its figures; guidance, never review rules
+     */
+    guide?: PracticeGuide;
+    /**
      * Human-readable name
      */
     name: string;
@@ -1249,6 +1253,10 @@ export type CreatePracticeRequest = {
      */
     slug: string;
     subject?: 'AUTHOR' | 'ASSIGNEE' | 'REVIEWER' | 'MERGER';
+    /**
+     * Developer-facing picture of the practice; guidance, never review rules
+     */
+    visual?: PracticeVisual;
     /**
      * Developer-facing exemplar; a concrete instance, not the review criteria
      */
@@ -1539,6 +1547,7 @@ export type CuratedPracticeDefinition = {
     deliveryBehavior: PracticeDeliveryBehavior;
     evidenceRequirements: Array<PracticeEvidenceRequirement>;
     groupSlug?: string;
+    guide?: PracticeGuide;
     name: string;
     precomputeScript?: string;
     precondition?: PracticePrecondition;
@@ -1550,6 +1559,7 @@ export type CuratedPracticeDefinition = {
     };
     signals: Array<string>;
     subject: 'AUTHOR' | 'ASSIGNEE' | 'REVIEWER' | 'MERGER';
+    visual?: PracticeVisual;
     whatGoodLooksLike?: string;
     whyItMatters?: string;
 };
@@ -1570,6 +1580,10 @@ export type CuratedPracticeRequest = {
     deliveryBehavior?: PracticeDeliveryBehavior;
     evidenceRequirements: Array<PracticeEvidenceRequirement>;
     groupSlug?: string;
+    /**
+     * Guide text and its figures; guidance, never review rules
+     */
+    guide?: PracticeGuide;
     name: string;
     precomputeScript?: string;
     precondition?: PracticePrecondition;
@@ -1581,6 +1595,10 @@ export type CuratedPracticeRequest = {
     };
     signals: Array<string>;
     subject?: 'AUTHOR' | 'ASSIGNEE' | 'REVIEWER' | 'MERGER';
+    /**
+     * Developer-facing picture of the practice; guidance, never review rules
+     */
+    visual?: PracticeVisual;
     whatGoodLooksLike?: string;
     whyItMatters?: string;
 };
@@ -3374,6 +3392,10 @@ export type Practice = {
      */
     groupSlug?: string;
     /**
+     * Developer-facing guide text and its figures (developer layer)
+     */
+    guide?: PracticeGuide;
+    /**
      * Practice ID
      */
     id: number;
@@ -3405,6 +3427,10 @@ export type Practice = {
      * Timestamp when the practice was last updated
      */
     updatedAt: string;
+    /**
+     * Developer-facing picture of the practice (developer layer)
+     */
+    visual?: PracticeVisual;
     /**
      * Developer-facing exemplar (developer layer)
      */
@@ -3486,6 +3512,7 @@ export type PracticeDefinition = {
     deliveryBehavior: PracticeDeliveryBehavior;
     evidenceRequirements: Array<PracticeEvidenceRequirement>;
     groupSlug?: string;
+    guide?: PracticeGuide;
     name: string;
     precomputeScript?: string;
     precondition?: PracticePrecondition;
@@ -3497,6 +3524,7 @@ export type PracticeDefinition = {
     };
     signals: Array<string>;
     subject: 'AUTHOR' | 'ASSIGNEE' | 'REVIEWER' | 'MERGER';
+    visual?: PracticeVisual;
     whatGoodLooksLike?: string;
     whyItMatters?: string;
 };
@@ -3746,6 +3774,34 @@ export type PracticeGroupTrend = {
 };
 
 /**
+ * The visual and the guide of one practice, as the practice panel shows them
+ */
+export type PracticeGuidance = {
+    guide?: PracticeGuide;
+    /**
+     * URL-safe identifier unique within workspace
+     */
+    practiceSlug: string;
+    visual?: PracticeVisual;
+};
+
+/**
+ * Developer guidance: the text of a practice's Guide tab and the SVG figures it shows. Never changes how the practice is reviewed
+ */
+export type PracticeGuide = {
+    /**
+     * SVG markup of each figure the Markdown shows, by figure name
+     */
+    figures: {
+        [key: string]: string;
+    };
+    /**
+     * Markdown. Shows a figure with ![description](figures/<name>.svg)
+     */
+    markdown: string;
+};
+
+/**
  * What must be in a piece of work for this practice to have anything to judge
  */
 export type PracticePrecondition = {
@@ -3805,7 +3861,7 @@ export type PracticeProfileOverview = {
 
 export type PracticeReleaseField = {
     conflict: boolean;
-    field: 'NAME' | 'SIGNALS' | 'EVIDENCE_REQUIREMENTS' | 'REVIEW_WHEN' | 'SUBJECT' | 'PRECONDITION' | 'CRITERIA' | 'PRECOMPUTE_SCRIPT' | 'AUTOMATED_REVIEW_POLICY' | 'WHY_IT_MATTERS' | 'WHAT_GOOD_LOOKS_LIKE' | 'GROUP_SLUG' | 'DELIVERY_BEHAVIOR';
+    field: 'NAME' | 'SIGNALS' | 'EVIDENCE_REQUIREMENTS' | 'REVIEW_WHEN' | 'SUBJECT' | 'PRECONDITION' | 'CRITERIA' | 'PRECOMPUTE_SCRIPT' | 'AUTOMATED_REVIEW_POLICY' | 'WHY_IT_MATTERS' | 'WHAT_GOOD_LOOKS_LIKE' | 'GROUP_SLUG' | 'DELIVERY_BEHAVIOR' | 'VISUAL' | 'GUIDE';
     offeredChanged: boolean;
 };
 
@@ -4199,6 +4255,20 @@ export type PracticeTrend = {
     scope: 'GROUP' | 'PRACTICE';
     slug: string;
     support: TrendSupport;
+};
+
+/**
+ * Developer guidance: one picture of the practice and what it shows. Never changes how the practice is reviewed
+ */
+export type PracticeVisual = {
+    /**
+     * What the picture shows, for people who cannot see it
+     */
+    alt: string;
+    /**
+     * SVG markup. Shapes and text only; colors come from the pv-* theme classes
+     */
+    svg: string;
 };
 
 /**
@@ -6345,7 +6415,7 @@ export type UpdatePracticeRequest = {
     /**
      * Optional fields to clear before applying supplied values
      */
-    clear?: Array<'PRECONDITION' | 'PRECOMPUTE_SCRIPT' | 'WHY_IT_MATTERS' | 'WHAT_GOOD_LOOKS_LIKE'>;
+    clear?: Array<'PRECONDITION' | 'PRECOMPUTE_SCRIPT' | 'WHY_IT_MATTERS' | 'WHAT_GOOD_LOOKS_LIKE' | 'VISUAL' | 'GUIDE'>;
     /**
      * Practice review criteria
      */
@@ -6360,6 +6430,10 @@ export type UpdatePracticeRequest = {
      * Catalog placement to apply with the definition update; omit to leave unchanged
      */
     group?: BindPracticeGroupRequest;
+    /**
+     * Guide text and its figures; guidance, never review rules
+     */
+    guide?: PracticeGuide;
     /**
      * Human-readable name
      */
@@ -6377,6 +6451,10 @@ export type UpdatePracticeRequest = {
     };
     signals?: Array<string>;
     subject?: 'AUTHOR' | 'ASSIGNEE' | 'REVIEWER' | 'MERGER';
+    /**
+     * Developer-facing picture of the practice; guidance, never review rules
+     */
+    visual?: PracticeVisual;
     /**
      * Concrete example shown to the developer; not review criteria
      */
@@ -14303,6 +14381,37 @@ export type BindGroupResponses = {
 };
 
 export type BindGroupResponse = BindGroupResponses[keyof BindGroupResponses];
+
+export type GetPracticeGuidanceData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        practiceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}/guidance';
+};
+
+export type GetPracticeGuidanceErrors = {
+    /**
+     * Practice not found
+     */
+    404: ProblemDetail;
+};
+
+export type GetPracticeGuidanceError = GetPracticeGuidanceErrors[keyof GetPracticeGuidanceErrors];
+
+export type GetPracticeGuidanceResponses = {
+    /**
+     * Guidance returned
+     */
+    200: PracticeGuidance;
+};
+
+export type GetPracticeGuidanceResponse = GetPracticeGuidanceResponses[keyof GetPracticeGuidanceResponses];
 
 export type PlacePracticeData = {
     body: PlacePracticeRequest;
