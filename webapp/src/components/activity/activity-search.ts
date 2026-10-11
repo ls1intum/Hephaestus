@@ -143,6 +143,17 @@ export const PEOPLE_SEARCH_DEFAULTS = peopleSearchSchema.parse({});
 
 export type PeopleSearch = z.infer<typeof peopleSearchSchema>;
 
+/** The public page opens a person by login and nothing over them: no one's work leaves the server. */
+export const PUBLIC_ACTIVITY_LEVEL_KINDS = ["person"] as const;
+
+export const publicActivitySearchSchema = peopleSearchSchema.extend(
+	detailStackSchema(PUBLIC_ACTIVITY_LEVEL_KINDS).shape,
+);
+
+export const PUBLIC_ACTIVITY_SEARCH_DEFAULTS = publicActivitySearchSchema.parse({});
+
+export type PublicActivitySearch = z.infer<typeof publicActivitySearchSchema>;
+
 /** Workspace activity adds a team, by its slug: `?team=core&repo=acme/api&sort=reviews`. */
 const workspaceActivityFilterSchema = peopleSearchSchema.extend({
 	view: z.enum(["people", "timeline"]).default("people").catch("people"),

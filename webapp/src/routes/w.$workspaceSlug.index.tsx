@@ -6,15 +6,19 @@ import type { PublicActivity } from "@/api/types.gen";
 import { publicPeopleRows } from "@/components/activity/activity-people-rows";
 import { periodFromSearch, periodQuery, periodSearch } from "@/components/activity/activity-period";
 import {
-	PEOPLE_SEARCH_DEFAULTS,
+	parseActivityStack,
+	PUBLIC_ACTIVITY_LEVEL_KINDS,
+	PUBLIC_ACTIVITY_SEARCH_DEFAULTS,
 	type PeopleSearch,
+	type PublicActivitySearch,
 	peopleDir,
 	peopleOrder,
-	peopleSearchSchema,
+	publicActivitySearchSchema,
 	PERIOD_SEARCH_KEYS,
 } from "@/components/activity/activity-search";
 import type { PeopleOrder } from "@/components/activity/ActivityPeopleTable";
 import { PublicActivityPage } from "@/components/activity/PublicActivityPage";
+import { useDetailStack } from "@/components/layout/detail-drawer/use-detail-stack";
 import { PublicActivityOnboardingDialog } from "@/components/onboarding/PublicActivityOnboardingDialog";
 import { Spinner } from "@/components/ui/spinner";
 import { useLoginNavigation } from "@/hooks/use-login-navigation";
@@ -36,9 +40,12 @@ type PublicActivityLoad =
  * an unknown and a private workspace the same answer, so neither can be told from the other here.
  */
 export const Route = createFileRoute("/w/$workspaceSlug/")({
-	validateSearch: peopleSearchSchema,
+	validateSearch: publicActivitySearchSchema,
 	search: {
-		middlewares: carriedSearchParams<PeopleSearch>(PERIOD_SEARCH_KEYS, PEOPLE_SEARCH_DEFAULTS),
+		middlewares: carriedSearchParams<PublicActivitySearch>(
+			PERIOD_SEARCH_KEYS,
+			PUBLIC_ACTIVITY_SEARCH_DEFAULTS,
+		),
 	},
 	beforeLoad: async ({ context, params, location }) => {
 		// A public page needs no identity, so an identity that cannot be read is a visitor.
@@ -158,6 +165,8 @@ function PublicActivityRoute() {
 	const setView = (view: Partial<PeopleSearch>) => {
 		void setSearch((previous) => ({ ...previous, ...view }), { replace: true });
 	};
+	const detailStack = parseActivityStack(search.detail, PUBLIC_ACTIVITY_LEVEL_KINDS);
+	const stackControls = useDetailStack(detailStack);
 
 	return (
 		<>
@@ -178,6 +187,7 @@ function PublicActivityRoute() {
 				repositories={page?.repositories ?? []}
 				coverage={page?.coverage}
 				updating={updating}
+				detail={{ stack: detailStack, onClose: stackControls.close }}
 				people={
 					load.status === "ready"
 						? { status: "ready", people: publicPeopleRows(load.page), stale: false }

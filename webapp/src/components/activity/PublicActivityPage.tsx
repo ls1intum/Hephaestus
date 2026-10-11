@@ -14,13 +14,15 @@ import { getProviderTerms, type ProviderType } from "@/lib/provider/provider-ter
 import { coverageNote } from "./activity-coverage";
 import { contributionsNote } from "./activity-people-rows";
 import type { ActivityPeriod } from "./activity-period";
+import type { ActivityStackEntry } from "./activity-search";
 import {
 	ActivityPeopleTable,
 	type PeopleOrder,
 	type PeopleTableState,
 } from "./ActivityPeopleTable";
 import { ActivityPeriodPicker } from "./ActivityPeriodPicker";
-import { providerProfileLink } from "./people-links";
+import { personLevelLink } from "./people-links";
+import { PublicPersonDrawer } from "./PublicPersonDrawer";
 
 export interface PublicActivityPageProps {
 	/** Undefined while the page could not read the workspace at all. */
@@ -40,6 +42,8 @@ export interface PublicActivityPageProps {
 	people: PeopleTableState;
 	/** Another period is loading, and the page still shows the previous one. */
 	updating: boolean;
+	/** The person levels the URL opens over the page, and how each closes. */
+	detail: { stack: ActivityStackEntry[]; onClose: (depth: number) => void };
 }
 
 /**
@@ -60,6 +64,7 @@ export function PublicActivityPage({
 	coverage,
 	people,
 	updating,
+	detail,
 }: PublicActivityPageProps) {
 	const terms = getProviderTerms(providerType);
 	const pullRequests = artifactKindNoun(ARTIFACT_KIND.pullRequest, 2, providerType);
@@ -67,7 +72,7 @@ export function PublicActivityPage({
 	// A repository the URL names but the workspace does not list stays in the picker, so it can be cleared.
 	const repositoryKeys = [...new Set([...repositories.map(({ key }) => key), ...repo])];
 	return (
-		<PageLayout className="max-w-4xl space-y-8">
+		<PageLayout className="space-y-8">
 			<PageHeader
 				icon={<Globe />}
 				title={workspaceName === undefined ? "Public activity" : `${workspaceName} activity`}
@@ -119,14 +124,23 @@ export function PublicActivityPage({
 				}
 			>
 				<ActivityPeopleTable
-					state={people}
+					state={
+						people.status === "ready" ? { ...people, stale: people.stale || updating } : people
+					}
 					providerType={providerType}
 					order={order}
 					onOrderChange={onOrderChange}
 					repo={repo}
-					personLink={providerProfileLink}
+					personLink={personLevelLink}
 				/>
 			</Section>
+			<PublicPersonDrawer
+				stack={detail.stack}
+				onClose={detail.onClose}
+				providerType={providerType}
+				// The previous period's figures stand in while the next loads, and the level says so.
+				people={people.status === "ready" ? { ...people, stale: people.stale || updating } : people}
+			/>
 		</PageLayout>
 	);
 }

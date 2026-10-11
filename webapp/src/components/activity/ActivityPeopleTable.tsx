@@ -77,10 +77,14 @@ const fold = (text: string): string =>
 const columnHelper = createColumnHelper<DataTableFeatures, PeopleRow>();
 
 /**
- * Below `sm` the position and the person stay in place while the figures scroll under them, so a
- * narrow screen shows whose row it is and that there is more to the side.
+ * The position and the person stay in place while the figures scroll under them, at whatever width
+ * the table overflows its container; with nothing to scroll, sticky does nothing. Above the `z-10`
+ * chips and lines in the figures, so a figure scrolling under never paints over a name.
  */
-const PINNED = "max-sm:sticky max-sm:z-10 max-sm:bg-card";
+const PINNED = "sticky z-20 bg-card";
+
+/** The position column's width, which is also where the pinned person column starts. */
+const POSITION_WIDTH = "w-12 min-w-12";
 
 /** A number column fits its figures and leaves the rest of the row to the person. */
 const NUMBER_COLUMN = { numeric: true, className: "w-px" };
@@ -144,7 +148,7 @@ export function ActivityPeopleTable({
 						<span className="sr-only">Position</span>
 					</>
 				),
-				meta: { numeric: true, className: cn("w-10 min-w-10 pl-3 max-sm:left-0", PINNED) },
+				meta: { numeric: true, className: cn(POSITION_WIDTH, "left-0 pl-3", PINNED) },
 				cell: ({ row }) => (
 					<span className="text-muted-foreground">{positions.get(row.original.person.id)}</span>
 				),
@@ -155,11 +159,8 @@ export function ActivityPeopleTable({
 				sortDescFirst: false,
 				sortFn: (a, b) => nameOrder.compare(a.original.person.name, b.original.person.name),
 				meta: {
-					className: cn(
-						"min-w-40 sm:min-w-48",
-						PINNED,
-						positioned ? "max-sm:left-10" : "max-sm:left-0",
-					),
+					// The edge marks where the figures pass under the pinned columns.
+					className: cn("border-r", PINNED, positioned ? "left-12" : "left-0"),
 				},
 				cell: ({ row }) => (
 					<PersonCell
@@ -347,8 +348,11 @@ export function ActivityPeopleTable({
 }
 
 /**
- * The name is the row's link and its keyboard stop, stretched over the row so the whole row is the
- * pointer target. A person whose first contribution to the workspace is in the range is new here.
+ * The name is the row's link and its keyboard stop, stretched over its pinned cell so the identity is
+ * the pointer target. A person whose first contribution to the workspace is in the range is new here.
+ *
+ * The identity has a set width, so a long name truncates instead of widening the pinned columns; the
+ * New marker sits on the login line, so it never takes room from the name.
  */
 function PersonCell({
 	person,
@@ -360,19 +364,19 @@ function PersonCell({
 	first: boolean;
 }) {
 	return (
-		<div className="flex min-w-0 items-center gap-3">
+		<div className="flex w-36 items-center gap-3 sm:w-56">
 			<MemberAvatar user={person} />
-			<div className="min-w-0">
-				<div className="flex min-w-0 items-center gap-2">
-					<InlineLink
-						render={link(person)}
-						className="truncate font-medium after:absolute after:inset-0"
-					>
-						{person.name}
-					</InlineLink>
+			<div className="min-w-0 flex-1">
+				<InlineLink
+					render={link(person)}
+					className="block truncate font-medium after:absolute after:inset-0"
+				>
+					{person.name}
+				</InlineLink>
+				<p className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+					<span className="truncate">{person.login}</span>
 					{first && <NewBadge />}
-				</div>
-				<p className="truncate text-xs text-muted-foreground">{person.login}</p>
+				</p>
 			</div>
 		</div>
 	);
@@ -386,7 +390,7 @@ function NewBadge() {
 		<Tooltip>
 			<TooltipTrigger
 				render={<Badge variant="muted" role="img" aria-label={FIRST_CONTRIBUTION} />}
-				className="relative z-10"
+				className="relative z-10 shrink-0"
 			>
 				<span aria-hidden>New</span>
 			</TooltipTrigger>

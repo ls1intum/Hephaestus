@@ -78,7 +78,7 @@ export function WorkspaceActivityPage({
 		...new Set([...(facets?.repositories ?? []).map(({ key }) => key), ...repo]),
 	];
 	return (
-		<PageLayout className="max-w-4xl space-y-8">
+		<PageLayout className="space-y-8">
 			<PageHeader
 				icon={<Building2 />}
 				title="Workspace activity"

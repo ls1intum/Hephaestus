@@ -206,7 +206,7 @@ export const Wide: Story = {
 	parameters: { chromatic: { viewports: [1920] } },
 	play: async ({ canvas }) => {
 		const table = canvas.getByRole("table", { name: "People" });
-		await expect(table.getBoundingClientRect().width).toBeLessThanOrEqual(896);
+		await expect(table.getBoundingClientRect().width).toBeLessThanOrEqual(1152);
 	},
 };
 

@@ -1,6 +1,6 @@
 import { QueryClient } from "@tanstack/react-query";
 import { createMemoryHistory, createRouter } from "@tanstack/react-router";
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http, type PathParams } from "msw";
 import { describe, expect, it, vi } from "vitest";
@@ -159,6 +159,54 @@ describe("the address of a workspace", () => {
 		await user.click(screen.getByRole("button", { name: /Retry/u }));
 		await screen.findByRole("heading", { name: "Acme activity" });
 		expect(names()).toHaveLength(2);
+	});
+
+	it("opens published person figures without another read, and returns to the same filters", async () => {
+		const user = userEvent.setup();
+		const reads: URL[] = [];
+		server.use(unauthenticatedUser);
+		publish(publicActivity(), reads);
+		const address = "/w/acme?range=30d&repo=acme/api&sort=name";
+		const { router } = renderRouteAtWithRouter(address);
+		await screen.findByRole("heading", { name: "Acme activity" }, ROUTE_RENDER_WAIT);
+
+		await user.click(screen.getByRole("link", { name: "Ada Lovelace" }));
+		const panel = await screen.findByRole("dialog", { name: "Ada Lovelace" });
+		await waitFor(() => expect(router.state.location.search.detail).toBe("person:ada"));
+		const totals = within(panel).getByRole("heading", { name: "In this range" }).closest("section");
+		expect(totals?.querySelector("dd")?.textContent).toBe("5");
+		const weeks = within(panel).getByRole("table", { name: "Contributions by week" });
+		expect(within(weeks).getByRole("cell", { name: "5" }).textContent).toBe("5");
+		expect(
+			within(panel)
+				.getByRole("link", { name: /ada on GitHub/u })
+				.getAttribute("href"),
+		).toBe("https://github.com/ada");
+		expect(reads).toHaveLength(1);
+
+		await act(async () => router.history.back());
+		await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+		expect(router.state.location.href).toBe(address);
+		expect(reads).toHaveLength(1);
+	});
+
+	it("removes a person's figures and profile when the published response no longer includes them", async () => {
+		let page = publicActivity();
+		server.use(
+			unauthenticatedUser,
+			http.get("*/public/workspaces/:slug/activity", () => HttpResponse.json(page)),
+		);
+		const { router } = renderRouteAtWithRouter("/w/acme?detail=person%3Aada");
+		const panel = await screen.findByRole("dialog", { name: "Ada Lovelace" }, ROUTE_RENDER_WAIT);
+		within(panel).getByRole("link", { name: /ada on GitHub/u });
+		page = publicActivity({ people: [person("bob", "Bob Brenner")] });
+		await act(async () => router.invalidate());
+		await waitFor(() => {
+			const current = screen.getByRole("dialog", { name: "ada" });
+			within(current).getByText("No activity in this range");
+			expect(within(current).queryByRole("link", { name: /on GitHub/u })).toBeNull();
+			expect(within(current).queryByRole("table")).toBeNull();
+		});
 	});
 });
 
