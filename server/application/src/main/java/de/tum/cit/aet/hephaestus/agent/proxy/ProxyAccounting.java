@@ -82,8 +82,8 @@ public class ProxyAccounting {
 
     /**
      * Counted by the cap that refused, because different people fix each one: an admin raises a monthly
-     * budget ({@link FundingSource#capTag}), and an operator raises the per-attempt practice script token cap
-     * ({@code practice_script_attempt}).
+     * budget ({@link FundingSource#capTag}), and an operator raises the per-attempt practice script token or
+     * search unit limit ({@code practice_script_attempt}).
      */
     private boolean countedRefusal(boolean refused, ProxyRouting routing, String cap) {
         if (refused) {
@@ -118,8 +118,9 @@ public class ProxyAccounting {
      * means this call's tokens were billed to nobody.
      *
      * @param practiceScript the practice script call; {@code null} for every other call
+     * @return the usage that was recorded; {@code null} when the body reports none or cannot be read
      */
-    public void recordUsage(
+    public @Nullable ProxyTokenUsage recordUsage(
             ProxyRouting.BilledAttempt attempt,
             @Nullable PracticeScriptCall practiceScript,
             LlmApiProtocol protocol,
@@ -133,6 +134,7 @@ public class ProxyAccounting {
             usage = null;
         }
         recordUsage(attempt, practiceScript, usage);
+        return usage;
     }
 
     /**

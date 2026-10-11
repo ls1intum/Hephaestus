@@ -136,6 +136,9 @@ erDiagram
         INTEGER calls "NOT NULL"
         BIGINT input_tokens "NOT NULL"
         BIGINT output_tokens "NOT NULL"
+        BIGINT cache_read_tokens "NOT NULL"
+        BIGINT cache_write_tokens "NOT NULL"
+        BIGINT search_units "NOT NULL"
     }
 
     ArtifactSignal {
@@ -862,6 +865,7 @@ erDiagram
         NUMERIC(18,8) applied_per_1m_cache_write_usd
         TIMESTAMPTZ occurred_at "NOT NULL"
         VARCHAR(16) usage_provenance
+        BIGINT search_units "NOT NULL"
     }
 
     LoginProvider {

@@ -744,6 +744,80 @@ class LlmProxyServiceTest extends BaseUnitTest {
     }
 
     /**
+     * A practice script call is never streamed, so its span reads the usage off the buffered body. The input count
+     * is the prompt total, cache reads included. A call that billed only search units carries no token count.
+     */
+    @ParameterizedTest
+    @CsvSource(
+            delimiter = '|',
+            value = {
+                "DECISION|openai-decisions|decision/decisions|"
+                        + "{\"answers\":[],\"usage\":{\"input_tokens\":40,\"output_tokens\":3}}|40|3|",
+                "CHAT|openai-completions|chat/chat/completions|{\"usage\":{\"prompt_tokens\":100,"
+                        + "\"completion_tokens\":5,\"prompt_tokens_details\":{\"cached_tokens\":60}}}|100|5|",
+                "RERANKING|cohere-rerank|reranking/rerank|"
+                        + "{\"results\":[],\"meta\":{\"billed_units\":{\"search_units\":3}}}|||3"
+            })
+    void shouldTagTheUsageOnTheSpanWhenAPracticeScriptCallIsNotStreamed(
+            ModelKind slot,
+            String protocol,
+            String op,
+            String reply,
+            @Nullable Long inputTokens,
+            @Nullable Long outputTokens,
+            @Nullable Long searchUnits) {
+        var exporter = mock(SpanExporter.class);
+        when(exporter.export(any())).thenReturn(CompletableResultCode.ofSuccess());
+        when(exporter.shutdown()).thenReturn(CompletableResultCode.ofSuccess());
+        try (var provider = SdkTracerProvider.builder()
+                .setSampler(Sampler.alwaysOn())
+                .addSpanProcessor(SimpleSpanProcessor.create(exporter))
+                .build()) {
+            var upstreamResponse = ClientResponse.create(HttpStatusCode.valueOf(200))
+                    .header(HttpHeaders.CONTENT_TYPE, "application/json")
+                    .body(reply)
+                    .build();
+            var service = new LlmProxyService(
+                    new OtelTracer(provider.get("test"), new OtelCurrentTraceContext(), event -> {}),
+                    WebClient.builder()
+                            .exchangeFunction(request -> Mono.just(upstreamResponse))
+                            .build(),
+                    resolver,
+                    OBJECT_MAPPER,
+                    new ProxyAccounting(
+                            budgetGate,
+                            usageAccumulator,
+                            mentorTurnUsageAccumulator,
+                            new SimpleMeterRegistry(),
+                            OBJECT_MAPPER),
+                    requestPolicy);
+            authenticate(practiceScriptRouting(slot, protocol));
+            when(resolver.resolveProxyCredential(any())).thenReturn(credential(protocol, LlmAuthMode.BEARER));
+            HttpHeaders headers = new HttpHeaders();
+            headers.set(JobTokenAuthenticationFilter.PRACTICE_SCRIPT_PRACTICE_HEADER, "comment-quality");
+
+            var result = service.proxyPracticeScript(
+                    request("POST", "/internal/llm/practice-script/" + op),
+                    new MockHttpServletResponse(),
+                    headers,
+                    "{}".getBytes(StandardCharsets.UTF_8));
+
+            assertThat(result).isNotNull();
+            assertThat(result.getStatusCode().value()).isEqualTo(200);
+            verify(exporter).export(argThat(spans -> {
+                var attributes = spans.iterator().next().getAttributes();
+                assertThat(attributes.get(AttributeKey.longKey("gen_ai.usage.input_tokens")))
+                        .isEqualTo(inputTokens);
+                assertThat(attributes.get(AttributeKey.longKey("gen_ai.usage.output_tokens")))
+                        .isEqualTo(outputTokens);
+                assertThat(attributes.get(AttributeKey.longKey("hephaestus.usage.search_units")))
+                        .isEqualTo(searchUnits);
+                return true;
+            }));
+        }
+    }
+
+    /**
      * These tests drive an actual HTTP stream because the failure they guard against is invisible to any
      * mock: a controller that returns the instant it sees an SSE body serves a perfect response and
      * reaches no accounting at all, so only the ledger tells the two apart.

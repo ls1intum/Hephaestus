@@ -344,15 +344,7 @@ class LlmProxyService {
                     accounting.recordMalformedUsage(attempt);
                 } else {
                     accounting.recordUsage(attempt, practiceScript, tap.observed());
-                    ProxyTokenUsage usage = tap.observed();
-                    if (usage != null) {
-                        span.tag(
-                                "gen_ai.usage.input_tokens",
-                                (long) usage.billableInputTokens()
-                                        + usage.cacheReadTokens()
-                                        + usage.cacheWriteTokens());
-                        span.tag("gen_ai.usage.output_tokens", usage.outputTokens());
-                    }
+                    tagUsage(span, tap.observed());
                 }
             }
             return null;
@@ -362,7 +354,7 @@ class LlmProxyService {
         }
         // Attributed now, not at the run's terminal write, so an execution that dies still bills.
         if (upstream.body() != null && served) {
-            accounting.recordUsage(attempt, practiceScript, protocol, upstream.body());
+            tagUsage(span, accounting.recordUsage(attempt, practiceScript, protocol, upstream.body()));
         }
         return ResponseEntity.status(upstream.status())
                 .headers(upstream.headers())
@@ -518,6 +510,21 @@ class LlmProxyService {
         return fundingSource == FundingSource.WORKSPACE
                 ? "Own-provider budget reached. Paused until an admin raises the cap or the month rolls over."
                 : "Shared-model budget reached. Paused until an admin raises the budget or the month rolls over.";
+    }
+
+    /**
+     * The OTel GenAI usage attributes. The input count is the prompt total, cache reads and writes included, as the
+     * convention defines it. GenAI has no attribute for search units, so a call that billed search units and reported
+     * no tokens carries only {@code hephaestus.usage.search_units}, not a token count of 0.
+     */
+    private static void tagUsage(Span span, @Nullable ProxyTokenUsage usage) {
+        if (usage == null) return;
+        if (usage.searchUnits() > 0) {
+            span.tag("hephaestus.usage.search_units", usage.searchUnits());
+            if (usage.promptTokens() == 0) return;
+        }
+        span.tag("gen_ai.usage.input_tokens", usage.promptTokens());
+        span.tag("gen_ai.usage.output_tokens", usage.outputTokens());
     }
 
     private static void recordSpanError(Span span, String errorType) {

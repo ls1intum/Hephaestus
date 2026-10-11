@@ -86,7 +86,7 @@ class ReviewPracticeScriptService {
                         purpose,
                         counted.getDataHandlingTier(),
                         counted.getCalls(),
-                        counted.getInputTokens(),
+                        counted.promptTokens(),
                         counted.getOutputTokens()));
             } else if (use != null) {
                 models.add(new ReviewPracticeScriptModelDTO(purpose, use.tier(), 0, 0, 0));

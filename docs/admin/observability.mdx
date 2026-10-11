@@ -362,9 +362,13 @@ are available through the private listener described in [Scrape metrics](#scrape
 Each practice-review attempt starts a `practice_review.execute` span. Its trace ID can differ from
 the job's submission correlation ID, which is carried as the `hephaestus.job.submission_trace_id`
 attribute rather than as a parent span. Sandbox proxy requests propagate the
-execution trace's sampling decision. A `gen_ai.chat` span covers each authenticated model request,
-including streaming, and records the model, HTTP outcome and observed streaming token usage when
-available. Framework HTTP spans describe the transport. Prompts, tool results, request bodies,
+execution trace's sampling decision. A `gen_ai.chat`, `gen_ai.decision`, `gen_ai.embeddings` or
+`gen_ai.rerank` span covers each authenticated model request, streamed or not. It records the model,
+the HTTP outcome and the token usage that the provider reported, as `gen_ai.usage.input_tokens` and
+`gen_ai.usage.output_tokens`. A reranking call that a provider billed in search units records
+`hephaestus.usage.search_units` instead.
+
+Framework HTTP spans describe the transport. Prompts, tool results, request bodies,
 headers and tokens used for authentication are not span attributes.
 
 For streaming requests, `hephaestus.stream.outcome` records transport completion separately from

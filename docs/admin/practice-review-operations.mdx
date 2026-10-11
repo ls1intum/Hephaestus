@@ -36,8 +36,8 @@ Work, not time, bounds the set.
 Each value is multiplied by the number of practices in the set, with a minimum of three.
 A set of five practices can make 60 model calls and write 80,000 output tokens.
 
-The model calls of practice scripts have their own attempt token limit.
-`PRACTICE_REVIEW_PRACTICE_SCRIPT_MAX_TOKENS_PER_ATTEMPT` (default 200000) sets it.
+The model calls of practice scripts have their own attempt token limit and attempt search unit limit.
+`PRACTICE_REVIEW_PRACTICE_SCRIPT_MAX_TOKENS_PER_ATTEMPT` (default 200000) and `PRACTICE_REVIEW_PRACTICE_SCRIPT_MAX_SEARCH_UNITS_PER_ATTEMPT` (default 1000) set them.
 See [Cost and limits](./ai-providers.mdx#cost-and-limits).
 [Practice scripts](#practice-scripts) tells you how to read what each script did.
 
@@ -129,8 +129,8 @@ Use them for alerts instead of application logs.
 - **`llm.proxy.budget.blocked`** — model calls of a running job that the LLM proxy refused at a cap, tagged by `apiProtocol` and `cap`.
   `instance` names the shared-model budget, and `byo` names the provider cap.
   An admin raises it.
-  `practice_script_attempt` names the [attempt token limit](./ai-providers.mdx#cost-and-limits).
-  An operator raises it with `PRACTICE_REVIEW_PRACTICE_SCRIPT_MAX_TOKENS_PER_ATTEMPT`.
+  `practice_script_attempt` names the [attempt token limit or the attempt search unit limit](./ai-providers.mdx#cost-and-limits).
+  An operator raises them with `PRACTICE_REVIEW_PRACTICE_SCRIPT_MAX_TOKENS_PER_ATTEMPT` and `PRACTICE_REVIEW_PRACTICE_SCRIPT_MAX_SEARCH_UNITS_PER_ATTEMPT`.
 - **`practice.review.occasions`** — live issue-update recording attempts, tagged by `signal` and `outcome` (`deferred` or `duplicate`).
   These exclude issue opening and closing.
 - **`practice.review.refused`** — refused reviews, tagged by `phase` (`submission` or `execution`) and `reason`.
@@ -253,8 +253,8 @@ A token limit, a budget or a cap stops calls in one of these places:
 - **The token limit of the practice**, `meta.tokens`, or the `maxSteps` of `agent`.
   The script's author raises it in the script, or makes the script send less.
   [Limits](./practice-scripts.mdx#limits) gives the limits.
-- **The attempt token limit.**
-  An operator raises it with `PRACTICE_REVIEW_PRACTICE_SCRIPT_MAX_TOKENS_PER_ATTEMPT`.
+- **The attempt token limit or the attempt search unit limit.**
+  An operator raises them with `PRACTICE_REVIEW_PRACTICE_SCRIPT_MAX_TOKENS_PER_ATTEMPT` and `PRACTICE_REVIEW_PRACTICE_SCRIPT_MAX_SEARCH_UNITS_PER_ATTEMPT`.
   See [Cost and limits](./ai-providers.mdx#cost-and-limits).
 - **The shared-model budget.**
   Only an instance admin raises it on **Instance admin → AI usage** with **Change budget**.

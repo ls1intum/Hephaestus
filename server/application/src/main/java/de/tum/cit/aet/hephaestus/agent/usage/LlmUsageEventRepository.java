@@ -65,7 +65,7 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
             input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, reasoning_tokens,
             total_calls, cost_usd, occurred_at, pricing_state, funding_source, applied_price_id,
             applied_workspace_model_id, applied_per_1m_input_usd, applied_per_1m_output_usd,
-            applied_per_1m_cache_read_usd, applied_per_1m_cache_write_usd, usage_provenance
+            applied_per_1m_cache_read_usd, applied_per_1m_cache_write_usd, usage_provenance, search_units
         ) VALUES (
             :#{#event.id()}, :#{#event.workspaceId()}, :#{#event.jobType()}, :#{#event.sourceType()},
             :#{#event.sourceId()}, :#{#event.sourceAttempt()}, :#{#event.model()},
@@ -75,7 +75,7 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
             :#{#event.fundingSource()}, :#{#event.appliedPriceId()},
             :#{#event.appliedWorkspaceModelId()}, :#{#event.appliedPer1mInputUsd()},
             :#{#event.appliedPer1mOutputUsd()}, :#{#event.appliedPer1mCacheReadUsd()},
-            :#{#event.appliedPer1mCacheWriteUsd()}, :#{#event.usageProvenance()}
+            :#{#event.appliedPer1mCacheWriteUsd()}, :#{#event.usageProvenance()}, :#{#event.searchUnits()}
         ) ON CONFLICT (source_type, source_id, source_attempt) DO NOTHING
         """, nativeQuery = true)
     int insertIfAbsent(@Param("event") LlmUsageInsert event);
@@ -130,7 +130,7 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
     @WorkspaceAgnostic("Repricing pass enumerates the instance's unpriced spend across all tenants")
     @Query("SELECT new de.tum.cit.aet.hephaestus.agent.usage.UnpricedLedgerRow("
             + "e.id, e.workspace.id, e.model, e.fundingSource, e.inputTokens, e.outputTokens, "
-            + "e.cacheReadTokens, e.cacheWriteTokens, e.appliedPriceId, e.appliedWorkspaceModelId) "
+            + "e.cacheReadTokens, e.cacheWriteTokens, e.searchUnits, e.appliedPriceId, e.appliedWorkspaceModelId) "
             + "FROM LlmUsageEvent e "
             + "WHERE e.occurredAt >= :from AND e.occurredAt < :to "
             + "AND e.pricingState = de.tum.cit.aet.hephaestus.agent.usage.PricingState.UNPRICED "
@@ -311,8 +311,8 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
      * practice scripts made the calls. One row per practice; the practice is {@code null} for the
      * ledger rows that have no usage rows left to split them by, such as the rows of a deleted job.
      *
-     * <p>Each ledger row is joined to the usage rows of its job, attempt, and kind. A practice weighs
-     * {@code input_tokens · applied input rate + output_tokens · applied output rate}, and takes that
+     * <p>Each ledger row is joined to the usage rows of its job, attempt, and kind. A practice weighs each of
+     * its token buckets at the row's applied rate for that bucket, and takes that
      * fraction of the row's cost, truncated to the ledger scale. The practice with the largest weight
      * takes the remainder, so the shares of one row add up to its cost exactly and none is negative. When
      * no practice weighs anything, the row costs nothing and each share is zero.
@@ -321,13 +321,17 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
      * {@code unpricedEventCount} of each practice that has a share in it, however many unpriced rows and
      * attempts the review has: the unit is the same as that of {@code reviews}. A NO_CHARGE row adds a
      * confirmed zero. Chat calls of practice scripts
-     * are not here: the ledger bills them on the review's own row.
+     * are not here: the ledger bills them on the review's own row. {@code inputTokens} is the whole prompt, cache
+     * reads and writes included, here and in {@link #aggregatePracticeScriptTotal}.
      */
     @Query(value = """
         WITH ledger AS (
             SELECT e.id, e.source_id, e.source_attempt, e.funding_source, e.pricing_state, e.cost_usd,
-                e.total_calls, e.input_tokens, e.output_tokens,
+                e.total_calls, e.input_tokens + e.cache_read_tokens + e.cache_write_tokens AS prompt_tokens,
+                e.output_tokens,
                 e.applied_per_1m_input_usd AS input_rate, e.applied_per_1m_output_usd AS output_rate,
+                e.applied_per_1m_cache_read_usd AS cache_read_rate,
+                e.applied_per_1m_cache_write_usd AS cache_write_rate,
                 REPLACE(e.source_type, 'PRACTICE_SCRIPT_', '') AS model_kind
             FROM llm_usage_event e
             WHERE e.workspace_id = :workspaceId AND e.occurred_at >= :from AND e.occurred_at < :to
@@ -337,9 +341,11 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
             SELECT l.id AS ledger_id, l.source_id, l.model_kind, l.funding_source, l.pricing_state, l.cost_usd,
                 u.practice_slug,
                 COALESCE(u.calls, l.total_calls) AS calls,
-                COALESCE(u.input_tokens, l.input_tokens) AS input_tokens,
+                COALESCE(u.input_tokens + u.cache_read_tokens + u.cache_write_tokens, l.prompt_tokens) AS input_tokens,
                 COALESCE(u.output_tokens, l.output_tokens) AS output_tokens,
-                COALESCE(u.input_tokens * l.input_rate, 0) + COALESCE(u.output_tokens * l.output_rate, 0) AS weight
+                COALESCE(u.input_tokens * l.input_rate, 0) + COALESCE(u.output_tokens * l.output_rate, 0)
+                    + COALESCE(u.cache_read_tokens * l.cache_read_rate, 0)
+                    + COALESCE(u.cache_write_tokens * l.cache_write_rate, 0) AS weight
             FROM ledger l
             LEFT JOIN agent_job_practice_script_usage u
               ON u.workspace_id = :workspaceId AND u.job_id = l.source_id AND u.attempt = l.source_attempt
@@ -385,7 +391,8 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
     @Query(
             value =
                     "SELECT COUNT(DISTINCT e.source_id) AS reviews, COALESCE(SUM(e.total_calls), 0) AS calls, "
-                            + "COALESCE(SUM(e.input_tokens), 0) AS inputTokens, "
+                            + "COALESCE(SUM(e.input_tokens + e.cache_read_tokens + e.cache_write_tokens), 0) "
+                            + "AS inputTokens, "
                             + "COALESCE(SUM(e.output_tokens), 0) AS outputTokens, "
                             + "COALESCE(SUM(e.cost_usd) FILTER (WHERE e.pricing_state <> 'UNPRICED' "
                             + "AND e.funding_source = 'INSTANCE'), 0) AS instanceTotalCostUsd, "

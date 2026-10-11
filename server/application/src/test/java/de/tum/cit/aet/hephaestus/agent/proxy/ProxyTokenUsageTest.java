@@ -147,9 +147,56 @@ class ProxyTokenUsageTest extends BaseUnitTest {
                 .isNull();
     }
 
+    /** Cohere v2 bills a rerank in search units under {@code meta.billed_units} and reports no tokens. */
+    @ParameterizedTest
+    @ValueSource(strings = {"3", "3.0"})
+    void shouldReadTheSearchUnitsWhenCohereBillsARerankInThem(String units) throws Exception {
+        var body = MAPPER.readTree("{\"id\":\"r1\",\"results\":[{\"index\":0,\"relevance_score\":0.9}],"
+                + "\"meta\":{\"api_version\":{\"version\":\"2\"},\"billed_units\":{\"search_units\":" + units
+                + "}}}");
+
+        assertThat(ProxyTokenUsage.from(body, LlmApiProtocol.COHERE_RERANK))
+                .isEqualTo(new ProxyTokenUsage(0, 0, 0, 0, 0, 3));
+    }
+
     @Test
-    void shouldRejectADecisionUsageWhenItLacksTheOutputCount() throws Exception {
-        var body = MAPPER.readTree("{\"usage\":{\"input_tokens\":40}}");
+    void shouldKeepTheTokensAndTheSearchUnitsWhenARerankingProviderReportsBoth() throws Exception {
+        var body =
+                MAPPER.readTree("{\"usage\":{\"total_tokens\":30},\"meta\":{\"billed_units\":{\"search_units\":1}}}");
+
+        assertThat(ProxyTokenUsage.from(body, LlmApiProtocol.COHERE_RERANK))
+                .isEqualTo(new ProxyTokenUsage(30, 0, 0, 0, 0, 1));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"1.5", "-1", "\"2\""})
+    void shouldRejectSearchUnitsWhenTheyAreNotAWholeCount(String units) throws Exception {
+        var body = MAPPER.readTree("{\"meta\":{\"billed_units\":{\"search_units\":" + units + "}}}");
+
+        assertThatIllegalArgumentException().isThrownBy(() -> ProxyTokenUsage.from(body, LlmApiProtocol.COHERE_RERANK));
+    }
+
+    /**
+     * The AI SDK reads a Decisions response in the Responses usage shape with every count optional. A decision
+     * writes no text, so a response without an output count bills its input alone.
+     */
+    @ParameterizedTest
+    @CsvSource(
+            delimiter = '|',
+            value = {
+                "{\"answers\":[],\"usage\":{\"input_tokens\":40,\"output_tokens\":3,\"total_tokens\":43}}|40|3",
+                "{\"answers\":[],\"usage\":{\"input_tokens\":40,\"total_tokens\":40}}|40|0",
+                "{\"answers\":[],\"usage\":{\"input_tokens\":40,\"output_tokens\":null}}|40|0"
+            })
+    void shouldBillTheInputWhenADecisionUsageHasOrLacksTheOutputCount(String body, int input, int output)
+            throws Exception {
+        assertThat(ProxyTokenUsage.from(MAPPER.readTree(body), LlmApiProtocol.OPENAI_DECISIONS))
+                .isEqualTo(new ProxyTokenUsage(input, output, 0, 0, 0));
+    }
+
+    @Test
+    void shouldRejectADecisionUsageWhenItLacksTheInputCount() throws Exception {
+        var body = MAPPER.readTree("{\"usage\":{\"output_tokens\":3}}");
 
         assertThatIllegalArgumentException()
                 .isThrownBy(() -> ProxyTokenUsage.from(body, LlmApiProtocol.OPENAI_DECISIONS));

@@ -34,4 +34,5 @@ public record LlmUsageInsert(
         @Nullable BigDecimal appliedPer1mOutputUsd,
         @Nullable BigDecimal appliedPer1mCacheReadUsd,
         @Nullable BigDecimal appliedPer1mCacheWriteUsd,
-        String usageProvenance) {}
+        String usageProvenance,
+        long searchUnits) {}

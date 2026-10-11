@@ -71,6 +71,9 @@ class PracticeScriptModelsMigrationTest {
 
         assertThat(column(database, "SELECT source_type FROM llm_usage_event ORDER BY id"))
                 .containsExactly("AGENT_JOB", "MENTOR_TURN");
+        // A row from before the upgrade billed no search units.
+        assertThat(column(database, "SELECT search_units::text FROM llm_usage_event ORDER BY id"))
+                .containsExactly("0", "0");
         for (String sourceType : NEW_SOURCE_TYPES) {
             execute(
                     database,

@@ -139,8 +139,8 @@ class TerminalUsageTest extends BaseUnitTest {
                 runner(1000, 700, 6),
                 new AgentJobLlmUsage(5, 800, 400, 0, 0, 0),
                 List.of(
-                        new PracticeScriptKindTotal(ModelKind.CHAT, 2, 300, 100),
-                        new PracticeScriptKindTotal(ModelKind.DECISION, 5, 50_000, 9_000)));
+                        new PracticeScriptKindTotal(ModelKind.CHAT, 2, 300, 100, 0, 0, 0),
+                        new PracticeScriptKindTotal(ModelKind.DECISION, 5, 50_000, 9_000, 0, 0, 0)));
 
         assertThat(usage.verifiable()).isTrue();
         assertThat(usage.provenance()).isEqualTo(UsageProvenance.RUNNER);
@@ -150,12 +150,26 @@ class TerminalUsageTest extends BaseUnitTest {
     }
 
     @Test
+    @DisplayName("a selected runner report keeps the practice script chat calls' cache reads in their own bucket")
+    void aSelectedRunnerReportKeepsThePracticeScriptCacheReadsApart() {
+        TerminalUsage usage = TerminalUsage.resolve(
+                runner(1000, 700, 6),
+                new AgentJobLlmUsage(5, 800, 400, 0, 0, 0),
+                List.of(new PracticeScriptKindTotal(ModelKind.CHAT, 2, 40, 100, 260, 0, 0)));
+
+        assertThat(usage.provenance()).isEqualTo(UsageProvenance.RUNNER);
+        assertThat(usage.inputTokens()).isEqualTo(1040);
+        assertThat(usage.cacheReadTokens()).isEqualTo(260);
+        assertThat(usage.outputTokens()).isEqualTo(800);
+    }
+
+    @Test
     @DisplayName("a selected proxy already holds the practice script chat calls and does not count them twice")
     void aSelectedProxyDoesNotCountThePracticeScriptChatCallsTwice() {
         TerminalUsage usage = TerminalUsage.resolve(
                 runner(1000, 700, 6),
                 new AgentJobLlmUsage(8, 1300, 800, 0, 0, 0),
-                List.of(new PracticeScriptKindTotal(ModelKind.CHAT, 2, 300, 100)));
+                List.of(new PracticeScriptKindTotal(ModelKind.CHAT, 2, 300, 100, 0, 0, 0)));
 
         assertThat(usage.verifiable()).isTrue();
         assertThat(usage.provenance()).isEqualTo(UsageProvenance.PROXY);
@@ -374,8 +388,8 @@ class TerminalUsageTest extends BaseUnitTest {
             UUID jobId = UUID.randomUUID();
             when(jobs.sumPracticeScriptUsageByKind(7L, jobId, 1))
                     .thenReturn(List.of(
-                            new PracticeScriptKindTotal(ModelKind.CHAT, 2, 70, 20),
-                            new PracticeScriptKindTotal(ModelKind.DECISION, 5, 500_000, 100_000)));
+                            new PracticeScriptKindTotal(ModelKind.CHAT, 2, 70, 20, 0, 0, 0),
+                            new PracticeScriptKindTotal(ModelKind.DECISION, 5, 500_000, 100_000, 0, 0, 0)));
 
             TerminalUsage.none().appendTo(recorder, jobs, 7L, jobFor(jobId, 1), snapshot, pricedInstance());
 

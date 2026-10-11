@@ -20,6 +20,7 @@ public record UnpricedLedgerRow(
         long outputTokens,
         long cacheReadTokens,
         long cacheWriteTokens,
+        long searchUnits,
         @Nullable Long appliedPriceId,
         @Nullable Long appliedWorkspaceModelId) {
 

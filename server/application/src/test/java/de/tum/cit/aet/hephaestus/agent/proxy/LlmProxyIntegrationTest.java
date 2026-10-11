@@ -333,7 +333,79 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
                             new UsageRow(ModelKind.EMBEDDING, PRACTICE, 1, 60, 0),
                             new UsageRow(ModelKind.EMBEDDING, "test-coverage", 1, 60, 0));
             assertThat(jobRepository.sumPracticeScriptUsageByKind(workspace.getId(), job.getId(), 0))
-                    .containsExactly(new PracticeScriptKindTotal(ModelKind.EMBEDDING, 2, 120, 0));
+                    .containsExactly(new PracticeScriptKindTotal(ModelKind.EMBEDDING, 2, 120, 0, 0, 0, 0));
+        }
+    }
+
+    /**
+     * Cohere bills a rerank in search units and reports no tokens. The row keeps them, and the attempt's search unit
+     * limit refuses the next call once the committed calls reach it, whatever their tokens.
+     */
+    @Test
+    void shouldCountTheSearchUnitsAndRefuseAtTheirLimitWhenCohereBillsReranksInThem() throws Exception {
+        try (MockWebServer upstream = new MockWebServer()) {
+            upstream.start();
+            for (int call = 0; call < 2; call++) {
+                upstream.enqueue(json("{\"id\":\"r\",\"results\":[{\"index\":0,\"relevance_score\":0.5}],"
+                        + "\"meta\":{\"billed_units\":{\"search_units\":3}}}"));
+            }
+            AgentJob job = practiceScriptJob(upstream.url("/v1").toString());
+            LlmProxyService capped = proxyService(200_000, 6);
+            String path = "/internal/llm/practice-script/reranking/rerank";
+
+            ProxyResult first =
+                    callPracticeScript(capped, job, path, PRACTICE, "{\"query\":\"q\",\"documents\":[\"a\"]}");
+            ProxyResult second =
+                    callPracticeScript(capped, job, path, PRACTICE, "{\"query\":\"q\",\"documents\":[\"a\"]}");
+            ProxyResult third =
+                    callPracticeScript(capped, job, path, PRACTICE, "{\"query\":\"q\",\"documents\":[\"a\"]}");
+
+            assertThat(first.status()).isEqualTo(200);
+            assertThat(second.status()).isEqualTo(200);
+            assertThat(third.status()).isEqualTo(402);
+            assertThat(third.body()).isEqualTo("Practice script budget spent");
+            assertThat(upstream.getRequestCount()).isEqualTo(2);
+            assertThat(jdbc.queryForMap(
+                            "SELECT calls, input_tokens, search_units FROM agent_job_practice_script_usage "
+                                    + "WHERE job_id = ? AND model_kind = 'RERANKING'",
+                            job.getId()))
+                    .containsEntry("calls", 2)
+                    .containsEntry("input_tokens", 0L)
+                    .containsEntry("search_units", 6L);
+        }
+    }
+
+    /**
+     * A chat call's cached prompt keeps its own bucket on the practice row and in the job's counters, so the ledger
+     * prices it at the cache rate. The attempt token limit still counts the whole prompt.
+     */
+    @Test
+    void shouldKeepTheCachedShareApartWhenAPracticeScriptChatCallReadsTheCache() throws Exception {
+        try (MockWebServer upstream = new MockWebServer()) {
+            upstream.start();
+            upstream.enqueue(json("{\"usage\":{\"prompt_tokens\":100,\"completion_tokens\":5,"
+                    + "\"prompt_tokens_details\":{\"cached_tokens\":60}}}"));
+            AgentJob job = practiceScriptJob(upstream.url("/v1").toString());
+
+            ProxyResult result =
+                    callPracticeScript(job, "/internal/llm/practice-script/chat/chat/completions", "{\"messages\":[]}");
+
+            assertThat(result.status()).isEqualTo(200);
+            assertThat(jdbc.queryForMap(
+                            "SELECT input_tokens, cache_read_tokens, cache_write_tokens, output_tokens "
+                                    + "FROM agent_job_practice_script_usage WHERE job_id = ? AND model_kind = 'CHAT'",
+                            job.getId()))
+                    .containsEntry("input_tokens", 40L)
+                    .containsEntry("cache_read_tokens", 60L)
+                    .containsEntry("cache_write_tokens", 0L)
+                    .containsEntry("output_tokens", 5L);
+            AgentJob reloaded = jobRepository.findById(job.getId()).orElseThrow();
+            assertThat(reloaded.getLlmTotalInputTokens()).isEqualTo(40);
+            assertThat(reloaded.getLlmCacheReadTokens()).isEqualTo(60);
+            assertThat(jobRepository.sumPracticeScriptUsageByKind(workspace.getId(), job.getId(), 0))
+                    .singleElement()
+                    .extracting(PracticeScriptKindTotal::tokens)
+                    .isEqualTo(105L);
         }
     }
 
@@ -409,6 +481,10 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
      * the transaction that its {@code REQUIRES_NEW} boundary gives it in production.
      */
     private LlmProxyService proxyService(long maxTokensPerAttempt) {
+        return proxyService(maxTokensPerAttempt, 1000);
+    }
+
+    private LlmProxyService proxyService(long maxTokensPerAttempt, long maxSearchUnitsPerAttempt) {
         ProxyRequestPolicy policy = mock(ProxyRequestPolicy.class);
         when(policy.allows(any())).thenReturn(true);
         return new LlmProxyService(
@@ -419,7 +495,8 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 new ProxyAccounting(
                         new ProxyBudgetGate(
                                 mock(LlmBudgetService.class),
-                                new PracticeReviewProperties(false, 15, 5, null, 12, 16000, maxTokensPerAttempt)),
+                                new PracticeReviewProperties(
+                                        false, 15, 5, null, 12, 16000, maxTokensPerAttempt, maxSearchUnitsPerAttempt)),
                         accumulator(),
                         mock(MentorTurnUsageAccumulator.class),
                         meterRegistry,

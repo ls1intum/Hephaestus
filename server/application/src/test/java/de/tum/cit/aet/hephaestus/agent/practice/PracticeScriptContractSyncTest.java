@@ -133,7 +133,7 @@ class PracticeScriptContractSyncTest extends BaseUnitTest {
                 new PiRuntimeFactory(mapper),
                 new PiResultParser(mapper, new SimpleMeterRegistry()),
                 new AgentImageProperties("agent-pi:test", ImagePullPolicy.IF_NOT_PRESENT),
-                new PracticeReviewProperties(false, 15, 5, null, 12, 16000, 200_000),
+                new PracticeReviewProperties(false, 15, 5, null, 12, 16000, 200_000, 1000),
                 mapper);
         PracticeAgentRequest request = new PracticeAgentRequest(
                 "openai-responses",

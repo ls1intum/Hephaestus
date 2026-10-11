@@ -25,11 +25,13 @@ class ProxyBudgetGate {
 
     private final LlmBudgetService budgetService;
     private final long practiceScriptMaxTokensPerAttempt;
+    private final long practiceScriptMaxSearchUnitsPerAttempt;
     private final Cache<Long, LlmBudgetHeadroom> headroomByWorkspace;
 
     ProxyBudgetGate(LlmBudgetService budgetService, PracticeReviewProperties properties) {
         this.budgetService = budgetService;
         this.practiceScriptMaxTokensPerAttempt = properties.practiceScriptMaxTokensPerAttempt();
+        this.practiceScriptMaxSearchUnitsPerAttempt = properties.practiceScriptMaxSearchUnitsPerAttempt();
         this.headroomByWorkspace = Caffeine.newBuilder()
                 .expireAfterWrite(TTL)
                 .maximumSize(MAX_CACHED_WORKSPACES)
@@ -52,12 +54,14 @@ class ProxyBudgetGate {
     }
 
     /**
-     * Whether one attempt's practice script calls have used the tokens that they may spend, on every model and
-     * for every practice together. This bounds a leaked practice script credential, also on a connection with no
-     * monthly cap. Only committed calls count, so calls in flight together can each pass and end above the
-     * cap.
+     * Whether one attempt's practice script calls have used the tokens or the search units that they may spend, on
+     * every model and for every practice together. This bounds a leaked practice script credential, also on a
+     * connection with no monthly cap. Search units are a limit of their own, never converted to tokens: a Cohere
+     * search unit covers from one to a hundred documents of any length up to its chunk size, so no token count is
+     * true for it. Only committed calls count, so calls in flight together can each pass and end above the cap.
      */
     boolean isPracticeScriptCapReached(ProxyRouting.BilledAttempt attempt) {
-        return attempt.practiceScriptTokens() >= practiceScriptMaxTokensPerAttempt;
+        return attempt.practiceScriptTokens() >= practiceScriptMaxTokensPerAttempt
+                || attempt.practiceScriptSearchUnits() >= practiceScriptMaxSearchUnitsPerAttempt;
     }
 }

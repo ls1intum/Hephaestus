@@ -68,16 +68,21 @@ public class ProxyUsageAccumulator {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void accumulatePracticeScript(
             BilledAttempt attempt, PracticeScriptCall call, @Nullable ProxyTokenUsage usage) {
-        long input = usage == null
-                ? 0L
-                : (long) usage.billableInputTokens() + usage.cacheReadTokens() + usage.cacheWriteTokens();
-        long output = usage == null ? 0L : usage.outputTokens();
+        ProxyTokenUsage counted = usage != null ? usage : new ProxyTokenUsage(0, 0, 0, 0, 0);
         fenced(
                 attempt,
                 () -> agentJobRepository.accumulatePracticeScriptUsage(
                         attempt.sourceId(),
                         attempt.number(),
-                        new PracticeScriptCallUsage(call.kind(), call.practiceSlug(), call.tier(), input, output)));
+                        new PracticeScriptCallUsage(
+                                call.kind(),
+                                call.practiceSlug(),
+                                call.tier(),
+                                counted.billableInputTokens(),
+                                counted.outputTokens(),
+                                counted.cacheReadTokens(),
+                                counted.cacheWriteTokens(),
+                                counted.searchUnits())));
     }
 
     /** @param write returns the rows the attempt fence let through */

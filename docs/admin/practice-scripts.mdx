@@ -827,6 +827,7 @@ It also tells which reasons the review's pages show.
 | --- | --- |
 | The token limit of the practice | `meta.tokens`, default 20 000 |
 | The attempt token limit: the tokens of one review attempt, all scripts together | Default 200 000. [Cost and limits](./ai-providers.mdx#cost-and-limits) tells who sets it. |
+| The attempt search unit limit: the search units that reranking calls of one review attempt billed, all scripts together | Default 1 000. Only the proxy counts search units, so a call that it refuses is not rated, with `budget`. |
 | Model calls in flight, all scripts together | 4 |
 | Requests in flight from one script: model calls and `ctx.tools.grep` searches | 32. One more stops the script with an error. |
 | Output tokens of one chat call | 4 096 |
@@ -858,6 +859,7 @@ The runner reserves tokens for each model call before the call starts.
 A call waits for its turn among the 4 calls in flight, and then makes its reservation.
 If the token limit of the practice or the attempt token limit cannot hold the reservation, the call is not rated, with `budget`.
 When the call ends, the runner keeps only the tokens that the provider reported, and frees the rest.
+A call can report more tokens than its reservation, so the stage can end above a token limit.
 A call that fails, is cancelled, or reports no tokens keeps its whole reservation.
 
 A reservation is one token for each four characters of the request, plus an output allowance:

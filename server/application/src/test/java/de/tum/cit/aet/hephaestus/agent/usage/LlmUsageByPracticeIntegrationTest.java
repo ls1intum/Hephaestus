@@ -420,6 +420,73 @@ class LlmUsageByPracticeIntegrationTest extends AbstractWorkspaceIntegrationTest
         assertThat(report.practiceScriptTotal().unpricedEventCount()).isEqualTo(2);
     }
 
+    /**
+     * A practice whose calls read the cache weighs its cache reads at the cache rate, as the ledger row priced them,
+     * and its input tokens are the whole prompt.
+     */
+    @Test
+    @WithAdminUser
+    void shouldWeighEachPracticesCacheReadsAtTheCacheRateWhenItSplitsADecisionRow() {
+        Workspace workspace = workspace("usage-by-practice-cache");
+        practice(workspace, COMMENTS, "Comment quality");
+        practice(workspace, TESTS, "Test coverage");
+        AgentJob review = runningJob(workspace);
+        transactionTemplate.executeWithoutResult(tx -> {
+            jobRepository.accumulatePracticeScriptUsage(
+                    review.getId(),
+                    0,
+                    new PracticeScriptCallUsage(ModelKind.DECISION, COMMENTS, null, 100_000, 0, 300_000, 0, 0));
+            jobRepository.accumulatePracticeScriptUsage(
+                    review.getId(),
+                    0,
+                    new PracticeScriptCallUsage(ModelKind.DECISION, TESTS, null, 200_000, 0, 0, 0, 0));
+        });
+        LlmPriceSnapshot cached = new LlmPriceSnapshot(
+                FundingSource.INSTANCE,
+                PricingState.PRICED,
+                1L,
+                null,
+                new BigDecimal("2"),
+                new BigDecimal("8"),
+                new BigDecimal("0.5"),
+                null);
+        LlmUsageEvent event = new LlmUsageEvent();
+        event.setId(UUID.randomUUID());
+        event.setWorkspace(workspace);
+        event.setJobType(LlmUsageJobType.PULL_REQUEST_REVIEW);
+        event.setSourceType(LlmUsageSourceType.PRACTICE_SCRIPT_DECISION);
+        event.setSourceId(review.getId());
+        event.setModel("model");
+        event.setInputTokens(300_000);
+        event.setCacheReadTokens(300_000);
+        event.setTotalCalls(2);
+        event.setCostUsd(cached.calculateCost(300_000, 0, 300_000, 0).usd());
+        event.setPricingState(PricingState.PRICED);
+        event.setFundingSource(FundingSource.INSTANCE);
+        event.setAppliedPer1mInputUsd(cached.per1mInputUsd());
+        event.setAppliedPer1mOutputUsd(cached.per1mOutputUsd());
+        event.setAppliedPer1mCacheReadUsd(cached.per1mCacheReadUsd());
+        event.setOccurredAt(MONTH.atDay(2).atStartOfDay(ZoneOffset.UTC).toInstant());
+        usageRepository.save(event);
+
+        WorkspaceLlmUsageReportDTO report = report(workspace);
+
+        // A $0.75 row: 0.1M·2 + 0.3M·0.5 = 0.35 and 0.2M·2 = 0.40. Weighing the cache reads at the input rate
+        // would give 0.60 to comment-quality.
+        assertPractice(
+                report.byPractice().get(0),
+                "Test coverage",
+                List.of(AgentPurpose.PRACTICE_DECISION),
+                new Usage(1, 1, 200_000, 0, "0.400000", "0", 0));
+        assertPractice(
+                report.byPractice().get(1),
+                "Comment quality",
+                List.of(AgentPurpose.PRACTICE_DECISION),
+                new Usage(1, 1, 400_000, 0, "0.350000", "0", 0));
+        assertThat(report.practiceScriptTotal().inputTokens()).isEqualTo(600_000);
+        assertThat(report.practiceScriptTotal().instanceTotalCostUsd()).isEqualByComparingTo("0.75");
+    }
+
     private record Usage(
             long reviews,
             long calls,
@@ -508,7 +575,14 @@ class LlmUsageByPracticeIntegrationTest extends AbstractWorkspaceIntegrationTest
                         job.getId(),
                         job.getRetryCount(),
                         new PracticeScriptCallUsage(
-                                ModelKind.valueOf(kind), practice, null, first ? input : 0, first ? output : 0));
+                                ModelKind.valueOf(kind),
+                                practice,
+                                null,
+                                first ? input : 0,
+                                first ? output : 0,
+                                0,
+                                0,
+                                0));
             }
         });
     }

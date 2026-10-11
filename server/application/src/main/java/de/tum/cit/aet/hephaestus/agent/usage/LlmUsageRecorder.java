@@ -36,6 +36,7 @@ public class LlmUsageRecorder {
         this.meterRegistry = meterRegistry;
     }
 
+    /** @param searchUnits what Cohere reranking calls billed instead of tokens; 0 for every other sample */
     public record LlmUsageSample(
             LlmUsageJobType jobType,
             LlmUsageSourceType sourceType,
@@ -47,6 +48,7 @@ public class LlmUsageRecorder {
             long cacheReadTokens,
             long cacheWriteTokens,
             long reasoningTokens,
+            long searchUnits,
             int totalCalls,
             LlmPriceSnapshot price,
             UsageProvenance provenance,
@@ -64,13 +66,17 @@ public class LlmUsageRecorder {
         }
     }
 
-    /** A rate the frozen price is missing cannot be charged, so the whole event stops being priced. */
+    /**
+     * A rate the frozen price is missing cannot be charged, so the whole event stops being priced. No price has a
+     * rate for search units, so a priced sample with search units is never charged.
+     */
     private static boolean isPricedWithARateMissing(LlmUsageSample sample, LlmPriceSnapshot price) {
         return (price.pricingState() == PricingState.PRICED
                 && ((sample.inputTokens() > 0 && price.per1mInputUsd() == null)
                         || (sample.outputTokens() > 0 && price.per1mOutputUsd() == null)
                         || (sample.cacheReadTokens() > 0 && price.per1mCacheReadUsd() == null)
-                        || (sample.cacheWriteTokens() > 0 && price.per1mCacheWriteUsd() == null)));
+                        || (sample.cacheWriteTokens() > 0 && price.per1mCacheWriteUsd() == null)
+                        || sample.searchUnits() > 0));
     }
 
     /** Keeps the frozen rates: they still say what the attempt would have cost. */
@@ -117,7 +123,8 @@ public class LlmUsageRecorder {
                 price.per1mOutputUsd(),
                 price.per1mCacheReadUsd(),
                 price.per1mCacheWriteUsd(),
-                sample.provenance().name()));
+                sample.provenance().name(),
+                Math.max(0, sample.searchUnits())));
         if (inserted == 0) {
             log.debug(
                     "LLM usage already recorded for sourceType={}, sourceId={}, sourceAttempt={}",

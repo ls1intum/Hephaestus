@@ -118,12 +118,13 @@ public class LlmUsageRepricer {
      * building a fake instance of the other's type to ask its question.
      */
     private static boolean missesARateItNeeds(UnpricedLedgerRow row, LlmPriceSnapshot price) {
-        // NO_CHARGE has no rates by design and is a real zero, not a gap.
+        // NO_CHARGE has no rates by design and is a real zero, not a gap. No price has a rate for search units.
         return (price.pricingState() == PricingState.PRICED
                 && ((row.inputTokens() > 0 && price.per1mInputUsd() == null)
                         || (row.outputTokens() > 0 && price.per1mOutputUsd() == null)
                         || (row.cacheReadTokens() > 0 && price.per1mCacheReadUsd() == null)
-                        || (row.cacheWriteTokens() > 0 && price.per1mCacheWriteUsd() == null)));
+                        || (row.cacheWriteTokens() > 0 && price.per1mCacheWriteUsd() == null)
+                        || row.searchUnits() > 0));
     }
 
     /**

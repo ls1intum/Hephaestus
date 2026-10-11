@@ -63,6 +63,7 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.spi.DataHandlingTier;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.micrometer.tracing.Tracer;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
@@ -264,7 +265,9 @@ class AgentJobTerminalStorageIntegrationTest extends BaseIntegrationTest {
             // job's own counters.
             transactions.executeWithoutResult(status -> {
                 jobs.accumulatePracticeScriptUsage(
-                        job.getId(), 0, new PracticeScriptCallUsage(ModelKind.CHAT, "comment-quality", null, 40, 10));
+                        job.getId(),
+                        0,
+                        new PracticeScriptCallUsage(ModelKind.CHAT, "comment-quality", null, 40, 10, 0, 0, 0));
                 jobs.accumulateLlmUsage(job.getId(), 0, new AgentJobLlmUsageDelta(40, 10, 0, 0, 0));
             });
             return new SandboxResult(0, Map.of(), "transcript", false, Duration.ofSeconds(1));
@@ -324,7 +327,9 @@ class AgentJobTerminalStorageIntegrationTest extends BaseIntegrationTest {
         when(runner.parseResult(any())).thenReturn(new AgentResult(true, Map.of("review", "LGTM")));
         when(sandbox.execute(any())).thenAnswer(invocation -> {
             transactions.executeWithoutResult(status -> jobs.accumulatePracticeScriptUsage(
-                    job.getId(), 0, new PracticeScriptCallUsage(ModelKind.EMBEDDING, "comment-quality", null, 40, 0)));
+                    job.getId(),
+                    0,
+                    new PracticeScriptCallUsage(ModelKind.EMBEDDING, "comment-quality", null, 40, 0, 0, 0, 0)));
             return new SandboxResult(0, Map.of(), "transcript", false, Duration.ofSeconds(1));
         });
 
@@ -339,6 +344,69 @@ class AgentJobTerminalStorageIntegrationTest extends BaseIntegrationTest {
         assertThat(number(row, "total_calls").intValue()).isEqualTo(1);
         assertThat(number(row, "input_tokens").longValue()).isEqualTo(40);
         assertThat(row.get("pricing_state")).isEqualTo("NO_CHARGE");
+    }
+
+    @Test
+    @DisplayName("a decision row prices its cache reads at the cache rate that its slot froze, like the review row")
+    void shouldPriceThePracticeScriptCacheReadsAtTheCacheRateWhenTheAttemptCompletes() {
+        var decision =
+                binding(AgentPurpose.PRACTICE_DECISION, LlmApiProtocol.OPENAI_COMPLETIONS, priced("2", "4", "0.5"));
+        when(policy.practiceScriptBinding(anyLong(), eq(AgentPurpose.PRACTICE_DECISION), any(), any()))
+                .thenReturn(Optional.of(decision));
+        AgentJob job = queued(Map.of(ModelKind.DECISION, FrozenModel.from(decision, resolver)));
+        when(runner.parseResult(any())).thenReturn(new AgentResult(true, Map.of("review", "LGTM")));
+        when(sandbox.execute(any())).thenAnswer(invocation -> {
+            transactions.executeWithoutResult(status -> jobs.accumulatePracticeScriptUsage(
+                    job.getId(),
+                    0,
+                    new PracticeScriptCallUsage(
+                            ModelKind.DECISION, "comment-quality", null, 1_000_000, 500_000, 2_000_000, 0, 0)));
+            return new SandboxResult(0, Map.of(), "transcript", false, Duration.ofSeconds(1));
+        });
+
+        executor.processJob(job.getId());
+
+        var row = jdbc.queryForMap(
+                "SELECT input_tokens, cache_read_tokens, pricing_state, cost_usd FROM llm_usage_event "
+                        + "WHERE source_id = ? AND source_type = 'PRACTICE_SCRIPT_DECISION'",
+                job.getId());
+        assertThat(number(row, "input_tokens").longValue()).isEqualTo(1_000_000);
+        assertThat(number(row, "cache_read_tokens").longValue()).isEqualTo(2_000_000);
+        assertThat(row.get("pricing_state")).isEqualTo("PRICED");
+        // $2 for the input, $2 for the output and $1 for the cache reads, not $4 for them at the input rate.
+        assertThat((BigDecimal) row.get("cost_usd")).isEqualByComparingTo("5");
+    }
+
+    @Test
+    @DisplayName("a reranking row keeps the search units it billed, unpriced, because no price has a rate for them")
+    void shouldKeepTheSearchUnitsUnpricedWhenAPricedRerankingModelBilledThem() {
+        var reranking = binding(AgentPurpose.PRACTICE_RERANKING, LlmApiProtocol.COHERE_RERANK, priced("1", "1", null));
+        when(policy.practiceScriptBinding(anyLong(), eq(AgentPurpose.PRACTICE_RERANKING), any(), any()))
+                .thenReturn(Optional.of(reranking));
+        AgentJob job = queued(Map.of(ModelKind.RERANKING, FrozenModel.from(reranking, resolver)));
+        when(runner.parseResult(any())).thenReturn(new AgentResult(true, Map.of("review", "LGTM")));
+        when(sandbox.execute(any())).thenAnswer(invocation -> {
+            transactions.executeWithoutResult(status -> {
+                for (int call = 0; call < 2; call++) {
+                    jobs.accumulatePracticeScriptUsage(
+                            job.getId(),
+                            0,
+                            new PracticeScriptCallUsage(ModelKind.RERANKING, "comment-quality", null, 0, 0, 0, 0, 3));
+                }
+            });
+            return new SandboxResult(0, Map.of(), "transcript", false, Duration.ofSeconds(1));
+        });
+
+        executor.processJob(job.getId());
+
+        var row = jdbc.queryForMap(
+                "SELECT total_calls, search_units, pricing_state, cost_usd FROM llm_usage_event "
+                        + "WHERE source_id = ? AND source_type = 'PRACTICE_SCRIPT_RERANKING'",
+                job.getId());
+        assertThat(number(row, "total_calls").intValue()).isEqualTo(2);
+        assertThat(number(row, "search_units").longValue()).isEqualTo(6);
+        assertThat(row.get("pricing_state")).isEqualTo("UNPRICED");
+        assertThat(row.get("cost_usd")).isNull();
     }
 
     @Test
@@ -473,6 +541,22 @@ class AgentJobTerminalStorageIntegrationTest extends BaseIntegrationTest {
     }
 
     private WorkspaceAgentBinding binding(AgentPurpose purpose, LlmApiProtocol apiProtocol) {
+        var price = new LlmModelPrice();
+        price.setPricingMode(PricingMode.NO_CHARGE);
+        return binding(purpose, apiProtocol, price);
+    }
+
+    /** Rates in USD per million tokens. */
+    private static LlmModelPrice priced(String input, String output, @Nullable String cacheRead) {
+        var price = new LlmModelPrice();
+        price.setPricingMode(PricingMode.PRICED);
+        price.setPer1mInputUsd(new BigDecimal(input));
+        price.setPer1mOutputUsd(new BigDecimal(output));
+        price.setPer1mCacheReadUsd(cacheRead == null ? null : new BigDecimal(cacheRead));
+        return price;
+    }
+
+    private WorkspaceAgentBinding binding(AgentPurpose purpose, LlmApiProtocol apiProtocol, LlmModelPrice price) {
         String slug = "terminal-" + UUID.randomUUID();
         var connection = LlmCatalogTestFixtures.connection(slug);
         connection.setApiProtocol(apiProtocol);
@@ -480,9 +564,7 @@ class AgentJobTerminalStorageIntegrationTest extends BaseIntegrationTest {
         LlmModel model = LlmCatalogTestFixtures.model(connection, slug, slug);
         model.setDataHandling(DataHandlingFacts.of(LlmDataOperator.OWN_ORGANISATION, null));
         model = models.save(model);
-        var price = new LlmModelPrice();
         price.setModel(model);
-        price.setPricingMode(PricingMode.NO_CHARGE);
         price.setEffectiveFrom(Instant.now());
         prices.saveAndFlush(price);
         var binding = new WorkspaceAgentBinding();

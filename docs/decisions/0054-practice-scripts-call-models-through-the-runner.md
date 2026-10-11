@@ -61,11 +61,18 @@ A `PRACTICE_DECISION` binding also accepts an `openai-completions` model, becaus
 The runner then reads each answer from `top_logprobs`.
 
 The proxy meters each call from a practice script for each attempt and model kind.
-One setting, `hephaestus.practice-review.practice-script-max-tokens-per-attempt`, is the attempt token limit.
-The runner checks it before each call, and the proxy enforces it.
-The proxy answers a spent limit, budget or cap with 402, because no rate limit uses that status.
-[Cost and limits](../admin/ai-providers.mdx#cost-and-limits) owns the limits.
+It keeps the buckets of the review's own row: input, cache reads, cache writes and output.
+It also keeps the search units that a Cohere reranking call bills instead of tokens.
 When the attempt ends, each kind other than chat becomes one ledger row.
+
+Each attempt has a token limit and a search unit limit.
+A search unit is not converted to tokens, because no token count is true for one.
+The runner checks the token limit before each call.
+
+The proxy enforces both limits.
+It counts only calls that have returned, so the calls in flight together can end above a limit.
+The proxy answers a spent limit, budget or cap with 402, because no rate limit uses that status.
+[Cost and limits](../admin/ai-providers.mdx#cost-and-limits) owns the limits and the overshoot.
 
 A script returns leads: a citation, a declared kind, scalar facts and an optional rating.
 The runner writes each quote from the source, and a failure becomes a "Not rated" line with its reason.
@@ -74,13 +81,16 @@ The runner writes each quote from the source, and a failure becomes a "Not rated
 
 - A script that a workspace admin wrote can use models and holds no credential.
 - A leaked practice script token reaches only model calls of one job attempt.
-  The attempt token limit bounds its spend.
+  The two attempt limits bound its spend, above them by its calls in flight.
 - A workspace that binds nothing loses nothing. Scripts with optional slots still give the leads that their code finds.
 - Every practice review attempt gets the practice script token, because the chat slot always exists.
 - Chat calls run on the review model, which can be a slow reasoning model.
 - The practice script stage takes its time from the review runner. The [workspace ABI](../contributor/agent/workspace-abi.mdx#practice-script-validation-and-limits) gives the split.
 - [What a script can reach](../contributor/practice-script-runner.mdx#what-a-script-can-reach) owns the threat model: which process holds which token.
-- A priced reranking model whose provider reports no tokens gives an unpriced ledger row. A model with **No metered API cost** records a confirmed $0.
+- A priced reranking model can give an unpriced ledger row, because a price has rates for tokens only.
+  This occurs when its provider bills search units or reports no tokens.
+  The row keeps the search units.
+  A model with **No metered API cost** records a confirmed $0.
 - The connection form offers all five protocols, so an admin creates every connection for practice scripts in the UI.
 - The server does not parse scripts, because a parser would only guess at what a script calls.
   A script declares its models when it runs.

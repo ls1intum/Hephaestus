@@ -650,7 +650,8 @@ When no model can serve the purpose, the model list tells you what to do:
 The list also gives two warnings:
 
 - For a decision model with a reasoning effort: a decision needs a model that answers at once with token probabilities.
-- For a reranking model without **No metered API cost**: a provider that reports no tokens gives unpriced calls.
+- For a reranking model without **No metered API cost**: some providers bill search units or report no tokens.
+  Their calls have no price.
   For a self-hosted reranker, set **No metered API cost** on the model.
   The workspace sets it on its own model.
   On a shared model, only an instance admin can set it, so the warning tells you to ask one.
@@ -764,18 +765,35 @@ Its calls count against the shared-model budget or the provider cap of the purse
 | Chat | On the review's own usage row, with the review's price. |
 | Decision, embedding, reranking | One usage row for each kind and review attempt, with the price frozen when the attempt was admitted. The source types are `PRACTICE_SCRIPT_DECISION`, `PRACTICE_SCRIPT_EMBEDDING` and `PRACTICE_SCRIPT_RERANKING`. |
 
-One review attempt has an attempt token limit for the model calls of all its practice scripts together, chat calls included.
-The environment variable `PRACTICE_REVIEW_PRACTICE_SCRIPT_MAX_TOKENS_PER_ATTEMPT` sets it.
-Its property is `hephaestus.practice-review.practice-script-max-tokens-per-attempt`.
-The default is 200 000 tokens.
-Only an operator can change it.
+A cached prompt token costs the cache rate of its model, as on the review's own usage row.
+
+One review attempt has two limits for the model calls of all its practice scripts together:
+
+| Limit | What it counts | Default | Environment variable and property |
+| --- | --- | --- | --- |
+| Attempt token limit | Input tokens, cached ones included, and output tokens of all models, chat calls included | 200 000 | `PRACTICE_REVIEW_PRACTICE_SCRIPT_MAX_TOKENS_PER_ATTEMPT`, `hephaestus.practice-review.practice-script-max-tokens-per-attempt` |
+| Attempt search unit limit | The search units that reranking calls billed | 1 000 | `PRACTICE_REVIEW_PRACTICE_SCRIPT_MAX_SEARCH_UNITS_PER_ATTEMPT`, `hephaestus.practice-review.practice-script-max-search-units-per-attempt` |
+
+Only an operator can change them.
+Some reranking providers, such as Cohere, bill a call in search units and report no tokens.
+A search unit is not converted to tokens, because one search unit can hold a few tokens or many thousands.
+Thus, search units have a limit of their own.
 
 The shared-model budget and the provider cap show on **AI usage**.
-The attempt token limit also bounds spend on a workspace's own provider that has no provider cap.
+The two attempt limits also bound spend on a workspace's own provider that has no provider cap.
 
-The practice script runner checks the attempt token limit before each call, and the proxy enforces it.
-When the attempt token limit, the shared-model budget or the provider cap is spent, the proxy refuses further calls from practice scripts with HTTP 402.
-The scripts then report the rest as not rated, and the review continues.
+The practice script runner checks the attempt token limit before each call.
+It cannot know the search units of a call before the provider answers, so only the proxy counts them.
+The proxy enforces both limits.
+When an attempt limit, the shared-model budget or the provider cap is spent, the proxy refuses further calls from practice scripts with HTTP 402.
+The scripts then report the rest as not rated with `budget`, and the review continues.
+
+The proxy counts only calls that have returned.
+Thus, each call that is in flight when a limit is reached can pass.
+The attempt can then end above the limit by the usage of those calls.
+The same applies to the shared-model budget and the provider cap.
+The runner sends at most 4 calls at the same time.
+A caller with a leaked practice script token can send more, and only the rate limit of the sandbox gateway bounds how many.
 
 Each call from a practice script names the practice whose script makes it.
 The proxy refuses a call without a practice with HTTP 400.
@@ -878,10 +896,13 @@ Chat calls from a script are not in this table, because they are part of each re
 On **By run type** and **By day**, **Runs** counts review attempts and Heph turns only.
 A usage row of a model for practice scripts adds its calls and cost to its review, but it is not a run.
 
-:::caution CAUTION: A priced reranking model that reports no tokens
+:::caution CAUTION: A priced reranking model that bills search units or reports no tokens
 
 Some reranking providers, such as Cohere, bill search units and report no token usage.
-Hephaestus cannot price a call without tokens, so it records the call without a price.
+Hephaestus records the search units on the usage row.
+A model price has rates for tokens only, so Hephaestus records such a row without a price.
+A call that reports neither tokens nor search units is also recorded without a price.
+
 In a purse with a budget or a cap, unpriced usage makes the month **UNVERIFIABLE**, and reviews pause.
 In such a purse, choose a reranking provider that reports token usage.
 For a self-hosted reranker, declare **No metered API cost**.

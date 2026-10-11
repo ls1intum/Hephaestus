@@ -58,6 +58,7 @@ public class MentorInFlightAccounting {
                 observed.cacheReadTokens(),
                 observed.cacheWriteTokens(),
                 observed.reasoningTokens(),
+                0L,
                 Math.max(1, observed.totalCalls()),
                 price,
                 observed.hasBillableUsage() ? UsageProvenance.PROXY : UsageProvenance.NONE,

@@ -691,10 +691,28 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         }
 
         @Test
+        void shouldCountTheCachedPromptAndTheSearchUnitsForTheAttemptLimitsWhenRoutingASlot() throws Exception {
+            AgentJob job = createPracticeScriptJob();
+            when(agentJobRepository.sumPracticeScriptUsageByKind(7L, job.getId(), 0))
+                    .thenReturn(List.of(
+                            new PracticeScriptKindTotal(ModelKind.DECISION, 2, 1_000, 100, 4_000, 500, 0),
+                            new PracticeScriptKindTotal(ModelKind.RERANKING, 3, 0, 0, 0, 0, 9)));
+
+            ProxyRouting routing = routeAs(job, "/internal/llm/practice-script/embedding/embeddings");
+
+            // The token limit counts the whole prompt; search units have their own limit.
+            assertThat(Objects.requireNonNull(routing.attempt()).practiceScriptTokens())
+                    .isEqualTo(5_600);
+            assertThat(Objects.requireNonNull(routing.attempt()).practiceScriptSearchUnits())
+                    .isEqualTo(9);
+        }
+
+        @Test
         void shouldPriceTheAttemptsPracticeScriptUsageFromTheSamePurseWhenRoutingASlot() throws Exception {
             AgentJob job = createPracticeScriptJob();
             when(agentJobRepository.sumPracticeScriptUsageByKind(7L, job.getId(), 0))
-                    .thenReturn(List.of(new PracticeScriptKindTotal(ModelKind.DECISION, 4, 1_000_000, 100_000)));
+                    .thenReturn(
+                            List.of(new PracticeScriptKindTotal(ModelKind.DECISION, 4, 1_000_000, 100_000, 0, 0, 0)));
 
             ProxyRouting routing = routeAs(job, "/internal/llm/practice-script/embedding/embeddings");
 

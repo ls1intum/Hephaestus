@@ -41,7 +41,8 @@ class ProxyBudgetGateTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        gate = new ProxyBudgetGate(budgetService, new PracticeReviewProperties(false, 15, 5, null, 12, 16000, 200_000));
+        gate = new ProxyBudgetGate(
+                budgetService, new PracticeReviewProperties(false, 15, 5, null, 12, 16000, 200_000, 1000));
     }
 
     private static LlmBudgetHeadroom instanceCapOfOneDollar() {
@@ -217,20 +218,25 @@ class ProxyBudgetGateTest extends BaseUnitTest {
         }
     }
 
-    /** The routing carries the attempt's tokens on every model for practice scripts and practice together. */
+    /**
+     * The routing carries the attempt's tokens and search units on every model for practice scripts and practice
+     * together. Each has its own limit: neither is converted into the other.
+     */
     @Nested
     class PracticeScriptCap {
 
         @ParameterizedTest
-        @CsvSource({"199999, false", "200000, true"})
-        void shouldRefuseWhenTheAttemptsPracticeScriptTokensReachTheCap(long tokens, boolean reached) {
+        @CsvSource({"199999, 999, false", "200000, 0, true", "0, 999, false", "0, 1000, true", "199999, 1000, true"})
+        void shouldRefuseWhenTheAttemptsPracticeScriptTokensOrSearchUnitsReachTheirLimit(
+                long tokens, long searchUnits, boolean reached) {
             var attempt = new ProxyRouting.BilledAttempt(
-                    LlmUsageSourceType.PRACTICE_SCRIPT_EMBEDDING,
+                    LlmUsageSourceType.PRACTICE_SCRIPT_RERANKING,
                     UUID.randomUUID(),
                     0,
                     BigDecimal.ZERO,
                     "worker",
-                    tokens);
+                    tokens,
+                    searchUnits);
 
             assertThat(gate.isPracticeScriptCapReached(attempt)).isEqualTo(reached);
         }

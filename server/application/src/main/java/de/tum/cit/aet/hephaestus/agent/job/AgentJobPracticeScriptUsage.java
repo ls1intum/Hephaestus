@@ -25,6 +25,7 @@ import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 import org.jspecify.annotations.Nullable;
@@ -79,14 +80,33 @@ public class AgentJobPracticeScriptUsage {
     @Column(name = "calls", nullable = false)
     private int calls;
 
+    /** The prompt tokens without the cache reads and writes, as the review's own counters keep them. */
     @Column(name = "input_tokens", nullable = false)
     private long inputTokens;
 
     @Column(name = "output_tokens", nullable = false)
     private long outputTokens;
 
+    @ColumnDefault("0")
+    @Column(name = "cache_read_tokens", nullable = false)
+    private long cacheReadTokens;
+
+    @ColumnDefault("0")
+    @Column(name = "cache_write_tokens", nullable = false)
+    private long cacheWriteTokens;
+
+    /** What Cohere reranking calls billed instead of tokens. */
+    @ColumnDefault("0")
+    @Column(name = "search_units", nullable = false)
+    private long searchUnits;
+
     public ModelKind modelKind() {
         return id.getModelKind();
+    }
+
+    /** The whole prompt: the input and the cache reads and writes. */
+    public long promptTokens() {
+        return inputTokens + cacheReadTokens + cacheWriteTokens;
     }
 
     /** The ledger source that bills calls of this kind; the review's own row bills the chat model. */

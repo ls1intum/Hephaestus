@@ -201,7 +201,7 @@ class AgentJobStaleReapIntegrationTest extends BaseIntegrationTest {
 
     private void practiceScriptCall(UUID jobId, ModelKind kind, String practice, long input, long output) {
         jobRepository.accumulatePracticeScriptUsage(
-                jobId, 0, new PracticeScriptCallUsage(kind, practice, null, input, output));
+                jobId, 0, new PracticeScriptCallUsage(kind, practice, null, input, output, 0, 0, 0));
     }
 
     private void assertPracticeScriptLedgerRows(UUID jobId) {

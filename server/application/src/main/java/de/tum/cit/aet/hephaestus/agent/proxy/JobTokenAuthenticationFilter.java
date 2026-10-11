@@ -207,6 +207,7 @@ public class JobTokenAuthenticationFilter extends OncePerRequestFilter {
                 LlmUsageSourceType.AGENT_JOB,
                 spentSoFarUsd(job, snapshot),
                 0L,
+                0L,
                 null);
     }
 
@@ -230,9 +231,8 @@ public class JobTokenAuthenticationFilter extends OncePerRequestFilter {
                 model,
                 AgentJobPracticeScriptUsage.ledgerSourceType(slot),
                 practiceScriptSpentUsd(job, snapshot, used, model.connectionScope()),
-                used.stream()
-                        .mapToLong(total -> total.inputTokens() + total.outputTokens())
-                        .sum(),
+                used.stream().mapToLong(PracticeScriptKindTotal::tokens).sum(),
+                used.stream().mapToLong(PracticeScriptKindTotal::searchUnits).sum(),
                 slot));
     }
 
@@ -243,6 +243,7 @@ public class JobTokenAuthenticationFilter extends OncePerRequestFilter {
             LlmUsageSourceType sourceType,
             BigDecimal spentUsd,
             long practiceScriptTokens,
+            long practiceScriptSearchUnits,
             @Nullable ModelKind slot) {
         return new ProxyRouting(
                 principal,
@@ -258,7 +259,8 @@ public class JobTokenAuthenticationFilter extends OncePerRequestFilter {
                         job.getRetryCount(),
                         spentUsd,
                         job.getWorkerId(),
-                        practiceScriptTokens),
+                        practiceScriptTokens,
+                        practiceScriptSearchUnits),
                 slot,
                 slot == null ? null : model.dataHandlingTier());
     }
@@ -274,7 +276,11 @@ public class JobTokenAuthenticationFilter extends OncePerRequestFilter {
             if (model == null || price == null || !Objects.equals(model.connectionScope(), purse)) {
                 continue;
             }
-            BigDecimal cost = price.calculateCost(total.inputTokens(), total.outputTokens(), 0L, 0L)
+            BigDecimal cost = price.calculateCost(
+                            total.inputTokens(),
+                            total.outputTokens(),
+                            total.cacheReadTokens(),
+                            total.cacheWriteTokens())
                     .usd();
             if (cost != null) {
                 spent = spent.add(cost);

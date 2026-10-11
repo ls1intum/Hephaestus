@@ -37,6 +37,7 @@ class LlmUsageRecorderTest extends BaseUnitTest {
                 500_000,
                 250_000,
                 900_000,
+                0,
                 1,
                 price,
                 UsageProvenance.RUNNER,
@@ -225,6 +226,7 @@ class LlmUsageRecorderTest extends BaseUnitTest {
                 -8,
                 -9,
                 0,
+                0,
                 priced(),
                 UsageProvenance.RUNNER,
                 Instant.now());
@@ -305,6 +307,7 @@ class LlmUsageRecorderTest extends BaseUnitTest {
                 1,
                 "authoritative-model",
                 inputTokens,
+                0,
                 0,
                 0,
                 0,

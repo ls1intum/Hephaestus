@@ -127,6 +127,7 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 0,
                 0,
                 0,
+                0,
                 1,
                 price,
                 UsageProvenance.RUNNER,

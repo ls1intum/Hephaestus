@@ -5,14 +5,33 @@ import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.JsonNode;
 
 /**
- * Normalized token buckets for one proxied response.
+ * Normalized usage buckets for one proxied response.
  *
  * @param billableInputTokens prompt tokens MINUS cache reads and writes, because OpenAI-compatible
  *     providers report both as details of the inclusive prompt total
  * @param reasoningTokens already counted inside {@link #outputTokens}; reported, never priced twice
+ * @param searchUnits the search units that a Cohere reranking call billed instead of tokens; 0 for every other
+ *     response
  */
 public record ProxyTokenUsage(
-        int billableInputTokens, int outputTokens, int reasoningTokens, int cacheReadTokens, int cacheWriteTokens) {
+        int billableInputTokens,
+        int outputTokens,
+        int reasoningTokens,
+        int cacheReadTokens,
+        int cacheWriteTokens,
+        int searchUnits) {
+
+    /** A response that bills tokens only, which is every response except a Cohere reranking one. */
+    public ProxyTokenUsage(
+            int billableInputTokens, int outputTokens, int reasoningTokens, int cacheReadTokens, int cacheWriteTokens) {
+        this(billableInputTokens, outputTokens, reasoningTokens, cacheReadTokens, cacheWriteTokens, 0);
+    }
+
+    /** The prompt total: the billable input and the cache reads and writes that it excludes. */
+    public long promptTokens() {
+        return (long) billableInputTokens + cacheReadTokens + cacheWriteTokens;
+    }
+
     /**
      * Reads the usage block of one non-streamed response in the shape its protocol reports.
      *
@@ -24,22 +43,47 @@ public record ProxyTokenUsage(
         return switch (protocol) {
             case OPENAI_COMPLETIONS -> from(body, false);
             case OPENAI_RESPONSES -> from(body, true);
+            // The Decisions API documents no usage object; the AI SDK reads it in the Responses shape with every
+            // count optional. A missing output count is 0, since a decision writes no text. Its cache details are
+            // not split off: no cache rate is documented for decisions, so the whole input is priced as input.
             case OPENAI_DECISIONS ->
                 usage == null
                         ? null
                         : new ProxyTokenUsage(
-                                requiredCount(usage, "input_tokens"), requiredCount(usage, "output_tokens"), 0, 0, 0);
+                                requiredCount(usage, "input_tokens"), count(usage, "output_tokens"), 0, 0, 0);
             case OPENAI_EMBEDDINGS ->
                 usage == null ? null : new ProxyTokenUsage(requiredCount(usage, "prompt_tokens"), 0, 0, 0, 0);
-            case COHERE_RERANK -> usage == null ? null : rerankUsage(usage);
+            case COHERE_RERANK -> rerankUsage(usage, body.path("meta").path("billed_units"));
         };
     }
 
-    /** Reranking providers report either a total or a prompt count; some report neither. */
-    private static @Nullable ProxyTokenUsage rerankUsage(JsonNode usage) {
-        Integer total = optionalCount(usage, "total_tokens");
-        Integer counted = total != null ? total : optionalCount(usage, "prompt_tokens");
-        return counted == null ? null : new ProxyTokenUsage(counted, 0, 0, 0, 0);
+    /**
+     * Jina and vLLM report a total or a prompt count in {@code usage}. Cohere reports none and bills search units in
+     * {@code meta.billed_units.search_units}. A provider can also report neither.
+     */
+    private static @Nullable ProxyTokenUsage rerankUsage(@Nullable JsonNode usage, JsonNode billedUnits) {
+        Integer total = usage == null ? null : optionalCount(usage, "total_tokens");
+        Integer counted = total != null || usage == null ? total : optionalCount(usage, "prompt_tokens");
+        Integer searchUnits = searchUnits(billedUnits);
+        if (counted == null && searchUnits == null) {
+            return null;
+        }
+        return new ProxyTokenUsage(counted == null ? 0 : counted, 0, 0, 0, 0, searchUnits == null ? 0 : searchUnits);
+    }
+
+    /** Cohere's schema types billed units as numbers, so a whole number written as {@code 1.0} is accepted too. */
+    private static @Nullable Integer searchUnits(JsonNode billedUnits) {
+        JsonNode value = billedUnits.get("search_units");
+        if (value == null || value.isNull()) {
+            return null;
+        }
+        if (!value.isNumber()
+                || !value.canConvertToExactIntegral()
+                || !value.canConvertToInt()
+                || value.intValue() < 0) {
+            throw new IllegalArgumentException("Invalid search units");
+        }
+        return value.intValue();
     }
 
     /** @return {@code null} when no usage block is present */

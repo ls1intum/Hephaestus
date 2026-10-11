@@ -57,6 +57,15 @@ ALTER TABLE workspace_llm_connection
             <column name="output_tokens" type="BIGINT">
                 <constraints nullable="false"/>
             </column>
+            <column defaultValueNumeric="0" name="cache_read_tokens" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column defaultValueNumeric="0" name="cache_write_tokens" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column defaultValueNumeric="0" name="search_units" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
         </createTable>
     </changeSet>
     <changeSet id="1791486276211-4" author="hephaestus">
@@ -282,5 +291,13 @@ SET adopted_base = (adopted_base - 'practiceScript') || jsonb_build_object('prec
 WHERE adopted_base -> 'practiceScript' IS NOT NULL;
             ]]></sql>
         </rollback>
+    </changeSet>
+    <changeSet id="1791486276211-22" author="hephaestus">
+        <comment>Keep the search units that Cohere reranking calls bill instead of tokens. Earlier rows billed none, so they hold 0.</comment>
+        <addColumn tableName="llm_usage_event">
+            <column defaultValueNumeric="0" name="search_units" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
     </changeSet>
 </databaseChangeLog>

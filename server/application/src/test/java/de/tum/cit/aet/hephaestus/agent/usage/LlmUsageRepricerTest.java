@@ -75,6 +75,7 @@ class LlmUsageRepricerTest extends BaseUnitTest {
                 0L,
                 0L,
                 0L,
+                0L,
                 appliedPriceId,
                 appliedWorkspaceModelId);
     }
@@ -116,6 +117,20 @@ class LlmUsageRepricerTest extends BaseUnitTest {
         // The row is priced by the catalogue entry it names, and the rate written back is that entry's.
         assertThat(price.getValue().appliedPriceId()).isEqualTo(11L);
         assertThat(price.getValue().per1mInputUsd()).isEqualByComparingTo("3.00");
+    }
+
+    // A Cohere reranking row billed search units. A price per token cannot charge them, so pricing its zero tokens
+    // would confirm $0 for a call that the provider charged.
+    @Test
+    @DisplayName("a row with search units stays unpriced, because no price has a rate for them")
+    void aRowWithSearchUnitsStaysUnpriceable() {
+        when(priceRepository.findById(11L)).thenReturn(Optional.of(price(PricingMode.PRICED, new BigDecimal("3.00"))));
+
+        Outcome outcome = repricer.reprice(new UnpricedLedgerRow(
+                EVENT_ID, WORKSPACE_ID, "rerank-v3.5", FundingSource.INSTANCE, 0L, 0L, 0L, 0L, 3L, 11L, null));
+
+        assertThat(outcome).isEqualTo(Outcome.STILL_UNPRICEABLE);
+        verify(usageRepository, never()).applyResolvedPrice(any(), any(), any());
     }
 
     // Every row the ledger backfill created — the ones that actually held a live cap shut — carries no

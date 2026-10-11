@@ -38,7 +38,7 @@ class PracticePiAdapterTest extends BaseUnitTest {
                 new PiRuntimeFactory(mapper),
                 new PiResultParser(mapper, new SimpleMeterRegistry()),
                 new AgentImageProperties(IMAGE, ImagePullPolicy.IF_NOT_PRESENT),
-                new PracticeReviewProperties(false, 15, 5, samplingTemperature, 12, 16000, 150_000),
+                new PracticeReviewProperties(false, 15, 5, samplingTemperature, 12, 16000, 150_000, 1000),
                 mapper);
     }
 

@@ -34,8 +34,8 @@ record TerminalUsage(
      *     (which zeroes them) and BEFORE the runner's totals are written over them
      * @param practiceScript the attempt's practice script totals by model kind. Its chat total is added to the
      *     runner's report: the practice script stage runs before the runner, in another process, so the report
-     *     never contains those calls, while the proxy's counters do. The practice script rows keep one prompt
-     *     total, so its cached share is counted as ordinary input.
+     *     never contains those calls, while the proxy's counters do. Its buckets are those of the proxy's
+     *     counters, so its cache reads and writes keep their own rates.
      */
     static TerminalUsage resolve(
             @Nullable LlmUsage runnerUsage,
@@ -131,6 +131,7 @@ record TerminalUsage(
                         cacheReadTokens,
                         cacheWriteTokens,
                         reasoningTokens,
+                        0L,
                         totalCalls,
                         price,
                         provenance,
@@ -154,14 +155,17 @@ record TerminalUsage(
                             model == null ? null : model.upstreamModelId(),
                             total.inputTokens(),
                             total.outputTokens(),
+                            total.cacheReadTokens(),
+                            total.cacheWriteTokens(),
                             0L,
-                            0L,
-                            0L,
+                            total.searchUnits(),
                             (int) Math.min(Integer.MAX_VALUE, total.calls()),
                             frozen != null ? frozen : LlmPriceSnapshot.unpricedInstance(),
                             UsageProvenance.PROXY,
                             occurredAt),
-                    total.inputTokens() + total.outputTokens() > 0);
+                    // Search units are observed usage too. The recorder appends them UNPRICED, because no price has
+                    // a rate for them; a model with no metered cost still records its confirmed zero.
+                    total.tokens() > 0 || total.searchUnits() > 0);
         }
         return billed;
     }
@@ -229,8 +233,8 @@ record TerminalUsage(
             return new Buckets(
                     input + total.inputTokens(),
                     output + total.outputTokens(),
-                    cacheRead,
-                    cacheWrite,
+                    cacheRead + total.cacheReadTokens(),
+                    cacheWrite + total.cacheWriteTokens(),
                     reasoning,
                     calls + total.calls());
         }

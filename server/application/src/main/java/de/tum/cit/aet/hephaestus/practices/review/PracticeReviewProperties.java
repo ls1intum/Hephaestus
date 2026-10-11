@@ -26,6 +26,10 @@ import org.springframework.validation.annotation.Validated;
  *                            the input and output tokens that the practice scripts of one review attempt
  *                            may spend on all their models together. The practice script runner holds its scripts to it,
  *                            and the proxy refuses further calls.
+ * @param practiceScriptMaxSearchUnitsPerAttempt
+ *                            the search units that the reranking calls of one review attempt's practice scripts may
+ *                            bill, for providers such as Cohere that bill search units instead of tokens. Only the
+ *                            proxy counts them, and it refuses further calls.
  */
 @Validated
 @ConfigurationProperties(prefix = "hephaestus.practice-review")
@@ -36,4 +40,5 @@ public record PracticeReviewProperties(
         @Nullable @DecimalMin("0.0") @DecimalMax("2.0") Double samplingTemperature,
         @Min(1) @DefaultValue("12") int practiceModelCalls,
         @Min(1000) @DefaultValue("16000") int practiceOutputTokens,
-        @Min(1) @DefaultValue("200000") long practiceScriptMaxTokensPerAttempt) {}
+        @Min(1) @DefaultValue("200000") long practiceScriptMaxTokensPerAttempt,
+        @Min(1) @DefaultValue("1000") long practiceScriptMaxSearchUnitsPerAttempt) {}

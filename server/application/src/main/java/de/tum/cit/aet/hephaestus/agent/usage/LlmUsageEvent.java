@@ -173,4 +173,12 @@ public class LlmUsageEvent {
     @Enumerated(EnumType.STRING)
     @Column(name = "usage_provenance", length = 16)
     private UsageProvenance usageProvenance;
+
+    /**
+     * What Cohere reranking calls billed instead of tokens. No price has a rate for them, so a PRICED row never
+     * holds any: a row with search units is UNPRICED unless its model declares no metered cost.
+     */
+    @ColumnDefault("0")
+    @Column(name = "search_units", nullable = false)
+    private long searchUnits;
 }

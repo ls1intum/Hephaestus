@@ -43,6 +43,8 @@ public record ProxyRouting(
      * @param spentUsd priced with the rates frozen onto the execution at admission
      * @param practiceScriptTokens the tokens that the attempt's practice script calls used on every model, read with
      *     {@code spentUsd}; 0 for every other call
+     * @param practiceScriptSearchUnits the search units that the attempt's practice script reranking calls billed,
+     *     read with {@code spentUsd}; 0 for every other call
      */
     public record BilledAttempt(
             LlmUsageSourceType sourceType,
@@ -50,7 +52,8 @@ public record ProxyRouting(
             int number,
             BigDecimal spentUsd,
             @Nullable String workerId,
-            long practiceScriptTokens) {
+            long practiceScriptTokens,
+            long practiceScriptSearchUnits) {
 
         /** An attempt that makes no practice script calls. */
         public BilledAttempt(
@@ -59,7 +62,7 @@ public record ProxyRouting(
                 int number,
                 BigDecimal spentUsd,
                 @Nullable String workerId) {
-            this(sourceType, sourceId, number, spentUsd, workerId, 0L);
+            this(sourceType, sourceId, number, spentUsd, workerId, 0L, 0L);
         }
     }
 

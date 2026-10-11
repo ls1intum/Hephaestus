@@ -421,6 +421,7 @@ public class MentorTurnPersistence {
                 usage.cacheReadTokens(),
                 usage.cacheWriteTokens(),
                 turn.reasoningTokens(),
+                0L,
                 Math.max(1, turn.calls()),
                 cookie.priceSnapshot(),
                 // Neither record had tokens, so the row names no source rather than crediting one that saw
