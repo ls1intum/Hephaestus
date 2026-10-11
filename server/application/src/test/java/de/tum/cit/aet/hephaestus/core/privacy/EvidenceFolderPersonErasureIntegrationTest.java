@@ -8,6 +8,10 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.adapter.EvidenceFolderLease;
 import de.tum.cit.aet.hephaestus.agent.adapter.EvidenceFolderPersonDataCatalog;
@@ -46,6 +50,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -53,10 +58,12 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
@@ -416,6 +423,213 @@ class EvidenceFolderPersonErasureIntegrationTest extends BaseIntegrationTest {
         }
     }
 
+    @Test
+    void shouldCountWhyACapturesCopiedJobsCannotVouchWithoutNamingAnyone() throws Exception {
+        databaseTestUtils.cleanDatabase();
+        var recorder = new ExactPersonDataCopyRecorder(jdbc);
+        var catalog = catalog(root, recorder);
+        var indexed = job("dependency-diagnostics");
+        var workspace = indexed.getWorkspace();
+        copy(root, catalog, recorder, indexed, new PersonCopyIdentity("GITLAB", "https://indexed.example", "7", null))
+                .close();
+        var legacy = legacyCopy(workspace, new PersonCopyIdentity("GITLAB", "https://legacy.example", "8", null));
+        var missing = jobIn(workspace);
+        var erased = jobIn(workspace);
+        UUID erasedReceipt = receipt(erased, "ERASED", Map.of());
+        var retried = jobIn(workspace);
+        receipt(
+                retried,
+                "READY",
+                Map.of("attempt", 0, "identities", List.of(), "repositories", List.of(), "dependencies", "COMPLETE"));
+        receipt(retried, "READY", Map.of("attempt", 1, "identities", List.of(), "repositories", List.of()));
+        UUID retriedErasedReceipt = receipt(retried, "ERASED", Map.of());
+        var files = new JobEvidenceFiles(new FabricLayout(root.toString()), jobs, Clock.systemUTC(), catalog);
+
+        try (var diagnostics = new Diagnostics()) {
+            var vouched = captureCopying(files, recorder, workspace, indexed);
+            assertThat(payload(vouched).path("dependencies").asString()).isEqualTo("COMPLETE");
+            assertThat(diagnostics.drain())
+                    .as("a complete assessment stays quiet")
+                    .isEmpty();
+
+            var fromLegacy = captureCopying(files, recorder, workspace, legacy);
+            assertThat(payload(fromLegacy).path("dependencies").asString()).isEqualTo("UNKNOWN");
+            assertThat(diagnostics.drain()).containsExactly(assessed("CAPTURE", 1, 0, 1, 0, 1));
+
+            var fromMissing = captureCopying(files, recorder, workspace, missing);
+            assertThat(payload(fromMissing).path("dependencies").asString()).isEqualTo("UNKNOWN");
+            assertThat(diagnostics.drain()).containsExactly(assessed("CAPTURE", 1, 1, 0, 0, 0));
+
+            var fromErased = captureCopying(files, recorder, workspace, erased);
+            assertThat(payload(fromErased).path("dependencies").asString()).isEqualTo("UNKNOWN");
+            assertThat(diagnostics.drain()).containsExactly(assessed("CAPTURE", 1, 0, 1, 1, 0));
+
+            var fromRetried = captureCopying(files, recorder, workspace, retried);
+            assertThat(payload(fromRetried).path("dependencies").asString()).isEqualTo("UNKNOWN");
+            assertThat(diagnostics.drain())
+                    .as("one job, three receipts: the vouching one counts in neither category")
+                    .containsExactly(assessed("CAPTURE", 1, 0, 3, 1, 1));
+        }
+        assertThat(receiptRow(erasedReceipt)).isEqualTo("ERASED {}");
+        assertThat(receiptRow(retriedErasedReceipt)).isEqualTo("ERASED {}");
+    }
+
+    @Test
+    void shouldCountALateReadsMissingRowsWithoutUpgradingOrRevivingItsReceipt() throws Exception {
+        databaseTestUtils.cleanDatabase();
+        var provider = providers.saveAndFlush(
+                new IdentityProvider(IdentityProviderType.GITLAB, "https://late-diagnostics.example"));
+        long developerId =
+                Objects.requireNonNull(users.saveAndFlush(TestUserFactory.createUser(78L, "late-diagnostics", provider))
+                        .getId());
+        var recorder = new ExactPersonDataCopyRecorder(jdbc);
+        var catalog = catalog(root, recorder);
+        var running = job("late-read-diagnostics");
+        var workspace = running.getWorkspace();
+        var source = jobIn(workspace);
+        copy(root, catalog, recorder, source, new PersonCopyIdentity("GITLAB", "https://source.example", "5", null))
+                .close();
+        var inputs = copy(
+                root,
+                catalog,
+                recorder,
+                running,
+                new PersonCopyIdentity("GITLAB", "https://late-diagnostics.example", "1", null));
+        try (inputs;
+                var diagnostics = new Diagnostics()) {
+            UUID supported = observation(source, developerId);
+            UUID vanished = UUID.randomUUID();
+            catalog.indexLateRead(
+                    running.getId(), workspace.getId(), 0, () -> "read", read -> Set.of(supported), read -> Set.of());
+            assertThat(payload(running).path("dependencies").asString()).isEqualTo("COMPLETE");
+            assertThat(diagnostics.drain())
+                    .as("a complete late read stays quiet")
+                    .isEmpty();
+
+            catalog.indexLateRead(
+                    running.getId(),
+                    workspace.getId(),
+                    0,
+                    () -> "read",
+                    read -> Set.of(supported, vanished),
+                    read -> Set.of());
+            var missingRow = new HashMap<>(assessed("LATE_READ", 1, 0, 1, 0, 0));
+            missingRow.put("evidence.missingRows", 1);
+            assertThat(diagnostics.drain()).containsExactly(missingRow);
+            assertThat(payload(running).path("dependencies").asString()).isEqualTo("UNKNOWN");
+
+            catalog.indexLateRead(
+                    running.getId(), workspace.getId(), 0, () -> "read", read -> Set.of(supported), read -> Set.of());
+            assertThat(diagnostics.drain()).isEmpty();
+            assertThat(payload(running).path("dependencies").asString())
+                    .as("a later complete read never upgrades the receipt")
+                    .isEqualTo("UNKNOWN");
+
+            jdbc.update("UPDATE person_evidence_copy SET state='ERASE_REQUESTED' WHERE job_id=?", running.getId());
+            String before = payload(running).toString();
+            catalog.indexLateRead(
+                    running.getId(),
+                    workspace.getId(),
+                    0,
+                    () -> "read",
+                    read -> Set.of(supported, vanished),
+                    read -> Set.of());
+            assertThat(diagnostics.drain())
+                    .as("the read is assessed whether or not its receipt is still held")
+                    .containsExactly(missingRow);
+            assertThat(jdbc.queryForObject(
+                            "SELECT state FROM person_evidence_copy WHERE job_id=?", String.class, running.getId()))
+                    .isEqualTo("ERASE_REQUESTED");
+            assertThat(payload(running).toString()).isEqualTo(before);
+        }
+    }
+
+    /** One incomplete dependency assessment as the catalog logs it: counts only. */
+    private static Map<String, Object> assessed(
+            String assessment,
+            int sourceJobs,
+            int sourceJobsWithoutReceipts,
+            int receipts,
+            int notReadyReceipts,
+            int unvouchedReadyReceipts) {
+        return Map.of(
+                "evidence.assessment", assessment,
+                "evidence.sourceJobs", sourceJobs,
+                "evidence.sourceJobsWithoutReceipts", sourceJobsWithoutReceipts,
+                "evidence.receipts", receipts,
+                "evidence.notReadyReceipts", notReadyReceipts,
+                "evidence.unvouchedReadyReceipts", unvouchedReadyReceipts);
+    }
+
+    /** The catalog's log events while open. Each must carry its key-value counts and nothing else. */
+    private static final class Diagnostics implements AutoCloseable {
+        private final Logger logger = (Logger) LoggerFactory.getLogger(EvidenceFolderPersonDataCatalog.class);
+        private final @Nullable Level level = logger.getLevel();
+        private final ListAppender<ILoggingEvent> appender = new ListAppender<>();
+
+        Diagnostics() {
+            appender.start();
+            logger.addAppender(appender);
+            logger.setLevel(Level.INFO);
+        }
+
+        List<Map<String, Object>> drain() {
+            var drained = new ArrayList<Map<String, Object>>();
+            for (var event : appender.list) {
+                assertThat(event.getFormattedMessage())
+                        .as("no ID, path or prose is formatted into the message")
+                        .isEqualTo("Copied evidence dependency assessment is incomplete");
+                assertThat(event.getArgumentArray()).isNullOrEmpty();
+                assertThat(event.getThrowableProxy()).isNull();
+                var fields = new HashMap<String, Object>();
+                event.getKeyValuePairs().forEach(pair -> fields.put(pair.key, pair.value));
+                drained.add(fields);
+            }
+            appender.list.clear();
+            return drained;
+        }
+
+        @Override
+        public void close() {
+            logger.detachAppender(appender);
+            logger.setLevel(level);
+        }
+    }
+
+    /** A capture whose only copied rows came from {@code source}. */
+    private AgentJob captureCopying(
+            JobEvidenceFiles files, ExactPersonDataCopyRecorder recorder, Workspace workspace, AgentJob source)
+            throws Exception {
+        var job = jobIn(workspace);
+        files.beginPersonCapture(job);
+        recorder.recordCopiedJob(source.getId());
+        files.prepare(
+                        job,
+                        new PreparedEvidence(Map.of("inputs/history/observations.json", new byte[] {'{', '}'}), null),
+                        null)
+                .close();
+        return job;
+    }
+
+    /** A receipt row as an earlier capture, attempt or erasure left it. */
+    private UUID receipt(AgentJob job, String state, Map<String, Object> payload) {
+        UUID id = UUID.randomUUID();
+        jdbc.update(
+                "INSERT INTO person_evidence_copy(id,workspace_id,job_id,store_id,state,payload) VALUES (?,?,?,?,?,CAST(? AS jsonb))",
+                id,
+                job.getWorkspace().getId(),
+                job.getId(),
+                UUID.randomUUID(),
+                state,
+                mapper.writeValueAsString(payload));
+        return id;
+    }
+
+    private @Nullable String receiptRow(UUID id) {
+        return jdbc.queryForObject(
+                "SELECT state||' '||payload::text FROM person_evidence_copy WHERE id=?", String.class, id);
+    }
+
     private JsonNode payload(AgentJob job) {
         return mapper.readTree(Objects.requireNonNull(jdbc.queryForObject(
                 "SELECT payload::text FROM person_evidence_copy WHERE job_id=?", String.class, job.getId())));
@@ -434,14 +648,7 @@ class EvidenceFolderPersonErasureIntegrationTest extends BaseIntegrationTest {
     /** A receipt written before receipts recorded the jobs whose rows they copied. */
     private AgentJob legacyCopy(Workspace workspace, PersonCopyIdentity identity) {
         var legacy = jobIn(workspace);
-        jdbc.update(
-                "INSERT INTO person_evidence_copy(id,workspace_id,job_id,store_id,state,payload) VALUES (?,?,?,?,'READY',CAST(? AS jsonb))",
-                UUID.randomUUID(),
-                workspace.getId(),
-                legacy.getId(),
-                UUID.randomUUID(),
-                mapper.writeValueAsString(
-                        Map.of("attempt", 0, "identities", List.of(identity), "repositories", List.of())));
+        receipt(legacy, "READY", Map.of("attempt", 0, "identities", List.of(identity), "repositories", List.of()));
         return legacy;
     }
 
