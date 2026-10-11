@@ -17,7 +17,7 @@ import { SyncResourcesTable } from "./SyncResourcesTable";
 import { SyncStatusHeader } from "./SyncStatusHeader";
 
 vi.mock("sonner", () => ({
-	toast: { success: vi.fn(), error: vi.fn() },
+	toast: { success: vi.fn(), message: vi.fn(), error: vi.fn() },
 }));
 
 function renderContainer({ livePushUnavailable = false } = {}) {
@@ -365,7 +365,7 @@ describe("Outline integration — sync now", () => {
 		fireEvent.click(syncButton);
 
 		await waitFor(() => expect(syncRequestBody).toStrictEqual({ type: "RECONCILIATION" }));
-		await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Sync started"));
+		await waitFor(() => expect(toast.message).toHaveBeenCalledWith("Sync in progress"));
 	});
 });
 

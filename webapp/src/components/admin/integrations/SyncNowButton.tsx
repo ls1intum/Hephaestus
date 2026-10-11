@@ -17,17 +17,40 @@ export interface SyncNowButtonProps {
 	 */
 	triggeringType?: SyncTriggerType | null;
 	activeJob?: SyncJob | null;
+	/**
+	 * Requests the stopping job's own type again. Offered only where the caller can send that type; the
+	 * server decides whether the old run is gone, so a still-running job comes back unchanged.
+	 */
+	onRecover?: () => void;
 }
 
 /**
  * The manual-sync trigger, and the only one on its card. With one visible trigger, a pending state can
  * only mean *this* trigger — Backfill is a menu item sharing the same mutation, not a second button.
  */
-export function SyncNowButton({ onClick, triggeringType = null, activeJob }: SyncNowButtonProps) {
-	const disabled = triggeringType != null || activeJob != null;
+export function SyncNowButton({
+	onClick,
+	triggeringType = null,
+	activeJob,
+	onRecover,
+}: SyncNowButtonProps) {
+	const stopping = activeJob?.cancelRequested === true;
+	const canRecover =
+		stopping && activeJob.type !== "INITIAL" && onRecover != null && triggeringType == null;
+	const disabled = !canRecover && (triggeringType != null || activeJob != null);
 	let text = "Sync now";
 	let announcement = "";
-	if (activeJob != null) {
+	if (activeJob != null && stopping) {
+		const noun = activeJob.type === "BACKFILL" ? "backfill" : "sync";
+		if (canRecover) {
+			text = `Check and retry ${noun}`;
+		} else if (triggeringType == null) {
+			text = "Stopping…";
+		} else {
+			text = "Checking…";
+		}
+		announcement = `${JOB_TYPE_LABEL[activeJob.type]} stopping`;
+	} else if (activeJob != null) {
 		text = "Syncing…";
 		announcement = `${JOB_TYPE_LABEL[activeJob.type]} in progress`;
 	} else if (triggeringType != null) {
@@ -37,7 +60,12 @@ export function SyncNowButton({ onClick, triggeringType = null, activeJob }: Syn
 
 	return (
 		<>
-			<Button variant="outline" size="sm" onClick={onClick} disabled={disabled}>
+			<Button
+				variant="outline"
+				size="sm"
+				onClick={canRecover ? onRecover : onClick}
+				disabled={disabled}
+			>
 				{disabled ? (
 					<Spinner className="size-4" aria-hidden />
 				) : (

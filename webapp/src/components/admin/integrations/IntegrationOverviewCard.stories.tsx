@@ -252,3 +252,20 @@ export const Disconnected: Story = {
 };
 
 export const Loading: Story = { args: { status: undefined, isStatusLoading: true } };
+
+export const StoppingReconciliation: Story = {
+	args: { status: { ...status, activeJob: { ...runningJob, cancelRequested: true } } },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("button", { name: "Check and retry sync" })).toBeEnabled();
+	},
+};
+
+export const StoppingBackfill: Story = {
+	args: {
+		status: { ...status, activeJob: { ...runningJob, type: "BACKFILL", cancelRequested: true } },
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("button", { name: "Stopping…" })).toBeDisabled();
+		await expect(canvas.getByRole("link", { name: /view details/iu })).toBeVisible();
+	},
+};

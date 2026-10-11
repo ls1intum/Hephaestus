@@ -13,6 +13,7 @@ import {
 	updateConnectionSyncJobMutation,
 } from "@/api/@tanstack/react-query.gen";
 import {
+	returnedJobMessage,
 	type SyncTriggerType,
 	syncPollInterval,
 } from "@/components/admin/integrations/sync-format";
@@ -97,23 +98,28 @@ export function useConnectionSync({
 		refetchInterval: syncPollInterval(hasActiveJob, livePushUnavailable),
 	});
 
-	const invalidateSyncActivity = () => {
+	const invalidateSyncActivity = async () => {
+		const invalidations: Promise<void>[] = [];
 		if (connectionId != null) {
 			const keyPath = { path: { workspaceSlug, connectionId } };
-			void queryClient.invalidateQueries({ queryKey: getConnectionSyncStatusQueryKey(keyPath) });
-			void queryClient.invalidateQueries({ queryKey: listConnectionSyncJobsQueryKey(keyPath) });
-			void queryClient.invalidateQueries({
-				queryKey: listConnectionSyncResourcesQueryKey(keyPath),
-			});
+			invalidations.push(
+				queryClient.invalidateQueries({ queryKey: getConnectionSyncStatusQueryKey(keyPath) }),
+
+				queryClient.invalidateQueries({ queryKey: listConnectionSyncJobsQueryKey(keyPath) }),
+				queryClient.invalidateQueries({
+					queryKey: listConnectionSyncResourcesQueryKey(keyPath),
+				}),
+			);
 		}
 		invalidateAlso?.();
+		await Promise.all(invalidations);
 	};
 
 	const triggerSync = useMutation({
 		...triggerSyncJobMutation(),
-		onSuccess: (job) => {
-			invalidateSyncActivity();
-			toast.success(job.type === "BACKFILL" ? "Backfill started" : "Sync started");
+		onSuccess: async (job) => {
+			toast.message(returnedJobMessage(job));
+			await invalidateSyncActivity();
 		},
 		onError: (e) => {
 			toast.error("We could not start the sync", { description: problemDetailOf(e) });
@@ -122,9 +128,9 @@ export function useConnectionSync({
 
 	const cancelJob = useMutation({
 		...updateConnectionSyncJobMutation(),
-		onSuccess: () => {
-			invalidateSyncActivity();
+		onSuccess: async () => {
 			toast.success(`Canceling the sync. It stops after the current ${cancelsAfter}.`);
+			await invalidateSyncActivity();
 		},
 		onError: (e) => {
 			toast.error("We could not cancel the sync", { description: problemDetailOf(e) });
@@ -187,7 +193,9 @@ export function useConnectionSync({
 	return {
 		/** Lets a provider poll its own queries on the same adaptive cadence as the sync plane. */
 		hasActiveJob,
-		invalidateSyncActivity,
+		invalidateSyncActivity: () => {
+			void invalidateSyncActivity();
+		},
 		syncStatusHeaderProps,
 		syncResourcesProps: {
 			resources: resourcesQuery.data ?? [],

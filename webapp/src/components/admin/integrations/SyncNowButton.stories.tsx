@@ -94,3 +94,36 @@ export const ActiveBackfill: Story = {
 		await expect(canvas.queryByText(/starting/iu)).not.toBeInTheDocument();
 	},
 };
+
+/** A canceled run is still stopping and this surface cannot retry its type, so nothing is offered. */
+export const Stopping: Story = {
+	args: { activeJob: { ...runningBackfill, cancelRequested: true } },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("button", { name: /stopping/iu })).toBeDisabled();
+		canvas.getByText("Backfill stopping");
+	},
+};
+
+/**
+ * A canceled backfill on a surface that can request a backfill: the admin may ask again, and the
+ * server answers with whatever job it holds. The action names the run's own type.
+ */
+export const StoppingRecoverable: Story = {
+	args: { activeJob: { ...runningBackfill, cancelRequested: true }, onRecover: fn() },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("button", { name: /check and retry backfill/iu })).toBeEnabled();
+		canvas.getByText("Backfill stopping");
+	},
+};
+
+/** The retry is in flight, so it cannot be sent twice. */
+export const StoppingRecoveryPending: Story = {
+	args: {
+		activeJob: { ...runningJob, cancelRequested: true },
+		onRecover: fn(),
+		triggeringType: "RECONCILIATION",
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("button", { name: /checking/iu })).toBeDisabled();
+	},
+};

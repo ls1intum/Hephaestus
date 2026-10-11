@@ -323,6 +323,10 @@ export const Cancelling: Story = {
 		status: { ...baseStatus, activeJob: { ...runningJob, cancelRequested: true } },
 	},
 	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("button", { name: "Stopping…" })).toBeDisabled();
+		await expect(
+			canvas.queryByRole("button", { name: /check and retry/iu }),
+		).not.toBeInTheDocument();
 		await expect(
 			canvas.getByRole("button", { name: /stopping after current step/iu }),
 		).toBeDisabled();
@@ -402,5 +406,46 @@ export const StatusLoadError: Story = {
 	},
 	play: async ({ canvas }) => {
 		canvas.getByText(/could not load github sync status/iu);
+	},
+};
+
+export const StoppingBackfill: Story = {
+	args: {
+		status: {
+			...baseStatus,
+			activeJob: { ...runningJob, type: "BACKFILL", cancelRequested: true },
+		},
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("button", { name: "Check and retry backfill" })).toBeEnabled();
+		await expect(canvas.getByRole("button", { name: "More sync options" })).toBeDisabled();
+	},
+};
+
+export const StoppingInitial: Story = {
+	args: {
+		status: { ...baseStatus, activeJob: { ...runningJob, type: "INITIAL", cancelRequested: true } },
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("button", { name: "Stopping…" })).toBeDisabled();
+		await expect(
+			canvas.queryByRole("button", { name: /check and retry/iu }),
+		).not.toBeInTheDocument();
+	},
+};
+
+export const StoppingUnsupportedBackfill: Story = {
+	args: {
+		status: {
+			...baseStatus,
+			backfillSupported: false,
+			activeJob: { ...runningJob, type: "BACKFILL", cancelRequested: true },
+		},
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("button", { name: "Stopping…" })).toBeDisabled();
+		await expect(
+			canvas.queryByRole("button", { name: /check and retry/iu }),
+		).not.toBeInTheDocument();
 	},
 };
