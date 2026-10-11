@@ -60,7 +60,7 @@ It does not check whether a workspace exists.
 1. Open the `hephaestus.build` zone and select **DNS**.
 2. Create a wildcard record with **Name** `*`, pointing to the same origin as the apex.
 3. Set the wildcard and apex records to **DNS only** (grey cloud).
-4. Keep explicit records for reserved services, including `docs`, separate from the wildcard.
+4. Keep explicit records for reserved services, including `docs` and `staging`, separate from the wildcard.
 5. Open **My Profile → API Tokens → Create Token** and select **Edit zone DNS**.
 6. Add **Zone → Zone → Read** and **Zone → DNS → Edit** permissions.
 7. Set **Zone Resources** to **Include → Specific zone → hephaestus.build**.
@@ -112,7 +112,7 @@ Set these non-secret values alongside `APP_HOSTNAME`:
 
 ```dotenv
 APP_HOSTNAME=hephaestus.build
-HEPHAESTUS_WORKSPACE_SUBDOMAINS_ENABLED=true
+HEPHAESTUS_WORKSPACE_SUBDOMAINS_ENABLED=false
 HEPHAESTUS_WORKSPACE_SUBDOMAINS_BASE_DOMAIN=hephaestus.build
 ACME_CHALLENGE=dnschallenge.provider
 ACME_CHALLENGE_VALUE=cloudflare
@@ -129,16 +129,20 @@ See [pull-based deployment](./pull-based-deployment.mdx).
 For the single-host installer, set these values in its one `.env` file.
 Previews keep subdomains off and use their existing proxy.
 
-Traefik requests one certificate with the apex as `tls.domains.main` and `*.<base>` as its SAN.
-It uses DNS-01 and keeps ACME state in the existing persistent volume.
-With subdomains off, the default remains HTTP-01.
+With DNS-01 and a nonempty base domain, Traefik requests the apex and `*.<base>` certificate
+through its default TLS store, even while workspace subdomains stay off.
+Recreate the proxy and verify both certificate names before enabling workspace routing.
+The base domain must equal `APP_HOSTNAME` during preparation as well as after enablement.
+ACME state stays in the existing persistent volume.
+
+Without these preparation settings, the default remains HTTP-01.
 Keep a working DNS-01 configuration during switch reversal if other services still use the wildcard certificate.
 See [Traefik ACME](https://doc.traefik.io/traefik/reference/install-configuration/tls/certificate-resolvers/acme/).
 
 ### Check and turn off
 
 1. Upgrade the app and proxy to this release with the switch off.
-2. Prepare the DNS-only wildcard record and DNS-01 wildcard certificate.
+2. Prepare the DNS-only wildcard record. Apply the proxy settings above with the switch off and verify the apex/wildcard certificate.
 3. Register the exact apex OAuth callbacks and verify apex sign-in.
 4. Set the switch and base domain in both app and proxy settings.
 5. Recreate the app and proxy with Compose's `--wait` option.

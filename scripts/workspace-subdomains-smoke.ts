@@ -69,6 +69,8 @@ command.push(
 	`--providers.docker.constraints=Label(\`com.docker.compose.project\`, \`${project}\`)`,
 	"--certificatesresolvers.letsencrypt.acme.caserver=https://127.0.0.1:9/directory",
 	"--api.insecure=true",
+	"--log.level=DEBUG",
+	"--log.format=json",
 );
 const override = path.join(directory, "override.yaml");
 let composePrepared = false;
@@ -226,7 +228,7 @@ try {
 	);
 	const testDynamic = dynamicTemplate.replace(
 		"tls:\n",
-		"tls:\n  stores:\n    default:\n      defaultCertificate:\n        certFile: /smoke/tls.pem\n        keyFile: /smoke/tls.key\n",
+		"tls:\n  certificates:\n    - certFile: /smoke/tls.pem\n      keyFile: /smoke/tls.key\n",
 	);
 	const proxyFixture = parseDocument(sources[0] ?? "");
 	const dynamicNode = proxyFixture.get("x-traefik-dynamic", true);
@@ -306,6 +308,11 @@ try {
 			ACME_CHALLENGE: "httpchallenge.entrypoint",
 		},
 		{
+			HEPHAESTUS_WORKSPACE_SUBDOMAINS_ENABLED: "false",
+			HEPHAESTUS_WORKSPACE_SUBDOMAINS_BASE_DOMAIN: "wrong.example.invalid",
+			ACME_CHALLENGE: "dnschallenge.provider",
+		},
+		{
 			ACME_CHALLENGE: "dnschallenge.provider",
 			TRAEFIK_DNS_CREDENTIAL_VARIABLE: "CF_DNS_API_TOKEN",
 		},
@@ -324,11 +331,16 @@ try {
 		assert.match(result.stdout + result.stderr, /Invalid workspace edge configuration:/u);
 	}
 
-	for (const enabled of ["false", "true", "false"]) {
+	for (const { enabled, dns } of [
+		{ enabled: "false", dns: false },
+		{ enabled: "false", dns: true },
+		{ enabled: "true", dns: true },
+		{ enabled: "false", dns: true },
+	]) {
 		env.HEPHAESTUS_WORKSPACE_SUBDOMAINS_ENABLED = enabled;
 		env.HEPHAESTUS_WORKSPACE_SUBDOMAINS_BASE_DOMAIN = base;
-		env.ACME_CHALLENGE = enabled === "true" ? "dnschallenge.provider" : "httpchallenge.entrypoint";
-		env.ACME_CHALLENGE_VALUE = enabled === "true" ? "cloudflare" : "http";
+		env.ACME_CHALLENGE = dns ? "dnschallenge.provider" : "httpchallenge.entrypoint";
+		env.ACME_CHALLENGE_VALUE = dns ? "cloudflare" : "http";
 		const selfHost = asRecord(
 			parseJson(
 				await output(
@@ -421,9 +433,14 @@ try {
 		const port = Number(published.trim().split(":").at(-1));
 		assert.ok(port > 0);
 		await waitForBody(port, base, "/", "tenant-spa");
-		await assert.rejects(get(port, "untrusted.example.invalid", "/"), {
-			code: "ERR_TLS_CERT_ALTNAME_INVALID",
-		});
+		await assert.rejects(
+			get(port, "untrusted.example.invalid", "/"),
+			(error: unknown) =>
+				error instanceof Error &&
+				"code" in error &&
+				(error.code === "ERR_TLS_CERT_ALTNAME_INVALID" ||
+					error.code === "DEPTH_ZERO_SELF_SIGNED_CERT"),
+		);
 		const apiPublished = await output("docker", [...args, "port", "reverse-proxy", "8080"], {
 			env,
 		});
@@ -436,7 +453,6 @@ try {
 			const router = asRecord(parseJson(await routerResponse.text()), "tenant router");
 			assert.equal(router.priority, 6);
 			const tls = asRecord(router.tls, "tenant TLS");
-			assert.deepEqual(tls.domains, [{ main: base, sans: [`*.${base}`] }]);
 			assert.equal(tls.certResolver, "letsencrypt");
 		}
 
@@ -444,6 +460,27 @@ try {
 			env,
 		});
 		const proxyId = proxyListing.trim();
+		const configurationLines = await output("docker", ["logs", proxyId]);
+		const configurations = configurationLines
+			.trim()
+			.split("\n")
+			.map((line) => asRecord(parseJson(line), "proxy log"))
+			.filter(
+				(entry) => entry.providerName === "file" && entry.message === "Configuration received",
+			);
+		assert.ok(configurations.length > 0, "The file provider must accept the edge configuration");
+		const configuration = asRecord(configurations.at(-1)?.config, "file configuration");
+		const tls = asRecord(configuration.tls, "file TLS");
+		if (dns) {
+			const stores = asRecord(tls.stores, "TLS stores");
+			const defaultStore = asRecord(stores.default, "default TLS store");
+			assert.deepEqual(defaultStore.defaultGeneratedCert, {
+				resolver: "letsencrypt",
+				domain: { main: base, sans: [`*.${base}`] },
+			});
+		} else {
+			assert.equal(tls.stores, undefined);
+		}
 		const inspection = await output("docker", ["inspect", proxyId]);
 		assert.ok(!inspection.includes(credential));
 		const mountedDynamic = await output("docker", [
@@ -574,7 +611,7 @@ try {
 			await expectStatus(port, `acme.${base}`, "/api/auth/csrf", 404);
 		}
 		console.log(
-			`Verified subdomains=${enabled} at https://127.0.0.1:${port} with Host/SNI ${base} and acme.${base}`,
+			`Verified subdomains=${enabled}, DNS-01=${dns} at https://127.0.0.1:${port} with Host/SNI ${base} and acme.${base}`,
 		);
 	}
 } catch (error) {
