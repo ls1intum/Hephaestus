@@ -124,17 +124,35 @@ export const ByName: Story = {
 
 /** A first name sort runs A to Z even when a search currently leaves no rows. */
 export const NameAfterNoMatches: Story = {
+	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
 	play: async ({ canvas, userEvent }) => {
 		const search = canvas.getByRole("searchbox", { name: "Search people" });
 		await userEvent.type(search, "zz");
-		await expect(canvas.getByText("No one matches your search")).toBeVisible();
+		await expect(window.innerWidth).toBe(320);
+		const table = canvas.getByRole("table", { name: "People" });
+		const container = table.closest<HTMLElement>("[data-slot='table-container']");
+		if (!container) {
+			throw new Error("The table has no scroll container");
+		}
+		const title = canvas.getByText("No one matches your search");
+		await expect(title).toBeVisible();
+		for (const scrollLeft of [0, container.scrollWidth]) {
+			container.scrollLeft = scrollLeft;
+			const box = title.getBoundingClientRect();
+			await expect(box.width).toBeGreaterThan(0);
+			await expect(box.left).toBeGreaterThanOrEqual(0);
+			await expect(box.right).toBeLessThanOrEqual(window.innerWidth);
+		}
+		await expect(container.scrollLeft).toBeGreaterThan(0);
+		container.scrollLeft = 0;
+		await expectNoPageOverflow();
 		await userEvent.click(canvas.getByRole("button", { name: "Person" }));
 		await expect(canvas.getByRole("columnheader", { name: "Person" })).toHaveAttribute(
 			"aria-sort",
 			"ascending",
 		);
 		await userEvent.clear(search);
-		const table = canvas.getByRole("table", { name: "People" });
+		await expect(canvas.queryByText("No one matches your search")).not.toBeInTheDocument();
 		await expect(
 			within(table)
 				.getAllByRole("link")
