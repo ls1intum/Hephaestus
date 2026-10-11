@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.web;
 
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import java.time.Instant;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.PageRequest;
@@ -26,6 +27,22 @@ public final class QueryFilterSupport {
 
     public static @Nullable List<ArtifactKind> artifactKinds(@Nullable List<String> raw) {
         return raw == null ? null : raw.stream().map(QueryFilterSupport::parse).toList();
+    }
+
+    /** Rejects a backwards window, which would otherwise answer an empty page for no visible reason. */
+    public static void requireWindow(@Nullable Instant from, @Nullable Instant to) {
+        if (from != null && to != null && from.isAfter(to)) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "The start of the range must not be after its end.");
+        }
+    }
+
+    /** Rejects one item of work without its kind, since the same id names different work in each kind. */
+    public static void requireKindForItem(@Nullable ArtifactKind kind, @Nullable Long artifactId) {
+        if (artifactId != null && kind == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "Choose a kind of work before you filter by one item.");
+        }
     }
 
     /** Builds an unsorted page after the parameter record has validated supplied bounds. */

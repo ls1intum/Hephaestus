@@ -65,6 +65,16 @@ export const tracedArtifacts = [
 		lastSignalAt: new Date("2026-08-07T09:12:00Z"),
 		signalCount: 6,
 		reviewedSignalCount: 2,
+		lastSignal: {
+			id: "sig-1423-push",
+			signal: "scm.pull_request.synchronized",
+			displayName: "New commits pushed",
+			revision: "9c1e2f0a",
+			occurredAt: new Date("2026-08-07T09:12:00Z"),
+			discoveredVia: "EVENT",
+			state: "TRIGGERED",
+			reviewId: "9d1c6a52-7c1e-4b0a-9d1e-2f3a4b5c6d7e",
+		},
 	},
 	{
 		artifactKind: "scm.pull_request",
@@ -81,6 +91,16 @@ export const tracedArtifacts = [
 		lastSignalAt: new Date("2026-08-06T16:40:00Z"),
 		signalCount: 3,
 		reviewedSignalCount: 1,
+		lastSignal: {
+			id: "sig-1418-ready",
+			signal: "scm.pull_request.ready_for_review",
+			displayName: "Marked ready for review",
+			revision: "41ab9e7c",
+			occurredAt: new Date("2026-08-06T16:40:00Z"),
+			discoveredVia: "EVENT",
+			state: "TRIGGERED",
+			reviewId: "2b7e4c1d-5a6f-4e3b-8c9d-0a1b2c3d4e5f",
+		},
 	},
 	{
 		artifactKind: "scm.issue",
@@ -89,6 +109,18 @@ export const tracedArtifacts = [
 		lastSignalAt: new Date("2026-08-05T11:02:00Z"),
 		signalCount: 2,
 		reviewedSignalCount: 0,
+		lastSignal: {
+			id: "sig-1430-opened",
+			signal: "scm.issue.opened",
+			displayName: "Opened",
+			revision: "1",
+			occurredAt: new Date("2026-08-05T11:02:00Z"),
+			discoveredVia: "EVENT",
+			state: "SUPPRESSED",
+			stateReason: "GATE_SKIPPED",
+			stateReasonDescription:
+				"This workspace’s review settings did not allow a review of this work.",
+		},
 	},
 	{
 		// No number, no container, no upstream link: a deleted or unlinkable artifact still lists.
@@ -102,6 +134,17 @@ export const tracedArtifacts = [
 		lastSignalAt: new Date("2026-08-04T08:30:00Z"),
 		signalCount: 1,
 		reviewedSignalCount: 0,
+		lastSignal: {
+			id: "sig-88-message",
+			signal: "chat.conversation_thread.message_posted",
+			displayName: "Message posted",
+			revision: "1",
+			occurredAt: new Date("2026-08-04T08:30:00Z"),
+			discoveredVia: "SYNC",
+			state: "LAPSED",
+			stateReason: "PENDING_DEADLINE_EXCEEDED",
+			stateReasonDescription: "It waited too long for a free review slot and was dropped.",
+		},
 	},
 	{
 		artifactKind: "docs.document",
@@ -117,6 +160,16 @@ export const tracedArtifacts = [
 		lastSignalAt: new Date("2026-08-03T14:15:00Z"),
 		signalCount: 2,
 		reviewedSignalCount: 1,
+		lastSignal: {
+			id: "sig-512-edited",
+			signal: "docs.document.updated",
+			displayName: "Edited",
+			revision: "7",
+			occurredAt: new Date("2026-08-03T14:15:00Z"),
+			discoveredVia: "SWEEP",
+			state: "TRIGGERED",
+			reviewId: "6f5e4d3c-2b1a-4098-8f7e-6d5c4b3a2918",
+		},
 	},
 ] satisfies TracedArtifact[];
 

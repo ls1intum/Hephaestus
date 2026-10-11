@@ -13,9 +13,7 @@ import java.util.List;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.server.ResponseStatusException;
 
 /**
  * @param artifactKind a bare string, not an {@link ArtifactKind} — {@link QueryFilterSupport#artifactKind} has the
@@ -77,15 +75,9 @@ public record ReviewObservationFilterParams(
         @Nullable
         Instant to) {
     public ObservationQueryFilter toFilter() {
-        if (artifactId != null && artifactKind == null) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST, "Choose a kind of work before you filter by one item.");
-        }
         ArtifactKind kind = QueryFilterSupport.artifactKind(artifactKind);
-        if (from != null && to != null && from.isAfter(to)) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST, "The start of the range must not be after its end.");
-        }
+        QueryFilterSupport.requireKindForItem(kind, artifactId);
+        QueryFilterSupport.requireWindow(from, to);
         return new ObservationQueryFilter(
                 practiceSlug,
                 groupSlug,

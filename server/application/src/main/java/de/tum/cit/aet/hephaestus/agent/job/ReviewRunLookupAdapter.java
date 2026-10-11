@@ -45,8 +45,36 @@ class ReviewRunLookupAdapter implements ReviewRunLookup {
                     AgentJobReviewRunStates.of(row.getStatus()),
                     row.getTriggerMode(),
                     PracticeCoverageLedger.from(row.getOutput()).evaluated(),
-                    feedbackUrl(row, target));
+                    feedbackUrl(row, target),
+                    row.getCreatedAt(),
+                    row.getLlmModel(),
+                    row.getCompletedAt(),
+                    phase(row.getStatus()),
+                    row.getStartedAt(),
+                    AgentJob.holdWhileQueued(row.getStatus(), row.getHoldReason()),
+                    row.getStatus() == AgentJobStatus.COMPLETED ? conclusion(row) : null);
         }));
+    }
+
+    /** Exhaustive, so a new job status fails the build here rather than a lineage read at run time. */
+    private static ReviewRunPhase phase(AgentJobStatus status) {
+        return switch (status) {
+            case QUEUED -> ReviewRunPhase.QUEUED;
+            case RUNNING -> ReviewRunPhase.RUNNING;
+            case COMPLETED -> ReviewRunPhase.COMPLETED;
+            case FAILED -> ReviewRunPhase.FAILED;
+            case TIMED_OUT -> ReviewRunPhase.TIMED_OUT;
+            case CANCELLED -> ReviewRunPhase.CANCELLED;
+        };
+    }
+
+    private static ReviewRunConclusion conclusion(ReviewRunFactsRow row) {
+        return switch (ReviewRunOutcome.fromJobOutput(row.getOutput())) {
+            case REVIEWED -> ReviewRunConclusion.REVIEWED;
+            case INSUFFICIENT_EVIDENCE -> ReviewRunConclusion.INSUFFICIENT_EVIDENCE;
+            case COALESCED -> ReviewRunConclusion.COALESCED;
+            case SUPERSEDED -> ReviewRunConclusion.SUPERSEDED;
+        };
     }
 
     /** The run's summary comment, linked only when the recorded address is a comment on the reviewed work itself. */

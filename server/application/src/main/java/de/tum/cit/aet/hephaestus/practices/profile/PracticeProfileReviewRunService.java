@@ -3,26 +3,21 @@ package de.tum.cit.aet.hephaestus.practices.profile;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
-import de.tum.cit.aet.hephaestus.practices.ReviewRuleFingerprint;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository.DeliveredFeedbackCount;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
-import de.tum.cit.aet.hephaestus.practices.model.Outcome;
-import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationInvalidationRepository;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.DeveloperReviewRunRow;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationService;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationVisibilityPolicy;
+import de.tum.cit.aet.hephaestus.practices.observation.RunPracticeOutcomes;
 import de.tum.cit.aet.hephaestus.practices.observation.VisibleRunPage;
 import de.tum.cit.aet.hephaestus.practices.observation.VisibleRunPage.VisibleRun;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.ObservationDetailDTO;
 import de.tum.cit.aet.hephaestus.practices.profile.dto.ProfileReviewRunDTO;
 import de.tum.cit.aet.hephaestus.practices.profile.dto.ProfileReviewRunDetailDTO;
 import de.tum.cit.aet.hephaestus.practices.profile.dto.ProfileReviewRunsPageDTO;
-import de.tum.cit.aet.hephaestus.practices.profile.dto.ReviewPracticeOutcomesDTO;
-import de.tum.cit.aet.hephaestus.practices.profile.dto.SlippedPracticeDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.CurrentDeveloperLookup;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequestStandingLookup;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequestStandingLookup.ReviewedWorkId;
@@ -32,8 +27,6 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewRunNarrativeLookup;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewedWorkLabels;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import java.time.Instant;
-import java.util.Collection;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -187,13 +180,9 @@ public class PracticeProfileReviewRunService {
                 .map(visible -> {
                     UUID jobId = visible.reviewId();
                     Observation newest = visible.observations().getFirst();
-                    Map<Practice, PracticeOutcome> outcomes = visible.observations().stream()
+                    RunPracticeOutcomes outcomes = RunPracticeOutcomes.of(visible.observations().stream()
                             .filter(observation -> !invalidated.contains(observation.getId()))
-                            .collect(Collectors.groupingBy(
-                                    Observation::getPractice,
-                                    Collectors.mapping(
-                                            PracticeProfileReviewRunService::countedOutcome,
-                                            Collectors.collectingAndThen(Collectors.toList(), PracticeOutcome::of))));
+                            .toList());
                     ReviewRunFacts run = facts.get(jobId);
                     return new ProfileReviewRunDTO(
                             jobId,
@@ -205,68 +194,12 @@ public class PracticeProfileReviewRunService {
                             run == null ? null : run.status(),
                             run == null ? null : run.triggerMode(),
                             run == null ? null : run.practicesEvaluated(),
-                            practices(outcomes.values()),
+                            outcomes.practices(),
                             delivered.getOrDefault(jobId, 0L),
                             run == null ? null : run.feedbackUrl(),
-                            slipped(outcomes),
+                            outcomes.slipped(),
                             mayRequest.contains(work(newest)));
                 })
-                .toList();
-    }
-
-    /**
-     * The outcome a run's summary counts. A met or not-met verdict recorded under an earlier fingerprint
-     * scheme, or without one, judged a behavior rather than the whole practice standard, so it counts as
-     * undecided; the observation itself keeps its recorded outcome.
-     */
-    private static Outcome countedOutcome(Observation observation) {
-        PracticeRevision evaluated = observation.getPracticeRevision();
-        boolean currentStandard =
-                evaluated != null && ReviewRuleFingerprint.isCurrentScheme(evaluated.getReviewRuleFingerprint());
-        return observation.getOutcome().isDecided() && !currentStandard
-                ? Outcome.UNDETERMINED
-                : observation.getOutcome();
-    }
-
-    /** What a run decided about one practice for this developer, from every standing observation of it. */
-    private enum PracticeOutcome {
-        TO_IMPROVE,
-        HELD,
-        NOT_APPLICABLE,
-        UNDECIDED;
-
-        /** Any problem outweighs any strength. */
-        static PracticeOutcome of(List<Outcome> kinds) {
-            if (kinds.stream().anyMatch(Outcome::isNotMet)) {
-                return TO_IMPROVE;
-            }
-            if (kinds.stream().anyMatch(Outcome::isMet)) {
-                return HELD;
-            }
-            return kinds.stream().allMatch(Outcome.NOT_APPLICABLE::equals) ? NOT_APPLICABLE : UNDECIDED;
-        }
-    }
-
-    private static ReviewPracticeOutcomesDTO practices(Collection<PracticeOutcome> outcomes) {
-        return new ReviewPracticeOutcomesDTO(
-                count(outcomes, PracticeOutcome.TO_IMPROVE),
-                count(outcomes, PracticeOutcome.HELD),
-                count(outcomes, PracticeOutcome.NOT_APPLICABLE),
-                count(outcomes, PracticeOutcome.UNDECIDED));
-    }
-
-    private static int count(Collection<PracticeOutcome> outcomes, PracticeOutcome outcome) {
-        return (int) outcomes.stream().filter(outcome::equals).count();
-    }
-
-    /** The practices counted as to improve, by name. */
-    private static List<SlippedPracticeDTO> slipped(Map<Practice, PracticeOutcome> outcomes) {
-        return outcomes.entrySet().stream()
-                .filter(entry -> entry.getValue() == PracticeOutcome.TO_IMPROVE)
-                .map(entry -> new SlippedPracticeDTO(
-                        entry.getKey().getSlug(), entry.getKey().getName()))
-                .sorted(Comparator.comparing(SlippedPracticeDTO::practiceName, String.CASE_INSENSITIVE_ORDER)
-                        .thenComparing(SlippedPracticeDTO::practiceSlug))
                 .toList();
     }
 

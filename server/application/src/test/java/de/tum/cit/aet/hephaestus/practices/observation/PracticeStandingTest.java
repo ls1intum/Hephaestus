@@ -30,7 +30,7 @@ class PracticeStandingTest {
     void shouldHoldWhenTheOnlySlipIsOlderThanTheStandingWindow() {
         // Four clean in the window of four; the slip before them is history the bar does not reach.
         assertThat(standing(PracticeStandingDTO.Standing.STRENGTH, trendOf(false, true, true, true, true))
-                        .isHolding())
+                        .isHolding(4))
                 .isTrue();
     }
 
@@ -38,7 +38,7 @@ class PracticeStandingTest {
     void shouldNotHoldWhenAnOpportunityInTheWindowRaisedAProblem() {
         // Three clean of four in the window: a strength carried by weight, not a held one.
         assertThat(standing(PracticeStandingDTO.Standing.STRENGTH, trendOf(false, true, true, true))
-                        .isHolding())
+                        .isHolding(4))
                 .isFalse();
     }
 
@@ -46,20 +46,20 @@ class PracticeStandingTest {
     void shouldHoldWhenFewerPiecesOfWorkThanTheWindowWereJudged() {
         // Two pieces of work ever judged, both clean: the bar is what there is, not the window's size.
         assertThat(standing(PracticeStandingDTO.Standing.STRENGTH, trendOf(true, true))
-                        .isHolding())
+                        .isHolding(4))
                 .isTrue();
     }
 
     @Test
     void shouldNotHoldWhenTheStandingIsBelowStrength() {
         assertThat(standing(PracticeStandingDTO.Standing.MIXED, trendOf(true, true, true, true))
-                        .isHolding())
+                        .isHolding(4))
                 .isFalse();
     }
 
     private static PracticeStanding standing(PracticeStandingDTO.Standing standing, PracticeTrend trend) {
         PracticeStandingDTO dto = new PracticeStandingDTO(
-                SLUG, "Testing", null, null, null, null, standing, List.of(), List.of(), null, null);
+                SLUG, "Testing", null, null, null, null, standing, List.of(), List.of(), null, null, false);
         return new PracticeStanding(dto, List.of(), List.of(), trend, null);
     }
 

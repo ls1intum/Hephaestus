@@ -53,7 +53,9 @@ const fourPieces = {
 	opportunities: 8,
 	opportunitiesUntilComparable: 0,
 	previousOpportunities: 4,
+	reviewedWork: 4,
 	ropeHalfWidth: 0.15,
+	standingWork: 4,
 };
 
 /** A settled standing names how many pieces of work it is read from, beside the badge. */

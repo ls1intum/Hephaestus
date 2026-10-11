@@ -14,8 +14,9 @@ public interface DeliveryPolicyEvaluationRepository extends JpaRepository<Delive
     List<DeliveryPolicyEvaluation> findByWorkspaceIdAndFeedbackIdOrderByEvaluatedAtAsc(
             Long workspaceId, UUID feedbackId);
 
-    List<DeliveryPolicyEvaluation> findByWorkspaceIdAndAgentJobIdAndFeedbackIdIsNullAndSurfaceOrderByEvaluatedAtAsc(
-            Long workspaceId, UUID agentJobId, DeliveryPolicySurface surface);
+    /** The checks a review ran for itself rather than for one piece of feedback, oldest first. */
+    List<DeliveryPolicyEvaluation> findByWorkspaceIdAndAgentJobIdAndFeedbackIdIsNullOrderByEvaluatedAtAsc(
+            Long workspaceId, UUID agentJobId);
 
     @Modifying
     @Query(value = """

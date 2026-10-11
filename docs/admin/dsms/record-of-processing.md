@@ -724,8 +724,10 @@ Other members see standings only in the counts of Practices across the workspace
 one developer when a count is small.
 
 Practice profiles and their feedback text are private to the developer. Workspace admins can read
-observations, delivery metadata and dispute explanations, but not practice-page or conversation
-feedback text through ordinary administration. Ratings and other private response notes stay private.
+observations, delivery metadata, whether a developer answered a piece of feedback, and dispute
+explanations. Ordinary administration does not show them practice-page or conversation feedback text.
+Ratings, other resolutions and other private response notes stay private.
+
 Instance-admin **View as user** is a separate read-only, reasoned and audited access path. External
 feedback follows the destination's audience.
 

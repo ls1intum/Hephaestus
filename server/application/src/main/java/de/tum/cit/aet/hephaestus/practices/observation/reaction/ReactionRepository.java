@@ -89,6 +89,44 @@ public interface ReactionRepository extends JpaRepository<Reaction, UUID> {
     }
 
     /**
+     * What an admin may learn of the response that stands on each of these pieces of feedback: that the recipient
+     * answered and when, whether the answer disputes the feedback, and the dispute's explanation, which is written to
+     * the admins. The rating, any other resolution and the note beside it stay in SQL, so no admin projection can
+     * pass them on. The same responses as {@link #findCurrentResponses}; the caller passes at least one id.
+     *
+     * <p>An answer that is only a rating still counts as answered here: admins see that and when, not how. Whether
+     * that should stay is an open product decision.
+     */
+    @Query(value = """
+        SELECT latest.feedback_id AS "feedbackId", latest.created_at AS "respondedAt",
+               (latest.action = 'DISPUTED') AS "disputed",
+               CASE WHEN latest.action = 'DISPUTED' THEN latest.explanation END AS "disputeExplanation"
+        FROM (
+        """ + LATEST_RESPONSE + """
+        ) latest
+        WHERE latest.feedback_id IN (:feedbackIds)
+          AND (latest.usefulness IS NOT NULL OR latest.action IS NOT NULL)
+        """, nativeQuery = true)
+    List<AdminVisibleResponseRow> findAdminVisibleResponses(
+            @Param("workspaceId") Long workspaceId, @Param("feedbackIds") Collection<UUID> feedbackIds);
+
+    /**
+     * A response as an admin may read it. It deliberately carries no rating and no private note: a test fails when a
+     * getter for either appears here.
+     */
+    interface AdminVisibleResponseRow {
+        UUID getFeedbackId();
+
+        Instant getRespondedAt();
+
+        @Nullable
+        Boolean getDisputed();
+
+        @Nullable
+        String getDisputeExplanation();
+    }
+
+    /**
      * The developer's standing answer on feedback about each requested observation, and on feedback about any
      * earlier observation that shares one of {@code recurrenceKeys} — the same practice, piece of work, developer
      * and place. One row per piece of feedback whose newest response carries a resolution; the reactor is the

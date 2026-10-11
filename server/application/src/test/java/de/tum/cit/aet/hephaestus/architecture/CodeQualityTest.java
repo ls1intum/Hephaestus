@@ -155,6 +155,10 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                     // JPQL admin-audit query: each nullable filter needs its own @Param for the
                     // CAST(:from AS Instant) IS NULL null-handling — a param object can't express it.
                     "AuthEventRepository.findForAdmin",
+                    // The same for the list of recorded work: each nullable bound and kind is its own @Param, since a
+                    // SpEL parameter object binds a null as bytea and the CAST(... AS Instant) IS NULL guard fails.
+                    // Callers use the SignalledArtifactFilter overload.
+                    "ArtifactSignalRepository.findSignalledArtifacts",
                     // Atomic JPQL terminal transition; Spring Data query parameters must remain individually bound.
                     "SyncJobRepository.completeActiveJob",
                     // Developer observation feed: every optional facet needs its own @Param for the

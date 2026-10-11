@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.practices.reviewoutput;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackLocation;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackQueryFilter;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.web.QueryFilterSupport;
@@ -13,9 +14,7 @@ import java.util.List;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.server.ResponseStatusException;
 
 /**
  * @param artifactKind a bare string, not an {@link ArtifactKind} — {@link QueryFilterSupport#artifactKind} has the
@@ -25,7 +24,20 @@ public record ReviewFeedbackFilterParams(
         @RequestParam(required = false) @Nullable List<FeedbackDeliveryState> deliveryState,
         @RequestParam(required = false) @Nullable List<FeedbackSuppressionReason> suppressionReason,
         @RequestParam(required = false) @Nullable List<FeedbackChannel> channel,
+
+        @Parameter(
+                description = "Where the feedback appears, by the provider that shows it (repeatable): a channel split"
+                        + " where the provider is known")
+        @RequestParam(required = false)
+        @Nullable
+        List<FeedbackLocation> location,
+
         @RequestParam(required = false) @Nullable UUID agentJobId,
+
+        @Parameter(description = "Keep the feedback written from this observation")
+        @RequestParam(required = false)
+        @Nullable
+        UUID observationId,
 
         @Parameter(description = "Kind of reviewed work, e.g. scm.pull_request")
         @RequestParam(required = false)
@@ -47,6 +59,13 @@ public record ReviewFeedbackFilterParams(
         @Nullable
         List<String> practiceSlug,
 
+        @Parameter(
+                description = "Practice groups whose feedback to list (repeatable): feedback bound to an observation"
+                        + " of a practice in any of them")
+        @RequestParam(required = false)
+        @Nullable
+        List<String> groupSlug,
+
         @Parameter(description = "Inclusive lower bound")
         @RequestParam(required = false)
         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
@@ -59,24 +78,21 @@ public record ReviewFeedbackFilterParams(
         @Nullable
         Instant to) {
     public FeedbackQueryFilter toFilter() {
-        if (artifactId != null && artifactKind == null) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST, "Choose a kind of work before you filter by one item.");
-        }
         ArtifactKind kind = QueryFilterSupport.artifactKind(artifactKind);
-        if (from != null && to != null && from.isAfter(to)) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST, "The start of the range must not be after its end.");
-        }
+        QueryFilterSupport.requireKindForItem(kind, artifactId);
+        QueryFilterSupport.requireWindow(from, to);
         return new FeedbackQueryFilter(
                 deliveryState,
                 suppressionReason,
                 channel,
+                location,
                 agentJobId,
+                observationId,
                 kind,
                 artifactId,
                 recipientUserId,
                 practiceSlug,
+                groupSlug,
                 from,
                 to);
     }

@@ -40,6 +40,7 @@ public interface MentorContextQueryRepository extends JpaRepository<User, Long> 
             COALESCE((SELECT COUNT(p1)
                 FROM PullRequest p1
                 JOIN RepositoryToMonitor rtm1 ON rtm1.nameWithOwner = p1.repository.nameWithOwner
+                    AND monitor_covers_repository(rtm1.workspace.id, rtm1.nativeId, p1.repository.nativeId, p1.repository.provider.id) = true
                 WHERE p1.author.id = :userId
                   AND p1.deletedAt IS NULL
                   AND rtm1.workspace.id = :workspaceId
@@ -47,6 +48,7 @@ public interface MentorContextQueryRepository extends JpaRepository<User, Long> 
             COALESCE((SELECT COUNT(p2)
                 FROM PullRequest p2
                 JOIN RepositoryToMonitor rtm2 ON rtm2.nameWithOwner = p2.repository.nameWithOwner
+                    AND monitor_covers_repository(rtm2.workspace.id, rtm2.nativeId, p2.repository.nativeId, p2.repository.provider.id) = true
                 WHERE p2.author.id = :userId
                   AND p2.deletedAt IS NULL
                   AND rtm2.workspace.id = :workspaceId
@@ -56,6 +58,7 @@ public interface MentorContextQueryRepository extends JpaRepository<User, Long> 
             COALESCE((SELECT COUNT(p3)
                 FROM PullRequest p3
                 JOIN RepositoryToMonitor rtm3 ON rtm3.nameWithOwner = p3.repository.nameWithOwner
+                    AND monitor_covers_repository(rtm3.workspace.id, rtm3.nativeId, p3.repository.nativeId, p3.repository.provider.id) = true
                 WHERE p3.author.id = :userId
                   AND p3.deletedAt IS NULL
                   AND rtm3.workspace.id = :workspaceId
@@ -65,6 +68,7 @@ public interface MentorContextQueryRepository extends JpaRepository<User, Long> 
             COALESCE((SELECT COUNT(i)
                 FROM Issue i
                 JOIN RepositoryToMonitor rtmi ON rtmi.nameWithOwner = i.repository.nameWithOwner
+                    AND monitor_covers_repository(rtmi.workspace.id, rtmi.nativeId, i.repository.nativeId, i.repository.provider.id) = true
                 WHERE TYPE(i) = Issue
                   AND i.author.id = :userId
                   AND i.deletedAt IS NULL
@@ -73,6 +77,7 @@ public interface MentorContextQueryRepository extends JpaRepository<User, Long> 
             COALESCE((SELECT COUNT(r1)
                 FROM PullRequestReview r1
                 JOIN RepositoryToMonitor rtmr1 ON rtmr1.nameWithOwner = r1.pullRequest.repository.nameWithOwner
+                    AND monitor_covers_repository(rtmr1.workspace.id, rtmr1.nativeId, r1.pullRequest.repository.nativeId, r1.pullRequest.repository.provider.id) = true
                 WHERE r1.author.id = :userId
                   AND r1.pullRequest.deletedAt IS NULL
                   AND rtmr1.workspace.id = :workspaceId
@@ -81,6 +86,7 @@ public interface MentorContextQueryRepository extends JpaRepository<User, Long> 
             COALESCE((SELECT COUNT(r2)
                 FROM PullRequestReview r2
                 JOIN RepositoryToMonitor rtmr2 ON rtmr2.nameWithOwner = r2.pullRequest.repository.nameWithOwner
+                    AND monitor_covers_repository(rtmr2.workspace.id, rtmr2.nativeId, r2.pullRequest.repository.nativeId, r2.pullRequest.repository.provider.id) = true
                 WHERE r2.author.id = :userId
                   AND r2.pullRequest.deletedAt IS NULL
                   AND rtmr2.workspace.id = :workspaceId
@@ -89,6 +95,7 @@ public interface MentorContextQueryRepository extends JpaRepository<User, Long> 
             COALESCE((SELECT COUNT(r3)
                 FROM PullRequestReview r3
                 JOIN RepositoryToMonitor rtmr3 ON rtmr3.nameWithOwner = r3.pullRequest.repository.nameWithOwner
+                    AND monitor_covers_repository(rtmr3.workspace.id, rtmr3.nativeId, r3.pullRequest.repository.nativeId, r3.pullRequest.repository.provider.id) = true
                 WHERE r3.pullRequest.author.id = :userId
                   AND r3.pullRequest.deletedAt IS NULL
                   AND rtmr3.workspace.id = :workspaceId
@@ -97,6 +104,7 @@ public interface MentorContextQueryRepository extends JpaRepository<User, Long> 
             COALESCE((SELECT COUNT(work)
                 FROM PullRequest work
                 JOIN RepositoryToMonitor rtmpr ON rtmpr.nameWithOwner = work.repository.nameWithOwner
+                    AND monitor_covers_repository(rtmpr.workspace.id, rtmpr.nativeId, work.repository.nativeId, work.repository.provider.id) = true
                 JOIN work.requestedReviewers request
                 WHERE request.user.id = :userId
                   AND work.deletedAt IS NULL
@@ -109,6 +117,7 @@ public interface MentorContextQueryRepository extends JpaRepository<User, Long> 
             COALESCE((SELECT COUNT(t)
                 FROM PullRequestReviewThread t
                 JOIN RepositoryToMonitor rtmt ON rtmt.nameWithOwner = t.pullRequest.repository.nameWithOwner
+                    AND monitor_covers_repository(rtmt.workspace.id, rtmt.nativeId, t.pullRequest.repository.nativeId, t.pullRequest.repository.provider.id) = true
                 WHERE t.pullRequest.author.id = :userId
                   AND t.pullRequest.deletedAt IS NULL
                   AND rtmt.workspace.id = :workspaceId
@@ -137,6 +146,7 @@ public interface MentorContextQueryRepository extends JpaRepository<User, Long> 
         SELECT i
         FROM Issue i
         JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = i.repository.nameWithOwner
+            AND monitor_covers_repository(rtm.workspace.id, rtm.nativeId, i.repository.nativeId, i.repository.provider.id) = true
         JOIN i.assignees a
         LEFT JOIN FETCH i.repository
         LEFT JOIN FETCH i.milestone
@@ -158,6 +168,7 @@ public interface MentorContextQueryRepository extends JpaRepository<User, Long> 
         SELECT work
         FROM PullRequest work
         JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = work.repository.nameWithOwner
+            AND monitor_covers_repository(rtm.workspace.id, rtm.nativeId, work.repository.nativeId, work.repository.provider.id) = true
         JOIN work.requestedReviewers request
         LEFT JOIN FETCH work.author
         LEFT JOIN FETCH work.repository
@@ -224,6 +235,7 @@ public interface MentorContextQueryRepository extends JpaRepository<User, Long> 
         SELECT prr
         FROM PullRequestReview prr
         JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = prr.pullRequest.repository.nameWithOwner
+            AND monitor_covers_repository(rtm.workspace.id, rtm.nativeId, prr.pullRequest.repository.nativeId, prr.pullRequest.repository.provider.id) = true
         LEFT JOIN FETCH prr.author
         LEFT JOIN FETCH prr.pullRequest
         WHERE prr.pullRequest.author.id = :userId
@@ -248,6 +260,7 @@ public interface MentorContextQueryRepository extends JpaRepository<User, Long> 
         SELECT p
         FROM PullRequest p
         JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = p.repository.nameWithOwner
+            AND monitor_covers_repository(rtm.workspace.id, rtm.nativeId, p.repository.nativeId, p.repository.provider.id) = true
         WHERE p.author.id = :userId
           AND p.deletedAt IS NULL
           AND rtm.workspace.id = :workspaceId
@@ -262,6 +275,7 @@ public interface MentorContextQueryRepository extends JpaRepository<User, Long> 
         FROM PullRequest p
         JOIN p.repository r
         JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = r.nameWithOwner
+            AND monitor_covers_repository(rtm.workspace.id, rtm.nativeId, r.nativeId, r.provider.id) = true
         WHERE p.id IN :ids
           AND p.deletedAt IS NULL
           AND rtm.workspace.id = :workspaceId
@@ -278,6 +292,7 @@ public interface MentorContextQueryRepository extends JpaRepository<User, Long> 
         FROM Issue i
         JOIN i.repository r
         JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = r.nameWithOwner
+            AND monitor_covers_repository(rtm.workspace.id, rtm.nativeId, r.nativeId, r.provider.id) = true
         WHERE TYPE(i) = Issue
           AND i.id IN :ids
           AND i.deletedAt IS NULL
@@ -312,6 +327,7 @@ public interface MentorContextQueryRepository extends JpaRepository<User, Long> 
         FROM PullRequest p
         JOIN p.repository r
         JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = r.nameWithOwner
+            AND monitor_covers_repository(rtm.workspace.id, rtm.nativeId, r.nativeId, r.provider.id) = true
         WHERE p.author.id = :userId
           AND p.deletedAt IS NULL
           AND p.state = de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue.State.OPEN
@@ -335,6 +351,7 @@ public interface MentorContextQueryRepository extends JpaRepository<User, Long> 
         FROM PullRequest p
         JOIN p.repository r
         JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = r.nameWithOwner
+            AND monitor_covers_repository(rtm.workspace.id, rtm.nativeId, r.nativeId, r.provider.id) = true
         WHERE p.id = :pullRequestId
           AND p.author.id = :userId
           AND p.deletedAt IS NULL
@@ -359,6 +376,7 @@ public interface MentorContextQueryRepository extends JpaRepository<User, Long> 
         FROM PullRequest p
         JOIN p.repository r
         JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = r.nameWithOwner
+            AND monitor_covers_repository(rtm.workspace.id, rtm.nativeId, r.nativeId, r.provider.id) = true
         JOIN p.closingIssues i
         WHERE p.id = :pullRequestId
           AND p.author.id = :userId
@@ -415,6 +433,7 @@ public interface MentorContextQueryRepository extends JpaRepository<User, Long> 
         SELECT i
         FROM Issue i
         JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = i.repository.nameWithOwner
+            AND monitor_covers_repository(rtm.workspace.id, rtm.nativeId, i.repository.nativeId, i.repository.provider.id) = true
         WHERE i.author.id = :userId
           AND i.deletedAt IS NULL
           AND rtm.workspace.id = :workspaceId

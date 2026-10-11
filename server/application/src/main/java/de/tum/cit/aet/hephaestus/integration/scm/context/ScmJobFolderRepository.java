@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.context;
 
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.MonitoredRepositoryScope;
 import jakarta.persistence.QueryHint;
 import java.util.stream.Stream;
 import org.hibernate.jpa.HibernateHints;
@@ -16,9 +17,11 @@ import org.springframework.data.repository.query.Param;
  */
 interface ScmJobFolderRepository extends Repository<Issue, Long> {
 
-    String MONITORED_BY_WORKSPACE = """
-         AND EXISTS (SELECT 1 FROM repository_to_monitor m JOIN repository r ON r.name_with_owner = m.name_with_owner
-                     WHERE m.workspace_id = :workspaceId AND r.id = i.repository_id)
+    String MONITORED_BY_WORKSPACE = "\n" + """
+         AND EXISTS (SELECT 1 FROM repository_to_monitor rtm JOIN repository r ON r.name_with_owner = rtm.name_with_owner
+                     AND\s""" + MonitoredRepositoryScope.NATIVE_RTM_R + """
+
+                     WHERE rtm.workspace_id = :workspaceId AND r.id = i.repository_id)
         """;
 
     String COMMENT = "(to_jsonb(c) || jsonb_build_object('synced_at', NULL))::text";
@@ -89,8 +92,10 @@ interface ScmJobFolderRepository extends Repository<Issue, Long> {
               'repository_id', r.id, 'provider_id', r.provider_id)::text
             FROM issue i JOIN repository r ON r.id = i.repository_id
             WHERE i.repository_id = :repositoryId AND i.issue_type = :issueType AND i.deleted_at IS NULL
-              AND EXISTS (SELECT 1 FROM repository_to_monitor m
-                          WHERE m.workspace_id = :workspaceId AND m.name_with_owner = r.name_with_owner)
+              AND EXISTS (SELECT 1 FROM repository_to_monitor rtm
+                          WHERE rtm.workspace_id = :workspaceId AND rtm.name_with_owner = r.name_with_owner
+                            AND\s""" + MonitoredRepositoryScope.NATIVE_RTM_R + """
+            )
             ORDER BY i.number
             """, nativeQuery = true)
     @QueryHints(@QueryHint(name = HibernateHints.HINT_FETCH_SIZE, value = "256"))

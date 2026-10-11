@@ -310,6 +310,13 @@ public interface ArtifactSignalRepository extends JpaRepository<ArtifactSignal, 
     /**
      * One row per artifact this workspace was in a position to say something about — including,
      * deliberately, the ones it said nothing about, which no job-derived listing can show.
+     *
+     * <p>The {@link SignalledArtifactFilter}'s {@code from} and {@code to} keep the signals that occurred in the half-open window {@code [from, to)}, the
+     * convention of the review, observation and feedback listings. Thus, a row and its counts then describe that
+     * window alone. A null bound drops out of the predicate.
+     *
+     * <p>{@code withoutReview} keeps only the artifacts none of whose signals in that window started a review: the
+     * work somebody expected a review on and did not get one.
      */
     @Query(
             value =
@@ -318,15 +325,65 @@ public interface ArtifactSignalRepository extends JpaRepository<ArtifactSignal, 
                             + " SUM(CASE WHEN s.state = de.tum.cit.aet.hephaestus.integration.core.signal.SignalState.TRIGGERED"
                             + " THEN 1 ELSE 0 END) AS reviewedSignalCount"
                             + " FROM ArtifactSignal s WHERE s.workspace.id = :workspaceId"
-                            + " AND (:artifactKind IS NULL OR s.artifactKind = :artifactKind)"
+                            + SIGNALLED_ARTIFACT_FILTER
                             + " GROUP BY s.artifactKind, s.artifactId ORDER BY MAX(s.occurredAt) DESC, s.artifactId DESC, s.artifactKind DESC",
-            countQuery =
-                    "SELECT COUNT(DISTINCT CONCAT(s.artifactKind, ':', s.artifactId)) FROM ArtifactSignal s"
-                            + " WHERE s.workspace.id = :workspaceId AND (:artifactKind IS NULL OR s.artifactKind = :artifactKind)")
+            countQuery = "SELECT COUNT(DISTINCT CONCAT(s.artifactKind, ':', s.artifactId)) FROM ArtifactSignal s"
+                    + " WHERE s.workspace.id = :workspaceId"
+                    + SIGNALLED_ARTIFACT_FILTER)
     Page<SignalledArtifactRow> findSignalledArtifacts(
             @Param("workspaceId") Long workspaceId,
             @Param("artifactKind") @Nullable String artifactKind,
+            @Param("artifactId") @Nullable Long artifactId,
+            @Param("from") @Nullable Instant from,
+            @Param("to") @Nullable Instant to,
+            @Param("withoutReview") boolean withoutReview,
             Pageable pageable);
+
+    /** {@link #findSignalledArtifacts} for a {@link SignalledArtifactFilter}. */
+    default Page<SignalledArtifactRow> findSignalledArtifacts(SignalledArtifactFilter filter, Pageable pageable) {
+        return findSignalledArtifacts(
+                filter.workspaceId(),
+                filter.artifactKind(),
+                filter.artifactId(),
+                filter.from(),
+                filter.to(),
+                filter.withoutReview(),
+                pageable);
+    }
+
+    String SIGNALLED_ARTIFACT_FILTER = " AND (:artifactKind IS NULL OR s.artifactKind = :artifactKind)"
+            + " AND (CAST(:artifactId AS Long) IS NULL OR s.artifactId = :artifactId)"
+            + " AND (CAST(:from AS Instant) IS NULL OR s.occurredAt >= :from)"
+            + " AND (CAST(:to AS Instant) IS NULL OR s.occurredAt < :to)"
+            + " AND (:withoutReview = false OR NOT EXISTS (SELECT t.id FROM ArtifactSignal t"
+            + " WHERE t.workspace.id = :workspaceId AND t.artifactKind = s.artifactKind"
+            + " AND t.artifactId = s.artifactId"
+            + " AND t.state = de.tum.cit.aet.hephaestus.integration.core.signal.SignalState.TRIGGERED"
+            + " AND (CAST(:from AS Instant) IS NULL OR t.occurredAt >= :from)"
+            + " AND (CAST(:to AS Instant) IS NULL OR t.occurredAt < :to)))";
+
+    /**
+     * The latest signal on each of these artifacts of one kind inside the half-open window {@code [from, to)}, the
+     * window {@link #findSignalledArtifacts} counts by, for the latest moment on each row of its page: one round trip
+     * per kind on the page, not one per row, and one row per artifact however long its history. A null bound drops
+     * out. Ties on the time go to the later signal name, then the later id.
+     */
+    @Query(value = """
+        SELECT DISTINCT ON (s.artifact_id) s.*
+        FROM artifact_signal s
+        WHERE s.workspace_id = :workspaceId
+          AND s.artifact_kind = :artifactKind
+          AND s.artifact_id IN (:artifactIds)
+          AND (CAST(:from AS timestamptz) IS NULL OR s.occurred_at >= CAST(:from AS timestamptz))
+          AND (CAST(:to AS timestamptz) IS NULL OR s.occurred_at < CAST(:to AS timestamptz))
+        ORDER BY s.artifact_id, s.occurred_at DESC, s.signal_name DESC, s.id DESC
+        """, nativeQuery = true)
+    List<ArtifactSignal> findLatestForArtifacts(
+            @Param("workspaceId") Long workspaceId,
+            @Param("artifactKind") String artifactKind,
+            @Param("artifactIds") Collection<Long> artifactIds,
+            @Param("from") @Nullable Instant from,
+            @Param("to") @Nullable Instant to);
 
     /**
      * Evidence against a dormancy claim, which is otherwise derived from which integrations are

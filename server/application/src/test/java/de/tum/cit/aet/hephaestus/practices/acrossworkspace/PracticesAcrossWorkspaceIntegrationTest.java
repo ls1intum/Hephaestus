@@ -308,6 +308,23 @@ class PracticesAcrossWorkspaceIntegrationTest extends AbstractPracticeReviewInte
     }
 
     @Test
+    @DisplayName("a group with no practices, or with every practice switched off, is left off the page")
+    void shouldLeaveOutAGroupWithoutAPracticeReviewIsAdmittedFor() {
+        group(workspace, "empty-group", "Empty");
+        Practice switchedOff =
+                persistPractice(workspace, group(workspace, "off-group", "Off"), "off", "Switched off", null);
+        // The reader's standing on it stays theirs, but the workspace no longer reviews it.
+        strength(switchedOff, reader, NEWEST);
+        switchedOff.setAutonomy(PracticeAutonomy.OFF);
+        practiceRepository.saveAndFlush(switchedOff);
+
+        assertThat(readAs(reader).groups())
+                .extracting(WorkspaceGroupSplitDTO::groupSlug)
+                .doesNotContain("empty-group", "off-group")
+                .contains("review-ready-work", "testing-discipline", "actionable-issues", "code-craftsmanship");
+    }
+
+    @Test
     @WithUser
     @DisplayName("open feedback counts what the reader's profile shows open, and reading it delivers nothing")
     void shouldCountOpenFeedbackByTheProfilesRuleWithoutDeliveringIt() {

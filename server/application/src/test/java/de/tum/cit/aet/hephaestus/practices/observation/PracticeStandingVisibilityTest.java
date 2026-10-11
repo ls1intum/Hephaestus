@@ -24,6 +24,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.CurrentDeveloperLookup;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -68,9 +69,14 @@ class PracticeStandingVisibilityTest extends BaseUnitTest {
 
     private PracticeStandingService practiceStandingService;
 
+    private final List<Practice> workspacePractices = new ArrayList<>();
+
     @BeforeEach
     void setUp() {
         when(clock.instant()).thenReturn(NOW);
+        lenient()
+                .when(practiceRepository.findByWorkspaceId(WORKSPACE_ID))
+                .thenAnswer(invocation -> List.copyOf(workspacePractices));
         lenient()
                 .when(workspaceReviewDefaultsProvider.forWorkspace(WORKSPACE_ID))
                 .thenReturn(WorkspaceReviewDefaults.UNSET);
@@ -111,8 +117,10 @@ class PracticeStandingVisibilityTest extends BaseUnitTest {
                 .build();
     }
 
-    private static Practice practice(String slug) {
+    /** A practice of the workspace: the standings list only practices the workspace still reviews. */
+    private Practice practice(String slug) {
         Practice practice = new Practice();
+        workspacePractices.add(practice);
         practice.setSlug(slug);
         practice.setName("Handling failure robustly");
         practice.setCriteria("ordinary criteria");
@@ -142,7 +150,37 @@ class PracticeStandingVisibilityTest extends BaseUnitTest {
                 WORKSPACE_ID, USER_ID, List.of(earlier.getObservedAt(), NOW));
 
         assertThat(snapshots.get(0).practices()).containsKey(practice.getSlug());
-        assertThat(snapshots.get(1).practices()).isEmpty();
+        // The workspace still reviews the practice, so it is listed, but the invisible claim says nothing.
+        assertThat(snapshots.get(1).practices().get(practice.getSlug()))
+                .satisfies(standing -> assertThat(standing.evidence()).isEmpty());
+    }
+
+    @Test
+    @DisplayName("work the visibility policy withholds is not counted as reviewed work either")
+    void countsOnlyTheReviewedWorkTheVisibilityPolicyAdmits() {
+        Practice practice = practice("robust-error-handling");
+        Observation shown = bad(practice, Severity.MAJOR);
+        Observation withheld = Observation.builder()
+                .id(UUID.randomUUID())
+                .practice(practice)
+                .artifactKind(ArtifactKinds.PULL_REQUEST)
+                .artifactId(43L)
+                .observedAt(NOW.minusSeconds(60))
+                .agentJobId(new UUID(0L, 43L))
+                .summary("A claim the developer may not be shown")
+                .outcome(Outcome.MET)
+                .build();
+        feeds(shown, withheld);
+        when(visibilityPolicy.permitsAll(
+                        WORKSPACE_ID, List.of(shown, withheld), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
+                .thenReturn(Set.of(shown.getId()));
+
+        assertThat(standings()).singleElement().satisfies(standing -> {
+            assertThat(standing.toWorkOn()).hasSize(1);
+            assertThat(standing.trendSupport()).isNotNull();
+            assertThat(standing.trendSupport().reviewedWork()).isEqualTo(1);
+            assertThat(standing.trendSupport().standingWork()).isEqualTo(1);
+        });
     }
 
     @Test
@@ -156,17 +194,17 @@ class PracticeStandingVisibilityTest extends BaseUnitTest {
                         WORKSPACE_ID, List.of(observation), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
                 .thenReturn(Set.of());
 
-        assertThat(standings()).isEmpty();
+        assertThat(standings()).singleElement().satisfies(standing -> {
+            assertThat(standing.standing()).isEqualTo(PracticeStandingDTO.Standing.NOT_OBSERVED);
+            assertThat(standing.toWorkOn()).isEmpty();
+        });
         verifyNoInteractions(feedbackObservationRepository);
     }
 
     @Test
     @DisplayName("a BAD observation with null severity does not NPE the sort and ranks after a graded one")
     void nullSeverityDoesNotBreakStandingSort() {
-        Practice practice = new Practice();
-        practice.setSlug("robust-error-handling");
-        practice.setName("Handling failure robustly");
-        practice.setCriteria("ordinary criteria");
+        Practice practice = practice("robust-error-handling");
 
         when(observationRepository.findByDeveloperAndWorkspaceBetween(
                         eq(USER_ID), eq(WORKSPACE_ID), any(Instant.class), any(Instant.class)))

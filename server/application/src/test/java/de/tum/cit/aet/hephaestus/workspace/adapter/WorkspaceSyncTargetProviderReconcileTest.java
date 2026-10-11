@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.consumer.IntegrationNatsConsumer;
 import de.tum.cit.aet.hephaestus.integration.core.consumer.NatsConnectionProperties;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
@@ -74,7 +75,8 @@ class WorkspaceSyncTargetProviderReconcileTest extends BaseUnitTest {
                 connectionService,
                 new NatsConnectionProperties(true, "nats://localhost:4222", null, null),
                 natsConsumerService,
-                mock(PracticeReviewRepositoryTargetRepository.class));
+                mock(PracticeReviewRepositoryTargetRepository.class),
+                mock(RepositoryRepository.class));
     }
 
     private RepositoryToMonitor monitor(@Nullable Long nativeId, String nameWithOwner) {

@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.reviewoutput.dto;
 
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackLocation;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository.OperatorFeedbackRow;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewedWorkRefDTO;
@@ -27,6 +28,13 @@ public record ReviewFeedbackDTO(
         ReviewSubjectDTO subject,
 
         @NonNull FeedbackChannel channel,
+
+        @NonNull
+        @Schema(
+                description = "Where the feedback appears, by the provider that shows it: the channel split where the"
+                        + " provider is known")
+        FeedbackLocation location,
+
         @NonNull FeedbackDeliveryState deliveryState,
 
         @Schema(description = "Why delivery stopped; set on withheld or terminally partial feedback") @Nullable
@@ -57,6 +65,7 @@ public record ReviewFeedbackDTO(
                 subjects.get(row.getRecipientUserId()),
                 subjects.get(row.getAboutUserId()),
                 row.getChannel(),
+                row.getLocation(),
                 row.getDeliveryState(),
                 row.getSuppressionReason(),
                 row.getReplacesId(),

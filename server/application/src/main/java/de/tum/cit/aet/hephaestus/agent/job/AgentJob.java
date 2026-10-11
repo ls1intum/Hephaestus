@@ -197,6 +197,14 @@ public class AgentJob {
     public static final String HOLD_REASON_BUDGET = "BUDGET";
 
     /**
+     * The hold a job reports: its {@code holdReason} while it still waits, null otherwise. The executor clears a
+     * hold only when it claims the job, so a job cancelled while held keeps the marker in the table.
+     */
+    public static @Nullable String holdWhileQueued(AgentJobStatus status, @Nullable String holdReason) {
+        return status == AgentJobStatus.QUEUED ? holdReason : null;
+    }
+
+    /**
      * Why this QUEUED job's {@link #availableAt} was pushed into the future, when the reason is one an
      * admin can undo. It exists so raising a cap can release exactly those jobs
      * ({@link AgentJobRepository#releaseBudgetHolds}) without also fast-forwarding a crash-retry backoff

@@ -31,4 +31,10 @@ public record TracedArtifactDTO(
         Integer signalCount,
 
         @NonNull @Schema(description = "How many of them started a review")
-        Integer reviewedSignalCount) {}
+        Integer reviewedSignalCount,
+
+        @NonNull
+        @Schema(
+                description = "The latest of them: what happened, how we came to know, and why it started no "
+                        + "review when it did not")
+        TracedSignalDTO lastSignal) {}

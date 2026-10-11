@@ -1005,7 +1005,26 @@ function toFeedback(run: RunSpec, spec: FeedbackSpec): ReviewFeedback {
 		replacesId: spec.replaces,
 		subject: run.developer,
 		suppressionReason: spec.withheldFor,
+		location: locationOf(run, spec),
 	};
+}
+
+/** The location the server derives: the channel, split by the work's provider. */
+function locationOf(run: RunSpec, spec: FeedbackSpec): ReviewFeedback["location"] {
+	switch (spec.channel) {
+		case "IN_APP": {
+			return "PRACTICE_PAGES";
+		}
+		case "IN_CONTEXT": {
+			const { provider } = run.work.reviewedWork;
+			return provider === "GITHUB" || provider === "GITLAB" ? provider : "OTHER_WORK";
+		}
+		case "IN_CHAT": {
+			return spec.outcome === "DELIVERED" || spec.outcome === "UNCONFIRMED"
+				? "HEPH"
+				: "NEXT_CONVERSATION";
+		}
+	}
 }
 
 /** Newest first, as the list endpoint returns them. */
@@ -1034,8 +1053,52 @@ export const reviewRuns: ReviewRunSummary[] = allRuns
 			undetermined: run.observations.filter((o) => o.outcome === "UNDETERMINED").length,
 		},
 		feedback: feedbackCounts(run.feedback.map((f) => f.outcome)),
+		developers: [run.developer],
+		...practiceVerdicts(run),
+		finishedAfterMerge: false,
+		finishedAfterMergeStartedByMerge: false,
 	}))
 	.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+/**
+ * One verdict per practice, as the server tallies a run: any not met outweighs a met, and a
+ * practice whose every observation did not apply did not apply. A finished run reached every
+ * practice it observed.
+ */
+function practiceVerdicts(
+	run: RunSpec,
+): Pick<ReviewRunSummary, "practices" | "slippedPractices" | "practicesEvaluated"> {
+	const bySlug = new Map<string, ObservationSpec[]>();
+	for (const observation of run.observations) {
+		bySlug.set(observation.practiceSlug, [
+			...(bySlug.get(observation.practiceSlug) ?? []),
+			observation,
+		]);
+	}
+	const practices = { notMet: 0, met: 0, notApplicable: 0, undetermined: 0 };
+	const slippedPractices: ReviewRunSummary["slippedPractices"] = [];
+	for (const [practiceSlug, observed] of bySlug) {
+		const outcomes = observed.map((observation) => observation.outcome);
+		if (outcomes.includes("NOT_MET")) {
+			practices.notMet += 1;
+			const practiceName =
+				workspacePractices.find((practice) => practice.slug === practiceSlug)?.name ?? practiceSlug;
+			slippedPractices.push({ practiceSlug, practiceName });
+		} else if (outcomes.includes("MET")) {
+			practices.met += 1;
+		} else if (outcomes.every((outcome) => outcome === "NOT_APPLICABLE")) {
+			practices.notApplicable += 1;
+		} else {
+			practices.undetermined += 1;
+		}
+	}
+	slippedPractices.sort((a, b) => a.practiceName.localeCompare(b.practiceName));
+	return {
+		practices,
+		slippedPractices,
+		practicesEvaluated: run.status === "COMPLETED" ? bySlug.size : undefined,
+	};
+}
 
 const JOB_TYPE_BY_ARTIFACT: Record<KnownArtifactKind, AgentJob["jobType"]> = {
 	[ARTIFACT_KIND.pullRequest]: "PULL_REQUEST_REVIEW",
@@ -1190,6 +1253,8 @@ export function feedbackDetail(feedbackId: string): ReviewFeedbackDetail {
 		suppressionReason: item.withheldFor,
 		deliveryPolicy: [],
 		withdrawals: [],
+		dispatches: [],
+		location: locationOf(run, item),
 	};
 }
 

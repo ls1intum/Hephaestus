@@ -1,8 +1,12 @@
 package de.tum.cit.aet.hephaestus.practices.observation.trend;
 
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
+import de.tum.cit.aet.hephaestus.practices.observation.ReviewedWorkKey;
 import java.time.Instant;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Pure opportunity-indexed Bayesian trend calculator for one practice.
@@ -24,9 +28,14 @@ final class PracticeTrendCalculator {
         OpportunityBundler.Bundles bundles =
                 OpportunityBundler.bundle(observations, cutoff, properties.getBundleSize());
         int missing = bundles.opportunitiesUntilComparable(properties.getBundleSize(), properties.getMinBundleSize());
+        // Counted before the cap: the cap shortens a chart, not the work a reader is told was reviewed.
+        Set<ReviewedWorkKey> reviewedWork = bundles.trail().stream()
+                .filter(EvidenceOpportunity::decided)
+                .map(EvidenceOpportunity::key)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
         List<EvidenceOpportunity> trail = OpportunityBundler.cappedTrail(bundles.trail(), properties.getBundleSize());
         TrendSupport support = TrendSupportFactory.forPractice(
-                properties, bundles.current().size(), bundles.previous().size(), missing, trail);
+                properties, bundles.current().size(), bundles.previous().size(), missing, reviewedWork, trail);
         if (missing > 0) {
             return new PracticeTrend(
                     practiceSlug,
@@ -36,6 +45,7 @@ final class PracticeTrendCalculator {
                     null,
                     null,
                     trail,
+                    reviewedWork,
                     null);
         }
 
@@ -51,6 +61,7 @@ final class PracticeTrendCalculator {
                 outcomes(bundles.current()),
                 outcomes(bundles.previous()),
                 trail,
+                reviewedWork,
                 difference);
     }
 

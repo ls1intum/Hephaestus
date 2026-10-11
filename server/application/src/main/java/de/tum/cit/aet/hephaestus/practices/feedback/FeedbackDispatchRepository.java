@@ -18,6 +18,25 @@ public interface FeedbackDispatchRepository extends JpaRepository<FeedbackDispat
 
     Optional<FeedbackDispatch> findByIdAndWorkspaceId(UUID id, Long workspaceId);
 
+    /** The packages a review posted without approval, oldest first; one per review in practice. */
+    @Query("""
+            SELECT dispatch FROM FeedbackDispatch dispatch
+            WHERE dispatch.workspaceId = :workspaceId AND dispatch.agentJobId = :agentJobId
+              AND dispatch.feedbackId IS NULL
+            ORDER BY dispatch.createdAt, dispatch.id
+            """)
+    List<FeedbackDispatch> findReviewPackages(
+            @Param("workspaceId") Long workspaceId, @Param("agentJobId") UUID agentJobId);
+
+    /** The packages of one approved proposal, oldest first; one per proposal in practice. */
+    @Query("""
+            SELECT dispatch FROM FeedbackDispatch dispatch
+            WHERE dispatch.workspaceId = :workspaceId AND dispatch.feedbackId = :feedbackId
+            ORDER BY dispatch.createdAt, dispatch.id
+            """)
+    List<FeedbackDispatch> findApprovedPackages(
+            @Param("workspaceId") Long workspaceId, @Param("feedbackId") UUID feedbackId);
+
     @Modifying
     @Query(value = """
         INSERT INTO feedback_dispatch (

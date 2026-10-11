@@ -14,6 +14,14 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UUID> {
+    /** Every attempt one source recorded in a workspace, first attempt first. */
+    @Query("SELECT e FROM LlmUsageEvent e WHERE e.workspace.id = :workspaceId AND e.sourceType = :sourceType"
+            + " AND e.sourceId = :sourceId ORDER BY e.sourceAttempt")
+    List<LlmUsageEvent> findByWorkspaceIdAndSourceTypeAndSourceIdOrderBySourceAttemptAsc(
+            @Param("workspaceId") Long workspaceId,
+            @Param("sourceType") LlmUsageSourceType sourceType,
+            @Param("sourceId") UUID sourceId);
+
     /** One retention batch. {@code occurred_at} is indexed on its own so this never scans the ledger. */
     @WorkspaceAgnostic("Retention removes expired usage rows across all workspaces")
     @Modifying(flushAutomatically = true, clearAutomatically = true)

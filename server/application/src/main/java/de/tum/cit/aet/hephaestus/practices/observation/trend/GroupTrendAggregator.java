@@ -4,9 +4,11 @@ import de.tum.cit.aet.hephaestus.practices.observation.ReviewedWorkKey;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Function;
 import org.jspecify.annotations.Nullable;
 
@@ -30,8 +32,10 @@ final class GroupTrendAggregator {
                 .filter(trend -> trend.difference() != null)
                 .toList();
         List<EvidenceOpportunity> trail = mergedTrail(practiceTrends, properties.getBundleSize());
+        // Over every practice that joined, compared or not: each one votes in the group's standing.
+        int standingWork = distinctOpportunityCount(practiceTrends, TrendBundle.CURRENT);
+        Set<ReviewedWorkKey> reviewedWork = reviewedWork(practiceTrends);
         if (comparable.isEmpty()) {
-            int current = distinctOpportunityCount(practiceTrends, TrendBundle.CURRENT);
             int previous = distinctOpportunityCount(practiceTrends, TrendBundle.PREVIOUS);
             int missing = practiceTrends.stream()
                     .mapToInt(trend -> trend.support().opportunitiesUntilComparable())
@@ -43,16 +47,19 @@ final class GroupTrendAggregator {
                     TrendDirection.INSUFFICIENT_EVIDENCE,
                     TrendSupportFactory.forGroup(
                             properties,
-                            current,
+                            standingWork,
                             previous,
                             distinctComparedOpportunities(practiceTrends),
                             missing,
+                            standingWork,
+                            reviewedWork,
                             0,
                             eligiblePracticeSlugs.size(),
                             trail),
                     null,
                     null,
                     trail,
+                    reviewedWork,
                     null);
         }
 
@@ -69,12 +76,15 @@ final class GroupTrendAggregator {
                         distinctOpportunityCount(comparable, TrendBundle.PREVIOUS),
                         distinctComparedOpportunities(comparable),
                         0,
+                        standingWork,
+                        reviewedWork,
                         comparable.size(),
                         eligiblePracticeSlugs.size(),
                         trail),
                 summed(comparable, PracticeTrend::currentOutcomes),
                 summed(comparable, PracticeTrend::previousOutcomes),
                 trail,
+                reviewedWork,
                 null);
     }
 
@@ -172,6 +182,13 @@ final class GroupTrendAggregator {
                 .map(EvidenceOpportunity::key)
                 .distinct()
                 .count();
+    }
+
+    /** Every piece of work any of the practices reached a verdict on, once however many practices did. */
+    private static Set<ReviewedWorkKey> reviewedWork(Collection<PracticeTrend> trends) {
+        Set<ReviewedWorkKey> work = new LinkedHashSet<>();
+        trends.forEach(trend -> work.addAll(trend.reviewedWork()));
+        return work;
     }
 
     private static int distinctOpportunityCount(Collection<PracticeTrend> trends, TrendBundle bundle) {

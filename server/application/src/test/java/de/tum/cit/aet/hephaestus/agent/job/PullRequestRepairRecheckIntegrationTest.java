@@ -1753,10 +1753,11 @@ class PullRequestRepairRecheckIntegrationTest extends AbstractPracticeReviewInte
         var summary = agentJobRepository
                 .findReviewRunSummaries(
                         workspace.getId(),
-                        AgentPurpose.PRACTICE_REVIEW,
-                        new ReviewRunFilterParams(null, null, null, null),
+                        new ReviewRunFilterParams(
+                                null, null, null, null, null, null, null, null, null, null, null, null, null),
                         null,
                         null,
+                        Instant.now(),
                         Pageable.unpaged())
                 .stream()
                 .filter(row -> row.getId().equals(older.getId()))

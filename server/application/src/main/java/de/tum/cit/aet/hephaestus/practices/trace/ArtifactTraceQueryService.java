@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactSignal;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactSignalRepository;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactSignalRepository.SignalledArtifactRow;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalledArtifactFilter;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ArtifactCatalog;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ArtifactIdentities;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ArtifactIdentity;
@@ -150,9 +151,11 @@ class ArtifactTraceQueryService {
     }
 
     @Transactional(readOnly = true)
-    public Page<TracedArtifactDTO> list(Long workspaceId, @Nullable ArtifactKind artifactKind, Pageable pageable) {
-        Page<SignalledArtifactRow> page = signals.findSignalledArtifacts(
-                workspaceId, artifactKind == null ? null : artifactKind.value(), pageable);
+    public Page<TracedArtifactDTO> list(SignalledArtifactFilter filter, Pageable pageable) {
+        Long workspaceId = filter.workspaceId();
+        Instant from = filter.from();
+        Instant to = filter.to();
+        Page<SignalledArtifactRow> page = signals.findSignalledArtifacts(filter, pageable);
         // One resolve call per kind on the page, not per row: a mixed page is at most as many round
         // trips as there are kinds, and a single-kind page is one.
         Map<ArtifactKind, List<Long>> idsByKind = new HashMap<>();
@@ -163,6 +166,13 @@ class ArtifactTraceQueryService {
         }
         Map<ArtifactKind, Map<Long, ArtifactIdentity>> resolved = new HashMap<>();
         idsByKind.forEach((kind, ids) -> resolved.put(kind, identities.resolve(workspaceId, kind, ids)));
+        Map<String, ArtifactSignal> latest = new HashMap<>();
+        idsByKind.forEach((kind, ids) -> {
+            // The latest in the row's own window, read in SQL.
+            for (ArtifactSignal signal : signals.findLatestForArtifacts(workspaceId, kind.value(), ids, from, to)) {
+                latest.put(kind.value() + ":" + signal.getArtifactId(), signal);
+            }
+        });
         return page.map(row -> {
             ArtifactKind kind = ArtifactKind.of(row.getArtifactKind());
             ArtifactIdentity identity = Objects.requireNonNull(
@@ -173,8 +183,13 @@ class ArtifactTraceQueryService {
                     ReviewedWorkLabels.ref(identity),
                     row.getLastSignalAt(),
                     Math.toIntExact(row.getSignalCount()),
-                    Math.toIntExact(row.getReviewedSignalCount()));
+                    Math.toIntExact(row.getReviewedSignalCount()),
+                    lastSignal(Objects.requireNonNull(latest.get(row.getArtifactKind() + ":" + row.getArtifactId()))));
         });
+    }
+
+    private TracedSignalDTO lastSignal(ArtifactSignal signal) {
+        return TracedSignalDTO.from(signal, artifacts.signalDisplayName(SignalName.of(signal.getSignalName())));
     }
 
     /**

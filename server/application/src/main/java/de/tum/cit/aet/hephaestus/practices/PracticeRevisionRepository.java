@@ -25,6 +25,9 @@ public interface PracticeRevisionRepository
 
     Optional<PracticeRevision> findFirstByPracticeIdOrderByRevisionNumberDesc(Long practiceId);
 
+    /** Every version of one practice, oldest first. The caller has resolved the practice in its workspace. */
+    List<PracticeRevision> findByPracticeIdOrderByRevisionNumberAsc(Long practiceId);
+
     /**
      * The first revision after {@code revisionNumber} whose review rules differ from {@code fingerprint}:
      * when the rules a past observation was measured against stopped being the ones in force. A later edit

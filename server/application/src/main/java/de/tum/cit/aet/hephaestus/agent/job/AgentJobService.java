@@ -119,6 +119,16 @@ public class AgentJobService {
                 .orElseThrow(() -> new EntityNotFoundException("AgentJob", jobId.toString()));
     }
 
+    /** When a run first posted on the work, when its feedback was first read, and when its work merged. */
+    @Transactional(readOnly = true)
+    public AgentJobDTO.ReviewMoments reviewMoments(Long workspaceId, UUID jobId) {
+        return agentJobRepository
+                .findReviewRunMoments(jobId, workspaceId)
+                .map(row -> new AgentJobDTO.ReviewMoments(
+                        row.getFirstFeedbackPostedAt(), row.getFirstFeedbackReadAt(), row.getWorkMergedAt()))
+                .orElse(AgentJobDTO.ReviewMoments.NONE);
+    }
+
     /**
      * Build a detached PR review submission request. Reads the PR's lazy associations, so it MUST be
      * called inside the caller's open session/transaction and the resulting request submitted OUTSIDE it

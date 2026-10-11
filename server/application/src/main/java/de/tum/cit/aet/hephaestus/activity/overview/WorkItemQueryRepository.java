@@ -28,6 +28,7 @@ public interface WorkItemQueryRepository extends Repository<Issue, Long> {
                 SELECT 1 FROM RepositoryToMonitor rtm
                 WHERE rtm.workspace.id = :workspaceId
                 AND rtm.nameWithOwner = work.repository.nameWithOwner
+                    AND monitor_covers_repository(rtm.workspace.id, rtm.nativeId, work.repository.nativeId, work.repository.provider.id) = true
             )
             """;
 

@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.reviewoutput.dto;
 
 import de.tum.cit.aet.hephaestus.practices.ReviewClaimCurrentness;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
+import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import de.tum.cit.aet.hephaestus.practices.model.Outcome;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.ObservationEvidenceDTO;
@@ -40,6 +41,13 @@ public record ReviewObservationDetailDTO(
         @Schema(description = "Severity band (null unless outcome is NOT_MET)") @Nullable
         Severity severity,
 
+        @NonNull
+        @Schema(
+                description = "How the review that recorded it came about: LIVE from the work itself, MANUAL"
+                        + " requested by a person, BACKFILL over work that predates the connection. A recurring sweep records"
+                        + " LIVE.")
+        ObservationOrigin origin,
+
         @Nullable ObservationEvidenceDTO evidence,
         @Nullable String evidenceRationale,
 
@@ -47,6 +55,10 @@ public record ReviewObservationDetailDTO(
         String recurrenceKey,
 
         @NonNull ReviewClaimCurrentness claimCurrentness,
+
+        @Schema(description = "When a later review of the same work superseded this observation; null while current")
+        @Nullable
+        Instant supersededAt,
 
         @NonNull
         @Schema(
@@ -87,10 +99,12 @@ public record ReviewObservationDetailDTO(
                 observation.getSummary(),
                 observation.getOutcome(),
                 observation.getSeverity(),
+                observation.getOrigin(),
                 includeEvidence ? ObservationEvidenceDTO.from(observation.getEvidence()) : null,
                 observation.getEvidenceRationale(),
                 observation.getRecurrenceKey(),
                 ReviewClaimCurrentness.of(revision, practice, observation.getSupersededAt()),
+                observation.getSupersededAt(),
                 invalidations,
                 disputes,
                 observation.getObservedAt(),

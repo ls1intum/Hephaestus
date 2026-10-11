@@ -5,12 +5,14 @@ import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.CredentialUnreadableException;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.consumer.IntegrationNatsConsumer;
 import de.tum.cit.aet.hephaestus.integration.core.consumer.NatsConnectionProperties;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncContextProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncCursorKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.SyncTargetFactory;
@@ -65,6 +67,7 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
     private final ObjectProvider<IntegrationNatsConsumer> natsConsumerService;
 
     private final PracticeReviewRepositoryTargetRepository practiceReviewRepositoryTargetRepository;
+    private final RepositoryRepository repositoryRepository;
 
     public WorkspaceSyncTargetProvider(
             WorkspaceRepository workspaceRepository,
@@ -73,7 +76,8 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
             ConnectionService connectionService,
             NatsConnectionProperties natsProperties,
             ObjectProvider<IntegrationNatsConsumer> natsConsumerService,
-            PracticeReviewRepositoryTargetRepository practiceReviewRepositoryTargetRepository) {
+            PracticeReviewRepositoryTargetRepository practiceReviewRepositoryTargetRepository,
+            RepositoryRepository repositoryRepository) {
         this.workspaceRepository = workspaceRepository;
         this.repositoryToMonitorRepository = repositoryToMonitorRepository;
         this.workspaceScopeFilter = workspaceScopeFilter;
@@ -81,6 +85,7 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
         this.natsProperties = natsProperties;
         this.natsConsumerService = natsConsumerService;
         this.practiceReviewRepositoryTargetRepository = practiceReviewRepositoryTargetRepository;
+        this.repositoryRepository = repositoryRepository;
     }
 
     private void logSkippedForUnreadableCredential(Workspace workspace, CredentialUnreadableException e) {
@@ -442,6 +447,26 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
         reconcileSyncTargetInTransaction(syncTargetId, resolvedNativeId, resolvedNameWithOwner);
     }
 
+    /**
+     * Whether the monitor's stored native id is that of a repository of its name on a provider of another kind than
+     * the workspace's SCM connection, as an id resolved by name alone once took it.
+     */
+    private boolean hasIdOfOtherProviderKind(RepositoryToMonitor rtm) {
+        if (rtm.getWorkspace() == null || rtm.getWorkspace().getId() == null) {
+            return false;
+        }
+        Optional<IntegrationKind> kind;
+        try {
+            kind = connectionService.findActiveProviderKind(rtm.getWorkspace().getId());
+        } catch (IllegalStateException e) {
+            return false;
+        }
+        return kind.map(IdentityProviderType::from)
+                .map(type -> repositoryRepository.existsByNameWithOwnerAndNativeIdAndProviderTypeNot(
+                        rtm.getNameWithOwner(), Objects.requireNonNull(rtm.getNativeId()), type))
+                .orElse(false);
+    }
+
     private void reconcileSyncTargetInTransaction(
             Long syncTargetId, @Nullable Long resolvedNativeId, @Nullable String resolvedNameWithOwner) {
         if (syncTargetId == null) {
@@ -450,8 +475,11 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
         repositoryToMonitorRepository.findById(syncTargetId).ifPresent(rtm -> {
             boolean dirty = false;
 
-            // Capture the stable id the first time it resolves.
-            if (rtm.getNativeId() == null && resolvedNativeId != null) {
+            // Capture the stable id the first time it resolves, and replace one taken from a repository of the
+            // same name on another kind of provider: the scoped queries would hide the monitored repository.
+            if (resolvedNativeId != null
+                    && (rtm.getNativeId() == null
+                            || (!rtm.getNativeId().equals(resolvedNativeId) && hasIdOfOtherProviderKind(rtm)))) {
                 rtm.setNativeId(resolvedNativeId);
                 dirty = true;
             }

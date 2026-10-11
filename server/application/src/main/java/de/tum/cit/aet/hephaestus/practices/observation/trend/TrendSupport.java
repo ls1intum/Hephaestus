@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.observation.trend;
 
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import java.time.Instant;
 import org.jspecify.annotations.Nullable;
 
@@ -15,12 +16,23 @@ import org.jspecify.annotations.Nullable;
  * <p>{@code opportunities} is not {@code currentOpportunities + previousOpportunities}. At group scope one
  * piece of reviewed work can be current evidence for one practice and previous evidence for another, and a
  * reader counts it once; at practice scope the two bundles are disjoint and the sum is the same number.
+ *
+ * <p>{@code standingWork} and {@code reviewedWork} answer what a standing is read from, not what a direction
+ * compares. {@code standingWork} is the distinct work in the current bundles: at practice scope it is
+ * {@code currentOpportunities}; at group scope it covers every practice that joined the group's trend, compared
+ * or not, because every one of them votes in the group's standing. {@code reviewedWork} is every distinct piece
+ * of work in the look-back whose newest live review reached a verdict on the practice, or on any of the group's
+ * practices, so it is never below {@code standingWork}. {@code reviewedWorkKind} is the kind all of that work
+ * shares, and absent when it is mixed or there is none.
  */
 public record TrendSupport(
         int currentOpportunities,
         int previousOpportunities,
         int opportunities,
         int opportunitiesUntilComparable,
+        int standingWork,
+        int reviewedWork,
+        @Nullable ArtifactKind reviewedWorkKind,
         @Nullable Integer comparablePractices,
         @Nullable Integer eligiblePractices,
         @Nullable Instant firstOpportunityAt,

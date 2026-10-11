@@ -66,9 +66,16 @@ public class PracticesAcrossWorkspaceService {
     private PracticesAcrossWorkspaceDTO readOverview(WorkspaceContext context) {
         Long workspaceId = context.id();
         Members members = members(workspaceId);
-        List<PracticeGroup> groups = practiceGroupService.listGroups(context, true);
         WorkspaceStandings standings =
                 practiceStandingService.getCurrentWorkspaceStandingSnapshots(workspaceId, members.read());
+        // A group with no practice review is admitted for has nothing to split: it has no practices, or every one
+        // of them is switched off. No verdict in it can vote, so leaving it out changes no one's standing.
+        List<PracticeGroup> groups = practiceGroupService.listGroups(context, true).stream()
+                .filter(group -> !standings
+                        .eligiblePracticesByGroup()
+                        .getOrDefault(group.getSlug(), List.of())
+                        .isEmpty())
+                .toList();
         Cohort current = cohort(groups, members, standings.byDeveloper());
 
         // The practices every reader sees, whatever their own evidence says.

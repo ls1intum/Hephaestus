@@ -344,6 +344,10 @@ export type AgentJob = {
      */
     availableAt: string;
     /**
+     * Why a CANCELLED job was cancelled; available on job detail, absent otherwise
+     */
+    cancellationReason?: 'DRAIN_GRACEFUL' | 'DRAIN_IMMEDIATE' | 'BUDGET_EXHAUSTED' | 'MODEL_UNAVAILABLE' | 'MEMBER_AI_DECLINED' | 'PERSON_DATA_ERASED';
+    /**
      * Timestamp when the job completed
      */
     completedAt?: string;
@@ -379,6 +383,14 @@ export type AgentJob = {
      * Container exit code
      */
     exitCode?: number;
+    /**
+     * When this review first posted feedback on the work without waiting for an admin's approval; available on review detail, absent until then
+     */
+    firstFeedbackPostedAt?: string;
+    /**
+     * When a developer first read this review's feedback on their practice pages or in a conversation; available on review detail, absent until then
+     */
+    firstFeedbackReadAt?: string;
     /**
      * Frozen generated-path policy and changed paths marked generated; available on review detail after evidence capture
      */
@@ -459,6 +471,68 @@ export type AgentJob = {
      * Work item reviewed by this job
      */
     target: ReviewRunTarget;
+    /**
+     * The id the job's log lines and spans carry, to find them in the logs; available on job detail
+     */
+    traceId?: string;
+    /**
+     * When the reviewed pull request or merge request was merged; available on review detail, absent for other work and for work that is not merged
+     */
+    workMergedAt?: string;
+};
+
+/**
+ * The model usage and cost of a job, per attempt and in total
+ */
+export type AgentJobUsage = {
+    /**
+     * One entry per attempt that reached the model, first attempt first
+     */
+    attempts: Array<AgentJobUsageAttempt>;
+    /**
+     * The cost of every attempt in US dollars; absent when an attempt has no known price or none reached the model
+     */
+    totalCostUsd?: number;
+    /**
+     * Attempts whose price is not known
+     */
+    unpricedAttempts: number;
+};
+
+/**
+ * The model usage and cost of one attempt of a job
+ */
+export type AgentJobUsageAttempt = {
+    /**
+     * The attempt, 1 for the first run
+     */
+    attempt: number;
+    cacheReadTokens: number;
+    cacheWriteTokens: number;
+    /**
+     * Cost in US dollars; absent while UNPRICED
+     */
+    costUsd?: number;
+    /**
+     * Who pays: the instance's shared models, or the workspace's own provider
+     */
+    fundingSource: 'INSTANCE' | 'WORKSPACE';
+    inputTokens: number;
+    /**
+     * The model the attempt called
+     */
+    model?: string;
+    /**
+     * When the attempt finished
+     */
+    occurredAt: string;
+    outputTokens: number;
+    /**
+     * PRICED has a cost; NO_CHARGE is a real $0; UNPRICED means no price was known, so its cost is absent rather than $0
+     */
+    pricingState: 'PRICED' | 'NO_CHARGE' | 'UNPRICED';
+    reasoningTokens: number;
+    totalCalls: number;
 };
 
 /**
@@ -1900,6 +1974,10 @@ export type FeedbackAccountRef = {
 export type FeedbackApproval = {
     actorAccountId?: number;
     decidedAt?: string;
+    /**
+     * Display name of the admin who decided; null when not resolved or the account is erased
+     */
+    decidedBy?: string;
     decision?: 'APPROVED' | 'REJECTED';
     feedbackId?: string;
     rejectionNote?: string;
@@ -4019,6 +4097,79 @@ export type PracticeReviewOverview = {
 };
 
 /**
+ * The practice review queue of a workspace as it stands now, and how fast it empties
+ */
+export type PracticeReviewQueue = {
+    /**
+     * Distinct workers running this workspace's practice reviews now, as the running jobs record them
+     */
+    activeWorkers: number;
+    /**
+     * When the queue was read; every wait and throughput window ends here
+     */
+    asOf: string;
+    /**
+     * Practice reviews that finished in the 24 hours before asOf, counted alike
+     */
+    finishedLastDay: number;
+    /**
+     * Practice reviews that finished in the hour before asOf, completed, failed or timed out; cancelled reviews are not counted
+     */
+    finishedLastHour: number;
+    /**
+     * finishedLastDay per hour, the throughput of the last 24 hours
+     */
+    finishedPerHourLastDay: number;
+    /**
+     * The head of the queue: the running reviews first, longest running first, then the waiting ones, longest waiting first, then the budget holds. At most 5 entries
+     */
+    head: Array<PracticeReviewQueueItem>;
+    /**
+     * Practice reviews queued now and held because the payer is over its monthly LLM cap
+     */
+    heldForBudget: number;
+    /**
+     * When the longest waiting of those was requested; absent when none waits. Holds for budget are left out, since they wait for the cap and not for a worker
+     */
+    oldestWaitingSince?: string;
+    /**
+     * Practice reviews running now
+     */
+    running: number;
+    /**
+     * Practice reviews queued now, other than those held for budget
+     */
+    waiting: number;
+};
+
+/**
+ * One practice review queued or running now
+ */
+export type PracticeReviewQueueItem = {
+    /**
+     * The developer the work is about, as the review names them; absent when it names none
+     */
+    developer?: ReviewSubject;
+    /**
+     * True when the review is queued and held for budget
+     */
+    heldForBudget: boolean;
+    /**
+     * The review
+     */
+    id: string;
+    /**
+     * Since when it is in its status: started for a running review; for a queued one, since it became available to a worker, which is its request unless it was requeued; for one held for budget, its request
+     */
+    since: string;
+    /**
+     * QUEUED or RUNNING
+     */
+    status: 'QUEUED' | 'RUNNING';
+    target: ReviewRunTarget;
+};
+
+/**
  * A workspace's practice-review policy: effective values plus raw overrides
  */
 export type PracticeReviewSettings = {
@@ -4084,6 +4235,96 @@ export type PracticeReviewStateValue = {
 };
 
 /**
+ * Where the time of practice reviews went in a time range, stage by stage, and the reviews that need a look
+ */
+export type PracticeReviewTiming = {
+    /**
+     * Until asked: from the moment on the work that started the review to its request, over the reviews a moment started before their request
+     */
+    asked: ReviewStageTiming;
+    /**
+     * Feedback created in the range and withheld because the work was already merged (ARTIFACT_MERGED)
+     */
+    feedbackWithheldAsMerged: number;
+    /**
+     * From the moment that started the review, or its request where no moment did, until it completed, one figure per review over the reviews that completed, whether they commented or not
+     */
+    finished: ReviewStageTiming;
+    /**
+     * Pull request and merge request reviews requested in the range that completed after the work was merged. The review list returns the same reviews with finishedAfterMerge.
+     */
+    finishedAfterMerge: number;
+    /**
+     * Of those, the reviews the merge itself started
+     */
+    finishedAfterMergeStartedByMerge: number;
+    /**
+     * Each stage's part of the time of the reviews that finished measures; absent when no review completed
+     */
+    finishedShares?: ReviewTimeShares;
+    /**
+     * Inclusive lower bound of the range measured, with its default filled in
+     */
+    from: string;
+    /**
+     * From the start of the model until the review ended, failed and timed-out runs included
+     */
+    model: ReviewStageTiming;
+    /**
+     * From the end of the review until it first posted feedback on the work by itself; feedback that waited for an admin's approval is left out
+     */
+    posted: ReviewStageTiming;
+    /**
+     * From the claim until the model started, while the evidence was prepared
+     */
+    preparation: ReviewStageTiming;
+    /**
+     * From the request until a worker claimed the review; a retried review's earlier attempt counts as waiting
+     */
+    queue: ReviewStageTiming;
+    /**
+     * Not a stage of the review: from the end of the review until a developer first read its feedback on their practice pages or was shown it in a conversation
+     */
+    read: ReviewStageTiming;
+    /**
+     * Exclusive upper bound of the range measured, with its default filled in
+     */
+    to: string;
+    /**
+     * From the moment that started the review, or its request where no moment did, until it first posted feedback on the work by itself, one figure per review over the reviews that did
+     */
+    total: ReviewStageTiming;
+    /**
+     * Each stage's part of the time of the reviews that total measures; absent when no review posted a comment
+     */
+    totalShares?: ReviewTimeShares;
+    /**
+     * Practice reviews queued now for longer than 10 minutes, whenever they were requested, other than those held for budget
+     */
+    waitingLong: number;
+};
+
+/**
+ * One version of a practice's definition and what changed in it
+ */
+export type PracticeRevision = {
+    /**
+     * The parts of the definition that differ from the version before; empty for the first version and for a version recorded again without a change
+     */
+    changed: Array<'NAME' | 'SIGNALS' | 'EVIDENCE_REQUIREMENTS' | 'REVIEW_WHEN' | 'SUBJECT' | 'PRECONDITION' | 'CRITERIA' | 'PRECOMPUTE_SCRIPT' | 'AUTOMATED_REVIEW_POLICY' | 'WHY_IT_MATTERS' | 'WHAT_GOOD_LOOKS_LIKE' | 'GROUP_SLUG' | 'DELIVERY_BEHAVIOR' | 'VISUAL' | 'GUIDE'>;
+    createdAt: string;
+    id: number;
+    /**
+     * Whether what a review checks changed, so observations made before it no longer reflect the practice. A change to the wording around it, or to when it runs, does not count.
+     */
+    reviewRulesChanged: boolean;
+    /**
+     * 1 for the first version, counting up
+     */
+    revisionNumber: number;
+};
+
+/**
  * A signal and the words a reader sees for it
  */
 export type PracticeSignal = {
@@ -4126,6 +4367,10 @@ export type PracticeStanding = {
      * Practice name
      */
     name: string;
+    /**
+     * True when the newest review of each piece of work in the look-back found that this practice did not apply to it; false when anything else was recorded, or nothing at all
+     */
+    notApplicableOnly?: boolean;
     /**
      * Practice slug
      */
@@ -4957,6 +5202,10 @@ export type ReviewFeedback = {
     deliveryState: 'AWAITING_APPROVAL' | 'PREPARED' | 'PARTIALLY_DELIVERED' | 'PARTIALLY_FAILED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED' | 'DISCARDED' | 'UNCONFIRMED';
     id: string;
     /**
+     * Where the feedback appears, by the provider that shows it: the channel split where the provider is known
+     */
+    location: 'GITHUB' | 'GITLAB' | 'OTHER_WORK' | 'HEPH' | 'SLACK' | 'NEXT_CONVERSATION' | 'PRACTICE_PAGES';
+    /**
      * Number of observations used to compose the feedback
      */
     observationCount: number;
@@ -5053,10 +5302,18 @@ export type ReviewFeedbackDetail = {
     deliveryPolicy: Array<DeliveryPolicyTrace>;
     deliveryState: 'AWAITING_APPROVAL' | 'PREPARED' | 'PARTIALLY_DELIVERED' | 'PARTIALLY_FAILED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED' | 'DISCARDED' | 'UNCONFIRMED';
     /**
+     * Every delivery of a package carrying this feedback to the provider, oldest first: its state, attempts, next attempt and last error. Empty for feedback that never goes to a provider, and for feedback no delivery was started for.
+     */
+    dispatches: Array<ReviewFeedbackDispatch>;
+    /**
      * The developer's standing dispute of this feedback; null while they do not dispute it
      */
     dispute?: FeedbackDispute;
     id: string;
+    /**
+     * Where the feedback appears, by the provider that shows it: the channel split where the provider is known
+     */
+    location: 'GITHUB' | 'GITLAB' | 'OTHER_WORK' | 'HEPH' | 'SLACK' | 'NEXT_CONVERSATION' | 'PRACTICE_PAGES';
     /**
      * Source observations in render order
      */
@@ -5101,6 +5358,300 @@ export type ReviewFeedbackDetail = {
      * Every withdrawal of this card from the developer's practice page, newest first; empty when none
      */
     withdrawals: Array<FeedbackWithdrawal>;
+};
+
+/**
+ * One delivery of feedback to the provider and how its attempts went
+ */
+export type ReviewFeedbackDispatch = {
+    /**
+     * How many times it was tried
+     */
+    attemptCount: number;
+    createdAt: string;
+    /**
+     * The provider's id of the delivered summary
+     */
+    deliveredExternalRef?: string;
+    /**
+     * Where the delivered summary can be opened on the provider
+     */
+    deliveredExternalUrl?: string;
+    /**
+     * AUTOMATIC_REVIEW_PACKAGE is the review's own package of every piece of feedback it posted without approval; APPROVED_REVIEW_PACKAGE is this approved proposal's package
+     */
+    destination: 'AUTOMATIC_REVIEW_PACKAGE' | 'APPROVED_REVIEW_PACKAGE';
+    id: string;
+    /**
+     * The error of the last failed attempt, as the provider or the server reported it
+     */
+    lastError?: string;
+    /**
+     * When it is tried next; null once it was sent, held back or given up
+     */
+    nextAttemptAt?: string;
+    state: 'PENDING' | 'CLAIMED' | 'SENT' | 'SUPPRESSED' | 'UNCERTAIN' | 'FAILED';
+    /**
+     * Why it was held back; null unless the state is SUPPRESSED
+     */
+    suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'COMPOSER_WITHHELD' | 'REPEATS_DELIVERED_NOTE' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ISSUE_SNAPSHOT_CHANGED' | 'ARTIFACT_MERGED' | 'PUBLIC_SUBJECT_INELIGIBLE' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_COVERAGE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET' | 'OBSERVATION_INVALIDATED' | 'REVIEWED_REVISION_CHANGED';
+    updatedAt: string;
+};
+
+/**
+ * Feedback at one location, one count per delivery state
+ */
+export type ReviewFeedbackLocationCounts = {
+    /**
+     * The feedback at this location, by delivery state
+     */
+    feedback: ReviewFeedbackCounts;
+    /**
+     * Where the feedback appears, by the provider that shows it
+     */
+    location: 'GITHUB' | 'GITLAB' | 'OTHER_WORK' | 'HEPH' | 'SLACK' | 'NEXT_CONVERSATION' | 'PRACTICE_PAGES';
+};
+
+/**
+ * How much feedback was withheld for one reason
+ */
+export type ReviewFeedbackReasonCount = {
+    /**
+     * The feedback withheld for this reason
+     */
+    count: number;
+    /**
+     * Why Hephaestus withheld it; absent for withheld feedback whose reason is not recorded
+     */
+    reason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'COMPOSER_WITHHELD' | 'REPEATS_DELIVERED_NOTE' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ISSUE_SNAPSHOT_CHANGED' | 'ARTIFACT_MERGED' | 'PUBLIC_SUBJECT_INELIGIBLE' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_COVERAGE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET' | 'OBSERVATION_INVALIDATED' | 'REVIEWED_REVISION_CHANGED';
+};
+
+/**
+ * How one record came about: the reviewed work, the review, its observations, the feedback written from them, where that feedback went and how the developer answered. Bounded: each list is capped and the count beside it says how many more there are
+ */
+export type ReviewLineage = {
+    /**
+     * The feedback in the chain, newest first
+     */
+    feedback: Array<ReviewLineageFeedback>;
+    /**
+     * Feedback in the chain that the list leaves out
+     */
+    moreFeedback: number;
+    /**
+     * Observations of the review, or behind the listed feedback, that the list leaves out
+     */
+    moreObservations: number;
+    /**
+     * The observations in the chain, the ones the request names first
+     */
+    observations: Array<ReviewLineageObservation>;
+    /**
+     * The review that recorded the observations; null when its record is gone
+     */
+    review?: ReviewLineageRun;
+    /**
+     * What started the review, from the first moment on the work that names it; null when no recorded moment names the review
+     */
+    reviewTrigger?: 'OPENED' | 'READY' | 'PUSHED' | 'EDITED' | 'REVIEWED' | 'MERGED' | 'CLOSED' | 'PUBLISHED' | 'SETTLED' | 'REQUESTED' | 'BACKFILL' | 'SWEEP';
+    /**
+     * The work the review read; null when the review named no work
+     */
+    work?: ReviewedWorkRef;
+    /**
+     * When the reviewed pull request or merge request was merged; null for other work and for work that is not merged
+     */
+    workMergedAt?: string;
+    /**
+     * What happened on the work, oldest first: opened, pushed, merged and the like, each with its time and whether it started this review. Empty unless the request asks for the whole review; then the newest 30 at most
+     */
+    workMoments: Array<ReviewLineageMoment>;
+};
+
+/**
+ * A piece of feedback in a lineage, with where it went and how the developer answered
+ */
+export type ReviewLineageFeedback = {
+    /**
+     * The review that composed it
+     */
+    agentJobId: string;
+    channel: 'IN_CONTEXT' | 'IN_CHAT' | 'IN_APP';
+    createdAt: string;
+    /**
+     * When an admin decided about it; null while nobody decided
+     */
+    decidedAt?: string;
+    /**
+     * What an admin decided about it before delivery; null while nobody decided
+     */
+    decision?: 'APPROVED' | 'REJECTED';
+    /**
+     * When it was placed; null if it was not delivered
+     */
+    deliveredAt?: string;
+    deliveryState: 'AWAITING_APPROVAL' | 'PREPARED' | 'PARTIALLY_DELIVERED' | 'PARTIALLY_FAILED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED' | 'DISCARDED' | 'UNCONFIRMED';
+    /**
+     * Whether the request names this feedback, or the observation it names led to it
+     */
+    focus: boolean;
+    id: string;
+    /**
+     * Where it appears, by the provider that shows it: the channel split where the provider is known, as the feedback list names it
+     */
+    location: 'GITHUB' | 'GITLAB' | 'OTHER_WORK' | 'HEPH' | 'SLACK' | 'NEXT_CONVERSATION' | 'PRACTICE_PAGES';
+    /**
+     * Every observation it was written from, in render order
+     */
+    observationIds: Array<string>;
+    /**
+     * How many comments, notes or conversation turns placed it
+     */
+    placementCount: number;
+    /**
+     * When the newer feedback that replaced it was written; null while nothing did
+     */
+    replacedAt?: string;
+    /**
+     * The newer feedback that replaced it; null while nothing did
+     */
+    replacedById?: string;
+    /**
+     * The earlier feedback it replaced; null on a first delivery
+     */
+    replacesId?: string;
+    /**
+     * How the developer answered it; null while nothing stands
+     */
+    response?: ReviewLineageResponse;
+    /**
+     * Why delivery stopped; set on withheld or terminally partial feedback
+     */
+    suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'COMPOSER_WITHHELD' | 'REPEATS_DELIVERED_NOTE' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ISSUE_SNAPSHOT_CHANGED' | 'ARTIFACT_MERGED' | 'PUBLIC_SUBJECT_INELIGIBLE' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_COVERAGE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET' | 'OBSERVATION_INVALIDATED' | 'REVIEWED_REVISION_CHANGED';
+    /**
+     * When an admin withdrew it from the developer's practice pages; null unless a withdrawal is in force
+     */
+    withdrawnAt?: string;
+};
+
+/**
+ * One moment on the reviewed work, such as opened, pushed or merged
+ */
+export type ReviewLineageMoment = {
+    /**
+     * Whether this moment came after the one that started the review and was folded into it, so it started no review of its own
+     */
+    joinedReview: boolean;
+    /**
+     * What happened, in the words a review trigger uses
+     */
+    kind: 'OPENED' | 'READY' | 'PUSHED' | 'EDITED' | 'REVIEWED' | 'MERGED' | 'CLOSED' | 'PUBLISHED' | 'SETTLED' | 'REQUESTED' | 'BACKFILL' | 'SWEEP';
+    /**
+     * When it happened upstream
+     */
+    occurredAt: string;
+    /**
+     * Whether this moment started the review
+     */
+    startedReview: boolean;
+};
+
+/**
+ * An observation in a lineage
+ */
+export type ReviewLineageObservation = {
+    /**
+     * The review that recorded it
+     */
+    agentJobId: string;
+    /**
+     * How many pieces of feedback were written from it, by any review
+     */
+    feedbackCount: number;
+    /**
+     * Whether the request names this observation, or the feedback it names was written from it
+     */
+    focus: boolean;
+    id: string;
+    /**
+     * Whether a workspace admin marked it incorrect and has not restored it
+     */
+    invalidated: boolean;
+    /**
+     * When a workspace admin marked it incorrect; null unless it is marked incorrect now
+     */
+    markedIncorrectAt?: string;
+    observedAt: string;
+    outcome: 'MET' | 'NOT_MET' | 'NOT_APPLICABLE' | 'UNDETERMINED';
+    /**
+     * How many pieces of feedback the review that recorded it wrote from it; a later review may write more, which feedbackCount counts too
+     */
+    ownFeedbackCount: number;
+    practiceName: string;
+    practiceSlug: string;
+    /**
+     * Severity band (null unless outcome is NOT_MET)
+     */
+    severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
+    summary: string;
+};
+
+/**
+ * Whether the developer answered a piece of feedback, whether that answer disputes it, and whether their later work resolved it. Their rating, any other resolution and their private notes are never part of it. At least one of respondedAt and resolvedByWorkAt is set
+ */
+export type ReviewLineageResponse = {
+    /**
+     * Why the developer disputes it, in their words to the workspace's admins; null unless disputed
+     */
+    disputeExplanation?: string;
+    /**
+     * Whether the answer that stands now disputes the feedback
+     */
+    disputed: boolean;
+    /**
+     * When their later work resolved it: three clean pieces of work in a row on the practice. Only feedback on their practice pages resolves this way; null while it has not
+     */
+    resolvedByWorkAt?: string;
+    /**
+     * When the developer's answer that stands now was given; null when only the work answered
+     */
+    respondedAt?: string;
+};
+
+/**
+ * The review in a lineage
+ */
+export type ReviewLineageRun = {
+    /**
+     * When the review was asked for
+     */
+    createdAt: string;
+    /**
+     * When the review finished; null while it runs
+     */
+    finishedAt?: string;
+    /**
+     * Why a queued review waits, where an admin can undo it, such as BUDGET; null otherwise
+     */
+    holdReason?: string;
+    id: string;
+    /**
+     * The language model the review used; null when it recorded none
+     */
+    model?: string;
+    /**
+     * Why a completed review recorded what it did: REVIEWED when the model ran, INSUFFICIENT_EVIDENCE when evidence could not be read and nothing was assessed, COALESCED when an earlier review on the same code had answered every practice, SUPERSEDED when a newer admitted review of the same work replaced it while it waited. Null until the review completed
+     */
+    outcome?: 'REVIEWED' | 'INSUFFICIENT_EVIDENCE' | 'COALESCED' | 'SUPERSEDED';
+    /**
+     * Where the review is, or how it ended, finer than status: a timeout or a cancellation
+     */
+    phase: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'TIMED_OUT' | 'CANCELLED';
+    /**
+     * When a worker picked the review up; null while it waits. It can be well after createdAt, the time it was asked for
+     */
+    startedAt?: string;
+    status: 'IN_PROGRESS' | 'COMPLETED' | 'FAILED';
 };
 
 /**
@@ -5202,6 +5753,10 @@ export type ReviewObservationDetail = {
     invalidations: Array<ObservationInvalidation>;
     observedAt: string;
     /**
+     * How the review that recorded it came about: LIVE from the work itself, MANUAL requested by a person, BACKFILL over work that predates the connection. A recurring sweep records LIVE.
+     */
+    origin: 'LIVE' | 'MANUAL' | 'BACKFILL';
+    /**
      * Result of the practice review
      */
     outcome: 'MET' | 'NOT_MET' | 'NOT_APPLICABLE' | 'UNDETERMINED';
@@ -5225,6 +5780,10 @@ export type ReviewObservationDetail = {
      */
     subject?: ReviewSubject;
     summary: string;
+    /**
+     * When a later review of the same work superseded this observation; null while current
+     */
+    supersededAt?: string;
 };
 
 /**
@@ -5261,6 +5820,10 @@ export type ReviewPlacement = {
      * Provider-native comment identifier
      */
     postedCommentRef?: string;
+    /**
+     * Permalink of the posted provider comment; null when the provider gave none
+     */
+    postedCommentUrl?: string;
 };
 
 export type ReviewPracticeGroup = {
@@ -5277,7 +5840,7 @@ export type ReviewPracticeGroup = {
 };
 
 /**
- * What one run decided about each practice it observed for this developer against the practice's whole positive standard, one count per practice however many observations it recorded; an invalidated observation decides nothing, and a met or not-met outcome recorded under an earlier or missing assessment scheme counts as undetermined
+ * What one run decided about each practice it observed against the practice's whole positive standard, one count per practice however many observations it recorded; an invalidated observation decides nothing, and a met or not-met outcome recorded under an earlier or missing assessment scheme counts as undetermined. The practice profile counts only what the run observed about the calling developer
  */
 export type ReviewPracticeOutcomes = {
     /**
@@ -5387,14 +5950,51 @@ export type ReviewRunRef = {
  */
 export type ReviewRunSummary = {
     createdAt: string;
+    /**
+     * The developers the run is about: everyone it recorded an observation about, or, before it recorded any, the person its work names; empty when neither is known
+     */
+    developers: Array<ReviewSubject>;
     feedback: ReviewFeedbackCounts;
+    /**
+     * True when a pull request or merge request review completed after its work was merged, as the timing's finishedAfterMerge counts it
+     */
+    finishedAfterMerge: boolean;
+    /**
+     * True when finishedAfterMerge and the merge itself started the review, so it could only finish after it
+     */
+    finishedAfterMergeStartedByMerge: boolean;
+    /**
+     * Why a queued review waits where an admin can undo it, such as BUDGET when it is held for the monthly LLM cap; absent unless the review is queued and held
+     */
+    holdReason?: string;
     id: string;
     observations: ReviewObservationCounts;
+    /**
+     * What occasioned the run: LIVE as the work arrived, MANUAL when somebody asked for it, BACKFILL while catching up on work that predates the connection; absent when the run records an origin this release does not know
+     */
+    origin?: 'LIVE' | 'MANUAL' | 'BACKFILL';
+    /**
+     * The run's place among the practice reviews of its work, counted from 1 for the oldest; absent when the run names no work
+     */
+    positionOnWork?: number;
+    practices: ReviewPracticeOutcomes;
+    /**
+     * How many practices the run measured; absent when it wrote no coverage ledger
+     */
+    practicesEvaluated?: number;
     /**
      * Result-processing status: null = not applicable, PENDING = awaiting processing, DELIVERED = processing finished, FAILED = processing error. Processing may include delivery; this status alone does not establish feedback publication.
      */
     resultProcessing?: 'PENDING' | 'DELIVERED' | 'FAILED';
     reviewOutcome: 'REVIEWED' | 'INSUFFICIENT_EVIDENCE' | 'COALESCED' | 'SUPERSEDED';
+    /**
+     * How many practice reviews its work has in all, so a row can say "Review 2 of 3"; absent when the run names no work
+     */
+    reviewsOnWork?: number;
+    /**
+     * Every practice counted in practices.notMet, once each, in order of practice name
+     */
+    slippedPractices: Array<SlippedPractice>;
     status: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'TIMED_OUT' | 'CANCELLED';
     target: ReviewRunTarget;
 };
@@ -5412,6 +6012,24 @@ export type ReviewRunTarget = {
      */
     title: string;
     type: string;
+};
+
+/**
+ * How long one stage of practice reviews took, over the reviews that passed through it
+ */
+export type ReviewStageTiming = {
+    /**
+     * Reviews that passed through the stage and were measured
+     */
+    count: number;
+    /**
+     * The median duration in whole seconds; absent when no review was measured
+     */
+    medianSeconds?: number;
+    /**
+     * The 90th percentile duration in whole seconds; absent when no review was measured
+     */
+    p90Seconds?: number;
 };
 
 export type ReviewSubject = {
@@ -5452,6 +6070,104 @@ export type ReviewSweepSchedule = {
      * is working from one whose workspace has been skipping it.
      */
     nextRunAt: string;
+};
+
+/**
+ * Each stage's part of the time of a set of whole reviews, from 0 to 1: its seconds summed over the set, divided by the reviews' summed seconds. The parts add up to 1
+ */
+export type ReviewTimeShares = {
+    /**
+     * Until asked: from the moment on the work that started the review to its request; 0 where no moment started it
+     */
+    asked: number;
+    /**
+     * With the model
+     */
+    model: number;
+    /**
+     * Until the comment was posted; absent for reviews that are not measured to a comment
+     */
+    posted?: number;
+    /**
+     * Preparing the evidence
+     */
+    preparation: number;
+    /**
+     * Waiting in the queue
+     */
+    queue: number;
+    /**
+     * The whole run of the reviews without a recorded execution start, such as those recorded before it was, so it cannot be split into preparation and model; 0 when every review has one
+     */
+    runUnsplit: number;
+};
+
+/**
+ * The facts the provider reported about a piece of reviewed work
+ */
+export type ReviewWorkFacts = {
+    /**
+     * Lines added
+     */
+    additions?: number;
+    artifactId: number;
+    artifactKind: string;
+    /**
+     * Who opened the work; absent when the account is unknown
+     */
+    author?: ReviewSubject;
+    /**
+     * Files changed
+     */
+    changedFiles?: number;
+    /**
+     * When the check state was last observed
+     */
+    checkObservedAt?: string;
+    /**
+     * The combined state of the checks on the head commit, when the provider reported one
+     */
+    checkState?: 'SUCCESS' | 'FAILURE' | 'PENDING' | 'CANCELLED' | 'NONE' | 'NO_PIPELINE' | 'SKIPPED';
+    closedAt?: string;
+    /**
+     * Commits on the work
+     */
+    commits?: number;
+    createdAt?: string;
+    /**
+     * Lines deleted
+     */
+    deletions?: number;
+    /**
+     * Whether a pull request or merge request is a draft; absent for an issue
+     */
+    draft?: boolean;
+    /**
+     * The commit at the head of the source branch
+     */
+    headRevision?: string;
+    /**
+     * When the work was last read from the provider
+     */
+    lastSyncAt?: string;
+    mergedAt?: string;
+    /**
+     * The branch the changes come from
+     */
+    sourceBranch?: string;
+    /**
+     * OPEN, CLOSED, or MERGED for a merged pull request or merge request
+     */
+    state: 'OPEN' | 'CLOSED' | 'MERGED';
+    /**
+     * Why an issue was closed or reopened
+     */
+    stateReason?: 'COMPLETED' | 'DUPLICATE' | 'NOT_PLANNED' | 'REOPENED' | 'UNKNOWN';
+    /**
+     * The branch the changes go into
+     */
+    targetBranch?: string;
+    updatedAt?: string;
 };
 
 /**
@@ -5698,7 +6414,7 @@ export type SlackUserWorkspacePreferences = {
 };
 
 /**
- * A practice a run recorded a problem about for this developer
+ * A practice a run recorded a problem about
  */
 export type SlippedPractice = {
     practiceName: string;
@@ -6050,6 +6766,10 @@ export type TimeBucketSize = 'DAY' | 'WEEK' | 'MONTH';
 export type TracedArtifact = {
     artifactId: number;
     artifactKind: string;
+    /**
+     * The latest of them: what happened, how we came to know, and why it started no review when it did not
+     */
+    lastSignal: TracedSignal;
     lastSignalAt: string;
     /**
      * How many of them started a review
@@ -6132,7 +6852,19 @@ export type TrendSupport = {
     opportunities: number;
     opportunitiesUntilComparable: number;
     previousOpportunities: number;
+    /**
+     * Distinct pieces of work in the look-back whose newest live review reached a verdict on this practice, or on any practice of this group; never below standingWork
+     */
+    reviewedWork: number;
+    /**
+     * The kind every piece counted in reviewedWork shares; absent when they are of several kinds or there are none
+     */
+    reviewedWorkKind?: string;
     ropeHalfWidth: number;
+    /**
+     * Distinct pieces of reviewed work the standing is read from: the newest decided pieces, at most bundleSize per practice, counted once across a group's practices
+     */
+    standingWork: number;
 };
 
 /**
@@ -10681,6 +11413,35 @@ export type RetryAgentJobDeliveryResponses = {
 
 export type RetryAgentJobDeliveryResponse = RetryAgentJobDeliveryResponses[keyof RetryAgentJobDeliveryResponses];
 
+export type GetAgentJobUsageData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        jobId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/agents/jobs/{jobId}/usage';
+};
+
+export type GetAgentJobUsageErrors = {
+    /**
+     * Job not found in this workspace
+     */
+    404: unknown;
+};
+
+export type GetAgentJobUsageResponses = {
+    /**
+     * Usage returned
+     */
+    200: AgentJobUsage;
+};
+
+export type GetAgentJobUsageResponse = GetAgentJobUsageResponses[keyof GetAgentJobUsageResponses];
+
 export type DeleteAgentData = {
     body?: never;
     path: {
@@ -13571,6 +14332,42 @@ export type ListPracticeReviewsData = {
          * Exclusive upper bound on when the review was requested
          */
         to?: string;
+        /**
+         * Keep the reviews that recorded an observation about this developer that is not marked incorrect
+         */
+        subjectUserId?: number;
+        /**
+         * Keep the reviews that recorded an observation of any of these practices that is not marked incorrect (repeatable)
+         */
+        practiceSlug?: Array<string>;
+        /**
+         * Keep the reviews that recorded an observation of a practice in any of these groups that is not marked incorrect (repeatable)
+         */
+        groupSlug?: Array<string>;
+        /**
+         * Keep this one review
+         */
+        agentJobId?: string;
+        /**
+         * Keep the reviews of this kind of work, e.g. scm.pull_request
+         */
+        artifactKind?: string;
+        /**
+         * Keep the reviews of this one piece of work; requires artifactKind
+         */
+        artifactId?: number;
+        /**
+         * True keeps the pull request and merge request reviews that completed after the work was merged; false or omitted keeps every review
+         */
+        finishedAfterMerge?: boolean;
+        /**
+         * True also keeps the queued reviews on hold, such as those waiting for the AI budget; alone it keeps only those. False or omitted adds nothing to the status filter
+         */
+        onHold?: boolean;
+        /**
+         * True also keeps the queued reviews that wait for a worker now, as the queue counts them: not held for the AI budget and due now, not backing off before a retry. Alone it keeps only those. False or omitted adds nothing to the status filter
+         */
+        waiting?: boolean;
     };
     url: '/workspaces/{workspaceSlug}/practices/reviews';
 };
@@ -13632,7 +14429,15 @@ export type ListPracticeReviewFeedbackData = {
         deliveryState?: Array<'AWAITING_APPROVAL' | 'PREPARED' | 'PARTIALLY_DELIVERED' | 'PARTIALLY_FAILED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED' | 'DISCARDED' | 'UNCONFIRMED'>;
         suppressionReason?: Array<'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'COMPOSER_WITHHELD' | 'REPEATS_DELIVERED_NOTE' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ISSUE_SNAPSHOT_CHANGED' | 'ARTIFACT_MERGED' | 'PUBLIC_SUBJECT_INELIGIBLE' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_COVERAGE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET' | 'OBSERVATION_INVALIDATED' | 'REVIEWED_REVISION_CHANGED'>;
         channel?: Array<'IN_CONTEXT' | 'IN_CHAT' | 'IN_APP'>;
+        /**
+         * Where the feedback appears, by the provider that shows it (repeatable): a channel split where the provider is known
+         */
+        location?: Array<'GITHUB' | 'GITLAB' | 'OTHER_WORK' | 'HEPH' | 'SLACK' | 'NEXT_CONVERSATION' | 'PRACTICE_PAGES'>;
         agentJobId?: string;
+        /**
+         * Keep the feedback written from this observation
+         */
+        observationId?: string;
         /**
          * Kind of reviewed work, e.g. scm.pull_request
          */
@@ -13646,6 +14451,10 @@ export type ListPracticeReviewFeedbackData = {
          * Practices whose feedback to list (repeatable): feedback bound to an observation of any of them, in any role
          */
         practiceSlug?: Array<string>;
+        /**
+         * Practice groups whose feedback to list (repeatable): feedback bound to an observation of a practice in any of them
+         */
+        groupSlug?: Array<string>;
         /**
          * Inclusive lower bound
          */
@@ -13675,6 +14484,150 @@ export type ListPracticeReviewFeedbackResponses = {
 };
 
 export type ListPracticeReviewFeedbackResponse = ListPracticeReviewFeedbackResponses[keyof ListPracticeReviewFeedbackResponses];
+
+export type CountPracticeReviewFeedbackByLocationData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: {
+        deliveryState?: Array<'AWAITING_APPROVAL' | 'PREPARED' | 'PARTIALLY_DELIVERED' | 'PARTIALLY_FAILED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED' | 'DISCARDED' | 'UNCONFIRMED'>;
+        suppressionReason?: Array<'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'COMPOSER_WITHHELD' | 'REPEATS_DELIVERED_NOTE' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ISSUE_SNAPSHOT_CHANGED' | 'ARTIFACT_MERGED' | 'PUBLIC_SUBJECT_INELIGIBLE' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_COVERAGE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET' | 'OBSERVATION_INVALIDATED' | 'REVIEWED_REVISION_CHANGED'>;
+        channel?: Array<'IN_CONTEXT' | 'IN_CHAT' | 'IN_APP'>;
+        /**
+         * Where the feedback appears, by the provider that shows it (repeatable): a channel split where the provider is known
+         */
+        location?: Array<'GITHUB' | 'GITLAB' | 'OTHER_WORK' | 'HEPH' | 'SLACK' | 'NEXT_CONVERSATION' | 'PRACTICE_PAGES'>;
+        agentJobId?: string;
+        /**
+         * Keep the feedback written from this observation
+         */
+        observationId?: string;
+        /**
+         * Kind of reviewed work, e.g. scm.pull_request
+         */
+        artifactKind?: string;
+        /**
+         * Artifact ID; requires artifactKind
+         */
+        artifactId?: number;
+        recipientUserId?: number;
+        /**
+         * Practices whose feedback to list (repeatable): feedback bound to an observation of any of them, in any role
+         */
+        practiceSlug?: Array<string>;
+        /**
+         * Practice groups whose feedback to list (repeatable): feedback bound to an observation of a practice in any of them
+         */
+        groupSlug?: Array<string>;
+        /**
+         * Inclusive lower bound
+         */
+        from?: string;
+        /**
+         * Exclusive upper bound
+         */
+        to?: string;
+    };
+    url: '/workspaces/{workspaceSlug}/practices/reviews/feedback/locations';
+};
+
+export type CountPracticeReviewFeedbackByLocationErrors = {
+    /**
+     * Invalid filter
+     */
+    400: ProblemDetail;
+    /**
+     * Workspace administrator access is required
+     */
+    403: ProblemDetail;
+};
+
+export type CountPracticeReviewFeedbackByLocationError = CountPracticeReviewFeedbackByLocationErrors[keyof CountPracticeReviewFeedbackByLocationErrors];
+
+export type CountPracticeReviewFeedbackByLocationResponses = {
+    /**
+     * Counts by location returned
+     */
+    200: Array<ReviewFeedbackLocationCounts>;
+};
+
+export type CountPracticeReviewFeedbackByLocationResponse = CountPracticeReviewFeedbackByLocationResponses[keyof CountPracticeReviewFeedbackByLocationResponses];
+
+export type CountPracticeReviewFeedbackByReasonData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: {
+        deliveryState?: Array<'AWAITING_APPROVAL' | 'PREPARED' | 'PARTIALLY_DELIVERED' | 'PARTIALLY_FAILED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED' | 'DISCARDED' | 'UNCONFIRMED'>;
+        suppressionReason?: Array<'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'COMPOSER_WITHHELD' | 'REPEATS_DELIVERED_NOTE' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ISSUE_SNAPSHOT_CHANGED' | 'ARTIFACT_MERGED' | 'PUBLIC_SUBJECT_INELIGIBLE' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_COVERAGE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET' | 'OBSERVATION_INVALIDATED' | 'REVIEWED_REVISION_CHANGED'>;
+        channel?: Array<'IN_CONTEXT' | 'IN_CHAT' | 'IN_APP'>;
+        /**
+         * Where the feedback appears, by the provider that shows it (repeatable): a channel split where the provider is known
+         */
+        location?: Array<'GITHUB' | 'GITLAB' | 'OTHER_WORK' | 'HEPH' | 'SLACK' | 'NEXT_CONVERSATION' | 'PRACTICE_PAGES'>;
+        agentJobId?: string;
+        /**
+         * Keep the feedback written from this observation
+         */
+        observationId?: string;
+        /**
+         * Kind of reviewed work, e.g. scm.pull_request
+         */
+        artifactKind?: string;
+        /**
+         * Artifact ID; requires artifactKind
+         */
+        artifactId?: number;
+        recipientUserId?: number;
+        /**
+         * Practices whose feedback to list (repeatable): feedback bound to an observation of any of them, in any role
+         */
+        practiceSlug?: Array<string>;
+        /**
+         * Practice groups whose feedback to list (repeatable): feedback bound to an observation of a practice in any of them
+         */
+        groupSlug?: Array<string>;
+        /**
+         * Inclusive lower bound
+         */
+        from?: string;
+        /**
+         * Exclusive upper bound
+         */
+        to?: string;
+    };
+    url: '/workspaces/{workspaceSlug}/practices/reviews/feedback/reasons';
+};
+
+export type CountPracticeReviewFeedbackByReasonErrors = {
+    /**
+     * Invalid filter
+     */
+    400: ProblemDetail;
+    /**
+     * Workspace administrator access is required
+     */
+    403: ProblemDetail;
+};
+
+export type CountPracticeReviewFeedbackByReasonError = CountPracticeReviewFeedbackByReasonErrors[keyof CountPracticeReviewFeedbackByReasonErrors];
+
+export type CountPracticeReviewFeedbackByReasonResponses = {
+    /**
+     * Counts by reason returned
+     */
+    200: Array<ReviewFeedbackReasonCount>;
+};
+
+export type CountPracticeReviewFeedbackByReasonResponse = CountPracticeReviewFeedbackByReasonResponses[keyof CountPracticeReviewFeedbackByReasonResponses];
 
 export type GetPracticeReviewFeedbackData = {
     body?: never;
@@ -13785,6 +14738,62 @@ export type UpdatePracticeReviewFeedbackWithdrawalResponses = {
 };
 
 export type UpdatePracticeReviewFeedbackWithdrawalResponse = UpdatePracticeReviewFeedbackWithdrawalResponses[keyof UpdatePracticeReviewFeedbackWithdrawalResponses];
+
+export type GetPracticeReviewLineageData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query: {
+        kind: 'OBSERVATION' | 'FEEDBACK' | 'REVIEW' | 'WORK';
+        /**
+         * The observation, feedback or review id; required unless kind is WORK
+         */
+        id?: string;
+        /**
+         * Kind of reviewed work, e.g. scm.pull_request; required when kind is WORK
+         */
+        artifactKind?: string;
+        /**
+         * Artifact ID; required when kind is WORK
+         */
+        artifactId?: number;
+        /**
+         * true lists the whole review around the record: every observation and piece of feedback of the review, up to 100 each, and the work's moments; false keeps the short chain
+         */
+        whole?: boolean;
+    };
+    url: '/workspaces/{workspaceSlug}/practices/reviews/lineage';
+};
+
+export type GetPracticeReviewLineageErrors = {
+    /**
+     * The parameters do not name a record of the requested kind
+     */
+    400: ProblemDetail;
+    /**
+     * Workspace administrator access is required
+     */
+    403: ProblemDetail;
+    /**
+     * Nothing of that kind and id was recorded in this workspace
+     */
+    404: ProblemDetail;
+};
+
+export type GetPracticeReviewLineageError = GetPracticeReviewLineageErrors[keyof GetPracticeReviewLineageErrors];
+
+export type GetPracticeReviewLineageResponses = {
+    /**
+     * Lineage returned
+     */
+    200: ReviewLineage;
+};
+
+export type GetPracticeReviewLineageResponse = GetPracticeReviewLineageResponses[keyof GetPracticeReviewLineageResponses];
 
 export type ListPracticeReviewObservationsData = {
     body?: never;
@@ -13947,6 +14956,10 @@ export type GetPracticeReviewOverviewData = {
          * The IANA time zone whose midnights start the buckets, such as Europe/Berlin
          */
         zone?: string;
+        /**
+         * True counts all of the workspace's practice reviews: from the first one's request, whatever from says, so the range may span more than 400 days. The response's from says where it started.
+         */
+        allTime?: boolean;
     };
     url: '/workspaces/{workspaceSlug}/practices/reviews/overview';
 };
@@ -13968,6 +14981,144 @@ export type GetPracticeReviewOverviewResponses = {
 };
 
 export type GetPracticeReviewOverviewResponse = GetPracticeReviewOverviewResponses[keyof GetPracticeReviewOverviewResponses];
+
+export type GetPracticeReviewQueueData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/reviews/queue';
+};
+
+export type GetPracticeReviewQueueResponses = {
+    /**
+     * Practice review queue returned
+     */
+    200: PracticeReviewQueue;
+};
+
+export type GetPracticeReviewQueueResponse = GetPracticeReviewQueueResponses[keyof GetPracticeReviewQueueResponses];
+
+export type ListPracticeReviewDeliveryChecksData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        agentJobId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/reviews/runs/{agentJobId}/delivery-checks';
+};
+
+export type ListPracticeReviewDeliveryChecksErrors = {
+    /**
+     * Invalid review id
+     */
+    400: ProblemDetail;
+    /**
+     * Workspace administrator access is required
+     */
+    403: ProblemDetail;
+};
+
+export type ListPracticeReviewDeliveryChecksError = ListPracticeReviewDeliveryChecksErrors[keyof ListPracticeReviewDeliveryChecksErrors];
+
+export type ListPracticeReviewDeliveryChecksResponses = {
+    /**
+     * Delivery checks returned
+     */
+    200: Array<DeliveryPolicyTrace>;
+};
+
+export type ListPracticeReviewDeliveryChecksResponse = ListPracticeReviewDeliveryChecksResponses[keyof ListPracticeReviewDeliveryChecksResponses];
+
+export type GetPracticeReviewTimingData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: {
+        /**
+         * Inclusive lower bound; defaults to seven days before to. A range spans at most 400 days.
+         */
+        from?: string;
+        /**
+         * Exclusive upper bound; defaults to now
+         */
+        to?: string;
+        /**
+         * True counts all of the workspace's practice reviews: from the first one's request, whatever from says, so the range may span more than 400 days. The response's from says where it started.
+         */
+        allTime?: boolean;
+    };
+    url: '/workspaces/{workspaceSlug}/practices/reviews/timing';
+};
+
+export type GetPracticeReviewTimingErrors = {
+    /**
+     * Invalid range
+     */
+    400: ProblemDetail;
+};
+
+export type GetPracticeReviewTimingError = GetPracticeReviewTimingErrors[keyof GetPracticeReviewTimingErrors];
+
+export type GetPracticeReviewTimingResponses = {
+    /**
+     * Practice reviews measured
+     */
+    200: PracticeReviewTiming;
+};
+
+export type GetPracticeReviewTimingResponse = GetPracticeReviewTimingResponses[keyof GetPracticeReviewTimingResponses];
+
+export type GetPracticeReviewWorkFactsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        /**
+         * Kind of work, e.g. scm.pull_request
+         */
+        artifactKind: string;
+        artifactId: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/reviews/work/{artifactKind}/{artifactId}';
+};
+
+export type GetPracticeReviewWorkFactsErrors = {
+    /**
+     * Not a pull request, merge request or issue
+     */
+    404: ProblemDetail;
+};
+
+export type GetPracticeReviewWorkFactsError = GetPracticeReviewWorkFactsErrors[keyof GetPracticeReviewWorkFactsErrors];
+
+export type GetPracticeReviewWorkFactsResponses = {
+    /**
+     * Facts returned
+     */
+    200: ReviewWorkFacts;
+    /**
+     * Nothing is stored about this work here: it is in no repository this workspace monitors, or the provider deleted it
+     */
+    204: void;
+};
+
+export type GetPracticeReviewWorkFactsResponse = GetPracticeReviewWorkFactsResponses[keyof GetPracticeReviewWorkFactsResponses];
 
 export type ListPracticeStandingsData = {
     body?: never;
@@ -14122,13 +15273,29 @@ export type ListTracedArtifactsData = {
          * Restrict to one kind of work, e.g. scm.pull_request
          */
         artifactKind?: string;
+        /**
+         * Restrict to one piece of work; requires artifactKind
+         */
+        artifactId?: number;
+        /**
+         * Inclusive lower bound on when a signal occurred
+         */
+        from?: string;
+        /**
+         * Exclusive upper bound on when a signal occurred
+         */
+        to?: string;
+        /**
+         * Only the work none of whose signals in the window started a review, which is the work somebody expected a review on and did not get one
+         */
+        withoutReview?: boolean;
     };
     url: '/workspaces/{workspaceSlug}/practices/trace';
 };
 
 export type ListTracedArtifactsErrors = {
     /**
-     * Unknown artifact kind or invalid pagination
+     * Unknown artifact kind, a backwards window or invalid pagination
      */
     400: ProblemDetail;
     /**
@@ -14493,6 +15660,37 @@ export type PlacePracticeResponses = {
 };
 
 export type PlacePracticeResponse = PlacePracticeResponses[keyof PlacePracticeResponses];
+
+export type ListPracticeRevisionsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        practiceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}/revisions';
+};
+
+export type ListPracticeRevisionsErrors = {
+    /**
+     * Practice not found
+     */
+    404: ProblemDetail;
+};
+
+export type ListPracticeRevisionsError = ListPracticeRevisionsErrors[keyof ListPracticeRevisionsErrors];
+
+export type ListPracticeRevisionsResponses = {
+    /**
+     * Versions returned
+     */
+    200: Array<PracticeRevision>;
+};
+
+export type ListPracticeRevisionsResponse = ListPracticeRevisionsResponses[keyof ListPracticeRevisionsResponses];
 
 export type SubmitWorkspaceProductFeedbackData = {
     body: FeedbackRequest;

@@ -39,6 +39,11 @@ public record TimeBucketParams(
         return TimeBuckets.of(new TimeRangeFilterParams(from, to).toRange(clock), zoneId());
     }
 
+    /** The buckets of a range the caller settled itself, such as all time, in this time zone. */
+    public TimeBuckets toBuckets(TimeRange range) {
+        return TimeBuckets.of(range, zoneId());
+    }
+
     /**
      * An ID from Java's time zone database, such as Europe/Berlin or UTC; a bare offset such as +02:00 is rejected
      * because it keeps one clock across a daylight-saving change.

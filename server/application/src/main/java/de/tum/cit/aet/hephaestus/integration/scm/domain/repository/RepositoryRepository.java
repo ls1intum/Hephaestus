@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.domain.repository;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -36,6 +37,10 @@ public interface RepositoryRepository extends JpaRepository<Repository, Long> {
     Optional<Repository> findByNativeIdAndProviderId(Long nativeId, Long providerId);
 
     Optional<Repository> findByNameWithOwnerAndProviderId(String nameWithOwner, Long providerId);
+
+    /** Whether a repository of this name and native id exists on a provider of another type. */
+    boolean existsByNameWithOwnerAndNativeIdAndProviderTypeNot(
+            String nameWithOwner, Long nativeId, IdentityProviderType providerType);
 
     /**
      * Finds a repository by ID with the organization eagerly fetched.
@@ -88,8 +93,10 @@ public interface RepositoryRepository extends JpaRepository<Repository, Long> {
      */
     @Query("""
         SELECT r FROM Repository r LEFT JOIN FETCH r.provider
-        WHERE r.nameWithOwner IN (
-            SELECT m.nameWithOwner FROM RepositoryToMonitor m WHERE m.workspace.id = :workspaceId
+        WHERE EXISTS (
+            SELECT 1 FROM RepositoryToMonitor m
+            WHERE m.workspace.id = :workspaceId AND m.nameWithOwner = r.nameWithOwner
+                AND monitor_covers_repository(m.workspace.id, m.nativeId, r.nativeId, r.provider.id) = true
         )
         ORDER BY r.nameWithOwner
         """)
@@ -103,8 +110,10 @@ public interface RepositoryRepository extends JpaRepository<Repository, Long> {
     @Query("""
         SELECT r FROM Repository r JOIN FETCH r.provider p
         WHERE p.id = :providerId
-        AND r.nameWithOwner IN (
-            SELECT m.nameWithOwner FROM RepositoryToMonitor m WHERE m.workspace.id = :workspaceId
+        AND EXISTS (
+            SELECT 1 FROM RepositoryToMonitor m
+            WHERE m.workspace.id = :workspaceId AND m.nameWithOwner = r.nameWithOwner
+                AND monitor_covers_repository(m.workspace.id, m.nativeId, r.nativeId, r.provider.id) = true
         )
         ORDER BY r.nameWithOwner
         """)

@@ -11,6 +11,7 @@ import de.tum.cit.aet.hephaestus.practices.dto.PlacePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeDefinitionOptionsDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeGuidanceDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.PracticeRevisionDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.ReorderPracticesRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.ReviewedPracticeDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeAutonomyRequestDTO;
@@ -63,6 +64,7 @@ public class PracticeCatalogController {
     private final AutonomyRollupService rollupService;
     private final PracticeGroupService groupService;
     private final PracticeDefinitionOptionsService definitionOptionsService;
+    private final PracticeRevisionService practiceRevisionService;
 
     @GetMapping("/definition-options")
     @Operation(
@@ -165,6 +167,30 @@ public class PracticeCatalogController {
                                 ? CacheControl.noCache().cachePrivate()
                                 : CacheControl.noStore())
                 .body(guidance);
+    }
+
+    @GetMapping("/{practiceSlug}/revisions")
+    @Operation(
+            summary = "List the versions of a practice definition",
+            description = "Every stored version, newest first, with the parts of the definition that differ from the"
+                    + " version before it and whether what a review checks changed.",
+            operationId = "listPracticeRevisions")
+    @ApiResponse(
+            responseCode = "200",
+            description = "Versions returned",
+            content = @Content(array = @ArraySchema(schema = @Schema(implementation = PracticeRevisionDTO.class))))
+    @ApiResponse(
+            responseCode = "404",
+            description = "Practice not found",
+            content =
+                    @Content(
+                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetail.class)))
+    @RequireAtLeastWorkspaceAdmin
+    public ResponseEntity<List<PracticeRevisionDTO>> listPracticeRevisions(
+            WorkspaceContext workspaceContext, @PathVariable String practiceSlug) {
+        Practice practice = practiceService.getPractice(workspaceContext, practiceSlug);
+        return ResponseEntity.ok(practiceRevisionService.history(practice));
     }
 
     @PostMapping

@@ -195,14 +195,63 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
           AND o.observed_at < :to
         """;
 
-    @Query(value = "SELECT o.agent_job_id AS \"jobId\"," + ASSESSMENT_COUNTS + """
+    /** The observations each run recorded, by assessment. One an admin marked incorrect counts as never made. */
+    @Query(
+            value = "SELECT o.agent_job_id AS \"jobId\"," + ASSESSMENT_COUNTS + """
         FROM observation o
         WHERE o.workspace_id = :workspaceId
           AND o.agent_job_id IN :jobIds
+          AND NOT
+        """ + INVALIDATED + """
         GROUP BY o.agent_job_id
-        """, nativeQuery = true)
+        """,
+            nativeQuery = true)
     List<ReviewObservationCounts> summarizeReviewObservations(
             @Param("workspaceId") Long workspaceId, @Param("jobIds") Collection<UUID> jobIds);
+
+    /**
+     * The observations the given runs recorded that still stand, about anyone: only the columns the admin review list
+     * reads to name a run's developers and to tally it with {@link RunPracticeOutcomes}, never the evidence or the
+     * reasoning. One an admin marked incorrect counts as never made and is left out.
+     */
+    @Query(value = """
+        SELECT o.agent_job_id AS "agentJobId", o.id AS "id", p.slug AS "practiceSlug", p.name AS "practiceName",
+               o.outcome AS "outcome", rev.review_rule_fingerprint AS "reviewRuleFingerprint",
+               o.about_user_id AS "aboutUserId", o.observed_at AS "observedAt"
+        FROM observation o
+        JOIN practice p ON p.id = o.practice_id
+        LEFT JOIN practice_revision rev ON rev.id = o.practice_revision_id
+        WHERE o.workspace_id = :workspaceId
+          AND o.agent_job_id IN (:jobIds)
+          AND NOT
+        """ + INVALIDATED, nativeQuery = true)
+    List<StandingRunObservationRow> findStandingRunObservations(
+            @Param("workspaceId") Long workspaceId, @Param("jobIds") Collection<UUID> jobIds);
+
+    interface StandingRunObservationRow {
+        UUID getAgentJobId();
+
+        UUID getId();
+
+        String getPracticeSlug();
+
+        String getPracticeName();
+
+        String getOutcome();
+
+        @Nullable
+        String getReviewRuleFingerprint();
+
+        Long getAboutUserId();
+
+        Instant getObservedAt();
+
+        /** What {@link RunPracticeOutcomes} counts of it. */
+        default RunPracticeOutcomes.Counted counted() {
+            return new RunPracticeOutcomes.Counted(
+                    getPracticeSlug(), getPracticeName(), Outcome.valueOf(getOutcome()), getReviewRuleFingerprint());
+        }
+    }
 
     /**
      * Observations recorded in {@code [from, to)} by practice, most observed first, then by name: one row for each

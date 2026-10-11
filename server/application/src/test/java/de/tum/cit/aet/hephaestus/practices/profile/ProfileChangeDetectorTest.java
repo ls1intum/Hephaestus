@@ -259,7 +259,8 @@ class ProfileChangeDetectorTest {
                 List.of(),
                 List.of(),
                 direction,
-                null);
+                null,
+                false);
     }
 
     private static PracticeGroupStandingDTO group(PracticeGroupStandingDTO.Standing standing) {

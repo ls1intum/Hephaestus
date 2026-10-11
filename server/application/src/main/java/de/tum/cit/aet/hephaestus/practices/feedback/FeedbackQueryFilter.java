@@ -10,11 +10,14 @@ public record FeedbackQueryFilter(
         @Nullable List<FeedbackDeliveryState> deliveryStates,
         @Nullable List<FeedbackSuppressionReason> suppressionReasons,
         @Nullable List<FeedbackChannel> channels,
+        @Nullable List<FeedbackLocation> locations,
         @Nullable UUID agentJobId,
+        @Nullable UUID observationId,
         @Nullable ArtifactKind artifactKind,
         @Nullable Long artifactId,
         @Nullable Long recipientUserId,
         @Nullable List<String> practiceSlugs,
+        @Nullable List<String> groupSlugs,
         @Nullable Instant from,
         @Nullable Instant to) {
     public String @Nullable [] deliveryStateNames() {
@@ -29,8 +32,16 @@ public record FeedbackQueryFilter(
         return names(channels);
     }
 
+    public String @Nullable [] locationNames() {
+        return names(locations);
+    }
+
     public String @Nullable [] practiceSlugArray() {
         return practiceSlugs == null || practiceSlugs.isEmpty() ? null : practiceSlugs.toArray(String[]::new);
+    }
+
+    public String @Nullable [] groupSlugArray() {
+        return groupSlugs == null || groupSlugs.isEmpty() ? null : groupSlugs.toArray(String[]::new);
     }
 
     public @Nullable String artifactKindValue() {

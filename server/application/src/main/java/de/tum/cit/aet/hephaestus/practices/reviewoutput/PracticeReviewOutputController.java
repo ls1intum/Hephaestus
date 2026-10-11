@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.reviewoutput;
 
 import de.tum.cit.aet.hephaestus.core.AuditExempt;
 import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.feedback.approval.FeedbackApprovalService;
 import de.tum.cit.aet.hephaestus.practices.feedback.approval.dto.DecideFeedbackProposalRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.feedback.approval.dto.FeedbackApprovalDTO;
@@ -9,10 +10,16 @@ import de.tum.cit.aet.hephaestus.practices.feedback.inapp.FeedbackWithdrawalServ
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationInvalidationService;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewFeedbackDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewFeedbackDetailDTO;
+import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewFeedbackLocationCountsDTO;
+import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewFeedbackReasonCountDTO;
+import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewLineageDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewObservationDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewObservationDetailDTO;
+import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewWorkFactsDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.UpdateFeedbackWithdrawalRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.UpdateObservationValidityRequestDTO;
+import de.tum.cit.aet.hephaestus.practices.trace.dto.DeliveryPolicyTraceDTO;
+import de.tum.cit.aet.hephaestus.practices.web.QueryFilterSupport;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
@@ -25,11 +32,16 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Positive;
+import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.web.PagedModel;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
@@ -41,6 +53,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.server.ResponseStatusException;
 
 @WorkspaceScopedController
 @RequestMapping("/practices/reviews")
@@ -55,6 +68,8 @@ public class PracticeReviewOutputController {
     private final FeedbackApprovalService feedbackApprovalService;
     private final ObservationInvalidationService invalidationService;
     private final FeedbackWithdrawalService withdrawalService;
+    private final ReviewLineageService lineageService;
+    private final ReviewWorkFactsQueryService workFactsQueryService;
 
     @GetMapping("/observations")
     @Operation(
@@ -168,6 +183,60 @@ public class PracticeReviewOutputController {
                 feedbackQueryService.list(workspaceContext.id(), filter.toFilter(), sort, PageRequest.of(page, size))));
     }
 
+    @GetMapping("/feedback/locations")
+    @Operation(
+            summary = "Count practice review feedback by location and delivery state",
+            description = "Counts the feedback that the list returns under the same filter, by where it appears."
+                    + " A location with no feedback is left out.",
+            operationId = "countPracticeReviewFeedbackByLocation")
+    @ApiResponse(responseCode = "200", description = "Counts by location returned")
+    @ApiResponse(
+            responseCode = "400",
+            description = "Invalid filter",
+            content =
+                    @Content(
+                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetail.class)))
+    @ApiResponse(
+            responseCode = "403",
+            description = "Workspace administrator access is required",
+            content =
+                    @Content(
+                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetail.class)))
+    public ResponseEntity<List<ReviewFeedbackLocationCountsDTO>> countFeedbackByLocation(
+            WorkspaceContext workspaceContext, @Valid @ParameterObject ReviewFeedbackFilterParams filter) {
+        return ResponseEntity.ok(feedbackQueryService.countByLocation(workspaceContext.id(), filter.toFilter()));
+    }
+
+    @GetMapping("/feedback/reasons")
+    @Operation(
+            summary = "Count withheld practice review feedback by reason",
+            description = "Counts the feedback that the list returns under the same filter and that carries a"
+                    + " suppression reason, by that reason. Withheld feedback without a reason is one count with no"
+                    + " reason. A reason with no feedback is left out. Only counts are returned, never the feedback"
+                    + " itself.",
+            operationId = "countPracticeReviewFeedbackByReason")
+    @ApiResponse(responseCode = "200", description = "Counts by reason returned")
+    @ApiResponse(
+            responseCode = "400",
+            description = "Invalid filter",
+            content =
+                    @Content(
+                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetail.class)))
+    @ApiResponse(
+            responseCode = "403",
+            description = "Workspace administrator access is required",
+            content =
+                    @Content(
+                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetail.class)))
+    public ResponseEntity<List<ReviewFeedbackReasonCountDTO>> countFeedbackByReason(
+            WorkspaceContext workspaceContext, @Valid @ParameterObject ReviewFeedbackFilterParams filter) {
+        return ResponseEntity.ok(feedbackQueryService.countByReason(workspaceContext.id(), filter.toFilter()));
+    }
+
     @GetMapping("/feedback/{feedbackId}")
     @Operation(
             summary = "Get feedback with its stored body, observations and placements",
@@ -232,7 +301,7 @@ public class PracticeReviewOutputController {
             @PathVariable UUID feedbackId,
             @Valid @RequestBody DecideFeedbackProposalRequestDTO request) {
         long actorAccountId = SecurityUtils.getCurrentAccountId().orElseThrow();
-        return ResponseEntity.ok(FeedbackApprovalDTO.from(
+        return ResponseEntity.ok(feedbackQueryService.approval(
                 feedbackApprovalService.decide(workspaceContext.id(), feedbackId, actorAccountId, request)));
     }
 
@@ -241,6 +310,152 @@ public class PracticeReviewOutputController {
     public ResponseEntity<FeedbackApprovalDTO> getFeedbackProposalDecision(
             WorkspaceContext workspaceContext, @PathVariable UUID feedbackId) {
         return ResponseEntity.ok(
-                FeedbackApprovalDTO.from(feedbackApprovalService.get(workspaceContext.id(), feedbackId)));
+                feedbackQueryService.approval(feedbackApprovalService.get(workspaceContext.id(), feedbackId)));
+    }
+
+    @GetMapping("/runs/{agentJobId}/delivery-checks")
+    @Operation(
+            summary = "List the delivery checks a review ran for itself",
+            description = "The checks of the review as a whole, not of one piece of feedback; a piece of feedback"
+                    + " lists its own on its detail. Oldest first; empty for a review of another workspace.",
+            operationId = "listPracticeReviewDeliveryChecks")
+    @ApiResponse(responseCode = "200", description = "Delivery checks returned")
+    @ApiResponse(
+            responseCode = "400",
+            description = "Invalid review id",
+            content =
+                    @Content(
+                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetail.class)))
+    @ApiResponse(
+            responseCode = "403",
+            description = "Workspace administrator access is required",
+            content =
+                    @Content(
+                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetail.class)))
+    public ResponseEntity<List<DeliveryPolicyTraceDTO>> listReviewDeliveryChecks(
+            WorkspaceContext workspaceContext, @PathVariable UUID agentJobId) {
+        return ResponseEntity.ok(feedbackQueryService.reviewDeliveryChecks(workspaceContext.id(), agentJobId));
+    }
+
+    @GetMapping("/work/{artifactKind}/{artifactId}")
+    @Operation(
+            summary = "Get what the provider reported about a pull request, merge request or issue",
+            description = "Its author, state, branches, times, size and the state of the checks on its head, as the"
+                    + " last sync stored them. Only work in a repository this workspace monitors that the provider has"
+                    + " not deleted: other work answers 204, because nothing is stored about it here. A conversation"
+                    + " or a document has no such facts"
+                    + " and answers 404.",
+            operationId = "getPracticeReviewWorkFacts")
+    @ApiResponse(
+            responseCode = "200",
+            description = "Facts returned",
+            content = @Content(schema = @Schema(implementation = ReviewWorkFactsDTO.class)))
+    @ApiResponse(
+            responseCode = "204",
+            description = "Nothing is stored about this work here: it is in no repository this workspace monitors,"
+                    + " or the provider deleted it",
+            content = @Content)
+    @ApiResponse(
+            responseCode = "404",
+            description = "Not a pull request, merge request or issue",
+            content =
+                    @Content(
+                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetail.class)))
+    public ResponseEntity<ReviewWorkFactsDTO> getWorkFacts(
+            WorkspaceContext workspaceContext,
+            @Parameter(description = "Kind of work, e.g. scm.pull_request") @PathVariable String artifactKind,
+            @PathVariable @Positive Long artifactId) {
+        // A path variable is never null, so the kind is always named here.
+        ArtifactKind kind = Objects.requireNonNull(QueryFilterSupport.artifactKind(artifactKind));
+        return workFactsQueryService
+                .get(workspaceContext.id(), kind, artifactId)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.noContent().build());
+    }
+
+    @GetMapping("/lineage")
+    @Operation(
+            summary = "Trace how an observation, piece of feedback, review or piece of work came about",
+            description = "Returns the chain from the reviewed work through the review and its observations to the"
+                    + " feedback written from them, where it went, whether the developer answered or disputes it"
+                    + " (never their rating or private notes) and whether their work resolved it. OBSERVATION,"
+                    + " FEEDBACK and REVIEW take `id`; WORK takes `artifactKind` and `artifactId` and traces the"
+                    + " newest review of that work. Each list is capped and carries a count of what it leaves out.",
+            operationId = "getPracticeReviewLineage")
+    @ApiResponse(
+            responseCode = "200",
+            description = "Lineage returned",
+            content = @Content(schema = @Schema(implementation = ReviewLineageDTO.class)))
+    @ApiResponse(
+            responseCode = "400",
+            description = "The parameters do not name a record of the requested kind",
+            content =
+                    @Content(
+                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetail.class)))
+    @ApiResponse(
+            responseCode = "404",
+            description = "Nothing of that kind and id was recorded in this workspace",
+            content =
+                    @Content(
+                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetail.class)))
+    @ApiResponse(
+            responseCode = "403",
+            description = "Workspace administrator access is required",
+            content =
+                    @Content(
+                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetail.class)))
+    public ResponseEntity<ReviewLineageDTO> getLineage(
+            WorkspaceContext workspaceContext,
+            @RequestParam ReviewLineageKind kind,
+            @Parameter(description = "The observation, feedback or review id; required unless kind is WORK")
+                    @RequestParam(required = false)
+                    @Nullable
+                    UUID id,
+            @Parameter(description = "Kind of reviewed work, e.g. scm.pull_request; required when kind is WORK")
+                    @RequestParam(required = false)
+                    @Nullable
+                    String artifactKind,
+            @Parameter(description = "Artifact ID; required when kind is WORK")
+                    @RequestParam(required = false)
+                    @Positive
+                    @Nullable
+                    Long artifactId,
+            @Parameter(
+                            description = "true lists the whole review around the record: every observation and piece"
+                                    + " of feedback of the review, up to 100 each, and the work's moments; false keeps"
+                                    + " the short chain")
+                    @RequestParam(defaultValue = "false")
+                    boolean whole) {
+        Long workspaceId = workspaceContext.id();
+        return ResponseEntity.ok(
+                switch (kind) {
+                    case OBSERVATION -> lineageService.ofObservation(workspaceId, recordId(id), whole);
+                    case FEEDBACK -> lineageService.ofFeedback(workspaceId, recordId(id), whole);
+                    case REVIEW -> lineageService.ofReview(workspaceId, recordId(id), whole);
+                    case WORK -> ofWork(workspaceId, artifactKind, artifactId, whole);
+                });
+    }
+
+    private ReviewLineageDTO ofWork(
+            Long workspaceId, @Nullable String artifactKind, @Nullable Long artifactId, boolean whole) {
+        ArtifactKind work = QueryFilterSupport.artifactKind(artifactKind);
+        if (work == null || artifactId == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "Name the kind of work and its id to trace a piece of work.");
+        }
+        return lineageService.ofWork(workspaceId, work, artifactId, whole);
+    }
+
+    private static UUID recordId(@Nullable UUID id) {
+        if (id == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Name the record to trace with its id.");
+        }
+        return id;
     }
 }

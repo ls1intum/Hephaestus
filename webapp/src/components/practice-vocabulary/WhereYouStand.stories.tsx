@@ -14,7 +14,9 @@ const support: TrendSupport = {
 	opportunities: 8,
 	opportunitiesUntilComparable: 0,
 	previousOpportunities: 4,
+	reviewedWork: 4,
 	ropeHalfWidth: 0.1,
+	standingWork: 4,
 };
 
 /**

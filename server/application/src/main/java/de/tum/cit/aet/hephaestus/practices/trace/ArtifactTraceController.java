@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.profile.PracticeProfileReviewRunService;
 import de.tum.cit.aet.hephaestus.practices.trace.dto.ArtifactTraceDTO;
 import de.tum.cit.aet.hephaestus.practices.trace.dto.TracedArtifactDTO;
+import de.tum.cit.aet.hephaestus.practices.web.QueryFilterSupport;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
 import de.tum.cit.aet.hephaestus.workspace.authorization.WorkspaceAccessService;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
@@ -15,11 +16,14 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.web.PagedModel;
 import org.springframework.http.MediaType;
@@ -59,12 +63,13 @@ public class ArtifactTraceController {
             summary = "List work this workspace recorded something about",
             description = "Workspace admins only. Built from the signal ledger, so it includes work that was never "
                     + "reviewed — which is exactly what a listing derived from review runs cannot show. Most "
-                    + "recently signalled first.",
+                    + "recently signalled first. A from/to window keeps the signals that occurred in it, so each "
+                    + "row and its counts then describe that window.",
             operationId = "listTracedArtifacts")
     @ApiResponse(responseCode = "200", description = "Paginated artifacts returned")
     @ApiResponse(
             responseCode = "400",
-            description = "Unknown artifact kind or invalid pagination",
+            description = "Unknown artifact kind, a backwards window or invalid pagination",
             content =
                     @Content(
                             mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
@@ -80,12 +85,9 @@ public class ArtifactTraceController {
             WorkspaceContext workspaceContext,
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "25") @Min(1) @Max(100) int size,
-            @Parameter(description = "Restrict to one kind of work, e.g. scm.pull_request")
-                    @RequestParam(required = false)
-                    @Nullable
-                    String artifactKind) {
+            @Valid @ParameterObject TracedArtifactFilterParams filter) {
         return ResponseEntity.ok(new PagedModel<>(
-                queryService.list(workspaceContext.id(), parseKind(artifactKind), PageRequest.of(page, size))));
+                queryService.list(filter.toFilter(workspaceContext.id()), PageRequest.of(page, size))));
     }
 
     @GetMapping("/{artifactKind}/{artifactId}")
@@ -122,10 +124,7 @@ public class ArtifactTraceController {
                     @RequestParam(required = false)
                     @Nullable
                     UUID reviewId) {
-        ArtifactKind kind = parseKind(artifactKind);
-        if (kind == null) {
-            throw new IllegalArgumentException("Name the kind of work to trace.");
-        }
+        ArtifactKind kind = Objects.requireNonNull(QueryFilterSupport.artifactKind(artifactKind));
         Long developerId = null;
         if (!access.isAdmin()) {
             if (reviewId == null) {
@@ -160,10 +159,7 @@ public class ArtifactTraceController {
             @PathVariable String artifactKind,
             @PathVariable Long artifactId,
             @RequestParam UUID reviewId) {
-        ArtifactKind kind = parseKind(artifactKind);
-        if (kind == null) {
-            throw new IllegalArgumentException("Name the kind of work to trace.");
-        }
+        ArtifactKind kind = Objects.requireNonNull(QueryFilterSupport.artifactKind(artifactKind));
         long developerId = ownDeveloper(workspaceContext, kind, artifactId, reviewId);
         return ResponseEntity.ok(queryService.trace(workspaceContext.id(), kind, artifactId, reviewId, developerId));
     }
@@ -172,13 +168,5 @@ public class ArtifactTraceController {
         return reviewRuns
                 .ownRunDeveloperOn(workspaceContext.id(), reviewId, kind, artifactId)
                 .orElseThrow(() -> new EntityNotFoundException("Review", reviewId.toString()));
-    }
-
-    /** A malformed kind is a bad request, not a 500: the grammar is enforced by {@link ArtifactKind}. */
-    private static @Nullable ArtifactKind parseKind(@Nullable String value) {
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        return ArtifactKind.of(value);
     }
 }

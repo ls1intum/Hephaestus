@@ -24,6 +24,14 @@ public class PracticeTrendService {
         return clock.instant().minus(PracticeStandingService.LOOKBACK_DAYS, ChronoUnit.DAYS);
     }
 
+    /**
+     * How many of a practice's newest opportunities its standing reads: its current bundle, so the standing work a
+     * trend reports is the work the standing was read from.
+     */
+    public int standingWindow() {
+        return properties.getBundleSize();
+    }
+
     /** One practice's trend over its evidence observed from {@code since}; insufficient over none. */
     public PracticeTrend calculatePractice(String practiceSlug, List<Observation> evidence, Instant since) {
         return PracticeTrendCalculator.calculatePractice(practiceSlug, evidence, since, properties);

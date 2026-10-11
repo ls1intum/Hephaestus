@@ -2,22 +2,31 @@ package de.tum.cit.aet.hephaestus.workspace;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InstallationRepositoryEnumerator;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ProvisioningListener;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.app.GitHubAppTokenService;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.StubInstallationRepositoryEnumerator;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
+import de.tum.cit.aet.hephaestus.workspace.adapter.WorkspaceSyncTargetProvider;
+import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.util.ReflectionTestUtils;
 
 class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
 
@@ -46,6 +55,12 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private ConnectionRepository connectionRepository;
+
+    @Autowired
+    private WorkspaceSyncTargetProvider workspaceSyncTargetProvider;
+
+    private static final String SHARED_NAME = "shared-org/shared-repo";
+    private static final String GITLAB_SERVER_URL = "https://gitlab.example.com";
 
     @BeforeEach
     void setup() {
@@ -133,6 +148,68 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
         assertThat(repositoryToMonitorRepository.findByWorkspaceId(workspace.getId()))
                 .extracting(RepositoryToMonitor::getNameWithOwner)
                 .containsExactly("HephaestusTest/retained");
+    }
+
+    @Test
+    void tokenWorkspaceDoesNotTakeTheIdOfAGitLabRepositoryOfTheSameName() {
+        Workspace workspace = persistGitHubTokenWorkspace();
+        persistRepository(IdentityProviderType.GITLAB, GITLAB_SERVER_URL, 701L);
+
+        workspaceRepositoryMonitorService.addRepositoryToMonitor(workspace.getWorkspaceSlug(), SHARED_NAME);
+
+        // The GitLab project's id would hide the GitHub repository from every scoped query.
+        assertThat(repositoryToMonitorRepository.findByWorkspaceId(workspace.getId()))
+                .singleElement()
+                .extracting(RepositoryToMonitor::getNativeId)
+                .isNull();
+    }
+
+    @Test
+    void reconcileReplacesAnIdTakenFromAGitLabRepositoryOfTheSameName() {
+        Workspace workspace = persistGitHubTokenWorkspace();
+        persistRepository(IdentityProviderType.GITLAB, GITLAB_SERVER_URL, 701L);
+        persistRepository(IdentityProviderType.GITHUB, "https://github.com", 9001L);
+        RepositoryToMonitor monitor = buildMonitor(workspace, SHARED_NAME);
+        monitor.setNativeId(701L);
+        monitor = repositoryToMonitorRepository.saveAndFlush(monitor);
+
+        workspaceSyncTargetProvider.reconcileSyncTargetIdentity(monitor.getId(), 9001L, SHARED_NAME);
+
+        assertThat(repositoryToMonitorRepository.findById(monitor.getId()))
+                .get()
+                .extracting(RepositoryToMonitor::getNativeId)
+                .isEqualTo(9001L);
+    }
+
+    private Workspace persistGitHubTokenWorkspace() {
+        Workspace saved = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("ws-github-token"));
+        Connection connection = new Connection(
+                saved,
+                IntegrationKind.GITHUB,
+                null,
+                new ConnectionConfig.GitHubPatConfig(saved.getAccountLogin(), null, Set.of()));
+        connection.setDisplayName(saved.getAccountLogin());
+        ReflectionTestUtils.setField(connection, "state", IntegrationState.ACTIVE);
+        connectionRepository.save(connection);
+        return saved;
+    }
+
+    private void persistRepository(IdentityProviderType type, String serverUrl, long nativeId) {
+        IdentityProvider provider = gitProviderRepository
+                .findByTypeAndServerUrl(type, serverUrl)
+                .orElseGet(() -> gitProviderRepository.save(new IdentityProvider(type, serverUrl)));
+        Repository repository = new Repository();
+        repository.setNativeId(nativeId);
+        repository.setName("shared-repo");
+        repository.setNameWithOwner(SHARED_NAME);
+        repository.setHtmlUrl(serverUrl + "/" + SHARED_NAME);
+        repository.setVisibility(Repository.Visibility.PRIVATE);
+        repository.setDefaultBranch("main");
+        repository.setCreatedAt(Instant.now());
+        repository.setUpdatedAt(Instant.now());
+        repository.setPushedAt(Instant.now());
+        repository.setProvider(provider);
+        repositoryRepository.save(repository);
     }
 
     private Workspace persistWorkspace(RepositorySelection selection) {

@@ -1,9 +1,12 @@
 package de.tum.cit.aet.hephaestus.practices.observation.trend;
 
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.practices.observation.ReviewedWorkKey;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Set;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -25,6 +28,7 @@ final class TrendSupportFactory {
             int currentOpportunities,
             int previousOpportunities,
             int opportunitiesUntilComparable,
+            Set<ReviewedWorkKey> reviewedWork,
             List<EvidenceOpportunity> trail) {
         // One practice's bundles are disjoint, so no piece of reviewed work is in both.
         return build(
@@ -33,6 +37,8 @@ final class TrendSupportFactory {
                 previousOpportunities,
                 currentOpportunities + previousOpportunities,
                 opportunitiesUntilComparable,
+                currentOpportunities,
+                reviewedWork,
                 null,
                 null,
                 trail);
@@ -50,6 +56,8 @@ final class TrendSupportFactory {
             int previousOpportunities,
             int opportunities,
             int opportunitiesUntilComparable,
+            int standingWork,
+            Set<ReviewedWorkKey> reviewedWork,
             int comparablePractices,
             int eligiblePractices,
             List<EvidenceOpportunity> trail) {
@@ -59,6 +67,8 @@ final class TrendSupportFactory {
                 previousOpportunities,
                 opportunities,
                 opportunitiesUntilComparable,
+                standingWork,
+                reviewedWork,
                 comparablePractices,
                 eligiblePractices,
                 trail);
@@ -70,6 +80,8 @@ final class TrendSupportFactory {
             int previousOpportunities,
             int opportunities,
             int opportunitiesUntilComparable,
+            int standingWork,
+            Set<ReviewedWorkKey> reviewedWork,
             @Nullable Integer comparablePractices,
             @Nullable Integer eligiblePractices,
             List<EvidenceOpportunity> trail) {
@@ -91,6 +103,9 @@ final class TrendSupportFactory {
                 previousOpportunities,
                 opportunities,
                 opportunitiesUntilComparable,
+                standingWork,
+                reviewedWork.size(),
+                sharedKind(reviewedWork),
                 comparablePractices,
                 eligiblePractices,
                 first,
@@ -99,5 +114,12 @@ final class TrendSupportFactory {
                 properties.getBundleSize(),
                 properties.getRopeHalfWidth(),
                 properties.getCredibilityThreshold());
+    }
+
+    /** The kind every piece of work shares, so a reader can be told "pull requests"; none when mixed or empty. */
+    private static @Nullable ArtifactKind sharedKind(Set<ReviewedWorkKey> work) {
+        List<ArtifactKind> kinds =
+                work.stream().map(ReviewedWorkKey::kind).distinct().toList();
+        return kinds.size() == 1 ? kinds.getFirst() : null;
     }
 }

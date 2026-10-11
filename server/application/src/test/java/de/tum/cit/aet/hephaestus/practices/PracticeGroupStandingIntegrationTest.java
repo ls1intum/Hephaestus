@@ -25,6 +25,7 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.hamcrest.MatcherAssert;
@@ -184,6 +185,21 @@ class PracticeGroupStandingIntegrationTest extends AbstractWorkspaceIntegrationT
             Long artifactId,
             Instant observedAt,
             String artifactKind) {
+        return insertObservation(
+                job, targetPractice, user, title, outcome, severity, artifactId, observedAt, artifactKind, "LIVE");
+    }
+
+    private UUID insertObservation(
+            AgentJob job,
+            Practice targetPractice,
+            User user,
+            String title,
+            String outcome,
+            @Nullable String severity,
+            Long artifactId,
+            Instant observedAt,
+            String artifactKind,
+            String origin) {
         UUID id = UUID.randomUUID();
         observationRepository.insertIfAbsent(
                 id,
@@ -202,8 +218,19 @@ class PracticeGroupStandingIntegrationTest extends AbstractWorkspaceIntegrationT
                 "Test reasoning for " + title,
                 null,
                 observedAt,
-                "LIVE");
+                origin);
         return id;
+    }
+
+    private WebTestClient.BodyContentSpec readPracticeStandings() {
+        return webTestClient
+                .get()
+                .uri("/workspaces/{workspaceSlug}/practices/standings", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody();
     }
 
     private void insertInapplicableObservation(Practice targetPractice, Outcome outcome, Long artifactId) {
@@ -419,6 +446,12 @@ class PracticeGroupStandingIntegrationTest extends AbstractWorkspaceIntegrationT
                     .doesNotExist()
                     .jsonPath("$[0].observations.length()")
                     .isEqualTo(0);
+
+            readPracticeStandings()
+                    .jsonPath("$[0].standing")
+                    .isEqualTo("NO_OPPORTUNITY")
+                    .jsonPath("$[0].notApplicableOnly")
+                    .isEqualTo(true);
         }
 
         @Test
@@ -437,6 +470,9 @@ class PracticeGroupStandingIntegrationTest extends AbstractWorkspaceIntegrationT
                     .expectBody()
                     .jsonPath("$[0].standing")
                     .isEqualTo("NO_OPPORTUNITY");
+
+            // Undetermined is not "did not apply": the practice stays a silence, not a practice that never applied.
+            readPracticeStandings().jsonPath("$[0].notApplicableOnly").isEqualTo(false);
         }
 
         @Test
@@ -629,7 +665,7 @@ class PracticeGroupStandingIntegrationTest extends AbstractWorkspaceIntegrationT
 
         @Test
         @WithUser
-        @DisplayName("a practice no longer reviewed does not vote in the group trend either")
+        @DisplayName("a practice switched off leaves the profile: no vote in the group trend, no evidence, no standing")
         void shouldKeepAnIneligiblePracticeOutOfTheGroupTrend() {
             persistStrengthPractice("commit-messages", "Commit Messages", 1L);
             Practice retired = persistPractice(workspace, group, "test-coverage", "Test Coverage");
@@ -647,8 +683,88 @@ class PracticeGroupStandingIntegrationTest extends AbstractWorkspaceIntegrationT
                     .expectBody()
                     .jsonPath("$[0].trendSupport.currentOpportunities")
                     .isEqualTo(1)
+                    // Its evidence leaves with it, even though the developer held a standing on it.
                     .jsonPath("$[0].observations.length()")
-                    .isEqualTo(2);
+                    .isEqualTo(1);
+
+            readPracticeStandings()
+                    .jsonPath("$[?(@.slug == 'test-coverage')]")
+                    .isEmpty()
+                    .jsonPath("$[?(@.slug == 'commit-messages')]")
+                    .isNotEmpty();
+        }
+
+        @Test
+        @WithUser
+        @DisplayName("counts the reviewed work a standing rests on: live verdicts in the look-back, each piece once")
+        void shouldCountTheReviewedWorkBehindAStanding() {
+            Instant now = Instant.now();
+            // Fourteen pull requests with a verdict, the newest last: more than the chart keeps.
+            for (long artifactId = 1; artifactId <= 14; artifactId++) {
+                insertObservation(
+                        agentJob,
+                        practice,
+                        developer,
+                        "Clear description " + artifactId,
+                        "MET",
+                        null,
+                        artifactId,
+                        now.minus(15 - artifactId, ChronoUnit.HOURS));
+            }
+            // None of these is reviewed work for the practice: no verdict, outside the look-back, requested
+            // rather than live, and someone else's.
+            insertInapplicableObservation(practice, Outcome.NOT_APPLICABLE, 50L);
+            insertObservation(
+                    agentJob, practice, developer, "Old gap", "NOT_MET", "MAJOR", 60L, now.minus(100, ChronoUnit.DAYS));
+            insertObservation(
+                    agentJob,
+                    practice,
+                    developer,
+                    "Requested gap",
+                    "NOT_MET",
+                    "MAJOR",
+                    70L,
+                    now,
+                    ArtifactKinds.PULL_REQUEST.value(),
+                    "MANUAL");
+            insertObservation(agentJob, practice, persistUser("someone-else"), "Not yours", "MET", null, 80L);
+            // A second practice judged pull request 1 again, and one more; a switched-off one judged another.
+            Practice commits = persistPractice(workspace, group, "commit-messages", "Commit Messages");
+            insertObservation(agentJob, commits, developer, "Good subject", "MET", null, 1L, now);
+            insertObservation(agentJob, commits, developer, "Good body", "MET", null, 90L, now);
+            Practice retired = persistPractice(workspace, group, "test-coverage", "Test Coverage");
+            retired.setAutonomy(PracticeAutonomy.OFF);
+            practiceRepository.saveAndFlush(retired);
+            insertObservation(agentJob, retired, developer, "Gap in Test Coverage", "NOT_MET", "MAJOR", 91L, now);
+
+            readPracticeStandings()
+                    .jsonPath("$[?(@.slug == 'pr-description-quality')].trendSupport.reviewedWork")
+                    .isEqualTo(List.of(14))
+                    .jsonPath("$[?(@.slug == 'pr-description-quality')].trendSupport.standingWork")
+                    .isEqualTo(List.of(4))
+                    .jsonPath("$[?(@.slug == 'pr-description-quality')].trendSupport.currentOpportunities")
+                    .isEqualTo(List.of(4))
+                    .jsonPath("$[?(@.slug == 'pr-description-quality')].trendSupport.reviewedWorkKind")
+                    .isEqualTo(List.of(ArtifactKinds.PULL_REQUEST.value()))
+                    .jsonPath("$[?(@.slug == 'commit-messages')].trendSupport.reviewedWork")
+                    .isEqualTo(List.of(2));
+
+            webTestClient
+                    .get()
+                    .uri(STANDINGS_URI, workspace.getWorkspaceSlug())
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    // Pull requests 1 to 14 and 90: pull request 1 once, though both practices judged it.
+                    .jsonPath("$[0].trendSupport.reviewedWork")
+                    .isEqualTo(15)
+                    // Each practice's newest: 11 to 14, then 1 and 90.
+                    .jsonPath("$[0].trendSupport.standingWork")
+                    .isEqualTo(6)
+                    .jsonPath("$[0].trendSupport.reviewedWorkKind")
+                    .isEqualTo(ArtifactKinds.PULL_REQUEST.value());
         }
 
         @Test

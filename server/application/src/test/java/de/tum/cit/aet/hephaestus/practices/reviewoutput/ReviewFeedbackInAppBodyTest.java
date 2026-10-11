@@ -7,10 +7,10 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountSummaryQuery;
 import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyEvaluationRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicySurface;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacementRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
@@ -47,6 +47,7 @@ class ReviewFeedbackInAppBodyTest extends BaseUnitTest {
             feedbackRepository,
             feedbackObservationRepository,
             feedbackPlacementRepository,
+            mock(FeedbackDispatchRepository.class),
             subjectResolver,
             reviewRunLookup,
             approvalRepository,
@@ -102,16 +103,11 @@ class ReviewFeedbackInAppBodyTest extends BaseUnitTest {
                 .thenReturn(List.of());
         when(policyEvaluationRepository.findByWorkspaceIdAndFeedbackIdOrderByEvaluatedAtAsc(WORKSPACE_ID, feedbackId))
                 .thenReturn(List.of());
-        when(policyEvaluationRepository
-                        .findByWorkspaceIdAndAgentJobIdAndFeedbackIdIsNullAndSurfaceOrderByEvaluatedAtAsc(
-                                WORKSPACE_ID,
-                                unit.getAgentJobId(),
-                                switch (channel) {
-                                    case IN_CONTEXT -> DeliveryPolicySurface.ARTIFACT;
-                                    case IN_APP -> DeliveryPolicySurface.IN_APP;
-                                    case IN_CHAT -> DeliveryPolicySurface.CONVERSATION;
-                                }))
-                .thenReturn(List.of());
+        when(feedbackRepository.findLocation(WORKSPACE_ID, feedbackId))
+                .thenReturn(Optional.of(
+                        channel == FeedbackChannel.IN_APP
+                                ? "PRACTICE_PAGES"
+                                : channel == FeedbackChannel.IN_CHAT ? "NEXT_CONVERSATION" : "GITHUB"));
         when(approvalRepository.findByFeedbackIdAndWorkspaceId(feedbackId, WORKSPACE_ID))
                 .thenReturn(Optional.empty());
         when(subjectResolver.resolve(any())).thenReturn(Map.of());

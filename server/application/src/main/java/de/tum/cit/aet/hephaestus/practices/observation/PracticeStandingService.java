@@ -44,12 +44,11 @@ public class PracticeStandingService {
     public static final int LOOKBACK_DAYS = 90;
 
     private static final int MAX_FEEDBACK_PER_PRACTICE = 5;
-    private static final int STANDING_WINDOW = 4;
     /**
-     * Per-opportunity weight decay, newest first. Derived rather than picked: two problem-free pieces of reviewed work in a
-     * row must be enough to acknowledge a fixed lapse, which with weights {@code 1, d, d², d³} holds exactly
-     * when {@code (1 + d) > 4·(d² + d³)}, i.e. {@code d < 0.5}. The effect is symmetric and intended: a fresh
-     * regression shows up as fast as a fresh fix.
+     * Per-opportunity weight decay, newest first. Derived rather than picked: two problem-free pieces of reviewed work
+     * in a row must be enough to acknowledge a fixed lapse, which with weights {@code 1, d, d², d³} (a window of four)
+     * holds exactly when {@code (1 + d) > 4·(d² + d³)}, i.e. {@code d < 0.5}. The effect is symmetric and intended: a
+     * fresh regression shows up as fast as a fresh fix.
      */
     private static final double STANDING_DECAY = 0.4;
 
@@ -210,11 +209,12 @@ public class PracticeStandingService {
     /**
      * Every practice the developer should see, whether or not it has anything to say, as of one edge.
      *
-     * <p>The UNION of two sets, both needed. The eligible practices are what the workspace currently watches;
-     * they belong here even with nothing to report, because "no observation reached this" and "the reviews ran
-     * and found nothing" are different answers a developer cannot otherwise tell apart.
-     * Practices with a standing are included even when review is no longer admitted for them: that
-     * feedback was raised and delivered, and switching a practice off does not un-say it.
+     * <p>Exactly the eligible practices: what the workspace currently watches. They belong here even with
+     * nothing to report, because "no observation reached this" and "the reviews ran and found nothing" are
+     * different answers a developer cannot otherwise tell apart. A practice switched off for the workspace
+     * is left out even where the developer held a standing on it: the profile shows nothing for a practice
+     * the workspace no longer reviews, so a group whose practices are all off is empty. The admin views read
+     * the observations themselves and still show it.
      */
     private StandingSnapshot snapshot(
             List<Observation> rows,
@@ -226,8 +226,6 @@ public class PracticeStandingService {
         Map<String, List<Observation>> liveByPractice = visibleByPractice(LatestRun.perLiveClaim(rows), visible);
         Map<String, Practice> subjects = new LinkedHashMap<>();
         eligibility.practices().forEach(practice -> subjects.put(practice.getSlug(), practice));
-        byPractice.forEach(
-                (slug, group) -> subjects.putIfAbsent(slug, group.getFirst().getPractice()));
 
         List<StandingSnapshot.PracticeStanding> standings = new ArrayList<>();
         for (Map.Entry<String, Practice> subject : subjects.entrySet()) {
@@ -259,6 +257,10 @@ public class PracticeStandingService {
      */
     private static PracticeStandingDTO silentStanding(Practice practice, @Nullable PracticeEvidence evidence) {
         boolean exercised = evidence != null && !evidence.withoutVerdict().isEmpty();
+        boolean notApplicableOnly = evidence != null
+                && exercised
+                && evidence.withoutVerdict().stream()
+                        .allMatch(observation -> observation.getOutcome() == Outcome.NOT_APPLICABLE);
         PracticeGroup group = practice.getGroup();
         return new PracticeStandingDTO(
                 practice.getSlug(),
@@ -271,7 +273,8 @@ public class PracticeStandingService {
                 List.of(),
                 List.of(),
                 null,
-                null);
+                null,
+                notApplicableOnly);
     }
 
     /** One practice response, complete on first construction. */
@@ -290,7 +293,8 @@ public class PracticeStandingService {
                 feedback(evidence.problems(), MAX_FEEDBACK_PER_PRACTICE, deliveredGuidance),
                 feedback(evidence.strengths(), MAX_STRENGTHS_PER_PRACTICE, deliveredGuidance),
                 trend.direction(),
-                TrendSupportDTO.from(trend.support()));
+                TrendSupportDTO.from(trend.support()),
+                false);
     }
 
     private static List<PracticeStandingObservationDTO> feedback(
@@ -302,23 +306,29 @@ public class PracticeStandingService {
                 .toList();
     }
 
+    /** How many of a practice's newest opportunities its standing is read from. */
+    public int standingWindow() {
+        return practiceTrendService.standingWindow();
+    }
+
     /**
      * How positive this practice's recent evidence was, in {@code [0,1]}. The standing label is a rendering of
      * this number, and the level above consumes the number rather than the label.
      *
-     * <p>One rule over the newest {@link #STANDING_WINDOW} opportunities, weighted by recency
+     * <p>One rule over the newest {@link PracticeTrendService#standingWindow} opportunities, weighted by recency
      * ({@code PracticeTrend#recentMetShare}). The opportunities are the live runs the trend reads
      * ({@link LatestRun#perLiveClaim}). Only a practice that no live run judged reads its requested and backfilled
      * work instead, by the same rule, so the two populations are never mixed. The binary fallback answers a practice
      * whose verdicts no opportunity carries, such as one whose newest run on a piece of work reached no verdict.
      */
     private double standingShare(PracticeEvidence evidence, PracticeTrend trend, Instant since) {
-        OptionalDouble live = trend.recentMetShare(STANDING_WINDOW, STANDING_DECAY);
+        int window = practiceTrendService.standingWindow();
+        OptionalDouble live = trend.recentMetShare(window, STANDING_DECAY);
         if (live.isPresent()) {
             return live.getAsDouble();
         }
         return practiceTrendService
-                .selfSelectedMetShare(evidence.observed(), since, STANDING_WINDOW, STANDING_DECAY)
+                .selfSelectedMetShare(evidence.observed(), since, window, STANDING_DECAY)
                 .orElseGet(() -> evidence.problems().isEmpty() ? 1.0 : 0.0);
     }
 
@@ -415,11 +425,13 @@ public class PracticeStandingService {
              * Whether a practice at {@code STRENGTH} is holding: every one of the newest opportunities its
              * standing was read off came back clean, not merely enough of them. The standing's window is the
              * bar, so a strength carried by an old slip that has decayed out of weight does not read as held.
+             *
+             * @param window how many of the newest opportunities a standing is read from
              */
-            public boolean isHolding() {
+            public boolean isHolding(int window) {
                 PracticeTrend.CleanWork cleanWork = trend.cleanWork();
                 return dto.standing() == PracticeStandingDTO.Standing.STRENGTH
-                        && cleanWork.count() >= Math.min(STANDING_WINDOW, cleanWork.decidedWork());
+                        && cleanWork.count() >= Math.min(window, cleanWork.decidedWork());
             }
         }
 

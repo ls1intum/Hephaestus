@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.observation.trend;
 
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.practices.observation.ReviewedWorkKey;
 import de.tum.cit.aet.hephaestus.practices.observation.trend.dto.OutcomeVectorDTO;
 import de.tum.cit.aet.hephaestus.practices.observation.trend.dto.PracticeTrendDTO;
 import de.tum.cit.aet.hephaestus.practices.observation.trend.dto.TrendOpportunityDTO;
@@ -11,6 +12,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.OptionalDouble;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -30,6 +32,12 @@ public final class PracticeTrend {
     private final @Nullable OutcomeVector previousOutcomes;
     private final List<EvidenceOpportunity> opportunities;
 
+    /**
+     * Every piece of work in the look-back with a decided opportunity, uncapped: {@link #opportunities} is cut to
+     * what a chart draws, and a group's count of reviewed work must still reach past that cut.
+     */
+    private final Set<ReviewedWorkKey> reviewedWork;
+
     /** Absent for INSUFFICIENT_EVIDENCE, and for a group result, which aggregates rather than diffs. */
     private final BetaPosterior.@Nullable Difference difference;
 
@@ -41,6 +49,7 @@ public final class PracticeTrend {
             @Nullable OutcomeVector currentOutcomes,
             @Nullable OutcomeVector previousOutcomes,
             List<EvidenceOpportunity> opportunities,
+            Set<ReviewedWorkKey> reviewedWork,
             BetaPosterior.@Nullable Difference difference) {
         this.slug = slug;
         this.scope = scope;
@@ -49,6 +58,7 @@ public final class PracticeTrend {
         this.currentOutcomes = currentOutcomes;
         this.previousOutcomes = previousOutcomes;
         this.opportunities = List.copyOf(opportunities);
+        this.reviewedWork = Set.copyOf(reviewedWork);
         this.difference = difference;
     }
 
@@ -189,6 +199,10 @@ public final class PracticeTrend {
 
     List<EvidenceOpportunity> opportunities() {
         return opportunities;
+    }
+
+    Set<ReviewedWorkKey> reviewedWork() {
+        return reviewedWork;
     }
 
     BetaPosterior.@Nullable Difference difference() {

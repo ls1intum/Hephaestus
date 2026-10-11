@@ -56,6 +56,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class WorkspaceRepositoryMonitorService {
 
     private static final Logger log = LoggerFactory.getLogger(WorkspaceRepositoryMonitorService.class);
+    private static final String GITHUB_SERVER_URL = "https://github.com";
 
     private final NatsConnectionProperties natsProperties;
 
@@ -197,7 +198,12 @@ public class WorkspaceRepositoryMonitorService {
 
         RepositoryToMonitor repositoryToMonitor = new RepositoryToMonitor();
         repositoryToMonitor.setNameWithOwner(nameWithOwner);
-        repositoryToMonitor.setNativeId(resolveNativeId(nameWithOwner));
+        // A token-based workspace syncs from github.com, as GitHubDataSyncService does.
+        repositoryToMonitor.setNativeId(resolveNativeId(
+                nameWithOwner,
+                gitProviderRepository
+                        .findByTypeAndServerUrl(IdentityProviderType.GITHUB, GITHUB_SERVER_URL)
+                        .orElse(null)));
         repositoryToMonitor.setWorkspace(workspace);
         persistRepositoryMonitor(workspace, repositoryToMonitor, false);
     }
@@ -380,14 +386,14 @@ public class WorkspaceRepositoryMonitorService {
         Workspace workspace = workspaceOpt.get();
 
         IdentityProvider provider = gitProviderRepository
-                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, GITHUB_SERVER_URL)
                 .orElseThrow(() -> new IllegalStateException(
                         "GitHub is not set up on this instance. Ask your instance operator to set it up."));
 
         ensureRepositoryFromSnapshot(
                 workspace, provider, snapshot.id(), snapshot.nameWithOwner(), snapshot.name(), snapshot.isPrivate());
 
-        ensureRepositoryMonitorInternal(workspace, snapshot.nameWithOwner(), true);
+        ensureRepositoryMonitorInternal(workspace, provider, snapshot.nameWithOwner(), true);
     }
 
     /**
@@ -464,7 +470,7 @@ public class WorkspaceRepositoryMonitorService {
         }
 
         IdentityProvider provider = gitProviderRepository
-                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, GITHUB_SERVER_URL)
                 .orElseThrow(() -> new IllegalStateException(
                         "GitHub is not set up on this instance. Ask your instance operator to set it up."));
 
@@ -476,7 +482,7 @@ public class WorkspaceRepositoryMonitorService {
                     snapshot.nameWithOwner(),
                     snapshot.name(),
                     snapshot.isPrivate());
-            ensureRepositoryMonitorInternal(workspace, snapshot.nameWithOwner(), deferSync);
+            ensureRepositoryMonitorInternal(workspace, provider, snapshot.nameWithOwner(), deferSync);
         });
 
         repositoryToMonitorRepository.findByWorkspaceId(workspace.getId()).stream()
@@ -496,17 +502,22 @@ public class WorkspaceRepositoryMonitorService {
 
     /**
      * Best-effort capture of the provider's stable repository id ({@code native_id}) at
-     * monitor-creation time by resolving the (already-upserted) domain {@link Repository} by name.
-     * Returns {@code null} when the repository is not yet known locally — e.g. a GitLab PAT repo added
-     * by name before its first sync — in which case the periodic sync backfills it later via
+     * monitor-creation time by resolving the (already-upserted) domain {@link Repository} by name on the
+     * workspace's provider. A repository of the same name on another provider does not count: its id
+     * would hide the monitored one from every scoped query ({@code MonitoredRepositoryScope}).
+     * Returns {@code null} when the repository is not yet known locally on that provider, in which case
+     * the periodic sync backfills it later via
      * {@link de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider#reconcileSyncTargetIdentity}.
      */
     @Nullable
-    private Long resolveNativeId(String nameWithOwner) {
-        if (StringUtils.isBlank(nameWithOwner)) {
+    private Long resolveNativeId(String nameWithOwner, @Nullable IdentityProvider provider) {
+        if (StringUtils.isBlank(nameWithOwner) || provider == null || provider.getId() == null) {
             return null;
         }
-        return findRepository(nameWithOwner).map(Repository::getNativeId).orElse(null);
+        return repositoryRepository
+                .findByNameWithOwnerAndProviderId(nameWithOwner, provider.getId())
+                .map(Repository::getNativeId)
+                .orElse(null);
     }
 
     private boolean shouldUseNats(Workspace workspace) {
@@ -630,7 +641,7 @@ public class WorkspaceRepositoryMonitorService {
      * return success - that's the idempotent behavior we want.
      */
     private Optional<Workspace> ensureRepositoryMonitorInternal(
-            Workspace workspace, String nameWithOwner, boolean deferSync) {
+            Workspace workspace, IdentityProvider provider, String nameWithOwner, boolean deferSync) {
         if (workspace == null || StringUtils.isBlank(nameWithOwner)) {
             return Optional.ofNullable(workspace);
         }
@@ -641,7 +652,7 @@ public class WorkspaceRepositoryMonitorService {
 
         RepositoryToMonitor monitor = new RepositoryToMonitor();
         monitor.setNameWithOwner(nameWithOwner);
-        monitor.setNativeId(resolveNativeId(nameWithOwner));
+        monitor.setNativeId(resolveNativeId(nameWithOwner, provider));
         monitor.setWorkspace(workspace);
 
         try {
