@@ -1902,15 +1902,52 @@ interface InAppSupportOccurrence {
 	observedAt: string;
 }
 
+/** InAppRoutingDecision as the server decides it from the evidence, before any card is written. */
+const IN_APP_DECISIONS = [
+	"ADMIT",
+	"NO_EVIDENCE",
+	"UNCORROBORATED",
+	"PRACTICE_REQUIRES_APPROVAL",
+	"BACKFILL_HELD",
+	"RECENTLY_SURFACED",
+	"UNATTRIBUTABLE_SUBJECT",
+] as const;
+
+/** ConversationRoutingDecision, per admitted NOT_MET observation. */
+const IN_CHAT_DECISIONS = [
+	"ADMIT",
+	"NOT_DELIVERABLE",
+	"HAS_INLINE_ANCHOR",
+	"ALREADY_DELIVERED_IN_CONTEXT",
+	"REVIEWER_DEFERRED",
+	"PRACTICE_REQUIRES_APPROVAL",
+	"BACKFILL_QUIET",
+] as const;
+
+interface InAppPracticeSupport {
+	practiceSlug: string;
+	decision: (typeof IN_APP_DECISIONS)[number];
+	occurrences: InAppSupportOccurrence[];
+}
+
 /** The server's dated IN_APP support read; null until admission, and null when it arrived malformed. */
 type InAppSupport =
+	| { state: "COMPLETE"; readAt: string; practices: InAppPracticeSupport[] }
+	| { state: "UNAVAILABLE" | "REFUSED"; readAt: string; refusal: string | null };
+let inAppSupport: InAppSupport | null = null;
+
+/** The server's dated IN_CHAT routing read; null until admission, and null when it arrived malformed. */
+type InChatEligibility =
 	| {
 			state: "COMPLETE";
 			readAt: string;
-			practices: { practiceSlug: string; occurrences: InAppSupportOccurrence[] }[];
+			observations: { observationId: string; decision: (typeof IN_CHAT_DECISIONS)[number] }[];
 	  }
-	| { state: "UNAVAILABLE" | "REFUSED"; readAt: string; refusal: string | null };
-let inAppSupport: InAppSupport | null = null;
+	| { state: "UNAVAILABLE" | "REFUSED"; readAt: string };
+let inChatEligibility: InChatEligibility | null = null;
+
+/** The open private lanes each NOT_MET practice is routed to; null until admission routed them. */
+let routedLanes: ReadonlyMap<string, readonly PrivateChannel[]> | null = null;
 
 function readSupportOccurrence(value: unknown): InAppSupportOccurrence | null {
 	if (
@@ -1977,14 +2014,20 @@ function readInAppSupport(
 	if (value.state !== "COMPLETE" || !Array.isArray(value.practices)) {
 		return null;
 	}
-	const practices: { practiceSlug: string; occurrences: InAppSupportOccurrence[] }[] = [];
+	const practices: InAppPracticeSupport[] = [];
 	const expected = new Set(notMetPractices(current));
 	for (const practice of value.practices) {
+		const decision = isRecord(practice)
+			? IN_APP_DECISIONS.find((known) => known === practice.decision)
+			: undefined;
 		if (
 			!isRecord(practice) ||
 			typeof practice.practiceSlug !== "string" ||
 			!expected.delete(practice.practiceSlug) ||
-			!Array.isArray(practice.occurrences)
+			decision === undefined ||
+			!Array.isArray(practice.occurrences) ||
+			// A practice the page refuses carries no support.
+			(decision !== "ADMIT" && practice.occurrences.length > 0)
 		) {
 			return null;
 		}
@@ -1992,12 +2035,105 @@ function readInAppSupport(
 		if (!occurrences.every((occurrence) => occurrence !== null)) {
 			return null;
 		}
-		practices.push({ practiceSlug: practice.practiceSlug, occurrences });
+		practices.push({ practiceSlug: practice.practiceSlug, decision, occurrences });
 	}
 	if (expected.size > 0) {
 		return null;
 	}
 	return { state: "COMPLETE", readAt: value.readAt, practices };
+}
+
+/** Validates the IN_CHAT routing beside the admission: one decision for each admitted NOT_MET observation, or none. */
+function readInChatEligibility(
+	value: unknown,
+	current: readonly AdmittedObservation[],
+): InChatEligibility | null {
+	if (
+		!isRecord(value) ||
+		typeof value.readAt !== "string" ||
+		!Number.isFinite(Date.parse(value.readAt)) ||
+		!Array.isArray(value.observations)
+	) {
+		return null;
+	}
+	if (value.state === "UNAVAILABLE" || value.state === "REFUSED") {
+		return value.observations.length === 0 ? { state: value.state, readAt: value.readAt } : null;
+	}
+	if (value.state !== "COMPLETE") {
+		return null;
+	}
+	const expected = new Set(
+		current
+			.filter((observation) => observation.outcome === "NOT_MET")
+			.map((observation) => observation.id),
+	);
+	const observations: { observationId: string; decision: (typeof IN_CHAT_DECISIONS)[number] }[] =
+		[];
+	for (const route of value.observations) {
+		const decision = isRecord(route)
+			? IN_CHAT_DECISIONS.find((known) => known === route.decision)
+			: undefined;
+		if (
+			!isRecord(route) ||
+			typeof route.observationId !== "string" ||
+			!expected.delete(route.observationId) ||
+			decision === undefined
+		) {
+			return null;
+		}
+		observations.push({ observationId: route.observationId, decision });
+	}
+	return expected.size === 0 ? { state: "COMPLETE", readAt: value.readAt, observations } : null;
+}
+
+/** Whether the server's read after admission routes the practice's NOT_MET observations to the lane. */
+function routedTo(channel: PrivateChannel, practiceSlug: string): boolean {
+	if (channel === "IN_APP") {
+		return (
+			inAppSupport?.state === "COMPLETE" &&
+			inAppSupport.practices.some(
+				(practice) => practice.practiceSlug === practiceSlug && practice.decision === "ADMIT",
+			)
+		);
+	}
+	if (inChatEligibility?.state !== "COMPLETE") {
+		return false;
+	}
+	const admitted = new Set(
+		inChatEligibility.observations
+			.filter((route) => route.decision === "ADMIT")
+			.map((route) => route.observationId),
+	);
+	return admittedObservations.some(
+		(observation) =>
+			observation.practiceSlug === practiceSlug &&
+			observation.outcome === "NOT_MET" &&
+			admitted.has(observation.id),
+	);
+}
+
+/** Why the server routes none of the practice's NOT_MET observations to the lane, in its own words. */
+function laneRefusal(channel: PrivateChannel, practiceSlug: string): string {
+	if (channel === "IN_APP") {
+		const decision =
+			inAppSupport?.state === "COMPLETE"
+				? inAppSupport.practices.find((practice) => practice.practiceSlug === practiceSlug)
+						?.decision
+				: undefined;
+		return decision ?? "not routed";
+	}
+	const ids = new Set(
+		admittedObservations
+			.filter((observation) => observation.practiceSlug === practiceSlug)
+			.map((observation) => observation.id),
+	);
+	const decisions =
+		inChatEligibility?.state === "COMPLETE"
+			? inChatEligibility.observations
+					.filter((route) => ids.has(route.observationId))
+					.map((route) => route.decision)
+			: [];
+	return decisions.length > 0 ? [...new Set(decisions)].join(", ") : "not routed";
 }
 const PUBLIC_FEEDBACK_HISTORY_PATH = `${CWD}/work/composition/public-feedback-history.json`;
 let compositionAdmitted = false;
@@ -2333,6 +2469,13 @@ function buildFeedbackTool(
 		const rejection = validateUnit(unit, observationsById, preparedTargets, deliveredPractices);
 		if (rejection !== null) {
 			return skipped(rejection);
+		}
+		// The server's routing decides the lanes a practice may reach; a withholding elsewhere decides nothing.
+		if (!(routedLanes?.get(unit.practiceSlug) ?? []).includes(unit.channel)) {
+			return skipped(
+				`${unit.channel} cannot carry feedback about ${unit.practiceSlug} this run ` +
+					`(${laneRefusal(unit.channel, unit.practiceSlug)}); write no unit for it there, not even a WITHHOLD. Skipped.`,
+			);
 		}
 		// IN_APP pattern feedback requires NOT_MET observations on distinct pieces of work.
 		if (unit.channel === "IN_APP" && delivers) {
@@ -3245,6 +3388,14 @@ function buildCompositionTurn(
 	const closedNote =
 		closed.length > 0 ? ` Closed this turn, so write nothing for them: ${closed.join(", ")}.` : "";
 	const coverageNote = notReachedNote(notReached);
+	const routing = PRIVATE_CHANNELS.filter((channel) => request.channels[channel].enabled)
+		.map(
+			(channel) =>
+				`${channel}: ${privatelyComposable()
+					.filter((slug) => routedLanes?.get(slug)?.includes(channel) === true)
+					.join(", ")}`,
+		)
+		.join("; ");
 	const admitted = JSON.stringify({ observations: observations.map(composerView) }, null, 1);
 	const onTheWork = plannedReviewFacts();
 	const historyRoot = nodePath.dirname(PREPARED_FEEDBACK_PATH);
@@ -3274,6 +3425,7 @@ ${admitted}
 ${context}
 ${onTheWork}
 Lanes open this turn: ${lanes}.${closedNote}
+The practices each open lane may carry: ${routing}. Write no unit, not even a WITHHOLD, for a practice on a lane that does not list it.
 A pattern claim needs at least ${request.minDistinctArtifacts} distinct pieces of work.
 
 ${coverageNote}Persist the units with report_feedback — every unit you have in one call. Writing nothing on a lane is a correct and common outcome; say in one line why, and stop.`;
@@ -3374,6 +3526,7 @@ async function admitObservations() {
 	if (inAppSupport?.state === "COMPLETE") {
 		writeFileSync(IN_APP_SUPPORT_PATH, JSON.stringify(inAppSupport, null, 2));
 	}
+	inChatEligibility = readInChatEligibility(answer.inChatEligibility, admittedObservations);
 }
 
 /**
@@ -3404,24 +3557,45 @@ function acceptAdmission(admitted: unknown): Record<string, unknown> {
 }
 
 /**
- * IN_APP rests on the server's support read. Without a complete one the lane closes for this run: a refusal is the
- * recipient policy's answer, anything else is IN_APP feedback that could not be composed. Other lanes go on.
+ * A private lane composes only what the server's read after admission routes to it. Without a complete read the lane
+ * closes for this run: a refusal is the policy's answer, anything else is feedback that could not be composed. A lane
+ * no NOT_MET practice is routed to closes as decided. Other lanes go on, and preparation still routes what is written.
  */
-function closeInAppWithoutSupport(request: CompositionRequest): void {
-	if (
-		!request.channels.IN_APP.enabled ||
-		notMetPractices(admittedObservations).length === 0 ||
-		inAppSupport?.state === "COMPLETE"
-	) {
-		return;
+function closeUnroutedPrivateLanes(request: CompositionRequest): void {
+	const notMet = notMetPractices(admittedObservations);
+	for (const channel of PRIVATE_CHANNELS) {
+		if (!request.channels[channel].enabled || notMet.length === 0) {
+			continue;
+		}
+		const read = channel === "IN_APP" ? inAppSupport : inChatEligibility;
+		if (read?.state !== "COMPLETE") {
+			request.channels[channel].enabled = false;
+			console.error(
+				`[pi-runner] ${channel} closed for this run: ${channel === "IN_APP" ? "support context" : "routing"} ${read === null ? "missing or malformed" : read.state}`,
+			);
+			if (read?.state !== "REFUSED") {
+				recordCompositionFailure("PRIVATE_FEEDBACK", "RUNTIME_ERROR");
+			}
+		} else if (!notMet.some((slug) => routedTo(channel, slug))) {
+			request.channels[channel].enabled = false;
+			console.error(`[pi-runner] ${channel} closed for this run: no practice is routed to it`);
+		}
 	}
-	request.channels.IN_APP.enabled = false;
-	console.error(
-		`[pi-runner] IN_APP closed for this run: support context ${inAppSupport === null ? "missing or malformed" : inAppSupport.state}`,
+	routedLanes = new Map(
+		notMet.map((slug) => [
+			slug,
+			PRIVATE_CHANNELS.filter(
+				(channel) => request.channels[channel].enabled && routedTo(channel, slug),
+			),
+		]),
 	);
-	if (inAppSupport?.state !== "REFUSED") {
-		recordCompositionFailure("PRIVATE_FEEDBACK", "RUNTIME_ERROR");
-	}
+}
+
+/** The NOT_MET practices private composition owes a decision on: those routed to an open lane, once routed. */
+function privatelyComposable(): string[] {
+	const notMet = notMetPractices(admittedObservations);
+	const lanes = routedLanes;
+	return lanes === null ? notMet : notMet.filter((slug) => (lanes.get(slug) ?? []).length > 0);
 }
 
 /** One read of the delivered public history; any refusal or bad answer is final, never an older or empty history. */
@@ -3910,7 +4084,7 @@ function compositionBudget(notMet: number): Work {
 	return turnBudget(Math.min(Math.max(1, notMet), PRACTICES_PER_TURN), PER_PRACTICE_WORK);
 }
 
-/** Existing private decision obligation: a stored unit or withholding may fold several practices in. */
+/** Private decision obligation: a stored unit or withholding may fold several practices in. */
 function undecidedPrivatePractices(): string[] {
 	const practiceOf = new Map(
 		admittedObservations.map((observation) => [observation.id, observation.practiceSlug]),
@@ -3921,7 +4095,7 @@ function undecidedPrivatePractices(): string[] {
 			...unit.basedOn.flatMap((id) => practiceOf.get(id) ?? []),
 		]),
 	);
-	return notMetPractices(admittedObservations).filter((slug) => !decided.has(slug));
+	return privatelyComposable().filter((slug) => !decided.has(slug));
 }
 
 function recordCompositionFailure(phase: CompositionPhase, reason: CompositionFailureReason): void {
@@ -4561,7 +4735,7 @@ async function main() {
 	measurementClosed = true;
 	await admitObservations();
 	if (compositionRequest) {
-		closeInAppWithoutSupport(compositionRequest);
+		closeUnroutedPrivateLanes(compositionRequest);
 	}
 	persistComposedFeedback();
 	maybeWriteResultFile();
@@ -4601,7 +4775,7 @@ async function main() {
 				if (compositionRequest.channels.IN_CONTEXT.enabled && reviewable.length > 0) {
 					await composeReview(compositionRequest, reviewable, notReached, safety);
 				}
-				if (notMetPractices(admittedObservations).length > 0 && !safety.expired()) {
+				if (privatelyComposable().length > 0 && !safety.expired()) {
 					await composePrivately(compositionRequest, safety);
 				}
 			} catch (error) {
@@ -5061,7 +5235,7 @@ async function main() {
 		});
 		await privateLoader.reload();
 		composerTool = "report_feedback";
-		// A lane closed after admission (IN_APP without its support read) leaves only the lanes still open.
+		// A lane closed after admission (closeUnroutedPrivateLanes) leaves only the lanes still open.
 		{
 			currentTurnSlugs = [];
 			const opened = await openSession(
@@ -5086,11 +5260,10 @@ async function main() {
 		}
 
 		async function composeInto(session: AgentSession): Promise<TurnTrace> {
-			const notMet = notMetPractices(admittedObservations);
 			const undecided = undecidedPrivatePractices;
 			let started = false;
 			const wasStarted = () => started;
-			const trace = openTurnTrace("composition", compositionBudget(notMet.length), {
+			const trace = openTurnTrace("composition", compositionBudget(privatelyComposable().length), {
 				owed: () => undecided().length,
 				nudge: COMPOSITION_NUDGE,
 			});

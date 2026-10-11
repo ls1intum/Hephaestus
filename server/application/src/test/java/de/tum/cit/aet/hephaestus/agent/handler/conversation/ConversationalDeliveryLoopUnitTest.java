@@ -17,8 +17,13 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.ConversationConsentGate;
 import de.tum.cit.aet.hephaestus.agent.handler.FeedbackSupersession;
+import de.tum.cit.aet.hephaestus.agent.handler.PracticeFeedbackDeliveryPolicy;
+import de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionResultParser;
+import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
+import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicySurface;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacement;
@@ -33,8 +38,10 @@ import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationVisibilityPolicy;
+import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaults;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -207,6 +214,95 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
 
         when(consentGate.activeThreadIds(WS, List.of(55L))).thenReturn(Set.of(55L));
         assertThat(reconciler().admits(WS, RECIPIENT, observationId)).isTrue();
+    }
+
+    /**
+     * Composition reads the lane's routing before it writes notes: the same permission and router preparation uses,
+     * so a note about a problem that belongs on a line is never written, and the routing names each admitted row.
+     */
+    @Test
+    void eligibilityRoutesTheAdmittedProblemsThroughThePermissionAndRouterPreparationUses() {
+        PracticeFeedbackDeliveryPolicy policy = mock(PracticeFeedbackDeliveryPolicy.class);
+        AgentJob job = job();
+        ObjectNode onTheDiff = MAPPER.createObjectNode();
+        onTheDiff.putArray("citations").addObject().put("sourceKind", "scm.pull-request.diff");
+        Observation anchored = problem(onTheDiff, null);
+        Observation unanchored = problem(null, null);
+        Observation strength = strength();
+        automatic(anchored, unanchored);
+        when(egressGuard.deliveryAllowed(any())).thenReturn(true);
+        when(policy.allowsComposition(job, DeliveryPolicySurface.CONVERSATION)).thenReturn(true);
+
+        ConversationEligibility eligibility =
+                listener(policy).eligibility(job, List.of(anchored, strength, unanchored));
+
+        assertThat(eligibility.state()).isEqualTo(ConversationEligibility.State.COMPLETE);
+        assertThat(eligibility.observations())
+                .containsExactly(
+                        new ConversationEligibility.ObservationRoute(
+                                anchored.getId(), ConversationRoutingDecision.HAS_INLINE_ANCHOR),
+                        new ConversationEligibility.ObservationRoute(
+                                unanchored.getId(), ConversationRoutingDecision.ADMIT));
+        assertThat(router().admit(List.of(anchored, strength, unanchored), WS, RoutingContext.author()))
+                .containsExactly(unanchored);
+    }
+
+    @Test
+    void eligibilityIsRefusedOnlyByThePermissionAndUnknownWhenTheProblemsConcernSeveralPeople() {
+        PracticeFeedbackDeliveryPolicy policy = mock(PracticeFeedbackDeliveryPolicy.class);
+        AgentJob job = job();
+        Observation mine = problem(null, null);
+        Observation someoneElses = problem(null, null);
+        when(someoneElses.getAboutUserId()).thenReturn(RECIPIENT + 1);
+
+        assertThat(listener(policy).eligibility(job, List.of(mine, someoneElses)))
+                .satisfies(read -> {
+                    assertThat(read.state()).isEqualTo(ConversationEligibility.State.UNAVAILABLE);
+                    assertThat(read.observations()).isEmpty();
+                });
+        verify(policy, never()).allowsComposition(any(), any());
+
+        when(egressGuard.deliveryAllowed(any())).thenReturn(true);
+        when(policy.allowsComposition(job, DeliveryPolicySurface.CONVERSATION)).thenReturn(false);
+        assertThat(listener(policy).eligibility(job, List.of(mine))).satisfies(read -> {
+            assertThat(read.state()).isEqualTo(ConversationEligibility.State.REFUSED);
+            assertThat(read.observations()).isEmpty();
+        });
+    }
+
+    private ConversationalDeliveryListener listener(PracticeFeedbackDeliveryPolicy policy) {
+        return new ConversationalDeliveryListener(
+                observationRepository,
+                router(),
+                preparer(),
+                egressGuard,
+                mock(AgentJobRepository.class),
+                mock(FeedbackCompositionResultParser.class),
+                policy);
+    }
+
+    private static AgentJob job() {
+        Workspace workspace = new Workspace();
+        workspace.setId(WS);
+        AgentJob job = new AgentJob();
+        job.setId(UUID.randomUUID());
+        job.setWorkspace(workspace);
+        return job;
+    }
+
+    private void automatic(Observation... observations) {
+        when(workspaceReviewDefaults.forWorkspace(WS))
+                .thenReturn(new WorkspaceReviewDefaults(PracticeAutonomy.AUTOMATIC));
+        List<ObservationRepository.ObservationPracticeAutonomy> rows = new ArrayList<>();
+        for (Observation observation : observations) {
+            UUID observationId = observation.getId();
+            ObservationRepository.ObservationPracticeAutonomy row =
+                    mock(ObservationRepository.ObservationPracticeAutonomy.class);
+            when(row.getObservationId()).thenReturn(observationId);
+            when(row.getPracticeAutonomy()).thenReturn(PracticeAutonomy.AUTOMATIC);
+            rows.add(row);
+        }
+        when(observationRepository.findPracticeAutonomyFor(any(), eq(WS))).thenReturn(rows);
     }
 
     @Test

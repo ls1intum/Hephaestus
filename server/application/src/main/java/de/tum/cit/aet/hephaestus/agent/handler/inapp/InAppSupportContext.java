@@ -11,9 +11,9 @@ import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.JsonNode;
 
 /**
- * The occurrences a new IN_APP card may cite at {@code readAt}, per current NOT_MET practice, as the page
- * selects them. It is read after the observations are admitted and is not part of the admission: a later read can
- * differ, and the page decides again whether a card is written.
+ * Per current NOT_MET practice, how the page routes a new IN_APP card at {@code readAt} and, when it admits one, the
+ * occurrences the card may cite, as the page selects them. It is read after the observations are admitted and is not
+ * part of the admission: a later read can differ, and the page decides again whether a card is written.
  *
  * @param refusal the recipient policy's reason, for {@link State#REFUSED}
  */
@@ -21,7 +21,7 @@ public record InAppSupportContext(
         State state, String readAt, @Nullable FeedbackSuppressionReason refusal, List<PracticeSupport> practices) {
 
     public enum State {
-        /** Every current NOT_MET practice was read; a practice without occurrences has none to cite. */
+        /** Every current NOT_MET practice was read and routed. */
         COMPLETE,
         /** The read failed or could not be attributed to one recipient; it says nothing about the support. */
         UNAVAILABLE,
@@ -29,7 +29,8 @@ public record InAppSupportContext(
         REFUSED,
     }
 
-    public record PracticeSupport(String practiceSlug, List<Occurrence> occurrences) {}
+    /** @param occurrences empty unless {@code decision} is {@link InAppRoutingDecision#ADMIT} */
+    public record PracticeSupport(String practiceSlug, InAppRoutingDecision decision, List<Occurrence> occurrences) {}
 
     /** One selected observation, with the native identity of the work it is about and what it recorded. */
     public record Occurrence(

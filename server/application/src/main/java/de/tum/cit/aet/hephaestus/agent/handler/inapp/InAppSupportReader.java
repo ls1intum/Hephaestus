@@ -3,29 +3,37 @@ package de.tum.cit.aet.hephaestus.agent.handler.inapp;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeFeedbackDeliveryPolicy;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ActorRole;
 import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyStage;
 import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicySurface;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.PreviousInAppFeedback;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Outcome;
+import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationVisibilityPolicy;
+import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
+import de.tum.cit.aet.hephaestus.practices.review.autonomy.AutonomyResolver;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
 /**
  * The evidence a new IN_APP card about one practice may stand on: the window from the previous card's cutoff, the
  * bounded recent read, and the delivery-purpose visibility. {@link InAppFeedbackRouter#problemsIn} picks the citable
- * occurrences from it. Selection only: routing and preparation decide whether a card is written. Worker admission and
- * server preparation read the same selection, so it exists in every runtime role.
+ * occurrences from it, and {@link #routingFacts} reads what {@link InAppFeedbackRouter} decides from besides the
+ * evidence. Worker admission and server preparation read the same selection, so it exists in every runtime role.
  */
 @Component
 public class InAppSupportReader {
@@ -36,6 +44,8 @@ public class InAppSupportReader {
     private final ObservationVisibilityPolicy visibilityPolicy;
     private final PreviousInAppFeedback previousInAppFeedback;
     private final PracticeFeedbackDeliveryPolicy deliveryPolicy;
+    private final FeedbackRepository feedbackRepository;
+    private final WorkspaceReviewDefaultsProvider workspaceDefaults;
     private final Clock clock;
 
     public InAppSupportReader(
@@ -43,12 +53,32 @@ public class InAppSupportReader {
             ObservationVisibilityPolicy visibilityPolicy,
             PreviousInAppFeedback previousInAppFeedback,
             PracticeFeedbackDeliveryPolicy deliveryPolicy,
+            FeedbackRepository feedbackRepository,
+            WorkspaceReviewDefaultsProvider workspaceDefaults,
             Clock clock) {
         this.observationRepository = observationRepository;
         this.visibilityPolicy = visibilityPolicy;
         this.previousInAppFeedback = previousInAppFeedback;
         this.deliveryPolicy = deliveryPolicy;
+        this.feedbackRepository = feedbackRepository;
+        this.workspaceDefaults = workspaceDefaults;
         this.clock = clock;
+    }
+
+    /** What {@link InAppFeedbackRouter} decides from besides the evidence, as the page holds it now. */
+    public record RoutingFacts(
+            @Nullable PracticeAutonomy autonomy,
+            ActorRole subjectRole,
+            @Nullable Instant lastSurfaced) {}
+
+    public RoutingFacts routingFacts(
+            Long workspaceId, Long recipientUserId, String practiceSlug, List<Observation> evidence) {
+        return new RoutingFacts(
+                effectiveTier(evidence, workspaceId),
+                subjectRole(evidence),
+                feedbackRepository
+                        .lastInAppSurfacedAt(workspaceId, recipientUserId, practiceSlug)
+                        .orElse(null));
     }
 
     /** The previous card about the practice, if any, and the evidence a new card reads. */
@@ -71,8 +101,9 @@ public class InAppSupportReader {
     }
 
     /**
-     * The support the private composition of an admitted run reads for IN_APP: per current NOT_MET practice, the
-     * occurrences a card could cite now. The recipient and the practices come from the admitted observations.
+     * The support the private composition of an admitted run reads for IN_APP: per current NOT_MET practice, how
+     * {@link InAppFeedbackRouter#routeEvidence} routes it now and, when it admits a card, the occurrences the card
+     * could cite. The recipient and the practices come from the admitted observations.
      */
     public InAppSupportContext snapshot(AgentJob job, List<Observation> admitted) {
         Instant now = clock.instant();
@@ -102,13 +133,52 @@ public class InAppSupportReader {
                 .map(observation -> observation.getPractice().getSlug())
                 .distinct()
                 .sorted()
-                .map(slug -> new InAppSupportContext.PracticeSupport(
-                        slug,
-                        select(workspaceId, recipient, slug, now).supports().stream()
-                                .map(InAppSupportContext.Occurrence::of)
-                                .toList()))
+                .map(slug -> practiceSupport(workspaceId, recipient, slug, now))
                 .toList();
         return InAppSupportContext.complete(now, practices);
+    }
+
+    private InAppSupportContext.PracticeSupport practiceSupport(
+            Long workspaceId, Long recipient, String slug, Instant now) {
+        Selection selection = select(workspaceId, recipient, slug, now);
+        RoutingFacts facts = routingFacts(workspaceId, recipient, slug, selection.evidence());
+        InAppRoutingDecision decision = InAppFeedbackRouter.routeEvidence(
+                selection.evidence(), facts.autonomy(), facts.subjectRole(), facts.lastSurfaced(), now);
+        // A practice no card can be written about copies none of its support into the sandbox.
+        List<InAppSupportContext.Occurrence> occurrences = decision == InAppRoutingDecision.ADMIT
+                ? selection.supports().stream()
+                        .map(InAppSupportContext.Occurrence::of)
+                        .toList()
+                : List.of();
+        return new InAppSupportContext.PracticeSupport(slug, decision, occurrences);
+    }
+
+    // Project autonomy to avoid depending on initialized entity associations.
+    private @Nullable PracticeAutonomy effectiveTier(List<Observation> evidence, Long workspaceId) {
+        List<UUID> ids = evidence.stream()
+                .map(Observation::getId)
+                .filter(Objects::nonNull)
+                .toList();
+        if (ids.isEmpty()) {
+            return null;
+        }
+        PracticeAutonomy workspaceDefault =
+                workspaceDefaults.forWorkspace(workspaceId).defaultAutonomy();
+        return observationRepository.findPracticeAutonomyFor(ids, workspaceId).stream()
+                .findFirst()
+                .map(row -> AutonomyResolver.resolvePractice(
+                                row.getPracticeAutonomy(), row.getGroupAutonomy(), workspaceDefault)
+                        .autonomy())
+                .orElse(null);
+    }
+
+    private static ActorRole subjectRole(List<Observation> evidence) {
+        return evidence.stream()
+                .map(Observation::getPractice)
+                .filter(Objects::nonNull)
+                .findFirst()
+                .map(Practice::getSubject)
+                .orElse(ActorRole.AUTHOR);
     }
 
     private List<Observation> visibleEvidence(

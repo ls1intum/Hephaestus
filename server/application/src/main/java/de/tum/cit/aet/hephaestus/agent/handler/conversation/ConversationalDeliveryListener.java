@@ -10,9 +10,11 @@ import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
 import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicySurface;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
+import de.tum.cit.aet.hephaestus.practices.model.Outcome;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -104,12 +106,8 @@ public class ConversationalDeliveryListener {
     }
 
     private int route(UUID agentJobId, UUID outputJobId, Long workspaceId) {
-        if (!egressGuard.deliveryAllowed("prepare-conversational-feedback")) {
-            log.debug("Conversational preparation suppressed: jobId={}", agentJobId);
-            return 0;
-        }
         AgentJob sourceJob = agentJobRepository.findById(agentJobId).orElse(null);
-        if (sourceJob == null || !deliveryPolicy.allowsComposition(sourceJob, DeliveryPolicySurface.CONVERSATION)) {
+        if (sourceJob == null || !composes(sourceJob)) {
             return 0;
         }
         List<Observation> observations = observationRepository.findByAgentJobId(agentJobId, workspaceId);
@@ -118,6 +116,36 @@ public class ConversationalDeliveryListener {
         }
         List<Observation> admitted = router.admit(observations, workspaceId, RoutingContext.author());
         return preparer.prepare(outputJobId, workspaceId, admitted, composedMoves(outputJobId));
+    }
+
+    /**
+     * How this lane would route a run's admitted NOT_MET observations now, through the same permission and router
+     * preparation uses, for the one person they are about. Read before composition; {@link #prepare} decides.
+     */
+    public ConversationEligibility eligibility(AgentJob job, List<Observation> admitted) {
+        Instant now = Instant.now();
+        List<Observation> negatives = admitted.stream()
+                .filter(observation -> observation.getOutcome() == Outcome.NOT_MET)
+                .toList();
+        if (negatives.isEmpty()) {
+            return ConversationEligibility.complete(now, Map.of());
+        }
+        if (negatives.stream().map(Observation::getAboutUserId).distinct().count() != 1) {
+            return ConversationEligibility.unavailable(now);
+        }
+        if (!composes(job)) {
+            return ConversationEligibility.refused(now);
+        }
+        return ConversationEligibility.complete(
+                now, router.decide(negatives, job.getWorkspace().getId(), RoutingContext.author()));
+    }
+
+    private boolean composes(AgentJob job) {
+        if (!egressGuard.deliveryAllowed("prepare-conversational-feedback")) {
+            log.debug("Conversational preparation suppressed: jobId={}", job.getId());
+            return false;
+        }
+        return deliveryPolicy.allowsComposition(job, DeliveryPolicySurface.CONVERSATION);
     }
 
     /**

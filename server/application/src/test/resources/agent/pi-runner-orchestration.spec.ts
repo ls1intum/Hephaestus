@@ -681,7 +681,8 @@ if (scenario !== undefined && scenario !== "") {
 		if (
 			scenario === "compose" ||
 			scenario === "compose-foreign-provider" ||
-			supportMode === "selected"
+			supportMode === "selected" ||
+			supportMode === "routing-missing"
 		) {
 			selected = [supportOccurrence("scm.pull_request", 3), supportOccurrence("scm.issue", 3)];
 		} else if (supportMode === "duplicate") {
@@ -691,6 +692,11 @@ if (scenario !== undefined && scenario !== "") {
 			];
 		}
 
+		// The page's decision per practice; these scenarios exercise composition, so it admits unless a mode refuses.
+		const inAppDecision = new Map([
+			["cooldown", "RECENTLY_SURFACED"],
+			["inline", "UNCORROBORATED"],
+		]).get(supportMode ?? "");
 		const complete = {
 			state: "COMPLETE",
 			readAt: "2026-10-07T10:00:00Z",
@@ -703,8 +709,29 @@ if (scenario !== undefined && scenario !== "") {
 							return row.practiceSlug;
 						}),
 				),
-			].map((practiceSlug) => ({ practiceSlug, occurrences: selected })),
+			].map((practiceSlug) =>
+				inAppDecision === undefined
+					? { practiceSlug, decision: "ADMIT", occurrences: selected }
+					: { practiceSlug, decision: inAppDecision, occurrences: [] },
+			),
 		};
+		// The conversation lane's routing per admitted NOT_MET row, by its id.
+		const chatRouting =
+			supportMode === "routing-missing"
+				? undefined
+				: {
+						state: "COMPLETE",
+						readAt: complete.readAt,
+						observations: rows.flatMap((row) => {
+							if (!isRecord(row) || row.outcome !== "NOT_MET") {
+								return [];
+							}
+							const inline =
+								supportMode === "inline" ||
+								(supportMode === "first-inline" && row.practiceSlug === "test-practice");
+							return [{ observationId: row.id, decision: inline ? "HAS_INLINE_ANCHOR" : "ADMIT" }];
+						}),
+					};
 		let support: unknown = complete;
 		if (supportMode === "missing") {
 			support = undefined;
@@ -720,6 +747,7 @@ if (scenario !== undefined && scenario !== "") {
 				practices: [
 					{
 						practiceSlug: "test-practice",
+						decision: "ADMIT",
 						occurrences: [{ ...supportOccurrence("scm.issue", 1), practiceRevisionId: "unknown" }],
 					},
 				],
@@ -731,6 +759,7 @@ if (scenario !== undefined && scenario !== "") {
 			admissionDigest: "admitted-digest",
 			observations: rows,
 			inAppSupport: support,
+			inChatEligibility: chatRouting,
 		});
 	});
 	const manager = {
@@ -2705,6 +2734,9 @@ if (scenario !== undefined && scenario !== "") {
 		"compose-support-unavailable",
 		"compose-support-refused",
 		"compose-support-refused-only",
+		"compose-support-cooldown",
+		"compose-support-inline",
+		"compose-support-routing-missing",
 		"compose",
 		"compose-continuation",
 		"compose-fresh-history",
@@ -2729,6 +2761,7 @@ if (scenario !== undefined && scenario !== "") {
 		"compose-invalid-select",
 		"compose-fold",
 		"compose-already-said",
+		"compose-already-said-inline",
 		"compose-context-unavailable",
 		"compose-counterevidence",
 		"compose-reviewer-only",
@@ -2747,6 +2780,10 @@ if (scenario !== undefined && scenario !== "") {
 				["compose-support-unavailable", "compose-support"],
 				["compose-support-refused", "compose-support"],
 				["compose-support-refused-only", "compose-support"],
+				["compose-support-cooldown", "compose-support"],
+				["compose-support-inline", "compose-support"],
+				["compose-support-routing-missing", "compose-support"],
+				["compose-already-said-inline", "compose-already-said"],
 				["compose-loop-rejection", "compose-loop"],
 				["compose-compacted", "compose-qualify"],
 				["compose-quiet-blank", "compose-quiet"],
@@ -2871,6 +2908,14 @@ if (scenario !== undefined && scenario !== "") {
 					"counts a NOT_MET practice folded into another practice's unit as decided and asks no more",
 				"compose-already-said":
 					"withholds as already said only on the channel and practice that captured delivered feedback records",
+				"compose-already-said-inline":
+					"refuses even a withholding on an open lane for a practice the server routed elsewhere",
+				"compose-support-cooldown":
+					"composes conversation notes for an unanchored problem while the page's cooldown closes its lane",
+				"compose-support-inline":
+					"opens no private session when every lane refuses the practice, keeping the review and every observation",
+				"compose-support-routing-missing":
+					"closes only the conversation lane, as a failure, when its routing read is missing",
 				"compose-abstention":
 					"composes from admitted NOT_APPLICABLE and UNDETERMINED observations without basing feedback on them",
 				"compose-unknown-outcome":
@@ -3180,7 +3225,7 @@ if (scenario !== undefined && scenario !== "") {
 								PI_ORCHESTRATION_SCENARIO: stage,
 								PI_IN_APP_SUPPORT_MODE: fixture.startsWith("compose-support-")
 									? fixture.slice("compose-support-".length)
-									: undefined,
+									: new Map([["compose-already-said-inline", "first-inline"]]).get(fixture),
 								PI_UNAVAILABLE_CONTEXT: String(fixture === "compose-context-unavailable"),
 								PI_PUBLIC_HISTORY_MODE: new Map([
 									["compose-fresh-history", "fresh"],
@@ -4198,7 +4243,7 @@ for (const item of nullableCases) {
 									(unit: unknown) =>
 										isRecord(unit) && unit.channel === "IN_CHAT" && unit.action === "NEW",
 								),
-								mode !== "refused-only",
+								!["refused-only", "inline", "routing-missing"].includes(mode),
 							);
 							assert.deepEqual(
 								payload.units
@@ -4209,13 +4254,21 @@ for (const item of nullableCases) {
 									}),
 								new Map<string, string[]>([
 									["selected", ["NEW"]],
+									["routing-missing", ["NEW"]],
 									["empty", ["WITHHOLD"]],
 									["duplicate", ["WITHHOLD"]],
 								]).get(mode) ?? [],
 							);
+							// A lane the server refuses is decided; only an unknown read is a failure.
 							assert.deepEqual(
 								payload.compositionFailures,
-								["missing", "malformed", "unavailable", "invalid-optional"].includes(mode)
+								[
+									"missing",
+									"malformed",
+									"unavailable",
+									"invalid-optional",
+									"routing-missing",
+								].includes(mode)
 									? [{ phase: "PRIVATE_FEEDBACK", reason: "RUNTIME_ERROR" }]
 									: [],
 							);
@@ -4223,8 +4276,38 @@ for (const item of nullableCases) {
 								events.filter(
 									(event) => event.includes("tools=") && event.includes("report_feedback"),
 								).length,
-								mode === "refused-only" ? 0 : 1,
+								mode === "refused-only" || mode === "inline" ? 0 : 1,
 							);
+							const unitReply = events.find((event) => event.startsWith("support-units:")) ?? "";
+							if (mode === "cooldown") {
+								// The cooldown closes IN_APP; the composer cannot open it again, and the notes stand.
+								assert.match(unitReply, /#1: IN_APP is not a lane this run may write for/u);
+								assert.match(unitReply, /#2: stored a IN_CHAT unit for test-practice \(NEW\)/u);
+								assert.match(
+									child.stderr,
+									/IN_APP closed for this run: no practice is routed to it/u,
+								);
+							}
+							if (mode === "routing-missing") {
+								assert.match(unitReply, /#2: IN_CHAT is not a lane this run may write for/u);
+								assert.match(
+									child.stderr,
+									/IN_CHAT closed for this run: routing missing or malformed/u,
+								);
+							}
+							if (mode === "inline") {
+								// Nothing private is asked of the model; the review and every observation remain.
+								assert.equal(unitReply, "");
+								assert.equal(payload.units.length, 0);
+								assert.match(
+									child.stderr,
+									/IN_APP closed for this run: no practice is routed to it/u,
+								);
+								assert.match(
+									child.stderr,
+									/IN_CHAT closed for this run: no practice is routed to it/u,
+								);
+							}
 							break;
 						}
 						case "compose":
@@ -5074,9 +5157,13 @@ for (const item of nullableCases) {
 								second,
 								/#2: stored a IN_CHAT unit for second-practice \(WITHHOLD\); 0\/1 used on that lane\./u,
 							);
+							// test-practice's problem is on the diff: the open lane refuses even a withholding for it.
+							const inline = fixture === "compose-already-said-inline";
 							assert.match(
 								second,
-								/#3: stored a IN_CHAT unit for test-practice \(WITHHOLD\); 0\/1 used on that lane\./u,
+								inline
+									? /#3: IN_CHAT cannot carry feedback about test-practice this run \(HAS_INLINE_ANCHOR\); write no unit for it there, not even a WITHHOLD\. Skipped\./u
+									: /#3: stored a IN_CHAT unit for test-practice \(WITHHOLD\); 0\/1 used on that lane\./u,
 							);
 							const payload: unknown = JSON.parse(
 								readFileSync(nodePath.join(cwd, "out/feedback.json"), "utf8"),
@@ -5091,7 +5178,7 @@ for (const item of nullableCases) {
 								[
 									"IN_APP:test-practice:ALREADY_SAID:observation-1+observation-2",
 									"IN_CHAT:second-practice:NO_MATERIAL_CHANGE:observation-2+observation-3",
-									"IN_CHAT:test-practice:BELOW_BAR:observation-1",
+									...(inline ? [] : ["IN_CHAT:test-practice:BELOW_BAR:observation-1"]),
 								],
 							);
 							assert.deepEqual(payload.compositionFailures, []);

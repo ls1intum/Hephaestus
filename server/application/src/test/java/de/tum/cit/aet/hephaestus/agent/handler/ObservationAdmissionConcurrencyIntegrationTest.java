@@ -13,6 +13,7 @@ import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.agent.context.JobEvidenceFiles;
 import de.tum.cit.aet.hephaestus.agent.handler.ObservationAdmissionService.AdmissionIdentity;
 import de.tum.cit.aet.hephaestus.agent.handler.ObservationAdmissionService.StaleAttemptException;
+import de.tum.cit.aet.hephaestus.agent.handler.inapp.InAppRoutingDecision;
 import de.tum.cit.aet.hephaestus.agent.handler.inapp.InAppSupportContext;
 import de.tum.cit.aet.hephaestus.agent.handler.inapp.InAppSupportReader;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
@@ -108,7 +109,8 @@ class ObservationAdmissionConcurrencyIntegrationTest extends BaseIntegrationTest
                 "2026-10-08T00:00:01Z",
                 null,
                 state == InAppSupportContext.State.COMPLETE
-                        ? List.of(new InAppSupportContext.PracticeSupport("handles-errors", List.of(occurrence)))
+                        ? List.of(new InAppSupportContext.PracticeSupport(
+                                "handles-errors", InAppRoutingDecision.ADMIT, List.of(occurrence)))
                         : List.of());
 
         var wire = mapper.valueToTree(context);
@@ -117,6 +119,8 @@ class ObservationAdmissionConcurrencyIntegrationTest extends BaseIntegrationTest
         assertThat(wire.path("readAt").asString()).isEqualTo(context.readAt());
         assertThat(wire.has("refusal")).isFalse();
         if (state == InAppSupportContext.State.COMPLETE) {
+            assertThat(wire.path("practices").path(0).path("decision").asString())
+                    .isEqualTo("ADMIT");
             var selected = wire.path("practices").path(0).path("occurrences").path(0);
             assertThat(selected.path("observationId").asString())
                     .isEqualTo(occurrence.observationId().toString());

@@ -3,6 +3,8 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.context.JobEvidenceFiles;
 import de.tum.cit.aet.hephaestus.agent.context.providers.ReviewHistoryContentSource;
+import de.tum.cit.aet.hephaestus.agent.handler.conversation.ConversationEligibility;
+import de.tum.cit.aet.hephaestus.agent.handler.conversation.ConversationalDeliveryListener;
 import de.tum.cit.aet.hephaestus.agent.handler.inapp.InAppSupportContext;
 import de.tum.cit.aet.hephaestus.agent.handler.inapp.InAppSupportReader;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
@@ -56,6 +58,9 @@ public class ObservationAdmissionService {
     /** The response key of the IN_APP support read after admission; see {@link InAppSupportContext}. */
     public static final String IN_APP_SUPPORT_KEY = "inAppSupport";
 
+    /** The response key of the IN_CHAT routing read after admission; see {@link ConversationEligibility}. */
+    public static final String IN_CHAT_ELIGIBILITY_KEY = "inChatEligibility";
+
     public static final String DIGEST_METADATA_KEY = "observation_admission_digest";
 
     /** The attempt whose citations the admission verified; a later attempt of the same job only composes. */
@@ -100,6 +105,7 @@ public class ObservationAdmissionService {
     private final PublicReviewEligibility publicReviewEligibility;
     private final ReviewHistoryContentSource reviewHistory;
     private final ObjectProvider<InAppSupportReader> inAppSupportReader;
+    private final ConversationalDeliveryListener conversationLane;
     private final PullRequestRepository pullRequests;
     private final ReviewCompositionBasisRepository basisRepository;
 
@@ -118,8 +124,10 @@ public class ObservationAdmissionService {
             PublicReviewEligibility publicReviewEligibility,
             ReviewHistoryContentSource reviewHistory,
             ObjectProvider<InAppSupportReader> inAppSupportReader,
+            ConversationalDeliveryListener conversationLane,
             PullRequestRepository pullRequests,
             ReviewCompositionBasisRepository basisRepository) {
+        this.conversationLane = conversationLane;
         this.pullRequests = pullRequests;
         this.basisRepository = basisRepository;
         this.jobs = jobs;
@@ -149,6 +157,7 @@ public class ObservationAdmissionService {
             // Read once the admission has committed, so a failed read cannot undo it. A joined request shares
             // this dated read; a later retry of the same submission reads again.
             admitted.set(IN_APP_SUPPORT_KEY, mapper.valueToTree(inAppSupport(identity)));
+            admitted.set(IN_CHAT_ELIGIBILITY_KEY, mapper.valueToTree(inChatEligibility(identity)));
             mine.outcome().complete(admitted);
             return admitted;
         } catch (RuntimeException exception) {
@@ -189,6 +198,25 @@ public class ObservationAdmissionService {
                     identity.jobId(),
                     e.getClass().getSimpleName());
             return InAppSupportContext.unavailable(Instant.now());
+        }
+    }
+
+    /**
+     * The IN_CHAT routing of the admitted run, for its owning attempt. It copies nothing from other reviews, so it is
+     * not indexed. A lost attempt stays a lost attempt; any other failure leaves the routing unavailable.
+     */
+    private ConversationEligibility inChatEligibility(AdmissionIdentity identity) {
+        try {
+            return Objects.requireNonNull(transactions.execute(status -> conversationLane.eligibility(
+                    ownedJob(identity), observations.findByAgentJobId(identity.jobId(), identity.workspaceId()))));
+        } catch (StaleAttemptException lost) {
+            throw lost;
+        } catch (RuntimeException e) {
+            log.warn(
+                    "IN_CHAT routing could not be read after admission: jobId={}, error={}",
+                    identity.jobId(),
+                    e.getClass().getSimpleName());
+            return ConversationEligibility.unavailable(Instant.now());
         }
     }
 

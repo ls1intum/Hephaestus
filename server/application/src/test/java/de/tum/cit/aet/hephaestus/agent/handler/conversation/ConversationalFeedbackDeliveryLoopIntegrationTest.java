@@ -268,6 +268,36 @@ class ConversationalFeedbackDeliveryLoopIntegrationTest extends BaseIntegrationT
         assertThat(feedbackPlacementRepository.findAll()).isEmpty();
     }
 
+    /**
+     * The decision composition reads before it writes notes is the router's own, keyed by the persisted rows: a problem
+     * cited on the diff belongs on the line, and only the unanchored one is prepared for the conversation.
+     */
+    @Test
+    void shouldRouteThePersistedProblemsBeforeCompositionAsPreparationDoes() {
+        AgentJob job = newJob();
+        Observation onTheDiff = saveObservation(job, "occ-diff", "scm.pull-request.diff");
+        Observation described = saveObservation(job, "occ-described", "scm.pull-request.core");
+        List<Observation> persisted = observationRepository.findByAgentJobId(job.getId(), workspace.getId());
+
+        assertThat(router.decide(persisted, workspace.getId(), RoutingContext.author()))
+                .containsOnly(
+                        Map.entry(onTheDiff.getId(), ConversationRoutingDecision.HAS_INLINE_ANCHOR),
+                        Map.entry(described.getId(), ConversationRoutingDecision.ADMIT));
+        assertThat(router.decide(persisted, workspace.getId(), RoutingContext.reviewer()))
+                .containsOnlyKeys(onTheDiff.getId(), described.getId())
+                .doesNotContainValue(ConversationRoutingDecision.ADMIT);
+
+        prepareFor(job);
+
+        assertThat(conversationUnits())
+                .filteredOn(unit -> unit.getAgentJobId().equals(job.getId()))
+                .singleElement()
+                .satisfies(unit -> assertThat(unit.getDeliveryState()).isEqualTo(FeedbackDeliveryState.PREPARED));
+        assertThat(router.admit(persisted, workspace.getId(), RoutingContext.author()))
+                .extracting(Observation::getId)
+                .containsExactly(described.getId());
+    }
+
     private void prepareFor(AgentJob job) {
         List<Observation> observations = observationRepository.findByAgentJobId(
                 job.getId(), job.getWorkspace().getId());
@@ -316,6 +346,10 @@ class ConversationalFeedbackDeliveryLoopIntegrationTest extends BaseIntegrationT
     }
 
     private Observation saveObservation(AgentJob job, String occurrenceKey) {
+        return saveObservation(job, occurrenceKey, "scm.pull-request.core");
+    }
+
+    private Observation saveObservation(AgentJob job, String occurrenceKey, String sourceKind) {
         UUID id = UUID.randomUUID();
         observationRepository.insertIfAbsent(
                 id,
@@ -331,11 +365,7 @@ class ConversationalFeedbackDeliveryLoopIntegrationTest extends BaseIntegrationT
                 "NOT_MET",
                 "MAJOR",
                 AdmittedObservationFixtures.evidence(
-                                job.getId(),
-                                "scm.pull-request.core",
-                                "context/metadata.json",
-                                "metadata.json",
-                                "example")
+                                job.getId(), sourceKind, "context/metadata.json", "metadata.json", "example")
                         .toString(),
                 null,
                 null,
