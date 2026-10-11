@@ -77,6 +77,7 @@ public class GitHubIssueCommentSyncService {
     private final GitHubExceptionClassifier exceptionClassifier;
     private final GitHubGraphQlSyncCoordinator graphQlSyncHelper;
     private static final int MAX_RETRY_ATTEMPTS = 3;
+    private static final int PARENT_REPAIR_CHUNK = 1000;
 
     public GitHubIssueCommentSyncService(
             GitHubGraphQlClientProvider graphQlClientProvider,
@@ -89,6 +90,30 @@ public class GitHubIssueCommentSyncService {
         this.syncProperties = syncProperties;
         this.exceptionClassifier = exceptionClassifier;
         this.graphQlSyncHelper = graphQlSyncHelper;
+    }
+
+    /**
+     * Moves this repository's comments from issue rows a stored GitHub pull request contradicts to that pull
+     * request, from what is already stored and with no provider call. The ceiling is fixed when the pass starts,
+     * each chunk commits on its own and starts after the last id the previous one covered; comments stored after
+     * the start wait for the next pass.
+     *
+     * @return the number of comments moved
+     */
+    public int repairCanonicalParents(long repositoryId) {
+        long ceiling = commentProcessor.canonicalParentCeiling(repositoryId);
+        long after = 0;
+        int moved = 0;
+        while (after < ceiling) {
+            var chunk = commentProcessor.moveToCanonicalParents(repositoryId, after, ceiling, PARENT_REPAIR_CHUNK);
+            moved += chunk.moved();
+            if (chunk.lastId() <= after) break;
+            after = chunk.lastId();
+        }
+        if (moved > 0) {
+            log.info("Moved comments to their pull request: repositoryId={}, comments={}", repositoryId, moved);
+        }
+        return moved;
     }
 
     /**

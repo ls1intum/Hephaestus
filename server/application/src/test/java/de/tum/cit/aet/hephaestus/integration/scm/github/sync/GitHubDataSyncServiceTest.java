@@ -43,6 +43,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubExceptionCl
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.RateLimitTracker;
 import de.tum.cit.aet.hephaestus.integration.scm.github.discussion.GitHubDiscussionSyncService;
 import de.tum.cit.aet.hephaestus.integration.scm.github.issue.GitHubIssueSyncService;
+import de.tum.cit.aet.hephaestus.integration.scm.github.issuecomment.GitHubIssueCommentSyncService;
 import de.tum.cit.aet.hephaestus.integration.scm.github.issuedependency.GitHubIssueDependencySyncService;
 import de.tum.cit.aet.hephaestus.integration.scm.github.issuetype.GitHubIssueTypeSyncService;
 import de.tum.cit.aet.hephaestus.integration.scm.github.label.GitHubLabelSyncService;
@@ -94,6 +95,9 @@ class GitHubDataSyncServiceTest extends BaseUnitTest {
 
     @Mock
     private ActivityLedgerRepair activityLedgerRepair;
+
+    @Mock
+    private GitHubIssueCommentSyncService commentSyncService;
 
     @Mock
     private IdentityProviderRepository gitProviderRepository;
@@ -212,7 +216,8 @@ class GitHubDataSyncServiceTest extends BaseUnitTest {
                 tokenProvider,
                 gitHubAppTokenService,
                 rateLimitTracker,
-                activityLedgerRepair);
+                activityLedgerRepair,
+                commentSyncService);
 
         provider = new IdentityProvider();
         ReflectionTestUtils.setField(provider, "id", PROVIDER_ID);

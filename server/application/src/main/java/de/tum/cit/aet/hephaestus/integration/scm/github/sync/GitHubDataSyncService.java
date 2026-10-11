@@ -36,6 +36,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubExceptionCl
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.RateLimitTracker;
 import de.tum.cit.aet.hephaestus.integration.scm.github.discussion.GitHubDiscussionSyncService;
 import de.tum.cit.aet.hephaestus.integration.scm.github.issue.GitHubIssueSyncService;
+import de.tum.cit.aet.hephaestus.integration.scm.github.issuecomment.GitHubIssueCommentSyncService;
 import de.tum.cit.aet.hephaestus.integration.scm.github.issuedependency.GitHubIssueDependencySyncService;
 import de.tum.cit.aet.hephaestus.integration.scm.github.issuetype.GitHubIssueTypeSyncService;
 import de.tum.cit.aet.hephaestus.integration.scm.github.label.GitHubLabelSyncService;
@@ -97,6 +98,7 @@ public class GitHubDataSyncService {
     private static final String GITHUB_SERVER_URL = "https://github.com";
 
     private final ActivityLedgerRepair activityLedgerRepair;
+    private final GitHubIssueCommentSyncService commentSyncService;
     private final SyncSchedulerProperties syncSchedulerProperties;
 
     private final IdentityProviderRepository gitProviderRepository;
@@ -153,7 +155,8 @@ public class GitHubDataSyncService {
             InstallationTokenProvider tokenProvider,
             GitHubAppTokenService gitHubAppTokenService,
             RateLimitTracker rateLimitTracker,
-            ActivityLedgerRepair activityLedgerRepair) {
+            ActivityLedgerRepair activityLedgerRepair,
+            GitHubIssueCommentSyncService commentSyncService) {
         this.syncSchedulerProperties = syncSchedulerProperties;
         this.gitProviderRepository = gitProviderRepository;
         this.syncTargetProvider = syncTargetProvider;
@@ -181,6 +184,7 @@ public class GitHubDataSyncService {
         this.gitHubAppTokenService = gitHubAppTokenService;
         this.rateLimitTracker = rateLimitTracker;
         this.activityLedgerRepair = activityLedgerRepair;
+        this.commentSyncService = commentSyncService;
     }
 
     private Optional<Repository> fetchRepositoryMetadata(SyncTarget target, IdentityProvider provider) {
@@ -452,6 +456,13 @@ public class GitHubDataSyncService {
             }
             if (error == null) {
                 error = commitBackfillError;
+            }
+            // Comment parents before the ledger: the activity read groups a comment by its stored parent.
+            try {
+                commentSyncService.repairCanonicalParents(repositoryId);
+            } catch (RuntimeException e) {
+                log.warn("Comment parent repair failed: workspaceId={}, repositoryId={}", scopeId, repositoryId, e);
+                if (error == null) error = "Comment parent repair failed";
             }
             try {
                 activityLedgerRepair.reconcileRepository(scopeId, repositoryId);
