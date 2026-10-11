@@ -43,7 +43,32 @@ class ProxyAccountingUnparseableUsageTest extends BaseUnitTest {
                         .count())
                 .as("a non-zero rate is the only signal that the ledger is under-billing")
                 .isEqualTo(1.0);
+        assertThat(missing("AGENT_JOB"))
+                .as("an unreadable body is not also an absent one")
+                .isZero();
         verify(usageAccumulator, never()).accumulate(any(), any());
+    }
+
+    @Test
+    void shouldCountAServedBodyThatReportsNoUsageAsMissingNotUnparseable() {
+        ProxyRouting.BilledAttempt attempt = new ProxyRouting.BilledAttempt(
+                LlmUsageSourceType.MENTOR_TURN, UUID.randomUUID(), 1, BigDecimal.ZERO, "worker-1");
+        byte[] body = "{\"choices\":[{\"message\":{\"content\":\"hi\"}}]}".getBytes(StandardCharsets.UTF_8);
+
+        accounting.recordUsage(attempt, body, false);
+
+        assertThat(missing("MENTOR_TURN")).isEqualTo(1.0);
+        assertThat(meterRegistry
+                        .counter("llm.proxy.usage.unparseable", "sourceType", "MENTOR_TURN")
+                        .count())
+                .isZero();
+        verify(mentorTurnUsageAccumulator, never()).accumulate(any(), any());
+    }
+
+    private double missing(String sourceType) {
+        return meterRegistry
+                .counter("llm.proxy.usage.missing", "sourceType", sourceType)
+                .count();
     }
 
     @Test
@@ -64,6 +89,7 @@ class ProxyAccountingUnparseableUsageTest extends BaseUnitTest {
                         .count())
                 .as("the counter must mean 'unbilled', not 'a call happened'")
                 .isZero();
+        assertThat(missing("AGENT_JOB")).isZero();
         verify(usageAccumulator).accumulate(attempt, new ProxyTokenUsage(6, 5, 2, 4, 0));
     }
 

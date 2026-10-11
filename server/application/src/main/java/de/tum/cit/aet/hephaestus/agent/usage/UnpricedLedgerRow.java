@@ -21,4 +21,13 @@ public record UnpricedLedgerRow(
         long cacheReadTokens,
         long cacheWriteTokens,
         @Nullable Long appliedPriceId,
-        @Nullable Long appliedWorkspaceModelId) {}
+        @Nullable Long appliedWorkspaceModelId) {
+
+    /**
+     * Whether the row measured a billable token. {@code LlmUsageEventRepository} fences its selection and
+     * UPDATE on the same condition.
+     */
+    public boolean hasTokenEvidence() {
+        return inputTokens > 0 || outputTokens > 0 || cacheReadTokens > 0 || cacheWriteTokens > 0;
+    }
+}

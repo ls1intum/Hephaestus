@@ -89,7 +89,9 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
     long countUncosted(@Param("workspaceId") Long workspaceId, @Param("from") Instant from, @Param("to") Instant to);
 
     /**
-     * Every UNPRICED row in the window, across all workspaces — the repricing pass's work list.
+     * Every UNPRICED row in the window that measured a billable token, across all workspaces — the
+     * repricing pass's work list. A row without one is unknown spend that no rate repairs, so it is never
+     * selected and cannot hold a page against the rows behind it.
      *
      * <p>Ordered oldest first so a backlog is cleared in the order it accumulated, and paged because one
      * catalogue gap can leave a month's worth of rows behind it.
@@ -101,6 +103,7 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
             + "FROM LlmUsageEvent e "
             + "WHERE e.occurredAt >= :from AND e.occurredAt < :to "
             + "AND e.pricingState = de.tum.cit.aet.hephaestus.agent.usage.PricingState.UNPRICED "
+            + "AND (e.inputTokens > 0 OR e.outputTokens > 0 OR e.cacheReadTokens > 0 OR e.cacheWriteTokens > 0) "
             + "ORDER BY e.occurredAt")
     List<UnpricedLedgerRow> findUnpricedInWindow(
             @Param("from") Instant from, @Param("to") Instant to, Pageable pageable);
@@ -111,10 +114,11 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
      *
      * <p>Fenced on {@code pricing_state = 'UNPRICED'}, so it can only ever move a row out of the
      * unpriced state and never re-price one that already carries a frozen amount somebody was charged.
-     * Two pods repricing the same row concurrently is therefore safe: the loser updates nothing.
+     * Two pods repricing the same row concurrently is therefore safe: the loser updates nothing. Also
+     * fenced on a measured billable token: a row without one stays unknown, whatever the price says,
+     * because a free model's zero is a fact only about spend that was observed.
      *
-     * <p>Every token column is untouched. The measurement is not in question here; only the arithmetic
-     * over it was impossible.
+     * <p>Every token column is untouched; this operation resolves a rate without changing the measurement.
      *
      * <p><b>The price travels as one value.</b> The eight columns this writes are the eight components
      * of the {@link LlmPriceSnapshot} the repricer resolved, so it is passed as the snapshot rather than
@@ -129,7 +133,7 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
      * @param price the resolved price, whose {@code pricingState} is what the row moves to — always the
      *     state the caller computed, so a NO_CHARGE model settles as a real zero rather than staying a
      *     blind spot
-     * @return 1 when this call priced the row, 0 when it was no longer unpriced
+     * @return 1 when this call priced the row, 0 when it was no longer unpriced or measured no billable token
      */
     @WorkspaceAgnostic("ID-based price repair; the event id comes from the cross-tenant repricing enumeration")
     @Modifying(flushAutomatically = true, clearAutomatically = true)
@@ -142,7 +146,8 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
                     + "applied_per_1m_output_usd = :#{#price.per1mOutputUsd()}, "
                     + "applied_per_1m_cache_read_usd = :#{#price.per1mCacheReadUsd()}, "
                     + "applied_per_1m_cache_write_usd = :#{#price.per1mCacheWriteUsd()} "
-                    + "WHERE id = :id AND pricing_state = 'UNPRICED'",
+                    + "WHERE id = :id AND pricing_state = 'UNPRICED' "
+                    + "AND (input_tokens > 0 OR output_tokens > 0 OR cache_read_tokens > 0 OR cache_write_tokens > 0)",
             nativeQuery = true)
     int applyResolvedPrice(
             @Param("id") UUID id, @Param("costUsd") BigDecimal costUsd, @Param("price") LlmPriceSnapshot price);

@@ -46,6 +46,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
@@ -682,6 +683,51 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
             assertThat(settled.getAppliedPriceId()).isNull();
             assertThat(settled.getAppliedPer1mInputUsd()).isNull();
             assertThat(settled.getAppliedPer1mOutputUsd()).isNull();
+        }
+
+        @Test
+        @DisplayName("a row with no measured token is never selected or settled, even at a free model")
+        void aRowWithNoTokenEvidenceStaysUnknown() {
+            Workspace workspace = setupWorkspace("reprice-no-evidence");
+            Instant occurredAt = Instant.now();
+            recordUnverifiable(
+                    workspace.getId(),
+                    new LlmUsageRecorder.LlmUsageSample(
+                            LlmUsageJobType.PULL_REQUEST_REVIEW,
+                            LlmUsageSourceType.AGENT_JOB,
+                            UUID.randomUUID(),
+                            0,
+                            "gpt-5",
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            2,
+                            pricedInstance("3.00", "9.00"),
+                            UsageProvenance.NONE,
+                            occurredAt));
+            LlmUsageEvent unmeasured = eventsOf(workspace).getFirst();
+            LlmUsageEvent measured = unpricedRow("reprice-measured-beside");
+
+            int updated = reprice(
+                    unmeasured.getId(),
+                    BigDecimal.ZERO,
+                    new LlmPriceSnapshot(
+                            FundingSource.INSTANCE, PricingState.NO_CHARGE, null, null, null, null, null, null));
+
+            assertThat(updated).isZero();
+            LlmUsageEvent stillUnknown = reload(unmeasured.getId());
+            assertThat(stillUnknown.getPricingState()).isEqualTo(PricingState.UNPRICED);
+            assertThat(stillUnknown.getCostUsd()).isNull();
+            assertThat(stillUnknown.getAppliedPriceId()).isEqualTo(42L);
+            assertThat(usageRepository.findUnpricedInWindow(
+                            occurredAt.minus(Duration.ofHours(1)),
+                            occurredAt.plus(Duration.ofHours(1)),
+                            PageRequest.of(0, LlmUsageRepricingSweeper.MAX_ROWS_PER_PASS)))
+                    .extracting(UnpricedLedgerRow::id)
+                    .contains(measured.getId())
+                    .doesNotContain(unmeasured.getId());
         }
 
         @Test

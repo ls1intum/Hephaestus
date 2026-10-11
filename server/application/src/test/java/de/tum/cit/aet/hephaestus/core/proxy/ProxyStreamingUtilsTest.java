@@ -4,6 +4,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -17,6 +18,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -568,6 +570,72 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
                     bytes -> tapped.append(new String(bytes, StandardCharsets.UTF_8)));
 
             assertThat(tapped.toString()).isEqualTo("data: delivered\n\n");
+        }
+
+        @Test
+        @DisplayName("a received usage frame is tapped even when the write to the client then fails")
+        void tapKeepsAReceivedUsageFrameWhoseFlushFails() throws IOException {
+            var factory = new NettyDataBufferFactory(PooledByteBufAllocator.DEFAULT);
+            var content = pooled(factory, "data: {\"delta\":\"hi\"}\n\n");
+            var usage = pooled(factory, "data: {\"usage\":{\"prompt_tokens\":3}}\n\n");
+            var subscriptions = new AtomicInteger();
+            Flux<DataBuffer> body =
+                    Flux.<DataBuffer>just(content, usage).doOnSubscribe(s -> subscriptions.incrementAndGet());
+            var response = mock(HttpServletResponse.class);
+            var output = mock(ServletOutputStream.class);
+            when(response.getOutputStream()).thenReturn(output);
+            doNothing()
+                    .doThrow(new IOException("Client disconnected"))
+                    .when(output)
+                    .flush();
+            StringBuilder tapped = new StringBuilder();
+
+            var outcome = ProxyStreamingUtils.streamSseToResponse(
+                    body, new HttpHeaders(), response, 200, bytes -> tapped.append(new String(bytes, UTF_8)));
+
+            assertThat(outcome).isEqualTo(ProxyStreamingUtils.StreamOutcome.CLIENT_DISCONNECTED);
+            assertThat(tapped.toString())
+                    .isEqualTo("data: {\"delta\":\"hi\"}\n\ndata: {\"usage\":{\"prompt_tokens\":3}}\n\n");
+            assertThat(subscriptions).hasValue(1);
+            assertThat(content.getNativeBuffer().refCnt()).isZero();
+            assertThat(usage.getNativeBuffer().refCnt()).isZero();
+        }
+
+        @Test
+        @DisplayName("a client that disconnects before the usage frame leaves the tap without it")
+        void tapHasNoUsageWhenTheClientDisconnectsFirst() throws Exception {
+            var factory = new NettyDataBufferFactory(PooledByteBufAllocator.DEFAULT);
+            var content = pooled(factory, "data: {\"delta\":\"hi\"}\n\n");
+            var usage = pooled(factory, "data: {\"usage\":{\"prompt_tokens\":3}}\n\n");
+            var cancelled = new AtomicBoolean();
+            var subscriptions = new AtomicInteger();
+            Flux<DataBuffer> body = Flux.<DataBuffer>just(content)
+                    .concatWith(Flux.<DataBuffer>just(usage).concatWith(Flux.never()))
+                    .doOnSubscribe(s -> subscriptions.incrementAndGet())
+                    .doOnCancel(() -> cancelled.set(true));
+            var response = mock(HttpServletResponse.class);
+            var output = mock(ServletOutputStream.class);
+            when(response.getOutputStream()).thenReturn(output);
+            doThrow(new IOException("Client disconnected")).when(output).write(any(byte[].class));
+            StringBuilder tapped = new StringBuilder();
+
+            var outcome = ProxyStreamingUtils.streamSseToResponse(
+                    body, new HttpHeaders(), response, 200, bytes -> tapped.append(new String(bytes, UTF_8)));
+
+            assertThat(outcome).isEqualTo(ProxyStreamingUtils.StreamOutcome.CLIENT_DISCONNECTED);
+            assertThat(tapped.toString()).isEqualTo("data: {\"delta\":\"hi\"}\n\n");
+            assertThat(subscriptions).hasValue(1);
+            await().untilAsserted(() -> {
+                assertThat(cancelled).isTrue();
+                assertThat(content.getNativeBuffer().refCnt()).isZero();
+                assertThat(usage.getNativeBuffer().refCnt()).isZero();
+            });
+        }
+
+        private NettyDataBuffer pooled(NettyDataBufferFactory factory, String frame) {
+            var buffer = factory.allocateBuffer(64);
+            buffer.write(frame.getBytes(UTF_8));
+            return buffer;
         }
     }
 }

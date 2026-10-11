@@ -601,16 +601,18 @@ class LlmProxyServiceTest extends BaseUnitTest {
             assertThat(usage.getValue().billableInputTokens()).isEqualTo(75);
             assertThat(usage.getValue().outputTokens()).isEqualTo(40);
             assertThat(usage.getValue().cacheReadTokens()).isEqualTo(25);
+            assertThat(missingUsage()).isZero();
         }
 
         @Test
-        @DisplayName("a stream that terminates before the usage frame records nothing")
+        @DisplayName("a stream that terminates before the usage frame records nothing and is counted as missing")
         void aTruncatedStreamRecordsNothing() throws Exception {
             MockHttpServletResponse response =
                     proxyStream("{\"choices\":[{\"delta\":{\"content\":\"cut off here\"}}],\"usage\":null}");
 
             assertThat(response.getContentAsString()).contains("cut off here");
             verifyNoInteractions(usageAccumulator);
+            assertThat(missingUsage()).isEqualTo(1.0);
         }
 
         @Test
@@ -621,7 +623,16 @@ class LlmProxyServiceTest extends BaseUnitTest {
                             .counter("llm.proxy.usage.unparseable", "sourceType", "AGENT_JOB")
                             .count())
                     .isEqualTo(1.0);
+            assertThat(missingUsage())
+                    .as("malformed usage is not also counted as absent")
+                    .isZero();
             verifyNoInteractions(usageAccumulator);
+        }
+
+        private double missingUsage() {
+            return streamingMeterRegistry
+                    .counter("llm.proxy.usage.missing", "sourceType", "AGENT_JOB")
+                    .count();
         }
 
         @Test
@@ -670,6 +681,12 @@ class LlmProxyServiceTest extends BaseUnitTest {
             RecordedRequest retry = Objects.requireNonNull(upstream.takeRequest(5, TimeUnit.SECONDS));
             assertThat(Objects.requireNonNull(initial.getBody()).utf8()).contains("stream_options");
             assertThat(Objects.requireNonNull(retry.getBody()).utf8()).doesNotContain("stream_options");
+            // The refusal and the served response without usage are two facts, each counted once.
+            assertThat(streamingMeterRegistry
+                            .counter("llm.proxy.stream.usage.unsupported", "apiProtocol", "openai-completions")
+                            .count())
+                    .isEqualTo(1.0);
+            assertThat(missingUsage()).isEqualTo(1.0);
         }
 
         @Test

@@ -121,10 +121,12 @@ public final class ProxyStreamingUtils {
 
     /**
      * As {@link #streamSseToResponse(Flux, HttpHeaders, HttpServletResponse, int)}, but also hands
-     * each chunk's bytes to {@code tap} as they go past. A tee, not a buffer: the tap runs after the
-     * chunk is flushed to the client, and a tap that throws is logged rather than failing the stream.
+     * each chunk's bytes to {@code tap} as they go past. A tee, not a buffer: the tap sees each chunk the
+     * proxy received before it is written to the client, so a failed write cannot discard what the
+     * upstream already sent. A tap that throws is logged rather than failing the stream.
      *
-     * @param tap receives a copy of each chunk's bytes; {@code null} to stream without observing
+     * @param tap receives a copy of each chunk's bytes received from upstream; {@code null} to stream
+     *     without observing
      */
     public static StreamOutcome streamSseToResponse(
             Flux<DataBuffer> dataFlux,
@@ -167,8 +169,6 @@ public final class ProxyStreamingUtils {
                         try {
                             byte[] bytes = new byte[buffer.readableByteCount()];
                             buffer.read(bytes);
-                            outputStream.write(bytes);
-                            outputStream.flush();
                             if (tap != null) {
                                 try {
                                     tap.accept(bytes);
@@ -176,6 +176,8 @@ public final class ProxyStreamingUtils {
                                     log.warn("SSE tap failed; stream continues: {}", tapFailure.toString());
                                 }
                             }
+                            outputStream.write(bytes);
+                            outputStream.flush();
                         } catch (IOException e) {
                             log.debug("Client disconnected during SSE streaming");
                             throw new StreamingException("Client disconnected", e);
