@@ -252,6 +252,7 @@ public class PullRequestContentSource implements EvidenceSource, ReviewContextBu
     private static final List<String> ADMISSION_FIELDS = List.of(
             "pr_number",
             "pr_url",
+            "repository_id",
             "repository_full_name",
             "source_branch",
             "target_branch",
@@ -274,6 +275,19 @@ public class PullRequestContentSource implements EvidenceSource, ReviewContextBu
         result.put("pr_number", requireInt(jobMetadata, "pr_number"));
         result.put("pr_url", requireText(jobMetadata, "pr_url"));
         result.put("repository_full_name", requireText(jobMetadata, "repository_full_name"));
+        // Preserve admission identity; the mirror supplies its provider only while it still matches.
+        var admittedRepositoryId = jobMetadata.get("repository_id");
+        if (admittedRepositoryId != null
+                && admittedRepositoryId.isIntegralNumber()
+                && admittedRepositoryId.asLong() > 0) {
+            result.set("repository_id", admittedRepositoryId);
+            var repository = pullRequest.getRepository();
+            if (repository != null
+                    && Long.valueOf(admittedRepositoryId.asLong()).equals(repository.getId())
+                    && repository.getProvider() != null) {
+                result.put("provider_id", repository.getProvider().getId());
+            }
+        }
         result.put("source_branch", requireText(jobMetadata, "source_branch"));
         result.put("target_branch", requireText(jobMetadata, "target_branch"));
         String reviewedHead = requireText(jobMetadata, "commit_sha");

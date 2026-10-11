@@ -130,11 +130,14 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
 
     /**
      * Everything a practice review's {@code metadata.json} projects, fetched in one query because the
-     * projection is written outside a transaction: the author, who merged it, the labels, the assignees
-     * and the milestone. {@code DISTINCT} for the same reason as {@link #findByIdWithAllForGate}.
+     * projection is written outside a transaction: the repository and its provider, the author, who merged
+     * it, the labels, the assignees and the milestone. {@code DISTINCT} for the same reason as
+     * {@link #findByIdWithAllForGate}.
      */
     @Query("""
         SELECT DISTINCT p FROM PullRequest p
+        LEFT JOIN FETCH p.repository r
+        LEFT JOIN FETCH r.provider
         LEFT JOIN FETCH p.labels
         LEFT JOIN FETCH p.assignees
         LEFT JOIN FETCH p.milestone

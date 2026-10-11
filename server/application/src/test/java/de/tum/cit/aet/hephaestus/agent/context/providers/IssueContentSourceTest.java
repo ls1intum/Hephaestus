@@ -17,6 +17,8 @@ import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
 import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
 import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.core.spi.DeliveredIssueCommentLookup;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
@@ -258,6 +260,7 @@ class IssueContentSourceTest extends BaseUnitTest {
     private ObjectNode sampleMetadata() {
         ObjectNode metadata = objectMapper.createObjectNode();
         metadata.put("issue_id", ISSUE_ID);
+        metadata.put("repository_id", 1L);
         return metadata;
     }
 
@@ -360,6 +363,9 @@ class IssueContentSourceTest extends BaseUnitTest {
         Repository repo = new Repository();
         repo.setId(1L);
         repo.setNameWithOwner("owner/repo");
+        IdentityProvider capturedProvider = new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com");
+        capturedProvider.setId(2L);
+        repo.setProvider(capturedProvider);
         issue.setRepository(repo);
 
         Milestone milestone = new Milestone();
@@ -398,11 +404,38 @@ class IssueContentSourceTest extends BaseUnitTest {
             assertThat(meta.get("state").asString()).isEqualTo("CLOSED");
             assertThat(meta.get("state_reason").asString()).isEqualTo("COMPLETED");
             assertThat(meta.get("repository_full_name").asString()).isEqualTo("owner/repo");
+            assertThat(meta.get("repository_id").asLong()).isEqualTo(1L);
+            assertThat(meta.get("provider_id").asLong()).isEqualTo(2L);
             assertThat(meta.get("author").asString()).isEqualTo("felix");
             assertThat(meta.get("issue_type").asString()).isEqualTo("Task");
             assertThat(meta.get("is_locked").asBoolean()).isTrue();
             assertThat(meta.has("comments_count")).isFalse();
             assertThat(meta.get("milestone").asString()).isEqualTo("v1.0");
+        }
+
+        @Test
+        void preservesAdmittedRepositoryWithoutBorrowingMovedProvider() throws Exception {
+            var issue = richIssue();
+            var repository = issue.getRepository();
+            assertThat(repository).isNotNull();
+            repository.setId(3L);
+            when(issueRepository.findByIdWithRepository(ISSUE_ID)).thenReturn(Optional.of(issue));
+            JsonNode meta = objectMapper.readTree(provider.capture(request(sampleMetadata()), Set.of(CORE))
+                    .files()
+                    .get(METADATA_KEY));
+            assertThat(meta.path("repository_id").asLong()).isEqualTo(1L);
+            assertThat(meta.has("provider_id")).isFalse();
+        }
+
+        @Test
+        void doesNotInventMissingAdmissionRepositoryIdentity() throws Exception {
+            when(issueRepository.findByIdWithRepository(ISSUE_ID)).thenReturn(Optional.of(richIssue()));
+            var metadata = sampleMetadata();
+            metadata.remove("repository_id");
+            JsonNode meta = objectMapper.readTree(
+                    provider.capture(request(metadata), Set.of(CORE)).files().get(METADATA_KEY));
+            assertThat(meta.has("repository_id")).isFalse();
+            assertThat(meta.has("provider_id")).isFalse();
         }
 
         @Test
