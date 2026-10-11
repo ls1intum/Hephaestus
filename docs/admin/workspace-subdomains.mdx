@@ -113,7 +113,7 @@ If authoritative DNS queries time out over UDP while TCP works, set
 `LEGO_EXPERIMENTAL_DNS_TCP_ONLY=true` in the proxy settings and recreate the proxy.
 This uses [lego's TCP transport](https://github.com/go-acme/lego/blob/v5.5.2/challenge/internal/client.go)
 for DNS queries, including propagation checks.
-It keeps the authoritative and recursive checks enabled.
+It leaves the existing propagation-check settings unchanged.
 The default is `false`.
 Set it back to `false` and recreate the proxy to restore the default transport.
 
