@@ -1352,7 +1352,10 @@ class PullRequestRepairRecheckIntegrationTest extends AbstractPracticeReviewInte
                 .findByIdAndWorkspaceId(repair.getId(), workspace.getId())
                 .orElseThrow();
         assertThat(failed.getStatus()).isEqualTo(AgentJobStatus.FAILED);
-        assertThat(failed.getErrorMessage()).contains("Pinned review head is unavailable");
+        // The fenced terminal write records the closed stage and kind, never the handler's own text.
+        assertThat(failed.getErrorMessage())
+                .isEqualTo("The job failed before execution while preparing the review inputs: "
+                        + "the review inputs could not be prepared.");
         assertThat(failed.getEvidenceSnapshot()).isNull();
         assertThat(failed.getDeliveryStatus()).isNotEqualTo(DeliveryStatus.DELIVERED);
         assertThat(observationRepository.findByAgentJobId(repair.getId(), workspace.getId()))
