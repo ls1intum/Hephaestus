@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.90.3
+
+### Patch Changes
+
+- Certificate preparation can use TCP for DNS queries when authoritative servers cannot be reached over UDP. The optional setting preserves existing propagation-check settings.
+- A practice review whose worker is lost after its observations were admitted can now continue to write the public review on the work, from the original inputs within their one-day eligibility window and the original commits still held by the server's local Git mirror. Practice assessment and private feedback are not repeated; private feedback for such a run is reported as not composed. Reviews admitted without kept inputs, or whose inputs expired, were erased or whose commits are no longer held, still fail as interrupted after admission.
+- A public activity page that takes a moment to open now shows the outline of the page instead of a spinner, and a person's figures show their outline while they load.
+- Public activity keeps the current figures visible when a refresh temporarily fails, with a retry that stays disabled while the page reloads.
+- When Teams cannot load, the page now says so and offers a retry, instead of saying the workspace has no teams.
+- Container image tags become available after their signatures and provenance have been verified.
+
 ## 0.90.2
 
 ### Patch Changes
