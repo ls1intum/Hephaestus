@@ -47,8 +47,9 @@ interface ActivityPeopleQueryRepository extends Repository<ActivityEvent, UUID> 
             m.unavailable_since IS NULL AND m.repository_visibility_confirmed_at > :visibilityConfirmedAfter
             """;
     String PUBLIC_REPOSITORY = " AND (:#{#scope.publicOnly()} = false OR (" + PUBLIC_REPOSITORY_CONDITION + ")) ";
+    // Inline eligibility so each use can join by identity instead of scanning the whole public cohort.
     String PUBLIC_PEOPLE = """
-            WITH public_people AS (SELECT u.id FROM "user" u WHERE true
+            WITH public_people AS NOT MATERIALIZED (SELECT u.id FROM "user" u WHERE true
             """ + PUBLIC_PERSON + """
             )
             """;

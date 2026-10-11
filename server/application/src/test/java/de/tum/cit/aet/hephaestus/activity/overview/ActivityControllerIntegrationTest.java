@@ -551,15 +551,35 @@ class ActivityControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
                     -1,
                     DAY.minus(Duration.ofDays(365)),
                     privateRepo);
+            Instant firstPublic = DAY.minus(Duration.ofDays(60));
+            record(ada, ActivityEventType.ISSUE_CREATED, ActivityTargetType.ISSUE, -2, firstPublic);
             var pull = pullRequest(ada, monitored, pr -> pr);
             record(ada, ActivityEventType.PULL_REQUEST_OPENED, ActivityTargetType.PULL_REQUEST, pull.getId(), DAY);
             var review = review(pull, zoe, PullRequestReview.State.APPROVED);
             record(zoe, ActivityEventType.REVIEW_APPROVED, ActivityTargetType.REVIEW, review.getId(), DAY);
-            var before = page();
+            var before = Objects.requireNonNull(webTestClient
+                    .get()
+                    .uri(
+                            "/public/workspaces/{slug}/activity?range=custom&from=" + FROM + "&to=" + TO,
+                            workspace.getWorkspaceSlug())
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody(PublicActivityDTO.class)
+                    .returnResult()
+                    .getResponseBody());
             assertThat(before.people())
                     .filteredOn(p -> p.login().equals(ada.getLogin()))
                     .extracting(p -> p.firstContributionAt())
-                    .containsExactly(DAY);
+                    .containsExactly(firstPublic);
+            assertThat(before.people())
+                    .filteredOn(p -> p.login().equals(ada.getLogin()))
+                    .extracting(p -> p.counts().contributions())
+                    .containsExactly(1L);
+            assertThat(before.people())
+                    .filteredOn(p -> p.login().equals(zoe.getLogin()))
+                    .extracting(p -> p.counts().peopleHelped())
+                    .containsExactly(1L);
             assertThat(before.coverage().totalRepositories()).isEqualTo(1);
             jdbc.update(
                     "UPDATE account SET public_activity_visible=false WHERE id IN (SELECT account_id FROM identity_link WHERE provider_id=? AND subject=?)",
@@ -568,6 +588,7 @@ class ActivityControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
             var after = page();
             assertThat(after.people()).extracting(p -> p.login()).containsExactly(zoe.getLogin());
             assertThat(after.people().getFirst().counts().peopleHelped()).isZero();
+            assertThat(after.people().getFirst().firstContributionAt()).isEqualTo(DAY);
         }
 
         @Test
