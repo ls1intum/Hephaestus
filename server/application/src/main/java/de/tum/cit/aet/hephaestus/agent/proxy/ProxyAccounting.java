@@ -131,7 +131,12 @@ public class ProxyAccounting {
         } catch (Exception e) {
             log.warn("Could not parse upstream usage for {} — this call's tokens go unbilled", attempt.sourceId(), e);
             recordMalformedUsage(attempt);
-            usage = null;
+            // An unreadable body is not also an absent one: the practice script row still counts the
+            // call, and only the unparseable counter records the gap.
+            if (practiceScript != null) {
+                usageAccumulator.accumulatePracticeScript(attempt, practiceScript, null);
+            }
+            return null;
         }
         recordUsage(attempt, practiceScript, usage);
         return usage;

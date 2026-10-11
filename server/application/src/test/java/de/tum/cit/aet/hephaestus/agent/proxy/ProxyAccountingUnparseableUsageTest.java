@@ -57,7 +57,7 @@ class ProxyAccountingUnparseableUsageTest extends BaseUnitTest {
                 LlmUsageSourceType.MENTOR_TURN, UUID.randomUUID(), 1, BigDecimal.ZERO, "worker-1");
         byte[] body = "{\"choices\":[{\"message\":{\"content\":\"hi\"}}]}".getBytes(StandardCharsets.UTF_8);
 
-        accounting.recordUsage(attempt, body, false);
+        accounting.recordUsage(attempt, null, LlmApiProtocol.OPENAI_COMPLETIONS, body);
 
         assertThat(missing("MENTOR_TURN")).isEqualTo(1.0);
         assertThat(meterRegistry

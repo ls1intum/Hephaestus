@@ -705,6 +705,7 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
                             0,
                             0,
                             0,
+                            0,
                             2,
                             pricedInstance("3.00", "9.00"),
                             UsageProvenance.NONE,
