@@ -1027,10 +1027,13 @@ const DAY_SECONDS = 24 * 60 * 60;
 async function sameDay(checkout: string, previous: string, target: string): Promise<boolean> {
 	let stamps: number[];
 	try {
-		const shown = await output("git", ["show", "--no-patch", "--format=%ct", previous, target], {
-			cwd: checkout,
-		});
-		stamps = shown.trim().split("\n").map(Number);
+		// One lookup per commit: `git show` prints a revision named twice only once.
+		const shown = await Promise.all(
+			[previous, target].map(async (commit) =>
+				output("git", ["show", "--no-patch", "--format=%ct", commit], { cwd: checkout }),
+			),
+		);
+		stamps = shown.flatMap((stamp) => stamp.trim().split("\n")).map(Number);
 	} catch {
 		return false;
 	}
