@@ -156,9 +156,45 @@ describe("the address of a workspace", () => {
 		renderRouteAtWithRouter("/w/acme");
 
 		await screen.findByText("We could not load people", undefined, ROUTE_RENDER_WAIT);
+		screen.getByRole("heading", { name: "Public activity" });
+		expect(screen.queryByRole("table", { name: "People" })).toBeNull();
 		await user.click(screen.getByRole("button", { name: /Retry/u }));
 		await screen.findByRole("heading", { name: "Acme activity" });
 		expect(names()).toHaveLength(2);
+	});
+
+	// The router's own delays decide this: nothing for a read under a second, then the page's shape.
+	it("shows the page's shape while a slow first read is out, then the page", async () => {
+		const response = deferred<Response>();
+		server.use(
+			unauthenticatedUser,
+			http.get("*/public/workspaces/:slug/activity", async () => response.promise),
+		);
+		renderRouteAtWithRouter("/w/acme");
+
+		await screen.findByText("Loading public activity", undefined, ROUTE_RENDER_WAIT);
+		expect(screen.queryByRole("heading", { name: "Acme activity" })).toBeNull();
+		expect(screen.queryByRole("table", { name: "People" })).toBeNull();
+		response.resolve(HttpResponse.json(publicActivity()));
+
+		await screen.findByRole("heading", { name: "Acme activity" }, ROUTE_RENDER_WAIT);
+		expect(screen.queryByText("Loading public activity")).toBeNull();
+		expect(names()).toStrictEqual(["Bob Brenner", "Ada Lovelace"]);
+	});
+
+	it("shows a page that reads quickly without the loading shape in between", async () => {
+		const loadingShown: boolean[] = [];
+		const observer = new MutationObserver(() => {
+			loadingShown.push(document.body.textContent.includes("Loading public activity"));
+		});
+		observer.observe(document.body, { childList: true, subtree: true });
+		server.use(unauthenticatedUser);
+		publish();
+		renderRouteAtWithRouter("/w/acme");
+
+		await screen.findByRole("heading", { name: "Acme activity" }, ROUTE_RENDER_WAIT);
+		observer.disconnect();
+		expect(loadingShown).not.toContain(true);
 	});
 
 	it("opens published person figures without another read, and returns to the same filters", async () => {

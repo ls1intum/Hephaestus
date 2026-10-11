@@ -15,7 +15,7 @@ import { daysBefore } from "@/stories/story-clock";
 import { precedes } from "@/test/dom";
 
 import { parseActivityStack, PUBLIC_ACTIVITY_LEVEL_KINDS } from "./activity-search";
-import { PublicActivityPage } from "./PublicActivityPage";
+import { PublicActivityPage, PublicActivityPageSkeleton } from "./PublicActivityPage";
 
 const activity = publicActivityOf(PEOPLE);
 
@@ -96,6 +96,17 @@ export const Loading: Story = {
 			"aria-busy",
 			"true",
 		);
+	},
+};
+
+/** The first read of the page: its shape, and nothing that stands in for the workspace or its people. */
+export const FirstLoad: Story = {
+	render: () => <PublicActivityPageSkeleton />,
+	play: async ({ canvas }) => {
+		canvas.getByText("Loading public activity");
+		await expect(canvas.queryByRole("heading", { level: 1 })).not.toBeInTheDocument();
+		await expect(canvas.queryByRole("button", { name: "Sign in" })).not.toBeInTheDocument();
+		await expect(canvas.queryByRole("table", { name: "People" })).not.toBeInTheDocument();
 	},
 };
 
@@ -242,6 +253,10 @@ export const PersonLoading: Story = {
 	play: async () => {
 		const panel = await settledDrawerPanel();
 		await expect(panel.querySelector('[aria-busy="true"]')).toBeVisible();
+		await expect(within(panel).queryByRole("link", { name: /on GitHub/u })).not.toBeInTheDocument();
+		await expect(
+			within(panel).queryByRole("heading", { name: "In this range" }),
+		).not.toBeInTheDocument();
 		await expect(within(panel).queryByRole("table")).not.toBeInTheDocument();
 	},
 };
