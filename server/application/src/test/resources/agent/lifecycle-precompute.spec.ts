@@ -491,6 +491,51 @@ void test("every captured linked issue is a row, and those with a checkable outc
 					},
 					{ number: 8, title: "Total only", state: "OPEN", body: "", subIssuesTotal: 2 },
 					{ number: 9, title: "None", state: "OPEN", body: "", subIssuesTotal: 0 },
+					{
+						number: 10,
+						title: "Provider rollup",
+						state: "OPEN",
+						body: "",
+						subIssuesTotal: 2,
+						subIssuesCompleted: 1,
+						subIssuesSource: "provider",
+					},
+					{
+						number: 11,
+						title: "Stored children, some open",
+						state: "OPEN",
+						body: "",
+						subIssuesTotal: 3,
+						subIssuesCompleted: 1,
+						subIssuesSource: "children",
+					},
+					{
+						number: 13,
+						title: "Stored children, all closed",
+						state: "CLOSED",
+						body: "",
+						subIssuesTotal: 2,
+						subIssuesCompleted: 2,
+						subIssuesSource: "children",
+					},
+					{
+						number: 15,
+						title: "Stored mirror has no children",
+						state: "OPEN",
+						body: "",
+						subIssuesTotal: 0,
+						subIssuesCompleted: 0,
+						subIssuesSource: "children",
+					},
+					{
+						number: 14,
+						title: "Unrecognized source",
+						state: "OPEN",
+						body: "",
+						subIssuesTotal: 2,
+						subIssuesCompleted: 2,
+						subIssuesSource: "everything",
+					},
 				],
 			},
 		},
@@ -503,11 +548,33 @@ void test("every captured linked issue is a row, and those with a checkable outc
 			contextDir,
 			changeDir,
 		);
-		assert.equal(result.metrics.linkedItems, 5);
-		assert.equal(result.metrics.checkableItems, 3);
+		assert.equal(result.metrics.linkedItems, 10);
+		assert.equal(result.metrics.checkableItems, 7);
 		assert.equal(result.metrics.untickedItems, 1);
-		const [story, tasks, subIssues, totalOnly, none] = result.hints;
-		assert.ok(story && tasks && subIssues && totalOnly && none);
+		const [
+			story,
+			tasks,
+			subIssues,
+			totalOnly,
+			none,
+			provider,
+			someOpen,
+			allClosed,
+			emptyMirror,
+			unrecognized,
+		] = result.hints;
+		assert.ok(
+			story &&
+				tasks &&
+				subIssues &&
+				totalOnly &&
+				none &&
+				provider &&
+				someOpen &&
+				allClosed &&
+				emptyMirror &&
+				unrecognized,
+		);
 		// An unreported rollup is unknown: neither a checkable outcome nor proof there is none.
 		assert.equal(story.pattern, "no task list or outcome heading");
 		assert.match(story.context, /sub-issue rollup not reported/u);
@@ -518,11 +585,34 @@ void test("every captured linked issue is a row, and those with a checkable outc
 		assert.equal(tasks.flags.unticked, 1);
 		assert.equal(tasks.flags.how, "linked through a commit or another item");
 		assert.equal(subIssues.flags.subIssuesTotal, 3);
-		assert.match(subIssues.context, /1\/3 sub-issues done/u);
-		assert.match(totalOnly.context, /2 sub-issues, completed count not reported/u);
-		assert.doesNotMatch(totalOnly.context, /0\/2/u);
+		assert.match(subIssues.context, /3 sub-issue\(s\), 1 completed; state/u);
+		assert.match(totalOnly.context, /2 sub-issue\(s\), completed count not reported; state/u);
+		assert.doesNotMatch(totalOnly.context, /0 completed/u);
 		assert.equal(none.pattern, "no checkable outcome");
 		assert.equal(none.flags.subIssuesTotal, 0);
+		assert.match(none.context, /0 sub-issue\(s\), completed count not reported/u);
+		// A capture that recorded no source, or one this reader does not recognize, claims neither.
+		const provenance = /as the provider reports|stored at capture|whole hierarchy/u;
+		for (const legacy of [story, subIssues, totalOnly, none, unrecognized]) {
+			assert.doesNotMatch(legacy.context, provenance);
+		}
+		assert.match(unrecognized.context, /2 sub-issue\(s\), 2 completed; state/u);
+		assert.match(provider.context, /2 sub-issue\(s\), 1 completed, as the provider reports them/u);
+		assert.doesNotMatch(provider.context, /stored at capture/u);
+		// Stored children are the mirror at capture, which may omit others.
+		assert.match(someOpen.context, /3 sub-issue\(s\), 1 completed.*stored at capture/u);
+		assert.equal(someOpen.pattern, "checkable outcome");
+		// All of them closed establishes only that mirror, not the whole hierarchy.
+		assert.match(allClosed.context, /2 sub-issue\(s\), 2 completed.*stored at capture/u);
+		assert.equal(allClosed.flags.subIssuesTotal, 2);
+		assert.match(allClosed.context, /stored children were closed, not.*whole hierarchy.*complete/u);
+		for (const stored of [someOpen, allClosed, emptyMirror]) {
+			assert.match(stored.context, /mirror may omit other children/u);
+		}
+		assert.equal(emptyMirror.pattern, "no task list or outcome heading");
+		assert.equal(emptyMirror.flags.subIssuesTotal, 0);
+		assert.match(emptyMirror.context, /0 sub-issue\(s\), 0 completed.*stored at capture/u);
+		assert.doesNotMatch(emptyMirror.context, /as the provider reports|whole hierarchy|unknown/u);
 		assert.match(result.directions[0] ?? "", /Each is a candidate: the criteria decide which/u);
 		assert.doesNotMatch(result.directions[0] ?? "", /every one is an occasion/u);
 		// An unmerged change has no occasion, whatever the items say.
@@ -534,6 +624,33 @@ void test("every captured linked issue is a row, and those with a checkable outc
 			changeDir,
 		);
 		assert.match(open.directions[0] ?? "", /not merged/u);
+		for (const source of ["provider", "children"]) {
+			writeFileSync(
+				nodePath.join(contextDir, "linked_work_items.json"),
+				JSON.stringify({
+					workItems: [
+						{
+							number: 1,
+							title: "Empty count",
+							body: "",
+							subIssuesTotal: 0,
+							subIssuesCompleted: 0,
+							subIssuesSource: source,
+						},
+					],
+				}),
+			);
+			const zero = await script(
+				nodePath.join(root, "repo"),
+				new Map(),
+				metadata,
+				contextDir,
+				changeDir,
+			);
+			assert.equal(zero.metrics.checkableItems, 0);
+			assert.match(zero.directions[0] ?? "", /positive captured sub-issue count/u);
+			assert.doesNotMatch(zero.directions[0] ?? "", /reported sub-issue rollup/u);
+		}
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}

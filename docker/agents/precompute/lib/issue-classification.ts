@@ -5,6 +5,18 @@ export interface IssueMetadata {
 	labels?: string[] | null;
 	sub_issues_total?: number | null;
 	sub_issues_completed?: number | null;
+	sub_issues_source?: string | null;
+}
+
+/**
+ * Where a captured sub-issue count came from: the provider's own rollup, or the child issues this
+ * repository stored at capture. A capture from before the source was recorded carries none.
+ */
+export type SubIssueSource = "provider" | "children";
+
+/** The recorded source, or undefined for a missing or unrecognized one, which is never trusted as either. */
+export function subIssueSource(value: unknown): SubIssueSource | undefined {
+	return value === "provider" || value === "children" ? value : undefined;
 }
 
 /** Case, spacing and punctuation set aside; letters and digits of every script kept. */
@@ -61,18 +73,31 @@ function knownCount(value: unknown): number | undefined {
 }
 
 /**
- * The provider's sub-issue rollup. A provider that does not report one leaves it null or omits it,
- * which says nothing about whether sub-issues exist: unknown stays unknown, never zero.
+ * A captured sub-issue rollup and what it is a count of. A provider that does not report one leaves it
+ * null or omits it, which says nothing about whether sub-issues exist: unknown stays unknown, never
+ * zero. Counted from stored children, it covers only the children this repository held at capture,
+ * which may omit others; all of them closed says that much and nothing about the whole hierarchy.
  */
 export function subIssueRollup(metadata: IssueMetadata) {
 	const total = knownCount(metadata.sub_issues_total);
 	const completed = knownCount(metadata.sub_issues_completed);
+	const source = subIssueSource(metadata.sub_issues_source);
 	let text = "sub-issue rollup not reported by the provider (unknown, not zero)";
 	if (total !== undefined) {
 		text =
 			completed === undefined
 				? `${String(total)} sub-issue(s), completed count not reported`
 				: `${String(total)} sub-issue(s), ${String(completed)} completed`;
+		if (source === "provider") {
+			text += ", as the provider reports them";
+		} else if (source === "children") {
+			text +=
+				", counted from the child issues this repository stored at capture; that mirror may omit other children";
+			if (total > 0 && completed === total) {
+				text +=
+					", so all of them closed shows only that the stored children were closed, not that the whole hierarchy is complete";
+			}
+		}
 	}
 	const metrics: Record<string, number> = {};
 	if (total !== undefined) {

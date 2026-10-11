@@ -2,6 +2,7 @@
 
 import type { ChangeCommit } from "./change.ts";
 import { contextFile, readContextJson } from "./context.ts";
+import { subIssueSource, type SubIssueSource } from "./issue-classification.ts";
 import { isJsonObject, text } from "./practice-contract.ts";
 import type { DiffFile, Hint, PullRequestMetadata } from "./types.ts";
 
@@ -19,6 +20,8 @@ export interface LinkedWorkItem {
 	closedAt?: string;
 	subIssuesTotal?: number;
 	subIssuesCompleted?: number;
+	/** What the counts are of; absent in a capture from before the source was recorded. */
+	subIssuesSource?: SubIssueSource;
 }
 
 /** A comment anchored to a line of the change (`comments.json`). */
@@ -116,6 +119,7 @@ export async function readLinkedWorkItemCapture(
 				closedAt: optionalString(item.closedAt),
 				subIssuesTotal: optionalNumber(item.subIssuesTotal),
 				subIssuesCompleted: optionalNumber(item.subIssuesCompleted),
+				subIssuesSource: subIssueSource(item.subIssuesSource),
 			},
 		];
 	});

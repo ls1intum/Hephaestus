@@ -222,38 +222,102 @@ void describe("issue classification across practices", () => {
 		});
 	}
 
-	void it("keeps an unreported sub-issue rollup unknown, apart from a reported zero and a total without its completed count", async () => {
+	void it("keeps sub-issue counts separate from their source and scope", async () => {
 		for (const scriptName of [
 			"breaks-large-work-into-trackable-subtasks",
 			"issue-scoped-to-single-concern",
 		]) {
 			const run = await loadScript(scriptName);
 			const issue = { title: "Course checklist", body: "- [ ] Clarify\n- [ ] Reply\n- [ ] Defer" };
+			// What a count is of is said only for a recorded source; a legacy or unrecognized one claims neither.
+			const provenance = /as the provider reports|stored at capture|whole hierarchy/u;
 			const cases: [
-				Record<string, number | null>,
+				Record<string, number | string | null>,
 				RegExp,
 				{ subIssuesTotal?: number; subIssuesCompleted?: number },
+				RegExp,
 			][] = [
-				[{}, /sub-issue rollup not reported by the provider \(unknown, not zero\)/u, {}],
 				[
-					{ sub_issues_total: null, sub_issues_completed: null },
+					{},
 					/sub-issue rollup not reported by the provider \(unknown, not zero\)/u,
 					{},
+					provenance,
+				],
+				[
+					{ sub_issues_total: null, sub_issues_completed: null, sub_issues_source: "children" },
+					/sub-issue rollup not reported by the provider \(unknown, not zero\)/u,
+					{},
+					provenance,
 				],
 				[
 					{ sub_issues_total: 0, sub_issues_completed: 0 },
 					/0 sub-issue\(s\), 0 completed/u,
 					{ subIssuesTotal: 0, subIssuesCompleted: 0 },
+					provenance,
 				],
 				[
 					{ sub_issues_total: 3, sub_issues_completed: null },
 					/3 sub-issue\(s\), completed count not reported/u,
 					{ subIssuesTotal: 3 },
+					provenance,
+				],
+				[
+					{ sub_issues_total: 0, sub_issues_completed: 0, sub_issues_source: "provider" },
+					/0 sub-issue\(s\), 0 completed, as the provider reports them/u,
+					{ subIssuesTotal: 0, subIssuesCompleted: 0 },
+					/stored at capture|whole hierarchy/u,
+				],
+				[
+					{ sub_issues_total: 0, sub_issues_completed: 0, sub_issues_source: "children" },
+					/0 sub-issue\(s\), 0 completed.*stored at capture/u,
+					{ subIssuesTotal: 0, subIssuesCompleted: 0 },
+					/as the provider reports|whole hierarchy|unknown/u,
+				],
+				[
+					{ sub_issues_total: 2, sub_issues_completed: 2, sub_issues_source: "provider" },
+					/2 sub-issue\(s\), 2 completed, as the provider reports them/u,
+					{ subIssuesTotal: 2, subIssuesCompleted: 2 },
+					/stored at capture|whole hierarchy/u,
+				],
+				[
+					{ sub_issues_total: 3, sub_issues_completed: 1, sub_issues_source: "children" },
+					/3 sub-issue\(s\), 1 completed.*stored at capture/u,
+					{ subIssuesTotal: 3, subIssuesCompleted: 1 },
+					/as the provider reports|whole hierarchy/u,
+				],
+				[
+					{ sub_issues_total: 2, sub_issues_completed: 2, sub_issues_source: "children" },
+					/2 sub-issue\(s\), 2 completed.*stored at capture/u,
+					{ subIssuesTotal: 2, subIssuesCompleted: 2 },
+					/as the provider reports/u,
+				],
+				[
+					{ sub_issues_total: 2, sub_issues_completed: 2, sub_issues_source: "Children" },
+					/2 sub-issue\(s\), 2 completed/u,
+					{ subIssuesTotal: 2, subIssuesCompleted: 2 },
+					provenance,
 				],
 			];
-			for (const [rollup, text, metrics] of cases) {
+			for (const [rollup, text, metrics, unsaid] of cases) {
 				const result = await run("", new Map(), { ...issue, ...rollup });
 				assert.match(result.directions.join("\n"), text, scriptName);
+				assert.doesNotMatch(result.directions.join("\n"), unsaid, scriptName);
+				if (
+					rollup.sub_issues_source === "children" &&
+					typeof rollup.sub_issues_total === "number"
+				) {
+					assert.match(result.directions.join("\n"), /mirror may omit other children/u, scriptName);
+					if (
+						rollup.sub_issues_total > 0 &&
+						rollup.sub_issues_completed === rollup.sub_issues_total
+					) {
+						assert.match(
+							result.directions.join("\n"),
+							/stored children were closed, not.*whole hierarchy.*complete/u,
+							scriptName,
+						);
+					}
+				}
 				assert.equal(result.metrics.subIssuesTotal, metrics.subIssuesTotal, scriptName);
 				assert.equal(result.metrics.subIssuesCompleted, metrics.subIssuesCompleted, scriptName);
 				assert.equal(result.metrics.taskCheckboxes ?? result.metrics.checkboxes, 3, scriptName);
