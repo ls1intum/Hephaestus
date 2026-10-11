@@ -47,6 +47,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
+      # Lists CI/CD runs on main to find a later qualified build of the requested commit.
+      actions: read
       contents: read
     outputs:
       apply: ${{ steps.policy.outputs.apply }}

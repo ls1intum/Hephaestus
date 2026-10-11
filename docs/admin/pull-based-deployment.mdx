@@ -60,6 +60,11 @@ when switching from a release to a commit. An unreadable channel or failed histo
 promotion rather than clearing a hold. Establish the initial channel with a manual promotion before
 enabling continuous staging.
 
+An automatic promotion that would advance the channel checks the most recent successful CI/CD run of a push to `main` in the same repository.
+If that run's commit strictly descends from the requested commit, the promotion is skipped.
+If the lookup fails, the requested commit continues through the existing promotion checks.
+Manual promotions never do this lookup.
+
 ## Requirements
 
 1. Install Docker Engine with Compose v2.
