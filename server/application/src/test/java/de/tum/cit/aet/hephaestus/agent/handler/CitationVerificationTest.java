@@ -60,6 +60,30 @@ class CitationVerificationTest extends BaseUnitTest {
                 .isInstanceOf(JobDeliveryException.class);
     }
 
+    /**
+     * A later attempt of an admitted review composes from the citations admission verified: they stay verified under
+     * the admitting attempt, and a verdict recorded under any other attempt does not pass for one.
+     */
+    @Test
+    void shouldVerifyAgainstTheAdmittingAttemptOnceTheReviewWasAdmitted() {
+        var job = job();
+        var evidence = new JsonMapper().createObjectNode();
+        var citation = evidence.putArray("citations").addObject().put("quote", "exact quote");
+        CitationVerification.record(citation, job, "a".repeat(64), CitationVerification.quoteDigest("exact quote"));
+        job.setMetadata(new JsonMapper()
+                .createObjectNode()
+                .put(ObservationAdmissionService.DIGEST_METADATA_KEY, "b".repeat(64))
+                .put(ObservationAdmissionService.ATTEMPT_METADATA_KEY, 0));
+
+        job.setRetryCount(1);
+        assertThatCode(() -> CitationVerification.requireVerified(job, evidence))
+                .doesNotThrowAnyException();
+
+        CitationVerification.record(citation, job, "a".repeat(64), CitationVerification.quoteDigest("exact quote"));
+        assertThatThrownBy(() -> CitationVerification.requireVerified(job, evidence))
+                .isInstanceOf(JobDeliveryException.class);
+    }
+
     static Stream<Arguments> mutationsAfterVerdict() {
         return Stream.of(
                 mutation("changed quote", (citation, job) -> citation.put("quote", "different quote")),

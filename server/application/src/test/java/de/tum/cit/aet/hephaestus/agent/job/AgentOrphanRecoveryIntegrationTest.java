@@ -23,6 +23,7 @@ import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonCopyIdentity;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
@@ -46,9 +47,12 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.tracing.Tracer;
+import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
@@ -125,6 +129,9 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private JdbcTemplate jdbc;
 
+    @Autowired
+    private ReviewCompositionContinuation continuation;
+
     private Workspace workspace;
     private LlmModel instanceModel;
     private Practice practice;
@@ -145,6 +152,7 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
                 usageRecorder,
                 meterRegistry,
                 new AgentJobTelemetry(meterRegistry, Tracer.NOOP));
+        sweeper.setCompositionContinuation(continuation);
         workspace = workspaceRepository.save(TestEntities.activeWorkspace("orphan-recovery-ws"));
 
         LlmConnection connection = connectionRepository.save(LlmCatalogTestFixtures.connection("orphan-recovery"));
@@ -387,6 +395,108 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         assertThat(jobRepository.findById(unadmitted).orElseThrow().getStatus()).isEqualTo(AgentJobStatus.RUNNING);
     }
 
+    @Test
+    @DisplayName(
+            "a lost admitted review whose original inputs are vouched for continues as one writer of its admission")
+    void shouldContinueALostAdmittedReviewUnderItsOriginalAdmissionAsANewAttempt() {
+        UUID jobId = runningJobOwnedBy("dead-replica-9", Instant.now().minus(Duration.ofMinutes(5)), 0);
+        Observation observed = admitWithObservation(jobId);
+        keepOriginalInputs(jobId, 0, "READY", "COMPLETE", Instant.now().plus(Duration.ofHours(1)));
+        spentBeforeItWasLost(jobId, 3);
+        registerStaleWorker("dead-replica-9");
+        AgentJob before = jobRepository.findById(jobId).orElseThrow();
+
+        sweeper.recoverOrphanedJobs();
+
+        AgentJob continuing = jobRepository.findById(jobId).orElseThrow();
+        assertThat(continuing.getStatus()).isEqualTo(AgentJobStatus.QUEUED);
+        assertThat(continuing.getRetryCount()).isEqualTo(1);
+        assertThat(continuing.getJobTokenHash()).isNotEqualTo(before.getJobTokenHash());
+        // The admission and the evidence it was verified against are the original attempt's, untouched.
+        assertThat(continuing.getMetadata()).isEqualTo(before.getMetadata());
+        assertThat(continuing.getEvidenceSnapshot()).isEqualTo(before.getEvidenceSnapshot());
+        assertThat(ObservationAdmissionService.isContinuation(continuing)).isTrue();
+        assertThat(ObservationAdmissionService.citationAttempt(continuing)).isZero();
+        assertThat(observationRepository.findById(observed.getId())).isPresent();
+        // The lost attempt is settled as itself; the new attempt starts from nothing.
+        assertThat(continuing.getLlmTotalCalls()).isZero();
+        assertThat(jdbc.queryForList(
+                        "SELECT total_calls FROM llm_usage_event WHERE source_id::text = ? AND source_attempt = 0",
+                        Integer.class,
+                        jobId.toString()))
+                .containsExactly(3);
+        // The lost worker's own attempt is gone: its requeue or its failure matches nothing now.
+        String token = AgentJob.generateJobToken();
+        Integer staleRequeue = transactionTemplate.execute(s -> {
+            continuation.holdRecoveryCustody();
+            return continuation.requeue(
+                    continuing,
+                    "dead-replica-9",
+                    new AgentJobRepository.CompositionRequeue(
+                            0, 5, Instant.now(), Instant.now(), token, AgentJob.computeTokenHash(token)));
+        });
+        assertThat(staleRequeue).isZero();
+        Integer staleFailure = transactionTemplate.execute(
+                s -> jobRepository.failAdmittedOwnedBy(jobId, "dead-replica-9", 0, Instant.now(), "lost"));
+        assertThat(staleFailure).isZero();
+        fastForwardAvailableAt(jobId);
+        assertThat(eligibleForClaim(jobId)).isTrue();
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(
+            strings = {
+                "erased receipt",
+                "receipt not indexing its copies",
+                "expired inputs",
+                "legacy admission",
+                "suppressed person"
+            })
+    @DisplayName("a lost admitted review whose original inputs cannot be vouched for fails as before")
+    void shouldFailTheLostAdmittedReviewWhenItsOriginalInputsCannotBeContinued(String why) {
+        UUID jobId = runningJobOwnedBy("dead-replica-10", Instant.now().minus(Duration.ofMinutes(5)), 0);
+        admitWithObservation(jobId);
+        Instant fresh = Instant.now().plus(Duration.ofHours(1));
+        switch (why) {
+            case "erased receipt" -> keepOriginalInputs(jobId, 0, "ERASE_REQUESTED", "COMPLETE", fresh);
+            case "suppressed person" -> {
+                keepOriginalInputs(jobId, 0, "READY", "COMPLETE", fresh);
+                jdbc.update(
+                        "INSERT INTO person_suppression(id,provider_id,subject,team_key) VALUES (?,?,?,'')",
+                        UUID.randomUUID(),
+                        requireNonNull(developer.getProvider()).getId(),
+                        "100");
+            }
+            case "receipt not indexing its copies" -> keepOriginalInputs(jobId, 0, "READY", "UNKNOWN", fresh);
+            case "expired inputs" ->
+                keepOriginalInputs(jobId, 0, "READY", "COMPLETE", Instant.now().minusSeconds(1));
+            default -> {
+                keepOriginalInputs(jobId, 0, "READY", "COMPLETE", fresh);
+                // Admitted before the admitting attempt was recorded: nothing says whose citations these were.
+                jdbc.update(
+                        "UPDATE agent_job SET metadata = metadata - CAST(? AS text) WHERE id = ?",
+                        ObservationAdmissionService.ATTEMPT_METADATA_KEY,
+                        jobId);
+            }
+        }
+        spentBeforeItWasLost(jobId, 2);
+        registerStaleWorker("dead-replica-10");
+        AgentJob before = jobRepository.findById(jobId).orElseThrow();
+
+        sweeper.recoverOrphanedJobs();
+
+        AgentJob failed = jobRepository.findById(jobId).orElseThrow();
+        assertThat(failed.getStatus()).isEqualTo(AgentJobStatus.FAILED);
+        assertThat(failed.getErrorMessage()).isEqualTo(ObservationAdmissionService.INTERRUPTED_AFTER_ADMISSION);
+        assertThat(failed.getRetryCount()).isZero();
+        assertThat(failed.getJobTokenHash()).isEqualTo(before.getJobTokenHash());
+        assertThat(jdbc.queryForList(
+                        "SELECT total_calls FROM llm_usage_event WHERE source_id::text = ? AND source_attempt = 0",
+                        Integer.class,
+                        jobId.toString()))
+                .containsExactly(2);
+    }
+
     @ParameterizedTest(name = "admission committed: {0}")
     @ValueSource(booleans = {true, false})
     @DisplayName("recovery waiting on the admission's row lock decides on what the admission left behind")
@@ -503,13 +613,61 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
             job.setMetadata(objectMapper
                     .createObjectNode()
                     .put("pull_request_id", 42)
-                    .put(ObservationAdmissionService.DIGEST_METADATA_KEY, "admitted-digest"));
+                    .put(ObservationAdmissionService.DIGEST_METADATA_KEY, "admitted-digest")
+                    .put(ObservationAdmissionService.ATTEMPT_METADATA_KEY, job.getRetryCount()));
             job.setEvidenceSnapshot(objectMapper
                     .createObjectNode()
                     .set("manifest", objectMapper.createObjectNode().put("contractVersion", "1.2.0")));
             jobRepository.saveAndFlush(job);
         });
         return observationRepository.findById(id).orElseThrow();
+    }
+
+    /**
+     * What an admission keeps for a later writer, as persisted: the inputs under its digest and attempt, and the
+     * capture receipt that vouches for whose rows they copied.
+     */
+    private void keepOriginalInputs(
+            UUID jobId, int attempt, String receiptState, String dependencies, Instant expiresAt) {
+        UUID copyId = UUID.randomUUID();
+        jdbc.update(
+                "INSERT INTO person_evidence_copy(id,workspace_id,job_id,store_id,state,payload) "
+                        + "VALUES (?,?,?,?,?,CAST(? AS jsonb))",
+                copyId,
+                workspace.getId(),
+                jobId,
+                UUID.randomUUID(),
+                receiptState,
+                objectMapper
+                        .createObjectNode()
+                        .put("attempt", attempt)
+                        .put("dependencies", dependencies)
+                        .set(
+                                "identities",
+                                objectMapper.valueToTree(
+                                        List.of(new PersonCopyIdentity("GITHUB", "https://github.com", "100", null))))
+                        .toString());
+        jdbc.update(
+                "INSERT INTO review_composition_basis(job_id,workspace_id,admission_attempt,admission_digest,"
+                        + "basis_version,basis_digest,copy_id,byte_size,created_at,expires_at,payload) "
+                        + "VALUES (?,?,?,?,?,?,?,?,?,?,CAST(? AS jsonb))",
+                jobId,
+                workspace.getId(),
+                attempt,
+                "admitted-digest",
+                ReviewCompositionBasis.VERSION,
+                ReviewCompositionBasis.digest(Map.of()),
+                copyId,
+                12,
+                Timestamp.from(expiresAt.minus(Duration.ofHours(2))),
+                Timestamp.from(expiresAt),
+                "{\"files\":{}}");
+    }
+
+    /** The attempt ran and the proxy counted its calls before its worker was lost. */
+    private void spentBeforeItWasLost(UUID jobId, int calls) {
+        jdbc.update(
+                "UPDATE agent_job SET execution_started_at = now(), llm_total_calls = ? WHERE id = ?", calls, jobId);
     }
 
     /** The practice's definition moves on after the admission, as a later edit would. */

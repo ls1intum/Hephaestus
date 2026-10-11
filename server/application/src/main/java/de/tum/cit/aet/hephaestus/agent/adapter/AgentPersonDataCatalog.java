@@ -27,6 +27,7 @@ import tools.jackson.databind.ObjectMapper;
 @PersonDataStores({
     "agent_job",
     "agent_job_evidence_copy",
+    "review_composition_basis",
     "llm_usage_event",
     "instance_llm_settings",
     "review_backfill_run",
@@ -66,6 +67,18 @@ public class AgentPersonDataCatalog implements PersonDataCatalog {
     @Override
     public List<PersonDataContributor> contributors() {
         return List.of(
+                // Original writer inputs copy the same people as their job: removed outright, before the job is
+                // redacted, so no later writer can read them. Only their coordinates are exported.
+                new JdbcPersonDataStore(
+                        jdbc,
+                        mapper,
+                        "review_composition_basis",
+                        "review_composition_basis",
+                        "t.job_id IN (" + SUBJECT_JOBS + ") OR t.job_id IN (" + COPYING_JOBS + ")",
+                        "job_id,workspace_id,admission_attempt,created_at,expires_at,byte_size",
+                        "job_id",
+                        "",
+                        -82),
                 new AgentJobStore(
                         "agent_job",
                         "t.id IN (" + SUBJECT_JOBS + ")",

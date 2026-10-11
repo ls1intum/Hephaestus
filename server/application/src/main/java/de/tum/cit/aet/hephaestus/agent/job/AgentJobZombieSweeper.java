@@ -82,6 +82,13 @@ public class AgentJobZombieSweeper {
     private final Counter snapshotUnreadable;
     private final AgentJobTelemetry jobTelemetry;
 
+    private @Nullable ReviewCompositionContinuation compositionContinuation;
+
+    @Autowired(required = false)
+    void setCompositionContinuation(ReviewCompositionContinuation continuing) {
+        this.compositionContinuation = continuing;
+    }
+
     @Autowired
     public AgentJobZombieSweeper(
             AgentJobRepository jobRepository,
@@ -223,6 +230,8 @@ public class AgentJobZombieSweeper {
      * attempt whose observations were admitted is never measured again, at or below the retry cap.
      */
     private OrphanRecovery recoverOrphan(OrphanedJobRef orphan) {
+        ReviewCompositionContinuation continuing = compositionContinuation;
+        if (continuing != null) continuing.holdRecoveryCustody();
         AgentJob job =
                 jobRepository.findByIdWithWorkspaceForUpdate(orphan.getJobId()).orElse(null);
         if (job == null
@@ -251,6 +260,25 @@ public class AgentJobZombieSweeper {
             }
         }
         boolean admitted = ObservationAdmissionService.isAdmitted(job);
+        // A lost admitted attempt continues as a writer only when its admission kept the original inputs.
+        if (admitted && continuing != null) {
+            Instant now = Instant.now();
+            String newToken = AgentJob.generateJobToken();
+            if (continuing.requeue(
+                            job,
+                            orphan.getWorkerId(),
+                            new AgentJobRepository.CompositionRequeue(
+                                    orphan.getRetryCount(),
+                                    agentProperties.maxRetries(),
+                                    now,
+                                    now.plus(AgentJobBackoff.compute(orphan.getRetryCount() + 1)),
+                                    newToken,
+                                    AgentJob.computeTokenHash(newToken)))
+                    > 0) {
+                recordUnverifiableUsage(job, counts);
+                return OrphanRecovery.REQUEUED;
+            }
+        }
         if (!admitted && orphan.getRetryCount() < agentProperties.maxRetries()) {
             return OrphanRecovery.NONE;
         }

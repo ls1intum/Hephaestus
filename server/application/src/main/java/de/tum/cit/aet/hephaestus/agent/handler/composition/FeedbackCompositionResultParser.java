@@ -62,8 +62,15 @@ public class FeedbackCompositionResultParser {
         if (failures == null) return CompositionStatus.LEGACY_UNKNOWN;
         if (!failures.isArray() || failures.size() > 2) return CompositionStatus.INVALID;
         Set<String> phases = new HashSet<>();
-        Set<String> reasons =
-                Set.of("MODEL_ERROR", "RUNTIME_ERROR", "BUDGET", "STALL", "SAFETY", "LOOP", "NO_DECISION");
+        Set<String> reasons = Set.of(
+                "MODEL_ERROR",
+                "RUNTIME_ERROR",
+                "BUDGET",
+                "STALL",
+                "SAFETY",
+                "LOOP",
+                "NO_DECISION",
+                "PRIVATE_NOT_RECOVERED");
         for (JsonNode failure : failures) {
             JsonNode phase = failure.get("phase");
             JsonNode reason = failure.get("reason");
@@ -75,7 +82,9 @@ public class FeedbackCompositionResultParser {
                     || !reason.isString()
                     || !Set.of("PUBLIC_REVIEW", "PRIVATE_FEEDBACK").contains(phase.asString())
                     || !phases.add(phase.asString())
-                    || !reasons.contains(reason.asString())) {
+                    || !reasons.contains(reason.asString())
+                    || (reason.asString().equals("PRIVATE_NOT_RECOVERED")
+                            && !phase.asString().equals("PRIVATE_FEEDBACK"))) {
                 return CompositionStatus.INVALID;
             }
         }

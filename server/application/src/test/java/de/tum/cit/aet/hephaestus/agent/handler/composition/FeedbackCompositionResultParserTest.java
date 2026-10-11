@@ -44,8 +44,15 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
         assertThat(FeedbackCompositionResultParser.compositionStatus(
                         objectMapper.readTree("{\"feedback\":{\"compositionFailures\":[]}}")))
                 .isEqualTo(FeedbackCompositionResultParser.CompositionStatus.NO_RECORDED_FAILURE);
-        for (String reason :
-                List.of("MODEL_ERROR", "RUNTIME_ERROR", "BUDGET", "STALL", "SAFETY", "LOOP", "NO_DECISION")) {
+        for (String reason : List.of(
+                "MODEL_ERROR",
+                "RUNTIME_ERROR",
+                "BUDGET",
+                "STALL",
+                "SAFETY",
+                "LOOP",
+                "NO_DECISION",
+                "PRIVATE_NOT_RECOVERED")) {
             var status = FeedbackCompositionResultParser.compositionStatus(objectMapper.readTree(
                     "{\"feedback\":{\"compositionFailures\":[{\"phase\":\"PRIVATE_FEEDBACK\",\"reason\":\"%s\"}]}}"
                             .formatted(reason)));
@@ -61,6 +68,7 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
                 "null",
                 "{}",
                 "[null]",
+                "[{\"phase\":\"PUBLIC_REVIEW\",\"reason\":\"PRIVATE_NOT_RECOVERED\"}]",
                 "[1]",
                 "[{\"phase\":\"PRIVATE_FEEDBACK\",\"reason\":\"provider secret\"}]",
                 "[{\"phase\":\"MEASUREMENT\",\"reason\":\"MODEL_ERROR\"}]",

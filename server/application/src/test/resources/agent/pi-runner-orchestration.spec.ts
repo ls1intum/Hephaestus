@@ -2706,6 +2706,7 @@ if (scenario !== undefined && scenario !== "") {
 		"compose-support-refused",
 		"compose-support-refused-only",
 		"compose",
+		"compose-continuation",
 		"compose-fresh-history",
 		"compose-history-invalid",
 		"compose-history-invalid-link",
@@ -2831,6 +2832,8 @@ if (scenario !== undefined && scenario !== "") {
 					"uses selected native issue and merge request identities while retaining current-only unit grounding",
 				"compose-foreign-provider":
 					"keeps distinct native work identities separate from provider URL text",
+				"compose-continuation":
+					"continues an admitted review by composing only the review on the work, measuring and admitting nothing",
 				"compose-overflow":
 					"compacts the session before a composition prompt that would not fit beside what it holds",
 				"compose-silent":
@@ -3003,6 +3006,17 @@ if (scenario !== undefined && scenario !== "") {
 									stage === "compose" || stage === "compose-foreign-provider"
 										? ["ARTIFACT", "DIFF"]
 										: ["ARTIFACT"],
+							}),
+						);
+					}
+					if (stage === "compose-continuation") {
+						// What an earlier attempt's admission answered, staged by the server beside the request.
+						writeFileSync(
+							nodePath.join(cwd, "evidence/composition-continuation.json"),
+							JSON.stringify({
+								schemaVersion: 1,
+								admissionDigest: "continued-digest",
+								observations: [admittedObservation],
 							}),
 						);
 					}
@@ -3200,10 +3214,16 @@ if (scenario !== undefined && scenario !== "") {
 						.trim()
 						.split("\n")
 						.filter(Boolean);
-					assert.ok(existsSync(nodePath.join(cwd, "out/practice-coverage.json")), child.stderr);
-					const coverage: unknown = JSON.parse(
-						readFileSync(nodePath.join(cwd, "out/practice-coverage.json"), "utf8"),
+					// A continuing writer evaluates no practice and reports no coverage of its own.
+					assert.equal(
+						existsSync(nodePath.join(cwd, "out/practice-coverage.json")),
+						stage !== "compose-continuation",
+						child.stderr,
 					);
+					const coverage: unknown =
+						stage === "compose-continuation"
+							? null
+							: JSON.parse(readFileSync(nodePath.join(cwd, "out/practice-coverage.json"), "utf8"));
 					const reached = (slugs: Record<string, "EVALUATED" | "NOT_REACHED">) =>
 						assert.deepEqual(coverage, {
 							eligible: Object.keys(slugs).length,
@@ -5286,6 +5306,38 @@ for (const item of nullableCases) {
 							assert.ok(typeof composition === "object" && composition !== null);
 							assert.equal(Reflect.get(composition, "toolErrors"), 24);
 							assert.equal(Reflect.get(composition, "recordingCalls"), 24);
+							break;
+						}
+						case "compose-continuation": {
+							assert.equal(child.status, 0, child.stderr);
+							// One session, the review composer's: no practice is assessed and nothing can be recorded.
+							assert.deepEqual(
+								events.filter((event) => event.startsWith("create:session")),
+								["create:session tools=report_review"],
+							);
+							assert.equal(
+								readFileSync(nodePath.join(cwd, "system-prompt.md"), "utf8"),
+								"Write clear, useful feedback.\n\nWrite the review on the work.",
+							);
+							// The result is the earlier admission, not one this attempt asked for.
+							const result: unknown = JSON.parse(
+								readFileSync(nodePath.join(cwd, "out/result.json"), "utf8"),
+							);
+							assert.deepEqual(result, {
+								observations: [admittedObservation],
+								admissionDigest: "continued-digest",
+							});
+							const feedback: unknown = JSON.parse(
+								readFileSync(nodePath.join(cwd, "out/feedback.json"), "utf8"),
+							);
+							assert.ok(isRecord(feedback));
+							assert.equal(feedback.admissionDigest, "continued-digest");
+							assert.ok(feedback.review !== null);
+							assert.deepEqual(feedback.units, []);
+							// The private lane was open and its negative stays undecided: that is said, not dropped.
+							assert.deepEqual(feedback.compositionFailures, [
+								{ phase: "PRIVATE_FEEDBACK", reason: "PRIVATE_NOT_RECOVERED" },
+							]);
 							break;
 						}
 						default: {

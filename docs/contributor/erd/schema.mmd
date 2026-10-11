@@ -1479,6 +1479,20 @@ erDiagram
         UUID sweep_schedule_id
     }
 
+    ReviewCompositionBasi {
+        UUID job_id PK,FK
+        INTEGER admission_attempt "NOT NULL"
+        VARCHAR(64) admission_digest "NOT NULL"
+        VARCHAR(64) basis_digest "NOT NULL"
+        INTEGER basis_version "NOT NULL"
+        BIGINT byte_size "NOT NULL"
+        UUID copy_id "NOT NULL"
+        TIMESTAMPTZ created_at "NOT NULL"
+        TIMESTAMPTZ expires_at "NOT NULL"
+        JSONB payload "NOT NULL"
+        BIGINT workspace_id FK "NOT NULL"
+    }
+
     ReviewSweepSchedule {
         UUID id PK
         BIGINT version "NOT NULL"
@@ -1806,6 +1820,7 @@ erDiagram
     Workspace ||--|| PracticeCatalogInstallation : has
     WorkspaceMembership ||--|| PracticeReviewPersonTarget : reviewed
     PullRequestReviewComment ||--|| PullRequestReviewThread : reviewed
+    AgentJob ||--|| ReviewCompositionBasi : reviewed
     User ||--|| UserPreference : has
     Organization ||--|| Workspace : has
     Workspace ||--|| WorkspaceOnboardingSetting : has

@@ -383,6 +383,15 @@ class PersonDataErasureIntegrationTest extends BaseIntegrationTest {
                 .isZero();
     }
 
+    private void keepCompositionInputs(DerivedConversation derived) {
+        jdbc.update("""
+                INSERT INTO review_composition_basis(job_id,workspace_id,admission_attempt,admission_digest,
+                    basis_version,basis_digest,copy_id,byte_size,created_at,expires_at,payload)
+                VALUES (?,?,0,?,1,?,?,32,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP + INTERVAL '1 hour',
+                    '{"files":{"record":"ORIGINAL-BASIS-CANARY"}}'::jsonb)
+                """, derived.jobId(), derived.workspaceId(), "a".repeat(64), "b".repeat(64), UUID.randomUUID());
+    }
+
     private ExternalInspectionFixture externalInspectionFixture(@Nullable String reviewedWorkUrl) {
         var provider = providers.saveAndFlush(
                 new IdentityProvider(IdentityProviderType.GITLAB, "https://privacy-gitlab.example.com"));
@@ -860,6 +869,7 @@ class PersonDataErasureIntegrationTest extends BaseIntegrationTest {
             var derived = seedDerivedConversation(workspace, 1000L + index, other);
             affected.add(derived);
             copiedJobs.add(derived.jobId());
+            keepCompositionInputs(derived);
             // Folder removal has already been acknowledged. Exact provenance remains until its counted
             // person step: the absence of the folder must not hide the job that copied the person.
             jdbc.update(
@@ -879,6 +889,7 @@ class PersonDataErasureIntegrationTest extends BaseIntegrationTest {
         }
         var unrelatedWorkspace = workspaces.saveAndFlush(WorkspaceTestFixtures.activeWorkspace("secondary-keep"));
         var unrelated = seedDerivedConversation(unrelatedWorkspace, 2000L, other);
+        keepCompositionInputs(unrelated);
         var preview = personData.preview(
                 administratorId,
                 null,
@@ -894,6 +905,9 @@ class PersonDataErasureIntegrationTest extends BaseIntegrationTest {
         assertThat(export.path("stores").path("person_evidence_copy")).hasSize(2);
         Map<String, Long> counts = mapper.readValue(preview.request().getCountsJson(), new TypeReference<>() {});
         assertThat(counts.get("agent_job_evidence_copy")).isEqualTo(2L);
+        assertThat(counts.get("review_composition_basis")).isEqualTo(2L);
+        assertThat(export.path("stores").path("review_composition_basis").toString())
+                .doesNotContain("ORIGINAL-BASIS-CANARY");
         assertThat(export.path("stores").path("agent_job")).isEmpty();
         assertThat(export.path("stores").path("agent_job_evidence_copy")).isEmpty();
         assertThat(export.path("stores").path("chat_thread_runtime_journal")).isEmpty();
@@ -911,6 +925,11 @@ class PersonDataErasureIntegrationTest extends BaseIntegrationTest {
         personData.run(requestId);
         assertThat(personData.get(requestId).request().getState()).isEqualTo(PersonDataRequest.State.COMPLETE);
         for (var derived : affected) {
+            assertThat(jdbc.queryForObject(
+                            "SELECT count(*) FROM review_composition_basis WHERE job_id=?",
+                            Integer.class,
+                            derived.jobId()))
+                    .isZero();
             assertThat(observationRepository.findAllById(derived.observationIds()))
                     .hasSize(2);
             assertThat(feedbackRepository.findById(derived.preparedId())).isPresent();
@@ -940,6 +959,11 @@ class PersonDataErasureIntegrationTest extends BaseIntegrationTest {
                 .isZero();
         assertThat(agentJobRepository.findById(unrelated.jobId()).orElseThrow().getEvidenceSnapshot())
                 .isNotNull();
+        assertThat(jdbc.queryForObject(
+                        "SELECT count(*) FROM review_composition_basis WHERE job_id=?",
+                        Integer.class,
+                        unrelated.jobId()))
+                .isEqualTo(1);
         assertThat(jdbc.queryForObject(
                         "SELECT length(session_jsonl) > 0 FROM chat_thread t JOIN chat_message m ON m.thread_id=t.id WHERE m.id=?",
                         Boolean.class,

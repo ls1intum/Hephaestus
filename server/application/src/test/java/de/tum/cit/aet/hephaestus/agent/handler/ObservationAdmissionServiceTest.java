@@ -28,6 +28,9 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.PreparedObservations;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewCompositionBasis;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewCompositionBasisRepository;
+import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.PreviousInAppFeedback;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
@@ -38,6 +41,7 @@ import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationVisibilityPolicy;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Collection;
@@ -64,6 +68,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -107,6 +112,9 @@ class ObservationAdmissionServiceTest extends BaseUnitTest {
     @Mock
     private PullRequestRepository pullRequests;
 
+    @Mock
+    private ReviewCompositionBasisRepository basisRepository;
+
     private ObservationAdmissionService service;
     private AgentJob job;
     private ObservationAdmissionService.AdmissionIdentity identity;
@@ -144,7 +152,8 @@ class ObservationAdmissionServiceTest extends BaseUnitTest {
                 publicEligibility,
                 reviewHistory,
                 supportReaders,
-                pullRequests);
+                pullRequests,
+                basisRepository);
         lenient().when(supportReaders.getIfAvailable()).thenReturn(supportReader);
         job = new AgentJob();
         job.setId(UUID.randomUUID());
@@ -218,7 +227,8 @@ class ObservationAdmissionServiceTest extends BaseUnitTest {
                         publicEligibility,
                         reviewHistory,
                         readers,
-                        pullRequests)
+                        pullRequests,
+                        basisRepository)
                 .admit(identity, mapper.createArrayNode());
     }
 
@@ -365,6 +375,88 @@ class ObservationAdmissionServiceTest extends BaseUnitTest {
                 .discardAdmittedAttempt(identity);
         service.admit(identity, mapper.createObjectNode());
         verify(evidenceFiles).discardAdmittedAttempt(identity);
+    }
+
+    /**
+     * The original public writer inputs are kept with the admission that produced them, in its transaction and
+     * before the attempt's folder is retired; a closed public lane or a receipt that cannot vouch keeps nothing.
+     */
+    @Test
+    void shouldKeepTheOriginalPublicInputsWithTheAdmissionOnlyWhenTheyCanServeAPublicWriter() {
+        UUID receipt = UUID.randomUUID();
+        when(evidenceFiles.completeReceipt(identity)).thenReturn(Optional.of(receipt));
+        Map<String, byte[]> files = Map.of(
+                SandboxLayout.FEEDBACK_COMPOSITION_PATH,
+                "{\"channels\":{\"IN_CONTEXT\":{\"enabled\":true}}}".getBytes(StandardCharsets.UTF_8),
+                SandboxLayout.CONTEXT_PREFIX + "description.md",
+                "Original description".getBytes(StandardCharsets.UTF_8));
+        when(evidenceFiles.originalPublicInputs(identity)).thenReturn(Optional.of(files));
+        when(evidenceFiles.holdVouchingReceipt(identity, receipt)).thenReturn(true);
+
+        ObjectNode response = service.admit(identity, mapper.createArrayNode());
+
+        var saved = ArgumentCaptor.forClass(ReviewCompositionBasis.class);
+        var order = inOrder(basisRepository, evidenceFiles);
+        // The receipt is held and rechecked before the row is written, inside the admitting transaction.
+        order.verify(evidenceFiles).holdVouchingReceipt(identity, receipt);
+        order.verify(basisRepository).save(saved.capture());
+        order.verify(evidenceFiles).discardAdmittedAttempt(identity);
+        ReviewCompositionBasis basis = saved.getValue();
+        assertThat(basis.getAdmissionAttempt()).isZero();
+        assertThat(basis.getAdmissionDigest())
+                .isEqualTo(response.path("admissionDigest").asString());
+        assertThat(basis.getCopyId()).isEqualTo(receipt);
+        assertThat(basis.getBasisDigest()).isEqualTo(ReviewCompositionBasis.digest(files));
+        assertThat(basis.getByteSize()).isEqualTo(mapper.writeValueAsBytes(basis.getPayload()).length);
+        assertThat(basis.getPayload().path("files").size()).isEqualTo(2);
+
+        // A replayed admission returns the original and keeps the first basis.
+        service.admit(identity, mapper.createArrayNode());
+        verify(basisRepository, times(1)).save(any());
+    }
+
+    @Test
+    void shouldKeepNoInputsWhenThePublicLaneWasClosed() {
+        when(evidenceFiles.completeReceipt(identity)).thenReturn(Optional.of(UUID.randomUUID()));
+        when(evidenceFiles.originalPublicInputs(identity))
+                .thenReturn(Optional.of(Map.of(
+                        SandboxLayout.FEEDBACK_COMPOSITION_PATH,
+                        "{\"channels\":{\"IN_CONTEXT\":{\"enabled\":false}}}".getBytes(StandardCharsets.UTF_8))));
+
+        service.admit(identity, mapper.createArrayNode());
+
+        verify(basisRepository, never()).save(any());
+    }
+
+    /** Inputs read before an erasure reached their receipt are not kept; the admission itself still commits. */
+    @Test
+    void shouldKeepNoInputsWhoseReceiptStoppedVouchingBeforeTheAdmissionCommitted() {
+        UUID receipt = UUID.randomUUID();
+        when(evidenceFiles.completeReceipt(identity)).thenReturn(Optional.of(receipt));
+        when(evidenceFiles.originalPublicInputs(identity))
+                .thenReturn(Optional.of(Map.of(
+                        SandboxLayout.FEEDBACK_COMPOSITION_PATH,
+                        "{\"channels\":{\"IN_CONTEXT\":{\"enabled\":true}}}".getBytes(StandardCharsets.UTF_8))));
+        when(evidenceFiles.holdVouchingReceipt(identity, receipt)).thenReturn(false);
+
+        service.admit(identity, mapper.createArrayNode());
+
+        verify(basisRepository, never()).save(any());
+        assertThat(ObservationAdmissionService.isAdmitted(job)).isTrue();
+    }
+
+    /** An attempt that continues an admitted review composes from it: it cannot admit again, not even a replay. */
+    @Test
+    void shouldRefuseAdmissionFromAnAttemptThatContinuesAnAdmittedReview() {
+        job.setMetadata(mapper.createObjectNode()
+                .put(ObservationAdmissionService.DIGEST_METADATA_KEY, "a".repeat(64))
+                .put(ObservationAdmissionService.ATTEMPT_METADATA_KEY, 0));
+        job.setRetryCount(1);
+        var continuing = new ObservationAdmissionService.AdmissionIdentity(job.getId(), 1L, 1, "worker-1");
+
+        assertThatThrownBy(() -> service.admit(continuing, mapper.createArrayNode()))
+                .isInstanceOf(ObservationAdmissionService.StaleAttemptException.class);
+        verify(prepared, never()).record(any());
     }
 
     @Test

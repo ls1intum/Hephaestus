@@ -32,6 +32,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -70,6 +71,10 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
     private static final String DEPENDENCIES = "dependencies";
 
     private static final String COMPLETE = "COMPLETE";
+    /** Who an attempt staged from an earlier attempt's retained inputs copies: that receipt's people, carried over. */
+    private static final String INHERITED_IDENTITIES = "inheritedIdentities";
+
+    private static final String INHERITED_REPOSITORIES = "inheritedRepositories";
     private static final String UNKNOWN = "UNKNOWN";
     private static final RowMapper<CopiedRow> COPIED_ROW_MAPPER = (rs, row) ->
             new CopiedRow(Objects.requireNonNull(rs.getObject(1, UUID.class)), rs.getLong(2), rs.getLong(3));
@@ -220,9 +225,11 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
         var dependencies = dependencies(capture.admission().jdbc(), capture.workspaceId(), sources);
         var identities = new LinkedHashSet<JsonNode>();
         capture.receipt().path("identities").forEach(identities::add);
+        capture.receipt().path(INHERITED_IDENTITIES).forEach(identities::add);
         identities.addAll(dependencies.identities());
         var repositories = new LinkedHashSet<JsonNode>();
         capture.receipt().path("repositories").forEach(repositories::add);
+        capture.receipt().path(INHERITED_REPOSITORIES).forEach(repositories::add);
         repositories.addAll(dependencies.repositories());
         capture.receipt().set("identities", mapper.valueToTree(identities));
         capture.receipt().set("repositories", mapper.valueToTree(repositories));
@@ -362,6 +369,96 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
             """, String.class, jobId, workspaceId, storeId().toString(), Integer.toString(attempt));
         if (dependencies.size() != 1) return TraceCustody.NOT_HELD;
         return COMPLETE.equals(dependencies.getFirst()) ? TraceCustody.INDEXED : TraceCustody.UNINDEXED_DEPENDENCY;
+    }
+
+    /**
+     * The receipt of an attempt's capture, only if it is ready and indexes every person its copied rows may name: the
+     * one receipt that can vouch for inputs retained from that attempt.
+     */
+    public Optional<UUID> completeReceipt(UUID jobId, long workspaceId, int attempt) {
+        if (!Files.exists(layout.root().resolve(".person-evidence-store-id"))) return Optional.empty();
+        return jdbc
+                .query(
+                        """
+            SELECT id FROM person_evidence_copy
+            WHERE job_id=? AND workspace_id=? AND store_id=CAST(? AS uuid) AND state='READY'
+              AND payload->>'attempt'=? AND payload->>'dependencies'=?
+            """,
+                        (rs, row) -> Objects.requireNonNull(rs.getObject(1, UUID.class)),
+                        jobId,
+                        workspaceId,
+                        storeId().toString(),
+                        Integer.toString(attempt),
+                        COMPLETE)
+                .stream()
+                .findFirst();
+    }
+
+    /**
+     * Holds copy admission until the caller's READ_COMMITTED transaction commits, then answers whether the original
+     * receipt still vouches for inputs read from its attempt's folder: READY, COMPLETE, that attempt's, and naming no
+     * person erased since. Called before the caller takes any work or job lock, as erasure orders them. Bytes read
+     * before an erasure began are kept only if this answers true, and an erasure that begins after waits for the
+     * commit and then finds the job through this receipt. The fence's own hold requires that transaction.
+     */
+    public boolean holdVouchingReceipt(UUID copyId, UUID jobId, long workspaceId, int attempt) {
+        holdCopyAdmission();
+        return vouchingReceipt(jdbc, copyId, jobId, workspaceId, attempt, true) != null;
+    }
+
+    /** Holds the existing copy/erasure fence before a recovery transaction takes any job lock. */
+    public void holdCopyAdmission() {
+        fence.holdForCapture();
+    }
+
+    /** A durable original receipt can vouch for retained inputs independently of the mounted worker store. */
+    public boolean vouchesForOriginalCopy(UUID copyId, UUID jobId, long workspaceId, int attempt) {
+        return vouchingReceipt(jdbc, copyId, jobId, workspaceId, attempt, false) != null;
+    }
+
+    /** The original receipt's payload, only while it still vouches for its attempt's retained inputs. */
+    private @Nullable JsonNode vouchingReceipt(
+            JdbcOperations controls, UUID copyId, UUID jobId, long workspaceId, int attempt, boolean local) {
+        if (local && !Files.exists(layout.root().resolve(".person-evidence-store-id"))) return null;
+        var payloads = controls.query(
+                """
+            SELECT payload::text FROM person_evidence_copy
+            WHERE id=CAST(? AS uuid) AND job_id=? AND workspace_id=? AND (CAST(? AS uuid) IS NULL OR store_id=CAST(? AS uuid)) AND state='READY'
+              AND payload->>'attempt'=? AND payload->>'dependencies'=?
+            """,
+                (rs, row) -> mapper.readTree(Objects.requireNonNull(rs.getString(1))),
+                copyId.toString(),
+                jobId,
+                workspaceId,
+                local ? storeId().toString() : null,
+                local ? storeId().toString() : null,
+                Integer.toString(attempt),
+                COMPLETE);
+        if (payloads.size() != 1) return null;
+        JsonNode original = payloads.getFirst();
+        var identities = List.of(mapper.convertValue(original.path("identities"), PersonCopyIdentity[].class));
+        return isSuppressed(identities, controls) ? null : original;
+    }
+
+    /**
+     * Makes the active capture copy the people of an earlier attempt's receipt, whose retained inputs it stages. Under
+     * the capture's erasure fence, so a person erased meanwhile refuses the attempt before any runtime receives them;
+     * a receipt erased, purged, no longer complete or not the admitting attempt's refuses it too.
+     */
+    public void inheritReceipt(AgentJob job, UUID originalCopyId, int originalAttempt) {
+        ActiveCapture capture = requireCapture(job);
+        JsonNode original = vouchingReceipt(
+                capture.admission().jdbc(),
+                originalCopyId,
+                capture.jobId(),
+                capture.workspaceId(),
+                originalAttempt,
+                false);
+        if (original == null) throw new IllegalStateException("The retained inputs' receipt no longer vouches");
+        capture.receipt().set(INHERITED_IDENTITIES, original.path("identities").deepCopy());
+        capture.receipt()
+                .set(INHERITED_REPOSITORIES, original.path("repositories").deepCopy());
+        capture.receipt().put("inheritedCopy", originalCopyId.toString());
     }
 
     private ActiveCapture requireCapture(AgentJob job) {

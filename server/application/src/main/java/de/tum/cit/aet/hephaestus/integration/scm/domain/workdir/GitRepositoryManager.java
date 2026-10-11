@@ -11,6 +11,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -458,6 +460,29 @@ public class GitRepositoryManager {
     public GitTreeSnapshot readTreeSnapshot(RepositoryKey repository, String sha) {
         requireEnabled();
         if (!ObjectId.isId(sha)) throw new GitOperationException("Invalid commit", new IOException(sha));
+        return snapshot(repository, sha, List.of(), "Cannot prepare Git snapshot");
+    }
+
+    /**
+     * The checkout {@link #readTreeSnapshot} made of {@code sha}, again: measured, bounded and limited the same way,
+     * but holding only the named original commits and their history from the local mirror's own objects. No remote
+     * is contacted and no branch, tag or other current ref is copied, so no captured-refs record is written; the
+     * caller restores the original one. A commit the mirror no longer holds refuses the snapshot rather than being
+     * replaced. The caller closes the snapshot to delete it.
+     */
+    public GitTreeSnapshot readOriginalSnapshot(RepositoryKey repository, String sha, Collection<String> commits) {
+        requireEnabled();
+        var wanted = new LinkedHashSet<String>();
+        wanted.add(sha);
+        wanted.addAll(commits);
+        for (String id : wanted) {
+            if (!ObjectId.isId(id)) throw new GitOperationException("Invalid commit", new IOException(id));
+        }
+        return snapshot(repository, sha, List.copyOf(wanted), "Cannot restore the original Git snapshot");
+    }
+
+    /** {@code originals} empty: the mirror's current refs, as a capture takes them; else only those commits. */
+    private GitTreeSnapshot snapshot(RepositoryKey repository, String sha, List<String> originals, String failure) {
         return locks.withReadLock(repository, () -> {
             Path mirror = mirror(repository);
             Path staging = null;
@@ -465,6 +490,8 @@ public class GitRepositoryManager {
                 Repository repo = source.getRepository();
                 RevCommit commit;
                 try (RevWalk walk = new RevWalk(repo)) {
+                    // A missing original commit fails here, before anything is staged.
+                    for (String id : originals) walk.parseCommit(ObjectId.fromString(id));
                     commit = walk.parseCommit(ObjectId.fromString(sha));
                 }
                 Set<String> limitations = new TreeSet<>();
@@ -503,22 +530,33 @@ public class GitRepositoryManager {
                     // A link in the checkout would let the review read outside it; it is a file holding the target.
                     config.setBoolean("core", null, "symlinks", false);
                     config.save();
-                    git.fetch()
-                            .setRemote(mirror.toUri().toString())
-                            .setRefSpecs(SNAPSHOT_REFSPECS)
-                            .setTagOpt(TagOpt.NO_TAGS)
-                            .call();
-                    if (!git.getRepository().getObjectDatabase().has(commit)) {
-                        // The reviewed commit sits on no branch, tag or review ref: it was pinned by id only.
+                    if (originals.isEmpty()) {
                         git.fetch()
                                 .setRemote(mirror.toUri().toString())
-                                .setRefSpecs(new RefSpec(sha + ":" + REVIEW_REFS + sha))
+                                .setRefSpecs(SNAPSHOT_REFSPECS)
                                 .setTagOpt(TagOpt.NO_TAGS)
                                 .call();
                     }
+                    if (!originals.isEmpty()
+                            || !git.getRepository().getObjectDatabase().has(commit)) {
+                        // Pinned by id only: the reviewed commit on no ref here, or each original commit.
+                        git.fetch()
+                                .setRemote(mirror.toUri().toString())
+                                .setRefSpecs((originals.isEmpty() ? List.of(sha) : originals)
+                                        .stream()
+                                                .map(id -> new RefSpec(id + ":" + REVIEW_REFS + id))
+                                                .toList())
+                                .setTagOpt(TagOpt.NO_TAGS)
+                                .call();
+                    }
+                    for (String id : originals) {
+                        if (!git.getRepository().getObjectDatabase().has(ObjectId.fromString(id))) {
+                            throw new GitOperationException("Original commit is not available", new IOException(id));
+                        }
+                    }
                     git.checkout().setName(sha).call();
                     for (String path : excluded) Files.deleteIfExists(staging.resolve(path));
-                    writeCapturedRefs(git.getRepository());
+                    if (originals.isEmpty()) writeCapturedRefs(git.getRepository());
                 }
                 return new GitTreeSnapshot(
                         staging, sha, commit.getTree().getName(), bytes, files, limitations.isEmpty(), limitations);
@@ -527,7 +565,7 @@ public class GitRepositoryManager {
                 throw e;
             } catch (GitAPIException | IOException | RuntimeException e) {
                 if (staging != null) deleteTreeQuietly(staging);
-                throw new GitOperationException("Cannot prepare Git snapshot", e);
+                throw new GitOperationException(failure, e);
             }
         });
     }

@@ -13,6 +13,7 @@ import de.tum.cit.aet.hephaestus.agent.handler.JobTypeHandlerRegistry;
 import de.tum.cit.aet.hephaestus.agent.handler.ObservationAdmissionService;
 import de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionResultParser;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.AnsweredPractice;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.PreparedJobInputs;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.ReviewSourceNotReadyException;
@@ -204,6 +205,14 @@ public class AgentJobExecutor {
     /** Poll-thread-owned, hence unsynchronized. */
     private boolean lastClaimPoolRejected;
 
+    /** Stages a writer continuing an admitted review; without it such an attempt fails as unrecoverable. */
+    private @Nullable ReviewCompositionContinuation compositionContinuation;
+
+    @Autowired(required = false)
+    void setCompositionContinuation(ReviewCompositionContinuation compositionContinuation) {
+        this.compositionContinuation = compositionContinuation;
+    }
+
     @Autowired
     public AgentJobExecutor(
             AgentProperties agentProperties,
@@ -370,6 +379,8 @@ public class AgentJobExecutor {
 
     /** Settles one job under its ownership fence; true only if a transition made here won. */
     private boolean settleForDrain(UUID jobId, AgentJobCancellationReason reason) {
+        ReviewCompositionContinuation continuing = compositionContinuation;
+        if (continuing != null) continuing.holdRecoveryCustody();
         AgentJob job = jobRepository.findByIdWithWorkspaceForUpdate(jobId).orElse(null);
         if (job == null) return false;
         // BEFORE requeuing: the requeue zeroes the accumulators, so a later read bills zero.
@@ -377,8 +388,11 @@ public class AgentJobExecutor {
                 ? jobRepository.findLlmUsageById(jobId).orElse(null)
                 : null;
         int updated = workerId != null ? requeueOrphanWithRotation(jobId, workerId, job.getRetryCount()) : 0;
-        // An attempt whose observations were admitted is never measured again: the requeue
-        // refused it, so it ends here with what it recorded.
+        // An attempt whose observations were admitted is never measured again: the requeue refused it. Its
+        // public writer continues from the original inputs if its admission kept them; otherwise it ends here.
+        if (updated == 0 && workerId != null) {
+            updated = continuing != null ? requeueForComposition(continuing, job, workerId) : 0;
+        }
         if (updated == 0 && workerId != null) {
             updated = jobRepository.failAdmittedOwnedBy(
                     jobId,
@@ -734,6 +748,16 @@ public class AgentJobExecutor {
             JobTypeHandler handler = handlerRegistry.getHandler(job.getJobType());
             AgentJobStatus terminalStatus = completeJob(jobId, agentResult, result, handler);
             metricOutcome = terminalStatus != null ? terminalStatus.name() : "unknown";
+            ReviewCompositionContinuation kept = compositionContinuation;
+            if (terminalStatus != null && terminalStatus.isTerminal() && kept != null) {
+                // Its result is recorded: no writer reads the original inputs again. The retention sweep removes
+                // what a failure here leaves.
+                try {
+                    kept.forget(job);
+                } catch (RuntimeException e) {
+                    log.warn("Could not remove original composition inputs: jobId={}", jobId, e);
+                }
+            }
 
             log.info("Agent job completed: jobId={}, duration={}", jobId, Duration.between(startTime, Instant.now()));
         } catch (SandboxCancelledException e) {
@@ -886,7 +910,16 @@ public class AgentJobExecutor {
         JobTypeHandler handler = handlerRegistry.getHandler(job.getJobType());
 
         AgentJob preparedJob = jobRepository.findByIdWithWorkspace(jobId).orElse(job);
-        PreparedJobInputs preparedInputs = handler.prepareInputs(preparedJob);
+        // A continuing writer captures nothing: it is staged from its admission's original inputs, and the job keeps
+        // the evidence record that admission verified against.
+        boolean continuation = ObservationAdmissionService.isContinuation(preparedJob);
+        ReviewCompositionContinuation continuing = compositionContinuation;
+        if (continuation && continuing == null) {
+            throw new JobPreparationException("The review cannot continue: this runtime cannot stage its writer");
+        }
+        PreparedJobInputs preparedInputs = continuation
+                ? Objects.requireNonNull(continuing).prepareInputs(preparedJob)
+                : handler.prepareInputs(preparedJob);
 
         try {
             stage.set(PreparationFailure.Stage.CREDENTIAL);
@@ -919,17 +952,19 @@ public class AgentJobExecutor {
                     workDeadline,
                     job.getRetryCount());
             stage.set(PreparationFailure.Stage.PROVENANCE);
-            persistProvenanceDigests(
-                    jobId,
-                    agentSpec.promptDigest(),
-                    sandboxSpec.inputFiles(),
-                    preparedInputs.filesOnDisk(),
-                    preparedInputs.directories(),
-                    job.getRetryCount(),
-                    preparedInputs.automatedReviewReadinessReport(),
-                    preparedInputs.answeredPractices(),
-                    reviewedArtifactId(job),
-                    job);
+            if (!continuation) {
+                persistProvenanceDigests(
+                        jobId,
+                        agentSpec.promptDigest(),
+                        sandboxSpec.inputFiles(),
+                        preparedInputs.filesOnDisk(),
+                        preparedInputs.directories(),
+                        job.getRetryCount(),
+                        preparedInputs.automatedReviewReadinessReport(),
+                        preparedInputs.answeredPractices(),
+                        reviewedArtifactId(job),
+                        job);
+            }
             return new PreparedSandbox(sandboxSpec, preparedInputs);
         } catch (RuntimeException exception) {
             preparedInputs.close();
@@ -1301,10 +1336,27 @@ public class AgentJobExecutor {
     }
 
     /**
-     * @param currentRetryCount sizes the backoff only — the UPDATE's own {@code retry_count <
+     * The current retry count sizes the backoff only — the UPDATE's own {@code retry_count <
      *     max-retries} WHERE clause is the authoritative cap, so a stale read here cannot let a job
      *     requeue past it
      */
+    private int requeueForComposition(ReviewCompositionContinuation continuing, AgentJob job, String owningWorkerId) {
+        int currentRetryCount = job.getRetryCount();
+        int attemptNumber = currentRetryCount + 1;
+        Instant now = Instant.now();
+        String newToken = AgentJob.generateJobToken();
+        return continuing.requeue(
+                job,
+                owningWorkerId,
+                new AgentJobRepository.CompositionRequeue(
+                        currentRetryCount,
+                        agentProperties.maxRetries(),
+                        now,
+                        now.plus(AgentJobBackoff.compute(attemptNumber)),
+                        newToken,
+                        AgentJob.computeTokenHash(newToken)));
+    }
+
     private int requeueOrphanWithRotation(UUID jobId, String owningWorkerId, int currentRetryCount) {
         int attemptNumber = currentRetryCount + 1;
         Instant availableAt = Instant.now().plus(AgentJobBackoff.compute(attemptNumber));
@@ -1350,8 +1402,9 @@ public class AgentJobExecutor {
 
             // Queued again after its observations were admitted: a new attempt would capture the work
             // anew, and its citations would not be the ones the admission verified. Its earlier attempt
-            // was billed when it was requeued, and nothing has run since.
-            if (ObservationAdmissionService.isAdmitted(job)) {
+            // was billed when it was requeued, and nothing has run since. Only a writer continuing from
+            // the admission's kept inputs is claimed, under every check below.
+            if (ObservationAdmissionService.isAdmitted(job) && !ObservationAdmissionService.isContinuation(job)) {
                 job.setStatus(AgentJobStatus.FAILED);
                 job.setCompletedAt(Instant.now());
                 job.setErrorMessage(ObservationAdmissionService.INTERRUPTED_AFTER_ADMISSION);

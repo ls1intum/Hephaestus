@@ -11,7 +11,10 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.PreparedObservations;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewCompositionBasis;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewCompositionBasisRepository;
 import de.tum.cit.aet.hephaestus.agent.runtime.ProvenanceDigest;
+import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
@@ -20,6 +23,7 @@ import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import java.io.Serial;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -53,6 +57,9 @@ public class ObservationAdmissionService {
     public static final String IN_APP_SUPPORT_KEY = "inAppSupport";
 
     public static final String DIGEST_METADATA_KEY = "observation_admission_digest";
+
+    /** The attempt whose citations the admission verified; a later attempt of the same job only composes. */
+    public static final String ATTEMPT_METADATA_KEY = "observation_admission_attempt";
 
     public static final String REFUSAL_METADATA_KEY = "observation_admission_refusal";
 
@@ -94,6 +101,7 @@ public class ObservationAdmissionService {
     private final ReviewHistoryContentSource reviewHistory;
     private final ObjectProvider<InAppSupportReader> inAppSupportReader;
     private final PullRequestRepository pullRequests;
+    private final ReviewCompositionBasisRepository basisRepository;
 
     /** Retries join in-flight verification rather than launching duplicate Git operations. */
     private final ConcurrentHashMap<AdmissionIdentity, Flight> flights = new ConcurrentHashMap<>();
@@ -110,8 +118,10 @@ public class ObservationAdmissionService {
             PublicReviewEligibility publicReviewEligibility,
             ReviewHistoryContentSource reviewHistory,
             ObjectProvider<InAppSupportReader> inAppSupportReader,
-            PullRequestRepository pullRequests) {
+            PullRequestRepository pullRequests,
+            ReviewCompositionBasisRepository basisRepository) {
         this.pullRequests = pullRequests;
+        this.basisRepository = basisRepository;
         this.jobs = jobs;
         this.observations = observations;
         this.handlers = handlers;
@@ -231,6 +241,8 @@ public class ObservationAdmissionService {
 
     private ObjectNode admitOnce(AdmissionIdentity identity, JsonNode submitted, String digest) {
         AgentJob candidate = Objects.requireNonNull(transactions.execute(status -> ownedJob(identity)));
+        // An attempt that continues an admitted review only composes: it admits nothing, not even a replay.
+        if (isContinuation(candidate)) throw new StaleAttemptException();
         String existing = admissionDigest(candidate);
         if (!existing.isBlank()) {
             return Objects.requireNonNull(transactions.execute(status -> {
@@ -254,8 +266,13 @@ public class ObservationAdmissionService {
                     JsonNodeFactory.instance.arrayNode());
             throw inadmissible;
         }
+        // Read from the attempt's own folder before any lock is taken, and kept only with the admission it belongs to.
+        ReviewCompositionBasis basis = originalBasis(identity, digest);
         try {
             return Objects.requireNonNull(transactions.execute(status -> {
+                // Copy admission first, as erasure orders it before work and job locks. The inputs read before it are
+                // kept only while their receipt still vouches for them; an erasure after waits, then finds this job.
+                boolean keep = basis != null && evidenceFiles.holdVouchingReceipt(identity, basis.getCopyId());
                 // The work before the job, as every writer that orders against this admission takes them: a
                 // reservation of public feedback, a mirror write, and the coalescer reading the latest running review.
                 // The job is not held while waiting, so the key is the prepared candidate's, checked once it is.
@@ -272,8 +289,12 @@ public class ObservationAdmissionService {
                             : mapper.createObjectNode();
                     metadata.remove(REFUSAL_METADATA_KEY);
                     metadata.put(DIGEST_METADATA_KEY, digest);
+                    metadata.put(ATTEMPT_METADATA_KEY, identity.attempt());
                     job.setMetadata(metadata);
                     jobs.save(job);
+                    if (keep) {
+                        basisRepository.save(Objects.requireNonNull(basis));
+                    }
                     jobs.discardRetiredArtifactInventory(
                             job.getId(), identity.workspaceId(), identity.attempt(), identity.workerId());
                 }
@@ -341,8 +362,75 @@ public class ObservationAdmissionService {
         }));
     }
 
+    /** The admitted observations as the admission answered them, for a writer that continues this review. */
+    @Transactional(readOnly = true)
+    public ObjectNode admittedResponse(AgentJob job) {
+        return response(
+                job,
+                admissionDigest(job),
+                observations.findByAgentJobId(job.getId(), job.getWorkspace().getId()));
+    }
+
     public static boolean isAdmitted(AgentJob job) {
         return !admissionDigest(job).isBlank();
+    }
+
+    /**
+     * The attempt the admitted citations were verified under. Before admission, and for a job admitted before the
+     * attempt was recorded, that is the current attempt: such a job is never continued under another one.
+     */
+    public static int citationAttempt(AgentJob job) {
+        JsonNode attempt = job.getMetadata() == null ? null : job.getMetadata().get(ATTEMPT_METADATA_KEY);
+        if (!isAdmitted(job) || attempt == null) return job.getRetryCount();
+        // Anything but an earlier or the current attempt was not written by the admission, and verifies nothing.
+        if (!attempt.isIntegralNumber()
+                || !attempt.canConvertToInt()
+                || attempt.asInt() < 0
+                || attempt.asInt() > job.getRetryCount()) return -1;
+        return attempt.asInt();
+    }
+
+    /** Whether this attempt continues an admitted review whose citations an earlier attempt verified. */
+    public static boolean isContinuation(AgentJob job) {
+        int admitted = citationAttempt(job);
+        return isAdmitted(job) && admitted >= 0 && admitted < job.getRetryCount();
+    }
+
+    /**
+     * The original public writer inputs of the admitting attempt, ready to be kept with its admission: only when its
+     * public lane was open, its capture receipt indexes every person the inputs copied, and every captured record
+     * reads back with the bytes the capture recorded. Otherwise nothing is kept, and the review stays unrecoverable
+     * if its writer is lost.
+     */
+    private @Nullable ReviewCompositionBasis originalBasis(AdmissionIdentity identity, String digest) {
+        var receipt = evidenceFiles.completeReceipt(identity);
+        if (receipt.isEmpty()) return null;
+        var files = evidenceFiles.originalPublicInputs(identity).orElse(null);
+        if (files == null) return null;
+        byte[] request = files.get(SandboxLayout.FEEDBACK_COMPOSITION_PATH);
+        if (request == null
+                || !mapper.readTree(request)
+                        .path("channels")
+                        .path("IN_CONTEXT")
+                        .path("enabled")
+                        .asBoolean(false)) return null;
+        ObjectNode payload = mapper.createObjectNode();
+        ObjectNode stored = payload.putObject("files");
+        files.forEach((path, bytes) -> stored.put(path, Base64.getEncoder().encodeToString(bytes)));
+        Instant now = Instant.now();
+        var basis = new ReviewCompositionBasis();
+        basis.setJobId(identity.jobId());
+        basis.setWorkspaceId(identity.workspaceId());
+        basis.setAdmissionAttempt(identity.attempt());
+        basis.setAdmissionDigest(digest);
+        basis.setBasisVersion(ReviewCompositionBasis.VERSION);
+        basis.setBasisDigest(ReviewCompositionBasis.digest(files));
+        basis.setCopyId(receipt.get());
+        basis.setByteSize(mapper.writeValueAsBytes(payload).length);
+        basis.setCreatedAt(now);
+        basis.setExpiresAt(now.plus(ReviewCompositionBasis.RETENTION));
+        basis.setPayload(payload);
+        return basis;
     }
 
     private static String admissionDigest(AgentJob job) {
