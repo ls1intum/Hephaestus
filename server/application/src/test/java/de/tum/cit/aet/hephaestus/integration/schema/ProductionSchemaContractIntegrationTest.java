@@ -138,6 +138,41 @@ class ProductionSchemaContractIntegrationTest {
     private IdentityProviderRepository identityProviderRepository;
 
     @Test
+    void shouldScopeAndCascadeOriginalCompositionInputsToTheirJob() {
+        DispatchOwner owner = insertDispatchOwner("basis-a-" + UUID.randomUUID());
+        DispatchOwner other = insertDispatchOwner("basis-b-" + UUID.randomUUID());
+        assertThatThrownBy(() -> insertCompositionBasis(new DispatchOwner(other.workspaceId(), owner.jobId())))
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("sfk_review_composition_basis_job");
+
+        insertCompositionBasis(owner);
+        insertCompositionBasis(other);
+        assertThat(jdbcTemplate.queryForObject(
+                        "SELECT workspace_id FROM review_composition_basis WHERE job_id = ?",
+                        Long.class,
+                        owner.jobId()))
+                .isEqualTo(owner.workspaceId());
+
+        jdbcTemplate.update(
+                "DELETE FROM agent_job WHERE id = ? AND workspace_id = ?", owner.jobId(), owner.workspaceId());
+        assertThat(jdbcTemplate.queryForObject(
+                        "SELECT count(*) FROM review_composition_basis WHERE job_id = ?", Integer.class, owner.jobId()))
+                .isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                        "SELECT count(*) FROM review_composition_basis WHERE job_id = ?", Integer.class, other.jobId()))
+                .isEqualTo(1);
+    }
+
+    private void insertCompositionBasis(DispatchOwner owner) {
+        jdbcTemplate.update("""
+                INSERT INTO review_composition_basis
+                  (job_id,workspace_id,admission_attempt,admission_digest,basis_version,basis_digest,
+                   copy_id,byte_size,created_at,expires_at,payload)
+                VALUES (?,?,0,?,1,?,?,2,now(),now()+interval '1 day','{}'::jsonb)
+                """, owner.jobId(), owner.workspaceId(), "a".repeat(64), "b".repeat(64), UUID.randomUUID());
+    }
+
+    @Test
     void shouldKeepTheActivityCoveringIndexAndRemoveItsRedundantBaseline() {
         assertThat(jdbcTemplate.queryForObject("""
                 SELECT indnkeyatts FROM pg_index

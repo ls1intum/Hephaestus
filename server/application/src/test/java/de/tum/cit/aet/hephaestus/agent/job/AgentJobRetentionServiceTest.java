@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -31,6 +32,9 @@ class AgentJobRetentionServiceTest extends BaseUnitTest {
     private AgentJobRepository jobRepository;
 
     @Mock
+    private ReviewCompositionBasisRepository basisRepository;
+
+    @Mock
     private TransactionTemplate transactionTemplate;
 
     private SimpleMeterRegistry meterRegistry;
@@ -48,7 +52,19 @@ class AgentJobRetentionServiceTest extends BaseUnitTest {
             return cb.doInTransaction(mock(TransactionStatus.class));
         });
         service = new AgentJobRetentionService(
-                jobRepository, AGENT_PROPS, Clock.systemUTC(), transactionTemplate, meterRegistry);
+                jobRepository, basisRepository, AGENT_PROPS, Clock.systemUTC(), transactionTemplate, meterRegistry);
+    }
+
+    @Test
+    @DisplayName("original composition inputs are removed first, batch by batch, before any job payload pass")
+    void removesUnusableCompositionInputsBeforeJobPayloads() {
+        when(basisRepository.deleteUnusable(any(), anyInt())).thenReturn(BATCH_SIZE, 3);
+
+        service.runRetention();
+
+        var order = inOrder(basisRepository, jobRepository);
+        order.verify(basisRepository, times(2)).deleteUnusable(any(), eq(BATCH_SIZE));
+        order.verify(jobRepository).stripTerminalPayloads(any(), eq(BATCH_SIZE));
     }
 
     @Nested

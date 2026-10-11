@@ -6,6 +6,11 @@ stage="$workspace/work/precompute-stage"
 output="$workspace/work/precompute-out"
 log="$workspace/work/precompute-runner.log"
 
+# A writer that continues an admitted review assesses no practice, so no practice gets hints.
+if [ -f "$workspace/inputs/composition-continuation.json" ]; then
+    exit 0
+fi
+
 (
     # POSIX sh measures this per-file limit in 512-byte blocks (10 MiB).
     ulimit -f 20480 &&

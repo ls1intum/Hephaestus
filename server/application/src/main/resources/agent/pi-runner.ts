@@ -834,15 +834,21 @@ function persistReviewState() {
 	);
 }
 
+/** This attempt continues an admitted review: it measured nothing, and its result is what was admitted. */
+let continuing = false;
+
 function maybeWriteResultFile(): boolean {
-	if (reviewState.observations.length === 0) {
+	const observations: readonly unknown[] = continuing
+		? admittedObservations
+		: reviewState.observations;
+	if (observations.length === 0) {
 		return false;
 	}
 	writeFileSync(
 		RESULT_PATH,
 		JSON.stringify(
 			{
-				observations: reviewState.observations,
+				observations,
 				...(admissionDigest === null ? {} : { admissionDigest }),
 			},
 			null,
@@ -1865,6 +1871,14 @@ console.error(
 );
 
 const COMPOSITION_REQUEST_PATH = INPUT_PATHS.compositionRequest;
+/**
+ * Staged beside the request only when this attempt continues a review an earlier attempt admitted and lost the writer
+ * of: what the server admitted then. Such an attempt assesses nothing; it composes the review on the work.
+ */
+const CONTINUATION_PATH = nodePath.join(
+	nodePath.dirname(COMPOSITION_REQUEST_PATH),
+	"composition-continuation.json",
+);
 const FEEDBACK_PATH = outputPath(OUTPUT, "feedback.json");
 const COMPOSER_PROMPT_PATH = `${CWD}/feedback-composer.md`;
 const REVIEW_COMPOSER_PROMPT_PATH = `${CWD}/review-composer.md`;
@@ -2058,7 +2072,8 @@ type CompositionFailureReason =
 	| "STALL"
 	| "SAFETY"
 	| "LOOP"
-	| "NO_DECISION";
+	| "NO_DECISION"
+	| "PRIVATE_NOT_RECOVERED";
 interface CompositionFailure {
 	phase: CompositionPhase;
 	reason: CompositionFailureReason;
@@ -3353,6 +3368,19 @@ async function admitObservations() {
 				`[pi-runner] admission attempt ${attempt}/${ADMISSION_ATTEMPTS} did not arrive (${errorText(error)}); retrying in ${delayMs}ms`,
 			),
 	);
+	const answer = acceptAdmission(admitted);
+	// The support read is checked only after the admission it accompanies; it never changes what was admitted.
+	inAppSupport = readInAppSupport(answer.inAppSupport, admittedObservations);
+	if (inAppSupport?.state === "COMPLETE") {
+		writeFileSync(IN_APP_SUPPORT_PATH, JSON.stringify(inAppSupport, null, 2));
+	}
+}
+
+/**
+ * Holds an admission answer as the composition's ground, whether this attempt's own admission returned it or the
+ * server staged an earlier attempt's for a continuing writer: both answer the one contract.
+ */
+function acceptAdmission(admitted: unknown): Record<string, unknown> {
 	if (
 		!isRecord(admitted) ||
 		admitted.schemaVersion !== 1 ||
@@ -3372,11 +3400,7 @@ async function admitObservations() {
 		COMPOSITION_OBSERVATIONS_PATH,
 		JSON.stringify({ observations: admittedObservations }, null, 2),
 	);
-	// The support read is checked only after the admission it accompanies; it never changes what was admitted.
-	inAppSupport = readInAppSupport(admitted.inAppSupport, admittedObservations);
-	if (inAppSupport?.state === "COMPLETE") {
-		writeFileSync(IN_APP_SUPPORT_PATH, JSON.stringify(inAppSupport, null, 2));
-	}
+	return admitted;
 }
 
 /**
@@ -4184,7 +4208,11 @@ async function main() {
 		});
 
 	const allSlugs = loadPracticeSlugs();
-	practiceCoverageLedger = new PracticeCoverageLedger(PRACTICE_COVERAGE_PATH, allSlugs);
+	continuing = existsSync(CONTINUATION_PATH);
+	// A continuing writer evaluates no practice, so it reports no coverage of its own.
+	if (!continuing) {
+		practiceCoverageLedger = new PracticeCoverageLedger(PRACTICE_COVERAGE_PATH, allSlugs);
+	}
 	persistRecordedNotes();
 	const turns = planTurns(practiceIndex, PRACTICES_PER_TURN);
 	const brief = buildBrief(CWD, {
@@ -4197,7 +4225,7 @@ async function main() {
 
 	const measureEnd = PROCESS_START_MS + WINDOWS.measureMs;
 	const startMs = Date.now();
-	const tooLate = Date.now() >= measureEnd;
+	const tooLate = !continuing && Date.now() >= measureEnd;
 	if (tooLate) {
 		console.error(
 			`[pi-runner] FAILED: the run reached its safety ceiling before the session could start`,
@@ -4446,6 +4474,10 @@ async function main() {
 		return stoppedBy();
 	}
 
+	if (continuing) {
+		await continueAdmittedReview();
+	}
+
 	let measureUsage: UsageReport;
 	try {
 		let stalls = 0;
@@ -4593,6 +4625,72 @@ async function main() {
 	);
 	finalizeOutput();
 	process.exit(0);
+
+	/**
+	 * An earlier attempt of this review measured, was admitted, and lost its writer. This one opens no practice session
+	 * and admits nothing: it composes only the review on the work, from the admission the server staged and the inputs
+	 * that attempt had. Private feedback is not composed here, and says so.
+	 */
+	async function continueAdmittedReview(): Promise<void> {
+		measuring = false;
+		measurementClosed = true;
+		acceptAdmission(parseJson(readFileSync(CONTINUATION_PATH, "utf8")));
+		// The original selection, less what was admitted: what that attempt did not reach stays not reached.
+		const unreachedSlugs = missingSlugs(
+			allSlugs,
+			admittedObservations.map((item) => item.practiceSlug),
+		);
+		console.error(
+			`[pi-runner] Continuing an admitted review: ${admittedObservations.length} observation(s), ` +
+				`${unreachedSlugs.length} practice(s) not reached; composing the review on the work only`,
+		);
+		if (
+			compositionRequest &&
+			PRIVATE_CHANNELS.some((channel) => compositionRequest.channels[channel].enabled) &&
+			undecidedPrivatePractices().length > 0
+		) {
+			recordCompositionFailure("PRIVATE_FEEDBACK", "PRIVATE_NOT_RECOVERED");
+		}
+		persistComposedFeedback();
+		const reviewable = publicObservations(admittedObservations);
+		if (compositionRequest?.channels.IN_CONTEXT.enabled === true && reviewable.length > 0) {
+			const safetyMs = AGENT_BUDGET_MS - (Date.now() - PROCESS_START_MS);
+			if (safetyMs <= 0) {
+				recordCompositionFailure("PUBLIC_REVIEW", "SAFETY");
+			} else {
+				const safety = scheduleDeadline(safetyMs, () => {
+					stopTurn(
+						"safety",
+						"the run is near its safety ceiling — preserving the composed review so far",
+					);
+				});
+				const unfinished = (reason: CompositionFailureReason) => {
+					if (composedFeedback.review === null) {
+						recordCompositionFailure("PUBLIC_REVIEW", reason);
+					}
+				};
+				try {
+					await composeReview(compositionRequest, reviewable, unreachedSlugs, safety);
+				} catch (error) {
+					unfinished(safety.expired() ? "SAFETY" : "RUNTIME_ERROR");
+					throw error;
+				} finally {
+					if (safety.expired()) {
+						unfinished("SAFETY");
+					}
+					clearTimeout(safety.timer);
+					persistComposedFeedback();
+					accumulateUsage(null, extractUsageFromSession({}, streamUsage));
+					persistUsage();
+				}
+			}
+		}
+		console.error(
+			`[pi-runner] SUCCESS: result.json holds the ${admittedObservations.length} admitted observation(s)`,
+		);
+		finalizeOutput();
+		process.exit(0);
+	}
 
 	/**
 	 * The review on the work, in a fresh session of its own whose only tools show a MET practice's staged standard and

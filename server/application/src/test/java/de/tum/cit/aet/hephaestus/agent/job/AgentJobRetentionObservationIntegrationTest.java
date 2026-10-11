@@ -14,11 +14,18 @@ import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.TreeMap;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,6 +44,12 @@ class AgentJobRetentionObservationIntegrationTest extends AbstractWorkspaceInteg
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private ReviewCompositionBasisRepository basisRepository;
+
+    @PersistenceContext
+    private @Nullable EntityManager entityManager;
 
     @Test
     @Transactional
@@ -85,14 +98,103 @@ class AgentJobRetentionObservationIntegrationTest extends AbstractWorkspaceInteg
         assertThat(jobRepository.existsById(unreferenced.getId())).isFalse();
     }
 
+    /**
+     * Original writer inputs live only while a writer could still use them, and only their own workspace reads them.
+     */
+    @Test
+    @Transactional
+    void removesOriginalCompositionInputsOnceNoWriterCanUseThem() {
+        var owner = persistUser("basis-owner");
+        Workspace workspace = createWorkspace("basis-retention", "Basis", "basis-org", AccountType.ORG, owner);
+        Workspace other = createWorkspace("basis-other", "Other", "basis-other-org", AccountType.ORG, owner);
+        AgentJob ended = oldTerminalJob(workspace);
+        AgentJob running = oldJob(workspace, AgentJobStatus.RUNNING);
+        AgentJob expired = oldJob(workspace, AgentJobStatus.RUNNING);
+        jobRepository.saveAllAndFlush(List.of(ended, running, expired));
+        Instant now = Instant.now();
+        basisRepository.save(basis(ended, now.plus(Duration.ofHours(1))));
+        basisRepository.save(basis(running, now.plus(Duration.ofHours(1))));
+        basisRepository.save(basis(expired, now.minus(Duration.ofSeconds(1))));
+
+        assertThat(basisRepository.deleteUnusable(now, 100)).isEqualTo(2);
+
+        assertThat(basisRepository.findByWorkspaceIdAndJobId(workspace.getId(), running.getId()))
+                .isPresent();
+        assertThat(basisRepository.findByWorkspaceIdAndJobId(other.getId(), running.getId()))
+                .isEmpty();
+        assertThat(basisRepository.findByWorkspaceIdAndJobId(workspace.getId(), ended.getId()))
+                .isEmpty();
+        assertThat(basisRepository.findByWorkspaceIdAndJobId(workspace.getId(), expired.getId()))
+                .isEmpty();
+    }
+
+    @Test
+    @Transactional
+    void shouldPreserveTheOriginalInputDigestThroughPostgresJsonb() {
+        var owner = persistUser("basis-json-owner");
+        Workspace workspace = createWorkspace("basis-json", "Basis", "basis-json-org", AccountType.ORG, owner);
+        AgentJob job = jobRepository.saveAndFlush(oldTerminalJob(workspace));
+        var original = Map.of(
+                "z.md",
+                "Original α\n".getBytes(StandardCharsets.UTF_8),
+                "a.json",
+                "{\"original\":true}".getBytes(StandardCharsets.UTF_8));
+        var payload = objectMapper.createObjectNode();
+        var files = payload.putObject("files");
+        original.forEach((path, bytes) -> files.put(path, Base64.getEncoder().encodeToString(bytes)));
+        var kept = basis(job, Instant.now().plus(Duration.ofHours(1)));
+        kept.setPayload(payload);
+        kept.setBasisDigest(ReviewCompositionBasis.digest(original));
+        kept.setByteSize(objectMapper.writeValueAsBytes(payload).length);
+        basisRepository.save(kept);
+        var persistence = Objects.requireNonNull(entityManager);
+        persistence.flush();
+        persistence.clear();
+
+        var reloaded = basisRepository
+                .findByWorkspaceIdAndJobId(workspace.getId(), job.getId())
+                .orElseThrow();
+        var decoded = new TreeMap<String, byte[]>();
+        reloaded.getPayload()
+                .path("files")
+                .properties()
+                .forEach(entry -> decoded.put(
+                        entry.getKey(),
+                        Base64.getDecoder().decode(entry.getValue().asString())));
+        assertThat(ReviewCompositionBasis.digest(decoded)).isEqualTo(kept.getBasisDigest());
+        original.forEach((path, bytes) -> assertThat(decoded.get(path)).containsExactly(bytes));
+    }
+
+    private ReviewCompositionBasis basis(AgentJob job, Instant expiresAt) {
+        var basis = new ReviewCompositionBasis();
+        basis.setJobId(job.getId());
+        basis.setWorkspaceId(job.getWorkspace().getId());
+        basis.setAdmissionAttempt(0);
+        basis.setAdmissionDigest("a".repeat(64));
+        basis.setBasisVersion(1);
+        basis.setBasisDigest("b".repeat(64));
+        basis.setCopyId(UUID.randomUUID());
+        basis.setByteSize(2);
+        basis.setCreatedAt(expiresAt.minus(Duration.ofHours(2)));
+        basis.setExpiresAt(expiresAt);
+        basis.setPayload(objectMapper.createObjectNode());
+        return basis;
+    }
+
     private AgentJob oldTerminalJob(Workspace workspace) {
+        return oldJob(workspace, AgentJobStatus.COMPLETED);
+    }
+
+    private AgentJob oldJob(Workspace workspace, AgentJobStatus status) {
         AgentJob job = new AgentJob();
         job.setWorkspace(workspace);
         job.setPurpose(AgentPurpose.PRACTICE_REVIEW);
         job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
-        job.setStatus(AgentJobStatus.COMPLETED);
-        job.setDeliveryStatus(DeliveryStatus.DELIVERED);
-        job.setCompletedAt(Instant.now().minus(Duration.ofDays(100)));
+        job.setStatus(status);
+        if (status == AgentJobStatus.COMPLETED) {
+            job.setDeliveryStatus(DeliveryStatus.DELIVERED);
+            job.setCompletedAt(Instant.now().minus(Duration.ofDays(100)));
+        }
         job.setConfigSnapshot(objectMapper.valueToTree(Map.of("model", "test")));
         return job;
     }

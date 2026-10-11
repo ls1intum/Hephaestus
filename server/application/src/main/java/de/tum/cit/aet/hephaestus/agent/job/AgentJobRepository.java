@@ -1084,6 +1084,66 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
             + ObservationAdmissionService.DIGEST_METADATA_KEY + "'), '') = ''";
 
     /**
+     * Locks this exact owned attempt, as erasure's cancellation locks it before marking receipts, and finds it only
+     * while it can be continued: no saved output, an admission recorded with its attempt, and that admission's kept
+     * inputs current, unexpired and vouched for by the admitting attempt's READY receipt that indexes every person
+     * they copied. A receipt erased, purged, unfinished or of another attempt finds nothing. Erasure that begins after
+     * this lock cancels the requeued attempt; one that marked the receipt before it leaves the attempt to fail.
+     */
+    @WorkspaceAgnostic("ID-based fenced lookup; the basis and receipt joins pin the job's own workspace")
+    @Query(
+            value = """
+            SELECT j.id FROM agent_job j
+            JOIN review_composition_basis b ON b.job_id = j.id AND b.workspace_id = j.workspace_id
+            JOIN person_evidence_copy c
+              ON c.id = b.copy_id AND c.job_id = j.id AND c.workspace_id = j.workspace_id
+            WHERE j.id = :id AND j.status = 'RUNNING' AND j.worker_id = :workerId AND j.retry_count = :attempt
+              AND j.output IS NULL
+              AND b.basis_version = :version AND b.expires_at > :now AND b.admission_attempt <= j.retry_count
+              AND b.admission_digest = j.metadata ->> '""" + ObservationAdmissionService.DIGEST_METADATA_KEY + """
+            '
+              AND j.metadata ->> '"""
+                    + ObservationAdmissionService.ATTEMPT_METADATA_KEY + """
+            ' = CAST(b.admission_attempt AS text)
+              AND c.state = 'READY' AND c.payload ->> 'dependencies' = 'COMPLETE'
+              AND c.payload ->> 'attempt' = CAST(b.admission_attempt AS text)
+            FOR NO KEY UPDATE OF j
+            """,
+            nativeQuery = true)
+    List<UUID> lockContinuableAttempt(
+            @Param("id") UUID id,
+            @Param("workerId") String workerId,
+            @Param("attempt") int attempt,
+            @Param("version") int version,
+            @Param("now") Instant now);
+
+    /** The transition of {@link #lockContinuableAttempt}, once its attempt is locked and found continuable. */
+    @WorkspaceAgnostic("ID-based fenced requeue; caller is @WorkspaceAgnostic sweeper or worker-local drain")
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("UPDATE AgentJob j SET j.status = 'QUEUED', j.workerId = null, "
+            + "j.startedAt = null, j.executionStartedAt = null, "
+            + "j.retryCount = j.retryCount + 1, j.availableAt = :#{#request.availableAt}, "
+            + "j.jobToken = :#{#request.newJobToken}, j.jobTokenHash = :#{#request.newJobTokenHash}, "
+            + "j.llmTotalCalls = 0, j.llmTotalInputTokens = 0, j.llmTotalOutputTokens = 0, "
+            + "j.llmTotalReasoningTokens = 0, j.llmCacheReadTokens = 0, j.llmCacheWriteTokens = 0 "
+            + "WHERE j.id = :id AND j.status = 'RUNNING' AND j.workerId = :workerId AND j.retryCount = :#{#request.attempt} "
+            + "AND j.retryCount < :#{#request.maxRetries} AND j.output IS NULL AND NOT (" + NOT_ADMITTED + ") "
+            + "AND EXISTS (SELECT 1 FROM ReviewCompositionBasis b WHERE b.jobId = j.id "
+            + "AND b.workspaceId = j.workspace.id AND b.expiresAt > :#{#request.now} "
+            + "AND b.admissionDigest = FUNCTION('jsonb_extract_path_text', j.metadata, '"
+            + ObservationAdmissionService.DIGEST_METADATA_KEY + "'))")
+    int requeueLockedForComposition(
+            @Param("id") UUID id, @Param("workerId") String workerId, @Param("request") CompositionRequeue request);
+
+    record CompositionRequeue(
+            int attempt,
+            int maxRetries,
+            Instant now,
+            Instant availableAt,
+            String newJobToken,
+            String newJobTokenHash) {}
+
+    /**
      * Ends a RUNNING attempt whose observations were admitted but whose run was lost before it finished:
      * it fails with what is known, and its observations, capture and digest stay as recorded. Fenced on
      * the owning worker and the attempt, so a stale caller cannot end a run another claim started;

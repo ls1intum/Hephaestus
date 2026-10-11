@@ -13,6 +13,7 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
 import de.tum.cit.aet.hephaestus.agent.runtime.ProvenanceDigest;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessReport;
+import de.tum.cit.aet.hephaestus.evidence.SourceArtifact;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.FabricLayout;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
 import java.io.IOException;
@@ -40,7 +41,9 @@ import java.security.MessageDigest;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -75,7 +78,7 @@ public class JobEvidenceFiles implements SandboxResultListener {
     static final Duration RETENTION_GRACE = Duration.ofHours(1);
 
     /** How long an attempt's debug transcript stays for next-day investigation. */
-    static final Duration TRACE_RETENTION = Duration.ofHours(24);
+    public static final Duration TRACE_RETENTION = Duration.ofHours(24);
 
     /** Where the gateway runner puts the native session transcripts in a result. */
     private static final String TRACES = "traces/";
@@ -403,6 +406,102 @@ public class JobEvidenceFiles implements SandboxResultListener {
             // Admission is durable. The scheduled cleaner retries a failed local removal.
             log.warn("Could not remove admitted attempt {}", identity.jobId(), exception);
         }
+    }
+
+    /** The manifest's rendered companion, which {@link JobFolderIndexBuilder} writes beside it. */
+    private static final String INDEX_MARKDOWN_PATH = "INDEX.md";
+
+    /**
+     * The finite inputs a public review writer was staged with, exactly as this attempt's folder holds them: the
+     * manifest and its rendered index (with every source's recorded bytes, digests, absences and omissions), every
+     * captured context record, the practice index and whole standards, the composition request, and the checkout's
+     * recorded HEAD and refs. Private history, sandbox work and the checkout's objects are not among them. Read while the attempt still owns its
+     * folder; a context record the manifest does not list with these exact bytes, or any unreadable file, leaves
+     * nothing to retain rather than a part.
+     */
+    public Optional<Map<String, byte[]>> originalPublicInputs(ObservationAdmissionService.AdmissionIdentity identity) {
+        Path root = directory(identity.workspaceId(), identity.jobId(), identity.attempt(), identity.workerId());
+        try {
+            var files = new TreeMap<String, byte[]>();
+            byte[] index = Files.readAllBytes(regularFile(root, SandboxLayout.MANIFEST_PATH));
+            files.put(SandboxLayout.MANIFEST_PATH, index);
+            var manifest = new JsonMapper().readValue(index, JobFolderIndex.class);
+            // The rendered index beside the manifest, and the request; each only as this attempt was staged with it.
+            for (String path : List.of(INDEX_MARKDOWN_PATH, SandboxLayout.FEEDBACK_COMPOSITION_PATH)) {
+                Path staged = root.resolve(path);
+                if (Files.isRegularFile(staged, LinkOption.NOFOLLOW_LINKS)) files.put(path, Files.readAllBytes(staged));
+            }
+            for (String prefix : List.of(SandboxLayout.CONTEXT_PREFIX, SandboxLayout.PRACTICES_PREFIX)) {
+                Path directory = root.resolve(prefix);
+                if (!Files.isDirectory(directory, LinkOption.NOFOLLOW_LINKS)) continue;
+                try (var entries = Files.walk(directory)) {
+                    for (Path path : entries.filter(path -> Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS))
+                            .toList()) {
+                        files.put(root.relativize(path).toString(), Files.readAllBytes(path));
+                    }
+                }
+            }
+            var listed = new HashMap<String, SourceArtifact>();
+            manifest.artifacts()
+                    .forEach(artifact -> listed.put(artifact.artifact().path(), artifact.artifact()));
+            // The checkout's own record of what it held; the objects come back from the mirror, these bytes do not.
+            for (String path : listed.keySet()) {
+                if (path.startsWith(SandboxLayout.REPO_MOUNT_RELATIVE + ".git/"))
+                    files.put(path, Files.readAllBytes(regularFile(root, path)));
+            }
+            for (var file : files.entrySet()) {
+                boolean recorded = file.getKey().startsWith(SandboxLayout.CONTEXT_PREFIX)
+                        || file.getKey().startsWith(SandboxLayout.REPO_MOUNT_RELATIVE);
+                if (!recorded) continue;
+                SourceArtifact artifact = listed.get(file.getKey());
+                if (artifact == null
+                        || artifact.bytes() != file.getValue().length
+                        || !artifact.sha256().equals(ProvenanceDigest.sha256Hex(file.getValue()))) {
+                    return Optional.empty();
+                }
+            }
+            for (String path : listed.keySet()) {
+                if (path.startsWith(SandboxLayout.CONTEXT_PREFIX) && !files.containsKey(path)) return Optional.empty();
+            }
+            return Optional.of(Collections.unmodifiableMap(files));
+        } catch (IOException | RuntimeException exception) {
+            log.warn(
+                    "Original writer inputs unreadable: jobId={}, type={}",
+                    identity.jobId(),
+                    exception.getClass().getSimpleName());
+            return Optional.empty();
+        }
+    }
+
+    private static Path regularFile(Path root, String relative) throws IOException {
+        Path file = safePath(root, relative);
+        if (!Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)) throw new IOException("Not a captured file");
+        return file;
+    }
+
+    /** See {@link EvidenceFolderPersonDataCatalog#completeReceipt}. */
+    public Optional<UUID> completeReceipt(ObservationAdmissionService.AdmissionIdentity identity) {
+        return personCopies.completeReceipt(identity.jobId(), identity.workspaceId(), identity.attempt());
+    }
+
+    /** See {@link EvidenceFolderPersonDataCatalog#holdCopyAdmission}. */
+    public void holdCopyAdmission() {
+        personCopies.holdCopyAdmission();
+    }
+
+    /** See {@link EvidenceFolderPersonDataCatalog#vouchesForOriginalCopy}. */
+    public boolean vouchesForOriginalCopy(UUID copyId, UUID jobId, long workspaceId, int attempt) {
+        return personCopies.vouchesForOriginalCopy(copyId, jobId, workspaceId, attempt);
+    }
+
+    /** See {@link EvidenceFolderPersonDataCatalog#holdVouchingReceipt}. */
+    public boolean holdVouchingReceipt(ObservationAdmissionService.AdmissionIdentity identity, UUID copyId) {
+        return personCopies.holdVouchingReceipt(copyId, identity.jobId(), identity.workspaceId(), identity.attempt());
+    }
+
+    /** See {@link EvidenceFolderPersonDataCatalog#inheritReceipt}. */
+    public void inheritPersonCapture(AgentJob job, UUID originalCopyId, int originalAttempt) {
+        personCopies.inheritReceipt(job, originalCopyId, originalAttempt);
     }
 
     /** The exact rows a read during runtime returned, by the tables that own them. */

@@ -36,11 +36,15 @@ public final class CitationVerification {
         verdict.put("citationSha256", citationDigest(citation));
     }
 
+    /**
+     * Checks against the attempt that admitted the citations, not the attempt running now: a writer that continues
+     * an admitted review composes from citations it did not verify, and neither re-verifies nor relabels them.
+     */
     static void requireVerified(AgentJob job, @Nullable JsonNode evidence) {
         if (evidence == null) throw new JobDeliveryException("No admitted evidence");
         JsonNode citations = evidence.path("citations");
         if (!citations.isArray() || citations.isEmpty()) throw new JobDeliveryException("No admitted citations");
-        requireVerifiedCitations(job.getId(), job.getRetryCount(), citations);
+        requireVerifiedCitations(job.getId(), ObservationAdmissionService.citationAttempt(job), citations);
     }
 
     public static void requireVerifiedCitations(UUID jobId, int attempt, JsonNode citations) {

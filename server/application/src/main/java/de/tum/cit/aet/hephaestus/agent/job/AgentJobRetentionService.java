@@ -35,6 +35,7 @@ public class AgentJobRetentionService {
     private static final Logger log = LoggerFactory.getLogger(AgentJobRetentionService.class);
 
     private final AgentJobRepository jobRepository;
+    private final ReviewCompositionBasisRepository basisRepository;
     private final AgentProperties agentProperties;
     private final Clock clock;
     private final BoundedBatchPass pass;
@@ -44,11 +45,13 @@ public class AgentJobRetentionService {
 
     public AgentJobRetentionService(
             AgentJobRepository jobRepository,
+            ReviewCompositionBasisRepository basisRepository,
             AgentProperties agentProperties,
             Clock clock,
             TransactionTemplate transactionTemplate,
             MeterRegistry meterRegistry) {
         this.jobRepository = jobRepository;
+        this.basisRepository = basisRepository;
         this.agentProperties = agentProperties;
         this.clock = clock;
         this.pass = new BoundedBatchPass(clock);
@@ -69,8 +72,22 @@ public class AgentJobRetentionService {
     @Scheduled(fixedDelay = 6, initialDelay = 1, timeUnit = TimeUnit.HOURS)
     @SchedulerLock(name = "agent-job-retention", lockAtMostFor = "PT20M", lockAtLeastFor = "PT10S")
     public void runRetention() {
+        deleteUnusableCompositionInputs();
         stripPayloads();
         deleteOldRows();
+    }
+
+    /** Original writer inputs go as soon as no writer can use them, not after the job's own payload retention. */
+    private void deleteUnusableCompositionInputs() {
+        Instant now = clock.instant();
+        BoundedBatchPass.Result result = pass.run(log, "composition-inputs", () -> {
+            Integer removed =
+                    transactionTemplate.execute(status -> basisRepository.deleteUnusable(now, pass.batchSize()));
+            return removed != null ? removed : 0;
+        });
+        if (result.affected() > 0) {
+            log.info("Retention: deleted original composition inputs of {} review(s)", result.affected());
+        }
     }
 
     private void stripPayloads() {

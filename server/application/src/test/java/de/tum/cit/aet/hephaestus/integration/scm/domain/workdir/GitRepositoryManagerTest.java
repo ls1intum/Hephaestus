@@ -306,6 +306,54 @@ class GitRepositoryManagerTest extends BaseUnitTest {
         }
     }
 
+    /**
+     * A writer that continues a review is given the checkout its capture had: the same tree, limits and exclusions,
+     * from the original commits alone, however the branches moved since. Nothing current comes with it.
+     */
+    @Test
+    void shouldRestoreTheOriginalCheckoutFromItsOwnCommitsAfterTheBranchesMoved() throws Exception {
+        try (Git git = repository()) {
+            String base = head(git);
+            Files.writeString(source.resolve("back\\slash.txt"), "windows\n");
+            String original = commit(git, "Reviewed change");
+            prepare();
+            GitRepositoryManager.GitTreeSnapshot captured = manager.readTreeSnapshot(KEY, original);
+            captured.close();
+            String later = commit(git, "Pushed after the review");
+            git.tag().setName("later").setSigned(false).call();
+            prepare();
+
+            try (var restored = manager.readOriginalSnapshot(KEY, original, List.of(base, original))) {
+                assertThat(restored.treeSha()).isEqualTo(captured.treeSha());
+                assertThat(restored.totalBytes()).isEqualTo(captured.totalBytes());
+                assertThat(restored.visitedFiles()).isEqualTo(captured.visitedFiles());
+                assertThat(restored.limitations()).isEqualTo(captured.limitations());
+                assertThat(restored.complete()).isFalse();
+                assertThat(restored.stagingDir().resolve("back\\slash.txt")).doesNotExist();
+                assertThat(Files.readString(restored.stagingDir().resolve(".git/HEAD"))
+                                .strip())
+                        .isEqualTo(original);
+                assertThat(restored.stagingDir().resolve(".git/refs/remotes")).doesNotExist();
+                assertThat(restored.stagingDir().resolve(".git/hephaestus-captured-refs"))
+                        .doesNotExist();
+                try (Git checkout = Git.open(restored.stagingDir().toFile())) {
+                    var objects = checkout.getRepository().getObjectDatabase();
+                    assertThat(objects.has(ObjectId.fromString(base))).isTrue();
+                    assertThat(objects.has(ObjectId.fromString(later))).isFalse();
+                }
+            }
+
+            // An original commit the mirror does not hold is refused before anything is staged, not replaced.
+            assertThatThrownBy(() -> manager.readOriginalSnapshot(KEY, original, List.of("d".repeat(40))))
+                    .isInstanceOf(GitRepositoryManager.GitOperationException.class);
+            // The original bound still applies.
+            assertThatThrownBy(() -> manager(true, 63).readOriginalSnapshot(KEY, original, List.of(base)))
+                    .isInstanceOf(GitRepositoryManager.GitOperationException.class)
+                    .hasMessage("Repository snapshot exceeds hephaestus.git.max-snapshot-bytes");
+            assertThat(stagingDirectories()).isEmpty();
+        }
+    }
+
     @Test
     void shouldRefuseTheSnapshotWhenItExceedsMaxSnapshotBytes() throws Exception {
         try (Git git = repository()) {
