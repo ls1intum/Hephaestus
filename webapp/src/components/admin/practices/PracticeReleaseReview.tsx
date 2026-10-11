@@ -69,7 +69,7 @@ function fieldText(definition: PracticeDefinition, field: Field): string {
 
 export interface PracticeReleaseReviewProps {
 	proposal: PracticeReleaseProposal;
-	pending: boolean;
+	pending: "accept" | "decline" | null;
 	onAccept: (choices: Record<string, Choice>) => void;
 	onDecline: () => void;
 }
@@ -165,7 +165,7 @@ export function PracticeReleaseReview({
 									<RadioGroup
 										aria-label={`Use a version for ${FIELDS[field].label}`}
 										value={choices.get(field) ?? ""}
-										disabled={pending}
+										disabled={pending !== null}
 										onValueChange={(choice) => {
 											if (choice === "CURRENT" || choice === "OFFERED") {
 												setChoices((previous) => new Map(previous).set(field, choice));
@@ -188,12 +188,13 @@ export function PracticeReleaseReview({
 				</TableBody>
 			</Table>
 			<div className="flex flex-wrap gap-2">
-				<Button type="button" disabled={!ready || pending} onClick={submit}>
-					{pending && <Spinner className="mr-1.5 size-4" />}
-					Accept selected fields
+				<Button type="button" disabled={!ready || pending !== null} onClick={submit}>
+					{pending === "accept" && <Spinner className="mr-1.5 size-4" />}
+					{pending === "accept" ? "Accepting selected fields…" : "Accept selected fields"}
 				</Button>
-				<Button type="button" variant="outline" disabled={pending} onClick={onDecline}>
-					Decline this update
+				<Button type="button" variant="outline" disabled={pending !== null} onClick={onDecline}>
+					{pending === "decline" && <Spinner className="mr-1.5 size-4" />}
+					{pending === "decline" ? "Declining update…" : "Decline this update"}
 				</Button>
 			</div>
 			<p className="text-xs text-muted-foreground">

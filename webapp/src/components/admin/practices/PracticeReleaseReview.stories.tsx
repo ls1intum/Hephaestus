@@ -42,7 +42,7 @@ const proposal: PracticeReleaseProposal = {
 
 const meta = {
 	component: PracticeReleaseReview,
-	args: { proposal, pending: false, onAccept: fn(), onDecline: fn() },
+	args: { proposal, pending: null, onAccept: fn(), onDecline: fn() },
 	parameters: { layout: "padded" },
 	tags: ["autodocs"],
 } satisfies Meta<typeof PracticeReleaseReview>;
@@ -111,8 +111,34 @@ export const RecordedVersionBase: Story = {
 	args: { proposal: { ...proposal, baseSource: "REVISION_FINGERPRINT_MATCH" } },
 };
 
-export const Submitting: Story = {
-	args: { pending: true },
+const readyProposal = {
+	...proposal,
+	current: base,
+	fields: proposal.fields
+		.filter((field) => field.offeredChanged)
+		.map((field) => ({ ...field, conflict: false })),
+};
+
+export const Accepting: Story = {
+	args: { proposal: readyProposal, pending: "accept" },
+	play: async () => {
+		await expect(screen.getByRole("button", { name: "Accepting selected fields…" })).toBeDisabled();
+		await expect(screen.getByRole("button", { name: "Decline this update" })).toBeDisabled();
+		for (const choice of screen.getAllByRole("radio")) {
+			await expect(choice).toHaveAttribute("aria-disabled", "true");
+		}
+	},
+};
+
+export const Declining: Story = {
+	args: { proposal: readyProposal, pending: "decline" },
+	play: async () => {
+		await expect(screen.getByRole("button", { name: "Declining update…" })).toBeDisabled();
+		await expect(screen.getByRole("button", { name: "Accept selected fields" })).toBeDisabled();
+		for (const choice of screen.getAllByRole("radio")) {
+			await expect(choice).toHaveAttribute("aria-disabled", "true");
+		}
+	},
 };
 
 export const NarrowComparison: Story = {

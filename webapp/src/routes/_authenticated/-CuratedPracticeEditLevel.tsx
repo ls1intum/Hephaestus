@@ -258,7 +258,10 @@ function LoadedCuratedPracticeEditor({
 			<PracticeReleaseReview
 				key={release.etag}
 				proposal={release}
-				pending={acceptRelease.isPending || declineRelease.isPending}
+				pending={
+					(acceptRelease.isPending ? "accept" : null) ??
+					(declineRelease.isPending ? "decline" : null)
+				}
 				onAccept={(choices) =>
 					acceptRelease.mutate({
 						path: { slug: practiceSlug },
