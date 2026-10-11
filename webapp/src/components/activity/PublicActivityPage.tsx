@@ -5,6 +5,7 @@ import type { ActivityCoverage, ActivityRepository } from "@/api/types.gen";
 import { FacetMultiSelect } from "@/components/common/FacetMultiSelect";
 import { FilterToolbar } from "@/components/common/FilterToolbar";
 import { InlineLink } from "@/components/common/InlineLink";
+import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { PageLayout } from "@/components/layout/PageLayout";
 import { Section } from "@/components/layout/Section";
@@ -43,8 +44,10 @@ export interface PublicActivityPageProps {
 	repositories: readonly Pick<ActivityRepository, "key">[];
 	coverage: ActivityCoverage | undefined;
 	people: PeopleTableState;
-	/** Another period is loading, and the page still shows the previous one. */
+	/** Activity is updating, and the page still shows its last successful figures. */
 	updating: boolean;
+	/** A failed repeat of this same range, while its last successful figures remain visible. */
+	refreshError?: { error: unknown; onRetry: () => void; pending: boolean };
 	/** The person levels the URL opens over the page, and how each closes. */
 	detail: { stack: ActivityStackEntry[]; onClose: (depth: number) => void };
 }
@@ -67,6 +70,7 @@ export function PublicActivityPage({
 	coverage,
 	people,
 	updating,
+	refreshError,
 	detail,
 }: PublicActivityPageProps) {
 	const terms = getProviderTerms(providerType);
@@ -116,6 +120,9 @@ export function PublicActivityPage({
 				</FilterToolbar>
 				<ActivityPeriodPicker period={period} onPeriodChange={onPeriodChange} updating={updating} />
 			</div>
+			{refreshError !== undefined && (
+				<QueryErrorAlert title="We could not refresh activity" {...refreshError} />
+			)}
 			<Section
 				size="lg"
 				title="Activity by person"

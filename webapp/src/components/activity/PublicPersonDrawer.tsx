@@ -215,7 +215,7 @@ function PersonFigures({
 		<>
 			{stale && (
 				<p className="text-sm text-muted-foreground">
-					These figures are for {spanLabel(span.from, span.to)} while the new range loads.
+					These figures are for {spanLabel(span.from, span.to)} while activity updates.
 				</p>
 			)}
 			{hasText(person.htmlUrl) && (
