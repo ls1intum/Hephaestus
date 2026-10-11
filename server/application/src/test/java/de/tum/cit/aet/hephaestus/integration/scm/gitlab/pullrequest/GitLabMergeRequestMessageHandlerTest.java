@@ -42,6 +42,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.springframework.transaction.TransactionStatus;
@@ -174,7 +175,11 @@ class GitLabMergeRequestMessageHandlerTest extends BaseUnitTest {
 
             handler.onMessage(mockMessage(event));
 
-            verify(mergeRequestProcessor).replaceClosingIssues(any(), eq(5), eq(List.of(41, 42)), any());
+            // The change is published under the delivery the read completes, never as a new occurrence.
+            var context = ArgumentCaptor.forClass(ProcessingContext.class);
+            verify(mergeRequestProcessor)
+                    .replaceClosingIssues(any(), eq(5), eq(List.of(41, 42)), any(), context.capture());
+            assertThat(context.getValue().isSync()).isFalse();
         }
 
         @Test
@@ -185,7 +190,7 @@ class GitLabMergeRequestMessageHandlerTest extends BaseUnitTest {
 
             handler.onMessage(mockMessage(event));
 
-            verify(mergeRequestProcessor, never()).replaceClosingIssues(any(), anyInt(), any(), any());
+            verify(mergeRequestProcessor, never()).replaceClosingIssues(any(), anyInt(), any(), any(), any());
         }
 
         @Test
@@ -274,7 +279,7 @@ class GitLabMergeRequestMessageHandlerTest extends BaseUnitTest {
             handler.onMessage(mockMessage(event));
 
             verify(mergeRequestProcessor, never()).applyReadiness(any(), anyInt(), any(), any(), any());
-            verify(mergeRequestProcessor, never()).replaceClosingIssues(any(), anyInt(), any(), any());
+            verify(mergeRequestProcessor, never()).replaceClosingIssues(any(), anyInt(), any(), any(), any());
         }
 
         @Test

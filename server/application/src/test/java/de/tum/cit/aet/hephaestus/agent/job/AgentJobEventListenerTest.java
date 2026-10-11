@@ -9,11 +9,13 @@ import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
+import de.tum.cit.aet.hephaestus.agent.context.providers.ReviewRepositoryPreparer;
 import de.tum.cit.aet.hephaestus.agent.handler.PullRequestReviewSubmissionRequest;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
@@ -56,6 +58,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
@@ -70,6 +73,9 @@ import org.mockito.Mock;
 import org.springframework.test.util.ReflectionTestUtils;
 
 class AgentJobEventListenerTest extends BaseUnitTest {
+
+    @Mock
+    private ReviewRepositoryPreparer repositoryPreparer;
 
     private static final RepositoryRef REPO_REF = new RepositoryRef(100L, "owner/repo", "main");
     private static final Long PR_ID = 456L;
@@ -98,7 +104,13 @@ class AgentJobEventListenerTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         listener = new AgentJobEventListener(
-                agentJobService, pullRequestRepository, reviewGate, workspaceResolver, signalRecorder, MANIFESTS);
+                agentJobService,
+                pullRequestRepository,
+                reviewGate,
+                workspaceResolver,
+                signalRecorder,
+                MANIFESTS,
+                repositoryPreparer);
 
         Workspace owningWorkspace = new Workspace();
         owningWorkspace.setId(WORKSPACE_ID);
@@ -550,6 +562,59 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             verify(pullRequestRepository, never()).findByIdWithAllForGate(any());
             verify(agentJobService, never()).submit(any(), any(), any(), any());
         }
+
+        /**
+         * Merged work has no edit review, but its head, text and closing issues are the linked-issue material:
+         * changing them is that occasion, live or as a sync discovered it. A label is not.
+         */
+        @Test
+        void shouldRecordAMergedRequestsLinkedOccasionOnlyForTheMaterialItReads() {
+            Issue closing = new Issue();
+            closing.setId(18L);
+            closing.setNumber(18);
+            closing.setTitle("Acceptance criteria");
+            closing.setState(Issue.State.CLOSED);
+            PullRequest merged = mockPullRequest("abc123", "feature", "main");
+            merged.setState(Issue.State.MERGED);
+            merged.setMerged(true);
+            Workspace owner = new Workspace();
+            owner.setId(WORKSPACE_ID);
+            when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(merged));
+            when(pullRequestRepository.findClosingIssuesById(PR_ID)).thenReturn(List.of(closing));
+            when(workspaceResolver.resolveAllForRepository(any())).thenReturn(List.of(owner));
+            when(repositoryPreparer.permittedRepositories(WORKSPACE_ID)).thenReturn(List.of(merged.getRepository()));
+            var prData = createPrData(Issue.State.MERGED, false, true);
+            var live = webhookContext(1L);
+
+            listener.onPullRequestUpdated(new ScmDomainEvent.PullRequestUpdated(prData, Set.of("relationships"), live));
+            verify(pullRequestRepository, never()).findByIdWithAllForGate(any());
+
+            listener.onPullRequestUpdated(new ScmDomainEvent.PullRequestUpdated(
+                    prData, Set.of("relationships", ScmSignals.CLOSING_ISSUES_FIELD), live));
+            listener.onPullRequestSynchronized(new ScmDomainEvent.PullRequestSynchronized(prData, live));
+            listener.onPullRequestUpdated(
+                    new ScmDomainEvent.PullRequestUpdated(prData, Set.of("headRefOid"), syncContext()));
+            EventContext sync = syncContext();
+            var rest = new EventContext(
+                    sync.eventId(),
+                    sync.occurredAt(),
+                    sync.scopeId(),
+                    sync.repository(),
+                    DataSource.REST_SYNC,
+                    sync.webhookAction(),
+                    sync.correlationId(),
+                    sync.providerType(),
+                    sync.actorUserId());
+            listener.onPullRequestUpdated(new ScmDomainEvent.PullRequestUpdated(prData, Set.of("body"), rest));
+
+            var keys = ArgumentCaptor.forClass(SignalKey.class);
+            verify(signalRecorder, times(2)).defer(keys.capture(), eq(live.occurredAt()), nullable(Long.class));
+            verify(signalRecorder, times(2)).record(keys.capture(), any(), eq(DiscoveredVia.SYNC));
+            assertThat(keys.getAllValues())
+                    .extracting(SignalKey::signalName)
+                    .containsOnly(ScmSignals.PULL_REQUEST_LINKED_ISSUE_UPDATED);
+            verifyNoInteractions(reviewGate, agentJobService);
+        }
     }
 
     @Nested
@@ -851,7 +916,13 @@ class AgentJobEventListenerTest extends BaseUnitTest {
                 // One resolver for both, as in production: the ledger key and the gate must agree on which
                 // workspace owns the repository.
                 var listener = new AgentJobEventListener(
-                        agentJobService, pullRequestRepository, realGate, workspaceResolver, signalRecorder, MANIFESTS);
+                        agentJobService,
+                        pullRequestRepository,
+                        realGate,
+                        workspaceResolver,
+                        signalRecorder,
+                        MANIFESTS,
+                        mock(ReviewRepositoryPreparer.class));
                 return new CollaborationFixture(
                         listener, userRoleChecker, practiceReviewReadiness, practiceRepository, workspaceResolver);
             }

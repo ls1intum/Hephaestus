@@ -675,10 +675,11 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
     class ProcessMethodCreate {
 
         @Test
-        void shouldStoreTheSyncOnlyFactsWhenTheWebhookAlreadyStoredTheSameUpdatedAt() {
+        void shouldAcceptClosingIssuesOnlyFromSyncWhenTheWebhookStoredTheSameUpdatedAt() {
             // The webhook wrote GitHub's updated_at first ...
             GitHubPullRequestDTO fromWebhook = createBasicPullRequestDto(FIXTURE_PR_ID, 26);
-            processor.process(fromWebhook, createContext());
+            processor.process(
+                    fromWebhook, ProcessingContext.forWebhook(testWorkspace.getId(), testRepository, "edited"));
             Issue closed = new Issue();
             closed.setNativeId(9_100L);
             closed.setNumber(3);
@@ -732,6 +733,14 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                     null // requestedTeams
                     );
 
+            processor.process(fromSync, ProcessingContext.forWebhook(testWorkspace.getId(), testRepository, "edited"));
+            PullRequest webhookStored = pullRequestRepository
+                    .findByRepositoryIdAndNumber(testRepository.getId(), 26)
+                    .orElseThrow();
+            assertThat(pullRequestRepository.findClosingIssuesById(webhookStored.getId()))
+                    .isEmpty();
+            eventListener.clear();
+
             PullRequest result = processor.process(fromSync, createContext());
 
             assertNotNull(result);
@@ -744,6 +753,10 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             assertThat(pullRequestRepository.findClosingIssuesById(stored.getId()))
                     .extracting(Issue::getId)
                     .containsExactly(closed.getId());
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestUpdated.class))
+                    .filteredOn(event -> event.changedFields().contains("closingIssues"))
+                    .singleElement()
+                    .satisfies(event -> assertThat(event.context().isSync()).isTrue());
         }
 
         @Test

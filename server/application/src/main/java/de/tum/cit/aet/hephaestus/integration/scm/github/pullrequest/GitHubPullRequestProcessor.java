@@ -15,6 +15,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.MilestoneRepos
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.Team;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.TeamRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
@@ -175,8 +176,18 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
                 boolean identityChanged = adoptCanonicalNativeId(existing, dbId, providerId);
                 boolean changed = !dto.updatedAt().isBefore(existing.getUpdatedAt())
                         && updateReviewRequests(dto, existing, providerId, context.observedAt());
-                changed |= applySyncOnlyFacts(dto, existing, repository);
-                return changed || identityChanged ? pullRequestRepository.save(existing) : existing;
+                changed |= applySyncOnlyFacts(dto, existing);
+                boolean closingIssuesChanged = replaceClosingIssues(dto, existing, repository, context);
+                PullRequest stored = changed || identityChanged || closingIssuesChanged
+                        ? pullRequestRepository.save(existing)
+                        : existing;
+                if (closingIssuesChanged) {
+                    eventPublisher.publishEvent(new ScmDomainEvent.PullRequestUpdated(
+                            ScmEventPayload.PullRequestData.from(stored),
+                            Set.of("relationships", ScmSignals.CLOSING_ISSUES_FIELD),
+                            EventContext.from(context)));
+                }
+                return stored;
             }
         }
 
@@ -240,8 +251,10 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         // stale row, or a comment stub inserted after the lookup above. This row is the one it locked.
         boolean identityChanged = adoptCanonicalNativeId(pr, dbId, providerId);
 
+        boolean closingIssuesChanged = replaceClosingIssues(dto, pr, repository, context);
         // Handle ManyToMany relationships (labels, assignees, requestedReviewers)
-        boolean relationshipsChanged = updateRelationships(dto, pr, repository, providerId, context.observedAt());
+        boolean relationshipsChanged =
+                updateRelationships(dto, pr, repository, providerId, context.observedAt()) || closingIssuesChanged;
 
         // Save identity and relationship changes; only relationships are a change of the work.
         if (identityChanged || relationshipsChanged) {
@@ -279,6 +292,9 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
                 if (relationshipsChanged) {
                     changedFields.add("relationships");
                 }
+                if (closingIssuesChanged) {
+                    changedFields.add(ScmSignals.CLOSING_ISSUES_FIELD);
+                }
                 eventPublisher.publishEvent(new ScmDomainEvent.PullRequestUpdated(
                         ScmEventPayload.PullRequestData.from(pr), changedFields, EventContext.from(context)));
                 log.debug("Updated pull request: prId={}, changedFields={}", pr.getId(), changedFields);
@@ -315,7 +331,7 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         boolean labelsChanged =
                 updateLabels(Objects.requireNonNullElse(dto.labels(), List.of()), pr.getLabels(), repository);
         boolean reviewRequestsChanged = updateReviewRequests(dto, pr, providerId, observedAt);
-        return assigneesChanged || labelsChanged || reviewRequestsChanged || applySyncOnlyFacts(dto, pr, repository);
+        return assigneesChanged || labelsChanged || reviewRequestsChanged || applySyncOnlyFacts(dto, pr);
     }
 
     /** The people and teams the payload asks for a review, received at {@code observedAt}. */
@@ -335,15 +351,14 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
     }
 
     /**
-     * The facts only the GraphQL sync reads — the closing references, the head's check rollup, the
-     * review decision and the merge state. A webhook payload carries none of them (null) and leaves
-     * the record as it is; a sync row carries them whether or not the core row moved.
+     * The other facts only the GraphQL sync reads — the head's check rollup, the review decision and the
+     * merge state. A webhook payload carries none of them (null) and leaves the record as it is; a sync
+     * row carries them whether or not the core row moved.
      *
      * @return whether anything changed
      */
-    private boolean applySyncOnlyFacts(GitHubPullRequestDTO dto, PullRequest pr, Repository repository) {
-        boolean changed = dto.closingIssueNumbers() != null
-                && pr.replaceClosingIssues(resolveLocalIssues(repository, dto.closingIssueNumbers()));
+    private boolean applySyncOnlyFacts(GitHubPullRequestDTO dto, PullRequest pr) {
+        boolean changed = false;
         if (dto.headChecks() != null) {
             changed |= pr.observeHeadChecks(
                     dto.headChecks().sha(), dto.headChecks().state(), true);
@@ -361,6 +376,14 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
             changed = true;
         }
         return changed;
+    }
+
+    /** Only the GraphQL sync reads what a pull request closes; a webhook payload carries none and keeps the record. */
+    private boolean replaceClosingIssues(
+            GitHubPullRequestDTO dto, PullRequest pr, Repository repository, ProcessingContext context) {
+        return context.isSync()
+                && dto.closingIssueNumbers() != null
+                && pr.replaceClosingIssues(resolveLocalIssues(repository, dto.closingIssueNumbers()));
     }
 
     private Set<Issue> resolveLocalIssues(Repository repository, List<Integer> numbers) {

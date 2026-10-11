@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.job;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.agent.context.providers.ReviewRepositoryPreparer;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
@@ -36,6 +37,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.support.TransactionTemplate;
 
 class BotPracticeReviewIntegrationTest extends AbstractWorkspaceIntegrationTest {
+
+    @Autowired
+    private ReviewRepositoryPreparer repositoryPreparer;
+
     @Autowired
     private RepositoryRepository repositories;
 
@@ -130,7 +135,8 @@ class BotPracticeReviewIntegrationTest extends AbstractWorkspaceIntegrationTest 
         review = reviews.saveAndFlush(review);
         var payload = ScmEventPayload.ReviewData.from(review).orElseThrow();
         assertThat(payload.humanAuthor()).isFalse();
-        var listener = new AgentJobEventListener(jobs, pullRequests, gate, resolver, recorder, manifests);
+        var listener =
+                new AgentJobEventListener(jobs, pullRequests, gate, resolver, recorder, manifests, repositoryPreparer);
         var context = new EventContext(
                 UUID.randomUUID(),
                 Instant.now(),

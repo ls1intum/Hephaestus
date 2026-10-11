@@ -30,6 +30,7 @@ import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
 import de.tum.cit.aet.hephaestus.agent.context.providers.LinkedWorkItemContentSource;
 import de.tum.cit.aet.hephaestus.agent.context.providers.PullRequestContentSource;
 import de.tum.cit.aet.hephaestus.agent.context.providers.RepositoryTreeContentSource;
+import de.tum.cit.aet.hephaestus.agent.context.providers.ReviewRepositoryPreparer;
 import de.tum.cit.aet.hephaestus.agent.handler.AnsweredPractices;
 import de.tum.cit.aet.hephaestus.agent.handler.CitationVerification;
 import de.tum.cit.aet.hephaestus.agent.handler.EvidenceSnapshotFixtures;
@@ -68,6 +69,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.core.framework.IntegrationManifestRegistry;
@@ -86,6 +88,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ActorRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.DataSource;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
@@ -96,6 +99,11 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRep
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.IssueEvidenceRevision;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.github.issue.GitHubIssueProcessor;
+import de.tum.cit.aet.hephaestus.integration.scm.github.issue.dto.GitHubIssueDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.issue.GitLabIssueProcessor;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.issue.dto.GitLabIssueEventDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequest.GitLabMergeRequestProcessor;
 import de.tum.cit.aet.hephaestus.practices.AbstractPracticeReviewIntegrationTest;
 import de.tum.cit.aet.hephaestus.practices.EvidenceStance;
 import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceRequirement;
@@ -118,6 +126,7 @@ import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewGate;
 import de.tum.cit.aet.hephaestus.practices.review.TriggerMode;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewedWorkChanges;
+import de.tum.cit.aet.hephaestus.testconfig.RecordingScmEventListener;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
@@ -169,6 +178,9 @@ import tools.jackson.databind.node.ObjectNode;
  */
 @MockitoSpyBean(types = {PullRequestReviewHandler.class, InAppSupportReader.class, JobEvidenceFiles.class})
 class PullRequestRepairRecheckIntegrationTest extends AbstractPracticeReviewIntegrationTest {
+
+    @Autowired
+    private ReviewRepositoryPreparer repositoryPreparer;
 
     private static final String REPO = "org/repair-repo";
     private static final String HEAD = "1".repeat(40);
@@ -283,6 +295,18 @@ class PullRequestRepairRecheckIntegrationTest extends AbstractPracticeReviewInte
     @Autowired
     private JsonMapper jsonMapper;
 
+    @Autowired
+    private GitHubIssueProcessor githubIssues;
+
+    @Autowired
+    private GitLabIssueProcessor gitlabIssues;
+
+    @Autowired
+    private RecordingScmEventListener providerEvents;
+
+    @Autowired
+    private GitLabMergeRequestProcessor gitlabMergeRequests;
+
     private Workspace workspace;
     private User developer;
     private Repository repository;
@@ -310,7 +334,13 @@ class PullRequestRepairRecheckIntegrationTest extends AbstractPracticeReviewInte
         repository = repositoryRepository.save(repository);
 
         listener = new AgentJobEventListener(
-                agentJobService, pullRequestRepository, gate, workspaceResolver, recorder, manifests);
+                agentJobService,
+                pullRequestRepository,
+                gate,
+                workspaceResolver,
+                recorder,
+                manifests,
+                repositoryPreparer);
         resubmitter = new PullRequestSignalResubmitter(
                 agentJobService, pullRequestRepository, gate, recorder, reviewRepository, manifests);
         coalescer = new PullRequestPushCoalescer(
@@ -543,15 +573,24 @@ class PullRequestRepairRecheckIntegrationTest extends AbstractPracticeReviewInte
                 workspaceResolver,
                 recorder,
                 issueEvidenceRevision,
-                transactionManager);
-        for (String body : List.of("- [x] Confirm repair", "- [x] Confirm repair", "- [x] Confirm repair and test")) {
+                transactionManager,
+                repositoryPreparer);
+        for (String body : List.of(
+                "- [x] Confirm repair with a check",
+                "- [x] Confirm repair with a check",
+                "- [x] Confirm repair and test")) {
             transactions.executeWithoutResult(status -> {
                 Issue current = issueRepository.findById(linkedIssueId).orElseThrow();
-                current.setBody(body);
-                issueRepository.saveAndFlush(current);
-                var event = new ScmDomainEvent.IssueUpdated(
-                        ScmEventPayload.IssueData.from(current), Set.of("body"), liveContext());
-                issueListener.onIssueUpdated(event);
+                providerEvents.clear();
+                processLinkedIssue(
+                        gitLab,
+                        current,
+                        body,
+                        "update",
+                        ProcessingContext.forWebhook(workspace.getId(), repository, "update"));
+                providerEvents.ofType(ScmDomainEvent.IssueUpdated.class).stream()
+                        .filter(event -> event.issue().id() == linkedIssueId)
+                        .forEach(issueListener::onIssueUpdated);
             });
         }
         assertThat(signalsOf(pr, ScmSignals.PULL_REQUEST_LINKED_ISSUE_UPDATED)).hasSize(2);
@@ -1367,6 +1406,241 @@ class PullRequestRepairRecheckIntegrationTest extends AbstractPracticeReviewInte
 
     @Autowired
     private ReviewMemberAiPolicy memberAiPolicy;
+
+    /**
+     * The linked material is the merged request's head, text and closing issues, and each issue's text, dates and
+     * state, open or closed. A live change of any of them is one deferred occasion per material key; a redelivery
+     * or a label leaves the key where it was, and a sync records what it found without deferring work.
+     */
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void shouldRecordOneLinkedOccasionPerMaterialChangeOfAMergedRequestAndItsIssue(boolean gitLab) {
+        provider(gitLab);
+        bindScmConnection(workspace, gitLab);
+        monitors.saveAndFlush(WorkspaceTestFixtures.repositoryMonitor(workspace, REPO));
+        Workspace foreign = workspaceRepository.saveAndFlush(
+                WorkspaceTestFixtures.activeWorkspace("foreign-linked-" + UUID.randomUUID()));
+        monitors.saveAndFlush(WorkspaceTestFixtures.repositoryMonitor(foreign, REPO));
+        bindScmConnection(foreign, !gitLab);
+        Repository alias = new Repository();
+        alias.setNativeId(repository.getNativeId());
+        alias.setProvider(gitLab ? ensureGitHubProvider() : ensureGitLabProvider());
+        alias.setName(repository.getName());
+        alias.setNameWithOwner(REPO);
+        alias.setDefaultBranch("main");
+        repositoryRepository.saveAndFlush(alias);
+        PullRequest pr = pullRequest(false, HEAD, "Closes #18");
+        Issue issue = new Issue();
+        issue.setNativeId(7202L);
+        issue.setProvider(repository.getProvider());
+        issue.setRepository(repository);
+        issue.setNumber(18);
+        issue.setState(Issue.State.OPEN);
+        issue.setTitle("Acceptance criteria");
+        issue.setBody("- [ ] Confirm repair");
+        issue.setCreatedAt(NOW.minus(Duration.ofDays(2)));
+        long issueId = issueRepository.saveAndFlush(issue).getId();
+        transactions.executeWithoutResult(status -> {
+            PullRequest managed = pullRequestRepository.findById(pr.getId()).orElseThrow();
+            managed.setState(Issue.State.MERGED);
+            managed.setMerged(true);
+            managed.setMergedAt(NOW);
+            managed.replaceClosingIssues(Set.of(issueRepository.getReferenceById(issueId)));
+            pullRequestRepository.saveAndFlush(managed);
+        });
+        var issueListener = new IssueAgentJobEventListener(
+                agentJobService,
+                issueRepository,
+                pullRequestRepository,
+                gate,
+                workspaceResolver,
+                recorder,
+                issueEvidenceRevision,
+                transactionManager,
+                repositoryPreparer);
+        Runnable closeIt = () -> transactions.executeWithoutResult(status -> {
+            Issue current = issueRepository.findById(issueId).orElseThrow();
+            providerEvents.clear();
+            processLinkedIssue(
+                    gitLab,
+                    current,
+                    Objects.requireNonNull(current.getBody()),
+                    "close",
+                    ProcessingContext.forWebhook(workspace.getId(), repository, "close"));
+            providerEvents.ofType(ScmDomainEvent.IssueClosed.class).stream()
+                    .filter(event -> event.issue().id() == issueId)
+                    .forEach(issueListener::onIssueClosedLinkedMaterial);
+        });
+
+        closeIt.run();
+        closeIt.run(); // the same delivery again
+        transactions.executeWithoutResult(status -> issueListener.onIssueUpdated(new ScmDomainEvent.IssueUpdated(
+                ScmEventPayload.IssueData.from(issueRepository.findById(issueId).orElseThrow()),
+                Set.of("relationships"),
+                liveContext())));
+        assertThat(signalsOf(pr, ScmSignals.PULL_REQUEST_LINKED_ISSUE_UPDATED))
+                .singleElement()
+                .satisfies(row -> assertThat(row.getState()).isEqualTo(SignalState.DEFERRED));
+
+        transactions.executeWithoutResult(status -> {
+            Issue current = issueRepository.findById(issueId).orElseThrow();
+            providerEvents.clear();
+            processLinkedIssue(
+                    gitLab,
+                    current,
+                    Objects.requireNonNull(current.getBody()),
+                    "reopen",
+                    ProcessingContext.forWebhook(workspace.getId(), repository, "reopen"));
+            providerEvents.ofType(ScmDomainEvent.IssueReopened.class).stream()
+                    .filter(event -> event.issue().id() == issueId)
+                    .forEach(issueListener::onIssueReopened);
+        });
+        assertThat(signalsOf(pr, ScmSignals.PULL_REQUEST_LINKED_ISSUE_UPDATED))
+                .hasSize(2)
+                .allSatisfy(row -> assertThat(row.getState()).isEqualTo(SignalState.DEFERRED));
+
+        // A sync that finds an opening date refined records the new material as found, and defers nothing.
+        transactions.executeWithoutResult(status -> {
+            Issue current = issueRepository.findById(issueId).orElseThrow();
+            current.setCreatedAt(NOW.minus(Duration.ofDays(3)));
+            issueRepository.saveAndFlush(current);
+            issueListener.onIssueUpdated(new ScmDomainEvent.IssueUpdated(
+                    ScmEventPayload.IssueData.from(current),
+                    Set.of("createdAt"),
+                    EventContext.forSync(workspace.getId(), new RepositoryRef(repository.getId(), REPO, "main"))));
+        });
+        assertThat(signalsOf(pr, ScmSignals.PULL_REQUEST_LINKED_ISSUE_UPDATED))
+                .hasSize(3)
+                .filteredOn(row -> row.getState() != SignalState.DEFERRED)
+                .singleElement()
+                .satisfies(row -> assertThat(row.getDiscoveredVia()).isEqualTo(DiscoveredVia.SYNC));
+
+        // On the merged request itself: a label moves nothing, a further closing issue does.
+        PullRequest merged = reload();
+        transactions.executeWithoutResult(status -> listener.onPullRequestUpdated(new ScmDomainEvent.PullRequestUpdated(
+                ScmEventPayload.PullRequestData.from(merged), Set.of("relationships"), liveContext())));
+        assertThat(signalsOf(pr, ScmSignals.PULL_REQUEST_LINKED_ISSUE_UPDATED)).hasSize(3);
+        Issue second = new Issue();
+        second.setNativeId(7203L);
+        second.setProvider(repository.getProvider());
+        second.setRepository(repository);
+        second.setNumber(19);
+        second.setState(Issue.State.OPEN);
+        second.setTitle("Follow-up criteria");
+        second.setBody("- [ ] Document the outcome");
+        long secondId = issueRepository.saveAndFlush(second).getId();
+        transactions.executeWithoutResult(status -> {
+            PullRequest managed = pullRequestRepository.findById(pr.getId()).orElseThrow();
+            if (gitLab) {
+                providerEvents.clear();
+                var version =
+                        new GitLabMergeRequestProcessor.StoredVersion(managed.getHeadRefOid(), managed.getUpdatedAt());
+                var context = ProcessingContext.forWebhook(workspace.getId(), repository, "update");
+                gitlabMergeRequests.replaceClosingIssues(
+                        repository, managed.getNumber(), List.of(18, 19), version, context);
+                providerEvents.ofType(ScmDomainEvent.PullRequestUpdated.class).stream()
+                        .filter(event -> event.pullRequest().id().equals(pr.getId()))
+                        .forEach(listener::onPullRequestUpdated);
+                var stale = new GitLabMergeRequestProcessor.StoredVersion("different-head", managed.getUpdatedAt());
+                gitlabMergeRequests.replaceClosingIssues(repository, managed.getNumber(), List.of(18), stale, context);
+                assertThat(pullRequestRepository.findClosingIssuesById(pr.getId()))
+                        .extracting(Issue::getId)
+                        .containsExactlyInAnyOrder(issueId, secondId);
+            } else {
+                managed.replaceClosingIssues(
+                        Set.of(issueRepository.getReferenceById(issueId), issueRepository.getReferenceById(secondId)));
+                pullRequestRepository.saveAndFlush(managed);
+                listener.onPullRequestUpdated(new ScmDomainEvent.PullRequestUpdated(
+                        ScmEventPayload.PullRequestData.from(managed),
+                        Set.of("relationships", ScmSignals.CLOSING_ISSUES_FIELD),
+                        EventContext.forSync(
+                                workspace.getId(), Objects.requireNonNull(RepositoryRef.from(repository)))));
+            }
+        });
+        assertThat(signalsOf(pr, ScmSignals.PULL_REQUEST_LINKED_ISSUE_UPDATED)).hasSize(4);
+        assertThat(signals.findForArtifact(foreign.getId(), ScmSignals.PULL_REQUEST.value(), pr.getId()))
+                .isEmpty();
+        assertThat(jobsOf(foreign)).isEmpty();
+        assertThat(signalsOf(pr, ScmSignals.PULL_REQUEST_EDITED)).isEmpty();
+        assertThat(jobsOf(workspace)).isEmpty();
+    }
+
+    private void bindScmConnection(Workspace owner, boolean gitLab) {
+        Connection connection = new Connection(
+                owner,
+                gitLab ? IntegrationKind.GITLAB : IntegrationKind.GITHUB,
+                "linked-scm",
+                gitLab
+                        ? new ConnectionConfig.GitLabConfig(
+                                "https://gitlab.com",
+                                null,
+                                null,
+                                ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
+                                Set.of(),
+                                null)
+                        : new ConnectionConfig.GitHubAppConfig(1732L, "org", null, Set.of()));
+        connection.setState(IntegrationState.ACTIVE);
+        connections.saveAndFlush(connection);
+    }
+
+    private void processLinkedIssue(
+            boolean gitLab, Issue issue, String body, String action, ProcessingContext context) {
+        boolean closed = !action.equals("reopen");
+        if (gitLab) {
+            var attrs = new GitLabIssueEventDTO.ObjectAttributes(
+                    issue.getNativeId(),
+                    issue.getNumber(),
+                    issue.getTitle(),
+                    body,
+                    closed ? "closed" : "opened",
+                    action,
+                    false,
+                    null,
+                    null,
+                    null,
+                    Objects.requireNonNull(issue.getCreatedAt()).toString(),
+                    Instant.now().toString(),
+                    closed ? NOW.toString() : null,
+                    null,
+                    null,
+                    "https://gitlab.com/" + REPO + "/-/issues/" + issue.getNumber());
+            var changes = action.equals("update")
+                    ? new GitLabIssueEventDTO.Changes(
+                            null, null, new GitLabIssueEventDTO.AttributeChange(), null, null, null)
+                    : null;
+            var event = new GitLabIssueEventDTO("issue", "issue", null, null, attrs, List.of(), List.of(), changes);
+            if (action.equals("close")) gitlabIssues.processClosed(event, context);
+            else if (action.equals("reopen")) gitlabIssues.processReopened(event, context);
+            else gitlabIssues.processUpdated(event, context);
+        } else {
+            var dto = new GitHubIssueDTO(
+                    issue.getNativeId(),
+                    null,
+                    null,
+                    issue.getNumber(),
+                    issue.getTitle(),
+                    body,
+                    closed ? "closed" : "open",
+                    closed ? "completed" : null,
+                    "https://github.com/" + REPO + "/issues/" + issue.getNumber(),
+                    0,
+                    issue.getCreatedAt(),
+                    Instant.now(),
+                    closed ? NOW : null,
+                    false,
+                    null,
+                    List.of(),
+                    List.of(),
+                    null,
+                    null,
+                    null,
+                    null,
+                    null);
+            if (action.equals("close")) githubIssues.processClosed(dto, context);
+            else if (action.equals("reopen")) githubIssues.processReopened(dto, context);
+            else githubIssues.process(dto, context);
+        }
+    }
 
     private void provider(boolean gitLab) {
         if (!gitLab) return;
