@@ -86,6 +86,7 @@ The proxy chooses one ACME challenge through these optional variables:
 | `ACME_CHALLENGE_VALUE` | `http` | Your lego DNS provider, such as `cloudflare` |
 | `TRAEFIK_DNS_CREDENTIALS_DIRECTORY` | `/etc/hephaestus/dns` | Absolute path to the proxy-only credential directory |
 | `TRAEFIK_DNS_CREDENTIAL_VARIABLE` | `CF_DNS_API_TOKEN_FILE` | Your provider's credential variable with the `_FILE` suffix |
+| `LEGO_EXPERIMENTAL_DNS_TCP_ONLY` | `false` | Set `true` only when DNS queries need TCP transport |
 
 For Cloudflare, create the credential directory with mode `0700`.
 Put only the raw zone-scoped token in its `token` file, with mode `0600`.
@@ -107,6 +108,14 @@ Each value must point to its file under `/run/secrets/dns`.
 See [lego credential files](https://go-acme.github.io/lego/dns/#configuration-and-credentials).
 Do not disable DNS propagation checks.
 Allow the proxy to reach the provider API and public DNS servers.
+
+If authoritative DNS queries time out over UDP while TCP works, set
+`LEGO_EXPERIMENTAL_DNS_TCP_ONLY=true` in the proxy settings and recreate the proxy.
+This uses [lego's TCP transport](https://github.com/go-acme/lego/blob/v5.5.2/challenge/internal/client.go)
+for DNS queries, including propagation checks.
+It leaves the existing propagation-check settings unchanged.
+The default is `false`.
+Set it back to `false` and recreate the proxy to restore the default transport.
 
 Set these non-secret values alongside `APP_HOSTNAME`:
 
