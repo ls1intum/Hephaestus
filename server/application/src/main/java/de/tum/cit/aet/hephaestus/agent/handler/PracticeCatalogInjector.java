@@ -20,6 +20,7 @@ import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvide
 import de.tum.cit.aet.hephaestus.practices.review.autonomy.AutonomyResolver;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -37,7 +38,8 @@ import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Injects the practice registry, criteria, and practice scripts into a job's workspace under
- * {@code inputs/practices/} and {@code work/practice-scripts/}. Shared by every {@link de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler}
+ * {@code inputs/practices/} and {@code work/practice-scripts/}, each script beside what it reads about its review
+ * ({@link PracticeScriptInputs}). Shared by every {@link de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler}
  * regardless of artifact — the catalog is per-job (workspace-active practices), not provider-shaped,
  * so it does not live behind the {@code ContentSource} SPI.
  *
@@ -63,14 +65,17 @@ class PracticeCatalogInjector {
     private final JsonMapper objectMapper;
     private final PracticeRepository practiceRepository;
     private final WorkspaceReviewDefaultsProvider workspaceDefaults;
+    private final PracticeScriptInputs practiceScriptInputs;
 
     PracticeCatalogInjector(
             JsonMapper objectMapper,
             PracticeRepository practiceRepository,
-            WorkspaceReviewDefaultsProvider workspaceDefaults) {
+            WorkspaceReviewDefaultsProvider workspaceDefaults,
+            PracticeScriptInputs practiceScriptInputs) {
         this.objectMapper = objectMapper;
         this.practiceRepository = practiceRepository;
         this.workspaceDefaults = workspaceDefaults;
+        this.practiceScriptInputs = practiceScriptInputs;
     }
 
     private static JsonNode admittedPractices(AgentJob job) {
@@ -157,7 +162,7 @@ class PracticeCatalogInjector {
         return practices;
     }
 
-    private static Map<String, String> reviewStateOf(AgentJob job) {
+    static Map<String, String> reviewStateOf(AgentJob job) {
         JsonNode metadata = job.getMetadata();
         JsonNode state = metadata == null ? null : metadata.get(REVIEW_STATE_METADATA_KEY);
         if (state == null) return Map.of();
@@ -275,16 +280,18 @@ class PracticeCatalogInjector {
 
         files.put(SandboxLayout.ANALYSIS_PRACTICES_PREFIX + ".gitkeep", new byte[0]);
 
-        int practiceScriptCount = 0;
+        List<Practice> withScript = new ArrayList<>();
         for (Practice p : practices) {
             String script = p.getPracticeScript();
             if (script != null && !script.isBlank()) {
                 files.put(
                         SandboxLayout.PRACTICE_SCRIPT_PREFIX + "practices/" + p.getSlug() + ".ts",
                         script.getBytes(StandardCharsets.UTF_8));
-                practiceScriptCount++;
+                withScript.add(p);
             }
         }
+        files.putAll(practiceScriptInputs.stage(job, focus, withScript));
+        int practiceScriptCount = withScript.size();
 
         log.info(
                 "Injected practice catalog: {} {} practices ({} with a practice script), workspaceId={}, jobId={}",
@@ -313,7 +320,7 @@ class PracticeCatalogInjector {
     }
 
     /** The practices admission rechecked beside the signal's own, which the signal alone would not select. */
-    private static Set<String> recheckedOf(AgentJob job) {
+    static Set<String> recheckedOf(AgentJob job) {
         JsonNode rechecked =
                 job.getMetadata() == null ? null : job.getMetadata().get(AgentJob.RECHECKED_PRACTICES_METADATA_KEY);
         if (rechecked == null || !rechecked.isArray()) {

@@ -65,20 +65,84 @@ The [workspace ABI](./agent/workspace-abi.mdx#practice-script-validation-and-lim
 
 A definition script runs in these steps:
 
-1. The child imports the script and sends `meta` to the runner.
-2. The runner validates `meta` with the zod schema in `lib/contract.ts`.
-3. The runner decides which declared slots are available.
-4. If a `required` slot is not available, the runner stops the child.
-5. Otherwise, the runner replies with the available slots and the token limit of the practice.
-6. The child calls `run` with the context, and sends the result.
-7. The runner validates the result with zod, settles the leads, and writes the section and the result.
+1. Before the child starts, the runner reads and validates the script's inputs.
+   [What a script reads about its review](#what-a-script-reads-about-its-review) tells how.
+2. The child imports the script and sends `meta` to the runner.
+3. The runner validates `meta` with the zod schema in `lib/contract.ts`.
+4. If the inputs of step 1 are not valid, the runner stops the child with the status `error`.
+5. The runner decides which declared slots are available.
+6. If a `required` slot is not available, the runner stops the child.
+7. Otherwise, the runner replies with the available slots and the token limit of the practice.
+8. The child builds the context from the inputs, calls `run`, and sends the result.
+9. The runner validates the result with zod and settles the leads.
+   It marks the new leads, and writes the section and the result.
 
-[Write a practice script](/admin/practice-scripts#meta) gives the status of a script that step 2 or step 4 stops.
+[Write a practice script](/admin/practice-scripts#meta) gives the status of a script that step 3, 4 or 6 stops.
+A positional script does not read the inputs, so step 4 does not stop it.
 
 A slot is available when `practice-script-models.json` has a model for it and that model's protocol serves the slot.
 `lib/contract.ts` holds the slots, the protocols, the reasons, the entry limits of one call, and the run statuses.
 `PracticeScriptContractSyncTest` keeps the slots, protocols, reasons and statuses equal to the Java side.
 `PracticeScriptCapsSyncTest` keeps `MODEL_SLOT_CAPS` equal to the entry limits of `LlmProxyService`.
+
+### What a script reads about its review
+
+The context of a definition script has a `kind`, a `work`, a `cause` and a `previous`.
+[The context](/admin/practice-scripts#the-context) gives their fields.
+The server stages them, and the runner validates them once, before the script starts:
+
+1. For each practice with a script, `PracticeCatalogInjector` writes `<slug>.ts` to `work/practice-scripts/practices/`.
+   Beside it, `PracticeScriptInputs` writes `<slug>.cause.json` and `<slug>.previous.json`.
+   Only the worker prepares a review, so only the worker writes them.
+   `PracticeScriptInputs` is no bean of its own.
+2. `pi-practice-scripts.ts` copies the three files of each practice to the stage.
+3. The runner reads the two files beside the script.
+   It reads the record of the work from the context folder.
+   The record is `metadata.json` for a pull request or an issue.
+   It is `conversation_thread.json` for a conversation, and `document.json` for a document.
+4. The runner validates the three with `practiceInputsSchema` in `lib/contract.ts`.
+   An error names the file that holds it.
+   An error fails the practice with the status `error`, as the other errors of a script do.
+
+The cause file holds `kind`, `subject.role` and `cause`.
+The practice's moments and review conditions are its review occasion.
+The cause tells which of them brought the practice into this review, or that a recheck or a request by hand did.
+The server derives `cause.type` from the job:
+
+| `type` | When |
+| --- | --- |
+| `requested` | The job's trigger mode is `MANUAL`: a request by hand or a campaign over earlier work. Such a job has no `signal` in the file. |
+| `recheck` | The slug is in the job's `rechecked_practices`, and the practice is not bound to the job's signal under its `review_state`. |
+| `moment` | Every other practice. On `scm.pull_request.reviewed`, the file also has `review`: the job's `review_id` and the login of its `about_user_id`. |
+
+`origin` is the job's `observation_origin`, `state` its `review_state`, and `admittedAt` its creation time.
+
+The previous file holds `null`, or the current claim of the practice about the review's person on the same work.
+The server reads it as the review reads history:
+`LatestRun.perClaim` over `ObservationRepository.findStandingForWork`, then `ObservationVisibilityPolicy.permitsAll`, then the consent of a conversation's channel.
+Thus, the server does not stage a claim that an admin invalidated, a stale claim, or a claim whose evidence is no longer authorized.
+An older claim does not take their place.
+
+The file holds the outcome, the severity and the citations.
+It holds no summary, no rationale and no delivery state.
+For a pull request, it holds the `head` of the earlier run's `reviewedWork`.
+
+`KINDS`, `MOMENTS` and `REVIEW_STATES` in `lib/contract.ts` repeat the artifact descriptors, which stay their home.
+`PracticeScriptContractSyncTest` keeps them equal, with the origins, outcomes, severities, subject roles and file suffixes.
+
+#### The change since the previous review
+
+When `previous.head` is set, the runner asks git if it is an ancestor of the reviewed head, `work.commit_sha`.
+If it is, the runner gives the script `previous.changeSince`: the parsed diff from `previous.head` to the reviewed head.
+If it is not, as after a force push, `changeSince` is absent, and the runner logs why.
+An empty `changeSince` means that the work did not change.
+The runner starts git, because a script's process has no child-process grant.
+It computes each change once and shares it between the practices with the same `head`.
+
+After the runner settles the leads, it marks each lead that cites a new-side line of the change that `changeSince` adds.
+The result counts them in `newSinceLastReview`.
+The section says how many leads are new, and marks each with `(new)`.
+The practice script report to the server does not carry the count.
 
 ### Model calls through IPC
 
@@ -120,7 +184,8 @@ A definition script's result has these fields:
 | `contract` | `definition`. |
 | `status` | `ok`, `skipped`, `error`, or `timeout`. `timeout` means that the runner stopped the script at its deadline, or that the stage ended before the script started. |
 | `durationMs` | The time from the start of the script to its result. |
-| `leads`, `facts`, `unrated`, `directions`, `kinds` | What the script returned, after the runner settled the leads. Each lead carries the quote that the runner wrote and its rating score. |
+| `leads`, `facts`, `unrated`, `directions`, `kinds` | What the script returned, after the runner settled the leads. Each lead carries the quote that the runner wrote and its rating score. A lead on a line added since the previous review has `newSinceLastReview: true`. |
+| `newSinceLastReview` | How many leads cite a line added since the previous review. Absent when the change since that review is not known. |
 | `dropped` | The leads that the runner did not show. |
 | `models` | Slot → `{ need, bound, notRated }`. `bound` tells if the job has a model for the slot. `notRated` counts the calls that the runner could not rate, by reason. |
 | `error` | For `error` and `timeout`, why the script failed or was stopped. The report `practice-scripts.json` keeps its first line for `error` only, as the [workspace ABI](./agent/workspace-abi.mdx#practice-script-report) tells. |
@@ -230,8 +295,11 @@ Before each call, it checks only that the model fits the developer's own AI choi
 | `PracticeScriptIntegrationTest` | The stored runs and the first line of a failed script's error, also when it holds a NUL. The runs of one review, with the calls that the proxy counted and the tiers of the attempt shown. The needs endpoint. Both endpoints with their access rules. The check that the proxy asks for each call allows a model for practice scripts only within the developer's own AI choice. |
 | `ReviewMemberAiPolicyTest` | The review's models for practice scripts come from the routing adapter for the reviewed developer. A Cloud member whose review runs on an In-house model gets no Cloud decision model. |
 | `LlmUsageByPracticeIntegrationTest` | The cost split by practice adds up to the usage rows. |
-| `docker/agents/practice-scripts/validate.test.ts` | `validate.ts` runs a definition script and a positional script. It skips a script without its required model and exits with 1 for a failed script. It stops with exit code 2 on a bad file name, a missing argument, or an input that it cannot use. |
-| `PracticeScriptContractSyncTest` | The slots, protocols, reasons, run statuses, practice header and slug pattern are the same in `lib/contract.ts` and in Java. |
+| `docker/agents/practice-scripts/validate.test.ts` | `validate.ts` runs a definition script and a positional script. It runs a script as a request by hand, or at the moment and with the previous result of its options. It skips a script without its required model and exits with 1 for a failed script. It stops with exit code 2 on a bad file name, a missing argument, or an input that it cannot use. |
+| `PracticeScriptContractSyncTest` | The slots, protocols, reasons, run statuses, practice header and slug pattern are the same in `lib/contract.ts` and in Java. So are the kinds, moments and review states of the artifact descriptors. So are the origins, outcomes, severities, subject roles, and the suffixes of the staged inputs. |
+| `PracticeScriptInputsTest` | The server stages the cause type for a bound moment, a recheck and a request by hand. It stages the review of a reviewer moment, and the current claim without model text. It stages no claim that is invalidated, not authorized, or from a conversation without consent. |
+| `docker/agents/practice-scripts/cause.test.ts` | The runner gives the context of a pull request and of an issue. It fails a script on inputs that do not parse and on a wrong `expectKind`. It marks new leads, marks none after a force push, and runs the example of the admin page. |
+| `docker/agents/practice-scripts/lib/script-inputs.test.ts` | The schema of the inputs of each kind, the error that names its file, `expectKind`, and `changeSince` for an ancestor, a force push and a missing commit. |
 | `PracticeScriptCapsSyncTest` | `MODEL_SLOT_CAPS` in `lib/contract.ts` equals the entry limits of one call from a practice script in `LlmProxyService`. |
 | `MemberAiRoutingAdapterTest` | The data-class rule of [Privacy](/admin/ai-providers#privacy) for the job's slots and the needs endpoint. |
 
@@ -249,6 +317,7 @@ To test a new definition script:
 
 1. Put a fixture next to the others in `docker/agents/practice-scripts/fixtures/`.
 2. Add a case to `definition.test.ts` that runs the fixture with no models.
+   `stagePracticeScripts` stages a requested pull request review beside the fixture, and the test stages `fixtures/pull-request-metadata.json` as its record.
 3. Assert the leads that code finds and the `unrated` lines.
 4. Add a case for each slot with a stand-in handler that answers by item.
 5. Assert the leads, the quotes, and the `models` report in `<slug>.json`.

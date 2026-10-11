@@ -164,7 +164,10 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         resultParser = new ReviewResultParser(objectMapper);
         taskEnvelopeWriter = new TaskEnvelopeWriter(objectMapper);
         var practiceCatalogInjector = new PracticeCatalogInjector(
-                objectMapper, practiceRepository, InContextDeliveryGateFixtures.workspaceDefaults());
+                objectMapper,
+                practiceRepository,
+                InContextDeliveryGateFixtures.workspaceDefaults(),
+                mock(PracticeScriptInputs.class));
         handler = new PullRequestReviewHandler(
                 objectMapper,
                 new PracticeReviewPreparation(

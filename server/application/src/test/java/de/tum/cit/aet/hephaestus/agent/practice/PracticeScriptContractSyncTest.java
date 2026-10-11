@@ -6,6 +6,8 @@ import de.tum.cit.aet.hephaestus.agent.catalog.LlmApiProtocol;
 import de.tum.cit.aet.hephaestus.agent.catalog.ModelKind;
 import de.tum.cit.aet.hephaestus.agent.catalog.ReasoningEffort;
 import de.tum.cit.aet.hephaestus.agent.config.FrozenModel;
+import de.tum.cit.aet.hephaestus.agent.conversation.ChatSignals;
+import de.tum.cit.aet.hephaestus.agent.conversation.ConversationThreadArtifactDescriptor;
 import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.agent.proxy.JobTokenAuthenticationFilter;
 import de.tum.cit.aet.hephaestus.agent.runtime.AgentImageProperties;
@@ -13,6 +15,17 @@ import de.tum.cit.aet.hephaestus.agent.runtime.PiResultParser;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiRuntimeFactory;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.sandbox.ImagePullPolicy;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ActorRole;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ArtifactDescriptor;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewStateDimension;
+import de.tum.cit.aet.hephaestus.integration.outline.domain.signal.DocsSignals;
+import de.tum.cit.aet.hephaestus.integration.outline.domain.signal.DocumentArtifactDescriptor;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.IssueArtifactDescriptor;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.PullRequestArtifactDescriptor;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
+import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
+import de.tum.cit.aet.hephaestus.practices.model.Outcome;
+import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptNotRatedReason;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptRunStatus;
@@ -23,9 +36,11 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
@@ -34,8 +49,9 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * Cross-language sync test. The practice script runner refuses the whole models file for one slot or
- * protocol it does not know, so the names that {@link PracticePiAdapter} writes must be the ones that
- * {@code docker/agents/practice-scripts/lib/contract.ts} accepts.
+ * protocol it does not know, and a script's inputs for one moment, state or outcome it does not know, so the
+ * names that the server writes must be the ones that {@code docker/agents/practice-scripts/lib/contract.ts}
+ * accepts.
  */
 class PracticeScriptContractSyncTest extends BaseUnitTest {
 
@@ -151,6 +167,111 @@ class PracticeScriptContractSyncTest extends BaseUnitTest {
         assertThat(Files.readString(resolveRepoFile("docker/agents/practice-scripts/runner.ts")))
                 .contains("process.env." + token);
     }
+
+    /**
+     * A script reads the moment and the review state of its cause in the words of the artifact descriptors, which
+     * stay their one home: the runner refuses a cause whose moment or state value it does not know.
+     */
+    @Test
+    void shouldKnowEveryMomentAndReviewStateTheDescriptorsDeclare() throws IOException {
+        String contract = Files.readString(resolveRepoFile("docker/agents/practice-scripts/lib/contract.ts"));
+        List<ArtifactDescriptor> descriptors = List.of(
+                new PullRequestArtifactDescriptor(),
+                new IssueArtifactDescriptor(),
+                new ConversationThreadArtifactDescriptor(),
+                new DocumentArtifactDescriptor());
+
+        assertThat(descriptors)
+                .extracting(ArtifactDescriptor::kind)
+                .containsExactly(
+                        ScmSignals.PULL_REQUEST,
+                        ScmSignals.ISSUE,
+                        ChatSignals.CONVERSATION_THREAD,
+                        DocsSignals.DOCUMENT);
+        assertThat(quotedIn(contract, "KINDS = ["))
+                .containsExactlyElementsOf(descriptors.stream()
+                        .map(descriptor -> descriptor.kind().value())
+                        .toList());
+        String moments = contract.substring(contract.indexOf("MOMENTS = {"));
+        String states = contract.substring(contract.indexOf("REVIEW_STATES = {"));
+        for (ArtifactDescriptor descriptor : descriptors) {
+            String kind = descriptor.kind().value();
+            assertThat(quotedIn(moments, "\"" + kind + "\": ["))
+                    .as("the moments of %s", kind)
+                    .containsExactlyInAnyOrderElementsOf(descriptor.signals().stream()
+                            .filter(signal -> !signal.requestedByHand())
+                            .map(signal -> signal.name().value())
+                            .toList());
+            Map<String, List<String>> declared = new LinkedHashMap<>();
+            for (ReviewStateDimension dimension :
+                    descriptor.reviewCapabilities().reviewWhenDimensions()) {
+                declared.put(
+                        dimension.key(),
+                        dimension.values().stream()
+                                .map(ReviewStateDimension.Value::value)
+                                .toList());
+            }
+            assertThat(dimensionsIn(states, kind))
+                    .as("the review state of %s", kind)
+                    .isEqualTo(declared);
+        }
+    }
+
+    /** The runner refuses a previous claim or a cause with a value the server's enums do not hold, and the reverse. */
+    @Test
+    void shouldStageOnlyOriginsOutcomesSeveritiesAndRolesThePracticeScriptRunnerAccepts() throws IOException {
+        String contract = Files.readString(resolveRepoFile("docker/agents/practice-scripts/lib/contract.ts"));
+
+        assertThat(quotedIn(contract, "ORIGINS = [")).containsExactlyElementsOf(names(ObservationOrigin.values()));
+        assertThat(quotedIn(contract, "OUTCOMES = [")).containsExactlyElementsOf(names(Outcome.values()));
+        assertThat(quotedIn(contract, "SEVERITIES = [")).containsExactlyElementsOf(names(Severity.values()));
+        // A review is never about an assignee, so no practice script reads that role.
+        assertThat(quotedIn(contract, "SUBJECT_ROLES = ["))
+                .containsExactlyElementsOf(Arrays.stream(ActorRole.values())
+                        .filter(role -> role != ActorRole.ASSIGNEE)
+                        .map(Enum::name)
+                        .toList());
+    }
+
+    /** The launcher stages each script with the files the server writes beside it, and the runner reads them there. */
+    @Test
+    void shouldStageTheCauseAndPreviousClaimWhereTheRunnerReadsThem() throws IOException {
+        String contract = Files.readString(resolveRepoFile("docker/agents/practice-scripts/lib/contract.ts"));
+        String launcher =
+                Files.readString(resolveRepoFile("server/application/src/main/resources/agent/pi-practice-scripts.ts"));
+
+        assertThat(contract)
+                .contains("CAUSE_FILE_SUFFIX = \"" + SandboxLayout.PRACTICE_SCRIPT_CAUSE_SUFFIX + "\"")
+                .contains("PREVIOUS_FILE_SUFFIX = \"" + SandboxLayout.PRACTICE_SCRIPT_PREVIOUS_SUFFIX + "\"");
+        assertThat(launcher)
+                .contains("\"" + SandboxLayout.PRACTICE_SCRIPT_CAUSE_SUFFIX + "\"")
+                .contains("\"" + SandboxLayout.PRACTICE_SCRIPT_PREVIOUS_SUFFIX + "\"");
+    }
+
+    private static List<String> names(Enum<?>[] values) {
+        return Arrays.stream(values).map(Enum::name).toList();
+    }
+
+    /** The dimensions of {@code kind} in the {@code REVIEW_STATES} literal that {@code states} starts with. */
+    private static Map<String, List<String>> dimensionsIn(String states, String kind) {
+        String start = "\"" + kind + "\": {";
+        int from = states.indexOf(start);
+        assertThat(from).as("REVIEW_STATES declares %s", kind).isNotNegative();
+        String block = states.substring(from + start.length(), states.indexOf('}', from));
+        Map<String, List<String>> dimensions = new LinkedHashMap<>();
+        Matcher dimension = DIMENSION.matcher(block);
+        while (dimension.find()) {
+            dimensions.put(
+                    dimension.group(1),
+                    QUOTED.matcher(dimension.group(2))
+                            .results()
+                            .map(result -> result.group(1))
+                            .toList());
+        }
+        return dimensions;
+    }
+
+    private static final Pattern DIMENSION = Pattern.compile("(\\w+): \\[([^\\]]*)\\]");
 
     private static FrozenModel model(String protocol, String modelId, @Nullable ReasoningEffort reasoningEffort) {
         return new FrozenModel(

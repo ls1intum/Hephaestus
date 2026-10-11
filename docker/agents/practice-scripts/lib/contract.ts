@@ -335,3 +335,291 @@ export const MODEL_SLOT_CALLS = {
 		},
 	},
 } satisfies { [S in ModelSlot]: SlotCall<S> };
+
+/*
+ * What a script reads about its review: the kind of the work, its record, the cause, the role the
+ * practice is about, and the previous claim. The server stages them; the runner validates them here.
+ */
+
+/**
+ * The kinds of reviewed work, the moments of each, and the dimensions of its review state, as the
+ * artifact descriptors declare them. A moment is each signal of the kind but the request by hand.
+ * `PracticeScriptContractSyncTest` keeps these lists equal to the descriptors, which stay their home.
+ */
+export const KINDS = [
+	"scm.pull_request",
+	"scm.issue",
+	"chat.conversation_thread",
+	"docs.document",
+] as const;
+export type Kind = (typeof KINDS)[number];
+
+export const MOMENTS = {
+	"scm.pull_request": [
+		"scm.pull_request.opened",
+		"scm.pull_request.ready",
+		"scm.pull_request.synchronized",
+		"scm.pull_request.edited",
+		"scm.pull_request.linked_issue_updated",
+		"scm.pull_request.reviewed",
+		"scm.pull_request.merged",
+		"scm.pull_request.closed",
+	],
+	"scm.issue": ["scm.issue.opened", "scm.issue.updated", "scm.issue.closed"],
+	"chat.conversation_thread": ["chat.conversation_thread.settled"],
+	"docs.document": ["docs.document.published", "docs.document.updated", "docs.document.archived"],
+} as const satisfies Record<Kind, readonly [string, ...string[]]>;
+export type Moment<K extends Kind = Kind> = (typeof MOMENTS)[K][number];
+
+export const REVIEW_STATES = {
+	"scm.pull_request": { draftStatus: ["DRAFT", "NOT_DRAFT"], state: ["OPEN", "CLOSED", "MERGED"] },
+	"scm.issue": { state: ["OPEN", "CLOSED"] },
+	"chat.conversation_thread": {},
+	"docs.document": { state: ["ACTIVE", "ARCHIVED"] },
+} as const satisfies Record<Kind, Record<string, readonly [string, ...string[]]>>;
+
+/** `ObservationOrigin`: the population that the review's observations belong to. */
+export const ORIGINS = ["LIVE", "MANUAL", "BACKFILL"] as const;
+export const OUTCOMES = ["MET", "NOT_MET", "NOT_APPLICABLE", "UNDETERMINED"] as const;
+export const SEVERITIES = ["CRITICAL", "MAJOR", "MINOR", "INFO"] as const;
+/** The roles that a practice can be about. A review is never about an assignee. */
+export const SUBJECT_ROLES = ["AUTHOR", "REVIEWER", "MERGER"] as const;
+export const CAUSE_TYPES = ["moment", "recheck", "requested"] as const;
+
+/** The file names of a practice's inputs beside its script: `SandboxLayout` on the server. */
+export const CAUSE_FILE_SUFFIX = ".cause.json";
+export const PREVIOUS_FILE_SUFFIX = ".previous.json";
+
+const COMMIT = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u;
+/** A full commit id, as git prints it. */
+export const isCommit = (value: string): boolean => COMMIT.test(value);
+
+/*
+ * The record of the reviewed work, one for each kind, as the server's content source stages it in the
+ * context folder. A field that the server does not write is not in the type: the runner drops an
+ * unknown field, and a known field of another shape fails the record.
+ */
+
+/** `metadata.json` of a pull request: `PullRequestContentSource.buildPullRequestMetadata`. */
+const pullRequestRecordSchema = z.object({
+	/** Which time each part describes: `admission_fields` come from the job, the rest from the mirror. */
+	basis: z.object({
+		admission_fields: z.array(z.string()),
+		admitted_at: z.string().optional(),
+		other_fields: z.string(),
+		mirror_synced_at: z.string().optional(),
+	}),
+	pr_number: z.int(),
+	pr_url: z.string(),
+	repository_full_name: z.string(),
+	source_branch: z.string(),
+	target_branch: z.string(),
+	/** The reviewed head. */
+	commit_sha: z.string(),
+	subject_role: z.enum(["AUTHOR", "REVIEWER"]),
+	/** Absent when the job does not carry the text: then it is not known. */
+	title: z.string().optional(),
+	body: z.string().nullable().optional(),
+	state: z.enum(["OPEN", "CLOSED", "MERGED"]).optional(),
+	is_draft: z.boolean(),
+	/** Apart from `state`: a pull request closed by its merge is stored CLOSED with `merged_at` set. */
+	is_merged: z.boolean(),
+	created_at: z.string().optional(),
+	closed_at: z.string().optional(),
+	merged_at: z.string().optional(),
+	additions: z.int(),
+	deletions: z.int(),
+	changed_files: z.int(),
+	author: z.string().optional(),
+	author_id: z.int().optional(),
+	/** The provider classified the author as automation. */
+	author_bot: z.literal(true).optional(),
+	merged_by: z.string().optional(),
+	labels: z.array(z.string()),
+	assignees: z.array(z.string()),
+	milestone: z.string().optional(),
+	/** Only the GraphQL sync fills it. */
+	merge_state_status: z.string().optional(),
+	/** Only the GraphQL sync fills it. */
+	review_decision: z.string().optional(),
+	/** What the checks or the pipeline said about the reviewed head. */
+	head_checks: z.enum(["SUCCESS", "FAILURE", "PENDING", "CANCELLED", "NONE"]).optional(),
+});
+
+/** `metadata.json` of an issue: `IssueContentSource`. */
+const issueRecordSchema = z.object({
+	issue_number: z.int(),
+	title: z.string().nullable(),
+	body: z.string(),
+	/** UNKNOWN when the mirror holds no state. */
+	state: z.enum(["OPEN", "CLOSED", "UNKNOWN"]),
+	state_reason: z.string().nullable(),
+	html_url: z.string().nullable(),
+	repository_full_name: z.string(),
+	author: z.string().nullable(),
+	author_id: z.int().nullable(),
+	issue_type: z.string().nullable(),
+	is_locked: z.boolean(),
+	sub_issues_total: z.int().nullable(),
+	sub_issues_completed: z.int().nullable(),
+	/** Where the sub-issue counts come from. Absent when they are not known. */
+	sub_issues_source: z.enum(["provider", "children"]).optional(),
+	milestone: z.string().nullable(),
+	closed_at: z.string().nullable(),
+	labels: z.array(z.string()),
+	assignees: z.array(z.string()),
+});
+
+/** `conversation_thread.json`: `ConversationThreadProjection.buildThreadPayload`. Its `_meta` notice is for a model. */
+const conversationRecordSchema = z.object({
+	channel: z.string(),
+	threadTs: z.string(),
+	messages: z.array(
+		z.object({
+			ts: z.string(),
+			author: z.string().nullable(),
+			authorLogin: z.string().optional(),
+			authorName: z.string().optional(),
+			text: z.string().nullable(),
+			/** Whether the member under review wrote the message. */
+			underReview: z.boolean().optional(),
+			edited: z.literal(true).optional(),
+		}),
+	),
+	messageCount: z.int(),
+	truncated: z.boolean(),
+});
+
+/** `document.json`: `DocumentContentSource`. The body is `document.md` in the same folder. */
+const documentRecordSchema = z.object({
+	title: z.string().nullable(),
+	collection: z.string().nullable(),
+	collectionSlug: z.string().nullable(),
+	slug: z.string().nullable(),
+	createdBy: z.string().nullable(),
+	updatedBy: z.string().nullable(),
+	createdAt: z.string().nullable(),
+	updatedAt: z.string().nullable(),
+	archived: z.boolean(),
+});
+
+/** Each kind's record: its file in the context folder, and its schema. */
+export const WORK_RECORDS = {
+	"scm.pull_request": { file: "metadata.json", schema: pullRequestRecordSchema },
+	"scm.issue": { file: "metadata.json", schema: issueRecordSchema },
+	"chat.conversation_thread": {
+		file: "conversation_thread.json",
+		schema: conversationRecordSchema,
+	},
+	"docs.document": { file: "document.json", schema: documentRecordSchema },
+} as const;
+
+const previousCitationSchema = z.strictObject({
+	sourceKind: z.string().min(1),
+	/** A repository path for a citation of the change or the checkout, else the cited record. */
+	path: z.string().min(1),
+	startLine: z.int().positive(),
+	endLine: z.int().positive(),
+	side: z.enum(["OLD", "NEW"]).optional(),
+});
+
+/**
+ * The inputs of a practice's script for work of one kind: its moments, the dimensions of its review
+ * state, as recorded at admission, and its record.
+ */
+function inputsOf<
+	K extends Kind,
+	M extends z.ZodType<Moment<K>>,
+	S extends z.ZodType,
+	W extends z.ZodType,
+>(kind: K, signal: M, state: S, work: W) {
+	const origin = z.enum(ORIGINS);
+	const admittedAt = z.iso.datetime();
+	return z.strictObject({
+		kind: z.literal(kind),
+		subject: z.strictObject({ role: z.enum(SUBJECT_ROLES) }),
+		cause: z.discriminatedUnion("type", [
+			z.strictObject({
+				type: z.literal("moment"),
+				signal,
+				origin,
+				state,
+				admittedAt,
+				/** Only on `scm.pull_request.reviewed`: the submitted review that the practice is about. */
+				review: z.strictObject({ id: z.int().positive(), reviewer: z.string().min(1) }).optional(),
+			}),
+			z.strictObject({ type: z.literal("recheck"), signal, origin, state, admittedAt }),
+			z.strictObject({ type: z.literal("requested"), origin, state, admittedAt }),
+		]),
+		/**
+		 * The latest current claim of this practice about the same person on the same work, or null. It
+		 * holds no model text and no delivery state.
+		 */
+		previous: z
+			.strictObject({
+				reviewedAt: z.iso.datetime(),
+				cause: z.enum(CAUSE_TYPES),
+				signal: signal.optional(),
+				outcome: z.enum(OUTCOMES),
+				severity: z.enum(SEVERITIES).optional(),
+				citations: z.array(previousCitationSchema),
+				/** Pull request only: the head that the previous review read. */
+				head: z.string().regex(COMMIT).optional(),
+			})
+			.nullable(),
+		work,
+	});
+}
+
+/**
+ * A practice's `<slug>.cause.json` (`kind`, `subject`, `cause`), with its `<slug>.previous.json`
+ * as `previous` and the kind's record as `work`.
+ */
+export const practiceInputsSchema = z.discriminatedUnion("kind", [
+	inputsOf(
+		"scm.pull_request",
+		z.enum(MOMENTS["scm.pull_request"]),
+		z.strictObject({
+			draftStatus: z.enum(REVIEW_STATES["scm.pull_request"].draftStatus).optional(),
+			state: z.enum(REVIEW_STATES["scm.pull_request"].state).optional(),
+		}),
+		pullRequestRecordSchema,
+	),
+	inputsOf(
+		"scm.issue",
+		z.enum(MOMENTS["scm.issue"]),
+		z.strictObject({ state: z.enum(REVIEW_STATES["scm.issue"].state).optional() }),
+		issueRecordSchema,
+	),
+	inputsOf(
+		"chat.conversation_thread",
+		z.enum(MOMENTS["chat.conversation_thread"]),
+		z.strictObject({}),
+		conversationRecordSchema,
+	),
+	inputsOf(
+		"docs.document",
+		z.enum(MOMENTS["docs.document"]),
+		z.strictObject({ state: z.enum(REVIEW_STATES["docs.document"].state).optional() }),
+		documentRecordSchema,
+	),
+]);
+export type PracticeInputs = z.infer<typeof practiceInputsSchema>;
+type InputsOf<K extends Kind> = Extract<PracticeInputs, { kind: K }>;
+
+/** The facts of the work that review conditions can name, as the review recorded them. */
+export type ReviewState<K extends Kind = Kind> = InputsOf<K>["cause"]["state"];
+/**
+ * Why this practice is in this review. The practice's moments and review conditions are its review
+ * occasion; the cause says which of them brought it in, or a recheck, or a request by hand.
+ * "moment": the practice is bound to the moment of the review, and its review conditions matched. "recheck": its current claim about the author is not met and the
+ * work changed since. "requested": a person or a campaign asked for each practice of the kind,
+ * whatever the state of the work.
+ */
+export type Cause<K extends Kind = Kind> = InputsOf<K>["cause"];
+export type StagedPrevious<K extends Kind = Kind> = NonNullable<InputsOf<K>["previous"]>;
+export type PreviousCitation = z.infer<typeof previousCitationSchema>;
+export type SubjectRole = PracticeInputs["subject"]["role"];
+export type CauseType = PracticeInputs["cause"]["type"];
+/** The record of the reviewed work of each kind. */
+export type Work = { [K in Kind]: InputsOf<K>["work"] };

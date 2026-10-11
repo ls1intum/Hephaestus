@@ -7,6 +7,11 @@ import { SUPPORTED_SCHEMA_VERSION, resolveTaskPaths } from "./pi-task-paths.ts";
 
 /** SandboxLayout.PRACTICE_SCRIPT_MODELS_FILE; SandboxLayoutSyncTest keeps the two equal. */
 const PRACTICE_SCRIPT_MODELS_FILE = "practice-script-models.json";
+/**
+ * Each script and what the server stages beside it: its cause and its previous claim.
+ * `PracticeScriptContractSyncTest` keeps the suffixes equal to `SandboxLayout`.
+ */
+const STAGED_SUFFIXES = [".ts", ".cause.json", ".previous.json"];
 
 const root = path.resolve(process.argv[2] ?? "/workspace");
 const envelope: unknown = JSON.parse(readFileSync(path.resolve(root, "task.json"), "utf8"));
@@ -37,7 +42,7 @@ mkdirSync(path.resolve(stage, "practices"), { recursive: true });
 mkdirSync(output, { recursive: true });
 if (existsSync(paths.practiceScripts)) {
 	for (const entry of readdirSync(paths.practiceScripts, { withFileTypes: true })) {
-		if (entry.isFile() && entry.name.endsWith(".ts")) {
+		if (entry.isFile() && STAGED_SUFFIXES.some((suffix) => entry.name.endsWith(suffix))) {
 			copyFileSync(
 				path.resolve(paths.practiceScripts, entry.name),
 				path.resolve(stage, "practices", entry.name),

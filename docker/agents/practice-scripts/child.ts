@@ -22,6 +22,7 @@ import { isPracticeModule } from "./lib/practice-contract.ts";
 import {
 	UnratedError,
 	type ModelNeeds,
+	type PracticeScriptContext,
 	type PracticeScriptDefinition,
 } from "./lib/practice-script.ts";
 
@@ -118,22 +119,38 @@ async function runDefinition(
 		}
 		throw new Error("unexpected reply to a model call");
 	});
-	return definition.run({
+	const { inputs, changeSince } = job;
+	// The runner accepts `meta` only with valid inputs.
+	if (inputs === undefined) {
+		throw new Error("the runner sent no inputs");
+	}
+	const common = {
 		practice: { slug: job.slug },
-		repo: job.repoPath,
-		change: job.diffFiles,
-		changeDir: job.changeDir,
-		metadata: job.metadata,
 		context: { dir: job.contextDir, reference: job.contextReference },
 		now: job.now,
 		models,
 		tools: evidenceTools(job.repoPath),
 		remaining: () => ({ tokens: tokensLeft, ms: Math.max(0, job.deadline - Date.now()) }),
-		signal: deadline,
-		log: (text) => {
+		abortSignal: deadline,
+		log: (text: string) => {
 			post({ kind: "log", text: text.slice(0, MAX_LOG_CHARS) });
 		},
-	});
+	};
+	const ctx: PracticeScriptContext<ModelNeeds> =
+		inputs.kind === "scm.pull_request"
+			? {
+					...common,
+					...inputs,
+					previous:
+						inputs.previous === null || changeSince === undefined
+							? inputs.previous
+							: { ...inputs.previous, changeSince },
+					repo: job.repoPath,
+					change: job.diffFiles,
+					changeDir: job.changeDir,
+				}
+			: { ...common, ...inputs };
+	return definition.run(ctx);
 }
 
 const arrived: readonly unknown[] = await jobArrived;

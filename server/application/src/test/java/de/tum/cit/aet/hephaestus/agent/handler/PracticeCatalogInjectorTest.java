@@ -59,7 +59,8 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        injector = new PracticeCatalogInjector(objectMapper, practiceRepository, workspaceDefaults());
+        injector = new PracticeCatalogInjector(
+                objectMapper, practiceRepository, workspaceDefaults(), mock(PracticeScriptInputs.class));
     }
 
     private Practice practice(String slug, SignalName... signals) {

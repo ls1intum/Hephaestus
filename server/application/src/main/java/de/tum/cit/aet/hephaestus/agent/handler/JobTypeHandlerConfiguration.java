@@ -2,16 +2,20 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 
 import de.tum.cit.aet.hephaestus.agent.context.JobEvidenceFiles;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
+import de.tum.cit.aet.hephaestus.agent.conversation.ConversationSourceLiveness;
 import de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionResultParser;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryChannel;
+import de.tum.cit.aet.hephaestus.integration.scm.ReviewTargetQuery;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRevisionService;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.observation.ObservationVisibilityPolicy;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
 import java.util.List;
 import org.springframework.context.ApplicationEventPublisher;
@@ -82,10 +86,29 @@ public class JobTypeHandlerConfiguration {
                 completions);
     }
 
+    /** Only the worker role prepares a review, so its practice script inputs are no bean of their own. */
     @Bean
     PracticeCatalogInjector practiceCatalogInjector(
-            PracticeRepository practiceRepository, WorkspaceReviewDefaultsProvider workspaceDefaults) {
-        return new PracticeCatalogInjector(objectMapper, practiceRepository, workspaceDefaults);
+            PracticeRepository practiceRepository,
+            WorkspaceReviewDefaultsProvider workspaceDefaults,
+            ObservationRepository observationRepository,
+            ObservationVisibilityPolicy observationVisibility,
+            ConversationSourceLiveness conversationLiveness,
+            AgentJobRepository agentJobRepository,
+            ReviewTargetQuery reviewTargets,
+            UserRepository userRepository) {
+        return new PracticeCatalogInjector(
+                objectMapper,
+                practiceRepository,
+                workspaceDefaults,
+                new PracticeScriptInputs(
+                        objectMapper,
+                        observationRepository,
+                        observationVisibility,
+                        conversationLiveness,
+                        agentJobRepository,
+                        reviewTargets,
+                        userRepository));
     }
 
     @Bean

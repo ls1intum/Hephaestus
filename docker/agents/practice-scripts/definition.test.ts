@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { after, describe, test } from "node:test";
 
@@ -23,6 +23,7 @@ import {
 
 const runner = path.join(import.meta.dirname, "runner.ts");
 const fixtures = path.join(import.meta.dirname, "fixtures");
+const pullRequestRecord = path.join(import.meta.dirname, "fixtures", "pull-request-metadata.json");
 const TOKEN = "practice-script-test-token";
 
 const roots: string[] = [];
@@ -80,6 +81,7 @@ async function run(
 		path.join(root, "context", "comments.json"),
 		'[\n  {"body": "Please split this"}\n]\n',
 	);
+	await copyFile(pullRequestRecord, path.join(root, "context", "metadata.json"));
 	await writeFile(path.join(root, "models.json"), JSON.stringify(bound));
 	// Asynchronous: the stand-in answers from this process while the runner waits on it.
 	const child = spawn(

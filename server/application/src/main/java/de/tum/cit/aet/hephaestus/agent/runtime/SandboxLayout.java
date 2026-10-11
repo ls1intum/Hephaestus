@@ -98,6 +98,15 @@ public final class SandboxLayout {
     /** Workspace-relative prefix for per-practice scripts injected from the database. */
     public static final String PRACTICE_SCRIPT_PREFIX = WORK_PREFIX + "practice-scripts/";
 
+    /**
+     * Beside each staged script {@code <slug>.ts}: {@code <slug>.cause.json}, why the practice is in this review,
+     * and {@code <slug>.previous.json}, its previous claim on this work or {@code null}. The practice script runner's
+     * {@code lib/contract.ts} owns their shape.
+     */
+    public static final String PRACTICE_SCRIPT_CAUSE_SUFFIX = ".cause.json";
+
+    public static final String PRACTICE_SCRIPT_PREVIOUS_SUFFIX = ".previous.json";
+
     /** Workspace-relative prefix for runtime practice script output (logs, structured hints). */
     public static final String PRACTICE_SCRIPT_OUT_PREFIX = WORK_PREFIX + "practice-scripts-out/";
 

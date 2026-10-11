@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { readFile, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { createInterface } from "node:readline";
@@ -18,12 +18,33 @@ after(async () =>
 	Promise.all(roots.map(async (root) => rm(root, { recursive: true, force: true }))),
 );
 
-/** Stages the scripts, and the change when given, and returns the runner's arguments. */
+/**
+ * Stages the scripts with the record of a pull request, and the change when given, and returns the
+ * runner's arguments.
+ */
 async function stage(scripts: Record<string, string>, diff?: string) {
 	const { root, practices } = await stagePracticeScripts(scripts);
 	roots.push(root);
 	const output = path.join(root, "out");
-	const args = [runner, "--repo", root, "--practices", practices, "--output", output];
+	const context = path.join(root, "context");
+	await mkdir(context);
+	await copyFile(
+		path.join(import.meta.dirname, "fixtures", "pull-request-metadata.json"),
+		path.join(context, "metadata.json"),
+	);
+	const args = [
+		runner,
+		"--repo",
+		root,
+		"--context",
+		context,
+		"--context-reference",
+		"context",
+		"--practices",
+		practices,
+		"--output",
+		output,
+	];
 	if (diff !== undefined) {
 		await writeFile(path.join(root, "change.diff"), diff);
 		args.push("--diff", path.join(root, "change.diff"));

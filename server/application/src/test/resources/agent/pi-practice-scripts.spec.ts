@@ -101,6 +101,40 @@ export default () => ({
 			})) {
 				writeFileSync(path.join(root, scripts, `${name}.ts`), source);
 			}
+			// A definition script reads what the server staged beside it, which the launcher stages with it.
+			writeFileSync(
+				path.join(root, scripts, "reads-cause.ts"),
+				`export default {
+ meta: { kinds: {} },
+ run: async (ctx) => ({ leads: [], facts: { kind: ctx.kind, cause: ctx.cause.type, signal: ctx.cause.signal, previous: ctx.previous === null, messages: ctx.work.messages.length } }),
+};
+`,
+			);
+			writeFileSync(
+				path.join(root, scripts, "reads-cause.cause.json"),
+				JSON.stringify({
+					kind: "chat.conversation_thread",
+					subject: { role: "AUTHOR" },
+					cause: {
+						type: "moment",
+						signal: "chat.conversation_thread.settled",
+						origin: "LIVE",
+						state: {},
+						admittedAt: "2026-01-01T00:00:00Z",
+					},
+				}),
+			);
+			writeFileSync(path.join(root, scripts, "reads-cause.previous.json"), "null");
+			writeFileSync(
+				path.join(root, context, "conversation_thread.json"),
+				JSON.stringify({
+					channel: "C1",
+					threadTs: "1.0",
+					messages: [{ ts: "1.0", author: "U1", text: "Why?" }],
+					messageCount: 1,
+					truncated: false,
+				}),
+			);
 			mkdirSync(path.join(root, "repos/project with spaces"), { recursive: true });
 			writeFileSync(path.join(root, "repos/project with spaces/marker"), "7");
 			writeFileSync(path.join(root, context, "marker"), "11");
@@ -186,6 +220,18 @@ export default () => ({
 			assert.ok(typeof scoped === "object" && scoped !== null);
 			assert.equal(Reflect.get(scoped, "status"), "ok");
 			assert.deepEqual(Reflect.get(scoped, "metrics"), { issue: 1 });
+			const definition: unknown = JSON.parse(
+				readFileSync(path.join(root, "work/practice-scripts-out/reads-cause.json"), "utf8"),
+			);
+			assert.ok(typeof definition === "object" && definition !== null);
+			assert.equal(Reflect.get(definition, "status"), "ok", JSON.stringify(definition));
+			assert.deepEqual(Reflect.get(definition, "facts"), {
+				kind: "chat.conversation_thread",
+				cause: "moment",
+				signal: "chat.conversation_thread.settled",
+				previous: true,
+				messages: 1,
+			});
 			for (const slug of ["missing-export", "invalid-result", "throws", "stored-inventory"]) {
 				const failure: unknown = JSON.parse(
 					readFileSync(path.join(root, `work/practice-scripts-out/${slug}.json`), "utf8"),

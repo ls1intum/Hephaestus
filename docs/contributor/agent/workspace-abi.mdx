@@ -111,7 +111,8 @@ It is not a successful review.
 │   ├── change/                      #   The change view pi-change.ts derives from the checkout with git:
 │   │                                #   diff.patch ([L<n>]-annotated), diff_stat.txt, files.json.
 │   ├── notes/review.md              #   What the review has recorded, appended by the runner; read back after compaction.
-│   ├── practice-scripts/            #   Practice scripts (TypeScript, run on Node).
+│   ├── practice-scripts/practices/  #   Practice scripts (<slug>.ts, run on Node), each beside its
+│   │                                #   <slug>.cause.json and <slug>.previous.json.
 │   ├── practice-scripts-out/        #   Practice script runtime output (logs, structured hints).
 │   ├── analysis/practices/          #   Per-practice analysis output (holds the .gitkeep marker).
 │   └── composition/                 #   observations.json — the admitted observations feedback is composed from.
@@ -571,7 +572,7 @@ Each process has a heap of at most 256 MiB.
 A script's process ends at the script's deadline, or earlier when the stage has less time left.
 The deadline is 15 seconds for a positional script and 60 seconds for a definition script.
 
-A definition script's model calls and its `ctx.signal` end 5 seconds before its deadline, so that the script can still return what it found.
+A definition script's model calls and its `ctx.abortSignal` end 5 seconds before its deadline, so that the script can still return what it found.
 The runner itself stops one second before the stage deadline.
 Thus, a script that never returns loses only its own practice's hints or leads.
 

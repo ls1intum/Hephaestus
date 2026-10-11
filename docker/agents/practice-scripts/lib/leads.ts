@@ -51,6 +51,8 @@ export interface Sources {
 
 interface QuotedLead extends Lead {
 	quote: string;
+	/** The lead cites a line that the change since the previous review added. */
+	newSinceLastReview?: true;
 }
 
 /** A path inside `root`, symlinks resolved, naming a regular file; otherwise undefined. */
@@ -168,6 +170,11 @@ export interface DefinitionResult {
 	directions: string[];
 	kinds: Record<string, string>;
 	dropped: number;
+	/**
+	 * How many leads cite a line that the change since the previous review added. Absent when that
+	 * change is not known: no previous review, or a previous head that is not an ancestor.
+	 */
+	newSinceLastReview?: number;
 	/** Why the script failed or was stopped. */
 	error?: string;
 }
@@ -192,7 +199,7 @@ function leadRow(lead: QuotedLead, contextReference: string): string {
 		.map(([key, value]) => `${key}=${String(value)}`)
 		.join(", ");
 	const quote = lead.quote.split("\n")[0]?.trim().slice(0, 120) ?? "";
-	return `- ${lead.kind}${lead.rating === undefined ? "" : " (model-rated)"} at ${where(lead.at, contextReference)}${quote ? `: \`${quote}\`` : ""}${facts ? ` [${facts}]` : ""}`;
+	return `- ${lead.kind}${lead.rating === undefined ? "" : " (model-rated)"}${lead.newSinceLastReview === true ? " (new)" : ""} at ${where(lead.at, contextReference)}${quote ? `: \`${quote}\`` : ""}${facts ? ` [${facts}]` : ""}`;
 }
 
 /** The section a definition script's result becomes, bounded as every practice's section is. */
@@ -223,6 +230,11 @@ export function renderDefinition(
 			...[...used].map((kind) => `- ${kind}: ${result.kinds[kind] ?? ""}`),
 			"",
 			"**Leads:**",
+			...(result.newSinceLastReview === undefined
+				? []
+				: [
+						`${result.newSinceLastReview} of ${result.leads.length} leads point at lines added since the last review of this practice, each marked (new).`,
+					]),
 			...result.leads.map((lead) => leadRow(lead, contextReference)),
 		);
 	}

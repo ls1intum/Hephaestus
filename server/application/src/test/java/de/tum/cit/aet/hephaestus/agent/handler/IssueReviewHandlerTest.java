@@ -86,7 +86,10 @@ class IssueReviewHandlerTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         var practiceCatalogInjector = new PracticeCatalogInjector(
-                objectMapper, practiceRepository, InContextDeliveryGateFixtures.workspaceDefaults());
+                objectMapper,
+                practiceRepository,
+                InContextDeliveryGateFixtures.workspaceDefaults(),
+                mock(PracticeScriptInputs.class));
         handler = new IssueReviewHandler(
                 objectMapper,
                 new PracticeReviewPreparation(

@@ -66,7 +66,7 @@ Thus, the first version of the script uses no model.
 ### 2. Find the places with code
 
 ```ts
-import { addedComments, definePracticeScript, type Lead } from "../lib/practice-script.ts";
+import { addedComments, definePracticeScript, expectKind, type Lead } from "../lib/practice-script.ts";
 
 const OPEN_WORK = /\b(TODO|FIXME|HACK|XXX)\b/u;
 const TRACKING = /#\d+|\b[A-Z][A-Z0-9]+-\d+\b|https?:\/\/\S+/u;
@@ -76,6 +76,7 @@ export default definePracticeScript({
     kinds: { "untracked-todo": "A TODO that the change adds, with no tracking reference." },
   },
   async run(ctx) {
+    expectKind(ctx, "scm.pull_request");
     const leads: Lead[] = addedComments(ctx.change)
       .filter((comment) => OPEN_WORK.test(comment.text) && !TRACKING.test(comment.text))
       .map((comment) => ({ at: comment.at, kind: "untracked-todo" }));
@@ -84,6 +85,8 @@ export default definePracticeScript({
 });
 ```
 
+`expectKind` tells TypeScript that the script reads a pull request, so `ctx.change` exists.
+[Narrow the context to a kind](#narrow-the-context-to-a-kind) tells more.
 `addedComments` returns each comment that the change adds, with its citation.
 `meta.kinds` declares each kind of lead with the sentence that the review reads for it.
 The script returns one lead for each comment that marks open work and has no tracking reference.
@@ -100,6 +103,7 @@ import {
   classify,
   commentKinds,
   definePracticeScript,
+  expectKind,
   type Lead,
 } from "../lib/practice-script.ts";
 
@@ -116,6 +120,7 @@ export default definePracticeScript({
     },
   },
   async run(ctx) {
+    expectKind(ctx, "scm.pull_request");
     const comments = addedComments(ctx.change);
     const leads: Lead[] = [];
     const unmarked: typeof comments = [];
@@ -185,7 +190,7 @@ const facts: Facts = {};
 const unrated: Unrated[] = [];
 ```
 
-`comments` is `addedComments(ctx.change)`.
+`comments` is `addedComments(ctx.change)`, after `expectKind(ctx, "scm.pull_request")`.
 
 ### Code only
 
@@ -321,7 +326,7 @@ if (chat !== undefined) {
       prompt: "Find where the function parseDiff is declared.",
       schema: z.object({ file: z.string(), line: z.int().positive() }),
       maxSteps: 8,
-      signal: ctx.signal,
+      abortSignal: ctx.abortSignal,
     }),
   );
   if ("value" in found) {
@@ -365,7 +370,7 @@ return {
 Then a slow model costs only its own step, and the other steps still finish before the deadline.
 Steps that run together share one limit of requests in flight, as [Requests in flight](#requests-in-flight) tells.
 To type `ctx` in such a function, declare `meta` as a constant with `as const`.
-Then type `ctx` as `PracticeScriptContext<typeof meta.models>`.
+Then type `ctx` as `PracticeScriptContext<typeof meta.models, "scm.pull_request">`, with the kind that the script reads.
 
 ### When not to write a script
 
@@ -390,8 +395,11 @@ You need a checkout of Hephaestus at the version of your instance, and Node.js a
 4. Run the script:
 
    ```bash
-   node validate.ts --script <script.ts> --repo <clone> --diff change.patch
+   node validate.ts --script <script.ts> --repo <clone> --diff change.patch --metadata fixtures/pull-request-metadata.json
    ```
+
+   `fixtures/pull-request-metadata.json` is a sample record of a pull request.
+   If the script reads `ctx.work`, copy the sample and put the values of your pull request in it.
 
 5. Read the output.
    It prints the result `<slug>.json` and the section `<slug>.md` that the review reads.
@@ -408,8 +416,12 @@ The command accepts these options:
 | `--script` | The script file. Its name, less `.ts`, is the practice's identifier: lowercase letters, digits and hyphens. |
 | `--repo` | A checkout of the repository at the head of the change. |
 | `--diff` | The change as a unified diff. Without it, the change is empty. |
-| `--metadata` | A JSON file with the metadata of the reviewed work, for a script that reads `ctx.metadata`. |
+| `--metadata` | The record of the reviewed work, which the script reads as `ctx.work`. Its shape also sets the kind of the work. [The record of each kind](#the-record-of-each-kind) gives the shapes. Without it, a script that uses `definePracticeScript` fails. |
 | `--context` | A folder with captured context records, for a script that reads `ctx.context`. |
+| `--signal` | A moment, such as `scm.pull_request.merged`. The script runs as a review at that moment. Without it, the script runs as a review that a person requested. |
+| `--recheck` | With `--signal`: the script runs as a recheck at that moment. |
+| `--cause` | A JSON file with the kind, the subject and the cause, in the shape that the server writes. Use it instead of `--signal` to set the review state or the subject. |
+| `--previous` | A JSON file with the previous result, in the shape of [`ctx.previous`](#the-previous-result). If it has a `head` that is an ancestor of the head of `--repo`, the script also gets `changeSince`. |
 | `--out` | A folder that keeps `<slug>.json` and `<slug>.md` after the run. |
 
 ## Use an AI assistant
@@ -494,22 +506,189 @@ Use `required` only when the script has nothing useful to say without the model.
 
 ### The context
 
-`run(ctx)` receives these fields:
+`run(ctx)` receives one context.
+Its shape depends on the kind of the reviewed work.
+`ctx.kind` tells the kinds apart.
 
 | Field | What it holds |
 | --- | --- |
+| `kind` | The kind of the reviewed work: `scm.pull_request`, `scm.issue`, `chat.conversation_thread` or `docs.document`. |
+| `work` | The record of the reviewed work. [The record of each kind](#the-record-of-each-kind) gives its fields. |
+| `cause` | Why this practice is in this review. [The cause](#the-cause) tells more. |
+| `previous` | The previous result of this practice on this work, or `null`. [The previous result](#the-previous-result) tells more. |
+| `subject.role` | The role that the practice is about: `AUTHOR`, `REVIEWER` or `MERGER`. |
 | `practice.slug` | The identifier of the practice. |
-| `repo` | The absolute path of the repository checkout under review. |
-| `change` | The parsed change: path → added and removed lines, keyed by line number. |
-| `changeDir` | The folder of the change view: `diff.patch`, `diff_stat.txt` and `files.json`. A review without a change, such as an issue review, has no such folder. The local command gives an empty string. Prefer `change`. |
-| `metadata` | The metadata of the reviewed work, as an object of unknown values. For a pull request, it holds fields such as `title`, `body` and `labels`. [Pull request records](/contributor/agent/agent-workspace-abi#pull-request-records) lists them. Validate each field that you read. The local command gives `{}` without `--metadata`. |
 | `context.dir`, `context.reference` | The folder of the captured context, and its reference, to cite records. |
 | `now` | The time of the review. Use it instead of the clock. |
 | `models` | The available model slots, as AI SDK model objects. |
 | `tools` | `readFile`, `listFiles` and `grep` over the repository, as AI SDK tools. |
 | `remaining()` | The tokens and milliseconds that this practice has left. |
-| `signal` | An `AbortSignal` that aborts shortly before the deadline of this practice. |
+| `abortSignal` | An `AbortSignal` that aborts shortly before the deadline of this practice. Give it to an AI SDK call as `abortSignal`. |
 | `log(text)` | One line to the runner's log. The runner keeps at most 2 000 characters of each line. |
+
+A pull request review also has these fields:
+
+| Field | What it holds |
+| --- | --- |
+| `repo` | The absolute path of the repository checkout at the reviewed head. |
+| `change` | The parsed change: path → added and removed lines, keyed by line number. |
+| `changeDir` | The folder of the change view: `diff.patch`, `diff_stat.txt` and `files.json`. The local command gives an empty string. Prefer `change`. |
+
+#### Narrow the context to a kind
+
+A practice reviews one kind of work: the kind of its moments.
+Call `expectKind` before you read a field of that kind:
+
+```ts
+async run(ctx) {
+  expectKind(ctx, "scm.pull_request");
+  const comments = addedComments(ctx.change);
+  // …
+}
+```
+
+After `expectKind`, TypeScript knows the kind of `ctx`, so `ctx.change` and the fields of `ctx.work` exist.
+If the review is about another kind, `expectKind` throws.
+The script then fails with the status `error`.
+It never reports that it found nothing.
+A script that reads more than one kind uses `switch (ctx.kind)` instead.
+
+#### The record of each kind
+
+The runner reads the record of the work from the context folder and validates it before the script starts.
+`ctx.work` holds only the fields below.
+If the record does not have this shape, the script does not run, and its status is `error`.
+
+| Kind | Record | `ctx.work` |
+| --- | --- | --- |
+| `scm.pull_request`: a GitHub pull request or a GitLab merge request | `metadata.json` | `pr_number`, `pr_url`, `repository_full_name`, `source_branch`, `target_branch`, `commit_sha` (the reviewed head), `subject_role`, `is_draft`, `is_merged`, `additions`, `deletions`, `changed_files`, `labels`, `assignees`, and `basis`, which tells when each field was read. When they are known: `title`, `body`, `state`, `created_at`, `closed_at`, `merged_at`, `author`, `author_id`, `author_bot`, `merged_by`, `milestone`, `merge_state_status`, `review_decision` and `head_checks`. |
+| `scm.issue`: a GitHub or GitLab issue | `metadata.json` | `issue_number`, `title`, `body`, `state`, `state_reason`, `html_url`, `repository_full_name`, `author`, `author_id`, `issue_type`, `is_locked`, `sub_issues_total`, `sub_issues_completed`, `milestone`, `closed_at`, `labels` and `assignees`. `sub_issues_source` when the counts are known. A field that the provider did not record is `null`. |
+| `chat.conversation_thread`: a Slack thread | `conversation_thread.json` | `channel`, `threadTs`, `messages`, `messageCount` and `truncated`. Each message has `ts`, `author` and `text`. When they are known, it also has `authorLogin`, `authorName`, `underReview` and `edited`. |
+| `docs.document`: an Outline document | `document.json` | `title`, `collection`, `collectionSlug`, `slug`, `createdBy`, `updatedBy`, `createdAt`, `updatedAt` and `archived`. The body is `document.md` in `context.dir`. |
+
+[Pull request records](/contributor/agent/agent-workspace-abi#pull-request-records) gives the meaning of each field of a pull request.
+
+#### The cause
+
+The moments and the review conditions of a practice are its review occasion.
+`ctx.cause` tells the script which of them brought the practice into this review, or that a recheck or a request by hand did.
+`ctx.cause.type` has one of three values:
+
+| `type` | Meaning | Fields |
+| --- | --- | --- |
+| `moment` | The practice is bound to the moment of the review, and its review conditions match. | `signal`, `origin`, `state`, `admittedAt`. On `scm.pull_request.reviewed`, also `review`. |
+| `recheck` | The practice's current result about the author is not met, and the work changed after that result. The practice is not bound to the moment. | `signal`, `origin`, `state`, `admittedAt` |
+| `requested` | A person asked for a review, or an admin started a review of earlier work. Each practice of the kind runs, in any state. | `origin`, `state`, `admittedAt` |
+
+- `signal` is the moment that the review was admitted under. It has the same name as in the practice's moments, such as `scm.pull_request.merged`.
+- `origin` is `LIVE`, `MANUAL` or `BACKFILL`, as [How a review was occasioned](/contributor/practice-review-glossary#how-a-review-was-occasioned) tells.
+- `state` is the state of the work that the review recorded when Hephaestus admitted it, such as `{ state: "OPEN", draftStatus: "NOT_DRAFT" }`. A conversation has no state.
+- `admittedAt` is the time when Hephaestus admitted the review.
+- `review` has the `id` of the submitted review and the login of its `reviewer`.
+
+| Kind | Moments |
+| --- | --- |
+| `scm.pull_request` | `opened`, `ready`, `synchronized`, `edited`, `reviewed`, `merged`, `closed`, and `linked_issue_updated`, which only a recheck has |
+| `scm.issue` | `opened`, `updated`, `closed` |
+| `chat.conversation_thread` | `settled` |
+| `docs.document` | `published`, `updated`, `archived` |
+
+Each moment has the kind as its prefix, such as `scm.issue.closed`.
+
+#### The previous result
+
+`ctx.previous` is the latest current result of this practice about the same person on this work.
+It is `null` when there is none.
+
+| Field | What it holds |
+| --- | --- |
+| `reviewedAt` | The time of that result. |
+| `cause`, `signal` | Why that review ran: `moment`, `recheck` or `requested`, as in [the cause](#the-cause). |
+| `outcome` | `MET`, `NOT_MET`, `NOT_APPLICABLE` or `UNDETERMINED`. |
+| `severity` | For `NOT_MET`: `CRITICAL`, `MAJOR`, `MINOR` or `INFO`. |
+| `citations` | The places that the result cites: `sourceKind`, `path`, `startLine`, `endLine`, and `side` for a line of the change. |
+| `head` | For a pull request: the head that the earlier review read. |
+| `changeSince` | For a pull request: the change from `head` to the reviewed head, in the shape of `change`. It is absent when `head` is not an ancestor of the reviewed head, for example after a force push. An empty map means that nothing changed. |
+
+`previous` has no summary and no rationale, because a model wrote them.
+It has no delivery state.
+A result that an admin marked incorrect is not a current result.
+A result whose evidence the workspace no longer permits is not a current result either.
+
+The runner marks each lead on a line that `changeSince` adds.
+[What the review reads](#what-the-review-reads) tells how.
+
+#### The practice decides when it runs
+
+The moments and the review conditions of the practice decide when the practice is reviewed.
+The script does not decide it.
+Read `ctx.cause` to do different work at different moments.
+Do not read fields such as `work.is_merged` to find out if the moment came.
+If a practice must not run at a moment, remove the moment from the practice.
+
+#### Different work for each cause
+
+This script does different work on a request, a recheck, a push and a merge:
+
+```ts
+import {
+  addedComments,
+  definePracticeScript,
+  expectKind,
+  type DiffFile,
+  type Lead,
+} from "../lib/practice-script.ts";
+
+const OPEN_WORK = /\b(?:TODO|FIXME)\b/u;
+const TRACKING = /#\d+|\b[A-Z][A-Z0-9]+-\d+\b|https?:\/\/\S+/u;
+
+export default definePracticeScript({
+  meta: {
+    kinds: { "untracked-todo": "A TODO that the change adds, with no tracking reference." },
+  },
+  async run(ctx) {
+    expectKind(ctx, "scm.pull_request");
+    const todos = addedComments(ctx.change).filter(
+      (comment) => OPEN_WORK.test(comment.text) && !TRACKING.test(comment.text),
+    );
+    // The leads in the files of `only`, or in the whole change.
+    const leads = (only?: ReadonlyMap<string, DiffFile>): Lead[] =>
+      todos
+        .filter((comment) => only === undefined || only.has(comment.at.change))
+        .map((comment) => ({ at: comment.at, kind: "untracked-todo" }));
+
+    const { cause } = ctx;
+    if (cause.type === "requested") {
+      return {
+        leads: leads(),
+        directions: ["A person asked for this review. Judge the work as it is now."],
+      };
+    }
+    if (cause.type === "recheck") {
+      return {
+        leads: leads(),
+        directions: ["The last review found untracked TODOs. Check if the new commits track them."],
+      };
+    }
+    if (cause.signal === "scm.pull_request.synchronized") {
+      // Only the files that the new commits changed, when that change is known.
+      return { leads: leads(ctx.previous?.changeSince) };
+    }
+    if (cause.signal === "scm.pull_request.merged") {
+      return {
+        leads: leads(),
+        directions: ["The work is merged. Each untracked TODO is now on the target branch."],
+      };
+    }
+    return { leads: leads() };
+  },
+});
+```
+
+`docker/agents/practice-scripts/fixtures/by-cause.ts` holds the same script, and its tests run it.
+The script does not list its moments.
+If an admin removes `merged` from the practice, the `merged` branch does not run again.
+On `opened`, `ready` and `edited`, the last `return` runs.
 
 ### Primitives and tools
 
@@ -655,7 +834,7 @@ It also tells which reasons the review's pages show.
 | Time | The deadline of each script and of the stage, in the [workspace ABI](/contributor/agent/agent-workspace-abi#practice-script-validation-and-limits) |
 
 Read `ctx.remaining()` before an expensive step.
-Pass `ctx.signal` to long work, such as `agent`.
+Pass `ctx.abortSignal` to long work, such as `agent`.
 
 #### Requests in flight
 
@@ -702,6 +881,9 @@ The section holds these lines:
 - The sentence of each lead kind that the section shows, once.
 - For each lead: its kind, its place, the first line of its quote, and its facts as `key=value`.
 - `(model-rated)` after the kind of a rated lead. The review never sees the score or the rated value.
+- When [`changeSince`](#the-previous-result) is known, one line that counts the leads on lines added after the last review.
+  An example is `1 of 2 leads point at lines added since the last review of this practice, each marked (new).`
+  Each such lead has `(new)` after its kind.
 - The facts about the whole work.
 - One `Not rated` line for each `unrated` entry, such as `Not rated: 3 added comments (unavailable). Read those yourself.`
 
@@ -728,3 +910,5 @@ If the script does not run because a `required` slot is not available, the secti
 | Catch an error and return an empty result | Let `step` turn it into a reason. | The review must know what it must read itself. |
 | Name a lead kind by a verdict, such as `violation` | Name it by what the place is, such as `untracked-todo`. | A lead is a place, not a claim. |
 | Ask for a model by name | Use `ctx.models`. | The workspace owns the assignment and its data handling. |
+| Read `work.is_merged` or `work.state` to find out if the moment came | Read `ctx.cause`. Change the practice's moments and review conditions. | The practice decides when it is reviewed. A second rule in the script goes out of date. |
+| Return no leads for a kind of work that the script does not read | Call `expectKind`. | A wrong kind is an error of the script, not a review that found nothing. |

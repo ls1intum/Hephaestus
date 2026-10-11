@@ -45,7 +45,10 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
 
     private PracticeCatalogInjector practiceCatalogInjector() {
         return new PracticeCatalogInjector(
-                objectMapper, practiceRepository, InContextDeliveryGateFixtures.workspaceDefaults());
+                objectMapper,
+                practiceRepository,
+                InContextDeliveryGateFixtures.workspaceDefaults(),
+                mock(PracticeScriptInputs.class));
     }
 
     private PracticeReviewPreparation preparation(PracticeCatalogInjector practiceCatalogInjector) {

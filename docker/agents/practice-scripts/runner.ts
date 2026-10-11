@@ -10,6 +10,7 @@ import { globFilesSync } from "./lib/files.ts";
 import { parseDiff } from "./lib/diff-parser.ts";
 import { isJsonObject } from "./lib/json.ts";
 import { hostModels, ModelBudget } from "./lib/models-host.ts";
+import { InputReader } from "./lib/script-inputs.ts";
 import {
 	POSITIONAL_MS,
 	practiceFiles,
@@ -182,14 +183,26 @@ const environment = {
 	log: (line: string) => console.error(line),
 };
 
+// Each practice's cause and previous claim are staged beside its script.
+const inputs = new InputReader({
+	practicesDir,
+	contextDir,
+	repo: repoPath,
+	log: environment.log,
+});
+
 const queue = [...practiceModules];
 const outcomes: ScriptOutcome[] = [];
 await Promise.all(
 	Array.from({ length: Math.min(CONCURRENCY, queue.length) }, async () => {
 		for (let next = queue.shift(); next !== undefined; next = queue.shift()) {
 			const [slug, modulePath] = next;
+			// One practice's unreadable inputs fail only that practice's definition script.
+			const read = await inputs
+				.read(slug)
+				.catch((error: unknown) => ({ error: `the runner could not read them: ${String(error)}` }));
 			const start = Date.now();
-			const outcome = await runScript(slug, modulePath, environment);
+			const outcome = await runScript(slug, modulePath, environment, read);
 			const durationMs = Date.now() - start;
 			const { result } = outcome;
 			const files = practiceFiles(

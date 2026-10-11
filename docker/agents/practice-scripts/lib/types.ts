@@ -73,8 +73,8 @@ export interface DiffHunk {
 
 /**
  * Pull request metadata — the `metadata.json` written by
- * PullRequestContentSource.buildPullRequestMetadata() on the server.
- * Scripts should import this instead of declaring ad-hoc types.
+ * PullRequestContentSource.buildPullRequestMetadata() on the server — as a positional script reads it.
+ * A definition script reads `ctx.work`, which `lib/contract.ts` validates.
  */
 export interface PullRequestMetadata {
 	pr_number: number;

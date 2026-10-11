@@ -21,26 +21,40 @@ import {
 
 import { callLabel } from "./call-label.ts";
 import type {
+	Kind,
 	ModelSlot,
 	Need,
+	Cause,
 	ParsedMeta,
 	PracticeScriptResult,
 	Reason,
 	SlotModels,
+	StagedPrevious,
+	SubjectRole,
 	Unrated,
+	Work,
 } from "./contract.ts";
-import type { ArtifactMetadata, DiffFile } from "./types.ts";
+import type { DiffFile } from "./types.ts";
 
 export type {
+	CauseType,
 	Citation,
 	Facts,
+	Kind,
 	Lead,
 	ModelSlot,
+	Moment,
 	Need,
+	Cause,
 	PracticeScriptResult,
+	PreviousCitation,
 	Reason,
+	ReviewState,
+	SubjectRole,
 	Unrated,
+	Work,
 } from "./contract.ts";
+export type { DiffFile } from "./types.ts";
 
 export type ModelNeeds = Partial<Record<ModelSlot, Need>>;
 
@@ -54,12 +68,26 @@ export type Models<M extends ModelNeeds> = {
 	[K in keyof M & ModelSlot as M[K] extends "optional" ? K : never]?: SlotModels[K];
 };
 
-export interface PracticeScriptContext<M extends ModelNeeds> {
+/**
+ * The latest current claim of this practice about the same person on the same work. It holds no model
+ * text and no delivery state.
+ */
+export type Previous<K extends Kind = Kind> = StagedPrevious<K> &
+	(K extends "scm.pull_request"
+		? {
+				/**
+				 * What the work changed since `head`: the change from the previous head to this review's head.
+				 * Absent when `head` is not an ancestor of this head, such as after a force push.
+				 */
+				changeSince?: ReadonlyMap<string, DiffFile>;
+			}
+		: unknown);
+
+/** The fields of the context that do not depend on the kind of the work. */
+interface Common<M extends ModelNeeds> {
 	practice: { slug: string };
-	repo: string;
-	change: Map<string, DiffFile>;
-	changeDir: string;
-	metadata: ArtifactMetadata;
+	/** The role that the practice is about. */
+	subject: { role: SubjectRole };
 	context: { dir: string; reference: string };
 	/** The time of the review. Use it instead of the clock, so that one review gives the same leads. */
 	now: string;
@@ -67,9 +95,32 @@ export interface PracticeScriptContext<M extends ModelNeeds> {
 	tools: ToolSet;
 	remaining: () => { tokens: number; ms: number };
 	/** Aborts when this practice's model calls end, a few seconds before its process is stopped. */
-	signal: AbortSignal;
+	abortSignal: AbortSignal;
 	log: (text: string) => void;
 }
+
+/** The change of a pull request: the only kind of work that has one. */
+interface ChangeFields {
+	/** The absolute path of the repository checkout at the reviewed head. */
+	repo: string;
+	/** The parsed change: path → added and removed lines, keyed by line number. */
+	change: ReadonlyMap<string, DiffFile>;
+	/** The folder of the change view: `diff.patch`, `diff_stat.txt` and `files.json`. */
+	changeDir: string;
+}
+
+/**
+ * What `run` receives, one shape for each kind of work. `kind` tells them apart: `expectKind` or a
+ * `switch` on `ctx.kind` narrows it.
+ */
+export type PracticeScriptContext<M extends ModelNeeds, K extends Kind = Kind> = {
+	[P in K]: Common<M> & {
+		kind: P;
+		work: Work[P];
+		cause: Cause<P>;
+		previous: Previous<P> | null;
+	} & (P extends "scm.pull_request" ? ChangeFields : unknown);
+}[K];
 
 export interface PracticeScriptDefinition<M extends ModelNeeds> {
 	meta: PracticeScriptMeta<M>;
@@ -81,6 +132,19 @@ export function definePracticeScript<const M extends ModelNeeds>(
 	definition: PracticeScriptDefinition<M>,
 ): PracticeScriptDefinition<M> {
 	return definition;
+}
+
+/**
+ * Narrows `ctx` to the kind of work that the script reads. A practice reviews one kind of work, so a
+ * mismatch is an error of the script, never a review that found nothing.
+ */
+export function expectKind<C extends { kind: Kind }, K extends C["kind"]>(
+	ctx: C,
+	kind: K,
+): asserts ctx is Extract<C, { kind: K }> {
+	if (ctx.kind !== kind) {
+		throw new Error(`the script reads ${kind}, but this review is about ${ctx.kind}`);
+	}
 }
 
 /** A model call the runner refused or could not finish. It is never a statement about the work. */
@@ -260,7 +324,7 @@ export async function agent<T>(options: {
 	prompt: string;
 	schema: FlexibleSchema<T>;
 	maxSteps?: number;
-	signal?: AbortSignal;
+	abortSignal?: AbortSignal;
 }): Promise<{ output: T; steps: number }> {
 	if (options.model === undefined) {
 		throw new UnratedError("unavailable", "no chat model is bound");
@@ -277,7 +341,7 @@ export async function agent<T>(options: {
 		toolChoice: "required",
 		stopWhen: isStepCount(maxSteps),
 		temperature: 0,
-	}).generate({ prompt: options.prompt, abortSignal: options.signal });
+	}).generate({ prompt: options.prompt, abortSignal: options.abortSignal });
 	const submitted = result.staticToolCalls.find((call) => {
 		// The final step can also call a repository tool, which the SDK's type does not include.
 		const name: string = call.toolName;

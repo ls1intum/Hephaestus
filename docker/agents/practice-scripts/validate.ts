@@ -4,6 +4,9 @@
  * `<slug>.json` and the section `<slug>.md` that the review reads. A model slot is not available, so
  * an optional slot gives its items as not rated and a required slot skips the script.
  *
+ * Without `--cause` or `--signal`, the script runs as a review that a person requested, of the kind
+ * of work that `--metadata` holds, or of a pull request. Without `--previous`, no review came before.
+ *
  * Exit codes: 0 when the script ran, 1 when it failed or ran out of time, 2 when an option or an input
  * file is not usable.
  */
@@ -11,16 +14,24 @@ import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { parseArgs } from "node:util";
 
-import { isFailed, PRACTICE_SLUG } from "./lib/contract.ts";
+import {
+	isFailed,
+	KINDS,
+	MOMENTS,
+	PRACTICE_SLUG,
+	WORK_RECORDS,
+	type Kind,
+} from "./lib/contract.ts";
 import { parseDiff } from "./lib/diff-parser.ts";
 import { isJsonObject } from "./lib/json.ts";
 import { ModelBudget } from "./lib/models-host.ts";
+import { changeSince, parseInputs, type ScriptInputs } from "./lib/script-inputs.ts";
 import { POSITIONAL_MS, practiceFiles, readableRoots, runScript } from "./lib/script-run.ts";
 import type { ArtifactMetadata, DiffFile } from "./lib/types.ts";
 import { stagePracticeScripts } from "./stage.ts";
 
 const USAGE =
-	"Usage: node validate.ts --script <file.ts> --repo <clone> [--diff <patch>] [--metadata <json>] [--context <dir>] [--out <dir>]";
+	"Usage: node validate.ts --script <file.ts> --repo <clone> [--diff <patch>] [--metadata <json>] [--context <dir>] [--cause <json> | --signal <moment> [--recheck]] [--previous <json>] [--out <dir>]";
 
 /** Stop on input that the command cannot use, with one line and exit code 2. */
 function stop(problem: string): never {
@@ -55,6 +66,10 @@ function options() {
 				diff: { type: "string" },
 				metadata: { type: "string" },
 				context: { type: "string" },
+				cause: { type: "string" },
+				signal: { type: "string" },
+				recheck: { type: "boolean" },
+				previous: { type: "string" },
 				out: { type: "string" },
 			},
 		}).values;
@@ -64,7 +79,18 @@ function options() {
 	}
 }
 
-const { script, repo, context, out, diff, metadata: metadataFile } = options();
+const {
+	script,
+	repo,
+	context,
+	out,
+	diff,
+	metadata: metadataFile,
+	cause: causeFile,
+	signal,
+	recheck,
+	previous: previousFile,
+} = options();
 if (script === undefined || repo === undefined) {
 	stop(`--script and --repo are required. ${USAGE}`);
 }
@@ -97,27 +123,100 @@ if (metadataFile !== undefined) {
 	}
 	metadata = value;
 }
+
+/** A JSON file that an option names. */
+async function json(option: string, file: string): Promise<unknown> {
+	try {
+		return JSON.parse(await read(option, file));
+	} catch (error) {
+		return stop(`--${option}: ${file} is not JSON: ${messageOf(error)}`);
+	}
+}
+
+/** The kind whose record `metadata` holds, if one does. */
+const kindOfRecord = (record: unknown): Kind | undefined =>
+	KINDS.find((kind) => WORK_RECORDS[kind].schema.safeParse(record).success);
+
+function signalKind(moment: string): Kind {
+	const kind = KINDS.find((candidate) => MOMENTS[candidate].some((m) => m === moment));
+	return kind ?? stop(`--signal: ${moment} is not a moment of any kind of work`);
+}
+
+if (causeFile !== undefined && signal !== undefined) {
+	stop(`--cause and --signal exclude each other. ${USAGE}`);
+}
+if (recheck === true && signal === undefined) {
+	stop(`--recheck needs --signal. ${USAGE}`);
+}
+const admittedAt = new Date().toISOString();
+const kind =
+	signal === undefined
+		? (kindOfRecord(metadataFile === undefined ? undefined : metadata) ?? "scm.pull_request")
+		: signalKind(signal);
+const cause: unknown =
+	causeFile === undefined
+		? {
+				kind,
+				subject: { role: "AUTHOR" },
+				cause:
+					signal === undefined
+						? { type: "requested", origin: "MANUAL", state: {}, admittedAt }
+						: {
+								type: recheck === true ? "recheck" : "moment",
+								signal,
+								origin: "LIVE",
+								state: {},
+								admittedAt,
+							},
+			}
+		: await json("cause", causeFile);
+const previous = previousFile === undefined ? null : await json("previous", previousFile);
+const parsed = parseInputs(
+	slug,
+	cause,
+	previous,
+	metadataFile === undefined ? undefined : metadata,
+);
+let inputs: ScriptInputs = parsed;
+if (
+	"inputs" in parsed &&
+	parsed.inputs.kind === "scm.pull_request" &&
+	parsed.inputs.previous?.head !== undefined
+) {
+	const since = await changeSince(repo, parsed.inputs.previous.head, parsed.inputs.work.commit_sha);
+	if ("change" in since) {
+		inputs = { ...parsed, changeSince: since.change };
+	} else {
+		console.error(`No change since the previous review: ${since.unknown}`);
+	}
+}
 if (out !== undefined) {
 	await mkdir(out, { recursive: true }).catch((error: unknown) => {
 		stop(`--out: ${messageOf(error)}`);
 	});
 }
 
-const staged = await stagePracticeScripts({ [slug]: source });
+// The inputs go to the script directly, so no file is staged beside it.
+const staged = await stagePracticeScripts({ [slug]: source }, {});
 try {
 	const started = Date.now();
-	const outcome = await runScript(slug, path.join(staged.practices, `${slug}.ts`), {
-		readable: readableRoots([staged.stage, repo, context ?? ""]),
-		sources: { change, repo, contextDir: context ?? "", contextReference: context ?? "" },
-		metadata,
-		changeDir: "",
-		now: new Date(started).toISOString(),
-		stageEnd: Number.POSITIVE_INFINITY,
-		positionalMs: POSITIONAL_MS,
-		models: () => ({}),
-		budget: new ModelBudget(0, 1),
-		log: (line) => console.error(line),
-	});
+	const outcome = await runScript(
+		slug,
+		path.join(staged.practices, `${slug}.ts`),
+		{
+			readable: readableRoots([staged.stage, repo, context ?? ""]),
+			sources: { change, repo, contextDir: context ?? "", contextReference: context ?? "" },
+			metadata,
+			changeDir: "",
+			now: new Date(started).toISOString(),
+			stageEnd: Number.POSITIVE_INFINITY,
+			positionalMs: POSITIONAL_MS,
+			models: () => ({}),
+			budget: new ModelBudget(0, 1),
+			log: (line) => console.error(line),
+		},
+		inputs,
+	);
 	// Without `--out`, the section's pointer names the result that this command prints.
 	const jsonPath = path.join(out ?? "", `${slug}.json`);
 	const sectionPath = path.join(out ?? "", `${slug}.md`);

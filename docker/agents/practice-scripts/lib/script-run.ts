@@ -27,6 +27,7 @@ import {
 } from "./leads.ts";
 import { modelCall, type ModelBudget } from "./models-host.ts";
 import { parsePositionalResult, renderPositional } from "./practice-contract.ts";
+import { addedSince, type ScriptInputs } from "./script-inputs.ts";
 import type { PracticeResult } from "./types.ts";
 
 /** Heap per script, in MiB. */
@@ -170,10 +171,15 @@ function positional(slug: string, value: unknown, env: ScriptEnvironment): Pract
 	};
 }
 
+/**
+ * Run one practice's script. `inputs` are what a definition script reads about its review; a positional
+ * script does not read them.
+ */
 export async function runScript(
 	slug: string,
 	modulePath: string,
 	env: ScriptEnvironment,
+	inputs: ScriptInputs,
 ): Promise<ScriptOutcome> {
 	const left = env.stageEnd - Date.now();
 	if (left <= 0) {
@@ -315,6 +321,11 @@ export async function runScript(
 			return;
 		}
 		meta = parsed.data;
+		if ("error" in inputs) {
+			settled ??= fail(`the review's inputs are not valid: ${inputs.error}`);
+			child.kill("SIGKILL");
+			return;
+		}
 		const needs: Partial<Record<ModelSlot, Need>> = meta.models ?? {};
 		for (const slot of MODEL_SLOTS) {
 			const need = needs[slot];
@@ -355,12 +366,22 @@ export async function runScript(
 			return;
 		}
 		const { leads, dropped } = settleLeads(parsed.data, meta.kinds, env.sources);
+		const since = "changeSince" in inputs ? inputs.changeSince : undefined;
+		const marked =
+			since === undefined
+				? leads
+				: leads.map((lead) =>
+						addedSince(lead.at, since) ? { ...lead, newSinceLastReview: true as const } : lead,
+					);
 		settled = definitionOutcome("ok", {
-			leads,
+			leads: marked,
 			facts: parsed.data.facts ?? {},
 			unrated: parsed.data.unrated ?? [],
 			directions: parsed.data.directions ?? [],
 			dropped,
+			...(since === undefined
+				? {}
+				: { newSinceLastReview: marked.filter((lead) => lead.newSinceLastReview).length }),
 		});
 	};
 
@@ -453,6 +474,7 @@ export async function runScript(
 		repoPath: env.sources.repo,
 		diffFiles: env.sources.change,
 		metadata: env.metadata,
+		...("inputs" in inputs ? inputs : {}),
 		contextDir: env.sources.contextDir,
 		changeDir: env.changeDir,
 		contextReference: env.sources.contextReference,

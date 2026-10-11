@@ -8,6 +8,7 @@ import {
 	cosineSimilarity,
 	definePracticeScript,
 	embedMany,
+	expectKind,
 	generateText,
 	Output,
 	rerank,
@@ -63,7 +64,8 @@ const meta = {
 	},
 } as const;
 
-type Context = PracticeScriptContext<typeof meta.models>;
+/** The script reads the change of a pull request. */
+type Context = PracticeScriptContext<typeof meta.models, "scm.pull_request">;
 
 /** What one part of the script found. */
 interface Part {
@@ -176,7 +178,7 @@ async function declaration(ctx: Context): Promise<Part> {
 				"Find where the function parseDiff is declared. Submit the file path relative to the repository root and the 1-based line of the declaration.",
 			schema: z.object({ file: z.string(), line: z.int().positive() }),
 			maxSteps: 8,
-			signal: ctx.signal,
+			abortSignal: ctx.abortSignal,
 		}),
 	);
 	if ("unrated" in found) {
@@ -199,6 +201,7 @@ async function declaration(ctx: Context): Promise<Part> {
 export default definePracticeScript({
 	meta,
 	async run(ctx) {
+		expectKind(ctx, "scm.pull_request");
 		const comments = addedComments(ctx.change);
 		const untrackedTodos: Lead[] = [];
 		const unmarked: AddedComment[] = [];

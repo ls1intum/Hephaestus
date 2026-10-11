@@ -7,6 +7,7 @@ import { test, type TestContext } from "node:test";
 
 const validate = path.join(import.meta.dirname, "validate.ts");
 const fixtures = path.join(import.meta.dirname, "fixtures");
+const pullRequestRecord = path.join(import.meta.dirname, "fixtures", "pull-request-metadata.json");
 
 const CHANGE = [
 	"diff --git a/src/cart.ts b/src/cart.ts",
@@ -58,6 +59,8 @@ void test("a definition script runs without models and prints its result and its
 		path.join(root, "change.diff"),
 		"--context",
 		path.join(root, "context"),
+		"--metadata",
+		pullRequestRecord,
 		"--out",
 		out,
 	]);
@@ -118,7 +121,14 @@ void test("a positional script runs as the runner runs it", async (t) => {
 void test("a script that requires a model is skipped, and one that fails exits with an error", async (t) => {
 	const root = await workspace(t);
 	const repo = path.join(root, "repo");
-	const skipped = run(["--script", path.join(fixtures, "requires-decision.ts"), "--repo", repo]);
+	const skipped = run([
+		"--script",
+		path.join(fixtures, "requires-decision.ts"),
+		"--repo",
+		repo,
+		"--metadata",
+		pullRequestRecord,
+	]);
 	assert.equal(skipped.status, 0, skipped.stderr);
 	assert.partialDeepStrictEqual(
 		JSON.parse(printed(skipped.stdout).get("requires-decision.json") ?? ""),
@@ -153,6 +163,60 @@ void test("a script whose process is killed exits with an error that is not a ti
 		error: "the script's process was killed by SIGKILL",
 	});
 	assert.deepEqual(await readdir(temporary), []);
+});
+
+void test("a script runs as a request by hand, or at the moment and with the previous claim that the options give", async (t) => {
+	const root = await workspace(t);
+	const byCause = path.join(fixtures, "by-cause.ts");
+	const base = [
+		"--script",
+		byCause,
+		"--repo",
+		path.join(root, "repo"),
+		"--diff",
+		path.join(root, "change.diff"),
+		"--metadata",
+		pullRequestRecord,
+	];
+	const requested = run(base);
+	assert.equal(requested.status, 0, requested.stderr);
+	assert.match(
+		printed(requested.stdout).get("by-cause.md") ?? "",
+		/^- A person asked for this review\./u,
+	);
+	const merged = run([...base, "--signal", "scm.pull_request.merged"]);
+	assert.equal(merged.status, 0, merged.stderr);
+	assert.match(printed(merged.stdout).get("by-cause.md") ?? "", /^- The work is merged\./u);
+	await writeFile(
+		path.join(root, "previous.json"),
+		JSON.stringify({
+			reviewedAt: "2026-01-01T00:00:00Z",
+			cause: "moment",
+			outcome: "NOT_MET",
+			severity: "MINOR",
+			citations: [],
+		}),
+	);
+	const recheck = run([
+		...base,
+		"--signal",
+		"scm.pull_request.synchronized",
+		"--recheck",
+		"--previous",
+		path.join(root, "previous.json"),
+	]);
+	assert.equal(recheck.status, 0, recheck.stderr);
+	assert.match(
+		printed(recheck.stdout).get("by-cause.md") ?? "",
+		/^- The last review found untracked TODOs\./u,
+	);
+	// The record names the kind: a pull request record cannot be read as an issue.
+	const issue = run([...base, "--signal", "scm.issue.opened"]);
+	assert.equal(issue.status, 1);
+	assert.match(
+		printed(issue.stdout).get("by-cause.json") ?? "",
+		/"error": "the review's inputs are not valid: metadata\.json: work\./u,
+	);
 });
 
 void test("a file whose name is not a practice identifier, or a missing argument, is refused", async (t) => {
@@ -205,6 +269,28 @@ void test("an option or an input that the command cannot use stops it with one l
 			/^--diff: \S+notes\.diff holds no unified diff$/u,
 		],
 		[["--script", leads, "--repo", repo, "--out", path.join(root, "list.json")], /^--out: EEXIST/u],
+		[
+			[
+				"--script",
+				leads,
+				"--repo",
+				repo,
+				"--cause",
+				path.join(root, "list.json"),
+				"--signal",
+				"scm.issue.opened",
+			],
+			/^--cause and --signal exclude each other\. Usage: /u,
+		],
+		[["--script", leads, "--repo", repo, "--recheck"], /^--recheck needs --signal\. Usage: /u],
+		[
+			["--script", leads, "--repo", repo, "--signal", "scm.pull_request.manual_review"],
+			/^--signal: scm\.pull_request\.manual_review is not a moment of any kind of work$/u,
+		],
+		[
+			["--script", leads, "--repo", repo, "--previous", path.join(root, "broken.json")],
+			/^--previous: \S+broken\.json is not JSON: /u,
+		],
 		[
 			["--script", leads, "--repo", repo, "--metadata", path.join(root, "broken.json")],
 			/^--metadata: \S+broken\.json is not JSON: /u,

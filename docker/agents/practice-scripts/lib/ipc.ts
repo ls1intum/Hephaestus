@@ -5,7 +5,13 @@
  */
 import { z } from "zod";
 
-import { modelSlotSchema, type ModelSlot, type Reason, type SlotAnswer } from "./contract.ts";
+import {
+	modelSlotSchema,
+	type ModelSlot,
+	type PracticeInputs,
+	type Reason,
+	type SlotAnswer,
+} from "./contract.ts";
 import type { GrepMatch } from "./grep.ts";
 import type { ArtifactMetadata, DiffFile } from "./types.ts";
 
@@ -14,12 +20,17 @@ export interface ChildJob {
 	slug: string;
 	repoPath: string;
 	diffFiles: Map<string, DiffFile>;
+	/** The positional contract's metadata argument. */
 	metadata: ArtifactMetadata;
+	/** What a definition script reads about its review, when the runner could validate it. */
+	inputs?: PracticeInputs;
+	/** The change since the previous review's head, when it is known. */
+	changeSince?: Map<string, DiffFile>;
 	contextDir: string;
 	changeDir: string;
 	contextReference: string;
 	now: string;
-	/** Epoch milliseconds at which the script's model calls and signal end; its process ends later. */
+	/** Epoch milliseconds at which the script's model calls and abort signal end; its process ends later. */
 	deadline: number;
 }
 
