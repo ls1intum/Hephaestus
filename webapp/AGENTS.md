@@ -9,6 +9,8 @@ React 19 SPA on TanStack Router/Query, Tailwind 4, shadcn primitives over **Base
 (`@base-ui/react`) — not Radix. Vitest + Storybook for tests, oxlint for lint and oxfmt for format,
 Vite for the build. React Compiler runs at build time.
 
+[DESIGN.md](DESIGN.md) owns the visual intent and points to the existing composition recipes.
+
 This file explains constraints that are easy to miss.
 It omits conventions that the tree or a lint message at the call site already explains.
 
