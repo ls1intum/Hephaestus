@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.90.2
+
+### Patch Changes
+
+- Conversation comments on a GitHub pull request now belong to that pull request, even where Hephaestus once also stored the pull request's number as an issue. The next repository sync moves such comments to their pull request without changing the comments themselves, so activity shows them as pull request activity. GitLab issues and merge requests that share a number stay separate.
+- A GitHub pull request that Hephaestus first saw through one of its comments now takes on the pull request's own GitHub identity at the next full sync or pull request event, even when that event is older than what is stored. It stays the same pull request in Hephaestus, so its existing comments, reviews and review requests keep their links.
+- Operators can prepare the apex and wildcard certificate with DNS-01 before enabling workspace subdomains. Turning workspace routing off keeps that certificate configuration in place.
+- Public workspace activity loads more efficiently while preserving privacy choices, contribution totals and first contribution dates.
+- Public activity names now open the person’s totals and weekly contributions, with a separate provider profile link. Activity tables use the available page width and keep names and positions visible while the figures scroll on small screens.
+- Review details now separate the wait before an attempt from preparation and execution. For retried reviews, the request-to-attempt span includes earlier attempts and retry waits. Active phases show "In progress", and missing phase boundaries show "Not recorded".
+- The significant-decisions practice now illustrates minor rationale gaps with persisted fields, consistent with its architectural scope.
+- When a canceled sync or backfill is still stopping, admins can check and retry it from the integration pages. The confirmation now reports what the server returned, such as a sync that is still stopping, queued or in progress, instead of always saying that a sync started.
+
 ## 0.90.1
 
 ### Patch Changes
