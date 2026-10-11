@@ -11,6 +11,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRep
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubRepositoryNameParser;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncProperties;
+import de.tum.cit.aet.hephaestus.integration.scm.github.issuecomment.GitHubIssueCommentSyncService;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceActorSelector;
 import java.time.Duration;
 import java.time.Instant;
@@ -31,6 +32,7 @@ public class GitHubBackfillRepair {
     private final BackfillRestartProvider backfillState;
     private final ActivityLedgerRepair ledger;
     private final WorkspaceActorSelector actors;
+    private final GitHubIssueCommentSyncService comments;
     private final Cache<Long, Boolean> inspections = Caffeine.newBuilder()
             .maximumSize(10000)
             .expireAfterWrite(Duration.ofHours(1))
@@ -45,7 +47,11 @@ public class GitHubBackfillRepair {
             return target;
         }
         var repo = repository.get();
-        if (manual) ledger.reconcileRepository(target.scopeId(), repo.getId());
+        if (manual) {
+            // Comment parents before the ledger: the activity read groups a comment by its stored parent.
+            comments.repairCanonicalParents(repo.getId());
+            ledger.reconcileRepository(target.scopeId(), repo.getId());
+        }
         if (!target.isPullRequestBackfillComplete()) return target;
         if (!manual
                 && target.backfillLastRunAt() != null

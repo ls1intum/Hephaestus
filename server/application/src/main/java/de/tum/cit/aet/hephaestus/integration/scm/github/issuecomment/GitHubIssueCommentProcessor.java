@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.issuecomment;
 
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
@@ -26,6 +27,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.user.GitHubUserProcessor
 import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
 import java.time.Instant;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
@@ -36,6 +38,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -102,16 +105,7 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
             return null;
         }
 
-        // Look up parent: try Issue first, then PullRequest (needed because
-        // IssueRepository filters by TYPE = Issue, excluding PullRequest rows)
-        Issue issue = issueRepository
-                .findByRepositoryIdAndNumber(context.repository().getId(), issueNumber)
-                .orElse(null);
-        if (issue == null) {
-            issue = pullRequestRepository
-                    .findByRepositoryIdAndNumber(context.repository().getId(), issueNumber)
-                    .orElse(null);
-        }
+        Issue issue = findParent(context.repository(), issueNumber, context);
         if (issue == null) {
             log.warn(
                     "Skipped comment processing: reason=parentNotFound, repoId={}, issueNumber={}, commentId={}",
@@ -167,15 +161,7 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
             return null;
         }
 
-        // Try to find existing parent entity: Issue first, then PullRequest
-        Issue issue = issueRepository
-                .findByRepositoryIdAndNumber(context.repository().getId(), issueDto.number())
-                .orElse(null);
-        if (issue == null) {
-            issue = pullRequestRepository
-                    .findByRepositoryIdAndNumber(context.repository().getId(), issueDto.number())
-                    .orElse(null);
-        }
+        Issue issue = findParent(context.repository(), issueDto.number(), context);
 
         // If parent doesn't exist, create a minimal entity from webhook data
         if (issue == null) {
@@ -331,15 +317,52 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
                     "Concurrent parent creation detected, looking up existing entity: repoId={}, issueNumber={}",
                     repository.getId(),
                     issueDto.number());
-            // Try Issue first, then PullRequest (IssueRepository filters by TYPE = Issue)
-            Issue found = issueRepository
-                    .findByRepositoryIdAndNumber(repository.getId(), issueDto.number())
-                    .orElse(null);
-            if (found != null) return found;
-            return pullRequestRepository
-                    .findByRepositoryIdAndNumber(repository.getId(), issueDto.number())
-                    .orElse(null);
+            return findParent(repository, issueDto.number(), context);
         }
+    }
+
+    /**
+     * The stored parent of a comment on {@code number}. GitHub numbers issues and pull requests in one space
+     * per repository, so a stored pull request of this provider is the parent even where an issue row with the
+     * same number also exists; that issue row is the parent only without one. The issue row is not changed.
+     */
+    private @Nullable Issue findParent(Repository repository, int number, ProcessingContext context) {
+        Optional<PullRequest> pullRequest = pullRequestRepository
+                .findByRepositoryIdAndNumber(repository.getId(), number)
+                .filter(pr -> Objects.equals(pr.getProvider().getId(), context.providerId()));
+        if (repository.getProvider().getType() == IdentityProviderType.GITHUB && pullRequest.isPresent()) {
+            return pullRequest.get();
+        }
+        return issueRepository
+                .findByRepositoryIdAndNumber(repository.getId(), number)
+                .filter(issue -> Objects.equals(issue.getProvider().getId(), context.providerId()))
+                .orElseGet(() -> pullRequest.orElse(null));
+    }
+
+    /** A bounded parent repair: the last comment id it covered and how many comments it moved. */
+    public record ParentRepair(long lastId, int moved) {}
+
+    /** The highest comment id {@link #moveToCanonicalParents} may move in this pass. */
+    @Transactional(readOnly = true)
+    public long canonicalParentCeiling(long repositoryId) {
+        return commentRepository.findCanonicalParentCeiling(repositoryId);
+    }
+
+    /**
+     * Moves one chunk of this repository's comments, ids in {@code (after, ceiling]}, from an issue row a stored
+     * pull request contradicts to that pull request. Its own transaction, and a bulk update that clears the
+     * persistence context, keep it apart from any managed parent and its orphan-removing comment collection.
+     * Comment ids, content, authors, times and the source rows stay; no comment event is published, as only
+     * the parent moved.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public ParentRepair moveToCanonicalParents(long repositoryId, long after, long ceiling, int limit) {
+        List<Long> ids = commentRepository.findCanonicalParentChunk(repositoryId, after, ceiling, limit);
+        if (ids.isEmpty()) {
+            return new ParentRepair(ceiling, 0);
+        }
+        long last = ids.getLast();
+        return new ParentRepair(last, commentRepository.moveToCanonicalPullRequest(repositoryId, ids));
     }
 
     /**

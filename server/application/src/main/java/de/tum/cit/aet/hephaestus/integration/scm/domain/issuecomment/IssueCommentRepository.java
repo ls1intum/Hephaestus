@@ -19,6 +19,50 @@ import org.springframework.stereotype.Repository;
 @Repository
 @WorkspaceAgnostic("Comments scoped through issue_id -> repository.workspace_id")
 public interface IssueCommentRepository extends JpaRepository<IssueComment, Long> {
+    /**
+     * Comment {@code c} of repository {@code :repositoryId} hangs on issue row {@code i}, and that number is a
+     * stored GitHub pull request {@code p} of the same provider. GitHub numbers issues and pull requests in
+     * one space per repository, so {@code p} is the comment's parent. Native ids are not compared: an issue
+     * resource's id is not the pull request's. GitLab numbers issues and merge requests separately and is
+     * never a witness.
+     */
+    String CANONICAL_PULL_REQUEST_PARENT = """
+            FROM issue i JOIN issue p ON p.repository_id=i.repository_id AND p.number=i.number
+                AND p.provider_id=i.provider_id AND p.issue_type='PULL_REQUEST' AND p.id<>i.id
+            JOIN identity_provider ip ON ip.id=p.provider_id AND ip.type='GITHUB'
+            JOIN repository r ON r.id=i.repository_id AND r.provider_id=i.provider_id
+            WHERE i.id=c.issue_id AND i.issue_type='ISSUE' AND i.repository_id=:repositoryId
+              AND c.provider_id=i.provider_id
+            """;
+
+    /** The highest comment id the repair may move now; later comments wait for the next pass. */
+    @Query(
+            value = "SELECT coalesce(max(c.id),0) FROM issue_comment c WHERE EXISTS (SELECT 1 "
+                    + CANONICAL_PULL_REQUEST_PARENT + ")",
+            nativeQuery = true)
+    long findCanonicalParentCeiling(@Param("repositoryId") long repositoryId);
+
+    @Query(
+            value = "SELECT c.id FROM issue_comment c WHERE c.id > :after AND c.id <= :ceiling AND EXISTS (SELECT 1 "
+                    + CANONICAL_PULL_REQUEST_PARENT + ") ORDER BY c.id LIMIT :limit",
+            nativeQuery = true)
+    List<Long> findCanonicalParentChunk(
+            @Param("repositoryId") long repositoryId,
+            @Param("after") long after,
+            @Param("ceiling") long ceiling,
+            @Param("limit") int limit);
+
+    /**
+     * Moves only the selected comments from a contradicted issue row to their pull request.
+     * The witness is evaluated again on the row being updated, so a current parent that no longer matches the
+     * witness is left as it is. Only the parent column changes: no other comment field, source row or collection.
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(
+            value = "UPDATE issue_comment c SET issue_id=p.id " + CANONICAL_PULL_REQUEST_PARENT + " AND c.id IN :ids",
+            nativeQuery = true)
+    int moveToCanonicalPullRequest(@Param("repositoryId") long repositoryId, @Param("ids") Collection<Long> ids);
+
     @Query("SELECT c.id AS id, c.nativeId AS nativeId FROM IssueComment c WHERE c.issue.id = :parentId")
     List<NoteIdProjection> findNoteIdsByParentId(@Param("parentId") long parentId);
 

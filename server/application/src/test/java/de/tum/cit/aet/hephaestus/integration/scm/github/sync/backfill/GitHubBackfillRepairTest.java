@@ -20,6 +20,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncProperties;
+import de.tum.cit.aet.hephaestus.integration.scm.github.issuecomment.GitHubIssueCommentSyncService;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceActorSelector;
 import java.time.Duration;
@@ -55,6 +56,9 @@ class GitHubBackfillRepairTest extends BaseUnitTest {
     private ActivityLedgerRepair ledger;
 
     @Mock
+    private GitHubIssueCommentSyncService comments;
+
+    @Mock
     private WorkspaceActorSelector actors;
 
     @Mock
@@ -74,7 +78,8 @@ class GitHubBackfillRepairTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        repair = new GitHubBackfillRepair(repositories, pullRequests, clients, properties, state, ledger, actors);
+        repair = new GitHubBackfillRepair(
+                repositories, pullRequests, clients, properties, state, ledger, actors, comments);
         target = SyncTargetTestBuilder.syncTarget()
                 .id(7L)
                 .scopeId(3L)

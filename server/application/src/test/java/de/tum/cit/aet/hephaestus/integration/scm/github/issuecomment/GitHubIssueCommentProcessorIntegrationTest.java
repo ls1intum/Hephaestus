@@ -4,6 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+import de.tum.cit.aet.hephaestus.activity.ActivityEventType;
+import de.tum.cit.aet.hephaestus.activity.overview.ActivityQueryRepository;
+import de.tum.cit.aet.hephaestus.activity.overview.ActivityScope;
+import de.tum.cit.aet.hephaestus.activity.overview.ActivityWorkCursor;
+import de.tum.cit.aet.hephaestus.core.time.TimeRange;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
@@ -29,12 +34,19 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.UUID;
 import org.hibernate.Hibernate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Limit;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
 
@@ -71,6 +83,18 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private RecordingScmEventListener eventListener;
+
+    @Autowired
+    private GitHubIssueCommentSyncService commentSyncService;
+
+    @Autowired
+    private TransactionTemplate transactionTemplate;
+
+    @Autowired
+    private JdbcTemplate jdbc;
+
+    @Autowired
+    private ActivityQueryRepository activityQueries;
 
     private Repository testRepository;
     private Workspace testWorkspace;
@@ -157,6 +181,226 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
                 "OWNER",
                 Instant.now(),
                 Instant.now());
+    }
+
+    private Repository storedRepository(IdentityProvider provider, long nativeId, String nameWithOwner) {
+        var repository = new Repository();
+        repository.setNativeId(nativeId);
+        repository.setName("Other");
+        repository.setNameWithOwner(nameWithOwner);
+        repository.setHtmlUrl("https://example.com/" + nameWithOwner);
+        repository.setVisibility(Repository.Visibility.PUBLIC);
+        repository.setDefaultBranch("main");
+        repository.setCreatedAt(Instant.now());
+        repository.setUpdatedAt(Instant.now());
+        repository.setPushedAt(Instant.now());
+        repository.setProvider(provider);
+        return repositoryRepository.save(repository);
+    }
+
+    private <T extends Issue> T stored(T work, Repository repository, int number, long nativeId) {
+        work.setNativeId(nativeId);
+        work.setProvider(repository.getProvider());
+        work.setNumber(number);
+        work.setTitle("Work " + number);
+        work.setState(Issue.State.OPEN);
+        work.setHtmlUrl(repository.getHtmlUrl() + "/" + number);
+        work.setCreatedAt(Instant.now());
+        work.setUpdatedAt(Instant.now());
+        work.setRepository(repository);
+        return work;
+    }
+
+    private PullRequest storedPullRequest(Repository repository, int number, long nativeId) {
+        PullRequest pr = stored(new PullRequest(), repository, number, nativeId);
+        pr.setAdditions(0);
+        pr.setDeletions(0);
+        pr.setChangedFiles(0);
+        pr.setCommits(0);
+        return pullRequestRepository.save(pr);
+    }
+
+    /** A comment stored on {@code parent} as an earlier version did, with no processing. */
+    private IssueComment storedComment(Issue parent, long nativeId) {
+        var comment = new IssueComment();
+        comment.setNativeId(nativeId);
+        comment.setProvider(parent.getProvider());
+        comment.setIssue(parent);
+        comment.setBody("Comment " + nativeId);
+        comment.setHtmlUrl(parent.getHtmlUrl() + "#issuecomment-" + nativeId);
+        comment.setCreatedAt(Instant.parse("2025-01-01T10:00:00Z"));
+        comment.setUpdatedAt(Instant.parse("2025-01-01T10:00:00Z"));
+        comment.setAuthorAssociation(AuthorAssociation.fromString("OWNER"));
+        return commentRepository.save(comment);
+    }
+
+    private IssueComment reloaded(IssueComment comment) {
+        return commentRepository
+                .findAllByIdWithRelations(List.of(Objects.requireNonNull(comment.getId())))
+                .getFirst();
+    }
+
+    private Long parentOf(IssueComment comment) {
+        return Objects.requireNonNull(
+                Objects.requireNonNull(reloaded(comment).getIssue()).getId());
+    }
+
+    /**
+     * GitHub numbers issues and pull requests in one space per repository: a stored pull request is the parent
+     * of a comment on its number, even beside an issue row with that number and a different native id.
+     */
+    @Nested
+    class CanonicalPullRequestParent {
+
+        @Test
+        void shouldMoveAReplayedCommentToTheStoredPullRequestWithoutAnEvent() {
+            GitHubCommentDTO dto = createCommentDTO(TEST_COMMENT_ID, "On the pull request");
+            IssueComment first = Objects.requireNonNull(processor.process(dto, 42, createContext()));
+            assertThat(parentOf(first)).isEqualTo(testIssue.getId());
+            PullRequest pr = storedPullRequest(testRepository, 42, TEST_ISSUE_ID + 1);
+            eventListener.clear();
+
+            IssueComment replayed = Objects.requireNonNull(processor.process(dto, 42, createContext()));
+
+            assertThat(replayed.getId()).isEqualTo(first.getId());
+            assertThat(reloaded(replayed).getNativeId()).isEqualTo(TEST_COMMENT_ID);
+            assertThat(reloaded(replayed).getBody()).isEqualTo("On the pull request");
+            assertThat(parentOf(replayed)).isEqualTo(pr.getId());
+            assertThat(issueRepository.findById(Objects.requireNonNull(testIssue.getId())))
+                    .isPresent();
+            assertThat(eventListener.ofType(ScmDomainEvent.CommentUpdated.class))
+                    .isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.CommentCreated.class))
+                    .isEmpty();
+        }
+
+        @Test
+        void shouldMoveStoredCommentsOnceAndLeaveEveryOtherParent() {
+            // A retired issue row keeps its tombstone; only its comments move. Retired before any comment is
+            // stored, so saving the detached row cannot orphan one.
+            testIssue.setDeletedAt(Instant.parse("2025-02-01T00:00:00Z"));
+            testIssue = issueRepository.save(testIssue);
+            IssueComment first = storedComment(testIssue, 1);
+            IssueComment second = storedComment(testIssue, 2);
+            Issue genuine = issueRepository.save(stored(new Issue(), testRepository, 43, 4300));
+            IssueComment onGenuine = storedComment(genuine, 3);
+            Repository otherRepository =
+                    storedRepository(githubProvider, TEST_REPO_ID + 1, "HephaestusTest/OtherRepository");
+            Issue sameNumberElsewhere = issueRepository.save(stored(new Issue(), otherRepository, 42, 4201));
+            IssueComment elsewhere = storedComment(sameNumberElsewhere, 4);
+            var gitlab = gitProviderRepository.save(
+                    new IdentityProvider(IdentityProviderType.GITLAB, "https://gitlab.example.com"));
+            Repository gitlabRepository = storedRepository(gitlab, 77, "group/project");
+            Issue gitlabIssue = issueRepository.save(stored(new Issue(), gitlabRepository, 42, 4202));
+            storedPullRequest(gitlabRepository, 42, 4203);
+            IssueComment onGitlabIssue = storedComment(gitlabIssue, 5);
+            PullRequest pr = storedPullRequest(testRepository, 42, TEST_ISSUE_ID + 1);
+
+            assertThat(commentSyncService.repairCanonicalParents(testRepository.getId()))
+                    .isEqualTo(2);
+            assertThat(commentSyncService.repairCanonicalParents(testRepository.getId()))
+                    .isZero();
+            assertThat(commentSyncService.repairCanonicalParents(gitlabRepository.getId()))
+                    .isZero();
+            assertThat(Objects.requireNonNull(processor.process(
+                                    createCommentDTO(5L, "Comment 5"),
+                                    42,
+                                    ProcessingContext.forSync(testWorkspace.getId(), gitlabRepository)))
+                            .getIssue())
+                    .isNotNull()
+                    .extracting(Issue::getId)
+                    .isEqualTo(gitlabIssue.getId());
+
+            assertThat(parentOf(first)).isEqualTo(pr.getId());
+            assertThat(parentOf(second)).isEqualTo(pr.getId());
+            assertThat(reloaded(first).getBody()).isEqualTo("Comment 1");
+            assertThat(reloaded(first).getNativeId()).isEqualTo(1L);
+            assertThat(parentOf(onGenuine)).isEqualTo(genuine.getId());
+            assertThat(parentOf(elsewhere)).isEqualTo(sameNumberElsewhere.getId());
+            assertThat(parentOf(onGitlabIssue)).isEqualTo(gitlabIssue.getId());
+            assertThat(issueRepository.findById(Objects.requireNonNull(testIssue.getId())))
+                    .hasValueSatisfying(issue -> {
+                        assertThat(issue.getDeletedAt()).isEqualTo(Instant.parse("2025-02-01T00:00:00Z"));
+                        assertThat(issue.getNativeId()).isEqualTo(TEST_ISSUE_ID);
+                    });
+            assertThat(pullRequestRepository.findById(Objects.requireNonNull(pr.getId())))
+                    .hasValueSatisfying(
+                            stored -> assertThat(stored.getNativeId()).isEqualTo(TEST_ISSUE_ID + 1));
+        }
+
+        @Test
+        void shouldRegroupTheSameLedgerEventWithoutChangingItsFacts() {
+            IssueComment comment = storedComment(testIssue, 1);
+            PullRequest pr = storedPullRequest(testRepository, 42, TEST_ISSUE_ID + 1);
+            long actorId = Objects.requireNonNull(jdbc.queryForObject(
+                    "INSERT INTO \"user\"(native_id,provider_id,login,type) VALUES (?,?,?,'USER') RETURNING id",
+                    Long.class,
+                    77,
+                    githubProvider.getId(),
+                    "commenter"));
+            UUID eventId = UUID.randomUUID();
+            jdbc.update("""
+                    INSERT INTO activity_event(id,workspace_id,event_key,event_type,occurred_at,actor_id,
+                        repository_id,target_type,target_id,ingested_at)
+                    VALUES (?,?,'stored-comment','COMMENT_CREATED','2025-01-01 10:00:00Z',?,?,'issue_comment',?,now())
+                    """, eventId, testWorkspace.getId(), actorId, testRepository.getId(), comment.getId());
+            var before = jdbc.queryForMap("SELECT * FROM activity_event WHERE id=?", eventId);
+            var scope =
+                    new ActivityScope(testWorkspace.getId(), Set.of(actorId), Set.of(), Set.of(testRepository.getId()));
+            var range = new TimeRange(Instant.parse("2024-01-01T00:00:00Z"), Instant.parse("2026-01-01T00:00:00Z"));
+            var cursor = new ActivityWorkCursor(range.to(), range.to(), "");
+            assertThat(activityQueries.findWork(
+                            scope, List.of(ActivityEventType.COMMENT_CREATED), range, cursor, Limit.of(10)))
+                    .singleElement()
+                    .satisfies(group -> assertThat(group.getId()).isEqualTo("work:" + testIssue.getId()));
+
+            assertThat(commentSyncService.repairCanonicalParents(testRepository.getId()))
+                    .isEqualTo(1);
+
+            assertThat(jdbc.queryForMap("SELECT * FROM activity_event WHERE id=?", eventId))
+                    .isEqualTo(before);
+            assertThat(activityQueries.findWork(
+                            scope, List.of(ActivityEventType.COMMENT_CREATED), range, cursor, Limit.of(10)))
+                    .singleElement()
+                    .satisfies(group -> {
+                        assertThat(group.getId()).isEqualTo("work:" + pr.getId());
+                        assertThat(group.getComments()).isEqualTo(1);
+                    });
+        }
+
+        @Test
+        void shouldContinueAfterTheLastIdUnderTheFixedCeilingAndRecheckTheParent() {
+            IssueComment first = storedComment(testIssue, 1);
+            IssueComment second = storedComment(testIssue, 2);
+            PullRequest pr = storedPullRequest(testRepository, 42, TEST_ISSUE_ID + 1);
+            long ceiling = processor.canonicalParentCeiling(testRepository.getId());
+            assertThat(ceiling).isEqualTo(second.getId());
+            // Stored after the pass began: above its ceiling.
+            IssueComment later = storedComment(testIssue, 3);
+
+            var chunk = processor.moveToCanonicalParents(testRepository.getId(), 0, ceiling, 1);
+            assertThat(chunk.lastId()).isEqualTo(first.getId());
+            assertThat(chunk.moved()).isEqualTo(1);
+            assertThat(parentOf(second)).isEqualTo(testIssue.getId());
+
+            // A parent changed after selection is not overwritten by the selected-ID update.
+            Issue genuine = issueRepository.save(stored(new Issue(), testRepository, 43, 4300));
+            IssueComment changed = reloaded(second);
+            changed.setIssue(genuine);
+            commentRepository.save(changed);
+            int moved = Objects.requireNonNull(
+                    transactionTemplate.execute(status -> commentRepository.moveToCanonicalPullRequest(
+                            testRepository.getId(), List.of(Objects.requireNonNull(second.getId())))));
+            assertThat(moved).isZero();
+            assertThat(parentOf(second)).isEqualTo(genuine.getId());
+
+            var rest = processor.moveToCanonicalParents(testRepository.getId(), chunk.lastId(), ceiling, 1);
+            assertThat(rest.moved()).isZero();
+            assertThat(parentOf(later)).isEqualTo(testIssue.getId());
+            assertThat(commentSyncService.repairCanonicalParents(testRepository.getId()))
+                    .isEqualTo(1);
+            assertThat(parentOf(later)).isEqualTo(pr.getId());
+        }
     }
 
     @Nested
@@ -412,6 +656,21 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
 
             // Verify no new issue was created
             assertThat(issueRepository.count()).isEqualTo(initialCount);
+        }
+
+        @Test
+        void shouldUseTheStoredPullRequestForAWebhookBesideAnIssueSibling() {
+            PullRequest pr = storedPullRequest(testRepository, 42, TEST_ISSUE_ID + 1);
+            GitHubCommentDTO dto = createCommentDTO(TEST_COMMENT_ID, "Conversation");
+            GitHubIssueDTO issueDto = createIssueDTOForExistingIssue(TEST_ISSUE_ID, 42);
+
+            IssueComment comment =
+                    Objects.requireNonNull(processor.processWithParentCreation(dto, issueDto, createContext()));
+
+            assertThat(parentOf(comment)).isEqualTo(pr.getId());
+            assertThat(reloaded(comment).getNativeId()).isEqualTo(TEST_COMMENT_ID);
+            assertThat(issueRepository.findById(Objects.requireNonNull(testIssue.getId())))
+                    .isPresent();
         }
 
         @Test
