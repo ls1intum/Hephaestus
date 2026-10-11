@@ -802,6 +802,7 @@ const stack = args[args.indexOf("--project-name") + 1];
 const image = stack === process.env.UNLOCKED_STACK ? "example.invalid/unverified:latest" : ${JSON.stringify(image)};
 console.log(JSON.stringify({ services: Object.fromEntries(Object.entries(declared).map(([name, service]) => [name, { ...service, image }])) }));
 }
+if (args.includes("pull") && process.env.FAIL_PULL === args[args.indexOf("--project-name") + 1]) process.exit(1);
 if (args.includes("stop")) {
 const service = declared[args.at(-1)];
 if (service === undefined || process.env.FAIL_WORKER_STOP === "1") process.exit(1);
@@ -857,6 +858,7 @@ await main(${JSON.stringify(units)});\n`,
 			failVerification = false,
 			failWorktreeRemove = false,
 			failWorkerStop = false,
+			failPull,
 			unlockedStack,
 			channel = "test",
 		}: {
@@ -864,6 +866,8 @@ await main(${JSON.stringify(units)});\n`,
 			failVerification?: boolean;
 			failWorktreeRemove?: boolean;
 			failWorkerStop?: boolean;
+			/** The stack whose image pull fails. */
+			failPull?: string;
 			channel?: string;
 			unlockedStack?: string;
 		} = {}) =>
@@ -883,6 +887,7 @@ await main(${JSON.stringify(units)});\n`,
 						FAIL_VERIFICATION: failVerification ? "1" : "0",
 						FAIL_WORKTREE_REMOVE: failWorktreeRemove ? "1" : "0",
 						FAIL_WORKER_STOP: failWorkerStop ? "1" : "0",
+						FAIL_PULL: failPull,
 						UNLOCKED_STACK: unlockedStack,
 					}),
 				},
@@ -1016,17 +1021,22 @@ await test(
 			assert.equal(calls[1], "trusted verifier");
 			const docker = calls.filter((line) => line.startsWith("docker"));
 			// A first install runs no worker yet, so nothing is stopped.
-			assert.equal(docker.length, 7);
+			assert.equal(docker.length, 10);
 			for (const [index, stack] of ["app", "core", "proxy"].entries()) {
 				assert.match(
 					docker[index] ?? "",
 					new RegExp(`--project-name ${stack} .* config --format json$`, "u"),
 				);
+				// Every verified stack's images are fetched before anything starts.
+				assert.match(
+					docker[index + 3] ?? "",
+					new RegExp(`--project-name ${stack} .* pull --policy missing$`, "u"),
+				);
 			}
-			assert.match(docker[3] ?? "", /--project-name core .* up .* nats-server$/u);
+			assert.match(docker[6] ?? "", /--project-name core .* up .* nats-server$/u);
 			for (const [index, stack] of ["app", "core", "proxy"].entries()) {
 				assert.match(
-					docker[index + 4] ?? "",
+					docker[index + 7] ?? "",
 					new RegExp(`--project-name ${stack} .* up .* --remove-orphans$`, "u"),
 				);
 			}
@@ -1078,7 +1088,41 @@ await test(
 			assert.match(result.stderr, /proxy renders images outside the release lock/u);
 			assert.deepEqual(await readApplied(path.join(directory, "applied.json")), previous);
 			assert.equal(await readlink(path.join(directory, "tooling")), fixture.bootstrap);
-			assert.doesNotMatch(await fixture.calls(), / up | stop |systemctl/u);
+			assert.doesNotMatch(await fixture.calls(), / pull | up | stop |systemctl/u);
+		} finally {
+			await rm(directory, { recursive: true, force: true });
+		}
+	},
+);
+
+await test(
+	"a failed image pull leaves the running worker, every stack, the applied release and the tooling untouched",
+	reconcilerSubprocess,
+	async () => {
+		const directory = await mkdtemp(path.join(tmpdir(), "reconcile-pull-"));
+		try {
+			const fixture = await reconcilerFixture(directory);
+			const previous = { ...fixture.record, release: "v0.9.0", commit: fixture.commitOf("v0.9.0") };
+			await writeFile(path.join(directory, "applied.json"), JSON.stringify(previous));
+			await fixture.retainLock("v0.9.0", previous.commit);
+			// The first tick adopts the recorded release's tooling, as every startup does.
+			const adopted = fixture.run();
+			assert.equal(adopted.status, 0, adopted.stderr);
+			const beforeCalls = await fixture.calls();
+
+			const result = fixture.run({ failPull: "core" });
+
+			assert.notEqual(result.status, 0);
+			assert.match(result.stderr, /docker exited with code 1/u);
+			assert.deepEqual(await readApplied(path.join(directory, "applied.json")), previous);
+			assert.equal(
+				await readlink(path.join(directory, "tooling")),
+				path.join(directory, "releases/v0.9.0"),
+			);
+			const afterCalls = await fixture.calls();
+			const calls = afterCalls.slice(beforeCalls.length);
+			assert.match(calls, /--project-name core .* pull --policy missing$/mu);
+			assert.doesNotMatch(calls, / stop | up /u);
 		} finally {
 			await rm(directory, { recursive: true, force: true });
 		}
@@ -1138,7 +1182,7 @@ await test(
 			assert.notEqual(unlocked.status, 0);
 			assert.match(unlocked.stderr, /release-locks\/v0\.9\.0\.env/u);
 			assert.deepEqual(await readApplied(path.join(directory, "applied.json")), previous);
-			assert.doesNotMatch(await fixture.calls(), / up | stop /u);
+			assert.doesNotMatch(await fixture.calls(), / pull | up | stop /u);
 
 			await fixture.retainLock("v0.9.0", previous.commit);
 			const result = fixture.run();
@@ -1159,8 +1203,14 @@ await test(
 			);
 			assert.equal(lines[stop + 1], "stopped within 6m");
 			const lastRender = lines.findLastIndex((line) => line.endsWith(" config --format json"));
+			const pulls = lines.flatMap((line, index) =>
+				line.endsWith(" pull --policy missing") ? [index] : [],
+			);
 			const firstUp = lines.findIndex((line) => / up /u.test(line));
-			assert.ok(lastRender < stop && stop < firstUp, lines.join("\n"));
+			// The running worker keeps working while every target image downloads.
+			assert.equal(pulls.length, 3, lines.join("\n"));
+			assert.ok(lastRender < Math.min(...pulls) && Math.max(...pulls) < stop, lines.join("\n"));
+			assert.ok(stop < firstUp, lines.join("\n"));
 			assert.match(lines[firstUp] ?? "", /--project-name core .* up .* nats-server$/u);
 		} finally {
 			await rm(directory, { recursive: true, force: true });
@@ -1218,7 +1268,7 @@ await test(
 			assert.match(missing.stderr, /recorded without its source commit/u);
 			assert.deepEqual(await readApplied(appliedFile), unbound);
 			assert.equal(await readlink(path.join(directory, "tooling")), fixture.bootstrap);
-			assert.doesNotMatch(await fixture.calls(), / up | stop |systemctl/u);
+			assert.doesNotMatch(await fixture.calls(), / pull | up | stop |systemctl/u);
 
 			const recorded = { ...unbound, commit: fixture.commitOf("v0.9.0") };
 			await writeFile(appliedFile, JSON.stringify(recorded));
@@ -1239,7 +1289,7 @@ await test(
 				path.join(directory, "releases/v0.9.0"),
 			);
 			const calls = await fixture.calls();
-			assert.doesNotMatch(calls.slice(before), / up | stop /u);
+			assert.doesNotMatch(calls.slice(before), / pull | up | stop /u);
 		} finally {
 			await rm(directory, { recursive: true, force: true });
 		}
@@ -1420,7 +1470,7 @@ await test(
 				const after = await host.calls();
 				return after.slice(before.length);
 			};
-			const restarts = / up | stop /u;
+			const imageOrServiceChanges = / pull | up | stop /u;
 
 			// Another environment's promotion is verified and accepted, and restarts nothing.
 			const elsewhere = await host.promoteElsewhere();
@@ -1428,7 +1478,7 @@ await test(
 				assert.match(host.apply(), /No change: already running/u);
 			});
 			assert.match(calls, /^cosign verify-blob/mu);
-			assert.doesNotMatch(calls, restarts);
+			assert.doesNotMatch(calls, imageOrServiceChanges);
 			assert.deepEqual(await host.record(), { ...first, channelCommit: elsewhere });
 			assert.notEqual(host.run({ failVerification: true }).status, 0);
 
@@ -1440,14 +1490,14 @@ await test(
 			const reapplied = await host.record();
 			assert.equal(reapplied?.release, built);
 			assert.notEqual(reapplied.channelIdentity, first.channelIdentity);
-			assert.doesNotMatch(await callsDuring(() => host.apply()), restarts);
+			assert.doesNotMatch(await callsDuring(() => host.apply()), imageOrServiceChanges);
 
 			// A record from before requests were kept learns the request at its accepted commit.
 			await writeFile(appliedFile, JSON.stringify({ ...reapplied, channelIdentity: undefined }));
 			calls = await callsDuring(() => {
 				assert.match(host.apply(), /No change: already running/u);
 			});
-			assert.doesNotMatch(calls, restarts);
+			assert.doesNotMatch(calls, imageOrServiceChanges);
 			assert.deepEqual(await host.record(), reapplied);
 
 			// A hold is accepted without becoming the request that runs, in a record of either kind.
