@@ -173,8 +173,8 @@ void describe("release evidence manifest", () => {
 });
 
 /**
- * Real `cosign verify-attestation` output, captured from cosign v3.0.6 — the version
- * `setup-release-security-tools` installs — attesting `--type spdxjson` over a local registry and
+ * Real `cosign verify-attestation` output, captured from cosign v3.0.6, a previously supported version,
+ * attesting `--type spdxjson` over a local registry and
  * verifying it back. The published release framing is identical: verifying
  * `ghcr.io/hephaestus-build/webapp@sha256:ff26dd20…` against the release identity prints one
  * unwrapped 1.4 MB envelope on stdout and its banner on stderr, which is the shape the v0.75.0

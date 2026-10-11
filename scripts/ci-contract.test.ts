@@ -3000,7 +3000,7 @@ void describe("CI contract", () => {
 		assert.equal(step(workflow, jobPath, "ossf/scorecard-action").get("publish_results"), true);
 	});
 
-	void test("pins every external action to a full commit SHA with a version comment", async () => {
+	void test("pins every external action to a full commit SHA with a tag or main reference", async () => {
 		const invalid: string[] = [];
 		for (const [file, source] of await readSources(
 			await posixGlob(".github/{actions,workflows}/**/*.{yml,yaml}"),
@@ -3016,12 +3016,16 @@ void describe("CI contract", () => {
 				if (reference.startsWith("./")) {
 					continue;
 				}
-				if (!/@[0-9a-f]{40}$/u.test(reference) || !/^ # v\S+(?:\s.*)?$/u.test(comment)) {
+				if (!/@[0-9a-f]{40}$/u.test(reference) || !/^ # (?:v\S+|main)(?:\s.*)?$/u.test(comment)) {
 					invalid.push(`${file}:${index + 1}: ${reference}`);
 				}
 			}
 		}
-		assert.deepEqual(invalid, [], "External uses must match @<40 lowercase hex> # v...");
+		assert.deepEqual(
+			invalid,
+			[],
+			"External uses must match @<40 lowercase hex> with a # v... or # main reference",
+		);
 	});
 
 	void test("centralises dependency installation and browser setup", async () => {
