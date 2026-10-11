@@ -7,7 +7,7 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { cp, readFile, rm, writeFile } from "node:fs/promises";
+import { copyFile, cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { after, before, test } from "node:test";
 
@@ -127,6 +127,13 @@ async function runEverySlot(bound: BoundModels) {
 			recursive: true,
 		});
 		await writeFile(path.join(root, "models.json"), JSON.stringify(bound));
+		// The runner parses the work record once and refuses a review without it.
+		const context = path.join(root, "context");
+		await mkdir(context);
+		await copyFile(
+			path.join(import.meta.dirname, "fixtures", "pull-request-metadata.json"),
+			path.join(context, "metadata.json"),
+		);
 		const child = spawn(
 			process.execPath,
 			[
@@ -135,6 +142,10 @@ async function runEverySlot(bound: BoundModels) {
 				path.join(root, "repo"),
 				"--diff",
 				path.join(root, "change.diff"),
+				"--context",
+				context,
+				"--context-reference",
+				"context",
 				"--practices",
 				practices,
 				"--output",

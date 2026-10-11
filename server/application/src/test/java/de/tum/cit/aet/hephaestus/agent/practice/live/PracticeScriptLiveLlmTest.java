@@ -473,6 +473,16 @@ class PracticeScriptLiveLlmTest extends AbstractWorkspaceIntegrationTest {
         Path practices = Files.createDirectories(workDir.resolve("stage/practices"));
         Files.createSymbolicLink(workDir.resolve("stage/lib"), PRACTICE_SCRIPT.resolve("lib"));
         Files.copy(PRACTICE_SCRIPT.resolve("fixtures/every-slot.ts"), practices.resolve("every-slot.ts"));
+        // What PracticeScriptInputs stages beside each script: why the practice is in this review.
+        Files.writeString(practices.resolve("every-slot" + SandboxLayout.PRACTICE_SCRIPT_CAUSE_SUFFIX), """
+                {"kind":"scm.pull_request","subject":{"role":"AUTHOR"},\
+                "cause":{"type":"requested","origin":"MANUAL","state":{},"admittedAt":"2026-10-01T00:00:00Z"}}
+                """);
+        // No earlier result of this practice on this work.
+        Files.writeString(practices.resolve("every-slot" + SandboxLayout.PRACTICE_SCRIPT_PREVIOUS_SUFFIX), "null\n");
+        // The work record that the runner parses once for every script.
+        Path context = Files.createDirectories(workDir.resolve("context"));
+        Files.copy(PRACTICE_SCRIPT.resolve("fixtures/pull-request-metadata.json"), context.resolve("metadata.json"));
         Files.writeString(workDir.resolve("package.json"), "{\"type\":\"module\"}\n");
         Files.writeString(workDir.resolve("change.diff"), CHANGE);
         // The repository the agent searches: the runner's library, which declares parseDiff.
@@ -488,6 +498,10 @@ class PracticeScriptLiveLlmTest extends AbstractWorkspaceIntegrationTest {
                         workDir.resolve("repo").toString(),
                         "--diff",
                         workDir.resolve("change.diff").toString(),
+                        "--context",
+                        context.toString(),
+                        "--context-reference",
+                        "context",
                         "--practices",
                         practices.toString(),
                         "--output",
