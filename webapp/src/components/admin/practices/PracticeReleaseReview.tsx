@@ -107,7 +107,10 @@ export function PracticeReleaseReview({
 	};
 
 	return (
-		<section className="space-y-5" aria-label={`Review update for ${proposal.offered.name}`}>
+		<section
+			className="min-w-0 space-y-5"
+			aria-label={`Review update for ${proposal.offered.name}`}
+		>
 			<div className="space-y-1">
 				<h2 className="text-lg font-semibold">{proposal.offered.name}</h2>
 				<p className="text-sm text-muted-foreground">

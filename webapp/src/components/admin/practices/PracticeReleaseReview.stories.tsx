@@ -3,6 +3,7 @@ import { expect, fn, screen, userEvent, within } from "storybook/test";
 
 import type { PracticeDefinition, PracticeReleaseProposal } from "@/api/types.gen";
 import { mockPullRequestReviewFields, mockPullRequestPolicy } from "@/mocks/fixtures/practice";
+import { expectTablesScrollInPlace } from "@/stories/reflow";
 
 import { PracticeReleaseReview } from "./PracticeReleaseReview";
 
@@ -112,4 +113,33 @@ export const RecordedVersionBase: Story = {
 
 export const Submitting: Story = {
 	args: { pending: true },
+};
+
+export const NarrowComparison: Story = {
+	args: {
+		proposal: {
+			...proposal,
+			fields: [{ field: "CRITERIA", offeredChanged: true, conflict: false }],
+		},
+	},
+	parameters: { chromatic: { viewports: [320, 930] } },
+	render: (args) => (
+		<section aria-label="Practice update panel" className="grid w-full max-w-160">
+			<PracticeReleaseReview {...args} />
+		</section>
+	),
+	play: async ({ canvas }) => {
+		const panel = canvas.getByRole("region", { name: "Practice update panel" });
+		await expect(panel.scrollWidth).toBeLessThanOrEqual(panel.clientWidth + 1);
+		await expectTablesScrollInPlace(panel, { expectOverflow: true });
+		const accept = canvas.getByRole("button", { name: "Accept selected fields" });
+		await expect(accept).toBeEnabled();
+		const bounds = accept.getBoundingClientRect();
+		const panelBounds = panel.getBoundingClientRect();
+		await expect(bounds.left).toBeGreaterThanOrEqual(panelBounds.left);
+		await expect(bounds.right).toBeLessThanOrEqual(panelBounds.right);
+		await expect(
+			document.elementFromPoint(bounds.left + bounds.width / 2, bounds.top + bounds.height / 2),
+		).toBe(accept);
+	},
 };
