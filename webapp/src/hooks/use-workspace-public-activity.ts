@@ -14,6 +14,7 @@ import {
 } from "@/api/@tanstack/react-query.gen";
 import type { UpdateWorkspacePublicActivityRequest } from "@/api/types.gen";
 import type { WorkspacePublicActivityState } from "@/components/admin/settings/WorkspacePublicActivitySettings";
+import { panelState } from "@/components/common/panel-state";
 import { problemDetailOf } from "@/lib/problem-detail";
 
 /**
@@ -91,6 +92,12 @@ export function useWorkspacePublicActivity({
 		});
 	};
 
+	// A failed background read keeps the last available restoration controls.
+	const hiddenContributorsState =
+		hiddenContributors.data === undefined
+			? panelState(hiddenContributors, (people) => ({ status: "ready" as const, people }))
+			: { status: "ready" as const, people: hiddenContributors.data };
+
 	let state: WorkspacePublicActivityState = { status: "loading" };
 	if (settings.data !== undefined) {
 		const pendingBody = update.isPending ? update.variables.body : undefined;
@@ -100,7 +107,7 @@ export function useWorkspacePublicActivity({
 			allowSearchEngines: settings.data.allowSearchEngines,
 			live,
 			hiddenPeople: hidden.data?.hiddenPeople,
-			hiddenContributors: hiddenContributors.data ?? [],
+			hiddenContributors: hiddenContributorsState,
 			restoring: showAgain.isPending ? showAgain.variables.path.userId : undefined,
 			pending: pendingBody && pendingChange(pendingBody, settings.data.enabled),
 		};

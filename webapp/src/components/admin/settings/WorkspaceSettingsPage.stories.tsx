@@ -22,7 +22,7 @@ const publicActivity = {
 		allowSearchEngines: false,
 		live: false,
 		hiddenPeople: undefined,
-		hiddenContributors: [],
+		hiddenContributors: { status: "ready", people: [] },
 		restoring: undefined,
 		pending: undefined,
 	},

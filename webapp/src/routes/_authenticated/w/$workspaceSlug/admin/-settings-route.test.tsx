@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { UpdateWorkspacePublicActivityRequest } from "@/api/types.gen";
 import { workspaceListItem } from "@/mocks/fixtures/workspaces";
 import { server } from "@/mocks/server";
+import { deferred } from "@/test/async";
 import { ROUTE_RENDER_WAIT, renderRouteAt, testQueryClient } from "@/test/router-harness";
 
 // Mounting the real route pulls in the whole admin layout and its lazy modules; the timeout is a
@@ -140,6 +141,58 @@ describe("the public activity page setting", () => {
 			undefined,
 			ROUTE_RENDER_WAIT,
 		);
+	});
+
+	it("waits for hidden contributors without saying there are none, and reads them again on retry", async () => {
+		const user = userEvent.setup();
+		settings = { enabled: true, allowSearchEngines: false };
+		const first = deferred<Response>();
+		const retry = deferred<Response>();
+		let reads = 0;
+		server.use(
+			http.get("*/workspaces/acme/activity/hidden-contributors", async () => {
+				reads += 1;
+				return first.promise;
+			}),
+		);
+		renderSettingsRoute(false);
+		const control = await screen.findByRole(
+			"switch",
+			{ name: "Publish the page" },
+			ROUTE_RENDER_WAIT,
+		);
+		const page = screen.getByRole("region", { name: "Public activity page" });
+		await waitFor(() => expect(reads).toBe(1));
+		expect(page.querySelector("[data-slot='skeleton']")).not.toBeNull();
+		expect(within(page).queryByRole("button", { name: "Show again" })).toBeNull();
+
+		first.resolve(HttpResponse.json({ status: 500 }, { status: 500 }));
+		await within(page).findByText("We could not load hidden contributors");
+		expect(control.getAttribute("aria-checked")).toBe("true");
+		await user.click(screen.getByRole("switch", { name: "Allow search engines" }));
+		await waitFor(() =>
+			expect(changes).toStrictEqual([{ publicActivityEnabled: true, allowSearchEngines: true }]),
+		);
+		within(page).getByText("We could not load hidden contributors");
+		server.use(
+			http.get("*/workspaces/acme/activity/hidden-contributors", async () => {
+				reads += 1;
+				return retry.promise;
+			}),
+		);
+		await user.click(within(page).getByRole("button", { name: /Retry/u }));
+
+		await waitFor(() => expect(reads).toBe(2));
+		expect(within(page).queryByRole("button", { name: /Retry/u })).toBeNull();
+		expect(page.querySelector("[aria-busy='true']")).not.toBeNull();
+		retry.resolve(
+			HttpResponse.json([
+				{ id: 11, login: "ada", name: "Ada Lovelace", avatarUrl: "", htmlUrl: "", email: "" },
+			]),
+		);
+		await within(page).findByRole("button", { name: "Show again" });
+		expect(within(page).queryByText("We could not load hidden contributors")).toBeNull();
+		expect(reads).toBe(2);
 	});
 
 	it("shows a person an admin hid without a membership again, which no other screen can", async () => {

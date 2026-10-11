@@ -3,6 +3,7 @@ import { useId, useRef, useState } from "react";
 
 import type { UserInfo } from "@/api/types.gen";
 import { MemberAvatar } from "@/components/activity/MemberAvatar";
+import type { PanelState } from "@/components/common/panel-state";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { Section } from "@/components/layout/Section";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -36,7 +37,9 @@ export type WorkspacePublicActivityState =
 			/** How many people the page leaves out, never who; undefined where the count did not load. */
 			hiddenPeople: number | undefined;
 			/** Who an admin hid without a membership: no other screen can show them again. */
-			hiddenContributors: readonly Pick<UserInfo, "id" | "login" | "name" | "avatarUrl">[];
+			hiddenContributors: PanelState<{
+				people: readonly Pick<UserInfo, "id" | "login" | "name" | "avatarUrl">[];
+			}>;
 			/** The person being shown again, if any. */
 			restoring: number | undefined;
 			/** The change in flight, if any. */
@@ -150,38 +153,60 @@ export function WorkspacePublicActivitySettings({
 							it in a private window.
 						</p>
 					)}
-					{state.hiddenContributors.length > 0 && (
-						<Section
-							level={3}
-							size="sm"
-							title="Hidden by an admin"
-							description="These people have no membership, and an admin hid them from activity. A member is shown again under Members."
-						>
-							<ul className="rounded-xl border bg-card">
-								{state.hiddenContributors.map((person) => (
-									<Item key={person.id} render={<li />} variant="row">
-										<MemberAvatar user={person} />
-										<ItemContent>
-											<ItemTitle>{person.name}</ItemTitle>
-											<ItemDescription>{person.login}</ItemDescription>
-										</ItemContent>
-										<ItemActions>
-											<Button
-												variant="outline"
-												size="sm"
-												disabled={state.restoring !== undefined}
-												focusableWhenDisabled
-												onClick={() => onShowAgain(person.id)}
-											>
-												{state.restoring === person.id && <Spinner />}
-												Show again
-											</Button>
-										</ItemActions>
-									</Item>
-								))}
-							</ul>
-						</Section>
+					{state.hiddenContributors.status === "loading" && (
+						<ul className="rounded-xl border bg-card" aria-busy="true" aria-hidden="true">
+							<Item render={<li />} variant="row">
+								<Skeleton className="size-8 rounded-full" />
+								<ItemContent>
+									<Skeleton className="h-4 w-32" />
+									<Skeleton className="h-3 w-20" />
+								</ItemContent>
+								<ItemActions>
+									<Skeleton className="h-8 w-24" />
+								</ItemActions>
+							</Item>
+						</ul>
 					)}
+					{state.hiddenContributors.status === "error" && (
+						<QueryErrorAlert
+							error={state.hiddenContributors.error}
+							title="We could not load hidden contributors"
+							onRetry={state.hiddenContributors.onRetry}
+						/>
+					)}
+					{state.hiddenContributors.status === "ready" &&
+						state.hiddenContributors.people.length > 0 && (
+							<Section
+								level={3}
+								size="sm"
+								title="Hidden by an admin"
+								description="These people have no membership, and an admin hid them from activity. A member is shown again under Members."
+							>
+								<ul className="rounded-xl border bg-card">
+									{state.hiddenContributors.people.map((person) => (
+										<Item key={person.id} render={<li />} variant="row">
+											<MemberAvatar user={person} />
+											<ItemContent>
+												<ItemTitle>{person.name}</ItemTitle>
+												<ItemDescription>{person.login}</ItemDescription>
+											</ItemContent>
+											<ItemActions>
+												<Button
+													variant="outline"
+													size="sm"
+													disabled={state.restoring !== undefined}
+													focusableWhenDisabled
+													onClick={() => onShowAgain(person.id)}
+												>
+													{state.restoring === person.id && <Spinner />}
+													Show again
+												</Button>
+											</ItemActions>
+										</Item>
+									))}
+								</ul>
+							</Section>
+						)}
 				</div>
 			)}
 			<PublishDialog
