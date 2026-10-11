@@ -350,9 +350,9 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
      * entity will be populated later by the proper issue/PR webhook or GraphQL sync.
      * <p>
      * <b>Important:</b> We must determine whether to create an Issue or PullRequest based
-     * on the {@code issueDto.isPullRequest()} flag. GitHub uses the same ID space for both,
-     * so if we create an Issue when it should be a PR, the later PR webhook will fail to
-     * update it (different entity type). The discriminator column prevents this.
+     * on the {@code issueDto.isPullRequest()} flag. GitHub numbers issues and pull requests in one
+     * space per repository, so if we create an Issue when it should be a PR, the later PR webhook
+     * will fail to update it (different entity type). The discriminator column prevents this.
      * <p>
      * <b>Note:</b> This method may throw {@link DataIntegrityViolationException} if another
      * thread creates the entity concurrently. Use {@link #createMinimalParentEntityWithRetry}
@@ -413,6 +413,10 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
      * but enough to create a valid entity. PR-specific fields like additions,
      * deletions, mergedAt, etc. will be populated by the pull_request webhook
      * or GraphQL sync.
+     * <p>
+     * The comment payload describes the pull request as an issue resource, so the stub's native id is
+     * that issue id, not the pull request's own id. It is provisional: the next full pull request
+     * payload replaces it with the pull request's id and keeps the stub's internal id and comments.
      * <p>
      * <b>Hydration Strategy:</b> Stubs are intentionally NOT eagerly fetched via API.
      * Instead, they rely on natural hydration through:
