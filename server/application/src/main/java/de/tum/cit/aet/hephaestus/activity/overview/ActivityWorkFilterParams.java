@@ -8,6 +8,7 @@ import jakarta.validation.constraints.Min;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Set;
+import java.util.function.Supplier;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Limit;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -37,11 +38,11 @@ public record ActivityWorkFilterParams(
     }
 
     /** The range the page is read in: a later page keeps the end the first page had. */
-    TimeRange range(ActivityPeopleRangeParams range, Clock clock, Instant earliest) {
+    TimeRange range(ActivityPeopleRangeParams range, Clock clock, Supplier<@Nullable Instant> historyStart) {
         return (cursor == null
                         ? range
                         : range.endingAt(ActivityWorkCursor.decode(cursor).to()))
-                .resolve(clock, earliest);
+                .resolve(clock, historyStart);
     }
 
     /** Where the page starts; an unreadable cursor is rejected. */

@@ -359,10 +359,6 @@ interface ActivityPeopleQueryRepository extends Repository<ActivityEvent, UUID> 
     @Nullable
     Instant findPublicEarliest(@Param("scope") ActivityScope scope);
 
-    default Instant earliest(ActivityScope scope, Instant fallback) {
-        return Objects.requireNonNullElse(findEarliest(scope), fallback);
-    }
-
     String COVERAGE_HEAD = """
                 monitors AS (
                     SELECT m.*, (issue_backfill_high_water_mark IS NOT NULL

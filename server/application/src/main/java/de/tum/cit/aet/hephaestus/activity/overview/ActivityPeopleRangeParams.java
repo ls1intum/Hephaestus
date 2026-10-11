@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.function.Supplier;
 import org.jspecify.annotations.Nullable;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
@@ -24,7 +25,8 @@ public record ActivityPeopleRangeParams(
         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) @Nullable
         Instant to) {
 
-    public TimeRange resolve(Clock clock, Instant earliest) {
+    /** History is read only for all-time; absent history yields an empty range at its end. */
+    public TimeRange resolve(Clock clock, Supplier<@Nullable Instant> historyStart) {
         Instant end = to == null ? clock.instant() : to;
         String preset = range == null ? (from == null ? "90d" : "custom") : range;
         Instant start =
@@ -32,7 +34,13 @@ public record ActivityPeopleRangeParams(
                     case "30d" -> end.minus(Duration.ofDays(30));
                     case "90d" -> end.minus(Duration.ofDays(90));
                     case "1y" -> end.minus(Duration.ofDays(365));
-                    case "all" -> earliest.isBefore(end) ? earliest : end;
+                    case "all" -> {
+                        if (from != null) {
+                            throw invalid("Use a custom range with a start date.");
+                        }
+                        Instant earliest = historyStart.get();
+                        yield earliest != null && earliest.isBefore(end) ? earliest : end;
+                    }
                     case "custom" -> {
                         if (from == null) {
                             throw invalid("A custom range needs a start date.");

@@ -60,8 +60,7 @@ public class ActivityPeopleService {
             ActivityPeopleRangeParams params,
             List<ActivityTeamDTO> teams,
             List<ActivityRepositoryDTO> repositories) {
-        var historyStart = queries.findEarliest(scope);
-        var range = params.resolve(clock, Objects.requireNonNullElse(historyStart, clock.instant()));
+        var range = params.resolve(clock, () -> queries.findEarliest(scope));
         var rows = queries.findPeople(scope, range, 0, false);
         Map<Long, ActivityPeopleQueryRepository.CountRow> totals = new LinkedHashMap<>();
         Map<Long, List<ActivitySparklineWeekDTO>> weeks = new LinkedHashMap<>();
@@ -131,7 +130,7 @@ public class ActivityPeopleService {
         var contributor = queries.contributor(workspace, userId, own);
         var repositories = queries.repositories(workspace);
         var scope = select(workspace, team, repositoryKeys, queries.teams(workspace), repositories);
-        var range = params.resolve(clock, queries.earliest(scope, clock.instant()));
+        var range = params.resolve(clock, () -> queries.findEarliest(scope));
         var rows = queries.people(scope, range, userId, own);
         var total = rows.stream()
                 .filter(ActivityPeopleQueryRepository.PersonCount::total)
