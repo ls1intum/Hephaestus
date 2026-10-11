@@ -866,7 +866,9 @@ Private feedback retains its own recipient, consent, recurrence and visibility c
 Suppression on the work does not promise that private feedback will be written.
 
 A work-state refusal stops `IN_CONTEXT` delivery.
-Closed work, changed work, and merged work that the workspace setting excludes get no note on the work.
+An issue captured closed remains eligible while closed under the exact reviewed snapshot.
+A transition between open and closed, or a changed snapshot, refuses its older note.
+Closed pull or merge requests, and merged work that the workspace setting excludes, get no note on the work.
 `IN_APP` and `IN_CHAT` retain their own evidence and visibility gates.
 Preparation alone does not certify that a unit may be shown.
 

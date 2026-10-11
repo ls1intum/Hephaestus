@@ -205,8 +205,9 @@ public class PracticeFeedbackDeliveryPolicy {
                 : null;
         boolean closedWhenQueued = metadata != null
                 && "closed".equalsIgnoreCase(metadata.path("state").asString(""));
+        boolean closedNow = target != null && target.getState() == Issue.State.CLOSED;
         // Work-state refusal belongs to the public note. Private channels retain their own evidence and visibility
-        // gates.
+        // gates. A captured closed occasion remains eligible while closed; the snapshot still fences later changes.
         FeedbackSuppressionReason artifactRefusal = metadata == null || target == null
                 ? FeedbackSuppressionReason.ARTIFACT_GONE
                 : surface != DeliveryPolicySurface.ARTIFACT
@@ -214,8 +215,10 @@ public class PracticeFeedbackDeliveryPolicy {
                         : !PublicReviewEligibility.isAuthorJob(metadata)
                                         || !publicSupportsAllowed(job, feedbackId, contributingPracticeSlugs, citedIds)
                                 ? FeedbackSuppressionReason.PUBLIC_SUBJECT_INELIGIBLE
-                                : closedWhenQueued || target.getState() == Issue.State.CLOSED
-                                        ? FeedbackSuppressionReason.ARTIFACT_CLOSED
+                                : closedWhenQueued != closedNow
+                                        ? closedWhenQueued
+                                                ? FeedbackSuppressionReason.ISSUE_SNAPSHOT_CHANGED
+                                                : FeedbackSuppressionReason.ARTIFACT_CLOSED
                                         : target.getReviewSnapshotId() == null
                                                         || !target.getReviewSnapshotId()
                                                                 .toString()
