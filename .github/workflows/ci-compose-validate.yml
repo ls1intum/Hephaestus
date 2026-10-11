@@ -46,6 +46,25 @@ jobs:
             exit 1
           fi
 
+      - name: Verify optional DNS transport and reversal in both stacks
+        working-directory: docker/self-host
+        run: |
+          set -euo pipefail
+          for stack in compose.yaml ../compose.proxy.yaml; do
+            unset LEGO_EXPERIMENTAL_DNS_TCP_ONLY
+            for transport in default true false; do
+              if [ "$transport" != default ]; then
+                export LEGO_EXPERIMENTAL_DNS_TCP_ONLY="$transport"
+              fi
+              expected="$transport"
+              [ "$transport" != default ] || expected=false
+              docker compose --env-file .env --env-file smoke-lock.env -f "$stack" config --format json \
+                | jq -e --arg expected "$expected" '
+                    .services["reverse-proxy"].environment.LEGO_EXPERIMENTAL_DNS_TCP_ONLY == $expected
+                  ' >/dev/null
+            done
+          done
+
       - name: Validate the opt-in PostgreSQL backup overlay
         working-directory: docker/self-host
         run: |
