@@ -1593,5 +1593,96 @@
 		},
 		"reason": "A feature title, a bare closing reference and generic build and lint checks name neither outcome item, so nothing accounts for the adopted outcome.",
 		"workType": "pull_request"
+	},
+	{
+		"id": "published-shared-api-key",
+		"expected": {
+			"avoids-insecure-defaults-and-over-broad-permissions": "NOT_APPLICABLE"
+		},
+		"files": {
+			"repo/Endpoint.swift": "import Foundation\nlet apiKey = \"shared-public-demo\"\nlet endpoint = URL(string: \"https://sports.example/api/\\(apiKey)/events\")\n",
+			"repo/docs/provider.md": "# Provider contract\nThe shared public key shared-public-demo is published for anyone to use for the free event feed. It provides no account-specific access.\n"
+		},
+		"reason": "The captured provider contract establishes a public value; no access guard or other exposure setting is changed.",
+		"workType": "pull_request"
+	},
+	{
+		"id": "public-client-identifier-log",
+		"expected": {
+			"avoids-insecure-defaults-and-over-broad-permissions": "MET"
+		},
+		"files": {
+			"repo/Client.swift": "import os\nlet clientID = \"public-client-registration\"\nlet logger = Logger(subsystem: \"example.client\", category: \"auth\")\nlogger.info(\"Client: \\(clientID)\")\n",
+			"repo/docs/client.md": "# Client contract\nThe clientID identifies the public application registration. It is displayed to users and never authenticates the client. No client secret is issued.\n"
+		},
+		"reason": "Logging adds the existing inspection occasion, while the captured value is a public identifier and no credential material is exposed.",
+		"workType": "pull_request"
+	},
+	{
+		"id": "private-sandbox-api-key",
+		"expected": {
+			"avoids-insecure-defaults-and-over-broad-permissions": "NOT_MET"
+		},
+		"files": {
+			"repo/Client.swift": "import Foundation\nlet apiKey = \"account-sandbox-credential\"\nlet endpoint = URL(string: \"https://payments.example/api/\\(apiKey)/customers\")\n",
+			"repo/docs/provider.md": "# Sandbox contract\nThis account-specific sandbox key authenticates as the account and permits reading and changing its customer records. It must remain private.\n"
+		},
+		"reason": "Account-specific test credentials remain confidential and source plus URL expose them.",
+		"workType": "pull_request",
+		"expectedSeverity": {
+			"avoids-insecure-defaults-and-over-broad-permissions": "MAJOR"
+		}
+	},
+	{
+		"id": "public-identifier-used-as-auth",
+		"expected": {
+			"avoids-insecure-defaults-and-over-broad-permissions": "NOT_MET"
+		},
+		"files": {
+			"repo/Guard.ts": "export function allowRequest(clientId: string) {\n  return clientId === \"public-application-id\";\n}\n",
+			"repo/docs/access.md": "# Access contract\nallowRequest is the sole guard for changing private account data. The application identifier is published in client code and is not an authentication credential.\n"
+		},
+		"reason": "A public identifier does not become secret; using it as the only authorization guard exposes private data.",
+		"workType": "pull_request",
+		"expectedSeverity": {
+			"avoids-insecure-defaults-and-over-broad-permissions": "MAJOR"
+		}
+	},
+	{
+		"id": "opaque-api-key-authority",
+		"expected": {
+			"avoids-insecure-defaults-and-over-broad-permissions": "UNDETERMINED"
+		},
+		"files": {
+			"repo/Endpoint.swift": "import Foundation\nlet apiKey = \"unclassified-service-value\"\nlet endpoint = URL(string: \"https://service.example/api/\\(apiKey)/items\")\n"
+		},
+		"reason": "The code names a candidate value, but the captured evidence does not establish its authorization or intended audience.",
+		"workType": "pull_request"
+	},
+	{
+		"id": "nonfunctional-credential-placeholder",
+		"expected": {
+			"avoids-insecure-defaults-and-over-broad-permissions": "NOT_APPLICABLE"
+		},
+		"files": {
+			"repo/docs/setup.md": "# Setup\nAPI_KEY=YOUR_PRIVATE_KEY_HERE is a nonfunctional placeholder. The provider rejects it. Obtain your own private key and pass it through the environment; do not commit that key.\n"
+		},
+		"reason": "The documentation contains no working credential or runtime exposure setting.",
+		"workType": "pull_request"
+	},
+	{
+		"id": "placeholder-does-not-exempt-runtime-secret",
+		"expected": {
+			"avoids-insecure-defaults-and-over-broad-permissions": "NOT_MET"
+		},
+		"files": {
+			"repo/Session.swift": "import Foundation\nfunc diagnose(_ accessToken: String) {\n    print(\"Access token: \\(accessToken)\")\n}\n",
+			"repo/docs/session.md": "# Session contract\nProduction calls diagnose with the issued bearer access token for the signed-in account. Documentation uses ACCESS_TOKEN_HERE only as a nonfunctional placeholder.\n"
+		},
+		"reason": "A placeholder in documentation does not make a private runtime bearer-token flow public.",
+		"workType": "pull_request",
+		"expectedSeverity": {
+			"avoids-insecure-defaults-and-over-broad-permissions": "MAJOR"
+		}
 	}
 ]

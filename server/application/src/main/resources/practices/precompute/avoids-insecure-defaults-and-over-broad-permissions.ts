@@ -7,18 +7,18 @@ import type { DiffFile, Hint, PullRequestMetadata } from "../lib/types.ts";
 // [label, regex] — each fires on an ADDED line. Tuned to the auth/transport/secret surface a login or API
 // change touches, where a "looks fine" review most often misses the real insecure default.
 const PATTERNS: [string, RegExp][] = [
-	// A secret/token interpolated into a URL path or query — leaks the bearer into proxy/access logs. Matches
-	// ${...}/#{...} (JS/Ruby/Kotlin) and Swift's \(...) interpolation of a secret-named variable into a path.
+	// A credential-named value interpolated into a URL path or query. Matches
+	// ${...}/#{...} (JS/Ruby/Kotlin) and Swift's \(...) interpolation of a credential-named variable into a path.
 	[
-		"secret in URL path/query",
+		"credential-named value in URL path/query",
 		/["'`](?:https?:\/\/|\/)[^"'`\n]*(?:\\\(|[$#]\{)[^"'`\n)}]*\b(?:token|secret|password|api[_-]?key|auth|session|refresh)\w*/iu,
 	],
 	// Keychain write — an omitted kSecAttrAccessible defaults to WhenUnlocked; whether the effective class,
 	// synchronization and backup migration fit the stored secret is the review's.
 	["keychain write", /\bSecItemAdd\b|kSecValueData\b/u],
-	// Logging a sensitive value (token/password/credential/response body) to console/log.
+	// Logging a credential-named value or response body to console/log.
 	[
-		"logs a secret / response body",
+		"logs credential-named value / response body",
 		/\b(?:print|NSLog|console\.(?:log|debug|info)|System\.out\.print\w*|log\.(?:debug|info|warn))\s*\([^)]*\b(?:token|password|secret|credential|response|body|account)\b/iu,
 	],
 	// Insecure transport / disabled TLS verification.
@@ -31,9 +31,9 @@ const PATTERNS: [string, RegExp][] = [
 		"over-broad permission / wildcard",
 		/chmod\s+0?777|\b0o?777\b|permitAll\(\)|\.anyRequest\(\)\.permitAll|Access-Control-Allow-Origin["'\s:]*\*|allowedOrigins?["'\s:]*\*/u,
 	],
-	// Hardcoded credential-ish literal assigned to a secret-named field.
+	// A literal assigned to a credential-named field.
 	[
-		"hardcoded secret literal",
+		"credential-named literal",
 		/\b(?:password|secret|api[_-]?key|token)\s*[:=]\s*["'`][A-Za-z0-9_\-/+]{8,}["'`]/iu,
 	],
 ];
@@ -74,7 +74,7 @@ export default function avoidsInsecureDefaultsAndOverBroadPermissions(
 	const directions =
 		hints.length > 0
 			? [
-					`Found ${hints.length} insecure-default / secret-exposure candidate(s) on added lines — investigate each on the reachable auth/transport surface: a token in a URL path leaks into logs; a keychain write takes its accessibility from kSecAttrAccessible, WhenUnlocked when omitted, which is not a defect by itself; a logged value exposes secrets only when it can carry credential material (a token, a key, an auth header or the body of an auth exchange); disabled TLS / wildcard CORS / world-writable perms are over-broad. Confirm whether each is real and exploitable before deciding.`,
+					`Found ${hints.length} insecure-default / secret-exposure candidate(s) on added lines — investigate each on the reachable auth/transport surface: for credential-named URL, literal and logging leads, establish the value’s role under class 5 of the standard before deciding whether it exposes credential material; a keychain write takes its accessibility from kSecAttrAccessible, WhenUnlocked when omitted, which is not a defect by itself; disabled TLS / wildcard CORS / world-writable perms are over-broad. Confirm whether each is real and exploitable before deciding.`,
 				]
 			: [];
 	return {

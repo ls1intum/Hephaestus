@@ -301,3 +301,39 @@ void test("a fixed URL remains a lead, not proof of an unhandled runtime failure
 		rmSync(root, { recursive: true, force: true });
 	}
 });
+
+void test("public, private and unknown credential-named values remain inspection leads", async () => {
+	const { root, script } = await stage("avoids-insecure-defaults-and-over-broad-permissions");
+	try {
+		const result = await script(
+			path.join(root, "repo"),
+			new Map([
+				added("Client.swift", [
+					'let apiKey = "shared-public-demo"',
+					'let secret = "account-sandbox-credential"',
+					'let token = "unclassified-service-value"',
+					String.raw`let url = "https://service.example/\(apiKey)/items"`,
+					String.raw`let url = "https://service.example/\(secret)/items"`,
+					"print(token)",
+					"print(response.body)",
+				]),
+			]),
+			metadata,
+		);
+		assert.equal(result.metrics.insecureDefaultCandidates, 7);
+		assert.deepEqual(
+			result.hints.map(({ file, line, pattern }) => ({ file, line, pattern })),
+			[
+				{ file: "Client.swift", line: 1, pattern: "credential-named literal" },
+				{ file: "Client.swift", line: 2, pattern: "credential-named literal" },
+				{ file: "Client.swift", line: 3, pattern: "credential-named literal" },
+				{ file: "Client.swift", line: 4, pattern: "credential-named value in URL path/query" },
+				{ file: "Client.swift", line: 5, pattern: "credential-named value in URL path/query" },
+				{ file: "Client.swift", line: 6, pattern: "logs credential-named value / response body" },
+				{ file: "Client.swift", line: 7, pattern: "logs credential-named value / response body" },
+			],
+		);
+	} finally {
+		rmSync(root, { recursive: true, force: true });
+	}
+});
