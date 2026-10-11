@@ -30,6 +30,7 @@ function hours(millis: number): string {
 
 export default definePracticeScript({
 	meta: {
+		version: 1,
 		kinds: {
 			"candidate-issue":
 				"An issue that the change names as its own, with when it was opened and when the earliest commit was authored.",

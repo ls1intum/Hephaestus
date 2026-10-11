@@ -141,6 +141,7 @@ interface CrashLine {
 
 export default definePracticeScript({
 	meta: {
+		version: 1,
 		kinds: {
 			"crash-operator":
 				"An added line that spells a crash operator; its facts name the language, the operators, and if it runs in a preview block or a test file.",

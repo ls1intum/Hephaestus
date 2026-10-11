@@ -9,7 +9,7 @@ import { branchIssueReferences, issueNumberReferences } from "../lib/references.
 const BRANCH_CHARS = 80;
 
 export default definePracticeScript({
-	meta: { kinds: {} },
+	meta: { version: 1, kinds: {} },
 	async run(ctx) {
 		expectKind(ctx, "scm.pull_request");
 		const description = ctx.work.body ?? "";

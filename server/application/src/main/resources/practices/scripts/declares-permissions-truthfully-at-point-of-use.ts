@@ -156,7 +156,7 @@ async function usageKeysInCheckout(repoPath: string): Promise<CheckoutKeys> {
 }
 
 export default definePracticeScript({
-	meta: { kinds: KINDS },
+	meta: { version: 1, kinds: KINDS },
 	async run(ctx) {
 		expectKind(ctx, "scm.pull_request");
 		const scan = await scanAddedLines(ctx.repo, ctx.change, {

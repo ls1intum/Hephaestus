@@ -14,6 +14,7 @@ import {
 
 export default definePracticeScript({
 	meta: {
+		version: 1,
 		kinds: {
 			merge:
 				"The merge of the pull request: who merged it, when, and the review decision of the provider.",

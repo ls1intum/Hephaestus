@@ -92,7 +92,7 @@ function additions(files: Record<string, number>): string {
 /** A script whose result is the given JSON, spelled inline, with the lead kinds it declares. */
 function script(result: object, kinds: Record<string, string> = {}): string {
 	return `export default {
-	meta: { kinds: ${JSON.stringify(kinds)} },
+	meta: { version: 1, kinds: ${JSON.stringify(kinds)} },
 	run: async () => (${JSON.stringify(result)}),
 };
 `;
@@ -100,7 +100,7 @@ function script(result: object, kinds: Record<string, string> = {}): string {
 
 /** A script whose `run` is the given body, with no lead kinds. */
 function running(body: string): string {
-	return `export default { meta: { kinds: {} }, run: async (ctx) => { ${body} } };\n`;
+	return `export default { meta: { version: 1, kinds: {} }, run: async (ctx) => { ${body} } };\n`;
 }
 
 void test("runner executes a staged practice and writes its public artifact contract", async () => {
@@ -182,7 +182,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 const attempt = (action) => { try { action(); return "allowed"; } catch (error) { return error.code ?? "denied"; } };
 export default {
-	meta: { kinds: {} },
+	meta: { version: 1, kinds: {} },
 	run: async () => ({
 		leads: [],
 		facts: { environment: Object.keys(process.env).length },
@@ -327,7 +327,7 @@ void test("a script searches the workspace through the runner, which alone may s
 		search: `
 import { grep } from ${JSON.stringify(grepModule)};
 export default {
-	meta: { kinds: {} },
+	meta: { version: 1, kinds: {} },
 	run: async (ctx) => {
 		const matches = await grep("needle", ctx.repo, { glob: "*.txt" });
 		return { leads: [], directions: matches.map((m) => m.file + ":" + m.line) };

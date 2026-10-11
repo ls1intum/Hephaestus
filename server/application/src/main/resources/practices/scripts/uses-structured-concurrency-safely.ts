@@ -65,6 +65,7 @@ async function defaultIsolationLines(repoPath: string): Promise<{ file: string; 
 
 export default definePracticeScript({
 	meta: {
+		version: 1,
 		kinds: {
 			"detached-task": "An added Task.detached call.",
 			"stored-task-handle": "An added property that stores a Task.",

@@ -106,6 +106,7 @@ async function declaresPublicProduct(repoPath: string): Promise<boolean> {
 
 export default definePracticeScript({
 	meta: {
+		version: 1,
 		kinds: {
 			"public-declaration":
 				"A declaration that the change adds and that the rules of its language export.",

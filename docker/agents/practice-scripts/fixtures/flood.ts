@@ -2,7 +2,7 @@
 import { definePracticeScript, embedMany } from "../lib/practice-script.ts";
 
 export default definePracticeScript({
-	meta: { models: { embedding: "required" }, kinds: { unused: "Not used." } },
+	meta: { version: 1, models: { embedding: "required" }, kinds: { unused: "Not used." } },
 	async run(ctx) {
 		await Promise.all(
 			Array.from({ length: 33 }, async (_, n) =>

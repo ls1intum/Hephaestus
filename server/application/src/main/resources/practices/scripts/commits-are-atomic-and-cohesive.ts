@@ -12,6 +12,7 @@ import { definePracticeScript, expectKind } from "../lib/practice-script.ts";
 
 export default definePracticeScript({
 	meta: {
+		version: 1,
 		kinds: {
 			[COMMIT_KIND]:
 				"An authored commit of the reviewed range, with the shape of its subject and the files that it touched.",

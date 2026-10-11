@@ -29,6 +29,7 @@ const STATE_DECLARATIONS: readonly SourcePattern[] = [
 
 export default definePracticeScript({
 	meta: {
+		version: 1,
 		kinds: {
 			"state-creating-an-object":
 				"An added @State or @StateObject declaration that creates an object.",

@@ -3,7 +3,7 @@
 import { definePracticeScript, generateText } from "../lib/practice-script.ts";
 
 export default definePracticeScript({
-	meta: { models: { chat: "required" }, kinds: { unused: "Not used." } },
+	meta: { version: 1, models: { chat: "required" }, kinds: { unused: "Not used." } },
 	async run(ctx) {
 		await generateText({
 			model: ctx.models.chat,

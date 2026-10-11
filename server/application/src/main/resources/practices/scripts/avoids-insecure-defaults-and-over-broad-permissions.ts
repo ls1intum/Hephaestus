@@ -14,7 +14,8 @@ const KINDS = {
 		"An added line that allows plain HTTP or turns off the verification of TLS certificates.",
 	"over-broad-permission-wildcard":
 		"An added line that grants world-writable file modes, permits all requests, or allows every origin.",
-	"credential-named-literal": "An added line that assigns a literal value to a credential-named field.",
+	"credential-named-literal":
+		"An added line that assigns a literal value to a credential-named field.",
 };
 type InsecureKind = keyof typeof KINDS;
 
@@ -58,7 +59,7 @@ function countFact(kind: InsecureKind): string {
 }
 
 export default definePracticeScript({
-	meta: { kinds: KINDS },
+	meta: { version: 1, kinds: KINDS },
 	async run(ctx) {
 		expectKind(ctx, "scm.pull_request");
 		const leads: Lead[] = [];

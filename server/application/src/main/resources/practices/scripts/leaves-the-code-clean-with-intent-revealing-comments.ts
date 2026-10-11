@@ -53,6 +53,7 @@ const LISTED = 40;
 
 export default definePracticeScript({
 	meta: {
+		version: 1,
 		kinds: {
 			"debug-output":
 				"An added call that writes debug output, such as print, console.log or println.",

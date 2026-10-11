@@ -4,6 +4,7 @@ import { definePracticeScript } from "../lib/practice-script.ts";
 
 export default definePracticeScript({
 	meta: {
+		version: 1,
 		kinds: {
 			"restates-code": "An added comment that may only restate the code beside it.",
 			"record-row": "A captured record row.",

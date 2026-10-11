@@ -34,6 +34,7 @@ const INTERFACE_LINES: readonly SourcePattern[] = [
 
 export default definePracticeScript({
 	meta: {
+		version: 1,
 		kinds: {
 			"accessibility-modifier":
 				"An added accessibility modifier, such as accessibilityLabel or accessibilityHidden.",

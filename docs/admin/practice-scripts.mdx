@@ -75,6 +75,7 @@ const TRACKING = /#\d+|\b[A-Z][A-Z0-9]+-\d+\b|https?:\/\/\S+/u;
 
 export default definePracticeScript({
   meta: {
+    version: 1,
     kinds: { "untracked-todo": "A TODO that the change adds, with no tracking reference." },
   },
   async run(ctx) {
@@ -115,6 +116,7 @@ const NEEDS_A_LOOK = new Set(["untracked-todo", "temporary-stub"]);
 
 export default definePracticeScript({
   meta: {
+    version: 1,
     models: { decision: "optional" },
     kinds: {
       "untracked-todo": "A TODO that the change adds, with no tracking reference.",
@@ -432,6 +434,7 @@ A script in the retired form is a plain function: `(repo, diffFiles, metadata, c
 To rewrite it:
 
 1. Wrap the function body in `run(ctx)` of `definePracticeScript`, as [`meta`](#meta) shows.
+   Set `meta.version` to `1`.
 2. Replace each argument with its field of the context:
 
    | Argument | Field |
@@ -480,6 +483,7 @@ import { definePracticeScript } from "../lib/practice-script.ts";
 
 export default definePracticeScript({
   meta: {
+    version: 1,
     models: { decision: "optional" },
     tokens: 20_000,
     kinds: { "untracked-todo": "A TODO without a tracking reference." },
@@ -495,6 +499,7 @@ A `meta` that is not valid stops the script with an error.
 
 | Field | Type | Meaning |
 | --- | --- | --- |
+| `version` | `1` | Required. The version of the script contract. Version 1 is the leads contract: `run` returns leads, and the review decides what each lead means. A script without it stops with the error `version is missing`. |
 | `models` | slot → `"required"` or `"optional"` | The model slots that the script uses. A slot that is not declared is never available. |
 | `tokens` | positive integer, at most 500 000 | The token limit of this practice. The default is 20 000. The attempt token limit applies too. [Limits](#limits) gives both. |
 | `kinds` | lead kind → one sentence | Each lead kind that the script can return, with the sentence that the review reads for it. |
@@ -676,6 +681,7 @@ const TRACKING = /#\d+|\b[A-Z][A-Z0-9]+-\d+\b|https?:\/\/\S+/u;
 
 export default definePracticeScript({
   meta: {
+    version: 1,
     kinds: { "untracked-todo": "A TODO that the change adds, with no tracking reference." },
   },
   async run(ctx) {

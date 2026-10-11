@@ -22,6 +22,8 @@ A workspace practice script whose default export is a plain function, the form o
 Its review shows the error *This script uses the retired positional form. Rewrite it with definePracticeScript.*
 The review continues on its other evidence, and the error never becomes a statement about the work.
 Ask the admins of each workspace to rewrite such a script, as [Rewrite a script in the retired form](https://docs.hephaestus.build/admin/practice-scripts#rewrite-a-script-in-the-retired-form) tells.
+The rewritten script declares `version: 1` in its `meta`.
+A script without it stops with the error *meta: version is missing. Add version: 1, the leads contract.*
 
 The scripts and criteria of the bundled practices changed.
 Each workspace that adopted a bundled practice gets an update offer for it.

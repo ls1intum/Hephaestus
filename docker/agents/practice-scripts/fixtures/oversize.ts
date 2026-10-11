@@ -16,6 +16,7 @@ const outcome = (result: { value: unknown } | { unrated: Reason }) =>
 
 export default definePracticeScript({
 	meta: {
+		version: 1,
 		models: { decision: "required", embedding: "required", reranking: "required" },
 		kinds: { unused: "Not used." },
 	},

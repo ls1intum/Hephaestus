@@ -222,7 +222,7 @@ the connection row and into its own negotiation.
 ## Update — 2026-10-09: purposes for practice scripts and model protocols
 
 Supersedes the purpose list of § Decision (`PRACTICE_REVIEW` | `MENTOR`) and the last clause of
-§ Revisit trigger. [ADR 0054](0054-practice-scripts-call-models-through-the-runner.md) owns the reasons.
+§ Revisit trigger. [ADR 0055](0055-practice-scripts-call-models-through-the-runner.md) owns the reasons.
 
 The revisit trigger "provider contracts beyond the OpenAI Chat Completions and Responses shapes become
 load-bearing" fired. The protocol stays a string on the connection row, and the API carries it as an

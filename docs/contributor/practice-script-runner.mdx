@@ -14,7 +14,7 @@ The runner is `docker/agents/practice-scripts/runner.ts`, and its library is `do
 [Write a practice script](/admin/practice-scripts) owns the script contract.
 It describes `definePracticeScript`, `meta`, the model slots, the context, the primitives, the result, the reasons and the limits.
 This page does not repeat those facts.
-[ADR 0054](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0054-practice-scripts-call-models-through-the-runner.md) records why a script calls models through the runner.
+[ADR 0055](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0055-practice-scripts-call-models-through-the-runner.md) records why a script calls models through the runner.
 
 Other documents own the adjacent facts:
 
@@ -39,6 +39,15 @@ This one line tells the admin to rewrite the script with `definePracticeScript`.
 
 A workspace script from an earlier release, whose default export is a plain function, gets this error.
 The review continues without the script's leads, and the error never becomes a statement about the work.
+
+`meta.version` names the version of the contract.
+Version 1 is the leads contract: `run` returns leads, and the review decides what each lead means.
+The runner accepts only `version: 1`.
+A later contract that changes what `run` returns gets the next number.
+Thus, the runner never infers the contract from the shape of a result.
+
+A `meta` without `version` fails at step 3.
+Its error is `meta: version is missing. Add version: 1, the leads contract.`
 
 `lib/practice-script.ts` is the only import that the admin page documents.
 It re-exports the readers that a workspace script needs.

@@ -39,6 +39,7 @@ interface Ask {
 
 export default definePracticeScript({
 	meta: {
+		version: 1,
 		kinds: {
 			"inline-ask":
 				"A comment by someone other than the author that opens a thread on a line of the change.",

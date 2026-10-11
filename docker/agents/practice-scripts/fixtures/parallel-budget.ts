@@ -2,7 +2,7 @@
 import { definePracticeScript, generateText, step } from "../lib/practice-script.ts";
 
 export default definePracticeScript({
-	meta: { models: { chat: "required" }, tokens: 2300, kinds: { unused: "Not used." } },
+	meta: { version: 1, models: { chat: "required" }, tokens: 2300, kinds: { unused: "Not used." } },
 	async run(ctx) {
 		const outcomes = await Promise.all(
 			[1, 2, 3, 4].map(async (n) =>

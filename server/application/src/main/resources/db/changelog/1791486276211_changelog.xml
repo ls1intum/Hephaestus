@@ -185,7 +185,7 @@ ALTER TABLE agent_job_practice_script_run
         <preConditions onFail="HALT" onError="HALT">
             <sqlCheck expectedResult="3">SELECT count(*) FROM information_schema.columns WHERE table_schema = 'public' AND column_name = 'precompute_script' AND table_name IN ('practice', 'practice_revision', 'curated_practice_override')</sqlCheck>
         </preConditions>
-        <comment>Rename the script column of practices, practice revisions and curated practice overrides to practice_script. The projection check reads the column by name at run time, so it is replaced in the same transaction. The trigger column list and the override shape check follow the rename by themselves. No row changes.</comment>
+        <comment>Rename the script column of practices, practice revisions and curated practice overrides to practice_script. The projection check reads the column by name at run time, so it is replaced in the same transaction, with every column that the 1791488096611 version compares. The trigger column list and the override shape check follow the rename by themselves. No row changes.</comment>
         <sql splitStatements="false"><![CDATA[
 ALTER TABLE practice RENAME COLUMN precompute_script TO practice_script;
 ALTER TABLE practice_revision RENAME COLUMN precompute_script TO practice_script;
@@ -218,6 +218,8 @@ CREATE OR REPLACE FUNCTION public.enforce_practice_current_revision_projection()
                   AND revision.delivery_behavior = practice.delivery_behavior
                   AND revision.why_it_matters IS NOT DISTINCT FROM practice.why_it_matters
                   AND revision.what_good_looks_like IS NOT DISTINCT FROM practice.what_good_looks_like
+                  AND revision.visual IS NOT DISTINCT FROM practice.visual
+                  AND revision.guide IS NOT DISTINCT FROM practice.guide
                   AND revision.group_slug IS NOT DISTINCT FROM practice_group.slug
             ) THEN
                 RAISE EXCEPTION 'practice current revision does not match its current projection'
@@ -260,6 +262,8 @@ CREATE OR REPLACE FUNCTION public.enforce_practice_current_revision_projection()
                   AND revision.delivery_behavior = practice.delivery_behavior
                   AND revision.why_it_matters IS NOT DISTINCT FROM practice.why_it_matters
                   AND revision.what_good_looks_like IS NOT DISTINCT FROM practice.what_good_looks_like
+                  AND revision.visual IS NOT DISTINCT FROM practice.visual
+                  AND revision.guide IS NOT DISTINCT FROM practice.guide
                   AND revision.group_slug IS NOT DISTINCT FROM practice_group.slug
             ) THEN
                 RAISE EXCEPTION 'practice current revision does not match its current projection'

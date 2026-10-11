@@ -339,7 +339,7 @@ function namedPaths(paths: readonly string[]): string {
 }
 
 export default definePracticeScript({
-	meta: { kinds: KINDS },
+	meta: { version: 1, kinds: KINDS },
 	async run(ctx) {
 		expectKind(ctx, "scm.pull_request");
 		const leads: Lead[] = [];

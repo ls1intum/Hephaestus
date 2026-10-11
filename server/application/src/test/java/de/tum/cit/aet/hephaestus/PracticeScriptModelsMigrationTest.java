@@ -11,6 +11,7 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 import liquibase.Contexts;
 import liquibase.Liquibase;
 import liquibase.database.DatabaseFactory;
@@ -23,12 +24,14 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Runs the practice script changelog against populated tables in their released shape. Only the columns, constraints,
- * functions and triggers that the changelog reads or changes are created.
+ * functions and triggers that the changelog reads or changes are created. The released visual and guide changelog
+ * runs first, as in {@code master.xml}, because it last replaced the projection check that this changelog replaces.
  */
 @Tag("database")
 class PracticeScriptModelsMigrationTest {
     private static final String CHANGELOG = "db/changelog/1791486276211_changelog.xml";
     private static final String RELEASED_PROJECTION_CHANGELOG = "db/changelog/1790892486246_changelog.xml";
+    private static final String RELEASED_GUIDANCE_CHANGELOG = "db/changelog/1791488096611_changelog.xml";
     private static final List<String> NEW_PROTOCOLS = List.of("openai-decisions", "openai-embeddings", "cohere-rerank");
     private static final List<String> NEW_SOURCE_TYPES =
             List.of("PRACTICE_SCRIPT_DECISION", "PRACTICE_SCRIPT_EMBEDDING", "PRACTICE_SCRIPT_RERANKING");
@@ -227,6 +230,61 @@ class PracticeScriptModelsMigrationTest {
     }
 
     /**
+     * The guidance changelog runs before this one and compares the visual and the guide. This changelog replaces the
+     * same check, so a practice whose visual, guide or script alone diverges from its current revision is still
+     * refused.
+     */
+    @Test
+    void shouldStillRefuseADivergedVisualGuideOrScriptWhenMigratedAfterTheGuidanceChangelog() throws Exception {
+        List<String> includes = masterIncludes();
+        assertThat(includes.indexOf(RELEASED_GUIDANCE_CHANGELOG))
+                .as("master.xml order")
+                .isNotNegative()
+                .isLessThan(includes.indexOf(CHANGELOG));
+        TestDatabase database = PostgreSQLTestContainer.createDatabase("practice_script_guidance_projection_migration");
+        createReleasedSchema(database, true, true);
+
+        migrate(database);
+
+        assertThat(column(database, """
+                        SELECT pg_get_triggerdef(oid) FROM pg_trigger
+                        WHERE tgname = 'practice_requires_current_revision_projection'
+                        """)).singleElement().asString().contains("visual", "guide", "practice_script");
+        try (Connection connection = connect(database);
+                var statement = connection.createStatement()) {
+            connection.setAutoCommit(false);
+            statement.execute("INSERT INTO practice_group (id, slug) VALUES (1, 'quality')");
+            statement.execute("""
+                    INSERT INTO practice (id, practice_group_id, slug, name, applies_to, signals,
+                        evidence_requirements, review_when, subject, criteria, practice_script,
+                        automated_review_policy, delivery_behavior, visual, guide)
+                    VALUES (1, 1, 'tests', 'Tests', 'scm.pull_request', '[]', '[]', '{}', 'AUTHOR', 'C',
+                        'export default 1;', '{}', '{}', '{"alt": "A"}', '{"markdown": "A"}')
+                    """);
+            statement.execute("""
+                    INSERT INTO practice_revision (id, practice_id, slug, name, applies_to, signals,
+                        evidence_requirements, review_when, subject, criteria, practice_script,
+                        automated_review_policy, delivery_behavior, visual, guide, group_slug)
+                    VALUES (1, 1, 'tests', 'Tests', 'scm.pull_request', '[]', '[]', '{}', 'AUTHOR', 'C',
+                        'export default 1;', '{}', '{}', '{"alt": "A"}', '{"markdown": "A"}', 'quality')
+                    """);
+            statement.execute("UPDATE practice SET current_revision_id = 1 WHERE id = 1");
+            connection.commit();
+        }
+
+        for (String change : List.of(
+                "visual = '{\"alt\": \"B\"}'",
+                "guide = '{\"markdown\": \"B\"}'",
+                "practice_script = 'export default 2;'")) {
+            assertThatThrownBy(() -> execute(database, "UPDATE practice SET " + change + " WHERE id = 1"))
+                    .as(change)
+                    .isInstanceOfSatisfying(
+                            SQLException.class,
+                            exception -> assertThat(exception.getSQLState()).isEqualTo("23514"));
+        }
+    }
+
+    /**
      * The rows hold no current revision, so the projection check would refuse any write to a column it watches.
      * The migration still succeeds, because the adoption base is not one of them.
      */
@@ -373,6 +431,21 @@ class PracticeScriptModelsMigrationTest {
         return function;
     }
 
+    /** The changelogs that {@code master.xml} includes, in its order, as classpath resource names. */
+    private static List<String> masterIncludes() throws Exception {
+        String master;
+        try (var stream =
+                PracticeScriptModelsMigrationTest.class.getClassLoader().getResourceAsStream("db/master.xml")) {
+            assertThat(stream).as("db/master.xml").isNotNull();
+            master = new String(stream.readAllBytes(), StandardCharsets.UTF_8);
+        }
+        return Pattern.compile("<include file=\"\\./(changelog/[^\"]+)\"")
+                .matcher(master)
+                .results()
+                .map(match -> "db/" + match.group(1))
+                .toList();
+    }
+
     private static List<@Nullable String> column(TestDatabase database, String query) throws SQLException {
         try (Connection connection = connect(database);
                 var statement = connection.createStatement();
@@ -394,11 +467,14 @@ class PracticeScriptModelsMigrationTest {
         }
     }
 
+    /** Applies the released guidance changelog, then this one, as {@code master.xml} orders them. */
     private static void migrate(TestDatabase database) throws Exception {
-        var liquibaseDatabase =
-                DatabaseFactory.getInstance().findCorrectDatabaseImplementation(new JdbcConnection(connect(database)));
-        try (Liquibase liquibase = new Liquibase(CHANGELOG, new ClassLoaderResourceAccessor(), liquibaseDatabase)) {
-            liquibase.update(new Contexts());
+        for (String changelog : List.of(RELEASED_GUIDANCE_CHANGELOG, CHANGELOG)) {
+            var liquibaseDatabase = DatabaseFactory.getInstance()
+                    .findCorrectDatabaseImplementation(new JdbcConnection(connect(database)));
+            try (Liquibase liquibase = new Liquibase(changelog, new ClassLoaderResourceAccessor(), liquibaseDatabase)) {
+                liquibase.update(new Contexts());
+            }
         }
     }
 }

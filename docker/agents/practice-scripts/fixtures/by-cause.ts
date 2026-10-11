@@ -13,6 +13,7 @@ const TRACKING = /#\d+|\b[A-Z][A-Z0-9]+-\d+\b|https?:\/\/\S+/u;
 
 export default definePracticeScript({
 	meta: {
+		version: 1,
 		kinds: { "untracked-todo": "A TODO that the change adds, with no tracking reference." },
 	},
 	async run(ctx) {

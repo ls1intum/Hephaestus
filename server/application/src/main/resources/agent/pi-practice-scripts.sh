@@ -7,7 +7,7 @@ stage="$workspace/work/practice-scripts-stage"
 output="$workspace/work/practice-scripts-out"
 log="$workspace/work/practice-scripts-runner.log"
 
-# A writer that continues an admitted review assesses no practice, so no practice gets hints.
+# A writer that continues an admitted review assesses no practice, so no practice gets leads.
 if [ -f "$workspace/inputs/composition-continuation.json" ]; then
     exit 0
 fi

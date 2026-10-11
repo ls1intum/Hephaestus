@@ -89,7 +89,7 @@ function acFacts(body: string): { heading: boolean; boxes: number } {
 }
 
 export default definePracticeScript({
-	meta: { kinds: {} },
+	meta: { version: 1, kinds: {} },
 	async run(ctx) {
 		expectKind(ctx, "scm.pull_request");
 		const title = ctx.work.title ?? "";

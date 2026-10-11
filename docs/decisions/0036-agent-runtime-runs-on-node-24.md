@@ -88,7 +88,7 @@ The practice script runner keeps the grant and starts one Node process for each 
 has `--permission`, no child-process grant, no write grant, an empty environment, a bounded heap and
 its own deadline. The library's `grep` sends a search to the runner, which starts `grep` with a fixed
 argument list inside the same read grants. The runner holds the practice script credential of
-[ADR 0054](0054-practice-scripts-call-models-through-the-runner.md), and a script's process holds no
+[ADR 0055](0055-practice-scripts-call-models-through-the-runner.md), and a script's process holds no
 credential. Node permissions stay defense in depth, and Docker isolation stays the outer boundary.
 
 [Workspace ABI § Practice script validation and limits](../contributor/agent/workspace-abi.mdx#practice-script-validation-and-limits)

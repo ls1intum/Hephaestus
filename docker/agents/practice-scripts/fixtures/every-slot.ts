@@ -49,6 +49,7 @@ function similarPairs(vectors: readonly number[][]): number {
 }
 
 const meta = {
+	version: 1,
 	models: {
 		chat: "optional",
 		decision: "optional",

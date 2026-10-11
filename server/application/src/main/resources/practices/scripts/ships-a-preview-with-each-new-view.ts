@@ -11,6 +11,7 @@ const PREVIEW = /^\s*#Preview\b|:\s*PreviewProvider\b/u;
 
 export default definePracticeScript({
 	meta: {
+		version: 1,
 		kinds: {
 			"new-view-type": "An added struct that conforms to View, with its name.",
 			preview: "An added #Preview or PreviewProvider.",

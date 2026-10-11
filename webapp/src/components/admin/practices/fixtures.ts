@@ -204,6 +204,7 @@ export function practiceScript(models: PracticeScriptModelSlots = {}): string {
 		"",
 		"export default definePracticeScript({",
 		"  meta: {",
+		"    version: 1,",
 		...(declared.length > 0 ? [`    models: { ${declared.join(", ")} },`] : []),
 		'    kinds: { "open-work": "A TODO or FIXME that the change adds." },',
 		"  },",

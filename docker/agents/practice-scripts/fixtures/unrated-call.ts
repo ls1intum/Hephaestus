@@ -3,7 +3,7 @@
 import { definePracticeScript, embedMany, step } from "../lib/practice-script.ts";
 
 export default definePracticeScript({
-	meta: { models: { embedding: "required" }, kinds: { unused: "Not used." } },
+	meta: { version: 1, models: { embedding: "required" }, kinds: { unused: "Not used." } },
 	async run(ctx) {
 		const started = performance.now();
 		const outcome = await step("slow", async () =>

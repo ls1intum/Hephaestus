@@ -19,6 +19,7 @@ const IO_IN_VIEW: readonly SourcePattern[] = [
 
 export default definePracticeScript({
 	meta: {
+		version: 1,
 		kinds: {
 			"urlsession-request": "An added line that uses URLSession or makes a URLRequest.",
 			"json-coding": "An added line that makes a JSONDecoder or a JSONEncoder.",

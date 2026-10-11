@@ -31,6 +31,7 @@ function howLinked(
 
 export default definePracticeScript({
 	meta: {
+		version: 1,
 		kinds: {
 			"checkable-outcome":
 				"A linked issue with a task list, an outcome heading or a positive sub-issue count.",

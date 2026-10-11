@@ -162,6 +162,7 @@ async function assetColors(repoPath: string): Promise<AssetColors> {
 
 export default definePracticeScript({
 	meta: {
+		version: 1,
 		kinds: {
 			"fixed-components":
 				"An added color made from fixed components, such as RGB, white or hex values.",

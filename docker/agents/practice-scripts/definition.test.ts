@@ -681,6 +681,14 @@ void describe("definition scripts", () => {
 		});
 	});
 
+	void test("a script without a contract version fails and says which version to declare", async () => {
+		const { json, section } = await run("missing-version", {});
+		const result = await json("missing-version");
+		assert.partialDeepStrictEqual(result, { contract: "unknown", status: "error" });
+		assert.equal(result.error, "meta: version is missing. Add version: 1, the leads contract.");
+		assert.match(await section("missing-version"), /version is missing\. Add version: 1/u);
+	});
+
 	void test("a result that breaks the contract is a script failure, never leads", async () => {
 		const { json, section } = await run("invalid-result", {});
 		assert.match(

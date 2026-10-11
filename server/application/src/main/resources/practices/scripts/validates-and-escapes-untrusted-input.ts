@@ -172,6 +172,7 @@ function firstMatch(rows: PatternRows, content: string): string | null {
 
 export default definePracticeScript({
 	meta: {
+		version: 1,
 		kinds: {
 			"source-near-sink": `An added line with a dangerous operation (a sink) and an untrusted input (a source) at most ${String(WINDOW)} added lines away.`,
 		},

@@ -101,6 +101,7 @@ function factKey(label: string): string {
 
 export default definePracticeScript({
 	meta: {
+		version: 1,
 		kinds: {
 			"edge-construct":
 				"An added line of code with a construct that can fail or mislead on an edge value, with its language and constructs.",

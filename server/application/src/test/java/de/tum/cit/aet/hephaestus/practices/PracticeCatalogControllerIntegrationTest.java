@@ -3180,7 +3180,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                     base.subject(),
                     base.precondition(),
                     base.criteria(),
-                    base.precomputeScript(),
+                    base.practiceScript(),
                     base.automatedReviewPolicy(),
                     base.whyItMatters(),
                     base.whatGoodLooksLike(),

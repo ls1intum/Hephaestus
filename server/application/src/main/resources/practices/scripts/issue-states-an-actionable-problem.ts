@@ -5,7 +5,7 @@ import { bodyFact, classifyIssue } from "../lib/issue-classification.ts";
 import { definePracticeScript, expectKind } from "../lib/practice-script.ts";
 
 export default definePracticeScript({
-	meta: { kinds: {} },
+	meta: { version: 1, kinds: {} },
 	async run(ctx) {
 		expectKind(ctx, "scm.issue");
 		const shape = classifyIssue(ctx.work);

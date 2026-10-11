@@ -5,7 +5,7 @@ import { isTestPath, languageOf } from "../lib/languages.ts";
 import { definePracticeScript, expectKind } from "../lib/practice-script.ts";
 
 export default definePracticeScript({
-	meta: { kinds: {} },
+	meta: { version: 1, kinds: {} },
 	async run(ctx) {
 		expectKind(ctx, "scm.pull_request");
 		const source = [...ctx.change.keys()].filter((path) => languageOf(path) !== null);

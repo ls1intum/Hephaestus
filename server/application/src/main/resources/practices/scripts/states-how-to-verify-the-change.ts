@@ -86,6 +86,7 @@ function listed(opening: string, items: readonly string[], separator = ", "): st
 
 export default definePracticeScript({
 	meta: {
+		version: 1,
 		kinds: {
 			"xcode-placeholder": "An added line that keeps an Xcode placeholder token.",
 			"runtime-secret-read": "An added line that reads a key or secret at runtime.",

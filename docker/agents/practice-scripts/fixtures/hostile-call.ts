@@ -3,7 +3,7 @@
 import { definePracticeScript } from "../lib/practice-script.ts";
 
 export default definePracticeScript({
-	meta: { models: { chat: "required" }, kinds: { unused: "Not used." } },
+	meta: { version: 1, models: { chat: "required" }, kinds: { unused: "Not used." } },
 	async run() {
 		process.send?.({
 			kind: "model",

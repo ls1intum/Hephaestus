@@ -14,6 +14,7 @@ import { readLinkedWorkItems } from "../lib/review.ts";
 
 export default definePracticeScript({
 	meta: {
+		version: 1,
 		kinds: {
 			"closing-reference":
 				"An issue number that the provider records as a closing link, or that a closing keyword in the body names.",

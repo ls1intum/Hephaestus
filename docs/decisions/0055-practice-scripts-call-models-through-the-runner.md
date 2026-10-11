@@ -1,4 +1,4 @@
-# ADR 0054: Practice scripts give leads through one contract and call models through the runner
+# ADR 0055: Practice scripts give leads through one contract and call models through the runner
 
 **Status:** Accepted
 
@@ -52,7 +52,9 @@ Neither may become a claim about a developer's work (`docs/contributor/practice-
 ### One contract
 
 A script has one default export, `definePracticeScript({ meta, run })` from `lib/practice-script.ts`.
-`meta` declares the lead kinds, the model slots and a token limit.
+`meta` declares the contract version, the lead kinds, the model slots and a token limit.
+The contract version is required and is `1`, the leads contract.
+A later contract that changes what `run` returns takes the next number, so the runner never infers the contract from a result.
 `run(ctx)` returns leads, facts, unrated items and directions.
 Every bundled script uses this contract.
 

@@ -10,6 +10,7 @@ const MAX_PAIRS = 20;
 
 export default definePracticeScript({
 	meta: {
+		version: 1,
 		kinds: {
 			"same-shaped-blocks":
 				"An added block whose lines have the same shape as another added block when names and literals are set aside.",

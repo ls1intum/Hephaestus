@@ -348,7 +348,7 @@ class PracticeReleaseServiceIntegrationTest extends AbstractWorkspaceIntegration
                 source.subject(),
                 source.precondition(),
                 source.criteria(),
-                source.precomputeScript(),
+                source.practiceScript(),
                 source.automatedReviewPolicy(),
                 source.whyItMatters(),
                 source.whatGoodLooksLike(),

@@ -5,7 +5,11 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { definePracticeScript, embedMany, step } from "../lib/practice-script.ts";
 
 export default definePracticeScript({
-	meta: { models: { embedding: "required" }, kinds: { found: "A line that plain code found." } },
+	meta: {
+		version: 1,
+		models: { embedding: "required" },
+		kinds: { found: "A line that plain code found." },
+	},
 	async run(ctx) {
 		const outcome = await step("slow", async () =>
 			embedMany({ model: ctx.models.embedding, values: ["x"] }),

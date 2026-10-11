@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {
 	existsSync,
+	mkdirSync,
 	mkdtempSync,
 	realpathSync,
 	readFileSync,
@@ -151,6 +152,34 @@ void test(
 					rmSync(root, { recursive: true, force: true });
 				}
 			});
+		}
+	},
+);
+
+void test(
+	"a composition continuation runs no practice script",
+	{ skip: process.platform !== "linux" },
+	() => {
+		const root = realpathSync(mkdtempSync(path.join(tmpdir(), "practice-script-continuation-")));
+		try {
+			mkdirSync(path.join(root, "inputs"));
+			writeFileSync(path.join(root, "inputs/composition-continuation.json"), "{}");
+			writeFileSync(
+				path.join(root, "pi-practice-scripts.ts"),
+				'require("node:fs").writeFileSync(process.argv[2] + "/ran", "ran");\n',
+			);
+			const result = spawnSync("sh", [bootstrap, "5", "1000", root], {
+				encoding: "utf8",
+				timeout: 5000,
+			});
+			assert.equal(result.error, undefined);
+			assert.equal(result.status, 0, result.stderr);
+			assert.equal(result.stderr, "");
+			// The writer assesses no practice, so the stage neither starts nor leaves an output folder.
+			assert.equal(existsSync(path.join(root, "ran")), false);
+			assert.equal(existsSync(path.join(root, "work/practice-scripts-out")), false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
 		}
 	},
 );

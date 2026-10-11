@@ -92,7 +92,7 @@ async function cited(result: Run, slug: string): Promise<string[]> {
 
 /** A definition script whose facts are what it read from `ctx`. */
 const READS_CONTEXT = `export default {
-	meta: { kinds: {} },
+	meta: { version: 1, kinds: {} },
 	run: async (ctx) => ({
 		leads: [],
 		facts: {
@@ -210,7 +210,7 @@ void describe("what a definition script reads about its review", () => {
 
 	void test("inputs that do not parse fail each script with the file that holds the error", async () => {
 		const definition =
-			"export default { meta: { kinds: {} }, run: async () => ({ leads: [] }) };\n";
+			"export default { meta: { version: 1, kinds: {} }, run: async () => ({ leads: [] }) };\n";
 		const { json, section } = await run(
 			{ definition },
 			{
@@ -258,7 +258,7 @@ void describe("what a definition script reads about its review", () => {
 			{
 				issues: `import { expectKind } from "../lib/practice-script.ts";
 export default {
-	meta: { kinds: {} },
+	meta: { version: 1, kinds: {} },
 	run: async (ctx) => {
 		expectKind(ctx, "scm.issue");
 		return { leads: [] };
@@ -316,7 +316,7 @@ async function history() {
 
 /** A script that cites the line of the earlier review and the line added since, and reads the change since. */
 const CITES_LINES = `export default {
-	meta: { kinds: { "added-line": "A line that the change adds." } },
+	meta: { version: 1, kinds: { "added-line": "A line that the change adds." } },
 	run: async (ctx) => ({
 		leads: [
 			{ at: { change: "cart.ts", line: 2 }, kind: "added-line" },

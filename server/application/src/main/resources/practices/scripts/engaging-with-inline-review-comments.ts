@@ -75,6 +75,7 @@ interface Note {
 
 export default definePracticeScript({
 	meta: {
+		version: 1,
 		kinds: {
 			"reviewer-comment": "An inline comment by someone other than the author.",
 			"conversation-comment": "A conversation comment by someone other than the author.",

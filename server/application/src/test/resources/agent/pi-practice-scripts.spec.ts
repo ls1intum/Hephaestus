@@ -72,7 +72,7 @@ if (scenarioRoot !== undefined && scenarioRoot !== "") {
 				`import { readFileSync } from "node:fs";
 import { parseDiff } from "../lib/diff-parser.ts";
 export default {
- meta: { kinds: { record: "The record of the work." } },
+ meta: { version: 1, kinds: { record: "The record of the work." } },
  run: async (ctx) => ({
   leads: [{ at: { record: "metadata.json" }, kind: "record" }],
   facts: {
@@ -91,17 +91,17 @@ export default {
 			for (const [name, source] of Object.entries({
 				"missing-export": "export const value = 1;",
 				"invalid-result":
-					"export default { meta: { kinds: {} }, run: async () => ({ leads: [], facts: { count: Infinity } }) };",
+					"export default { meta: { version: 1, kinds: {} }, run: async () => ({ leads: [], facts: { count: Infinity } }) };",
 				throws:
-					"export default { meta: { kinds: {} }, run: async () => { throw new Error('broken practice'); } };",
+					"export default { meta: { version: 1, kinds: {} }, run: async () => { throw new Error('broken practice'); } };",
 				"stored-inventory": `import { inventoryIssues, readProjectInventory } from "../lib/context.ts";
 export default {
- meta: { kinds: {} },
+ meta: { version: 1, kinds: {} },
  run: async (ctx) => ({ leads: [], facts: { issues: inventoryIssues(await readProjectInventory(ctx.context.dir)).size } }),
 };`,
 				"stored-scoped-inventory": `import { inventoryIssues } from "../lib/context.ts";
 export default {
- meta: { kinds: {} },
+ meta: { version: 1, kinds: {} },
  run: async () => ({
   leads: [],
   facts: {
@@ -139,7 +139,7 @@ export default {
 			writeFileSync(
 				path.join(root, scripts, "reads-cause.ts"),
 				`export default {
- meta: { kinds: {} },
+ meta: { version: 1, kinds: {} },
  run: async (ctx) => ({ leads: [], facts: { kind: ctx.kind, cause: ctx.cause.type, signal: ctx.cause.signal, previous: ctx.previous === null, messages: ctx.work.messages.length } }),
 };
 `,

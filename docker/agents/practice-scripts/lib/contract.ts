@@ -91,7 +91,19 @@ const line = (max: number) =>
 
 const LEAD_KIND = /^[a-z][a-z0-9-]{1,47}$/u;
 
+/**
+ * The version of the script contract that `meta.version` names. Version 1 is the leads contract: `run`
+ * returns leads, facts and directions, and the review decides what each lead means.
+ */
+export const CONTRACT_VERSION = 1;
+
 export const metaSchema = z.strictObject({
+	version: z.literal(CONTRACT_VERSION, {
+		error: (issue) =>
+			issue.input === undefined
+				? `version is missing. Add version: ${CONTRACT_VERSION}, the leads contract.`
+				: `version ${JSON.stringify(issue.input)} is not known. Use version: ${CONTRACT_VERSION}, the leads contract.`,
+	}),
 	models: z.partialRecord(modelSlotSchema, needSchema).optional(),
 	/** This practice's token ceiling, inside the stage's own ceiling. */
 	tokens: z.int().positive().max(500_000).optional(),

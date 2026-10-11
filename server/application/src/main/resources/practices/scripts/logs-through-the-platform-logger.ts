@@ -86,6 +86,7 @@ const LISTED = 40;
 
 export default definePracticeScript({
 	meta: {
+		version: 1,
 		kinds: {
 			"print-call": "An added print-style call, such as print, println, console.log or System.out.",
 			"logger-call":
