@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
+import { expect, fn } from "storybook/test";
 
 import type { TeamInfo } from "@/api/types.gen";
 import { withStandardPage } from "@/stories/decorators";
@@ -143,21 +144,62 @@ type Story = StoryObj<typeof meta>;
 export const WithTeams: Story = {
 	args: {
 		teams: mockTeams,
-		isLoading: false,
+		state: { status: "ready" },
 	},
 };
 
 export const Loading: Story = {
 	args: {
 		teams: [],
-		isLoading: true,
+		state: { status: "loading" },
 	},
 };
 
 export const Empty: Story = {
 	args: {
 		teams: [],
-		isLoading: false,
+		state: { status: "ready" },
+	},
+};
+
+/** The team list could not be read: the page says so and offers a retry, never "No teams yet". */
+export const Failed: Story = {
+	args: {
+		teams: [],
+		state: { status: "error", error: new Error("Network down"), onRetry: fn() },
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("We could not load teams")).toBeVisible();
+		await expect(canvas.getByRole("button", { name: "Retry" })).toBeVisible();
+		await expect(canvas.queryByText(/No teams yet/u)).not.toBeInTheDocument();
+	},
+};
+
+/** A refresh failed: the teams already read stay, under the failure and its retry. */
+export const RefreshFailed: Story = {
+	args: {
+		teams: mockTeams,
+		state: { status: "ready", refresh: { error: new Error("Network down"), onRetry: fn() } },
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("We could not refresh teams")).toBeVisible();
+		await expect(canvas.getByRole("button", { name: "Retry" })).toBeVisible();
+		await expect(canvas.getByRole("heading", { level: 2, name: "Frontend" })).toBeVisible();
+	},
+};
+
+/** The same teams remain visible while the requested retry is still reading. */
+export const RetryingRefresh: Story = {
+	args: {
+		teams: mockTeams,
+		state: {
+			status: "ready",
+			refresh: { error: new Error("Network down"), onRetry: fn(), pending: true },
+		},
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("button", { name: "Retrying…" })).toBeDisabled();
+		await expect(canvas.getByRole("heading", { level: 2, name: "Frontend" })).toBeVisible();
 	},
 };
 
@@ -171,7 +213,7 @@ export const MobileHierarchy: Story = {
 					}
 				: team,
 		),
-		isLoading: false,
+		state: { status: "ready" },
 	},
 	parameters: {
 		viewport: { defaultViewport: "reflow" },
