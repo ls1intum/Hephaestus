@@ -3291,6 +3291,12 @@ void test("the task graph keeps its cache posture", async () => {
 		);
 	}
 	assert.ok(Array.isArray(asRecord(tasks["gate:docs-lint"], "gate:docs-lint").input));
+	assert.equal(
+		asRecord(tasks["gate:changesets"], "gate:changesets").cache,
+		false,
+		"pending note additions and edits must be read on every local check",
+	);
+	assert.match(commandsOf(tasks["gate:changesets"]).join(" "), /verify-changesets\.ts --local/u);
 
 	for (const [file, source] of await workflowSources()) {
 		assert.doesNotMatch(

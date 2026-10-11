@@ -1,6 +1,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
+import { readChangesets } from "@changesets/read";
+
 import { isSet } from "./lib/env.ts";
 import { asArray, asRecord, asString, readJsonFile } from "./lib/json.ts";
 import { CLAUDE_SESSION_PATTERN } from "./lib/model-attribution.ts";
@@ -44,6 +46,9 @@ export const verifyChangesetMigration = (
 	}
 };
 
+const changesetId = (file: string): string =>
+	path.posix.relative(".changeset", file).replace(/\.md$/u, "");
+
 export const verifyChangesets = (
 	status: unknown,
 	files: readonly string[],
@@ -52,7 +57,7 @@ export const verifyChangesets = (
 	const byId = changesetEntries(status);
 
 	for (const file of files) {
-		const entry = byId.get(path.basename(file, ".md"));
+		const entry = byId.get(changesetId(file));
 		if (!entry) {
 			throw new Error(`${file}: Changesets did not parse this file`);
 		}
@@ -98,10 +103,48 @@ export const verifyChangesets = (
 	}
 };
 
+async function verifyParsedChangesets(
+	status: unknown,
+	files: readonly string[],
+	rootDir: string,
+): Promise<void> {
+	const root = asRecord(await readJsonFile(path.join(rootDir, "package.json")), "package.json");
+	verifyChangesets(status, files, asString(root.version, "package.json version").startsWith("0."));
+	const entries = changesetEntries(status);
+	for (const file of files) {
+		const entry = entries.get(changesetId(file));
+		if (entry) {
+			const summary = asString(entry.summary, `${file} summary`);
+			const fragmentFile = path.join(rootDir, ".migration", path.basename(file));
+			verifyChangesetMigration(
+				file,
+				summary,
+				existsSync(fragmentFile) ? readFileSync(fragmentFile, "utf8") : undefined,
+			);
+		}
+	}
+}
+
+export async function verifyLocalChangesets(rootDir: string): Promise<void> {
+	const changesets = await readChangesets(rootDir);
+	await verifyParsedChangesets(
+		{ changesets },
+		changesets.map(({ id }) => `.changeset/${id}.md`),
+		rootDir,
+	);
+}
+
 async function main(): Promise<void> {
 	const [statusJson, ...arguments_] = process.argv.slice(2);
 	if (!isSet(statusJson)) {
-		throw new Error("usage: verify-changesets.ts <changeset-status-json> <files...>");
+		throw new Error("usage: verify-changesets.ts --local | <changeset-status-json> <files...>");
+	}
+	if (statusJson === "--local") {
+		if (arguments_.length > 0) {
+			throw new Error("--local reads all pending changesets and takes no file arguments");
+		}
+		await verifyLocalChangesets(process.cwd());
+		return;
 	}
 	const status = await readJsonFile(statusJson);
 	if (arguments_[0] === "--migration") {
@@ -115,25 +158,7 @@ async function main(): Promise<void> {
 			verifyMigrationFragment(file, summary, readFileSync(file, "utf8"));
 		}
 	} else {
-		const root = asRecord(await readJsonFile("package.json"), "package.json");
-		verifyChangesets(
-			status,
-			arguments_,
-			asString(root.version, "package.json version").startsWith("0."),
-		);
-		const entries = changesetEntries(status);
-		for (const file of arguments_) {
-			const entry = entries.get(path.basename(file, ".md"));
-			if (entry) {
-				const summary = asString(entry.summary, `${file} summary`);
-				const fragmentFile = `.migration/${path.basename(file)}`;
-				verifyChangesetMigration(
-					file,
-					summary,
-					existsSync(fragmentFile) ? readFileSync(fragmentFile, "utf8") : undefined,
-				);
-			}
-		}
+		await verifyParsedChangesets(status, arguments_, process.cwd());
 	}
 }
 

@@ -1,8 +1,14 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import {
 	verifyChangesets,
+	verifyLocalChangesets,
 	verifyChangesetMigration,
 	verifyMigrationFragment,
 } from "./verify-changesets.ts";
@@ -115,4 +121,58 @@ void test("migration fragments require an operator marker and one entry", () => 
 	assert.doesNotThrow(() =>
 		verifyChangesetMigration(".changeset/note.md", "No action.", undefined),
 	);
+});
+
+void test("local content check reads real notes without a Git repository", async (t) => {
+	const root = await mkdtemp(path.join(tmpdir(), "local-changesets-"));
+	t.after(async () => rm(root, { recursive: true, force: true }));
+	await mkdir(path.join(root, ".changeset", "pre"), { recursive: true });
+	await writeFile(path.join(root, "package.json"), JSON.stringify({ version: "0.91.0" }));
+	await writeFile(path.join(root, ".changeset", "README.md"), "Not a changeset.");
+	await verifyLocalChangesets(root);
+	await writeFile(path.join(root, ".changeset", "note.md"), "---\n---\n");
+	await assert.rejects(verifyLocalChangesets(root), /must explain/u);
+	await writeFile(
+		path.join(root, ".changeset", "note.md"),
+		"---\n---\n\nCI only. No shipped application changes.\n",
+	);
+	await writeFile(
+		path.join(root, ".changeset", "pre", "note.md"),
+		'---\n"hephaestus": patch\n---\n\nSign-in works again.\n',
+	);
+	await verifyLocalChangesets(root);
+	const script = fileURLToPath(new URL("verify-changesets.ts", import.meta.url));
+	execFileSync(process.execPath, [script, "--local"], { cwd: root, stdio: "pipe" });
+	await writeFile(path.join(root, ".changeset", "new.md"), "---\n---\n");
+	assert.throws(() =>
+		execFileSync(process.execPath, [script, "--local"], { cwd: root, stdio: "pipe" }),
+	);
+	await rm(path.join(root, ".changeset", "new.md"));
+	await verifyLocalChangesets(root);
+});
+
+void test("local files retain the existing release and migration refusals", async (t) => {
+	const root = await mkdtemp(path.join(tmpdir(), "local-note-policy-"));
+	t.after(async () => rm(root, { recursive: true, force: true }));
+	await mkdir(path.join(root, ".changeset"));
+	await writeFile(path.join(root, "package.json"), JSON.stringify({ version: "0.91.0" }));
+	const note = path.join(root, ".changeset", "note.md");
+	for (const [source, expected] of [
+		["No frontmatter.", /missing or invalid frontmatter/u],
+		['---\n"webapp": patch\n---\n\nFix.\n', /must release only/u],
+		['---\n"hephaestus": major\n---\n\nBreaks API.\n', /pre-1.0 major/u],
+		[
+			'---\n"hephaestus": minor\n---\n\n**Operators:** change the setting.\n',
+			/requires \.migration/u,
+		],
+	] as const) {
+		await writeFile(note, source);
+		await assert.rejects(verifyLocalChangesets(root), expected);
+	}
+	await mkdir(path.join(root, ".migration"));
+	await writeFile(
+		path.join(root, ".migration", "note.md"),
+		"#### 🔴 Update the setting\n\nSet the new value before upgrading.\n",
+	);
+	await verifyLocalChangesets(root);
 });
