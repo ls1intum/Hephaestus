@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn, within } from "storybook/test";
+import { expect, fn, waitFor, within } from "storybook/test";
 
 import { LARGE_PEOPLE, PEOPLE, peopleOf, readyPeople } from "@/stories/activity-story-data";
 import { withProvider, withStandardPage } from "@/stories/decorators";
@@ -252,6 +252,80 @@ export const GitLabDark: Story = {
 	decorators: [withProvider("GITLAB")],
 	args: { providerType: "GITLAB" },
 	globals: { theme: "dark" },
+};
+
+const LONG_NAME = "Maximiliane Alexandra Featherstonehaugh-Wolfeschlegelsteinhausen";
+const large = peopleOf(LARGE_PEOPLE);
+const longFirst = [...large.people].sort(
+	(a, b) => b.counts.contributions - a.counts.contributions,
+)[0];
+
+/**
+ * In a narrow column the figures scroll under the pinned position and name. Past row 100 a position has
+ * three digits, and a long name with the New marker still keeps its set width.
+ */
+export const NarrowScroll: Story = {
+	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
+	args: {
+		state: readyPeople({
+			...large,
+			people: large.people.map((row) =>
+				row === longFirst ? { ...row, person: { ...row.person, name: LONG_NAME } } : row,
+			),
+			highlights: {
+				...large.highlights,
+				firstContributors: longFirst ? [longFirst.person.id] : [],
+			},
+		}),
+	},
+	play: async ({ canvas, userEvent }) => {
+		const table = canvas.getByRole("table", { name: "People" });
+		await userEvent.click(canvas.getByRole("button", { name: "Show more people" }));
+		await userEvent.click(canvas.getByRole("button", { name: "Show more people" }));
+		const container = table.closest<HTMLElement>("[data-slot='table-container']");
+		await expect(container).not.toBeNull();
+		if (!container) {
+			return;
+		}
+		container.scrollLeft = container.scrollWidth;
+		await waitFor(async () => expect(container.scrollLeft).toBeGreaterThan(0));
+		await expect(window.innerWidth).toBe(320);
+
+		const bodyRows = within(table).getAllByRole("row").slice(1);
+		const threeDigits = bodyRows.find(
+			(row) => (within(row).getAllByRole("cell")[0]?.textContent ?? "").length === 3,
+		);
+		await expect(threeDigits).toBeDefined();
+		if (!threeDigits) {
+			throw new Error("The rendered rows did not include a three-digit position");
+		}
+		const longRow = within(table).getByRole("row", { name: new RegExp(LONG_NAME, "u") });
+		for (const row of [threeDigits, longRow]) {
+			const [position, name] = within(row).getAllByRole("cell");
+			if (!position || !name) {
+				throw new Error("A row without its position or name");
+			}
+			row.scrollIntoView({ block: "center" });
+			const box = container.getBoundingClientRect();
+			const positionBox = position.getBoundingClientRect();
+			const nameBox = name.getBoundingClientRect();
+			// Identity stays at the edge and leaves room for the scrolling figures.
+			await expect(Math.abs(positionBox.left - box.left)).toBeLessThanOrEqual(2);
+			await expect(positionBox.right).toBeLessThanOrEqual(nameBox.left + 1);
+			await expect(nameBox.right - box.left).toBeLessThanOrEqual(box.width * 0.75);
+			// What a pointer at the name's centre hits is the name's cell, not a figure passing under it.
+			const hit = document.elementFromPoint(
+				nameBox.left + nameBox.width / 2,
+				nameBox.top + nameBox.height / 2,
+			);
+			await expect(name.contains(hit)).toBe(true);
+		}
+		const link = within(longRow).getByRole("link");
+		await expect(link.scrollWidth).toBeGreaterThan(link.clientWidth);
+		await expect(
+			within(longRow).getByRole("img", { name: "First contribution in this range" }),
+		).toBeVisible();
+	},
 };
 
 export const Reflow: Story = {

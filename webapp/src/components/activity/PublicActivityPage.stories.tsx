@@ -9,9 +9,12 @@ import {
 	REPOSITORIES,
 } from "@/stories/activity-story-data";
 import { withProvider, withStandardPage } from "@/stories/decorators";
+import { settledDrawerPanel } from "@/stories/overlay";
 import { expectNoPageOverflow } from "@/stories/reflow";
 import { daysBefore } from "@/stories/story-clock";
+import { precedes } from "@/test/dom";
 
+import { parseActivityStack, PUBLIC_ACTIVITY_LEVEL_KINDS } from "./activity-search";
 import { PublicActivityPage } from "./PublicActivityPage";
 
 const activity = publicActivityOf(PEOPLE);
@@ -35,6 +38,7 @@ const meta = {
 		coverage: activity.coverage,
 		people: readyPublicPeople(activity),
 		updating: false,
+		detail: { stack: [], onClose: fn() },
 	},
 } satisfies Meta<typeof PublicActivityPage>;
 
@@ -72,14 +76,16 @@ export const SignedIn: Story = {
 	},
 };
 
-/** Each name leads to the person's page at the provider, apart from this page. */
-export const ProfileLinks: Story = {
+/** Names open the published figures here; the provider profile is a separate link. */
+export const PersonLinks: Story = {
 	play: async ({ canvas }) => {
 		const link = within(canvas.getByRole("table", { name: "People" })).getByRole("link", {
-			name: "Ada Lovelace, profile (opens in a new tab)",
+			name: "Ada Lovelace",
 		});
-		await expect(link).toHaveAttribute("href", "https://github.com/ada");
-		await expect(link).toHaveAttribute("target", "_blank");
+		await expect(
+			new URL(link.getAttribute("href") ?? "", window.location.href).searchParams.get("detail"),
+		).toBe("person:ada");
+		await expect(link).not.toHaveAttribute("target");
 	},
 };
 
@@ -170,7 +176,99 @@ export const Wide: Story = {
 	parameters: { chromatic: { viewports: [1920] } },
 	play: async ({ canvas }) => {
 		const table = canvas.getByRole("table", { name: "People" });
-		await expect(table.getBoundingClientRect().width).toBeLessThanOrEqual(896);
+		await expect(table.getBoundingClientRect().width).toBeLessThanOrEqual(1152);
+	},
+};
+
+const adaDetail = {
+	stack: parseActivityStack(["person:ada"], PUBLIC_ACTIVITY_LEVEL_KINDS),
+	onClose: fn(),
+};
+
+export const PersonDetails: Story = {
+	args: {
+		detail: adaDetail,
+		people: readyPublicPeople(
+			publicActivityOf(PEOPLE, {
+				from: new Date("2026-12-28T00:00:00Z"),
+				to: new Date("2027-01-11T00:00:00Z"),
+				people: activity.people.map((person) => ({
+					...person,
+					counts: { ...person.counts, activeWeeks: 2 },
+					weeks: [
+						{ start: new Date("2026-12-28T00:00:00Z"), contributions: person.counts.contributions },
+						{ start: new Date("2027-01-04T00:00:00Z"), contributions: 0 },
+					],
+				})),
+			}),
+		),
+	},
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		await expect(panel.getByRole("heading", { name: "Ada Lovelace" })).toBeVisible();
+		await expect(panel.getByRole("heading", { name: "In this range" })).toBeVisible();
+		await expect(panel.getByText("Distinct pull requests reviewed")).toBeVisible();
+		const weeks = within(panel.getByRole("table", { name: "Contributions by week" }));
+		await expect(weeks.getByRole("cell", { name: "28 December 2026" })).toBeVisible();
+		await expect(weeks.getByRole("cell", { name: "4 January 2027" })).toBeVisible();
+		await expect(
+			precedes(
+				panel.getByRole("link", { name: /ada on GitHub/u }),
+				panel.getByRole("heading", { name: "In this range" }),
+			),
+		).toBe(true);
+		await expect(panel.getByRole("link", { name: /ada on GitHub/u })).toHaveAttribute(
+			"href",
+			"https://github.com/ada",
+		);
+		await expect(panel.getByRole("link", { name: /ada on GitHub/u })).toHaveAttribute(
+			"target",
+			"_blank",
+		);
+	},
+};
+
+export const PersonMissing: Story = {
+	args: { detail: adaDetail, people: readyPublicPeople(publicActivityOf([])) },
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		await expect(panel.getByText("No activity in this range")).toBeVisible();
+		await expect(panel.queryByRole("link", { name: /on GitHub/u })).not.toBeInTheDocument();
+	},
+};
+
+export const PersonLoading: Story = {
+	args: { detail: adaDetail, people: { status: "loading" } },
+	play: async () => {
+		const panel = await settledDrawerPanel();
+		await expect(panel.querySelector('[aria-busy="true"]')).toBeVisible();
+		await expect(within(panel).queryByRole("table")).not.toBeInTheDocument();
+	},
+};
+
+export const PersonFailed: Story = {
+	args: {
+		detail: adaDetail,
+		people: { status: "error", error: new Error("Network down"), onRetry: fn() },
+	},
+	play: async ({ args, userEvent }) => {
+		const panel = within(await settledDrawerPanel());
+		await expect(panel.getByText("We could not load this person’s activity")).toBeVisible();
+		await userEvent.click(panel.getByRole("button", { name: /Retry/u }));
+		await expect(
+			args.people.status === "error" ? args.people.onRetry : undefined,
+		).toHaveBeenCalledOnce();
+	},
+};
+
+export const PersonUpdating: Story = {
+	args: { detail: adaDetail, period: { kind: "preset", preset: "30d" }, updating: true },
+	play: async () => {
+		const panel = await settledDrawerPanel();
+		await expect(
+			within(panel).getByText(/These figures are for .* while the new range loads\./u),
+		).toBeVisible();
+		await expect(panel.querySelector('[aria-busy="true"]')).toBeVisible();
 	},
 };
 
