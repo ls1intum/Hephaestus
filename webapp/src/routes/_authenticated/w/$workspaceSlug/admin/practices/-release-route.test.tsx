@@ -1,10 +1,11 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
-import { expect, it } from "vitest";
+import { beforeEach, expect, it } from "vitest";
 
 import type { PracticeReleaseProposal } from "@/api/types.gen";
 import { mockPullRequestReviewFields, mockPullRequestPolicy } from "@/mocks/fixtures/practice";
 import { server } from "@/mocks/server";
+import { deferred } from "@/test/async";
 import { ROUTE_RENDER_WAIT, renderRouteAt } from "@/test/router-harness";
 
 const base = {
@@ -27,9 +28,7 @@ const proposal: PracticeReleaseProposal = {
 	fields: [{ field: "CRITERIA", offeredChanged: true, conflict: true }],
 };
 
-it("accepts a workspace update with explicit field choice and the reviewed version", async () => {
-	let receivedTag: string | null = null;
-	let receivedBody: unknown;
+beforeEach(() => {
 	server.use(
 		http.get("*/workspaces", () =>
 			HttpResponse.json([
@@ -48,6 +47,13 @@ it("accepts a workspace update with explicit field choice and the reviewed versi
 		),
 		http.get("*/workspaces/:workspaceSlug/practices/releases", () => HttpResponse.json([proposal])),
 		http.get("*/workspaces/:workspaceSlug/practices", () => HttpResponse.json([])),
+	);
+});
+
+it("accepts a workspace update with explicit field choice and the reviewed version", async () => {
+	let receivedTag: string | null = null;
+	let receivedBody: unknown;
+	server.use(
 		http.put("*/workspaces/:workspaceSlug/practices/releases/:slug", async ({ request }) => {
 			receivedTag = request.headers.get("if-match");
 			receivedBody = await request.json();
@@ -75,3 +81,118 @@ it("accepts a workspace update with explicit field choice and the reviewed versi
 	expect(receivedBody).toStrictEqual({ choices: { CRITERIA: "OFFERED" } });
 	await screen.findByText("No updates to review", undefined, ROUTE_RENDER_WAIT);
 });
+
+const decisions = [
+	{
+		decision: "accept",
+		action: "Accept selected fields",
+		progress: "Accepting selected fields…",
+		other: "Decline this update",
+		success: "Practice update accepted",
+	},
+	{
+		decision: "decline",
+		action: "Decline this update",
+		progress: "Declining update…",
+		other: "Accept selected fields",
+		success: "Practice update declined",
+	},
+];
+
+it.each(decisions)(
+	"keeps $decision pending until the updated inbox arrives",
+	async ({ action, progress, other, success }) => {
+		const refreshed = deferred<Response>();
+		let refreshes = 0;
+		server.use(
+			http.get(
+				"*/workspaces/:workspaceSlug/practices/releases",
+				() => HttpResponse.json([proposal]),
+				{
+					once: true,
+				},
+			),
+			http.get("*/workspaces/:workspaceSlug/practices/releases", async () => {
+				refreshes += 1;
+				return refreshed.promise;
+			}),
+			http.put("*/workspaces/:workspaceSlug/practices/releases/:slug", () => HttpResponse.json({})),
+			http.delete(
+				"*/workspaces/:workspaceSlug/practices/releases/:slug",
+				() => new HttpResponse(null, { status: 204 }),
+			),
+		);
+		renderRouteAt("/w/acme/admin/practices/releases");
+		const choices = await screen.findByRole(
+			"radiogroup",
+			{ name: "Use a version for Review criteria" },
+			ROUTE_RENDER_WAIT,
+		);
+		fireEvent.click(within(choices).getByRole("radio", { name: "Proposed" }));
+		fireEvent.click(
+			screen.getByRole("button", {
+				name: action,
+			}),
+		);
+		try {
+			await waitFor(() => expect(refreshes).toBe(1));
+			expect(
+				screen.getByRole("button", {
+					name: progress,
+				}),
+			).toHaveProperty("disabled", true);
+			expect(
+				screen.getByRole("button", {
+					name: other,
+				}),
+			).toHaveProperty("disabled", true);
+			expect(
+				within(choices).getByRole("radio", { name: "Proposed" }).getAttribute("aria-disabled"),
+			).toBe("true");
+			await act(async () => {
+				refreshed.resolve(HttpResponse.json([]));
+			});
+			await screen.findByText("No updates to review", undefined, ROUTE_RENDER_WAIT);
+			await screen.findByText(success);
+		} finally {
+			refreshed.resolve(HttpResponse.json([]));
+		}
+	},
+);
+
+it.each(decisions)(
+	"keeps a saved $decision decision successful when the inbox refresh fails",
+	async ({ action, success }) => {
+		server.use(
+			http.get(
+				"*/workspaces/:workspaceSlug/practices/releases",
+				() => HttpResponse.json([proposal]),
+				{ once: true },
+			),
+			http.get("*/workspaces/:workspaceSlug/practices/releases", () =>
+				HttpResponse.json({ status: 503 }, { status: 503 }),
+			),
+			http.put("*/workspaces/:workspaceSlug/practices/releases/:slug", () => HttpResponse.json({})),
+			http.delete(
+				"*/workspaces/:workspaceSlug/practices/releases/:slug",
+				() => new HttpResponse(null, { status: 204 }),
+			),
+		);
+		renderRouteAt("/w/acme/admin/practices/releases");
+		const choices = await screen.findByRole(
+			"radiogroup",
+			{ name: "Use a version for Review criteria" },
+			ROUTE_RENDER_WAIT,
+		);
+		fireEvent.click(within(choices).getByRole("radio", { name: "Proposed" }));
+		fireEvent.click(
+			screen.getByRole("button", {
+				name: action,
+			}),
+		);
+		await screen.findByText("We could not load practice updates", undefined, ROUTE_RENDER_WAIT);
+		await screen.findByText(success);
+		expect(screen.queryByText("We could not accept the update")).toBeNull();
+		expect(screen.queryByText("We could not decline the update")).toBeNull();
+	},
+);

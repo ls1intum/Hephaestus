@@ -37,43 +37,45 @@ function PracticeReleaseInbox() {
 	const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
 	const queryClient = useQueryClient();
 	const query = useQuery(listPracticeReleasesOptions({ path: { workspaceSlug } }));
-	const refresh = () => {
-		void queryClient.invalidateQueries({
-			queryKey: listPracticeReleasesQueryKey({ path: { workspaceSlug } }),
-		});
-		void queryClient.invalidateQueries({
-			queryKey: listPracticesQueryKey({ path: { workspaceSlug } }),
-		});
+	const refresh = async () => {
+		await Promise.all([
+			queryClient.invalidateQueries({
+				queryKey: listPracticeReleasesQueryKey({ path: { workspaceSlug } }),
+			}),
+			queryClient.invalidateQueries({
+				queryKey: listPracticesQueryKey({ path: { workspaceSlug } }),
+			}),
+		]);
 	};
 	const accept = useMutation({
 		...acceptPracticeReleaseMutation(),
-		onSuccess: () => {
-			refresh();
+		onSuccess: async () => {
+			await refresh();
 			toast.success("Practice update accepted");
 		},
 		onError: (error) => {
 			if (problemStatusOf(error) === 412) {
-				refresh();
+				void refresh();
 			}
 			toast.error("We could not accept the update", { description: problemDetailOf(error) });
 		},
 	});
 	const decline = useMutation({
 		...declinePracticeReleaseMutation(),
-		onSuccess: () => {
-			refresh();
+		onSuccess: async () => {
+			await refresh();
 			toast.success("Practice update declined");
 		},
 		onError: (error) => {
 			if (problemStatusOf(error) === 412) {
-				refresh();
+				void refresh();
 			}
 			toast.error("We could not decline the update", { description: problemDetailOf(error) });
 		},
 	});
 	const proposals = query.data ?? [];
 	const selected = proposals.find((proposal) => proposal.slug === selectedSlug) ?? proposals[0];
-	const pending = accept.isPending || decline.isPending;
+	const pending = (accept.isPending ? "accept" : null) ?? (decline.isPending ? "decline" : null);
 	let content: ReactNode;
 	if (query.isPending) {
 		content = (
