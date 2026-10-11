@@ -755,7 +755,9 @@ When release preflight is required, it owns image vulnerability scanning for bot
 The image-build workflows omit their duplicate scans. Other published builds scan every platform
 they built. Each platform retains its own report and policy result. The final gate rejects a required preflight that is skipped, canceled or unsuccessful.
 
-The build scan resolves its immutable image reference through
+The build scan starts from its platform's build digest artifact without waiting for manifest signing.
+Before publishing verified tags, the manifest job checks that both final index leaves equal the scan subjects.
+It resolves the immutable image reference through
 `scripts/resolve-image-scan-subject.ts`, using the same platform resolver in `scripts/lib/image-scan.ts` as scheduled rescans. An index must
 contain the requested platform. A missing platform or malformed index fails instead of falling back
 to whichever architecture the scanner's host would choose. A single manifest is resolved through
@@ -769,7 +771,7 @@ Pushes, dispatches, and merge groups use `github.sha`.
 Pull requests use their head SHA because `github.sha` is a merge commit with no image tag.
 
 Within a run, the vulnerability scan ignores tags.
-It reads the digest output from its own build or merge job.
+It reads the captured single-architecture build output or its own platform build digest artifact.
 Thus, a scan-only rerun scans that build's artifact.
 
 `ci-contract.test.ts` asserts the whole contract.

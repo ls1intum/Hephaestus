@@ -374,7 +374,6 @@ jobs:
         with:
           path: ${{ runner.temp }}/digests
           pattern: digests-${{ steps.prep.outputs.image_name }}-*
-          merge-multiple: true
 
       # Caller-selected registry, not GHCR-only; see ci-cd.mdx § Shared setup actions.
       - name: Log in to Container Registry
@@ -400,9 +399,40 @@ jobs:
       - name: Create manifest and push
         working-directory: ${{ runner.temp }}/digests
         run: |
+          set -euo pipefail
+          entries=(*)
+          (( ${#entries[@]} == 2 )) || exit 1
           args=(--tag "$STAGING_IMAGE" --metadata-file "$RUNNER_TEMP/merged-image.json")
-          for digest in *; do args+=("$INPUTS_REGISTRY/$INPUTS_IMAGE_NAME@sha256:$digest"); done
+          expected='[]'
+          image_pair="${INPUTS_IMAGE_NAME//\//-}"
+          for arch in amd64 arm64; do
+            files=("digests-$image_pair-linux-$arch"/*)
+            (( ${#files[@]} == 1 )) || exit 1
+            [[ -f "${files[0]}" && ! -L "${files[0]}" ]] || exit 1
+            digest="${files[0]##*/}"
+            [[ "$digest" =~ ^[a-f0-9]{64}$ ]] || exit 1
+            reference="$INPUTS_REGISTRY/$INPUTS_IMAGE_NAME@sha256:$digest"
+            raw=$(docker buildx imagetools inspect "$reference" --raw)
+            leaf=$(jq -er --arg arch "$arch" --arg digest "sha256:$digest" '
+              if has("manifests") then
+                [.manifests[] | select(.platform.os == "linux" and .platform.architecture == $arch) | .digest]
+                | if length == 1 then .[0] else error("expected one platform leaf") end
+              else $digest end' <<< "$raw")
+            [[ "$leaf" =~ ^sha256:[a-f0-9]{64}$ ]] || exit 1
+            expected=$(jq -cn --argjson previous "$expected" --arg platform "linux/$arch" --arg digest "$leaf" \
+              '$previous + [{platform: $platform, digest: $digest}]')
+            args+=("$reference")
+          done
           docker buildx imagetools create "${args[@]}"
+          merged=$(jq -er '."containerimage.descriptor".digest' "$RUNNER_TEMP/merged-image.json")
+          [[ "$merged" =~ ^sha256:[a-f0-9]{64}$ ]] || exit 1
+          # The scans use these build artifacts while this job assembles and verifies the index.
+          # Refuse publication if its real platform leaves differ from the scanned subjects.
+          docker buildx imagetools inspect "$INPUTS_REGISTRY/$INPUTS_IMAGE_NAME@$merged" --raw |
+            jq -e --argjson expected "$expected" '
+              [.manifests[] | select(.platform.os != "unknown" or .platform.architecture != "unknown")
+                | {platform: (.platform.os + "/" + .platform.architecture), digest: .digest}]
+              | sort_by(.platform) == ($expected | sort_by(.platform))' >/dev/null
         env:
           INPUTS_REGISTRY: ${{ inputs.registry }}
           INPUTS_IMAGE_NAME: ${{ inputs.image-name }}
@@ -467,12 +497,8 @@ jobs:
 
   scan:
     name: Scan ${{ matrix.platform }} Image
-    needs: [build, merge]
-    # `merge` is skipped for single-architecture builds, which would skip this job too
-    # without a status-check function to suppress the implicit success() over every need.
-    if: >-
-      ${{ inputs.scan-images && inputs.publish && !cancelled() && needs.build.result == 'success' &&
-      needs.merge.result != 'failure' && needs.merge.result != 'cancelled' }}
+    needs: build
+    if: ${{ inputs.scan-images && inputs.publish && !cancelled() && needs.build.result == 'success' }}
     strategy:
       fail-fast: false
       matrix:
@@ -507,10 +533,28 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Prepare digest artifact name
+        id: prep
+        if: ${{ !inputs.single-arch }}
+        env:
+          INPUT_IMAGE_NAME: ${{ inputs.image-name }}
+        run: |
+          echo "image_name=${INPUT_IMAGE_NAME//\//-}" >> "$GITHUB_OUTPUT"
+          echo "platform_pair=${SCAN_PLATFORM//\//-}" >> "$GITHUB_OUTPUT"
+
+      - name: Download platform digest
+        if: ${{ !inputs.single-arch }}
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: digests-${{ steps.prep.outputs.image_name }}-${{ steps.prep.outputs.platform_pair }}
+          path: ${{ runner.temp }}/scan-digest
+
       - name: Resolve the platform subject
         id: subject
         env:
-          IMAGE_REF: ${{ inputs.registry }}/${{ inputs.image-name }}@${{ inputs.single-arch && needs.build.outputs.manifest-digest || needs.merge.outputs.manifest-digest }}
+          IMAGE_REF: ${{ inputs.single-arch && format('{0}/{1}@{2}', inputs.registry, inputs.image-name, needs.build.outputs.manifest-digest) || '' }}
+          DIGEST_DIRECTORY: ${{ !inputs.single-arch && format('{0}/scan-digest', runner.temp) || '' }}
+          IMAGE_REPOSITORY: ${{ inputs.registry }}/${{ inputs.image-name }}
           INPUT_IMAGE_NAME: ${{ inputs.image-name }}
         run: node scripts/resolve-image-scan-subject.ts
 
