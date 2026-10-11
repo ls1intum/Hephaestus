@@ -59,6 +59,10 @@ public class ActivityLedgerReconciler implements ActivityLedgerRepair {
             repository.deleteReplyEvents(workspaceId, repositoryId, source.name(), after, last);
             return new Chunk(last, 0);
         }
+        if (source == Source.INVALID_ISSUE) {
+            repository.deleteInvalidIssueEvents(workspaceId, repositoryId, source.name(), after, last);
+            return new Chunk(last, 0);
+        }
         var candidates = repository.findChunkActors(repositoryId, source.name(), after, last);
         var admitted = writeFence.holdForUserWrites(candidates);
         if (admitted.isEmpty()) return new Chunk(last, 0);
@@ -68,6 +72,7 @@ public class ActivityLedgerReconciler implements ActivityLedgerRepair {
     private record Chunk(long lastId, int inserted) {}
 
     private enum Source {
+        INVALID_ISSUE,
         ISSUE,
         REVIEW,
         REPLY_REVIEW,

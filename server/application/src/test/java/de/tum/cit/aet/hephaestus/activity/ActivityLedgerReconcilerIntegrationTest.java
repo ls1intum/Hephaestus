@@ -26,6 +26,7 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -364,6 +365,127 @@ class ActivityLedgerReconcilerIntegrationTest extends BaseIntegrationTest {
         assertThat(reconciler.reconcileRepository(workspaceId, repositoryId)).isZero();
         assertThat(jdbc.queryForList("SELECT id FROM activity_event WHERE workspace_id=?", UUID.class, workspaceId))
                 .isEmpty();
+    }
+
+    private String event(long workspace, ActivityEventType type, String targetType, long target) {
+        String key = ActivityEvent.buildKey(type, target, at);
+        jdbc.update(
+                """
+                INSERT INTO activity_event(id,event_key,event_type,occurred_at,actor_id,workspace_id,
+                    repository_id,target_type,target_id,ingested_at)
+                VALUES (?,?,?,?,?,?,?,?,?,now())
+                """,
+                UUID.randomUUID(),
+                key,
+                type.name(),
+                Timestamp.from(at),
+                authorId,
+                workspace,
+                repositoryId,
+                targetType,
+                target);
+        return key;
+    }
+
+    private List<String> keys(long workspace) {
+        return jdbc
+                .queryForList("SELECT event_key FROM activity_event WHERE workspace_id=?", String.class, workspace)
+                .stream()
+                .map(Objects::requireNonNull)
+                .toList();
+    }
+
+    private long otherWorkspace() {
+        var other = new Workspace();
+        other.setWorkspaceSlug("other-" + UUID.randomUUID());
+        other.setDisplayName("Other");
+        other.setAccountLogin("other");
+        other.setAccountType(AccountType.ORG);
+        return workspaces.saveAndFlush(other).getId();
+    }
+
+    /** GitHub shares one number space, so an issue row beside a stored pull request is not an issue. */
+    @ParameterizedTest
+    @EnumSource(
+            value = IdentityProviderType.class,
+            names = {"GITHUB", "GITLAB"})
+    void shouldRetireIssueFactsOfAnIssueRowAPullRequestContradicts(IdentityProviderType type) {
+        if (type == IdentityProviderType.GITLAB) fixture(type);
+        long pr = issue("PULL_REQUEST", 7, authorId);
+        jdbc.update("UPDATE issue SET state='CLOSED',closed_at=? WHERE id=?", Timestamp.from(at.plusSeconds(5)), pr);
+        long sibling = issue("ISSUE", 7007, authorId);
+        jdbc.update("UPDATE issue SET number=7,state='CLOSED',closed_at=? WHERE id=?", Timestamp.from(at), sibling);
+        long retiredPr = issue("PULL_REQUEST", 9, authorId);
+        long retired = issue("ISSUE", 9009, authorId);
+        jdbc.update("UPDATE issue SET number=9,deleted_at=now() WHERE id=?", retired);
+        long comment = Objects.requireNonNull(
+                jdbc.queryForObject("""
+                INSERT INTO issue_comment(native_id,provider_id,issue_id,author_id,created_at,body,html_url)
+                VALUES (1,?,?,?,?,'Discussion','https://example.com/comment') RETURNING id
+                """, Long.class, providerId, retired, authorId, Timestamp.from(at)));
+        String retiredComment = event(workspaceId, ActivityEventType.COMMENT_CREATED, "issue_comment", comment);
+        var issueFacts = List.of(
+                event(workspaceId, ActivityEventType.ISSUE_CREATED, "issue", sibling),
+                event(workspaceId, ActivityEventType.ISSUE_CLOSED, "issue", sibling),
+                event(workspaceId, ActivityEventType.ISSUE_CREATED, "issue", retired));
+        long other = otherWorkspace();
+        String elsewhere = event(other, ActivityEventType.ISSUE_CREATED, "issue", sibling);
+
+        reconciler.reconcileRepository(workspaceId, repositoryId);
+        assertThat(reconciler.reconcileRepository(workspaceId, repositoryId)).isZero();
+
+        var expected = new ArrayList<>(List.of(
+                retiredComment,
+                ActivityEvent.buildKey(ActivityEventType.PULL_REQUEST_OPENED, pr, at),
+                ActivityEvent.buildKey(ActivityEventType.PULL_REQUEST_CLOSED, pr, at.plusSeconds(5)),
+                ActivityEvent.buildKey(ActivityEventType.PULL_REQUEST_OPENED, retiredPr, at)));
+        // GitLab numbers issues and merge requests separately: its issue facts stand.
+        if (type == IdentityProviderType.GITLAB) expected.addAll(issueFacts);
+        assertThat(keys(workspaceId)).containsExactlyInAnyOrderElementsOf(expected);
+        assertThat(keys(other)).containsExactly(elsewhere);
+        // The source rows are untouched: both issue rows remain with their own native ids.
+        assertThat(jdbc.queryForList(
+                        "SELECT native_id FROM issue WHERE id IN (?,?,?,?) ORDER BY native_id",
+                        Long.class,
+                        pr,
+                        sibling,
+                        retiredPr,
+                        retired))
+                .containsExactly(7L, 9L, 7007L, 9009L);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM issue_comment WHERE id=?", Long.class, comment))
+                .isEqualTo(1L);
+    }
+
+    @Test
+    void shouldReplaceIssueFactsOfAConvertedTargetOnlyWithRecordedPullRequestFacts() {
+        long converted = issue("PULL_REQUEST", 1, authorId);
+        // Closed with no recorded closing time: no close is invented.
+        jdbc.update("UPDATE issue SET state='CLOSED',closed_at=NULL WHERE id=?", converted);
+        long suppressedAuthor = author(5, "suppressed");
+        long hidden = issue("PULL_REQUEST", 2, suppressedAuthor);
+        jdbc.update(
+                "INSERT INTO person_suppression(id,provider_id,subject,team_key) VALUES (?,?,?,?)",
+                UUID.randomUUID(),
+                providerId,
+                "5",
+                "");
+        long gone = issue("ISSUE", 3, authorId);
+        jdbc.update("UPDATE issue SET deleted_at=now() WHERE id=?", gone);
+        event(workspaceId, ActivityEventType.ISSUE_CREATED, "issue", converted);
+        event(workspaceId, ActivityEventType.ISSUE_REOPENED, "issue", converted);
+        event(workspaceId, ActivityEventType.ISSUE_CREATED, "issue", hidden);
+        String deletedIssue = event(workspaceId, ActivityEventType.ISSUE_CREATED, "issue", gone);
+        long review = review(converted, "APPROVED");
+        String approval = event(workspaceId, ActivityEventType.REVIEW_APPROVED, "review", review);
+
+        reconciler.reconcileRepository(workspaceId, repositoryId);
+        assertThat(reconciler.reconcileRepository(workspaceId, repositoryId)).isZero();
+
+        assertThat(keys(workspaceId))
+                .containsExactlyInAnyOrder(
+                        ActivityEvent.buildKey(ActivityEventType.PULL_REQUEST_OPENED, converted, at),
+                        approval,
+                        deletedIssue);
     }
 
     @Test

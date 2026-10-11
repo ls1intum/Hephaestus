@@ -10,6 +10,29 @@ import org.springframework.data.repository.query.Param;
 
 /** Source facts and conflict-safe writes for bounded activity repair. */
 public interface ActivityLedgerRepository extends Repository<ActivityEvent, UUID> {
+    /**
+     * Issue row {@code i} is contradicted by a pull request: GitHub numbers issues and pull requests in one
+     * space per repository, so a stored GitHub pull request with its provider, repository and number means
+     * {@code i} is not an issue. Native ids are not compared: an issue payload's id is not the pull
+     * request's. GitLab numbers issues and merge requests separately, so it is never a witness there.
+     */
+    String PULL_REQUEST_SIBLING = """
+                EXISTS (SELECT 1 FROM issue p JOIN identity_provider ip ON ip.id=p.provider_id
+                    WHERE p.issue_type='PULL_REQUEST' AND ip.type='GITHUB' AND p.provider_id=i.provider_id
+                      AND p.repository_id=i.repository_id AND p.number=i.number)
+                """;
+    /**
+     * Targets whose issue lifecycle facts are invalid: a row that is a pull request now, and an issue row a
+     * pull request contradicts. Tombstoned rows are included, since their recorded facts outlive them.
+     */
+    String INVALID_ISSUE_ROWS = """
+                SELECT i.id target_id, i.author_id actor_id, i.created_at occurred_at,
+                       'ISSUE_CREATED' event_type, 'issue.created' key_type, 'issue' target_type
+                FROM issue i
+                WHERE i.repository_id=:repositoryId
+                  AND (i.issue_type='PULL_REQUEST' OR (i.issue_type<>'PULL_REQUEST' AND
+                """ + PULL_REQUEST_SIBLING + "))";
+
     String ISSUE_ROWS = """
                 SELECT i.id target_id, i.author_id actor_id, v.occurred_at,
                        v.event_type, v.key_type, v.target_type
@@ -28,7 +51,8 @@ public interface ActivityLedgerRepository extends Repository<ActivityEvent, UUID
                 WHERE i.repository_id=:repositoryId AND i.deleted_at IS NULL
                   AND (v.event_type IN ('PULL_REQUEST_OPENED','ISSUE_CREATED')
                        OR i.state='CLOSED' OR i.is_merged)
-                """;
+                  AND (i.issue_type='PULL_REQUEST' OR NOT
+                """ + PULL_REQUEST_SIBLING + ")";
     String REVIEW_ROWS = """
                 SELECT r.id target_id, r.author_id actor_id, r.submitted_at occurred_at,
                        CASE WHEN r.state='DISMISSED' THEN 'REVIEW_COMMENTED' ELSE 'REVIEW_' || r.state END event_type,
@@ -59,7 +83,8 @@ public interface ActivityLedgerRepository extends Repository<ActivityEvent, UUID
                 WHERE i.repository_id=:repositoryId AND i.deleted_at IS NULL
                 """;
 
-    String SOURCES = "SELECT 'ISSUE' source_type, s.* FROM (" + ISSUE_ROWS + ") s" + " UNION ALL "
+    String SOURCES = "SELECT 'INVALID_ISSUE' source_type, s.* FROM (" + INVALID_ISSUE_ROWS + ") s" + " UNION ALL "
+            + "SELECT 'ISSUE' source_type, s.* FROM (" + ISSUE_ROWS + ") s" + " UNION ALL "
             + "SELECT 'REVIEW' source_type, s.* FROM ("
             + REVIEW_ROWS + ") s" + " UNION ALL " + "SELECT 'REPLY_REVIEW' source_type, s.* FROM ("
             + REPLY_REVIEW_ROWS + ") s" + " UNION ALL " + "SELECT 'COMMENT' source_type, s.* FROM ("
@@ -114,6 +139,23 @@ public interface ActivityLedgerRepository extends Repository<ActivityEvent, UUID
               AND e.event_type='REVIEW_COMMENTED' AND e.target_id=c.target_id
             """, nativeQuery = true)
     int deleteReplyEvents(
+            @Param("workspaceId") long workspaceId,
+            @Param("repositoryId") long repositoryId,
+            @Param("source") String source,
+            @Param("after") long after,
+            @Param("last") long last);
+
+    /**
+     * Removes this workspace's issue lifecycle facts for invalid targets; their comments, reviews and pull
+     * request facts stay. The candidate rows bound the targets to the repository.
+     */
+    @Modifying
+    @Query(value = CANDIDATES + """
+            DELETE FROM activity_event e USING candidate c
+            WHERE e.workspace_id=:workspaceId AND e.repository_id=:repositoryId AND e.target_type='issue'
+              AND e.event_type IN ('ISSUE_CREATED','ISSUE_CLOSED','ISSUE_REOPENED') AND e.target_id=c.target_id
+            """, nativeQuery = true)
+    int deleteInvalidIssueEvents(
             @Param("workspaceId") long workspaceId,
             @Param("repositoryId") long repositoryId,
             @Param("source") String source,

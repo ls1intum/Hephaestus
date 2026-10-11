@@ -13,6 +13,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.label.LabelRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.Milestone;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.MilestoneRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
@@ -51,12 +52,14 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
     private static final Logger log = LoggerFactory.getLogger(GitHubIssueProcessor.class);
 
     private final IssueRepository issueRepository;
+    private final PullRequestRepository pullRequestRepository;
     private final OrganizationRepository organizationRepository;
     private final GitHubIssueTypeSyncService issueTypeSyncService;
     private final ApplicationEventPublisher eventPublisher;
 
     public GitHubIssueProcessor(
             IssueRepository issueRepository,
+            PullRequestRepository pullRequestRepository,
             LabelRepository labelRepository,
             MilestoneRepository milestoneRepository,
             UserRepository userRepository,
@@ -66,9 +69,26 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
             ApplicationEventPublisher eventPublisher) {
         super(userRepository, labelRepository, milestoneRepository, gitHubUserProcessor);
         this.issueRepository = issueRepository;
+        this.pullRequestRepository = pullRequestRepository;
         this.organizationRepository = organizationRepository;
         this.issueTypeSyncService = issueTypeSyncService;
         this.eventPublisher = eventPublisher;
+    }
+
+    /**
+     * Whether this payload is a pull request rather than an issue. GitHub's REST issue payloads carry
+     * {@code pull_request} for a pull request, and issues and pull requests share one number space per
+     * repository, so a number this repository already stores as a pull request is not an issue either.
+     * The stored check reads current state only; it does not lock against a pull request written
+     * concurrently. The payload's issue id is never a pull request id.
+     */
+    private boolean namesPullRequest(GitHubIssueDTO dto, ProcessingContext context) {
+        if (dto.isPullRequest()) return true;
+        Repository repository = context.repository();
+        return repository != null
+                && pullRequestRepository
+                        .findByRepositoryIdAndNumber(repository.getId(), dto.number())
+                        .isPresent();
     }
 
     /**
@@ -121,6 +141,10 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
 
         Repository repository = Objects.requireNonNull(context.repository(), "Issue processing requires a repository");
         Long providerId = Objects.requireNonNull(context.providerId(), "Issue processing requires a provider");
+        if (namesPullRequest(dto, context)) {
+            log.debug("Skipped issue processing: reason=pullRequest, issueNumber={}", dto.number());
+            return null;
+        }
 
         // Compare by natural key (repository_id, number), not dbId — the same issue can arrive
         // with different provider IDs from different sources.
@@ -374,6 +398,7 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
      */
     @Transactional
     public void processTransferred(GitHubIssueDTO issueDto, ProcessingContext context) {
+        if (namesPullRequest(issueDto, context)) return;
         issueRepository
                 .findByRepositoryIdAndNumber(
                         Objects.requireNonNull(context.repository(), "Issue event requires a repository")
@@ -396,6 +421,7 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
 
     @Transactional
     public void processDeleted(GitHubIssueDTO issueDto, ProcessingContext context) {
+        if (namesPullRequest(issueDto, context)) return;
         // With synthetic PKs, we cannot use deleteById(nativeId) because the PK is
         // auto-generated and differs from the native provider ID. Look up by natural key instead.
         issueRepository
