@@ -102,8 +102,15 @@ public class ProxyAccounting {
         }
     }
 
+    /** Counts served responses without reported usage by source type; never estimates tokens or provider charges. */
     public void recordUsage(ProxyRouting.BilledAttempt attempt, @Nullable ProxyTokenUsage usage) {
         if (usage == null) {
+            meterRegistry
+                    .counter(
+                            AgentMetrics.LLM_PROXY_USAGE_MISSING,
+                            "sourceType",
+                            attempt.sourceType().name())
+                    .increment();
             return;
         }
         switch (attempt.sourceType()) {

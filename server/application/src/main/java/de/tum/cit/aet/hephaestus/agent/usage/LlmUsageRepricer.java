@@ -21,11 +21,12 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Prices one ledger row that could not be priced when it was written.
  *
- * <p><b>Why this is a repair and not a rewrite of history.</b> An UNPRICED row is not a decision, it is
- * a gap: the catalogue had no usable rate for the model at the moment the work finished. The row already
- * holds the tokens, which are the measurement; only the multiplication was impossible. Once the missing
- * rate exists, applying it recovers the number the row was always supposed to carry. Nothing else about
- * the row is touched — never the tokens, never the source key, never {@code occurred_at}.
+ * <p><b>Why this is a repair and not a rewrite of history.</b> When an UNPRICED row has measured
+ * tokens but lacked a usable rate, the tokens are the measurement and the missing rate prevents their
+ * multiplication. Once the missing rate exists, applying it recovers
+ * the number the row was always supposed to carry. Nothing else about the row is touched — never the
+ * tokens, never the source key, never {@code occurred_at}. A row with no billable token is unknown spend,
+ * not a gap, and no rate repairs it.
  *
  * <p><b>Why it has to exist at all.</b> A single UNPRICED row funded from a capped purse makes the whole
  * month UNVERIFIABLE, and an UNVERIFIABLE purse is blocked exactly like an exhausted one. Before this,
@@ -66,10 +67,18 @@ public class LlmUsageRepricer {
         STILL_UNPRICEABLE,
         /** The row named no model, or named one this instance can no longer identify. Nothing was written. */
         UNIDENTIFIABLE,
+        /**
+         * The row measured no billable token, so any rate, a free one included, would price spend nobody
+         * observed. Nothing was written; the row stays unknown.
+         */
+        NO_TOKEN_EVIDENCE,
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Outcome reprice(UnpricedLedgerRow row) {
+        if (!row.hasTokenEvidence()) {
+            return Outcome.NO_TOKEN_EVIDENCE;
+        }
         Rates rates = resolveRates(row);
         if (rates == null) {
             return Outcome.UNIDENTIFIABLE;

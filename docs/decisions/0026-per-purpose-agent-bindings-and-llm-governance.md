@@ -183,8 +183,8 @@ gate never kills a call already streaming; it acts only pre-forward.
   turns it is the number of developers chatting at once.
 - **Calls the provider reports no usage for.** A streamed call whose provider rejects
   `stream_options.include_usage` (retried without it, counted as
-  `llm.proxy.stream.usage.unsupported`), or any response with no usage block, contributes nothing to
-  the in-flight term. That execution is bounded only by the ledger term.
+  `llm.proxy.stream.usage.unsupported`), or any served response with no usage block (counted as
+  `llm.proxy.usage.missing`), contributes nothing to the in-flight term. That execution is bounded only by the ledger term.
 - **A crashed worker's mentor turn, until the reaper runs.** Its spend is on the `chat_message` row but
   not yet in the ledger, so the gate lets the workspace keep spending against headroom that is already
   gone. `MentorInFlightReaper` bills the calls the proxy recorded once its window elapses (defaulting to

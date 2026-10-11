@@ -190,6 +190,16 @@ class LlmUsageRepricerTest extends BaseUnitTest {
         assertThat(appliedPrice().pricingState()).isEqualTo(PricingState.NO_CHARGE);
     }
 
+    @Test
+    @DisplayName("a row with no measured token stays unknown even when its model is free")
+    void aRowWithNoTokenEvidenceIsNeverPriced() {
+        var unmeasured = new UnpricedLedgerRow(
+                EVENT_ID, WORKSPACE_ID, "gpt-5", FundingSource.INSTANCE, 0L, 0L, 0L, 0L, 11L, null);
+
+        assertThat(repricer.reprice(unmeasured)).isEqualTo(Outcome.NO_TOKEN_EVIDENCE);
+        verifyNoInteractions(usageRepository, priceRepository, modelRepository, workspaceModelRepository);
+    }
+
     // The UPDATE is fenced on pricing_state = 'UNPRICED', so a row another pod already priced returns 0
     // rows. Reporting that as a reprice would tell an operator the block had lifted when it had not.
     @Test
