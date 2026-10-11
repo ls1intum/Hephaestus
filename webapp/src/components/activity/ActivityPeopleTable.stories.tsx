@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn, waitFor, within } from "storybook/test";
+import { expect, fn, within } from "storybook/test";
 
 import { LARGE_PEOPLE, PEOPLE, peopleOf, readyPeople } from "@/stories/activity-story-data";
 import { withProvider, withStandardPage } from "@/stories/decorators";
@@ -189,17 +189,6 @@ export const NoMatch: Story = {
 	},
 };
 
-/** 250 people render 50 at a time; the end's press stays for the keyboard. */
-export const Large: Story = {
-	args: { state: readyPeople(peopleOf(LARGE_PEOPLE)) },
-	play: async ({ canvas, userEvent }) => {
-		const table = canvas.getByRole("table", { name: "People" });
-		await expect(rows(table)).toHaveLength(50);
-		await userEvent.click(canvas.getByRole("button", { name: "Show more people" }));
-		await expect(rows(table)).toHaveLength(100);
-	},
-};
-
 export const Empty: Story = {
 	args: { state: readyPeople(peopleOf([])) },
 	play: async ({ canvas }) => {
@@ -238,10 +227,8 @@ export const StaleEmpty: Story = {
 export const Loading: Story = {
 	args: { state: { status: "loading" } },
 	play: async ({ canvas }) => {
-		await expect(canvas.getByRole("table", { name: "People" })).toHaveAttribute(
-			"aria-busy",
-			"true",
-		);
+		const table = canvas.getByRole("table", { name: "People" });
+		await expect(table).toHaveAttribute("aria-busy", "true");
 		await expect(canvas.queryAllByRole("link")).toHaveLength(0);
 	},
 };
@@ -281,9 +268,26 @@ const [longFirst, twoWordSecond] = [...large.people].sort(
 	(a, b) => b.counts.contributions - a.counts.contributions,
 );
 
+/** Four-digit pairs in both two-part columns. */
+const BUSY = {
+	pullRequestsOpened: 1234,
+	pullRequestsMerged: 1187,
+	pullRequestsReviewed: 2048,
+	peopleHelped: 1024,
+	issuesOpened: 3,
+};
+
 function renamed(row: (typeof large.people)[number]) {
 	if (row === longFirst) {
-		return { ...row, person: { ...row.person, name: LONG_NAME } };
+		return {
+			...row,
+			person: { ...row.person, name: LONG_NAME },
+			counts: {
+				...row.counts,
+				...BUSY,
+				contributions: BUSY.pullRequestsOpened + BUSY.pullRequestsReviewed + BUSY.issuesOpened,
+			},
+		};
 	}
 	if (row === twoWordSecond) {
 		return { ...row, person: { ...row.person, name: TWO_WORD_NAME } };
@@ -291,82 +295,257 @@ function renamed(row: (typeof large.people)[number]) {
 	return row;
 }
 
-/**
- * In a narrow column the figures scroll under the pinned position and name. Past row 100 a position has
- * three digits. A name wraps to two lines in its set width, so a first and last name read whole, and
- * a longer one with the New marker is cut after the second line.
- */
-export const NarrowScroll: Story = {
-	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
-	args: {
-		state: readyPeople({
-			...large,
-			people: large.people.map(renamed),
-			highlights: {
-				...large.highlights,
-				firstContributors: longFirst ? [longFirst.person.id] : [],
-			},
-		}),
+const busyPeople = readyPeople({
+	...large,
+	people: large.people.map(renamed),
+	highlights: {
+		...large.highlights,
+		firstContributors: longFirst ? [longFirst.person.id] : [],
 	},
+});
+
+/** 250 people render 50 at a time; at full width a four-digit pair sits side by side. */
+export const Large: Story = {
+	args: { state: busyPeople },
 	play: async ({ canvas, userEvent }) => {
 		const table = canvas.getByRole("table", { name: "People" });
-		await userEvent.click(canvas.getByRole("button", { name: "Show more people" }));
-		await userEvent.click(canvas.getByRole("button", { name: "Show more people" }));
-		const container = table.closest<HTMLElement>("[data-slot='table-container']");
-		await expect(container).not.toBeNull();
-		if (!container) {
-			return;
-		}
-		container.scrollLeft = container.scrollWidth;
-		await waitFor(async () => expect(container.scrollLeft).toBeGreaterThan(0));
-		await expect(window.innerWidth).toBe(320);
-
-		const bodyRows = within(table).getAllByRole("row").slice(1);
-		const threeDigits = bodyRows.find(
-			(row) => (within(row).getAllByRole("cell")[0]?.textContent ?? "").length === 3,
-		);
-		await expect(threeDigits).toBeDefined();
-		if (!threeDigits) {
-			throw new Error("The rendered rows did not include a three-digit position");
-		}
+		await expect(rows(table)).toHaveLength(50);
+		await expect(within(table).getByRole("columnheader", { name: "Position" })).toBeVisible();
+		const header = within(table).getByRole("columnheader", { name: /^Pull requests/u });
 		const longRow = within(table).getByRole("row", { name: new RegExp(LONG_NAME, "u") });
-		for (const row of [threeDigits, longRow]) {
-			const [position, name] = within(row).getAllByRole("cell");
-			if (!position || !name) {
-				throw new Error("A row without its position or name");
-			}
-			row.scrollIntoView({ block: "center" });
-			const box = container.getBoundingClientRect();
-			const positionBox = position.getBoundingClientRect();
-			const nameBox = name.getBoundingClientRect();
-			// Identity stays at the edge and leaves room for the scrolling figures.
-			await expect(Math.abs(positionBox.left - box.left)).toBeLessThanOrEqual(2);
-			await expect(positionBox.right).toBeLessThanOrEqual(nameBox.left + 1);
-			await expect(nameBox.right - box.left).toBeLessThanOrEqual(box.width * 0.75);
-			// What a pointer at the name's centre hits is the name's cell, not a figure passing under it.
-			const hit = document.elementFromPoint(
-				nameBox.left + nameBox.width / 2,
-				nameBox.top + nameBox.height / 2,
-			);
-			await expect(name.contains(hit)).toBe(true);
+		const cell =
+			within(longRow).getAllByRole("cell")[
+				within(table).getAllByRole("columnheader").indexOf(header)
+			];
+		const [opened, merged] = cell ? within(cell).getAllByRole("img") : [];
+		if (!opened || !merged) {
+			throw new Error("The pull request figures are not both shown");
 		}
-		const link = within(longRow).getByRole("link", { name: LONG_NAME });
-		const lineHeight = Number.parseFloat(getComputedStyle(link).lineHeight);
-		await expect(link.clientHeight).toBeLessThanOrEqual(2 * lineHeight + 1);
-		await expect(link.clientHeight).toBeGreaterThan(lineHeight + 1);
-		await expect(link.scrollHeight).toBeGreaterThan(link.clientHeight);
-		const twoWord = within(table).getByRole("link", { name: TWO_WORD_NAME });
-		await expect(twoWord.clientHeight).toBeGreaterThan(lineHeight + 1);
-		await expect(twoWord.scrollHeight).toBeLessThanOrEqual(twoWord.clientHeight + 1);
+		await expect(merged.getBoundingClientRect().left).toBeGreaterThanOrEqual(
+			opened.getBoundingClientRect().right,
+		);
 		await expect(
-			within(longRow).getByRole("img", { name: "First contribution in this range" }),
-		).toBeVisible();
+			Math.abs(merged.getBoundingClientRect().top - opened.getBoundingClientRect().top),
+		).toBeLessThanOrEqual(1);
+		await userEvent.click(canvas.getByRole("button", { name: "Show more people" }));
+		await expect(rows(table)).toHaveLength(100);
+	},
+};
+
+/**
+ * Below `sm`: no position, the name pinned at the edge, stacked pairs, short headers that start
+ * their full names, and the controls and figures whole beside the name.
+ */
+async function expectNarrowTable(
+	{ canvas, userEvent }: Parameters<NonNullable<Story["play"]>>[0],
+	expected: { width: number; region: number; pullRequests: RegExp },
+) {
+	await expect(window.innerWidth).toBe(expected.width);
+	const table = canvas.getByRole("table", { name: "People" });
+	const container = table.closest<HTMLElement>("[data-slot='table-container']");
+	if (!container) {
+		throw new Error("The table has no scroll container");
+	}
+	await expect(Math.round(container.getBoundingClientRect().width)).toBe(expected.region);
+	await expect(within(table).queryByRole("columnheader", { name: "Position" })).toBeNull();
+	const NARROW_METRICS = [
+		/^Total contributions/u,
+		expected.pullRequests,
+		/^Reviews/u,
+		/^Issues/u,
+		/^Active weeks/u,
+		/^Weekly trend/u,
+	];
+
+	const longRow = within(table).getByRole("row", { name: new RegExp(LONG_NAME, "u") });
+	longRow.scrollIntoView({ block: "center" });
+	const cells = within(longRow).getAllByRole("cell");
+	const headers = within(table).getAllByRole("columnheader");
+	const [nameCell] = cells;
+	if (!nameCell) {
+		throw new Error("The row has no name cell");
+	}
+	container.scrollLeft = 0;
+	const innerLeft = container.getBoundingClientRect().left + container.clientLeft;
+	const innerRight = innerLeft + container.clientWidth;
+	// The name is pinned at the edge, with no empty position beside it.
+	await expect(Math.abs(nameCell.getBoundingClientRect().left - innerLeft)).toBeLessThanOrEqual(1);
+	for (const metric of NARROW_METRICS) {
+		const header = within(table).getByRole("columnheader", { name: metric });
+		const cell = cells[headers.indexOf(header)];
+		if (!cell) {
+			throw new Error(`No figures under ${String(metric)}`);
+		}
+		const label = within(header).queryByRole("button") ?? header.firstElementChild;
+		const chips = within(cell).queryAllByRole("img");
+		const figures = chips.length > 0 ? chips : [cell.firstElementChild];
+		if (!label || figures.some((figure) => figure === null)) {
+			throw new Error("A metric has no visible label or figures");
+		}
+		// Scroll the content into view; cell padding need not fit beside the pinned name.
+		container.scrollLeft +=
+			label.getBoundingClientRect().left - nameCell.getBoundingClientRect().right;
+		const edge = nameCell.getBoundingClientRect().right;
+		for (const part of [label, ...figures]) {
+			if (!part) {
+				throw new Error("A metric has no figures");
+			}
+			const box = part.getBoundingClientRect();
+			await expect(box.left).toBeGreaterThanOrEqual(edge - 1);
+			await expect(box.right).toBeLessThanOrEqual(innerRight + 1);
+		}
+		await expect(cell.scrollWidth).toBeLessThanOrEqual(cell.clientWidth + 1);
+		// Each figure is what a pointer at it reaches, not the pinned name over it.
+		for (const chip of within(cell).queryAllByRole("img")) {
+			const box = chip.getBoundingClientRect();
+			const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+			await expect(chip.contains(hit)).toBe(true);
+		}
+	}
+	// Four-digit pairs stay whole and stack: merged under opened.
+	const pullRequestsHeader = within(table).getByRole("columnheader", {
+		name: expected.pullRequests,
+	});
+	const pullRequests = cells[headers.indexOf(pullRequestsHeader)];
+	if (!pullRequests) {
+		throw new Error("No pull request figures");
+	}
+	await expect(within(pullRequests).getByText("1,234")).toBeVisible();
+	await expect(within(pullRequests).getByText("1,187")).toBeVisible();
+	const [opened, merged] = within(pullRequests).getAllByRole("img");
+	if (!opened || !merged) {
+		throw new Error("The pull request figures are not both shown");
+	}
+	await expect(merged.getBoundingClientRect().top).toBeGreaterThanOrEqual(
+		opened.getBoundingClientRect().bottom - 1,
+	);
+
+	// The keyboard reaches the full name through the sort buttons, and it is not covered.
+	const link = within(longRow).getByRole("link", { name: LONG_NAME });
+	canvas.getByRole("searchbox", { name: "Search people" }).focus();
+	for (let step = 0; step < 12 && document.activeElement !== link; step += 1) {
+		await userEvent.tab();
+	}
+	await expect(link).toHaveFocus();
+	const linkBox = link.getBoundingClientRect();
+	const hit = document.elementFromPoint(
+		linkBox.left + linkBox.width / 2,
+		linkBox.top + linkBox.height / 2,
+	);
+	await expect(link.contains(hit)).toBe(true);
+	const sort = canvas.getByRole("button", { name: expected.pullRequests });
+	sort.focus();
+	await userEvent.keyboard("{Enter}");
+	await expect(pullRequestsHeader).toHaveAttribute("aria-sort", "descending");
+	await expect(within(table).queryByRole("columnheader", { name: "Position" })).toBeNull();
+	await expectNoPageOverflow();
+
+	const lineHeight = Number.parseFloat(getComputedStyle(link).lineHeight);
+	await expect(link.clientHeight).toBeLessThanOrEqual(2 * lineHeight + 1);
+	await expect(link.clientHeight).toBeGreaterThan(lineHeight + 1);
+	await expect(link.scrollHeight).toBeGreaterThan(link.clientHeight);
+	const twoWord = within(table).getByRole("link", { name: TWO_WORD_NAME });
+	await expect(twoWord.clientHeight).toBeGreaterThan(lineHeight + 1);
+	await expect(twoWord.scrollHeight).toBeLessThanOrEqual(twoWord.clientHeight + 1);
+	await expect(
+		within(longRow).getByRole("img", { name: "First contribution in this range" }),
+	).toBeVisible();
+}
+
+/** The page's own table region at 320px. */
+export const NarrowScroll: Story = {
+	parameters: {
+		layout: "fullscreen",
+		viewport: { defaultViewport: "reflow" },
+		chromatic: { viewports: [320] },
+	},
+	args: { state: busyPeople },
+	play: async (context) => {
+		await expectNarrowTable(context, {
+			width: 320,
+			region: 288,
+			pullRequests: /^PRs \(Pull requests\)/u,
+		});
+	},
+};
+
+/** Nested in a padded region at 320px. */
+export const NarrowScrollNested: Story = {
+	decorators: [
+		(Story) => (
+			<div className="px-4">
+				<Story />
+			</div>
+		),
+	],
+	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
+	args: { state: busyPeople },
+	play: async (context) => {
+		await expectNarrowTable(context, {
+			width: 320,
+			region: 256,
+			pullRequests: /^PRs \(Pull requests\)/u,
+		});
+	},
+};
+
+export const NarrowScroll390: Story = {
+	parameters: {
+		layout: "fullscreen",
+		viewport: {
+			options: { phone390: { name: "Phone (390px)", styles: { width: "390px", height: "844px" } } },
+			defaultViewport: "phone390",
+		},
+		chromatic: { viewports: [390] },
+	},
+	args: { state: busyPeople },
+	play: async (context) => {
+		await expectNarrowTable(context, {
+			width: 390,
+			region: 358,
+			pullRequests: /^PRs \(Pull requests\)/u,
+		});
+	},
+};
+
+export const NarrowScrollGitLab: Story = {
+	decorators: [withProvider("GITLAB")],
+	parameters: {
+		layout: "fullscreen",
+		viewport: { defaultViewport: "reflow" },
+		chromatic: { viewports: [320] },
+	},
+	args: { state: busyPeople, providerType: "GITLAB" },
+	play: async (context) => {
+		await expectNarrowTable(context, {
+			width: 320,
+			region: 288,
+			pullRequests: /^MRs \(Merge requests\)/u,
+		});
 	},
 };
 
 export const Reflow: Story = {
 	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
 	play: async () => {
+		await expectNoPageOverflow();
+	},
+};
+
+export const LoadingNarrow: Story = {
+	...Loading,
+	parameters: {
+		layout: "fullscreen",
+		viewport: { defaultViewport: "reflow" },
+		chromatic: { viewports: [320] },
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("table", { name: "People" })).toHaveAttribute(
+			"aria-busy",
+			"true",
+		);
+		await expect(canvas.getByRole("columnheader", { name: /^Total contributions/u })).toBeVisible();
+		await expect(canvas.queryAllByRole("link")).toHaveLength(0);
 		await expectNoPageOverflow();
 	},
 };

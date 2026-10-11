@@ -77,13 +77,12 @@ const fold = (text: string): string =>
 const columnHelper = createColumnHelper<DataTableFeatures, PeopleRow>();
 
 /**
- * The position and the person stay in place while the figures scroll under them, at whatever width
- * the table overflows its container; with nothing to scroll, sticky does nothing. Above the `z-10`
- * chips and lines in the figures, so a figure scrolling under never paints over a name.
+ * The person stays in place while the figures scroll; above `sm`, the position stays too. Above
+ * the `z-10` chips and lines, so a figure scrolling under never paints over a name.
  */
 const PINNED = "sticky z-20 bg-card";
 
-/** The position column's width, which is also where the pinned person column starts. */
+/** Above `sm`, the position column's width is where the pinned person column starts. */
 const POSITION_WIDTH = "w-12 min-w-12";
 
 /** A number column fits its figures and leaves the rest of the row to the person. */
@@ -148,7 +147,11 @@ export function ActivityPeopleTable({
 						<span className="sr-only">Position</span>
 					</>
 				),
-				meta: { numeric: true, className: cn(POSITION_WIDTH, "left-0 pl-3", PINNED) },
+				// Below `sm` the position gives its room to the figures; the order and its ties stay.
+				meta: {
+					numeric: true,
+					className: cn(POSITION_WIDTH, "left-0 pl-3", PINNED, "hidden sm:table-cell"),
+				},
 				cell: ({ row }) => (
 					<span className="text-muted-foreground">{positions.get(row.original.person.id)}</span>
 				),
@@ -160,7 +163,7 @@ export function ActivityPeopleTable({
 				sortFn: (a, b) => nameOrder.compare(a.original.person.name, b.original.person.name),
 				meta: {
 					// The edge marks where the figures pass under the pinned columns.
-					className: cn("border-r", PINNED, positioned ? "left-12" : "left-0"),
+					className: cn("left-0 border-r", PINNED, positioned && "sm:left-12"),
 				},
 				cell: ({ row }) => (
 					<PersonCell
@@ -172,7 +175,14 @@ export function ActivityPeopleTable({
 			}),
 			columnHelper.accessor(PEOPLE_COUNTS.contributions, {
 				id: "contributions" satisfies PeopleSort,
-				header: "Contributions",
+				header: () => (
+					<>
+						<span className="sm:hidden">
+							Total<span className="sr-only"> contributions</span>
+						</span>
+						<span className="hidden sm:inline">Contributions</span>
+					</>
+				),
 				meta: NUMBER_COLUMN,
 				cell: ({ getValue }) => <Figure count={getValue()} strong />,
 			}),
@@ -291,7 +301,7 @@ export function ActivityPeopleTable({
 						bordered
 						aria-label="People"
 						aria-busy={state.status === "loading" || stale || undefined}
-						className={cn("min-w-200", stale && STALE)}
+						className={cn("sm:min-w-200", stale && STALE)}
 					>
 						<DataTableHeader table={table} />
 						<TableBody>

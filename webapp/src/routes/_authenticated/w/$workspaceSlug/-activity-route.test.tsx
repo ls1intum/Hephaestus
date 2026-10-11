@@ -748,7 +748,7 @@ describe("Workspace activity", () => {
 		await waitFor(() => expect(readsOf("/activity/people").length).toBeGreaterThan(0));
 		expect(readsOf("/activity/people")[0]?.search).toBe("?range=90d");
 		expect(
-			screen.getByRole("columnheader", { name: /^Contributions/u }).getAttribute("aria-sort"),
+			screen.getByRole("columnheader", { name: /contributions/iu }).getAttribute("aria-sort"),
 		).toBe("descending");
 	});
 
@@ -763,7 +763,7 @@ describe("Workspace activity", () => {
 			["1", "Bob"],
 			["2", "Ada"],
 		]);
-		await user.click(screen.getByRole("button", { name: /^Contributions/u }));
+		await user.click(screen.getByRole("button", { name: /contributions/iu }));
 		await waitFor(() => expect(router.state.location.href).toBe("/w/acme/workspace-activity"));
 		// The same count is the same position, and a tie stays in name order.
 		expect(positions()).toStrictEqual([
