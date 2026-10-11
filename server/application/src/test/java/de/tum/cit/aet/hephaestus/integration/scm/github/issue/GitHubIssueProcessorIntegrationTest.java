@@ -45,6 +45,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
 
@@ -59,6 +60,9 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private GitHubIssueProcessor processor;
+
+    @Autowired
+    private JdbcTemplate jdbc;
 
     @Autowired
     private IssueRepository issueRepository;
@@ -187,6 +191,103 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 ,
                 null // subIssuesSummary
                 );
+    }
+
+    /** GitHub's issue payload for a pull request carries {@code pull_request}; it is never stored as an issue. */
+    @Nested
+    class PullRequestMarkedPayload {
+
+        private GitHubIssueDTO pullRequestDto(Long id, int number) {
+            return new GitHubIssueDTO(
+                    id,
+                    null,
+                    "PR_node_" + id,
+                    number,
+                    "Pull request #" + number,
+                    "Body of pull request #" + number,
+                    "closed",
+                    "completed",
+                    "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/pull/" + number,
+                    0,
+                    Instant.parse("2025-11-01T21:42:45Z"),
+                    Instant.parse("2025-11-01T21:42:45Z"),
+                    Instant.parse("2025-11-02T21:42:45Z"),
+                    false,
+                    createAuthorDto(),
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    new GitHubIssueDTO.PullRequestRef(
+                            "https://api.github.com/repos/" + FIXTURE_REPO_FULL_NAME + "/pulls/" + number,
+                            "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/pull/" + number),
+                    null);
+        }
+
+        @Test
+        void shouldStoreNoIssueAndPublishNoEventOnAnyLifecyclePath() {
+            var dto = pullRequestDto(9101L, 41);
+
+            assertThat(processor.process(dto, createContext())).isNull();
+            assertThat(processor.processStub(dto, createContext())).isNull();
+            assertThat(processor.processClosed(dto, createContext())).isNull();
+            assertThat(processor.processReopened(dto, createContext())).isNull();
+            assertThat(processor.processUntyped(dto, createContext())).isNull();
+            processor.processTransferred(dto, createContext());
+            processor.processDeleted(dto, createContext());
+
+            assertThat(issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), 41))
+                    .isEmpty();
+            assertThat(userRepository.findAll()).noneMatch(user -> FIXTURE_AUTHOR_LOGIN.equals(user.getLogin()));
+            assertThat(eventListener.ofType(ScmDomainEvent.IssueCreated.class)).isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.IssueClosed.class)).isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.IssueReopened.class)).isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.IssueDeleted.class)).isEmpty();
+        }
+
+        @Test
+        void shouldRefuseAnUnmarkedIssuePayloadForAStoredPullRequestWithoutChangingNativeIdentity() {
+            jdbc.update("""
+                    INSERT INTO issue(issue_type,native_id,provider_id,repository_id,number,
+                        created_at,state,comments_count,is_locked,is_merged,title,is_draft,additions,deletions,changed_files,commits)
+                    VALUES ('PULL_REQUEST',9201,?, ?,43,now(),'OPEN',0,false,false,'Pull request',false,0,0,0,0)
+                    """, githubProvider.getId(), testRepository.getId());
+            var dto = createBasicIssueDto(9301L, 43);
+
+            assertThat(processor.process(dto, createContext())).isNull();
+            assertThat(processor.processStub(dto, createContext())).isNull();
+            processor.processTransferred(dto, createContext());
+            processor.processDeleted(dto, createContext());
+
+            assertThat(issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), 43))
+                    .isEmpty();
+            assertThat(jdbc.queryForObject(
+                            "SELECT native_id FROM issue WHERE repository_id=? AND number=43 AND issue_type='PULL_REQUEST'",
+                            Long.class,
+                            testRepository.getId()))
+                    .isEqualTo(9201L);
+            assertThat(eventListener.ofType(ScmDomainEvent.IssueCreated.class)).isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.IssueDeleted.class)).isEmpty();
+        }
+
+        @Test
+        void shouldLeaveAStoredIssueToItsOwnDeliveriesAndStillDeleteARealIssue() {
+            assertThat(processor.process(createBasicIssueDto(9102L, 42), createContext()))
+                    .isNotNull();
+
+            processor.processTransferred(pullRequestDto(9103L, 42), createContext());
+            processor.processDeleted(pullRequestDto(9103L, 42), createContext());
+            assertThat(issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), 42))
+                    .hasValueSatisfying(
+                            issue -> assertThat(issue.getDeletedAt()).isNull());
+            assertThat(eventListener.ofType(ScmDomainEvent.IssueDeleted.class)).isEmpty();
+
+            processor.processDeleted(createBasicIssueDto(9102L, 42), createContext());
+            assertThat(issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), 42))
+                    .isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.IssueDeleted.class)).hasSize(1);
+        }
     }
 
     @Nested
