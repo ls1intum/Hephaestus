@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -22,7 +22,14 @@ function runEntrypoint(enabled: boolean) {
 				APPLICATION_CLIENT_URL: "",
 			},
 		});
-		return { ...result, wroteConfig: existsSync(path.join(html, ".well-known/hephaestus.json")) };
+		const envConfigs = existsSync(html)
+			? readdirSync(html).filter((name) => /^env-config\.[a-f0-9]{8}\.js$/u.test(name))
+			: [];
+		return {
+			...result,
+			wroteConfig: existsSync(path.join(html, ".well-known/hephaestus.json")),
+			envConfigs: envConfigs.map((name) => readFileSync(path.join(html, name), "utf8")),
+		};
 	} finally {
 		rmSync(directory, { recursive: true, force: true });
 	}
@@ -39,4 +46,8 @@ void test("the container accepts an empty client URL with workspace addresses of
 	const result = runEntrypoint(false);
 	assert.equal(result.status, 0, result.stderr);
 	assert.equal(result.wroteConfig, true);
+	assert.equal(result.envConfigs.length, 1);
+	const [envConfig = ""] = result.envConfigs;
+	assert.match(envConfig, /^\s*HEPHAESTUS_WORKSPACE_SUBDOMAINS_ENABLED: "false"/mu);
+	assert.match(envConfig, /^\s*APPLICATION_CLIENT_URL: ""/mu);
 });
