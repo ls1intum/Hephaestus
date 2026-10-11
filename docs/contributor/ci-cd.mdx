@@ -631,6 +631,10 @@ Preview controllers keep their trusted sparse bootstrap checkouts explicit: a re
 action is unavailable before checkout. Their inventory job uses `github-script`'s bundled Node.
 Controller jobs that invoke Node scripts use `setup-toolchain` without a package install.
 
+Commit, branch and pull request image tags are published only after their immutable digest passes
+signature and provenance verification. Index assembly uses a run-specific staging tag. Final tag
+publication preserves the verified digest.
+
 Image verification stays beside publishing. The single-platform step signs and verifies one image.
 The merge job signs recursively, then verifies the index. The alias job verifies each immutable
 subject before moving its tags. Merge and alias jobs need no checkout or repository toolchain just

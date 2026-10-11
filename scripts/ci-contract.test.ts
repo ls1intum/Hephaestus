@@ -1638,7 +1638,8 @@ void describe("CI contract", () => {
 		const build = ["jobs", "build"];
 		for (const name of [
 			"Log in to Container Registry",
-			"Apply tags to buildpack image",
+			"Prepare single-architecture buildpack index",
+			"Publish verified image tags",
 			"Capture single-architecture digest",
 			"Generate build provenance attestation",
 			"Install Cosign",
