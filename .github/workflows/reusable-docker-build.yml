@@ -165,12 +165,12 @@ jobs:
             ${{ github.event_name == 'push' && matrix.platform == 'linux/amd64' && secrets.SENTRY_ORG != '' && format('sentry_org={0}', secrets.SENTRY_ORG) || '' }}
             ${{ github.event_name == 'push' && matrix.platform == 'linux/amd64' && secrets.SENTRY_PROJECT != '' && format('sentry_project={0}', secrets.SENTRY_PROJECT) || '' }}
           labels: ${{ steps.meta.outputs.labels }}
-          tags: ${{ inputs.single-arch && steps.meta.outputs.tags || '' }}
+          tags: ${{ !inputs.publish && inputs.single-arch && steps.meta.outputs.tags || '' }}
           push: ${{ inputs.publish }}
           # A local build is only tagged on the single-architecture path, and loading an untagged
           # image into the daemon leaves something nothing can name.
           load: ${{ !inputs.publish && inputs.single-arch }}
-          outputs: ${{ inputs.publish && !inputs.single-arch && format('type=image,"name={0}/{1}",push-by-digest=true,name-canonical=true,push=true', inputs.registry, inputs.image-name) || '' }}
+          outputs: ${{ inputs.publish && format('type=image,"name={0}/{1}",push-by-digest=true,name-canonical=true,push=true', inputs.registry, inputs.image-name) || '' }}
           # A refreshed package stage does not invalidate cached descendants in BuildKit.
           no-cache-filters: os-packages,runtime
           cache-from: |
@@ -268,26 +268,27 @@ jobs:
             touch "${{ runner.temp }}/digests/${digest#sha256:}"
           fi
 
-      - name: Apply tags to buildpack image
+      - name: Prepare single-architecture buildpack index
         if: inputs.publish && inputs.single-arch && inputs.use-buildpacks
         env:
           SOURCE_IMAGE: ${{ inputs.registry }}/${{ inputs.image-name }}@${{ steps.build-buildpacks.outputs.digest }}
+          STAGING_IMAGE: ${{ inputs.registry }}/${{ inputs.image-name }}:ci-${{ github.run_id }}-${{ github.run_attempt }}-single
         run: |
-          mapfile -t tags < <(jq -r '.tags[]' <<< "$DOCKER_METADATA_OUTPUT_JSON")
-          args=()
-          for tag in "${tags[@]}"; do
-            args+=(--tag "$tag")
-          done
-          docker buildx imagetools create "${args[@]}" "$SOURCE_IMAGE"
+          docker buildx imagetools create --tag "$STAGING_IMAGE" \
+            --metadata-file "$RUNNER_TEMP/single-image.json" "$SOURCE_IMAGE"
 
       - name: Capture single-architecture digest
         id: single-digest
         if: inputs.publish && inputs.single-arch
         env:
-          IMAGE_TAG_REF: ${{ fromJSON(steps.meta.outputs.json).tags[0] }}
+          DOCKERFILE_DIGEST: ${{ steps.build.outputs.digest }}
+          USE_BUILDPACKS: ${{ inputs.use-buildpacks }}
         run: |
           set -euo pipefail
-          DIGEST=$(docker buildx imagetools inspect --format '{{.Manifest.Digest}}' "$IMAGE_TAG_REF")
+          DIGEST="$DOCKERFILE_DIGEST"
+          if [ "$USE_BUILDPACKS" = true ]; then
+            DIGEST=$(jq -er '."containerimage.descriptor".digest' "$RUNNER_TEMP/single-image.json")
+          fi
           if [[ ! "$DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]]; then
             echo "::error::Refusing to publish: image digest is invalid (got: ${DIGEST:-<empty>})"
             exit 1
@@ -322,6 +323,21 @@ jobs:
             --certificate-github-workflow-repository "${{ github.repository }}" \
             > /dev/null
           gh attestation verify "oci://$IMAGE_REF" --bundle-from-oci --owner "${{ github.repository_owner }}"
+
+      - name: Publish verified image tags
+        if: inputs.publish && inputs.single-arch
+        env:
+          IMAGE_REF: ${{ inputs.registry }}/${{ inputs.image-name }}@${{ steps.single-digest.outputs.manifest-digest }}
+        run: |
+          set -euo pipefail
+          mapfile -t tags < <(jq -er '.tags[]' <<< "$DOCKER_METADATA_OUTPUT_JSON")
+          (( ${#tags[@]} > 0 ))
+          args=()
+          for tag in "${tags[@]}"; do args+=(--tag "$tag"); done
+          docker buildx imagetools create --prefer-index=false "${args[@]}" \
+            --metadata-file "$RUNNER_TEMP/published-image.json" "$IMAGE_REF"
+          PUBLISHED_DIGEST=$(jq -er '."containerimage.descriptor".digest' "$RUNNER_TEMP/published-image.json")
+          [[ "$PUBLISHED_DIGEST" = "${IMAGE_REF##*@}" ]]
 
       - name: Upload digest
         if: ${{ inputs.publish && !inputs.single-arch }}
@@ -385,22 +401,19 @@ jobs:
       - name: Create manifest and push
         working-directory: ${{ runner.temp }}/digests
         run: |
-          mapfile -t tags < <(jq -er '.tags[]' <<< "$DOCKER_METADATA_OUTPUT_JSON")
-          args=()
-          for tag in "${tags[@]}"; do args+=(-t "$tag"); done
+          args=(--tag "$STAGING_IMAGE" --metadata-file "$RUNNER_TEMP/merged-image.json")
           for digest in *; do args+=("$INPUTS_REGISTRY/$INPUTS_IMAGE_NAME@sha256:$digest"); done
           docker buildx imagetools create "${args[@]}"
         env:
           INPUTS_REGISTRY: ${{ inputs.registry }}
           INPUTS_IMAGE_NAME: ${{ inputs.image-name }}
+          STAGING_IMAGE: ${{ inputs.registry }}/${{ inputs.image-name }}:ci-${{ github.run_id }}-${{ github.run_attempt }}-index
 
       - name: Capture manifest digest
         id: digest
-        env:
-          IMAGE_TAG_REF: ${{ inputs.registry }}/${{ inputs.image-name }}:${{ steps.meta.outputs.version }}
         run: |
           set -euo pipefail
-          DIGEST=$(docker buildx imagetools inspect --format '{{.Manifest.Digest}}' "$IMAGE_TAG_REF")
+          DIGEST=$(jq -er '."containerimage.descriptor".digest' "$RUNNER_TEMP/merged-image.json")
           if [[ ! "$DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]]; then
             echo "::error::Refusing to publish: manifest digest is not a sha256:<64 lowercase hex> value (got: ${DIGEST:-<empty>})"
             exit 1
@@ -439,6 +452,20 @@ jobs:
             --certificate-github-workflow-repository "${{ github.repository }}" \
             > /dev/null
           gh attestation verify "oci://$IMAGE_REF" --bundle-from-oci --owner "${{ github.repository_owner }}"
+
+      - name: Publish verified image tags
+        env:
+          IMAGE_REF: ${{ inputs.registry }}/${{ inputs.image-name }}@${{ steps.digest.outputs.manifest-digest }}
+        run: |
+          set -euo pipefail
+          mapfile -t tags < <(jq -er '.tags[]' <<< "$DOCKER_METADATA_OUTPUT_JSON")
+          (( ${#tags[@]} > 0 ))
+          args=()
+          for tag in "${tags[@]}"; do args+=(--tag "$tag"); done
+          docker buildx imagetools create --prefer-index=false "${args[@]}" \
+            --metadata-file "$RUNNER_TEMP/published-image.json" "$IMAGE_REF"
+          PUBLISHED_DIGEST=$(jq -er '."containerimage.descriptor".digest' "$RUNNER_TEMP/published-image.json")
+          [[ "$PUBLISHED_DIGEST" = "${IMAGE_REF##*@}" ]]
 
   scan:
     name: Scan ${{ matrix.platform }} Image

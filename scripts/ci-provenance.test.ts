@@ -76,7 +76,11 @@ const exitCodes = { none: 0, signature: 7, attestation: 9 };
 // These are Linux publishing jobs. Execute their actual shell bodies with tool-boundary fixtures
 // so different quoting or function control flow cannot silently weaken one verification site.
 for (const site of verificationSites) {
-	for (const [failure, exitCode] of Object.entries(exitCodes)) {
+	const failures =
+		site.job === "tag-unchanged-images"
+			? exitCodes
+			: { ...exitCodes, publication: 11, changedDigest: 1 };
+	for (const [failure, exitCode] of Object.entries(failures)) {
 		void test(
 			`${site.job}: ${failure === "none" ? "success" : `${failure} rejection`} preserves immutable-image verification`,
 			{ skip: process.platform === "win32" },
@@ -99,7 +103,17 @@ for (const site of verificationSites) {
 						`\${{ inputs.registry }}/\${{ inputs.image-name }}@\${{ steps.${source}.outputs.manifest-digest }}`,
 					);
 				}
-				const script = String(step.get("run"))
+				const publication: unknown = steps.items.find(
+					(item) => isMap(item) && item.get("name") === "Publish verified image tags",
+				);
+				if (site.job !== "tag-unchanged-images") {
+					assert.ok(isMap(publication));
+					assert.ok(steps.items.indexOf(publication) > steps.items.indexOf(step));
+					assert.equal(publication.getIn(["env", "IMAGE_REF"]), step.getIn(["env", "IMAGE_REF"]));
+				}
+				const script = (
+					String(step.get("run")) + (isMap(publication) ? String(publication.get("run")) : "")
+				)
 					.replaceAll(`\${{ github.repository }}`, repository)
 					.replaceAll(`\${{ github.repository_owner }}`, owner);
 				assert.ok(!script.includes(`\${{`));
@@ -118,6 +132,13 @@ const args = process.argv.slice(2);
 fs.appendFileSync(process.env.CALL_LOG, JSON.stringify([tool, ...args]) + '\\n');
 if (tool === 'cosign' && args[0] === 'verify' && process.env.FAILURE === 'signature') process.exit(7);
 if (tool === 'gh' && process.env.FAILURE === 'attestation') process.exit(9);
+if (tool === 'docker' && args.includes('create')) {
+  if (process.env.FAILURE === 'publication') process.exit(11);
+  const index = args.indexOf('--metadata-file');
+  if (index !== -1) fs.writeFileSync(args[index + 1], JSON.stringify({
+    'containerimage.descriptor': { digest: process.env.FAILURE === 'changedDigest' ? 'sha256:' + 'd'.repeat(64) : process.env.DIGEST }
+  }));
+}
 if (tool === 'docker' && args.includes('inspect')) process.stdout.write(process.env.DIGEST);
 `,
 					);
@@ -131,6 +152,10 @@ if (tool === 'docker' && args.includes('inspect')) process.stdout.write(process.
 						CALL_LOG: log,
 						FAILURE: failure,
 						DIGEST: digest,
+						RUNNER_TEMP: directory,
+						DOCKER_METADATA_OUTPUT_JSON: JSON.stringify({
+							tags: [`${image}:commit`, `${image}:ci`],
+						}),
 						IMAGE_REF: immutable,
 						REPOSITORY: repository,
 						REPOSITORY_OWNER: owner,
@@ -180,6 +205,26 @@ if (tool === 'docker' && args.includes('inspect')) process.stdout.write(process.
 						"--bundle-from-oci",
 						"--owner",
 						owner,
+					]);
+				}
+				if (
+					site.job !== "tag-unchanged-images" &&
+					failure !== "signature" &&
+					failure !== "attestation"
+				) {
+					expected.push([
+						"docker",
+						"buildx",
+						"imagetools",
+						"create",
+						"--prefer-index=false",
+						"--tag",
+						`${image}:commit`,
+						"--tag",
+						`${image}:ci`,
+						"--metadata-file",
+						path.join(directory, "published-image.json"),
+						immutable,
 					]);
 				}
 				if (failure === "none" && site.job === "tag-unchanged-images") {
@@ -234,6 +279,84 @@ void test("registry-only merge and alias jobs remain checkout-free and signing k
 		);
 		if (job === "build") {
 			assert.doesNotMatch(String(sign.get("run")), /--recursive/u);
+		}
+	}
+});
+
+for (const source of ["dockerfile", "buildpacks", "merged"] as const) {
+	for (const captured of [digest, "invalid", null]) {
+		void test(`${source}: ${captured === digest ? "valid" : "invalid or missing"} publication subject`, async (t) => {
+			const workflow = parseDocument(
+				await readFile(".github/workflows/reusable-docker-build.yml", "utf8"),
+			);
+			const job = source === "merged" ? "merge" : "build";
+			const name =
+				source === "merged" ? "Capture manifest digest" : "Capture single-architecture digest";
+			const steps = workflow.getIn(["jobs", job, "steps"]);
+			assert.ok(isSeq(steps));
+			const capture: unknown = steps.items.find((item) => isMap(item) && item.get("name") === name);
+			assert.ok(isMap(capture));
+			const directory = await mkdtemp(path.join(tmpdir(), "publication-subject-"));
+			t.after(async () => rm(directory, { recursive: true, force: true }));
+			const output = path.join(directory, "output");
+			await writeFile(output, "");
+			const descriptor = { "containerimage.descriptor": { digest: captured } };
+			await writeFile(
+				path.join(directory, source === "merged" ? "merged-image.json" : "single-image.json"),
+				JSON.stringify(descriptor),
+			);
+			const result = spawnSync("bash", ["-e", "-c", String(capture.get("run"))], {
+				encoding: "utf8",
+				env: {
+					...process.env,
+					RUNNER_TEMP: directory,
+					GITHUB_OUTPUT: output,
+					DOCKERFILE_DIGEST: captured ?? "",
+					USE_BUILDPACKS: String(source === "buildpacks"),
+				},
+			});
+			assert.equal(result.status === 0, captured === digest, result.stderr);
+			assert.equal(
+				await readFile(output, "utf8"),
+				captured === digest ? `manifest-digest=${digest}\n` : "",
+			);
+		});
+	}
+}
+
+void test("canonical tags are withheld until verification for both image builders", async () => {
+	const workflow = parseDocument(
+		await readFile(".github/workflows/reusable-docker-build.yml", "utf8"),
+	);
+	for (const job of ["build", "merge"]) {
+		const steps = workflow.getIn(["jobs", job, "steps"]);
+		assert.ok(isSeq(steps));
+		const values = asArray(steps.toJSON(), "steps").map((step) => asRecord(step, "step"));
+		const publication = values.findIndex((step) => step.name === "Publish verified image tags");
+		const verification = values.findIndex(
+			(step) =>
+				step.name ===
+				(job === "build" ? "Sign and verify image" : "Verify signature + attestation"),
+		);
+		assert.ok(publication > verification && verification !== -1);
+		for (const step of values.slice(0, publication)) {
+			if (step.name === "Build and push (Dockerfile)") {
+				const inputs = asRecord(step.with, "build inputs");
+				assert.equal(
+					inputs.tags,
+					`\${{ !inputs.publish && inputs.single-arch && steps.meta.outputs.tags || '' }}`,
+				);
+				assert.match(String(inputs.outputs), /inputs\.publish && format/u);
+				assert.match(String(inputs.outputs), /push-by-digest=true/u);
+			}
+			if (
+				step.name === "Prepare single-architecture buildpack index" ||
+				step.name === "Create manifest and push"
+			) {
+				const env = asRecord(step.env, "staging environment");
+				assert.match(String(env.STAGING_IMAGE), /github\.run_id.*github\.run_attempt/u);
+				assert.doesNotMatch(String(step.run), /DOCKER_METADATA_OUTPUT_JSON/u);
+			}
 		}
 	}
 });
