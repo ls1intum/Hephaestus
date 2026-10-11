@@ -1,7 +1,8 @@
 import { HttpResponse, http } from "msw";
 import { assert, describe, expect, it } from "vitest";
 
-import { adminListAuthEvents, listBackfillRuns } from "@/api/sdk.gen";
+import { adminListAuthEvents, getAgentJob, listBackfillRuns } from "@/api/sdk.gen";
+import { reviewJob } from "@/components/admin/practice-reviews/fixtures";
 import { server } from "@/mocks/server";
 
 /**
@@ -48,6 +49,24 @@ describe("generated SDK response transformers", () => {
 		// `new Date(undefined)` is an Invalid Date, which renders as the literal text "Invalid Date"
 		// instead of the em dash a screen shows for "not yet". The transformer must skip the field.
 		expect(data?.[0]?.finishedAt).toBeUndefined();
+	});
+
+	it("revives a review's execution boundary only when the server recorded it", async () => {
+		const job = reviewJob("11111111-1111-1111-1111-111111111111");
+		const path = { workspaceSlug: "acme", jobId: job.id };
+		const endpoint = "*/workspaces/:slug/agents/jobs/:jobId";
+		server.use(http.get(endpoint, () => HttpResponse.json({ ...job, executionStartedAt: ISO })));
+
+		const recorded = await getAgentJob({ path });
+		const boundary = recorded.data?.executionStartedAt;
+		assert(boundary instanceof Date);
+		expect(boundary.toISOString()).toBe(ISO);
+
+		server.use(
+			http.get(endpoint, () => HttpResponse.json({ ...job, executionStartedAt: undefined })),
+		);
+		const legacy = await getAgentJob({ path });
+		expect(legacy.data?.executionStartedAt).toBeUndefined();
 	});
 });
 

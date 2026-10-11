@@ -575,6 +575,9 @@ const agentJobSchemaResponseTransformer = (data: any) => {
         data.completedAt = new Date(data.completedAt);
     }
     data.createdAt = new Date(data.createdAt);
+    if (data.executionStartedAt) {
+        data.executionStartedAt = new Date(data.executionStartedAt);
+    }
     if (data.startedAt) {
         data.startedAt = new Date(data.startedAt);
     }

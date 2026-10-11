@@ -26,7 +26,7 @@ import { ReviewArtifactLink } from "./ReviewArtifact";
 import { ReviewLevelHeader } from "./ReviewLevelHeader";
 import { ReviewOutputSections } from "./ReviewOutputSections";
 import { ReviewRunActions } from "./ReviewRunActions";
-import { ReviewRunCard } from "./ReviewRunCard";
+import { ReviewRunCard, ReviewRunCardSkeleton } from "./ReviewRunCard";
 import { ReviewRunNotices } from "./ReviewRunNotices";
 
 export interface ReviewRunLevelProps {
@@ -184,7 +184,7 @@ function ReviewRunSkeleton() {
 				<Skeleton className="h-6 w-40" />
 				<Skeleton className="h-32 w-full" />
 			</div>
-			<Skeleton className="h-40 w-full" />
+			<ReviewRunCardSkeleton />
 		</div>
 	);
 }

@@ -92,8 +92,17 @@ public record AgentJobDTO(
         @NonNull @Schema(description = "Timestamp when the job was created")
         Instant createdAt,
 
-        @Schema(description = "Timestamp when the job started running") @Nullable
+        @Schema(
+                description = "When a worker claimed the current attempt and began preparing it. A retry resets it, "
+                        + "so it never describes an earlier attempt.")
+        @Nullable
         Instant startedAt,
+
+        @Schema(
+                description = "When the current attempt finished preparation, immediately before its sandbox was "
+                        + "invoked, if it got that far. A retry resets it; absent on runs from before it was recorded.")
+        @Nullable
+        Instant executionStartedAt,
 
         @Schema(description = "Timestamp when the job completed") @Nullable
         Instant completedAt,
@@ -160,6 +169,7 @@ public record AgentJobDTO(
                 job.getHoldReason(),
                 job.getCreatedAt(),
                 job.getStartedAt(),
+                job.getExecutionStartedAt(),
                 job.getCompletedAt(),
                 job.getLlmModel(),
                 job.getLlmModelVersion(),
@@ -200,6 +210,7 @@ public record AgentJobDTO(
                 row.getHoldReason(),
                 row.getCreatedAt(),
                 row.getStartedAt(),
+                row.getExecutionStartedAt(),
                 row.getCompletedAt(),
                 row.getLlmModel(),
                 row.getLlmModelVersion(),
