@@ -3,6 +3,8 @@ import { type ReactNode, useLayoutEffect } from "react";
 
 import type { TeamInfo } from "@/api/types.gen";
 import { type Contributor, ContributorGrid } from "@/components/common/ContributorGrid";
+import type { PanelState } from "@/components/common/panel-state";
+import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { PageLayout } from "@/components/layout/PageLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,7 +14,11 @@ import { visibleTeamTree } from "./visible-team-tree";
 
 export interface TeamsPageProps {
 	teams: TeamInfo[];
-	isLoading: boolean;
+	/**
+	 * The team list's read. A failed read is never shown as a workspace with no teams; a refresh that
+	 * failed and may pass on retry keeps the teams it could not replace.
+	 */
+	state: PanelState<{ refresh?: { error: unknown; onRetry: () => void; pending?: boolean } }>;
 }
 
 /**
@@ -55,7 +61,7 @@ function sortMembers(team: TeamInfo) {
 	return [...team.members].sort((a, b) => a.name.localeCompare(b.name));
 }
 
-export function TeamsPage({ teams, isLoading }: TeamsPageProps) {
+export function TeamsPage({ teams, state }: TeamsPageProps) {
 	const visibleTeams = teams.filter((t) => !t.hidden);
 	const { roots, childrenOf: childrenMap } = visibleTeamTree(teams);
 	const membersByTeamId = new Map(
@@ -188,7 +194,7 @@ export function TeamsPage({ teams, isLoading }: TeamsPageProps) {
 	}, []);
 
 	let body: ReactNode;
-	if (isLoading) {
+	if (state.status === "loading") {
 		body = (
 			<div className="space-y-4">
 				{["a", "b", "c"].map((id) => (
@@ -209,6 +215,14 @@ export function TeamsPage({ teams, isLoading }: TeamsPageProps) {
 				))}
 			</div>
 		);
+	} else if (state.status === "error") {
+		body = (
+			<QueryErrorAlert
+				error={state.error}
+				title="We could not load teams"
+				onRetry={state.onRetry}
+			/>
+		);
 	} else if (roots.length > 0) {
 		body = <div className="space-y-4">{roots.map((team) => renderTeamNode(team))}</div>;
 	} else {
@@ -227,6 +241,14 @@ export function TeamsPage({ teams, isLoading }: TeamsPageProps) {
 				description="See contributors grouped by team and explore their activity."
 			/>
 
+			{state.status === "ready" && state.refresh !== undefined && (
+				<QueryErrorAlert
+					error={state.refresh.error}
+					title="We could not refresh teams"
+					onRetry={state.refresh.onRetry}
+					pending={state.refresh.pending}
+				/>
+			)}
 			{body}
 		</PageLayout>
 	);
