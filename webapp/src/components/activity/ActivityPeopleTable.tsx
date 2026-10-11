@@ -302,6 +302,23 @@ export function ActivityPeopleTable({
 						aria-label="People"
 						aria-busy={state.status === "loading" || stale || undefined}
 						className={cn("sm:min-w-200", stale && STALE)}
+						// Reserve the pinned identity columns in the browser's logical scroll region.
+						containerClassName={cn(
+							"scroll-ps-41",
+							order.sort === "name" ? "sm:scroll-ps-61" : "sm:scroll-ps-73",
+						)}
+						// Native focus skips a button already inside the scrollport, even when a pinned cell covers it.
+						onFocusCapture={(event) => {
+							const { target } = event;
+							if (!(target instanceof HTMLButtonElement)) {
+								return;
+							}
+							const head = target.closest("th");
+							if (head === null || getComputedStyle(head).position === "sticky") {
+								return;
+							}
+							target.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "instant" });
+						}}
 					>
 						<DataTableHeader table={table} />
 						<TableBody>
