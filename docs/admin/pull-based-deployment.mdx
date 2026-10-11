@@ -13,8 +13,8 @@ For a release deployment, the host verifies two signatures:
 
 | Artifact                                    | Signed by              | Answers                                                  |
 | ------------------------------------------- | ---------------------- | -------------------------------------------------------- |
-| The channel (`channels/<env>.json`)         | the promotion workflow | *may this host move, and who said so*                    |
-| The release lock (`release-<version>.json`) | the release workflow   | *which source commit and image digests are this release* |
+| The channel (`channels/<env>.json`)         | the promotion workflow | may this host move, and who said so                    |
+| The release lock (`release-<version>.json`) | the release workflow   | which source commit and image digests are this release |
 
 The host rejects a new channel commit that does not descend from its last accepted channel commit.
 It also rejects lower release versions and older commits unless `allowRollback` is set. These checks
@@ -68,7 +68,7 @@ Manual promotions never do this lookup.
 ## Requirements
 
 1. Install Docker Engine with Compose v2.
-2. Install `git` and `cosign`.
+2. Install `git` and Cosign 3.1.3 or later.
 3. Install the Node.js version pinned in `package.json#devEngines.runtime`.
 4. Verify downloaded tools against their published checksums.
 5. Allow outbound HTTPS to GitHub and its release-asset download hosts.

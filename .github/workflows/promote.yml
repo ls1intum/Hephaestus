@@ -106,7 +106,7 @@ jobs:
         with:
           install: "none"
 
-      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+      - uses: sigstore/cosign-installer@af595e623eec1ede52d6322f53b635d5def0a95a # main
 
       # Unlike tooling, upstream image pins must come from the deployment target.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
