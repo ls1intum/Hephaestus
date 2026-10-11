@@ -124,6 +124,18 @@
 		"workType": "pull_request"
 	},
 	{
+		"id": "in-memory-class-without-architectural-decision",
+		"expected": {
+			"records-significant-decisions-with-rationale": "NOT_APPLICABLE"
+		},
+		"files": {
+			"context/description.md": "Add an in-memory note draft model.\n",
+			"repo/App/NoteDraft.swift": "final class NoteDraft {\n    var text: String = \"\"\n}\n"
+		},
+		"reason": "A bare in-memory class makes no persisted model, public contract, shared mechanism or security decision, so no significant decision needs a recorded why even though none is given.",
+		"workType": "pull_request"
+	},
+	{
 		"id": "adr-in-change",
 		"expected": {
 			"records-significant-decisions-with-rationale": "MET"
