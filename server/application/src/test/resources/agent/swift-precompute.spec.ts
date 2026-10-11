@@ -160,7 +160,7 @@ void test("an API use is shown with the usage keys located for it and where, nev
 			new Map([whole("App/Scanner.swift", source)]),
 			metadata,
 		);
-		assert.equal(result.metrics.capabilitiesAdded, 2);
+		assert.equal(result.metrics.permissionReferenceKinds, 2);
 		assert.equal(result.metrics.authorizationRequests, 1);
 		const said = result.directions.join("\n");
 		assert.match(said, /Location — keys located: none/u);
@@ -189,7 +189,7 @@ void test("a system picker, an import or an image picker on the library is not p
 			new Map([whole("App/Picker.swift", source)]),
 			metadata,
 		);
-		assert.equal(result.metrics.capabilitiesAdded, 0);
+		assert.equal(result.metrics.permissionReferenceKinds, 0);
 		assert.deepEqual(result.directions, []);
 		// Choosing the camera as the picker's source is the access it is.
 		const camera = await script(
@@ -197,8 +197,58 @@ void test("a system picker, an import or an image picker on the library is not p
 			new Map([whole("App/Picker.swift", `${source}\nlibrary.sourceType = .camera\n`)]),
 			metadata,
 		);
-		assert.equal(camera.metrics.capabilitiesAdded, 1);
+		assert.equal(camera.metrics.permissionReferenceKinds, 1);
 		assert.match(camera.directions.join("\n"), /Camera — keys located: none/u);
+	} finally {
+		rmSync(root, { recursive: true, force: true });
+	}
+});
+
+void test("a location type named in a delegate signature is a reference to inspect, and only a request call is a request", async () => {
+	const { root, script } = await stage("declares-permissions-truthfully-at-point-of-use");
+	try {
+		const delegateOnly = [
+			"import CoreLocation",
+			"final class Preview: NSObject, CLLocationManagerDelegate {",
+			"    func locationManager(_ manager: CLLocationManager, didFailWithError error: any Error) {}",
+			"}",
+		].join("\n");
+		const typeOnly = await script(
+			path.join(root, "repo"),
+			new Map([whole("App/Preview.swift", delegateOnly)]),
+			metadata,
+		);
+		assert.deepEqual(
+			typeOnly.hints.map((h) => [h.line, h.pattern]),
+			[[3, "permission-related reference Location"]],
+		);
+		assert.equal(typeOnly.metrics.permissionReferenceKinds, 1);
+		assert.equal(typeOnly.metrics.authorizationRequests, 0);
+
+		const requesting = [
+			"import CoreLocation",
+			"final class Preview: NSObject, CLLocationManagerDelegate {",
+			"    let manager = CLLocationManager()",
+			"    func begin() { manager.requestWhenInUseAuthorization() }",
+			"}",
+		].join("\n");
+		const request = await script(
+			path.join(root, "repo"),
+			new Map([whole("App/Preview.swift", requesting)]),
+			metadata,
+		);
+		assert.deepEqual(
+			request.hints
+				.filter((h) => h.pattern === "permission-related reference Location")
+				.map((h) => h.line),
+			[3],
+		);
+		assert.deepEqual(
+			request.hints.filter((h) => h.pattern === "authorization request").map((h) => h.line),
+			[4],
+		);
+		assert.equal(request.metrics.permissionReferenceKinds, 1);
+		assert.equal(request.metrics.authorizationRequests, 1);
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}
