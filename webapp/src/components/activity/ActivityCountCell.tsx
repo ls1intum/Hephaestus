@@ -1,7 +1,8 @@
 import { PeopleIcon } from "@primer/octicons-react";
+import { cn } from "cn";
 import { GitLabUsersIcon } from "@/components/icons/gitlab-icons";
 import type { IconComponent } from "@/components/icons/provider-icons";
-import type { ProviderType } from "@/lib/provider/provider-terms";
+import { getProviderTerms, type ProviderType } from "@/lib/provider/provider-terms";
 import { capitalise } from "@/lib/text";
 
 import { CountChip, NoneMark } from "./ActionChip";
@@ -30,7 +31,8 @@ const PEOPLE_ICON = providerIcon(PeopleIcon, GitLabUsersIcon);
  * by first, then what it holds — pull requests opened and merged, pull requests reviewed and whose
  * work, issues opened. Each part has a slot of its own width, right-aligned, so a column of rows
  * lines up part by part. A part with nothing in it leaves its slot empty, and a cell with nothing
- * at all is one dash.
+ * at all is one dash. Below `sm` the parts stack, so a column is as wide as one part, and an empty
+ * part leaves no slot.
  */
 export function ActivityCountCell({ category, counts, providerType }: ActivityCountCellProps) {
 	const parts = PARTS[category](counts, providerType);
@@ -40,9 +42,15 @@ export function ActivityCountCell({ category, counts, providerType }: ActivityCo
 	const shown = parts.filter((part) => part.count > 0);
 	return (
 		// Above the row's stretched link, so a pointer reaches each part's tooltip.
-		<span className="relative z-10 inline-flex items-center justify-end gap-2 align-middle">
+		<span className="relative z-10 inline-flex flex-col items-end gap-0.5 align-middle sm:flex-row sm:items-center sm:justify-end sm:gap-2">
 			{parts.map((part) => (
-				<span key={part.key} className="inline-flex min-w-9 justify-end">
+				<span
+					key={part.key}
+					className={cn(
+						"inline-flex min-w-9 justify-end",
+						part.count === 0 && "hidden sm:inline-flex",
+					)}
+				>
 					{part.count > 0 && (
 						<CountChip icon={part.icon} tone={part.tone} phrase={part.phrase}>
 							<span aria-hidden className="font-medium tabular-nums">
@@ -66,10 +74,22 @@ export function ActivityCountHeader({
 	providerType: ProviderType;
 }) {
 	const Icon = HEADER_ICONS[category](providerType);
+	const label = ACTIVITY_CATEGORY_DEFS[category].label(providerType);
 	return (
 		<span className="inline-flex items-center gap-1.5">
 			<Icon size={16} className="shrink-0" />
-			{ACTIVITY_CATEGORY_DEFS[category].label(providerType)}
+			{category === "pull-requests" ? (
+				// The visible short form starts the accessible name.
+				<>
+					<span className="sm:hidden">
+						{getProviderTerms(providerType).pullRequestsShort}
+						<span className="sr-only"> ({label})</span>
+					</span>
+					<span className="hidden sm:inline">{label}</span>
+				</>
+			) : (
+				label
+			)}
 		</span>
 	);
 }

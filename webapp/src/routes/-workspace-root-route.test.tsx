@@ -137,7 +137,7 @@ describe("the address of a workspace", () => {
 		expect(reads.at(-1)?.searchParams.get("range")).toBe("1y");
 		expect(reads.at(-1)?.searchParams.getAll("repo")).toStrictEqual(["acme/api"]);
 
-		await user.click(screen.getByRole("button", { name: "Contributions" }));
+		await user.click(screen.getByRole("button", { name: /contributions/iu }));
 		await waitFor(() => expect(router.state.location.search.sort).toBeUndefined());
 		await user.click(screen.getByRole("button", { name: "30 days" }));
 		await waitFor(() => expect(router.state.location.search.range).toBe("30d"));
