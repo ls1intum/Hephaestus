@@ -19,6 +19,10 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.context.JobEvidenceFiles;
 import de.tum.cit.aet.hephaestus.agent.context.providers.ReviewHistoryContentSource;
+import de.tum.cit.aet.hephaestus.agent.handler.conversation.ConversationEligibility;
+import de.tum.cit.aet.hephaestus.agent.handler.conversation.ConversationRoutingDecision;
+import de.tum.cit.aet.hephaestus.agent.handler.conversation.ConversationalDeliveryListener;
+import de.tum.cit.aet.hephaestus.agent.handler.inapp.InAppRoutingDecision;
 import de.tum.cit.aet.hephaestus.agent.handler.inapp.InAppSupportContext;
 import de.tum.cit.aet.hephaestus.agent.handler.inapp.InAppSupportReader;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
@@ -32,6 +36,7 @@ import de.tum.cit.aet.hephaestus.agent.job.ReviewCompositionBasis;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewCompositionBasisRepository;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.PreviousInAppFeedback;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
@@ -39,6 +44,7 @@ import de.tum.cit.aet.hephaestus.practices.model.Outcome;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationVisibilityPolicy;
+import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.nio.charset.StandardCharsets;
@@ -110,6 +116,9 @@ class ObservationAdmissionServiceTest extends BaseUnitTest {
     private ObjectProvider<InAppSupportReader> supportReaders;
 
     @Mock
+    private ConversationalDeliveryListener conversationLane;
+
+    @Mock
     private PullRequestRepository pullRequests;
 
     @Mock
@@ -152,6 +161,7 @@ class ObservationAdmissionServiceTest extends BaseUnitTest {
                 publicEligibility,
                 reviewHistory,
                 supportReaders,
+                conversationLane,
                 pullRequests,
                 basisRepository);
         lenient().when(supportReaders.getIfAvailable()).thenReturn(supportReader);
@@ -198,6 +208,8 @@ class ObservationAdmissionServiceTest extends BaseUnitTest {
                 .withBean(ObservationVisibilityPolicy.class, () -> mock(ObservationVisibilityPolicy.class))
                 .withBean(PreviousInAppFeedback.class, () -> mock(PreviousInAppFeedback.class))
                 .withBean(PracticeFeedbackDeliveryPolicy.class, () -> mock(PracticeFeedbackDeliveryPolicy.class))
+                .withBean(FeedbackRepository.class, () -> mock(FeedbackRepository.class))
+                .withBean(WorkspaceReviewDefaultsProvider.class, () -> mock(WorkspaceReviewDefaultsProvider.class))
                 .withBean(Clock.class, Clock::systemUTC);
         worker.withUserConfiguration(InAppSupportReader.class)
                 .run(context -> assertThat(admitWith(context.getBeanProvider(InAppSupportReader.class))
@@ -227,6 +239,7 @@ class ObservationAdmissionServiceTest extends BaseUnitTest {
                         publicEligibility,
                         reviewHistory,
                         readers,
+                        conversationLane,
                         pullRequests,
                         basisRepository)
                 .admit(identity, mapper.createArrayNode());
@@ -238,14 +251,78 @@ class ObservationAdmissionServiceTest extends BaseUnitTest {
                 InAppSupportContext.State.COMPLETE,
                 "2026-10-08T10:00:00Z",
                 null,
-                List.of(new InAppSupportContext.PracticeSupport("handles-errors", List.of())));
+                List.of(new InAppSupportContext.PracticeSupport(
+                        "handles-errors", InAppRoutingDecision.UNCORROBORATED, List.of())));
         when(supportReader.snapshot(job, List.of())).thenReturn(support);
 
         ObjectNode response = service.admit(identity, mapper.createArrayNode());
 
         assertThat(response.path(ObservationAdmissionService.IN_APP_SUPPORT_KEY))
                 .isEqualTo(mapper.valueToTree(support));
+        assertThat(response.path(ObservationAdmissionService.IN_APP_SUPPORT_KEY)
+                        .path("practices")
+                        .get(0)
+                        .path("decision")
+                        .asString())
+                .isEqualTo("UNCORROBORATED");
         assertThat(response.path("observations").isArray()).isTrue();
+    }
+
+    /** The conversation lane's routing is read for the owning attempt's admitted rows, by their persisted ids. */
+    @Test
+    void shouldCarryTheConversationRoutingOfTheAdmittedRowsBesideTheFullAdmission() {
+        Observation anchored = negative("inline-practice");
+        Observation unanchored = negative("described-practice");
+        when(observations.findByAgentJobId(job.getId(), 1L)).thenReturn(List.of(anchored, unanchored));
+        var routing = new ConversationEligibility(
+                ConversationEligibility.State.COMPLETE,
+                "2026-10-08T10:00:00Z",
+                List.of(
+                        new ConversationEligibility.ObservationRoute(
+                                anchored.getId(), ConversationRoutingDecision.HAS_INLINE_ANCHOR),
+                        new ConversationEligibility.ObservationRoute(
+                                unanchored.getId(), ConversationRoutingDecision.ADMIT)));
+        when(conversationLane.eligibility(job, List.of(anchored, unanchored))).thenReturn(routing);
+
+        ObjectNode response = service.admit(identity, mapper.createArrayNode());
+
+        assertThat(response.path(ObservationAdmissionService.IN_CHAT_ELIGIBILITY_KEY))
+                .isEqualTo(mapper.valueToTree(routing));
+        // A lane decision narrows composition only: every admitted observation is still answered.
+        assertThat(response.path("observations"))
+                .extracting(row -> row.path("id").asString())
+                .containsExactly(anchored.getId().toString(), unanchored.getId().toString());
+    }
+
+    @Test
+    void shouldKeepTheAdmissionAndReportConversationRoutingUnavailableWhenItsReadFails() {
+        when(conversationLane.eligibility(eq(job), any())).thenThrow(new IllegalStateException("read failed"));
+
+        ObjectNode response = service.admit(identity, mapper.createArrayNode());
+
+        assertThat(response.path(ObservationAdmissionService.IN_CHAT_ELIGIBILITY_KEY)
+                        .path("state")
+                        .asString())
+                .isEqualTo("UNAVAILABLE");
+        assertThat(response.path(ObservationAdmissionService.IN_CHAT_ELIGIBILITY_KEY)
+                        .path("observations"))
+                .isEmpty();
+        assertThat(ObservationAdmissionService.isAdmitted(job)).isTrue();
+    }
+
+    private Observation negative(String slug) {
+        Practice practice = new Practice();
+        practice.setSlug(slug);
+        return Observation.builder()
+                .id(UUID.randomUUID())
+                .practice(practice)
+                .aboutUserId(7L)
+                .artifactKind(ArtifactKinds.PULL_REQUEST)
+                .artifactId(42L)
+                .summary("A problem")
+                .outcome(Outcome.NOT_MET)
+                .evidence(mapper.createObjectNode())
+                .build();
     }
 
     @Test
@@ -263,7 +340,7 @@ class ObservationAdmissionServiceTest extends BaseUnitTest {
                         .path(ObservationAdmissionService.DIGEST_METADATA_KEY)
                         .asString())
                 .isNotBlank();
-        verifyNoInteractions(supportReader);
+        verifyNoInteractions(supportReader, conversationLane);
     }
 
     @Test

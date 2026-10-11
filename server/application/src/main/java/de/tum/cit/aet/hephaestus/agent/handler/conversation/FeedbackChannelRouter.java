@@ -12,8 +12,8 @@ import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaults;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
 import de.tum.cit.aet.hephaestus.practices.review.autonomy.AutonomyResolver;
-import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -49,18 +49,25 @@ public class FeedbackChannelRouter {
     }
 
     public List<Observation> admit(List<Observation> observations, long workspaceId, RoutingContext context) {
+        Map<UUID, ConversationRoutingDecision> decisions = decide(observations, workspaceId, context);
+        return observations.stream()
+                .filter(observation -> decisions.get(observation.getId()) == ConversationRoutingDecision.ADMIT)
+                .toList();
+    }
+
+    /** Each observation's routing decision, by its id, in the order given. */
+    public Map<UUID, ConversationRoutingDecision> decide(
+            List<Observation> observations, long workspaceId, RoutingContext context) {
         WorkspaceReviewDefaults defaults = workspaceDefaults.forWorkspace(workspaceId);
         Map<UUID, PracticeAutonomy> autonomyByPracticeId =
                 autonomyByPracticeId(observations, workspaceId, defaults.defaultAutonomy());
-        List<Observation> admitted = new ArrayList<>();
+        Map<UUID, ConversationRoutingDecision> decisions = new LinkedHashMap<>();
         for (Observation observation : observations) {
-            ConversationRoutingDecision decision =
-                    route(observation, autonomyByPracticeId.get(observation.getId()), workspaceId, context);
-            if (decision == ConversationRoutingDecision.ADMIT) {
-                admitted.add(observation);
-            }
+            decisions.put(
+                    observation.getId(),
+                    route(observation, autonomyByPracticeId.get(observation.getId()), workspaceId, context));
         }
-        return admitted;
+        return decisions;
     }
 
     public ConversationRoutingDecision route(

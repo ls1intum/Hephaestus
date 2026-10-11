@@ -66,13 +66,17 @@ class InAppCompositionListenerTest extends BaseUnitTest {
     private final InAppCompositionListener listener = new InAppCompositionListener(
             jobs,
             observations,
-            feedback,
             new StaticListableBeanFactory(Map.of(
                             "supportReader",
                             new InAppSupportReader(
-                                    observations, visibility, previous, policy, Clock.fixed(NOW, ZoneOffset.UTC))))
+                                    observations,
+                                    visibility,
+                                    previous,
+                                    policy,
+                                    feedback,
+                                    defaults,
+                                    Clock.fixed(NOW, ZoneOffset.UTC))))
                     .getBeanProvider(InAppSupportReader.class),
-            defaults,
             parser,
             preparer,
             policy,

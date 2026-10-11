@@ -8,18 +8,12 @@ import de.tum.cit.aet.hephaestus.agent.handler.conversation.PracticeFeedbackPrep
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.config.FeedbackLaneExecutor;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ActorRole;
 import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyStage;
 import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicySurface;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.PreviousInAppFeedback;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
-import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
-import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
-import de.tum.cit.aet.hephaestus.practices.review.autonomy.AutonomyResolver;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -52,8 +46,6 @@ public class InAppCompositionListener {
 
     private final AgentJobRepository agentJobRepository;
     private final ObservationRepository observationRepository;
-    private final FeedbackRepository feedbackRepository;
-    private final WorkspaceReviewDefaultsProvider workspaceDefaults;
     private final FeedbackCompositionResultParser resultParser;
     private final InAppFeedbackPreparer preparer;
     private final PracticeFeedbackDeliveryPolicy deliveryPolicy;
@@ -63,17 +55,13 @@ public class InAppCompositionListener {
     public InAppCompositionListener(
             AgentJobRepository agentJobRepository,
             ObservationRepository observationRepository,
-            FeedbackRepository feedbackRepository,
             ObjectProvider<InAppSupportReader> supportReaders,
-            WorkspaceReviewDefaultsProvider workspaceDefaults,
             FeedbackCompositionResultParser resultParser,
             InAppFeedbackPreparer preparer,
             PracticeFeedbackDeliveryPolicy deliveryPolicy,
             Clock clock) {
         this.agentJobRepository = agentJobRepository;
         this.observationRepository = observationRepository;
-        this.feedbackRepository = feedbackRepository;
-        this.workspaceDefaults = workspaceDefaults;
         this.resultParser = resultParser;
         this.preparer = preparer;
         this.deliveryPolicy = deliveryPolicy;
@@ -173,8 +161,6 @@ public class InAppCompositionListener {
             int positionBase) {
         var reader = supportReader;
         if (reader == null) return 0;
-        PracticeAutonomy workspaceDefault =
-                workspaceDefaults.forWorkspace(workspaceId).defaultAutonomy();
         Instant now = clock.instant();
         List<InAppFeedbackPreparer.RoutedMessage> routed = new ArrayList<>(messages.size());
         for (ComposedInAppMessage message : messages) {
@@ -183,15 +169,10 @@ public class InAppCompositionListener {
                     reader.select(workspaceId, recipientUserId, message.practiceSlug(), now);
             Optional<PreviousInAppFeedback.Previous> previous = selection.previous();
             List<Observation> evidence = selection.evidence();
+            InAppSupportReader.RoutingFacts facts =
+                    reader.routingFacts(workspaceId, recipientUserId, message.practiceSlug(), evidence);
             InAppRoutingDecision decision = InAppFeedbackRouter.route(
-                    message,
-                    evidence,
-                    effectiveTier(evidence, workspaceId, workspaceDefault),
-                    subjectRole(evidence),
-                    feedbackRepository
-                            .lastInAppSurfacedAt(workspaceId, recipientUserId, message.practiceSlug())
-                            .orElse(null),
-                    now);
+                    message, evidence, facts.autonomy(), facts.subjectRole(), facts.lastSurfaced(), now);
             if (decision != InAppRoutingDecision.ADMIT) {
                 log.debug(
                         "In-app message withheld: reason={}, practice={}, jobId={}",
@@ -209,32 +190,5 @@ public class InAppCompositionListener {
                             .orElse(null)));
         }
         return preparer.prepare(agentJobId, workspaceId, recipientUserId, List.copyOf(routed), positionBase);
-    }
-
-    // Project autonomy to avoid depending on initialized entity associations.
-    private @Nullable PracticeAutonomy effectiveTier(
-            List<Observation> evidence, Long workspaceId, PracticeAutonomy workspaceDefault) {
-        List<UUID> ids = evidence.stream()
-                .map(Observation::getId)
-                .filter(Objects::nonNull)
-                .toList();
-        if (ids.isEmpty()) {
-            return null;
-        }
-        return observationRepository.findPracticeAutonomyFor(ids, workspaceId).stream()
-                .findFirst()
-                .map(row -> AutonomyResolver.resolvePractice(
-                                row.getPracticeAutonomy(), row.getGroupAutonomy(), workspaceDefault)
-                        .autonomy())
-                .orElse(null);
-    }
-
-    private ActorRole subjectRole(List<Observation> evidence) {
-        return evidence.stream()
-                .map(Observation::getPractice)
-                .filter(Objects::nonNull)
-                .findFirst()
-                .map(Practice::getSubject)
-                .orElse(ActorRole.AUTHOR);
     }
 }

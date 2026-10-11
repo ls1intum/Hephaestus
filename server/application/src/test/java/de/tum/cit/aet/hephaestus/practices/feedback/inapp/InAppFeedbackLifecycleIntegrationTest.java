@@ -158,7 +158,6 @@ class InAppFeedbackLifecycleIntegrationTest extends AbstractPracticeReviewIntegr
         inAppLane = new InAppCompositionListener(
                 agentJobRepository,
                 observationRepository,
-                feedbackRepository,
                 new StaticListableBeanFactory(Map.of(
                                 "supportReader",
                                 new InAppSupportReader(
@@ -166,9 +165,10 @@ class InAppFeedbackLifecycleIntegrationTest extends AbstractPracticeReviewIntegr
                                         visibilityPolicy,
                                         previousInAppFeedback,
                                         openGate,
+                                        feedbackRepository,
+                                        workspaceDefaults,
                                         clock)))
                         .getBeanProvider(InAppSupportReader.class),
-                workspaceDefaults,
                 resultParser,
                 preparer,
                 openGate,

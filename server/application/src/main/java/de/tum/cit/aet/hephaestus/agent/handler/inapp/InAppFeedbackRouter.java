@@ -51,6 +51,19 @@ public final class InAppFeedbackRouter {
         if (!message.isComplete()) {
             return InAppRoutingDecision.INCOMPLETE;
         }
+        return routeEvidence(evidence, autonomy, subjectRole, lastSurfaced, now);
+    }
+
+    /**
+     * What {@link #route} decides from the evidence and the page's context alone. Composition reads it before a
+     * message is written; preparation decides again through {@link #route}.
+     */
+    public static InAppRoutingDecision routeEvidence(
+            List<Observation> evidence,
+            @Nullable PracticeAutonomy autonomy,
+            ActorRole subjectRole,
+            @Nullable Instant lastSurfaced,
+            Instant now) {
         // Checked before anything else about the evidence: a message about a practice whose results cannot
         // be attributed to a named person must not be shown to that person, whatever else is true of it.
         // MERGER attribution is enforced by PracticeCatalogInjector.subjectNameable at admission.
