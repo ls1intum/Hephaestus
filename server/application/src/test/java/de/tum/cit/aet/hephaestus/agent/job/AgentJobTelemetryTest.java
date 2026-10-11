@@ -85,4 +85,38 @@ class AgentJobTelemetryTest {
             }));
         }
     }
+
+    @Test
+    @SuppressWarnings("try") // The scope makes the span current until this block ends.
+    void shouldTagTheExecutionSpanWithOnlyTheClosedPreparationStageAndKind() {
+        var exporter = mock(SpanExporter.class);
+        when(exporter.export(any())).thenReturn(CompletableResultCode.ofSuccess());
+        when(exporter.shutdown()).thenReturn(CompletableResultCode.ofSuccess());
+        try (var provider = SdkTracerProvider.builder()
+                .setSampler(Sampler.alwaysOn())
+                .addSpanProcessor(SimpleSpanProcessor.create(exporter))
+                .build()) {
+            var tracer = new OtelTracer(provider.get("test"), new OtelCurrentTraceContext(), event -> {});
+            var telemetry = new AgentJobTelemetry(new SimpleMeterRegistry(), tracer);
+            var job = new AgentJob();
+            job.prePersist();
+            job.setWorkspace(workspace(42L));
+            job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
+            var failure = PreparationFailure.of(
+                    PreparationFailure.Stage.PROVENANCE,
+                    new IllegalStateException("jdbc:postgresql://db/hephaestus password=secret"));
+            var span = telemetry.startExecution(job);
+            try (var scope = telemetry.executionScope(span)) {
+                telemetry.preparationFailed(job, failure, "FAILED");
+            } finally {
+                span.end();
+            }
+            verify(exporter).export(argThat(spans -> {
+                var attributes = spans.iterator().next().getAttributes();
+                return "provenance".equals(attributes.get(AttributeKey.stringKey("hephaestus.job.preparation.stage")))
+                        && "unknown".equals(attributes.get(AttributeKey.stringKey("hephaestus.job.preparation.kind")))
+                        && !attributes.toString().contains("secret");
+            }));
+        }
+    }
 }

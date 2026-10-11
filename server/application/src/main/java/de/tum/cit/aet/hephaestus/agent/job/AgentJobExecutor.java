@@ -80,6 +80,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -686,6 +687,8 @@ public class AgentJobExecutor {
         Instant startTime = Instant.now();
         String metricOutcome = "unknown";
         boolean sandboxExecutionStarted = false;
+        // The stage belongs to this run, including failures before input preparation begins.
+        var preparationStage = new AtomicReference<>(PreparationFailure.Stage.RUN_SETUP);
         PreparedJobInputs stagedInputs = null;
         try {
             Duration queueDuration = Duration.between(job.getCreatedAt(), job.getStartedAt());
@@ -696,12 +699,13 @@ public class AgentJobExecutor {
                     AgentJobTelemetry.Outcome.STARTED,
                     queueDuration);
 
-            PreparedSandbox preparedSandbox = prepareSandboxSpec(jobId, job, claim.snapshot);
+            PreparedSandbox preparedSandbox = prepareSandboxSpec(jobId, job, claim.snapshot, preparationStage);
             stagedInputs = preparedSandbox.stagedInputs();
             SandboxSpec sandboxSpec = preparedSandbox.spec();
             // Past this boundary provider usage may exist even if execute() throws, so it is persisted
             // for recovery on another process. A lost fence means the job was cancelled or requeued
             // while preparation ran, so its sandbox must not start.
+            preparationStage.set(PreparationFailure.Stage.EXECUTION_FENCE);
             if (!markExecutionStarted(jobId)) {
                 metricOutcome = "OWNERSHIP_LOST";
                 log.info("Skipped sandbox start after execution fence was lost: jobId={}", jobId);
@@ -767,7 +771,12 @@ public class AgentJobExecutor {
                     metricOutcome = "OWNERSHIP_LOST";
                 }
             } catch (Exception persistenceFailure) {
-                metricOutcome = handleExecutionFailure(jobId, job, persistenceFailure, false);
+                metricOutcome = handleExecutionFailure(
+                        jobId,
+                        job,
+                        persistenceFailure,
+                        false,
+                        PreparationFailure.of(PreparationFailure.Stage.PROVENANCE, persistenceFailure));
             }
         } catch (ReviewCoalescedException e) {
             // Recorded like a refusal, through the same fenced terminal write, but it is not one: the evidence was
@@ -786,7 +795,12 @@ public class AgentJobExecutor {
                     metricOutcome = "OWNERSHIP_LOST";
                 }
             } catch (Exception persistenceFailure) {
-                metricOutcome = handleExecutionFailure(jobId, job, persistenceFailure, false);
+                metricOutcome = handleExecutionFailure(
+                        jobId,
+                        job,
+                        persistenceFailure,
+                        false,
+                        PreparationFailure.of(PreparationFailure.Stage.PROVENANCE, persistenceFailure));
             }
         } catch (TerminalPersistenceException e) {
             // Provider work already completed. Leave RUNNING for the zombie sweeper to terminalize
@@ -794,7 +808,12 @@ public class AgentJobExecutor {
             log.error("Terminal job persistence failed after provider completion: jobId={}", jobId, e);
             metricOutcome = "PERSISTENCE_FAILED";
         } catch (Exception e) {
-            metricOutcome = handleExecutionFailure(jobId, job, e, sandboxExecutionStarted);
+            metricOutcome = handleExecutionFailure(
+                    jobId,
+                    job,
+                    e,
+                    sandboxExecutionStarted,
+                    sandboxExecutionStarted ? null : PreparationFailure.of(preparationStage.get(), e));
         } finally {
             // Admission and delivery are done by now, so the attempt's evidence can be retired: deleted
             // once its observations were admitted, kept for the cleanup grace otherwise.
@@ -861,13 +880,16 @@ public class AgentJobExecutor {
     private record PreparedSandbox(SandboxSpec spec, PreparedJobInputs stagedInputs) {}
 
     /** No provider execution happens here, so no LLM cost accrues if this throws. */
-    private PreparedSandbox prepareSandboxSpec(UUID jobId, AgentJob job, ConfigSnapshot snapshot) {
+    private PreparedSandbox prepareSandboxSpec(
+            UUID jobId, AgentJob job, ConfigSnapshot snapshot, AtomicReference<PreparationFailure.Stage> stage) {
+        stage.set(PreparationFailure.Stage.INPUTS);
         JobTypeHandler handler = handlerRegistry.getHandler(job.getJobType());
 
         AgentJob preparedJob = jobRepository.findByIdWithWorkspace(jobId).orElse(job);
         PreparedJobInputs preparedInputs = handler.prepareInputs(preparedJob);
 
         try {
+            stage.set(PreparationFailure.Stage.CREDENTIAL);
             // Sandboxes access providers through the LLM proxy with an attempt-scoped credential.
             Instant workDeadline =
                     Instant.now().plusSeconds(snapshot.timeoutSeconds()).truncatedTo(ChronoUnit.SECONDS);
@@ -876,6 +898,7 @@ public class AgentJobExecutor {
                     job.getWorkspace().getId(),
                     job.getRetryCount(),
                     workDeadline.plus(SandboxLayout.RESULT_UPLOAD_GRACE));
+            stage.set(PreparationFailure.Stage.SPEC);
             PracticeAgentRequest adapterRequest = new PracticeAgentRequest(
                     snapshot.apiProtocol(),
                     snapshot.upstreamModelId(),
@@ -895,6 +918,7 @@ public class AgentJobExecutor {
                     snapshot,
                     workDeadline,
                     job.getRetryCount());
+            stage.set(PreparationFailure.Stage.PROVENANCE);
             persistProvenanceDigests(
                     jobId,
                     agentSpec.promptDigest(),
@@ -1123,15 +1147,37 @@ public class AgentJobExecutor {
     /**
      * @param sandboxExecutionStarted whether provider execution may have started; only then can an
      *     unverifiable usage event be truthful
+     * @param preparation where preparation stopped, when the sandbox never started; the row then records its fixed
+     *     message instead of the failure's own, and the closed stage and kind reach telemetry
      * @return the {@code agent.job.execution.duration} outcome tag
      */
-    private String handleExecutionFailure(UUID jobId, AgentJob job, Exception e, boolean sandboxExecutionStarted) {
+    private String handleExecutionFailure(
+            UUID jobId,
+            AgentJob job,
+            Exception e,
+            boolean sandboxExecutionStarted,
+            @Nullable PreparationFailure preparation) {
+        String outcome = settleExecutionFailure(jobId, job, e, sandboxExecutionStarted, preparation);
+        if (preparation != null) {
+            jobTelemetry.preparationFailed(job, preparation, outcome);
+        }
+        return outcome;
+    }
+
+    private String settleExecutionFailure(
+            UUID jobId,
+            AgentJob job,
+            Exception e,
+            boolean sandboxExecutionStarted,
+            @Nullable PreparationFailure preparation) {
         if (e instanceof InterruptedException) {
             Thread.currentThread().interrupt();
         }
 
-        String errorMessage = truncateErrorMessage(e.getMessage());
-        log.error("Agent job failed: jobId={}, error={}", jobId, errorMessage, e);
+        String errorMessage = preparation == null ? truncateErrorMessage(e.getMessage()) : preparation.message();
+        if (preparation == null) {
+            log.error("Agent job failed: jobId={}, error={}", jobId, errorMessage, e);
+        }
 
         if (workerId != null && isRetryableExecutionFailure(e)) {
             int currentRetryCount = job.getRetryCount();

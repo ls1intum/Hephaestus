@@ -15,6 +15,7 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -105,13 +106,17 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.RecoverableDataAccessException;
@@ -167,6 +172,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private SimpleMeterRegistry meterRegistry;
+    private AgentJobTelemetry jobTelemetry;
 
     private AgentJobExecutor executor;
 
@@ -185,6 +191,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         meterRegistry = new SimpleMeterRegistry();
+        jobTelemetry = spy(new AgentJobTelemetry(meterRegistry, Tracer.NOOP));
 
         executor = new AgentJobExecutor(
                 AGENT_PROPS,
@@ -199,7 +206,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                 objectMapper,
                 meterRegistry,
                 new PracticeReviewRefusalMetrics(meterRegistry),
-                new AgentJobTelemetry(meterRegistry, Tracer.NOOP),
+                jobTelemetry,
                 usageRecorder,
                 llmBudgetService,
                 NO_LIVE_ADMISSION,
@@ -1012,6 +1019,106 @@ class AgentJobExecutorTest extends BaseUnitTest {
             verify(sandboxManager, never()).execute(any());
             verify(usageRecorder, never()).recordUnverifiable(any(), any());
             verify(usageRecorder, never()).record(any(), any());
+            // An untyped failure is not classified from its text, and its text never reaches the row.
+            verify(jobRepository)
+                    .transitionStatus(
+                            eq(jobId),
+                            eq(AgentJobStatus.FAILED),
+                            any(),
+                            eq("The job failed before execution while preparing the review inputs: "
+                                    + "the cause is not classified."),
+                            eq(Set.of(AgentJobStatus.RUNNING)));
+        }
+
+        @ParameterizedTest
+        @CsvSource({
+            "run_setup,true",
+            "credential,true",
+            "spec,true",
+            "provenance,true",
+            "execution_fence,true",
+            "credential,false"
+        })
+        @ExtendWith(OutputCaptureExtension.class)
+        void shouldRecordTheOwnedPreparationFailureWithoutSensitiveText(
+                String stage, boolean ownsTheTerminalWrite, CapturedOutput output) {
+            when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any()))
+                    .thenReturn(Optional.of(job));
+            when(memberAiPolicy.binding(eq(99L), eq(AgentJobType.PULL_REQUEST_REVIEW), any()))
+                    .thenReturn(Optional.of(binding));
+            when(jobRepository.countRunningByWorkspaceIdAndPurposeAndDataHandlingTier(
+                            eq(99L), eq(AgentPurpose.PRACTICE_REVIEW), any()))
+                    .thenReturn(0L);
+            when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+            when(jobRepository.transitionStatus(any(), eq(AgentJobStatus.FAILED), any(), any(), any()))
+                    .thenReturn(ownsTheTerminalWrite ? 1 : 0);
+            JobTypeHandler handler = mock(JobTypeHandler.class);
+            String secret = "jdbc:postgresql://private/db signing-key=/etc/worker.pem token=eyJ.secret";
+            if (!stage.equals("run_setup")) {
+                when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW))
+                        .thenReturn(handler);
+                when(handler.prepareInputs(any())).thenReturn(PreparedJobInputsFixtures.filesOnly(Map.of()));
+            }
+            if (stage.equals("run_setup")) {
+                doThrow(new IllegalStateException(secret))
+                        .when(jobTelemetry)
+                        .transition(any(), eq("agent.job.started"), any(), any(), any());
+            } else if (stage.equals("credential")) {
+                when(workerJwtIssuer.issueForJobUntil(any(), anyLong(), anyInt(), any()))
+                        .thenThrow(new IllegalStateException(secret));
+            } else if (stage.equals("spec")) {
+                when(practiceAgent.buildSandboxSpec(any())).thenThrow(new IllegalStateException(secret));
+            } else {
+                when(practiceAgent.buildSandboxSpec(any())).thenReturn(minimalSpec());
+                if (stage.equals("provenance")) {
+                    when(jobRepository.updateProvenanceDigests(any(), any(), anyInt(), any()))
+                            .thenThrow(new DataIntegrityViolationException(secret));
+                } else {
+                    when(jobRepository.updateProvenanceDigests(any(), any(), anyInt(), any()))
+                            .thenReturn(1);
+                    when(jobRepository.markExecutionStarted(any(), any(), any()))
+                            .thenThrow(new DataIntegrityViolationException(secret));
+                }
+            }
+
+            executor.processJob(jobId);
+
+            verify(sandboxManager, never()).execute(any());
+            verify(handler, never()).deliver(any());
+            if (stage.equals("run_setup")) verify(handler, never()).prepareInputs(any());
+            verify(usageRecorder, never()).recordUnverifiable(any(), any());
+            var message = ArgumentCaptor.forClass(String.class);
+            verify(jobRepository)
+                    .transitionStatus(eq(jobId), eq(AgentJobStatus.FAILED), any(), message.capture(), any());
+            String operation =
+                    switch (stage) {
+                        case "run_setup" -> "initializing review preparation";
+                        case "credential" -> "issuing the run credential";
+                        case "spec" -> "building the sandbox specification";
+                        case "provenance" -> "recording the input provenance";
+                        default -> "marking execution as started";
+                    };
+            String kind = stage.equals("run_setup") || stage.equals("credential") || stage.equals("spec")
+                    ? "the cause is not classified"
+                    : "a database operation failed";
+            assertThat(message.getValue())
+                    .isEqualTo("The job failed before execution while " + operation + ": " + kind + ".");
+            assertThat(output.getAll())
+                    .doesNotContain(secret)
+                    .doesNotContain("worker.pem")
+                    .doesNotContain("eyJ.secret");
+            assertThat(meterRegistry
+                            .get("agent.job.execution.duration")
+                            .tag("status", ownsTheTerminalWrite ? "FAILED" : "OWNERSHIP_LOST")
+                            .timer()
+                            .count())
+                    .isOne();
+            assertThat(meterRegistry
+                            .get("agent.job.total")
+                            .tag("outcome", "failed")
+                            .counter()
+                            .count())
+                    .isEqualTo(ownsTheTerminalWrite ? 1.0 : 0.0);
         }
     }
 

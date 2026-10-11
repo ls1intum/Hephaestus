@@ -139,6 +139,27 @@ final class AgentJobTelemetry {
         Objects.requireNonNull(terminalCounters.get(outcome)).increment();
     }
 
+    /**
+     * A failure before the sandbox started, with what the executor made of it: {@code REQUEUED}, {@code FAILED} or
+     * {@code OWNERSHIP_LOST}. Only the closed stage and kind are recorded, never the failure's own message.
+     */
+    void preparationFailed(AgentJob job, PreparationFailure failure, String result) {
+        log.atWarn()
+                .addKeyValue("event.name", "agent.job.preparation_failed")
+                .addKeyValue(StructuredLogKeys.JOB_ID, job.getId())
+                .addKeyValue(StructuredLogKeys.WORKSPACE_ID, job.getWorkspace().getId())
+                .addKeyValue("job.type", job.getJobType())
+                .addKeyValue("job.preparation.stage", failure.stage().tag())
+                .addKeyValue("job.preparation.kind", failure.kind().tag())
+                .addKeyValue("job.result", result)
+                .log("Agent job preparation failed");
+        Span span = tracer.currentSpan();
+        if (span != null) {
+            span.tag("hephaestus.job.preparation.stage", failure.stage().tag());
+            span.tag("hephaestus.job.preparation.kind", failure.kind().tag());
+        }
+    }
+
     static Duration age(AgentJob job) {
         Instant createdAt = job.getCreatedAt();
         if (createdAt == null) return Duration.ZERO;
