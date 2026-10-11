@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.practices;
 import de.tum.cit.aet.hephaestus.core.AuditExempt;
 import de.tum.cit.aet.hephaestus.core.AuditLedger;
 import de.tum.cit.aet.hephaestus.core.Audited;
+import de.tum.cit.aet.hephaestus.core.security.UserViewContextHolder;
 import de.tum.cit.aet.hephaestus.practices.dto.AutonomyRollupDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.BindPracticeGroupRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeRequestDTO;
@@ -159,7 +160,10 @@ public class PracticeCatalogController {
         // If-None-Match with 304 and these same headers.
         return ResponseEntity.ok()
                 .eTag("W/\"" + guidance.entityTag() + "\"")
-                .cacheControl(CacheControl.noCache().cachePrivate())
+                .cacheControl(
+                        UserViewContextHolder.get() == null
+                                ? CacheControl.noCache().cachePrivate()
+                                : CacheControl.noStore())
                 .body(guidance);
     }
 
