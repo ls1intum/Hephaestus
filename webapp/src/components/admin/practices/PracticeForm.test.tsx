@@ -215,3 +215,26 @@ describe("the visual and the guide of a workspace practice", () => {
 		);
 	});
 });
+
+it("removes a reference figure before saving while preserving the guide's other text", async () => {
+	const onSubmit = vi.fn();
+	await renderPractice(mockPullRequestReviewFields, onSubmit, {
+		guide: {
+			markdown: "Intro.\n\n![A square][square]\n\n[square]: figures/square.svg",
+			figures: {
+				square:
+					'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"><rect width="1" height="1" /></svg>',
+			},
+		},
+	});
+	const user = userEvent.setup();
+	await user.click(screen.getByRole("button", { name: "Remove figure square" }));
+	await user.click(screen.getByRole("button", { name: "Save changes" }));
+	expect(onSubmit).toHaveBeenCalledWith(
+		"review-swift",
+		expect.objectContaining({
+			guide: { markdown: "Intro.\n\n[square]: figures/square.svg", figures: {} },
+		}),
+		null,
+	);
+});

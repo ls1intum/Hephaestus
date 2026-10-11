@@ -24,6 +24,7 @@ import {
 	EmptyTitle,
 } from "@/components/ui/empty";
 import { Spinner } from "@/components/ui/spinner";
+import { refreshPracticeGuidance } from "@/hooks/practice-guidance-cache";
 import { workspaceAdminHead } from "@/lib/page-title";
 import { problemDetailOf, problemStatusOf } from "@/lib/problem-detail";
 
@@ -49,8 +50,11 @@ function PracticeReleaseInbox() {
 	};
 	const accept = useMutation({
 		...acceptPracticeReleaseMutation(),
-		onSuccess: async () => {
-			await refresh();
+		onSuccess: async (updated) => {
+			await Promise.all([
+				refresh(),
+				refreshPracticeGuidance(queryClient, workspaceSlug, updated.slug),
+			]);
 			toast.success("Practice update accepted");
 		},
 		onError: (error) => {

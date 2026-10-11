@@ -1,3 +1,5 @@
+import { fromMarkdown } from "mdast-util-from-markdown";
+
 import type { PracticeGuide, PracticeVisual } from "@/api/types.gen";
 
 import { generateSlug } from "./constants";
@@ -84,34 +86,72 @@ function leadingBreaks(text: string): number {
 	return /^\n*/u.exec(text)?.[0].length ?? 0;
 }
 
-function figureImages(name: string): RegExp {
-	// A figure name holds only lowercase letters, digits and hyphens, so it needs no escaping.
-	return new RegExp(String.raw`!\[([^\]]*)\]\(figures/${name}\.svg(?:\s+"[^"]*")?\)`, "gu");
-}
+type MarkdownNode =
+	| ReturnType<typeof fromMarkdown>
+	| ReturnType<typeof fromMarkdown>["children"][number];
 
-/** The guide's text without any line that shows the figure, so the server never meets a dangling one. */
-export function withoutFigure(markdown: string, name: string): string {
-	const images = figureImages(name);
-	return (
-		markdown
-			.split("\n")
-			// Only the lines that showed the figure change, so a hard break elsewhere keeps its spaces.
-			.flatMap((line) => {
-				const rest = line.replace(images, "");
-				if (rest === line) {
-					return [line];
-				}
-				return rest.trim().length === 0 ? [] : [rest.replaceAll(/ {2,}/gu, " ").trimEnd()];
-			})
-			.join("\n")
-			.replaceAll(/\n{3,}/gu, "\n\n")
-			.replace(/^\n+/u, "")
+function figureImages(markdown: string, name: string) {
+	const nodes: MarkdownNode[] = [];
+	const visit = (node: MarkdownNode): void => {
+		nodes.push(node);
+		if ("children" in node) {
+			for (const child of node.children) {
+				visit(child);
+			}
+		}
+	};
+	visit(fromMarkdown(markdown));
+	const definitions = new Map<string, string>();
+	for (const node of nodes) {
+		if (node.type === "definition" && !definitions.has(node.identifier)) {
+			definitions.set(node.identifier, node.url);
+		}
+	}
+	const path = `figures/${name}.svg`;
+	const images = nodes.filter((node) => node.type === "image" || node.type === "imageReference");
+	return images.filter((node) =>
+		node.type === "image" ? node.url === path : definitions.get(node.identifier) === path,
 	);
 }
 
-/** What the guide's text says the figure shows, from the first line that shows it. */
+/** Removes rendered images of the figure; reference definitions and code examples stay intact. */
+export function withoutFigure(markdown: string, name: string): string {
+	const changedLines = new Set<number>();
+	let remaining = "";
+	let cursor = 0;
+	let lineIndex = 0;
+	for (const image of figureImages(markdown, name)) {
+		const start = image.position?.start.offset;
+		const end = image.position?.end.offset;
+		if (start !== undefined && end !== undefined) {
+			const before = markdown.slice(cursor, start);
+			remaining += before;
+			lineIndex += before.split("\n").length - 1;
+			changedLines.add(lineIndex);
+			cursor = end;
+		}
+	}
+	remaining += markdown.slice(cursor);
+	const lines: string[] = [];
+	let removedLine = false;
+	for (const [index, line] of remaining.split("\n").entries()) {
+		if (changedLines.has(index)) {
+			if (line.trim().length === 0) {
+				removedLine = true;
+				continue;
+			}
+			lines.push(line);
+		} else if (!(removedLine && line.length === 0 && (lines.length === 0 || lines.at(-1) === ""))) {
+			lines.push(line);
+		}
+		removedLine = false;
+	}
+	return lines.join("\n");
+}
+
+/** What the first rendered image says the figure shows, for inline and reference image syntax. */
 export function figureDescription(markdown: string, name: string): string | undefined {
-	const description = figureImages(name).exec(markdown)?.[1]?.trim();
+	const description = figureImages(markdown, name)[0]?.alt?.trim();
 	return description === undefined || description.length === 0 ? undefined : description;
 }
 

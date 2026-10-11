@@ -10,6 +10,8 @@ import {
 import type { CreatePracticeRequest, Practice, UpdatePracticeRequest } from "@/api/types.gen";
 import { problemDetailOf, problemStatusOf } from "@/lib/problem-detail";
 
+import { refreshPracticeGuidance } from "./practice-guidance-cache";
+
 import {
 	patchPractice,
 	practiceCatalogStructureScope,
@@ -74,6 +76,7 @@ export function usePracticeEditor(workspaceSlug: string): PracticeEditor {
 			);
 			void queryClient.invalidateQueries({ queryKey: detailQueryKey });
 			void queryClient.invalidateQueries({ queryKey: listQueryKey });
+			await refreshPracticeGuidance(queryClient, workspaceSlug, updated.slug);
 			toast.success("Practice saved");
 			return updated;
 		},
@@ -87,6 +90,7 @@ export function usePracticeEditor(workspaceSlug: string): PracticeEditor {
 				practices ? upsertPractice(practices, created) : practices,
 			);
 			void queryClient.invalidateQueries({ queryKey: listQueryKey });
+			await refreshPracticeGuidance(queryClient, workspaceSlug, created.slug);
 			toast.success("Practice created");
 			return created;
 		},

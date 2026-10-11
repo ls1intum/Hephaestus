@@ -7,6 +7,7 @@ import {
 	deleteGroupMutation,
 	deletePracticeMutation,
 	getPracticeQueryKey,
+	getPracticeGuidanceQueryKey,
 	listAdoptablePracticesQueryKey,
 	listGroupsQueryKey,
 	listPracticesOptions,
@@ -162,6 +163,12 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 				);
 				for (const practice of deleted) {
 					queryClient.removeQueries({
+						queryKey: getPracticeGuidanceQueryKey({
+							path: { workspaceSlug, practiceSlug: practice.slug },
+						}),
+						exact: true,
+					});
+					queryClient.removeQueries({
 						queryKey: getPracticeQueryKey({
 							path: { workspaceSlug, practiceSlug: practice.slug },
 						}),
@@ -309,6 +316,12 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 			]);
 		},
 		onSuccess: (_data, variables) => {
+			queryClient.removeQueries({
+				queryKey: getPracticeGuidanceQueryKey({
+					path: { workspaceSlug, practiceSlug: variables.path.practiceSlug },
+				}),
+				exact: true,
+			});
 			queryClient.setQueryData<Practice[]>(practicesQueryKey, (practices = []) =>
 				practices.filter((practice) => practice.slug !== variables.path.practiceSlug),
 			);

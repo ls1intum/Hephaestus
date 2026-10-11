@@ -154,3 +154,18 @@ export const WithError: Story = {
 		);
 	},
 };
+
+/** A CommonMark reference image can be removed without rewriting the guide's code example. */
+export const ReferenceFigure: Story = {
+	args: {
+		value: {
+			markdown:
+				"Keep `a  b` unchanged.\n\n![Three changes][order]\n\n[order]: figures/split-order.svg",
+			figures: { "split-order": figureSvg },
+		},
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("img", { name: "Three changes" })).toBeVisible();
+		await expect(canvas.getByRole("button", { name: "Remove figure split-order" })).toBeEnabled();
+	},
+};

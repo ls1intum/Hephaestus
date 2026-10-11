@@ -49,7 +49,7 @@ describe("withoutFigure", () => {
 	it("removes every line that shows the figure and leaves the rest", () => {
 		const markdown = `Intro.\n\n${figureLine("split")}\n\nMiddle ![Two](figures/split.svg "t") text.\n\n![Other](figures/other.svg)`;
 		expect(withoutFigure(markdown, "split")).toBe(
-			"Intro.\n\nMiddle text.\n\n![Other](figures/other.svg)",
+			"Intro.\n\nMiddle  text.\n\n![Other](figures/other.svg)",
 		);
 	});
 
@@ -57,6 +57,33 @@ describe("withoutFigure", () => {
 		expect(withoutFigure("![A](figures/split-order.svg)", "split")).toBe(
 			"![A](figures/split-order.svg)",
 		);
+	});
+	it("removes full, collapsed and shortcut reference images while preserving definitions and code", () => {
+		const markdown =
+			"![One][square]\n\n![square][]\n\n![square]\n\n[square]: figures/split.svg\n\n`![Example][square]`\n\n```md\n![Example](figures/split.svg)\n\n\n```";
+		expect(withoutFigure(markdown, "split")).toBe(
+			"[square]: figures/split.svg\n\n`![Example][square]`\n\n```md\n![Example](figures/split.svg)\n\n\n```",
+		);
+		expect(figureDescription(markdown, "split")).toBe("One");
+	});
+
+	it("preserves another image and a link that share a reference definition", () => {
+		const markdown =
+			"Intro ![Removed][Shared] and [kept link][Shared].\n\n![Other](figures/other.svg)\n\n[shared]: figures/split.svg";
+		expect(withoutFigure(markdown, "split")).toBe(
+			"Intro  and [kept link][Shared].\n\n![Other](figures/other.svg)\n\n[shared]: figures/split.svg",
+		);
+	});
+
+	it("uses the first definition and leaves escaped image examples alone", () => {
+		const markdown =
+			"![Shown][square]\n\n\\![Example][square]\n\n[square]: figures/other.svg\n[square]: figures/split.svg";
+		expect(withoutFigure(markdown, "split")).toBe(markdown);
+	});
+	it("preserves same-line inline-code spaces, hard breaks and indentation", () => {
+		expect(
+			withoutFigure("Before `a  b` ![caption](figures/split.svg)  \n\n    literal  text", "split"),
+		).toBe("Before `a  b`   \n\n    literal  text");
 	});
 });
 
