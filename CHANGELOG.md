@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.91.0
+
+### Minor Changes
+
+- The practice panel opens with why the practice matters. A picture of the idea follows, with what good work looks like as its caption. The tabs **Observations** and **Feedback** come next, and **Observations** starts with **Where you stand**. A practice with a longer guide shows it in a third tab, **Guide**.
+
+  The group panel drops its tabs: its description, **Where you stand** and its practices show in one column. Heph explains a practice in the same words as its panel. Every Hephaestus default practice ships with a picture and a guide, each with its sources.
+
+  Workspace and instance admins can add a **Visual** and a **Guide** to a practice. Each picture is an SVG file of shapes and text. It can take its colors from the light or dark theme, and show a code token in the app's code font.
+
+  Practice guidance refreshes after workspace edits and catalogue adoption. Removing a guide figure also removes its Markdown image references while keeping code examples.
+
+### Patch Changes
+
+- Activity counts are easier to read on small screens while the People table keeps names visible as you scroll.
+- On activity pages, a search that matches no one now says so where you can see it on a narrow screen, instead of off to the side of the people table.
+- In the people table on activity pages, names now wrap to a second line instead of being cut after a few letters on small screens, and the weekly trend column has a visible heading.
+- The Workspace activity timeline no longer counts everyone in the workspace just to fill its team and repository pickers.
+- Practice updates keep decision controls unavailable until the update list refreshes. Accepting and declining each show their own progress.
+- Review diagnostics now distinguish source reviews with no evidence receipt from unfinished or incomplete evidence records using counts. The added diagnostic fields contain no identities or evidence content.
+- Release signing and verification use Cosign 3.1.3, which rejects legacy signature bundles that could bypass the required signer identity and issuer. Operators should update Cosign on deployment hosts to 3.1.3 or later.
+- Feedback previews and rendered notes hide delivery markers correctly when their text uses Windows line endings.
+- Practice pictures and guides are now available when an administrator views a workspace member's practice profile.
+
 ## 0.90.4
 
 ### Patch Changes
