@@ -24,7 +24,7 @@ import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
-import de.tum.cit.aet.hephaestus.agent.job.PrecomputeKindTotal;
+import de.tum.cit.aet.hephaestus.agent.job.PracticeScriptKindTotal;
 import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetService;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
@@ -248,22 +248,22 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @CsvSource(
             delimiter = '|',
             value = {
-                "CHAT|/internal/llm/precompute/chat/chat/completions|/v1/chat/completions|"
+                "CHAT|/internal/llm/practice-script/chat/chat/completions|/v1/chat/completions|"
                         + "{\"usage\":{\"prompt_tokens\":11,\"completion_tokens\":4}}|11|4",
-                "DECISION|/internal/llm/precompute/decision/decisions|/v1/decisions|"
+                "DECISION|/internal/llm/practice-script/decision/decisions|/v1/decisions|"
                         + "{\"answers\":[],\"usage\":{\"input_tokens\":40,\"output_tokens\":3}}|40|3",
-                "EMBEDDING|/internal/llm/precompute/embedding/embeddings|/v1/embeddings|"
+                "EMBEDDING|/internal/llm/practice-script/embedding/embeddings|/v1/embeddings|"
                         + "{\"data\":[],\"usage\":{\"prompt_tokens\":12,\"total_tokens\":12}}|12|0",
-                "RERANKING|/internal/llm/precompute/reranking/rerank|/v1/rerank|{\"results\":[]}|0|0"
+                "RERANKING|/internal/llm/practice-script/reranking/rerank|/v1/rerank|{\"results\":[]}|0|0"
             })
-    void shouldForwardEachPrecomputeOpWithTheCatalogModelWhenThePrecomputeTokenCallsIt(
+    void shouldForwardEachPracticeScriptOpWithTheCatalogModelWhenThePracticeScriptTokenCallsIt(
             ModelKind slot, String path, String upstreamPath, String reply, long input, long output) throws Exception {
         try (MockWebServer upstream = new MockWebServer()) {
             upstream.start();
             upstream.enqueue(json(reply));
-            AgentJob job = precomputeJob(upstream.url("/v1").toString());
+            AgentJob job = practiceScriptJob(upstream.url("/v1").toString());
 
-            ProxyResult result = callPrecompute(job, path, "{\"model\":\"runner-controlled\",\"input\":[\"a\"]}");
+            ProxyResult result = callPracticeScript(job, path, "{\"model\":\"runner-controlled\",\"input\":[\"a\"]}");
 
             assertThat(result.status()).isEqualTo(200);
             RecordedRequest sent = Objects.requireNonNull(upstream.takeRequest(5, TimeUnit.SECONDS));
@@ -274,11 +274,11 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
                             .path("model")
                             .asString())
                     .isEqualTo(slot.name().toLowerCase(Locale.ROOT) + "-upstream");
-            assertThat(precomputeRows(job, 0)).containsExactly(new UsageRow(slot, PRACTICE, 1, input, output));
+            assertThat(practiceScriptRows(job, 0)).containsExactly(new UsageRow(slot, PRACTICE, 1, input, output));
             // The row keeps the tier of the model that served it, so the review can show it for a run that did not
             // finish.
             assertThat(jdbc.queryForObject(
-                            "SELECT data_handling_tier FROM agent_job_precompute_usage WHERE job_id = ?",
+                            "SELECT data_handling_tier FROM agent_job_practice_script_usage WHERE job_id = ?",
                             String.class,
                             job.getId()))
                     .isEqualTo(slot == ModelKind.CHAT ? "UNDECLARED" : "CLOUD");
@@ -290,21 +290,21 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
     }
 
     @Test
-    void shouldRefuseWithPaymentRequiredWhenTheAttemptsPrecomputeTokensReachTheCap() throws Exception {
+    void shouldRefuseWithPaymentRequiredWhenTheAttemptsPracticeScriptTokensReachTheCap() throws Exception {
         try (MockWebServer upstream = new MockWebServer()) {
             upstream.start();
             upstream.enqueue(json("{\"data\":[],\"usage\":{\"prompt_tokens\":120}}"));
-            AgentJob job = precomputeJob(upstream.url("/v1").toString());
+            AgentJob job = practiceScriptJob(upstream.url("/v1").toString());
             LlmProxyService capped = proxyService(100);
 
-            ProxyResult first =
-                    callPrecompute(capped, job, "/internal/llm/precompute/embedding/embeddings", PRACTICE, "{}");
+            ProxyResult first = callPracticeScript(
+                    capped, job, "/internal/llm/practice-script/embedding/embeddings", PRACTICE, "{}");
             ProxyResult second =
-                    callPrecompute(capped, job, "/internal/llm/precompute/decision/decisions", PRACTICE, "{}");
+                    callPracticeScript(capped, job, "/internal/llm/practice-script/decision/decisions", PRACTICE, "{}");
 
             assertThat(first.status()).isEqualTo(200);
             assertThat(second.status()).isEqualTo(402);
-            assertThat(second.body()).isEqualTo("Precompute budget spent");
+            assertThat(second.body()).isEqualTo("Practice script budget spent");
             assertThat(upstream.getRequestCount()).isEqualTo(1);
         }
     }
@@ -317,80 +317,82 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
             for (int call = 0; call < 3; call++) {
                 upstream.enqueue(json("{\"data\":[],\"usage\":{\"prompt_tokens\":60}}"));
             }
-            AgentJob job = precomputeJob(upstream.url("/v1").toString());
+            AgentJob job = practiceScriptJob(upstream.url("/v1").toString());
             LlmProxyService capped = proxyService(100);
-            String path = "/internal/llm/precompute/embedding/embeddings";
+            String path = "/internal/llm/practice-script/embedding/embeddings";
 
-            ProxyResult first = callPrecompute(capped, job, path, PRACTICE, "{}");
-            ProxyResult second = callPrecompute(capped, job, path, "test-coverage", "{}");
-            ProxyResult third = callPrecompute(capped, job, path, "test-coverage", "{}");
+            ProxyResult first = callPracticeScript(capped, job, path, PRACTICE, "{}");
+            ProxyResult second = callPracticeScript(capped, job, path, "test-coverage", "{}");
+            ProxyResult third = callPracticeScript(capped, job, path, "test-coverage", "{}");
 
             assertThat(first.status()).isEqualTo(200);
             assertThat(second.status()).isEqualTo(200);
             assertThat(third.status()).isEqualTo(402);
-            assertThat(precomputeRows(job, 0))
+            assertThat(practiceScriptRows(job, 0))
                     .containsExactlyInAnyOrder(
                             new UsageRow(ModelKind.EMBEDDING, PRACTICE, 1, 60, 0),
                             new UsageRow(ModelKind.EMBEDDING, "test-coverage", 1, 60, 0));
-            assertThat(jobRepository.sumPrecomputeUsageByKind(workspace.getId(), job.getId(), 0))
-                    .containsExactly(new PrecomputeKindTotal(ModelKind.EMBEDDING, 2, 120, 0));
+            assertThat(jobRepository.sumPracticeScriptUsageByKind(workspace.getId(), job.getId(), 0))
+                    .containsExactly(new PracticeScriptKindTotal(ModelKind.EMBEDDING, 2, 120, 0));
         }
     }
 
     /** The attempt in the key is the fence: a late call of an earlier attempt adds to no row. */
     @Test
-    void shouldKeepEachAttemptsPrecomputeRowApartWhenTheJobIsRequeued() {
-        AgentJob job = precomputeJob("https://models.example.com/v1");
+    void shouldKeepEachAttemptsPracticeScriptRowApartWhenTheJobIsRequeued() {
+        AgentJob job = practiceScriptJob("https://models.example.com/v1");
         ProxyUsageAccumulator accumulator = accumulator();
-        var attemptZero = billed(job, 0, LlmUsageSourceType.PRECOMPUTE_DECISION);
-        var decision = new PrecomputeCall(ModelKind.DECISION, null, PRACTICE);
-        accumulator.accumulatePrecompute(attemptZero, decision, new ProxyTokenUsage(10, 2, 0, 0, 0));
-        accumulator.accumulatePrecompute(attemptZero, decision, new ProxyTokenUsage(5, 1, 0, 0, 0));
+        var attemptZero = billed(job, 0, LlmUsageSourceType.PRACTICE_SCRIPT_DECISION);
+        var decision = new PracticeScriptCall(ModelKind.DECISION, null, PRACTICE);
+        accumulator.accumulatePracticeScript(attemptZero, decision, new ProxyTokenUsage(10, 2, 0, 0, 0));
+        accumulator.accumulatePracticeScript(attemptZero, decision, new ProxyTokenUsage(5, 1, 0, 0, 0));
 
         job.setRetryCount(1);
         job = jobRepository.saveAndFlush(job);
-        accumulator.accumulatePrecompute(attemptZero, decision, new ProxyTokenUsage(1000, 0, 0, 0, 0));
-        accumulator.accumulatePrecompute(
-                billed(job, 1, LlmUsageSourceType.PRECOMPUTE_DECISION), decision, new ProxyTokenUsage(7, 0, 0, 0, 0));
+        accumulator.accumulatePracticeScript(attemptZero, decision, new ProxyTokenUsage(1000, 0, 0, 0, 0));
+        accumulator.accumulatePracticeScript(
+                billed(job, 1, LlmUsageSourceType.PRACTICE_SCRIPT_DECISION),
+                decision,
+                new ProxyTokenUsage(7, 0, 0, 0, 0));
 
-        assertThat(precomputeRows(job, 0)).containsExactly(new UsageRow(ModelKind.DECISION, PRACTICE, 2, 15, 3));
-        assertThat(precomputeRows(job, 1)).containsExactly(new UsageRow(ModelKind.DECISION, PRACTICE, 1, 7, 0));
+        assertThat(practiceScriptRows(job, 0)).containsExactly(new UsageRow(ModelKind.DECISION, PRACTICE, 2, 15, 3));
+        assertThat(practiceScriptRows(job, 1)).containsExactly(new UsageRow(ModelKind.DECISION, PRACTICE, 1, 7, 0));
     }
 
     @Test
-    void shouldDropAPrecomputeCallWhenItReturnsAfterTheJobEnded() {
-        AgentJob job = precomputeJob("https://models.example.com/v1");
+    void shouldDropAPracticeScriptCallWhenItReturnsAfterTheJobEnded() {
+        AgentJob job = practiceScriptJob("https://models.example.com/v1");
         job.setStatus(AgentJobStatus.COMPLETED);
         job = jobRepository.saveAndFlush(job);
 
         accumulator()
-                .accumulatePrecompute(
-                        billed(job, 0, LlmUsageSourceType.PRECOMPUTE_EMBEDDING),
-                        new PrecomputeCall(ModelKind.EMBEDDING, null, PRACTICE),
+                .accumulatePracticeScript(
+                        billed(job, 0, LlmUsageSourceType.PRACTICE_SCRIPT_EMBEDDING),
+                        new PracticeScriptCall(ModelKind.EMBEDDING, null, PRACTICE),
                         new ProxyTokenUsage(9, 0, 0, 0, 0));
 
-        assertThat(precomputeRows(job, 0)).isEmpty();
+        assertThat(practiceScriptRows(job, 0)).isEmpty();
     }
 
-    private ProxyResult callPrecompute(AgentJob job, String path, String body) throws Exception {
-        return callPrecompute(proxyService(200_000), job, path, PRACTICE, body);
+    private ProxyResult callPracticeScript(AgentJob job, String path, String body) throws Exception {
+        return callPracticeScript(proxyService(200_000), job, path, PRACTICE, body);
     }
 
     /** @param practice the practice that the runner names in its header */
-    private ProxyResult callPrecompute(LlmProxyService service, AgentJob job, String path, String practice, String body)
-            throws Exception {
+    private ProxyResult callPracticeScript(
+            LlmProxyService service, AgentJob job, String path, String practice, String body) throws Exception {
         MockHttpServletRequest request = new MockHttpServletRequest("POST", path);
         request.setRemoteAddr("127.0.0.1");
-        request.addHeader("Authorization", "Bearer " + precomputeTokenFor(job));
+        request.addHeader("Authorization", "Bearer " + practiceScriptTokenFor(job));
         HttpHeaders headers = new HttpHeaders();
-        headers.set(JobTokenAuthenticationFilter.PRECOMPUTE_PRACTICE_HEADER, practice);
+        headers.set(JobTokenAuthenticationFilter.PRACTICE_SCRIPT_PRACTICE_HEADER, practice);
         MockHttpServletResponse response = new MockHttpServletResponse();
         AtomicReference<@Nullable ResponseEntity<?>> served = new AtomicReference<>();
         filter.doFilter(
                 request,
                 response,
-                (filteredRequest, filteredResponse) -> served.set(
-                        service.proxyPrecompute(request, response, headers, body.getBytes(StandardCharsets.UTF_8))));
+                (filteredRequest, filteredResponse) -> served.set(service.proxyPracticeScript(
+                        request, response, headers, body.getBytes(StandardCharsets.UTF_8))));
         ResponseEntity<?> result = served.get();
         if (result == null) return new ProxyResult(response.getStatus(), null);
         Object payload = result.getBody();
@@ -433,9 +435,9 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
             }
 
             @Override
-            public void accumulatePrecompute(
-                    ProxyRouting.BilledAttempt attempt, PrecomputeCall call, @Nullable ProxyTokenUsage usage) {
-                transactionTemplate.executeWithoutResult(tx -> super.accumulatePrecompute(attempt, call, usage));
+            public void accumulatePracticeScript(
+                    ProxyRouting.BilledAttempt attempt, PracticeScriptCall call, @Nullable ProxyTokenUsage usage) {
+                transactionTemplate.executeWithoutResult(tx -> super.accumulatePracticeScript(attempt, call, usage));
             }
         };
     }
@@ -444,10 +446,10 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         return new ProxyRouting.BilledAttempt(sourceType, job.getId(), attempt, BigDecimal.ZERO, "worker-1");
     }
 
-    private List<UsageRow> precomputeRows(AgentJob job, int attempt) {
+    private List<UsageRow> practiceScriptRows(AgentJob job, int attempt) {
         return jdbc.query(
                 "SELECT model_kind, practice_slug, calls, input_tokens, output_tokens "
-                        + "FROM agent_job_precompute_usage WHERE job_id = ? AND attempt = ?",
+                        + "FROM agent_job_practice_script_usage WHERE job_id = ? AND attempt = ?",
                 (row, index) -> new UsageRow(
                         ModelKind.valueOf(row.getString("model_kind")),
                         row.getString("practice_slug"),
@@ -468,17 +470,17 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 .build();
     }
 
-    private String precomputeTokenFor(AgentJob job) {
+    private String practiceScriptTokenFor(AgentJob job) {
         return jwtIssuer.issueForJobUntil(
                 job.getId(),
                 workspace.getId(),
                 job.getRetryCount(),
                 Instant.now().plus(Duration.ofMinutes(5)),
-                WorkerJwtIssuer.LLM_PRECOMPUTE_SCOPE);
+                WorkerJwtIssuer.LLM_PRACTICE_SCRIPT_SCOPE);
     }
 
     /** A running review whose four slots each point at their own catalog model behind {@code baseUrl}. */
-    private AgentJob precomputeJob(String baseUrl) {
+    private AgentJob practiceScriptJob(String baseUrl) {
         Map<ModelKind, CatalogModel> catalog = new EnumMap<>(ModelKind.class);
         for (ModelKind kind : ModelKind.values()) {
             LlmApiProtocol protocol =
@@ -537,7 +539,7 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
                         price,
                         DataHandlingTier.UNDECLARED,
                         null)
-                .withPrecompute(slots);
+                .withPracticeScript(slots);
 
         AgentJob job = new AgentJob();
         job.setWorkspace(workspace);

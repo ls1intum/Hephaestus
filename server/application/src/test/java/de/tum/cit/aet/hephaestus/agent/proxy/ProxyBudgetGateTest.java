@@ -217,17 +217,22 @@ class ProxyBudgetGateTest extends BaseUnitTest {
         }
     }
 
-    /** The routing carries the attempt's tokens on every precompute model and practice together. */
+    /** The routing carries the attempt's tokens on every model for practice scripts and practice together. */
     @Nested
-    class PrecomputeCap {
+    class PracticeScriptCap {
 
         @ParameterizedTest
         @CsvSource({"199999, false", "200000, true"})
-        void shouldRefuseWhenTheAttemptsPrecomputeTokensReachTheCap(long tokens, boolean reached) {
+        void shouldRefuseWhenTheAttemptsPracticeScriptTokensReachTheCap(long tokens, boolean reached) {
             var attempt = new ProxyRouting.BilledAttempt(
-                    LlmUsageSourceType.PRECOMPUTE_EMBEDDING, UUID.randomUUID(), 0, BigDecimal.ZERO, "worker", tokens);
+                    LlmUsageSourceType.PRACTICE_SCRIPT_EMBEDDING,
+                    UUID.randomUUID(),
+                    0,
+                    BigDecimal.ZERO,
+                    "worker",
+                    tokens);
 
-            assertThat(gate.isPrecomputeCapReached(attempt)).isEqualTo(reached);
+            assertThat(gate.isPracticeScriptCapReached(attempt)).isEqualTo(reached);
         }
     }
 }

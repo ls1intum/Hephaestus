@@ -14,10 +14,10 @@ import org.jspecify.annotations.Nullable;
  *
  * @param principalDescription log/metrics-safe identifier of the caller — never the token
  * @param attempt {@code null} only for a mentor session between turns
- * @param precomputeSlot the precompute model this credential calls; {@code null} for the review's own
+ * @param practiceScriptSlot the model for practice scripts this credential calls; {@code null} for the review's own
  *     calls and for every other gateway capability
- * @param precomputeTier the data handling tier of that model, as the attempt froze it; {@code null} without a
- *     precompute slot or when the attempt froze no tier for that model
+ * @param practiceScriptTier the data handling tier of that model, as the attempt froze it; {@code null} without a
+ *     practice script slot or when the attempt froze no tier for that model
  */
 public record ProxyRouting(
         String principalDescription,
@@ -28,8 +28,8 @@ public record ProxyRouting(
         @Nullable Long modelId,
         @Nullable Long workspaceId,
         @Nullable BilledAttempt attempt,
-        @Nullable ModelKind precomputeSlot,
-        @Nullable DataHandlingTier precomputeTier) {
+        @Nullable ModelKind practiceScriptSlot,
+        @Nullable DataHandlingTier practiceScriptTier) {
     /**
      * The one execution this credential bills to, with identity and spend read in the same instant so
      * a caller cannot pair one execution's identity with another's spend.
@@ -41,7 +41,7 @@ public record ProxyRouting(
      *     be dropped rather than billed to whoever owns the row now.
      * @param workerId worker owning the authenticated job attempt; null for mentor turns
      * @param spentUsd priced with the rates frozen onto the execution at admission
-     * @param precomputeTokens the tokens that the attempt's precompute calls used on every model, read with
+     * @param practiceScriptTokens the tokens that the attempt's practice script calls used on every model, read with
      *     {@code spentUsd}; 0 for every other call
      */
     public record BilledAttempt(
@@ -50,9 +50,9 @@ public record ProxyRouting(
             int number,
             BigDecimal spentUsd,
             @Nullable String workerId,
-            long precomputeTokens) {
+            long practiceScriptTokens) {
 
-        /** An attempt that makes no precompute calls. */
+        /** An attempt that makes no practice script calls. */
         public BilledAttempt(
                 LlmUsageSourceType sourceType,
                 UUID sourceId,

@@ -9,7 +9,7 @@ import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
-import de.tum.cit.aet.hephaestus.agent.job.PrecomputeCallUsage;
+import de.tum.cit.aet.hephaestus.agent.job.PracticeScriptCallUsage;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ActorRole;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
@@ -40,7 +40,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * The precompute spend of a month, split by practice. Every money figure below is written out by hand, so
+ * The practice script spend of a month, split by practice. Every money figure below is written out by hand, so
  * a wrong weight, a lost remainder, or a row from the wrong month, workspace, or ledger source shows as a
  * changed number rather than as a total that still happens to add up.
  */
@@ -107,7 +107,7 @@ class LlmUsageByPracticeIntegrationTest extends AbstractWorkspaceIntegrationTest
      */
     @Test
     @WithAdminUser
-    void shouldSplitThePrecomputeLedgerByPracticeAndAddUpToItWhenTheMonthMixesEveryCase() {
+    void shouldSplitThePracticeScriptLedgerByPracticeAndAddUpToItWhenTheMonthMixesEveryCase() {
         Workspace workspace = workspace("usage-by-practice");
         Workspace other = workspace("usage-by-practice-other");
         practice(workspace, COMMENTS, "Comment quality");
@@ -123,19 +123,27 @@ class LlmUsageByPracticeIntegrationTest extends AbstractWorkspaceIntegrationTest
         calls(review, "CHAT", COMMENTS, 70, 20, 1);
         // Only the job's own workspace writes its usage rows, so a row of another workspace is never read.
         jdbc.update(
-                "INSERT INTO agent_job_precompute_usage "
+                "INSERT INTO agent_job_practice_script_usage "
                         + "(job_id, attempt, model_kind, practice_slug, workspace_id, calls, input_tokens, output_tokens) "
                         + "VALUES (?, 0, 'DECISION', 'intruder', ?, 1, 1000000, 0)",
                 review.getId(),
                 other.getId());
         ledger(workspace, review, 0, LlmUsageSourceType.AGENT_JOB, INSTANCE_DECISION, 9_000, 1_000, 4, MONTH);
-        ledger(workspace, review, 0, LlmUsageSourceType.PRECOMPUTE_DECISION, INSTANCE_DECISION, 400_000, 100_000, 3);
-        ledger(workspace, review, 0, LlmUsageSourceType.PRECOMPUTE_EMBEDDING, NO_CHARGE, 5_000, 0, 1);
         ledger(
                 workspace,
                 review,
                 0,
-                LlmUsageSourceType.PRECOMPUTE_RERANKING,
+                LlmUsageSourceType.PRACTICE_SCRIPT_DECISION,
+                INSTANCE_DECISION,
+                400_000,
+                100_000,
+                3);
+        ledger(workspace, review, 0, LlmUsageSourceType.PRACTICE_SCRIPT_EMBEDDING, NO_CHARGE, 5_000, 0, 1);
+        ledger(
+                workspace,
+                review,
+                0,
+                LlmUsageSourceType.PRACTICE_SCRIPT_RERANKING,
                 LlmPriceSnapshot.unpricedInstance(),
                 0,
                 0,
@@ -144,15 +152,15 @@ class LlmUsageByPracticeIntegrationTest extends AbstractWorkspaceIntegrationTest
         calls(review, "DECISION", COMMENTS, 1, 0, 1);
         calls(review, "DECISION", TESTS, 2, 0, 1);
         ledger(workspace, review, 1, LlmUsageSourceType.AGENT_JOB, INSTANCE_DECISION, 9_000, 1_000, 4, MONTH);
-        ledger(workspace, review, 1, LlmUsageSourceType.PRECOMPUTE_DECISION, OWN_DECISION, 3, 0, 2);
+        ledger(workspace, review, 1, LlmUsageSourceType.PRACTICE_SCRIPT_DECISION, OWN_DECISION, 3, 0, 2);
 
         AgentJob retired = runningJob(workspace);
         calls(retired, "DECISION", RETIRED, 10_000, 0, 1);
-        ledger(workspace, retired, 0, LlmUsageSourceType.PRECOMPUTE_DECISION, INSTANCE_DECISION, 10_000, 0, 1);
+        ledger(workspace, retired, 0, LlmUsageSourceType.PRACTICE_SCRIPT_DECISION, INSTANCE_DECISION, 10_000, 0, 1);
 
         AgentJob deleted = runningJob(workspace);
         calls(deleted, "DECISION", COMMENTS, 20_000, 0, 1);
-        ledger(workspace, deleted, 0, LlmUsageSourceType.PRECOMPUTE_DECISION, INSTANCE_DECISION, 20_000, 0, 1);
+        ledger(workspace, deleted, 0, LlmUsageSourceType.PRACTICE_SCRIPT_DECISION, INSTANCE_DECISION, 20_000, 0, 1);
         jdbc.update("DELETE FROM agent_job WHERE id = ?", deleted.getId());
 
         AgentJob lastMonth = runningJob(workspace);
@@ -161,7 +169,7 @@ class LlmUsageByPracticeIntegrationTest extends AbstractWorkspaceIntegrationTest
                 workspace,
                 lastMonth,
                 0,
-                LlmUsageSourceType.PRECOMPUTE_DECISION,
+                LlmUsageSourceType.PRACTICE_SCRIPT_DECISION,
                 INSTANCE_DECISION,
                 500_000,
                 0,
@@ -170,7 +178,7 @@ class LlmUsageByPracticeIntegrationTest extends AbstractWorkspaceIntegrationTest
 
         AgentJob elsewhere = runningJob(other);
         calls(elsewhere, "DECISION", COMMENTS, 700_000, 0, 1);
-        ledger(other, elsewhere, 0, LlmUsageSourceType.PRECOMPUTE_DECISION, INSTANCE_DECISION, 700_000, 0, 1);
+        ledger(other, elsewhere, 0, LlmUsageSourceType.PRACTICE_SCRIPT_DECISION, INSTANCE_DECISION, 700_000, 0, 1);
 
         WorkspaceLlmUsageReportDTO report = report(workspace);
 
@@ -208,7 +216,7 @@ class LlmUsageByPracticeIntegrationTest extends AbstractWorkspaceIntegrationTest
                 List.of(AgentPurpose.PRACTICE_DECISION),
                 new Usage(1, 1, 20_000, 0, "0.040000", "0", 0));
 
-        LlmUsagePrecomputeTotalDTO total = report.precomputeTotal();
+        LlmUsagePracticeScriptTotalDTO total = report.practiceScriptTotal();
         assertThat(total.reviews()).isEqualTo(3);
         assertThat(total.calls()).isEqualTo(11);
         assertThat(total.inputTokens()).isEqualTo(435_003);
@@ -247,7 +255,7 @@ class LlmUsageByPracticeIntegrationTest extends AbstractWorkspaceIntegrationTest
                 .findFirst()
                 .orElseThrow();
         assertThat(reviews.events())
-                .as("two attempts ran; precompute rows are not runs")
+                .as("two attempts ran; practice script rows are not runs")
                 .isEqualTo(2);
         assertThat(reviews.totalCalls()).as("calls still count every row").isEqualTo(19);
         assertThat(report.byDay())
@@ -268,7 +276,7 @@ class LlmUsageByPracticeIntegrationTest extends AbstractWorkspaceIntegrationTest
         for (String slug : List.of("gamma", "alpha", "beta")) {
             calls(review, "DECISION", slug, 1, 0, 1);
         }
-        ledger(workspace, review, 0, LlmUsageSourceType.PRECOMPUTE_DECISION, OWN_DECISION, 3, 0, 3);
+        ledger(workspace, review, 0, LlmUsageSourceType.PRACTICE_SCRIPT_DECISION, OWN_DECISION, 3, 0, 3);
 
         WorkspaceLlmUsageReportDTO report = report(workspace);
 
@@ -279,7 +287,7 @@ class LlmUsageByPracticeIntegrationTest extends AbstractWorkspaceIntegrationTest
                                 .stripTrailingZeros()
                                 .toPlainString())
                 .containsExactly(tuple("alpha", "0.000004"), tuple("beta", "0.000003"), tuple("gamma", "0.000003"));
-        assertThat(report.precomputeTotal().ownProviderTotalCostUsd()).isEqualByComparingTo("0.00001");
+        assertThat(report.practiceScriptTotal().ownProviderTotalCostUsd()).isEqualByComparingTo("0.00001");
     }
 
     /** A month holds the rows from its first instant up to, not including, the first instant of the next. */
@@ -305,7 +313,7 @@ class LlmUsageByPracticeIntegrationTest extends AbstractWorkspaceIntegrationTest
                     workspace,
                     review,
                     0,
-                    LlmUsageSourceType.PRECOMPUTE_DECISION,
+                    LlmUsageSourceType.PRACTICE_SCRIPT_DECISION,
                     INSTANCE_DECISION,
                     input,
                     0,
@@ -319,24 +327,24 @@ class LlmUsageByPracticeIntegrationTest extends AbstractWorkspaceIntegrationTest
             assertThat(practice.inputTokens()).isEqualTo(1_001_000);
             assertThat(practice.instanceTotalCostUsd()).isEqualByComparingTo("2.002");
         });
-        assertThat(report.precomputeTotal().inputTokens()).isEqualTo(1_001_000);
-        assertThat(report.precomputeTotal().reviews()).isEqualTo(2);
+        assertThat(report.practiceScriptTotal().inputTokens()).isEqualTo(1_001_000);
+        assertThat(report.practiceScriptTotal().reviews()).isEqualTo(2);
     }
 
-    /** One review is one review, however many precompute rows it has; one unpriced row drops it whole. */
+    /** One review is one review, however many practice script rows it has; one unpriced row drops it whole. */
     @Test
-    void shouldCountAReviewOnceWhenItsPrecomputeRowsCarryItsJobId() {
+    void shouldCountAReviewOnceWhenItsPracticeScriptRowsCarryItsJobId() {
         Workspace workspace = workspace("usage-by-practice-mean");
         AgentJob priced = runningJob(workspace);
         AgentJob partlyUnpriced = runningJob(workspace);
         ledger(workspace, priced, 0, LlmUsageSourceType.AGENT_JOB, INSTANCE_DECISION, 500_000, 0, 1, MONTH);
-        ledger(workspace, priced, 0, LlmUsageSourceType.PRECOMPUTE_DECISION, INSTANCE_DECISION, 500_000, 0, 1);
+        ledger(workspace, priced, 0, LlmUsageSourceType.PRACTICE_SCRIPT_DECISION, INSTANCE_DECISION, 500_000, 0, 1);
         ledger(workspace, partlyUnpriced, 0, LlmUsageSourceType.AGENT_JOB, INSTANCE_DECISION, 500_000, 0, 1, MONTH);
         ledger(
                 workspace,
                 partlyUnpriced,
                 0,
-                LlmUsageSourceType.PRECOMPUTE_RERANKING,
+                LlmUsageSourceType.PRACTICE_SCRIPT_RERANKING,
                 LlmPriceSnapshot.unpricedInstance(),
                 0,
                 0,
@@ -369,22 +377,30 @@ class LlmUsageByPracticeIntegrationTest extends AbstractWorkspaceIntegrationTest
         calls(everyRowUnpriced, "DECISION", TESTS, 1_000, 0, 1);
         calls(everyRowUnpriced, "RERANKING", COMMENTS, 0, 0, 1);
         ledger(workspace, everyRowUnpriced, 0, LlmUsageSourceType.AGENT_JOB, unpriced, 9_000, 1_000, 4);
-        ledger(workspace, everyRowUnpriced, 0, LlmUsageSourceType.PRECOMPUTE_DECISION, unpriced, 2_000, 0, 2);
-        ledger(workspace, everyRowUnpriced, 0, LlmUsageSourceType.PRECOMPUTE_RERANKING, unpriced, 0, 0, 1);
+        ledger(workspace, everyRowUnpriced, 0, LlmUsageSourceType.PRACTICE_SCRIPT_DECISION, unpriced, 2_000, 0, 2);
+        ledger(workspace, everyRowUnpriced, 0, LlmUsageSourceType.PRACTICE_SCRIPT_RERANKING, unpriced, 0, 0, 1);
         retry(everyRowUnpriced);
         calls(everyRowUnpriced, "DECISION", COMMENTS, 1_000, 0, 1);
         ledger(workspace, everyRowUnpriced, 1, LlmUsageSourceType.AGENT_JOB, INSTANCE_DECISION, 9_000, 1_000, 4);
-        ledger(workspace, everyRowUnpriced, 1, LlmUsageSourceType.PRECOMPUTE_DECISION, unpriced, 1_000, 0, 1);
+        ledger(workspace, everyRowUnpriced, 1, LlmUsageSourceType.PRACTICE_SCRIPT_DECISION, unpriced, 1_000, 0, 1);
 
-        AgentJob onlyPrecomputeUnpriced = runningJob(workspace);
-        calls(onlyPrecomputeUnpriced, "DECISION", COMMENTS, 1_000, 0, 1);
-        ledger(workspace, onlyPrecomputeUnpriced, 0, LlmUsageSourceType.AGENT_JOB, INSTANCE_DECISION, 9_000, 0, 1);
-        ledger(workspace, onlyPrecomputeUnpriced, 0, LlmUsageSourceType.PRECOMPUTE_DECISION, unpriced, 1_000, 0, 1);
+        AgentJob onlyPracticeScriptUnpriced = runningJob(workspace);
+        calls(onlyPracticeScriptUnpriced, "DECISION", COMMENTS, 1_000, 0, 1);
+        ledger(workspace, onlyPracticeScriptUnpriced, 0, LlmUsageSourceType.AGENT_JOB, INSTANCE_DECISION, 9_000, 0, 1);
+        ledger(
+                workspace,
+                onlyPracticeScriptUnpriced,
+                0,
+                LlmUsageSourceType.PRACTICE_SCRIPT_DECISION,
+                unpriced,
+                1_000,
+                0,
+                1);
 
         AgentJob priced = runningJob(workspace);
         calls(priced, "DECISION", TESTS, 1_000, 0, 1);
         ledger(workspace, priced, 0, LlmUsageSourceType.AGENT_JOB, INSTANCE_DECISION, 9_000, 0, 1);
-        ledger(workspace, priced, 0, LlmUsageSourceType.PRECOMPUTE_DECISION, INSTANCE_DECISION, 1_000, 0, 1);
+        ledger(workspace, priced, 0, LlmUsageSourceType.PRACTICE_SCRIPT_DECISION, INSTANCE_DECISION, 1_000, 0, 1);
 
         WorkspaceLlmUsageReportDTO report = report(workspace);
 
@@ -401,7 +417,7 @@ class LlmUsageByPracticeIntegrationTest extends AbstractWorkspaceIntegrationTest
         assertThat(report.byPractice())
                 .extracting(LlmUsageByPracticeDTO::practiceSlug, LlmUsageByPracticeDTO::unpricedEventCount)
                 .containsExactlyInAnyOrder(tuple(COMMENTS, 2L), tuple(TESTS, 1L));
-        assertThat(report.precomputeTotal().unpricedEventCount()).isEqualTo(2);
+        assertThat(report.practiceScriptTotal().unpricedEventCount()).isEqualTo(2);
     }
 
     private record Usage(
@@ -488,10 +504,10 @@ class LlmUsageByPracticeIntegrationTest extends AbstractWorkspaceIntegrationTest
         transactionTemplate.executeWithoutResult(tx -> {
             for (int call = 0; call < count; call++) {
                 boolean first = call == 0;
-                jobRepository.accumulatePrecomputeUsage(
+                jobRepository.accumulatePracticeScriptUsage(
                         job.getId(),
                         job.getRetryCount(),
-                        new PrecomputeCallUsage(
+                        new PracticeScriptCallUsage(
                                 ModelKind.valueOf(kind), practice, null, first ? input : 0, first ? output : 0));
             }
         });

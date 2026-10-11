@@ -119,7 +119,7 @@ class AgentJobTerminalStorageIntegrationTest extends BaseIntegrationTest {
     private PiResultParser parser;
 
     @Autowired
-    private AgentJobPrecomputeRunRepository precomputeRunRepository;
+    private AgentJobPracticeScriptRunRepository practiceScriptRunRepository;
 
     @Autowired
     private PracticeRepository practices;
@@ -188,7 +188,7 @@ class AgentJobTerminalStorageIntegrationTest extends BaseIntegrationTest {
                 new PracticeReviewRefusalMetrics(metrics),
                 new AgentJobTelemetry(metrics, Tracer.NOOP),
                 usageRecorder,
-                new PrecomputeRunRecorder(parser, precomputeRunRepository, metrics, mapper),
+                new PracticeScriptRunRecorder(parser, practiceScriptRunRepository, metrics, mapper),
                 budgets,
                 admission,
                 mock(ArtifactSourceCatalogRegistry.class),
@@ -254,17 +254,17 @@ class AgentJobTerminalStorageIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("a runner report that covers the proxy is booked with the precompute chat calls it could not see")
-    void shouldBookThePrecomputeChatCallsWithTheRunnersReport() {
+    @DisplayName("a runner report that covers the proxy is booked with the practice script chat calls it could not see")
+    void shouldBookThePracticeScriptChatCallsWithTheRunnersReport() {
         AgentJob job = queued();
         var reported = new AgentResult.LlmUsage("provider-name", 300, 120, null, null, null, null, 3);
         when(runner.parseResult(any())).thenReturn(new AgentResult(true, Map.of("review", "LGTM"), reported));
         when(sandbox.execute(any())).thenAnswer(invocation -> {
-            // One precompute call on the chat model, as the proxy counts it: on its practice row and in the
+            // One practice script call on the chat model, as the proxy counts it: on its practice row and in the
             // job's own counters.
             transactions.executeWithoutResult(status -> {
-                jobs.accumulatePrecomputeUsage(
-                        job.getId(), 0, new PrecomputeCallUsage(ModelKind.CHAT, "comment-quality", null, 40, 10));
+                jobs.accumulatePracticeScriptUsage(
+                        job.getId(), 0, new PracticeScriptCallUsage(ModelKind.CHAT, "comment-quality", null, 40, 10));
                 jobs.accumulateLlmUsage(job.getId(), 0, new AgentJobLlmUsageDelta(40, 10, 0, 0, 0));
             });
             return new SandboxResult(0, Map.of(), "transcript", false, Duration.ofSeconds(1));
@@ -314,16 +314,17 @@ class AgentJobTerminalStorageIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("a completed attempt books each precompute model the proxy counted, at the price its slot froze")
-    void shouldBookEachPrecomputeModelWhenTheAttemptCompletes() {
+    @DisplayName(
+            "a completed attempt books each model for practice scripts the proxy counted, at the price its slot froze")
+    void shouldBookEachPracticeScriptModelWhenTheAttemptCompletes() {
         var embedding = binding(AgentPurpose.PRACTICE_EMBEDDING, LlmApiProtocol.OPENAI_EMBEDDINGS);
-        when(policy.precomputeBinding(anyLong(), eq(AgentPurpose.PRACTICE_EMBEDDING), any(), any()))
+        when(policy.practiceScriptBinding(anyLong(), eq(AgentPurpose.PRACTICE_EMBEDDING), any(), any()))
                 .thenReturn(Optional.of(embedding));
         AgentJob job = queued(Map.of(ModelKind.EMBEDDING, FrozenModel.from(embedding, resolver)));
         when(runner.parseResult(any())).thenReturn(new AgentResult(true, Map.of("review", "LGTM")));
         when(sandbox.execute(any())).thenAnswer(invocation -> {
-            transactions.executeWithoutResult(status -> jobs.accumulatePrecomputeUsage(
-                    job.getId(), 0, new PrecomputeCallUsage(ModelKind.EMBEDDING, "comment-quality", null, 40, 0)));
+            transactions.executeWithoutResult(status -> jobs.accumulatePracticeScriptUsage(
+                    job.getId(), 0, new PracticeScriptCallUsage(ModelKind.EMBEDDING, "comment-quality", null, 40, 0)));
             return new SandboxResult(0, Map.of(), "transcript", false, Duration.ofSeconds(1));
         });
 
@@ -331,7 +332,7 @@ class AgentJobTerminalStorageIntegrationTest extends BaseIntegrationTest {
 
         var row = jdbc.queryForMap(
                 "SELECT model, total_calls, input_tokens, pricing_state FROM llm_usage_event "
-                        + "WHERE source_id = ? AND source_type = 'PRECOMPUTE_EMBEDDING'",
+                        + "WHERE source_id = ? AND source_type = 'PRACTICE_SCRIPT_EMBEDDING'",
                 job.getId());
         assertThat(row.get("model"))
                 .isEqualTo(Objects.requireNonNull(embedding.getInstanceModel()).getUpstreamModelId());
@@ -341,7 +342,7 @@ class AgentJobTerminalStorageIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("a completed attempt records what each staged precompute script did, as the runner reported it")
+    @DisplayName("a completed attempt records what each staged practice script did, as the runner reported it")
     void shouldRecordEachStagedScriptsRunWhenTheAttemptCompletes() {
         Practice decides = practice("comment-quality", "decide()");
         Practice scans = practice("error-handling", "scan()");
@@ -369,7 +370,7 @@ class AgentJobTerminalStorageIntegrationTest extends BaseIntegrationTest {
                     job.getId());
             return new SandboxResult(
                     0,
-                    Map.of(SandboxLayout.PRECOMPUTE_REPORT_FILE, report),
+                    Map.of(SandboxLayout.PRACTICE_SCRIPT_REPORT_FILE, report),
                     "transcript",
                     false,
                     Duration.ofSeconds(1));
@@ -379,7 +380,7 @@ class AgentJobTerminalStorageIntegrationTest extends BaseIntegrationTest {
 
         var runs = jdbc.queryForList(
                 "SELECT practice_slug, attempt, status, leads, practice_revision_id, CAST(models AS text) AS models "
-                        + "FROM agent_job_precompute_run WHERE job_id = ? ORDER BY practice_slug",
+                        + "FROM agent_job_practice_script_run WHERE job_id = ? ORDER BY practice_slug",
                 job.getId());
         assertThat(runs).hasSize(2);
         assertThat(runs.get(0))
@@ -455,7 +456,7 @@ class AgentJobTerminalStorageIntegrationTest extends BaseIntegrationTest {
         return rows == null ? 0 : rows;
     }
 
-    /** A practice of the workspace whose current revision holds this precompute script. */
+    /** A practice of the workspace whose current revision holds this practice script. */
     private Practice practice(String slug, String script) {
         Practice practice = new Practice();
         practice.setAutomatedReviewPolicy(PracticeTestEvidence.pullRequest());
@@ -465,7 +466,7 @@ class AgentJobTerminalStorageIntegrationTest extends BaseIntegrationTest {
         practice.setCriteria("Review the change");
         PracticeTestEvidence.configure(practice, ScmSignals.PULL_REQUEST_OPENED);
         practice.setAutonomy(PracticeAutonomy.AUTOMATIC);
-        practice.setPrecomputeScript(script);
+        practice.setPracticeScript(script);
         practice = practices.save(practice);
         practice.setCurrentRevision(revisions.save(new PracticeRevision(practice, 1)));
         return practices.save(practice);
@@ -499,7 +500,7 @@ class AgentJobTerminalStorageIntegrationTest extends BaseIntegrationTest {
         return queued(null);
     }
 
-    private AgentJob queued(@Nullable Map<ModelKind, FrozenModel> precompute) {
+    private AgentJob queued(@Nullable Map<ModelKind, FrozenModel> practiceScript) {
         return Objects.requireNonNull(transactions.execute(status -> {
             var binding = bindings.findByWorkspaceIdAndPurposeAndDataHandlingTier(
                             workspace.getId(), AgentPurpose.PRACTICE_REVIEW, DataHandlingTier.IN_HOUSE)
@@ -511,7 +512,7 @@ class AgentJobTerminalStorageIntegrationTest extends BaseIntegrationTest {
             job.setMetadata(mapper.createObjectNode());
             job.setConfigSnapshot(ConfigSnapshot.from(binding, resolver)
                     .withPriceSnapshot(admission.admit(binding).price())
-                    .withPrecompute(precompute)
+                    .withPracticeScript(practiceScript)
                     .toJson(mapper));
             job.setLlmTotalCalls(2);
             job.setLlmTotalInputTokens(100);

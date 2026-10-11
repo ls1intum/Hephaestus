@@ -396,7 +396,7 @@ describe("CuratedPracticeForm", () => {
 		});
 		expect(submitted.automatedReviewPolicy.knownLimitations).toStrictEqual([]);
 		await user.click(screen.getByRole("button", { name: /Technical settings/u }));
-		expect(screen.queryByText("Precompute script")).toBeNull();
+		expect(screen.queryByText("Script")).toBeNull();
 	});
 
 	it("gives the occasion its evidence back when review resumes", async () => {
@@ -421,7 +421,7 @@ describe("CuratedPracticeForm", () => {
 	it("does not schedule mentoring when a practice needs human review", async () => {
 		const user = userEvent.setup();
 		const onSubmit = submitSpy();
-		await renderForm({ precomputeScript: "export default {};" }, onSubmit);
+		await renderForm({ practiceScript: "export default {};" }, onSubmit);
 
 		await user.click(screen.getByRole("radio", { name: /Human review needed/u }));
 		await user.type(
@@ -429,12 +429,12 @@ describe("CuratedPracticeForm", () => {
 			"A mentor must discuss the developer's reasoning.",
 		);
 		await user.click(screen.getByRole("button", { name: /Technical settings/u }));
-		expect(screen.queryByText("Precompute script")).toBeNull();
+		expect(screen.queryByText("Script")).toBeNull();
 
 		await user.click(screen.getByRole("button", { name: "Save changes" }));
 		const submitted = onSubmit.mock.calls[0]?.[0];
 		assert(submitted);
-		expect(submitted.precomputeScript).toBeUndefined();
+		expect(submitted.practiceScript).toBeUndefined();
 		expect(submitted.automatedReviewPolicy.automatedReview).toStrictEqual({
 			mode: "LANGUAGE_MODEL",
 			evidenceSufficiency: "DECLARED_EVIDENCE_INSUFFICIENT",

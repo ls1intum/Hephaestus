@@ -120,7 +120,7 @@ public class PracticeRevisionService {
             case SUBJECT -> revision.getSubject();
             case PRECONDITION -> revision.getPrecondition();
             case CRITERIA -> revision.getCriteria();
-            case PRECOMPUTE_SCRIPT -> revision.getPrecomputeScript();
+            case PRACTICE_SCRIPT -> revision.getPracticeScript();
             case AUTOMATED_REVIEW_POLICY -> revision.getAutomatedReviewPolicy();
             case WHY_IT_MATTERS -> revision.getWhyItMatters();
             case WHAT_GOOD_LOOKS_LIKE -> revision.getWhatGoodLooksLike();

@@ -33,8 +33,8 @@ public final class PracticeDefinitionValidator {
                 definition.automatedReviewPolicy().automatedReview().canAttemptAutomatedReview();
         validateSignals(definition);
         validateReviewWhenAndPrecondition(definition);
-        if (!canRunAutomatedReview && definition.precomputeScript() != null) {
-            throw new IllegalArgumentException("A precompute script needs a practice that Hephaestus can review.");
+        if (!canRunAutomatedReview && definition.practiceScript() != null) {
+            throw new IllegalArgumentException("A practice script needs a practice that Hephaestus can review.");
         }
         rejectReviewResultLabels("Why it matters", definition.whyItMatters());
         rejectReviewResultLabels("What good looks like", definition.whatGoodLooksLike());

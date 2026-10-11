@@ -121,6 +121,32 @@ class ReviewRuleFingerprintTest extends BaseUnitTest {
                 .isNotEqualTo(issue.provenanceFingerprint("describe-work"));
     }
 
+    /**
+     * Stored digests and fingerprints hash field values by position, never by field name. Renaming a
+     * field must leave both values unchanged, or every adopted practice shows a false catalogue update.
+     */
+    @Test
+    void shouldKeepStoredDigestAndFingerprintValuesForAPracticeWithAScript() {
+        var definition = new PracticeDefinition(
+                "Describe the change",
+                List.of(ScmSignals.PULL_REQUEST_OPENED),
+                List.of(required(CORE)),
+                Map.of(),
+                ActorRole.AUTHOR,
+                null,
+                "Criteria.",
+                "export default 1;\n",
+                PracticeTestEvidence.pullRequest(),
+                "Why.",
+                "Good.",
+                "group");
+
+        assertThat(definition.digest("describe-the-change"))
+                .isEqualTo("f854d3eb42f472881da660cbf24b452b284cd1d8ece75609ef81d0c89c4325fb");
+        assertThat(definition.provenanceFingerprint("describe-the-change"))
+                .isEqualTo("v5:8027b33944698ffca22fdd8d85bca8e9de28b1a6c222b69814f20f4f8faa4b3f");
+    }
+
     private static String fingerprintOf(PracticeDefinition definition) {
         return ReviewRuleFingerprint.of(
                 "describe-the-change",

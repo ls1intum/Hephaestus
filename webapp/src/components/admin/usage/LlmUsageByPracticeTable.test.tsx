@@ -5,7 +5,7 @@ import {
 	commentQualityUsage,
 	deletedPracticeUsage,
 	expectedBehaviourUsage,
-	NO_PRECOMPUTE_USAGE,
+	NO_PRACTICE_SCRIPT_USAGE,
 	notAttributedUsage,
 } from "./fixtures";
 import { LlmUsageByPracticeTable } from "./LlmUsageByPracticeTable";
@@ -16,8 +16,8 @@ import { LlmUsageByPracticeTable } from "./LlmUsageByPracticeTable";
  */
 const report = {
 	byPractice: [commentQualityUsage, notAttributedUsage],
-	precomputeTotal: {
-		...NO_PRECOMPUTE_USAGE.precomputeTotal,
+	practiceScriptTotal: {
+		...NO_PRACTICE_SCRIPT_USAGE.practiceScriptTotal,
 		reviews: 7,
 		calls: 99,
 		inputTokens: 11,
@@ -28,7 +28,7 @@ const report = {
 };
 
 function table(): HTMLElement {
-	return screen.getByRole("table", { name: "Precompute model spend by practice" });
+	return screen.getByRole("table", { name: "Spend on models for practice scripts, by practice" });
 }
 
 /** Each cell's rendered text. */
@@ -47,7 +47,7 @@ function practiceOrder(): (string | null)[] {
 		.map((row) => within(row).getAllByRole("cell")[0]?.textContent ?? null);
 }
 
-describe("precompute models by practice", () => {
+describe("models for practice scripts by practice", () => {
 	it("prints the server's total, never a re-addition of the rows", () => {
 		render(<LlmUsageByPracticeTable report={report} purses={["SHARED"]} />);
 

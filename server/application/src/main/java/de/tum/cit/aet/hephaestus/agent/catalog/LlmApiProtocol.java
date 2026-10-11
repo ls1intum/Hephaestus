@@ -39,7 +39,7 @@ public enum LlmApiProtocol {
 
     /**
      * Whether a model on this protocol can fill a slot of {@code slot} kind. A chat completions model
-     * also answers decisions: the precompute runner reads them from its token log probabilities.
+     * also answers decisions: the practice script runner reads them from its token log probabilities.
      */
     public boolean serves(ModelKind slot) {
         return kind == slot || (this == OPENAI_COMPLETIONS && slot == ModelKind.DECISION);

@@ -13,7 +13,7 @@ import {
 	usageReport,
 	withMonthTotals,
 	withOwnProvider,
-	withPrecomputeUsage,
+	withPracticeScriptUsage,
 } from "./fixtures";
 import { addMonths, formatMonthLabel } from "./usage-utils";
 import { WorkspaceUsageReport } from "./WorkspaceUsageReport";
@@ -97,13 +97,13 @@ export const BothCapsHealthy: Story = {
 	},
 };
 
-const PRECOMPUTE_CARD = "Precompute models by practice";
+const PRACTICE_SCRIPT_CARD = "Models for practice scripts, by practice";
 
 /** Below *By run type*, because its spend is a split of the review run types, not an addition. */
-export const PrecomputeModelsByPractice: Story = {
-	args: { report: withPrecomputeUsage(capped) },
+export const PracticeScriptModelsByPractice: Story = {
+	args: { report: withPracticeScriptUsage(capped) },
 	play: async ({ canvas }) => {
-		const title = await canvas.findByRole("heading", { name: PRECOMPUTE_CARD });
+		const title = await canvas.findByRole("heading", { name: PRACTICE_SCRIPT_CARD });
 		const runTypes = canvas.getByRole("heading", { name: "By run type" });
 		await expect(precedes(runTypes, title)).toBe(true);
 		const link = canvas.getByRole("link", { name: "Comments explain why" });
@@ -115,10 +115,10 @@ export const PrecomputeModelsByPractice: Story = {
 };
 
 /** A month in which no script called a model has no card, not an empty one. */
-export const NoPrecomputeCalls: Story = {
+export const NoPracticeScriptCalls: Story = {
 	play: async ({ canvas }) => {
 		await expect(await canvas.findByText("By run type")).toBeVisible();
-		await expect(canvas.queryByText(PRECOMPUTE_CARD)).toBeNull();
+		await expect(canvas.queryByText(PRACTICE_SCRIPT_CARD)).toBeNull();
 	},
 };
 
@@ -408,7 +408,7 @@ export const Empty: Story = {
 export const Dark: Story = {
 	args: {
 		report: {
-			...withMonthTotals(withPrecomputeUsage(capped), {
+			...withMonthTotals(withPracticeScriptUsage(capped), {
 				instanceTotalCostUsd: 25.0142,
 				unpricedEventCount: 7,
 			}),
@@ -420,7 +420,7 @@ export const Dark: Story = {
 	},
 	globals: { theme: "dark" },
 	play: async ({ canvas }) => {
-		await expect(await canvas.findByRole("heading", { name: PRECOMPUTE_CARD })).toBeVisible();
+		await expect(await canvas.findByRole("heading", { name: PRACTICE_SCRIPT_CARD })).toBeVisible();
 		await expect(
 			canvas.getByRole("progressbar", { name: "Shared-model budget used" }),
 		).toBeVisible();

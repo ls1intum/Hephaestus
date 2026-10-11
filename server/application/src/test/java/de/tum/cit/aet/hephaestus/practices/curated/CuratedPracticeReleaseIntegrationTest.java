@@ -150,7 +150,7 @@ class CuratedPracticeReleaseIntegrationTest extends BaseIntegrationTest {
                 source.subject(),
                 source.precondition(),
                 criteria,
-                source.precomputeScript(),
+                source.practiceScript(),
                 source.automatedReviewPolicy(),
                 source.whyItMatters(),
                 source.whatGoodLooksLike(),

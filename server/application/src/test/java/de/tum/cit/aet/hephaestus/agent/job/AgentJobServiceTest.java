@@ -449,19 +449,19 @@ class AgentJobServiceTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldFreezeABoundPrecomputeModelWhenTheReviewIsSubmitted() {
+        void shouldFreezeABoundPracticeScriptModelWhenTheReviewIsSubmitted() {
             var embeddingBinding = new WorkspaceAgentBinding();
             embeddingBinding.setId(11L);
             embeddingBinding.setWorkspace(workspace);
             embeddingBinding.setPurpose(AgentPurpose.PRACTICE_EMBEDDING);
             embeddingBinding.setDataHandlingTier(DataHandlingTier.CLOUD);
-            when(memberAiPolicy.precomputeBinding(
+            when(memberAiPolicy.practiceScriptBinding(
                             eq(1L), eq(AgentPurpose.PRACTICE_DECISION), eq(AgentJobType.PULL_REQUEST_REVIEW), any()))
                     .thenReturn(Optional.empty());
-            when(memberAiPolicy.precomputeBinding(
+            when(memberAiPolicy.practiceScriptBinding(
                             eq(1L), eq(AgentPurpose.PRACTICE_EMBEDDING), eq(AgentJobType.PULL_REQUEST_REVIEW), any()))
                     .thenReturn(Optional.of(embeddingBinding));
-            when(memberAiPolicy.precomputeBinding(
+            when(memberAiPolicy.practiceScriptBinding(
                             eq(1L), eq(AgentPurpose.PRACTICE_RERANKING), eq(AgentJobType.PULL_REQUEST_REVIEW), any()))
                     .thenReturn(Optional.empty());
             when(llmModelResolver.resolve(embeddingBinding))
@@ -480,7 +480,7 @@ class AgentJobServiceTest extends BaseUnitTest {
             ConfigSnapshot snapshot =
                     ConfigSnapshot.fromJson(Objects.requireNonNull(job.getConfigSnapshot()), objectMapper);
             assertThat(snapshot.upstreamModelId()).isEqualTo("claude-sonnet-4");
-            assertThat(snapshot.precompute())
+            assertThat(snapshot.practiceScript())
                     .as("the price is frozen at admission, not at submit")
                     .containsOnly(Map.entry(
                             ModelKind.EMBEDDING,
@@ -498,13 +498,13 @@ class AgentJobServiceTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldSubmitTheReviewWithoutPrecomputeModelsWhenNoneIsReady() {
+        void shouldSubmitTheReviewWithoutPracticeScriptModelsWhenNoneIsReady() {
             AgentJob job = submitCreatingAJob();
 
             ConfigSnapshot snapshot =
                     ConfigSnapshot.fromJson(Objects.requireNonNull(job.getConfigSnapshot()), objectMapper);
             assertThat(job.getStatus()).isEqualTo(AgentJobStatus.QUEUED);
-            assertThat(snapshot.precompute()).isNull();
+            assertThat(snapshot.practiceScript()).isNull();
         }
 
         @Test

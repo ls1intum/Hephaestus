@@ -77,7 +77,7 @@ describe("AdminLlmConnectionFormDialog", () => {
 		);
 	});
 
-	// A precompute endpoint may serve no `/models`, so only that failure is neutral, not an alert.
+	// An endpoint for practice scripts may serve no `/models`, so only that failure is neutral, not an alert.
 	it.each([
 		[
 			"openai-embeddings",

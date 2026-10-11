@@ -34,7 +34,7 @@ public record PracticeDefinition(
 
         @Nullable PracticePrecondition precondition,
         @NonNull String criteria,
-        @Nullable String precomputeScript,
+        @Nullable String practiceScript,
         @NonNull PracticeAutomatedReviewPolicy automatedReviewPolicy,
         @Nullable String whyItMatters,
         @Nullable String whatGoodLooksLike,
@@ -43,7 +43,7 @@ public record PracticeDefinition(
         @Nullable PracticeVisual visual,
         @Nullable PracticeGuide guide)
         implements CatalogDefinition, ClosedPracticeInput {
-    public static final int MAX_PRECOMPUTE_SCRIPT_LENGTH = 100_000;
+    public static final int MAX_PRACTICE_SCRIPT_LENGTH = 100_000;
 
     public PracticeDefinition {
         Objects.requireNonNull(name, "name");
@@ -72,7 +72,7 @@ public record PracticeDefinition(
         if (!automatedReviewDisabled && evidenceRequirements.stream().noneMatch(PracticeEvidenceRequirement::refuses)) {
             throw new IllegalArgumentException("Automated review needs at least one required evidence source.");
         }
-        precomputeScript = blankToNull(precomputeScript);
+        practiceScript = blankToNull(practiceScript);
         whyItMatters = blankToNull(whyItMatters);
         whatGoodLooksLike = blankToNull(whatGoodLooksLike);
     }
@@ -85,7 +85,7 @@ public record PracticeDefinition(
             ActorRole subject,
             @Nullable PracticePrecondition precondition,
             String criteria,
-            @Nullable String precomputeScript,
+            @Nullable String practiceScript,
             PracticeAutomatedReviewPolicy automatedReviewPolicy,
             @Nullable String whyItMatters,
             @Nullable String whatGoodLooksLike,
@@ -98,7 +98,7 @@ public record PracticeDefinition(
                 subject,
                 precondition,
                 criteria,
-                precomputeScript,
+                practiceScript,
                 automatedReviewPolicy,
                 whyItMatters,
                 whatGoodLooksLike,
@@ -117,7 +117,7 @@ public record PracticeDefinition(
                 practice.getSubject(),
                 practice.getPrecondition(),
                 practice.getCriteria(),
-                practice.getPrecomputeScript(),
+                practice.getPracticeScript(),
                 practice.getAutomatedReviewPolicy(),
                 practice.getWhyItMatters(),
                 practice.getWhatGoodLooksLike(),
@@ -148,7 +148,7 @@ public record PracticeDefinition(
                 revision.getSubject(),
                 revision.getPrecondition(),
                 revision.getCriteria(),
-                revision.getPrecomputeScript(),
+                revision.getPracticeScript(),
                 revision.getAutomatedReviewPolicy(),
                 revision.getWhyItMatters(),
                 revision.getWhatGoodLooksLike(),
@@ -201,7 +201,7 @@ public record PracticeDefinition(
                 subject,
                 precondition,
                 criteria,
-                precomputeScript,
+                practiceScript,
                 automatedReviewPolicy,
                 groupSlug);
     }

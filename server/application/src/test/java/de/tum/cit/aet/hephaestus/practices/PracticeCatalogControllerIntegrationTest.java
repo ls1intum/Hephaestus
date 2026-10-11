@@ -150,7 +150,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 shown.subject(),
                 shown.precondition(),
                 criteria,
-                shown.precomputeScript(),
+                shown.practiceScript(),
                 shown.automatedReviewPolicy(),
                 shown.whyItMatters(),
                 shown.whatGoodLooksLike(),
@@ -213,7 +213,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 ActorRole.AUTHOR,
                 null,
                 request.criteria(),
-                request.precomputeScript(),
+                request.practiceScript(),
                 request.automatedReviewPolicy(),
                 request.whyItMatters(),
                 request.whatGoodLooksLike(),
@@ -232,7 +232,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 request.subject(),
                 request.precondition(),
                 request.criteria(),
-                automatedReview ? request.precomputeScript() : null,
+                automatedReview ? request.practiceScript() : null,
                 evidence,
                 request.whyItMatters(),
                 request.whatGoodLooksLike(),
@@ -1454,7 +1454,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         void clearsOptionalContent() {
             ensureAdminMembership(workspace);
             Practice practice = persistPractice("clear-content", "Clear content", true);
-            practice.setPrecomputeScript("return {}");
+            practice.setPracticeScript("return {}");
             practice.setWhyItMatters("Useful rationale");
             practice.setWhatGoodLooksLike("Useful example");
             practiceRepository.save(practice);
@@ -1465,13 +1465,13 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                     .headers(TestAuthUtils.withCurrentUser())
                     .contentType(MediaType.APPLICATION_JSON)
                     .bodyValue("""
-                    {"clear":["PRECOMPUTE_SCRIPT","WHY_IT_MATTERS","WHAT_GOOD_LOOKS_LIKE"]}
+                    {"clear":["PRACTICE_SCRIPT","WHY_IT_MATTERS","WHAT_GOOD_LOOKS_LIKE"]}
                     """)
                     .exchange()
                     .expectStatus()
                     .isOk()
                     .expectBody()
-                    .jsonPath("$.precomputeScript")
+                    .jsonPath("$.practiceScript")
                     .doesNotExist()
                     .jsonPath("$.whyItMatters")
                     .doesNotExist()

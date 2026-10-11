@@ -3,7 +3,7 @@ import type {
 	DeliveryPolicyTrace,
 	PracticeSignal,
 	PracticeTraceEntry,
-	PrecomputeRun,
+	PracticeScriptRun,
 	ReviewedWorkRef,
 	TracedArtifact,
 	TracedSignal,
@@ -435,8 +435,8 @@ const practiceTraceEntries = [
 	},
 ] satisfies PracticeTraceEntry[];
 
-/** What a practice's precompute script did in one review, one run per way it can end. */
-export const precomputeRuns = {
+/** What a practice's script did in one review, one run per way it can end. */
+export const practiceScriptRuns = {
 	found: { status: "OK", leads: 4, models: [] },
 	skipped: {
 		status: "SKIPPED",
@@ -493,7 +493,7 @@ export const precomputeRuns = {
 	},
 	notFinished: { status: "NOT_FINISHED", leads: 0, models: [] },
 	failed: { status: "FAILED", leads: 0, models: [] },
-} satisfies Record<string, PrecomputeRun>;
+} satisfies Record<string, PracticeScriptRun>;
 
 export const deniedDeliveryPolicyEvaluation: DeliveryPolicyTrace = {
 	reviewId: "22222222-2222-2222-2222-222222222222",

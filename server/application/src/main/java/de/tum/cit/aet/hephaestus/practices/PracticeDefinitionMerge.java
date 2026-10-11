@@ -54,8 +54,8 @@ public final class PracticeDefinitionMerge {
                         .precondition(),
                 source(PracticeDefinitionField.CRITERIA, current, offered, choices)
                         .criteria(),
-                source(PracticeDefinitionField.PRECOMPUTE_SCRIPT, current, offered, choices)
-                        .precomputeScript(),
+                source(PracticeDefinitionField.PRACTICE_SCRIPT, current, offered, choices)
+                        .practiceScript(),
                 source(PracticeDefinitionField.AUTOMATED_REVIEW_POLICY, current, offered, choices)
                         .automatedReviewPolicy(),
                 source(PracticeDefinitionField.WHY_IT_MATTERS, current, offered, choices)
@@ -88,7 +88,7 @@ public final class PracticeDefinitionMerge {
             case SUBJECT -> definition.subject();
             case PRECONDITION -> definition.precondition();
             case CRITERIA -> definition.criteria();
-            case PRECOMPUTE_SCRIPT -> definition.precomputeScript();
+            case PRACTICE_SCRIPT -> definition.practiceScript();
             case AUTOMATED_REVIEW_POLICY -> definition.automatedReviewPolicy();
             case WHY_IT_MATTERS -> definition.whyItMatters();
             case WHAT_GOOD_LOOKS_LIKE -> definition.whatGoodLooksLike();

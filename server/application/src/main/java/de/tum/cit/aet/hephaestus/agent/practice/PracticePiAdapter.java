@@ -41,24 +41,25 @@ public class PracticePiAdapter {
 
     static final String PRACTICE_OUTPUT_TOKENS_ENV = "PI_PRACTICE_OUTPUT_TOKENS";
 
-    static final String PRECOMPUTE_TOKEN_ENV = "PRECOMPUTE_PROXY_TOKEN";
+    static final String PRACTICE_SCRIPT_TOKEN_ENV = "PRACTICE_SCRIPT_PROXY_TOKEN";
 
-    /** The longest the precompute stage takes, whatever the job's timeout. */
-    public static final int MAX_PRECOMPUTE_SECONDS = 90;
+    /** The longest the practice script stage takes, whatever the job's timeout. */
+    public static final int MAX_PRACTICE_SCRIPT_SECONDS = 90;
 
     /**
-     * The shortest job timeout. It leaves the runner more than its shutdown buffer even after a precompute
-     * stage of {@link #MAX_PRECOMPUTE_SECONDS}.
+     * The shortest job timeout. It leaves the runner more than its shutdown buffer even after a practice script
+     * stage of {@link #MAX_PRACTICE_SCRIPT_SECONDS}.
      */
-    public static final int MIN_TIMEOUT_SECONDS = MAX_PRECOMPUTE_SECONDS + PiRuntimeFactory.TIMEOUT_BUFFER_SECONDS + 1;
+    public static final int MIN_TIMEOUT_SECONDS =
+            MAX_PRACTICE_SCRIPT_SECONDS + PiRuntimeFactory.TIMEOUT_BUFFER_SECONDS + 1;
 
     public PracticeSandboxSpec buildSandboxSpec(PracticeAgentRequest request) {
-        int precomputeSeconds = precomputeBudgetSeconds(request.timeoutSeconds());
-        String precomputeToken = request.precomputeToken();
-        Map<String, BoundModel> precomputeModels = boundModels(request.precomputeModels());
-        Map<String, byte[]> extraInputs = precomputeModels.isEmpty()
+        int practiceScriptSeconds = practiceScriptBudgetSeconds(request.timeoutSeconds());
+        String practiceScriptToken = request.practiceScriptToken();
+        Map<String, BoundModel> practiceScriptModels = boundModels(request.practiceScriptModels());
+        Map<String, byte[]> extraInputs = practiceScriptModels.isEmpty()
                 ? Map.of()
-                : Map.of(SandboxLayout.PRECOMPUTE_MODELS_FILE, toJson(precomputeModels));
+                : Map.of(SandboxLayout.PRACTICE_SCRIPT_MODELS_FILE, toJson(practiceScriptModels));
         PiRuntimeFactory.PiPlan plan = runtimeFactory.build(new PiPlanSpec(
                 request.apiProtocol(),
                 request.upstreamModelId(),
@@ -68,11 +69,11 @@ public class PracticePiAdapter {
                 request.jobToken(),
                 // Native shell access must not provide a route to push or fetch uncaptured evidence.
                 false,
-                // The runner starts after the precompute stage, so that stage's budget is not the runner's.
-                request.timeoutSeconds() - precomputeSeconds,
+                // The runner starts after the practice script stage, so that stage's budget is not the runner's.
+                request.timeoutSeconds() - practiceScriptSeconds,
                 PROFILE,
                 extraInputs,
-                buildPrecomputeStep(precomputeSeconds, reviewProperties.precomputeMaxTokensPerAttempt())));
+                buildPracticeScriptStep(practiceScriptSeconds, reviewProperties.practiceScriptMaxTokensPerAttempt())));
         Map<String, String> environment = new LinkedHashMap<>(plan.environment());
         environment.put(PRACTICE_MODEL_CALLS_ENV, Integer.toString(reviewProperties.practiceModelCalls()));
         environment.put(PRACTICE_OUTPUT_TOKENS_ENV, Integer.toString(reviewProperties.practiceOutputTokens()));
@@ -80,8 +81,8 @@ public class PracticePiAdapter {
         if (temperature != null) {
             environment.put(SAMPLING_TEMPERATURE_ENV, temperature.toString());
         }
-        if (precomputeToken != null) {
-            environment.put(PRECOMPUTE_TOKEN_ENV, precomputeToken);
+        if (practiceScriptToken != null) {
+            environment.put(PRACTICE_SCRIPT_TOKEN_ENV, practiceScriptToken);
         }
         return new PracticeSandboxSpec(
                 imageProperties.reference(),
@@ -98,13 +99,13 @@ public class PracticePiAdapter {
         return resultParser.parse(sandboxResult);
     }
 
-    /** One entry of {@link SandboxLayout#PRECOMPUTE_MODELS_FILE}: the precompute runner's {@code boundModelSchema}. */
+    /** One entry of {@link SandboxLayout#PRACTICE_SCRIPT_MODELS_FILE}: the practice script runner's {@code boundModelSchema}. */
     @JsonInclude(JsonInclude.Include.NON_NULL)
     record BoundModel(
             String protocol, String modelId, @Nullable ReasoningEffort reasoningEffort) {}
 
     /**
-     * The precompute models file, by slot. The runner rejects the whole file for one unknown protocol,
+     * The models for practice scripts file, by slot. The runner rejects the whole file for one unknown protocol,
      * and a pre-catalog snapshot can hold one, so a model on such a protocol has no entry.
      */
     private static Map<String, BoundModel> boundModels(Map<ModelKind, FrozenModel> models) {
@@ -123,24 +124,24 @@ public class PracticePiAdapter {
         try {
             return objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(models);
         } catch (JacksonException e) {
-            throw new IllegalStateException("Failed to serialize " + SandboxLayout.PRECOMPUTE_MODELS_FILE, e);
+            throw new IllegalStateException("Failed to serialize " + SandboxLayout.PRACTICE_SCRIPT_MODELS_FILE, e);
         }
     }
 
-    /** One tenth of the job's timeout, from 1 second to {@link #MAX_PRECOMPUTE_SECONDS}. */
-    static int precomputeBudgetSeconds(int timeoutSeconds) {
-        return Math.min(MAX_PRECOMPUTE_SECONDS, Math.max(1, timeoutSeconds / 10));
+    /** One tenth of the job's timeout, from 1 second to {@link #MAX_PRACTICE_SCRIPT_SECONDS}. */
+    static int practiceScriptBudgetSeconds(int timeoutSeconds) {
+        return Math.min(MAX_PRACTICE_SCRIPT_SECONDS, Math.max(1, timeoutSeconds / 10));
     }
 
     /**
      * What runs before the model: the change view is derived from the checkout (a failure there is the
-     * review's failure, since nothing could be reviewed), then the practices' precompute scripts, which
-     * only add hints and may fail quietly. Only the precompute stage may call the precompute models, so
-     * the review runner starts without their token. The precompute runner holds its scripts to the
+     * review's failure, since nothing could be reviewed), then the practices' practice scripts, which
+     * only add hints and may fail quietly. Only the practice script stage may call the models for practice scripts, so
+     * the review runner starts without their token. The practice script runner holds its scripts to the
      * proxy's token cap for the attempt.
      */
-    private static String buildPrecomputeStep(int budgetSeconds, long maxTokens) {
-        return "node /workspace/pi-change.ts && sh /workspace/pi-precompute.sh " + budgetSeconds + " " + maxTokens
-                + " && unset " + PRECOMPUTE_TOKEN_ENV + " && ";
+    private static String buildPracticeScriptStep(int budgetSeconds, long maxTokens) {
+        return "node /workspace/pi-change.ts && sh /workspace/pi-practice-scripts.sh " + budgetSeconds + " " + maxTokens
+                + " && unset " + PRACTICE_SCRIPT_TOKEN_ENV + " && ";
     }
 }

@@ -85,7 +85,7 @@ public class LlmUsageService {
                 .toList();
 
         List<LlmUsageByPracticeDTO> byPractice =
-                usageRepository.aggregatePrecomputeByPractice(workspaceId, window.from(), window.to()).stream()
+                usageRepository.aggregatePracticeScriptByPractice(workspaceId, window.from(), window.to()).stream()
                         .map(row -> new LlmUsageByPracticeDTO(
                                 row.getPracticeSlug(),
                                 row.getPracticeName(),
@@ -98,16 +98,16 @@ public class LlmUsageService {
                                 row.getOwnProviderTotalCostUsd(),
                                 row.getUnpricedEventCount()))
                         .toList();
-        LlmUsageEventRepository.PrecomputeTotalAggregate precompute =
-                usageRepository.aggregatePrecomputeTotal(workspaceId, window.from(), window.to());
-        LlmUsagePrecomputeTotalDTO precomputeTotal = new LlmUsagePrecomputeTotalDTO(
-                precompute.getReviews(),
-                precompute.getCalls(),
-                precompute.getInputTokens(),
-                precompute.getOutputTokens(),
-                precompute.getInstanceTotalCostUsd(),
-                precompute.getOwnProviderTotalCostUsd(),
-                precompute.getUnpricedEventCount());
+        LlmUsageEventRepository.PracticeScriptTotalAggregate practiceScript =
+                usageRepository.aggregatePracticeScriptTotal(workspaceId, window.from(), window.to());
+        LlmUsagePracticeScriptTotalDTO practiceScriptTotal = new LlmUsagePracticeScriptTotalDTO(
+                practiceScript.getReviews(),
+                practiceScript.getCalls(),
+                practiceScript.getInputTokens(),
+                practiceScript.getOutputTokens(),
+                practiceScript.getInstanceTotalCostUsd(),
+                practiceScript.getOwnProviderTotalCostUsd(),
+                practiceScript.getUnpricedEventCount());
 
         BigDecimal pricedTotal = usageRepository.sumCost(workspaceId, window.from(), window.to());
         BigDecimal ownProviderTotal = usageRepository.sumByoCost(workspaceId, window.from(), window.to());
@@ -142,7 +142,7 @@ public class LlmUsageService {
                 byJobType,
                 byDay,
                 byPractice,
-                precomputeTotal,
+                practiceScriptTotal,
                 fxRateLookup.forMonth(month).orElse(null));
     }
 
@@ -185,11 +185,11 @@ public class LlmUsageService {
         return month.equals(YearMonth.now(ZoneOffset.UTC));
     }
 
-    /** The precompute purposes of the comma-separated model kinds, in their declared order. */
+    /** The practice script purposes of the comma-separated model kinds, in their declared order. */
     private static List<AgentPurpose> purposes(String modelKinds) {
         List<ModelKind> kinds =
                 Arrays.stream(modelKinds.split(",")).map(ModelKind::valueOf).toList();
-        return AgentPurpose.precompute().stream()
+        return AgentPurpose.practiceScript().stream()
                 .filter(purpose -> kinds.contains(purpose.kind()))
                 .toList();
     }

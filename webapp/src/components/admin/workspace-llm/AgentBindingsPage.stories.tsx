@@ -1,9 +1,9 @@
 import type { Meta, StoryContext, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, userEvent, waitFor, within } from "storybook/test";
 
-import type { AgentBinding, AvailableLlmModel, PracticePrecomputeSummary } from "@/api/types.gen";
+import type { AgentBinding, AvailableLlmModel, PracticeScriptSummary } from "@/api/types.gen";
 import { DATA_HANDLING_DEFS } from "@/components/practice-vocabulary/data-handling-defs";
-import { PRECOMPUTE_REQUIRED_DEF } from "@/components/practice-vocabulary/precompute-need-defs";
+import { PRACTICE_SCRIPT_REQUIRED_DEF } from "@/components/practice-vocabulary/practice-script-need-defs";
 import {
 	PURPOSE_STATUS_DEFS,
 	type PurposeStatus,
@@ -17,7 +17,7 @@ import { WorkspaceLlmProviderPanel } from "./WorkspaceLlmProviderPanel";
 import {
 	AgentBindingsPage,
 	bindingTargetKey,
-	type PrecomputeSummariesState,
+	type PracticeScriptSummariesState,
 } from "./AgentBindingsPage";
 import {
 	mockAvailableModels,
@@ -25,8 +25,8 @@ import {
 	mockDecisionModel,
 	mockDescribeWhatAndWhyNeeds,
 	mockEmbeddingModel,
-	mockPrecomputeModels,
-	mockPrecomputeNeeds,
+	mockPracticeScriptModels,
+	mockPracticeScriptNeeds,
 	SERVED_ALONE,
 } from "./fixtures";
 
@@ -100,7 +100,7 @@ const partiallyCovered: AgentBinding[] = [
 	binding("UNDECLARED", undeclaredModel),
 ];
 
-/** Practice reviews and Heph serve every member on one In-house model; no precompute model is bound. */
+/** Practice reviews and Heph serve every member on one In-house model; no model for practice scripts is bound. */
 const everyoneCovered: AgentBinding[] = [
 	binding("IN_HOUSE", inHouseModel),
 	binding("IN_HOUSE", inHouseModel, { purpose: "MENTOR" }),
@@ -125,7 +125,7 @@ const workspaceInUse: AgentBinding[] = [
 	binding("IN_HOUSE", mockEmbeddingModel, { purpose: "PRACTICE_EMBEDDING" }),
 ];
 
-const needsIn = (summaries: PracticePrecomputeSummary[]): PrecomputeSummariesState => ({
+const needsIn = (summaries: PracticeScriptSummary[]): PracticeScriptSummariesState => ({
 	status: "ready",
 	summaries,
 });
@@ -160,10 +160,10 @@ const meta = {
 		workspaceSlug: "acme",
 		state: { status: "ready" },
 		bindings: [binding("IN_HOUSE", inHouseModel)],
-		availableModels: [...mockAvailableModels, ...mockPrecomputeModels],
+		availableModels: [...mockAvailableModels, ...mockPracticeScriptModels],
 		practicesEnabled: true,
 		aiChoiceRequired: false,
-		precomputeNeeds: needsIn([]),
+		practiceScriptNeeds: needsIn([]),
 		ownProviderAllowed: true,
 		pendingWrites: new Map(),
 		onFocusPurposeClosed: fn(),
@@ -183,7 +183,7 @@ export const Loading: Story = {
 	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("heading", { name: "Reviews and Heph" })).toBeVisible();
 		await expect(
-			canvas.getByRole("heading", { name: "Models for precompute scripts" }),
+			canvas.getByRole("heading", { name: "Models for practice scripts" }),
 		).toBeVisible();
 		await expect(canvas.queryByRole("button", { name: "Practice reviews" })).toBeNull();
 		await expect(screen.queryByRole("status")).toBeNull();
@@ -259,7 +259,7 @@ export const RequiredNeedUnmet: Story = {
 	args: {
 		bindings: [...reviewsOnBothTiers, decisionForCloud],
 		aiChoiceRequired: true,
-		precomputeNeeds: needsIn(mockPrecomputeNeeds),
+		practiceScriptNeeds: needsIn(mockPracticeScriptNeeds),
 	},
 	play: async ({ canvas }) => {
 		const decision = trigger(canvas, "Decision model");
@@ -272,7 +272,7 @@ export const RequiredNeedUnmet: Story = {
 		await expect(region.queryByRole("alert")).toBeNull();
 		const note = region.getByRole("note");
 		await expect(note).toHaveTextContent(
-			"1 practice needs a decision model for In-house members. Until you assign one, its precompute script does not run, and the review checks the practice without its help.",
+			"1 practice needs a decision model for In-house members. Until you assign one, its practice script does not run, and the review checks the practice without its help.",
 		);
 		// One state, one tone: the note wears the colour of the row's badge.
 		const badge = within(decision).getByText(statusLabel("NEEDS_ATTENTION"), {
@@ -286,7 +286,7 @@ export const RequiredNeedUnmet: Story = {
 		await expect(
 			levelsOpenedBy(practice.getByRole("link", { name: "Comment quality" })),
 		).toStrictEqual(["practice:comment-quality"]);
-		const required = practice.getByText(PRECOMPUTE_REQUIRED_DEF.label);
+		const required = practice.getByText(PRACTICE_SCRIPT_REQUIRED_DEF.label);
 		await expect(required).toBeVisible();
 		// The badge sits beside the name it qualifies, not at the far edge of the row.
 		const name = practice.getByRole("link", { name: "Comment quality" }).getBoundingClientRect();
@@ -303,7 +303,7 @@ export const RequiredNeedUnmet: Story = {
 	},
 };
 
-const commentChecks: PracticePrecomputeSummary[] = ["Comment quality", "Comments explain why"].map(
+const commentChecks: PracticeScriptSummary[] = ["Comment quality", "Comments explain why"].map(
 	(practiceName, index) => ({
 		...mockCommentQualityNeeds,
 		practiceSlug: `comment-check-${index + 1}`,
@@ -316,14 +316,14 @@ export const SeveralPracticesNeedIt: Story = {
 	args: {
 		bindings: [...reviewsOnBothTiers, decisionForCloud],
 		aiChoiceRequired: true,
-		precomputeNeeds: needsIn(commentChecks),
+		practiceScriptNeeds: needsIn(commentChecks),
 	},
 	play: async ({ canvas }) => {
 		const region = within(await canvas.findByRole("region", { name: "Decision model" }));
 		const notes = region.getAllByRole("note");
 		await expect(notes).toHaveLength(1);
 		await expect(notes[0]).toHaveTextContent(
-			"2 practices need a decision model for In-house members. Until you assign one, their precompute scripts do not run, and the reviews check those practices without their help.",
+			"2 practices need a decision model for In-house members. Until you assign one, their practice scripts do not run, and the reviews check those practices without their help.",
 		);
 		const names = within(region.getByRole("list", { name: "Used by" }))
 			.getAllByRole("link")
@@ -349,18 +349,18 @@ export const CloudModelUnused: Story = {
 			"Cloud members’ reviews run on an In-house model, so this model is not used. Assign a Cloud model for practice reviews to use it.";
 		await expect(cloud.getByText(note)).toBeVisible();
 		await expect(cloud.getByRole("combobox", { name: /Cloud/u })).toHaveAccessibleDescription(note);
-		// Only the Cloud editor of a precompute kind has it.
+		// Only the Cloud editor of a model kind for practice scripts has it.
 		const inHouse = row(within(canvas.getByRole("region", { name: "Decision model" })), "In-house");
 		await expect(inHouse.queryByText(/reviews run on an In-house model/u)).toBeNull();
 	},
 };
 
 /**
- * The needs are read apart from the page: while they load, the precompute rows claim nothing about
+ * The needs are read apart from the page: while they load, the rows for practice scripts claim nothing about
  * them, and the rest of the page already works.
  */
-export const PrecomputeNeedsLoading: Story = {
-	args: { precomputeNeeds: { status: "loading" } },
+export const PracticeScriptNeedsLoading: Story = {
+	args: { practiceScriptNeeds: { status: "loading" } },
 	play: async ({ canvas }) => {
 		// No count and no status: the description is the cells alone.
 		await expect(trigger(canvas, "Decision model")).toHaveAccessibleDescription(
@@ -373,17 +373,17 @@ export const PrecomputeNeedsLoading: Story = {
 	},
 };
 
-/** A failed read of the needs says so in the precompute section, and nothing else stops. */
-export const PrecomputeNeedsFailed: Story = {
+/** A failed read of the needs says so in the section *Models for practice scripts*, and nothing else stops. */
+export const PracticeScriptNeedsFailed: Story = {
 	args: {
-		precomputeNeeds: {
+		practiceScriptNeeds: {
 			status: "error",
 			error: { status: 500, title: "Internal Server Error" },
 			onRetry: fn(),
 		},
 	},
 	play: async ({ canvas }) => {
-		const section = within(canvas.getByRole("region", { name: "Models for precompute scripts" }));
+		const section = within(canvas.getByRole("region", { name: "Models for practice scripts" }));
 		await expect(
 			section.getByText("We could not load which practices use these models"),
 		).toBeVisible();
@@ -395,7 +395,7 @@ export const PrecomputeNeedsFailed: Story = {
 	},
 };
 
-const manyPractices: PracticePrecomputeSummary[] = Array.from({ length: 7 }, (_, index) => ({
+const manyPractices: PracticeScriptSummary[] = Array.from({ length: 7 }, (_, index) => ({
 	...mockDescribeWhatAndWhyNeeds,
 	practiceSlug: `practice-${index + 1}`,
 	practiceName: `Practice ${index + 1}`,
@@ -403,13 +403,13 @@ const manyPractices: PracticePrecomputeSummary[] = Array.from({ length: 7 }, (_,
 
 /** A long list shows five practices, then the rest on request. An optional need wears no badge. */
 export const ManyPracticesUseIt: Story = {
-	args: { precomputeNeeds: needsIn(manyPractices) },
+	args: { practiceScriptNeeds: needsIn(manyPractices) },
 	play: async ({ canvas }) => {
 		const region = await openPurpose(canvas, "Embedding model");
 		const usedBy = within(region.getByRole("list", { name: "Used by" }));
 		await expect(usedBy.getAllByRole("listitem")).toHaveLength(5);
 		await expect(usedBy.queryByText("Optional")).toBeNull();
-		await expect(usedBy.queryByText(PRECOMPUTE_REQUIRED_DEF.label)).toBeNull();
+		await expect(usedBy.queryByText(PRACTICE_SCRIPT_REQUIRED_DEF.label)).toBeNull();
 		await userEvent.click(region.getByRole("button", { name: "Show all 7" }));
 		await expect(usedBy.getAllByRole("listitem")).toHaveLength(7);
 		await expect(region.queryByRole("button", { name: /^Show all/u })).toBeNull();
@@ -561,8 +561,8 @@ export const OffersOnlyModelsThatServeThePurpose: Story = {
 };
 
 /**
- * With no review model, the row opens by itself: nothing reviews until one is assigned. A precompute
- * kind with no model at all names the API to connect and links to the providers below.
+ * With no review model, the row opens by itself: nothing reviews until one is assigned. A model kind for
+ * practice scripts with no model at all names the API to connect and links to the providers below.
  */
 export const NoModelsAvailable: Story = {
 	args: {
@@ -597,7 +597,7 @@ export const NoModelsAvailable: Story = {
 		await expect(
 			row(reviews, UNCHOSEN_ROW).getByText(/No model for this purpose is available yet/u),
 		).toBeVisible();
-		// A precompute kind with no model at all says which API to connect, once per row.
+		// A model kind for practice scripts with no model at all says which API to connect, once per row.
 		const embedding = row(await openPurpose(canvas, "Embedding model"), "Cloud");
 		await expect(embedding.getByRole("combobox", { name: /Cloud/u })).toHaveAccessibleDescription(
 			"No embedding model yet. Connect a provider with the Embeddings API under Your providers, then add its model.",
@@ -637,7 +637,7 @@ export const ProjectReviewsDisabled: Story = {
 	args: {
 		bindings: [...partiallyCovered, decisionForCloudUnserved],
 		practicesEnabled: false,
-		precomputeNeeds: needsIn(mockPrecomputeNeeds),
+		practiceScriptNeeds: needsIn(mockPracticeScriptNeeds),
 	},
 	play: async ({ canvas }) => {
 		for (const title of ["Practice reviews", "Decision model", "Embedding model"]) {
@@ -744,7 +744,7 @@ export const AdvancedDisclosure: Story = {
 		await openAdvanced(mentor);
 		await expect(mentor.queryByLabelText(/^Max concurrent runs/u)).toBeNull();
 		await expect(mentor.getByLabelText(/^Timeout \(seconds\)/u)).toHaveValue(10_800);
-		// A precompute model runs under its practice review's limits and has none of its own.
+		// A model for practice scripts runs under its practice review's limits and has none of its own.
 		await expect(
 			row(await openPurpose(canvas, "Embedding model"), "In-house").queryByRole("button", {
 				name: /^Advanced/u,
@@ -777,7 +777,7 @@ export const InvalidRunLimit: Story = {
 export const MobileReflow: Story = {
 	args: {
 		bindings: workspaceInUse,
-		precomputeNeeds: needsIn([mockCommentQualityNeeds]),
+		practiceScriptNeeds: needsIn([mockCommentQualityNeeds]),
 	},
 	parameters: {
 		layout: "fullscreen",
@@ -801,7 +801,7 @@ export const MobileReflow: Story = {
 export const InUse: Story = {
 	args: {
 		bindings: workspaceInUse,
-		precomputeNeeds: needsIn(mockPrecomputeNeeds),
+		practiceScriptNeeds: needsIn(mockPracticeScriptNeeds),
 	},
 	play: async ({ canvas }) => {
 		// Heph is a kind like the others here, so its mark takes the review kind's neutral tone, not
@@ -830,7 +830,7 @@ export const InUse: Story = {
 export const Dark: Story = {
 	args: {
 		bindings: workspaceInUse,
-		precomputeNeeds: needsIn(mockPrecomputeNeeds),
+		practiceScriptNeeds: needsIn(mockPracticeScriptNeeds),
 	},
 	globals: { theme: "dark" },
 };

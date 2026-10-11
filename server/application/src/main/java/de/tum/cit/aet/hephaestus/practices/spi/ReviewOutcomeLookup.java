@@ -20,7 +20,7 @@ public interface ReviewOutcomeLookup {
      * @param coverageByPracticeSlug outcome for each eligible practice; empty without a valid account
      * @param answeredByPracticeSlug the completed review whose answer this run reused instead of asking, by
      *                               practice slug, as the run recorded it when it was prepared
-     * @param precomputeByPracticeSlug what each staged precompute script did in the run's last finished
+     * @param practiceScriptByPracticeSlug what each staged practice script did in the run's last finished
      *                                 attempt, by practice slug; empty when the runner reported nothing
      */
     record ReviewOutcome(
@@ -30,7 +30,7 @@ public interface ReviewOutcomeLookup {
             @NonNull Map<String, PracticeReadinessOutcome> readinessByPracticeSlug,
             @NonNull Map<String, PracticeCoverageOutcome> coverageByPracticeSlug,
             @NonNull Map<String, UUID> answeredByPracticeSlug,
-            @NonNull Map<String, PrecomputeRunDTO> precomputeByPracticeSlug) {
+            @NonNull Map<String, PracticeScriptRunDTO> practiceScriptByPracticeSlug) {
         public ReviewOutcome(
                 ReviewRunState state,
                 boolean insufficientEvidence,

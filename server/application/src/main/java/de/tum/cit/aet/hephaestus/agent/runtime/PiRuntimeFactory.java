@@ -90,15 +90,15 @@ public class PiRuntimeFactory {
         String runtimeFlagsFragment = renderRuntimeFlags(profile.runtimeFlags());
         String runtimeEnvFragment = renderRuntimeEnv(profile.additionalEnv());
 
-        String precomputeStep = spec.precomputeStep();
+        String practiceScriptStep = spec.practiceScriptStep();
         String jobToken = spec.jobToken();
-        if (precomputeStep == null || jobToken == null) {
+        if (practiceScriptStep == null || jobToken == null) {
             throw new IllegalStateException("validated Pi plan contains null fields");
         }
         // Every directory the runner may write exists before Node starts; PiRunnerProfile says why.
         String command = "mkdir -p " + String.join(" ", PiRunnerProfile.WRITABLE_DIRECTORIES)
                 + " /home/agent/.local/config && "
-                + precomputeStep
+                + practiceScriptStep
                 + runtimeEnvFragment
                 + "node "
                 + runtimeFlagsFragment

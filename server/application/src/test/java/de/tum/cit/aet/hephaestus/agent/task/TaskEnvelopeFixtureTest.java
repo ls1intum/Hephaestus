@@ -14,7 +14,7 @@ import tools.jackson.databind.json.JsonMapper;
 /** JSON contract fixture shared with the TypeScript runner tests. */
 class TaskEnvelopeFixtureTest extends BaseUnitTest {
 
-    private static final String FIXTURE_PATH = "task-fixtures/v3/practice-review.json";
+    private static final String FIXTURE_PATH = "task-fixtures/v4/practice-review.json";
 
     @Test
     void matchesFixture() throws IOException {

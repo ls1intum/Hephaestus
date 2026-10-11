@@ -35,7 +35,7 @@ const preview: CatalogPracticePreview = {
 		deliveryBehavior: { summaryOnly: false },
 		automatedReviewPolicy: mockPullRequestPolicy,
 		automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
-		precomputeScript: "export default { hasDescription: pullRequest.body.length > 0 };",
+		practiceScript: "export default { hasDescription: pullRequest.body.length > 0 };",
 		whyItMatters: "Reviewers need intent to assess whether the change solves the right problem.",
 		whatGoodLooksLike: "A concise summary, motivation, and verification steps.",
 		groupSlug: "review-ready-work",

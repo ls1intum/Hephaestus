@@ -83,8 +83,8 @@ class ProxyRequestPolicyTest extends BaseUnitTest {
     @ParameterizedTest
     @EnumSource(
             value = LlmUsageSourceType.class,
-            names = {"PRECOMPUTE_DECISION", "PRECOMPUTE_EMBEDDING", "PRECOMPUTE_RERANKING"})
-    void shouldCheckAPrecomputeModelAgainstTheReviewedDeveloperWhenItsSlotIsCalled(LlmUsageSourceType source) {
+            names = {"PRACTICE_SCRIPT_DECISION", "PRACTICE_SCRIPT_EMBEDDING", "PRACTICE_SCRIPT_RERANKING"})
+    void shouldCheckAPracticeScriptModelAgainstTheReviewedDeveloperWhenItsSlotIsCalled(LlmUsageSourceType source) {
         var job = new AgentJob();
         when(jobs.findByIdAndWorkspaceId(id, 1L)).thenReturn(Optional.of(job));
         when(reviews.allows(job, model)).thenReturn(true);

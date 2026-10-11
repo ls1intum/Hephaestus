@@ -72,15 +72,15 @@ export const ApiOptions: Story = {
 				.getAllByRole("option")
 				.map((option) => option.textContent),
 		).toStrictEqual(["Responses API", "Chat Completions API"]);
-		const precompute = screen.getByRole("group", { name: "For precompute scripts" });
+		const practiceScripts = screen.getByRole("group", { name: "For practice scripts" });
 		await expect(
-			within(precompute)
+			within(practiceScripts)
 				.getAllByRole("option")
 				.map((option) => option.textContent),
 		).toStrictEqual(["Decisions API", "Embeddings API", "Rerank API (Cohere-compatible)"]);
 		await expect(screen.getAllByRole("option")).toHaveLength(5);
 
-		await userEvent.click(within(precompute).getByRole("option", { name: "Embeddings API" }));
+		await userEvent.click(within(practiceScripts).getByRole("option", { name: "Embeddings API" }));
 		await expect(args.onChange).toHaveBeenLastCalledWith(
 			expect.objectContaining({ apiProtocol: "openai-embeddings" }),
 		);

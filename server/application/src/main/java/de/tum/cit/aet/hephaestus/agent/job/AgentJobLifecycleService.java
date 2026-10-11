@@ -220,8 +220,8 @@ public class AgentJobLifecycleService {
                 snap.priceSnapshot() != null ? snap.priceSnapshot() : LlmPriceSnapshot.unpricedInstance();
         // A cancel from the API cannot see what the attempt consumed; the executor path that observes
         // the cancellation bills the proxy-attributed tokens, so the review's own row carries none. A
-        // precompute call waits for the job row and is dropped once the transition above ends the
-        // attempt, so the precompute rows are complete here.
+        // practice script call waits for the job row and is dropped once the transition above ends the
+        // attempt, so the practice script rows are complete here.
         boolean billed =
                 TerminalUsage.none().appendTo(usageRecorder, agentJobRepository, workspaceId, job, snap, price);
         log.info(

@@ -169,10 +169,10 @@
 					"description": "What must be in the work for this practice to have anything to judge. Decided from staged evidence before the practice is put to a model, so a practice whose prerequisite is provably absent is not asked. Omit to apply to every artifact of this kind.",
 					"$ref": "#/$defs/precondition"
 				},
-				"precomputeScript": {
+				"practiceScript": {
 					"description": "Optional classpath resource containing TypeScript that prepares structured review context.",
 					"type": "string",
-					"pattern": "^practices/precompute/[a-z0-9]+(?:-[a-z0-9]+)*\\.ts$"
+					"pattern": "^practices/scripts/[a-z0-9]+(?:-[a-z0-9]+)*\\.ts$"
 				},
 				"preamble": {
 					"description": "Optional named criteria preamble; defaults to the reviewed work type.",

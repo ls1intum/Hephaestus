@@ -11,14 +11,14 @@ public enum AgentPurpose {
     PRACTICE_REVIEW(ModelKind.CHAT),
     /** Interactive mentor turns (web SSE and Slack). */
     MENTOR(ModelKind.CHAT),
-    /** Closed questions that practice precompute scripts ask before a review. */
+    /** Closed questions that practice scripts ask before a review. */
     PRACTICE_DECISION(ModelKind.DECISION),
-    /** Embeddings that practice precompute scripts compute before a review. */
+    /** Embeddings that practice scripts compute before a review. */
     PRACTICE_EMBEDDING(ModelKind.EMBEDDING),
-    /** Reranking that practice precompute scripts do before a review. */
+    /** Reranking that practice scripts do before a review. */
     PRACTICE_RERANKING(ModelKind.RERANKING);
 
-    private static final List<AgentPurpose> PRECOMPUTE = Arrays.stream(values())
+    private static final List<AgentPurpose> PRACTICE_SCRIPT = Arrays.stream(values())
             .filter(purpose -> purpose.kind != ModelKind.CHAT)
             .toList();
 
@@ -45,10 +45,10 @@ public enum AgentPurpose {
     }
 
     /**
-     * The purposes that give a practice review its optional precompute models, one per non-chat kind.
-     * The chat model of precompute is the review's own model.
+     * The purposes that give a practice review its optional models for practice scripts, one per non-chat kind.
+     * The chat model of practice scripts is the review's own model.
      */
-    public static List<AgentPurpose> precompute() {
-        return PRECOMPUTE;
+    public static List<AgentPurpose> practiceScript() {
+        return PRACTICE_SCRIPT;
     }
 }

@@ -161,8 +161,9 @@ const INTENTIONALLY_MISSING_PATHS = [
 	},
 	{
 		document: "docs/contributor/practice-catalogue.md",
-		value: "work/precompute-out/<slug>.md",
-		reason: "a practice's precompute section, written inside the agent workspace for its turn",
+		value: "work/practice-scripts-out/<slug>.md",
+		reason:
+			"the practice script section of a practice, written inside the agent workspace for its turn",
 	},
 	{
 		document: "AGENTS.md",

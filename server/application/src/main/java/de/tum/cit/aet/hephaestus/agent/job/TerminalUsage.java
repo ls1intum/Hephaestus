@@ -32,15 +32,15 @@ record TerminalUsage(
      * @param runnerUsage what the agent runner reported, or {@code null} when it never produced one
      * @param proxyCounts the {@code agent_job} row's proxy accumulators, read BEFORE any requeue
      *     (which zeroes them) and BEFORE the runner's totals are written over them
-     * @param precompute the attempt's precompute totals by model kind. Its chat total is added to the
-     *     runner's report: the precompute stage runs before the runner, in another process, so the report
-     *     never contains those calls, while the proxy's counters do. The precompute rows keep one prompt
+     * @param practiceScript the attempt's practice script totals by model kind. Its chat total is added to the
+     *     runner's report: the practice script stage runs before the runner, in another process, so the report
+     *     never contains those calls, while the proxy's counters do. The practice script rows keep one prompt
      *     total, so its cached share is counted as ordinary input.
      */
     static TerminalUsage resolve(
             @Nullable LlmUsage runnerUsage,
             @Nullable AgentJobLlmUsage proxyCounts,
-            List<PrecomputeKindTotal> precompute) {
+            List<PracticeScriptKindTotal> practiceScript) {
         boolean fromRunner = hasTokens(runnerUsage);
         boolean fromProxy = proxyCounts != null && proxyCounts.hasBillableUsage();
         if (!fromRunner && !fromProxy) {
@@ -54,7 +54,7 @@ record TerminalUsage(
 
         Buckets runner = fromRunner ? Buckets.of(Objects.requireNonNull(runnerUsage)) : Buckets.NONE;
         if (fromRunner) {
-            for (PrecomputeKindTotal total : precompute) {
+            for (PracticeScriptKindTotal total : practiceScript) {
                 if (total.modelKind() == ModelKind.CHAT) {
                     runner = runner.plus(total);
                 }
@@ -78,7 +78,7 @@ record TerminalUsage(
     }
 
     /**
-     * An attempt that ended without a runner report. The proxy's counters already hold its precompute
+     * An attempt that ended without a runner report. The proxy's counters already hold its practice script
      * chat calls.
      */
     static TerminalUsage fromProxy(@Nullable AgentJobLlmUsage proxyCounts) {
@@ -92,18 +92,18 @@ record TerminalUsage(
 
     /**
      * Append this ending attempt to the spend ledger — the ONE way an {@code agent_job} attempt becomes
-     * ledger rows: its own row, then one row for each precompute model other than chat that it called,
+     * ledger rows: its own row, then one row for each model for practice scripts other than chat that it called,
      * over all its practices. The ledger key holds no practice, so one row per practice would keep only
      * the first.
-     * The precompute chat calls are already in this attempt's own row: the proxy's counters hold them, and
+     * The practice script chat calls are already in this attempt's own row: the proxy's counters hold them, and
      * {@link #resolve} adds them to a runner report. Which of the recorder's two
      * append paths a row takes is derived here, never chosen by the caller: a caller picking it itself
      * could write a PRICED row of invented zeros, the exact failure the ledger exists to prevent.
      *
      * @param workspaceId passed explicitly rather than read off {@code job}: the terminal paths differ
      *     in whether they hold a workspace-scoped id or a job loaded with its workspace
-     * @param snapshot the admitted snapshot, which names the models and prices the precompute rows;
-     *     {@code null} when it cannot be read, which leaves the precompute rows UNPRICED
+     * @param snapshot the admitted snapshot, which names the models and prices the practice script rows;
+     *     {@code null} when it cannot be read, which leaves the practice script rows UNPRICED
      * @param price the price of the attempt's own row
      * @return true when the attempt's own row was billed at its frozen price, false when it was appended
      *     UNPRICED
@@ -136,18 +136,19 @@ record TerminalUsage(
                         provenance,
                         occurredAt),
                 verifiable);
-        for (PrecomputeKindTotal total : jobs.sumPrecomputeUsageByKind(workspaceId, job.getId(), job.getRetryCount())) {
+        for (PracticeScriptKindTotal total :
+                jobs.sumPracticeScriptUsageByKind(workspaceId, job.getId(), job.getRetryCount())) {
             if (total.modelKind() == ModelKind.CHAT) {
                 continue;
             }
-            FrozenModel model = snapshot == null ? null : snapshot.precomputeSlot(total.modelKind());
+            FrozenModel model = snapshot == null ? null : snapshot.practiceScriptSlot(total.modelKind());
             LlmPriceSnapshot frozen = model == null ? null : model.priceSnapshot();
             append(
                     recorder,
                     workspaceId,
                     new LlmUsageRecorder.LlmUsageSample(
                             LlmUsageJobType.from(job.getJobType()),
-                            AgentJobPrecomputeUsage.ledgerSourceType(total.modelKind()),
+                            AgentJobPracticeScriptUsage.ledgerSourceType(total.modelKind()),
                             job.getId(),
                             job.getRetryCount(),
                             model == null ? null : model.upstreamModelId(),
@@ -224,7 +225,7 @@ record TerminalUsage(
                     Math.max(0, counts.totalCalls()));
         }
 
-        Buckets plus(PrecomputeKindTotal total) {
+        Buckets plus(PracticeScriptKindTotal total) {
             return new Buckets(
                     input + total.inputTokens(),
                     output + total.outputTokens(),

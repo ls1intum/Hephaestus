@@ -72,8 +72,8 @@ public class CuratedPracticeOverride {
     @Column(name = "criteria", columnDefinition = "TEXT")
     private @Nullable String criteria;
 
-    @Column(name = "precompute_script", columnDefinition = "TEXT")
-    private @Nullable String precomputeScript;
+    @Column(name = "practice_script", columnDefinition = "TEXT")
+    private @Nullable String practiceScript;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "automated_review_policy", columnDefinition = "jsonb")
@@ -151,7 +151,7 @@ public class CuratedPracticeOverride {
                 subject,
                 precondition,
                 criteria,
-                precomputeScript,
+                practiceScript,
                 automatedReviewPolicy,
                 whyItMatters,
                 whatGoodLooksLike,
@@ -170,7 +170,7 @@ public class CuratedPracticeOverride {
         this.subject = definition.subject();
         this.precondition = definition.precondition();
         this.criteria = definition.criteria();
-        this.precomputeScript = definition.precomputeScript();
+        this.practiceScript = definition.practiceScript();
         this.automatedReviewPolicy = definition.automatedReviewPolicy();
         this.deliveryBehavior = definition.deliveryBehavior();
         this.whyItMatters = definition.whyItMatters();
@@ -200,7 +200,7 @@ public class CuratedPracticeOverride {
         this.subject = ActorRole.AUTHOR;
         this.precondition = null;
         this.criteria = null;
-        this.precomputeScript = null;
+        this.practiceScript = null;
         this.automatedReviewPolicy = null;
         this.deliveryBehavior = null;
         this.whyItMatters = null;

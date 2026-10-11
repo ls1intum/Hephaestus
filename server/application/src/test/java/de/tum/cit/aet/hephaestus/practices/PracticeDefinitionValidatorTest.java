@@ -174,11 +174,11 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
     }
 
     @Test
-    void rejectsPrecomputeScriptWithoutAutomatedReview() {
+    void rejectsPracticeScriptWithoutAutomatedReview() {
         assertThatThrownBy(() -> validator.validate(definition(
                         ScmSignals.PULL_REQUEST_OPENED, "export default {}", List.of(), withoutAutomatedReview())))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("A precompute script needs a practice that Hephaestus can review.");
+                .hasMessage("A practice script needs a practice that Hephaestus can review.");
     }
 
     @ParameterizedTest
@@ -289,7 +289,7 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
                     original.subject(),
                     original.precondition(),
                     original.criteria(),
-                    original.precomputeScript(),
+                    original.practiceScript(),
                     original.automatedReviewPolicy(),
                     original.whyItMatters(),
                     original.whatGoodLooksLike(),
@@ -302,7 +302,7 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
 
     private static PracticeDefinition definition(
             SignalName signal,
-            @Nullable String precomputeScript,
+            @Nullable String practiceScript,
             List<PracticeEvidenceRequirement> needs,
             PracticeAutomatedReviewPolicy policy) {
         return new PracticeDefinition(
@@ -313,7 +313,7 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
                 ActorRole.AUTHOR,
                 null,
                 "Assess the review",
-                precomputeScript,
+                practiceScript,
                 policy,
                 null,
                 null,

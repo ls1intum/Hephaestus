@@ -93,8 +93,8 @@ class AgentBindingControllerIntegrationTest extends AbstractWorkspaceIntegration
 
     @Test
     @WithAdminUser
-    @DisplayName("each binding names the members it serves, with a precompute binding capped at their review")
-    void shouldNameTheMembersEachBindingServesWhenTheReviewIsStricterThanAPrecomputeModel() {
+    @DisplayName("each binding names the members it serves, with a practice script binding capped at their review")
+    void shouldNameTheMembersEachBindingServesWhenTheReviewIsStricterThanAPracticeScriptModel() {
         Workspace workspace = setupWorkspace("binding-served");
         LlmModel review = seedInstanceModel("binding-served-review");
         review.setDataHandling(DataHandlingFacts.of(LlmDataOperator.OWN_ORGANISATION, null));

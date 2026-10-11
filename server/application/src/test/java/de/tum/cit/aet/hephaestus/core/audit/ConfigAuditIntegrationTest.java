@@ -183,7 +183,7 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
                         PracticeTestEvidence.needsFor(ArtifactKinds.PULL_REQUEST),
                         "criteria",
                         "Initial private criteria",
-                        "precomputeScript",
+                        "practiceScript",
                         "return { hints: [] };"))
                 .exchange()
                 .expectStatus()
@@ -203,7 +203,7 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
                         "Focused code reviews",
                         "criteria",
                         "Updated private criteria",
-                        "precomputeScript",
+                        "practiceScript",
                         "return { hints: ['updated'] };"))
                 .exchange()
                 .expectStatus()
@@ -230,10 +230,10 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 .extracting(ConfigAuditEvent::getAction)
                 .containsExactly(ConfigAuditAction.CREATED, ConfigAuditAction.UPDATED, ConfigAuditAction.DELETED);
         assertThat(rows.get(0).getNewValue())
-                .contains("\"criteriaRevision\":1", "\"criteriaSha256\"", "\"precomputeScriptSha256\"")
+                .contains("\"criteriaRevision\":1", "\"criteriaSha256\"", "\"practiceScriptSha256\"")
                 .doesNotContain("Initial private criteria", "return { hints");
         assertThat(rows.get(1).changedKeyList())
-                .containsExactlyInAnyOrder("name", "criteriaRevision", "criteriaSha256", "precomputeScriptSha256");
+                .containsExactlyInAnyOrder("name", "criteriaRevision", "criteriaSha256", "practiceScriptSha256");
         assertThat(rows.get(1).getNewValue())
                 .contains("\"criteriaRevision\":2", "\"name\":\"Focused code reviews\"")
                 .doesNotContain("Updated private criteria", "return { hints");

@@ -379,7 +379,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         }
 
         @Test
-        void shCommandWithPrecomputeOrder() {
+        void shCommandWithPracticeScriptOrder() {
             PiPlanSpec spec = new PiPlanSpec(
                     "openai-completions",
                     "gpt-x",
@@ -391,12 +391,12 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                     600,
                     PRACTICE,
                     Map.of(),
-                    "echo precompute && ");
+                    "echo practice-scripts && ");
             var plan = factory.build(spec);
             assertThat(plan.command()).hasSize(3);
             assertThat(plan.command().get(0)).isEqualTo("sh");
             String body = plan.command().get(2);
-            assertThat(body.indexOf("echo precompute"))
+            assertThat(body.indexOf("echo practice-scripts"))
                     .isLessThan(
                             body.indexOf(SandboxLayout.WORKSPACE_ROOT + "/" + SandboxLayout.RUNNER_SCRIPT_FILENAME));
         }

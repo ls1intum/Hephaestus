@@ -1,21 +1,21 @@
 import { describe, expect, it } from "vitest";
 
 import {
-	isPrecomputeApi,
+	isPracticeScriptApi,
 	LLM_API_PROTOCOL_GROUPS,
-	precomputeApiFor,
+	practiceScriptApiFor,
 	LLM_API_PROTOCOL_SELECT_ITEMS,
 	llmApiProtocolDescription,
 } from "./llm-api-protocol-labels";
 
 describe("LLM API protocol labels", () => {
-	it("offers chat APIs first, then the precompute APIs, each once", () => {
+	it("offers chat APIs first, then the APIs for practice scripts, each once", () => {
 		expect(
 			LLM_API_PROTOCOL_GROUPS.map(({ label, protocols }) => ({ label, protocols })),
 		).toStrictEqual([
 			{ label: "Chat models", protocols: ["openai-responses", "openai-completions"] },
 			{
-				label: "For precompute scripts",
+				label: "For practice scripts",
 				protocols: ["openai-decisions", "openai-embeddings", "cohere-rerank"],
 			},
 		]);
@@ -45,8 +45,8 @@ describe("LLM API protocol labels", () => {
 		["openai-decisions", true],
 		["openai-embeddings", true],
 		["cohere-rerank", true],
-	] as const)("treats %s as a precompute API: %s", (protocol, precompute) => {
-		expect(isPrecomputeApi(protocol)).toBe(precompute);
+	] as const)("treats %s as an API for practice scripts: %s", (protocol, practiceScript) => {
+		expect(isPracticeScriptApi(protocol)).toBe(practiceScript);
 	});
 
 	it.each([
@@ -55,6 +55,6 @@ describe("LLM API protocol labels", () => {
 		["PRACTICE_RERANKING", "cohere-rerank"],
 		["PRACTICE_REVIEW", undefined],
 	] as const)("names the API that serves only %s: %s", (purpose, protocol) => {
-		expect(precomputeApiFor(purpose)).toBe(protocol);
+		expect(practiceScriptApiFor(purpose)).toBe(protocol);
 	});
 });

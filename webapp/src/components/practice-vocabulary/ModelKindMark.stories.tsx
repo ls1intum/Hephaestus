@@ -9,7 +9,7 @@ import { ModelKindMark } from "./ModelKindMark";
  * stays neutral: a tinted ground is a practice group's pill, and a tinted badge is a status, so
  * neither may stand for a kind.
  *
- * The three precompute kinds take violet, cyan and fuchsia, each at least 30° (OKLCH) from the
+ * The three model kinds for practice scripts take violet, cyan and fuchsia, each at least 30° (OKLCH) from the
  * status tones and the mentor accent. Practice reviews and Heph stay neutral, because this mark
  * does not introduce Heph.
  */

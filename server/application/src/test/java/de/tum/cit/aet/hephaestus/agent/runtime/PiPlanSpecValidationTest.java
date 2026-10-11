@@ -158,7 +158,7 @@ class PiPlanSpecValidationTest extends BaseUnitTest {
     }
 
     @Test
-    void nullPrecomputeStepNormalizesToEmptyString() {
+    void nullPracticeScriptStepNormalizesToEmptyString() {
         PiPlanSpec spec = new PiPlanSpec(
                 "openai-completions",
                 "gpt-5.4-mini",
@@ -173,7 +173,7 @@ class PiPlanSpecValidationTest extends BaseUnitTest {
                 null);
 
         // The null-coalesce protects PiRuntimeFactory's string concat from an NPE downstream.
-        assertThat(spec.precomputeStep()).isEmpty();
+        assertThat(spec.practiceScriptStep()).isEmpty();
     }
 
     @Test

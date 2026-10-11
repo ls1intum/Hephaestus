@@ -12,13 +12,13 @@ import {
 	expectedBehaviourUsage,
 	usageReport,
 	withOwnProvider,
-	withPrecomputeUsage,
+	withPracticeScriptUsage,
 } from "./fixtures";
 import { LlmUsageByPracticeTable } from "./LlmUsageByPracticeTable";
 
-const TABLE_NAME = "Precompute model spend by practice";
+const TABLE_NAME = "Spend on models for practice scripts, by practice";
 
-const priced = withPrecomputeUsage(withOwnProvider(usageReport()));
+const priced = withPracticeScriptUsage(withOwnProvider(usageReport()));
 
 /** `find`, not `get`: the preview's router mounts the story after the play function starts. */
 async function tableIn(canvas: StoryContext["canvas"]): Promise<HTMLElement> {
@@ -46,7 +46,7 @@ async function practiceOrder(canvas: StoryContext["canvas"]): Promise<string[]> 
 }
 
 /**
- * What the decision, embedding and reranking calls of each practice's precompute script cost, one
+ * What the decision, embedding and reranking calls of each practice's script cost, one
  * row per practice. That spend is already inside the run types, so this table is a split of it, never
  * an addition to it. The footer is the server's own total: one review runs several practices, so
  * its reviews do not add up from the rows.
@@ -182,7 +182,7 @@ export const OwnProviderAbsent: Story = {
 		purses: ["SHARED"],
 		report: {
 			byPractice: [commentQualityUsage, noChargeUsage],
-			precomputeTotal: {
+			practiceScriptTotal: {
 				reviews: 27,
 				calls: 552,
 				inputTokens: 148_400,
@@ -217,7 +217,7 @@ export const UnpricedReviews: Story = {
 	args: {
 		report: {
 			byPractice: [commentQualityUsage, deletedPracticeUsage],
-			precomputeTotal: {
+			practiceScriptTotal: {
 				reviews: 20,
 				calls: 433,
 				inputTokens: 96_400,
@@ -255,7 +255,7 @@ export const NotAttributed: Story = {
 	args: {
 		report: {
 			byPractice: [commentQualityUsage, notAttributedUsage],
-			precomputeTotal: {
+			practiceScriptTotal: {
 				reviews: 19,
 				calls: 426,
 				inputTokens: 99_500,
@@ -319,7 +319,7 @@ export const SubCentAverage: Story = {
 				notAttributedUsage,
 				{ ...noChargeUsage, instanceTotalCostUsd: 0.0042 },
 			],
-			precomputeTotal: {
+			practiceScriptTotal: {
 				reviews: 29,
 				calls: 566,
 				inputTokens: 151_500,

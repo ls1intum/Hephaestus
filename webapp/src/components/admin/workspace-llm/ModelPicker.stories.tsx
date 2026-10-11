@@ -131,7 +131,7 @@ export const NoModelsForTier: Story = {
 };
 
 /**
- * A precompute kind with no model at all names the API that serves only it, and links to the
+ * A model kind for practice scripts with no model at all names the API that serves only it, and links to the
  * workspace's own providers on the same page.
  */
 export const NoDecisionModelYet: Story = {

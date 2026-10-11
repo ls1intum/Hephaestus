@@ -13,7 +13,7 @@ import {
 	AdminInstanceLlmUsageTable,
 	type AdminInstanceLlmUsageTableProps,
 } from "./AdminInstanceLlmUsageTable";
-import { NO_PRECOMPUTE_USAGE } from "./fixtures";
+import { NO_PRACTICE_SCRIPT_USAGE } from "./fixtures";
 
 const workspace: AdminWorkspaceLlmUsage = {
 	workspaceSlug: "example-workspace",
@@ -49,7 +49,7 @@ const detailReport: WorkspaceLlmUsageReport = {
 	ownProviderPaused: false,
 	ownProviderInUse: true,
 	unpricedEventCount: 0,
-	...NO_PRECOMPUTE_USAGE,
+	...NO_PRACTICE_SCRIPT_USAGE,
 	byJobType: [
 		{
 			jobType: "MENTOR_TURN",

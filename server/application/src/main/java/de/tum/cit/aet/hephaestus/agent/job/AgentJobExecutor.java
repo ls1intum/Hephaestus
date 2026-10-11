@@ -185,7 +185,7 @@ public class AgentJobExecutor {
     private final MeterRegistry meterRegistry;
     private final PracticeReviewRefusalMetrics practiceReviewRefusalMetrics;
     private final LlmUsageRecorder usageRecorder;
-    private final PrecomputeRunRecorder precomputeRuns;
+    private final PracticeScriptRunRecorder practiceScriptRuns;
     private final LlmBudgetService llmBudgetService;
     private final @Nullable LlmAdmissionService llmAdmissionService;
 
@@ -234,7 +234,7 @@ public class AgentJobExecutor {
             PracticeReviewRefusalMetrics practiceReviewRefusalMetrics,
             AgentJobTelemetry jobTelemetry,
             LlmUsageRecorder usageRecorder,
-            PrecomputeRunRecorder precomputeRuns,
+            PracticeScriptRunRecorder practiceScriptRuns,
             LlmBudgetService llmBudgetService,
             @Nullable LlmAdmissionService llmAdmissionService,
             ArtifactSourceCatalogRegistry sourceCatalogs,
@@ -257,7 +257,7 @@ public class AgentJobExecutor {
         this.practiceReviewRefusalMetrics = practiceReviewRefusalMetrics;
         this.jobTelemetry = jobTelemetry;
         this.usageRecorder = usageRecorder;
-        this.precomputeRuns = precomputeRuns;
+        this.practiceScriptRuns = practiceScriptRuns;
         this.llmBudgetService = llmBudgetService;
         this.llmAdmissionService = llmAdmissionService;
         this.capacityState = capacityState;
@@ -953,14 +953,14 @@ public class AgentJobExecutor {
                     job.getRetryCount(),
                     tokenExpiry,
                     WorkerJwtIssuer.LLM_PROXY_SCOPE);
-            // A second credential, so the precompute scripts never hold the review's capabilities.
-            String precomputeToken = job.getPurpose() == AgentPurpose.PRACTICE_REVIEW
+            // A second credential, so the practice scripts never hold the review's capabilities.
+            String practiceScriptToken = job.getPurpose() == AgentPurpose.PRACTICE_REVIEW
                     ? workerJwtIssuer.issueForJobUntil(
                             jobId,
                             job.getWorkspace().getId(),
                             job.getRetryCount(),
                             tokenExpiry,
-                            WorkerJwtIssuer.LLM_PRECOMPUTE_SCOPE)
+                            WorkerJwtIssuer.LLM_PRACTICE_SCRIPT_SCOPE)
                     : null;
             stage.set(PreparationFailure.Stage.SPEC);
             PracticeAgentRequest adapterRequest = new PracticeAgentRequest(
@@ -971,8 +971,8 @@ public class AgentJobExecutor {
                     snapshot.reasoningEffort(),
                     jobToken,
                     snapshot.timeoutSeconds(),
-                    precomputeToken,
-                    precomputeToken == null ? Map.of() : snapshot.precomputeModels());
+                    practiceScriptToken,
+                    practiceScriptToken == null ? Map.of() : snapshot.practiceScriptModels());
 
             PracticeSandboxSpec agentSpec = practiceAgent.buildSandboxSpec(adapterRequest);
             SandboxSpec sandboxSpec = buildSandboxSpec(
@@ -1485,7 +1485,8 @@ public class AgentJobExecutor {
                     }
                     snapshot = submitted
                             .withPriceSnapshot(admitted.price())
-                            .withPrecompute(admitPrecompute(job, submitted.precompute(), llmAdmissionService));
+                            .withPracticeScript(
+                                    admitPracticeScript(job, submitted.practiceScript(), llmAdmissionService));
                 } else {
                     snapshot = submitted;
                 }
@@ -1532,24 +1533,24 @@ public class AgentJobExecutor {
     }
 
     /**
-     * Re-admits each precompute model frozen at submit and freezes its price, as for the review's own
+     * Re-admits each model for practice scripts frozen at submit and freezes its price, as for the review's own
      * model. A model that no longer resolves to the same catalog row, or that has no usable price, drops
      * out of this job. The review still runs without it.
      */
-    private @Nullable Map<ModelKind, FrozenModel> admitPrecompute(
+    private @Nullable Map<ModelKind, FrozenModel> admitPracticeScript(
             AgentJob job, @Nullable Map<ModelKind, FrozenModel> submitted, LlmAdmissionService admission) {
         if (submitted == null) {
             return null;
         }
         Map<ModelKind, FrozenModel> admitted = new EnumMap<>(ModelKind.class);
-        for (AgentPurpose purpose : AgentPurpose.precompute()) {
+        for (AgentPurpose purpose : AgentPurpose.practiceScript()) {
             FrozenModel slot = submitted.get(purpose.kind());
             if (slot == null) {
                 continue;
             }
             DataHandlingTier tier = Objects.requireNonNullElse(slot.dataHandlingTier(), DataHandlingTier.UNDECLARED);
             Optional<FrozenModel> priced = memberAiPolicy
-                    .precomputeBinding(job.getWorkspace().getId(), purpose, job.getJobType(), job.getMetadata())
+                    .practiceScriptBinding(job.getWorkspace().getId(), purpose, job.getJobType(), job.getMetadata())
                     .filter(binding -> binding.getDataHandlingTier() == tier)
                     .flatMap(admission::admitIfAvailable)
                     .filter(slot::isAdmittedAs)
@@ -1558,7 +1559,7 @@ public class AgentJobExecutor {
                 admitted.put(purpose.kind(), priced.get());
             } else {
                 log.info(
-                        "Dropping a precompute model that is no longer available: jobId={}, kind={}",
+                        "Dropping a model for practice scripts that is no longer available: jobId={}, kind={}",
                         job.getId(),
                         purpose.kind());
             }
@@ -1787,7 +1788,7 @@ public class AgentJobExecutor {
             TerminalUsage usage = TerminalUsage.resolve(
                     runnerUsage,
                     proxyCounts,
-                    jobRepository.sumPrecomputeUsageByKind(
+                    jobRepository.sumPracticeScriptUsageByKind(
                             freshJob.getWorkspace().getId(), jobId, freshJob.getRetryCount()));
 
             // Use the ledger totals: the runner may omit usage details counted by the proxy.
@@ -1805,10 +1806,10 @@ public class AgentJobExecutor {
             jobRepository.saveAndFlush(freshJob);
 
             usage.appendTo(usageRecorder, jobRepository, freshJob.getWorkspace().getId(), freshJob, snapshot, price);
-            precomputeRuns.record(
+            practiceScriptRuns.record(
                     freshJob,
-                    sandboxResult.outputFiles().get(SandboxLayout.PRECOMPUTE_REPORT_FILE),
-                    snapshot.precomputeModels(),
+                    sandboxResult.outputFiles().get(SandboxLayout.PRACTICE_SCRIPT_REPORT_FILE),
+                    snapshot.practiceScriptModels(),
                     finishedAt);
             return terminalStatus;
         });

@@ -34,8 +34,8 @@ class ProxyRequestPolicy {
         var model = new LlmModelResolver.ConnectionRef(
                 request.connectionScope(), request.connectionId(), request.modelId(), workspaceId);
         return switch (attempt.sourceType()) {
-            // A precompute model is checked like the review's own model: against the reviewed developer.
-            case AGENT_JOB, PRECOMPUTE_DECISION, PRECOMPUTE_EMBEDDING, PRECOMPUTE_RERANKING ->
+            // A model for practice scripts is checked like the review's own model: against the reviewed developer.
+            case AGENT_JOB, PRACTICE_SCRIPT_DECISION, PRACTICE_SCRIPT_EMBEDDING, PRACTICE_SCRIPT_RERANKING ->
                 jobs.findByIdAndWorkspaceId(attempt.sourceId(), workspaceId)
                         .filter(job -> reviews.allows(job, model))
                         .isPresent();

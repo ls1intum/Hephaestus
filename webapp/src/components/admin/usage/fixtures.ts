@@ -2,7 +2,7 @@ import type {
 	FxRateInfo,
 	LlmUsageByJobType,
 	LlmUsageByPractice,
-	LlmUsagePrecomputeTotal,
+	LlmUsagePracticeScriptTotal,
 	WorkspaceLlmUsageReport,
 } from "@/api/types.gen";
 
@@ -17,12 +17,12 @@ export function dayOfMonth(month: string, day: number): Date {
 	return new Date(Date.UTC(Number(yearStr), Number(monthStr) - 1, day, 12));
 }
 
-type PrecomputeUsage = Pick<WorkspaceLlmUsageReport, "byPractice" | "precomputeTotal">;
+type PracticeScriptUsage = Pick<WorkspaceLlmUsageReport, "byPractice" | "practiceScriptTotal">;
 
-/** A month in which no precompute script called a decision, embedding or reranking model. */
-export const NO_PRECOMPUTE_USAGE: PrecomputeUsage = {
+/** A month in which no practice script called a decision, embedding or reranking model. */
+export const NO_PRACTICE_SCRIPT_USAGE: PracticeScriptUsage = {
 	byPractice: [],
-	precomputeTotal: {
+	practiceScriptTotal: {
 		reviews: 0,
 		calls: 0,
 		inputTokens: 0,
@@ -50,7 +50,7 @@ export function usageReport(month: string = STORY_MONTH): WorkspaceLlmUsageRepor
 		instancePaused: false,
 		ownProviderPaused: false,
 		unpricedEventCount: 0,
-		...NO_PRECOMPUTE_USAGE,
+		...NO_PRACTICE_SCRIPT_USAGE,
 		byJobType: [
 			{
 				jobType: "PULL_REQUEST_REVIEW",
@@ -283,7 +283,7 @@ export const deletedPracticeUsage: LlmUsageByPractice = {
  * The server's own total, not a sum of the rows: one review runs several practices, so it counts
  * 31 reviews where the rows add up to 41.
  */
-const pricedPrecomputeTotal: LlmUsagePrecomputeTotal = {
+const pricedPracticeScriptTotal: LlmUsagePracticeScriptTotal = {
 	reviews: 31,
 	calls: 662,
 	inputTokens: 361_500,
@@ -294,13 +294,13 @@ const pricedPrecomputeTotal: LlmUsagePrecomputeTotal = {
 };
 
 /**
- * Precompute calls that every model priced, inside the run types of {@link withOwnProvider}: the
+ * Practice script calls that every model priced, inside the run types of {@link withOwnProvider}: the
  * pull request practices on shared models, the issue practice partly on the workspace's own provider.
  */
-export function withPrecomputeUsage(report: WorkspaceLlmUsageReport): WorkspaceLlmUsageReport {
+export function withPracticeScriptUsage(report: WorkspaceLlmUsageReport): WorkspaceLlmUsageReport {
 	return {
 		...report,
 		byPractice: [commentQualityUsage, expectedBehaviourUsage, notAttributedUsage, noChargeUsage],
-		precomputeTotal: pricedPrecomputeTotal,
+		practiceScriptTotal: pricedPracticeScriptTotal,
 	};
 }

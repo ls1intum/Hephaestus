@@ -17,7 +17,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 
 /**
  * Pins, for each false-lapse or false-credit pattern the criteria decide, the sentence that places the
- * work on the right side of the line. Patterns a precompute script caused are pinned by its spec instead.
+ * work on the right side of the line. Patterns a practice script caused are pinned by its spec instead.
  * Error handling source contrasts are defined in practices/criteria-cases.json.
  */
 class CatalogFalseLapseLineTest extends BaseUnitTest {

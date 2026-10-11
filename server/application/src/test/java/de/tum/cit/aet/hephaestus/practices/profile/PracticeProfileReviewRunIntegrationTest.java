@@ -597,11 +597,11 @@ class PracticeProfileReviewRunIntegrationTest extends AbstractPracticeReviewInte
                 """
                 INSERT INTO practice_revision (
                     practice_id, revision_number, slug, name, applies_to, signals, evidence_requirements, review_when,
-                    subject, precondition, criteria, precompute_script, automated_review_policy, delivery_behavior,
+                    subject, precondition, criteria, practice_script, automated_review_policy, delivery_behavior,
                     why_it_matters, what_good_looks_like, group_slug, review_rule_fingerprint, created_at
                 )
                 SELECT practice_id, ?, slug, name, applies_to, signals, evidence_requirements, review_when,
-                       subject, precondition, criteria, precompute_script, automated_review_policy, delivery_behavior,
+                       subject, precondition, criteria, practice_script, automated_review_policy, delivery_behavior,
                        why_it_matters, what_good_looks_like, group_slug, CAST(? AS varchar), created_at
                 FROM practice_revision WHERE id = ?
                 RETURNING id

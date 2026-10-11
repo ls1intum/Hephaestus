@@ -13,7 +13,7 @@ const base: PurposeStatusInput = {
 };
 
 describe("purposeStatus", () => {
-	it("says nothing about a precompute model that no practice uses, whatever it assigns", () => {
+	it("says nothing about a model for practice scripts that no practice uses, whatever it assigns", () => {
 		expect(purposeStatus({ ...base, used: false })).toBeNull();
 		// An assignment that serves nobody is no gap: the row's cells show it as not used.
 		expect(

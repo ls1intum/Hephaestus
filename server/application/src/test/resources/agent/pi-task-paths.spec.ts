@@ -15,7 +15,7 @@ const paths = {
 	practiceIndex: "practices/index.json",
 	compositionRequest: "composition/request.json",
 	preparedFeedback: "history/prepared.json",
-	precomputeScripts: "scripts/practices",
+	practiceScripts: "scripts/practices",
 };
 
 void test("resolves a completely relocated layout without any captured-input prefix", () => {
@@ -65,22 +65,22 @@ void test("ignores additive metadata without relaxing required path validation",
 
 void test("accepts the envelope produced by the Java task writer", () => {
 	const envelope: unknown = JSON.parse(
-		readFileSync(new URL("../task-fixtures/v3/practice-review.json", import.meta.url), "utf8"),
+		readFileSync(new URL("../task-fixtures/v4/practice-review.json", import.meta.url), "utf8"),
 	);
 	assert.ok(typeof envelope === "object" && envelope !== null);
 	assert.equal(taskPaths(envelope).contextRoot, Reflect.get(envelope, "contextRoot"));
-	assert.equal(Reflect.get(envelope, "schemaVersion"), 3);
+	assert.equal(Reflect.get(envelope, "schemaVersion"), 4);
 	assert.equal(Reflect.has(envelope, "kind"), false);
 	assert.equal(Reflect.has(envelope, "task"), false);
 	assert.equal(Reflect.has(envelope, "paths"), false);
 });
 
 for (const [name, envelope] of Object.entries({
-	"old schema": { schemaVersion: 2, ...paths, prompt: "Review" },
+	"old schema": { schemaVersion: 3, ...paths, prompt: "Review" },
 
-	"missing paths": { schemaVersion: 3, prompt: "Review" },
+	"missing paths": { schemaVersion: 4, prompt: "Review" },
 	traversal: {
-		schemaVersion: 3,
+		schemaVersion: 4,
 		...paths,
 		manifest: "../secret",
 		prompt: "Review",

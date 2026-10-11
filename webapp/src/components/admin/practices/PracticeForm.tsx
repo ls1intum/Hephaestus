@@ -69,7 +69,7 @@ function asDefinitionValue(practice: Practice): PracticeDefinitionValue {
 			: {}),
 		...(practice.visual ? { visual: practice.visual } : {}),
 		...(practice.guide ? { guide: practice.guide } : {}),
-		...(hasText(practice.precomputeScript) ? { precomputeScript: practice.precomputeScript } : {}),
+		...(hasText(practice.practiceScript) ? { practiceScript: practice.practiceScript } : {}),
 		automatedReviewPolicy: practice.automatedReviewPolicy,
 		deliveryBehavior: practice.deliveryBehavior,
 	};
@@ -89,8 +89,8 @@ export function PracticeForm(props: PracticeFormProps) {
 		if (!definition.precondition) {
 			clear.push("PRECONDITION");
 		}
-		if (!hasText(definition.precomputeScript)) {
-			clear.push("PRECOMPUTE_SCRIPT");
+		if (!hasText(definition.practiceScript)) {
+			clear.push("PRACTICE_SCRIPT");
 		}
 		if (!hasText(definition.whyItMatters)) {
 			clear.push("WHY_IT_MATTERS");
@@ -120,7 +120,7 @@ export function PracticeForm(props: PracticeFormProps) {
 				whatGoodLooksLike: definition.whatGoodLooksLike,
 				visual: definition.visual,
 				guide: definition.guide,
-				precomputeScript: definition.precomputeScript,
+				practiceScript: definition.practiceScript,
 				automatedReviewPolicy: definition.automatedReviewPolicy,
 				deliveryBehavior: definition.deliveryBehavior,
 				clear: clear.length > 0 ? clear : undefined,
@@ -185,7 +185,7 @@ export function PracticeForm(props: PracticeFormProps) {
 			isPending={isPending}
 			definitionOptions={definitionOptions}
 			cancelAction={cancel}
-			precomputeModelsLink={modelsLink}
+			practiceScriptModelsLink={modelsLink}
 			onSubmit={submit}
 		/>
 	) : (
@@ -198,7 +198,7 @@ export function PracticeForm(props: PracticeFormProps) {
 			cancelAction={cancel}
 			afterFields={reviewResults}
 			evidenceOutcome={props.evidenceOutcome}
-			precomputeModelsLink={modelsLink}
+			practiceScriptModelsLink={modelsLink}
 			onSubmit={submit}
 		/>
 	);

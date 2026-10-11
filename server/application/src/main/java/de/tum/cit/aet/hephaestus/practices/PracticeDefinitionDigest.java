@@ -16,7 +16,7 @@ final class PracticeDefinitionDigest {
         ReviewRuleFingerprint.addAssessment(
                 digest, definition.evidenceRequirements(), definition.subject(), definition.precondition());
         digest.add(definition.criteria())
-                .addNullable(definition.precomputeScript())
+                .addNullable(definition.practiceScript())
                 .add(PracticeAutomatedReviewPolicyDigest.digest(definition.automatedReviewPolicy()))
                 .addNullable(definition.whyItMatters())
                 .addNullable(definition.whatGoodLooksLike())

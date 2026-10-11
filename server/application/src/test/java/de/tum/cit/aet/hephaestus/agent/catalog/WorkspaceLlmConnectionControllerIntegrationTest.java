@@ -69,7 +69,7 @@ class WorkspaceLlmConnectionControllerIntegrationTest extends AbstractWorkspaceI
         assertThat(created.hasApiKey()).isTrue();
         assertThat(created.apiKeyLast4()).isEqualTo("9999");
         assertThat(created.connectionPlatform()).isEqualTo(LlmConnectionPlatform.AZURE);
-        // A chat completions model also answers the decisions of precompute scripts.
+        // A chat completions model also answers the decisions of practice scripts.
         assertThat(created.purposes())
                 .containsExactly(AgentPurpose.PRACTICE_REVIEW, AgentPurpose.MENTOR, AgentPurpose.PRACTICE_DECISION);
 

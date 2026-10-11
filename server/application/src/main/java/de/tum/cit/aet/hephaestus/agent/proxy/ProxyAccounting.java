@@ -35,7 +35,7 @@ public class ProxyAccounting {
     private final DistributionSummary gatewayRequestSize;
     private final Counter gatewayThrottled;
     private final Counter gatewayLimiterErrors;
-    private final Counter precomputeUnattributed;
+    private final Counter practiceScriptUnattributed;
 
     ProxyAccounting(
             ProxyBudgetGate budgetGate,
@@ -63,8 +63,8 @@ public class ProxyAccounting {
         this.gatewayLimiterErrors = Counter.builder(AgentMetrics.SANDBOX_GATEWAY_LIMITER_ERRORS)
                 .description("Sandbox gateway requests served without a rate-limit decision")
                 .register(meterRegistry);
-        this.precomputeUnattributed = Counter.builder(AgentMetrics.LLM_PROXY_PRECOMPUTE_UNATTRIBUTED)
-                .description("Precompute calls refused because they named no valid practice")
+        this.practiceScriptUnattributed = Counter.builder(AgentMetrics.LLM_PROXY_PRACTICE_SCRIPT_UNATTRIBUTED)
+                .description("Practice script calls refused because they named no valid practice")
                 .register(meterRegistry);
     }
 
@@ -76,14 +76,14 @@ public class ProxyAccounting {
         return countedRefusal(budgetGate.isBlocked(routing), routing, FundingSource.capTag(routing.connectionScope()));
     }
 
-    public boolean refuseForPrecomputeCap(ProxyRouting routing, ProxyRouting.BilledAttempt attempt) {
-        return countedRefusal(budgetGate.isPrecomputeCapReached(attempt), routing, "precompute_attempt");
+    public boolean refuseForPracticeScriptCap(ProxyRouting routing, ProxyRouting.BilledAttempt attempt) {
+        return countedRefusal(budgetGate.isPracticeScriptCapReached(attempt), routing, "practice_script_attempt");
     }
 
     /**
      * Counted by the cap that refused, because different people fix each one: an admin raises a monthly
-     * budget ({@link FundingSource#capTag}), and an operator raises the per-attempt precompute token cap
-     * ({@code precompute_attempt}).
+     * budget ({@link FundingSource#capTag}), and an operator raises the per-attempt practice script token cap
+     * ({@code practice_script_attempt}).
      */
     private boolean countedRefusal(boolean refused, ProxyRouting routing, String cap) {
         if (refused) {
@@ -105,11 +105,11 @@ public class ProxyAccounting {
     }
 
     /**
-     * A precompute call named no practice, or no valid one, so its spend could not be split by practice.
-     * Any rate is a defect: the precompute runner names the practice on every call.
+     * A practice script call named no practice, or no valid one, so its spend could not be split by practice.
+     * Any rate is a defect: the practice script runner names the practice on every call.
      */
-    public void recordUnattributedPrecompute() {
-        precomputeUnattributed.increment();
+    public void recordUnattributedPracticeScript() {
+        practiceScriptUnattributed.increment();
     }
 
     /**
@@ -117,11 +117,11 @@ public class ProxyAccounting {
      * already charged us for — into an error for the runner. Counted instead, since an unreadable body
      * means this call's tokens were billed to nobody.
      *
-     * @param precompute the precompute call; {@code null} for every other call
+     * @param practiceScript the practice script call; {@code null} for every other call
      */
     public void recordUsage(
             ProxyRouting.BilledAttempt attempt,
-            @Nullable PrecomputeCall precompute,
+            @Nullable PracticeScriptCall practiceScript,
             LlmApiProtocol protocol,
             byte[] upstreamBody) {
         ProxyTokenUsage usage;
@@ -132,19 +132,21 @@ public class ProxyAccounting {
             recordMalformedUsage(attempt);
             usage = null;
         }
-        recordUsage(attempt, precompute, usage);
+        recordUsage(attempt, practiceScript, usage);
     }
 
     /**
-     * A precompute call counts on its row even when its provider reports no tokens, so the row shows
-     * every call. A precompute call on the chat model also goes into the job's own counters, because the
+     * A practice script call counts on its row even when its provider reports no tokens, so the row shows
+     * every call. A practice script call on the chat model also goes into the job's own counters, because the
      * review's ledger row bills the chat model. A served response without reported usage is counted by
      * source type; tokens and provider charges are never estimated.
      */
     public void recordUsage(
-            ProxyRouting.BilledAttempt attempt, @Nullable PrecomputeCall precompute, @Nullable ProxyTokenUsage usage) {
-        if (precompute != null) {
-            usageAccumulator.accumulatePrecompute(attempt, precompute, usage);
+            ProxyRouting.BilledAttempt attempt,
+            @Nullable PracticeScriptCall practiceScript,
+            @Nullable ProxyTokenUsage usage) {
+        if (practiceScript != null) {
+            usageAccumulator.accumulatePracticeScript(attempt, practiceScript, usage);
         }
         if (usage == null) {
             meterRegistry
@@ -158,7 +160,7 @@ public class ProxyAccounting {
         switch (attempt.sourceType()) {
             case AGENT_JOB -> usageAccumulator.accumulate(attempt, usage);
             case MENTOR_TURN -> mentorTurnUsageAccumulator.accumulate(attempt, usage);
-            case PRECOMPUTE_DECISION, PRECOMPUTE_EMBEDDING, PRECOMPUTE_RERANKING -> {}
+            case PRACTICE_SCRIPT_DECISION, PRACTICE_SCRIPT_EMBEDDING, PRACTICE_SCRIPT_RERANKING -> {}
         }
     }
 

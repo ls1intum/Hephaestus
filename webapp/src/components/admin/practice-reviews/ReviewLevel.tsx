@@ -9,7 +9,7 @@ import type {
 	AgentJobUsage,
 	AgentJobUsageAttempt,
 	DeliveryPolicyTrace as DeliveryCheck,
-	ReviewPrecompute,
+	ReviewPracticeScripts,
 	ReviewRunSummary,
 } from "@/api/types.gen";
 import { formatTokens, JOB_TYPE_LABELS } from "@/components/admin/usage/usage-utils";
@@ -72,7 +72,7 @@ import { ReviewStatusMark } from "./ReviewBadges";
 import { ReviewDayTime } from "./ReviewDayTime";
 import { ReviewFact, ReviewFactGrid } from "./ReviewFactGrid";
 import { ReviewLevelHeader } from "./ReviewLevelHeader";
-import { ReviewPrecomputeTable } from "./ReviewPrecomputeTable";
+import { ReviewPracticeScriptTable } from "./ReviewPracticeScriptTable";
 import { ReviewRunActions } from "./ReviewRunActions";
 
 export interface ReviewLevelProps {
@@ -87,8 +87,8 @@ export interface ReviewLevelProps {
 	groups?: readonly PracticeGroupLook[] | undefined;
 	/** The delivery checks the review ran for itself rather than for one piece of feedback. */
 	deliveryChecks?: PanelState<{ checks: DeliveryCheck[] }>;
-	/** What each practice's precompute script did before the review; the section shows only with one. */
-	precompute?: PanelState<{ scripts: ReviewPrecompute[] }>;
+	/** What each practice's script did before the review; the section shows only with one. */
+	practiceScript?: PanelState<{ scripts: ReviewPracticeScripts[] }>;
 	/** What the review spent on the model, attempt by attempt. */
 	usage?: PanelState<{ usage: AgentJobUsage }>;
 	onCancel: () => void;
@@ -147,7 +147,7 @@ export function ReviewLevel({
 	trace,
 	groups,
 	deliveryChecks,
-	precompute,
+	practiceScript,
 	usage,
 	onCancel,
 	cancelPending,
@@ -233,8 +233,8 @@ export function ReviewLevel({
 					<ReviewPractices job={job} trace={trace} summary={summary} groups={groups} />
 				</SheetSection>
 				{deliveryChecks !== undefined && <ReviewDeliveryChecks state={deliveryChecks} />}
-				{precompute !== undefined && (
-					<PrecomputeScripts workspaceSlug={workspaceSlug} state={precompute} />
+				{practiceScript !== undefined && (
+					<PracticeScripts workspaceSlug={workspaceSlug} state={practiceScript} />
 				)}
 				<SheetTechnical facts={technicalFacts(job, usage)}>
 					{usage?.status === "error" && (
@@ -569,8 +569,8 @@ function technicalFacts(
 				</span>
 			),
 		},
-		// The review's own calls: a precompute script's decision, embedding and reranking calls are on
-		// the Precompute scripts section above.
+		// The review's own calls: a practice script's decision, embedding and reranking calls are on
+		// the Practice scripts section above.
 		{ label: "Review model calls", value: formatTokens(job.llmTotalCalls) },
 		{ label: "Tokens read", value: formatTokens(job.llmTotalInputTokens) },
 		{
@@ -611,12 +611,12 @@ function technicalFacts(
  * Absent while it loads and when no script ran: a skeleton for a section that may not exist would
  * hold space that the technical facts then jump into.
  */
-function PrecomputeScripts({
+function PracticeScripts({
 	workspaceSlug,
 	state,
 }: {
 	workspaceSlug: string;
-	state: PanelState<{ scripts: ReviewPrecompute[] }>;
+	state: PanelState<{ scripts: ReviewPracticeScripts[] }>;
 }) {
 	if (state.status === "loading" || (state.status === "ready" && state.scripts.length === 0)) {
 		return null;
@@ -624,18 +624,18 @@ function PrecomputeScripts({
 	return (
 		<SheetSection
 			part="details"
-			title="Precompute scripts"
-			description="What each practice’s script did before this review."
+			title="Practice scripts"
+			description="What each practice script did before this review."
 		>
 			{state.status === "error" ? (
 				<QueryErrorAlert
 					error={state.error}
-					title="We could not load what the precompute scripts did"
+					title="We could not load what the practice scripts did"
 					onRetry={state.onRetry}
 				/>
 			) : (
 				<>
-					<ReviewPrecomputeTable workspaceSlug={workspaceSlug} scripts={state.scripts} />
+					<ReviewPracticeScriptTable workspaceSlug={workspaceSlug} scripts={state.scripts} />
 					<p className="text-xs text-muted-foreground">
 						Spend is on{" "}
 						<InlineLink

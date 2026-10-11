@@ -10,7 +10,7 @@ import {
 	reviewFeedback,
 	reviewJob,
 	reviewObservations,
-	reviewPrecompute,
+	reviewPracticeScripts,
 	reviewRuns,
 } from "@/components/admin/practice-reviews/fixtures";
 import {
@@ -333,18 +333,18 @@ describe("a review's sheet", () => {
 	 * Its own read, by this review's id, so a slow or failed one costs the reader that section alone.
 	 * What the section shows of the answer is its stories' to prove.
 	 */
-	it("asks for what this review's precompute scripts did", async () => {
+	it("asks for what this review's practice scripts did", async () => {
 		server.use(
-			http.get("*/workspaces/:workspaceSlug/agents/jobs/:jobId/precompute", () =>
-				HttpResponse.json([reviewPrecompute.found]),
+			http.get("*/workspaces/:workspaceSlug/agents/jobs/:jobId/practice-scripts", () =>
+				HttpResponse.json([reviewPracticeScripts.found]),
 			),
 		);
 
 		renderRouteAtWithRouter(`${REVIEWS}/runs?detail=review:${REVIEW}`);
 		const sheet = await screen.findByRole("dialog", undefined, ROUTE_RENDER_WAIT);
-		await within(sheet).findByRole("region", { name: "Precompute scripts" }, ROUTE_RENDER_WAIT);
+		await within(sheet).findByRole("region", { name: "Practice scripts" }, ROUTE_RENDER_WAIT);
 
-		expect(requestsTo(`/agents/jobs/${REVIEW}/precompute`)).toHaveLength(1);
+		expect(requestsTo(`/agents/jobs/${REVIEW}/practice-scripts`)).toHaveLength(1);
 	});
 });
 

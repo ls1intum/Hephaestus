@@ -190,19 +190,19 @@ export const mockPracticeLongText: Practice = {
 };
 
 /** The model slots a script declares in `meta.models`, each `"required"` or `"optional"`. */
-type PrecomputeModelSlots = Partial<
+type PracticeScriptModelSlots = Partial<
 	Record<"chat" | "decision" | "embedding" | "reranking", "required" | "optional">
 >;
 
-/** The contract the precompute guide teaches: `definePrecompute`, declared models and kinds, and leads. */
-export function precomputeScript(models: PrecomputeModelSlots = {}): string {
+/** The contract the practice script guide teaches: `definePracticeScript`, declared models and kinds, and leads. */
+export function practiceScript(models: PracticeScriptModelSlots = {}): string {
 	const declared = Object.entries(models).map(([slot, need]) => `${slot}: "${need}"`);
 	return [
-		'import { addedComments, definePrecompute, type Lead } from "../lib/precompute.ts";',
+		'import { addedComments, definePracticeScript, type Lead } from "../lib/practice-script.ts";',
 		"",
 		String.raw`const OPEN_WORK = /\b(TODO|FIXME)\b/u;`,
 		"",
-		"export default definePrecompute({",
+		"export default definePracticeScript({",
 		"  meta: {",
 		...(declared.length > 0 ? [`    models: { ${declared.join(", ")} },`] : []),
 		'    kinds: { "open-work": "A TODO or FIXME that the change adds." },',
@@ -225,7 +225,7 @@ export const mockPracticeWithAllTriggers: Practice = {
 	signals: [...mockPullRequestReviewFields.signals, ...mockMergeReviewFields.signals],
 	criteria:
 		"## Commit Discipline\n\nEach commit message must:\n- Start with a type prefix (feat, fix, refactor, etc.)\n- Have a descriptive subject (not just issue numbers)\n- Reference the related issue\n\n### Anti-patterns to Flag\n- `fixes #123` with no description\n- Branch-slug-format titles like `feature/ABC-123`\n- Single-word messages like `update` or `fix`",
-	precomputeScript: precomputeScript(),
+	practiceScript: practiceScript(),
 	artifactKind: "scm.pull_request",
 	deliveryBehavior: { summaryOnly: false },
 	automatedReviewPolicy: mockPullRequestPolicy,

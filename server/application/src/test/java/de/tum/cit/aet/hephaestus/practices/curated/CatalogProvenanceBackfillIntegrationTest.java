@@ -274,7 +274,7 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
                 definition.subject(),
                 definition.precondition(),
                 criteria,
-                definition.precomputeScript(),
+                definition.practiceScript(),
                 definition.automatedReviewPolicy(),
                 definition.whyItMatters(),
                 definition.whatGoodLooksLike(),

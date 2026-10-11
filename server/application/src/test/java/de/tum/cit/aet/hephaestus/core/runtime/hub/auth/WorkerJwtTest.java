@@ -80,13 +80,13 @@ class WorkerJwtTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldCarryOnlyThePrecomputeScopeWhenIssuedForPrecompute() {
+    void shouldCarryOnlyThePracticeScriptScopeWhenIssuedForPracticeScript() {
         Instant deadline = Instant.now().plusSeconds(600);
 
-        JobJwt jwt = (JobJwt) verifier.verify(
-                issuer.issueForJobUntil(UUID.randomUUID(), 42L, 0, deadline, WorkerJwtIssuer.LLM_PRECOMPUTE_SCOPE));
+        JobJwt jwt = (JobJwt) verifier.verify(issuer.issueForJobUntil(
+                UUID.randomUUID(), 42L, 0, deadline, WorkerJwtIssuer.LLM_PRACTICE_SCRIPT_SCOPE));
 
-        assertThat(jwt.scopes()).containsExactly("llm_precompute");
+        assertThat(jwt.scopes()).containsExactly("llm_practice_script");
     }
 
     @Test

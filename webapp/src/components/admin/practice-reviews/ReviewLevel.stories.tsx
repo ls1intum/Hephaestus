@@ -16,7 +16,7 @@ import {
 	mockJobUsageUnpriced,
 	reviewDeliveryChecksOf,
 	reviewJob,
-	reviewPrecompute,
+	reviewPracticeScripts,
 	reviewRuns,
 	reviewTraceOf,
 } from "./fixtures";
@@ -58,7 +58,7 @@ const meta = {
 		trace: { status: "ready", trace: reviewTraceOf(job) },
 		groups,
 		deliveryChecks: { status: "ready", checks: [] },
-		precompute: { status: "ready", scripts: [] },
+		practiceScript: { status: "ready", scripts: [] },
 		usage: {
 			status: "ready",
 			usage: { ...mockJobUsageTwoAttempts, attempts: mockJobUsageTwoAttempts.attempts.slice(1) },
@@ -69,7 +69,7 @@ const meta = {
 		retryResultProcessingPending: false,
 		onRequestReview: fn(),
 	},
-	argTypes: { path: { control: false }, precompute: { control: false } },
+	argTypes: { path: { control: false }, practiceScript: { control: false } },
 	render: (args) => (
 		<InLevelStack
 			entry={reviewLevel(args.job.status === "ready" ? args.job.job.id : job.id)}
@@ -512,27 +512,27 @@ export const ModelWithTier: Story = {
 		// The tier is its icon, as on every other surface; its name is for a screen reader.
 		await expect(model?.nextElementSibling).toHaveTextContent(/gpt-5-nano\s*Cloud$/u);
 		await expect(panel.getByText("Cloud")).toHaveClass("sr-only");
-		// The calls are the review model's: a precompute script's own models are counted elsewhere.
+		// The calls are the review model's: a practice script's own models are counted elsewhere.
 		await expect(panel.getByText("Review model calls")).toBeVisible();
 	},
 };
 
 /**
- * What the precompute scripts did sits with the practices the review answered: it explains how
+ * What the practice scripts did sits with the practices the review answered: it explains how
  * each practice was prepared, and its calls are not the review's technical facts.
  */
-export const WithPrecomputeScripts: Story = {
+export const WithPracticeScripts: Story = {
 	args: {
-		precompute: {
+		practiceScript: {
 			status: "ready",
-			scripts: [reviewPrecompute.found, reviewPrecompute.callsNotRated, reviewPrecompute.failed],
+			scripts: [reviewPracticeScripts.found, reviewPracticeScripts.callsNotRated, reviewPracticeScripts.failed],
 		},
 	},
 	play: async () => {
 		const panel = within(await settledDrawerPanel());
-		const section = panel.getByRole("region", { name: "Precompute scripts" });
+		const section = panel.getByRole("region", { name: "Practice scripts" });
 		await expect(
-			within(section).getByText("What each practice’s script did before this review."),
+			within(section).getByText("What each practice script did before this review."),
 		).toBeVisible();
 		await expect(within(section).getByRole("link", { name: "AI usage" })).toHaveAttribute(
 			"href",
@@ -542,34 +542,34 @@ export const WithPrecomputeScripts: Story = {
 };
 
 /** No script ran, so there is no section about scripts. */
-export const WithoutPrecomputeScripts: Story = {
+export const WithoutPracticeScripts: Story = {
 	play: async () => {
 		const panel = within(await settledDrawerPanel());
 		await expect(
-			panel.queryByRole("region", { name: "Precompute scripts" }),
+			panel.queryByRole("region", { name: "Practice scripts" }),
 		).not.toBeInTheDocument();
 	},
 };
 
 /** A failed read is said, never shown as a review without scripts. */
-export const PrecomputeFailedToLoad: Story = {
+export const PracticeScriptFailedToLoad: Story = {
 	args: {
-		precompute: {
+		practiceScript: {
 			status: "error",
-			error: { status: 503, detail: "The precompute record is unavailable." },
+			error: { status: 503, detail: "The practice script record is unavailable." },
 			onRetry: fn(),
 		},
 	},
 	play: async ({ args, userEvent }) => {
 		const panel = within(await settledDrawerPanel());
-		const section = panel.getByRole("region", { name: "Precompute scripts" });
+		const section = panel.getByRole("region", { name: "Practice scripts" });
 		await expect(
-			within(section).getByText("We could not load what the precompute scripts did"),
+			within(section).getByText("We could not load what the practice scripts did"),
 		).toBeVisible();
 		await userEvent.click(within(section).getByRole("button", { name: "Retry" }));
-		if (args.precompute?.status !== "error") {
+		if (args.practiceScript?.status !== "error") {
 			throw new Error("This story is the error branch");
 		}
-		await expect(args.precompute.onRetry).toHaveBeenCalledOnce();
+		await expect(args.practiceScript.onRetry).toHaveBeenCalledOnce();
 	},
 };

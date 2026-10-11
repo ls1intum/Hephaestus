@@ -28,7 +28,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/** Primary document projections for review readiness and precompute; reads through the mirror owner's SPI. */
+/** Primary document projections for review readiness and practice scripts; reads through the mirror owner's SPI. */
 @Component
 public class DocumentContentSource implements EvidenceSource, ReviewContextBuilder {
 

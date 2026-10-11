@@ -102,7 +102,7 @@ type DefinitionChange = NonNullable<UpdatePracticeRequest["definitionChanges"]>[
 
 const NO_GROUP = "__none__";
 
-const PRECOMPUTE_GUIDE_URL = "https://docs.hephaestus.build/admin/precompute-scripts";
+const PRACTICE_SCRIPT_GUIDE_URL = "https://docs.hephaestus.build/admin/practice-scripts";
 
 export interface PracticeDefinitionGroupOption {
 	slug: string;
@@ -128,7 +128,7 @@ export interface PracticeDefinitionValue {
 	whatGoodLooksLike?: string;
 	visual?: PracticeVisual;
 	guide?: PracticeGuide;
-	precomputeScript?: string;
+	practiceScript?: string;
 	automatedReviewPolicy: PracticeAutomatedReviewPolicy;
 	deliveryBehavior?: PracticeDeliveryBehavior;
 }
@@ -151,10 +151,10 @@ interface PracticeDefinitionFormBaseProps {
 	definitionOptions: PracticeDefinitionOptions;
 	evidenceOutcome?: PracticeEvidenceOutcome;
 	/**
-	 * A link to the AI models page, rendered as *AI models* in the precompute script's help. Only a
+	 * A link to the AI models page, rendered as *AI models* in the practice script's help. Only a
 	 * workspace has that page; without it the words stay plain.
 	 */
-	precomputeModelsLink?: ReactElement;
+	practiceScriptModelsLink?: ReactElement;
 }
 
 interface PracticeDefinitionFormCreateProps extends PracticeDefinitionFormBaseProps {
@@ -193,7 +193,7 @@ interface FormState {
 	whatGoodLooksLike: string;
 	visual: PracticeVisual;
 	guide: PracticeGuide;
-	precomputeScript: string;
+	practiceScript: string;
 	automatedReviewPolicy: PracticeAutomatedReviewPolicy;
 	deliveryBehavior: PracticeDeliveryBehavior;
 }
@@ -206,7 +206,7 @@ interface WorkTypeDraft {
 	subject: ActorRole;
 	precondition?: PracticePrecondition;
 	gateText: string;
-	precomputeScript: string;
+	practiceScript: string;
 	automatedReviewPolicy: PracticeAutomatedReviewPolicy;
 }
 
@@ -232,7 +232,7 @@ function blankState(fallback: PracticeWorkTypeDefinitionOptions | undefined): Fo
 		whatGoodLooksLike: "",
 		visual: NO_VISUAL,
 		guide: NO_GUIDE,
-		precomputeScript: "",
+		practiceScript: "",
 		automatedReviewPolicy: fallback?.recommendedPolicy ?? EMPTY_POLICY,
 		deliveryBehavior: { summaryOnly: false },
 	};
@@ -255,7 +255,7 @@ function stateOf(
 		whatGoodLooksLike: initialData.whatGoodLooksLike ?? "",
 		visual: initialData.visual ?? NO_VISUAL,
 		guide: initialData.guide ?? NO_GUIDE,
-		precomputeScript: initialData.precomputeScript ?? "",
+		practiceScript: initialData.practiceScript ?? "",
 		automatedReviewPolicy: initialData.automatedReviewPolicy,
 		deliveryBehavior: { summaryOnly: false, ...initialData.deliveryBehavior },
 	};
@@ -265,7 +265,7 @@ function draftOf(form: FormState): WorkTypeDraft {
 	return {
 		...normalizeReviewSettings(form),
 		gateText: form.gateText,
-		precomputeScript: form.precomputeScript,
+		practiceScript: form.practiceScript,
 		automatedReviewPolicy: form.automatedReviewPolicy,
 	};
 }
@@ -465,7 +465,7 @@ function HeldScriptNote({ script, reviewed }: { script: string; reviewed: boolea
 	}
 	return (
 		<p className="max-w-2xl text-sm text-muted-foreground">
-			A precompute script needs a practice that Hephaestus can review. Your script stays in this
+			A practice script needs a practice that Hephaestus can review. Your script stays in this
 			draft, and saving with this choice removes it.
 		</p>
 	);
@@ -491,7 +491,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 		initialData,
 		definitionOptions,
 		evidenceOutcome,
-		precomputeModelsLink,
+		practiceScriptModelsLink,
 	} = props;
 	const formDisabled = isPending || disabled;
 	const [form, setForm] = useState<FormState>(() => initialState(definitionOptions, initialData));
@@ -500,8 +500,8 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 	// focuses it again.
 	const [refusals, setRefusals] = useState(0);
 	const [showAdvanced, setShowAdvanced] = useState(false);
-	const [showPrecompute, setShowPrecompute] = useState(() =>
-		hasText(initialData?.precomputeScript),
+	const [showPracticeScript, setShowPracticeScript] = useState(() =>
+		hasText(initialData?.practiceScript),
 	);
 	const [guideView, setGuideView] = useState<PracticeGuideView>("write");
 	const workTypes = orderedWorkTypes(definitionOptions);
@@ -563,9 +563,9 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 	const selectWorkType = (next: PracticeWorkTypeDefinitionOptions) => {
 		// Each work type keeps its own script. A switch that swaps the script in or out opens its
 		// section, so the change is not made out of sight.
-		const nextScript = workTypeDrafts.get(next.artifactKind)?.precomputeScript ?? "";
-		if (next.artifactKind !== artifactKind && nextScript !== form.precomputeScript) {
-			setShowPrecompute(true);
+		const nextScript = workTypeDrafts.get(next.artifactKind)?.practiceScript ?? "";
+		if (next.artifactKind !== artifactKind && nextScript !== form.practiceScript) {
+			setShowPracticeScript(true);
 		}
 		setForm((previous) => {
 			const previousKind = previous.artifactKind;
@@ -595,7 +595,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 					? withoutEvidence(reviewFields)
 					: reviewFields),
 				precondition: reviewFields.precondition,
-				precomputeScript: draft?.precomputeScript ?? "",
+				practiceScript: draft?.practiceScript ?? "",
 			};
 		});
 	};
@@ -664,8 +664,8 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 			...(hasGuide(form.guide) ? { guide: form.guide } : {}),
 			// The script stays in the draft across support choices, so choosing back restores it. Only
 			// the save decides: a policy that cannot be reviewed sends no script, and an edit clears it.
-			...(canRunMentoring && form.precomputeScript.trim()
-				? { precomputeScript: form.precomputeScript.trim() }
+			...(canRunMentoring && form.practiceScript.trim()
+				? { practiceScript: form.practiceScript.trim() }
 				: {}),
 			automatedReviewPolicy: form.automatedReviewPolicy,
 			deliveryBehavior: {
@@ -851,7 +851,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 								onChange={updatePolicy}
 								error={shownErrors.policy}
 							/>
-							<HeldScriptNote script={form.precomputeScript} reviewed={canRunMentoring} />
+							<HeldScriptNote script={form.practiceScript} reviewed={canRunMentoring} />
 						</div>
 
 						<Separator />
@@ -1010,32 +1010,32 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 							<>
 								<Separator />
 								<CollapsibleSection
-									title="Precompute script"
+									title="Script"
 									subtitle="Optional. Code that finds places for the review to check."
-									open={showPrecompute}
-									onOpenChange={setShowPrecompute}
+									open={showPracticeScript}
+									onOpenChange={setShowPracticeScript}
 								>
 									<p className="max-w-2xl text-sm text-muted-foreground">
 										TypeScript that runs before each review of this practice. It points the review
 										at places to check and never writes feedback.{" "}
-										<InlineLink href={PRECOMPUTE_GUIDE_URL} external>
-											Write a precompute script
+										<InlineLink href={PRACTICE_SCRIPT_GUIDE_URL} external>
+											Write a practice script
 										</InlineLink>
 										. It can call the models on{" "}
-										{precomputeModelsLink === undefined ? (
+										{practiceScriptModelsLink === undefined ? (
 											"AI models"
 										) : (
-											<InlineLink render={precomputeModelsLink}>AI models</InlineLink>
+											<InlineLink render={practiceScriptModelsLink}>AI models</InlineLink>
 										)}
 										.
 									</p>
 									<CodeEditor
-										value={form.precomputeScript}
+										value={form.practiceScript}
 										onChange={(value) =>
-											setForm((previous) => ({ ...previous, precomputeScript: value }))
+											setForm((previous) => ({ ...previous, practiceScript: value }))
 										}
 										language="typescript"
-										ariaLabel="Precompute script"
+										ariaLabel="Practice script"
 										className="h-[400px]"
 										readOnly={formDisabled}
 									/>

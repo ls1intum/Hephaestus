@@ -17,8 +17,8 @@ public record TaskEnvelope(
         String practiceIndex,
         String compositionRequest,
         String preparedFeedback,
-        String precomputeScripts) {
-    public static final int SCHEMA_VERSION = 3;
+        String practiceScripts) {
+    public static final int SCHEMA_VERSION = 4;
 
     public TaskEnvelope {
         Objects.requireNonNull(jobId, "jobId");
@@ -30,7 +30,7 @@ public record TaskEnvelope(
                 practiceIndex,
                 compositionRequest,
                 preparedFeedback,
-                precomputeScripts);
+                practiceScripts);
         if (schemaVersion != SCHEMA_VERSION) {
             throw new IllegalArgumentException("Unsupported schemaVersion: " + schemaVersion);
         }
@@ -54,7 +54,7 @@ public record TaskEnvelope(
                 paths.practiceIndex(),
                 paths.compositionRequest(),
                 paths.preparedFeedback(),
-                paths.precomputeScripts());
+                paths.practiceScripts());
     }
 
     public TaskPaths paths() {
@@ -65,6 +65,6 @@ public record TaskEnvelope(
                 practiceIndex,
                 compositionRequest,
                 preparedFeedback,
-                precomputeScripts);
+                practiceScripts);
     }
 }

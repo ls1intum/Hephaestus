@@ -17,8 +17,8 @@ public enum ModelKind {
     RERANKING;
 
     /**
-     * The name of this kind as a precompute model slot: a key of the precompute models file, an entry of
-     * the precompute runner's {@code MODEL_SLOTS}, and the {@code {slot}} segment of the precompute proxy
+     * The name of this kind as a model for practice scripts slot: a key of the models for practice scripts file, an entry of
+     * the practice script runner's {@code MODEL_SLOTS}, and the {@code {slot}} segment of the practice script proxy
      * paths.
      */
     public String slot() {

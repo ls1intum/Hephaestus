@@ -58,7 +58,7 @@ const sidebars: SidebarsConfig = {
 				"artifact-source-contract",
 				"practice-catalogue",
 				"practice-visuals",
-				"practice-precompute",
+				"practice-script-runner",
 				"practice-feedback-schema",
 				"practice-feedback-language",
 				"practice-review-glossary",

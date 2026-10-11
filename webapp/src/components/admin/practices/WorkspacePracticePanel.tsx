@@ -5,9 +5,9 @@ import { cn } from "cn";
 import type {
 	Practice,
 	PracticeDefinitionOptions,
-	PracticePrecomputeSummary,
-	PrecomputeAsOf,
-	PrecomputeNeed,
+	PracticeScriptSummary,
+	PracticeScriptAsOf,
+	PracticeScriptNeed,
 } from "@/api/types.gen";
 import { reviewLevel } from "@/components/admin/practice-reviews/review-levels";
 import {
@@ -23,11 +23,11 @@ import { detailSearch } from "@/components/layout/detail-drawer/detail-stack";
 import type { LevelPath } from "@/components/layout/detail-drawer/DetailPath";
 import { DetailStackLink } from "@/components/layout/detail-drawer/DetailStackLink";
 import { LevelHeader } from "@/components/layout/detail-drawer/LevelHeader";
-import { PrecomputeModelLink } from "@/components/practice-trace/PrecomputeModelLink";
+import { PracticeScriptModelLink } from "@/components/practice-trace/PracticeScriptModelLink";
 import {
 	AGENT_PURPOSE_DEFS,
 	assignModelLabel,
-	isPrecomputePurpose,
+	isPracticeScriptPurpose,
 } from "@/components/practice-vocabulary/agent-purpose-defs";
 import {
 	type DataHandlingTier,
@@ -35,7 +35,7 @@ import {
 } from "@/components/practice-vocabulary/data-handling-defs";
 import { GroupPill } from "@/components/practice-vocabulary/GroupPill";
 import { ModelKindMark } from "@/components/practice-vocabulary/ModelKindMark";
-import { precomputeNeedBadge } from "@/components/practice-vocabulary/precompute-need-defs";
+import { practiceScriptNeedBadge } from "@/components/practice-vocabulary/practice-script-need-defs";
 import { PURPOSE_STATUS_DEFS } from "@/components/practice-vocabulary/purpose-status-defs";
 import { UnmetTiers } from "@/components/practice-vocabulary/UnmetTiers";
 import { WorkTypeLabel } from "@/components/practice-vocabulary/WorkTypeLabel";
@@ -62,16 +62,16 @@ export type WorkspacePracticeState = PanelState<{
 }>;
 
 /**
- * What the practice's precompute script needs, from the newest review that ran its current version.
+ * What the practice's script needs, from the newest review that ran its current version.
  * Ready without a summary when no review has reported on the script yet.
  */
-export type PrecomputeNeedsState = PanelState<{ summary: PracticePrecomputeSummary | undefined }>;
+export type PracticeScriptNeedsState = PanelState<{ summary: PracticeScriptSummary | undefined }>;
 
 export interface WorkspacePracticePanelProps {
 	workspaceSlug: string;
 	state: WorkspacePracticeState;
-	/** Read only when the practice has a precompute script. */
-	precompute: PrecomputeNeedsState;
+	/** Read only when the practice has a practice script. */
+	practiceScript: PracticeScriptNeedsState;
 	nested?: boolean;
 	/** Where the level sits, from the drawer. */
 	path: LevelPath;
@@ -88,7 +88,7 @@ export interface WorkspacePracticePanelProps {
 export function WorkspacePracticePanel({
 	workspaceSlug,
 	state,
-	precompute,
+	practiceScript,
 	nested,
 	path,
 }: WorkspacePracticePanelProps) {
@@ -117,8 +117,8 @@ export function WorkspacePracticePanel({
 	}
 
 	const { practice, definitionOptions, groupName } = state;
-	const scripted = hasText(practice.precomputeScript);
-	const blocking = scripted ? blockingNeeds(precompute) : [];
+	const scripted = hasText(practice.practiceScript);
+	const blocking = scripted ? blockingNeeds(practiceScript) : [];
 
 	return (
 		<>
@@ -141,8 +141,8 @@ export function WorkspacePracticePanel({
 							<BlockingNeedsAlert workspaceSlug={workspaceSlug} needs={blocking} />
 						)
 					}
-					precompute={
-						scripted && <PrecomputeScriptNeeds workspaceSlug={workspaceSlug} state={precompute} />
+					practiceScript={
+						scripted && <PracticeScriptNeeds workspaceSlug={workspaceSlug} state={practiceScript} />
 					}
 				/>
 			</DrawerBody>
@@ -168,7 +168,7 @@ export function WorkspacePracticePanel({
 }
 
 /** The current script's needs, or none while they load, failed, or describe an earlier script. */
-function currentNeeds(state: PrecomputeNeedsState): PrecomputeNeed[] {
+function currentNeeds(state: PracticeScriptNeedsState): PracticeScriptNeed[] {
 	if (state.status !== "ready" || state.summary === undefined) {
 		return [];
 	}
@@ -177,13 +177,15 @@ function currentNeeds(state: PrecomputeNeedsState): PrecomputeNeed[] {
 }
 
 /**
- * The needs that stop the script for some members: a required precompute model with no assignment
+ * The needs that stop the script for some members: a required model for practice scripts with no assignment
  * for their tier. The review model always runs the review, so the script requiring it stops nothing.
  */
-function blockingNeeds(state: PrecomputeNeedsState): PrecomputeNeed[] {
+function blockingNeeds(state: PracticeScriptNeedsState): PracticeScriptNeed[] {
 	return currentNeeds(state).filter(
 		(need) =>
-			need.need === "REQUIRED" && isPrecomputePurpose(need.purpose) && need.unmetTiers.length > 0,
+			need.need === "REQUIRED" &&
+			isPracticeScriptPurpose(need.purpose) &&
+			need.unmetTiers.length > 0,
 	);
 }
 
@@ -206,7 +208,7 @@ function BlockingNeedsAlert({
 	needs,
 }: {
 	workspaceSlug: string;
-	needs: PrecomputeNeed[];
+	needs: PracticeScriptNeed[];
 }) {
 	return (
 		<Alert variant={BLOCKING_TONE} role="note">
@@ -214,11 +216,11 @@ function BlockingNeedsAlert({
 			<AlertDescription>
 				{needs.map((need) => (
 					<p key={need.purpose}>
-						The precompute script does not run for {workOf(need.unmetTiers)}: no{" "}
+						The practice script does not run for {workOf(need.unmetTiers)}: no{" "}
 						{AGENT_PURPOSE_DEFS[need.purpose].noun} is assigned for them.{" "}
-						<PrecomputeModelLink workspaceSlug={workspaceSlug} purpose={need.purpose}>
+						<PracticeScriptModelLink workspaceSlug={workspaceSlug} purpose={need.purpose}>
 							{assignModelLabel(need.purpose)}
-						</PrecomputeModelLink>
+						</PracticeScriptModelLink>
 					</p>
 				))}
 			</AlertDescription>
@@ -226,9 +228,9 @@ function BlockingNeedsAlert({
 	);
 }
 
-interface PrecomputeScriptNeedsProps {
+interface PracticeScriptNeedsProps {
 	workspaceSlug: string;
-	state: PrecomputeNeedsState;
+	state: PracticeScriptNeedsState;
 }
 
 /**
@@ -236,7 +238,7 @@ interface PrecomputeScriptNeedsProps {
  * version of the script reported them. Nothing here is a health verdict: a run's own outcome is on
  * that review's trace.
  */
-function PrecomputeScriptNeeds({ workspaceSlug, state }: PrecomputeScriptNeedsProps) {
+function PracticeScriptNeeds({ workspaceSlug, state }: PracticeScriptNeedsProps) {
 	if (state.status === "loading") {
 		return (
 			<div className="space-y-2" aria-hidden>
@@ -262,7 +264,7 @@ function PrecomputeScriptNeeds({ workspaceSlug, state }: PrecomputeScriptNeedsPr
 		return <NeedsNote>Its models show after its next review.</NeedsNote>;
 	}
 	// The review model always runs the review, so a row for it would have nothing to say.
-	const models = summary.needs.filter((need) => isPrecomputePurpose(need.purpose));
+	const models = summary.needs.filter((need) => isPracticeScriptPurpose(need.purpose));
 	return (
 		<div className="space-y-2">
 			{models.length === 0 ? (
@@ -289,9 +291,9 @@ function NeedsNote({ children }: { children: string }) {
 	return <p className="text-sm text-muted-foreground">{children}</p>;
 }
 
-function NeedItem({ workspaceSlug, need }: { workspaceSlug: string; need: PrecomputeNeed }) {
+function NeedItem({ workspaceSlug, need }: { workspaceSlug: string; need: PracticeScriptNeed }) {
 	const unmet = need.unmetTiers.length > 0;
-	const badge = precomputeNeedBadge(need.need);
+	const badge = practiceScriptNeedBadge(need.need);
 	return (
 		<Item variant="row" size="sm" role="listitem">
 			<ItemContent>
@@ -313,16 +315,16 @@ function NeedItem({ workspaceSlug, need }: { workspaceSlug: string; need: Precom
 			{unmet && (
 				// Below `sm` under the line it fixes, so the name and the line keep the row's width.
 				<ItemActions className="basis-full pl-10 sm:basis-auto sm:pl-0">
-					<PrecomputeModelLink workspaceSlug={workspaceSlug} purpose={need.purpose}>
+					<PracticeScriptModelLink workspaceSlug={workspaceSlug} purpose={need.purpose}>
 						{assignModelLabel(need.purpose)}
-					</PrecomputeModelLink>
+					</PracticeScriptModelLink>
 				</ItemActions>
 			)}
 		</Item>
 	);
 }
 
-function AsOfReview({ workspaceSlug, asOf }: { workspaceSlug: string; asOf: PrecomputeAsOf }) {
+function AsOfReview({ workspaceSlug, asOf }: { workspaceSlug: string; asOf: PracticeScriptAsOf }) {
 	return (
 		<p className="text-xs text-muted-foreground">
 			<Link

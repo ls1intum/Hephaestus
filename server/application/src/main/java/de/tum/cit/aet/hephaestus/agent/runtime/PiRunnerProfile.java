@@ -21,7 +21,7 @@ public interface PiRunnerProfile {
      * all of these before the runner starts, and {@link #BASE_RUNTIME_FLAGS} grants exactly these, so
      * neither half can name a path the other does not.
      *
-     * <p>{@code PracticePiAdapter} builds the precompute invocation with a grant and a pre-creation of
+     * <p>{@code PracticePiAdapter} builds the practice script invocation with a grant and a pre-creation of
      * its own, outside this list.
      */
     List<String> WRITABLE_DIRECTORIES = List.of(

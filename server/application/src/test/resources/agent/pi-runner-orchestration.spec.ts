@@ -3264,14 +3264,14 @@ if (scenario !== undefined && scenario !== "") {
 							practiceCriteria,
 						);
 					}
-					// What the practice's precompute script derived, as the precompute runner writes it.
-					mkdirSync(nodePath.join(cwd, "work/precompute-out"), { recursive: true });
+					// What the practice's script derived, as the practice script runner writes it.
+					mkdirSync(nodePath.join(cwd, "work/practice-scripts-out"), { recursive: true });
 					writeFileSync(
-						nodePath.join(cwd, "work/precompute-out/test-practice.md"),
+						nodePath.join(cwd, "work/practice-scripts-out/test-practice.md"),
 						"- `src/Auth.java` [L10] — insecure call: `insecure();`\n",
 					);
 					writeFileSync(
-						nodePath.join(cwd, "work/precompute-out/test-practice.json"),
+						nodePath.join(cwd, "work/practice-scripts-out/test-practice.json"),
 						JSON.stringify({
 							practice: "test-practice",
 							contract: "positional",
@@ -3454,14 +3454,14 @@ if (scenario !== undefined && scenario !== "") {
 					writeFileSync(
 						nodePath.join(cwd, "task.json"),
 						JSON.stringify({
-							schemaVersion: 3,
+							schemaVersion: 4,
 							contextRoot: "evidence",
 							repositoryRoot: "repos/primary",
 							manifest: "evidence/manifest.json",
 							practiceIndex: "catalog/practices/index.json",
 							compositionRequest: "evidence/composition.json",
 							preparedFeedback: "history/prepared.json",
-							precomputeScripts: "scripts/practices",
+							practiceScripts: "scripts/practices",
 							prompt: "Review the practice.",
 							repositoryFullName: "group/repo",
 							pullRequestNumber: 3,
@@ -4232,7 +4232,7 @@ for (const item of nullableCases) {
 								stage === "measure-context-missing" ? "(criteria file missing)" : practiceCriteria;
 							const criterionAt = turn.indexOf(criterion);
 							const illustrationsAt = turn.indexOf("## How report_observation takes observations");
-							const leadsAt = turn.indexOf("#### Precomputed leads");
+							const leadsAt = turn.indexOf("#### Leads from the practice script");
 							const recordAt = turn.lastIndexOf("Record one observation for test-practice");
 							assert.ok(criterionAt !== -1 && turn.includes("### `evidence/metadata.json`"), turn);
 							assert.ok(criterionAt > turn.indexOf("### `evidence/metadata.json`"), turn);
@@ -4308,14 +4308,14 @@ for (const item of nullableCases) {
 							);
 							assert.ok(
 								first.indexOf("## How report_observation takes observations") <
-									first.indexOf("#### Precomputed leads"),
+									first.indexOf("#### Leads from the practice script"),
 							);
 							for (const turn of [first, second]) {
 								assert.equal(turn.split("## How report_observation takes observations").length, 2);
 							}
 							assert.match(
 								first,
-								/#### Precomputed leads for `test-practice` — starting points to check against the criteria, not verdicts\n- `src\/Auth\.java` \[L10\] — insecure call/u,
+								/#### Leads from the practice script for `test-practice` — starting points to check against the criteria, not verdicts\n- `src\/Auth\.java` \[L10\] — insecure call/u,
 							);
 							assert.match(
 								events.find((event) => event.startsWith("corrected-kind:")) ?? "",
@@ -4634,10 +4634,10 @@ for (const item of nullableCases) {
 						case "compose":
 						case "compose-foreign-provider": {
 							assert.equal(child.status, 0, child.stderr);
-							// Composition removed the precompute output after the runner read its report.
-							assert.equal(existsSync(nodePath.join(cwd, "work/precompute-out")), false);
+							// Composition removed the practice script output after the runner read its report.
+							assert.equal(existsSync(nodePath.join(cwd, "work/practice-scripts-out")), false);
 							assert.deepEqual(
-								JSON.parse(readFileSync(nodePath.join(cwd, "out/precompute.json"), "utf8")),
+								JSON.parse(readFileSync(nodePath.join(cwd, "out/practice-scripts.json"), "utf8")),
 								{
 									practices: [
 										{ slug: "second-practice", status: "not-finished", leads: 0 },
@@ -4857,7 +4857,7 @@ for (const item of nullableCases) {
 							assert.ok(criteriaAt < composerTurn.indexOf('"id": "observation-1"'), composerTurn);
 							assert.doesNotMatch(
 								composerTurn,
-								/Precomputed leads|insecure call: |Complete second criterion/u,
+								/Leads from the practice script|insecure call: |Complete second criterion/u,
 							);
 							// Earlier feedback keeps every fact it was staged with and names where its words are.
 							for (const fact of [

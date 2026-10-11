@@ -20,7 +20,7 @@ public final class SandboxLayout {
 
     // ── Job folder (ADR 0041): read-only inputs and separate writable mounts ──────────────────────────────
     //   context/, repos/, inputs/, task.json, INDEX.* — the read-only job folder
-    //   work/    — scratch the agent + precompute write during the run; NEVER collected
+    //   work/    — scratch the agent + practice scripts write during the run; NEVER collected
     //   out/     — the ONLY directory collected back into SQL
     //   .pi/     — the Pi SDK runtime home (vendor dir)
 
@@ -60,11 +60,11 @@ public final class SandboxLayout {
     public static final String FEEDBACK_FILENAME = "feedback.json";
 
     /**
-     * Filename of the precompute report, collected from {@link #OUTPUT_PATH}: one entry per staged precompute
+     * Filename of the practice script report, collected from {@link #OUTPUT_PATH}: one entry per staged practice script
      * script with its status, leads, and models. The runner writes it before it deletes
-     * {@link #PRECOMPUTE_OUT_PREFIX}, which is never collected.
+     * {@link #PRACTICE_SCRIPT_OUT_PREFIX}, which is never collected.
      */
-    public static final String PRECOMPUTE_REPORT_FILE = "precompute.json";
+    public static final String PRACTICE_SCRIPT_REPORT_FILE = "practice-scripts.json";
 
     /** Workspace-relative filename of the composition stage's instructions, staged beside the runner. */
     public static final String FEEDBACK_COMPOSER_PROMPT_FILENAME = "feedback-composer.md";
@@ -90,16 +90,16 @@ public final class SandboxLayout {
 
     /**
      * Workspace-relative prefix for the writable scratch region (ADR 0020). Everything the agent +
-     * precompute write during a run lives here; the sandbox makes this subtree writable by the
+     * practice script write during a run lives here; the sandbox makes this subtree writable by the
      * container uid while {@link #INPUTS_PREFIX} stays read-only. Never collected back into SQL.
      */
     public static final String WORK_PREFIX = "work/";
 
-    /** Workspace-relative prefix for per-practice precompute scripts injected from the database. */
-    public static final String PRECOMPUTE_PREFIX = WORK_PREFIX + "precompute/";
+    /** Workspace-relative prefix for per-practice scripts injected from the database. */
+    public static final String PRACTICE_SCRIPT_PREFIX = WORK_PREFIX + "practice-scripts/";
 
-    /** Workspace-relative prefix for runtime precompute output (logs, structured hints). */
-    public static final String PRECOMPUTE_OUT_PREFIX = WORK_PREFIX + "precompute-out/";
+    /** Workspace-relative prefix for runtime practice script output (logs, structured hints). */
+    public static final String PRACTICE_SCRIPT_OUT_PREFIX = WORK_PREFIX + "practice-scripts-out/";
 
     /** Workspace-relative prefix for analysis markers ({@link #ANALYSIS_PRACTICES_PREFIX} is a child). */
     public static final String ANALYSIS_PREFIX = WORK_PREFIX + "analysis/";
@@ -129,10 +129,10 @@ public final class SandboxLayout {
     public static final String NODE_PACKAGE_JSON_FILENAME = "package.json";
 
     /**
-     * Workspace-relative filename of the models that the precompute scripts may call, by slot. It holds
-     * no credential: the precompute stage alone receives {@code $PRECOMPUTE_PROXY_TOKEN}.
+     * Workspace-relative filename of the models that the practice scripts may call, by slot. It holds
+     * no credential: the practice script stage alone receives {@code $PRACTICE_SCRIPT_PROXY_TOKEN}.
      */
-    public static final String PRECOMPUTE_MODELS_FILE = "precompute-models.json";
+    public static final String PRACTICE_SCRIPT_MODELS_FILE = "practice-script-models.json";
 
     /** Workspace-relative filename of the shared provider-registration ES module both runners import. */
     public static final String PROVIDER_HELPER_FILENAME = "pi-provider.ts";
@@ -193,6 +193,6 @@ public final class SandboxLayout {
 
     /** Exact workspace paths an adapter may pass in {@link PiPlanSpec#extraInputs()}. */
     public static Set<String> allowedExtraInputPaths() {
-        return Set.of(MENTOR_SYSTEM_PROMPT_PATH, PRECOMPUTE_MODELS_FILE);
+        return Set.of(MENTOR_SYSTEM_PROMPT_PATH, PRACTICE_SCRIPT_MODELS_FILE);
     }
 }

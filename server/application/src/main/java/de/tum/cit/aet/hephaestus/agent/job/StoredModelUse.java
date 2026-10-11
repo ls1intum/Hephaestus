@@ -1,17 +1,17 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
-import de.tum.cit.aet.hephaestus.practices.spi.PrecomputeModelPurpose;
-import de.tum.cit.aet.hephaestus.practices.spi.PrecomputeModelUseDTO;
-import de.tum.cit.aet.hephaestus.practices.spi.PrecomputeNeed;
-import de.tum.cit.aet.hephaestus.practices.spi.PrecomputeNotRatedDTO;
-import de.tum.cit.aet.hephaestus.practices.spi.PrecomputeNotRatedReason;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptModelPurpose;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptModelUseDTO;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptNeed;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptNotRatedDTO;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptNotRatedReason;
 import de.tum.cit.aet.hephaestus.workspace.spi.DataHandlingTier;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 
 /**
- * One model use as the {@code models} column of {@code agent_job_precompute_run} stores it. The stored form
- * belongs to this module, apart from the wire form {@link PrecomputeModelUseDTO}, so a change to a wire field
+ * One model use as the {@code models} column of {@code agent_job_practice_script_run} stores it. The stored form
+ * belongs to this module, apart from the wire form {@link PracticeScriptModelUseDTO}, so a change to a wire field
  * name cannot make the stored runs unreadable.
  *
  * <p>The enum values are stored by name, and they are a storage contract. To rename, split, or remove a value,
@@ -22,8 +22,8 @@ import org.jspecify.annotations.Nullable;
  *     attempt had none. The job's snapshot holds only its latest attempt's models, so the run keeps its own.
  */
 record StoredModelUse(
-        PrecomputeModelPurpose purpose,
-        PrecomputeNeed need,
+        PracticeScriptModelPurpose purpose,
+        PracticeScriptNeed need,
         boolean bound,
         List<NotRated> notRated,
         @Nullable DataHandlingTier tier) {
@@ -32,9 +32,9 @@ record StoredModelUse(
         notRated = List.copyOf(notRated);
     }
 
-    record NotRated(PrecomputeNotRatedReason reason, int count) {}
+    record NotRated(PracticeScriptNotRatedReason reason, int count) {}
 
-    static StoredModelUse of(PrecomputeModelUseDTO use, @Nullable DataHandlingTier tier) {
+    static StoredModelUse of(PracticeScriptModelUseDTO use, @Nullable DataHandlingTier tier) {
         return new StoredModelUse(
                 use.purpose(),
                 use.need(),
@@ -45,13 +45,13 @@ record StoredModelUse(
                 tier);
     }
 
-    PrecomputeModelUseDTO toDto() {
-        return new PrecomputeModelUseDTO(
+    PracticeScriptModelUseDTO toDto() {
+        return new PracticeScriptModelUseDTO(
                 purpose,
                 need,
                 bound,
                 notRated.stream()
-                        .map(entry -> new PrecomputeNotRatedDTO(entry.reason(), entry.count()))
+                        .map(entry -> new PracticeScriptNotRatedDTO(entry.reason(), entry.count()))
                         .toList());
     }
 }

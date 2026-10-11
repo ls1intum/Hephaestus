@@ -178,9 +178,9 @@ class ReviewMemberAiPolicyTest extends BaseUnitTest {
                 .isFalse();
     }
 
-    /** The review's precompute models are routed for the reviewed developer and capped at the review's own tier. */
+    /** The review's models for practice scripts are routed for the reviewed developer and capped at the review's own tier. */
     @Test
-    void shouldGiveNoCloudPrecomputeModelWhenTheCloudMembersReviewRunsInHouse() {
+    void shouldGiveNoCloudPracticeScriptModelWhenTheCloudMembersReviewRunsInHouse() {
         var bindings = mock(WorkspaceAgentBindingRepository.class);
         var resolver = mock(LlmModelResolver.class);
         var routed = new ReviewMemberAiPolicy(
@@ -203,7 +203,7 @@ class ReviewMemberAiPolicyTest extends BaseUnitTest {
 
         assertThat(routed.binding(1L, AgentJobType.PULL_REQUEST_REVIEW, metadata))
                 .contains(review);
-        assertThat(routed.precomputeBinding(
+        assertThat(routed.practiceScriptBinding(
                         1L, AgentPurpose.PRACTICE_DECISION, AgentJobType.PULL_REQUEST_REVIEW, metadata))
                 .isEmpty();
     }

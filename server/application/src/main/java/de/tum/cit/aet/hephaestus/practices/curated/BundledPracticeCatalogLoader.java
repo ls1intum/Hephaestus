@@ -177,7 +177,7 @@ public class BundledPracticeCatalogLoader {
                 occasion.subject() == null ? ActorRole.AUTHOR : occasion.subject(),
                 occasion.precondition(),
                 criteria,
-                loadPrecomputeScript(node, slug),
+                loadPracticeScript(node, slug),
                 policy(objectMapper, evidenceDefaults.policyFor(artifactKind), node, slug),
                 whyItMatters,
                 whatGoodLooksLike,
@@ -252,19 +252,19 @@ public class BundledPracticeCatalogLoader {
         }
     }
 
-    private static @Nullable String loadPrecomputeScript(JsonNode node, String slug) {
-        String resourcePath = text(node, "precomputeScript");
+    private static @Nullable String loadPracticeScript(JsonNode node, String slug) {
+        String resourcePath = text(node, "practiceScript");
         if (resourcePath == null) {
             return null;
         }
         var resource = new ClassPathResource(resourcePath);
         if (!resource.exists()) {
-            throw new IllegalStateException("bundled precompute script does not exist: " + resourcePath);
+            throw new IllegalStateException("bundled practice script does not exist: " + resourcePath);
         }
         try (InputStream input = resource.getInputStream()) {
             return new String(input.readAllBytes(), StandardCharsets.UTF_8);
         } catch (IOException exception) {
-            throw new IllegalStateException("cannot read bundled precompute script: " + slug, exception);
+            throw new IllegalStateException("cannot read bundled practice script: " + slug, exception);
         }
     }
 

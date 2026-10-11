@@ -74,7 +74,7 @@ public class LlmUsageEvent {
 
     @NonNull
     @Enumerated(EnumType.STRING)
-    @Column(name = "source_type", nullable = false, length = 20, updatable = false)
+    @Column(name = "source_type", nullable = false, length = 32, updatable = false)
     private LlmUsageSourceType sourceType;
 
     @ColumnDefault("0")

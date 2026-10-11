@@ -18,13 +18,16 @@
 		"forceConsistentCasingInFileNames": true,
 		"skipLibCheck": true,
 		"noEmit": true,
-		"rootDirs": ["server/application/src/main/resources/practices", "docker/agents/precompute"]
+		"rootDirs": [
+			"server/application/src/main/resources/practices",
+			"docker/agents/practice-scripts"
+		]
 	},
 	"include": [
 		"server/application/src/main/resources/agent/**/*.ts",
 		"server/application/src/test/resources/agent/**/*.ts",
-		"server/application/src/main/resources/practices/precompute/**/*.ts",
-		"docker/agents/precompute/**/*.ts",
+		"server/application/src/main/resources/practices/scripts/**/*.ts",
+		"docker/agents/practice-scripts/**/*.ts",
 		"docker/agents/pi/**/*.ts"
 	]
 }

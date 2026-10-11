@@ -2,7 +2,7 @@ import type {
 	AgentBinding,
 	AgentJob,
 	AvailableLlmModel,
-	PracticePrecomputeSummary,
+	PracticeScriptSummary,
 } from "@/api/types.gen";
 import { inStoryYear, minutesAfter } from "@/stories/story-clock";
 
@@ -53,7 +53,7 @@ export const mockAvailableModels: AvailableLlmModel[] = [
 	},
 ];
 
-/** One model per precompute kind, each on the API that serves it. */
+/** One model per model kind for practice scripts, each on the API that serves it. */
 export const mockDecisionModel: AvailableLlmModel = {
 	dataHandlingTier: "CLOUD",
 	id: 3,
@@ -98,7 +98,7 @@ export const mockRerankModel: AvailableLlmModel = {
 	pricingMode: "UNPRICED",
 };
 
-export const mockPrecomputeModels: AvailableLlmModel[] = [
+export const mockPracticeScriptModels: AvailableLlmModel[] = [
 	mockDecisionModel,
 	mockEmbeddingModel,
 	mockRerankModel,
@@ -108,7 +108,7 @@ export const mockPrecomputeModels: AvailableLlmModel[] = [
 const asOf = { jobId: "job-completed-1", finishedAt: inStoryYear("10-03T09:00") };
 
 /** Comment quality requires a decision model that In-house members do not get. */
-export const mockCommentQualityNeeds: PracticePrecomputeSummary = {
+export const mockCommentQualityNeeds: PracticeScriptSummary = {
 	practiceSlug: "comment-quality",
 	practiceName: "Comment quality",
 	asOf,
@@ -119,7 +119,7 @@ export const mockCommentQualityNeeds: PracticePrecomputeSummary = {
 	],
 };
 
-export const mockDescribeWhatAndWhyNeeds: PracticePrecomputeSummary = {
+export const mockDescribeWhatAndWhyNeeds: PracticeScriptSummary = {
 	practiceSlug: "describe-what-and-why",
 	practiceName: "Describe what and why",
 	asOf,
@@ -128,14 +128,14 @@ export const mockDescribeWhatAndWhyNeeds: PracticePrecomputeSummary = {
 };
 
 /** A script whose newest review ran an earlier version: it declares nothing yet. */
-export const mockChangedScriptNeeds: PracticePrecomputeSummary = {
+export const mockChangedScriptNeeds: PracticeScriptSummary = {
 	practiceSlug: "small-pull-requests",
 	practiceName: "Small pull requests",
 	scriptChanged: true,
 	needs: [],
 };
 
-export const mockPrecomputeNeeds: PracticePrecomputeSummary[] = [
+export const mockPracticeScriptNeeds: PracticeScriptSummary[] = [
 	mockCommentQualityNeeds,
 	mockDescribeWhatAndWhyNeeds,
 	mockChangedScriptNeeds,

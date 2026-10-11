@@ -30,14 +30,14 @@ public final class ReviewRuleFingerprint {
             ActorRole subject,
             @Nullable PracticePrecondition precondition,
             String criteria,
-            @Nullable String precomputeScript,
+            @Nullable String practiceScript,
             PracticeAutomatedReviewPolicy automatedReviewPolicy,
             @Nullable String groupSlug) {
         CanonicalDigest digest = new CanonicalDigest().add(slug).add(name).add(artifactKind.value());
         addAssessment(digest, evidenceRequirements, subject, precondition);
         return (SCHEME
                 + digest.add(criteria)
-                        .addNullable(precomputeScript)
+                        .addNullable(practiceScript)
                         .add(PracticeAutomatedReviewPolicyDigest.digest(automatedReviewPolicy))
                         .addNullable(groupSlug)
                         .hex());

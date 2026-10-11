@@ -415,7 +415,7 @@ public class AgentJobService {
             job.setTraceId(resolveTraceId());
             try {
                 job.setConfigSnapshot(ConfigSnapshot.from(binding, llmModelResolver)
-                        .withPrecompute(precomputeSlots(workspace.getId(), jobType, submission.metadata()))
+                        .withPracticeScript(practiceScriptSlots(workspace.getId(), jobType, submission.metadata()))
                         .toJson(objectMapper));
             } catch (IllegalStateException unavailableModel) {
                 log.warn(
@@ -460,16 +460,16 @@ public class AgentJobService {
     }
 
     /**
-     * Each precompute model is routed like the review's own model, through the same developer's tier
+     * Each model for practice scripts is routed like the review's own model, through the same developer's tier
      * ceiling. A purpose with no ready binding gives no slot: the review runs, and the scripts that
      * need that model report that it is missing.
      */
-    private @Nullable Map<ModelKind, FrozenModel> precomputeSlots(
+    private @Nullable Map<ModelKind, FrozenModel> practiceScriptSlots(
             Long workspaceId, AgentJobType jobType, JsonNode metadata) {
         Map<ModelKind, FrozenModel> slots = new EnumMap<>(ModelKind.class);
-        for (AgentPurpose purpose : AgentPurpose.precompute()) {
+        for (AgentPurpose purpose : AgentPurpose.practiceScript()) {
             memberAiPolicy
-                    .precomputeBinding(workspaceId, purpose, jobType, metadata)
+                    .practiceScriptBinding(workspaceId, purpose, jobType, metadata)
                     .ifPresent(binding -> slots.put(purpose.kind(), FrozenModel.from(binding, llmModelResolver)));
         }
         return slots.isEmpty() ? null : slots;

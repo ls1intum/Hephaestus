@@ -37,7 +37,7 @@ import { LlmUsageByPracticeTable } from "./LlmUsageByPracticeTable";
 import {
 	budgetUsedPercent,
 	formatMonthLabel,
-	precomputeByPracticeDescription,
+	practiceScriptByPracticeDescription,
 	projectBudget,
 	purseCap,
 	pursesOf,
@@ -217,8 +217,8 @@ export function WorkspaceUsageReport({
 
 					{report.byPractice.length > 0 && (
 						<Section
-							title="Precompute models by practice"
-							description={precomputeByPracticeDescription(isCurrentMonth)}
+							title="Models for practice scripts, by practice"
+							description={practiceScriptByPracticeDescription(isCurrentMonth)}
 						>
 							<LlmUsageByPracticeTable
 								report={report}

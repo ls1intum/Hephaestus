@@ -1,8 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
 
-import type { PracticePrecomputeSummary } from "@/api/types.gen";
-import { mockPractices, precomputeScript } from "@/components/admin/practices/fixtures";
+import type { PracticeScriptSummary } from "@/api/types.gen";
+import { mockPractices, practiceScript } from "@/components/admin/practices/fixtures";
 import { PURPOSE_STATUS_DEFS } from "@/components/practice-vocabulary/purpose-status-defs";
 import { mockPracticeDefinitionOptions } from "@/mocks/fixtures/practice";
 import { withPageBehind } from "@/stories/decorators";
@@ -14,7 +14,7 @@ import { levelsOpenedBy } from "@/test/detail-stack";
 import { precedes } from "@/test/dom";
 
 import {
-	type PrecomputeNeedsState,
+	type PracticeScriptNeedsState,
 	WorkspacePracticePanel,
 	type WorkspacePracticeState,
 } from "./WorkspacePracticePanel";
@@ -34,15 +34,15 @@ const ready = (over: Partial<ReadyState> = {}): ReadyState => ({
 	...over,
 });
 
-/** A practice whose script declares these models, the way the precompute guide teaches. */
-const scriptedWith = (models: Parameters<typeof precomputeScript>[0]) =>
-	ready({ practice: { ...practice, precomputeScript: precomputeScript(models) } });
+/** A practice whose script declares these models, the way the practice script guide teaches. */
+const scriptedWith = (models: Parameters<typeof practiceScript>[0]) =>
+	ready({ practice: { ...practice, practiceScript: practiceScript(models) } });
 
 const scripted = scriptedWith({ decision: "required" });
 
 const REVIEW_JOB_ID = "6f1c2b7a-0d3e-4c55-9a51-2f7a3e8b9c10";
 
-const needs = (over: Partial<PracticePrecomputeSummary> = {}): PrecomputeNeedsState => ({
+const needs = (over: Partial<PracticeScriptSummary> = {}): PracticeScriptNeedsState => ({
 	status: "ready",
 	summary: {
 		practiceSlug: practice.slug,
@@ -71,12 +71,12 @@ const meta = {
 	args: {
 		workspaceSlug: "demo",
 		state: ready(),
-		precompute: { status: "ready", summary: undefined },
+		practiceScript: { status: "ready", summary: undefined },
 		path: { behind: [{ label: "Practice setup", depth: 0 }], onClose: fn() },
 	},
 	argTypes: {
 		state: { control: false },
-		precompute: { control: false },
+		practiceScript: { control: false },
 		path: { control: false },
 	},
 	render: (args) => (
@@ -184,24 +184,24 @@ export const DarkMode: Story = {
 
 /** Opens the script's disclosure, where what it needs sits above its source. */
 async function openScript() {
-	const trigger = await screen.findByRole("button", { name: "Precompute script" });
+	const trigger = await screen.findByRole("button", { name: "Practice script" });
 	await expectSettledVisible(trigger);
 	await userEvent.click(trigger);
 	return trigger;
 }
 
-/** A practice without a precompute script has nothing to say about models, so nothing names one. */
-export const PrecomputeNoScript: Story = {
-	args: { precompute: needs() },
+/** A practice without a practice script has nothing to say about models, so nothing names one. */
+export const PracticeScriptNoScript: Story = {
+	args: { practiceScript: needs() },
 	play: async () => {
 		await expectSettledVisible(await screen.findByRole("link", { name: "Edit practice" }));
-		await expect(screen.queryByText(/precompute script/iu)).not.toBeInTheDocument();
+		await expect(screen.queryByText(/practice script/iu)).not.toBeInTheDocument();
 		await expect(screen.queryByRole("note")).not.toBeInTheDocument();
 	},
 };
 
-export const PrecomputeUsesNoModel: Story = {
-	args: { state: scriptedWith({}), precompute: needs() },
+export const PracticeScriptUsesNoModel: Story = {
+	args: { state: scriptedWith({}), practiceScript: needs() },
 	play: async () => {
 		await openScript();
 		await expectSettledVisible(await screen.findByText("It uses no model."));
@@ -213,10 +213,10 @@ export const PrecomputeUsesNoModel: Story = {
 };
 
 /** An optional model with an assignment for every tier is the quiet case: no badge, no alert. */
-export const PrecomputeOptionalMet: Story = {
+export const PracticeScriptOptionalMet: Story = {
 	args: {
 		state: scriptedWith({ embedding: "optional" }),
-		precompute: needs({
+		practiceScript: needs({
 			needs: [{ purpose: "PRACTICE_EMBEDDING", need: "OPTIONAL", unmetTiers: [] }],
 		}),
 	},
@@ -237,10 +237,10 @@ export const PrecomputeOptionalMet: Story = {
  * words; members who have not made an AI choice are named as such, not by the "Not declared" label.
  * The review model always runs the review, so it has no row.
  */
-export const PrecomputeRequiredUnmet: Story = {
+export const PracticeScriptRequiredUnmet: Story = {
 	args: {
 		state: scriptedWith({ chat: "required", decision: "required", reranking: "optional" }),
-		precompute: needs({
+		practiceScript: needs({
 			needs: [
 				{ purpose: "PRACTICE_DECISION", need: "REQUIRED", unmetTiers: ["IN_HOUSE"] },
 				{ purpose: "PRACTICE_REVIEW", need: "REQUIRED", unmetTiers: [] },
@@ -256,7 +256,7 @@ export const PrecomputeRequiredUnmet: Story = {
 		const alert = await screen.findByRole("note");
 		await expectSettledVisible(alert);
 		await expect(alert).toHaveTextContent(
-			"The precompute script does not run for In-house members’ work: no decision model is assigned for them. Assign a decision model",
+			"The practice script does not run for In-house members’ work: no decision model is assigned for them. Assign a decision model",
 		);
 		await expect(
 			within(alert).getByRole("link", { name: "Assign a decision model" }),
@@ -286,10 +286,10 @@ export const PrecomputeRequiredUnmet: Story = {
 };
 
 /** A script that calls only the review model has nothing to assign, but it does use a model. */
-export const PrecomputeUsesOnlyTheReviewModel: Story = {
+export const PracticeScriptUsesOnlyTheReviewModel: Story = {
 	args: {
 		state: scriptedWith({ chat: "required" }),
-		precompute: needs({
+		practiceScript: needs({
 			needs: [{ purpose: "PRACTICE_REVIEW", need: "REQUIRED", unmetTiers: [] }],
 		}),
 	},
@@ -309,17 +309,17 @@ export const DisclosureOrder: Story = {
 		state: ready({
 			practice: {
 				...practice,
-				precomputeScript: precomputeScript(),
+				practiceScript: practiceScript(),
 				deliveryBehavior: { summaryOnly: true },
 			},
 		}),
-		precompute: needs(),
+		practiceScript: needs(),
 	},
 	play: async () => {
 		const decides = await screen.findByRole("button", { name: "How it decides" });
 		await expectSettledVisible(decides);
 		const scope = screen.getByRole("button", { name: "Review scope and evidence" });
-		const script = screen.getByRole("button", { name: "Precompute script" });
+		const script = screen.getByRole("button", { name: "Practice script" });
 		const delivery = screen.getByRole("button", { name: "How feedback is delivered" });
 		await expect(
 			precedes(decides, scope) && precedes(scope, script) && precedes(script, delivery),
@@ -328,8 +328,8 @@ export const DisclosureOrder: Story = {
 };
 
 /** No review has run this script yet, so there are no needs to show and no review to point at. */
-export const PrecomputeShownAfterNextReview: Story = {
-	args: { state: scripted, precompute: { status: "ready", summary: undefined } },
+export const PracticeScriptShownAfterNextReview: Story = {
+	args: { state: scripted, practiceScript: { status: "ready", summary: undefined } },
 	play: async () => {
 		await openScript();
 		await expectSettledVisible(await screen.findByText("Its models show after its next review."));
@@ -340,10 +340,10 @@ export const PrecomputeShownAfterNextReview: Story = {
 };
 
 /** The newest review ran an earlier version of the script, so its needs would describe other code. */
-export const PrecomputeScriptChanged: Story = {
+export const PracticeScriptChanged: Story = {
 	args: {
 		state: scripted,
-		precompute: needs({
+		practiceScript: needs({
 			asOf: undefined,
 			scriptChanged: true,
 			needs: [{ purpose: "PRACTICE_DECISION", need: "REQUIRED", unmetTiers: ["IN_HOUSE"] }],
@@ -359,8 +359,8 @@ export const PrecomputeScriptChanged: Story = {
 	},
 };
 
-export const PrecomputeNeedsLoading: Story = {
-	args: { state: scripted, precompute: { status: "loading" } },
+export const PracticeScriptNeedsLoading: Story = {
+	args: { state: scripted, practiceScript: { status: "loading" } },
 	play: async () => {
 		await openScript();
 		const panel = await settledDrawerPanel();
@@ -372,17 +372,17 @@ export const PrecomputeNeedsLoading: Story = {
 	},
 };
 
-export const PrecomputeNeedsFailed: Story = {
+export const PracticeScriptNeedsFailed: Story = {
 	args: {
 		state: scripted,
-		precompute: { status: "error", error: new Error("offline"), onRetry: fn() },
+		practiceScript: { status: "error", error: new Error("offline"), onRetry: fn() },
 	},
 	play: async ({ args }) => {
 		await openScript();
 		const retry = await screen.findByRole("button", { name: "Retry" });
 		await expectSettledVisible(retry);
 		await userEvent.click(retry);
-		const { precompute } = args;
-		await expect(precompute.status === "error" && precompute.onRetry).toHaveBeenCalledOnce();
+		const { practiceScript: needsState } = args;
+		await expect(needsState.status === "error" && needsState.onRetry).toHaveBeenCalledOnce();
 	},
 };

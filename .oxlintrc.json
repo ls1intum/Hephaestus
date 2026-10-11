@@ -494,37 +494,38 @@
 			"rules": { "import/no-relative-parent-imports": "off" }
 		},
 		{
-			// `tsconfig.agents.json` overlays this directory with `docker/agents/precompute` through
-			// `rootDirs`, and the agent image reproduces that layout under `/opt/precompute`. `../lib/x`
-			// is the spelling both resolve; an alias would typecheck and then fail in the sandbox. The
-			// runner's fixtures are staged next to the same `lib` link, so they use the same spelling.
+			// `tsconfig.agents.json` overlays this directory with `docker/agents/practice-scripts`
+			// through `rootDirs`, and the agent image reproduces that layout under
+			// `/opt/practice-scripts`. `../lib/x` is the spelling both resolve; an alias would typecheck
+			// and then fail in the sandbox. The runner's fixtures are staged next to the same `lib` link,
+			// so they use the same spelling.
 			"files": [
-				"server/application/src/main/resources/practices/precompute/**",
-				"docker/agents/precompute/fixtures/**"
+				"server/application/src/main/resources/practices/scripts/**",
+				"docker/agents/practice-scripts/fixtures/**"
 			],
 			"rules": { "import/no-relative-parent-imports": "off" }
 		},
 		{
-			// The runner and the precompute scripts execute on Node inside the agent sandbox, and a CLI
+			// The runner and the practice scripts execute on Node inside the agent sandbox, and a CLI
 			// entry point ends the process rather than returning a status nobody reads.
 			"files": [
 				"server/application/src/main/resources/agent/**",
 				"server/application/src/test/resources/agent/**",
-				"server/application/src/main/resources/practices/precompute/**",
-				"docker/agents/precompute/**",
+				"server/application/src/main/resources/practices/scripts/**",
+				"docker/agents/practice-scripts/**",
 				"scripts/**"
 			],
 			"rules": { "unicorn/no-process-exit": "off" }
 		},
 		{
 			// The runner's tools answer per item, so a validator is one guard per rule of a contract, and
-			// a precompute script is one guard per shape it recognises; at the default 20 the rule grades
+			// a practice script is one guard per shape it recognises; at the default 20 the rule grades
 			// how many rules the contract has. Forty is the line between that and a function doing several
 			// functions' work. An orchestration scenario is one linear story per stage, and is not graded.
 			"files": [
 				"server/application/src/main/resources/agent/**",
-				"server/application/src/main/resources/practices/precompute/**",
-				"docker/agents/precompute/**"
+				"server/application/src/main/resources/practices/scripts/**",
+				"docker/agents/practice-scripts/**"
 			],
 			"rules": { "complexity": ["error", { "max": 40 }] }
 		},

@@ -57,7 +57,7 @@ import {
 	validateSearchScope,
 } from "./pi-observation-normalize.ts";
 import { PracticeCoverageLedger } from "./pi-practice-coverage.ts";
-import { precomputeReport } from "./pi-precompute-report.ts";
+import { practiceScriptReport } from "./pi-practice-scripts-report.ts";
 import { loadProviderConfig, reasoningSetting, registerHephaestusProvider } from "./pi-provider.ts";
 import { completePublicReview } from "./pi-public-completion.ts";
 import {
@@ -405,12 +405,12 @@ const WATCHDOG_PATH = outputPath(OUTPUT, "watchdog-killed.json");
 const USAGE_PATH = outputPath(OUTPUT, "usage.json");
 const RUNNER_DEBUG_PATH = outputPath(OUTPUT, "runner-debug.json");
 const PRACTICE_COVERAGE_PATH = outputPath(OUTPUT, "practice-coverage.json");
-const PRECOMPUTE_REPORT_PATH = outputPath(OUTPUT, "precompute.json");
-// Read at the start: the precompute stage ended before this runner started, and composition removes
+const PRACTICE_SCRIPT_REPORT_PATH = outputPath(OUTPUT, "practice-scripts.json");
+// Read at the start: the practice script stage ended before this runner started, and composition removes
 // its output.
-const precomputeReportText = precomputeReport(
-	INPUT_PATHS.precomputeScripts,
-	`${CWD}/work/precompute-out`,
+const practiceScriptReportText = practiceScriptReport(
+	INPUT_PATHS.practiceScripts,
+	`${CWD}/work/practice-scripts-out`,
 );
 /** The runner's own record of what this review has recorded so far; read back after a compaction. */
 const NOTES_PATH = `${CWD}/work/notes/review.md`;
@@ -886,9 +886,9 @@ function finalizeOutput(): void {
 	if (compositionAdmitted) {
 		persist(FEEDBACK_PATH, persistComposedFeedback);
 	}
-	if (precomputeReportText !== undefined) {
-		persist(PRECOMPUTE_REPORT_PATH, () => {
-			writeFileSync(PRECOMPUTE_REPORT_PATH, precomputeReportText);
+	if (practiceScriptReportText !== undefined) {
+		persist(PRACTICE_SCRIPT_REPORT_PATH, () => {
+			writeFileSync(PRACTICE_SCRIPT_REPORT_PATH, practiceScriptReportText);
 		});
 	}
 	for (const entry of readdirSync(OUTPUT)) {
@@ -3948,12 +3948,12 @@ function criteriaFileOf(slug: string): string | null {
 	return existsSync(file) ? readFileSync(file, "utf8") : null;
 }
 
-/** The leads the practice's precompute script derived, when it ran; empty when it did not. */
-function precomputeSectionOf(slug: string): string {
-	const file = `${CWD}/work/precompute-out/${slug}.md`;
+/** The leads the practice's script derived, when it ran; empty when it did not. */
+function practiceScriptSectionOf(slug: string): string {
+	const file = `${CWD}/work/practice-scripts-out/${slug}.md`;
 	const section = existsSync(file) ? readFileSync(file, "utf8").trim() : "";
 	return section
-		? `\n\n#### Precomputed leads for \`${slug}\` — starting points to check against the criteria, not verdicts\n${section}`
+		? `\n\n#### Leads from the practice script for \`${slug}\` — starting points to check against the criteria, not verdicts\n${section}`
 		: "";
 }
 
@@ -4094,14 +4094,14 @@ ${example
 
 /**
  * A turn of one practice, after the opening when the context does not hold it: its whole criterion first, then
- * the generic illustrations when the context does not hold them, the precomputed leads, and the task. Its work
+ * the generic illustrations when the context does not hold them, the leads from the practice scripts, and the task. Its work
  * budget is not stated: told its call budget up front, an open model read less and missed more not-met practices.
  */
 function practiceTurnText(heading: string, slug: string, brief: string): string {
 	const illustrations = openingInContext ? "" : `\n\n${OBSERVATION_EXAMPLE}`;
 	return `${openingIfNeeded(brief)}${heading}
 
-${criteriaOf([slug])}${illustrations}${precomputeSectionOf(slug)}
+${criteriaOf([slug])}${illustrations}${practiceScriptSectionOf(slug)}
 
 Record one observation for ${slug} with report_observation: the outcome its criterion above decides through its Occasion, Judge and Defer, as the evidence supports it, NOT_APPLICABLE and UNDETERMINED included. What the brief shows is yours to quote; read more when the criterion needs evidence beyond it. This session records and revises only this practice.`;
 }
@@ -4817,7 +4817,7 @@ async function main() {
 			}
 		};
 		// Leads serve measurement only. Composition never receives them, and from here it cannot read them.
-		rmSync(`${CWD}/work/precompute-out`, { recursive: true, force: true });
+		rmSync(`${CWD}/work/practice-scripts-out`, { recursive: true, force: true });
 		const safetyMs = AGENT_BUDGET_MS - (Date.now() - PROCESS_START_MS);
 		if (safetyMs <= 0) {
 			markRemaining("SAFETY");

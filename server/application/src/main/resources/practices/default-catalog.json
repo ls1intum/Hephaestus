@@ -96,7 +96,7 @@
 							"stance": "CONTEXTUAL"
 						}
 					],
-					"precomputeScript": "practices/precompute/states-how-to-verify-the-change.ts",
+					"practiceScript": "practices/scripts/states-how-to-verify-the-change.ts",
 					"whyItMatters": "A reviewer who knows where to start, what to do and what to expect can check the change in minutes and trusts what they see. Without that, they either guess at a procedure, skip the check, or ask — and the change waits.",
 					"whatGoodLooksLike": "A change to the filter sheet whose description says: open Discover, apply two types, relaunch — the filters are still applied; clear them — the default list is back. The steps name the screen, the action and what success looks like, and the linked issue's acceptance criteria say the same.",
 					"holdsAs": "Every change says how to check that it works",
@@ -121,7 +121,7 @@
 							"stance": "REQUIRED"
 						}
 					],
-					"precomputeScript": "practices/precompute/ready-and-traceable-handoff.ts",
+					"practiceScript": "practices/scripts/ready-and-traceable-handoff.ts",
 					"whyItMatters": "A clear handoff helps reviewers decide when to give work their attention and follow it back to the need it answers.",
 					"whatGoodLooksLike": "A feature change kept in Draft while unfinished, with an issue reference such as '#482'. When the work is ready for review, its status and description agree. A small formatting chore can stand on its own without a tracking issue.",
 					"holdsAs": "The change's status is clear, and substantive work names the issue it answers.",
@@ -163,7 +163,7 @@
 					},
 					"guide": "practices/guidance/commit-subjects-explain-each-change/guide.md",
 					"criteria": "Assess the complete practice standard within the captured evidence boundary.\n\nREVIEW FOCUS: each authored commit subject names a specific action and object, so a reviewer can follow the history without opening the diff.\n\n## The standard\nJudge whether the pull request's commit SUBJECTS let a reviewer follow the change step by step. A legible subject names a specific action and object, so someone reading the history understands the described step without opening the diff. Judge clarity, not format: a `type:` prefix (feat, fix, refactor, chore) is acceptable but never required, and terse is fine when the object of the change is clear (\"wire up depth buffer\", \"cache detection results\", \"split parser into lexer + reader\" are all legible). Uninformative: a subject that carries no specific information about the change — a bare \"wip\", \"fix\", \"update\", \"lint\" or \"stuff\" with no object, a lone punctuation mark, placeholder junk, a bare issue reference or branch slug with no description, \"address comments\" with no specifics, a subject cut off mid-phrase, or the same subject repeated verbatim across commits. The test is the object: \"update changelog\", \"rename settings tab\" and \"ignore build output\" name what was touched and are legible however terse; \"small changes\", \"fix\" and \"cleanup\" name nothing. These are open examples, not a closed list; reason as an experienced reviewer would about whether each subject carries real information. A subject pairing a reference WITH a real summary (\"#39: switch logging to the shared Logger\") is legible, not noise. This is a workflow practice about how history is written, never a claim about the code itself.\n\n## Occasion\nThis is a gate. Automatic merge commits (\"Merge branch ...\", \"Merge pull request ...\", or two or more `parents`) are git plumbing, not authored summaries; exclude them from the judgment. Record NOT_APPLICABLE, say so, and stop when only merge commits remain after that exclusion: no authored subject was written here.\n\n## Sources\n1. The commits (`context/commits.json`), staged from the pinned range of the change: each subject, its body and its `parents`. They establish what each authored subject says. Judge each subject on its own. The subject describes the step; the record does not establish what the code does or whether it matches that description.\nThe precomputed leads below these criteria, when present, show authored subjects and their shapes: bare, repeated or cut off. They are places to look, never verdicts. If `context/commits.json` is unavailable, report a collection gap and record no observation; uncollected subjects are never authored silence and never UNDETERMINED.\n\n## Judge\nAssess conformance to the standard in this context.\n- MET: every authored subject names a specific action and object; a reviewer can read top to bottom and follow the work.\n- NOT_MET: some authored subjects carry no specific information about the change. Quote the noisy subjects and explain what information their words leave unclear.\n- UNDETERMINED: no ordinary case. A subject you have read is either informative or not; never invent a subject or a clean bill you did not read.\nOne observation per review, over every authored subject. State how many subjects you saw.\n\n## Severity\nNOT_MET only; never above MAJOR on subject quality alone — a formative practice to grow, never a merge gate. Scale to how much the noise degrades a reviewer's ability to follow the history, and weigh review burden proportionally: a single-commit change is inherently low-burden. INFO: a lone straggler in an otherwise clear history, the gentlest nudge. MINOR, the usual band: several uninformative subjects that make the history hard to follow. MAJOR: a history that is mostly noise, where a reviewer genuinely cannot follow the change commit by commit.\n\n## Grounding\nEvery claim rests on the subject text you quote: the deciding subjects — the noisy ones for NOT_MET, and the subjects you accepted for MET. Quote the deciding subjects verbatim with their short SHA and cite the corresponding lines in the captured `context/commits.json` artifact. Never cite a diff line or a repository file for this observation — its evidence is subject text — and never record UNDETERMINED because the subjects have no line of their own to cite. Describe observable behaviour only; never impute intent or character.\n\n## Defer\nLegibility of the pull request title and description belongs to `describe-what-and-why`; the scope and cohesion of what a commit touches belongs to `commits-are-atomic-and-cohesive`; code correctness belongs to other practices. Here only: does each authored subject describe a specific step to the reader?",
-					"precomputeScript": "practices/precompute/commit-subjects-explain-each-change.ts"
+					"practiceScript": "practices/scripts/commit-subjects-explain-each-change.ts"
 				},
 				{
 					"slug": "honours-linked-issue-acceptance-criteria",
@@ -191,7 +191,7 @@
 							"stance": "CONTEXTUAL"
 						}
 					],
-					"precomputeScript": "practices/precompute/honours-linked-issue-acceptance-criteria.ts",
+					"practiceScript": "practices/scripts/honours-linked-issue-acceptance-criteria.ts",
 					"whyItMatters": "When you close an issue, everyone assumes its whole checklist is done. A quick note on what you finished and what you left for later spares your reviewer from re-checking each item, and keeps the unfinished work from quietly disappearing.",
 					"whatGoodLooksLike": "A line in the description such as 'Closes #57: login and reset are done here, the rate-limit item moves to #61', so the change can be checked against its own definition of done.",
 					"holdsAs": "Each change says which acceptance criteria it met",
@@ -247,7 +247,7 @@
 							}
 						]
 					},
-					"precomputeScript": "practices/precompute/engaging-with-inline-review-comments.ts",
+					"practiceScript": "practices/scripts/engaging-with-inline-review-comments.ts",
 					"whyItMatters": "A reviewer spent real attention pointing at a specific line. When the thread just sits there, they cannot tell whether you agreed, fixed it, or missed it, and they will hesitate before putting in that effort again.",
 					"whatGoodLooksLike": "Every reviewer comment gets a visible response, either a follow-up commit that addresses it or a short reply like 'Good catch, switched to the shared client in a2b1c3', so no thread sits unanswered.",
 					"holdsAs": "Every reviewer comment gets a visible answer",
@@ -280,7 +280,7 @@
 							"stance": "EXHAUSTIVE"
 						}
 					],
-					"precomputeScript": "practices/precompute/merged-past-unresolved-review-threads.ts",
+					"practiceScript": "practices/scripts/merged-past-unresolved-review-threads.ts",
 					"whyItMatters": "Merging while a reviewer still has changes requested skips the very check they asked for, and tells them their review did not count. It is also a quality signal, not just a courtesy: changes that land with little reviewer discussion tend to carry more defects that surface after release. Resolving the threads first keeps review worth doing.",
 					"whatGoodLooksLike": "By the time you merge, every open thread is resolved and anyone who requested changes has come back with an approval, so nothing lands over an objection.",
 					"holdsAs": "Nothing merges over an open thread or objection",
@@ -314,7 +314,7 @@
 							"stance": "EXHAUSTIVE"
 						}
 					],
-					"precomputeScript": "practices/precompute/issue-states-an-actionable-problem.ts",
+					"practiceScript": "practices/scripts/issue-states-an-actionable-problem.ts",
 					"whyItMatters": "Clear descriptions help the next maintainer understand the requested change or problem. They reduce guesswork and give planning and discussion a useful starting point.",
 					"whatGoodLooksLike": "A bug report that reads 'uploading a 0-byte file returns 500, I expected a clear validation error' and lists the exact steps to reproduce, so a maintainer can start straight away. Or a request that names one concrete capability with who it helps and why, such as 'reviewers lose track of which files changed in large diffs, so add a per-file changed-lines summary to the review view'.",
 					"holdsAs": "Issues state a problem a maintainer can act on",
@@ -343,7 +343,7 @@
 						"summaryOnly": false,
 						"overlapGroup": "issue-structure"
 					},
-					"precomputeScript": "practices/precompute/issue-scoped-to-single-concern.ts",
+					"practiceScript": "practices/scripts/issue-scoped-to-single-concern.ts",
 					"whyItMatters": "An issue that quietly bundles three unrelated asks cannot be assigned, estimated, or closed cleanly. One part lands, the rest linger, and the whole thing stays open forever, tracking nothing.",
 					"whatGoodLooksLike": "One issue, one deliverable, such as 'add CSV export to the reports page', rather than 'add CSV export, fix the date picker, and bump the chart library' crammed into one ticket.",
 					"holdsAs": "Each issue asks for one deliverable, not a bundle",
@@ -372,7 +372,7 @@
 						"summaryOnly": false,
 						"overlapGroup": "issue-structure"
 					},
-					"precomputeScript": "practices/precompute/issue-has-checkable-outcome.ts",
+					"practiceScript": "practices/scripts/issue-has-checkable-outcome.ts",
 					"whyItMatters": "Without a clear line for 'done', nobody can tell when the work is finished, including the person doing it. A checkable outcome turns 'improve performance' from an open-ended wish into a task someone can actually complete.",
 					"whatGoodLooksLike": "A short acceptance checklist a maintainer can tick off when the work is truly finished, such as 'export downloads a valid CSV' and 'an empty result shows a friendly message', rather than a vague hope of improvement.",
 					"holdsAs": "Every issue says what done looks like",
@@ -562,7 +562,7 @@
 							"stance": "CONTEXTUAL"
 						}
 					],
-					"precomputeScript": "practices/precompute/ships-tests-with-the-change.ts",
+					"practiceScript": "practices/scripts/ships-tests-with-the-change.ts",
 					"whyItMatters": "Automated tests preserve checked behavior as the code changes and catch regressions without repeating every manual check. Shipping a focused test with a behavior change or defect fix gives later contributors a repeatable check of the behavior the change is meant to keep.",
 					"whatGoodLooksLike": "New logic arrives with a test beside it, and a bug fix comes with a test that fails on the old code and passes on the new, proving the behaviour is what you say it is.",
 					"holdsAs": "New logic and fixes arrive with a test beside them",
@@ -634,7 +634,7 @@
 							"stance": "CONTEXTUAL"
 						}
 					],
-					"precomputeScript": "practices/precompute/removes-duplication-instead-of-copy-pasting.ts",
+					"practiceScript": "practices/scripts/removes-duplication-instead-of-copy-pasting.ts",
 					"whyItMatters": "Copy-pasted logic means every future fix has to land in every copy, and the copy you forget keeps the old behaviour, which is exactly the bug. Pull the shared part into one place and you fix it once.",
 					"whatGoodLooksLike": "By the time the same validation logic shows up a third time, you stop copying it and lift the shared concept into one named helper every caller uses, leaving a single source of truth instead of copies that drift apart. You hold off when blocks only look alike by coincidence, since forcing a shared abstraction on them is worse than the duplication.",
 					"holdsAs": "Repeated logic gets lifted into one named helper",
@@ -693,7 +693,7 @@
 							"stance": "CONTEXTUAL"
 						}
 					],
-					"precomputeScript": "practices/precompute/leaves-the-code-clean-with-intent-revealing-comments.ts",
+					"practiceScript": "practices/scripts/leaves-the-code-clean-with-intent-revealing-comments.ts",
 					"whyItMatters": "Stray debug output, blocks of commented-out code, and comments that just echo the line all add noise the next reader has to wade through. Clean code with a comment that explains the why reads like someone meant it.",
 					"whatGoodLooksLike": "No leftover print statements or commented-out branches, and where a line looks surprising, a short comment gives the reason, such as 'retry once: the upstream API drops the first call after an idle period', rather than restating what the line does.",
 					"holdsAs": "Code lands clean, with comments that explain why",
@@ -723,7 +723,7 @@
 							"stance": "CONTEXTUAL"
 						}
 					],
-					"precomputeScript": "practices/precompute/logs-through-the-platform-logger.ts",
+					"practiceScript": "practices/scripts/logs-through-the-platform-logger.ts",
 					"whyItMatters": "Print-style diagnostics bypass the platform's logging facilities. The platform logger — `Logger` on Apple platforms, `Log`/Timber on Android, SLF4J on the JVM, `logging` in Python, a logger module in Node — lets application diagnostics be collected and filtered where the app runs.",
 					"whatGoodLooksLike": "Diagnostics in application code go through the platform's logger. `print`, `console.log`, `println` and `System.out` are left to output a program means to print — a command-line tool, a script, a build step, a test, a playground or a `#Preview` — or to a `DEBUG`-only block.",
 					"holdsAs": "Application code logs through the logger, never print",
@@ -762,7 +762,7 @@
 							"stance": "CONTEXTUAL"
 						}
 					],
-					"precomputeScript": "practices/precompute/handles-errors-instead-of-swallowing-them.ts",
+					"practiceScript": "practices/scripts/handles-errors-instead-of-swallowing-them.ts",
 					"whyItMatters": "An empty catch block turns a failure into a silent one: the code carries on as if nothing went wrong, and you find out only when something downstream breaks with no clue why. Surfacing the error saves the 2am debugging session.",
 					"whatGoodLooksLike": "A failed call reaches someone who can act. The code passes the error to a caller who can react, records it where a person will notice, or ignores it only for a reason that the code shows.",
 					"holdsAs": "Failures surface or recover, never get swallowed",
@@ -792,7 +792,7 @@
 							"stance": "CONTEXTUAL"
 						}
 					],
-					"precomputeScript": "practices/precompute/validates-inputs-and-edge-cases-at-the-boundary.ts",
+					"practiceScript": "practices/scripts/validates-inputs-and-edge-cases-at-the-boundary.ts",
 					"whyItMatters": "Data from a user, a file, or another service will not always arrive in the shape you expected: it can be empty, null, negative, or huge. Checking it where it enters means a clear rejection instead of a confusing crash three layers deep.",
 					"whatGoodLooksLike": "Code that reads an external value first asks what happens if it is missing or out of range and handles that on purpose, so an empty list or a malformed payload meets a clean guard instead of a null-pointer surprise.",
 					"holdsAs": "External values meet a guard before they are used",
@@ -822,7 +822,7 @@
 							"stance": "CONTEXTUAL"
 						}
 					],
-					"precomputeScript": "practices/precompute/avoids-unsafe-panics-and-chosen-crashes.ts",
+					"practiceScript": "practices/scripts/avoids-unsafe-panics-and-chosen-crashes.ts",
 					"whyItMatters": "Reaching for a force-unwrap or a panic on a condition that can actually happen turns an ordinary hiccup into a hard crash for your users. A problem the code can recover from deserves a graceful path, not a deliberate stop.",
 					"whatGoodLooksLike": "Where a value might legitimately be absent, the code unwraps it safely and falls back to a default or a clear error, instead of force-unwrapping and bringing the whole thing down.",
 					"holdsAs": "Missing values fall back instead of crashing",
@@ -861,7 +861,7 @@
 							"stance": "CONTEXTUAL"
 						}
 					],
-					"precomputeScript": "practices/precompute/validates-and-escapes-untrusted-input.ts",
+					"practiceScript": "practices/scripts/validates-and-escapes-untrusted-input.ts",
 					"whyItMatters": "Gluing raw user input straight into a query, a shell command, or a page is how injection bugs are born, the kind that leak a database or run an attacker's code. Parameterizing or escaping it first is what keeps that door shut.",
 					"whatGoodLooksLike": "User-supplied values reach the database through bound parameters and the page through proper escaping, never concatenated into a SQL string or dropped into HTML as-is.",
 					"holdsAs": "Untrusted input is bound or escaped before a sink",
@@ -891,7 +891,7 @@
 							"stance": "CONTEXTUAL"
 						}
 					],
-					"precomputeScript": "practices/precompute/avoids-insecure-defaults-and-over-broad-permissions.ts",
+					"practiceScript": "practices/scripts/avoids-insecure-defaults-and-over-broad-permissions.ts",
 					"whyItMatters": "A default or permission that ships wider than it needs sits quietly until someone exploits it, and this kind of misconfiguration is among the most common security gaps there is. Starting locked down means you only open what you can justify.",
 					"whatGoodLooksLike": "A new endpoint or credential grants exactly the access it needs and no more, with scoped permissions and a specific allowed origin from an allowlist, not an origin reflected back from the request or a blanket wildcard, instead of a permissive default dropped in to make things work.",
 					"holdsAs": "New access grants exactly what it needs and no more",
@@ -925,7 +925,7 @@
 							"stance": "EXHAUSTIVE"
 						}
 					],
-					"precomputeScript": "practices/precompute/changes-dependencies-deliberately.ts",
+					"practiceScript": "practices/scripts/changes-dependencies-deliberately.ts",
 					"whyItMatters": "Every dependency you add is code you now trust and have to keep patched, and many malicious packages slip in disguised as a real name a letter or two off. A one-line note on why a package is there, plus a lockfile that moves with the manifest, lets a reviewer sanity-check the addition and keeps the build reproducible.",
 					"whatGoodLooksLike": "A new package arrives with a sentence on what it is for. The manifest and resolution stay consistent with the ecosystem and the repository policy, updating a lockfile when needed rather than requiring one for every edit.",
 					"holdsAs": "Dependency changes stay coherent and notable choices have a reason",
@@ -1001,7 +1001,7 @@
 							"stance": "EXHAUSTIVE"
 						}
 					],
-					"precomputeScript": "practices/precompute/documents-public-api-and-behaviour-changes.ts",
+					"practiceScript": "practices/scripts/documents-public-api-and-behaviour-changes.ts",
 					"whyItMatters": "People outside your code depend on what you export. Change a public function or endpoint without a note and they find out at runtime, in their own project, with no warning, and they trust your library a little less each time.",
 					"whatGoodLooksLike": "A renamed parameter or a changed response shape lands with its reference docs and a changelog line updated in the same change, so the people building on your API hear about it from you, not from a broken build.",
 					"holdsAs": "API and behaviour changes ship with their docs",
@@ -1113,7 +1113,7 @@
 					},
 					"guide": "practices/guidance/commits-are-atomic-and-cohesive/guide.md",
 					"criteria": "Assess the complete practice standard within the captured evidence boundary.\n\nREVIEW FOCUS: how the pull request's commits are partitioned — each commit one cohesive logical change, as its authored subject and body describe it and its own files show.\n\n## The standard\nJudge one thing: whether the commits are SPLIT so each one captures a single logical change, rather than one commit tangling separable work into a bundle a reviewer cannot follow, revert, or cherry-pick on its own. One logical change is one piece of work with everything it needs: a feature with its model, view, view model, test, asset, the manifest entry for the package it uses and the navigation that reaches it; a fix with its test; a diagram with the README line that embeds it; one document's sections revised for one reason. That is one concern however many clauses or files name it (\"parse the header and validate it\"). Two concerns are two pieces of work that each make sense alone: two features or user stories, two unrelated fixes, behavioural work beside a chore (a reformat or lint sweep, a rename or move sweep, a dependency bump, tooling or editor settings), or code beside an unrelated document or course deliverable. Several cohesive commits in one pull request is fine here, and a chore or a revert in its own commit is the partition working, not a tangle. Decide what is separable as an experienced reviewer would; there is no fixed word list. This is a workflow practice about how the history is partitioned, never a code-defect claim.\n\n## Occasion\nThis is a gate. Record NOT_APPLICABLE, name which case, and stop when there was no split to judge: no authored non-merge commit remains: every entry is an automatic merge commit (two or more `parents`, or a \"Merge ...\" subject).\n\n## Sources\n1. The commits (`context/commits.json`): each subject, full body, `parents` and the `files` it touched against its first parent, with status and line counts. They establish the author's partition — what each commit says it holds and what it actually touched. A commit whose files carry a second piece of work its subject does not name — a whole source-tree rename or a new view under a README subject, a user-story rewrite under a diagram subject — is a tangle the subject hides; the supporting files of the work it does name never are. `git show <sha>` in the checkout gives its patch when the file list is not enough.\n2. The per-file changed-line spread of the whole change (`work/change/files.json`, `work/change/diff.patch`): the overall breadth the commits together cover.\nRead subjects, bodies and each commit's files together and judge conservatively. The precomputed leads below these criteria list every authored commit as one row — its subject's shape (bare, a repeat, joined clauses, cut off), how many files it only moved, and the files it edited with their line counts — as places to look, never verdicts: joined clauses are punctuation, not a count of concerns. If `context/commits.json` is unavailable, report a collection gap and record no observation; uncollected subjects are never authored silence and never UNDETERMINED.\n\n## Judge\nAssess conformance to the standard in this context.\n- MET: every commit holds one logical change, as its subject, body and files show. Looks like a lapse but is not: \"Add order history, and adjust the order fetch\" where the adjustment returns what the new history reads; \"Rewrite the README goal for the new scope, update its user stories\" revising one README for one reason; \"Update class diagram: add Invoice, drop method signatures\" revising one diagram; a feature commit that also edits `project.yml` for its package; README commits later reverted, each on its own. Each is one concern.\n- NOT_MET: at least one commit holds two concerns — its subject or body names both (\"Extract the card views, replace deprecated colour calls everywhere\": a refactor and an API sweep; \"add formatter settings + start the settings screen\"), or its files carry one its subject does not name. Quote the deciding subject with its short SHA, name the two pieces of work, and name the path that shows an unnamed one.\n- UNDETERMINED when a bare or vague subject (\"fixes\", \"ccc\", \"Improve MR\") leaves a commit's content open and neither its files nor its patch settle whether it holds one piece of work or two; name the commit and the missing distinction. A broad commit under a vague subject is not a tangle by breadth alone; a narrow one whose files show a single piece of work is cohesive.\nOne observation per review, over the whole series, including a single authored commit that can be cohesive or bundled.\n\n## Severity\nNOT_MET only; never above MAJOR on commit atomicity alone — a formative practice, not a merge gate. MINOR, the usual band: a single commit bundles separable work, and splitting it would isolate each concern. MAJOR: the history broadly tangles, so a reviewer cannot reason about or revert one concern at a time.\n\n## Grounding\nEvery claim cites the commit record that supports it: quote the deciding subject(s) verbatim, each with its short SHA, for NOT_MET, and name any path from that commit's `files` that shows the unnamed concern; cite the subjects whose partition you accepted for MET. Never claim a per-commit file mapping you cannot observe. Cite the corresponding subject, SHA and file entries in the captured `context/commits.json` artifact. Never cite a diff line for this observation, and never record UNDETERMINED because the subjects have no line of their own to cite. Describe the observable split; never impute intent or character, and never frame a tangle as a defect in the code.\n\n## Defer\nOverall pull request size, and a pull request carrying several features in separate commits, belong to `scope-one-reviewable-change`; a large but cohesive partition can be a strength here. Subject wording belongs to `commit-subjects-explain-each-change`; a vague subject alone establishes neither cohesion nor a tangle. A generated or editor file swept into a commit (`.idea/`, `.DS_Store`, a regenerated `Info.plist`) belongs to `excludes-generated-and-build-artifacts`. Here only: does each commit hold one logical change?",
-					"precomputeScript": "practices/precompute/commits-are-atomic-and-cohesive.ts"
+					"practiceScript": "practices/scripts/commits-are-atomic-and-cohesive.ts"
 				},
 				{
 					"slug": "excludes-generated-and-build-artifacts",
@@ -1171,7 +1171,7 @@
 							"stance": "EXHAUSTIVE"
 						}
 					],
-					"precomputeScript": "practices/precompute/breaks-large-work-into-trackable-subtasks.ts",
+					"practiceScript": "practices/scripts/breaks-large-work-into-trackable-subtasks.ts",
 					"whyItMatters": "A big ask written as one wall of text is either 0% or 100% done, with no way to see progress or split the load. Breaking it into checkable steps turns a daunting job into pieces people can pick up and finish one at a time.",
 					"whatGoodLooksLike": "A genuinely large issue split into a task list or linked sub-issues, such as 'design the schema', 'add the endpoint', and 'wire up the UI', so progress is visible and pieces can be worked in parallel.",
 					"holdsAs": "Large work arrives split into trackable pieces",
@@ -1267,7 +1267,7 @@
 							"stance": "EXHAUSTIVE"
 						}
 					],
-					"precomputeScript": "practices/precompute/links-the-change-to-its-issue.ts",
+					"practiceScript": "practices/scripts/links-the-change-to-its-issue.ts",
 					"whyItMatters": "A change that names the issue it answers can be read against what was asked and leaves a trail anyone can follow later. When the platform recognizes the reference as closing, the issue also closes when the change merges; a plain mention links the two but does not establish automatic closure. One without a reference makes the reviewer guess what the work was for.",
 					"whatGoodLooksLike": "The title, the description or the branch names the issue by number, with a closing keyword in the body when the change completes it, so the platform can close the issue with the merge and the two stay linked.",
 					"holdsAs": "Every change names the issue it implements",
@@ -1313,7 +1313,7 @@
 					},
 					"guide": "practices/guidance/merge-confirms-the-linked-issue-outcome/guide.md",
 					"criteria": "Assess the complete practice standard within the captured evidence boundary.\n\nREVIEW FOCUS: for merged work, the captured record confirms the linked issue's stated outcome — its adopted outcome items reported as delivered or named as deferred — so the tracker accounts for what was delivered.\n\n## The standard\nJudge one thing about this merged pull request: does the captured record bring the linked issue's own definition of done into line with what landed? The merge establishes the occasion; this review assesses confirmation in the capture, not the issue body at merge time. An issue that stated a checkable outcome (an acceptance checklist, a Definition of Done, a Given-When-Then block, tracked sub-issues) is confirmed when the captured record accounts for each outcome item the change adopts — reported as delivered or named as deferred — in the issue, in the pull request body, or in a closing comment. Content decides, not form: a tick, a checked item, an authored delivery bullet or a sentence counts when its wording substantively names a specific adopted outcome item, even under a template heading and while the issue's own boxes stay unticked; no checkbox, heading, closing word or formula is required. A check that names none of the items (builds, reviewed, lint clean), a bare closing reference, a line that names only the feature (\"added the search screen\"), or an inventory of changes whose link to the items must be inferred from the code confirms nothing about them. Work that delivers part of what it adopts is confirmed only when the delivered part is named and the rest is named as deferred; an adopted item left unmentioned is unaccounted for. It need not close the issue or tick an item twice. Assess only this bookkeeping act, never whether the work is correct: a tick or a delivery line is the author's report, not proof that an item works, was checked or is fulfilled, nor of when it was made; an unticked item may describe delivered work, and a ticked one may not.\n\n## Occasion\nThis is a gate. Record NOT_APPLICABLE, name the fact, and stop when: the pull request is not merged; a complete linked-work inventory establishes no relevant item, or the linked item states no checkable outcome you can quote (a task list, an acceptance or Definition-of-Done block, a Given-When-Then, or a non-zero sub-issue rollup); or the linked item was closed as not planned, duplicate or superseded, since its outcome was deliberately abandoned. A linked item with an outcome and a merge are the occasion — every captured item this change explicitly implements, closing candidates and adopted partial work alike; a mention alone does not establish that this change must account for the item; the precomputed leads list each with its items and ticks. A user story without a task list, an outcome heading or sub-issues is no occasion, however plainly the diff delivers it.\n\n## Sources\n1. The pull request record (`context/metadata.json`): `state` and `merged_at`. It establishes that and when the change merged. It never establishes the issue's state.\n2. Each linked item (`context/linked_work_items/<n>.md`: number, title, state, body; `how` in `linked_work_items.json` says whether the provider records it as a closing candidate): the checkable outcome as written, with its ticks as captured. It establishes what was stated and which items are ticked. Confirmation captured after the merge counts. A missing confirmation describes this capture; it does not establish that confirmation never happened or that it was missing at merge time. Its body is the text as mirrored at capture, and its opening and closing dates are not when any line of it was written. A closed state alone confirms nothing; the ticks or the words do.\n3. The body (`context/description.md`) and the discussion (`context/general_comments.json`): a done/deferred account as the standard describes it. They establish what the author said was delivered. They never establish that it was.\n4. The diff (`work/change/diff.patch`): read only to ground a heavier severity when a named item is plainly not touched. It never establishes that an item is met.\nIf the linked item's body or the record's merge time is unavailable, report a collection gap and record no observation.\n\n## Judge\nAssess conformance to the standard in this context.\n- MET: the capture accounts for every adopted outcome item as the standard says, as delivered or deferred. Quote the ticks, lines or sentence that name each item. Judge the recorded done/deferred mapping, not whether the code actually delivers the item.\n- NOT_MET: the change merged, the linked item states a checkable outcome, and the capture leaves at least one adopted item unaccounted for as the standard says — unticked and unnamed, whether the issue is closed or open. Quote the unaccounted items and the merge time.\n- UNDETERMINED: complete captured text leaves the done/deferred mapping genuinely ambiguous; name the deciding question. A truncated capture of a required checklist is a collection gap and produces no observation.\nOne observation per review.\n\n## Severity\nNOT_MET only; never above MAJOR on this alone — non-blocking. MINOR, the usual band: one or two items left unaccounted for in the capture with the work plainly delivered, or an authored account that names the outcome loosely. MAJOR: most of the stated outcome is unaccounted for in the captured closed issue, or the captured issue is open with nothing said. Identical evidence yields identical severity.\n\n## Grounding\nQuote the outcome items from the linked item as written, the tick state, the merge time from the record, and any authored line that accounts for them. Never claim an item is met, unmet or accounted for from the code; never infer a tick that is not in the capture; never read a closed state as a tick. Credit a tick or an authored line in the item's body or the description as captured; say it was there before, at or after the merge only when independently dated evidence establishes that, since the creation date of a body, a description or a comment alone does not date text edited later. A later capture that confirms the outcome does not undo an earlier observation that read it unconfirmed; each stands for the capture it read.\n\n## Defer\nWhether a closing pull request's own handoff says which acceptance criteria it covers belongs to `honours-linked-issue-acceptance-criteria`; the issue's own closing decision, when someone closes it by hand, belongs to `issue-closed-with-unmet-outcome`. Here only: does the captured record confirm the linked issue's outcome for the merged work?",
-					"precomputeScript": "practices/precompute/merge-confirms-the-linked-issue-outcome.ts"
+					"practiceScript": "practices/scripts/merge-confirms-the-linked-issue-outcome.ts"
 				},
 				{
 					"slug": "defers-review-asks-into-tracked-work",
@@ -1354,7 +1354,7 @@
 					},
 					"guide": "practices/guidance/defers-review-asks-into-tracked-work/guide.md",
 					"criteria": "Assess the complete practice standard within the captured evidence boundary.\n\nREVIEW FOCUS: a review ask the author defers rather than addresses is turned into tracked work or explicitly waived by the reviewer, never resolved on a bare promise.\n\n## The standard\nJudge one thing: when a reviewer asked for something in a thread and the author did not do it in this change, what happened to the ask at the merge? A deferral is tracked when the thread, the body or a comment names an issue for it (`#number`, a link, \"tracked in …\") or the reviewer explicitly agrees to drop it (\"fine to skip\", \"not needed\", a reviewer statement accepting the author's stated reason). An approval given on the condition that the ask be done later (\"Approved, as long as you add the tests in a follow-up\") keeps the ask alive: it is a deferral that needs a tracked item, never a waiver. A deferral is bare when the ask is resolved or the change merged with only \"later\", \"next PR\", \"will do\" or silence. Judge only asks the author deferred; an ask the author addressed in the diff, or answered with a reason the reviewer accepted, is not a deferral.\n\n## Occasion\nThis is a gate. Record NOT_APPLICABLE, name the fact, and stop when: the pull request is not merged; the complete captured inline and general review record contains no ask the author left unaddressed in the change — every ask was addressed in the diff or answered with a reason the reviewer accepted. A question that requests no change (\"what is this for?\") is not an ask, whether or not it was answered, and neither is a remark aimed at later work (\"something to keep in mind next time\") or a suggestion the reviewer plainly leaves to the author's choice: it asks nothing of this change. Polite wording (\"could you\", \"consider\", \"if possible\") does not make a request optional; judge what the reviewer asked of this change. The author is the `author` login of `context/metadata.json`; a comment by any other login is a reviewer's, and a reviewer's own \"ignore\" or \"fine\" on an ask — theirs or a bot's — is a waiver. A merged change with at least one deferred ask is the occasion.\n\n## Sources\n1. The inline review comments (`context/comments.json`: `path`, `line`, `body`, `author`, `created_at`) and the conversation (`context/general_comments.json`): every ask and every reply, with authors and dates. They establish which asks were made, which were answered, and with what words. The threads (`context/review_threads.json`) carry each thread's path, line and resolution and no words; a resolution by the author establishes nothing about the substance, and a resolution by the reviewer after the author's stated reason is the reviewer accepting it. The precomputed leads below these criteria list every comment by someone other than the author, one row each, with whether the change touches its file, whether the author replied, whether the reviewer had a later word on the thread or approved after it: decide every row that asks something.\n2. The diff (`work/change/diff.patch`): whether an ask was addressed in the change — the file and line the thread anchors to, read as changed or not. It establishes addressed versus not; it never establishes a waiver.\n3. The body and the discussion (`context/description.md`, `context/general_comments.json`): a follow-up list, an issue reference for the deferral, or the reviewer's agreement. They establish tracking or a waiver when quotable.\n4. The linked work items (`context/linked_work_items/<n>.md`) when captured: an issue that names the deferred ask. It establishes the tracking; its absence establishes nothing when a comment names an issue by number.\nIf the change merged but the threads are absent or truncated, report a collection gap and record no observation.\n\n## Judge\nEnumerate every ask by someone other than the author first and decide each against the diff — a two-part ask half-addressed leaves one part deferred, and a thread marked RESOLVED decides nothing. An ask about the pull request itself rather than its code — mark it ready, retitle it, link an issue, fill in the description — is addressed when the captured record shows it done: the draft flag, the title, the description or the link. A draft cannot be merged, so a merged pull request settles a request to mark it ready; no transition time is needed. An ask about the code is addressed only by a changed line that does what was asked; an unchanged anchor alone does not establish that the ask was unaddressed: a guard or other relevant change elsewhere can satisfy it. Inspect the request's substance and the complete changed code before deciding. An ask the author answered with a reason is deferred bare unless the reviewer explicitly accepts the reason; a later approval without such evidence is not a waiver. Then assess the standard against all relevant evidence.\n- MET: at least one ask is deferred, and every deferred ask is tracked by a named issue or explicitly waived by the reviewer. Quote the ask and the tracking reference or the waiver.\n- NOT_MET: at least one ask was deferred on a bare promise or in silence — resolved or merged past with no issue and no reviewer waiver. Quote the ask and the author's last word on it, or note the silence.\n- UNDETERMINED: the thread's last word could be a waiver or a deferral and the reviewer's approval carries no comment; name the fact that would settle it.\nOne observation per review, on the single most consequential bare deferral when there are several.\n\n## Severity\nNOT_MET only; never above MAJOR on this alone — non-blocking. MINOR, the usual band: a small ask (a rename, a comment, a nit) deferred bare. MAJOR: a correctness, safety or test ask deferred on a bare promise and the change merged. Identical evidence yields identical severity.\n\n## Grounding\nQuote the reviewer's ask and the author's reply verbatim with their authors and dates, and the issue reference or waiver when there is one. Never infer a waiver from an approval alone, and never claim an ask was addressed without the changed line that addresses it.\n\n## Defer\nWhether the author replied to comments at all belongs to `engaging-with-inline-review-comments`; a thread left unresolved at the merge belongs to `merged-past-unresolved-review-threads`. Here only: where did the deferred asks go?",
-					"precomputeScript": "practices/precompute/defers-review-asks-into-tracked-work.ts"
+					"practiceScript": "practices/scripts/defers-review-asks-into-tracked-work.ts"
 				},
 				{
 					"slug": "merges-only-after-approval",
@@ -1375,7 +1375,7 @@
 						}
 					],
 					"subject": "MERGER",
-					"precomputeScript": "practices/precompute/merges-only-after-approval.ts",
+					"practiceScript": "practices/scripts/merges-only-after-approval.ts",
 					"whyItMatters": "A change merged before anyone approved it skips the one check the team agreed on: a second pair of eyes before the code is everyone's. It is also how a reviewer's outstanding request for changes gets buried. Waiting for the approval, and re-requesting it after a rework, is what keeps the review real.",
 					"whatGoodLooksLike": "The person who merges does so after an approval from someone other than the author that is still current — no later request for changes, no dismissal — and after a rework asks for the approval again before merging.",
 					"holdsAs": "Nothing merges without a current approval from someone else",
@@ -1413,7 +1413,7 @@
 					},
 					"guide": "practices/guidance/plans-the-work-in-an-issue-first/guide.md",
 					"criteria": "Assess the complete practice standard within the captured evidence boundary.\n\nREVIEW FOCUS: the tracked issue this change implements exists no later than the earliest captured authored commit, without inferring actual work-start or motive.\n\n## The standard\nJudge one thing: did the issue this pull request implements exist no later than the first recorded commit? The earliest captured commit author date (`context/commits.json`, `authoredAt`) is the recorded timing proxy. It does not establish when actual work began, and the pull request creation time is a handoff time, not a substitute for it. The issue's opening is its `createdAt` in the linked work item. An issue opened before the first captured commit precedes that recorded step; an issue opened after it follows that step. Neither timing establishes the author's intent or the order of unrecorded work. Judge only the recorded order of the two dates, never the quality of the issue or of the change.\n\n## Occasion\nThis is a gate. Record NOT_APPLICABLE, name the fact, and stop when: no named issue is one this pull request implements — a captured item or one among the `unresolvedReferences` — because the description names none, or rules each out (`Not related to #N`, an aside about other work); or the change is of a kind that answers no issue by convention — a release, a bot dependency update, a revert. Only a candidate issue the precomputed leads list can be that issue: one captured as this repository's closing candidate (`how: closesOnMerge`, including a link made in the provider's UI), or named by a closing keyword, the title, the branch or the author's own `Related to #N`. One named only by `Related to` counts when the description or the issue shows this change delivers part of that issue's work, not when the sentence is about other work. A number the leads do not list is no occasion — a bare `#N`, a `Related to` in a quotation, code or HTML comment, another project's issue. A related issue is captured as a mention, not a closing candidate: never say it closed or will close with this merge. Whether an issue is linked at all belongs to `links-the-change-to-its-issue`; here the linked issue is the occasion.\n\n## Sources\n1. The linked work item (`context/linked_work_items/<n>.md`, its opening line `Opened <time>`, and `linked_work_items.json`, `createdAt`): when the issue was opened. It establishes the plan's date.\n2. The commits (`context/commits.json`, `authoredAt`): author dates of recorded commits. Require a usable author date for every captured commit and compare the earliest; neither a commit date nor a handoff timestamp substitutes for missing author dates. These dates do not establish actual work-start.\n3. The pull request record (`context/metadata.json`): the identity of the reviewed work, never a substitute start time.\n4. The precomputed leads below these criteria: each candidate issue, how it was named, its opening time, the earliest commit's author date and the hours between them, computed; read the two dates from it and check them against the sources above.\nFailed or missing required linked-work-item or commit capture is a collection gap and produces no observation. Successfully captured records with missing native dates leave the timing UNDETERMINED.\n\n## Judge\nAssess conformance to the standard in this context.\n- MET: the issue's `createdAt` is no later than the earliest captured commit's usable `authoredAt`, and every captured commit has a usable author date. Quote both times.\n- NOT_MET: the issue's `createdAt` is later than the earliest captured commit's usable `authoredAt`, and every captured commit has a usable author date. Quote both times.\n- UNDETERMINED: the complete captured commit record is empty or any captured commit has no usable author date, so the timing proxy cannot be established; or the issue this change implements has no opening time here — its number is among the `unresolvedReferences`, so this repository holds no synchronized issue under it, or its linked item carries no `createdAt`. Record as the open question which issue that is and when it was opened, and as what would settle it that issue's opening time in this repository; never claim it exists, predates the work or closes. Or several named issues remain plausible as the one this change implements, their dates fall in different outcomes, and the description and issues do not settle which. Name them; never choose the favourable one.\nOne observation per review, on the issue the change implements; when several plausible issues fall in the same cell, on the one a closing candidate names, else the title, else the branch, else the `Related to`.\n\n## Severity\nNOT_MET only; never above MINOR on this alone — non-blocking. Calibrate the nudge to the recorded planning gap and its coordination cost; elapsed time alone does not establish an intention or raise severity.\n\n## Grounding\nCite the linked item's `Opened <time>` line and the reviewed pull request record; cite the earliest usable author date and SHA from the captured `context/commits.json` artifact. Never infer an order from issue and pull request numbers; never read a commit date where an author date exists.\n\n## Defer\nWhether the change names its issue belongs to `links-the-change-to-its-issue`; whether the issue states a checkable outcome belongs to `issue-has-checkable-outcome`. Here only: did the issue exist before the first recorded commit?",
-					"precomputeScript": "practices/precompute/plans-the-work-in-an-issue-first.ts"
+					"practiceScript": "practices/scripts/plans-the-work-in-an-issue-first.ts"
 				}
 			]
 		},
@@ -1450,7 +1450,7 @@
 							}
 						]
 					},
-					"precomputeScript": "practices/precompute/keeps-views-free-of-networking-and-persistence.ts",
+					"practiceScript": "practices/scripts/keeps-views-free-of-networking-and-persistence.ts",
 					"whyItMatters": "A SwiftUI view that fetches, decodes or saves is a view nobody can preview, test or reuse, and its logic is invisible to the next screen that needs the same data. Keeping that work in a model or store is what lets the view stay a description of the screen.",
 					"whatGoodLooksLike": "Views describe the screen from state they are handed; requests, decoding and file or preference access live in a model, store or service the view talks to through a method or a binding, and SwiftData is used through its own view-side idiom.",
 					"holdsAs": "Views render the state they are handed and never fetch or persist",
@@ -1488,7 +1488,7 @@
 							}
 						]
 					},
-					"precomputeScript": "practices/precompute/owns-state-at-the-right-level.ts",
+					"practiceScript": "practices/scripts/owns-state-at-the-right-level.ts",
 					"whyItMatters": "State declared in the wrong place is the root of the bugs that make SwiftUI feel unpredictable: a model recreated on every render, a value copied into two views that drift apart, a derived value stored and forgotten. Declaring each piece of state where it is owned keeps the screen a function of its data.",
 					"whatGoodLooksLike": "Value state a single view owns is `@State`; a shared model is `@Observable` and injected through the environment or passed down, never recreated in a child; a child that edits a parent's value takes a `Binding`; a derived value is computed, not stored.",
 					"holdsAs": "Each piece of state lives at the level that owns it",
@@ -1526,7 +1526,7 @@
 							}
 						]
 					},
-					"precomputeScript": "practices/precompute/makes-ui-accessible-by-default.ts",
+					"practiceScript": "practices/scripts/makes-ui-accessible-by-default.ts",
 					"whyItMatters": "A control a screen reader cannot name, a label that cannot grow with the user's text size, an image that says nothing — each locks a group of people out of the screen, and each is a line the author could have written when the view was made. Accessibility added later is the expensive kind.",
 					"whatGoodLooksLike": "Every icon-only control and meaningful image has a label; text uses semantic fonts so Dynamic Type works; nothing is fixed to a size that clips at larger text; colour is never the only signal.",
 					"holdsAs": "Every control carries a label and text scales with the user",
@@ -1564,7 +1564,7 @@
 							}
 						]
 					},
-					"precomputeScript": "practices/precompute/uses-structured-concurrency-safely.ts",
+					"practiceScript": "practices/scripts/uses-structured-concurrency-safely.ts",
 					"whyItMatters": "An unstructured task that outlives its view, UI state mutated off the main actor, a fire-and-forget request that cannot be cancelled — these are the crashes and stale screens that appear only on a slow network. Swift's structured concurrency prevents them when it is used the way it is designed.",
 					"whatGoodLooksLike": "View-lifecycle work runs in `.task` or another effective cancellation lifecycle. A synchronous user action can start a Task whose lifetime fits the operation; UI state stays correctly isolated and needed results or failures are handled.",
 					"holdsAs": "Async work is scoped to its view and cancelled with it",
@@ -1602,7 +1602,7 @@
 							}
 						]
 					},
-					"precomputeScript": "practices/precompute/ships-a-preview-with-each-new-view.ts",
+					"practiceScript": "practices/scripts/ships-a-preview-with-each-new-view.ts",
 					"whyItMatters": "A SwiftUI view without a preview is a screen nobody can see without running the whole app to it, and the first thing the next person deletes when it breaks. A preview with representative data is the cheapest verification a view can have, and the way a reviewer sees what changed.",
 					"whatGoodLooksLike": "The new screens and presentation a change adds can be seen in a `#Preview` with representative sample data — including an empty, loading or error state when they have one — so they can be checked without launching the app.",
 					"holdsAs": "New views ship with previews that show what they present",
@@ -1640,7 +1640,7 @@
 							}
 						]
 					},
-					"precomputeScript": "practices/precompute/declares-permissions-truthfully-at-point-of-use.ts",
+					"practiceScript": "practices/scripts/declares-permissions-truthfully-at-point-of-use.ts",
 					"whyItMatters": "Access that requires a usage description cannot be authorized without one. A specific explanation and a request made when the feature needs access help users make an informed choice. The declaration and the request are part of the feature.",
 					"whatGoodLooksLike": "When a change adds a capability that needs the user's permission, the `Info.plist` usage description arrives in the same change, says truthfully what the app does with the access, and the permission is requested where the feature needs it, not at launch.",
 					"holdsAs": "Permissions say truthfully why and are asked for in use",
@@ -1678,7 +1678,7 @@
 							}
 						]
 					},
-					"precomputeScript": "practices/precompute/uses-adaptive-colors-for-every-appearance.ts",
+					"practiceScript": "practices/scripts/uses-adaptive-colors-for-every-appearance.ts",
 					"whyItMatters": "A screen built from literal colors is right in one appearance and wrong in the other: white text vanishes on a light background, a hard-coded card stays white in Dark Mode, and every screen has to be revisited when the palette changes. Semantic and asset colors adapt on their own, and the whole app follows one palette.",
 					"whatGoodLooksLike": "Text, backgrounds and fills use colors that adapt — SwiftUI's standard colors such as `.green`, UIKit's dynamic colors such as `UIColor.systemTeal` — semantic colors (`.primary`, `.secondary`, `Color(.systemBackground)`), materials, the accent color or named asset colors with light and dark variants; a literal is used only where the color is part of the content, such as text over a fill the same view sets.",
 					"holdsAs": "Colors adapt to light and dark appearance alike",

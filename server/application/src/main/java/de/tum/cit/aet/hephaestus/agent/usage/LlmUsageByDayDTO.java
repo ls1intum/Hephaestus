@@ -19,9 +19,10 @@ public record LlmUsageByDayDTO(
         @NonNull
         @Schema(
                 description = "Runs this day with at least one ledger row whose price is not yet known. A "
-                        + "precompute row counts toward the run of its review. Those rows are excluded from both "
+                        + "practice script row counts toward the run of its review. Those rows are excluded from both "
                         + "totals above.")
         Long unpricedEventCount,
 
-        @NonNull @Schema(description = "Runs: job attempts and mentor turns. Precompute model rows are not runs.")
+        @NonNull
+        @Schema(description = "Runs: job attempts and mentor turns. Rows of models for practice scripts are not runs.")
         Long events) {}

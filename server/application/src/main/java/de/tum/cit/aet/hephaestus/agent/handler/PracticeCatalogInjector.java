@@ -36,8 +36,8 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Injects the practice registry, criteria, and precompute scripts into a job's workspace under
- * {@code inputs/practices/} and {@code work/precompute/}. Shared by every {@link de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler}
+ * Injects the practice registry, criteria, and practice scripts into a job's workspace under
+ * {@code inputs/practices/} and {@code work/practice-scripts/}. Shared by every {@link de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler}
  * regardless of artifact — the catalog is per-job (workspace-active practices), not provider-shaped,
  * so it does not live behind the {@code ContentSource} SPI.
  *
@@ -268,29 +268,29 @@ class PracticeCatalogInjector {
                         + "For a practice about hand-written changes, record NOT_APPLICABLE if no hand-written changed files remain; "
                         + "do not claim a strength or a missing behavior from an empty hand-written change. "
                         + "Other evidence, such as review comments, commits, title and body, remains reviewable. "
-                        + "Precompute hints and provider totals do not override this policy.\n";
+                        + "Practice script hints and provider totals do not override this policy.\n";
             }
             files.put(SandboxLayout.PRACTICES_PREFIX + p.getSlug() + ".md", criteria.getBytes(StandardCharsets.UTF_8));
         }
 
         files.put(SandboxLayout.ANALYSIS_PRACTICES_PREFIX + ".gitkeep", new byte[0]);
 
-        int precomputeCount = 0;
+        int practiceScriptCount = 0;
         for (Practice p : practices) {
-            String script = p.getPrecomputeScript();
+            String script = p.getPracticeScript();
             if (script != null && !script.isBlank()) {
                 files.put(
-                        SandboxLayout.PRECOMPUTE_PREFIX + "practices/" + p.getSlug() + ".ts",
+                        SandboxLayout.PRACTICE_SCRIPT_PREFIX + "practices/" + p.getSlug() + ".ts",
                         script.getBytes(StandardCharsets.UTF_8));
-                precomputeCount++;
+                practiceScriptCount++;
             }
         }
 
         log.info(
-                "Injected practice catalog: {} {} practices ({} with precompute), workspaceId={}, jobId={}",
+                "Injected practice catalog: {} {} practices ({} with a practice script), workspaceId={}, jobId={}",
                 practices.size(),
                 focus,
-                precomputeCount,
+                practiceScriptCount,
                 workspaceId,
                 job.getId());
     }

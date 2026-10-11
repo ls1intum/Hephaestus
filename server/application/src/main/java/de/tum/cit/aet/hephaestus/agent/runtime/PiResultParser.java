@@ -3,12 +3,12 @@ package de.tum.cit.aet.hephaestus.agent.runtime;
 import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxResult;
-import de.tum.cit.aet.hephaestus.practices.spi.PrecomputeModelPurpose;
-import de.tum.cit.aet.hephaestus.practices.spi.PrecomputeModelUseDTO;
-import de.tum.cit.aet.hephaestus.practices.spi.PrecomputeNeed;
-import de.tum.cit.aet.hephaestus.practices.spi.PrecomputeNotRatedDTO;
-import de.tum.cit.aet.hephaestus.practices.spi.PrecomputeNotRatedReason;
-import de.tum.cit.aet.hephaestus.practices.spi.PrecomputeRunStatus;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptModelPurpose;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptModelUseDTO;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptNeed;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptNotRatedDTO;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptNotRatedReason;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptRunStatus;
 import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
@@ -42,8 +42,8 @@ import tools.jackson.databind.ObjectMapper;
  * runner artifacts. A malformed result is not a successful run and carries no {@code rawOutput}.
  *
  * <p>Parse failures are counted by the {@code agent.pi.result.parse.failure{stage}} counter; a malformed auxiliary
- * artifact costs only that artifact. The precompute report is read apart from the result, by
- * {@link #parsePrecomputeReport}, because only the job knows which scripts it staged.
+ * artifact costs only that artifact. The practice script report is read apart from the result, by
+ * {@link #parsePracticeScriptReport}, because only the job knows which scripts it staged.
  */
 @Service
 public class PiResultParser {
@@ -265,68 +265,68 @@ public class PiResultParser {
     }
 
     /**
-     * One staged precompute script's run, as {@link SandboxLayout#PRECOMPUTE_REPORT_FILE} reported it.
+     * One staged practice script's run, as {@link SandboxLayout#PRACTICE_SCRIPT_REPORT_FILE} reported it.
      *
      * @param models the models the script declared; empty for a script that uses no model, and {@code null} when
      *     they are not known because the script ended before it declared them or did not finish
-     * @param error the first line of the script's error, at most {@link #PRECOMPUTE_ERROR_MAX_LENGTH} characters;
+     * @param error the first line of the script's error, at most {@link #PRACTICE_SCRIPT_ERROR_MAX_LENGTH} characters;
      *     {@code null} unless the script failed and the runner named the error
      * @param durationMs how long the script ran; {@code null} when it did not run, did not finish, or the runner did not
      *     say
      */
-    public record PrecomputeRunReport(
+    public record PracticeScriptRunReport(
             String practiceSlug,
-            PrecomputeRunStatus status,
+            PracticeScriptRunStatus status,
             int leads,
-            @Nullable List<PrecomputeModelUseDTO> models,
+            @Nullable List<PracticeScriptModelUseDTO> models,
             @Nullable String error,
             @Nullable Integer durationMs) {
-        public PrecomputeRunReport {
+        public PracticeScriptRunReport {
             models = models == null ? null : List.copyOf(models);
         }
 
         /** A staged script the report does not name: the runner lists every staged script, finished or not. */
-        static PrecomputeRunReport notFinished(String practiceSlug) {
-            return new PrecomputeRunReport(practiceSlug, PrecomputeRunStatus.NOT_FINISHED, 0, null, null, null);
+        static PracticeScriptRunReport notFinished(String practiceSlug) {
+            return new PracticeScriptRunReport(practiceSlug, PracticeScriptRunStatus.NOT_FINISHED, 0, null, null, null);
         }
     }
 
-    static final int PRECOMPUTE_REPORT_MAX_BYTES = 64 * 1024;
-    static final int PRECOMPUTE_REPORT_MAX_ENTRIES = 256;
+    static final int PRACTICE_SCRIPT_REPORT_MAX_BYTES = 64 * 1024;
+    static final int PRACTICE_SCRIPT_REPORT_MAX_ENTRIES = 256;
 
-    /** The longest error line that a precompute run keeps, in characters, as {@code precompute.json} bounds it. */
-    public static final int PRECOMPUTE_ERROR_MAX_LENGTH = 500;
+    /** The longest error line that a practice script run keeps, in characters, as {@code practice-scripts.json} bounds it. */
+    public static final int PRACTICE_SCRIPT_ERROR_MAX_LENGTH = 500;
 
     private static final Pattern CONTROL = Pattern.compile("\\p{Cc}");
     private static final Pattern BLANK_START = Pattern.compile("^[\\p{Cc}\\p{Z}]+");
     private static final Pattern BLANK_END = Pattern.compile("[\\p{Cc}\\p{Z}]+\\z");
     private static final Pattern LINE_END = Pattern.compile("[\\r\\n]");
 
-    private static final Map<String, PrecomputeRunStatus> PRECOMPUTE_STATUSES = Map.of(
-            "ok", PrecomputeRunStatus.OK,
-            "skipped", PrecomputeRunStatus.SKIPPED,
-            "error", PrecomputeRunStatus.FAILED,
-            "timeout", PrecomputeRunStatus.TIMED_OUT,
-            "not-finished", PrecomputeRunStatus.NOT_FINISHED);
+    private static final Map<String, PracticeScriptRunStatus> PRACTICE_SCRIPT_STATUSES = Map.of(
+            "ok", PracticeScriptRunStatus.OK,
+            "skipped", PracticeScriptRunStatus.SKIPPED,
+            "error", PracticeScriptRunStatus.FAILED,
+            "timeout", PracticeScriptRunStatus.TIMED_OUT,
+            "not-finished", PracticeScriptRunStatus.NOT_FINISHED);
 
-    private static final Map<String, PrecomputeNeed> PRECOMPUTE_NEEDS =
-            Map.of("required", PrecomputeNeed.REQUIRED, "optional", PrecomputeNeed.OPTIONAL);
+    private static final Map<String, PracticeScriptNeed> PRACTICE_SCRIPT_NEEDS =
+            Map.of("required", PracticeScriptNeed.REQUIRED, "optional", PracticeScriptNeed.OPTIONAL);
 
-    private static final Map<String, PrecomputeNotRatedReason> NOT_RATED_REASONS = Arrays.stream(
-                    PrecomputeNotRatedReason.values())
-            .collect(Collectors.toUnmodifiableMap(PrecomputeNotRatedReason::wire, reason -> reason));
+    private static final Map<String, PracticeScriptNotRatedReason> NOT_RATED_REASONS = Arrays.stream(
+                    PracticeScriptNotRatedReason.values())
+            .collect(Collectors.toUnmodifiableMap(PracticeScriptNotRatedReason::wire, reason -> reason));
 
     /**
      * Each purpose by the slot of its agent purpose's model kind. Built from the mirror, so an agent purpose that
      * the mirror lacks leaves its slot unknown here instead of failing to load; a sync test names that drift.
      */
-    private static final Map<String, PrecomputeModelPurpose> PURPOSES_BY_SLOT = Arrays.stream(
-                    PrecomputeModelPurpose.values())
+    private static final Map<String, PracticeScriptModelPurpose> PURPOSES_BY_SLOT = Arrays.stream(
+                    PracticeScriptModelPurpose.values())
             .collect(Collectors.toUnmodifiableMap(
                     purpose -> AgentPurpose.valueOf(purpose.name()).kind().slot(), purpose -> purpose));
 
     /**
-     * The precompute runs of one attempt, one per staged script. An entry with a value outside the contract,
+     * The practice script runs of one attempt, one per staged script. An entry with a value outside the contract,
      * a duplicate slug, or a slug the job did not stage is dropped and counted. A staged script that a whole
      * report does not name did not finish. A truncated report says nothing about the scripts it does not name,
      * so they get no run.
@@ -334,14 +334,14 @@ public class PiResultParser {
      * <p>A missing or unreadable report yields no runs at all. It says nothing about any script, and recording
      * "did not finish" for each would turn a lost file into a claim about the scripts.
      *
-     * @param staged the slugs of the practices whose precompute script the job staged
+     * @param staged the slugs of the practices whose practice script the job staged
      */
-    public List<PrecomputeRunReport> parsePrecomputeReport(byte @Nullable [] reportFile, Set<String> staged) {
+    public List<PracticeScriptRunReport> parsePracticeScriptReport(byte @Nullable [] reportFile, Set<String> staged) {
         if (reportFile == null || reportFile.length == 0) {
             return List.of();
         }
-        if (reportFile.length > PRECOMPUTE_REPORT_MAX_BYTES) {
-            recordFailure("precompute_report", new IllegalArgumentException("report too large"));
+        if (reportFile.length > PRACTICE_SCRIPT_REPORT_MAX_BYTES) {
+            recordFailure("practice_script_report", new IllegalArgumentException("report too large"));
             return List.of();
         }
         JsonNode root;
@@ -351,33 +351,34 @@ public class PiResultParser {
                     .with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
                     .readValue(reportFile);
         } catch (JacksonException e) {
-            recordFailure("precompute_report", e);
+            recordFailure("practice_script_report", e);
             return List.of();
         }
         JsonNode entries = root != null && root.isObject() ? root.get("practices") : null;
         JsonNode truncated = root != null && root.isObject() ? root.get("truncated") : null;
         if (entries == null
                 || !entries.isArray()
-                || entries.size() > PRECOMPUTE_REPORT_MAX_ENTRIES
+                || entries.size() > PRACTICE_SCRIPT_REPORT_MAX_ENTRIES
                 || truncated == null
                 || !truncated.isBoolean()) {
             recordFailure(
-                    "precompute_report", new IllegalArgumentException("no bounded practices array or truncation flag"));
+                    "practice_script_report",
+                    new IllegalArgumentException("no bounded practices array or truncation flag"));
             return List.of();
         }
         Set<String> named = new HashSet<>();
-        Map<String, PrecomputeRunReport> runs = new TreeMap<>();
+        Map<String, PracticeScriptRunReport> runs = new TreeMap<>();
         for (JsonNode entry : entries) {
             String slug = entry.path("slug").isString() ? entry.path("slug").asString() : null;
             if (slug == null || !staged.contains(slug)) {
-                recordFailure("precompute_report", new IllegalArgumentException("entry for no staged script"));
+                recordFailure("practice_script_report", new IllegalArgumentException("entry for no staged script"));
                 continue;
             }
             boolean first = named.add(slug);
-            PrecomputeRunReport run = precomputeRun(slug, entry);
+            PracticeScriptRunReport run = practiceScriptRun(slug, entry);
             if (run == null || !first) {
                 // The runner did name the script, so it gets no run rather than one the runner did not report.
-                recordFailure("precompute_report", new IllegalArgumentException("invalid or duplicate entry"));
+                recordFailure("practice_script_report", new IllegalArgumentException("invalid or duplicate entry"));
                 runs.remove(slug);
                 continue;
             }
@@ -385,66 +386,67 @@ public class PiResultParser {
         }
         if (!truncated.asBoolean()) {
             for (String slug : staged) {
-                if (!named.contains(slug)) runs.put(slug, PrecomputeRunReport.notFinished(slug));
+                if (!named.contains(slug)) runs.put(slug, PracticeScriptRunReport.notFinished(slug));
             }
         }
         return List.copyOf(runs.values());
     }
 
-    private static @Nullable PrecomputeRunReport precomputeRun(String slug, JsonNode entry) {
-        PrecomputeRunStatus status =
-                PRECOMPUTE_STATUSES.get(entry.path("status").asString(""));
+    private static @Nullable PracticeScriptRunReport practiceScriptRun(String slug, JsonNode entry) {
+        PracticeScriptRunStatus status =
+                PRACTICE_SCRIPT_STATUSES.get(entry.path("status").asString(""));
         Integer leads = count(entry.path("leads"));
         JsonNode declared = entry.path("models");
-        List<PrecomputeModelUseDTO> models = declared.isMissingNode() ? null : modelUses(declared);
+        List<PracticeScriptModelUseDTO> models = declared.isMissingNode() ? null : modelUses(declared);
         if (status == null || leads == null || (!declared.isMissingNode() && models == null)) {
             return null;
         }
         // A script that did not run found nothing, and a report that says otherwise is not believed.
-        boolean ran = status != PrecomputeRunStatus.SKIPPED && status != PrecomputeRunStatus.NOT_FINISHED;
+        boolean ran = status != PracticeScriptRunStatus.SKIPPED && status != PracticeScriptRunStatus.NOT_FINISHED;
         if (!ran && leads != 0) {
             return null;
         }
         // A script that did not finish declared nothing.
-        if (status == PrecomputeRunStatus.NOT_FINISHED && models != null) {
+        if (status == PracticeScriptRunStatus.NOT_FINISHED && models != null) {
             return null;
         }
-        String error = status == PrecomputeRunStatus.FAILED ? errorLine(entry.path("error")) : null;
+        String error = status == PracticeScriptRunStatus.FAILED ? errorLine(entry.path("error")) : null;
         // A script that did not run took no time. A duration only explains the run, so a missing or malformed one
         // leaves the run without it.
         Integer durationMs = ran ? count(entry.path("durationMs")) : null;
-        return new PrecomputeRunReport(slug, status, leads, models, error, durationMs);
+        return new PracticeScriptRunReport(slug, status, leads, models, error, durationMs);
     }
 
     /**
      * The line of a failed script's error that the run keeps, by the rule of {@code errorLine} in
-     * {@code pi-precompute-report.ts}: the first line after blanks, cut to {@link #PRECOMPUTE_ERROR_MAX_LENGTH} code
+     * {@code pi-practice-scripts-report.ts}: the first line after blanks, cut to {@link #PRACTICE_SCRIPT_ERROR_MAX_LENGTH} code
      * points, with each control character as a space and no blanks at the end. A line that is still not
      * {@link StorableText} is left out: the run is written in the attempt's terminal transaction, which a refused
      * value would fail. The error only explains the failure, so a missing or malformed one leaves the run without it
-     * instead of dropping the run. {@code precompute-error-lines.json} holds the cases that both sides agree on.
+     * instead of dropping the run. {@code practice-script-error-lines.json} holds the cases that both sides agree on.
      */
     private static @Nullable String errorLine(JsonNode error) {
         if (!error.isString()) return null;
         String text = BLANK_START.matcher(error.asString()).replaceFirst("");
         Matcher lineEnd = LINE_END.matcher(text);
         String first = lineEnd.find() ? text.substring(0, lineEnd.start()) : text;
-        String cut = first.codePointCount(0, first.length()) <= PRECOMPUTE_ERROR_MAX_LENGTH
+        String cut = first.codePointCount(0, first.length()) <= PRACTICE_SCRIPT_ERROR_MAX_LENGTH
                 ? first
-                : first.substring(0, first.offsetByCodePoints(0, PRECOMPUTE_ERROR_MAX_LENGTH));
+                : first.substring(0, first.offsetByCodePoints(0, PRACTICE_SCRIPT_ERROR_MAX_LENGTH));
         String line = BLANK_END.matcher(CONTROL.matcher(cut).replaceAll(" ")).replaceFirst("");
         return line.isEmpty() || !StorableText.isStorable(line) ? null : line;
     }
 
-    private static @Nullable List<PrecomputeModelUseDTO> modelUses(JsonNode models) {
+    private static @Nullable List<PracticeScriptModelUseDTO> modelUses(JsonNode models) {
         if (!models.isArray()) return null;
-        List<PrecomputeModelUseDTO> uses = new ArrayList<>();
-        Set<PrecomputeModelPurpose> seen = new HashSet<>();
+        List<PracticeScriptModelUseDTO> uses = new ArrayList<>();
+        Set<PracticeScriptModelPurpose> seen = new HashSet<>();
         for (JsonNode model : models) {
-            PrecomputeModelPurpose purpose =
+            PracticeScriptModelPurpose purpose =
                     PURPOSES_BY_SLOT.get(model.path("slot").asString(""));
-            PrecomputeNeed need = PRECOMPUTE_NEEDS.get(model.path("need").asString(""));
-            List<PrecomputeNotRatedDTO> notRated = notRated(model.path("notRated"));
+            PracticeScriptNeed need =
+                    PRACTICE_SCRIPT_NEEDS.get(model.path("need").asString(""));
+            List<PracticeScriptNotRatedDTO> notRated = notRated(model.path("notRated"));
             if (purpose == null
                     || !seen.add(purpose)
                     || need == null
@@ -452,25 +454,25 @@ public class PiResultParser {
                     || notRated == null) {
                 return null;
             }
-            uses.add(
-                    new PrecomputeModelUseDTO(purpose, need, model.path("bound").asBoolean(), notRated));
+            uses.add(new PracticeScriptModelUseDTO(
+                    purpose, need, model.path("bound").asBoolean(), notRated));
         }
         return uses;
     }
 
     /** By reason, in the declared order of the reasons; a zero count is no fact and is left out. */
-    private static @Nullable List<PrecomputeNotRatedDTO> notRated(JsonNode counts) {
+    private static @Nullable List<PracticeScriptNotRatedDTO> notRated(JsonNode counts) {
         if (counts.isMissingNode()) return List.of();
         if (!counts.isObject()) return null;
-        Map<PrecomputeNotRatedReason, Integer> byReason = new EnumMap<>(PrecomputeNotRatedReason.class);
+        Map<PracticeScriptNotRatedReason, Integer> byReason = new EnumMap<>(PracticeScriptNotRatedReason.class);
         for (Map.Entry<String, JsonNode> property : counts.properties()) {
-            PrecomputeNotRatedReason reason = NOT_RATED_REASONS.get(property.getKey());
+            PracticeScriptNotRatedReason reason = NOT_RATED_REASONS.get(property.getKey());
             Integer count = count(property.getValue());
             if (reason == null || count == null) return null;
             if (count > 0) byReason.put(reason, count);
         }
         return byReason.entrySet().stream()
-                .map(entry -> new PrecomputeNotRatedDTO(entry.getKey(), entry.getValue()))
+                .map(entry -> new PracticeScriptNotRatedDTO(entry.getKey(), entry.getValue()))
                 .toList();
     }
 

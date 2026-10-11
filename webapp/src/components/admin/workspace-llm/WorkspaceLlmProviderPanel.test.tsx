@@ -106,7 +106,7 @@ describe("WorkspaceLlmProviderPanel", () => {
 		expect(gpuCard.queryByText("GPT shared endpoint")).toBeNull();
 	});
 
-	it("reads a missing model list on a precompute API as no fault, and on a chat API as a failure", () => {
+	it("reads a missing model list on an API for practice scripts as no fault, and on a chat API as a failure", () => {
 		renderPanel({
 			state: { status: "ready", connections: [openAi, embeddings], models: [] },
 			testResults: new Map([

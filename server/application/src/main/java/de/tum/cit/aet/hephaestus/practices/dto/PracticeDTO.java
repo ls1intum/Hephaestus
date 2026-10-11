@@ -53,10 +53,8 @@ public record PracticeDTO(
         String criteria,
 
         @Nullable
-        @Schema(
-                description =
-                        "TypeScript precompute script that runs before the review and points it at places to check")
-        String precomputeScript,
+        @Schema(description = "TypeScript practice script that runs before the review and points it at places to check")
+        String practiceScript,
 
         @NonNull PracticeAutomatedReviewPolicy automatedReviewPolicy,
         @NonNull PracticeAutomatedReviewValidation automatedReviewValidation,
@@ -124,7 +122,7 @@ public record PracticeDTO(
                 practice.getSubject(),
                 practice.getPrecondition(),
                 practice.getCriteria(),
-                practice.getPrecomputeScript(),
+                practice.getPracticeScript(),
                 practice.getAutomatedReviewPolicy(),
                 PracticeAutomatedReviewValidation.authorDeclared(practice.getSlug(), PracticeDefinition.from(practice)),
                 practice.getArtifactKind(),

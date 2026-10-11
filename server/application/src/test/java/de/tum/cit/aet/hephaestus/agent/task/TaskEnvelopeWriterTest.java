@@ -34,7 +34,7 @@ class TaskEnvelopeWriterTest extends BaseUnitTest {
     void shouldWriteOneFlatRecordWithoutDiscriminator() throws Exception {
         JsonNode root = reader.readTree(writer.write(sampleEnvelope()));
 
-        assertThat(root.get("schemaVersion").asInt()).isEqualTo(3);
+        assertThat(root.get("schemaVersion").asInt()).isEqualTo(4);
         assertThat(root.get("jobId").asString()).isEqualTo("00000000-0000-0000-0000-00000000abcd");
         assertThat(root.get("workspaceId").asLong()).isEqualTo(99L);
         assertThat(root.has("kind")).isFalse();
@@ -64,7 +64,7 @@ class TaskEnvelopeWriterTest extends BaseUnitTest {
     void roundTripDeserialise() throws Exception {
         TaskEnvelope decoded = reader.readValue(writer.write(sampleEnvelope()), TaskEnvelope.class);
 
-        assertThat(decoded.schemaVersion()).isEqualTo(3);
+        assertThat(decoded.schemaVersion()).isEqualTo(4);
         assertThat(decoded.workspaceId()).isEqualTo(99L);
         assertThat(decoded.paths()).isEqualTo(TaskPaths.capturedInputs());
         assertThat(decoded).isEqualTo(sampleEnvelope());
@@ -101,7 +101,7 @@ class TaskEnvelopeWriterTest extends BaseUnitTest {
                         "index.json",
                         "compose.json",
                         "prepared.json",
-                        "precompute"))
+                        "practice-scripts"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("schemaVersion");
         assertThatThrownBy(() -> TaskEnvelope.of(jobId, 0L, task))

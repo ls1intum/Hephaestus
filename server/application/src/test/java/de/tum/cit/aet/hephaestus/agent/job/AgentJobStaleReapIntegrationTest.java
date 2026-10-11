@@ -163,46 +163,48 @@ class AgentJobStaleReapIntegrationTest extends BaseIntegrationTest {
     }
 
     /**
-     * The reaper appends one row per non-chat precompute model next to the review's row, at the price
+     * The reaper appends one row per non-chat model for practice scripts next to the review's row, at the price
      * and from the purse that the slot froze. The chat row only bounds spend: the review's row bills it.
      */
     @Test
-    @DisplayName("a reaped attempt bills each precompute model at its slot's frozen price and purse")
-    void shouldAppendAPrecomputeLedgerRowPerKindWhenAStaleJobIsReaped() {
-        UUID jobId = staleRunningJob(precomputeSnapshot().toJson(objectMapper), withProxyUsage());
-        precomputeCalls(jobId);
+    @DisplayName("a reaped attempt bills each model for practice scripts at its slot's frozen price and purse")
+    void shouldAppendAPracticeScriptLedgerRowPerKindWhenAStaleJobIsReaped() {
+        UUID jobId = staleRunningJob(practiceScriptSnapshot().toJson(objectMapper), withProxyUsage());
+        practiceScriptCalls(jobId);
 
         sweeper.reapStaleRunningJobs();
 
-        assertPrecomputeLedgerRows(jobId);
+        assertPracticeScriptLedgerRows(jobId);
     }
 
     @Test
-    @DisplayName("a cancelled attempt bills each precompute model once over its practices, at its slot's price")
-    void shouldAppendAPrecomputeLedgerRowPerKindWhenARunningJobIsCancelled() {
-        UUID jobId = staleRunningJob(precomputeSnapshot().toJson(objectMapper), withProxyUsage());
-        precomputeCalls(jobId);
+    @DisplayName(
+            "a cancelled attempt bills each model for practice scripts once over its practices, at its slot's price")
+    void shouldAppendAPracticeScriptLedgerRowPerKindWhenARunningJobIsCancelled() {
+        UUID jobId = staleRunningJob(practiceScriptSnapshot().toJson(objectMapper), withProxyUsage());
+        practiceScriptCalls(jobId);
 
         lifecycleService.cancel(workspace.getId(), jobId);
 
-        assertPrecomputeLedgerRows(jobId);
+        assertPracticeScriptLedgerRows(jobId);
     }
 
-    private void precomputeCalls(UUID jobId) {
+    private void practiceScriptCalls(UUID jobId) {
         transactionTemplate.executeWithoutResult(tx -> {
-            precomputeCall(jobId, ModelKind.DECISION, "comment-quality", 300_000, 50_000);
-            precomputeCall(jobId, ModelKind.DECISION, "test-coverage", 200_000, 50_000);
-            precomputeCall(jobId, ModelKind.EMBEDDING, "comment-quality", 1_000, 0);
-            precomputeCall(jobId, ModelKind.RERANKING, "comment-quality", 0, 0);
-            precomputeCall(jobId, ModelKind.CHAT, "comment-quality", 70, 20);
+            practiceScriptCall(jobId, ModelKind.DECISION, "comment-quality", 300_000, 50_000);
+            practiceScriptCall(jobId, ModelKind.DECISION, "test-coverage", 200_000, 50_000);
+            practiceScriptCall(jobId, ModelKind.EMBEDDING, "comment-quality", 1_000, 0);
+            practiceScriptCall(jobId, ModelKind.RERANKING, "comment-quality", 0, 0);
+            practiceScriptCall(jobId, ModelKind.CHAT, "comment-quality", 70, 20);
         });
     }
 
-    private void precomputeCall(UUID jobId, ModelKind kind, String practice, long input, long output) {
-        jobRepository.accumulatePrecomputeUsage(jobId, 0, new PrecomputeCallUsage(kind, practice, null, input, output));
+    private void practiceScriptCall(UUID jobId, ModelKind kind, String practice, long input, long output) {
+        jobRepository.accumulatePracticeScriptUsage(
+                jobId, 0, new PracticeScriptCallUsage(kind, practice, null, input, output));
     }
 
-    private void assertPrecomputeLedgerRows(UUID jobId) {
+    private void assertPracticeScriptLedgerRows(UUID jobId) {
         List<LlmUsageEvent> rows = usageEventRepository.findAll().stream()
                 .filter(event -> event.getSourceId().equals(jobId))
                 .toList();
@@ -210,11 +212,11 @@ class AgentJobStaleReapIntegrationTest extends BaseIntegrationTest {
                 .extracting(LlmUsageEvent::getSourceType)
                 .containsExactlyInAnyOrder(
                         LlmUsageSourceType.AGENT_JOB,
-                        LlmUsageSourceType.PRECOMPUTE_DECISION,
-                        LlmUsageSourceType.PRECOMPUTE_EMBEDDING,
-                        LlmUsageSourceType.PRECOMPUTE_RERANKING);
+                        LlmUsageSourceType.PRACTICE_SCRIPT_DECISION,
+                        LlmUsageSourceType.PRACTICE_SCRIPT_EMBEDDING,
+                        LlmUsageSourceType.PRACTICE_SCRIPT_RERANKING);
 
-        LlmUsageEvent decision = row(rows, LlmUsageSourceType.PRECOMPUTE_DECISION);
+        LlmUsageEvent decision = row(rows, LlmUsageSourceType.PRACTICE_SCRIPT_DECISION);
         assertThat(decision.getSourceAttempt()).isZero();
         assertThat(decision.getModel()).isEqualTo("decision-upstream");
         assertThat(decision.getInputTokens()).isEqualTo(500_000L);
@@ -226,7 +228,7 @@ class AgentJobStaleReapIntegrationTest extends BaseIntegrationTest {
         assertThat(decision.getCostUsd()).isEqualByComparingTo("1.8");
         assertThat(decision.getUsageProvenance()).isEqualTo(UsageProvenance.PROXY);
 
-        LlmUsageEvent embedding = row(rows, LlmUsageSourceType.PRECOMPUTE_EMBEDDING);
+        LlmUsageEvent embedding = row(rows, LlmUsageSourceType.PRACTICE_SCRIPT_EMBEDDING);
         assertThat(embedding.getModel()).isEqualTo("embedding-upstream");
         assertThat(embedding.getInputTokens()).isEqualTo(1_000L);
         assertThat(embedding.getPricingState())
@@ -234,7 +236,7 @@ class AgentJobStaleReapIntegrationTest extends BaseIntegrationTest {
                 .isEqualTo(PricingState.UNPRICED);
         assertThat(embedding.getCostUsd()).isNull();
 
-        LlmUsageEvent reranking = row(rows, LlmUsageSourceType.PRECOMPUTE_RERANKING);
+        LlmUsageEvent reranking = row(rows, LlmUsageSourceType.PRACTICE_SCRIPT_RERANKING);
         assertThat(reranking.getTotalCalls()).isEqualTo(1);
         assertThat(reranking.getPricingState())
                 .as("a model without metered cost is a confirmed zero, even when the provider reports no tokens")
@@ -249,7 +251,7 @@ class AgentJobStaleReapIntegrationTest extends BaseIntegrationTest {
                 .orElseThrow();
     }
 
-    private ConfigSnapshot precomputeSnapshot() {
+    private ConfigSnapshot practiceScriptSnapshot() {
         Map<ModelKind, FrozenModel> slots = new EnumMap<>(ModelKind.class);
         slots.put(
                 ModelKind.DECISION,
@@ -273,7 +275,7 @@ class AgentJobStaleReapIntegrationTest extends BaseIntegrationTest {
                         "reranking-upstream",
                         new LlmPriceSnapshot(
                                 FundingSource.INSTANCE, PricingState.NO_CHARGE, null, null, null, null, null, null)));
-        return snapshot().withPrecompute(slots);
+        return snapshot().withPracticeScript(slots);
     }
 
     private FrozenModel slot(String protocol, String upstreamModelId, @Nullable LlmPriceSnapshot price) {

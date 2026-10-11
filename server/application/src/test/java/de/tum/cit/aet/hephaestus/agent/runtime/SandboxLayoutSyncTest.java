@@ -57,24 +57,26 @@ class SandboxLayoutSyncTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldReadThePrecomputeModelsFileTheServerWrites() throws IOException {
-        assertThat(Files.readString(resolveResource("agent/pi-precompute.ts")))
-                .as("pi-precompute.ts pins PRECOMPUTE_MODELS_FILE to SandboxLayout.PRECOMPUTE_MODELS_FILE")
-                .contains("PRECOMPUTE_MODELS_FILE = \"" + SandboxLayout.PRECOMPUTE_MODELS_FILE + "\"");
+    void shouldReadThePracticeScriptModelsFileTheServerWrites() throws IOException {
+        assertThat(Files.readString(resolveResource("agent/pi-practice-scripts.ts")))
+                .as(
+                        "pi-practice-scripts.ts pins PRACTICE_SCRIPT_MODELS_FILE to SandboxLayout.PRACTICE_SCRIPT_MODELS_FILE")
+                .contains("PRACTICE_SCRIPT_MODELS_FILE = \"" + SandboxLayout.PRACTICE_SCRIPT_MODELS_FILE + "\"");
     }
 
     /** The server refuses a report past these bounds whole, so the runner must stay within them. */
     @Test
-    void shouldWriteThePrecomputeReportTheServerReadsWithinItsBounds() throws IOException {
+    void shouldWriteThePracticeScriptReportTheServerReadsWithinItsBounds() throws IOException {
         assertThat(Files.readString(resolveResource("agent/pi-runner.ts")))
-                .as("pi-runner.ts writes SandboxLayout.PRECOMPUTE_REPORT_FILE under its output")
-                .contains("outputPath(OUTPUT, \"" + SandboxLayout.PRECOMPUTE_REPORT_FILE + "\")");
-        assertThat(Files.readString(resolveResource("agent/pi-precompute-report.ts")))
+                .as("pi-runner.ts writes SandboxLayout.PRACTICE_SCRIPT_REPORT_FILE under its output")
+                .contains("outputPath(OUTPUT, \"" + SandboxLayout.PRACTICE_SCRIPT_REPORT_FILE + "\")");
+        assertThat(Files.readString(resolveResource("agent/pi-practice-scripts-report.ts")))
                 .contains(
-                        "PRECOMPUTE_REPORT_MAX_BYTES = " + PiResultParser.PRECOMPUTE_REPORT_MAX_BYTES / 1024
+                        "PRACTICE_SCRIPT_REPORT_MAX_BYTES = " + PiResultParser.PRACTICE_SCRIPT_REPORT_MAX_BYTES / 1024
                                 + " * 1024;",
-                        "PRECOMPUTE_REPORT_MAX_PRACTICES = " + PiResultParser.PRECOMPUTE_REPORT_MAX_ENTRIES + ";",
-                        "PRECOMPUTE_ERROR_MAX_CHARS = " + PiResultParser.PRECOMPUTE_ERROR_MAX_LENGTH + ";");
+                        "PRACTICE_SCRIPT_REPORT_MAX_PRACTICES = " + PiResultParser.PRACTICE_SCRIPT_REPORT_MAX_ENTRIES
+                                + ";",
+                        "PRACTICE_SCRIPT_ERROR_MAX_CHARS = " + PiResultParser.PRACTICE_SCRIPT_ERROR_MAX_LENGTH + ";");
     }
 
     @Test

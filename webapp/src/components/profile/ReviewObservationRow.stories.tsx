@@ -50,7 +50,7 @@ const strength = {
 				startLine: 88,
 				endLine: 90,
 				quote:
-					"// Raised from 30s: the precompute step regularly needs 45s on a cold cache.\n" +
+					"// Raised from 30s: the practice script step regularly needs 45s on a cold cache.\n" +
 					"private static final Duration TIMEOUT = Duration.ofSeconds(90);",
 				quoteRedacted: false,
 			},

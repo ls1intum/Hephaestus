@@ -32,7 +32,7 @@ describe("CodeEditor", () => {
 	it("checks TypeScript syntax but not types, because the modules a file imports are not loaded", () => {
 		diagnostics = { noSyntaxValidation: false, onlyVisible: false };
 
-		render(<CodeEditor value="" onChange={vi.fn()} ariaLabel="Precompute script" />);
+		render(<CodeEditor value="" onChange={vi.fn()} ariaLabel="Practice script" />);
 
 		expect(diagnostics).toStrictEqual({
 			noSyntaxValidation: false,

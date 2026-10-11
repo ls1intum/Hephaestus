@@ -25,7 +25,7 @@ const REPORT: Wire<WorkspaceLlmUsageReport> = {
 	byJobType: [],
 	byDay: [],
 	byPractice: [],
-	precomputeTotal: {
+	practiceScriptTotal: {
 		reviews: 0,
 		calls: 0,
 		inputTokens: 0,
@@ -37,7 +37,7 @@ const REPORT: Wire<WorkspaceLlmUsageReport> = {
 };
 
 /** As the server writes it: a null slug or name is left out of the JSON. */
-const PRECOMPUTE_ROWS: Wire<LlmUsageByPractice>[] = [
+const PRACTICE_SCRIPT_ROWS: Wire<LlmUsageByPractice>[] = [
 	{
 		practiceSlug: "comment-quality",
 		practiceName: "Comments explain why",
@@ -138,7 +138,7 @@ function mockReport(report: Wire<WorkspaceLlmUsageReport>, requestedMonths: stri
 	);
 }
 
-describe("workspace AI usage route, precompute models by practice", () => {
+describe("workspace AI usage route, models for practice scripts by practice", () => {
 	it("asks for the month in the address and lists each practice from the wire", async () => {
 		const requestedMonths: string[] = [];
 		mockReport(
@@ -158,9 +158,9 @@ describe("workspace AI usage route, precompute models by practice", () => {
 						events: 5,
 					},
 				],
-				byPractice: PRECOMPUTE_ROWS,
-				precomputeTotal: {
-					...REPORT.precomputeTotal,
+				byPractice: PRACTICE_SCRIPT_ROWS,
+				practiceScriptTotal: {
+					...REPORT.practiceScriptTotal,
 					reviews: 4,
 					calls: 46,
 					ownProviderTotalCostUsd: 0.42,
@@ -172,7 +172,7 @@ describe("workspace AI usage route, precompute models by practice", () => {
 
 		const table = await screen.findByRole(
 			"table",
-			{ name: "Precompute model spend by practice" },
+			{ name: "Spend on models for practice scripts, by practice" },
 			ROUTE_RENDER_WAIT,
 		);
 		expect(requestedMonths).toContain("2026-07");
@@ -192,7 +192,7 @@ describe("workspace AI usage route, precompute models by practice", () => {
 		renderRouteAt("/w/acme/admin/usage");
 
 		await screen.findByRole("button", { name: "Change provider cap" }, ROUTE_RENDER_WAIT);
-		expect(screen.queryByText("Precompute models by practice")).toBeNull();
+		expect(screen.queryByText("Models for practice scripts, by practice")).toBeNull();
 	});
 
 	it("says the report could not load, and offers a retry", async () => {

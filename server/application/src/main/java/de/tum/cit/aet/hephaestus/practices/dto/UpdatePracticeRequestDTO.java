@@ -49,13 +49,11 @@ public record UpdatePracticeRequestDTO(
         String criteria,
 
         @Size(
-                max = PracticeDefinition.MAX_PRECOMPUTE_SCRIPT_LENGTH,
-                message = "Precompute script must be at most 100000 characters")
-        @Schema(
-                description =
-                        "TypeScript precompute script that runs before the review and points it at places to check")
+                max = PracticeDefinition.MAX_PRACTICE_SCRIPT_LENGTH,
+                message = "Practice script must be at most 100,000 characters")
+        @Schema(description = "TypeScript practice script that runs before the review and points it at places to check")
         @Nullable
-        String precomputeScript,
+        String practiceScript,
 
         @Valid
         @Schema(
@@ -103,7 +101,7 @@ public record UpdatePracticeRequestDTO(
             @Nullable ActorRole subject,
             @Nullable PracticePrecondition precondition,
             @Nullable String criteria,
-            @Nullable String precomputeScript,
+            @Nullable String practiceScript,
             @Nullable PracticeAutomatedReviewPolicy automatedReviewPolicy,
             @Nullable String whyItMatters,
             @Nullable String whatGoodLooksLike,
@@ -118,7 +116,7 @@ public record UpdatePracticeRequestDTO(
                 subject,
                 precondition,
                 criteria,
-                precomputeScript,
+                practiceScript,
                 automatedReviewPolicy,
                 whyItMatters,
                 whatGoodLooksLike,

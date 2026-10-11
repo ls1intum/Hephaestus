@@ -345,7 +345,7 @@ class CatalogAdoptionControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .findByWorkspaceIdAndSlug(workspace.getId(), slug)
                 .orElseThrow();
         assertThat(practice.getAutonomy()).isEqualTo(PracticeAutonomy.OFF);
-        assertThat(practice.getPrecomputeScript()).isNull();
+        assertThat(practice.getPracticeScript()).isNull();
     }
 
     @Test

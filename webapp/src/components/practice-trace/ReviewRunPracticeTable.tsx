@@ -6,7 +6,7 @@ import type {
 	ObservationDetail,
 	PracticeGroup,
 	PracticeTraceEntry,
-	PrecomputeRun,
+	PracticeScriptRun,
 	TracedSignal,
 } from "@/api/types.gen";
 import { reviewLevel } from "@/components/admin/practice-reviews/review-levels";
@@ -23,11 +23,10 @@ import {
 } from "@/components/practice-vocabulary/group-visuals";
 import { GroupName } from "@/components/practice-vocabulary/GroupName";
 import { MARKED_INCORRECT_DEF } from "@/components/practice-vocabulary/observation-invalidation-defs";
-import { PracticePill } from "@/components/practice-vocabulary/PracticePill";
 import {
-	precomputeFix,
-	precomputeRunSentence,
-} from "@/components/practice-vocabulary/precompute-run-status-defs";
+	practiceScriptFix,
+	practiceScriptRunSentence,
+} from "@/components/practice-vocabulary/practice-script-run-status-defs";
 import { StatusLabel, StatusTooltip } from "@/components/practice-vocabulary/StatusTooltip";
 import {
 	TRACE_OUTCOME_DEFS,
@@ -47,7 +46,7 @@ import {
 } from "@/components/ui/table";
 import { hasText } from "@/lib/text";
 
-import { PrecomputeFixLink } from "./PrecomputeFixLink";
+import { PracticeScriptFixLink } from "./PracticeScriptFixLink";
 import { deliveryLabel, REVIEW_FILTER_MAX_LENGTH } from "./trace-format";
 import { TraceOutcomeBadge } from "./TraceOutcomeBadge";
 
@@ -68,7 +67,7 @@ export type PracticeRowObservation = Pick<ObservationDetail, "id" | "summary" | 
 	Partial<Pick<ObservationDetail, "invalidationReason">>;
 
 export interface ReviewRunPracticeTableProps {
-	/** Where an admin's fix links lead, such as the AI models page for a missing precompute model. */
+	/** Where an admin's fix links lead, such as the AI models page for a missing model for practice scripts. */
 	workspaceSlug: string;
 	/** Each practice's answer on the work: one review's, or the latest across every review of it. */
 	entries: PracticeTraceEntry[];
@@ -99,7 +98,7 @@ export interface ReviewRunPracticeTableProps {
 	/** How a row answered by an earlier review links to it; the caller owns where reviews open. */
 	earlierReviewLink?: (reviewId: string) => ReactNode;
 	/**
-	 * How a precompute line's *Details* opens its review, where the table sits in a stack that a
+	 * How a practice script line's *Details* opens its review, where the table sits in a stack that a
 	 * review opens over. The label carries a trailing icon, so the link lays it out inline. Absent,
 	 * it opens the review on Practice reviews.
 	 */
@@ -553,11 +552,11 @@ function WhatItSaw({
 						</span>
 						<AutonomyBadge autonomy={entry.autonomy} />
 					</span>
-					{entry.precompute !== undefined && (
-						<PrecomputeTraceLine
+					{entry.practiceScript !== undefined && (
+						<PracticeScriptTraceLine
 							workspaceSlug={workspaceSlug}
 							entry={entry}
-							run={entry.precompute}
+							run={entry.practiceScript}
 							reviewLink={reviewLink}
 						/>
 					)}
@@ -579,12 +578,12 @@ function WhatItSaw({
 }
 
 /**
- * What the practice's precompute script did before the review, in one muted line: how it ended, the
- * one change that would help it, and *Details*, which opens the review's Precompute scripts
+ * What the practice's script did before the review, in one muted line: how it ended, the
+ * one change that would help it, and *Details*, which opens the review's *Practice scripts* section
  * section with the reasons behind any unrated call. The links name the practice for a screen
  * reader, which lists every row's links together.
  */
-function PrecomputeTraceLine({
+function PracticeScriptTraceLine({
 	workspaceSlug,
 	entry,
 	run,
@@ -592,14 +591,14 @@ function PrecomputeTraceLine({
 }: {
 	workspaceSlug: string;
 	entry: PracticeTraceEntry;
-	run: PrecomputeRun;
+	run: PracticeScriptRun;
 	reviewLink: ((reviewId: string, label: ReactNode) => ReactNode) | undefined;
 }) {
-	const fix = precomputeFix(run);
+	const fix = practiceScriptFix(run);
 	const { reviewId, practiceName } = entry;
 	const details = (
 		<>
-			Details <span className="sr-only">of the precompute script for {practiceName}</span>
+			Details <span className="sr-only">of the practice script for {practiceName}</span>
 			<ArrowRightIcon className="size-3 shrink-0" aria-hidden />
 		</>
 	);
@@ -607,9 +606,9 @@ function PrecomputeTraceLine({
 		<span className="flex min-w-0 items-start gap-1.5 text-pretty">
 			<ScanSearchIcon className="mt-px size-3.5 shrink-0" aria-hidden />
 			<span className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
-				<span>{precomputeRunSentence(run)}</span>
+				<span>{practiceScriptRunSentence(run)}</span>
 				{fix !== undefined && (
-					<PrecomputeFixLink
+					<PracticeScriptFixLink
 						workspaceSlug={workspaceSlug}
 						practiceSlug={entry.practiceSlug}
 						practiceName={practiceName}

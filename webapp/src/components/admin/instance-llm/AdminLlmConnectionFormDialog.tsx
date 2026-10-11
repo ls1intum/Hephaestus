@@ -300,7 +300,7 @@ interface ProbeFoundProps {
 }
 
 /**
- * What a test that is no fault found: the models, or that a precompute endpoint lists none. The
+ * What a test that is no fault found: the models, or that an endpoint for practice scripts lists none. The
  * status region around it announces it, so it takes no alert role of its own.
  */
 function ProbeFound({ apiProtocol, probeResult }: ProbeFoundProps) {

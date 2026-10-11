@@ -69,7 +69,7 @@ Only `displayName`, `baseUrl`, and `apiProtocol` are required.
 | ------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **Display name**               | yes      | Free text, ≤ 128 characters. Editable after creation. Display name, service declaration, API key, and enabled state can change. Routing identity and slug cannot.                                                                                                                                                                                                                                                                                                                                                                                |
 | **Base URL**                   | yes      | The provider's OpenAI-compatible root, ≤ 2048 characters. Examples: `https://api.openai.com/v1`, or `https://<resource>.openai.azure.com/openai/v1` for Azure. Requires HTTPS. Must have no credentials, query string, or fragment. **Immutable after create.**                                                                                                                                                                                                                                                                                  |
-| **API**                        | yes      | The API that the endpoint serves. Under **Chat models**: **Responses API** (`openai-responses`), the default, and **Chat Completions API** (`openai-completions`). Under **For precompute scripts**: **Decisions API**, **Embeddings API**, and **Rerank API (Cohere-compatible)**. [Precompute models](#precompute-models) describes these three. Prefer Responses API for reviews and the mentor, which call tools across many turns. It can preserve reasoning between tool calls for supported models and providers. OpenAI, Vercel AI Gateway, OpenRouter, and vLLM offer it. Support depends on the model and deployment. For Chat Completions-only endpoints, choose **Chat Completions API**. **Immutable after create.** The edit form shows the API as text.                     |
+| **API**                        | yes      | The API that the endpoint serves. Under **Chat models**: **Responses API** (`openai-responses`), the default, and **Chat Completions API** (`openai-completions`). Under **For practice scripts**: **Decisions API**, **Embeddings API**, and **Rerank API (Cohere-compatible)**. [Models for practice scripts](#models-for-practice-scripts) describes these three. Prefer Responses API for reviews and the mentor, which call tools across many turns. It can preserve reasoning between tool calls for supported models and providers. OpenAI, Vercel AI Gateway, OpenRouter, and vLLM offer it. Support depends on the model and deployment. For Chat Completions-only endpoints, choose **Chat Completions API**. **Immutable after create.** The edit form shows the API as text.                     |
 | **Authentication**             | no       | `BEARER` → `Authorization: Bearer <key>`, or `API_KEY` → `api-key: <key>`. Defaults to `BEARER`. Azure needs `API_KEY`. **Immutable after create.**                                                                                                                                                                                                                                                                                                                                                                                              |
 | **Service receiving requests** | no       | Search for the service that receives requests from the configured endpoint, such as Logos, Azure, or Vercel AI Gateway. If absent or uncertain, leave **Not listed or unknown**. This display declaration does not prove where inference runs or who operates the model. You can change or clear it later.                                                                                                                                                                                                                                       |
 | **API key**                    | no       | Write-only and encrypted at rest. Never returned. A saved connection reports only `hasApiKey` and the last four characters. On edit, leave blank to keep the stored key. To delete it, select **Remove stored API key**. Optional: a self-hosted vLLM or Ollama gateway may need no credential.                                                                                                                                                                                                                                                  |
@@ -210,8 +210,9 @@ Connected. N models available.
 
 Failures show the same message, but provider model IDs never appear.
 
-Many endpoints for precompute scripts do not serve `/models`.
-When the probe of a connection with a precompute API gets HTTP 404, 405 or 501, the result shows this text instead of a failure:
+Many endpoints for practice scripts do not serve `/models`.
+The probe of such a connection can get HTTP 404, 405 or 501.
+Then the result shows this text instead of a failure:
 
 ```text
 No model list at this address. Add the model by its ID. If its calls fail too, check the base URL.
@@ -406,7 +407,7 @@ The UI shows the title.
 - **Budgets, caps, and what a cap pauses:** [Workspace budgets and alerting](./production-setup#workspace-budgets-and-alerting).
 - **The environment variables that *are* deploy-time facts:** [Instance-wide LLM settings](./production-setup#instance-wide-llm-settings).
 - **Nothing is being reviewed:** [When a workspace goes quiet](./practice-review#when-a-workspace-goes-quiet).
-- **Models for precompute scripts:** [Precompute models](#precompute-models).
+- **Models for practice scripts:** [Models for practice scripts](#models-for-practice-scripts).
 
 ## Data handling and members' AI choices
 
@@ -582,16 +583,16 @@ Before you delete a model, remove or replace its assignments.
 The server refuses deletion of an assigned model.
 Provider unavailability does not remove recorded feedback or earlier conversations.
 
-## Precompute models
+## Models for practice scripts
 
-Before a practice review measures a practice, the practice's precompute script can look for places that the review must check.
+Before a practice review measures a practice, the practice's script can look for places that the review must check.
 A script can ask models to rate or find those places.
 It never writes feedback, and the review checks each place against the practice.
-[Write a precompute script](./precompute-scripts.mdx) tells how to write one.
+[Write a practice script](./practice-scripts.mdx) tells how to write one.
 
 A script can use four kinds of model.
 The chat model is always the practice review's own model.
-You assign the three other kinds on **AI models**, under **Models for precompute scripts**:
+You assign the three other kinds on **AI models**, under **Models for practice scripts**:
 
 | Purpose | API in the connection form | `apiProtocol` | Endpoint the proxy calls | Example providers |
 | --- | --- | --- | --- | --- |
@@ -614,27 +615,27 @@ If you assign none of them, nothing breaks:
 - A script that needs a missing model does not run. The review reads the sources for that practice itself.
 - A script that can work without the model gives the places it finds without it.
 
-The bundled practice scripts call no precompute model.
-Assign one when a customized precompute script uses it.
+The bundled practice scripts call none of these models.
+Assign one when a customized practice script uses it.
 
 A host that loads models on demand can take minutes to load a model after a pause.
-A precompute call that waits longer than its script's deadline is not rated, and the review runs without it.
-On such a host, keep the precompute models loaded, or expect calls that are not rated after a pause.
+A call from a practice script that waits longer than its script's deadline is not rated, and the review runs without it.
+On such a host, keep the models for practice scripts loaded, or expect calls that are not rated after a pause.
 
-### Assign a precompute model
+### Assign a model for practice scripts
 
 1. Create the connection.
    An instance admin uses **Instance admin → AI models**.
    A workspace admin uses **Your providers** at the bottom of the workspace's **AI models** page.
    Under each provider's name, an icon for each kind of model that its API serves comes before the API's name.
 2. In **API**, choose the API from the table above.
-   The three precompute APIs are under **For precompute scripts**.
+   The three APIs for practice scripts are under **For practice scripts**.
 3. Do steps 2 to 6 of [the staged flow](#1-the-staged-flow-and-why-it-is-staged).
    These steps test the connection, add and price the model, and enable both.
    For an instance model, also do step 7 and share it.
    If the probe cannot list the models, enter the model ID yourself.
 4. Open the workspace's **AI models** page.
-   Under **Models for precompute scripts**, open the row of the purpose, such as **Embedding model**.
+   Under **Models for practice scripts**, open the row of the purpose, such as **Embedding model**.
 5. Choose a model for each tier that must have one, and select **Save assignment**.
 
 Each purpose offers only the models that can serve it.
@@ -655,7 +656,7 @@ The list also gives two warnings:
   On a shared model, only an instance admin can set it, so the warning tells you to ask one.
   See the caution in [Usage by practice](#usage-by-practice).
 
-A **Cloud** model of a precompute purpose is not used while **Practice reviews** has no ready **Cloud** model.
+A **Cloud** model of a purpose for practice scripts is not used while **Practice reviews** has no ready **Cloud** model.
 Then its form shows this note:
 
 ```text
@@ -672,7 +673,7 @@ For example:
 This is a chat model. Choose an embedding model here.
 ```
 
-### Which practices use a precompute model
+### Which practices use a model for practice scripts
 
 A script declares its models in its code, as **required** or **optional**.
 Hephaestus reads that declaration only when a review runs the script.
@@ -680,7 +681,7 @@ Thus, a practice's needs appear only after a review in which the script declared
 A script that fails before it declares them says nothing about them.
 After a change to the script, the needs appear again after the next review.
 
-Each purpose row under **Models for precompute scripts** shows these facts:
+Each purpose row under **Models for practice scripts** shows these facts:
 
 - **The collapsed row**: one column for each tier, **In-house** and **Cloud**.
   While the member choice is optional, a third column, **Not chosen**, shows the model for members who have not chosen.
@@ -693,10 +694,10 @@ Each purpose row under **Models for precompute scripts** shows these facts:
   - **Not set for some members**: some members get no model for this purpose. The tier columns show which.
   - **Not set**: no member gets a model for this purpose.
   - **Needs attention**: an assigned model cannot run, or a practice requires a model that some members do not get.
-  - **Off**: practice reviews are off, so no precompute model is used.
+  - **Off**: practice reviews are off, so no model for practice scripts is used.
 
   While practice reviews are on, a purpose that serves every member shows no badge.
-  A precompute purpose that no practice uses also shows no badge then, whatever it assigns.
+  A purpose for practice scripts that no practice uses also shows no badge then, whatever it assigns.
 - **Used by**, when you open the row: each practice that uses the model.
   A practice that requires the model shows **Required**.
   A practice that uses the model only when it is available shows no badge.
@@ -710,7 +711,7 @@ Practices can require the model while some members do not get one.
 Then the row shows a warning with the count of those practices and the tier, for example:
 
 ```text
-2 practices need a decision model for In-house members. Until you assign one, their precompute scripts do not run, and the reviews check those practices without their help.
+2 practices need a decision model for In-house members. Until you assign one, their practice scripts do not run, and the reviews check those practices without their help.
 ```
 
 **Used by** names the practices.
@@ -723,12 +724,12 @@ Links such as **Assign a decision model** and **Check the decision model** use t
 The same needs appear for one practice under **Practice setup**:
 
 - An alert at the top says when some members do not get a model that the script requires.
-  An example is `The precompute script does not run for In-house members’ work: no decision model is assigned for them.`
+  An example is `The practice script does not run for In-house members’ work: no decision model is assigned for them.`
   **Assign a decision model** opens the purpose row.
-- The item **Precompute script** shows the needs above the script's code.
+- The item **Practice script** shows the needs above the script's code.
   Each need is one row with the kind of model, such as **Decision model**.
   The review's own chat model has no row, because it always runs the review.
-  A precompute model that the script requires shows **Required**.
+  A model that the script requires shows **Required**.
   A line with tier icons names the members without a model, such as **Not set for In-house members**.
   A link beside the line opens the purpose row.
 - `It uses no model.` when the script declares no model.
@@ -737,52 +738,52 @@ The same needs appear for one practice under **Practice setup**:
 - `The script changed. Its models show after its next review.` when the newest review that reported the needs ran an earlier version of the script.
 
 Below the needs, **As of the review on**, with a date such as 3 Oct, opens the review that reported them.
-[Practice review operations](./practice-review-operations.mdx#precompute-scripts) tells you how to read what a script did in one review.
+[Practice review operations](./practice-review-operations.mdx#practice-scripts) tells you how to read what a script did in one review.
 
 ### Privacy
 
-A precompute model follows the same data-handling rules as the review model.
-For each review, Hephaestus chooses each precompute model through the reviewed developer's AI choice, like the review model.
-A precompute model is at least as strict as the review's own model.
+A model for practice scripts follows the same data-handling rules as the review model.
+For each review, Hephaestus chooses each model for practice scripts through the reviewed developer's AI choice, like the review model.
+A model for practice scripts is at least as strict as the review's own model.
 If a developer's review runs on an In-house model, the scripts of that review use only In-house models.
-The description of **Models for precompute scripts** on **AI models** states this rule.
+The description of **Models for practice scripts** on **AI models** states this rule.
 
 If no row of a purpose fits, the slot stays empty, and the review runs without it.
 The proxy checks the developer's AI choice again before each call.
 
 A script sends parts of the reviewed work to the model, such as added code and comments.
-Declare **Operated by** for a precompute model with the same care as for a review model.
+Declare **Operated by** for a model for practice scripts with the same care as for a review model.
 
 ### Cost and limits
 
-Price a precompute model like any other model.
+Price a model for practice scripts like any other model.
 Its calls count against the shared-model budget or the provider cap of the purse that pays for it.
 
 | Model | How Hephaestus bills it |
 | --- | --- |
 | Chat | On the review's own usage row, with the review's price. |
-| Decision, embedding, reranking | One usage row for each kind and review attempt, with the price frozen when the attempt was admitted. The source types are `PRECOMPUTE_DECISION`, `PRECOMPUTE_EMBEDDING` and `PRECOMPUTE_RERANKING`. |
+| Decision, embedding, reranking | One usage row for each kind and review attempt, with the price frozen when the attempt was admitted. The source types are `PRACTICE_SCRIPT_DECISION`, `PRACTICE_SCRIPT_EMBEDDING` and `PRACTICE_SCRIPT_RERANKING`. |
 
-One review attempt has an attempt token limit for the model calls of all its precompute scripts together, chat calls included.
-The environment variable `PRACTICE_REVIEW_PRECOMPUTE_MAX_TOKENS_PER_ATTEMPT` sets it.
-Its property is `hephaestus.practice-review.precompute-max-tokens-per-attempt`.
+One review attempt has an attempt token limit for the model calls of all its practice scripts together, chat calls included.
+The environment variable `PRACTICE_REVIEW_PRACTICE_SCRIPT_MAX_TOKENS_PER_ATTEMPT` sets it.
+Its property is `hephaestus.practice-review.practice-script-max-tokens-per-attempt`.
 The default is 200 000 tokens.
 Only an operator can change it.
 
 The shared-model budget and the provider cap show on **AI usage**.
 The attempt token limit also bounds spend on a workspace's own provider that has no provider cap.
 
-The precompute runner checks the attempt token limit before each call, and the proxy enforces it.
-When the attempt token limit, the shared-model budget or the provider cap is spent, the proxy refuses further precompute calls with HTTP 402.
+The practice script runner checks the attempt token limit before each call, and the proxy enforces it.
+When the attempt token limit, the shared-model budget or the provider cap is spent, the proxy refuses further calls from practice scripts with HTTP 402.
 The scripts then report the rest as not rated, and the review continues.
 
-Each precompute call names the practice whose script makes it.
+Each call from a practice script names the practice whose script makes it.
 The proxy refuses a call without a practice with HTTP 400.
-The [workspace ABI](/contributor/agent/agent-workspace-abi#precompute-models) gives the header, and [Practice review operations](./practice-review-operations.mdx#precompute-metrics) gives the metric that counts these refusals.
+The [workspace ABI](/contributor/agent/agent-workspace-abi#models-for-practice-scripts) gives the header, and [Practice review operations](./practice-review-operations.mdx#practice-script-metrics) gives the metric that counts these refusals.
 
 ### Usage by practice
 
-The workspace's **AI usage** page has four sections: **Spend this month**, **By run type**, **Precompute models by practice**, and **By day**.
+The workspace's **AI usage** page has four sections: **Spend this month**, **By run type**, **Models for practice scripts, by practice**, and **By day**.
 For an earlier month, the first section is **Spend in** and the month, such as **Spend in September 2026**.
 The first section shows one tile for each purse: **Shared models** and **Own provider**.
 
@@ -815,7 +816,7 @@ The two purses are never added together.
 Two tables show an average next to the spend of each purse:
 
 - **By run type** shows **Spend** and **Avg per run**.
-- **Precompute models by practice** shows **Spend** and **Avg per review**.
+- **Models for practice scripts, by practice** shows **Spend** and **Avg per review**.
 
 **By day** shows only the spend of each purse.
 The table of workspaces on **Instance admin → AI usage** shows the spend of each purse, the shared-model budget, and the provider cap.
@@ -825,9 +826,9 @@ On a narrow screen, the token and call columns are hidden.
 **No price set** appears only when a row has usage without a price.
 In **By run type** and **By day**, it counts the runs that have usage without a price.
 A run is one review attempt or one Heph turn, with all of its usage rows.
-In **Precompute models by practice**, it counts reviews.
+In **Models for practice scripts, by practice**, it counts reviews.
 
-**Precompute models by practice** appears only in a month with decision, embedding, or reranking usage.
+**Models for practice scripts, by practice** appears only in a month with decision, embedding, or reranking usage.
 On **Instance admin → AI usage**, the same table appears when you select **Details** for a workspace.
 The instance console has no table of practices across all workspaces.
 To see the practices of one workspace, open its details.
@@ -837,7 +838,7 @@ The table has one row for each practice:
 | Column | What it shows |
 | --- | --- |
 | **Practice** | The practice. A practice that the workspace no longer has shows its identifier and **Not a current practice**. |
-| **Models** | The precompute models that its script called: decision, embedding, or reranking. Each kind has its own icon. |
+| **Models** | The models for practice scripts that its script called: decision, embedding, or reranking. Each kind has its own icon. |
 | **Shared models**: **Spend**, **Avg per review** | Its share of the cost on the instance catalog's models, and that cost divided by its reviews. |
 | **Own provider**: **Spend**, **Avg per review** | Its share of the cost on the workspace's own provider, and that cost divided by its reviews. |
 | **Reviews** | The reviews whose scripts called its models. |
@@ -875,7 +876,7 @@ The table shows the usage of finished reviews, to date in the current month.
 These costs are already part of the run types above it.
 Chat calls from a script are not in this table, because they are part of each review's own cost.
 On **By run type** and **By day**, **Runs** counts review attempts and Heph turns only.
-A precompute usage row adds its calls and cost to its review, but it is not a run.
+A usage row of a model for practice scripts adds its calls and cost to its review, but it is not a run.
 
 :::caution CAUTION: A priced reranking model that reports no tokens
 

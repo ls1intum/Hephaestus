@@ -21,7 +21,7 @@ record PracticeDefinitionSnapshot(
         @Nullable PracticePrecondition precondition,
         @Nullable Integer criteriaRevision,
         String criteriaSha256,
-        @Nullable String precomputeScriptSha256,
+        @Nullable String practiceScriptSha256,
         String automatedReviewPolicySha256,
         @Nullable String whyItMatters,
         @Nullable String whatGoodLooksLike,
@@ -46,9 +46,7 @@ record PracticeDefinitionSnapshot(
                 practice.getPrecondition(),
                 criteriaRevision,
                 CanonicalDigest.sha256Hex(practice.getCriteria()),
-                practice.getPrecomputeScript() == null
-                        ? null
-                        : CanonicalDigest.sha256Hex(practice.getPrecomputeScript()),
+                practice.getPracticeScript() == null ? null : CanonicalDigest.sha256Hex(practice.getPracticeScript()),
                 PracticeAutomatedReviewPolicyDigest.digest(practice.getAutomatedReviewPolicy()),
                 practice.getWhyItMatters(),
                 practice.getWhatGoodLooksLike(),

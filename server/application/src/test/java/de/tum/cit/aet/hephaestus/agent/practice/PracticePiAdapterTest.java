@@ -69,31 +69,33 @@ class PracticePiAdapterTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldDeriveTheChangeBeforePrecomputeAndStageBothWithTheRunner() {
+    void shouldDeriveTheChangeBeforePracticeScriptAndStageBothWithTheRunner() {
         var spec = adapter.buildSandboxSpec(proxyRequest());
         assertThat(spec.inputFiles())
-                .containsKeys("pi-change.ts", "pi-precompute.sh", "pi-precompute.ts", "pi-task-paths.ts");
+                .containsKeys("pi-change.ts", "pi-practice-scripts.sh", "pi-practice-scripts.ts", "pi-task-paths.ts");
         assertThat(spec.command())
                 .anySatisfy(command -> assertThat(command)
-                        .contains("node /workspace/pi-change.ts && sh /workspace/pi-precompute.sh 60 150000 && "));
+                        .contains(
+                                "node /workspace/pi-change.ts && sh /workspace/pi-practice-scripts.sh 60 150000 && "));
     }
 
     @Test
-    void shouldStartTheReviewRunnerWithoutThePrecomputeToken() {
+    void shouldStartTheReviewRunnerWithoutThePracticeScriptToken() {
         String command = adapter.buildSandboxSpec(proxyRequest()).command().getLast();
 
-        assertThat(command).contains("sh /workspace/pi-precompute.sh 60 150000 && unset PRECOMPUTE_PROXY_TOKEN && ");
-        assertThat(command.indexOf("unset PRECOMPUTE_PROXY_TOKEN"))
+        assertThat(command)
+                .contains("sh /workspace/pi-practice-scripts.sh 60 150000 && unset PRACTICE_SCRIPT_PROXY_TOKEN && ");
+        assertThat(command.indexOf("unset PRACTICE_SCRIPT_PROXY_TOKEN"))
                 .isLessThan(command.indexOf(SandboxLayout.RUNNER_SCRIPT_FILENAME));
     }
 
     @Test
-    void shouldCapPrecomputeAtNinetySecondsAndOneTenthOfTheJobDeadline() {
-        assertThat(PracticePiAdapter.precomputeBudgetSeconds(3600)).isEqualTo(90);
-        assertThat(PracticePiAdapter.precomputeBudgetSeconds(900)).isEqualTo(90);
-        assertThat(PracticePiAdapter.precomputeBudgetSeconds(600)).isEqualTo(60);
-        assertThat(PracticePiAdapter.precomputeBudgetSeconds(120)).isEqualTo(12);
-        assertThat(PracticePiAdapter.precomputeBudgetSeconds(5)).isEqualTo(1);
+    void shouldCapPracticeScriptAtNinetySecondsAndOneTenthOfTheJobDeadline() {
+        assertThat(PracticePiAdapter.practiceScriptBudgetSeconds(3600)).isEqualTo(90);
+        assertThat(PracticePiAdapter.practiceScriptBudgetSeconds(900)).isEqualTo(90);
+        assertThat(PracticePiAdapter.practiceScriptBudgetSeconds(600)).isEqualTo(60);
+        assertThat(PracticePiAdapter.practiceScriptBudgetSeconds(120)).isEqualTo(12);
+        assertThat(PracticePiAdapter.practiceScriptBudgetSeconds(5)).isEqualTo(1);
     }
 
     @Test
@@ -116,7 +118,7 @@ class PracticePiAdapterTest extends BaseUnitTest {
 
     @ParameterizedTest
     @CsvSource({"600, 480000", "3600, 3450000", "120, 48000"})
-    void shouldTakeThePrecomputeStageOutOfTheRunnerBudget(int timeoutSeconds, long expectedBudgetMs) {
+    void shouldTakeThePracticeScriptStageOutOfTheRunnerBudget(int timeoutSeconds, long expectedBudgetMs) {
         PracticeAgentRequest request = new PracticeAgentRequest(
                 "openai-completions", "m", null, null, null, "job-token-123", timeoutSeconds, null, Map.of());
 
@@ -127,15 +129,15 @@ class PracticePiAdapterTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldGiveThePrecomputeStageNoModelsAndNoTokenWhenTheJobHasNone() {
+    void shouldGiveThePracticeScriptStageNoModelsAndNoTokenWhenTheJobHasNone() {
         var spec = adapter.buildSandboxSpec(proxyRequest());
 
-        assertThat(spec.inputFiles()).doesNotContainKey(SandboxLayout.PRECOMPUTE_MODELS_FILE);
-        assertThat(spec.environment()).doesNotContainKey("PRECOMPUTE_PROXY_TOKEN");
+        assertThat(spec.inputFiles()).doesNotContainKey(SandboxLayout.PRACTICE_SCRIPT_MODELS_FILE);
+        assertThat(spec.environment()).doesNotContainKey("PRACTICE_SCRIPT_PROXY_TOKEN");
     }
 
     @Test
-    void shouldWriteTheReviewModelAsTheOnlyChatSlotWhenNoPrecomputeModelIsBound() throws Exception {
+    void shouldWriteTheReviewModelAsTheOnlyChatSlotWhenNoPracticeScriptModelIsBound() throws Exception {
         PracticeAgentRequest request = new PracticeAgentRequest(
                 "openai-completions",
                 "qwen-chat",
@@ -144,20 +146,20 @@ class PracticePiAdapterTest extends BaseUnitTest {
                 null,
                 "job-token-123",
                 600,
-                "precompute-token-456",
+                "practice-script-token-456",
                 Map.of(ModelKind.CHAT, model("openai-completions", "qwen-chat")));
 
         var spec = adapter.buildSandboxSpec(request);
 
-        assertThat(spec.environment()).containsEntry("PRECOMPUTE_PROXY_TOKEN", "precompute-token-456");
+        assertThat(spec.environment()).containsEntry("PRACTICE_SCRIPT_PROXY_TOKEN", "practice-script-token-456");
         assertThat(spec.networkPolicy()).isNotNull();
         assertThat(spec.networkPolicy().llmProxyToken()).isEqualTo("job-token-123");
-        JsonNode models = new ObjectMapper().readTree(spec.inputFiles().get(SandboxLayout.PRECOMPUTE_MODELS_FILE));
+        JsonNode models = new ObjectMapper().readTree(spec.inputFiles().get(SandboxLayout.PRACTICE_SCRIPT_MODELS_FILE));
         assertThat(models.propertyNames()).containsExactly("chat");
     }
 
     @Test
-    void shouldLeaveOutAReviewModelWhoseProtocolThePrecomputeRunnerCannotCall() throws Exception {
+    void shouldLeaveOutAReviewModelWhoseProtocolThePracticeScriptRunnerCannotCall() throws Exception {
         FrozenModel legacyChat = model("azure-openai-responses", "gpt-5.4-mini");
         PracticeAgentRequest request = new PracticeAgentRequest(
                 "azure-openai-responses",
@@ -167,11 +169,12 @@ class PracticePiAdapterTest extends BaseUnitTest {
                 null,
                 "job-token-123",
                 600,
-                "precompute-token-456",
+                "practice-script-token-456",
                 Map.of(ModelKind.CHAT, legacyChat, ModelKind.EMBEDDING, model("openai-embeddings", "embedder")));
 
         JsonNode models = new ObjectMapper()
-                .readTree(adapter.buildSandboxSpec(request).inputFiles().get(SandboxLayout.PRECOMPUTE_MODELS_FILE));
+                .readTree(
+                        adapter.buildSandboxSpec(request).inputFiles().get(SandboxLayout.PRACTICE_SCRIPT_MODELS_FILE));
 
         assertThat(models.propertyNames()).containsExactly("embedding");
         PracticeAgentRequest withoutSlots = new PracticeAgentRequest(
@@ -182,11 +185,11 @@ class PracticePiAdapterTest extends BaseUnitTest {
                 null,
                 "job-token-123",
                 600,
-                "precompute-token-456",
+                "practice-script-token-456",
                 Map.of(ModelKind.CHAT, legacyChat));
         assertThat(adapter.buildSandboxSpec(withoutSlots).inputFiles())
                 .as("a job without any callable model has no models file")
-                .doesNotContainKey(SandboxLayout.PRECOMPUTE_MODELS_FILE);
+                .doesNotContainKey(SandboxLayout.PRACTICE_SCRIPT_MODELS_FILE);
     }
 
     private static FrozenModel model(String protocol, String modelId) {

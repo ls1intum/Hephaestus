@@ -287,7 +287,7 @@ function LoadedCuratedPracticeEditor({
 			initialData={{
 				slug: basePractice.slug,
 				...basePractice.definition,
-				precomputeScript: basePractice.definition.precomputeScript ?? undefined,
+				practiceScript: basePractice.definition.practiceScript ?? undefined,
 				whyItMatters: basePractice.definition.whyItMatters ?? undefined,
 				whatGoodLooksLike: basePractice.definition.whatGoodLooksLike ?? undefined,
 				groupSlug: basePractice.definition.groupSlug ?? undefined,

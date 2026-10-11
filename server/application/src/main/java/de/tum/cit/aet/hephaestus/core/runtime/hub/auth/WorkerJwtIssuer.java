@@ -16,8 +16,8 @@ public class WorkerJwtIssuer {
     /** Lets a sandbox call the review model and the other gateway capabilities of its job. */
     public static final String LLM_PROXY_SCOPE = "llm_proxy";
 
-    /** Lets a sandbox call only the precompute models of its job, under {@code /internal/llm/precompute/}. */
-    public static final String LLM_PRECOMPUTE_SCOPE = "llm_precompute";
+    /** Lets a sandbox call only the models for practice scripts of its job, under {@code /internal/llm/practice-script/}. */
+    public static final String LLM_PRACTICE_SCRIPT_SCOPE = "llm_practice_script";
 
     private final WorkerKeyRing keyRing;
     private final WorkerTokenProperties properties;
@@ -54,7 +54,7 @@ public class WorkerJwtIssuer {
         return issueForJobUntil(jobId, workspaceId, attempt, Instant.now().plus(ttl), LLM_PROXY_SCOPE);
     }
 
-    /** @param scope {@link #LLM_PROXY_SCOPE} or {@link #LLM_PRECOMPUTE_SCOPE}. One token never holds both. */
+    /** @param scope {@link #LLM_PROXY_SCOPE} or {@link #LLM_PRACTICE_SCRIPT_SCOPE}. One token never holds both. */
     public String issueForJobUntil(UUID jobId, Long workspaceId, int attempt, Instant expiresAt, String scope) {
         WorkerSigningKey active = keyRing.active();
         Instant now = Instant.now();

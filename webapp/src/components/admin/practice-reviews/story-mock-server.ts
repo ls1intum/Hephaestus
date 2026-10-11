@@ -307,8 +307,8 @@ export function reviewHandlers({
 		http.get("*/workspaces/:workspaceSlug/practices/definition-options", () =>
 			HttpResponse.json(mockPracticeDefinitionOptions),
 		),
-		// No practice in the fixture has a precompute script.
-		http.get("*/workspaces/:workspaceSlug/agents/jobs/:jobId/precompute", () =>
+		// No practice in the fixture has a practice script.
+		http.get("*/workspaces/:workspaceSlug/agents/jobs/:jobId/practice-scripts", () =>
 			HttpResponse.json([]),
 		),
 		http.get("*/workspaces/:workspaceSlug/practices", () => HttpResponse.json(workspacePractices)),

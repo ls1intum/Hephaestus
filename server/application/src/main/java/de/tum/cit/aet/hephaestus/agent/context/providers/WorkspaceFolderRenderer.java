@@ -527,7 +527,7 @@ public class WorkspaceFolderRenderer implements EvidenceSource {
         }
     }
 
-    /** One uncapped precompute projection of the same folder corpus, not a second content collector. */
+    /** One uncapped practice script projection of the same folder corpus, not a second content collector. */
     private void inventory(Path root, BudgetedFiles files, long workspace) {
         Path target = root.resolve("context/project_inventory.json");
         try {

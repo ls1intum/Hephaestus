@@ -152,8 +152,8 @@ The SPA talks to the server only through the generated client.
   It runs through the Vite+ version pinned in `devDependencies`.
   `tsconfig.agents.json` type-checks these sources as one project:
   - The agent runner (`server/application/src/main/resources/agent/`).
-  - The precompute runner and lib (`docker/agents/precompute/`).
-  - The per-practice precompute scripts (`server/application/src/main/resources/practices/precompute/`).
+  - The practice script runner and lib (`docker/agents/practice-scripts/`).
+  - The bundled practice scripts (`server/application/src/main/resources/practices/scripts/`).
 
 Skills live in `.claude/skills/<name>/`.
 Claude Code and opencode read them there.
@@ -209,7 +209,7 @@ Do not copy a skill elsewhere.
 | `vp run check` | Every gate in the `quality` group in `vite.config.ts`: static analysis, formatting, agent tests, repository policy |
 | `vp run verify` | `check` plus the credential-free builds and test suites |
 | `vp run test:webapp` | Vitest |
-| `vp run test:agents` | Agent runtime and precompute specs, on Node |
+| `vp run test:agents` | Agent runtime and practice script specs, on Node |
 | `vp run test:server:unit` | Server unit tests — the other tiers are in `server/AGENTS.md` § Test tiers |
 
 ### Task vocabulary
@@ -255,7 +255,7 @@ Oxlint lints.
 Oxfmt formats, sorts imports, and sorts Tailwind classes.
 One rule set has multiple layers.
 The root `.oxlintrc.json` is the base for every TypeScript file and the config for the Node trees.
-These trees are the agent runner, precompute, `scripts/**`, `load-tests/**`, and the task graph.
+These trees are the agent runner, the practice script runner, `scripts/**`, `load-tests/**`, and the task graph.
 `oxlint.react.jsonc` is the React layer.
 
 `oxlint.app.jsonc` adds the application compiler, Vitest, and Storybook policy for `webapp/.oxlintrc.json` and `extension/.oxlintrc.json`.
@@ -357,7 +357,7 @@ Every *Done when* bullet is a change that ships, never a measurement or a verdic
   Use `satisfies`.
 - Validate anything crossing a trust boundary: a webhook body, a hand-parsed stream, or a `JSON.parse`.
   Use a discriminated union, or a `zod` schema in a tree that has zod.
-  Only the SPA, the extension and the precompute runner (`docker/agents/precompute/`) have zod.
+  Only the SPA, the extension and the practice script runner (`docker/agents/practice-scripts/`) have zod.
   Never log a token, a secret, or a raw request body.
 - A leading `_` marks what the language or a tool reads that way.
   Examples are an unused binding, a server field name, or a runtime global, never something private.

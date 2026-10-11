@@ -237,7 +237,7 @@ class BundledPracticeCatalogLoaderTest extends BaseUnitTest {
                                 "triages-the-issue-with-labels-and-ownership",
                                 "PROJECT_CLASSIFICATION_SCHEME_NOT_CAPTURED"));
         assertThat(humanReview).allSatisfy(practice -> {
-            assertThat(practice.definition().precomputeScript()).isNull();
+            assertThat(practice.definition().practiceScript()).isNull();
             assertThat(loader.holdsAs(practice.slug())).isEmpty();
         });
     }
@@ -255,7 +255,7 @@ class BundledPracticeCatalogLoaderTest extends BaseUnitTest {
                 .filteredOn(practice -> practice.slug().equals("ships-tests-with-the-change"))
                 .singleElement()
                 .satisfies(practice ->
-                        assertThat(practice.definition().precomputeScript()).isNotBlank());
+                        assertThat(practice.definition().practiceScript()).isNotBlank());
         // Handoff, reviewer-comment and commit-history practices read what people wrote; only code practices
         // are framed by the diff.
         for (String slug : List.of(

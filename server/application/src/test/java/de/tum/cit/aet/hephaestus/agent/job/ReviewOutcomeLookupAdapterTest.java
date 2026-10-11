@@ -4,8 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
 import de.tum.cit.aet.hephaestus.evidence.internal.ClasspathArtifactSourceCatalogRegistry;
-import de.tum.cit.aet.hephaestus.practices.spi.PrecomputeRunDTO;
-import de.tum.cit.aet.hephaestus.practices.spi.PrecomputeRunStatus;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptRunDTO;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptRunStatus;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Clock;
 import java.time.Instant;
@@ -22,7 +22,7 @@ class ReviewOutcomeLookupAdapterTest extends BaseUnitTest {
     private final JsonMapper mapper = JsonMapper.builder().build();
     private final ReviewOutcomeLookupAdapter adapter = new ReviewOutcomeLookupAdapter(
             mock(AgentJobRepository.class),
-            mock(AgentJobPrecomputeRunRepository.class),
+            mock(AgentJobPracticeScriptRunRepository.class),
             new ClasspathArtifactSourceCatalogRegistry(mapper, Clock.systemUTC()));
 
     @Test
@@ -103,24 +103,25 @@ class ReviewOutcomeLookupAdapterTest extends BaseUnitTest {
         once.setId(UUID.randomUUID());
 
         var byJob = ReviewOutcomeLookupAdapter.latestAttemptRuns(List.of(
-                run(retried, 0, "tests", PrecomputeRunStatus.FAILED),
-                run(retried, 0, "naming", PrecomputeRunStatus.OK),
-                run(retried, 1, "tests", PrecomputeRunStatus.SKIPPED),
-                run(once, 0, "tests", PrecomputeRunStatus.TIMED_OUT)));
+                run(retried, 0, "tests", PracticeScriptRunStatus.FAILED),
+                run(retried, 0, "naming", PracticeScriptRunStatus.OK),
+                run(retried, 1, "tests", PracticeScriptRunStatus.SKIPPED),
+                run(once, 0, "tests", PracticeScriptRunStatus.TIMED_OUT)));
 
         assertThat(byJob.get(retried.getId()))
                 .containsOnlyKeys("tests")
                 .extractingByKey("tests")
-                .extracting(PrecomputeRunDTO::status)
-                .isEqualTo(PrecomputeRunStatus.SKIPPED);
+                .extracting(PracticeScriptRunDTO::status)
+                .isEqualTo(PracticeScriptRunStatus.SKIPPED);
         assertThat(byJob.get(once.getId()))
                 .extractingByKey("tests")
-                .extracting(PrecomputeRunDTO::status)
-                .isEqualTo(PrecomputeRunStatus.TIMED_OUT);
+                .extracting(PracticeScriptRunDTO::status)
+                .isEqualTo(PracticeScriptRunStatus.TIMED_OUT);
     }
 
-    private static AgentJobPrecomputeRun run(AgentJob job, int attempt, String slug, PrecomputeRunStatus status) {
-        return new AgentJobPrecomputeRun(
+    private static AgentJobPracticeScriptRun run(
+            AgentJob job, int attempt, String slug, PracticeScriptRunStatus status) {
+        return new AgentJobPracticeScriptRun(
                 job, attempt, slug, 7L, status, 0, JsonNodeFactory.instance.arrayNode(), Instant.EPOCH, null, null);
     }
 

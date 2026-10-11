@@ -130,17 +130,17 @@ class TerminalUsageTest extends BaseUnitTest {
         assertThat(usage.totalCalls()).isEqualTo(50);
     }
 
-    // The precompute stage runs before the runner, in another process, so the runner's report never holds
+    // The practice script stage runs before the runner, in another process, so the runner's report never holds
     // its chat calls. The proxy counted them in the job's counters, but here it missed review calls.
     @Test
-    @DisplayName("a selected runner report also bills the precompute chat calls it could not see")
-    void aSelectedRunnerReportAlsoBillsThePrecomputeChatCalls() {
+    @DisplayName("a selected runner report also bills the practice script chat calls it could not see")
+    void aSelectedRunnerReportAlsoBillsThePracticeScriptChatCalls() {
         TerminalUsage usage = TerminalUsage.resolve(
                 runner(1000, 700, 6),
                 new AgentJobLlmUsage(5, 800, 400, 0, 0, 0),
                 List.of(
-                        new PrecomputeKindTotal(ModelKind.CHAT, 2, 300, 100),
-                        new PrecomputeKindTotal(ModelKind.DECISION, 5, 50_000, 9_000)));
+                        new PracticeScriptKindTotal(ModelKind.CHAT, 2, 300, 100),
+                        new PracticeScriptKindTotal(ModelKind.DECISION, 5, 50_000, 9_000)));
 
         assertThat(usage.verifiable()).isTrue();
         assertThat(usage.provenance()).isEqualTo(UsageProvenance.RUNNER);
@@ -150,12 +150,12 @@ class TerminalUsageTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("a selected proxy already holds the precompute chat calls and does not count them twice")
-    void aSelectedProxyDoesNotCountThePrecomputeChatCallsTwice() {
+    @DisplayName("a selected proxy already holds the practice script chat calls and does not count them twice")
+    void aSelectedProxyDoesNotCountThePracticeScriptChatCallsTwice() {
         TerminalUsage usage = TerminalUsage.resolve(
                 runner(1000, 700, 6),
                 new AgentJobLlmUsage(8, 1300, 800, 0, 0, 0),
-                List.of(new PrecomputeKindTotal(ModelKind.CHAT, 2, 300, 100)));
+                List.of(new PracticeScriptKindTotal(ModelKind.CHAT, 2, 300, 100)));
 
         assertThat(usage.verifiable()).isTrue();
         assertThat(usage.provenance()).isEqualTo(UsageProvenance.PROXY);
@@ -369,13 +369,13 @@ class TerminalUsageTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("each precompute kind other than chat becomes one row with the total over its practices")
-        void eachPrecomputeKindBecomesOneRowWithItsTotal() {
+        @DisplayName("each practice script kind other than chat becomes one row with the total over its practices")
+        void eachPracticeScriptKindBecomesOneRowWithItsTotal() {
             UUID jobId = UUID.randomUUID();
-            when(jobs.sumPrecomputeUsageByKind(7L, jobId, 1))
+            when(jobs.sumPracticeScriptUsageByKind(7L, jobId, 1))
                     .thenReturn(List.of(
-                            new PrecomputeKindTotal(ModelKind.CHAT, 2, 70, 20),
-                            new PrecomputeKindTotal(ModelKind.DECISION, 5, 500_000, 100_000)));
+                            new PracticeScriptKindTotal(ModelKind.CHAT, 2, 70, 20),
+                            new PracticeScriptKindTotal(ModelKind.DECISION, 5, 500_000, 100_000)));
 
             TerminalUsage.none().appendTo(recorder, jobs, 7L, jobFor(jobId, 1), snapshot, pricedInstance());
 
@@ -383,7 +383,7 @@ class TerminalUsageTest extends BaseUnitTest {
                     ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
             verify(recorder, times(2)).recordUnverifiable(eq(7L), sample.capture());
             LlmUsageRecorder.LlmUsageSample decision = sample.getAllValues().get(1);
-            assertThat(decision.sourceType()).isEqualTo(LlmUsageSourceType.PRECOMPUTE_DECISION);
+            assertThat(decision.sourceType()).isEqualTo(LlmUsageSourceType.PRACTICE_SCRIPT_DECISION);
             assertThat(decision.sourceAttempt()).isEqualTo(1);
             assertThat(decision.totalCalls()).isEqualTo(5);
             assertThat(decision.inputTokens()).isEqualTo(500_000);

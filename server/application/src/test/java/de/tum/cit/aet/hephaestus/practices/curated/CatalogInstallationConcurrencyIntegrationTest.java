@@ -52,7 +52,7 @@ class CatalogInstallationConcurrencyIntegrationTest extends AbstractWorkspaceInt
                 definition.subject(),
                 definition.precondition(),
                 "Committed catalog criteria",
-                definition.precomputeScript(),
+                definition.practiceScript(),
                 definition.automatedReviewPolicy(),
                 definition.whyItMatters(),
                 definition.whatGoodLooksLike(),

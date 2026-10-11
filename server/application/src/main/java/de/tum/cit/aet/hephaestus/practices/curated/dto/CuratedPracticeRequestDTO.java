@@ -52,10 +52,10 @@ public record CuratedPracticeRequestDTO(
         String criteria,
 
         @Size(
-                max = PracticeDefinition.MAX_PRECOMPUTE_SCRIPT_LENGTH,
-                message = "Precompute script must be at most 100000 characters")
+                max = PracticeDefinition.MAX_PRACTICE_SCRIPT_LENGTH,
+                message = "Practice script must be at most 100,000 characters")
         @Nullable
-        String precomputeScript,
+        String practiceScript,
 
         @Valid
         @Schema(
@@ -92,7 +92,7 @@ public record CuratedPracticeRequestDTO(
             @Nullable ActorRole subject,
             @Nullable PracticePrecondition precondition,
             String criteria,
-            @Nullable String precomputeScript,
+            @Nullable String practiceScript,
             @Nullable PracticeAutomatedReviewPolicy automatedReviewPolicy,
             @Nullable String whyItMatters,
             @Nullable String whatGoodLooksLike,
@@ -106,7 +106,7 @@ public record CuratedPracticeRequestDTO(
                 subject == null ? ActorRole.AUTHOR : subject,
                 precondition,
                 criteria,
-                precomputeScript,
+                practiceScript,
                 automatedReviewPolicy,
                 whyItMatters,
                 whatGoodLooksLike,
@@ -127,7 +127,7 @@ public record CuratedPracticeRequestDTO(
                 subject == null ? ActorRole.AUTHOR : subject,
                 precondition,
                 criteria,
-                precomputeScript,
+                practiceScript,
                 resolvedEvidence,
                 whyItMatters,
                 whatGoodLooksLike,

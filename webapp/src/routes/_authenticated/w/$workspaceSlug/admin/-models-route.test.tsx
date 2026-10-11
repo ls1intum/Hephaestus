@@ -8,7 +8,7 @@ import { getMemberOnboardingQueryKey, listAgentsQueryKey } from "@/api/@tanstack
 import type {
 	AgentBinding,
 	AvailableLlmModel,
-	PracticePrecomputeSummary,
+	PracticeScriptSummary,
 	WorkspaceLlmConnection,
 	WorkspaceLlmModel,
 } from "@/api/types.gen";
@@ -90,7 +90,7 @@ function binding(
 function mockModelsRoute(
 	bindings: () => AgentBinding[],
 	aiChoiceRequired = false,
-	needs: Wire<PracticePrecomputeSummary>[] = [],
+	needs: Wire<PracticeScriptSummary>[] = [],
 ) {
 	server.use(
 		http.get("*/workspaces/:workspaceSlug/members/me", () =>
@@ -118,7 +118,9 @@ function mockModelsRoute(
 			HttpResponse.json({ ownProviderAllowed: false }),
 		),
 		http.get("*/workspaces/:workspaceSlug/llm/connections", () => HttpResponse.json([])),
-		http.get("*/workspaces/:workspaceSlug/practices/precompute", () => HttpResponse.json(needs)),
+		http.get("*/workspaces/:workspaceSlug/practices/practice-script-needs", () =>
+			HttpResponse.json(needs),
+		),
 		http.get("*/workspaces/:workspaceSlug/llm/usage", () => HttpResponse.json(USAGE)),
 		http.get("*/workspaces/:workspaceSlug", () => HttpResponse.json(WORKSPACE)),
 		http.get("*/workspaces", () => HttpResponse.json([WORKSPACE_LIST_ITEM])),
@@ -643,7 +645,7 @@ it("ignores a purpose the page does not have", async () => {
 	expect(screen.queryAllByRole("button", { expanded: true })).toStrictEqual([]);
 });
 
-it("counts the practices whose scripts use a model, from the workspace's precompute needs", async () => {
+it("counts the practices whose scripts use a model, from the workspace's practice script needs", async () => {
 	mockModelsRoute(() => [binding("PRACTICE_REVIEW", 20)], true, [
 		{
 			practiceSlug: "comment-quality",
@@ -666,9 +668,9 @@ it("counts the practices whose scripts use a model, from the workspace's precomp
 	).toBeNull();
 });
 
-type UnmetTiers = PracticePrecomputeSummary["needs"][number]["unmetTiers"];
+type UnmetTiers = PracticeScriptSummary["needs"][number]["unmetTiers"];
 
-const commentQualityNeeds = (unmetTiers: UnmetTiers): Wire<PracticePrecomputeSummary> => ({
+const commentQualityNeeds = (unmetTiers: UnmetTiers): Wire<PracticeScriptSummary> => ({
 	practiceSlug: "comment-quality",
 	practiceName: "Comment quality",
 	asOf: { jobId: "job-1", finishedAt: "2026-10-03T09:00:00Z" },
@@ -676,10 +678,10 @@ const commentQualityNeeds = (unmetTiers: UnmetTiers): Wire<PracticePrecomputeSum
 	needs: [{ purpose: "PRACTICE_DECISION", need: "REQUIRED", unmetTiers }],
 });
 
-it("keeps the page usable when the precompute needs fail, and says so in their section only", async () => {
+it("keeps the page usable when the practice script needs fail, and says so in their section only", async () => {
 	mockModelsRoute(() => [binding("PRACTICE_REVIEW", 20)]);
 	server.use(
-		http.get("*/workspaces/:workspaceSlug/practices/precompute", () =>
+		http.get("*/workspaces/:workspaceSlug/practices/practice-script-needs", () =>
 			HttpResponse.json({ status: 500, title: "Internal Server Error" }, { status: 500 }),
 		),
 	);
@@ -691,7 +693,7 @@ it("keeps the page usable when the precompute needs fail, and says so in their s
 	);
 	expect(screen.queryByText("We could not load AI models")).toBeNull();
 	expect(saveButton("Practice reviews").disabled).toBe(false);
-	// Nothing claims a practice uses a precompute model, or that none does.
+	// Nothing claims a practice uses a model for practice scripts, or that none does.
 	expect(
 		within(screen.getByRole("button", { name: "Decision model" })).queryByText(/practice/u),
 	).toBeNull();
@@ -702,7 +704,7 @@ it("asks again which practices miss a model once a binding is saved", async () =
 	let unmetTiers: UnmetTiers = ["IN_HOUSE"];
 	mockModelsRoute(() => [binding("PRACTICE_REVIEW", 20)], true);
 	server.use(
-		http.get("*/workspaces/:workspaceSlug/practices/precompute", () =>
+		http.get("*/workspaces/:workspaceSlug/practices/practice-script-needs", () =>
 			HttpResponse.json([commentQualityNeeds(unmetTiers)]),
 		),
 		http.put("*/workspaces/acme/agents/PRACTICE_REVIEW", () => {

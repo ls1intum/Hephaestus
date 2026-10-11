@@ -42,7 +42,7 @@ class PracticeAutomatedReviewValidationTest extends BaseUnitTest {
                 original.subject(),
                 original.precondition(),
                 original.criteria(),
-                original.precomputeScript(),
+                original.practiceScript(),
                 original.automatedReviewPolicy(),
                 "Reviews reduce integration risk.",
                 original.whatGoodLooksLike(),

@@ -130,7 +130,7 @@ class ProxyTokenUsageTest extends BaseUnitTest {
                 "openai-completions|{\"usage\":{\"prompt_tokens\":9,\"completion_tokens\":1}}|9|1",
                 "openai-responses|{\"usage\":{\"input_tokens\":7,\"output_tokens\":2}}|7|2"
             })
-    void shouldReadTheUsageShapeOfEachProtocolWhenAPrecomputeCallIsServed(
+    void shouldReadTheUsageShapeOfEachProtocolWhenAPracticeScriptCallIsServed(
             String protocol, String body, int input, int output) throws Exception {
         var usage = ProxyTokenUsage.from(
                 MAPPER.readTree(body), LlmApiProtocol.parse(protocol).orElseThrow());

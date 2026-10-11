@@ -18,7 +18,7 @@ public record LlmUsageByJobTypeDTO(
         @NonNull
         @Schema(
                 description = "Runs of this job type with at least one ledger row whose price is not yet known. A "
-                        + "precompute row counts toward the run of its review. Those rows are excluded from both "
+                        + "practice script row counts toward the run of its review. Those rows are excluded from both "
                         + "totals above.")
         Long unpricedEventCount,
 
@@ -33,5 +33,6 @@ public record LlmUsageByJobTypeDTO(
                         + "include every assistant call in an internal tool loop.")
         Long totalCalls,
 
-        @NonNull @Schema(description = "Runs: job attempts and mentor turns. Precompute model rows are not runs.")
+        @NonNull
+        @Schema(description = "Runs: job attempts and mentor turns. Rows of models for practice scripts are not runs.")
         Long events) {}

@@ -1827,7 +1827,7 @@ class PullRequestRepairRecheckIntegrationTest extends AbstractPracticeReviewInte
                     new PracticeReviewRefusalMetrics(meters),
                     new AgentJobTelemetry(meters, Tracer.NOOP),
                     mock(LlmUsageRecorder.class),
-                    mock(PrecomputeRunRecorder.class),
+                    mock(PracticeScriptRunRecorder.class),
                     budgets,
                     null,
                     mock(ArtifactSourceCatalogRegistry.class),

@@ -23,7 +23,7 @@ const definition: CuratedPracticeDefinition = {
 	deliveryBehavior: { summaryOnly: false },
 	automatedReviewPolicy: mockPullRequestPolicy,
 	automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
-	precomputeScript: "export default { hasDescription: pullRequest.body.length > 0 };",
+	practiceScript: "export default { hasDescription: pullRequest.body.length > 0 };",
 	whyItMatters: "Reviewers need intent to assess whether the change solves the right problem.",
 	whatGoodLooksLike: "A concise summary, motivation, and verification steps.",
 	groupSlug: "review-ready-work",
@@ -47,12 +47,12 @@ export const Complete: Story = {
 		await expect(canvas.queryByText(/hasDescription/u)).not.toBeInTheDocument();
 		await userEvent.click(canvas.getByRole("button", { name: "Review scope and evidence" }));
 		await expect(canvas.getByText("Pull request details")).toBeVisible();
-		await userEvent.click(canvas.getByRole("button", { name: "Precompute script" }));
+		await userEvent.click(canvas.getByRole("button", { name: "Practice script" }));
 		await expect(canvas.getByText(/hasDescription/u)).toBeVisible();
 		// The disclosures follow a review: how it decides, what it reads, what runs before it.
 		const decides = canvas.getByRole("button", { name: "How it decides" });
 		const scope = canvas.getByRole("button", { name: "Review scope and evidence" });
-		const script = canvas.getByRole("button", { name: "Precompute script" });
+		const script = canvas.getByRole("button", { name: "Practice script" });
 		await expect(precedes(decides, scope) && precedes(scope, script)).toBe(true);
 	},
 };
@@ -63,7 +63,7 @@ export const WithoutOptionalGuidance: Story = {
 			...definition,
 			whyItMatters: undefined,
 			whatGoodLooksLike: undefined,
-			precomputeScript: undefined,
+			practiceScript: undefined,
 		},
 	},
 };
@@ -133,7 +133,7 @@ export const CriteriaIsMarkdown: Story = {
 /**
  * The decision being made is "do we want this practice", so the rationale leads. `criteria` answers a
  * different question — how the model judges — in text addressed to the model, so it sits behind a
- * disclosure with the precompute script rather than above the reason to adopt.
+ * disclosure with the practice script rather than above the reason to adopt.
  */
 export const RationaleLeadsTheRuleFollows: Story = {
 	play: async ({ canvas }) => {

@@ -21,7 +21,7 @@ When the two disagree, that is a bug in one of them, not a choice for the writer
 Within a surface already titled **Practice reviews**, shorten **practice feedback** to **feedback**.
 Use the full term when the surrounding context does not establish which kind of feedback is meant.
 Within **Practice setup** or **Practice catalog**, shorten **practice group** to **group**.
-In the practice editor, shorten **practice visual** to **Visual** and **practice guide** to **Guide**.
+In the practice editor, shorten **practice visual** to **Visual**, **practice guide** to **Guide**, and **practice script** to **Script**.
 
 **Practice group is the canonical noun at every layer.** Use `PracticeGroup`, `groupSlug`, and `/practice-groups` in Java and HTTP contracts as well as **practice group** in product copy.
 *Practice area*, `PracticeArea`, `areaSlug`, and `/practice-areas` are retired names, not internal synonyms.
@@ -73,7 +73,8 @@ In the practice editor, shorten **practice visual** to **Visual** and **practice
 | **Instance catalog**                | The set of practices a workspace may adopt from                                                                                                                              | curated catalog                                                      |
 | **Workspace practices**             | Independent definitions used for reviews in one workspace                                                                                                  | workspace catalog                                                    |
 | **Review rules**                    | Inputs and criteria that determine review behavior                                                                                                         | detector configuration                                               |
-| **Precompute script**               | Optional code in a practice that points its review at places to check. The [glossary](./practice-review-glossary.mdx#product-terms) defines it | static analysis, analyzer, detector, linter                          |
+| **Practice script**                 | Optional code in a practice that points its review to locations to examine. The [glossary](./practice-review-glossary.mdx#product-terms) defines it | precompute script, pre-compute script, static analysis, analyzer, detector, linter, scout, check script |
+| **Model for practice scripts**      | A decision, embedding or reranking model that practice scripts call. The [glossary](./practice-review-glossary.mdx#product-terms) defines it | precompute model, script model, helper model |
 | **Developer guidance**              | Explanatory text that does not change review behavior                                                                                                      | learner guidance                                                     |
 | **Practice visual**                 | The optional picture that introduces a practice on its panel, with a description of what it means. It is developer guidance. [Descriptions](./practice-visuals.md#descriptions) gives the rules for the description | illustration, hero image, diagram, explainer |
 | **Practice guide**                  | The optional longer explanation of a practice in the **Guide** tab of its panel: Markdown with figures. It is developer guidance | article, explainer, lesson, documentation |
@@ -90,7 +91,7 @@ Use provider-specific names such as **pull request** or **merge request** when t
 *Habit* is retired for what a practice describes or what recurs across someone's work: say *practice*, *way of working* or *repeated pattern*.
 A card that still shows retired words is wrong wording, and is [withdrawn](./practice-review-glossary.mdx#withdrawn-feedback).
 
-*Static analysis* is retired for a practice's optional script: say **precompute script** in the editor, the previews, the docs and the release notes.
+*Static analysis* and *precompute script* are retired for a practice's optional script: say **practice script** in the previews, the docs and the release notes.
 
 *Leaderboard*, *league*, *league points*, *XP*, *level*, *score*, *rank* and *streak* are retired for activity and do not describe anything in the product ([ADR 0045](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0045-activity-counts-work-and-never-ranks-people.md)).
 A sorted Workspace activity shows a **position**, never a *rank* ([ADR 0052](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0052-activity-sorts-by-contributions-and-can-be-public.md)).

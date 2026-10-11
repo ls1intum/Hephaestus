@@ -35,8 +35,8 @@ export const ChatApi: Story = {
 	},
 };
 
-/** A precompute API serves one kind of model: one mark. */
-export const PrecomputeApi: Story = {
+/** An API for practice scripts serves one kind of model: one mark. */
+export const PracticeScriptApi: Story = {
 	args: { connection: { apiProtocol: "openai-embeddings", purposes: ["PRACTICE_EMBEDDING"] } },
 	play: async ({ canvas, canvasElement }) => {
 		await expect(canvas.getByText("Embeddings API")).toBeVisible();

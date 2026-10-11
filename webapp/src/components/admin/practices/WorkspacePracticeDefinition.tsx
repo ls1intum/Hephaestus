@@ -20,10 +20,10 @@ export interface WorkspacePracticeDefinitionProps {
 	 * already says the autonomy, so it is said once.
 	 */
 	showStanding?: boolean;
-	/** A notice under the autonomy, such as the members a precompute script does not run for. */
+	/** A notice under the autonomy, such as the members a practice script does not run for. */
 	notice?: ReactNode;
-	/** What the precompute script needs, beside its code; see `PracticeDefinitionPreview`. */
-	precompute?: ReactNode;
+	/** What the practice script needs, beside its code; see `PracticeDefinitionPreview`. */
+	practiceScript?: ReactNode;
 }
 
 /**
@@ -38,7 +38,7 @@ export function WorkspacePracticeDefinition({
 	groupName,
 	showStanding = true,
 	notice,
-	precompute,
+	practiceScript,
 }: WorkspacePracticeDefinitionProps) {
 	const autonomy = AUTONOMY_DEFS[practice.autonomy.effective];
 	const autonomySource = autonomySourceOf(practice.autonomy, groupName ?? null);
@@ -70,7 +70,7 @@ export function WorkspacePracticeDefinition({
 			<PracticeDefinitionPreview
 				definition={practice}
 				options={definitionOptions}
-				precompute={precompute}
+				practiceScript={practiceScript}
 			/>
 		</div>
 	);

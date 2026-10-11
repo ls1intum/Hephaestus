@@ -95,7 +95,7 @@ export const EditEmbeddingsConnection: Story = {
 };
 
 /**
- * A precompute endpoint may serve no `{baseUrl}/models`. When it answers that the list is not
+ * An endpoint for practice scripts may serve no `{baseUrl}/models`. When it answers that the list is not
  * there, the test is no fault, and the result says so in the status region.
  */
 export const EmbeddingsProbeListsNoModels: Story = {
@@ -123,7 +123,7 @@ export const EmbeddingsProbeListsNoModels: Story = {
 	},
 };
 
-/** A refused key on a precompute endpoint is a real fault, so it keeps the server's words. */
+/** A refused key on an endpoint for practice scripts is a real fault, so it keeps the server's words. */
 export const EmbeddingsProbeRefused: Story = {
 	args: {
 		editing: embeddingsConnection,

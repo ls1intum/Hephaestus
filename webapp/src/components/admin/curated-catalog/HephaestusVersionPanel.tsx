@@ -67,7 +67,7 @@ const PRACTICE_FIELDS = {
 	whatGoodLooksLike: "What good looks like",
 	visual: "Visual",
 	guide: "Guide",
-	precomputeScript: "Precompute script",
+	practiceScript: "Practice script",
 	// The occasions and their evidence render under a heading of their own, which this must not repeat.
 	automatedReviewPolicy: "How it is reviewed",
 	deliveryBehavior: "Feedback delivery",
@@ -211,7 +211,7 @@ export function HephaestusVersionPanel(props: HephaestusVersionPanelProps) {
 												<dd
 													className={cn(
 														"text-xs break-words whitespace-pre-wrap text-muted-foreground",
-														field === "precomputeScript" && "font-mono",
+														field === "practiceScript" && "font-mono",
 													)}
 												>
 													{value}

@@ -3,7 +3,7 @@ import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { renderWithRouter } from "@/test/router-harness";
 
-import type { AgentBinding, AvailableLlmModel, PracticePrecomputeSummary } from "@/api/types.gen";
+import type { AgentBinding, AvailableLlmModel, PracticeScriptSummary } from "@/api/types.gen";
 
 import { AgentBindingsPage, type AgentBindingsPageProps } from "./AgentBindingsPage";
 
@@ -48,7 +48,7 @@ function Page(overrides: Partial<AgentBindingsPageProps>) {
 			availableModels={[inHouseModel, cloudModel]}
 			practicesEnabled
 			aiChoiceRequired={false}
-			precomputeNeeds={{ status: "ready", summaries: [] }}
+			practiceScriptNeeds={{ status: "ready", summaries: [] }}
 			ownProviderAllowed
 			pendingWrites={new Map()}
 			onSave={vi.fn()}
@@ -249,7 +249,7 @@ describe("AgentBindingsPage rows", () => {
 		displayName: "Decider",
 		purposes: ["PRACTICE_DECISION"],
 	};
-	const needs: PracticePrecomputeSummary[] = [
+	const needs: PracticeScriptSummary[] = [
 		{
 			practiceSlug: "comment-quality",
 			practiceName: "Comment quality",
@@ -265,18 +265,18 @@ describe("AgentBindingsPage rows", () => {
 		},
 	];
 
-	it("opens a precompute row whose required model some members lack, and says who", async () => {
+	it("opens a row for practice scripts whose required model some members lack, and says who", async () => {
 		await renderWithRouter(
 			<Page
 				availableModels={[inHouseModel, cloudModel, decisionModel]}
-				precomputeNeeds={{ status: "ready", summaries: needs }}
+				practiceScriptNeeds={{ status: "ready", summaries: needs }}
 			/>,
 			"/",
 		);
 		expect(expanded("Decision model")).toBe("true");
 		expect(expanded("Embedding model")).toBe("false");
 		expect(screen.getByRole("note").textContent).toBe(
-			"1 practice needs a decision model for In-house and Cloud members and members who have not chosen. Until you assign one, its precompute script does not run, and the review checks the practice without its help.",
+			"1 practice needs a decision model for In-house and Cloud members and members who have not chosen. Until you assign one, its practice script does not run, and the review checks the practice without its help.",
 		);
 		expect(
 			screen.getByRole("button", { name: "Decision model" }).getAttribute("aria-describedby"),
@@ -284,22 +284,22 @@ describe("AgentBindingsPage rows", () => {
 		screen.getByText("Needs attention", { ignore: ".sr-only" });
 	});
 
-	it("opens a precompute row once, when needs that arrive after the page ask for it", async () => {
+	it("opens a row for practice scripts once, when needs that arrive after the page ask for it", async () => {
 		function NeedsArriveLater() {
-			const [precomputeNeeds, setPrecomputeNeeds] = useState<
-				AgentBindingsPageProps["precomputeNeeds"]
+			const [practiceScriptNeeds, setPracticeScriptNeeds] = useState<
+				AgentBindingsPageProps["practiceScriptNeeds"]
 			>({ status: "loading" });
 			return (
 				<>
 					<button
 						type="button"
-						onClick={() => setPrecomputeNeeds({ status: "ready", summaries: [...needs] })}
+						onClick={() => setPracticeScriptNeeds({ status: "ready", summaries: [...needs] })}
 					>
 						Needs arrive
 					</button>
 					<Page
 						availableModels={[inHouseModel, cloudModel, decisionModel]}
-						precomputeNeeds={precomputeNeeds}
+						practiceScriptNeeds={practiceScriptNeeds}
 					/>
 				</>
 			);

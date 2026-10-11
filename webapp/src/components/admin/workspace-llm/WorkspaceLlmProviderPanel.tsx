@@ -64,7 +64,7 @@ export interface WorkspaceLlmProviderPanelProps {
 }
 
 interface TestOutcome {
-	/** `neutral`: a precompute endpoint may not list its models at all, so its failed probe is no fault. */
+	/** `neutral`: an endpoint for practice scripts may not list its models at all, so its failed probe is no fault. */
 	tone: "ok" | "neutral" | "failed";
 	message: string;
 }

@@ -104,8 +104,8 @@ export function selectPracticePatch(
 		// A signal edit can change the kind of assessed work; use the server's resulting validation basis.
 		...("signals" in request ||
 		"criteria" in request ||
-		"precomputeScript" in request ||
-		clear.has("PRECOMPUTE_SCRIPT") ||
+		"practiceScript" in request ||
+		clear.has("PRACTICE_SCRIPT") ||
 		"automatedReviewPolicy" in request ||
 		"evidenceRequirements" in request ||
 		"subject" in request ||
@@ -120,8 +120,8 @@ export function selectPracticePatch(
 			? { automatedReviewValidation: practice.automatedReviewValidation }
 			: {}),
 		...("name" in request ? { name: practice.name } : {}),
-		...("precomputeScript" in request || clear.has("PRECOMPUTE_SCRIPT")
-			? { precomputeScript: practice.precomputeScript }
+		...("practiceScript" in request || clear.has("PRACTICE_SCRIPT")
+			? { practiceScript: practice.practiceScript }
 			: {}),
 		...("whatGoodLooksLike" in request || clear.has("WHAT_GOOD_LOOKS_LIKE")
 			? { whatGoodLooksLike: practice.whatGoodLooksLike }

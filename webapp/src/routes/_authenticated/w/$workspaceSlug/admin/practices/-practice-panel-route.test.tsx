@@ -2,7 +2,7 @@ import { screen, within } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { PracticePrecomputeSummary } from "@/api/types.gen";
+import type { PracticeScriptSummary } from "@/api/types.gen";
 import { mockPractices } from "@/components/admin/practices/fixtures";
 import { detailSearch } from "@/components/layout/detail-drawer/detail-stack";
 import type { Wire } from "@/lib/dates";
@@ -21,10 +21,10 @@ const scripted = {
 	...base,
 	slug: "comment-quality",
 	name: "Comment quality",
-	precomputeScript: "x",
+	practiceScript: "x",
 };
 
-const summaries: Wire<PracticePrecomputeSummary>[] = [
+const summaries: Wire<PracticeScriptSummary>[] = [
 	{
 		practiceSlug: "another-practice",
 		practiceName: "Another practice",
@@ -41,7 +41,7 @@ const summaries: Wire<PracticePrecomputeSummary>[] = [
 	},
 ];
 
-describe("a practice's precompute needs on practice setup", () => {
+describe("a practice's script needs on practice setup", () => {
 	const needsRequested = vi.fn<(workspaceSlug: string) => void>();
 
 	beforeEach(() => {
@@ -57,7 +57,7 @@ describe("a practice's precompute needs on practice setup", () => {
 				HttpResponse.json(mockPracticeDefinitionOptions),
 			),
 			http.get("*/workspaces/:workspaceSlug/practices/releases", () => HttpResponse.json([])),
-			http.get("*/workspaces/:workspaceSlug/practices/precompute", ({ params }) => {
+			http.get("*/workspaces/:workspaceSlug/practices/practice-script-needs", ({ params }) => {
 				needsRequested(String(params.workspaceSlug));
 				return HttpResponse.json(summaries);
 			}),
@@ -75,7 +75,7 @@ describe("a practice's precompute needs on practice setup", () => {
 		// The unmet required model stops the script, so the panel says so before anything else.
 		const alert = await screen.findByRole("note", {}, ROUTE_RENDER_WAIT);
 		expect(alert.textContent).toBe(
-			"The precompute script does not run for In-house members’ work: no decision model is assigned for them. Assign a decision model",
+			"The practice script does not run for In-house members’ work: no decision model is assigned for them. Assign a decision model",
 		);
 		expect(
 			within(alert).getByRole("link", { name: "Assign a decision model" }).getAttribute("href"),

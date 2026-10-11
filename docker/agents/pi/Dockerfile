@@ -9,8 +9,8 @@ COPY pi/package.json pi/pnpm-lock.yaml pi/pnpm-workspace.yaml ./
 COPY pi/patches/ ./patches/
 RUN pnpm install --prod --frozen-lockfile --ignore-scripts
 
-WORKDIR /opt/precompute
-COPY precompute/package.json precompute/pnpm-lock.yaml precompute/pnpm-workspace.yaml ./
+WORKDIR /opt/practice-scripts
+COPY practice-scripts/package.json practice-scripts/pnpm-lock.yaml practice-scripts/pnpm-workspace.yaml ./
 RUN pnpm install --prod --frozen-lockfile --ignore-scripts
 
 # Debian 13: its fd (>= 8.7) takes the `--no-require-git` Pi's find tool passes outside a repository.
@@ -87,9 +87,9 @@ RUN mkdir -p /tmp/abi-check && ln -sf /opt/pi-sdk/node_modules /tmp/abi-check/no
       -e 'require("node:child_process").spawnSync("true")' 2>/dev/null && \
     rm -rf /tmp/abi-check
 
-COPY --from=dependencies /opt/precompute/node_modules /opt/precompute/node_modules
-COPY precompute/package.json precompute/runner.ts precompute/child.ts /opt/precompute/
-COPY precompute/lib/ /opt/precompute/lib/
+COPY --from=dependencies /opt/practice-scripts/node_modules /opt/practice-scripts/node_modules
+COPY practice-scripts/package.json practice-scripts/runner.ts practice-scripts/child.ts /opt/practice-scripts/
+COPY practice-scripts/lib/ /opt/practice-scripts/lib/
 
 RUN git config --system core.hooksPath /nonexistent && \
     git config --system core.fsmonitor false && \

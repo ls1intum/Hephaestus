@@ -37,11 +37,11 @@ public class ReviewMemberAiPolicy {
         return routing.binding(workspaceId, AgentPurpose.PRACTICE_REVIEW, subject(workspaceId, type, metadata));
     }
 
-    /** The binding that serves one precompute purpose of the review, routed for the same developer as the review. */
+    /** The binding that serves one practice script purpose of the review, routed for the same developer as the review. */
     @Transactional(readOnly = true)
-    public Optional<WorkspaceAgentBinding> precomputeBinding(
+    public Optional<WorkspaceAgentBinding> practiceScriptBinding(
             long workspaceId, AgentPurpose purpose, AgentJobType type, @Nullable JsonNode metadata) {
-        return routing.precomputeBinding(workspaceId, purpose, subject(workspaceId, type, metadata));
+        return routing.practiceScriptBinding(workspaceId, purpose, subject(workspaceId, type, metadata));
     }
 
     @Transactional(readOnly = true)

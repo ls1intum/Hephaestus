@@ -46,7 +46,7 @@ public class AgentJobController {
     private final AgentJobLifecycleService agentJobLifecycleService;
     private final ReviewRunTargets reviewRunTargets;
     private final AgentJobUsageQuery usageQuery;
-    private final ReviewPrecomputeService reviewPrecompute;
+    private final ReviewPracticeScriptService reviewPracticeScript;
 
     @GetMapping
     @Operation(summary = "List agent jobs for a workspace")
@@ -103,8 +103,8 @@ public class AgentJobController {
         return ResponseEntity.ok(usageQuery.usage(workspaceContext.id(), jobId));
     }
 
-    @GetMapping("/{jobId}/precompute")
-    @Operation(summary = "List what each practice's precompute script did in the current attempt of a review")
+    @GetMapping("/{jobId}/practice-scripts")
+    @Operation(summary = "List what each practice's script did in the current attempt of a review")
     @ApiResponse(
             responseCode = "200",
             description = "One entry per staged script; empty when no script ran or the attempt has not ended")
@@ -113,9 +113,9 @@ public class AgentJobController {
             description = "Job not found in this workspace",
             content = @Content(schema = @Schema(hidden = true)))
     @RequireAtLeastWorkspaceAdmin
-    public ResponseEntity<List<ReviewPrecomputeDTO>> getAgentJobPrecompute(
+    public ResponseEntity<List<ReviewPracticeScriptsDTO>> getAgentJobPracticeScripts(
             WorkspaceContext workspaceContext, @PathVariable UUID jobId) {
-        return ResponseEntity.ok(reviewPrecompute.currentAttempt(workspaceContext.id(), jobId));
+        return ResponseEntity.ok(reviewPracticeScript.currentAttempt(workspaceContext.id(), jobId));
     }
 
     @PostMapping("/{jobId}/cancel")

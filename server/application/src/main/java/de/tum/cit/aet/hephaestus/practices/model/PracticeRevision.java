@@ -121,9 +121,9 @@ public class PracticeRevision {
     @ToString.Exclude
     private String criteria;
 
-    @Column(name = "precompute_script", columnDefinition = "TEXT")
+    @Column(name = "practice_script", columnDefinition = "TEXT")
     @ToString.Exclude
-    private @Nullable String precomputeScript;
+    private @Nullable String practiceScript;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "automated_review_policy", columnDefinition = "jsonb")
@@ -188,7 +188,7 @@ public class PracticeRevision {
         this.subject = practice.getSubject();
         this.precondition = practice.getPrecondition();
         this.criteria = Objects.requireNonNull(practice.getCriteria(), "practice.criteria");
-        this.precomputeScript = practice.getPrecomputeScript();
+        this.practiceScript = practice.getPracticeScript();
         this.automatedReviewPolicy =
                 Objects.requireNonNull(practice.getAutomatedReviewPolicy(), "practice.automatedReviewPolicy");
         this.deliveryBehavior = practice.getDeliveryBehavior();
@@ -223,7 +223,7 @@ public class PracticeRevision {
                 subject,
                 precondition,
                 criteria,
-                precomputeScript,
+                practiceScript,
                 automatedReviewPolicy,
                 groupSlug);
     }

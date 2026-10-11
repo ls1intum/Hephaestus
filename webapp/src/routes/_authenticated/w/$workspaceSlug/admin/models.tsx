@@ -12,8 +12,8 @@ import {
 	getWorkspaceOptions,
 	listAgentsOptions,
 	listAgentsQueryKey,
-	listPrecomputeNeedsOptions,
-	listPrecomputeNeedsQueryKey,
+	listPracticeScriptNeedsOptions,
+	listPracticeScriptNeedsQueryKey,
 	workspaceCreateLlmConnectionMutation,
 	workspaceCreateLlmModelMutation,
 	workspaceDeleteLlmConnectionMutation,
@@ -132,14 +132,16 @@ function ModelsContainer() {
 	const onboardingSettingsQuery = useQuery(
 		getMemberOnboardingSettingsOptions({ path: { workspaceSlug } }),
 	);
-	const precomputeNeedsQuery = useQuery(listPrecomputeNeedsOptions({ path: { workspaceSlug } }));
+	const practiceScriptNeedsQuery = useQuery(
+		listPracticeScriptNeedsOptions({ path: { workspaceSlug } }),
+	);
 	const usageQuery = useQuery({
 		...getLlmUsageReportOptions({ path: { workspaceSlug }, query: { month: currentMonthUtc() } }),
 		staleTime: 60_000,
 	});
 
-	// The precompute needs are not among them: the page binds models without them, so their failure
-	// shows only in the precompute section.
+	// The practice script needs are not among them: the page binds models without them, so their failure
+	// shows only in the section *Models for practice scripts*.
 	const pageQueries = [
 		bindingsQuery,
 		workspaceQuery,
@@ -155,7 +157,7 @@ function ModelsContainer() {
 			queryClient.invalidateQueries({ queryKey: listAgentsQueryKey({ path: { workspaceSlug } }) }),
 			queryClient.invalidateQueries(getMemberOnboardingOptions({ path: { workspaceSlug } })),
 			queryClient.invalidateQueries({
-				queryKey: listPrecomputeNeedsQueryKey({ path: { workspaceSlug } }),
+				queryKey: listPracticeScriptNeedsQueryKey({ path: { workspaceSlug } }),
 			}),
 		]);
 
@@ -246,7 +248,7 @@ function ModelsContainer() {
 			availableModels={availableModelsQuery.data ?? []}
 			practicesEnabled={workspaceQuery.data?.practicesEnabled ?? false}
 			aiChoiceRequired={onboardingSettingsQuery.data?.aiChoiceRequired ?? false}
-			precomputeNeeds={panelState(precomputeNeedsQuery, (summaries) => ({
+			practiceScriptNeeds={panelState(practiceScriptNeedsQuery, (summaries) => ({
 				status: "ready" as const,
 				summaries,
 			}))}

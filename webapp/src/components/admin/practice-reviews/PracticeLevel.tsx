@@ -171,8 +171,8 @@ export function PracticeLevel({
 									: "—",
 						},
 						{
-							label: "Precompute script",
-							value: hasText(practice.precomputeScript) ? "Present" : "None",
+							label: "Practice script",
+							value: hasText(practice.practiceScript) ? "Present" : "None",
 						},
 					]}
 				/>

@@ -225,12 +225,12 @@ public class Practice {
     private @Nullable PracticeGuide guide;
 
     /**
-     * Optional Node/TypeScript static-analysis script that runs before the AI agent and produces structured
-     * hints (not observations) as starting points; {@code null} means no precomputation runs.
+     * Optional Node/TypeScript practice script that runs before the review and produces leads (not
+     * observations) as starting points; {@code null} means no practice script runs.
      */
-    @Column(name = "precompute_script", columnDefinition = "TEXT")
+    @Column(name = "practice_script", columnDefinition = "TEXT")
     @ToString.Exclude
-    private @Nullable String precomputeScript;
+    private @Nullable String practiceScript;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "automated_review_policy", columnDefinition = "jsonb", nullable = false)

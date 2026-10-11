@@ -43,7 +43,7 @@ const groups = [longNamedGroup, issueAuthoringGroup];
 const longTextPractice = {
 	...mockPracticeLongText,
 	groupSlug: longNamedGroup.slug,
-	precomputeScript: "export default {};",
+	practiceScript: "export default {};",
 };
 
 const issuePractice = {

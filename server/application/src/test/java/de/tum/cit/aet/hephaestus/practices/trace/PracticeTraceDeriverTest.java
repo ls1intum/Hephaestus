@@ -8,8 +8,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeSignalDTO;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
-import de.tum.cit.aet.hephaestus.practices.spi.PrecomputeRunDTO;
-import de.tum.cit.aet.hephaestus.practices.spi.PrecomputeRunStatus;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptRunDTO;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptRunStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOutcomeLookup.PracticeCoverageOutcome;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOutcomeLookup.PracticeReadinessOutcome;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOutcomeLookup.ReviewOutcome;
@@ -121,8 +121,8 @@ class PracticeTraceDeriverTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldCarryThePrecomputeRunOfTheReviewTheEntryNames() {
-            var run = new PrecomputeRunDTO(PrecomputeRunStatus.SKIPPED, 0, List.of());
+        void shouldCarryThePracticeScriptRunOfTheReviewTheEntryNames() {
+            var run = new PracticeScriptRunDTO(PracticeScriptRunStatus.SKIPPED, 0, List.of());
             var review = new ReviewOutcome(
                     ReviewRunState.COMPLETED,
                     false,
@@ -130,7 +130,11 @@ class PracticeTraceDeriverTest extends BaseUnitTest {
                     Map.of("slug", new PracticeReadinessOutcome(true, List.of(), null, null)),
                     Map.of("slug", PracticeCoverageOutcome.EVALUATED),
                     Map.of(),
-                    Map.of("slug", run, "other-practice", new PrecomputeRunDTO(PrecomputeRunStatus.OK, 4, List.of())));
+                    Map.of(
+                            "slug",
+                            run,
+                            "other-practice",
+                            new PracticeScriptRunDTO(PracticeScriptRunStatus.OK, 4, List.of())));
 
             var entry = only(
                     practice(PracticeAutonomy.AUTOMATIC, READY),
@@ -139,11 +143,11 @@ class PracticeTraceDeriverTest extends BaseUnitTest {
                     Map.of());
 
             assertThat(entry.reviewId()).isEqualTo(RUN);
-            assertThat(entry.precompute()).isEqualTo(run);
+            assertThat(entry.practiceScript()).isEqualTo(run);
         }
 
         @Test
-        void shouldCarryNoPrecomputeRunWhenTheReviewReportedNoneForThePractice() {
+        void shouldCarryNoPracticeScriptRunWhenTheReviewReportedNoneForThePractice() {
             var entry = only(
                     practice(PracticeAutonomy.AUTOMATIC, READY),
                     List.of(triggered(READY, RUN)),
@@ -151,7 +155,7 @@ class PracticeTraceDeriverTest extends BaseUnitTest {
                     Map.of());
 
             assertThat(entry.reviewId()).isEqualTo(RUN);
-            assertThat(entry.precompute()).isNull();
+            assertThat(entry.practiceScript()).isNull();
         }
 
         @Test

@@ -17,8 +17,8 @@ import {
 	listPracticesOptions,
 	listPracticesQueryKey,
 	listPracticeReleasesOptions,
-	listPrecomputeNeedsOptions,
-	listPrecomputeNeedsQueryKey,
+	listPracticeScriptNeedsOptions,
+	listPracticeScriptNeedsQueryKey,
 	previewGroupAdoptionOptions,
 	previewPracticeAdoptionOptions,
 } from "@/api/@tanstack/react-query.gen";
@@ -56,7 +56,7 @@ import {
 	PracticeTreeSkeleton,
 } from "@/components/admin/practices/PracticeSkeletons";
 import {
-	type PrecomputeNeedsState,
+	type PracticeScriptNeedsState,
 	WorkspacePracticePanel,
 	type WorkspacePracticeState,
 } from "@/components/admin/practices/WorkspacePracticePanel";
@@ -168,9 +168,9 @@ function PracticeCatalogRoute() {
 		...listAdoptablePracticesOptions({ path: { workspaceSlug } }),
 		enabled: library === true,
 	});
-	// What each precompute script needs is read only on a practice's own level.
-	const precomputeNeedsQuery = useQuery({
-		...listPrecomputeNeedsOptions({ path: { workspaceSlug } }),
+	// What each practice script needs is read only on a practice's own level.
+	const practiceScriptNeedsQuery = useQuery({
+		...listPracticeScriptNeedsOptions({ path: { workspaceSlug } }),
 		enabled: detailStack.some((entry) => entry.kind === "practice"),
 	});
 	// `useQueries` cannot correlate a result with the entry that produced it, so each payload is
@@ -221,8 +221,8 @@ function PracticeCatalogRoute() {
 		onClose: stackControls.close,
 	});
 
-	const precomputeNeedsOf = (practiceSlug: string): PrecomputeNeedsState =>
-		panelState(precomputeNeedsQuery, (summaries) => ({
+	const practiceScriptNeedsOf = (practiceSlug: string): PracticeScriptNeedsState =>
+		panelState(practiceScriptNeedsQuery, (summaries) => ({
 			status: "ready" as const,
 			summary: summaries.find((summary) => summary.practiceSlug === practiceSlug),
 		}));
@@ -570,7 +570,7 @@ function PracticeCatalogRoute() {
 								nested={level.nested}
 								path={pathAt(level.depth)}
 								state={state}
-								precompute={precomputeNeedsOf(entry.id)}
+								practiceScript={practiceScriptNeedsOf(entry.id)}
 							/>
 						);
 					}
@@ -613,7 +613,9 @@ function PracticeCatalogRoute() {
 														await saved(editor.update(slug, data, groupSlug));
 														// A changed script makes the needs on record stale.
 														void queryClient.invalidateQueries({
-															queryKey: listPrecomputeNeedsQueryKey({ path: { workspaceSlug } }),
+															queryKey: listPracticeScriptNeedsQueryKey({
+																path: { workspaceSlug },
+															}),
 														});
 													},
 													evidenceOutcome: evidenceOutcomesQuery.data?.find(

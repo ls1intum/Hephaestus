@@ -23,13 +23,13 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
             @Param("sourceId") UUID sourceId);
 
     /**
-     * The runs among the ledger rows of {@code e}: one per job attempt and one per mentor turn. A precompute
+     * The runs among the ledger rows of {@code e}: one per job attempt and one per mentor turn. A practice script
      * row adds calls and cost to the attempt that it belongs to, but it is not a run of its own.
      */
     String RUNS = "COUNT(e.id) FILTER (WHERE e.source_type IN ('AGENT_JOB', 'MENTOR_TURN'))";
 
     /**
-     * The runs among the ledger rows of {@code e} that have at least one row with no price. A precompute row
+     * The runs among the ledger rows of {@code e} that have at least one row with no price. A practice script row
      * carries the job id and attempt of its run, so it counts toward that run and never as a run of its own.
      */
     String UNPRICED_RUNS =
@@ -284,7 +284,7 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
      * <p>Deliberately not derived from {@link #aggregateByJobType}: a row there is one <em>attempt</em>,
      * not one review, so dividing spend by attempt count under-quotes exactly the retry-heavy workspaces
      * whose campaigns cost the most. Grouping by source first makes "reviews" the denominator. The source
-     * id alone is the review: its precompute rows carry the job id under their own source types.
+     * id alone is the review: its practice script rows carry the job id under their own source types.
      *
      * <p>A review with any unpriced attempt is dropped from numerator and denominator together, so a
      * half-priced catalogue reports the mean of what it could price rather than one dragged toward zero.
@@ -308,7 +308,7 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
 
     /**
      * The decision, embedding, and reranking ledger rows of a month, split between the practices whose
-     * precompute scripts made the calls. One row per practice; the practice is {@code null} for the
+     * practice scripts made the calls. One row per practice; the practice is {@code null} for the
      * ledger rows that have no usage rows left to split them by, such as the rows of a deleted job.
      *
      * <p>Each ledger row is joined to the usage rows of its job, attempt, and kind. A practice weighs
@@ -320,7 +320,7 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
      * <p>An UNPRICED row adds no cost to any practice. Its review counts once in the
      * {@code unpricedEventCount} of each practice that has a share in it, however many unpriced rows and
      * attempts the review has: the unit is the same as that of {@code reviews}. A NO_CHARGE row adds a
-     * confirmed zero. Chat calls of precompute scripts
+     * confirmed zero. Chat calls of practice scripts
      * are not here: the ledger bills them on the review's own row.
      */
     @Query(value = """
@@ -328,10 +328,10 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
             SELECT e.id, e.source_id, e.source_attempt, e.funding_source, e.pricing_state, e.cost_usd,
                 e.total_calls, e.input_tokens, e.output_tokens,
                 e.applied_per_1m_input_usd AS input_rate, e.applied_per_1m_output_usd AS output_rate,
-                REPLACE(e.source_type, 'PRECOMPUTE_', '') AS model_kind
+                REPLACE(e.source_type, 'PRACTICE_SCRIPT_', '') AS model_kind
             FROM llm_usage_event e
             WHERE e.workspace_id = :workspaceId AND e.occurred_at >= :from AND e.occurred_at < :to
-              AND e.source_type IN ('PRECOMPUTE_DECISION', 'PRECOMPUTE_EMBEDDING', 'PRECOMPUTE_RERANKING')
+              AND e.source_type IN ('PRACTICE_SCRIPT_DECISION', 'PRACTICE_SCRIPT_EMBEDDING', 'PRACTICE_SCRIPT_RERANKING')
         ),
         shares AS (
             SELECT l.id AS ledger_id, l.source_id, l.model_kind, l.funding_source, l.pricing_state, l.cost_usd,
@@ -341,7 +341,7 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
                 COALESCE(u.output_tokens, l.output_tokens) AS output_tokens,
                 COALESCE(u.input_tokens * l.input_rate, 0) + COALESCE(u.output_tokens * l.output_rate, 0) AS weight
             FROM ledger l
-            LEFT JOIN agent_job_precompute_usage u
+            LEFT JOIN agent_job_practice_script_usage u
               ON u.workspace_id = :workspaceId AND u.job_id = l.source_id AND u.attempt = l.source_attempt
              AND u.model_kind = l.model_kind
         ),
@@ -374,28 +374,29 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
         GROUP BY a.practice_slug, p.name
         ORDER BY COALESCE(SUM(a.cost_share), 0) DESC, a.practice_slug NULLS LAST
         """, nativeQuery = true)
-    List<PracticeAggregate> aggregatePrecomputeByPractice(
+    List<PracticeAggregate> aggregatePracticeScriptByPractice(
             @Param("workspaceId") Long workspaceId, @Param("from") Instant from, @Param("to") Instant to);
 
     /**
      * The decision, embedding, and reranking ledger rows of a month, read from the ledger alone. Their
-     * cost is what {@link #aggregatePrecomputeByPractice} splits. {@link LlmUsagePrecomputeTotalDTO} states which
+     * cost is what {@link #aggregatePracticeScriptByPractice} splits. {@link LlmUsagePracticeScriptTotalDTO} states which
      * of these sums equal the practices' sums.
      */
     @Query(
-            value = "SELECT COUNT(DISTINCT e.source_id) AS reviews, COALESCE(SUM(e.total_calls), 0) AS calls, "
-                    + "COALESCE(SUM(e.input_tokens), 0) AS inputTokens, "
-                    + "COALESCE(SUM(e.output_tokens), 0) AS outputTokens, "
-                    + "COALESCE(SUM(e.cost_usd) FILTER (WHERE e.pricing_state <> 'UNPRICED' "
-                    + "AND e.funding_source = 'INSTANCE'), 0) AS instanceTotalCostUsd, "
-                    + "COALESCE(SUM(e.cost_usd) FILTER (WHERE e.pricing_state <> 'UNPRICED' "
-                    + "AND e.funding_source = 'WORKSPACE'), 0) AS ownProviderTotalCostUsd, "
-                    + "COUNT(DISTINCT e.source_id) FILTER (WHERE e.pricing_state = 'UNPRICED') AS unpricedEventCount "
-                    + "FROM llm_usage_event e "
-                    + "WHERE e.workspace_id = :workspaceId AND e.occurred_at >= :from AND e.occurred_at < :to "
-                    + "AND e.source_type IN ('PRECOMPUTE_DECISION', 'PRECOMPUTE_EMBEDDING', 'PRECOMPUTE_RERANKING')",
+            value =
+                    "SELECT COUNT(DISTINCT e.source_id) AS reviews, COALESCE(SUM(e.total_calls), 0) AS calls, "
+                            + "COALESCE(SUM(e.input_tokens), 0) AS inputTokens, "
+                            + "COALESCE(SUM(e.output_tokens), 0) AS outputTokens, "
+                            + "COALESCE(SUM(e.cost_usd) FILTER (WHERE e.pricing_state <> 'UNPRICED' "
+                            + "AND e.funding_source = 'INSTANCE'), 0) AS instanceTotalCostUsd, "
+                            + "COALESCE(SUM(e.cost_usd) FILTER (WHERE e.pricing_state <> 'UNPRICED' "
+                            + "AND e.funding_source = 'WORKSPACE'), 0) AS ownProviderTotalCostUsd, "
+                            + "COUNT(DISTINCT e.source_id) FILTER (WHERE e.pricing_state = 'UNPRICED') AS unpricedEventCount "
+                            + "FROM llm_usage_event e "
+                            + "WHERE e.workspace_id = :workspaceId AND e.occurred_at >= :from AND e.occurred_at < :to "
+                            + "AND e.source_type IN ('PRACTICE_SCRIPT_DECISION', 'PRACTICE_SCRIPT_EMBEDDING', 'PRACTICE_SCRIPT_RERANKING')",
             nativeQuery = true)
-    PrecomputeTotalAggregate aggregatePrecomputeTotal(
+    PracticeScriptTotalAggregate aggregatePracticeScriptTotal(
             @Param("workspaceId") Long workspaceId, @Param("from") Instant from, @Param("to") Instant to);
 
     interface PracticeAggregate {
@@ -423,7 +424,7 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
         long getUnpricedEventCount();
     }
 
-    interface PrecomputeTotalAggregate {
+    interface PracticeScriptTotalAggregate {
         long getReviews();
 
         long getCalls();

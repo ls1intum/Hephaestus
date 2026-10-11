@@ -55,14 +55,14 @@ export interface PurposeStatusInput {
 	served: readonly boolean[];
 	/** The purpose runs inside practice reviews, and they are off. */
 	off: boolean;
-	/** A practice's precompute script requires this model and some members do not get one. */
+	/** A practice's script requires this model and some members do not get one. */
 	requiredNeedUnmet: boolean;
-	/** False for a precompute purpose that no practice declares; true for every other purpose. */
+	/** False for a purpose for practice scripts that no practice declares; true for every other purpose. */
 	used: boolean;
 }
 
 /**
- * Null when there is nothing to flag: every member is served, or a precompute model that no practice
+ * Null when there is nothing to flag: every member is served, or a model for practice scripts that no practice
  * uses asks for nothing, whatever it assigns; its cells still show the assignments. An enabled
  * assignment the server cannot run, or an unmet required need, outranks coverage.
  */

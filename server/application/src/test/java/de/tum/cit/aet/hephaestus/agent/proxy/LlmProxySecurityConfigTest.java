@@ -241,30 +241,30 @@ class LlmProxySecurityConfigTest extends BaseUnitTest {
     }
 
     /**
-     * The precompute route exists only on the gateway, under the model-call bound, for its own scope. A
-     * review token refused there spends nothing from the precompute token's bucket.
+     * The practice script route exists only on the gateway, under the model-call bound, for its own scope. A
+     * review token refused there spends nothing from the practice script token's bucket.
      */
     @Test
-    void servesThePrecomputeRouteOnlyOnTheGatewayForAPrecomputeToken() throws Exception {
-        String path = "/internal/llm/precompute/chat/chat/completions";
+    void servesThePracticeScriptRouteOnlyOnTheGatewayForAPracticeScriptToken() throws Exception {
+        String path = "/internal/llm/practice-script/chat/chat/completions";
         AgentJob job = runningJobOnAttempt(1);
         when(jobRepository.findByIdWithWorkspace(job.getId())).thenReturn(Optional.of(job));
-        when(jwtVerifier.verify("precompute")).thenReturn(jobJwt(job, 1, "llm_precompute"));
+        when(jwtVerifier.verify("practice-script-token")).thenReturn(jobJwt(job, 1, "llm_practice_script"));
         when(jwtVerifier.verify("review")).thenReturn(jobJwt(job, 1, "llm_proxy"));
 
         MockHttpServletRequest review = request("POST", path, GATEWAY_PORT);
         review.addHeader("Authorization", "Bearer review");
         assertThat(answerTo(review)).isEqualTo(403);
         assertThat(servedAs.get()).isNull();
-        MockHttpServletRequest precompute = request("POST", path, GATEWAY_PORT);
-        precompute.addHeader("Authorization", "Bearer precompute");
-        assertThat(answerTo(precompute)).isEqualTo(200);
+        MockHttpServletRequest practiceScript = request("POST", path, GATEWAY_PORT);
+        practiceScript.addHeader("Authorization", "Bearer practice-script-token");
+        assertThat(answerTo(practiceScript)).isEqualTo(200);
         assertThat(servedAs.get())
                 .isNotNull()
                 .extracting(Authentication::getPrincipal)
                 .asInstanceOf(type(ProxyRouting.class))
                 .extracting(ProxyRouting::principalDescription)
-                .isEqualTo("job:" + job.getId() + ":precompute");
+                .isEqualTo("job:" + job.getId() + ":practice-script");
         assertThat(answerTo("POST", path, APPLICATION_PORT)).isEqualTo(404);
         assertThat(answerTo("POST", path, GATEWAY_PORT, new byte[GATEWAY.maxRequestBytes() + 1]))
                 .isEqualTo(413);
@@ -281,13 +281,13 @@ class LlmProxySecurityConfigTest extends BaseUnitTest {
         "GET,/internal/llm/runtime/{job}/frames",
         "POST,/internal/llm/runtime/{job}/result"
     })
-    void refusesAPrecomputeTokenOnEveryOtherCapability(String method, String path) throws Exception {
+    void refusesAPracticeScriptTokenOnEveryOtherCapability(String method, String path) throws Exception {
         AgentJob job = runningJobOnAttempt(1);
         when(jobRepository.findByIdWithWorkspace(job.getId())).thenReturn(Optional.of(job));
-        when(jwtVerifier.verify("precompute")).thenReturn(jobJwt(job, 1, "llm_precompute"));
+        when(jwtVerifier.verify("practice-script-token")).thenReturn(jobJwt(job, 1, "llm_practice_script"));
         MockHttpServletRequest request =
                 request(method, path.replace("{job}", job.getId().toString()), GATEWAY_PORT);
-        request.addHeader("Authorization", "Bearer precompute");
+        request.addHeader("Authorization", "Bearer practice-script-token");
 
         assertThat(answerTo(request)).isEqualTo(403);
         assertThat(servedAs.get()).isNull();
@@ -304,13 +304,13 @@ class LlmProxySecurityConfigTest extends BaseUnitTest {
     }
 
     @Test
-    void refusesAMentorCredentialOnThePrecomputeRoute() throws Exception {
+    void refusesAMentorCredentialOnThePracticeScriptRoute() throws Exception {
         String mentorToken = mentorRegistry.mint(
                 UUID.randomUUID(),
                 new MentorProxyCredentialRegistry.Route(
                         "openai-completions", "https://api.example.com/v1", null, null, null, null));
         MockHttpServletRequest request =
-                request("POST", "/internal/llm/precompute/chat/chat/completions", GATEWAY_PORT);
+                request("POST", "/internal/llm/practice-script/chat/chat/completions", GATEWAY_PORT);
         request.addHeader("Authorization", "Bearer " + mentorToken);
 
         assertThat(answerTo(request)).isEqualTo(403);

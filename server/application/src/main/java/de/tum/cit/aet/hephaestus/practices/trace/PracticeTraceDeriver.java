@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.trace;
 
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalStateReason;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
-import de.tum.cit.aet.hephaestus.practices.spi.PrecomputeRunDTO;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptRunDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOutcomeLookup.PracticeCoverageOutcome;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOutcomeLookup.PracticeReadinessOutcome;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOutcomeLookup.ReviewOutcome;
@@ -53,7 +53,7 @@ final class PracticeTraceDeriver {
                     occurrences,
                     reviews,
                     outputsByPracticeId.getOrDefault(practice.id(), PracticeOutput.NONE));
-            entries.add(entry.withPrecompute(precompute(entry, reviews)));
+            entries.add(entry.withPracticeScript(practiceScript(entry, reviews)));
         }
         return entries.stream()
                 .sorted(Comparator.comparingInt((PracticeTraceEntryDTO entry) -> RANK.getOrDefault(entry.outcome(), 99))
@@ -320,11 +320,11 @@ final class PracticeTraceDeriver {
                 output);
     }
 
-    /** The precompute run of the review the entry names, which is the review a reader opens from it. */
-    private static @Nullable PrecomputeRunDTO precompute(
+    /** The practice script run of the review the entry names, which is the review a reader opens from it. */
+    private static @Nullable PracticeScriptRunDTO practiceScript(
             PracticeTraceEntryDTO entry, Map<UUID, ReviewOutcome> reviews) {
         ReviewOutcome review = entry.reviewId() == null ? null : reviews.get(entry.reviewId());
-        return review == null ? null : review.precomputeByPracticeSlug().get(entry.practiceSlug());
+        return review == null ? null : review.practiceScriptByPracticeSlug().get(entry.practiceSlug());
     }
 
     private static boolean watches(TracedPractice practice, SignalOccurrence occurrence) {

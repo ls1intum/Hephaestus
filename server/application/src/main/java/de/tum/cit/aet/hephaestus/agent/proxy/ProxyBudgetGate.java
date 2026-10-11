@@ -24,12 +24,12 @@ class ProxyBudgetGate {
     private static final long MAX_CACHED_WORKSPACES = 10_000;
 
     private final LlmBudgetService budgetService;
-    private final long precomputeMaxTokensPerAttempt;
+    private final long practiceScriptMaxTokensPerAttempt;
     private final Cache<Long, LlmBudgetHeadroom> headroomByWorkspace;
 
     ProxyBudgetGate(LlmBudgetService budgetService, PracticeReviewProperties properties) {
         this.budgetService = budgetService;
-        this.precomputeMaxTokensPerAttempt = properties.precomputeMaxTokensPerAttempt();
+        this.practiceScriptMaxTokensPerAttempt = properties.practiceScriptMaxTokensPerAttempt();
         this.headroomByWorkspace = Caffeine.newBuilder()
                 .expireAfterWrite(TTL)
                 .maximumSize(MAX_CACHED_WORKSPACES)
@@ -52,12 +52,12 @@ class ProxyBudgetGate {
     }
 
     /**
-     * Whether one attempt's precompute calls have used the tokens that they may spend, on every model and
-     * for every practice together. This bounds a leaked precompute credential, also on a connection with no
+     * Whether one attempt's practice script calls have used the tokens that they may spend, on every model and
+     * for every practice together. This bounds a leaked practice script credential, also on a connection with no
      * monthly cap. Only committed calls count, so calls in flight together can each pass and end above the
      * cap.
      */
-    boolean isPrecomputeCapReached(ProxyRouting.BilledAttempt attempt) {
-        return attempt.precomputeTokens() >= precomputeMaxTokensPerAttempt;
+    boolean isPracticeScriptCapReached(ProxyRouting.BilledAttempt attempt) {
+        return attempt.practiceScriptTokens() >= practiceScriptMaxTokensPerAttempt;
     }
 }

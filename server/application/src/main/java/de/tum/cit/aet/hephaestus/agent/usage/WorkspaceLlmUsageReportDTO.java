@@ -51,7 +51,7 @@ public record WorkspaceLlmUsageReportDTO(
         @NonNull
         @Schema(
                 description = "Runs this month (job attempts and mentor turns, either purse) with at least one "
-                        + "ledger row whose price is not yet known, each counted once. A precompute row counts "
+                        + "ledger row whose price is not yet known, each counted once. A practice script row counts "
                         + "toward the run of its review. Those rows are excluded from both totals above, so a "
                         + "non-zero value means the real spend may be higher than shown.")
         Long unpricedEventCount,
@@ -81,13 +81,13 @@ public record WorkspaceLlmUsageReportDTO(
 
         @NonNull
         @Schema(
-                description = "The decision, embedding and reranking calls of precompute scripts, one entry per "
+                description = "The decision, embedding and reranking calls of practice scripts, one entry per "
                         + "practice, most spend first. Their spend is already part of byJobType. Chat calls of "
-                        + "precompute scripts are in each review's own cost and not here.")
+                        + "practice scripts are in each review's own cost and not here.")
         List<LlmUsageByPracticeDTO> byPractice,
 
         @NonNull @Schema(description = "The byPractice entries in total, read from the ledger.")
-        LlmUsagePrecomputeTotalDTO precomputeTotal,
+        LlmUsagePracticeScriptTotalDTO practiceScriptTotal,
 
         @Nullable
         @Schema(

@@ -459,7 +459,7 @@ function ReviewLevelRead({
 			trace={run.trace}
 			groups={groups}
 			deliveryChecks={run.deliveryChecks}
-			precompute={run.precompute}
+			practiceScript={run.practiceScript}
 			usage={run.usage}
 			onCancel={run.onCancel}
 			cancelPending={run.cancelPending}

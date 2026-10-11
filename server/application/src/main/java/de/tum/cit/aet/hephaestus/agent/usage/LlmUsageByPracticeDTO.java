@@ -7,9 +7,9 @@ import java.util.List;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
-/** One practice's share of a month's precompute model spend, inside {@link WorkspaceLlmUsageReportDTO}. */
+/** One practice's share of a month's spend on models for practice scripts, inside {@link WorkspaceLlmUsageReportDTO}. */
 @Schema(
-        description = "The decision, embedding and reranking calls that one practice's precompute script made in "
+        description = "The decision, embedding and reranking calls that one practice's script made in "
                 + "finished reviews this month. The cost of each review's calls is split between its practices by "
                 + "the priced tokens that each used.")
 public record LlmUsageByPracticeDTO(
@@ -22,12 +22,12 @@ public record LlmUsageByPracticeDTO(
         @Nullable @Schema(description = "The practice name. Null when the slug names no current practice.")
         String practiceName,
 
-        @NonNull @Schema(description = "The precompute models that the script called.")
+        @NonNull @Schema(description = "The models for practice scripts that the script called.")
         List<AgentPurpose> purposes,
 
         @NonNull
         @Schema(
-                description = "Reviews in which the script called a precompute model. A review with several "
+                description = "Reviews in which the script called a model for practice scripts. A review with several "
                         + "practices counts for each of them.")
         Long reviews,
 
@@ -44,7 +44,7 @@ public record LlmUsageByPracticeDTO(
 
         @NonNull
         @Schema(
-                description = "Reviews with a precompute ledger row whose price is not yet known and that holds "
+                description = "Reviews with a practice script ledger row whose price is not yet known and that holds "
                         + "this practice's calls, each review counted once. Those rows are excluded from both "
                         + "totals above. A review with several practices counts for each of them.")
         Long unpricedEventCount) {}

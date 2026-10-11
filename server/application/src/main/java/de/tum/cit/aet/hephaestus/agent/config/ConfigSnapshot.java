@@ -52,8 +52,8 @@ public record ConfigSnapshot(
         @Nullable LlmPriceSnapshot priceSnapshot,
         // The slot the job was routed to; null in older rows reads as UNDECLARED.
         @Nullable DataHandlingTier dataHandlingTier,
-        // The precompute models bound besides the review's own; null when none is.
-        @Nullable Map<ModelKind, FrozenModel> precompute) {
+        // The models for practice scripts bound besides the review's own; null when none is.
+        @Nullable Map<ModelKind, FrozenModel> practiceScript) {
     /**
      * Bump only for a reshape (field removal, type change, semantic reinterpretation). Adding a
      * nullable field is compatible both ways and needs no bump.
@@ -127,11 +127,11 @@ public record ConfigSnapshot(
                 allowInternet,
                 price,
                 dataHandlingTier,
-                precompute);
+                practiceScript);
     }
 
-    /** The chat kind is never a key: the precompute chat model is {@link #model()}. */
-    public ConfigSnapshot withPrecompute(@Nullable Map<ModelKind, FrozenModel> slots) {
+    /** The chat kind is never a key: the practice script chat model is {@link #model()}. */
+    public ConfigSnapshot withPracticeScript(@Nullable Map<ModelKind, FrozenModel> slots) {
         return new ConfigSnapshot(
                 schemaVersion,
                 apiProtocol,
@@ -152,7 +152,7 @@ public record ConfigSnapshot(
                 slots);
     }
 
-    /** The review's own model, which is also the chat model of its precompute scripts. */
+    /** The review's own model, which is also the chat model of its practice scripts. */
     public FrozenModel model() {
         return new FrozenModel(
                 apiProtocol,
@@ -167,19 +167,19 @@ public record ConfigSnapshot(
                 priceSnapshot);
     }
 
-    /** Every model that the precompute scripts may call, by kind; the chat model is {@link #model()}. */
-    public Map<ModelKind, FrozenModel> precomputeModels() {
+    /** Every model that the practice scripts may call, by kind; the chat model is {@link #model()}. */
+    public Map<ModelKind, FrozenModel> practiceScriptModels() {
         Map<ModelKind, FrozenModel> models = new EnumMap<>(ModelKind.class);
         models.put(ModelKind.CHAT, model());
-        if (precompute != null) {
-            models.putAll(precompute);
+        if (practiceScript != null) {
+            models.putAll(practiceScript);
         }
         return models;
     }
 
-    /** The separately bound precompute model of one kind other than chat, or {@code null} when none is frozen. */
-    public @Nullable FrozenModel precomputeSlot(ModelKind kind) {
-        return precompute == null ? null : precompute.get(kind);
+    /** The separately bound model for practice scripts of one kind other than chat, or {@code null} when none is frozen. */
+    public @Nullable FrozenModel practiceScriptSlot(ModelKind kind) {
+        return practiceScript == null ? null : practiceScript.get(kind);
     }
 
     public JsonNode toJson(ObjectMapper objectMapper) {
@@ -227,7 +227,7 @@ public record ConfigSnapshot(
                 allowInternet,
                 priceSnapshot,
                 dataHandlingTier,
-                precompute);
+                practiceScript);
     }
 
     /**

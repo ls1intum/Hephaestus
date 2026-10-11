@@ -6,7 +6,7 @@ import { AiMark } from "@/components/icons/AiMark";
 import {
 	AGENT_PURPOSE_DEFS,
 	type AgentPurpose,
-	isPrecomputePurpose,
+	isPracticeScriptPurpose,
 } from "@/components/practice-vocabulary/agent-purpose-defs";
 import {
 	DATA_HANDLING_DEFS,
@@ -24,7 +24,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
-import { LLM_API_PROTOCOL_LABELS, precomputeApiFor } from "@/lib/llm-api-protocol-labels";
+import { LLM_API_PROTOCOL_LABELS, practiceScriptApiFor } from "@/lib/llm-api-protocol-labels";
 import { priceLabel } from "@/lib/llm-pricing";
 import { hasText } from "@/lib/text";
 
@@ -62,7 +62,7 @@ export interface ModelPickerProps {
 	 */
 	tier?: DataHandlingTier;
 	/**
-	 * The purpose the model is assigned to. A precompute purpose with no model at all says what to
+	 * The purpose the model is assigned to. A purpose for practice scripts with no model at all says what to
 	 * connect, and a chosen model that will not serve it well says why, under the picker.
 	 */
 	purpose?: AgentPurpose;
@@ -128,7 +128,7 @@ function purposeHint(
 	if (purpose === undefined) {
 		return undefined;
 	}
-	if (!isPrecomputePurpose(purpose)) {
+	if (!isPracticeScriptPurpose(purpose)) {
 		return undefined;
 	}
 	const { noun } = AGENT_PURPOSE_DEFS[purpose];
@@ -136,7 +136,7 @@ function purposeHint(
 		if (!ownProviderAllowed) {
 			return `No ${noun} yet. Ask an instance admin to share one.`;
 		}
-		const api = precomputeApiFor(purpose);
+		const api = practiceScriptApiFor(purpose);
 		return (
 			<>
 				No {noun} yet. Connect a provider

@@ -323,12 +323,12 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("inject writes index.json and the per-slug criteria, and skips blank precompute scripts")
-    void injectWritesCatalogArtifactsAndSkipsBlankPrecompute() {
+    @DisplayName("inject writes index.json and the per-slug criteria, and skips blank practice scripts")
+    void injectWritesCatalogArtifactsAndSkipsBlankPracticeScript() {
         Practice withScript = practice("authoring", ScmSignals.PULL_REQUEST_OPENED);
-        withScript.setPrecomputeScript("export default () => ({});");
+        withScript.setPracticeScript("export default () => ({});");
         Practice blankScript = practice("retrospective", ScmSignals.PULL_REQUEST_MERGED);
-        blankScript.setPrecomputeScript("   "); // blank → no .ts written
+        blankScript.setPracticeScript("   "); // blank → no .ts written
         when(practiceRepository.findByWorkspaceIdAndArtifactKind(1L, ArtifactKinds.PULL_REQUEST))
                 .thenReturn(List.of(withScript, blankScript));
         Map<String, byte[]> files = new HashMap<>();
@@ -346,9 +346,9 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
                 .containsKey(md("authoring"))
                 .containsKey(md("retrospective"))
                 .doesNotContainKey(SandboxLayout.PRACTICES_PREFIX + "all-criteria.md");
-        // Only the populated precompute script is written; the blank one is skipped.
-        assertThat(files).containsKey(SandboxLayout.PRECOMPUTE_PREFIX + "practices/authoring.ts");
-        assertThat(files).doesNotContainKey(SandboxLayout.PRECOMPUTE_PREFIX + "practices/retrospective.ts");
+        // Only the populated practice script is written; the blank one is skipped.
+        assertThat(files).containsKey(SandboxLayout.PRACTICE_SCRIPT_PREFIX + "practices/authoring.ts");
+        assertThat(files).doesNotContainKey(SandboxLayout.PRACTICE_SCRIPT_PREFIX + "practices/retrospective.ts");
     }
 
     @Test

@@ -53,7 +53,7 @@ const group = (dependsOn: readonly string[]) => ({
 const webappSources = "'webapp/**/*.{js,jsx,ts,tsx,json,jsonc,css}'";
 const extensionSources = "'extension/**/*.{js,jsx,ts,tsx,json,jsonc,css}'";
 const agentSources =
-	"'server/application/src/{main,test}/resources/agent/**/*.ts' 'server/application/src/main/resources/practices/precompute/**/*.ts' 'docker/agents/{precompute,pi}/**/*.ts' 'scripts/**/*.ts'";
+	"'server/application/src/{main,test}/resources/agent/**/*.ts' 'server/application/src/main/resources/practices/scripts/**/*.ts' 'docker/agents/{practice-scripts,pi}/**/*.ts' 'scripts/**/*.ts'";
 const loadSources = "'load-tests/**/*.js'";
 const docsSources = "'docs/**/*.{js,jsx,ts,tsx,json,jsonc,css}'";
 // Two passes: a negation applies to the whole invocation, so `!*/**` would also drop the nested set.
@@ -310,7 +310,7 @@ export default defineConfig({
 			"build:extension": run("vp run --filter extension zip"),
 			"dev:extension": run("vp run --filter extension dev"),
 
-			// Agent runtime, precompute, repository scripts and tooling config
+			// Agent runtime, practice scripts, repository scripts and tooling config
 			"gate:agents-format": cached(`vp fmt --check ${agentSources}`),
 			"gate:config-format": cached(configFormatCommand("--check")),
 			"gate:agents-lint": run(`vp exec oxlint ${oxlintFormat}${oxlintTargets}`),
@@ -329,7 +329,7 @@ export default defineConfig({
 			]),
 			"gate:agent-tests": group(["test:agents"]),
 			"test:agents": run(
-				"node --test server/application/src/test/resources/agent/*.spec.ts docker/agents/precompute/*.test.ts docker/agents/precompute/lib/*.test.ts docker/agents/pi/*.test.ts",
+				"node --test server/application/src/test/resources/agent/*.spec.ts docker/agents/practice-scripts/*.test.ts docker/agents/practice-scripts/lib/*.test.ts docker/agents/pi/*.test.ts",
 			),
 			"test:tooling": run("node --test scripts/*.test.ts"),
 

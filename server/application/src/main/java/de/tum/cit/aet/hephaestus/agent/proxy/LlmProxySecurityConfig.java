@@ -40,7 +40,7 @@ import tools.jackson.databind.ObjectMapper;
  * <ol>
  *   <li>the sandbox capabilities on the gateway connector, authenticated by a proxy-scoped bearer
  *       credential, authorized by its scope, and rate-limited per authenticated principal. The
- *       {@link WorkerJwtIssuer#LLM_PRECOMPUTE_SCOPE} reaches only the precompute calls, and
+ *       {@link WorkerJwtIssuer#LLM_PRACTICE_SCRIPT_SCOPE} reaches only the practice script calls, and
  *       {@link WorkerJwtIssuer#LLM_PROXY_SCOPE} reaches everything else;
  *   <li>everything else on the gateway connector, denied and answered {@code 404} so the connector
  *       admits to no route a sandbox is not meant to call;
@@ -69,11 +69,11 @@ class LlmProxySecurityConfig {
             WorkerProperties workerProperties)
             throws Exception {
         var paths = PathPatternRequestMatcher.withDefaults();
-        RequestMatcher precomputeCalls = paths.matcher(HttpMethod.POST, "/internal/llm/precompute/{slot}/**");
+        RequestMatcher practiceScriptCalls = paths.matcher(HttpMethod.POST, "/internal/llm/practice-script/{slot}/**");
         RequestMatcher modelCalls = new OrRequestMatcher(
                 paths.matcher(HttpMethod.POST, "/internal/llm/chat/completions"),
                 paths.matcher(HttpMethod.POST, "/internal/llm/responses"),
-                precomputeCalls,
+                practiceScriptCalls,
                 paths.matcher(HttpMethod.POST, "/internal/llm/admit-observations"),
                 paths.matcher(HttpMethod.POST, "/internal/llm/public-feedback-history"),
                 paths.matcher(HttpMethod.POST, "/internal/llm/complete-public-review"));
@@ -90,8 +90,8 @@ class LlmProxySecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(errors -> errors.authenticationEntryPoint(
                         (request, response, exception) -> response.setStatus(HttpStatus.NOT_FOUND.value())))
-                .authorizeHttpRequests(auth -> auth.requestMatchers(precomputeCalls)
-                        .access(hasScope(WorkerJwtIssuer.LLM_PRECOMPUTE_SCOPE))
+                .authorizeHttpRequests(auth -> auth.requestMatchers(practiceScriptCalls)
+                        .access(hasScope(WorkerJwtIssuer.LLM_PRACTICE_SCRIPT_SCOPE))
                         .anyRequest()
                         .access(hasScope(WorkerJwtIssuer.LLM_PROXY_SCOPE)))
                 .addFilterBefore(

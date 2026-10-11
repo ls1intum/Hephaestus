@@ -127,7 +127,7 @@ class AgentJobPolicyIntegrationTest extends BaseIntegrationTest {
                 new PracticeReviewRefusalMetrics(metrics),
                 new AgentJobTelemetry(metrics, Tracer.NOOP),
                 mock(LlmUsageRecorder.class),
-                mock(PrecomputeRunRecorder.class),
+                mock(PracticeScriptRunRecorder.class),
                 budgets,
                 admission,
                 mock(ArtifactSourceCatalogRegistry.class),

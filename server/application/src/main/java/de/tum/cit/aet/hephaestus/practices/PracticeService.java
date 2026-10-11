@@ -321,12 +321,12 @@ public class PracticeService {
                                 ? null
                                 : beforeDefinition.precondition(),
                 request.criteria() == null ? beforeDefinition.criteria() : request.criteria(),
-                removesAutomatedReview && request.precomputeScript() == null
+                removesAutomatedReview && request.practiceScript() == null
                         ? null
                         : patch(
-                                beforeDefinition.precomputeScript(),
-                                request.precomputeScript(),
-                                fieldsToClear.contains(ClearablePracticeField.PRECOMPUTE_SCRIPT)),
+                                beforeDefinition.practiceScript(),
+                                request.practiceScript(),
+                                fieldsToClear.contains(ClearablePracticeField.PRACTICE_SCRIPT)),
                 automatedReviewPolicy,
                 patch(
                         beforeDefinition.whyItMatters(),
@@ -475,7 +475,7 @@ public class PracticeService {
                 request.subject() == null ? ActorRole.AUTHOR : request.subject(),
                 request.precondition(),
                 required(request.criteria(), "criteria"),
-                request.precomputeScript(),
+                request.practiceScript(),
                 request.automatedReviewPolicy() == null
                         ? evidenceDefaults.policyFor(artifactKind)
                         : request.automatedReviewPolicy(),
@@ -502,7 +502,7 @@ public class PracticeService {
         practice.setSubject(definition.subject());
         practice.setPrecondition(definition.precondition());
         practice.setCriteria(definition.criteria());
-        practice.setPrecomputeScript(definition.precomputeScript());
+        practice.setPracticeScript(definition.practiceScript());
         practice.setAutomatedReviewPolicy(definition.automatedReviewPolicy());
         practice.setDeliveryBehavior(definition.deliveryBehavior());
         practice.setWhyItMatters(definition.whyItMatters());

@@ -152,7 +152,7 @@ class ConfigSnapshotTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldRoundTripThePrecomputeModelsWhenTheJobHasThem() {
+        void shouldRoundTripThePracticeScriptModelsWhenTheJobHasThem() {
             WorkspaceAgentBinding binding = createBinding();
             stubResolver(binding);
             var embedding = new FrozenModel(
@@ -179,34 +179,34 @@ class ConfigSnapshotTest extends BaseUnitTest {
                             null)
                     .withPriceSnapshot(LlmPriceSnapshot.unpricedInstance());
             ConfigSnapshot original = ConfigSnapshot.from(binding, resolver)
-                    .withPrecompute(Map.of(ModelKind.EMBEDDING, embedding, ModelKind.DECISION, decision));
+                    .withPracticeScript(Map.of(ModelKind.EMBEDDING, embedding, ModelKind.DECISION, decision));
 
             JsonNode json = original.toJson(OBJECT_MAPPER);
             ConfigSnapshot deserialized = ConfigSnapshot.fromJson(json, OBJECT_MAPPER);
 
             assertThat(deserialized).isEqualTo(original);
-            assertThat(json.path("precompute").path("EMBEDDING").has("connectionRef"))
+            assertThat(json.path("practiceScript").path("EMBEDDING").has("connectionRef"))
                     .as("only the record components are stored")
                     .isFalse();
             assertThat(json.toString()).doesNotContain("apiKey");
         }
 
         @Test
-        void shouldReadNoPrecomputeModelsWhenTheRowPredatesThem() {
+        void shouldReadNoPracticeScriptModelsWhenTheRowPredatesThem() {
             WorkspaceAgentBinding binding = createBinding();
             stubResolver(binding);
             ObjectNode json =
                     (ObjectNode) ConfigSnapshot.from(binding, resolver).toJson(OBJECT_MAPPER);
-            json.remove("precompute");
+            json.remove("practiceScript");
 
             ConfigSnapshot deserialized = ConfigSnapshot.fromJson(json, OBJECT_MAPPER);
 
-            assertThat(deserialized.precompute()).isNull();
+            assertThat(deserialized.practiceScript()).isNull();
             assertThat(deserialized.upstreamModelId()).isEqualTo("claude-sonnet-4-20250514");
         }
 
         @Test
-        void shouldKeepThePrecomputeModelsWhenTheReviewPriceIsFrozen() {
+        void shouldKeepThePracticeScriptModelsWhenTheReviewPriceIsFrozen() {
             WorkspaceAgentBinding binding = createBinding();
             stubResolver(binding);
             var reranking = new FrozenModel(
@@ -222,10 +222,10 @@ class ConfigSnapshotTest extends BaseUnitTest {
                     null);
 
             ConfigSnapshot priced = ConfigSnapshot.from(binding, resolver)
-                    .withPrecompute(Map.of(ModelKind.RERANKING, reranking))
+                    .withPracticeScript(Map.of(ModelKind.RERANKING, reranking))
                     .withPriceSnapshot(LlmPriceSnapshot.unpricedInstance());
 
-            assertThat(priced.precomputeSlot(ModelKind.RERANKING)).isEqualTo(reranking);
+            assertThat(priced.practiceScriptSlot(ModelKind.RERANKING)).isEqualTo(reranking);
         }
 
         @Test
@@ -395,7 +395,7 @@ class ConfigSnapshotTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldOfferTheReviewModelAsThePrecomputeChatModelWhenOtherKindsAreBound() {
+    void shouldOfferTheReviewModelAsThePracticeScriptChatModelWhenOtherKindsAreBound() {
         WorkspaceAgentBinding binding = createBinding();
         stubResolver(binding);
         var embedding = new FrozenModel(
@@ -411,9 +411,9 @@ class ConfigSnapshotTest extends BaseUnitTest {
                 null);
 
         ConfigSnapshot snapshot =
-                ConfigSnapshot.from(binding, resolver).withPrecompute(Map.of(ModelKind.EMBEDDING, embedding));
+                ConfigSnapshot.from(binding, resolver).withPracticeScript(Map.of(ModelKind.EMBEDDING, embedding));
 
-        assertThat(snapshot.precomputeModels())
+        assertThat(snapshot.practiceScriptModels())
                 .containsOnly(Map.entry(ModelKind.CHAT, snapshot.model()), Map.entry(ModelKind.EMBEDDING, embedding));
         assertThat(snapshot.model().upstreamModelId()).isEqualTo("claude-sonnet-4-20250514");
         assertThat(snapshot.model().connectionRef())

@@ -182,7 +182,7 @@ Deletion must traverse every content-bearing copy and derived record. A deleted 
 
 - Job directory.
 - Repository snapshot.
-- Precompute output.
+- Practice script output.
 - Observation.
 - Feedback record.
 - Export.

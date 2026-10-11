@@ -15,8 +15,8 @@ import type {
 	AgentBinding,
 	AgentBindingRequest,
 	AvailableLlmModel,
-	PracticePrecomputeSummary,
-	PrecomputeNeed,
+	PracticeScriptSummary,
+	PracticeScriptNeed,
 	WorkspaceLlmUsageReport,
 } from "@/api/types.gen";
 import { practiceSetupLevel } from "@/components/admin/practices/practice-search";
@@ -36,8 +36,8 @@ import {
 	AGENT_PURPOSES,
 	type AgentPurpose,
 	isAgentPurpose,
-	isPrecomputePurpose,
-	PRECOMPUTE_PURPOSES,
+	isPracticeScriptPurpose,
+	PRACTICE_SCRIPT_PURPOSES,
 } from "@/components/practice-vocabulary/agent-purpose-defs";
 import {
 	BINDING_READINESS_DEFS,
@@ -54,7 +54,7 @@ import {
 } from "@/components/practice-vocabulary/data-handling-defs";
 import { DataHandlingMark } from "@/components/practice-vocabulary/DataHandlingMark";
 import { ModelKindMark } from "@/components/practice-vocabulary/ModelKindMark";
-import { precomputeNeedBadge } from "@/components/practice-vocabulary/precompute-need-defs";
+import { practiceScriptNeedBadge } from "@/components/practice-vocabulary/practice-script-need-defs";
 import {
 	PURPOSE_STATUS_DEFS,
 	type PurposeStatus,
@@ -112,13 +112,13 @@ interface PurposeGroup {
 const REVIEWS_GROUP: PurposeGroup = {
 	title: "Reviews and Heph",
 	rule: "A member who chooses Cloud gets the Cloud assignment when it is ready, and the In-house one when it is not. A member who chooses In-house gets only the In-house assignment.",
-	purposes: AGENT_PURPOSES.filter((purpose) => !isPrecomputePurpose(purpose)),
+	purposes: AGENT_PURPOSES.filter((purpose) => !isPracticeScriptPurpose(purpose)),
 };
 
-const PRECOMPUTE_GROUP: PurposeGroup = {
-	title: "Models for precompute scripts",
-	rule: "A practice’s precompute script runs before its review and points it at places to check. A script uses only models at least as strict as the review’s own model.",
-	purposes: PRECOMPUTE_PURPOSES,
+const PRACTICE_SCRIPT_GROUP: PurposeGroup = {
+	title: "Models for practice scripts",
+	rule: "A practice’s script runs before its review and points it to places to check. A script uses only models at least as strict as the review’s own model.",
+	purposes: PRACTICE_SCRIPT_PURPOSES,
 };
 
 /** One column of a purpose row: the members who gave one answer, and which model serves them. */
@@ -178,7 +178,7 @@ function servingBinding(
 }
 
 /**
- * A precompute assignment that could run but serves none of its own tier's members: the server
+ * An assignment for practice scripts that could run but serves none of its own tier's members: the server
  * serves a script no looser than the review model of the same members.
  */
 function servesNoneOfItsTier(binding: AgentBinding): boolean {
@@ -244,7 +244,7 @@ function parseWholeNumber(
 	return { value: parsed, error: null };
 }
 
-export type PrecomputeSummariesState = PanelState<{ summaries: PracticePrecomputeSummary[] }>;
+export type PracticeScriptSummariesState = PanelState<{ summaries: PracticeScriptSummary[] }>;
 
 export interface AgentBindingsPageProps {
 	workspaceSlug: string;
@@ -255,10 +255,10 @@ export interface AgentBindingsPageProps {
 	/** Once a workspace requires the choice, the undeclared row serves nobody. */
 	aiChoiceRequired: boolean;
 	/**
-	 * What each practice's precompute script declared in its newest review. Its own state: the rest
-	 * of the page works without it, so its failure shows only in the precompute section.
+	 * What each practice's script declared in its newest review. Its own state: the rest
+	 * of the page works without it, so its failure shows only in the section *Models for practice scripts*.
 	 */
-	precomputeNeeds: PrecomputeSummariesState;
+	practiceScriptNeeds: PracticeScriptSummariesState;
 	/**
 	 * Whether the instance lets this workspace add its own providers. False, a hint that would send
 	 * the admin to add one names who can share a model instead.
@@ -383,7 +383,7 @@ function PurposeGroupsSkeleton({ aiChoiceRequired }: { aiChoiceRequired: boolean
 	const columns = tierColumns(aiChoiceRequired);
 	return (
 		<div className="space-y-8" aria-busy="true">
-			{[REVIEWS_GROUP, PRECOMPUTE_GROUP].map((group) => (
+			{[REVIEWS_GROUP, PRACTICE_SCRIPT_GROUP].map((group) => (
 				<Section key={group.title} title={group.title} description={group.rule}>
 					<Card flush>
 						<TierHeader aiChoiceRequired={aiChoiceRequired} />
@@ -400,7 +400,7 @@ function PurposeGroupsSkeleton({ aiChoiceRequired }: { aiChoiceRequired: boolean
 											<Skeleton className="size-8 shrink-0 rounded-md" />
 											<div className="min-w-0 flex-1 space-y-1.5">
 												<Skeleton className="h-4 w-32" />
-												{isPrecomputePurpose(purpose) && <Skeleton className="h-3 w-24" />}
+												{isPracticeScriptPurpose(purpose) && <Skeleton className="h-3 w-24" />}
 											</div>
 										</div>
 										{columns.map((column) => (
@@ -421,7 +421,7 @@ function PurposeGroupsSkeleton({ aiChoiceRequired }: { aiChoiceRequired: boolean
 interface UsedBy {
 	practiceSlug: string;
 	practiceName: string;
-	need: PrecomputeNeed["need"];
+	need: PracticeScriptNeed["need"];
 	unmetTiers: DataHandlingTier[];
 }
 
@@ -444,8 +444,8 @@ interface PurposeView {
 	status: PurposeStatus | null;
 	cells: TierCell[];
 	/**
-	 * Precompute purposes only: the practices whose scripts declared this model. Undefined for a
-	 * precompute purpose until the needs are in.
+	 * Purposes for practice scripts only: the practices whose scripts declared this model. Undefined for a
+	 * purpose for practice scripts until the needs are in.
 	 */
 	usedBy?: UsedBy[];
 	/** The practices whose required model some members do not get. */
@@ -469,7 +469,7 @@ function usedByOrder(a: UsedBy, b: UsedBy): number {
 	);
 }
 
-function usedByOf(purpose: AgentPurpose, summaries: PracticePrecomputeSummary[]): UsedBy[] {
+function usedByOf(purpose: AgentPurpose, summaries: PracticeScriptSummary[]): UsedBy[] {
 	return summaries
 		.flatMap((summary) =>
 			summary.needs
@@ -490,7 +490,7 @@ interface PurposeViewInput {
 	practicesEnabled: boolean;
 	aiChoiceRequired: boolean;
 	/** Undefined while the needs load or after they failed: no row claims anything about them. */
-	needs: PracticePrecomputeSummary[] | undefined;
+	needs: PracticeScriptSummary[] | undefined;
 }
 
 function purposeView(
@@ -500,8 +500,8 @@ function purposeView(
 	const own = bindings.filter((binding) => binding.purpose === purpose);
 	// Every purpose but Heph runs inside a practice review, so their switch turns it off too.
 	const off = purpose !== "MENTOR" && !practicesEnabled;
-	const precompute = isPrecomputePurpose(purpose);
-	const usedBy = precompute && needs !== undefined ? usedByOf(purpose, needs) : undefined;
+	const practiceScript = isPracticeScriptPurpose(purpose);
+	const usedBy = practiceScript && needs !== undefined ? usedByOf(purpose, needs) : undefined;
 	const unmet = off ? [] : (usedBy ?? []).filter(unmetRequired);
 	// While practice reviews are off no column is served, whatever the row binds.
 	const cells = tierColumns(aiChoiceRequired).map((column) => {
@@ -529,7 +529,7 @@ function purposeView(
 			served: cells.map((cell) => cell.binding !== undefined),
 			off,
 			requiredNeedUnmet: unmet.length > 0,
-			used: !precompute || (usedBy !== undefined && usedBy.length > 0),
+			used: !practiceScript || (usedBy !== undefined && usedBy.length > 0),
 		}),
 	};
 }
@@ -553,10 +553,10 @@ function PurposeGroups({
 	onFocusPurposeClosed,
 	...props
 }: PurposeGroupsProps) {
-	const { precomputeNeeds } = props;
-	const needs = precomputeNeeds.status === "ready" ? precomputeNeeds.summaries : undefined;
+	const { practiceScriptNeeds } = props;
+	const needs = practiceScriptNeeds.status === "ready" ? practiceScriptNeeds.summaries : undefined;
 	const views = new Map(
-		[...REVIEWS_GROUP.purposes, ...PRECOMPUTE_GROUP.purposes].map((purpose) => [
+		[...REVIEWS_GROUP.purposes, ...PRACTICE_SCRIPT_GROUP.purposes].map((purpose) => [
 			purpose,
 			purposeView(purpose, { ...props, needs }),
 		]),
@@ -568,14 +568,14 @@ function PurposeGroups({
 		});
 	// Decided once: a row that opens or closes under the admin after each save would lose their place.
 	const [open, setOpen] = useState<AgentPurpose[]>(() => openingNow(AGENT_PURPOSES));
-	// The precompute rows are judged by the needs, which can arrive after the page, so they decide
+	// The rows for practice scripts are judged by the needs, which can arrive after the page, so they decide
 	// once when the needs first arrive.
 	const [needsJudged, setNeedsJudged] = useState(needs !== undefined);
 	if (needs !== undefined && !needsJudged) {
 		setNeedsJudged(true);
 		setOpen((current) => [
 			...current,
-			...openingNow(PRECOMPUTE_GROUP.purposes).filter((purpose) => !current.includes(purpose)),
+			...openingNow(PRACTICE_SCRIPT_GROUP.purposes).filter((purpose) => !current.includes(purpose)),
 		]);
 	}
 	const openValue =
@@ -619,19 +619,19 @@ function PurposeGroups({
 				{...sectionProps}
 			/>
 			<PurposeGroupSection
-				group={PRECOMPUTE_GROUP}
+				group={PRACTICE_SCRIPT_GROUP}
 				description={
 					<>
-						{PRECOMPUTE_GROUP.rule}
+						{PRACTICE_SCRIPT_GROUP.rule}
 						{off && <> Practice reviews are off, so these models are not used. {reviewsOffLink}</>}
 					</>
 				}
 				notice={
-					precomputeNeeds.status === "error" && (
+					practiceScriptNeeds.status === "error" && (
 						<QueryErrorAlert
-							error={precomputeNeeds.error}
+							error={practiceScriptNeeds.error}
 							title="We could not load which practices use these models"
-							onRetry={precomputeNeeds.onRetry}
+							onRetry={practiceScriptNeeds.onRetry}
 						/>
 					)
 				}
@@ -775,7 +775,7 @@ function PurposeRow({
 	rowRef,
 	availableModels,
 	aiChoiceRequired,
-	precomputeNeeds,
+	practiceScriptNeeds,
 	ownProviderAllowed,
 	pendingWrites,
 	saveRevisions,
@@ -788,7 +788,7 @@ function PurposeRow({
 	const { title, description } = AGENT_PURPOSE_DEFS[purpose];
 	// The server names the purposes each model's protocol can serve.
 	const servingModels = availableModels.filter((model) => model.purposes.includes(purpose));
-	const precompute = isPrecomputePurpose(purpose);
+	const practiceScript = isPracticeScriptPurpose(purpose);
 	const usedById = `${baseId}-used-by`;
 	const statusId = `${baseId}-status`;
 	const cellId = (index: number) => `${baseId}-cell-${index}`;
@@ -825,7 +825,7 @@ function PurposeRow({
 							)}
 							{/* A div skeleton cannot sit in the trigger's button; an invisible line holds the
 							    height the count will take, and claims nothing while the needs load. */}
-							{precompute && precomputeNeeds.status === "loading" && (
+							{practiceScript && practiceScriptNeeds.status === "loading" && (
 								<span aria-hidden className="invisible block text-xs">
 									{usedByLine([])}
 								</span>
@@ -883,7 +883,7 @@ function PurposeRow({
 								ownProviderAllowed={ownProviderAllowed}
 								practiceReviewsOff={off}
 								unusedForCloudMembers={
-									precompute &&
+									practiceScript &&
 									tier === "CLOUD" &&
 									binding !== undefined &&
 									servesNoneOfItsTier(binding)
@@ -915,8 +915,8 @@ function unmetNeedSentence(purpose: AgentPurpose, unmet: UsedBy[]): string {
 			: `${unmet.length} practices need ${withArticle} for ${members}.`;
 	const consequence =
 		unmet.length === 1
-			? "Until you assign one, its precompute script does not run, and the review checks the practice without its help."
-			: "Until you assign one, their precompute scripts do not run, and the reviews check those practices without their help.";
+			? "Until you assign one, its practice script does not run, and the review checks the practice without its help."
+			: "Until you assign one, their practice scripts do not run, and the reviews check those practices without their help.";
 	return `${needs} ${consequence}`;
 }
 
@@ -931,7 +931,7 @@ function UsedByList({ usedBy, workspaceSlug }: { usedBy: UsedBy[]; workspaceSlug
 			</h4>
 			<ul aria-labelledby={headingId} className="divide-y">
 				{shown.map((entry) => {
-					const badge = precomputeNeedBadge(entry.need);
+					const badge = practiceScriptNeedBadge(entry.need);
 					return (
 						<li key={entry.practiceSlug} className="space-y-0.5 py-2">
 							{/* The badge sits beside the name it qualifies, not at the far edge of the row. */}
@@ -999,7 +999,7 @@ interface BindingRowProps {
 	/** While practice reviews are off no row serves anyone, so none claims to be ready. */
 	practiceReviewsOff: boolean;
 	/**
-	 * A precompute Cloud assignment that Cloud members do not get: their reviews run on an In-house
+	 * A Cloud assignment for practice scripts that Cloud members do not get: their reviews run on an In-house
 	 * model, and a script model is never looser than its review's.
 	 */
 	unusedForCloudMembers: boolean;
@@ -1036,8 +1036,8 @@ function BindingRow({
 	const noModels = !availableModels.some(
 		(model) => pickerTier === undefined || model.dataHandlingTier === pickerTier,
 	);
-	// With no model of a precompute kind at all, the picker itself says what to connect.
-	const pickerExplainsEmpty = isPrecomputePurpose(purpose) && availableModels.length === 0;
+	// With no model of a model kind for practice scripts at all, the picker itself says what to connect.
+	const pickerExplainsEmpty = isPracticeScriptPurpose(purpose) && availableModels.length === 0;
 	const boundModel = modelOf(binding, availableModels);
 	// A bound model whose facts were re-declared has dropped out of this row: the picker still names
 	// it on the trigger, and the row says why it stopped serving.
@@ -1059,7 +1059,7 @@ function BindingRow({
 	const [showAdvanced, setShowAdvanced] = useState(false);
 	// Only Heph may reach the internet; the server rejects the flag for every other purpose.
 	const internetConfigurable = purpose === "MENTOR";
-	// A precompute model is called inside a practice review, under that review's limits.
+	// A model for practice scripts is called inside a practice review, under that review's limits.
 	const hasRunLimits = purpose === "PRACTICE_REVIEW" || purpose === "MENTOR";
 	const [submitAttempt, setSubmitAttempt] = useState(0);
 

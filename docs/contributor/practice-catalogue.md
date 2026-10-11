@@ -10,7 +10,7 @@ Product terminology lives in the [practice feedback language guide](practice-fee
 This page covers how to maintain the catalog.
 
 [Writing effective practices](/admin/writing-practices) owns the authoring method, a worked example and the case-based review checklist for both custom and bundled practices.
-Apply it to the effective definition, including its shared preamble and any precompute output, rather than reading the criteria in isolation.
+Apply it to the effective definition, including its shared preamble and any practice script output, rather than reading the criteria in isolation.
 
 ## Sources and ownership
 
@@ -26,7 +26,7 @@ flowchart LR
 
 | Scope               | Owner                    | Stored as                                   | Decides                          |
 | ------------------- | ------------------------ | ------------------------------------------- | -------------------------------- |
-| Hephaestus defaults | repository maintainers   | `default-catalog.json` + precompute scripts | the bundled definition and order |
+| Hephaestus defaults | repository maintainers   | `default-catalog.json` + practice scripts   | the bundled definition and order |
 | Instance catalog    | instance administrators  | sparse override rows                        | what workspaces may adopt        |
 | Workspace practices | workspace administrators | full database copies                        | reviews in one workspace         |
 
@@ -68,7 +68,7 @@ The practice editor follows the decisions an author can make confidently:
 3. **How this practice is mentored** — choose AI-supported mentoring, human review, or guidance only.
 
 The review signals are under **When this practice is reviewed**.
-The optional precompute script has its own section after **When this practice is reviewed**.
+The optional practice script has its own section, **Script**, after **When this practice is reviewed**.
 The generated identifier and feedback delivery are under **Technical settings**.
 A new practice starts with the signals and evidence requirements recommended for its kind of work.
 Authors change them only when the practice needs a different review boundary.
@@ -95,7 +95,7 @@ The practice form starts with one product choice instead of separate model and e
   A developer, peer, or mentor can still review it from context the system does not collect.
   It still names its occasion, which supplies its artifact kind.
   Saying what a practice is about is not the same claim as asking Hephaestus to act on it.
-  It cannot define a precompute script.
+  It cannot define a practice script.
   Its autonomy is forced to `OFF`.
 - **Guidance only** keeps the criteria and guidance without configuring Hephaestus to review it.
 
@@ -343,9 +343,9 @@ Do not present a standard as an experiment or a convention as a proven outcome.
    Omitting a dimension permits all its values.
    There is no occasion array or string-or-object shorthand.
 
-   Reference any precompute script explicitly.
+   Reference any practice script explicitly.
    A script must be named after the practice slug, and an unreferenced one fails validation.
-   What a script is and what the library owns is in [Precompute scripts](#precompute-scripts) below.
+   What a script is and what the library owns is in [Practice scripts](#practice-scripts) below.
 
    Give the practice a `holdsAs` sentence — [Holds as](./practice-feedback-language.md) in the feedback language.
    Use one present-tense line without dashes, within the length that the schema (`default-catalog.schema.json`) sets.
@@ -360,7 +360,7 @@ Do not present a standard as an experiment or a convention as a proven outcome.
    The one exception is `insufficiencyReason`.
 
    If no collected source can answer the practice's question, it ships as **Human review needed**.
-   It carries that reason and no precompute script.
+   It carries that reason and no practice script.
    The shipped reason is a withdrawal, not a default, so no instance customization or recorded workspace copy can override it.
 
    The effective catalog gives a customized entry that asks for a review the shipped policy and reason (`PracticeDefinition.withdrawnAs`).
@@ -418,23 +418,23 @@ A changed visual or guide follows the [release behavior](#release-behavior) of e
 
 [Practice visuals and guides](./practice-visuals.md) is the style guide.
 
-### Precompute scripts
+### Practice scripts
 
-A precompute script extracts candidates inside the review container.
+A practice script extracts candidates inside the review container.
 It receives the parsed diff, artifact metadata, captured context and derived change directory (`work/change/`).
 Its output is hints, metrics and directions, not observations.
 
 This section describes the positional contract that every bundled script uses.
-It is the supported legacy contract of the bundled scripts, as [Precompute runner internals](./practice-precompute.mdx#two-contracts) states.
+It is the supported legacy contract of the bundled scripts, as [Practice script runner](./practice-script-runner.mdx#two-contracts) states.
 A script with the definition contract returns leads and can call models.
-[Write a precompute script](/admin/precompute-scripts) owns that contract, its model slots and its lead design.
-The [workspace ABI](./agent/workspace-abi.mdx#precompute-validation-and-limits) owns the process grants and deadlines of both contracts.
+[Write a practice script](/admin/practice-scripts) owns that contract, its model slots and its lead design.
+The [workspace ABI](./agent/workspace-abi.mdx#practice-script-validation-and-limits) owns the process grants and deadlines of both contracts.
 
 A hint on a changed line must name a file and a line that the change adds.
 The runner does not show a hint that does not, and the section states how many it held back.
 
 - **Practice-specific predicates belong in the script.** Shared readers and scanning mechanics live
-  in `docker/agents/precompute/lib/`. Keep the predicates consistent with the practice criteria.
+  in `docker/agents/practice-scripts/lib/`. Keep the predicates consistent with the practice criteria.
 - **A candidate is not a judgment.** A matched line or review thread directs inspection. The model
   must check its context against the criteria. The purity test rejects observation vocabulary in
   scripts, but does not establish that their output is complete or correct.
@@ -444,7 +444,7 @@ The runner does not show a hint that does not, and the section states how many i
   Unsupported languages and unavailable files produce `unknown` placement. Directions must identify
   relevant limits, such as constructs that span several lines.
 
-The runner renders one bounded section per practice, `work/precompute-out/<slug>.md`, and the review shows it under that practice's criteria in the turn that evaluates it.
+The runner renders one bounded section per practice, `work/practice-scripts-out/<slug>.md`, and the review shows it under that practice's criteria in the turn that evaluates it.
 A section holds the practice's directions, candidate locations and record rows.
 When they do not fit its 3,000 characters, it keeps a sample of each and a pointer to the full per-practice JSON.
 Sections are bounded one by one, so a script with many rows never crowds another practice's leads out.
@@ -453,13 +453,13 @@ A section is an entry point to the evidence, not proof that the model inspected 
 
 ### Review the effective definition
 
-For every changed practice, compare its criteria with the work-type preamble, review configuration, precompute script, shared review instructions and developer guidance.
+For every changed practice, compare its criteria with the work-type preamble, review configuration, practice script, shared review instructions and developer guidance.
 Check these seams explicitly:
 
 - A preamble cannot declare a source unavailable when the review captures it, or infer absence from
   an unavailable quotation. The actual capture manifest establishes availability. Practice criteria
   establish permitted use.
-- A precompute candidate is a lead, not a judgment. A count or path match alone cannot establish a
+- A candidate from a practice script is a lead, not a judgment. A count or path match alone cannot establish a
   developer's intent, a runtime outcome or the adequacy of a rationale.
 - An applicability exclusion and an assessed outcome cannot both describe the same case. Read all
   exceptions together with the final decision instructions, not just the opening behavior statement.

@@ -7,8 +7,8 @@ import de.tum.cit.aet.hephaestus.core.UnknownVocabulary;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceContract;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
-import de.tum.cit.aet.hephaestus.practices.spi.PrecomputeModelUseDTO;
-import de.tum.cit.aet.hephaestus.practices.spi.PrecomputeRunDTO;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptModelUseDTO;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptRunDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOutcomeLookup;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -35,7 +35,7 @@ class ReviewOutcomeLookupAdapter implements ReviewOutcomeLookup {
     private static final TypeReference<List<StoredModelUse>> MODEL_USES = new TypeReference<>() {};
 
     private final AgentJobRepository repository;
-    private final AgentJobPrecomputeRunRepository precomputeRuns;
+    private final AgentJobPracticeScriptRunRepository practiceScriptRuns;
     private final ArtifactSourceCatalogRegistry sources;
 
     @Override
@@ -48,8 +48,8 @@ class ReviewOutcomeLookupAdapter implements ReviewOutcomeLookup {
         for (AnsweredPracticesRow row : repository.findAnsweredPractices(workspaceId, reviewIds)) {
             answered.put(row.getId(), answeredBy(row.getAnsweredPractices()));
         }
-        Map<UUID, Map<String, PrecomputeRunDTO>> precompute =
-                latestAttemptRuns(precomputeRuns.findByWorkspaceIdAndJobIdIn(workspaceId, reviewIds));
+        Map<UUID, Map<String, PracticeScriptRunDTO>> practiceScript =
+                latestAttemptRuns(practiceScriptRuns.findByWorkspaceIdAndJobIdIn(workspaceId, reviewIds));
         Map<UUID, ReviewOutcome> outcomes = new HashMap<>();
         for (ReviewOutcomeRow row : repository.findReviewOutcomes(workspaceId, reviewIds)) {
             outcomes.put(
@@ -57,7 +57,7 @@ class ReviewOutcomeLookupAdapter implements ReviewOutcomeLookup {
                     toOutcome(
                             row,
                             answered.getOrDefault(row.getId(), Map.of()),
-                            precompute.getOrDefault(row.getId(), Map.of())));
+                            practiceScript.getOrDefault(row.getId(), Map.of())));
         }
         return Map.copyOf(outcomes);
     }
@@ -66,26 +66,26 @@ class ReviewOutcomeLookupAdapter implements ReviewOutcomeLookup {
      * Each job's runs of its last attempt that recorded any. Only a terminal attempt records runs, so this is
      * the attempt the job's outcome describes.
      */
-    static Map<UUID, Map<String, PrecomputeRunDTO>> latestAttemptRuns(List<AgentJobPrecomputeRun> runs) {
+    static Map<UUID, Map<String, PracticeScriptRunDTO>> latestAttemptRuns(List<AgentJobPracticeScriptRun> runs) {
         Map<UUID, Integer> lastAttempt = new HashMap<>();
-        for (AgentJobPrecomputeRun run : runs) {
+        for (AgentJobPracticeScriptRun run : runs) {
             lastAttempt.merge(run.getId().getJobId(), run.attempt(), Math::max);
         }
-        Map<UUID, Map<String, PrecomputeRunDTO>> byJob = new HashMap<>();
-        for (AgentJobPrecomputeRun run : runs) {
+        Map<UUID, Map<String, PracticeScriptRunDTO>> byJob = new HashMap<>();
+        for (AgentJobPracticeScriptRun run : runs) {
             UUID jobId = run.getId().getJobId();
             if (Integer.valueOf(run.attempt()).equals(lastAttempt.get(jobId))) {
                 byJob.computeIfAbsent(jobId, id -> new HashMap<>())
                         .put(
                                 run.practiceSlug(),
-                                new PrecomputeRunDTO(run.getStatus(), run.getLeads(), modelUses(run.getModels())));
+                                new PracticeScriptRunDTO(run.getStatus(), run.getLeads(), modelUses(run.getModels())));
             }
         }
         return byJob;
     }
 
     /** A run whose models are not known made no model calls that the trace can list. */
-    private static List<PrecomputeModelUseDTO> modelUses(@Nullable JsonNode stored) {
+    private static List<PracticeScriptModelUseDTO> modelUses(@Nullable JsonNode stored) {
         return storedModelUses(stored).stream().map(StoredModelUse::toDto).toList();
     }
 
@@ -94,7 +94,7 @@ class ReviewOutcomeLookupAdapter implements ReviewOutcomeLookup {
     }
 
     private ReviewOutcome toOutcome(
-            ReviewOutcomeRow row, Map<String, UUID> answeredBy, Map<String, PrecomputeRunDTO> precompute) {
+            ReviewOutcomeRow row, Map<String, UUID> answeredBy, Map<String, PracticeScriptRunDTO> practiceScript) {
         boolean refusedEvidence = row.getStatus() == AgentJobStatus.COMPLETED
                 && row.getOutput() != null
                 && ReviewRunOutcome.fromJobOutput(row.getOutput()) == ReviewRunOutcome.INSUFFICIENT_EVIDENCE;
@@ -105,7 +105,7 @@ class ReviewOutcomeLookupAdapter implements ReviewOutcomeLookup {
                 readiness(row.getReviewReadiness()),
                 coverage(row.getOutput()),
                 answeredBy,
-                Map.copyOf(precompute));
+                Map.copyOf(practiceScript));
     }
 
     /** The producing review by practice slug; an unreadable record answers nothing rather than guessing. */

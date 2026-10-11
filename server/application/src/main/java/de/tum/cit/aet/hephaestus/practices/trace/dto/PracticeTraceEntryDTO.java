@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.practices.trace.dto;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeSignalDTO;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
-import de.tum.cit.aet.hephaestus.practices.spi.PrecomputeRunDTO;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptRunDTO;
 import de.tum.cit.aet.hephaestus.practices.trace.PracticeTraceOutcome;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
@@ -78,13 +78,13 @@ public record PracticeTraceEntryDTO(
         List<FeedbackSuppressionReason> withheldReasons,
 
         @Schema(
-                description = "What this practice's precompute script did in the named review; null when the "
+                description = "What this practice's script did in the named review; null when the "
                         + "practice has no script there or the review reported nothing about it")
         @Nullable
-        PrecomputeRunDTO precompute) {
+        PracticeScriptRunDTO practiceScript) {
 
-    /** This entry with the precompute run of the review it names. */
-    public PracticeTraceEntryDTO withPrecompute(@Nullable PrecomputeRunDTO run) {
+    /** This entry with the practice script run of the review it names. */
+    public PracticeTraceEntryDTO withPracticeScript(@Nullable PracticeScriptRunDTO run) {
         return new PracticeTraceEntryDTO(
                 practiceSlug,
                 practiceName,

@@ -436,20 +436,20 @@ class LlmProxyServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    class PrecomputeRoutes {
+    class PracticeScriptRoutes {
 
         @ParameterizedTest
         @NullSource
         @ValueSource(strings = {"", "Comment-Quality", "../comment-quality", "-comment-quality"})
         void shouldRefuseAndCountACallWhenItNamesNoValidPractice(@Nullable String practice) {
-            authenticate(precomputeRouting(ModelKind.EMBEDDING, "openai-embeddings"));
+            authenticate(practiceScriptRouting(ModelKind.EMBEDDING, "openai-embeddings"));
             HttpHeaders headers = new HttpHeaders();
             if (practice != null) {
-                headers.set(JobTokenAuthenticationFilter.PRECOMPUTE_PRACTICE_HEADER, practice);
+                headers.set(JobTokenAuthenticationFilter.PRACTICE_SCRIPT_PRACTICE_HEADER, practice);
             }
 
-            var result = controller.proxyPrecompute(
-                    request("POST", "/internal/llm/precompute/embedding/embeddings"),
+            var result = controller.proxyPracticeScript(
+                    request("POST", "/internal/llm/practice-script/embedding/embeddings"),
                     new MockHttpServletResponse(),
                     headers,
                     jsonBody());
@@ -457,7 +457,7 @@ class LlmProxyServiceTest extends BaseUnitTest {
             assertThat(result).isNotNull();
             assertThat(result.getStatusCode().value()).isEqualTo(400);
             assertThat(meterRegistry
-                            .counter("llm.proxy.precompute.unattributed")
+                            .counter("llm.proxy.practice_script.unattributed")
                             .count())
                     .isEqualTo(1.0);
             verifyNoInteractions(resolver, usageAccumulator);
@@ -465,10 +465,10 @@ class LlmProxyServiceTest extends BaseUnitTest {
 
         @Test
         void shouldRefuseACallWhenItsPracticeIsLongerThanASlug() {
-            authenticate(precomputeRouting(ModelKind.EMBEDDING, "openai-embeddings"));
+            authenticate(practiceScriptRouting(ModelKind.EMBEDDING, "openai-embeddings"));
 
-            var result = controller.proxyPrecompute(
-                    request("POST", "/internal/llm/precompute/embedding/embeddings"),
+            var result = controller.proxyPracticeScript(
+                    request("POST", "/internal/llm/practice-script/embedding/embeddings"),
                     new MockHttpServletResponse(),
                     practiceHeaders("a".repeat(65)),
                     jsonBody());
@@ -479,10 +479,10 @@ class LlmProxyServiceTest extends BaseUnitTest {
 
         @Test
         void shouldRefuseAnOpWhenItIsNotThePathOfTheSlotsProtocol() {
-            authenticate(precomputeRouting(ModelKind.DECISION, "openai-decisions"));
+            authenticate(practiceScriptRouting(ModelKind.DECISION, "openai-decisions"));
 
-            var result = controller.proxyPrecompute(
-                    request("POST", "/internal/llm/precompute/decision/chat/completions"),
+            var result = controller.proxyPracticeScript(
+                    request("POST", "/internal/llm/practice-script/decision/chat/completions"),
                     new MockHttpServletResponse(),
                     practiceHeaders(),
                     jsonBody());
@@ -495,15 +495,15 @@ class LlmProxyServiceTest extends BaseUnitTest {
         /** 502 from the blocked target proves the call passed op validation and reached the credential. */
         @Test
         void shouldAcceptChatCompletionsOnTheDecisionSlotWhenItsModelIsAChatCompletionsModel() {
-            var routing = precomputeRouting(ModelKind.DECISION, "openai-completions");
+            var routing = practiceScriptRouting(ModelKind.DECISION, "openai-completions");
             authenticate(routing);
             stubCredential(routing, credential("openai-completions", LlmAuthMode.BEARER));
             doThrow(new IllegalArgumentException("blocked"))
                     .when(requestPolicy)
                     .validateTarget("https://api.example.com/v1");
 
-            var result = controller.proxyPrecompute(
-                    request("POST", "/internal/llm/precompute/decision/chat/completions"),
+            var result = controller.proxyPracticeScript(
+                    request("POST", "/internal/llm/practice-script/decision/chat/completions"),
                     new MockHttpServletResponse(),
                     practiceHeaders(),
                     jsonBody());
@@ -514,10 +514,10 @@ class LlmProxyServiceTest extends BaseUnitTest {
 
         @Test
         void shouldRefuseASlotWhenItsFrozenProtocolServesAnotherKind() {
-            authenticate(precomputeRouting(ModelKind.EMBEDDING, "openai-decisions"));
+            authenticate(practiceScriptRouting(ModelKind.EMBEDDING, "openai-decisions"));
 
-            var result = controller.proxyPrecompute(
-                    request("POST", "/internal/llm/precompute/embedding/decisions"),
+            var result = controller.proxyPracticeScript(
+                    request("POST", "/internal/llm/practice-script/embedding/decisions"),
                     new MockHttpServletResponse(),
                     practiceHeaders(),
                     jsonBody());
@@ -528,11 +528,11 @@ class LlmProxyServiceTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldRefuseAStreamWhenAPrecomputeCallAsksForOne() {
-            authenticate(precomputeRouting(ModelKind.CHAT, "openai-completions"));
+        void shouldRefuseAStreamWhenAPracticeScriptCallAsksForOne() {
+            authenticate(practiceScriptRouting(ModelKind.CHAT, "openai-completions"));
 
-            var result = controller.proxyPrecompute(
-                    request("POST", "/internal/llm/precompute/chat/chat/completions"),
+            var result = controller.proxyPracticeScript(
+                    request("POST", "/internal/llm/practice-script/chat/chat/completions"),
                     new MockHttpServletResponse(),
                     practiceHeaders(),
                     "{\"stream\":true,\"messages\":[]}".getBytes(StandardCharsets.UTF_8));
@@ -543,8 +543,8 @@ class LlmProxyServiceTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldRefuseAPrecomputeCredentialWhenItCallsAReviewPath() {
-            authenticate(precomputeRouting(ModelKind.CHAT, "openai-completions"));
+        void shouldRefuseAPracticeScriptCredentialWhenItCallsAReviewPath() {
+            authenticate(practiceScriptRouting(ModelKind.CHAT, "openai-completions"));
 
             var result = controller.proxy(
                     request("POST", "/internal/llm/chat/completions"),
@@ -558,11 +558,11 @@ class LlmProxyServiceTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldRefuseAReviewCredentialWhenItCallsAPrecomputePath() {
+        void shouldRefuseAReviewCredentialWhenItCallsAPracticeScriptPath() {
             authenticate(routing("openai-completions"));
 
-            var result = controller.proxyPrecompute(
-                    request("POST", "/internal/llm/precompute/chat/chat/completions"),
+            var result = controller.proxyPracticeScript(
+                    request("POST", "/internal/llm/practice-script/chat/chat/completions"),
                     new MockHttpServletResponse(),
                     practiceHeaders(),
                     jsonBody());
@@ -574,34 +574,34 @@ class LlmProxyServiceTest extends BaseUnitTest {
 
         /** 402, not 429: a rate limit also answers 429, and the runner must not report it as a budget. */
         @Test
-        void shouldRefuseWithPaymentRequiredWhenThePrecomputeCapIsSpent() {
-            var routing = precomputeRouting(ModelKind.EMBEDDING, "openai-embeddings");
+        void shouldRefuseWithPaymentRequiredWhenThePracticeScriptCapIsSpent() {
+            var routing = practiceScriptRouting(ModelKind.EMBEDDING, "openai-embeddings");
             authenticate(routing);
-            when(budgetGate.isPrecomputeCapReached(Objects.requireNonNull(routing.attempt())))
+            when(budgetGate.isPracticeScriptCapReached(Objects.requireNonNull(routing.attempt())))
                     .thenReturn(true);
 
-            var result = controller.proxyPrecompute(
-                    request("POST", "/internal/llm/precompute/embedding/embeddings"),
+            var result = controller.proxyPracticeScript(
+                    request("POST", "/internal/llm/practice-script/embedding/embeddings"),
                     new MockHttpServletResponse(),
                     practiceHeaders(),
                     jsonBody());
 
             assertThat(result).isNotNull();
             assertThat(result.getStatusCode().value()).isEqualTo(402);
-            assertThat(String.valueOf(result.getBody())).isEqualTo("Precompute budget spent");
+            assertThat(String.valueOf(result.getBody())).isEqualTo("Practice script budget spent");
             verifyNoInteractions(resolver);
-            assertThat(blocked("openai-embeddings", "precompute_attempt")).isEqualTo(1);
+            assertThat(blocked("openai-embeddings", "practice_script_attempt")).isEqualTo(1);
             assertThat(blocked("openai-embeddings", "instance")).isZero();
         }
 
         @Test
-        void shouldRefuseWithPaymentRequiredWhenTheMonthlyBudgetStopsAPrecomputeCall() {
-            var routing = precomputeRouting(ModelKind.CHAT, "openai-completions");
+        void shouldRefuseWithPaymentRequiredWhenTheMonthlyBudgetStopsAPracticeScriptCall() {
+            var routing = practiceScriptRouting(ModelKind.CHAT, "openai-completions");
             authenticate(routing);
             when(budgetGate.isBlocked(routing)).thenReturn(true);
 
-            var result = controller.proxyPrecompute(
-                    request("POST", "/internal/llm/precompute/chat/chat/completions"),
+            var result = controller.proxyPracticeScript(
+                    request("POST", "/internal/llm/practice-script/chat/chat/completions"),
                     new MockHttpServletResponse(),
                     practiceHeaders(),
                     jsonBody());
@@ -612,23 +612,23 @@ class LlmProxyServiceTest extends BaseUnitTest {
             verifyNoInteractions(resolver);
             // An admin fixes a monthly budget and an operator the attempt's cap, so an alert must tell them apart.
             assertThat(blocked("openai-completions", "instance")).isEqualTo(1);
-            assertThat(blocked("openai-completions", "precompute_attempt")).isZero();
+            assertThat(blocked("openai-completions", "practice_script_attempt")).isZero();
         }
 
         /** 502 from the unresolved credential proves the call at the bound passed validation. */
         @ParameterizedTest
         @CsvSource({
-            "DECISION,openai-decisions,/internal/llm/precompute/decision/decisions,questions,64",
-            "EMBEDDING,openai-embeddings,/internal/llm/precompute/embedding/embeddings,input,64",
-            "RERANKING,cohere-rerank,/internal/llm/precompute/reranking/rerank,documents,256"
+            "DECISION,openai-decisions,/internal/llm/practice-script/decision/decisions,questions,64",
+            "EMBEDDING,openai-embeddings,/internal/llm/practice-script/embedding/embeddings,input,64",
+            "RERANKING,cohere-rerank,/internal/llm/practice-script/reranking/rerank,documents,256"
         })
         void shouldRefuseACallBeforeTheUpstreamWhenItHoldsMoreEntriesThanItsBound(
                 ModelKind slot, String protocol, String path, String field, int max) {
-            authenticate(precomputeRouting(slot, protocol));
+            authenticate(practiceScriptRouting(slot, protocol));
 
-            var atBound = controller.proxyPrecompute(
+            var atBound = controller.proxyPracticeScript(
                     request("POST", path), new MockHttpServletResponse(), practiceHeaders(), entries(field, max));
-            var aboveBound = controller.proxyPrecompute(
+            var aboveBound = controller.proxyPracticeScript(
                     request("POST", path), new MockHttpServletResponse(), practiceHeaders(), entries(field, max + 1));
 
             assertThat(atBound).isNotNull();
@@ -645,7 +645,7 @@ class LlmProxyServiceTest extends BaseUnitTest {
 
         private static HttpHeaders practiceHeaders(String practice) {
             HttpHeaders headers = new HttpHeaders();
-            headers.set(JobTokenAuthenticationFilter.PRECOMPUTE_PRACTICE_HEADER, practice);
+            headers.set(JobTokenAuthenticationFilter.PRACTICE_SCRIPT_PRACTICE_HEADER, practice);
             return headers;
         }
 
@@ -1084,9 +1084,9 @@ class LlmProxyServiceTest extends BaseUnitTest {
                 null);
     }
 
-    private static ProxyRouting precomputeRouting(ModelKind slot, String protocol) {
+    private static ProxyRouting practiceScriptRouting(ModelKind slot, String protocol) {
         return new ProxyRouting(
-                "job:test:precompute",
+                "job:test:practice-script",
                 protocol,
                 "https://frozen.example.com/v1",
                 FundingSource.INSTANCE,

@@ -41,7 +41,7 @@ public class MemberAiRoutingAdapter implements WorkspaceAiAvailability {
     }
 
     /**
-     * {@link #precomputeBinding} calls this instead of {@link #binding}: a call to another transactional method of
+     * {@link #practiceScriptBinding} calls this instead of {@link #binding}: a call to another transactional method of
      * this bean skips its proxy.
      */
     private Optional<WorkspaceAgentBinding> route(long workspaceId, AgentPurpose purpose, @Nullable Long developerId) {
@@ -59,13 +59,13 @@ public class MemberAiRoutingAdapter implements WorkspaceAiAvailability {
     }
 
     /**
-     * The binding that serves one precompute purpose of a review about the developer. A precompute script sends
+     * The binding that serves one practice script purpose of a review about the developer. A practice script sends
      * the reviewed work to its models, so its ceiling is the stricter of the developer's ceiling and the tier of
      * the review binding that serves the developer: work that the review keeps in-house never goes to a cloud
-     * precompute model. Empty when no review binding serves the developer.
+     * model for practice scripts. Empty when no review binding serves the developer.
      */
     @Transactional(readOnly = true)
-    public Optional<WorkspaceAgentBinding> precomputeBinding(
+    public Optional<WorkspaceAgentBinding> practiceScriptBinding(
             long workspaceId, AgentPurpose purpose, @Nullable Long developerId) {
         var review = route(workspaceId, AgentPurpose.PRACTICE_REVIEW, developerId);
         if (review.isEmpty()) return Optional.empty();
@@ -82,7 +82,7 @@ public class MemberAiRoutingAdapter implements WorkspaceAiAvailability {
     @Transactional(readOnly = true)
     public List<DataHandlingTier> unservedTiers(long workspaceId, AgentPurpose purpose) {
         var rows = bindings.findByWorkspaceIdAndPurpose(workspaceId, purpose);
-        var reviewRows = AgentPurpose.precompute().contains(purpose)
+        var reviewRows = AgentPurpose.practiceScript().contains(purpose)
                 ? bindings.findByWorkspaceIdAndPurpose(workspaceId, AgentPurpose.PRACTICE_REVIEW)
                 : List.<WorkspaceAgentBinding>of();
         boolean choiceOptional = choiceOptional(workspaceId);
@@ -94,8 +94,8 @@ public class MemberAiRoutingAdapter implements WorkspaceAiAvailability {
 
     /**
      * For each purpose and binding tier of the workspace, the members that the binding serves now, named by the
-     * tier of their choice as in {@link #unservedTiers}. A precompute purpose is capped at the tier of the review
-     * binding that serves the same members, as {@link #precomputeBinding} caps it. Members whom no review binding
+     * tier of their choice as in {@link #unservedTiers}. A practice script purpose is capped at the tier of the review
+     * binding that serves the same members, as {@link #practiceScriptBinding} caps it. Members whom no review binding
      * serves are judged at their own ceiling: no review runs for them, and the review purpose reports that gap.
      */
     @Transactional(readOnly = true)
@@ -108,7 +108,7 @@ public class MemberAiRoutingAdapter implements WorkspaceAiAvailability {
         boolean choiceOptional = choiceOptional(workspaceId);
         var served = new EnumMap<AgentPurpose, Map<DataHandlingTier, List<DataHandlingTier>>>(AgentPurpose.class);
         rows.forEach((purpose, own) -> {
-            var reviewRows = AgentPurpose.precompute().contains(purpose)
+            var reviewRows = AgentPurpose.practiceScript().contains(purpose)
                     ? rows.getOrDefault(AgentPurpose.PRACTICE_REVIEW, List.of())
                     : List.<WorkspaceAgentBinding>of();
             var bySlot = new EnumMap<DataHandlingTier, List<DataHandlingTier>>(DataHandlingTier.class);

@@ -314,7 +314,7 @@ class MemberAiRoutingAdapterTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldGiveACloudMemberNoCloudPrecomputeModelWhenTheirReviewRunsInHouse() {
+    void shouldGiveACloudMemberNoCloudPracticeScriptModelWhenTheirReviewRunsInHouse() {
         chose(MemberAiChoice.CLOUD);
         var review = ready(DataHandlingTier.IN_HOUSE);
         var decision = ready(DataHandlingTier.CLOUD);
@@ -323,12 +323,12 @@ class MemberAiRoutingAdapterTest extends BaseUnitTest {
         when(bindings.findByWorkspaceIdAndPurpose(1L, AgentPurpose.PRACTICE_DECISION))
                 .thenReturn(List.of(decision));
 
-        assertThat(routing.precomputeBinding(1L, AgentPurpose.PRACTICE_DECISION, 20L))
+        assertThat(routing.practiceScriptBinding(1L, AgentPurpose.PRACTICE_DECISION, 20L))
                 .isEmpty();
     }
 
     @Test
-    void shouldGiveACloudMemberAStricterPrecomputeModelThanTheirCloudReview() {
+    void shouldGiveACloudMemberAStricterPracticeScriptModelThanTheirCloudReview() {
         chose(MemberAiChoice.CLOUD);
         var review = ready(DataHandlingTier.CLOUD);
         var decision = ready(DataHandlingTier.IN_HOUSE);
@@ -337,12 +337,12 @@ class MemberAiRoutingAdapterTest extends BaseUnitTest {
         when(bindings.findByWorkspaceIdAndPurpose(1L, AgentPurpose.PRACTICE_DECISION))
                 .thenReturn(List.of(decision));
 
-        assertThat(routing.precomputeBinding(1L, AgentPurpose.PRACTICE_DECISION, 20L))
+        assertThat(routing.practiceScriptBinding(1L, AgentPurpose.PRACTICE_DECISION, 20L))
                 .contains(decision);
     }
 
     @Test
-    void shouldGiveAnInHouseMemberNoPrecomputeModelWhenOnlyACloudOneIsAssigned() {
+    void shouldGiveAnInHouseMemberNoPracticeScriptModelWhenOnlyACloudOneIsAssigned() {
         chose(MemberAiChoice.IN_HOUSE_ONLY);
         var inHouseReview = ready(DataHandlingTier.IN_HOUSE);
         var cloudReview = ready(DataHandlingTier.CLOUD);
@@ -352,19 +352,19 @@ class MemberAiRoutingAdapterTest extends BaseUnitTest {
         when(bindings.findByWorkspaceIdAndPurpose(1L, AgentPurpose.PRACTICE_DECISION))
                 .thenReturn(List.of(decision));
 
-        assertThat(routing.precomputeBinding(1L, AgentPurpose.PRACTICE_DECISION, 20L))
+        assertThat(routing.practiceScriptBinding(1L, AgentPurpose.PRACTICE_DECISION, 20L))
                 .isEmpty();
     }
 
     @Test
-    void shouldGiveNoPrecomputeModelWhenNoReviewModelServesTheMember() {
+    void shouldGiveNoPracticeScriptModelWhenNoReviewModelServesTheMember() {
         chose(MemberAiChoice.CLOUD);
         var decision = ready(DataHandlingTier.CLOUD);
         lenient()
                 .when(bindings.findByWorkspaceIdAndPurpose(1L, AgentPurpose.PRACTICE_DECISION))
                 .thenReturn(List.of(decision));
 
-        assertThat(routing.precomputeBinding(1L, AgentPurpose.PRACTICE_DECISION, 20L))
+        assertThat(routing.practiceScriptBinding(1L, AgentPurpose.PRACTICE_DECISION, 20L))
                 .isEmpty();
     }
 
@@ -381,7 +381,7 @@ class MemberAiRoutingAdapterTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldNameTheMembersEachBindingServesWithThePrecomputeBindingCappedAtTheirReview() {
+    void shouldNameTheMembersEachBindingServesWithThePracticeScriptBindingCappedAtTheirReview() {
         when(preferences.forDeveloper(1L, null)).thenReturn(new MemberAiPreferences.Decision(false, null));
         var review = ready(AgentPurpose.PRACTICE_REVIEW, DataHandlingTier.IN_HOUSE);
         var undeclaredReview = ready(AgentPurpose.PRACTICE_REVIEW, DataHandlingTier.UNDECLARED);
@@ -407,14 +407,14 @@ class MemberAiRoutingAdapterTest extends BaseUnitTest {
     }
 
     /**
-     * The binding view, the needs, and the route of a review's precompute model must give the same answers, or
+     * The binding view, the needs, and the route of a review's model for practice scripts must give the same answers, or
      * the AI models page shows a model that the review never uses. Each row names, for the members who chose
      * in-house and for those who chose cloud, the decision binding that serves them and the one that their review
      * routes to. A member whom no review binding serves still has a serving decision binding, but no route.
      */
     @ParameterizedTest
     @MethodSource("assignments")
-    void shouldAnswerAsTheNeedsAndThePrecomputeRouteDoWhenTheBindingViewNamesTheMembersServed(
+    void shouldAnswerAsTheNeedsAndThePracticeScriptRouteDoWhenTheBindingViewNamesTheMembersServed(
             Set<DataHandlingTier> reviewTiers,
             Set<DataHandlingTier> decisionTiers,
             @Nullable DataHandlingTier inHouseSlot,
@@ -457,7 +457,7 @@ class MemberAiRoutingAdapterTest extends BaseUnitTest {
             lenient()
                     .when(preferences.forDeveloper(1L, 20L))
                     .thenReturn(new MemberAiPreferences.Decision(true, choice));
-            assertThat(routing.precomputeBinding(1L, AgentPurpose.PRACTICE_DECISION, 20L)
+            assertThat(routing.practiceScriptBinding(1L, AgentPurpose.PRACTICE_DECISION, 20L)
                             .map(WorkspaceAgentBinding::getDataHandlingTier))
                     .as("route of %s", member)
                     .isEqualTo(Optional.ofNullable(route));
@@ -498,7 +498,7 @@ class MemberAiRoutingAdapterTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldGiveAMemberWhoHasNotChosenTheUndeclaredPrecomputeModelBesideTheUndeclaredReview() {
+    void shouldGiveAMemberWhoHasNotChosenTheUndeclaredPracticeScriptModelBesideTheUndeclaredReview() {
         when(preferences.forDeveloper(1L, 20L)).thenReturn(new MemberAiPreferences.Decision(false, null));
         var review = ready(DataHandlingTier.UNDECLARED);
         var decision = ready(DataHandlingTier.UNDECLARED);
@@ -509,7 +509,7 @@ class MemberAiRoutingAdapterTest extends BaseUnitTest {
                         1L, AgentPurpose.PRACTICE_DECISION, DataHandlingTier.UNDECLARED))
                 .thenReturn(Optional.of(decision));
 
-        assertThat(routing.precomputeBinding(1L, AgentPurpose.PRACTICE_DECISION, 20L))
+        assertThat(routing.practiceScriptBinding(1L, AgentPurpose.PRACTICE_DECISION, 20L))
                 .contains(decision);
     }
 

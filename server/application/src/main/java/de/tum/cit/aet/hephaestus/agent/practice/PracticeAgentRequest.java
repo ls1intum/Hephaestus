@@ -11,10 +11,10 @@ import org.jspecify.annotations.Nullable;
  * Input for {@link PracticePiAdapter#buildSandboxSpec}. Carries no prompt — that travels in the
  * {@code task.json} envelope the handler writes.
  *
- * @param precomputeToken the credential of the precompute scripts, scoped to the precompute models
- *     only; {@code null} for a job that runs no precompute scripts
- * @param precomputeModels the models that the precompute scripts may call, by kind; empty without a
- *     {@code precomputeToken}
+ * @param practiceScriptToken the credential of the practice scripts, scoped to the models for practice scripts
+ *     only; {@code null} for a job that runs no practice scripts
+ * @param practiceScriptModels the models that the practice scripts may call, by kind; empty without a
+ *     {@code practiceScriptToken}
  */
 public record PracticeAgentRequest(
         String apiProtocol,
@@ -24,8 +24,8 @@ public record PracticeAgentRequest(
         @Nullable ReasoningEffort reasoningEffort,
         String jobToken,
         int timeoutSeconds,
-        @Nullable String precomputeToken,
-        Map<ModelKind, FrozenModel> precomputeModels) {
+        @Nullable String practiceScriptToken,
+        Map<ModelKind, FrozenModel> practiceScriptModels) {
     public PracticeAgentRequest {
         Objects.requireNonNull(apiProtocol, "apiProtocol must not be null");
         Objects.requireNonNull(upstreamModelId, "upstreamModelId must not be null");
@@ -35,6 +35,6 @@ public record PracticeAgentRequest(
         if (jobToken == null || jobToken.isBlank()) {
             throw new IllegalArgumentException("jobToken is required — every sandbox talks to the LLM proxy");
         }
-        precomputeModels = Map.copyOf(precomputeModels);
+        practiceScriptModels = Map.copyOf(practiceScriptModels);
     }
 }

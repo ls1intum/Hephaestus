@@ -6,7 +6,7 @@ import { expectTargetSize, horizontalScrollParentOf } from "@/stories/reflow";
 import { StatefulPatch } from "@/stories/stateful";
 
 import { AdminInstanceLlmUsageTable } from "./AdminInstanceLlmUsageTable";
-import { commentQualityUsage, NO_PRECOMPUTE_USAGE, notAttributedUsage } from "./fixtures";
+import { commentQualityUsage, NO_PRACTICE_SCRIPT_USAGE, notAttributedUsage } from "./fixtures";
 
 const FX_DISCLOSURE = /reference rate published on/u;
 
@@ -130,7 +130,7 @@ function detailReportFor(row: AdminWorkspaceLlmUsage): WorkspaceLlmUsageReport {
 		...limits,
 		month: "2026-07",
 		unpricedEventCount: 0,
-		...NO_PRECOMPUTE_USAGE,
+		...NO_PRACTICE_SCRIPT_USAGE,
 		byJobType: [
 			{
 				jobType: "PULL_REQUEST_REVIEW",
@@ -351,7 +351,7 @@ export const SharedModelsOnly: Story = {
 	},
 };
 
-/** Most workspaces have no precompute calls, and the panel then has no section for them. */
+/** Most workspaces have no practice script calls, and the panel then has no section for them. */
 export const Expanded: Story = {
 	args: {
 		expandedWorkspaceSlug: pausedOnSharedBudget.workspaceSlug,
@@ -370,7 +370,7 @@ export const Expanded: Story = {
 			panel.getAllByRole("heading", { level: 3 }).map((heading) => heading.textContent),
 		).toStrictEqual(["By run type", "By day"]);
 		await expect(
-			panel.queryByRole("heading", { name: "Precompute models by practice" }),
+			panel.queryByRole("heading", { name: "Models for practice scripts, by practice" }),
 		).toBeNull();
 	},
 };
@@ -379,13 +379,13 @@ export const Expanded: Story = {
  * The same per-practice table as the workspace console, below the two breakdowns. Practice names are
  * plain text here: an instance admin does not have to belong to the workspace.
  */
-export const ExpandedWithPrecomputeModels: Story = {
+export const ExpandedWithPracticeScriptModels: Story = {
 	args: {
 		expandedWorkspaceSlug: pausedOnSharedBudget.workspaceSlug,
 		detailReport: {
 			...detailReport,
 			byPractice: [commentQualityUsage, notAttributedUsage],
-			precomputeTotal: {
+			practiceScriptTotal: {
 				reviews: 19,
 				calls: 426,
 				inputTokens: 99_500,
@@ -400,7 +400,9 @@ export const ExpandedWithPrecomputeModels: Story = {
 	parameters: { viewport: { defaultViewport: "desktop" } },
 	play: async ({ canvas }) => {
 		const panel = within(await expandedPanelFor(canvas, pausedOnSharedBudget.displayName));
-		const table = panel.getByRole("table", { name: "Precompute model spend by practice" });
+		const table = panel.getByRole("table", {
+			name: "Spend on models for practice scripts, by practice",
+		});
 		await expect(within(table).getByText("Comments explain why")).toBeVisible();
 		await expect(within(table).queryByRole("link")).toBeNull();
 		await expect(within(table).getByRole("row", { name: /^Total/u }).textContent).toContain(
@@ -410,7 +412,7 @@ export const ExpandedWithPrecomputeModels: Story = {
 		for (const name of [
 			"AI spend by run type",
 			"AI spend by day",
-			"Precompute model spend by practice",
+			"Spend on models for practice scripts, by practice",
 		]) {
 			const scroller = horizontalScrollParentOf(panel.getByRole("table", { name }));
 			await expect(scroller.scrollWidth, name).toBeLessThanOrEqual(scroller.clientWidth + 1);

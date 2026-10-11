@@ -46,7 +46,7 @@ import { PurseHeading, PurseLeaf } from "./PurseHeading";
 import {
 	budgetUsedPercent,
 	FIRST_COLUMN,
-	precomputeByPracticeDescription,
+	practiceScriptByPracticeDescription,
 	projectBudget,
 	purseCap,
 	pursesOf,
@@ -569,13 +569,13 @@ function WorkspaceUsageDetails({
 					<Section level={3} title="By run type">
 						<LlmUsageByJobTypeTable report={loaded} purses={purses} />
 					</Section>
-					{/* Only once loaded: most workspaces have no precompute calls, and a skeleton that
+					{/* Only once loaded: most workspaces have no practice script calls, and a skeleton that
 					    then vanishes moves more than a section that appears among the others. */}
 					{loaded != null && loaded.byPractice.length > 0 && (
 						<Section
 							level={3}
-							title="Precompute models by practice"
-							description={precomputeByPracticeDescription(isCurrentMonth)}
+							title="Models for practice scripts, by practice"
+							description={practiceScriptByPracticeDescription(isCurrentMonth)}
 						>
 							<LlmUsageByPracticeTable report={loaded} purses={purses} />
 						</Section>

@@ -23,7 +23,7 @@ import type {
 	ReviewObservation,
 	ReviewObservationCounts,
 	ReviewObservationDetail,
-	ReviewPrecompute,
+	ReviewPracticeScripts,
 	ReviewRunSummary,
 	ReviewRunTarget,
 	ReviewSubject,
@@ -2155,11 +2155,11 @@ export const PRIVATE_FEEDBACK_TEXT =
 	"Private to Barbara: the runbook's first step is the one a tired reader most needs.";
 
 // ---------------------------------------------------------------------------------------------
-// What the precompute scripts did before one review: one entry per status the section words.
+// What the practice scripts did before one review: one entry per status the section words.
 
 const decision = { purpose: "PRACTICE_DECISION", need: "REQUIRED", bound: true } as const;
 
-export const reviewPrecompute = {
+export const reviewPracticeScripts = {
 	found: {
 		practiceSlug: "thin-controllers",
 		practiceName: "Thin controllers",
@@ -2241,8 +2241,7 @@ export const reviewPrecompute = {
 		run: { status: "FAILED", leads: 0, models: [] },
 		durationMs: 40,
 		models: [],
-		error:
-			"TypeError: change.files is not iterable at precompute (tests-name-the-behaviour.ts:14:23)",
+		error: "TypeError: change.files is not iterable at run (tests-name-the-behaviour.ts:14:23)",
 	},
 	// The stage stopped before the script reported, so the run names no models and their tiers are
 	// unknown, while the proxy still counted the calls it forwarded.
@@ -2258,4 +2257,4 @@ export const reviewPrecompute = {
 		durationMs: 15_000,
 		models: [],
 	},
-} satisfies Record<string, ReviewPrecompute>;
+} satisfies Record<string, ReviewPracticeScripts>;

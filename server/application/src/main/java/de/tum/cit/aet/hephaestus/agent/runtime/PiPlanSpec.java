@@ -13,7 +13,7 @@ import org.jspecify.annotations.Nullable;
  *     into the {@code hephaestus} provider registration
  * @param jobToken the job-scoped bearer credential the sandbox authenticates to the LLM proxy with;
  *     required, because that proxy is the only path a sandbox has to a model
- * @param timeoutSeconds the time the runner has from its start, which is after the precompute step;
+ * @param timeoutSeconds the time the runner has from its start, which is after the practice script step;
  *     its model budget is this less {@link PiRuntimeFactory#TIMEOUT_BUFFER_SECONDS}
  */
 public record PiPlanSpec(
@@ -27,7 +27,7 @@ public record PiPlanSpec(
         int timeoutSeconds,
         PiRunnerProfile runnerProfile,
         Map<String, byte[]> extraInputs,
-        @Nullable String precomputeStep) {
+        @Nullable String practiceScriptStep) {
     public PiPlanSpec {
         if (apiProtocol == null || apiProtocol.isBlank()) {
             throw new IllegalArgumentException("apiProtocol must not be blank");
@@ -62,6 +62,6 @@ public record PiPlanSpec(
                         + "SandboxLayout.allowedExtraInputPaths()");
             }
         }
-        precomputeStep = precomputeStep != null ? precomputeStep : "";
+        practiceScriptStep = practiceScriptStep != null ? practiceScriptStep : "";
     }
 }

@@ -25,15 +25,15 @@ interface AgentPurposeDef {
 	withArticle: string;
 	description: string;
 	/**
-	 * Whether only precompute scripts call it. False for review and Heph: a script can call the review
-	 * model too, but that model is not a precompute one. Which APIs serve a purpose is the server's
+	 * Whether only practice scripts call it. False for review and Heph: a script can call the review
+	 * model too, but that model is not a model for practice scripts. Which APIs serve a purpose is the server's
 	 * fact, sent as each model's `purposes`; a connection's API names them in `LLM_API_PROTOCOL_LABELS`.
 	 */
-	precompute: boolean;
+	practiceScript: boolean;
 	/** The glyph `ModelKindMark` draws on its neutral tile. */
 	icon: ModelKindIcon;
 	/**
-	 * The glyph's colour, as complete class strings. A hue tells the three precompute kinds apart;
+	 * The glyph's colour, as complete class strings. A hue tells the three model kinds for practice scripts apart;
 	 * each stays at least 30° (OKLCH) from success, warning, destructive and mentor, so a kind never
 	 * reads as a status or the accent. Review and Heph stay neutral.
 	 */
@@ -53,7 +53,7 @@ export const AGENT_PURPOSE_DEFS = {
 		noun: "review model",
 		withArticle: "the review model",
 		description: "Checks connected project work and conversations against your practices.",
-		precompute: false,
+		practiceScript: false,
 		icon: ListChecksIcon,
 		tone: "text-foreground",
 	},
@@ -64,7 +64,7 @@ export const AGENT_PURPOSE_DEFS = {
 		withArticle: "the Heph model",
 		description:
 			"Powers conversations with Heph. Every member is offered Heph once an assignment here is ready.",
-		precompute: false,
+		practiceScript: false,
 		icon: HephKindIcon,
 		tone: "text-foreground",
 	},
@@ -75,7 +75,7 @@ export const AGENT_PURPOSE_DEFS = {
 		withArticle: "a decision model",
 		description:
 			"Answers short questions about each place a script finds, such as whether a comment explains why.",
-		precompute: true,
+		practiceScript: true,
 		icon: SplitIcon,
 		tone: "text-violet-700 dark:text-violet-300",
 	},
@@ -85,7 +85,7 @@ export const AGENT_PURPOSE_DEFS = {
 		noun: "embedding model",
 		withArticle: "an embedding model",
 		description: "Finds code and text close in meaning to what a script looks for.",
-		precompute: true,
+		practiceScript: true,
 		icon: ChartScatterIcon,
 		tone: "text-cyan-700 dark:text-cyan-300",
 	},
@@ -95,7 +95,7 @@ export const AGENT_PURPOSE_DEFS = {
 		noun: "reranking model",
 		withArticle: "a reranking model",
 		description: "Puts the places a script finds in order, most relevant first.",
-		precompute: true,
+		practiceScript: true,
 		icon: ArrowDownWideNarrowIcon,
 		tone: "text-fuchsia-700 dark:text-fuchsia-300",
 	},
@@ -104,15 +104,15 @@ export const AGENT_PURPOSE_DEFS = {
 /** Every purpose, in page order; also the values `?purpose=` accepts. */
 export const AGENT_PURPOSES = statusValues(AGENT_PURPOSE_DEFS);
 
-/** The purposes under *Models for precompute scripts*, in page order. */
-export const PRECOMPUTE_PURPOSES = AGENT_PURPOSES.filter(isPrecomputePurpose);
+/** The purposes under *Models for practice scripts*, in page order. */
+export const PRACTICE_SCRIPT_PURPOSES = AGENT_PURPOSES.filter(isPracticeScriptPurpose);
 
 export function isAgentPurpose(value: string): value is AgentPurpose {
 	return Object.hasOwn(AGENT_PURPOSE_DEFS, value);
 }
 
-export function isPrecomputePurpose(purpose: AgentPurpose): boolean {
-	return AGENT_PURPOSE_DEFS[purpose].precompute;
+export function isPracticeScriptPurpose(purpose: AgentPurpose): boolean {
+	return AGENT_PURPOSE_DEFS[purpose].practiceScript;
 }
 
 /** The link text that opens a missing model's purpose on AI models. */

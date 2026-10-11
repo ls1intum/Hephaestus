@@ -37,7 +37,7 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Credential-injecting proxy for the model calls of agent sandboxes and their precompute scripts.
+ * Credential-injecting proxy for the model calls of agent sandboxes and their practice scripts.
  * The authenticated token chooses a catalog model; callers cannot choose an upstream host, path,
  * protocol, credential header, or model id.
  */
@@ -82,7 +82,7 @@ class LlmProxyService {
         LlmApiProtocol protocol = LlmApiProtocol.parse(routing.apiProtocol())
                 .filter(parsed -> parsed.serves(ModelKind.CHAT))
                 .orElse(null);
-        if (routing.precomputeSlot() != null
+        if (routing.practiceScriptSlot() != null
                 || protocol == null
                 || !(PROXY_PATH_PREFIX + protocol.upstreamPath()).equals(request.getRequestURI())) {
             return ResponseEntity.status(404).body("Not found");
@@ -94,12 +94,12 @@ class LlmProxyService {
     }
 
     /**
-     * Serves one call of a precompute script on {@code /internal/llm/precompute/{slot}/{op}}. The op must
+     * Serves one call of a practice script on {@code /internal/llm/practice-script/{slot}/{op}}. The op must
      * be the path of the slot's frozen protocol. The call must name its practice in
-     * {@link JobTokenAuthenticationFilter#PRECOMPUTE_PRACTICE_HEADER}. The call is never streamed, so its
+     * {@link JobTokenAuthenticationFilter#PRACTICE_SCRIPT_PRACTICE_HEADER}. The call is never streamed, so its
      * usage is always read from the response body.
      */
-    public @Nullable ResponseEntity<?> proxyPrecompute(
+    public @Nullable ResponseEntity<?> proxyPracticeScript(
             HttpServletRequest request,
             HttpServletResponse response,
             HttpHeaders incomingHeaders,
@@ -107,30 +107,30 @@ class LlmProxyService {
         ProxyRouting routing = authenticatedRouting();
         ResponseEntity<String> rejected = validateSafeSurface(request);
         if (rejected != null) return rejected;
-        ModelKind slot = routing.precomputeSlot();
+        ModelKind slot = routing.practiceScriptSlot();
         LlmApiProtocol protocol = LlmApiProtocol.parse(routing.apiProtocol())
                 .filter(parsed -> slot != null && parsed.serves(slot))
                 .orElse(null);
         if (slot == null || protocol == null) {
             return ResponseEntity.status(404).body("Not found");
         }
-        String slotPath = JobTokenAuthenticationFilter.PRECOMPUTE_PATH + slot.slot();
+        String slotPath = JobTokenAuthenticationFilter.PRACTICE_SCRIPT_PATH + slot.slot();
         if (!(slotPath + protocol.upstreamPath()).equals(request.getRequestURI())) {
             return ResponseEntity.badRequest().body("This model takes calls on " + slotPath + protocol.upstreamPath());
         }
-        String practice = incomingHeaders.getFirst(JobTokenAuthenticationFilter.PRECOMPUTE_PRACTICE_HEADER);
+        String practice = incomingHeaders.getFirst(JobTokenAuthenticationFilter.PRACTICE_SCRIPT_PRACTICE_HEADER);
         if (practice == null || !SandboxLayout.PRACTICE_SLUG.matcher(practice).matches()) {
-            accounting.recordUnattributedPrecompute();
+            accounting.recordUnattributedPracticeScript();
             return ResponseEntity.badRequest()
-                    .body("A precompute call must name its practice in "
-                            + JobTokenAuthenticationFilter.PRECOMPUTE_PRACTICE_HEADER);
+                    .body("A practice script call must name its practice in "
+                            + JobTokenAuthenticationFilter.PRACTICE_SCRIPT_PRACTICE_HEADER);
         }
         if (body == null || body.length == 0) return ResponseEntity.badRequest().body("Request body is required");
         rejected = validateJsonObject(body);
         if (rejected != null) return rejected;
         JsonNode call = objectMapper.readTree(body);
         if (call.path("stream").asBoolean(false)) {
-            return ResponseEntity.badRequest().body("Precompute calls cannot stream");
+            return ResponseEntity.badRequest().body("Practice script calls cannot stream");
         }
         String tooManyEntries = tooManyEntries(call, protocol);
         if (tooManyEntries != null)
@@ -138,13 +138,14 @@ class LlmProxyService {
         return serve(
                 routing,
                 protocol,
-                new PrecomputeCall(slot, routing.precomputeTier(), practice),
+                new PracticeScriptCall(slot, routing.practiceScriptTier(), practice),
                 response,
                 incomingHeaders,
                 body);
     }
 
-    // MODEL_SLOT_CAPS in docker/agents/precompute/lib/contract.ts holds the same caps, so the runner refuses first.
+    // MODEL_SLOT_CAPS in docker/agents/practice-scripts/lib/contract.ts holds the same caps, so the runner refuses
+    // first.
     static final int MAX_DECISION_QUESTIONS = 64;
     static final int MAX_EMBEDDING_INPUTS = 64;
     static final int MAX_RERANK_DOCUMENTS = 256;
@@ -166,12 +167,12 @@ class LlmProxyService {
         return "'" + field + "' must hold at most " + max + " entries";
     }
 
-    /** @param precompute {@code null} for a call of the review or of Heph */
+    /** @param practiceScript {@code null} for a call of the review or of Heph */
     @SuppressWarnings("try") // The scope installs the current span and restores it on close.
     private @Nullable ResponseEntity<?> serve(
             ProxyRouting routing,
             LlmApiProtocol protocol,
-            @Nullable PrecomputeCall precompute,
+            @Nullable PracticeScriptCall practiceScript,
             HttpServletResponse response,
             HttpHeaders incomingHeaders,
             byte[] body) {
@@ -191,7 +192,7 @@ class LlmProxyService {
             span.tag("hephaestus.job.id", routing.sourceId().toString());
         if (routing.workspaceId() != null) span.tag("hephaestus.workspace.id", routing.workspaceId());
         try (var ignored = tracer.withSpan(span)) {
-            var result = forward(routing, protocol, precompute, response, incomingHeaders, body, span);
+            var result = forward(routing, protocol, practiceScript, response, incomingHeaders, body, span);
             int status = result == null
                     ? response.getStatus()
                     : result.getStatusCode().value();
@@ -221,7 +222,7 @@ class LlmProxyService {
     private @Nullable ResponseEntity<?> forward(
             ProxyRouting routing,
             LlmApiProtocol protocol,
-            @Nullable PrecomputeCall precompute,
+            @Nullable PracticeScriptCall practiceScript,
             HttpServletResponse response,
             HttpHeaders incomingHeaders,
             byte[] body,
@@ -239,15 +240,16 @@ class LlmProxyService {
             return ResponseEntity.status(403).body("Your AI choice no longer permits this model in this workspace.");
         }
 
-        // A precompute call is refused with 402, which no rate limit answers, so its runner can tell a
+        // A practice script call is refused with 402, which no rate limit answers, so its runner can tell a
         // spent budget from the gateway's or the provider's 429. The AI SDK also never retries a 402.
-        HttpStatus spendingRefusal = precompute == null ? HttpStatus.TOO_MANY_REQUESTS : HttpStatus.PAYMENT_REQUIRED;
+        HttpStatus spendingRefusal =
+                practiceScript == null ? HttpStatus.TOO_MANY_REQUESTS : HttpStatus.PAYMENT_REQUIRED;
         // Before any credential is resolved or the network touched. Never interrupts a live stream.
         if (accounting.refuseForBudget(routing)) {
             return ResponseEntity.status(spendingRefusal).body(budgetReachedMessage(routing.connectionScope()));
         }
-        if (precompute != null && accounting.refuseForPrecomputeCap(routing, attempt)) {
-            return ResponseEntity.status(spendingRefusal).body("Precompute budget spent");
+        if (practiceScript != null && accounting.refuseForPracticeScriptCap(routing, attempt)) {
+            return ResponseEntity.status(spendingRefusal).body("Practice script budget spent");
         }
 
         LlmModelResolver.ProxyCredential credential =
@@ -341,7 +343,7 @@ class LlmProxyService {
                 if (tap.hasMalformedUsage()) {
                     accounting.recordMalformedUsage(attempt);
                 } else {
-                    accounting.recordUsage(attempt, precompute, tap.observed());
+                    accounting.recordUsage(attempt, practiceScript, tap.observed());
                     ProxyTokenUsage usage = tap.observed();
                     if (usage != null) {
                         span.tag(
@@ -360,7 +362,7 @@ class LlmProxyService {
         }
         // Attributed now, not at the run's terminal write, so an execution that dies still bills.
         if (upstream.body() != null && served) {
-            accounting.recordUsage(attempt, precompute, protocol, upstream.body());
+            accounting.recordUsage(attempt, practiceScript, protocol, upstream.body());
         }
         return ResponseEntity.status(upstream.status())
                 .headers(upstream.headers())

@@ -727,7 +727,7 @@ previews need every image at the head SHA. No other event has a preview.
 | CI config                  | one filter per leg naming its own workflow files and actions. Any `.github/workflows/**` or `.github/actions/**` change runs Actionlint and Zizmor                                                                                                                                                                                                                                                                                |
 
 `docker/agents/**` is in both the tooling and the agent-image filters: `test:agents` and
-`typecheck:agents` cover the precompute tree, and the same tree builds the agent image.
+`typecheck:agents` cover the practice script tree, and the same tree builds the agent image.
 
 ## Docker layer caching
 
@@ -1027,17 +1027,17 @@ vp run verification:extension-build  # Production zip, then its manifest check
 vp run format:java:check     # Check formatting
 vp run test:server:unit      # Unit tests
 
-# Agent runtime (Node) — the Pi runner and the practice precompute scripts
-vp run test:agents           # Runner + precompute specs
+# Agent runtime (Node) — the Pi runner and the practice scripts
+vp run test:agents           # Runner + practice script specs
 vp run check:agents           # Format check, oxlint, both typechecks, release-image inventory, scripts/*.test.ts
 vp run fix:agents            # check:agents, applying every safe fix
-vp run typecheck:agents      # Agent + precompute TypeScript
+vp run typecheck:agents      # Agent + practice script TypeScript
 ```
 
 | Issue                                               | Solution                                       |
 | --------------------------------------------------- | ---------------------------------------------- |
 | Formatting errors                                   | Run `vp run format`                            |
-| Lint errors (agent runtime, precompute, `scripts/`) | Run `vp run fix:agents`, then fix what remains |
+| Lint errors (agent runtime, practice scripts, `scripts/`) | Run `vp run fix:agents`, then fix what remains |
 | TypeScript errors                                   | Run `vp run typecheck` to see details          |
 | OpenAPI out of sync                                 | Run `vp run generate:api`                      |
 | Database schema drift                               | Run `vp run db:draft-changelog`                |

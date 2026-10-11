@@ -22,10 +22,10 @@ export interface PracticeDefinitionPreviewProps {
 	definition: CuratedPracticeDefinition;
 	options: PracticeDefinitionOptions;
 	/**
-	 * What the precompute script needs in this workspace, above its source. Only a workspace has
+	 * What the practice script needs in this workspace, above its source. Only a workspace has
 	 * models to assign, so the catalog passes none.
 	 */
-	precompute?: ReactNode;
+	practiceScript?: ReactNode;
 }
 
 /**
@@ -41,7 +41,7 @@ export interface PracticeDefinitionPreviewProps {
 export function PracticeDefinitionPreview({
 	definition,
 	options,
-	precompute,
+	practiceScript,
 }: PracticeDefinitionPreviewProps) {
 	const workType = options.workTypes.find(
 		(candidate) => candidate.artifactKind === definition.artifactKind,
@@ -90,14 +90,18 @@ export function PracticeDefinitionPreview({
 						/>
 					</AccordionContent>
 				</AccordionItem>
-				{hasText(definition.precomputeScript) && (
-					<AccordionItem value="precompute-script">
-						<AccordionTrigger>Precompute script</AccordionTrigger>
+				{hasText(definition.practiceScript) && (
+					<AccordionItem value="practice-script">
+						<AccordionTrigger>Practice script</AccordionTrigger>
 						{/* Gaps rather than margins: the panel's own paragraph margin would double them. */}
 						<AccordionContent className="flex flex-col gap-4 [&_p:not(:last-child)]:mb-0">
-							{precompute}
-							<pre className="max-h-80 overflow-auto rounded-md bg-muted p-3 text-xs">
-								<code>{definition.precomputeScript}</code>
+							{practiceScript}
+							<pre
+								// oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- Keyboard users must be able to scroll this region.
+								tabIndex={0}
+								className="max-h-80 overflow-auto rounded-md bg-muted p-3 text-xs"
+							>
+								<code>{definition.practiceScript}</code>
 							</pre>
 						</AccordionContent>
 					</AccordionItem>

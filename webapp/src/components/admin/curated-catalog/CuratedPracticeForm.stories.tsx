@@ -31,7 +31,7 @@ const initialData: CuratedPracticeFormInitialValue = {
 	criteria: "Review whether the description explains the purpose, approach, and testing.",
 	whyItMatters: "Reviewers should not need to reconstruct the author's intent.",
 	whatGoodLooksLike: "The description states why, what changed, and how it was verified.",
-	precomputeScript: "export default function precompute() { return {}; }",
+	practiceScript: "export default function practiceScript() { return {}; }",
 	deliveryBehavior: { summaryOnly: false },
 	automatedReviewPolicy: mockPullRequestPolicy,
 	automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,

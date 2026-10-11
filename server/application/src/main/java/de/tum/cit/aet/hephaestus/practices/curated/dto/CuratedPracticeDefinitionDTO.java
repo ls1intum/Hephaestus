@@ -38,7 +38,7 @@ public record CuratedPracticeDefinitionDTO(
 
         @Nullable PracticePrecondition precondition,
         @NonNull String criteria,
-        @Nullable String precomputeScript,
+        @Nullable String practiceScript,
         @NonNull PracticeAutomatedReviewPolicy automatedReviewPolicy,
         @NonNull PracticeAutomatedReviewValidation automatedReviewValidation,
         @Nullable String whyItMatters,
@@ -57,7 +57,7 @@ public record CuratedPracticeDefinitionDTO(
                 definition.subject(),
                 definition.precondition(),
                 definition.criteria(),
-                definition.precomputeScript(),
+                definition.practiceScript(),
                 definition.automatedReviewPolicy(),
                 PracticeAutomatedReviewValidation.authorDeclared(practiceSlug, definition),
                 definition.whyItMatters(),

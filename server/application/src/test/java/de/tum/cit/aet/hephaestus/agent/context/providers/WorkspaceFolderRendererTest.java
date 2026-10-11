@@ -235,7 +235,7 @@ class WorkspaceFolderRendererTest extends BaseUnitTest {
     }
 
     @Test
-    void rendersPinnedCommitsWithParentsAndFileChangesForExistingPrecomputeConsumers() throws Exception {
+    void rendersPinnedCommitsWithParentsAndFileChangesForExistingPracticeScriptConsumers() throws Exception {
         var source = renderer();
         var kind = PullRequestContentSource.CORE;
         when(policies.isSourceUsePermitted(catalog.version(), kind, SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW))

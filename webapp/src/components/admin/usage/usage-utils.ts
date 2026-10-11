@@ -103,8 +103,8 @@ export function averageSpend(
 	return totalUsd / count;
 }
 
-/** The note under *Precompute models by practice*, on both consoles. */
-export function precomputeByPracticeDescription(isCurrentMonth: boolean): string {
+/** The note under *Models for practice scripts, by practice*, on both consoles. */
+export function practiceScriptByPracticeDescription(isCurrentMonth: boolean): string {
 	return `Decision, embedding and reranking calls from finished reviews${isCurrentMonth ? ", to date" : ""}. Chat calls from scripts are in each review’s cost. A review that ran several scripts counts once in the total.`;
 }
 

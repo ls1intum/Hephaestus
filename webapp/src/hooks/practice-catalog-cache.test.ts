@@ -171,8 +171,8 @@ describe("practice catalog cache updates", () => {
 			automatedReviewPolicy: updated.automatedReviewPolicy,
 			automatedReviewValidation: updated.automatedReviewValidation,
 		});
-		expect(selectPracticePatch(updated, { clear: ["PRECOMPUTE_SCRIPT"] })).toStrictEqual({
-			precomputeScript: updated.precomputeScript,
+		expect(selectPracticePatch(updated, { clear: ["PRACTICE_SCRIPT"] })).toStrictEqual({
+			practiceScript: updated.practiceScript,
 			automatedReviewPolicy: updated.automatedReviewPolicy,
 			automatedReviewValidation: updated.automatedReviewValidation,
 		});

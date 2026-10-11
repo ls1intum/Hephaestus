@@ -45,7 +45,7 @@ class ContentSourceContractTest extends BaseUnitTest {
                 assertThat(src)
                         .as(
                                 "%s names the practice '%s' — a connector must not encode practice-dependent logic "
-                                        + "(move it to the precompute script or the agent)",
+                                        + "(move it to the practice script or the agent)",
                                 provider.getFileName(), slug)
                         .doesNotContain(slug);
             }

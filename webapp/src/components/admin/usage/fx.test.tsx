@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import type { FxRateInfo, LlmUsageByDay, WorkspaceLlmUsageReport } from "@/api/types.gen";
 
-import { NO_PRECOMPUTE_USAGE } from "./fixtures";
+import { NO_PRACTICE_SCRIPT_USAGE } from "./fixtures";
 import {
 	capConversion,
 	type Fx,
@@ -46,7 +46,7 @@ function dayReport(
 		ownProviderBudgetVerdict: "WITHIN",
 		ownProviderPaused: false,
 		ownProviderInUse: ownProviderTotalCostUsd > 0,
-		...NO_PRECOMPUTE_USAGE,
+		...NO_PRACTICE_SCRIPT_USAGE,
 	};
 }
 

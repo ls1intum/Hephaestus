@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import {
 	cancelAgentJobMutation,
 	getAgentJobOptions,
-	getAgentJobPrecomputeOptions,
+	getAgentJobPracticeScriptsOptions,
 	getAgentJobQueryKey,
 	getAgentJobUsageOptions,
 	getArtifactTraceOptions,
@@ -17,7 +17,7 @@ import type {
 	AgentJob,
 	AgentJobUsage,
 	DeliveryPolicyTrace,
-	ReviewPrecompute,
+	ReviewPracticeScripts,
 } from "@/api/types.gen";
 import type { RunTraceState } from "@/components/admin/practice-reviews/review-run-sections";
 import {
@@ -31,7 +31,7 @@ import { retryUnlessNotFound } from "@/runtime/tanstack-query/query-defaults";
 
 /**
  * Everything the review's sheet needs, already resolved: the review, how it answered each practice,
- * the delivery checks it ran for itself, what its precompute scripts did, what it cost, and the two
+ * the delivery checks it ran for itself, what its practice scripts did, what it cost, and the two
  * actions an operator can take on it. Its
  * observations and feedback are other records: the sheet does not read them.
  *
@@ -42,7 +42,7 @@ export interface ReviewRunController {
 	job: PanelState<{ job: AgentJob }>;
 	trace: RunTraceState;
 	deliveryChecks: PanelState<{ checks: DeliveryPolicyTrace[] }>;
-	precompute: PanelState<{ scripts: ReviewPrecompute[] }>;
+	practiceScript: PanelState<{ scripts: ReviewPracticeScripts[] }>;
 	usage: PanelState<{ usage: AgentJobUsage }>;
 	onCancel: () => void;
 	cancelPending: boolean;
@@ -91,8 +91,8 @@ export function useReviewRunController(workspaceSlug: string, jobId: string): Re
 	// is final once the job is terminal, and it is asked for only then. A retry starts a new attempt.
 	// When that attempt ends, the query is enabled again, and it asks again only if its last answer is
 	// older than the client's stale time (`QUERY_STALE_TIME_MS`).
-	const precomputeQuery = useQuery({
-		...getAgentJobPrecomputeOptions({ path: { workspaceSlug, jobId } }),
+	const practiceScriptQuery = useQuery({
+		...getAgentJobPracticeScriptsOptions({ path: { workspaceSlug, jobId } }),
 		enabled: jobQuery.data !== undefined && !runIsActive,
 	});
 
@@ -159,7 +159,7 @@ export function useReviewRunController(workspaceSlug: string, jobId: string): Re
 				? { status: "none" }
 				: panelState(traceQuery, (trace) => ({ status: "ready" as const, trace })),
 		deliveryChecks: panelState(checksQuery, (checks) => ({ status: "ready" as const, checks })),
-		precompute: panelState(precomputeQuery, (scripts) => ({ status: "ready" as const, scripts })),
+		practiceScript: panelState(practiceScriptQuery, (scripts) => ({ status: "ready" as const, scripts })),
 		usage: panelState(usageQuery, (usage) => ({ status: "ready" as const, usage })),
 		onCancel: () => cancelJob.mutate({ path: { workspaceSlug, jobId } }),
 		cancelPending: cancelJob.isPending,

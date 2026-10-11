@@ -1,15 +1,15 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn } from "storybook/test";
 
-import type { PracticeTraceEntry, PrecomputeRun } from "@/api/types.gen";
+import type { PracticeTraceEntry, PracticeScriptRun } from "@/api/types.gen";
 import { reviewLevel } from "@/components/admin/practice-reviews/review-levels";
 import { InlineLink } from "@/components/common/InlineLink";
 import { DetailStackLink } from "@/components/layout/detail-drawer/DetailStackLink";
-import { precomputeGuideUrl } from "@/components/practice-vocabulary/precompute-run-status-defs";
+import { practiceScriptGuideUrl } from "@/components/practice-vocabulary/practice-script-run-status-defs";
 import { groups } from "@/stories/practice-profile-story-mock-data";
 import { levelsOpenedBy } from "@/test/detail-stack";
 
-import { artifactTrace, precomputeRuns } from "./fixtures";
+import { artifactTrace, practiceScriptRuns } from "./fixtures";
 import { ReviewRunPracticeTable } from "./ReviewRunPracticeTable";
 
 const [reviewed] = artifactTrace.practices;
@@ -19,18 +19,18 @@ if (reviewed === undefined) {
 
 /** The fix and *Details* name the practice for a screen reader, which lists every row's links together. */
 const forPractice = (label: string) => `${label} for ${reviewed.practiceName}`;
-const DETAILS = `Details of the precompute script for ${reviewed.practiceName}`;
+const DETAILS = `Details of the practice script for ${reviewed.practiceName}`;
 
-/** One reviewed practice whose precompute script ended as `run`. */
-const withPrecompute = (run: PrecomputeRun): PracticeTraceEntry[] => [
-	{ ...reviewed, precompute: run },
+/** One reviewed practice whose practice script ended as `run`. */
+const withPracticeScript = (run: PracticeScriptRun): PracticeTraceEntry[] => [
+	{ ...reviewed, practiceScript: run },
 ];
 
 /**
  * Every practice's answer on one piece of work. An admin also reads the operating facts under each
- * answer: what was sent, the autonomy, what the precompute script did, and what the answer rests on.
+ * answer: what was sent, the autonomy, what the practice script did, and what the answer rests on.
  *
- * The precompute line is muted text and never a badge. It is about the script that ran before the
+ * The practice script line is muted text and never a badge. It is about the script that ran before the
  * review, not about the developer's work, so it must not read as the practice's outcome.
  */
 const meta = {
@@ -61,29 +61,29 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
-/** Every line ends in *Details*, the review's Precompute scripts section, where the reasons are. */
+/** Every line ends in *Details*, the review's *Practice scripts* section, where the reasons are. */
 async function expectDetails(link: HTMLElement) {
 	await expect(link.getAttribute("href")).toMatch(/^\/w\/demo\/admin\/practices\/reviews\?/u);
 	await expect(levelsOpenedBy(link)).toStrictEqual(["review:11111111-1111-1111-1111-111111111111"]);
 }
 
 /** A script that ran and gave the review places has nothing to fix, so *Details* is the only link. */
-export const PrecomputeFound: Story = {
-	args: { entries: withPrecompute(precomputeRuns.found) },
+export const PracticeScriptFound: Story = {
+	args: { entries: withPracticeScript(practiceScriptRuns.found) },
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText(/^Precompute script found 4 places to check\./u)).toBeVisible();
+		await expect(canvas.getByText(/^Practice script found 4 places to check\./u)).toBeVisible();
 		await expect(canvas.queryByRole("link", { name: /model$|script$/u })).not.toBeInTheDocument();
 		await expectDetails(canvas.getByRole("link", { name: DETAILS }));
 	},
 };
 
 /** A skipped script found nothing because it did not run, so the line names the missing model instead of a count. */
-export const PrecomputeSkipped: Story = {
-	args: { entries: withPrecompute(precomputeRuns.skipped) },
+export const PracticeScriptSkipped: Story = {
+	args: { entries: withPracticeScript(practiceScriptRuns.skipped) },
 	play: async ({ canvas }) => {
 		await expect(
 			canvas.getByText(
-				/^Precompute script did not run: no decision model was set for this review\./u,
+				/^Practice script did not run: no decision model was set for this review\./u,
 			),
 		).toBeVisible();
 		await expect(canvas.queryByText(/0 places/u)).not.toBeInTheDocument();
@@ -100,11 +100,11 @@ export const PrecomputeSkipped: Story = {
  * A count of unrated items is model calls, never places: one call can carry many places. Of the
  * reasons, only the unusable answer points at the model, so the line offers that model alone.
  */
-export const PrecomputeCallsNotRated: Story = {
-	args: { entries: withPrecompute(precomputeRuns.partial) },
+export const PracticeScriptCallsNotRated: Story = {
+	args: { entries: withPracticeScript(practiceScriptRuns.partial) },
 	play: async ({ canvas }) => {
 		await expect(
-			canvas.getByText(/^Precompute script found 3 places to check\. 8 calls were not rated\./u),
+			canvas.getByText(/^Practice script found 3 places to check\. 8 calls were not rated\./u),
 		).toBeVisible();
 		await expect(
 			canvas.getByRole("link", { name: forPractice("Check the decision model") }),
@@ -123,13 +123,11 @@ export const PrecomputeCallsNotRated: Story = {
  * work held no places. No page fixes a slow model host, so the line links the guide that says who
  * can.
  */
-export const PrecomputeRatedNone: Story = {
-	args: { entries: withPrecompute(precomputeRuns.ratedNone) },
+export const PracticeScriptRatedNone: Story = {
+	args: { entries: withPracticeScript(practiceScriptRuns.ratedNone) },
 	play: async ({ canvas }) => {
 		await expect(
-			canvas.getByText(
-				/^Precompute script handed the review no places\. 6 calls were not rated\./u,
-			),
+			canvas.getByText(/^Practice script handed the review no places\. 6 calls were not rated\./u),
 		).toBeVisible();
 		await expect(canvas.queryByText(/found no places/u)).not.toBeInTheDocument();
 		await expect(canvas.queryByRole("link", { name: /model for/u })).not.toBeInTheDocument();
@@ -137,7 +135,7 @@ export const PrecomputeRatedNone: Story = {
 			canvas.getByRole("link", {
 				name: new RegExp(`^${forPractice("Why calls go unrated")}`, "u"),
 			}),
-		).toHaveAttribute("href", precomputeGuideUrl("UNRATED_CALLS"));
+		).toHaveAttribute("href", practiceScriptGuideUrl("UNRATED_CALLS"));
 		await expectDetails(canvas.getByRole("link", { name: DETAILS }));
 	},
 };
@@ -146,9 +144,9 @@ export const PrecomputeRatedNone: Story = {
  * Inside a drawer stack, the caller opens the review over the stack it already has, so *Details*
  * keeps the reader's place.
  */
-export const PrecomputeDetailsInAStack: Story = {
+export const PracticeScriptDetailsInAStack: Story = {
 	args: {
-		entries: withPrecompute(precomputeRuns.found),
+		entries: withPracticeScript(practiceScriptRuns.found),
 		reviewLink: (reviewId, label) => (
 			<InlineLink
 				className="inline-flex items-center gap-1"
@@ -171,16 +169,16 @@ export const PrecomputeDetailsInAStack: Story = {
  * The stage stopped before the script reported. No page here fixes that, so the line links the
  * guide that says what to raise or speed up.
  */
-export const PrecomputeNotFinished: Story = {
-	args: { entries: withPrecompute(precomputeRuns.notFinished) },
+export const PracticeScriptNotFinished: Story = {
+	args: { entries: withPracticeScript(practiceScriptRuns.notFinished) },
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText(/^Precompute script did not finish\./u)).toBeVisible();
+		await expect(canvas.getByText(/^Practice script did not finish\./u)).toBeVisible();
 		await expect(canvas.queryByRole("link", { name: /model$|script$/u })).not.toBeInTheDocument();
 		await expect(
 			canvas.getByRole("link", {
 				name: new RegExp(`^${forPractice("Why scripts stop early")}`, "u"),
 			}),
-		).toHaveAttribute("href", precomputeGuideUrl("STOPPED_EARLY"));
+		).toHaveAttribute("href", practiceScriptGuideUrl("STOPPED_EARLY"));
 		await expectDetails(canvas.getByRole("link", { name: DETAILS }));
 	},
 };
@@ -190,12 +188,12 @@ export const PrecomputeNotFinished: Story = {
  * answers went unrated waits: the line links the guide first, because the review lost what the
  * script did not reach.
  */
-export const PrecomputeTimedOut: Story = {
-	args: { entries: withPrecompute(precomputeRuns.timedOut) },
+export const PracticeScriptTimedOut: Story = {
+	args: { entries: withPracticeScript(practiceScriptRuns.timedOut) },
 	play: async ({ canvas }) => {
 		await expect(
 			canvas.getByText(
-				/^Precompute script ran out of time but found 2 places to check\. 1 call was not rated\./u,
+				/^Practice script ran out of time but found 2 places to check\. 1 call was not rated\./u,
 			),
 		).toBeVisible();
 		await expect(canvas.queryByRole("link", { name: /model for/u })).not.toBeInTheDocument();
@@ -203,16 +201,16 @@ export const PrecomputeTimedOut: Story = {
 			canvas.getByRole("link", {
 				name: new RegExp(`^${forPractice("Why scripts stop early")}`, "u"),
 			}),
-		).toHaveAttribute("href", precomputeGuideUrl("STOPPED_EARLY"));
+		).toHaveAttribute("href", practiceScriptGuideUrl("STOPPED_EARLY"));
 		await expectDetails(canvas.getByRole("link", { name: DETAILS }));
 	},
 };
 
 /** A script that failed is the author's to fix, so the line opens its practice in the editor. */
-export const PrecomputeFailed: Story = {
-	args: { entries: withPrecompute(precomputeRuns.failed) },
+export const PracticeScriptFailed: Story = {
+	args: { entries: withPracticeScript(practiceScriptRuns.failed) },
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText(/^Precompute script failed\./u)).toBeVisible();
+		await expect(canvas.getByText(/^Practice script failed\./u)).toBeVisible();
 		const edit = canvas.getByRole("link", { name: forPractice("Edit the script") });
 		await expect(edit.getAttribute("href")).toMatch(/^\/w\/demo\/admin\/practices\?/u);
 		await expect(levelsOpenedBy(edit)).toStrictEqual([`practice-edit:${reviewed.practiceSlug}`]);
@@ -221,11 +219,11 @@ export const PrecomputeFailed: Story = {
 };
 
 /** The script is an operating fact, like the delivery sentence: a member reads the answer alone. */
-export const PrecomputeHiddenFromMembers: Story = {
-	args: { entries: withPrecompute(precomputeRuns.skipped), canAdminister: false },
+export const PracticeScriptHiddenFromMembers: Story = {
+	args: { entries: withPracticeScript(practiceScriptRuns.skipped), canAdminister: false },
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText(reviewed.explanation)).toBeVisible();
-		await expect(canvas.queryByText(/Precompute script/u)).not.toBeInTheDocument();
+		await expect(canvas.queryByText(/Practice script/u)).not.toBeInTheDocument();
 		await expect(
 			canvas.queryByRole("link", { name: /^Assign |^Details/u }),
 		).not.toBeInTheDocument();
@@ -233,6 +231,6 @@ export const PrecomputeHiddenFromMembers: Story = {
 };
 
 export const NarrowViewport: Story = {
-	args: { entries: withPrecompute(precomputeRuns.partial) },
+	args: { entries: withPracticeScript(practiceScriptRuns.partial) },
 	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
 };

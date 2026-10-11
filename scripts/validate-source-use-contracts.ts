@@ -234,7 +234,7 @@ validate(
 /** A bundled practice, as far as the script/practice pairing below is concerned. */
 interface BundledPractice {
 	readonly slug: string;
-	readonly precomputeScript: string | undefined;
+	readonly practiceScript: string | undefined;
 }
 
 const bundledPractices = (value: unknown, label: string): BundledPractice[] =>
@@ -244,13 +244,13 @@ const bundledPractices = (value: unknown, label: string): BundledPractice[] =>
 			(practice, index) => {
 				const entry = `${groupLabel} practices[${index}]`;
 				const record = asRecord(practice, entry);
-				const script = record.precomputeScript;
+				const script = record.practiceScript;
 				return {
 					slug: asString(record.slug, `${entry}.slug`),
-					precomputeScript:
+					practiceScript:
 						script === undefined || script === null
 							? undefined
-							: asString(script, `${entry}.precomputeScript`),
+							: asString(script, `${entry}.practiceScript`),
 				};
 			},
 		);
@@ -258,38 +258,38 @@ const bundledPractices = (value: unknown, label: string): BundledPractice[] =>
 
 const practices = bundledPractices(parsedPracticeCatalog, PRACTICE_CATALOG);
 
-const precomputeResourcePrefix = "practices/precompute/";
-const precomputeFiles = await readdir(
-	path.join(root, "server/application/src/main/resources/practices/precompute"),
+const practiceScriptResourcePrefix = "practices/scripts/";
+const practiceScriptFiles = await readdir(
+	path.join(root, "server/application/src/main/resources/practices/scripts"),
 );
-const precomputeScripts = new Set(
-	precomputeFiles
+const practiceScripts = new Set(
+	practiceScriptFiles
 		.filter((file) => file.endsWith(".ts"))
-		.map((file) => precomputeResourcePrefix + file),
+		.map((file) => practiceScriptResourcePrefix + file),
 );
-const referencedPrecomputeScripts = new Set<string>();
+const referencedPracticeScripts = new Set<string>();
 for (const practice of practices) {
-	if (practice.precomputeScript === undefined) {
+	if (practice.practiceScript === undefined) {
 		continue;
 	}
 	// The loader checks the script exists. Nothing checks it belongs to the practice that names it,
 	// and a script named after a slug is the only thing that keeps the pair findable from either side.
-	const expected = `${precomputeResourcePrefix}${practice.slug}.ts`;
-	if (practice.precomputeScript !== expected) {
+	const expected = `${practiceScriptResourcePrefix}${practice.slug}.ts`;
+	if (practice.practiceScript !== expected) {
 		throw new Error(
-			`default-catalog.json practice '${practice.slug}' must name its precompute script '${expected}'`,
+			`default-catalog.json practice '${practice.slug}' must name its practice script '${expected}'`,
 		);
 	}
-	if (!precomputeScripts.has(expected)) {
+	if (!practiceScripts.has(expected)) {
 		throw new Error(
-			`default-catalog.json practice '${practice.slug}' names a missing precompute script`,
+			`default-catalog.json practice '${practice.slug}' names a missing practice script`,
 		);
 	}
-	referencedPrecomputeScripts.add(expected);
+	referencedPracticeScripts.add(expected);
 }
-for (const script of precomputeScripts) {
-	if (!referencedPrecomputeScripts.has(script)) {
-		throw new Error(`precompute script '${script}' is not named by any bundled practice`);
+for (const script of practiceScripts) {
+	if (!referencedPracticeScripts.has(script)) {
+		throw new Error(`practice script '${script}' is not named by any bundled practice`);
 	}
 }
 

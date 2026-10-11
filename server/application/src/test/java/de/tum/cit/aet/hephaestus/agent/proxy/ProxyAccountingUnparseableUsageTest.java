@@ -113,19 +113,19 @@ class ProxyAccountingUnparseableUsageTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldStillCountThePrecomputeCallWhenItsBodyIsUnreadable() {
+    void shouldStillCountThePracticeScriptCallWhenItsBodyIsUnreadable() {
         ProxyRouting.BilledAttempt attempt = new ProxyRouting.BilledAttempt(
-                LlmUsageSourceType.PRECOMPUTE_EMBEDDING, UUID.randomUUID(), 0, BigDecimal.ZERO, "worker-1");
+                LlmUsageSourceType.PRACTICE_SCRIPT_EMBEDDING, UUID.randomUUID(), 0, BigDecimal.ZERO, "worker-1");
         byte[] notJson = "<html>502 upstream</html>".getBytes(StandardCharsets.UTF_8);
 
-        PrecomputeCall call = new PrecomputeCall(ModelKind.EMBEDDING, null, "comment-quality");
+        PracticeScriptCall call = new PracticeScriptCall(ModelKind.EMBEDDING, null, "comment-quality");
 
         accounting.recordUsage(attempt, call, LlmApiProtocol.OPENAI_EMBEDDINGS, notJson);
 
         assertThat(meterRegistry
-                        .counter("llm.proxy.usage.unparseable", "sourceType", "PRECOMPUTE_EMBEDDING")
+                        .counter("llm.proxy.usage.unparseable", "sourceType", "PRACTICE_SCRIPT_EMBEDDING")
                         .count())
                 .isEqualTo(1.0);
-        verify(usageAccumulator).accumulatePrecompute(attempt, call, null);
+        verify(usageAccumulator).accumulatePracticeScript(attempt, call, null);
     }
 }

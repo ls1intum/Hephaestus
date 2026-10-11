@@ -4,14 +4,14 @@ import { createColumnHelper, FlexRender, type SortingState, useTable } from "@ta
 import { useMemo, useState } from "react";
 
 import { cn } from "cn";
-import type { LlmUsageByPractice, LlmUsagePrecomputeTotal } from "@/api/types.gen";
+import type { LlmUsageByPractice, LlmUsagePracticeScriptTotal } from "@/api/types.gen";
 import { TableRowsSkeleton } from "@/components/admin/integrations/TableRowsSkeleton";
 import { practiceSetupLevel } from "@/components/admin/practices/practice-search";
 import { type DataTableFeatures, dataTableFeatures } from "@/components/common/data-table";
 import { DataTableHeader } from "@/components/common/DataTableHeader";
 import { InlineLink } from "@/components/common/InlineLink";
 import { detailSearch } from "@/components/layout/detail-drawer/detail-stack";
-import { isPrecomputePurpose } from "@/components/practice-vocabulary/agent-purpose-defs";
+import { isPracticeScriptPurpose } from "@/components/practice-vocabulary/agent-purpose-defs";
 import { ModelKindMark } from "@/components/practice-vocabulary/ModelKindMark";
 import type { Purse } from "@/components/practice-vocabulary/purse-defs";
 import {
@@ -44,7 +44,7 @@ import {
 
 export interface LlmUsageByPracticeTableProps {
 	/** Absent while the report loads. */
-	report?: { byPractice: LlmUsageByPractice[]; precomputeTotal: LlmUsagePrecomputeTotal };
+	report?: { byPractice: LlmUsageByPractice[]; practiceScriptTotal: LlmUsagePracticeScriptTotal };
 	/** The purses this page shows, the same on every table of it: `pursesOf`, one array per answer. */
 	purses: readonly Purse[];
 	/**
@@ -60,8 +60,8 @@ const NUMERIC = { numeric: true };
 const NUMERIC_WIDE_ONLY = { numeric: true, className: WIDE_ONLY };
 
 /**
- * Decision, embedding and reranking calls of precompute scripts, one row per practice, most shared
- * spend first. The footer is the server's `precomputeTotal`: one review runs several practices, so its
+ * Decision, embedding and reranking calls of practice scripts, one row per practice, most shared
+ * spend first. The footer is the server's `practiceScriptTotal`: one review runs several practices, so its
  * reviews, with or without a price, do not add up from the rows, and money is never re-added here.
  */
 export function LlmUsageByPracticeTable({
@@ -70,7 +70,7 @@ export function LlmUsageByPracticeTable({
 	workspaceSlug,
 }: LlmUsageByPracticeTableProps) {
 	const rows = report?.byPractice;
-	const total = rows != null && rows.length > 1 ? report?.precomputeTotal : undefined;
+	const total = rows != null && rows.length > 1 ? report?.practiceScriptTotal : undefined;
 	const hasUnpriced = rows?.some((row) => row.unpricedEventCount > 0) === true;
 	const [sorting, setSorting] = useState<SortingState>([{ id: "SHARED-spend", desc: true }]);
 
@@ -194,7 +194,9 @@ export function LlmUsageByPracticeTable({
 
 	return (
 		<Table bordered>
-			<TableCaption className="sr-only">Precompute model spend by practice</TableCaption>
+			<TableCaption className="sr-only">
+				Spend on models for practice scripts, by practice
+			</TableCaption>
 			<DataTableHeader table={table} />
 			{rows == null ? (
 				<TableRowsSkeleton
@@ -260,7 +262,7 @@ function practiceSortName(row: LlmUsageByPractice): string {
 }
 
 function averageOf(
-	figures: LlmUsageByPractice | LlmUsagePrecomputeTotal,
+	figures: LlmUsageByPractice | LlmUsagePracticeScriptTotal,
 	purse: Purse,
 ): number | null {
 	return averageSpend(spendOf(figures, purse), figures.reviews, figures.unpricedEventCount);
@@ -273,7 +275,7 @@ function AverageCell({ average, digits }: { average: number | null; digits: Aver
 function ModelKinds({ row }: { row: LlmUsageByPractice }) {
 	return (
 		<span className="flex flex-col gap-1">
-			{row.purposes.filter(isPrecomputePurpose).map((purpose) => (
+			{row.purposes.filter(isPracticeScriptPurpose).map((purpose) => (
 				<ModelKindMark key={purpose} purpose={purpose} />
 			))}
 		</span>

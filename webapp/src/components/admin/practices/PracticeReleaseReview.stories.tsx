@@ -209,16 +209,16 @@ export const GuidanceUpdate: Story = {
 };
 
 /** The script that runs before each review carries the editor's name for it. */
-export const PrecomputeScriptUpdate: Story = {
+export const PracticeScriptUpdate: Story = {
 	args: {
 		proposal: {
 			...proposal,
 			current: base,
-			offered: { ...base, precomputeScript: "export default { models: {} };" },
-			fields: [{ field: "PRECOMPUTE_SCRIPT", offeredChanged: true, conflict: false }],
+			offered: { ...base, practiceScript: "export default { models: {} };" },
+			fields: [{ field: "PRACTICE_SCRIPT", offeredChanged: true, conflict: false }],
 		},
 	},
 	play: async () => {
-		await expect(screen.getByText("Precompute script")).toBeVisible();
+		await expect(screen.getByText("Practice script")).toBeVisible();
 	},
 };

@@ -94,14 +94,16 @@ export const Default: Story = {
 		await expect(chat.getByText("Responses API")).toBeVisible();
 		await expect(chat.getByText("Key ends in ab12")).toBeVisible();
 		await expect(chat.getByRole("table", { name: "Models on My OpenAI account" })).toBeVisible();
-		const precompute = within(canvas.getByRole("region", { name: "On-prem embeddings" }));
-		await expect(precompute.getByText("Embeddings API")).toBeVisible();
-		await expect(precompute.getByText(", for Embedding model")).toHaveClass("sr-only");
+		const embeddingsProvider = within(canvas.getByRole("region", { name: "On-prem embeddings" }));
+		await expect(embeddingsProvider.getByText("Embeddings API")).toBeVisible();
+		await expect(embeddingsProvider.getByText(", for Embedding model")).toHaveClass("sr-only");
 		await expect(
-			precompute.getByRole("cell", { name: "No models yet. Add a model to use this provider." }),
+			embeddingsProvider.getByRole("cell", {
+				name: "No models yet. Add a model to use this provider.",
+			}),
 		).toBeVisible();
 		await expect(
-			precompute.getByRole("button", { name: "Add model to On-prem embeddings" }),
+			embeddingsProvider.getByRole("button", { name: "Add model to On-prem embeddings" }),
 		).toBeVisible();
 		// The server keeps a provider that still has models, so its Disconnect says why it is off.
 		const keeps = chat.getByRole("button", { name: "Disconnect My OpenAI account" });
@@ -109,9 +111,11 @@ export const Default: Story = {
 		await expect(keeps).toHaveAccessibleDescription("To disconnect, delete its models first.");
 		await expect(chat.getByText("To disconnect, delete its models first.")).toBeVisible();
 		await expect(
-			precompute.getByRole("button", { name: "Disconnect On-prem embeddings" }),
+			embeddingsProvider.getByRole("button", { name: "Disconnect On-prem embeddings" }),
 		).toBeEnabled();
-		await expect(precompute.queryByText("To disconnect, delete its models first.")).toBeNull();
+		await expect(
+			embeddingsProvider.queryByText("To disconnect, delete its models first."),
+		).toBeNull();
 		// Stacked tables keep their columns in the same places, an empty one too.
 		for (const column of ["Data handling", "Price", "Status", "Actions"]) {
 			await expect(
@@ -181,7 +185,7 @@ export const RegistrationBlocked: Story = {
 };
 
 /**
- * A precompute endpoint often serves no model list, so its failed test is no fault; a chat endpoint
+ * A embeddings endpoint often serves no model list, so its failed test is no fault; a chat endpoint
  * that fails the same way is one.
  */
 export const TestResults: Story = {
@@ -200,11 +204,11 @@ export const TestResults: Story = {
 	play: async ({ canvas }) => {
 		const chat = within(canvas.getByRole("region", { name: "My OpenAI account" }));
 		await expect(chat.getByRole("status")).toHaveTextContent("Connected. 12 models available.");
-		const precompute = within(canvas.getByRole("region", { name: "On-prem embeddings" }));
-		await expect(precompute.getByRole("status")).toHaveTextContent(
+		const embeddingsProvider = within(canvas.getByRole("region", { name: "On-prem embeddings" }));
+		await expect(embeddingsProvider.getByRole("status")).toHaveTextContent(
 			/^No model list at this address/u,
 		);
-		await expect(precompute.queryByRole("alert")).toBeNull();
+		await expect(embeddingsProvider.queryByRole("alert")).toBeNull();
 	},
 };
 
