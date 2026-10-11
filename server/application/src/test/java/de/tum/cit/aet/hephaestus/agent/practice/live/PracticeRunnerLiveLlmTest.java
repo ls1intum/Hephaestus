@@ -538,7 +538,7 @@ class PracticeRunnerLiveLlmTest {
         }
 
         private void forward(HttpExchange exchange, LiveLlmCredentials creds) throws IOException {
-            Forwarding forwarding = new Forwarding(exchange);
+            Forwarding forwarding = new Forwarding();
             if (!register(forwarding)) {
                 exchange.close();
                 return;
@@ -604,7 +604,6 @@ class PracticeRunnerLiveLlmTest {
          */
         @Override
         public void close() {
-            List<HttpExchange> exchanges = new ArrayList<>();
             List<InputStream> streams = new ArrayList<>();
             synchronized (lifecycle) {
                 if (closed) {
@@ -612,7 +611,6 @@ class PracticeRunnerLiveLlmTest {
                 }
                 closed = true;
                 for (Forwarding forwarding : active) {
-                    exchanges.add(forwarding.exchange);
                     if (forwarding.upstream != null) {
                         streams.add(forwarding.upstream);
                     }
@@ -621,6 +619,7 @@ class PracticeRunnerLiveLlmTest {
             long deadline = System.nanoTime() + CLOSE_TIMEOUT.toNanos();
             List<Exception> failures = new ArrayList<>();
             try {
+                // Stop closes connections; the handler alone closes each response body and exchange.
                 server.stop(0);
             } catch (RuntimeException e) {
                 failures.add(e);
@@ -634,13 +633,6 @@ class PracticeRunnerLiveLlmTest {
                 try {
                     stream.close();
                 } catch (IOException | RuntimeException e) {
-                    failures.add(e);
-                }
-            }
-            for (HttpExchange exchange : exchanges) {
-                try {
-                    exchange.close();
-                } catch (RuntimeException e) {
                     failures.add(e);
                 }
             }
@@ -671,15 +663,10 @@ class PracticeRunnerLiveLlmTest {
             return Duration.ofNanos(Math.max(0, deadline - System.nanoTime()));
         }
 
-        /** One forwarded request and, once the upstream answers, the response stream it transfers. */
+        /** Once the upstream answers, the response stream transferred by one forwarding handler. */
         private static final class Forwarding {
-            private final HttpExchange exchange;
             // Guarded by the stand-in's lifecycle lock.
             private @Nullable InputStream upstream;
-
-            Forwarding(HttpExchange exchange) {
-                this.exchange = exchange;
-            }
         }
     }
 }
