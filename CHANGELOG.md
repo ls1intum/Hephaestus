@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.90.1
+
+### Patch Changes
+
+- Workspace activity looks up where a scope's history starts only for all-time ranges. Last 30 days, 90 days, a year, a custom range and the default range no longer run that lookup.
+- Workspace activity loads more efficiently while preserving contribution totals and first contribution dates.
+- Local web app startup checks now work with the stock macOS Bash shell.
+- Practice update comparisons scroll within their panel on narrow screens, keeping the accept and decline buttons visible.
+- Accepting or declining a practice catalogue update now avoids a deadlock with practice adoption in the same workspace.
+- Issue reviews can recognize tracked subtasks from synchronized child issues when the provider supplies no complete count. Unknown counts remain unknown, and stored counts are identified as captured records rather than complete provider totals.
+- GitHub pull requests identified in issue payloads no longer create issue activity. Activity repair removes incorrect issue lifecycle entries while preserving comments and reviews. GitLab issues and merge requests that share a number remain separate.
+- Permission-related scan leads now name matching references to inspect. The permission standard describes missing required usage descriptions without assuming every API crashes.
+- Deployments now make the new release's images available before they stop the running worker. If an image pull fails, the running release, worker, and applied record stay unchanged.
+- Practice review failures before execution now identify the preparation step and a classified cause when one is known.
+  These failure details omit sensitive exception text and leave retry behavior unchanged.
+- Promoting the current commit again no longer unnecessarily replaces the database image.
+- Issue reviews now distinguish provider sub-issue totals from counts of stored children. Stored counts describe the mirror at capture and may omit other children, even when every stored child is closed. This applies to the issue under review and to linked issues.
+
 ## 0.90.0
 
 ### Minor Changes
