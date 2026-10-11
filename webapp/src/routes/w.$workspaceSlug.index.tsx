@@ -17,10 +17,12 @@ import {
 	PERIOD_SEARCH_KEYS,
 } from "@/components/activity/activity-search";
 import type { PeopleOrder } from "@/components/activity/ActivityPeopleTable";
-import { PublicActivityPage } from "@/components/activity/PublicActivityPage";
+import {
+	PublicActivityPage,
+	PublicActivityPageSkeleton,
+} from "@/components/activity/PublicActivityPage";
 import { useDetailStack } from "@/components/layout/detail-drawer/use-detail-stack";
 import { PublicActivityOnboardingDialog } from "@/components/onboarding/PublicActivityOnboardingDialog";
-import { Spinner } from "@/components/ui/spinner";
 import { useLoginNavigation } from "@/hooks/use-login-navigation";
 import { usePublicActivityOnboarding } from "@/hooks/use-public-activity-onboarding";
 import { pageTitle } from "@/lib/page-title";
@@ -137,11 +139,7 @@ export const Route = createFileRoute("/w/$workspaceSlug/")({
 			],
 		};
 	},
-	pendingComponent: () => (
-		<div className="flex h-96 items-center justify-center">
-			<Spinner className="size-8" />
-		</div>
-	),
+	pendingComponent: PublicActivityPageSkeleton,
 	component: PublicActivityRoute,
 });
 

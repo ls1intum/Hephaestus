@@ -137,12 +137,54 @@ function PublicPersonLevel({
 	);
 }
 
+/** The seven totals `PersonFigures` lists. */
+const TOTALS_COUNT = 7;
+
+const SKELETON_WEEKS = 3;
+
+/** The level's regions before the page's people arrive: the profile link, the totals and the weeks. */
 function PersonSkeleton() {
 	return (
-		<div className="space-y-3">
-			{Array.from({ length: 4 }, (_, index) => (
-				<Skeleton key={index} className="h-5 w-full" />
-			))}
+		<div className="space-y-6" aria-hidden inert>
+			<Skeleton className="h-5 w-40" />
+			<div className="space-y-2">
+				<Skeleton className="h-6 w-28" />
+				<div className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1">
+					{Array.from({ length: TOTALS_COUNT }, (_, index) => (
+						<div key={index} className="contents">
+							<Skeleton className="h-5 w-44 max-w-full" />
+							<Skeleton className="h-5 w-8" />
+						</div>
+					))}
+				</div>
+			</div>
+			<div className="space-y-2">
+				<Skeleton className="h-6 w-48" />
+				<Table aria-hidden>
+					<TableHeader>
+						<TableRow variant="static">
+							<TableHead>
+								<Skeleton className="h-4 w-16" />
+							</TableHead>
+							<TableHead numeric>
+								<Skeleton className="ml-auto h-4 w-24" />
+							</TableHead>
+						</TableRow>
+					</TableHeader>
+					<TableBody>
+						{Array.from({ length: SKELETON_WEEKS }, (_, index) => (
+							<TableRow key={index} variant="static">
+								<TableCell>
+									<Skeleton className="h-5 w-32" />
+								</TableCell>
+								<TableCell numeric>
+									<Skeleton className="ml-auto h-5 w-8" />
+								</TableCell>
+							</TableRow>
+						))}
+					</TableBody>
+				</Table>
+			</div>
 		</div>
 	);
 }
