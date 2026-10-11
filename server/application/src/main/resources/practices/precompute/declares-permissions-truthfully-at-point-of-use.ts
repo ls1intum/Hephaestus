@@ -1,6 +1,7 @@
-// Precompute HINTS for declares-permissions-truthfully-at-point-of-use: the permission-bearing API calls
+// Precompute HINTS for declares-permissions-truthfully-at-point-of-use: the permission-related references
 // and authorization requests ADDED in Swift files, and the usage-description keys located in the change
-// or in the first plist/project files of the checkout, each with its path. A key located in some file
+// or in the first plist/project files of the checkout, each with its path. A reference names a type or
+// call to inspect; it does not show that the change requests restricted access. A key located in some file
 // does not show that the target in question declares it, nor does a key not located show that it does
 // not; the review reads the target, the actual API and the description.
 import { readFile } from "node:fs/promises";
@@ -10,10 +11,11 @@ import { globFilesSync } from "../lib/files.ts";
 import { countLabel, sampleNote, scanAddedLines, type SourcePattern } from "../lib/source-scan.ts";
 import type { DiffFile, Hint, PullRequestMetadata } from "../lib/types.ts";
 
-// capability label -> [the API use that can need permission, usage keys that may declare it]. An import
-// or a type name alone is not access: the system photo picker needs no library permission, and an
-// image picker reaches the camera only when the camera is its source.
-const CAPABILITIES: readonly [string, RegExp, string[]][] = [
+// reference kind -> [a permission-related type or call to inspect, usage keys that may declare its access].
+// A match is a place to look, not access: a type named in a signature or conformance requests nothing,
+// the system photo picker needs no library permission, and an image picker reaches the camera only when
+// the camera is its source.
+const PERMISSION_REFERENCES: readonly [string, RegExp, string[]][] = [
 	[
 		"Location",
 		/\bCLLocationManager\b/u,
@@ -66,7 +68,10 @@ const REQUEST: readonly SourcePattern[] = [
 		"authorization request",
 		/\brequest(?:WhenInUse|Always)?Authorization\b|\brequestAccess\b|\brequestTrackingAuthorization\b|\bPHPhotoLibrary\.requestAuthorization\b/u,
 	],
-	...CAPABILITIES.map(([label, re]): SourcePattern => [`capability ${label}`, re]),
+	...PERMISSION_REFERENCES.map(([kind, re]): SourcePattern => [
+		`permission-related reference ${kind}`,
+		re,
+	]),
 ];
 
 const USAGE_KEY = /\b(?<key>NS\w+UsageDescription)\b/gu;
@@ -144,7 +149,9 @@ export default async function declaresPermissionsTruthfullyAtPointOfUse(
 		}
 	}
 	const checkout = await usageKeysInCheckout(repoPath);
-	const capabilities = CAPABILITIES.filter(([label]) => scan.counts.has(`capability ${label}`));
+	const references = PERMISSION_REFERENCES.filter(([kind]) =>
+		scan.counts.has(`permission-related reference ${kind}`),
+	);
 	const located = (keys: string[]) =>
 		keys.flatMap((key) => {
 			const inChange = keysInChange.get(key);
@@ -157,16 +164,16 @@ export default async function declaresPermissionsTruthfullyAtPointOfUse(
 			return where.length === 0 ? [] : [`${key} (${where.join(", ")})`];
 		});
 	const directions: string[] = [...sampleNote(scan)];
-	if (capabilities.length > 0) {
+	if (references.length > 0) {
 		const read = `${String(checkout.filesRead)} of ${String(checkout.filesFound)} plist/project file(s) read${checkout.unreadable > 0 ? `, ${String(checkout.unreadable)} unreadable` : ""}`;
 		directions.push(
-			`API uses that can need permission: ${capabilities
-				.map(([label, , keys]) => {
+			`Permission-related references to inspect: ${references
+				.map(([kind, , keys]) => {
 					if (keys.length === 0) {
-						return `${label} (no usage key applies)`;
+						return `${kind} (no usage key applies)`;
 					}
 					const found = located(keys);
-					return `${label} — keys located: ${found.length > 0 ? found.join("; ") : "none"}`;
+					return `${kind} — keys located: ${found.length > 0 ? found.join("; ") : "none"}`;
 				})
 				.join(
 					". ",
@@ -182,7 +189,7 @@ export default async function declaresPermissionsTruthfullyAtPointOfUse(
 	return {
 		hints: hints.slice(0, 40),
 		metrics: {
-			capabilitiesAdded: capabilities.length,
+			permissionReferenceKinds: references.length,
 			authorizationRequests: requests,
 			usageKeysAdded: keysInChange.size,
 			usageKeysLocatedInCheckout: checkout.keys.size,
