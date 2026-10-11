@@ -34,6 +34,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.ReviewDecisi
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment.PullRequestReviewComment;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment.PullRequestReviewCommentRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.PullRequestReviewThread;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.RepositoryKey;
@@ -45,6 +46,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -212,6 +214,58 @@ class PullRequestContentSourceTest extends BaseUnitTest {
             JsonNode metadataJson = objectMapper.readTree(files.get("context/metadata.json"));
             assertThat(metadataJson.get("pr_number").asInt()).isEqualTo(42);
             assertThat(metadataJson.get("repository_full_name").asString()).isEqualTo("owner/repo");
+        }
+
+        /** A full name is unique only per provider, so the record carries the ids that tell two apart. */
+        @Test
+        void shouldStateTheAdmittedRepositoryAndOnlyItsOwnProviderWhenTheMirrorStillHoldsIt() throws Exception {
+            var provider9 = new IdentityProvider(IdentityProviderType.GITLAB, "https://gitlab.example");
+            provider9.setId(9L);
+            var admitted = new Repository();
+            admitted.setId(123L);
+            admitted.setProvider(provider9);
+            var moved = new Repository();
+            moved.setId(124L);
+            moved.setProvider(provider9);
+
+            for (var repository : List.of(admitted, moved)) {
+                PullRequest pr = new PullRequest();
+                pr.setRepository(repository);
+                when(pullRequestRepository.findByIdForReviewContext(456L)).thenReturn(Optional.of(pr));
+
+                JsonNode metadataJson = objectMapper.readTree(provider.capture(request(sampleMetadata()), Set.of(CORE))
+                        .files()
+                        .get("context/metadata.json"));
+
+                assertThat(metadataJson.get("repository_id").asLong()).isEqualTo(123L);
+                assertThat(metadataJson.path("basis").path("admission_fields").toString())
+                        .contains("\"repository_id\"");
+                if (Objects.equals(repository.getId(), admitted.getId())) {
+                    assertThat(metadataJson.get("provider_id").asLong()).isEqualTo(9L);
+                } else {
+                    assertThat(metadataJson.has("provider_id")).isFalse();
+                }
+            }
+        }
+
+        @Test
+        void shouldLeaveMalformedAdvisoryIdentityAbsentWithoutChangingCaptureAuthorization() throws Exception {
+            var pr = new PullRequest();
+            when(pullRequestRepository.findByIdForReviewContext(456L)).thenReturn(Optional.of(pr));
+            for (double invalid : new double[] {0, -1, 1.5}) {
+                var metadata = sampleMetadata();
+                metadata.put("repository_id", invalid);
+                JsonNode captured = objectMapper.readTree(provider.capture(request(metadata), Set.of(CORE))
+                        .files()
+                        .get("context/metadata.json"));
+                assertThat(captured.has("repository_id")).isFalse();
+                assertThat(captured.has("provider_id")).isFalse();
+            }
+            var missing = sampleMetadata();
+            missing.remove("repository_id");
+            assertThatThrownBy(() -> provider.capture(request(missing), Set.of(CORE)))
+                    .isInstanceOf(JobPreparationException.class)
+                    .hasMessageContaining("repository_id");
         }
 
         @Test

@@ -71,6 +71,10 @@ export interface PullRequestMetadata {
 	pr_number: number;
 	pr_url: string;
 	repository_full_name: string;
+	/** The admitted repository's id; a full name is unique only within one provider. */
+	repository_id?: number;
+	/** That repository's provider as the mirror held it at capture; absent when it could not be told. */
+	provider_id?: number;
 	source_branch: string;
 	target_branch: string;
 	commit_sha: string;

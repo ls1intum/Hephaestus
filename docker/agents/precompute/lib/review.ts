@@ -15,6 +15,8 @@ export interface LinkedWorkItem {
 	 * `mentions` when only the text names it. Only `state` and `closedAt` say whether it closed.
 	 */
 	how?: "closesOnMerge" | "mentions";
+	/** The provider's address of the issue; a closing candidate can belong to another repository. */
+	url?: string;
 	body: string;
 	createdAt?: string;
 	closedAt?: string;
@@ -114,6 +116,7 @@ export async function readLinkedWorkItemCapture(
 				title: text(item.title),
 				state: optionalString(item.state),
 				how: linkHow(item.how),
+				url: optionalString(item.url),
 				body: text(item.body ?? item.description),
 				createdAt: optionalString(item.createdAt),
 				closedAt: optionalString(item.closedAt),

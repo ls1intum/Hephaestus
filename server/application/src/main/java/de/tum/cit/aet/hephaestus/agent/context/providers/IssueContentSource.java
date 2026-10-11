@@ -179,6 +179,19 @@ public class IssueContentSource implements EvidenceSource, ReviewContextBuilder 
                     issue.getStateReason() != null ? issue.getStateReason().name() : null);
             meta.put("html_url", issue.getHtmlUrl());
             meta.put("repository_full_name", repoFullName);
+            // Keep the admitted repository identity; a moved mirror cannot supply its provider.
+            var admittedRepositoryId = metadata.get("repository_id");
+            if (admittedRepositoryId != null
+                    && admittedRepositoryId.isIntegralNumber()
+                    && admittedRepositoryId.asLong() > 0) {
+                meta.set("repository_id", admittedRepositoryId);
+                var repository = issue.getRepository();
+                if (repository != null
+                        && Objects.equals(repository.getId(), admittedRepositoryId.asLong())
+                        && repository.getProvider() != null) {
+                    meta.put("provider_id", repository.getProvider().getId());
+                }
+            }
             meta.put("author", issue.getAuthor() != null ? issue.getAuthor().getLogin() : null);
             meta.put("author_id", issue.getAuthor() != null ? issue.getAuthor().getNativeId() : null);
             meta.put(

@@ -59,6 +59,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 class ScmJobFolderProjectorIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
@@ -183,6 +184,44 @@ class ScmJobFolderProjectorIntegrationTest extends AbstractWorkspaceIntegrationT
         assertThat(project(workspace, widgets, ALL))
                 .extracting(ProjectedRecord::path)
                 .containsExactly("issues/1/record.json", "issues/1/description.md", "issues/1/comments.jsonl");
+    }
+
+    /** A full name is unique only per provider, so each inventory row carries the ids that tell two apart. */
+    @Test
+    void shouldStreamEachInventoryRowWithItsOwnRepositoryAndProviderWhenTwoProvidersShareAFullName() {
+        Repository onGitHub = repository("labels-org/twins", workspace);
+        Repository onGitLab = new Repository();
+        onGitLab.setNativeId(nativeIds.incrementAndGet());
+        onGitLab.setProvider(ensureGitLabProvider());
+        onGitLab.setName("twins");
+        onGitLab.setNameWithOwner("labels-org/twins");
+        onGitLab.setHtmlUrl("https://gitlab.com/labels-org/twins");
+        onGitLab.setDefaultBranch("main");
+        onGitLab = repositoryRepository.save(onGitLab);
+        issue(onGitHub, 7);
+        Issue gitLabIssue = issue(onGitLab, 7);
+        gitLabIssue.setProvider(onGitLab.getProvider());
+        issueRepository.save(gitLabIssue);
+
+        for (Repository repository : List.of(onGitHub, onGitLab)) {
+            List<ObjectNode> rows = new ArrayList<>();
+            projector.forEachInventoryRecord(workspace.getId(), repository.getId(), "ISSUE", rows::add);
+            assertThat(rows).singleElement().satisfies(row -> {
+                assertThat(row.path("number").asInt()).isEqualTo(7);
+                assertThat(row.path("repository").asString()).isEqualTo("labels-org/twins");
+                assertThat(row.path("repository_id").asLong()).isEqualTo(repository.getId());
+                assertThat(row.path("provider_id").asLong())
+                        .isEqualTo(repository.getProvider().getId());
+            });
+        }
+        assertThat(onGitHub.getProvider().getId())
+                .isNotEqualTo(onGitLab.getProvider().getId());
+
+        User otherOwner = persistUser("twins-owner");
+        Workspace unmonitored = createWorkspace("twins", "Twins", "twins-org", AccountType.ORG, otherOwner);
+        List<ObjectNode> none = new ArrayList<>();
+        projector.forEachInventoryRecord(unmonitored.getId(), onGitHub.getId(), "ISSUE", none::add);
+        assertThat(none).isEmpty();
     }
 
     @Test

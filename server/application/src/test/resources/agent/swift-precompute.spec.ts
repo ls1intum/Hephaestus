@@ -35,6 +35,8 @@ const metadata = {
 	pr_number: 1,
 	pr_url: "https://example.org/team/project/pull/1",
 	repository_full_name: "team/project",
+	repository_id: 1,
+	provider_id: 1,
 	source_branch: "f",
 	target_branch: "main",
 	commit_sha: "abc123",
@@ -373,9 +375,21 @@ void test("a change with no reference anywhere says what it scanned and what the
 	const { root, script } = await stage("links-the-change-to-its-issue");
 	try {
 		mkdirSync(path.join(root, "context"));
+		// Each row carries the ids of its repository; the reviewed one is the admitted repository id.
 		writeFileSync(
 			path.join(root, "context/project_inventory.json"),
-			JSON.stringify({ issues: [{ number: 4, title: "Add the event map", state: "opened" }] }),
+			JSON.stringify({
+				issues: [
+					{
+						repository: "team/project",
+						repository_id: 1,
+						provider_id: 1,
+						number: 4,
+						title: "Add the event map",
+						state: "opened",
+					},
+				],
+			}),
 		);
 		const result = await script(
 			path.join(root, "repo"),

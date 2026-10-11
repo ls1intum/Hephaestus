@@ -78,13 +78,32 @@ export default (repo, diff, metadata, context, change, reference) => ({
 				"invalid-result":
 					"export default () => ({ hints: [], directions: [], metrics: { count: Infinity } });",
 				throws: "export default () => { throw new Error('broken practice'); };",
+				"stored-inventory": `import { inventoryIssues, readProjectInventory } from "../lib/context.ts";
+export default async (repo, diff, metadata, context) => ({
+ hints: [], directions: [], metrics: { issues: inventoryIssues(await readProjectInventory(context)).size }
+});`,
+				"stored-scoped-inventory": `import { inventoryIssues } from "../lib/context.ts";
+export default () => ({
+ hints: [], directions: [], metrics: {
+  issue: Number(inventoryIssues({ repository: "team/project", issues: [{ number: 7, title: "Focal issue" }] }).get(7)?.title === "Focal issue")
+ }
+});`,
 			})) {
 				writeFileSync(path.join(root, scripts, `${name}.ts`), source);
 			}
 			mkdirSync(path.join(root, "repos/project with spaces"), { recursive: true });
 			writeFileSync(path.join(root, "repos/project with spaces/marker"), "7");
 			writeFileSync(path.join(root, context, "marker"), "11");
-			writeFileSync(path.join(root, context, "metadata.json"), JSON.stringify({ marker: 13 }));
+			writeFileSync(
+				path.join(root, context, "metadata.json"),
+				JSON.stringify({ marker: 13, repository_full_name: "team/project" }),
+			);
+			writeFileSync(
+				path.join(root, context, "project_inventory.json"),
+				JSON.stringify({
+					issues: [{ repository: "team/other", number: 7, title: "Foreign issue" }],
+				}),
+			);
 			symlinkSync("example.ts", path.join(root, scripts, "linked.ts"));
 			writeFileSync(
 				path.join(root, "task.json"),
@@ -147,7 +166,13 @@ export default (repo, diff, metadata, context, change, reference) => ({
 				repo: 7,
 			});
 			assert.ok(readFileSync(path.join(root, "work/precompute-out/.complete"), "utf8"));
-			for (const slug of ["missing-export", "invalid-result", "throws"]) {
+			const scoped: unknown = JSON.parse(
+				readFileSync(path.join(root, "work/precompute-out/stored-scoped-inventory.json"), "utf8"),
+			);
+			assert.ok(typeof scoped === "object" && scoped !== null);
+			assert.equal(Reflect.get(scoped, "status"), "ok");
+			assert.deepEqual(Reflect.get(scoped, "metrics"), { issue: 1 });
+			for (const slug of ["missing-export", "invalid-result", "throws", "stored-inventory"]) {
 				const failure: unknown = JSON.parse(
 					readFileSync(path.join(root, `work/precompute-out/${slug}.json`), "utf8"),
 				);
@@ -161,6 +186,12 @@ export default (repo, diff, metadata, context, change, reference) => ({
 				/^> \*\*Script failed\.\*\* Agent must analyze this practice manually\./u,
 			);
 
+			const advisory = readFileSync(
+				path.join(root, "work/precompute-out/stored-inventory.md"),
+				"utf8",
+			);
+			assert.match(advisory, /Agent must analyze this practice manually/u);
+			assert.match(advisory, /no explicit single-repository scope/u);
 			assert.throws(
 				() => readFileSync(path.join(root, "work/precompute-stage/practices/linked.ts")),
 				/ENOENT/u,
