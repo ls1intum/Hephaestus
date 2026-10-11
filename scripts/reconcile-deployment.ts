@@ -800,17 +800,37 @@ async function verifiedComposeArgs(
 }
 
 /**
- * Stops the worker the applied release runs before anything it depends on is replaced, from that
- * release's own app configuration and lock: `stop` waits up to the stop_grace_period the running
- * worker was started with, whatever the candidate declares, and the candidate's `up` starts what it
- * declares. A first install, or an applied release without the worker, has none to stop.
+ * Downloads every verified stack's images while the applied release still runs, so the worker is not
+ * stopped for the length of a download. `pull` starts no container, and `--policy missing` leaves an
+ * image the host already has alone.
  */
-async function stopAppliedWorker(
+async function pullStacks(
+	releaseTree: string,
+	composeArgsByStack: ReadonlyMap<Stack, RenderedStack>,
+): Promise<void> {
+	for (const [, { composeArgs }] of composeArgsByStack) {
+		await run("docker", [...composeArgs, "pull", "--policy", "missing"], { cwd: releaseTree });
+	}
+}
+
+interface AppliedWorker {
+	composeArgs: string[];
+	tree: string;
+}
+
+/**
+ * The worker the applied release runs, from that release's own app configuration and lock, so it is
+ * stopped before anything it depends on is replaced: `stop` waits up to the stop_grace_period the
+ * running worker was started with, whatever the candidate declares, and the candidate's `up` starts
+ * what it declares. A first install, or an applied release without the worker, has none to stop.
+ * Every refusal here comes before any image is pulled.
+ */
+async function appliedWorker(
 	config: HostConfig,
 	applied: AppliedState | undefined,
-): Promise<void> {
+): Promise<AppliedWorker | undefined> {
 	if (!applied || !config.stacks.includes("app")) {
-		return;
+		return undefined;
 	}
 	// As for its tooling, only the commit the record keeps identifies what runs: a retained lock or tree
 	// cannot tell the accepted source from one a failed re-promotion staged. A worker that may be running
@@ -835,9 +855,9 @@ async function stopAppliedWorker(
 	);
 	const rendered = await verifiedComposeArgs(config, ["app"], tree, lockFile, lockEnv);
 	const app = rendered.get("app");
-	if (app !== undefined && app.services.includes(WORKER_SERVICE)) {
-		await run("docker", [...app.composeArgs, "stop", WORKER_SERVICE], { cwd: tree });
-	}
+	return app !== undefined && app.services.includes(WORKER_SERVICE)
+		? { composeArgs: app.composeArgs, tree }
+		: undefined;
 }
 
 async function startStacks(
@@ -961,7 +981,11 @@ export async function main(unitsDirectory = SYSTEMD_UNITS): Promise<void> {
 		lockFile,
 		lockEnv,
 	);
-	await stopAppliedWorker(config, applied);
+	const worker = await appliedWorker(config, applied);
+	await pullStacks(releaseTree, composeArgsByStack);
+	if (worker !== undefined) {
+		await run("docker", [...worker.composeArgs, "stop", WORKER_SERVICE], { cwd: worker.tree });
+	}
 	await startStacks(config, releaseTree, composeArgsByStack);
 
 	const finishedAt = new Date();
