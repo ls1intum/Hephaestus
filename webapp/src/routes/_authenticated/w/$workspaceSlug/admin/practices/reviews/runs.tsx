@@ -36,14 +36,16 @@ function ReviewRunsRoute() {
 			query: runsQuery(search, REVIEW_PAGE_SIZE),
 		}),
 		...pagedModelParams,
-		// While a loaded review is queued or running, the list is read again on a timer: every loaded
-		// page, one after another. The timer stops once none is, and TanStack pauses it in a hidden
-		// tab. The screen below is told nothing about this: it renders whichever answer is current, so
-		// a row that changes under the reader looks exactly like a row that arrived that way.
+		// Result processing can settle after execution; poll through both stages.
 		refetchInterval: (result) =>
 			loadedPages(result.state.data)
 				.flatMap((page) => page.content ?? [])
-				.some((review) => review.status === "QUEUED" || review.status === "RUNNING")
+				.some(
+					(review) =>
+						review.status === "QUEUED" ||
+						review.status === "RUNNING" ||
+						review.resultProcessing === "PENDING",
+				)
 				? ACTIVE_REVIEW_POLL_MS
 				: false,
 	});
