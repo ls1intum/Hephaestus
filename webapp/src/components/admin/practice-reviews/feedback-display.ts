@@ -36,8 +36,8 @@ const FOOTER_RULE = "---";
  * The provider hides the comment Hephaestus finds its copy by and renders the footer's `<sub>` tags;
  * this renderer would print both. So a block that is exactly that comment is left out, and the footer
  * lines Hephaestus wrote at the end lose their tags but keep their words and links. Nothing else
- * changes: authored text, other HTML and code, however it quotes either, stay as written, and a body
- * with neither comes back as the same string.
+ * changes apart from Markdown line endings when a marker or footer is rewritten. Authored text,
+ * other HTML and code stay intact, and a body with neither comes back as the same string.
  */
 export function feedbackDisplayMarkdown(body: string): string {
 	return rewrite(body, false, false);
@@ -57,8 +57,9 @@ export function feedbackExcerptMarkdown(body: string, cut: boolean): string {
 
 function rewrite(body: string, excerpt: boolean, cut: boolean): string {
 	const blocks = parseMarkdownIntoBlocks(body);
-	// The blocks are the body's own text, cut apart; anything the split normalized is left alone.
-	if (blocks.join("") !== body) {
+	// CommonMark normalizes line endings; other parser rewrites must not change authored text.
+	const normalized = body.replaceAll("\r\n", "\n").replaceAll("\r", "\n");
+	if (blocks.join("") !== normalized) {
 		return body;
 	}
 	let changed = false;

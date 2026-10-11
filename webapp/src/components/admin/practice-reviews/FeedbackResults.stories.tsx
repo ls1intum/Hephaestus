@@ -12,6 +12,13 @@ if (!firstFeedback) {
 	throw new Error("The review fixtures must contain a piece of feedback");
 }
 
+const postedFeedback = reviewFeedback.find(
+	(item) => item.channel === "IN_CONTEXT" && item.deliveryState === "DELIVERED",
+);
+if (!postedFeedback) {
+	throw new Error("The review fixtures must contain delivered feedback on the work");
+}
+
 /** Storybook resets a spy that appears in `args` between runs, so one instance is enough. */
 const clearFilters = fn();
 
@@ -89,6 +96,26 @@ export const Mobile: Story = {
 	play: async ({ canvas }) => {
 		await expect(canvas.getAllByRole("button", { name: "Withheld" })).toHaveLength(4);
 		await expectNoPageOverflow();
+	},
+};
+
+export const PostedWithCrLf: Story = {
+	args: {
+		state: {
+			status: "ready",
+			feedback: [
+				{
+					...postedFeedback,
+					bodyPreview:
+						"<!-- hephaestus:practice-review:00000000-0000-0000-0000-000000000001 -->\r\nKeep the lookup focused.\r\n",
+					bodyTruncated: false,
+				},
+			],
+		},
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("link", { name: "Keep the lookup focused." })).toBeVisible();
+		await expect(canvas.queryByText(/hephaestus:practice-review/u)).toBeNull();
 	},
 };
 
