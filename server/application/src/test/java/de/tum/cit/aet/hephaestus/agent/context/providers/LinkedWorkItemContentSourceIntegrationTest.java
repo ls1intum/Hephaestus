@@ -2,6 +2,8 @@ package de.tum.cit.aet.hephaestus.agent.context.providers;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
+import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
@@ -19,6 +21,8 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Checks child-issue rollups against PostgreSQL, including exclusion of pull requests.
@@ -36,6 +40,12 @@ class LinkedWorkItemContentSourceIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private IdentityProviderRepository gitProviderRepository;
+
+    @Autowired
+    private IssueContentSource issueContentSource;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     private IdentityProvider provider;
     private Repository repository;
@@ -67,9 +77,12 @@ class LinkedWorkItemContentSourceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    void shouldCountAParentsChildrenWithClosedOnesAsCompleted() {
+    void shouldCountAParentsChildrenWithClosedOnesAsCompleted() throws Exception {
         Issue epic = persistIssue(1, Issue.State.OPEN, null);
         Issue other = persistIssue(2, Issue.State.OPEN, null);
+        Repository otherRepository = persistRepository("acme/api");
+        Issue sameNumberElsewhere = persistIssue(otherRepository, 1, Issue.State.OPEN, null);
+        persistIssue(otherRepository, 3, Issue.State.CLOSED, sameNumberElsewhere);
         persistIssue(3, Issue.State.CLOSED, epic);
         persistIssue(4, Issue.State.OPEN, epic);
         persistIssue(5, Issue.State.CLOSED, other);
@@ -96,6 +109,35 @@ class LinkedWorkItemContentSourceIntegrationTest extends BaseIntegrationTest {
         assertThat(rollup.getCompleted()).isEqualTo(1);
         assertThat(none.getTotal()).isZero();
         assertThat(none.getCompleted()).isZero();
+
+        JsonNode captured = captureIssueMetadata(epic);
+        assertThat(captured.get("sub_issues_total").asLong()).isEqualTo(2);
+        assertThat(captured.get("sub_issues_completed").asLong()).isEqualTo(1);
+        assertThat(captured.get("sub_issues_source").asString()).isEqualTo("children");
+    }
+
+    @Test
+    void shouldLeaveDirectCountsUnknownWhenTheLastStoredChildIsRemoved() throws Exception {
+        Issue parent = persistIssue(10, Issue.State.OPEN, null);
+        Issue child = persistIssue(11, Issue.State.CLOSED, parent);
+
+        assertThat(captureIssueMetadata(parent).get("sub_issues_total").asLong())
+                .isEqualTo(1);
+        child.setParentIssue(null);
+        issueRepository.save(child);
+
+        JsonNode captured = captureIssueMetadata(parent);
+        assertThat(captured.get("sub_issues_total").isNull()).isTrue();
+        assertThat(captured.get("sub_issues_completed").isNull()).isTrue();
+        assertThat(captured.has("sub_issues_source")).isFalse();
+    }
+
+    private JsonNode captureIssueMetadata(Issue issue) throws Exception {
+        AgentJob job = new AgentJob();
+        job.setMetadata(objectMapper.createObjectNode().put("issue_id", issue.getId()));
+        var captured =
+                issueContentSource.capture(new ContextRequest.IssueReviewRequest(job), Set.of(IssueContentSource.CORE));
+        return objectMapper.readTree(captured.files().get("context/metadata.json"));
     }
 
     @Test

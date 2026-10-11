@@ -310,6 +310,15 @@ This applies to GitLab, whose sync links a child to its parent but never totals 
 
 All three are absent when there is neither a provider count nor a child.
 
+A direct issue review uses the same count sources in `metadata.json`.
+Its fields are `sub_issues_total`, `sub_issues_completed`, and `sub_issues_source`.
+A complete provider pair is marked `provider`, including a reported zero.
+Otherwise, a positive stored-child count is marked `children`.
+Stored counts can be partial and describe the mirror at capture, not the hierarchy at an earlier event.
+
+With no complete provider pair or stored child, both counts are null and no source is stated.
+An incomplete provider pair or a zero stored count never establishes an empty hierarchy.
+
 ## Conversation records
 
 **`conversation_thread.json`** (a conversation review) contains `channel`, `threadTs`, `messageCount`, `truncated` and `messages`, oldest first.
