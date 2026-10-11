@@ -296,18 +296,6 @@ export function ActivityPeopleTable({
 						<DataTableHeader table={table} />
 						<TableBody>
 							{state.status === "loading" && <PeopleSkeletonRows colSpan={columnCount} />}
-							{state.status === "ready" && found === 0 && (
-								<TableRow variant="static">
-									<TableCell colSpan={columnCount} className="p-4 whitespace-normal">
-										<Empty>
-											<EmptyHeader>
-												<EmptyTitle>No one matches your search</EmptyTitle>
-												<EmptyDescription>Try a different name.</EmptyDescription>
-											</EmptyHeader>
-										</Empty>
-									</TableCell>
-								</TableRow>
-							)}
 							{table.getRowModel().rows.map((row) => (
 								<TableRow key={row.id} className="relative">
 									{row.getVisibleCells().map((cell) => {
@@ -326,6 +314,15 @@ export function ActivityPeopleTable({
 							))}
 						</TableBody>
 					</Table>
+					{/* Keep the empty state outside the table's horizontal scroll. */}
+					{state.status === "ready" && found === 0 && (
+						<Empty>
+							<EmptyHeader>
+								<EmptyTitle>No one matches your search</EmptyTitle>
+								<EmptyDescription>Try a different name.</EmptyDescription>
+							</EmptyHeader>
+						</Empty>
+					)}
 					<InfiniteListEnd
 						hasMore={table.getCanNextPage()}
 						onLoadMore={() => setShown((count) => count + ROWS_STEP)}
