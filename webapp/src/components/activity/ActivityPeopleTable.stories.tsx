@@ -420,6 +420,8 @@ async function expectNarrowTable(
 		opened.getBoundingClientRect().bottom - 1,
 	);
 
+	await expectKeyboardSortReveal({ canvas, userEvent }, expected.pullRequests);
+
 	// The keyboard reaches the full name through the sort buttons, and it is not covered.
 	const link = within(longRow).getByRole("link", { name: LONG_NAME });
 	canvas.getByRole("searchbox", { name: "Search people" }).focus();
@@ -450,6 +452,41 @@ async function expectNarrowTable(
 	await expect(
 		within(longRow).getByRole("img", { name: "First contribution in this range" }),
 	).toBeVisible();
+}
+
+async function expectKeyboardSortReveal(
+	{ canvas, userEvent }: Pick<Parameters<NonNullable<Story["play"]>>[0], "canvas" | "userEvent">,
+	pullRequests: RegExp,
+) {
+	const table = canvas.getByRole("table", { name: "People" });
+	const container = table.closest<HTMLElement>("[data-slot='table-container']");
+	if (!container) {
+		throw new Error("The table has no scroll container");
+	}
+	const innerRight =
+		container.getBoundingClientRect().left + container.clientLeft + container.clientWidth;
+	// Partly panned, so the target is under the pinned name, and panned to the end, so it is past it:
+	// either way the keyboard brings a sort button out from under the name.
+	const personHeader = within(table).getByRole("columnheader", { name: "Person" });
+	const sortButton = (name: RegExp) => within(table).getByRole("button", { name });
+	const moves = [
+		[/^Person/u, /^(?:Total )?contributions/iu, false],
+		[/^Reviews/u, pullRequests, true],
+	] as const;
+	for (const [offset, [from, to, shift]] of [125, container.scrollWidth].flatMap((pan) =>
+		moves.map((move) => [pan, move] as const),
+	)) {
+		sortButton(from).focus({ preventScroll: true });
+		container.scrollLeft = offset;
+		await userEvent.tab({ shift });
+		const target = sortButton(to);
+		await expect(target).toHaveFocus();
+		const box = target.getBoundingClientRect();
+		await expect(box.left).toBeGreaterThanOrEqual(personHeader.getBoundingClientRect().right - 1);
+		await expect(box.right).toBeLessThanOrEqual(innerRight + 1);
+		const covering = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+		await expect(target.contains(covering)).toBe(true);
+	}
 }
 
 /** The page's own table region at 320px. */
@@ -546,6 +583,46 @@ export const LoadingNarrow: Story = {
 		);
 		await expect(canvas.getByRole("columnheader", { name: /^Total contributions/u })).toBeVisible();
 		await expect(canvas.queryAllByRole("link")).toHaveLength(0);
+		await expectNoPageOverflow();
+	},
+};
+
+export const KeyboardFocusWide: Story = {
+	parameters: {
+		layout: "fullscreen",
+		viewport: {
+			options: {
+				narrowDesktop: { name: "Narrow desktop", styles: { width: "700px", height: "900px" } },
+			},
+			defaultViewport: "narrowDesktop",
+		},
+	},
+	args: { state: busyPeople },
+	play: async (context) => {
+		await expect(window.innerWidth).toBe(700);
+		await expectKeyboardSortReveal(context, /^Pull requests/u);
+		await context.userEvent.click(context.canvas.getByRole("button", { name: "Person" }));
+		await expectKeyboardSortReveal(context, /^Pull requests/u);
+		await expectNoPageOverflow();
+	},
+};
+
+export const KeyboardFocusWideSparse: Story = {
+	parameters: {
+		layout: "fullscreen",
+		viewport: {
+			options: {
+				narrowDesktop: { name: "Narrow desktop", styles: { width: "700px", height: "900px" } },
+			},
+			defaultViewport: "narrowDesktop",
+		},
+	},
+	args: { state: readyPeople(peopleOf(PEOPLE)) },
+	play: async (context) => {
+		await expect(window.innerWidth).toBe(700);
+		await expectKeyboardSortReveal(context, /^Pull requests/u);
+		await context.userEvent.click(context.canvas.getByRole("button", { name: "Person" }));
+		await expectKeyboardSortReveal(context, /^Pull requests/u);
 		await expectNoPageOverflow();
 	},
 };
