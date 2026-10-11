@@ -99,8 +99,9 @@ main() {
 
 
   # Extract all env var names from TypeScript (single source of truth)
-  local -a all_vars
-  mapfile -t all_vars < <(extract_env_vars)
+  local -a all_vars=()
+  local var
+  while IFS= read -r var; do all_vars+=("$var"); done < <(extract_env_vars)
   
   if [[ ${#all_vars[@]} -eq 0 ]]; then
     log "ERROR: No environment variables found in $ENV_TS"
