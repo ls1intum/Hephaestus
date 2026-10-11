@@ -1389,6 +1389,40 @@ class ActivityControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         assertThat(incomplete.highlights().firstContributors()).isEmpty();
     }
 
+    @Test
+    void shouldCountAndDateOnlyActivityByAccountsOfTheMonitoredRepositorysProvider() {
+        User elsewhere = member("activity-gitlab-ada", "Ada on GitLab");
+        elsewhere.setProvider(ensureGitLabProvider());
+        elsewhere = userRepository.save(elsewhere);
+        Instant before = Instant.parse(FROM).minus(Duration.ofDays(400));
+        record(elsewhere, ActivityEventType.ISSUE_CREATED, ActivityTargetType.ISSUE, -994L, before, monitored);
+        record(elsewhere, ActivityEventType.ISSUE_CREATED, ActivityTargetType.ISSUE, -995L, DAY, monitored);
+        record(ada, ActivityEventType.ISSUE_CREATED, ActivityTargetType.ISSUE, -996L, before, monitored);
+        record(ada, ActivityEventType.ISSUE_CREATED, ActivityTargetType.ISSUE, -997L, DAY, monitored);
+
+        var people = peopleService.people(
+                workspace.getId(),
+                new ActivityPeopleRangeParams("custom", Instant.parse(FROM), Instant.parse(TO)),
+                null,
+                Set.of(monitored.getNameWithOwner()));
+
+        assertThat(people.people()).extracting(row -> row.person().id()).doesNotContain(elsewhere.getId());
+        assertThat(people.people())
+                .filteredOn(row -> row.person().id().equals(ada.getId()))
+                .singleElement()
+                .satisfies(row -> {
+                    assertThat(row.counts().contributions()).isEqualTo(1);
+                    assertThat(row.firstContributionAt()).isEqualTo(before);
+                });
+        var detail = peopleService.person(
+                workspace.getId(),
+                ada.getId(),
+                new ActivityPeopleRangeParams("custom", Instant.parse(FROM), Instant.parse(TO)),
+                null,
+                Set.of(monitored.getNameWithOwner()));
+        assertThat(detail.counts().contributions()).isEqualTo(1);
+    }
+
     @Nested
     class PersonDetail {
         @Test
