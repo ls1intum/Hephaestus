@@ -62,9 +62,11 @@ public class PracticeReleaseService {
             String slug,
             @Nullable EntityTagPrecondition precondition,
             Map<PracticeDefinitionField, PracticeReleaseChoice> choices) {
+        // The catalogue before the workspace, as catalogue adoption and repair take them.
+        EffectiveCatalog catalog = instanceReleases.catalogForDecision();
         Workspace workspace = lockWorkspace(ctx);
         Practice practice = practice(ctx, slug);
-        PracticeReleaseProposalDTO proposal = requireProposal(practice, instanceReleases.catalogForDecision());
+        PracticeReleaseProposalDTO proposal = requireProposal(practice, catalog);
         PracticeReleasePrecondition.requireCurrent(precondition, proposal);
         PracticeDefinition merged =
                 PracticeDefinitionMerge.apply(proposal.base(), proposal.current(), proposal.offered(), choices);
@@ -109,9 +111,10 @@ public class PracticeReleaseService {
 
     @Transactional
     public void decline(WorkspaceContext ctx, String slug, @Nullable EntityTagPrecondition precondition) {
+        EffectiveCatalog catalog = instanceReleases.catalogForDecision();
         lockWorkspace(ctx);
         Practice practice = practice(ctx, slug);
-        PracticeReleaseProposalDTO proposal = requireProposal(practice, instanceReleases.catalogForDecision());
+        PracticeReleaseProposalDTO proposal = requireProposal(practice, catalog);
         PracticeReleasePrecondition.requireCurrent(precondition, proposal);
         PracticeDefinitionSnapshot before =
                 PracticeDefinitionSnapshot.of(practice, revisions.currentRevisionNumber(practice));
