@@ -1,5 +1,5 @@
 // Precompute FACTS for issue-scoped-to-single-concern: the task-list items and issue-number mentions the
-// body carries and the provider's sub-issue rollup as reported. Whether the issue is one concern at its level
+// body carries and the captured sub-issue rollup with its source. Whether the issue is one concern at its level
 // is the criteria's to decide.
 import {
 	bodyFact,

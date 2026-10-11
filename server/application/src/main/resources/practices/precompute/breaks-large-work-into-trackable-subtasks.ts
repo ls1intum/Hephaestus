@@ -1,5 +1,5 @@
 // Precompute FACTS for breaks-large-work-into-trackable-subtasks: the task-list items and issue-number
-// mentions the body carries, its labels, and the provider's sub-issue rollup as reported. Whether the
+// mentions the body carries, its labels, and the captured sub-issue rollup with its source. Whether the
 // work is large and whether it is broken down are the criteria's to decide from the text.
 import {
 	bodyFact,
