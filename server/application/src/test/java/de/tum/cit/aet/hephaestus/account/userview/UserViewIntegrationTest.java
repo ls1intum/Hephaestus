@@ -14,6 +14,12 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRep
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
 import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeGuide;
+import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
+import de.tum.cit.aet.hephaestus.practices.PracticeVisual;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
+import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
@@ -22,6 +28,7 @@ import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;
 import java.time.Instant;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Consumer;
@@ -51,6 +58,9 @@ class UserViewIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired
     private ChatThreadRepository threads;
+
+    @Autowired
+    private PracticeRepository practices;
 
     @Autowired
     private IdentityLinkRepository identityLinks;
@@ -323,6 +333,38 @@ class UserViewIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 .jsonPath("$.content[0].people[0].id")
                 .isEqualTo(viewed.getId());
         assertThat(userViewRowsFor(viewed)).isEqualTo(1);
+    }
+
+    @Test
+    void shouldReadThePracticeVisualAndGuideWhenViewingAMember() {
+        persistGuidedPractice(workspace);
+
+        sessionRequest("/workspaces/acme/practices/guided-practice/guidance")
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectHeader()
+                .cacheControl(CacheControl.noStore())
+                .expectBody()
+                .jsonPath("$.visual.alt")
+                .isEqualTo("Two changes")
+                .jsonPath("$.guide.markdown")
+                .isEqualTo("# Keep changes separate");
+        assertThat(userViewRowsFor(viewed)).isEqualTo(1);
+    }
+
+    @Test
+    void shouldHideGuidanceAndRecordNothingWhenThePathLeavesTheViewedWorkspace() {
+        Workspace other =
+                createWorkspace("other-guidance", "Other guidance", viewed.getLogin(), AccountType.USER, viewed);
+        persistGuidedPractice(other);
+
+        sessionRequest("/workspaces/other-guidance/practices/guided-practice/guidance")
+                .exchange()
+                .expectStatus()
+                .isNotFound()
+                .expectBody(Void.class);
+        assertThat(userViewRowsFor(viewed)).isZero();
     }
 
     @Test
@@ -628,5 +670,18 @@ class UserViewIntegrationTest extends AbstractWorkspaceIntegrationTest {
         thread.setUser(owner);
         thread.setTitle(title);
         return threads.save(thread);
+    }
+
+    private void persistGuidedPractice(Workspace ownerWorkspace) {
+        Practice practice = new Practice();
+        practice.setWorkspace(ownerWorkspace);
+        practice.setSlug("guided-practice");
+        practice.setName("Separate changes");
+        practice.setCriteria("Keep each change focused.");
+        PracticeTestEvidence.configure(practice, ArtifactKinds.PULL_REQUEST);
+        practice.setAutomatedReviewPolicy(PracticeTestEvidence.pullRequest());
+        practice.setVisual(new PracticeVisual("<svg xmlns=\"http://www.w3.org/2000/svg\"/>", "Two changes"));
+        practice.setGuide(new PracticeGuide("# Keep changes separate", Map.of()));
+        practices.save(practice);
     }
 }
