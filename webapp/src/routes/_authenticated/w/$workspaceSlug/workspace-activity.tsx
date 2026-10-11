@@ -9,7 +9,7 @@ import {
 	updateActivityAutomationMutation,
 	updatePublicActivityObjectionMutation,
 } from "@/api/@tanstack/react-query.gen";
-import type { ActivityPerson } from "@/api/types.gen";
+import type { ActivityPerson, ActivityTeam } from "@/api/types.gen";
 import { ACTIVITY_CATEGORY_DEFS } from "@/components/activity/activity-kind-defs";
 import {
 	type ActivityPeriod,
@@ -91,7 +91,6 @@ function WorkspaceActivity() {
 	const people = useActivityPeople({ ...scope, enabled: peopleEnabled });
 	const facets = useActivityFacets({ ...scope, enabled: peopleEnabled });
 	const ready = people.status === "ready" ? people.people : undefined;
-	const teamName = teamPaths(facets?.teams ?? []).find(({ key }) => key === search.team)?.label;
 
 	const stackControls = useDetailStack(detailStack);
 	const targets = detailStack.map(({ target }) => target);
@@ -106,7 +105,7 @@ function WorkspaceActivity() {
 		...scope,
 		enabled: search.view === "timeline",
 		copy: {
-			title: workLogTitle(teamName ?? workspace?.displayName ?? "Activity"),
+			title: workspaceWorkTitle(search.team, facets.data?.teams, workspace?.displayName),
 			providerType,
 			people: true,
 		},
@@ -236,7 +235,8 @@ function WorkspaceActivity() {
 					setView({ sort, dir: peopleDir(sort, desc) })
 				}
 				people={people}
-				facets={facets}
+				facets={facets.data}
+				facetsError={facets.error}
 				timeline={timeline}
 			/>
 			<ActivityDetailDrawer
@@ -264,6 +264,15 @@ function WorkspaceActivity() {
 			/>
 		</>
 	);
+}
+
+function workspaceWorkTitle(
+	team: string | undefined,
+	teams: ActivityTeam[] | undefined,
+	workspaceName: string | undefined,
+): string {
+	const teamName = teamPaths(teams ?? []).find(({ key }) => key === team)?.label;
+	return workLogTitle(teamName ?? team ?? workspaceName ?? "Activity");
 }
 
 function automationLabel(kind: ActivityPerson["kind"], pending: boolean): string {

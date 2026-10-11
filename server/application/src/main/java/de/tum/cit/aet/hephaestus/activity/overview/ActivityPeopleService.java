@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.activity.overview;
 import de.tum.cit.aet.hephaestus.activity.overview.dto.ActivityBreakdownDTO;
 import de.tum.cit.aet.hephaestus.activity.overview.dto.ActivityContributorKind;
 import de.tum.cit.aet.hephaestus.activity.overview.dto.ActivityCountsDTO;
+import de.tum.cit.aet.hephaestus.activity.overview.dto.ActivityFacetsDTO;
 import de.tum.cit.aet.hephaestus.activity.overview.dto.ActivityHighlightsDTO;
 import de.tum.cit.aet.hephaestus.activity.overview.dto.ActivityPeopleDTO;
 import de.tum.cit.aet.hephaestus.activity.overview.dto.ActivityPersonDTO;
@@ -44,6 +45,12 @@ public class ActivityPeopleService {
         var repositories = queries.repositories(workspace);
         var scope = select(workspace, team, repositoryKeys, teams, repositories);
         return aggregate(scope, params, teams, repositories);
+    }
+
+    /** What {@link #people} lists to narrow by, without counting anyone. No period or scope changes it. */
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public ActivityFacetsDTO facets(long workspace) {
+        return new ActivityFacetsDTO(queries.repositories(workspace), queries.teams(workspace));
     }
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ, timeout = 10)

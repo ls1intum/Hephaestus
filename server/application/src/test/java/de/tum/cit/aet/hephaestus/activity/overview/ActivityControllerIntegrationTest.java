@@ -11,6 +11,7 @@ import de.tum.cit.aet.hephaestus.activity.ActivityEventType;
 import de.tum.cit.aet.hephaestus.activity.ActivityTargetType;
 import de.tum.cit.aet.hephaestus.activity.overview.dto.ActivityActionDTO;
 import de.tum.cit.aet.hephaestus.activity.overview.dto.ActivityContributorKind;
+import de.tum.cit.aet.hephaestus.activity.overview.dto.ActivityFacetsDTO;
 import de.tum.cit.aet.hephaestus.activity.overview.dto.ActivityPeopleDTO;
 import de.tum.cit.aet.hephaestus.activity.overview.dto.ActivityPersonDTO;
 import de.tum.cit.aet.hephaestus.activity.overview.dto.ActivityPersonDetailDTO;
@@ -1350,6 +1351,7 @@ class ActivityControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         workspace.setPublicActivityEnabled(true);
         workspaceRepository.save(workspace);
         for (String path : List.of(
+                "/facets",
                 "/people",
                 "/people/" + ada.getId(),
                 "/people/" + ada.getId() + "/work",
@@ -2121,6 +2123,66 @@ class ActivityControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
 
             summaryStatus(uri -> uri.queryParam("team", platform.getSlug()))
                     .isNotFound()
+                    .expectBody(Void.class);
+        }
+
+        @Test
+        void shouldListTheSameRepositoriesAndTeamsAsThePeopleReadWhateverItsScope() {
+            team("platform-web-ui", web.getId());
+            teamSettingsService.updateTeamVisibility(workspace, web.getId(), true);
+            Repository onGitLab = repository("activity-org/on-gitlab", true);
+            onGitLab.setProvider(ensureGitLabProvider());
+            repositoryRepository.save(onGitLab);
+            RepositoryToMonitor notSynced = new RepositoryToMonitor();
+            notSynced.setWorkspace(workspace);
+            notSynced.setNameWithOwner("activity-org/not-synced");
+            repositoryToMonitorRepository.save(notSynced);
+
+            ActivityFacetsDTO facets = Objects.requireNonNull(status("/facets", uri -> uri)
+                    .isOk()
+                    .expectBody(ActivityFacetsDTO.class)
+                    .returnResult()
+                    .getResponseBody());
+            ActivityPeopleDTO people = Objects.requireNonNull(get(
+                            "/people",
+                            uri -> uri.queryParam("team", platform.getSlug())
+                                    .queryParam("repo", monitored.getNameWithOwner()))
+                    .isOk()
+                    .expectBody(ActivityPeopleDTO.class)
+                    .returnResult()
+                    .getResponseBody());
+
+            assertThat(facets.repositories()).isEqualTo(people.repositories());
+            assertThat(facets.teams()).isEqualTo(people.teams());
+            assertThat(facets.repositories())
+                    .extracting(repository -> repository.key())
+                    .as("monitored, of the workspace's provider and synced")
+                    .containsExactly(monitored.getNameWithOwner());
+            assertThat(facets.teams())
+                    .extracting(team -> team.key())
+                    .as("a hidden sub-team and everything below it are left out")
+                    .containsExactly(platform.getSlug());
+        }
+
+        @Test
+        void shouldListOnlyTheWorkspacesOwnFacetsAndRefuseAnotherWorkspacesToANonMember() {
+            Workspace other = createWorkspace(
+                    "activity-facets-other",
+                    "Other",
+                    "activity-facets-other",
+                    AccountType.ORG,
+                    persistUser("activity-facets-other-owner"));
+
+            ActivityFacetsDTO elsewhere = peopleService.facets(other.getId());
+            assertThat(elsewhere.repositories()).isEmpty();
+            assertThat(elsewhere.teams()).isEmpty();
+            webTestClient
+                    .get()
+                    .uri("/workspaces/{slug}/activity/facets", other.getWorkspaceSlug())
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .exchange()
+                    .expectStatus()
+                    .isForbidden()
                     .expectBody(Void.class);
         }
 

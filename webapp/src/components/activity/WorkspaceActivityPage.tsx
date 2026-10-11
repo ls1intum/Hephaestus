@@ -4,6 +4,7 @@ import { cn } from "cn";
 import type { ActivityPeople } from "@/api/types.gen";
 import { FacetMultiSelect } from "@/components/common/FacetMultiSelect";
 import { FilterToolbar } from "@/components/common/FilterToolbar";
+import { QueryErrorAlert, type QueryErrorAlertProps } from "@/components/common/QueryErrorAlert";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { PageLayout } from "@/components/layout/PageLayout";
 import { Section } from "@/components/layout/Section";
@@ -45,8 +46,9 @@ export interface WorkspaceActivityPageProps {
 	order: PeopleOrder;
 	onOrderChange: (order: PeopleOrder) => void;
 	people: ActivityPeopleState;
-	/** Undefined until the first people arrive; the previous scope's while another loads. */
+	/** The picker options, from cached people or the separate timeline read. */
 	facets: ActivityFacets | undefined;
+	facetsError?: Pick<QueryErrorAlertProps, "error" | "onRetry" | "pending">;
 	timeline: ActivityWorkLogState;
 }
 
@@ -69,6 +71,7 @@ export function WorkspaceActivityPage({
 	onOrderChange,
 	people,
 	facets,
+	facetsError,
 	timeline,
 }: WorkspaceActivityPageProps) {
 	const ready = people.status === "ready" ? people.people : undefined;
@@ -84,6 +87,9 @@ export function WorkspaceActivityPage({
 				title="Workspace activity"
 				description={ready && coverageNote(ready.coverage)}
 			/>
+			{facetsError && (
+				<QueryErrorAlert title="We could not load activity filters" {...facetsError} />
+			)}
 			<div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
 				<ActivityTeamPicker teams={facets?.teams} value={team} onChange={onTeamChange} />
 				<FilterToolbar hasFilter={repo.length > 0} onReset={() => onRepoChange([])}>

@@ -265,6 +265,21 @@ export const SwitchViews: Story = {
 	},
 };
 
+export const TimelineFiltersFailed: Story = {
+	args: {
+		view: "timeline",
+		team: "payments",
+		facets: undefined,
+		facetsError: { error: { status: 500 }, onRetry: fn() },
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("alert")).toHaveTextContent("We could not load activity filters");
+		await expect(canvas.getByRole("button", { name: /^Retry$/u })).toBeEnabled();
+		await expect(canvas.getByRole("combobox", { name: "Team: payments" })).toBeVisible();
+		await expect(canvas.getByRole("button", { name: "Copy as Markdown" })).toBeVisible();
+	},
+};
+
 export const TimelineLoading: Story = {
 	args: { view: "timeline", timeline: { status: "loading" } },
 };

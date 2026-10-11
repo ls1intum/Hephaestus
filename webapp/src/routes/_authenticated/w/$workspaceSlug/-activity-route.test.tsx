@@ -553,6 +553,10 @@ describe("Workspace activity", () => {
 				record(request);
 				return HttpResponse.json(people);
 			}),
+			http.get("*/workspaces/:workspaceSlug/activity/facets", ({ request }) => {
+				record(request);
+				return HttpResponse.json({ repositories: people.repositories, teams: people.teams });
+			}),
 			http.get("*/workspaces/:workspaceSlug/activity/people/:userId", ({ request }) => {
 				record(request);
 				return HttpResponse.json(personDetail);
@@ -601,6 +605,8 @@ describe("Workspace activity", () => {
 		expect(readsOf("/activity/work")[0]?.searchParams.get("range")).toBe("30d");
 		expect(readsOf("/activity/work")[0]?.searchParams.get("team")).toBe("core");
 		expect(readsOf("/activity/work")[0]?.searchParams.getAll("repo")).toStrictEqual(["acme/api"]);
+		// The people already read hold the pickers' options.
+		expect(readsOf("/activity/facets")).toStrictEqual([]);
 		expect(router.state.location.search.view).toBe("timeline");
 		await user.click(screen.getByRole("tab", { name: "People" }));
 		await waitFor(() =>
@@ -610,6 +616,109 @@ describe("Workspace activity", () => {
 		);
 		expect(screen.getByRole("columnheader", { name: /^Reviews/u }).getAttribute("aria-sort")).toBe(
 			"ascending",
+		);
+	});
+
+	it("counts nobody for a timeline opened by address, and reads its pickers' options once", async () => {
+		const user = userEvent.setup();
+		const { router } = renderRouteAtWithRouter("/w/acme/workspace-activity?view=timeline");
+
+		await user.click(
+			await screen.findByRole("combobox", { name: "Team: Everyone" }, ROUTE_RENDER_WAIT),
+		);
+		await user.click(await screen.findByRole("option", { name: "Core / Backend" }));
+		await waitFor(() =>
+			expect(readsOf("/activity/work").map((url) => url.searchParams.get("team"))).toContain(
+				"backend",
+			),
+		);
+		expect(router.state.location.search.team).toBe("backend");
+		expect(readsOf("/activity/facets").map(({ search }) => search)).toStrictEqual([""]);
+		expect(readsOf("/activity/people")).toStrictEqual([]);
+	});
+
+	it("keeps a filtered timeline visible when its pickers fail, and retries only the pickers", async () => {
+		server.use(
+			http.get(
+				"*/workspaces/acme/activity/facets",
+				({ request }) => {
+					record(request);
+					return HttpResponse.json({ status: 500 }, { status: 500 });
+				},
+				{ once: true },
+			),
+		);
+		server.use(
+			http.get("*/workspaces/acme/activity/work", ({ request }) => {
+				record(request);
+				return HttpResponse.json({ content: [workItem(1)] });
+			}),
+		);
+		const user = userEvent.setup();
+		const { router } = renderRouteAtWithRouter(
+			"/w/acme/workspace-activity?view=timeline&team=backend",
+		);
+		await screen.findByText("We could not load activity filters", undefined, ROUTE_RENDER_WAIT);
+		await screen.findByText("Pull request 1");
+		expect(screen.getByRole("combobox", { name: "Team: backend" })).not.toBeNull();
+		await user.click(screen.getByRole("button", { name: "Copy as Markdown" }));
+		await screen.findByText("Copied 1 item as Markdown");
+		await expect(navigator.clipboard.readText()).resolves.toContain("## backend,");
+		const response = deferred<Response>();
+		server.use(
+			http.get("*/workspaces/acme/activity/facets", async ({ request }) => {
+				record(request);
+				return response.promise;
+			}),
+		);
+		await user.click(screen.getByRole("button", { name: /^Retry$/u }));
+		await waitFor(() => expect(readsOf("/activity/facets")).toHaveLength(2));
+		expect(screen.queryByRole("button", { name: /^Retry/u })).toBeNull();
+		expect(screen.getByText("Pull request 1")).not.toBeNull();
+		expect(screen.getByRole("button", { name: "Copy as Markdown" })).not.toBeNull();
+		expect(screen.getByRole("combobox", { name: "Team: backend" })).not.toBeNull();
+		response.resolve(HttpResponse.json({ teams: people.teams, repositories: people.repositories }));
+		await screen.findByRole("combobox", { name: "Team: Core / Backend" });
+		expect(screen.queryByText("We could not load activity filters")).toBeNull();
+		expect(router.state.location.search.team).toBe("backend");
+		expect(readsOf("/activity/facets")).toHaveLength(2);
+		expect(readsOf("/activity/work")).toHaveLength(1);
+		expect(readsOf("/activity/people")).toHaveLength(0);
+	});
+
+	it("does not carry the pickers' options into another workspace's timeline", async () => {
+		server.use(
+			http.get("*/workspaces", () =>
+				HttpResponse.json([workspaceListItem("acme"), workspaceListItem("other")]),
+			),
+			http.get("*/workspaces/other", () => HttpResponse.json(workspaceListItem("other"))),
+			http.get("*/workspaces/other/activity/facets", ({ request }) => {
+				record(request);
+				return HttpResponse.json({
+					repositories: [{ id: 99, key: "other/api", name: "other-api" }],
+					teams: [{ id: 99, key: "other", name: "Other team" }],
+				});
+			}),
+		);
+		const user = userEvent.setup();
+		const { router } = renderRouteAtWithRouter("/w/acme/workspace-activity");
+		await screen.findByRole("table", { name: "People" }, ROUTE_RENDER_WAIT);
+		await router.navigate({
+			to: "/w/$workspaceSlug/workspace-activity",
+			params: { workspaceSlug: "other" },
+			search: { view: "timeline" },
+		});
+		await waitFor(() =>
+			expect(readsOf("/activity/facets").map(({ pathname }) => pathname)).toContain(
+				"/workspaces/other/activity/facets",
+			),
+		);
+		await user.click(await screen.findByRole("combobox", { name: "Team: Everyone" }));
+		await expect(screen.findByRole("option", { name: "Other team" })).resolves.not.toBeNull();
+		expect(screen.queryByRole("option", { name: "Core" })).toBeNull();
+		expect(screen.queryByRole("option", { name: "Core / Backend" })).toBeNull();
+		expect(readsOf("/activity/people").every(({ pathname }) => pathname.includes("/acme/"))).toBe(
+			true,
 		);
 	});
 
