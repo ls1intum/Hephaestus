@@ -79,7 +79,7 @@ for (const site of verificationSites) {
 	const failures =
 		site.job === "tag-unchanged-images"
 			? exitCodes
-			: { ...exitCodes, publication: 11, changedDigest: 1 };
+			: { ...exitCodes, publication: 11, changedDigest: 1, emptyTags: 4, invalidMetadata: 5 };
 	for (const [failure, exitCode] of Object.entries(failures)) {
 		void test(
 			`${site.job}: ${failure === "none" ? "success" : `${failure} rejection`} preserves immutable-image verification`,
@@ -153,9 +153,12 @@ if (tool === 'docker' && args.includes('inspect')) process.stdout.write(process.
 						FAILURE: failure,
 						DIGEST: digest,
 						RUNNER_TEMP: directory,
-						DOCKER_METADATA_OUTPUT_JSON: JSON.stringify({
-							tags: [`${image}:commit`, `${image}:ci`],
-						}),
+						DOCKER_METADATA_OUTPUT_JSON:
+							failure === "invalidMetadata"
+								? "{"
+								: JSON.stringify({
+										tags: failure === "emptyTags" ? [] : [`${image}:commit`, `${image}:ci`],
+									}),
 						IMAGE_REF: immutable,
 						REPOSITORY: repository,
 						REPOSITORY_OWNER: owner,
@@ -210,7 +213,9 @@ if (tool === 'docker' && args.includes('inspect')) process.stdout.write(process.
 				if (
 					site.job !== "tag-unchanged-images" &&
 					failure !== "signature" &&
-					failure !== "attestation"
+					failure !== "attestation" &&
+					failure !== "emptyTags" &&
+					failure !== "invalidMetadata"
 				) {
 					expected.push([
 						"docker",
