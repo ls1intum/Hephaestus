@@ -153,7 +153,7 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
      *
      * <p><b>The price travels as one value.</b> The eight columns this writes are the eight components
      * of the {@link LlmPriceSnapshot} the repricer resolved, so it is passed as the snapshot rather than
-     * unpacked into a positional list: a row is priced by <em>one</em> catalogue entry, and splitting it
+     * unpacked into a list of values: a row is priced by <em>one</em> catalogue entry, and splitting it
      * into separate arguments only creates the chance of pairing one entry's rate with another's id.
      * Same shape as {@link #insertIfAbsent}, and for the same reason.
      *

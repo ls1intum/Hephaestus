@@ -26,8 +26,8 @@ import { parseDiff } from "./lib/diff-parser.ts";
 import { isJsonObject } from "./lib/json.ts";
 import { ModelBudget } from "./lib/models-host.ts";
 import { changeSince, parseInputs, type ScriptInputs } from "./lib/script-inputs.ts";
-import { POSITIONAL_MS, practiceFiles, readableRoots, runScript } from "./lib/script-run.ts";
-import type { ArtifactMetadata, DiffFile } from "./lib/types.ts";
+import { practiceFiles, readableRoots, runScript } from "./lib/script-run.ts";
+import type { DiffFile } from "./lib/types.ts";
 import { stagePracticeScripts } from "./stage.ts";
 
 const USAGE =
@@ -74,7 +74,7 @@ function options() {
 			},
 		}).values;
 	} catch (error) {
-		// Node's message can add a sentence about positional arguments; the usage line replaces it.
+		// Node's message can add a sentence about arguments without an option; the usage line replaces it.
 		return stop(`${messageOf(error).replace(/\. .*$/su, "")}. ${USAGE}`);
 	}
 }
@@ -110,7 +110,7 @@ const change =
 if (diff !== undefined && change.size === 0) {
 	stop(`--diff: ${diff} holds no unified diff`);
 }
-let metadata: ArtifactMetadata = {};
+let metadata: Record<string, unknown> = {};
 if (metadataFile !== undefined) {
 	let value: unknown;
 	try {
@@ -200,17 +200,15 @@ if (out !== undefined) {
 const staged = await stagePracticeScripts({ [slug]: source }, {});
 try {
 	const started = Date.now();
-	const outcome = await runScript(
+	const result = await runScript(
 		slug,
 		path.join(staged.practices, `${slug}.ts`),
 		{
 			readable: readableRoots([staged.stage, repo, context ?? ""]),
 			sources: { change, repo, contextDir: context ?? "", contextReference: context ?? "" },
-			metadata,
 			changeDir: "",
 			now: new Date(started).toISOString(),
 			stageEnd: Number.POSITIVE_INFINITY,
-			positionalMs: POSITIONAL_MS,
 			models: () => ({}),
 			budget: new ModelBudget(0, 1),
 			log: (line) => console.error(line),
@@ -220,13 +218,13 @@ try {
 	// Without `--out`, the section's pointer names the result that this command prints.
 	const jsonPath = path.join(out ?? "", `${slug}.json`);
 	const sectionPath = path.join(out ?? "", `${slug}.md`);
-	const files = practiceFiles(outcome, Date.now() - started, jsonPath, context ?? "");
+	const files = practiceFiles(result, Date.now() - started, jsonPath, context ?? "");
 	if (out !== undefined) {
 		await writeFile(jsonPath, files.json);
 		await writeFile(sectionPath, files.section);
 	}
 	console.log(`==> ${jsonPath} <==\n${files.json}\n\n==> ${sectionPath} <==\n${files.section}`);
-	process.exitCode = isFailed(outcome.result.status) ? 1 : 0;
+	process.exitCode = isFailed(result.status) ? 1 : 0;
 } finally {
 	await rm(staged.root, { recursive: true, force: true });
 }

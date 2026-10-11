@@ -1,5 +1,5 @@
 /**
- * The runner's side of what a definition script reads about its review: the files that the server
+ * The runner's side of what a script reads about its review: the files that the server
  * stages beside the script, the record of the work, and the change since the previous review. The
  * runner validates them once, before the script's process starts. The script's process cannot start
  * git, so the runner computes the change.
@@ -24,7 +24,7 @@ import { parseDiff } from "./diff-parser.ts";
 import { isJsonObject } from "./json.ts";
 import type { DiffFile } from "./types.ts";
 
-/** What the runner gives a definition script, or why it cannot. */
+/** What the runner gives a script, or why it cannot. */
 export type ScriptInputs =
 	| { inputs: PracticeInputs; changeSince?: Map<string, DiffFile> }
 	| { error: string };

@@ -7,6 +7,7 @@ import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 
 import { callLabel } from "./lib/call-label.ts";
+import { RETIRED_FORM_ERROR } from "./lib/contract.ts";
 import { evidenceTools } from "./lib/evidence-tools.ts";
 import { delegateGrep } from "./lib/grep.ts";
 import {
@@ -18,8 +19,8 @@ import {
 } from "./lib/ipc.ts";
 import { isJsonObject } from "./lib/json.ts";
 import { ipcModels } from "./lib/models-ipc.ts";
-import { isPracticeModule } from "./lib/practice-contract.ts";
 import {
+	isPracticeScriptDefinition,
 	UnratedError,
 	type ModelNeeds,
 	type PracticeScriptContext,
@@ -79,10 +80,6 @@ delegateGrep(async (pattern, dir, opts) => {
 	}
 	throw new Error(reply.kind === "grep-failed" ? reply.message : "unexpected reply to a search");
 });
-
-function isDefinition(value: unknown): value is PracticeScriptDefinition<ModelNeeds> {
-	return isJsonObject(value) && typeof value.run === "function" && isJsonObject(value.meta);
-}
 
 async function runDefinition(
 	job: ChildJob,
@@ -162,23 +159,10 @@ const { job } = first;
 try {
 	const mod: unknown = await import(pathToFileURL(job.modulePath).href);
 	const exported: unknown = isJsonObject(mod) ? mod.default : undefined;
-	if (isDefinition(exported)) {
-		await postLast({ kind: "result", value: await runDefinition(job, exported) });
-	} else if (isPracticeModule(mod)) {
-		const value: unknown = await mod.default(
-			job.repoPath,
-			job.diffFiles,
-			job.metadata,
-			job.contextDir,
-			job.changeDir,
-			job.contextReference,
-		);
-		await postLast({ kind: "result", value });
-	} else {
-		throw new Error(
-			"the script must export a default function or a definePracticeScript definition",
-		);
+	if (!isPracticeScriptDefinition(exported)) {
+		throw new Error(RETIRED_FORM_ERROR);
 	}
+	await postLast({ kind: "result", value: await runDefinition(job, exported) });
 } catch (error) {
 	// A practice script is foreign code (DB-stored data), so it can throw a non-Error value.
 	await postLast({

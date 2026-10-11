@@ -44,9 +44,11 @@ Most of a script is code.
 A script can also call models: a decision model, an embedding model, a reranking model, and the review's own chat model.
 Use a model only at a point where code cannot decide.
 
-The bundled practices have scripts in an earlier form, with a plain function as the default export.
-Hephaestus still runs them.
-Write each new script with `definePracticeScript`, as this page shows.
+Every script uses `definePracticeScript`, as this page shows.
+A script from an earlier release can have a plain function as its default export.
+Hephaestus does not run a script in that retired form.
+Its review shows the error *This script uses the retired positional form. Rewrite it with definePracticeScript.*, and continues without the script's leads.
+[Rewrite a script in the retired form](#rewrite-a-script-in-the-retired-form) tells how.
 
 ## Write your first script
 
@@ -416,13 +418,39 @@ The command accepts these options:
 | `--script` | The script file. Its name, less `.ts`, is the practice's identifier: lowercase letters, digits and hyphens. |
 | `--repo` | A checkout of the repository at the head of the change. |
 | `--diff` | The change as a unified diff. Without it, the change is empty. |
-| `--metadata` | The record of the reviewed work, which the script reads as `ctx.work`. Its shape also sets the kind of the work. [The record of each kind](#the-record-of-each-kind) gives the shapes. Without it, a script that uses `definePracticeScript` fails. |
+| `--metadata` | The record of the reviewed work, which the script reads as `ctx.work`. Its shape also sets the kind of the work. [The record of each kind](#the-record-of-each-kind) gives the shapes. Without it, the script fails, because it has no record to read. |
 | `--context` | A folder with captured context records, for a script that reads `ctx.context`. |
 | `--signal` | A moment, such as `scm.pull_request.merged`. The script runs as a review at that moment. Without it, the script runs as a review that a person requested. |
 | `--recheck` | With `--signal`: the script runs as a recheck at that moment. |
 | `--cause` | A JSON file with the kind, the subject and the cause, in the shape that the server writes. Use it instead of `--signal` to set the review state or the subject. |
 | `--previous` | A JSON file with the previous result, in the shape of [`ctx.previous`](#the-previous-result). If it has a `head` that is an ancestor of the head of `--repo`, the script also gets `changeSince`. |
 | `--out` | A folder that keeps `<slug>.json` and `<slug>.md` after the run. |
+
+## Rewrite a script in the retired form
+
+A script in the retired form is a plain function: `(repo, diffFiles, metadata, contextDir, changeDir, contextReference) => ({ hints, metrics, directions })`.
+To rewrite it:
+
+1. Wrap the function body in `run(ctx)` of `definePracticeScript`, as [`meta`](#meta) shows.
+2. Replace each argument with its field of the context:
+
+   | Argument | Field |
+   | --- | --- |
+   | `repo` | `ctx.repo` |
+   | `diffFiles` | `ctx.change` |
+   | `metadata` | `ctx.work` |
+   | `contextDir` | `ctx.context.dir` |
+   | `changeDir` | `ctx.changeDir` |
+   | `contextReference` | `ctx.context.reference` |
+
+   Call `expectKind(ctx, "scm.pull_request")` first when the script reads `ctx.repo`, `ctx.change` or `ctx.changeDir`.
+3. Replace each hint with a lead.
+   A hint on a changed line becomes `{ at: { change: file, line }, kind }`.
+   A hint on a record becomes `{ at: { record: file }, kind }`.
+   Declare each kind in `meta.kinds` with one sentence.
+   Put the flags of a hint in the `facts` of its lead.
+4. Return the metrics as `facts`, and keep the directions.
+5. Run the script on a change, as [Run a script on your own change](#run-a-script-on-your-own-change) tells, and save it.
 
 ## Use an AI assistant
 
@@ -565,6 +593,10 @@ If the record does not have this shape, the script does not run, and its status 
 | `scm.issue`: a GitHub or GitLab issue | `metadata.json` | `issue_number`, `title`, `body`, `state`, `state_reason`, `html_url`, `repository_full_name`, `author`, `author_id`, `issue_type`, `is_locked`, `sub_issues_total`, `sub_issues_completed`, `milestone`, `closed_at`, `labels` and `assignees`. `sub_issues_source` when the counts are known. A field that the provider did not record is `null`. |
 | `chat.conversation_thread`: a Slack thread | `conversation_thread.json` | `channel`, `threadTs`, `messages`, `messageCount` and `truncated`. Each message has `ts`, `author` and `text`. When they are known, it also has `authorLogin`, `authorName`, `underReview` and `edited`. |
 | `docs.document`: an Outline document | `document.json` | `title`, `collection`, `collectionSlug`, `slug`, `createdBy`, `updatedBy`, `createdAt`, `updatedAt` and `archived`. The body is `document.md` in `context.dir`. |
+
+A descriptive field can get a value that this release does not know, such as a new pipeline state from a provider.
+Then `head_checks` and `sub_issues_source` are absent, which means that they are not known, and the `state` of an issue is `UNKNOWN`.
+A value of another shape in any other field fails the record.
 
 [Pull request records](/contributor/agent/agent-workspace-abi#pull-request-records) gives the meaning of each field of a pull request.
 
@@ -843,8 +875,7 @@ A script that sends more than 32 requests at the same time stops with an error.
 The runner sends only 4 model calls at a time, so the other requests wait in the runner.
 Some primitives send many calls at once:
 
-- `classify` sends all its packs of 30 items at the same time.
-  Thus, more than 960 items in one `classify` stop the script.
+- `classify` sends at most 4 packs of 30 items at the same time, so it does not stop the script.
 - `embedMany` sends all its calls of 64 values at the same time.
   Thus, more than 2 048 values in one `embedMany` stop the script.
   Set `maxParallelCalls` on `embedMany` to send fewer calls at a time.
@@ -890,9 +921,15 @@ The section holds these lines:
 - One `Not rated` line for each `unrated` entry, such as `Not rated: 3 added comments (unavailable). Read those yourself.`
 
 A section has at most 3 000 characters, so one script cannot push the leads of another practice out.
-When the lines do not fit, the runner cuts the section at a line break and ends it with a pointer to the full result.
-The cut removes the last lines first: the `Not rated` lines, then the facts, then the last leads.
-Thus, return only the leads that the review needs, so that the `Not rated` lines stay in the section.
+The notices come first in this bound: the notice of a failed script and the `Not rated` lines.
+They take at most 1 500 characters.
+When more `Not rated` lines exist, one line counts the entries that the section does not show.
+
+The directions, the leads and the facts get the rest of the bound, in that order.
+When they do not fit, the section keeps the first lines.
+Then one line counts the lines that the section does not show, and how many of them are leads.
+That line points to the full result.
+Thus, return only the leads that the review needs.
 
 If the script fails or runs out of time, the section says so, and the review assesses the practice from the sources.
 If the script does not run because a `required` slot is not available, the section names the slots.

@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
+import { setTimeout as delay } from "node:timers/promises";
 
 import { Experimental_DecisionMockModelV4, MockLanguageModelV4 } from "ai/test";
 
+import { MODEL_CONCURRENCY } from "./concurrency.ts";
 import { agent, classify, step, z, type QuestionSet } from "./practice-script.ts";
 
 const kinds: QuestionSet<string> = {
@@ -29,6 +31,45 @@ void describe("the practice script primitives", () => {
 		});
 		assert.equal(ratings.size, 0);
 		assert.deepEqual(unrated, [{ what: "added comments", count: 1, reason: "off-format" }]);
+	});
+
+	void test("classify keeps at most MODEL_CONCURRENCY packs in flight and rates every item", async () => {
+		let calls = 0;
+		let inFlight = 0;
+		let most = 0;
+		const model = new Experimental_DecisionMockModelV4({
+			doDecide: async ({ questions }) => {
+				calls += 1;
+				inFlight += 1;
+				most = Math.max(most, inFlight);
+				await delay(5);
+				inFlight -= 1;
+				return {
+					answers: Object.fromEntries(
+						Object.keys(questions).map((id) => [
+							id,
+							{
+								type: "choice" as const,
+								choice: "explains-why",
+								probabilities: { "explains-why": 0.9, "restates-code": 0.1 },
+							},
+						]),
+					),
+					warnings: [],
+				};
+			},
+		});
+		const items = Array.from({ length: 300 }, (_, i) => `// step ${String(i)}`);
+		const { ratings, unrated } = await classify({
+			model,
+			set: kinds,
+			items,
+			what: "added comments",
+		});
+		assert.equal(calls, 10);
+		assert.equal(most, MODEL_CONCURRENCY);
+		assert.equal(ratings.size, items.length);
+		assert.deepEqual(unrated, []);
 	});
 
 	void test("no items and no model leave nothing unrated, so the reviewer reads no empty line", async () => {

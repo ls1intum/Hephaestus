@@ -1,10 +1,11 @@
 /**
- * The runner's side of a definition script's result. The runner writes each quote from the source, so
+ * The runner's side of a script's result. The runner writes each quote from the source, so
  * a lead cannot quote words that the source does not hold.
  */
 import { realpathSync, statSync, readFileSync } from "node:fs";
 import path from "node:path";
 
+import { oneLine } from "./bounded-text.ts";
 import {
 	isFailed,
 	type Citation,
@@ -26,21 +27,17 @@ const MAX_QUOTE_LINES = 20;
  * A practice's section is inlined beside its criteria in the turn that evaluates it, so each section is
  * bounded on its own: one busy script cannot crowd another practice's leads out of the prompt.
  */
-export const SECTION_CHARS = 3000;
+const SECTION_CHARS = 3000;
+/**
+ * The most of a section that its notices take: why the script failed or did not run, and what it did
+ * not rate. The rest of the section can never push them out.
+ */
+const NOTICE_CHARS = 1500;
+/** The longest notice line: a failure message can be long. */
+const NOTICE_LINE_CHARS = 300;
 
-/** The first line of the section of a script that failed, whichever its contract. */
-export const SCRIPT_FAILED = "> **Script failed.** Agent must analyze this practice manually.";
-
-/** A section cut to its bound at a line break, or mid-line when one line alone overruns, with a pointer to the full result. */
-export function boundSection(section: string, jsonPointer: string): string {
-	if (section.length <= SECTION_CHARS) {
-		return `${section}\n`;
-	}
-	const pointer = `- ... the rest is in ${jsonPointer}`;
-	const kept = section.slice(0, SECTION_CHARS - pointer.length - 2);
-	const lineEnd = kept.lastIndexOf("\n");
-	return `${lineEnd > 0 ? kept.slice(0, lineEnd) : kept}\n${pointer}\n`;
-}
+/** The first line of the section of a script that failed. */
+const SCRIPT_FAILED = "> **Script failed.** Agent must analyze this practice manually.";
 
 export interface Sources {
 	change: Map<string, DiffFile>;
@@ -149,7 +146,7 @@ export function settleLeads(
 }
 
 /**
- * One slot of a definition script: what it needs, whether a model was bound, and its calls that the
+ * One slot of a script: what it needs, whether a model was bound, and its calls that the
  * runner could not rate, by reason. The proxy counts calls and tokens.
  */
 export interface SlotReport {
@@ -158,10 +155,13 @@ export interface SlotReport {
 	notRated: Partial<Record<Reason, number>>;
 }
 
-/** What a definition script did, as `<slug>.json` records it. */
-export interface DefinitionResult {
+/**
+ * What a script did, as `<slug>.json` records it. "unknown": the script failed before the runner
+ * accepted its `meta`, or never started, so its models are not known.
+ */
+export interface ScriptResult {
 	practice: string;
-	contract: "definition";
+	contract: "definition" | "unknown";
 	status: RunStatus;
 	models: Partial<Record<ModelSlot, SlotReport>>;
 	leads: QuotedLead[];
@@ -202,29 +202,65 @@ function leadRow(lead: QuotedLead, contextReference: string): string {
 	return `- ${lead.kind}${lead.rating === undefined ? "" : " (model-rated)"}${lead.newSinceLastReview === true ? " (new)" : ""} at ${where(lead.at, contextReference)}${quote ? `: \`${quote}\`` : ""}${facts ? ` [${facts}]` : ""}`;
 }
 
-/** The section a definition script's result becomes, bounded as every practice's section is. */
-export function renderDefinition(
-	result: DefinitionResult,
+/** The characters that lines take in a section, each with its line break. */
+const charsOf = (lines: readonly string[]) => lines.reduce((n, line) => n + line.length + 1, 0);
+
+/**
+ * The lines in their order, as many as fit in `max` characters. When some do not fit, the last line
+ * is `rest` of the lines that it leaves out.
+ */
+function fit(lines: readonly string[], max: number, rest: (omitted: readonly string[]) => string) {
+	if (charsOf(lines) <= max) {
+		return lines;
+	}
+	let kept = 0;
+	while (
+		kept < lines.length &&
+		charsOf(lines.slice(0, kept + 1)) + rest(lines.slice(kept + 1)).length + 1 <= max
+	) {
+		kept += 1;
+	}
+	return [...lines.slice(0, kept), rest(lines.slice(kept))];
+}
+
+/**
+ * The section that a script's result becomes. It has at most {@link SECTION_CHARS} characters. The
+ * notices come first in its bound: why the script failed or did not run, and each `Not rated` line.
+ * The directions, leads and facts get what is left, and a line counts what they leave out.
+ */
+export function renderSection(
+	result: ScriptResult,
 	contextReference: string,
 	jsonPointer: string,
 ): string {
-	const lines: string[] = [];
+	const head: string[] = [];
+	const body: string[] = [];
 	if (isFailed(result.status)) {
-		lines.push(SCRIPT_FAILED, "");
+		head.push(
+			SCRIPT_FAILED,
+			"",
+			...result.directions.map((direction) => `- ${oneLine(direction, NOTICE_LINE_CHARS)}`),
+		);
+	} else {
+		body.push(...result.directions.map((direction) => `- ${direction}`));
 	}
 	if (result.status === "skipped") {
 		const needed = Object.entries(result.models)
 			.filter(([, slot]) => slot.need === "required" && !slot.bound)
 			.map(([name]) => name);
-		lines.push(
+		head.push(
 			`> **Not run.** No model is available for a slot that the practice script requires: ${needed.join(", ")}. Assess it from the sources yourself.`,
 			"",
 		);
 	}
-	lines.push(...result.directions.map((direction) => `- ${direction}`));
+	const leadRows = new Set<string>();
 	const used = new Set(result.leads.map((lead) => lead.kind));
 	if (used.size > 0) {
-		lines.push(
+		const rows = result.leads.map((lead) => leadRow(lead, contextReference));
+		for (const row of rows) {
+			leadRows.add(row);
+		}
+		body.push(
 			"",
 			"**Lead kinds:**",
 			...[...used].map((kind) => `- ${kind}: ${result.kinds[kind] ?? ""}`),
@@ -235,12 +271,12 @@ export function renderDefinition(
 				: [
 						`${result.newSinceLastReview} of ${result.leads.length} leads point at lines added since the last review of this practice, each marked (new).`,
 					]),
-			...result.leads.map((lead) => leadRow(lead, contextReference)),
+			...rows,
 		);
 	}
 	const facts = Object.entries(result.facts ?? {});
 	if (facts.length > 0) {
-		lines.push("", "**Facts:**", ...facts.map(([key, value]) => `- ${key} = ${String(value)}`));
+		body.push("", "**Facts:**", ...facts.map(([key, value]) => `- ${key} = ${String(value)}`));
 	}
 	const unrated = [...result.unrated];
 	if (result.dropped > 0) {
@@ -250,8 +286,21 @@ export function renderDefinition(
 			reason: "off-format",
 		});
 	}
-	for (const item of unrated) {
-		lines.push(`- Not rated: ${item.count} ${item.what} (${item.reason}). Read those yourself.`);
-	}
-	return boundSection(lines.join("\n").trim(), jsonPointer);
+	const notRated = fit(
+		unrated.map((item) =>
+			oneLine(
+				`- Not rated: ${item.count} ${item.what} (${item.reason}). Read those yourself.`,
+				NOTICE_LINE_CHARS,
+			),
+		),
+		NOTICE_CHARS - charsOf(head),
+		(omitted) =>
+			`- Not rated: ${omitted.length} more entries are not shown. The full result is in ${jsonPointer}.`,
+	);
+	const shown = fit(body, SECTION_CHARS - charsOf(head) - charsOf(notRated) - 1, (omitted) => {
+		const lines = omitted.filter((line) => line !== "");
+		const leads = lines.filter((line) => leadRows.has(line)).length;
+		return `- ${lines.length} more lines are not shown${leads > 0 ? `, ${leads} of them leads` : ""}. The full result is in ${jsonPointer}.`;
+	});
+	return `${[...head, ...shown, ...notRated].join("\n").trim()}\n`;
 }

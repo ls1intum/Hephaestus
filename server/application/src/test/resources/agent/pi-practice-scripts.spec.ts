@@ -71,35 +71,69 @@ if (scenarioRoot !== undefined && scenarioRoot !== "") {
 				path.join(root, scripts, "example.ts"),
 				`import { readFileSync } from "node:fs";
 import { parseDiff } from "../lib/diff-parser.ts";
-export default (repo, diff, metadata, context, change, reference) => ({
- hints: [{ file: reference + "/metadata.json", line: 0, pattern: "record", context: "task path", inDiff: false, flags: {} }], directions: [], metrics: {
-  files: diff.size,
-  addedLine: Number(diff.get("a").addedLines.get(1) === "line"),
-  parsed: parseDiff(readFileSync(change + "/diff.patch", "utf8")).size,
-  context: Number(readFileSync(context + "/marker", "utf8")),
-  repo: Number(readFileSync(repo + "/marker", "utf8")),
-  metadata: metadata.marker
- }
-});
+export default {
+ meta: { kinds: { record: "The record of the work." } },
+ run: async (ctx) => ({
+  leads: [{ at: { record: "metadata.json" }, kind: "record" }],
+  facts: {
+   files: ctx.change.size,
+   addedLine: Number(ctx.change.get("a").addedLines.get(1) === "line"),
+   parsed: parseDiff(readFileSync(ctx.changeDir + "/diff.patch", "utf8")).size,
+   context: Number(readFileSync(ctx.context.dir + "/marker", "utf8")),
+   reference: ctx.context.reference,
+   repo: Number(readFileSync(ctx.repo + "/marker", "utf8")),
+   prNumber: ctx.work.pr_number,
+  },
+ }),
+};
 `,
 			);
 			for (const [name, source] of Object.entries({
 				"missing-export": "export const value = 1;",
 				"invalid-result":
-					"export default () => ({ hints: [], directions: [], metrics: { count: Infinity } });",
-				throws: "export default () => { throw new Error('broken practice'); };",
+					"export default { meta: { kinds: {} }, run: async () => ({ leads: [], facts: { count: Infinity } }) };",
+				throws:
+					"export default { meta: { kinds: {} }, run: async () => { throw new Error('broken practice'); } };",
 				"stored-inventory": `import { inventoryIssues, readProjectInventory } from "../lib/context.ts";
-export default async (repo, diff, metadata, context) => ({
- hints: [], directions: [], metrics: { issues: inventoryIssues(await readProjectInventory(context)).size }
-});`,
+export default {
+ meta: { kinds: {} },
+ run: async (ctx) => ({ leads: [], facts: { issues: inventoryIssues(await readProjectInventory(ctx.context.dir)).size } }),
+};`,
 				"stored-scoped-inventory": `import { inventoryIssues } from "../lib/context.ts";
-export default () => ({
- hints: [], directions: [], metrics: {
-  issue: Number(inventoryIssues({ repository: "team/project", issues: [{ number: 7, title: "Focal issue" }] }).get(7)?.title === "Focal issue")
- }
-});`,
+export default {
+ meta: { kinds: {} },
+ run: async () => ({
+  leads: [],
+  facts: {
+   issue: Number(inventoryIssues({ repository: "team/project", issues: [{ number: 7, title: "Focal issue" }] }).get(7)?.title === "Focal issue"),
+  },
+ }),
+};`,
 			})) {
 				writeFileSync(path.join(root, scripts, `${name}.ts`), source);
+			}
+			for (const name of [
+				"example",
+				"missing-export",
+				"invalid-result",
+				"throws",
+				"stored-inventory",
+				"stored-scoped-inventory",
+			]) {
+				writeFileSync(
+					path.join(root, scripts, `${name}.cause.json`),
+					JSON.stringify({
+						kind: "scm.pull_request",
+						subject: { role: "AUTHOR" },
+						cause: {
+							type: "requested",
+							origin: "MANUAL",
+							state: {},
+							admittedAt: "2026-01-01T00:00:00Z",
+						},
+					}),
+				);
+				writeFileSync(path.join(root, scripts, `${name}.previous.json`), "null");
 			}
 			// A definition script reads what the server staged beside it, which the launcher stages with it.
 			writeFileSync(
@@ -140,7 +174,23 @@ export default () => ({
 			writeFileSync(path.join(root, context, "marker"), "11");
 			writeFileSync(
 				path.join(root, context, "metadata.json"),
-				JSON.stringify({ marker: 13, repository_full_name: "team/project" }),
+				JSON.stringify({
+					basis: { admission_fields: [], other_fields: "CAPTURE" },
+					pr_number: 13,
+					pr_url: "https://example.org/team/project/pull/13",
+					repository_full_name: "team/project",
+					source_branch: "feature",
+					target_branch: "main",
+					commit_sha: "a".repeat(40),
+					subject_role: "AUTHOR",
+					is_draft: false,
+					is_merged: false,
+					additions: 1,
+					deletions: 0,
+					changed_files: 1,
+					labels: [],
+					assignees: [],
+				}),
 			);
 			writeFileSync(
 				path.join(root, context, "project_inventory.json"),
@@ -195,31 +245,29 @@ export default () => ({
 			);
 			assert.ok(typeof result === "object" && result !== null);
 			assert.equal(Reflect.get(result, "status"), "ok", JSON.stringify(result));
-			assert.deepEqual(Reflect.get(result, "hints"), [
-				{
-					file: `${context}/metadata.json`,
-					line: 0,
-					pattern: "record",
-					context: "task path",
-					inDiff: false,
-					flags: {},
-				},
+			assert.deepEqual(Reflect.get(result, "leads"), [
+				{ at: { record: "metadata.json" }, kind: "record", quote: "" },
 			]);
-			assert.deepEqual(Reflect.get(result, "metrics"), {
+			assert.deepEqual(Reflect.get(result, "facts"), {
 				files: 1,
 				addedLine: 1,
-				metadata: 13,
 				parsed: 1,
 				context: 11,
+				reference: context,
 				repo: 7,
+				prNumber: 13,
 			});
+			assert.match(
+				readFileSync(path.join(root, "work/practice-scripts-out/example.md"), "utf8"),
+				new RegExp(`- record at \`${context}/metadata\\.json\``, "u"),
+			);
 			assert.ok(readFileSync(path.join(root, "work/practice-scripts-out/.complete"), "utf8"));
 			const scoped: unknown = JSON.parse(
 				readFileSync(path.join(root, "work/practice-scripts-out/stored-scoped-inventory.json"), "utf8"),
 			);
 			assert.ok(typeof scoped === "object" && scoped !== null);
 			assert.equal(Reflect.get(scoped, "status"), "ok");
-			assert.deepEqual(Reflect.get(scoped, "metrics"), { issue: 1 });
+			assert.deepEqual(Reflect.get(scoped, "facts"), { issue: 1 });
 			const definition: unknown = JSON.parse(
 				readFileSync(path.join(root, "work/practice-scripts-out/reads-cause.json"), "utf8"),
 			);
@@ -238,7 +286,7 @@ export default () => ({
 				);
 				assert.ok(typeof failure === "object" && failure !== null);
 				assert.equal(Reflect.get(failure, "status"), "error");
-				assert.deepEqual(Reflect.get(failure, "hints"), []);
+				assert.deepEqual(Reflect.get(failure, "leads"), []);
 			}
 			// A failed script's practice is said to be the model's to analyze, in its own section.
 			assert.match(

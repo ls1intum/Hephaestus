@@ -20,7 +20,8 @@ Other documents own the adjacent facts:
 
 | Fact | Home |
 | --- | --- |
-| Where bundled scripts live, how a bundled practice changes, the positional contract, and how a section is bounded | [Practice catalogue](./practice-catalogue.md#practice-scripts) |
+| Where bundled scripts live and how a bundled practice changes | [Practice catalogue](./practice-catalogue.md#practice-scripts) |
+| What a section holds and how it is bounded | [What the review reads](/admin/practice-scripts#what-the-review-reads) |
 | The stage time, the script deadlines, the process grants, and `practice-script-models.json` | [Workspace ABI](./agent/workspace-abi.mdx#practice-script-validation-and-limits) |
 | The practice header of each model call, and the practice script report (`practice-scripts.json`) | [Workspace ABI](./agent/workspace-abi.mdx#practice-script-report) |
 | The stages of a review and where leads stop | [Practice review pipeline](./practice-review-pipeline.mdx) |
@@ -28,20 +29,16 @@ Other documents own the adjacent facts:
 | What each line about a script in a review means, and the metrics | [Practice review operations](/admin/practice-review-operations#practice-scripts) |
 | The live tests | [Testing](./testing.mdx#live-models-for-practice-scripts) |
 
-### Two contracts
+### One contract
 
-The runner runs two contracts.
-The child process tells them apart by the shape of the default export.
+The runner runs one contract: a default export of `definePracticeScript({ meta, run })`.
+Every bundled script uses it.
+The child process checks that the default export has `meta` and a `run` function.
+If it does not, the script fails with the status `error` and the error `RETIRED_FORM_ERROR` from `lib/contract.ts`.
+This one line tells the admin to rewrite the script with `definePracticeScript`.
 
-| Contract | Default export | Returns | Can call models | Deadline |
-| --- | --- | --- | --- | --- |
-| **Positional** | `(repo, diffFiles, metadata, contextDir, changeDir, contextReference) => result` | Hints, metrics and directions | No | The positional deadline |
-| **Definition** | `definePracticeScript({ meta, run })` | Leads, facts, unrated items and directions | Yes | The definition deadline, which is longer, because the script can wait for models |
-
-The positional contract is the supported legacy contract of the bundled scripts.
-Every bundled script uses it, so the runner must keep it while a bundled script or a customized copy of one uses it.
-The [practice catalogue](./practice-catalogue.md#practice-scripts) describes it.
-The [workspace ABI](./agent/workspace-abi.mdx#practice-script-validation-and-limits) gives both deadlines.
+A workspace script from an earlier release, whose default export is a plain function, gets this error.
+The review continues without the script's leads, and the error never becomes a statement about the work.
 
 `lib/practice-script.ts` is the only import that the admin page documents.
 It re-exports the readers that a workspace script needs.
@@ -53,7 +50,7 @@ A workspace that customized a bundled practice keeps a copy of its script, so su
 A bundled script is `server/application/src/main/resources/practices/scripts/<slug>.ts`.
 The [practice catalogue](./practice-catalogue.md#practice-scripts) tells how a bundled practice and its script change.
 
-1. Write a new bundled script with the definition contract, as [Write a practice script](/admin/practice-scripts) tells.
+1. Write a new bundled script with `definePracticeScript`, as [Write a practice script](/admin/practice-scripts) tells.
 2. Import from `docker/agents/practice-scripts/lib/practice-script.ts` where it exports what you need.
 3. Put shared readers and scanning mechanics in `docker/agents/practice-scripts/lib/`, and the predicates of one practice in its script.
 4. Add the tests that [Testing](#testing) describes.
@@ -63,11 +60,11 @@ The [practice catalogue](./practice-catalogue.md#practice-scripts) tells how a b
 The runner starts one Node process for each script, through `child.ts`.
 The [workspace ABI](./agent/workspace-abi.mdx#practice-script-validation-and-limits) gives how many run at a time, their grants, and their deadlines.
 
-A definition script runs in these steps:
+A script runs in these steps:
 
 1. Before the child starts, the runner reads and validates the script's inputs.
    [What a script reads about its review](#what-a-script-reads-about-its-review) tells how.
-2. The child imports the script and sends `meta` to the runner.
+2. The child imports the script, checks its default export, and sends `meta` to the runner.
 3. The runner validates `meta` with the zod schema in `lib/contract.ts`.
 4. If the inputs of step 1 are not valid, the runner stops the child with the status `error`.
 5. The runner decides which declared slots are available.
@@ -77,8 +74,7 @@ A definition script runs in these steps:
 9. The runner validates the result with zod and settles the leads.
    It marks the new leads, and writes the section and the result.
 
-[Write a practice script](/admin/practice-scripts#meta) gives the status of a script that step 3, 4 or 6 stops.
-A positional script does not read the inputs, so step 4 does not stop it.
+[Write a practice script](/admin/practice-scripts#meta) gives the status of a script that step 2, 3, 4 or 6 stops.
 
 A slot is available when `practice-script-models.json` has a model for it and that model's protocol serves the slot.
 `lib/contract.ts` holds the slots, the protocols, the reasons, the entry limits of one call, and the run statuses.
@@ -87,7 +83,7 @@ A slot is available when `practice-script-models.json` has a model for it and th
 
 ### What a script reads about its review
 
-The context of a definition script has a `kind`, a `work`, a `cause` and a `previous`.
+The context of a script has a `kind`, a `work`, a `cause` and a `previous`.
 [The context](/admin/practice-scripts#the-context) gives their fields.
 The server stages them, and the runner validates them once, before the script starts:
 
@@ -103,6 +99,13 @@ The server stages them, and the runner validates them once, before the script st
 4. The runner validates the three with `practiceInputsSchema` in `lib/contract.ts`.
    An error names the file that holds it.
    An error fails the practice with the status `error`, as the other errors of a script do.
+
+The record schemas follow what the content sources write.
+A field that is wrong for an identity, a role, a revision or a structure fails the record.
+Only a descriptive field with a defined meaning for "not known" falls back to it.
+Such a field reads a value that the schema does not name, such as a new pipeline state, as not known.
+`notKnownWhenUnnamed` in `lib/contract.ts` marks these fields: `head_checks` and `sub_issues_source`.
+An issue's `state` reads such a value as `UNKNOWN`.
 
 The cause file holds `kind`, `subject.role` and `cause`.
 The practice's moments and review conditions are its review occasion.
@@ -159,6 +162,9 @@ The runner refuses a call that holds more entries than the entry limit of its sl
 [Limits](/admin/practice-scripts#limits) gives the values.
 The embedding stub sets `maxEmbeddingsPerCall` to its limit, so the AI SDK splits a larger `embedMany` into calls within the limit.
 `classify` packs its questions with `PACK_SIZE` in `lib/practice-script.ts`, which stays below the decision limit.
+It keeps at most `MODEL_CONCURRENCY` packs in flight, through `eachBounded` in `lib/concurrency.ts`, so a large `classify` does not reach `MAX_IN_FLIGHT`.
+The runner starts the script processes through the same `eachBounded`.
+
 On the Decisions, Embeddings and Rerank APIs, the proxy enforces the same limits with HTTP 413.
 A decision call to a Chat Completions model has only the runner's check.
 
@@ -170,18 +176,18 @@ When the call ends, the runner settles the account with the tokens that the prov
 A call that fails, is cancelled, or reports no tokens keeps its reservation, because the provider can have billed it.
 The LLM proxy enforces the attempt token limit and the purses again, as [Cost and limits](/admin/ai-providers#cost-and-limits) tells.
 
-`MODEL_CONCURRENCY` in `runner.ts` limits the model calls in flight for all scripts together.
+`MODEL_CONCURRENCY` in `lib/concurrency.ts` limits the model calls in flight for all scripts together.
 `MAX_IN_FLIGHT` in `lib/script-run.ts` stops a script that has too many requests in flight.
 [Limits](/admin/practice-scripts#limits) gives both values.
 
 ## What the runner records
 
 When a practice ends, the runner writes `<slug>.md`, the section, and `<slug>.json`, the result.
-A definition script's result has these fields:
+A script's result has these fields:
 
 | Field | Meaning |
 | --- | --- |
-| `contract` | `definition`. |
+| `contract` | `definition` when the runner accepted the script's `meta`. `unknown` when the script failed before that, or never started. |
 | `status` | `ok`, `skipped`, `error`, or `timeout`. `timeout` means that the runner stopped the script at its deadline, or that the stage ended before the script started. |
 | `durationMs` | The time from the start of the script to its result. |
 | `leads`, `facts`, `unrated`, `directions`, `kinds` | What the script returned, after the runner settled the leads. Each lead carries the quote that the runner wrote and its rating score. A lead on a line added since the previous review has `newSinceLastReview: true`. |
@@ -190,19 +196,12 @@ A definition script's result has these fields:
 | `models` | Slot → `{ need, bound, notRated }`. `bound` tells if the job has a model for the slot. `notRated` counts the calls that the runner could not rate, by reason. |
 | `error` | For `error` and `timeout`, why the script failed or was stopped. The report `practice-scripts.json` keeps its first line for `error` only, as the [workspace ABI](./agent/workspace-abi.mdx#practice-script-report) tells. |
 
-A positional script's result has `contract` (`positional`), `status` (`ok`), `durationMs`, `hints`, `dropped`, `metrics` and `directions`.
-There, `dropped` counts the changed-line hints that the runner did not show.
-
-A script that fails before it sends `meta`, or that never starts, gets a result of the same shape with the contract `unknown`.
-Its status is `error` or `timeout`.
-Only a valid result without `meta` shows that a script is positional.
-Thus, a positional script that fails is also `unknown`.
+A script with the contract `unknown` has the status `error` or `timeout`, no leads, and empty `models` and `kinds`.
 Its needs are not known, so the server records no models for it.
 
 The result holds no tokens and no calls.
 The proxy counts those for each practice, and the usage report shows them.
-`.timing.json` holds the totals of the stage: `durationMs`, `practices`, `positionalHints`, `inDiffHints`, `leads` and `errors`.
-`positionalHints` and `inDiffHints` count the hints of positional scripts, and `leads` counts the leads of definition scripts.
+`.timing.json` holds the totals of the stage: `durationMs`, `practices`, `leads` and `errors`.
 `errors` counts the results with the status `error` or `timeout`.
 
 The review runner turns the results into the report `practice-scripts.json` in `out/`, which the server stores.
@@ -287,19 +286,21 @@ Before each call, it checks only that the model fits the developer's own AI choi
 | Test | What it proves |
 | --- | --- |
 | `docker/agents/practice-scripts/definition.test.ts` | The runner runs the fixtures against the proxy stand-in, holds the token limits, settles leads, and renders sections. |
-| `docker/agents/practice-scripts/runner.test.ts` | Process grants, deadlines, sections, and a stopped stage. |
-| `docker/agents/practice-scripts/scripts.test.ts` | The bundled positional scripts. |
+| `docker/agents/practice-scripts/runner.test.ts` | Process grants, deadlines, sections, a stopped stage, and the error of a script in the retired form. |
+| `docker/agents/practice-scripts/lib/leads.test.ts` | The section bound: the notices of a failed script and the `Not rated` lines stay, and a line counts what the bound leaves out. |
+| `docker/agents/practice-scripts/scripts.test.ts` and `server/application/src/test/resources/agent/*-practice-script.spec.ts` | The bundled scripts. Each runs through `run-bundled.ts`, which validates the inputs and the result as the runner does. |
 | `docker/agents/practice-scripts/live.test.ts` | The runner and `fixtures/every-slot.ts` against real models. |
 | `server/application/src/test/resources/agent/pi-practice-scripts-report.spec.ts` | `practice-scripts.json` for each status, its bounds, and a script without a result. |
 | `PiResultParserPracticeScriptReportTest` | The server reads the report within its bounds and drops entries outside the contract. |
 | `PracticeScriptIntegrationTest` | The stored runs and the first line of a failed script's error, also when it holds a NUL. The runs of one review, with the calls that the proxy counted and the tiers of the attempt shown. The needs endpoint. Both endpoints with their access rules. The check that the proxy asks for each call allows a model for practice scripts only within the developer's own AI choice. |
 | `ReviewMemberAiPolicyTest` | The review's models for practice scripts come from the routing adapter for the reviewed developer. A Cloud member whose review runs on an In-house model gets no Cloud decision model. |
 | `LlmUsageByPracticeIntegrationTest` | The cost split by practice adds up to the usage rows. |
-| `docker/agents/practice-scripts/validate.test.ts` | `validate.ts` runs a definition script and a positional script. It runs a script as a request by hand, or at the moment and with the previous result of its options. It skips a script without its required model and exits with 1 for a failed script. It stops with exit code 2 on a bad file name, a missing argument, or an input that it cannot use. |
+| `docker/agents/practice-scripts/validate.test.ts` | `validate.ts` runs a script, and a script in the retired form exits with 1 and its error line. It runs a script as a request by hand, or at the moment and with the previous result of its options. It skips a script without its required model and exits with 1 for a failed script. It stops with exit code 2 on a bad file name, a missing argument, or an input that it cannot use. |
 | `PracticeScriptContractSyncTest` | The slots, protocols, reasons, run statuses, practice header and slug pattern are the same in `lib/contract.ts` and in Java. So are the kinds, moments and review states of the artifact descriptors. So are the origins, outcomes, severities, subject roles, and the suffixes of the staged inputs. |
 | `PracticeScriptInputsTest` | The server stages the cause type for a bound moment, a recheck and a request by hand. It stages the review of a reviewer moment, and the current claim without model text. It stages no claim that is invalidated, not authorized, or from a conversation without consent. |
 | `docker/agents/practice-scripts/cause.test.ts` | The runner gives the context of a pull request and of an issue. It fails a script on inputs that do not parse and on a wrong `expectKind`. It marks new leads, marks none after a force push, and runs the example of the admin page. |
-| `docker/agents/practice-scripts/lib/script-inputs.test.ts` | The schema of the inputs of each kind, the error that names its file, `expectKind`, and `changeSince` for an ancestor, a force push and a missing commit. |
+| `docker/agents/practice-scripts/lib/script-inputs.test.ts` | The schema of the inputs of each kind, with records in the shapes that the content sources stage. The descriptive fields that read an unnamed value as not known. The error that names its file, `expectKind`, and `changeSince` for an ancestor, a force push and a missing commit. |
+| `docker/agents/practice-scripts/lib/practice-script.test.ts` | The primitives, and that `classify` keeps at most `MODEL_CONCURRENCY` packs in flight. |
 | `PracticeScriptCapsSyncTest` | `MODEL_SLOT_CAPS` in `lib/contract.ts` equals the entry limits of one call from a practice script in `LlmProxyService`. |
 | `MemberAiRoutingAdapterTest` | The data-class rule of [Privacy](/admin/ai-providers#privacy) for the job's slots and the needs endpoint. |
 
@@ -313,7 +314,7 @@ A test gives it a handler that answers by item.
 A handler must throw for an item that it does not know, so that a changed prompt fails the test.
 A test asserts what the runner guarantees, never the wording of a real model.
 
-To test a new definition script:
+To test a new script:
 
 1. Put a fixture next to the others in `docker/agents/practice-scripts/fixtures/`.
 2. Add a case to `definition.test.ts` that runs the fixture with no models.
@@ -322,7 +323,7 @@ To test a new definition script:
 4. Add a case for each slot with a stand-in handler that answers by item.
 5. Assert the leads, the quotes, and the `models` report in `<slug>.json`.
 
-`validate.ts` runs one script of either contract on a repository without models, through the same staging as the tests.
+`validate.ts` runs one script on a repository without models, through the same staging as the tests.
 [Run a script on your own change](/admin/practice-scripts#run-a-script-on-your-own-change) gives its options.
 
 To run a script with models, set `LLM_PROXY_URL` to a server that serves the practice script routes, and `PRACTICE_SCRIPT_PROXY_TOKEN` to its token.

@@ -208,12 +208,11 @@ void describe("what a definition script reads about its review", () => {
 		});
 	});
 
-	void test("inputs that do not parse fail each definition script with the file that holds the error, and a positional script runs", async () => {
+	void test("inputs that do not parse fail each script with the file that holds the error", async () => {
 		const definition =
 			"export default { meta: { kinds: {} }, run: async () => ({ leads: [] }) };\n";
-		const positional = "export default () => ({ hints: [], metrics: {}, directions: ['ran'] });\n";
 		const { json, section } = await run(
-			{ definition, positional },
+			{ definition },
 			{
 				cause: {
 					kind: "scm.pull_request",
@@ -236,10 +235,6 @@ void describe("what a definition script reads about its review", () => {
 			/^the review's inputs are not valid: definition\.cause\.json: cause\.type /u,
 		);
 		assert.match(await section("definition"), /\*\*Script failed\.\*\*/u);
-		assert.partialDeepStrictEqual(await json("positional"), {
-			contract: "positional",
-			status: "ok",
-		});
 
 		const missing = await run({ definition }, { cause: { kind: "scm.pull_request" } }, metadata);
 		assert.partialDeepStrictEqual(await missing.json("definition"), {

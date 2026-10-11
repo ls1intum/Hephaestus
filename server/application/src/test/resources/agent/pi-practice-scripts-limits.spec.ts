@@ -109,7 +109,7 @@ void test(
 					assert.equal(result.status, 0, result.stderr);
 					assert.equal(result.stdout, "review-continues");
 					assert.equal(
-						result.stderr.includes("continuing without hints"),
+						result.stderr.includes("continuing without leads"),
 						scenario.failure,
 						result.stderr,
 					);

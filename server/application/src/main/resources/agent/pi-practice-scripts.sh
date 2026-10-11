@@ -32,7 +32,7 @@ fi
     kill -KILL "-$pid" 2>/dev/null || true
     exit "$status"
 ) || {
-    printf '%s\n' '[practice-scripts] failed, continuing without hints' >&2
+    printf '%s\n' '[practice-scripts] failed, continuing without leads' >&2
     # The runner writes each practice's section and result whole, as a pair, when that practice
     # finishes. Those pairs stay; every other file is partial or not the runner's, and goes.
     mkdir -p "$output"

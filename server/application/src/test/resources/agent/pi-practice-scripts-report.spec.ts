@@ -4,7 +4,10 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { after, test } from "node:test";
 
-import { RUN_STATUSES } from "../../../../../../docker/agents/practice-scripts/lib/contract.ts";
+import {
+	RETIRED_FORM_ERROR,
+	RUN_STATUSES,
+} from "../../../../../../docker/agents/practice-scripts/lib/contract.ts";
 import {
 	PRACTICE_SCRIPT_ERROR_MAX_CHARS,
 	PRACTICE_SCRIPT_REPORT_MAX_BYTES,
@@ -28,7 +31,7 @@ function staged(slugs: readonly string[], results: Record<string, unknown> = {})
 	mkdirSync(scripts, { recursive: true });
 	mkdirSync(output, { recursive: true });
 	for (const slug of slugs) {
-		writeFileSync(path.join(scripts, `${slug}.ts`), "export default () => ({});\n");
+		writeFileSync(path.join(scripts, `${slug}.ts`), "export default {};\n");
 	}
 	for (const [slug, result] of Object.entries(results)) {
 		writeFileSync(
@@ -60,15 +63,10 @@ const definition = (status: string, extra: object = {}) => ({
 	...extra,
 });
 
-const positional = (status: string, extra: object = {}) => ({
-	practice: "x",
-	contract: "positional",
-	status,
-	hints: [],
-	metrics: {},
-	directions: [],
-	dropped: 0,
-	durationMs: 40,
+/** A script that ended before the runner accepted its `meta`, so its models are not known. */
+const unknown = (status: string, extra: object = {}) => ({
+	...definition(status),
+	contract: "unknown",
 	...extra,
 });
 
@@ -104,8 +102,8 @@ void test("the report of every status, slot, need and reason is the one the serv
 			"needs-a-model": definition("skipped", {
 				models: { decision: { need: "required", bound: false, notRated: {} } },
 			}),
-			scans: positional("ok", { hints: [{}, {}, {}] }),
-			slow: { ...positional("timeout"), contract: "unknown", error: "Timeout after 15003ms" },
+			scans: definition("ok", { leads: [{}, {}, {}] }),
+			slow: unknown("timeout", { error: "Timeout after 60003ms" }),
 		},
 	);
 	const fixture: unknown = JSON.parse(
@@ -117,9 +115,9 @@ void test("the report of every status, slot, need and reason is the one the serv
 void test("a script whose models are not known is reported without models, never as one that uses none", () => {
 	const { scripts, output } = staged(["earlier-runner", "late", "never-ran", "scans"], {
 		// A runner from before the contract field says nothing about the models.
-		"earlier-runner": { practice: "earlier-runner", status: "error", hints: [], metrics: {} },
-		late: { ...positional("timeout"), contract: "unknown" },
-		scans: positional("ok"),
+		"earlier-runner": { practice: "earlier-runner", status: "error", leads: [] },
+		late: unknown("timeout"),
+		scans: definition("ok"),
 	});
 	assert.deepEqual(report(scripts, output), {
 		practices: [
@@ -227,10 +225,10 @@ void test("a failed script's error is reported as the line that the server keeps
 		[...cases.map((_, index) => caseSlug(index)), "odd", "unnamed"],
 		{
 			...Object.fromEntries(
-				cases.map(({ error }, index) => [caseSlug(index), positional("error", { error })]),
+				cases.map(({ error }, index) => [caseSlug(index), unknown("error", { error })]),
 			),
-			odd: positional("error", { error: 42 }),
-			unnamed: positional("error"),
+			odd: unknown("error", { error: 42 }),
+			unnamed: unknown("error"),
 		},
 	);
 	const reported = report(scripts, output);
@@ -245,10 +243,26 @@ void test("a failed script's error is reported as the line that the server keeps
 	assert.deepEqual([errors.get("odd"), errors.get("unnamed")], [undefined, undefined]);
 });
 
+void test("a script in the retired form is reported with its whole error line and no models", () => {
+	const { scripts, output } = staged(["retired"], {
+		retired: unknown("error", {
+			directions: [`Script failed: ${RETIRED_FORM_ERROR}`],
+			error: RETIRED_FORM_ERROR,
+		}),
+	});
+	assert.ok(RETIRED_FORM_ERROR.length <= PRACTICE_SCRIPT_ERROR_MAX_CHARS);
+	assert.deepEqual(report(scripts, output), {
+		practices: [
+			{ slug: "retired", status: "error", leads: 0, error: RETIRED_FORM_ERROR, durationMs: 40 },
+		],
+		truncated: false,
+	});
+});
+
 void test("how long a script ran is reported only when the runner wrote a count", () => {
 	const { scripts, output } = staged(["negative", "text"], {
-		negative: positional("ok", { durationMs: -1 }),
-		text: positional("ok", { durationMs: "40" }),
+		negative: definition("ok", { durationMs: -1 }),
+		text: definition("ok", { durationMs: "40" }),
 	});
 	assert.deepEqual(report(scripts, output), {
 		practices: [
@@ -357,7 +371,7 @@ void test("the report keeps every practice within its bounds and leaves out the 
 	const error = "\u{1F642}".repeat(PRACTICE_SCRIPT_ERROR_MAX_CHARS);
 	const { scripts, output } = staged(
 		slugs,
-		Object.fromEntries(slugs.map((slug) => [slug, positional("error", { error })])),
+		Object.fromEntries(slugs.map((slug) => [slug, unknown("error", { error })])),
 	);
 	const text = practiceScriptReport(scripts, output);
 	assert.ok(text !== undefined);
@@ -387,8 +401,8 @@ void test("an error that does not fit leaves room for a shorter error after it",
 	const long = "\u{1F642}".repeat(PRACTICE_SCRIPT_ERROR_MAX_CHARS);
 	const slugs = Array.from({ length: 40 }, (_, i) => `p-${String(i).padStart(2, "0")}`);
 	const { scripts, output } = staged(slugs, {
-		...Object.fromEntries(slugs.map((slug) => [slug, positional("error", { error: long })])),
-		"p-39": positional("error", { error: "Cannot read x" }),
+		...Object.fromEntries(slugs.map((slug) => [slug, unknown("error", { error: long })])),
+		"p-39": unknown("error", { error: "Cannot read x" }),
 	});
 	const parsed: unknown = JSON.parse(practiceScriptReport(scripts, output) ?? "");
 	assert.ok(typeof parsed === "object" && parsed !== null && "practices" in parsed);

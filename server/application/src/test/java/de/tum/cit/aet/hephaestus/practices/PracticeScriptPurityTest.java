@@ -10,8 +10,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
@@ -33,12 +31,6 @@ class PracticeScriptPurityTest extends BaseUnitTest {
     private static final List<String> OBSERVATION_TOKENS =
             Arrays.stream(Outcome.values()).map(Outcome::name).toList();
 
-    // These released scripts tell the reviewer when the captured record cannot settle the order, which is the
-    // reviewer's UNDETERMINED. Their bytes are digested, so an edit offers every adopting workspace an update.
-    private static final Map<String, Set<String>> RELEASED_EXCEPTIONS = Map.of(
-            "merged-past-unresolved-review-threads.ts", Set.of("UNDETERMINED"),
-            "plans-the-work-in-an-issue-first.ts", Set.of("UNDETERMINED"));
-
     @Test
     @DisplayName("no practice script emits an observation outcome outside its header comments")
     void noScriptLaundersAnObservation() throws IOException {
@@ -53,11 +45,6 @@ class PracticeScriptPurityTest extends BaseUnitTest {
                     continue;
                 }
                 for (String token : OBSERVATION_TOKENS) {
-                    if (RELEASED_EXCEPTIONS
-                            .getOrDefault(script.getFileName().toString(), Set.of())
-                            .contains(token)) {
-                        continue;
-                    }
                     // \b would treat the leading "_" / "." as a boundary, so anchor on the surrounding chars
                     // explicitly: the token must not be flanked by another identifier character.
                     boolean leaks = Pattern.compile("(?<![A-Z_])" + token + "(?![A-Z_])")

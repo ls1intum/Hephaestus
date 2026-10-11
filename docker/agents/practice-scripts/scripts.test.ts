@@ -1,32 +1,17 @@
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { afterEach, describe, it } from "node:test";
+import { describe, it } from "node:test";
 
-import { practiceScriptResultSchema } from "./lib/contract.ts";
 import type { DiffFile } from "./lib/types.ts";
-import { runBundled } from "./run-bundled.ts";
-import { issueRecord, loadDefinition, moment, runDefinition } from "./run-definition.ts";
-
-const tempDirs: string[] = [];
-
-async function createTempDir(prefix: string): Promise<string> {
-	const dir = await mkdtemp(path.join(tmpdir(), prefix));
-	tempDirs.push(dir);
-	return dir;
-}
+import { moment, runBundled } from "./run-bundled.ts";
 
 /** A path the diff touched. The scripts under test read the changed paths, not the hunk bodies. */
 function changedFile(file: string): DiffFile {
 	return { path: file, addedLines: new Map(), removedLines: new Map(), hunks: [] };
 }
-
-afterEach(async () => {
-	await Promise.all(
-		tempDirs.splice(0).map(async (dir) => rm(dir, { recursive: true, force: true })),
-	);
-});
 
 void describe("ships-tests-with-the-change", () => {
 	const slug = "ships-tests-with-the-change";
@@ -43,7 +28,7 @@ void describe("ships-tests-with-the-change", () => {
 
 		// No checkout at all: the question is answered from the diff, with no repository census.
 		const result = await runBundled(slug, {
-			repo: path.join(await createTempDir("pc-empty-"), "missing"),
+			repo: path.join(tmpdir(), `missing-checkout-${randomUUID()}`),
 			change,
 		});
 
@@ -58,7 +43,7 @@ void describe("ships-tests-with-the-change", () => {
 	void it("judges untested production code without a test target instead of abstaining", async () => {
 		const change = new Map([["App/Quiz.swift", changedFile("App/Quiz.swift")]]);
 
-		const result = await runBundled(slug, { repo: await createTempDir("pc-no-tests-"), change });
+		const result = await runBundled(slug, { change });
 
 		assert.deepEqual(result.facts, { diffProductionFiles: 1, diffTestFiles: 0 });
 		const directions = (result.directions ?? []).join(" ");
@@ -69,7 +54,7 @@ void describe("ships-tests-with-the-change", () => {
 	void it("says nothing about a change with no source file", async () => {
 		const change = new Map([["README.md", changedFile("README.md")]]);
 
-		const result = await runBundled(slug, { repo: await createTempDir("pc-docs-"), change });
+		const result = await runBundled(slug, { change });
 
 		assert.deepEqual(result.directions, []);
 	});
@@ -92,17 +77,7 @@ void describe("issue classification across practices", () => {
 		"issue-scoped-to-single-concern",
 	];
 
-	/** Run an issue script as a review of an opened issue, with `fields` over the issue record. */
-	async function runIssue(slug: string, fields: Record<string, unknown>) {
-		const { definition, root } = await loadDefinition(slug);
-		tempDirs.push(root);
-		return practiceScriptResultSchema.parse(
-			await runDefinition(definition, {
-				work: issueRecord(fields),
-				cause: moment("scm.issue.opened"),
-			}),
-		);
-	}
+	const opened = moment("scm.issue.opened");
 
 	for (const { name, metadata, emptyOrTitleEcho, hasDeliverableType, looksUmbrella } of [
 		{
@@ -204,7 +179,7 @@ void describe("issue classification across practices", () => {
 	]) {
 		void it(`preserves shared facts for a ${name}`, async () => {
 			for (const scriptName of names) {
-				const result = await runIssue(scriptName, metadata);
+				const result = await runBundled(scriptName, { work: metadata, cause: opened });
 				assert.equal(result.facts?.emptyOrTitleEcho, emptyOrTitleEcho, scriptName);
 				assert.deepEqual(result.leads, [], scriptName);
 				if (scriptName !== "issue-scoped-to-single-concern") {
@@ -288,55 +263,38 @@ void describe("issue classification across practices", () => {
 		],
 	];
 
-	void it("keeps sub-issue counts separate from their source and scope", async () => {
-		// The runner refuses a record with a source it does not know, so the script never reads one.
-		const known = subIssueCases.filter(([rollup]) => rollup.sub_issues_source !== "Children");
-		for (const [rollup, text, facts, unsaid] of known) {
-			const result = await runIssue("breaks-large-work-into-trackable-subtasks", {
-				...issue,
-				...rollup,
-			});
-			const said = (result.directions ?? []).join("\n");
-			assert.deepEqual(result.leads, []);
-			assert.match(said, text);
-			assert.doesNotMatch(said, unsaid);
-			if (rollup.sub_issues_source === "children" && typeof rollup.sub_issues_total === "number") {
-				assert.match(said, /mirror may omit other children/u);
+	void it("keeps sub-issue counts separate from their source and scope in each script that reads them", async () => {
+		for (const { slug, checkboxes } of [
+			{ slug: "breaks-large-work-into-trackable-subtasks", checkboxes: "taskCheckboxes" },
+			{ slug: "issue-scoped-to-single-concern", checkboxes: "checkboxes" },
+		]) {
+			for (const [rollup, text, facts, unsaid] of subIssueCases) {
+				const result = await runBundled(slug, { work: { ...issue, ...rollup }, cause: opened });
+				const said = (result.directions ?? []).join("\n");
+				assert.deepEqual(result.leads, [], slug);
+				assert.match(said, text, slug);
+				assert.doesNotMatch(said, unsaid, slug);
 				if (
-					rollup.sub_issues_total > 0 &&
-					rollup.sub_issues_completed === rollup.sub_issues_total
+					rollup.sub_issues_source === "children" &&
+					typeof rollup.sub_issues_total === "number"
 				) {
-					assert.match(said, /stored children were closed, not.*whole hierarchy.*complete/u);
+					assert.match(said, /mirror may omit other children/u, slug);
+					if (
+						rollup.sub_issues_total > 0 &&
+						rollup.sub_issues_completed === rollup.sub_issues_total
+					) {
+						assert.match(
+							said,
+							/stored children were closed, not.*whole hierarchy.*complete/u,
+							slug,
+						);
+					}
 				}
+				assert.equal(result.facts?.subIssuesTotal, facts.subIssuesTotal, slug);
+				assert.equal(result.facts?.subIssuesCompleted, facts.subIssuesCompleted, slug);
+				assert.equal(result.facts?.[checkboxes], 3, slug);
+				assert.doesNotMatch(said, /looks large|strong candidate/iu, slug);
 			}
-			assert.equal(result.facts?.subIssuesTotal, facts.subIssuesTotal);
-			assert.equal(result.facts?.subIssuesCompleted, facts.subIssuesCompleted);
-			assert.equal(result.facts?.taskCheckboxes, 3);
-			assert.doesNotMatch(said, /looks large|strong candidate/iu);
-		}
-	});
-
-	void it("keeps sub-issue counts separate from their source and scope in one issue's scope", async () => {
-		// The runner refuses a record with a source it does not know, so the script never reads one.
-		const known = subIssueCases.filter(([rollup]) => rollup.sub_issues_source !== "Children");
-		for (const [rollup, text, facts, unsaid] of known) {
-			const result = await runIssue("issue-scoped-to-single-concern", { ...issue, ...rollup });
-			const said = (result.directions ?? []).join("\n");
-			assert.match(said, text);
-			assert.doesNotMatch(said, unsaid);
-			if (rollup.sub_issues_source === "children" && typeof rollup.sub_issues_total === "number") {
-				assert.match(said, /mirror may omit other children/u);
-				if (
-					rollup.sub_issues_total > 0 &&
-					rollup.sub_issues_completed === rollup.sub_issues_total
-				) {
-					assert.match(said, /stored children were closed, not.*whole hierarchy.*complete/u);
-				}
-			}
-			assert.equal(result.facts?.subIssuesTotal, facts.subIssuesTotal);
-			assert.equal(result.facts?.subIssuesCompleted, facts.subIssuesCompleted);
-			assert.equal(result.facts?.checkboxes, 3);
-			assert.doesNotMatch(said, /looks large|strong candidate/iu);
 		}
 	});
 });
@@ -349,7 +307,7 @@ void it("testing guidance keeps words separated by template comments apart", asy
 });
 
 void it("linked-work analysis reads only explicitly supplied context, never a repository-derived fallback", async () => {
-	const root = await createTempDir("linked-work-context-");
+	const root = await mkdtemp(path.join(tmpdir(), "linked-work-context-"));
 	const slug = "honours-linked-issue-acceptance-criteria";
 	try {
 		const legacy = path.join(root, "inputs", "context");
@@ -366,12 +324,12 @@ void it("linked-work analysis reads only explicitly supplied context, never a re
 			JSON.stringify({ workItems: [{ body: "Acceptance criteria\n- [ ] one\n- [ ] two" }] }),
 		);
 		const work = { source_branch: "fix-example", title: "Fixes #12" };
-		const explicit = await runBundled(slug, { work, repo, contextDir: context });
+		const explicit = await runBundled(slug, { work, repo, context });
 		assert.equal(explicit.facts?.acceptanceCriteriaCheckboxes, 2);
 		assert.deepEqual(explicit.leads, []);
 		const absent = await runBundled(slug, { work, repo });
 		assert.equal(absent.facts?.linkedItemsFilePresent, 0);
-		const missing = await runBundled(slug, { work, repo, contextDir: path.join(root, "missing") });
+		const missing = await runBundled(slug, { work, repo, context: path.join(root, "missing") });
 		assert.equal(missing.facts?.linkedItemsFilePresent, 0);
 	} finally {
 		await rm(root, { recursive: true, force: true });

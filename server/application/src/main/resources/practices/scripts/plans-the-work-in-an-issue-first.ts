@@ -16,7 +16,7 @@ import { millisBetween, readLinkedWorkItemCapture } from "../lib/review.ts";
 /** The two moments in one sentence, the way the cell reads them. */
 function relationOf(issueToFirstCommit: number | null): string {
 	if (issueToFirstCommit === null) {
-		return "the captured commits do not establish the earliest authored time; the order is UNDETERMINED";
+		return "the captured commits do not establish the earliest authored time; the order is not known from the record";
 	}
 	return issueToFirstCommit >= 0
 		? `the earliest commit was authored ${hours(issueToFirstCommit)} h after the issue was opened`
@@ -110,7 +110,7 @@ export default definePracticeScript({
 		const unresolved = [...named.keys()].filter((n) => capture?.unresolved.includes(n) ?? false);
 		if (!commitsCaptured) {
 			directions.push(
-				"The commit record is missing or malformed: report a collection gap and record no observation, never UNDETERMINED.",
+				"The commit record is missing or malformed: report a collection gap and record no observation.",
 			);
 		} else if (capture === null) {
 			directions.push(
@@ -127,7 +127,7 @@ export default definePracticeScript({
 						unresolved.map((n) => `#${String(n)}`),
 						100,
 					)} are among the capture's unresolved references: this repository holds no synchronized issue with that number, so no opening time.`,
-					"Whether one is the issue this change implements is read from the description: if it is, the order stays open (UNDETERMINED, never a timing judgement on another issue instead); if the description rules it out, it is no occasion.",
+					"Whether one is the issue this change implements is read from the description: if it is, the record cannot settle the order, so name that issue and its missing opening time (never a timing judgement on another issue instead); if the description rules it out, it is no occasion.",
 				);
 			}
 			if (leads.length > 0) {
@@ -137,8 +137,8 @@ export default definePracticeScript({
 					"Compare the issue opening and earliest captured authored commit exactly. These dates establish the recorded order, not when all work began or why the issue was written.",
 					...(first === undefined
 						? [
-								"If the complete captured commit record is empty or any commit lacks a usable authored date, the earliest time cannot be established and the timing is UNDETERMINED.",
-								"The pull request's creation dates the handoff, not the start of work; it cannot replace the missing date. Missing commit capture is a collection gap, not UNDETERMINED.",
+								"If the complete captured commit record is empty or any commit lacks a usable authored date, the earliest time cannot be established, so the record cannot settle the timing: the criteria say how to decide it.",
+								"The pull request's creation dates the handoff, not the start of work; it cannot replace the missing date. Missing commit capture is a collection gap, not an unsettled order.",
 							]
 						: []),
 				);

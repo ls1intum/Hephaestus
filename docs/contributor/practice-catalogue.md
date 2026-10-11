@@ -420,18 +420,15 @@ A changed visual or guide follows the [release behavior](#release-behavior) of e
 
 ### Practice scripts
 
-A practice script extracts candidates inside the review container.
-It receives the parsed diff, artifact metadata, captured context and derived change directory (`work/change/`).
-Its output is hints, metrics and directions, not observations.
+A practice script finds leads inside the review container.
+Every bundled script uses `definePracticeScript`, the one contract that the runner runs.
+It reads the work, the cause, the previous result, the parsed change and the captured context.
+It returns leads, facts, unrated items and directions, not observations.
+[Write a practice script](/admin/practice-scripts) owns the contract, its model slots and its lead design.
+The [workspace ABI](./agent/workspace-abi.mdx#practice-script-validation-and-limits) owns the process grants and the deadline.
 
-This section describes the positional contract that every bundled script uses.
-It is the supported legacy contract of the bundled scripts, as [Practice script runner](./practice-script-runner.mdx#two-contracts) states.
-A script with the definition contract returns leads and can call models.
-[Write a practice script](/admin/practice-scripts) owns that contract, its model slots and its lead design.
-The [workspace ABI](./agent/workspace-abi.mdx#practice-script-validation-and-limits) owns the process grants and deadlines of both contracts.
-
-A hint on a changed line must name a file and a line that the change adds.
-The runner does not show a hint that does not, and the section states how many it held back.
+The runner keeps only a lead whose kind the script declares and whose citation the source holds.
+The section counts the leads that it does not show.
 
 - **Practice-specific predicates belong in the script.** Shared readers and scanning mechanics live
   in `docker/agents/practice-scripts/lib/`. Keep the predicates consistent with the practice criteria.
@@ -445,9 +442,9 @@ The runner does not show a hint that does not, and the section states how many i
   relevant limits, such as constructs that span several lines.
 
 The runner renders one bounded section per practice, `work/practice-scripts-out/<slug>.md`, and the review shows it under that practice's criteria in the turn that evaluates it.
-A section holds the practice's directions, candidate locations and record rows.
-When they do not fit its 3,000 characters, it keeps a sample of each and a pointer to the full per-practice JSON.
-Sections are bounded one by one, so a script with many rows never crowds another practice's leads out.
+A section holds the practice's directions, leads, facts and `Not rated` lines.
+[What the review reads](/admin/practice-scripts#what-the-review-reads) gives its 3,000-character bound and what the bound keeps.
+Sections are bounded one by one, so a script with many leads never crowds another practice's leads out.
 
 A section is an entry point to the evidence, not proof that the model inspected every candidate.
 

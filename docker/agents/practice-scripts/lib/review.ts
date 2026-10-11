@@ -5,10 +5,10 @@ import { readFile } from "node:fs/promises";
 import { factsOf } from "./bounded-text.ts";
 import type { ChangeCommit } from "./change.ts";
 import { readContextJson } from "./context.ts";
-import type { Cause, Lead } from "./contract.ts";
+import type { Cause, Lead, Work } from "./contract.ts";
 import { subIssueSource, type SubIssueSource } from "./issue-classification.ts";
 import { isJsonObject, optionalNumber, optionalString, text } from "./json.ts";
-import type { DiffFile, PullRequestMetadata } from "./types.ts";
+import type { DiffFile } from "./types.ts";
 
 export interface LinkedWorkItem {
 	number: number;
@@ -376,7 +376,7 @@ interface MergeFacts {
 
 /** The fields of a pull request record that tell about its merge, as `ctx.work` holds them. */
 type MergeRecord = Pick<
-	PullRequestMetadata,
+	Work["scm.pull_request"],
 	"merged_at" | "merged_by" | "author" | "review_decision" | "merge_state_status" | "head_checks"
 >;
 

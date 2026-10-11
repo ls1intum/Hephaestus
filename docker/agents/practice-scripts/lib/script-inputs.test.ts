@@ -33,6 +33,13 @@ function staged(cause: Record<string, unknown>) {
 	};
 }
 
+/** The record of the work, as the runner gives it to a script. */
+function workOf(cause: unknown, work: unknown) {
+	const parsed = parseInputs("p", cause, null, work);
+	assert.ok("inputs" in parsed, JSON.stringify(parsed));
+	return parsed.inputs.work;
+}
+
 type Context = { kind: "scm.pull_request"; change: number } | { kind: "scm.issue" };
 /** A context of an issue, typed as either kind. */
 const issueContext = (): Context => ({ kind: "scm.issue" });
@@ -199,6 +206,114 @@ void describe("the inputs of a definition script", () => {
 		for (const [cause, previous, work, message] of cases) {
 			const parsed = parseInputs("p", cause, previous, work);
 			assert.ok("error" in parsed, JSON.stringify(cause));
+			assert.match(parsed.error, message);
+		}
+	});
+
+	void test("records in the shapes that the content sources stage parse, and a descriptive value that a provider adds later reads as not known", () => {
+		// `PullRequestContentSource.buildPullRequestMetadata` for a GitLab merge request without a pipeline.
+		const mergeRequest = {
+			basis: {
+				admission_fields: [
+					"pr_number",
+					"pr_url",
+					"repository_full_name",
+					"source_branch",
+					"target_branch",
+					"commit_sha",
+					"subject_role",
+					"title",
+					"body",
+				],
+				admitted_at: "2026-01-02T03:04:05.123456Z",
+				other_fields: "CAPTURE",
+				mirror_synced_at: "2026-01-02T03:00:00Z",
+			},
+			pr_number: 16,
+			pr_url: "https://gitlab.example.org/team/project/-/merge_requests/16",
+			repository_full_name: "team/project",
+			source_branch: "18-add-ingredient-view",
+			target_branch: "main",
+			commit_sha: "b".repeat(40),
+			subject_role: "AUTHOR",
+			title: "Add the ingredient view",
+			body: null,
+			state: "OPEN",
+			is_draft: false,
+			is_merged: false,
+			created_at: "2026-01-01T10:00:00Z",
+			additions: 12,
+			deletions: 3,
+			changed_files: 2,
+			author: "renovate",
+			author_id: 42,
+			author_bot: true,
+			labels: ["dependencies"],
+			assignees: [],
+			merge_state_status: "CLEAN",
+			head_checks: "NO_PIPELINE",
+		};
+		// `IssueContentSource` for an issue whose counts come from its stored children.
+		const issueRecord = {
+			issue_number: 7,
+			title: "Export billing reports",
+			body: "",
+			state: "CLOSED",
+			state_reason: "COMPLETED",
+			html_url: "https://github.com/team/project/issues/7",
+			repository_full_name: "team/project",
+			author: "ada",
+			author_id: 9,
+			issue_type: "Task",
+			is_locked: false,
+			sub_issues_total: 3,
+			sub_issues_completed: 3,
+			sub_issues_source: "children",
+			milestone: null,
+			closed_at: "2026-01-03T00:00:00Z",
+			labels: [],
+			assignees: ["ada"],
+		};
+		const issueCause = {
+			kind: "scm.issue",
+			subject: { role: "AUTHOR" },
+			cause: { type: "requested", origin: "MANUAL", state: {}, admittedAt: "2026-01-01T00:00:00Z" },
+		};
+		assert.partialDeepStrictEqual(workOf(staged({ type: "requested" }), mergeRequest), {
+			head_checks: "NO_PIPELINE",
+			author_bot: true,
+			body: null,
+		});
+		assert.partialDeepStrictEqual(workOf(issueCause, issueRecord), {
+			state: "CLOSED",
+			sub_issues_source: "children",
+		});
+		const later = workOf(staged({ type: "requested" }), { ...mergeRequest, head_checks: "MANUAL" });
+		assert.equal("head_checks" in later && later.head_checks !== undefined, false);
+		const unnamed = workOf(issueCause, {
+			...issueRecord,
+			sub_issues_source: "Children",
+			state: "MERGED",
+		});
+		assert.partialDeepStrictEqual(unnamed, { state: "UNKNOWN", sub_issues_total: 3 });
+		assert.equal("sub_issues_source" in unnamed && unnamed.sub_issues_source !== undefined, false);
+	});
+
+	void test("an identity, a role, a revision or a structure of another shape fails the record", () => {
+		const cases: [Record<string, unknown>, RegExp][] = [
+			[{ pr_number: "16" }, /^metadata\.json: work\.pr_number /u],
+			[{ author_id: "42" }, /^metadata\.json: work\.author_id /u],
+			[{ subject_role: "ASSIGNEE" }, /^metadata\.json: work\.subject_role /u],
+			[{ commit_sha: "abc123" }, /^metadata\.json: work\.commit_sha /u],
+			[{ labels: "bug" }, /^metadata\.json: work\.labels /u],
+			[{ basis: "CAPTURE" }, /^metadata\.json: work\.basis /u],
+		];
+		for (const [fields, message] of cases) {
+			const parsed = parseInputs("p", staged({ type: "requested" }), null, {
+				...pullRequest,
+				...fields,
+			});
+			assert.ok("error" in parsed, JSON.stringify(fields));
 			assert.match(parsed.error, message);
 		}
 	});

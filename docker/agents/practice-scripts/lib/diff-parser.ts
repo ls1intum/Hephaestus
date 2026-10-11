@@ -84,19 +84,3 @@ export function parseDiff(diffContent: string): Map<string, DiffFile> {
 
 	return files;
 }
-
-/** Check if a given file path + line number is in the diff (on a + line) */
-export function isInDiff(
-	diffFiles: Map<string, DiffFile>,
-	filePath: string,
-	lineNum: number,
-): boolean {
-	// Try exact match first, then suffix match
-	const df =
-		diffFiles.get(filePath) ??
-		[...diffFiles.values()].find((f) => filePath.endsWith(f.path) || f.path.endsWith(filePath));
-	if (!df) {
-		return false;
-	}
-	return df.addedLines.has(lineNum);
-}

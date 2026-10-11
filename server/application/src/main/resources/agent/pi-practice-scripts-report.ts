@@ -22,7 +22,7 @@ const isEnded = (value: unknown): value is Ended => ENDED.some((status) => statu
 /** "not-finished": the practice has no result. The server maps each status to its `PracticeScriptRunStatus`. */
 export type PracticeScriptRunStatus = Ended | "not-finished";
 
-/** One model slot of a definition script, in the practice script contract's own words (`lib/contract.ts`). */
+/** One model slot of a script, in the practice script contract's own words (`lib/contract.ts`). */
 export interface PracticeScriptModelUse {
 	slot: string;
 	need: string;
@@ -112,7 +112,7 @@ function runOf(slug: string, file: string): PracticeScriptRun {
 	if (!isEnded(status)) {
 		return notFinished;
 	}
-	const leads = contract === "definition" ? result.leads : result.hints;
+	const { leads } = result;
 	const error = status === "error" ? errorLine(result.error) : undefined;
 	const durationMs = count(result.durationMs);
 	const run: PracticeScriptRun = {
@@ -122,11 +122,8 @@ function runOf(slug: string, file: string): PracticeScriptRun {
 		...(error === undefined ? {} : { error }),
 		...(durationMs === undefined ? {} : { durationMs }),
 	};
-	if (contract === "definition") {
-		return { ...run, models: modelUses(result.models) };
-	}
-	// Any other contract, or none from an earlier runner, leaves the models unknown.
-	return contract === "positional" ? { ...run, models: [] } : run;
+	// Only a script whose `meta` the runner accepted has known models.
+	return contract === "definition" ? { ...run, models: modelUses(result.models) } : run;
 }
 
 /**

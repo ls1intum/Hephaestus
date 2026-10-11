@@ -1,4 +1,4 @@
-/** The definition contract of a practice script, as the runner parses it. */
+/** The contract of a practice script, as the runner parses it. */
 import type {
 	EmbeddingModelV4,
 	EmbeddingModelV4CallOptions,
@@ -16,6 +16,13 @@ import type {
 import { z } from "zod";
 
 import { isJsonObject } from "./json.ts";
+
+/**
+ * The error of a script whose default export is not a `definePracticeScript` definition, such as a
+ * plain function: the form that scripts had before `definePracticeScript`.
+ */
+export const RETIRED_FORM_ERROR =
+	"This script uses the retired positional form. Rewrite it with definePracticeScript.";
 
 /** A practice slug as the server writes it: `SandboxLayout.PRACTICE_SLUG`, anchored. */
 export const PRACTICE_SLUG = /^[a-z0-9][a-z0-9-]{0,63}$/u;
@@ -397,8 +404,18 @@ export const isCommit = (value: string): boolean => COMMIT.test(value);
 /*
  * The record of the reviewed work, one for each kind, as the server's content source stages it in the
  * context folder. A field that the server does not write is not in the type: the runner drops an
- * unknown field, and a known field of another shape fails the record.
+ * unknown field, and a known field of another shape fails the record. Only a descriptive field with a
+ * defined meaning for "not known" falls back to it (`notKnownWhenUnnamed`), so that a value that a
+ * provider adds later does not fail the review's script.
  */
+
+/**
+ * A descriptive field whose absence means that it is not known. A value that the contract does not
+ * name is not known either: it reads as absent, and the record stays valid.
+ */
+function notKnownWhenUnnamed<const T extends readonly [string, ...string[]]>(values: T) {
+	return z.union([z.enum(values).optional(), z.unknown().transform(() => undefined)]);
+}
 
 /** `metadata.json` of a pull request: `PullRequestContentSource.buildPullRequestMetadata`. */
 const pullRequestRecordSchema = z.object({
@@ -415,7 +432,7 @@ const pullRequestRecordSchema = z.object({
 	source_branch: z.string(),
 	target_branch: z.string(),
 	/** The reviewed head. */
-	commit_sha: z.string(),
+	commit_sha: z.string().regex(COMMIT),
 	subject_role: z.enum(["AUTHOR", "REVIEWER"]),
 	/** Absent when the job does not carry the text: then it is not known. */
 	title: z.string().optional(),
@@ -442,8 +459,16 @@ const pullRequestRecordSchema = z.object({
 	merge_state_status: z.string().optional(),
 	/** Only the GraphQL sync fills it. */
 	review_decision: z.string().optional(),
-	/** What the checks or the pipeline said about the reviewed head. */
-	head_checks: z.enum(["SUCCESS", "FAILURE", "PENDING", "CANCELLED", "NONE"]).optional(),
+	/** What the checks or the pipeline said about the reviewed head: `CheckState`. */
+	head_checks: notKnownWhenUnnamed([
+		"SUCCESS",
+		"FAILURE",
+		"PENDING",
+		"CANCELLED",
+		"NONE",
+		"NO_PIPELINE",
+		"SKIPPED",
+	]),
 });
 
 /** `metadata.json` of an issue: `IssueContentSource`. */
@@ -451,8 +476,11 @@ const issueRecordSchema = z.object({
 	issue_number: z.int(),
 	title: z.string().nullable(),
 	body: z.string(),
-	/** UNKNOWN when the mirror holds no state. */
-	state: z.enum(["OPEN", "CLOSED", "UNKNOWN"]),
+	/** UNKNOWN when the mirror holds no state, or a state that the contract does not name. */
+	state: z.union([
+		z.enum(["OPEN", "CLOSED", "UNKNOWN"]),
+		z.unknown().transform(() => "UNKNOWN" as const),
+	]),
 	state_reason: z.string().nullable(),
 	html_url: z.string().nullable(),
 	repository_full_name: z.string(),
@@ -462,8 +490,8 @@ const issueRecordSchema = z.object({
 	is_locked: z.boolean(),
 	sub_issues_total: z.int().nullable(),
 	sub_issues_completed: z.int().nullable(),
-	/** Where the sub-issue counts come from. Absent when they are not known. */
-	sub_issues_source: z.enum(["provider", "children"]).optional(),
+	/** Where the sub-issue counts come from. Absent when it is not known. */
+	sub_issues_source: notKnownWhenUnnamed(["provider", "children"]),
 	milestone: z.string().nullable(),
 	closed_at: z.string().nullable(),
 	labels: z.array(z.string()),

@@ -5,7 +5,7 @@
 import type { Facts } from "./contract.ts";
 
 export const DIRECTION_CHARS = 300;
-export const FACT_CHARS = 200;
+const FACT_CHARS = 200;
 
 /** The text on one line, cut to `max` characters with an ellipsis. */
 export function oneLine(text: string, max: number): string {

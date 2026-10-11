@@ -13,29 +13,27 @@ import {
 	type ModelSlot,
 	type Need,
 	type ParsedMeta,
+	type RunStatus,
 	type SlotModels,
 } from "./contract.ts";
-import { isInDiff } from "./diff-parser.ts";
 import { grep, type GrepMatch } from "./grep.ts";
 import { childMessageSchema, type ChildJob, type ChildMessage, type RunnerMessage } from "./ipc.ts";
 import {
-	renderDefinition,
+	renderSection,
 	settleLeads,
-	type DefinitionResult,
+	type ScriptResult,
 	type SlotReport,
 	type Sources,
 } from "./leads.ts";
 import { modelCall, type ModelBudget } from "./models-host.ts";
-import { parsePositionalResult, renderPositional } from "./practice-contract.ts";
 import { addedSince, type ScriptInputs } from "./script-inputs.ts";
-import type { PracticeResult } from "./types.ts";
 
 /** Heap per script, in MiB. */
 const CHILD_HEAP_MB = 256;
-/** A definition script may wait for models, so it keeps a longer limit than a positional script. */
-const DEFINITION_MS = 60_000;
+/** The time limit of one script, which can wait for models. */
+const SCRIPT_MS = 60_000;
 /**
- * A definition script's model calls and signal end this long before its process is killed, so a
+ * A script's model calls and signal end this long before its process is killed, so a
  * model that does not answer leaves its step unrated and the script still returns what it found.
  */
 const RETURN_MS = 5000;
@@ -43,21 +41,16 @@ const RETURN_MS = 5000;
 const PRACTICE_TOKENS = 20_000;
 /** Messages a child may send while its earlier ones are still being answered. */
 const MAX_IN_FLIGHT = 32;
-/** Default time limit of a positional script. */
-export const POSITIONAL_MS = 15_000;
 /** The most of a failed script's error that its result keeps. */
 export const MAX_ERROR_CHARS = 2000;
 
 interface ScriptEnvironment {
 	readable: readonly string[];
 	sources: Sources;
-	metadata: ChildJob["metadata"];
 	changeDir: string;
 	now: string;
 	/** Epoch milliseconds: no script runs past it. */
 	stageEnd: number;
-	/** Upper bound of a positional script's time, from `--timeout`. */
-	positionalMs: number;
 	/** The models of one practice: every call names the practice to the proxy. */
 	models: (practice: string) => Partial<SlotModels>;
 	budget: ModelBudget;
@@ -65,28 +58,30 @@ interface ScriptEnvironment {
 	log: (line: string) => void;
 }
 
-/**
- * "unknown": the script failed before it said what it is, or never started, so nothing is known about the
- * models it uses. Only a valid result without `meta` shows that a script is positional.
- */
-export type ScriptOutcome =
-	| { contract: "positional" | "unknown"; result: PracticeResult }
-	| { contract: "definition"; result: DefinitionResult };
-
 const messageOf = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
-/** A script that failed before it sent `meta`, or never started. */
-function failure(slug: string, message: string, status: FailedStatus = "error"): ScriptOutcome {
+/** The result of a script before the runner knows its `meta`: no models, kinds or leads. */
+function emptyResult(slug: string, status: RunStatus): ScriptResult {
 	return {
+		practice: slug,
 		contract: "unknown",
-		result: {
-			practice: slug,
-			status,
-			hints: [],
-			metrics: { error: 1 },
-			directions: [`Script failed: ${message}`],
-			error: message,
-		},
+		status,
+		models: {},
+		leads: [],
+		facts: {},
+		unrated: [],
+		directions: [],
+		kinds: {},
+		dropped: 0,
+	};
+}
+
+/** A script that failed before it sent `meta`, or never started. */
+function failure(slug: string, message: string, status: FailedStatus = "error"): ScriptResult {
+	return {
+		...emptyResult(slug, status),
+		directions: [`Script failed: ${message}`],
+		error: message,
 	};
 }
 
@@ -122,18 +117,14 @@ export function readableRoots(inputs: readonly string[]): string[] {
  * at `jsonPath` for what it leaves out.
  */
 export function practiceFiles(
-	outcome: ScriptOutcome,
+	result: ScriptResult,
 	durationMs: number,
 	jsonPath: string,
 	contextReference: string,
 ): { json: string; section: string } {
-	const pointer = `\`${jsonPath}\``;
 	return {
-		json: JSON.stringify({ ...outcome.result, contract: outcome.contract, durationMs }, null, 2),
-		section:
-			outcome.contract === "definition"
-				? renderDefinition(outcome.result, contextReference, pointer)
-				: renderPositional(outcome.result, pointer),
+		json: JSON.stringify({ ...result, durationMs }, null, 2),
+		section: renderSection(result, contextReference, `\`${jsonPath}\``),
 	};
 }
 
@@ -147,47 +138,20 @@ async function isReadable(readable: readonly string[], dir: string): Promise<boo
 	);
 }
 
-/** A positional result, with the changed-line hints that the change does not hold held back. */
-function positional(slug: string, value: unknown, env: ScriptEnvironment): PracticeResult {
-	const findings = parsePositionalResult(value, `Script ${slug}`);
-	const hints = findings.hints.filter(
-		(h) => !h.inDiff || isInDiff(env.sources.change, h.file, h.line),
-	);
-	const dropped = findings.hints.length - hints.length;
-	return {
-		practice: slug,
-		status: "ok",
-		hints,
-		dropped,
-		metrics: findings.metrics,
-		directions: [
-			...findings.directions.slice(0, 10),
-			...(dropped > 0
-				? [
-						`${dropped} hint(s) on changed lines are not shown: their file and line are not in the change.`,
-					]
-				: []),
-		],
-	};
-}
-
-/**
- * Run one practice's script. `inputs` are what a definition script reads about its review; a positional
- * script does not read them.
- */
+/** Run one practice's script. `inputs` are what the script reads about its review. */
 export async function runScript(
 	slug: string,
 	modulePath: string,
 	env: ScriptEnvironment,
 	inputs: ScriptInputs,
-): Promise<ScriptOutcome> {
+): Promise<ScriptResult> {
 	const left = env.stageEnd - Date.now();
 	if (left <= 0) {
 		return failure(slug, "the stage deadline passed before this practice started", "timeout");
 	}
 	const models = env.models(slug);
 	const started = Date.now();
-	const deadline = started + Math.min(DEFINITION_MS, left);
+	const deadline = started + Math.min(SCRIPT_MS, left);
 	const callsEnd = Math.max(started, deadline - RETURN_MS);
 	const child = fork(path.join(import.meta.dirname, "..", "child.ts"), [], {
 		env: {},
@@ -224,14 +188,8 @@ export async function runScript(
 		child.kill("SIGKILL");
 	};
 	const deadlineLimit = setTimeout(stopAtLimit, deadline - Date.now());
-	// A positional script is stopped at its own shorter limit; a definition script says what it is
-	// with its first message, `meta`, and keeps the longer one.
-	const positionalLimit = setTimeout(
-		stopAtLimit,
-		Math.min(env.positionalMs, deadline - Date.now()),
-	);
 
-	let settled: ScriptOutcome | undefined;
+	let settled: ScriptResult | undefined;
 	let meta: ParsedMeta | undefined;
 	const available: Partial<Record<ModelSlot, string>> = {};
 	const account = { left: 0 };
@@ -239,31 +197,19 @@ export async function runScript(
 	const calls = new Map<number, AbortController>();
 	let inFlight = 0;
 
-	const definitionOutcome = (
-		status: DefinitionResult["status"],
-		parts: Partial<DefinitionResult> = {},
-	): ScriptOutcome => ({
+	const knownResult = (status: RunStatus, parts: Partial<ScriptResult> = {}): ScriptResult => ({
+		...emptyResult(slug, status),
 		contract: "definition",
-		result: {
-			practice: slug,
-			contract: "definition",
-			status,
-			models: report,
-			leads: [],
-			facts: {},
-			unrated: [],
-			directions: [],
-			kinds: meta?.kinds ?? {},
-			dropped: 0,
-			...parts,
-		},
+		models: report,
+		kinds: meta?.kinds ?? {},
+		...parts,
 	});
 	// Only an accepted `meta` says which models a script uses; a script that failed before it is unknown.
-	const fail = (error: string, status: FailedStatus = "error"): ScriptOutcome => {
+	const fail = (error: string, status: FailedStatus = "error"): ScriptResult => {
 		const message = error.slice(0, MAX_ERROR_CHARS).toWellFormed();
 		return meta === undefined
 			? failure(slug, message, status)
-			: definitionOutcome(status, { directions: [`Script failed: ${message}`], error: message });
+			: knownResult(status, { directions: [`Script failed: ${message}`], error: message });
 	};
 
 	const answerModel = async (message: Extract<ChildMessage, { kind: "model" }>): Promise<void> => {
@@ -309,7 +255,6 @@ export async function runScript(
 	};
 
 	const acceptMeta = (value: unknown) => {
-		clearTimeout(positionalLimit);
 		const parsed = metaSchema.safeParse(value);
 		if (!parsed.success || meta !== undefined) {
 			settled ??= fail(
@@ -339,7 +284,7 @@ export async function runScript(
 			}
 		}
 		if (Object.values(report).some((r) => r.need === "required" && !r.bound)) {
-			settled ??= definitionOutcome("skipped");
+			settled ??= knownResult("skipped");
 			child.kill("SIGKILL");
 			return;
 		}
@@ -352,11 +297,7 @@ export async function runScript(
 			return;
 		}
 		if (meta === undefined) {
-			try {
-				settled = { contract: "positional", result: positional(slug, value, env) };
-			} catch (error) {
-				settled = fail(messageOf(error));
-			}
+			settled = fail("the script sent its result before meta");
 			return;
 		}
 		const parsed = practiceScriptResultSchema.safeParse(value);
@@ -373,7 +314,7 @@ export async function runScript(
 				: leads.map((lead) =>
 						addedSince(lead.at, since) ? { ...lead, newSinceLastReview: true as const } : lead,
 					);
-		settled = definitionOutcome("ok", {
+		settled = knownResult("ok", {
 			leads: marked,
 			facts: parsed.data.facts ?? {},
 			unrated: parsed.data.unrated ?? [],
@@ -444,12 +385,10 @@ export async function runScript(
 				return;
 			}
 			case "result": {
-				clearTimeout(positionalLimit);
 				acceptResult(message.value);
 				return;
 			}
 			case "failed": {
-				clearTimeout(positionalLimit);
 				settled ??= fail(message.message);
 				return;
 			}
@@ -473,7 +412,6 @@ export async function runScript(
 		slug,
 		repoPath: env.sources.repo,
 		diffFiles: env.sources.change,
-		metadata: env.metadata,
 		...("inputs" in inputs ? inputs : {}),
 		contextDir: env.sources.contextDir,
 		changeDir: env.changeDir,
@@ -483,7 +421,6 @@ export async function runScript(
 	};
 	reply({ kind: "job", job });
 	const exit: readonly unknown[] = await closed;
-	clearTimeout(positionalLimit);
 	clearTimeout(deadlineLimit);
 	if (settled !== undefined) {
 		return settled;

@@ -8,9 +8,20 @@ import {
 	isCommentLine,
 } from "./declarations.ts";
 import { isTestPath, languageOf } from "./languages.ts";
-import type { DiffFile, Hint } from "./types.ts";
+import type { DiffFile } from "./types.ts";
 
 export type SourcePattern = [label: string, test: RegExp];
+
+/** One added line that a pattern matched, with where it sits. */
+export interface ScanHint {
+	file: string;
+	line: number;
+	/** The label of the pattern that matched. */
+	pattern: string;
+	/** The trimmed line, at most 160 characters. */
+	context: string;
+	flags: Record<string, boolean | number | string>;
+}
 
 export interface Placement {
 	/** `struct EventList`, `file scope`, or `unknown` when the checkout or the language row is missing. */
@@ -22,7 +33,7 @@ export interface Placement {
 
 interface SourceScan {
 	/** The first `maxHints` matching lines; `matched` and `countLabel` count every one. */
-	hints: Hint[];
+	hints: ScanHint[];
 	/** Every matching line, shown or not. */
 	matched: number;
 	/** Matching lines by pattern label, over every line scanned. */
@@ -118,7 +129,6 @@ export async function scanAddedLines(
 					line,
 					pattern: label,
 					context: content.trim().slice(0, 160),
-					inDiff: true,
 					flags: {
 						enclosing: placement.enclosing,
 						supertypes: placement.supertypes,

@@ -58,7 +58,7 @@ export default definePracticeScript({
 							"The record gives no usable merge time, so no resolution is placed before or after the merge.",
 						]
 					: []),
-				"These are not proven open at merge: compare opening and resolution times, and treat an unknown historical order as UNDETERMINED.",
+				"These are not proven open at merge: compare opening and resolution times; where the record cannot settle that order, name the missing date and decide as the criteria say.",
 				"Read each thread's comments in comments.json by its id (the comments' `thread`) before deciding what it asked.",
 			);
 		}

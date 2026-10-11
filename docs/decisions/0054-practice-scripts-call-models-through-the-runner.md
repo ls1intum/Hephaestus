@@ -1,4 +1,4 @@
-# ADR 0054: Practice scripts call models through the runner with a second credential
+# ADR 0054: Practice scripts give leads through one contract and call models through the runner
 
 **Status:** Accepted
 
@@ -13,6 +13,10 @@
 ## Context
 
 A practice's script finds places for the reviewer to look before the practice is measured.
+Before this decision, a script was a plain function of positional arguments, `(repo, diffFiles, metadata, contextDir, changeDir, contextReference)`.
+It returned hints, metrics and directions.
+It could not read why its practice was in the review, or what the previous review of the practice found.
+
 Many practices need a judgment that a text pattern cannot make, such as "this comment only restates the code".
 A model can make that judgment for a small, fixed set of answers at a low cost.
 Embeddings and reranking can find near-duplicates and choose which candidates to show.
@@ -27,13 +31,15 @@ Neither may become a claim about a developer's work (`docs/contributor/practice-
 
 ## Decision drivers
 
+- One contract for every script, bundled or written by a workspace admin.
+- A script gives leads. The review's model judges the practice.
 - A script never holds a credential.
 - A model failure or a missing model never becomes a statement about the work.
 - Model text never reaches the reviewer as wording, and leads never reach composition.
 - Operators choose and pay for each model with the existing bindings, tiers and prices.
 - Spend has a bound for each attempt that does not depend on the shared-model budget or the provider cap.
 
-## Considered options
+## Considered options for model calls
 
 1. **Give each script process a narrow token.** The script would choose the model, the request fields and the retries.
    The runner would lose the token limits and the request allowlist.
@@ -42,6 +48,51 @@ Neither may become a claim about a developer's work (`docs/contributor/practice-
 4. **The runner makes every call with a second credential, and each model kind is its own purpose.**
 
 ## Decision
+
+### One contract
+
+A script has one default export, `definePracticeScript({ meta, run })` from `lib/practice-script.ts`.
+`meta` declares the lead kinds, the model slots and a token limit.
+`run(ctx)` returns leads, facts, unrated items and directions.
+Every bundled script uses this contract.
+
+The positional form is retired.
+The runner does not run a script whose default export is not a definition.
+Such a script fails with the status `error` and one error line that tells the admin to rewrite it with `definePracticeScript`.
+The review continues without its leads.
+
+### Scripts give leads, and the model judges
+
+A lead is a citation, a declared kind, scalar facts and an optional rating.
+The runner keeps only a lead whose kind the script declares and whose citation the source holds.
+It writes each quote from the source.
+A lead reaches only the turn that measures its practice.
+It never becomes an observation or feedback.
+
+The review's model checks each lead against the practice's criteria and decides.
+A script never decides that the practice is met.
+
+### Cause and previous
+
+The context tells a script why its practice is in the review, as `cause`:
+
+- `moment`: the practice is bound to the moment of the review, and its review conditions match.
+- `recheck`: the practice's current result about the author is not met, and the work changed after it.
+- `requested`: a person asked for the review, or an admin started a review of earlier work.
+
+The practice's moments and review conditions stay the only home of when a practice is reviewed.
+A script reads the cause to do different work at different moments, and never decides when it runs.
+
+`previous` is the practice's latest current result about the same person on the same work, or `null`.
+It holds the outcome, the severity and the citations, and no model text or delivery state.
+For a pull request, it holds the earlier head, and the runner gives the change since that head when the head is an ancestor.
+The runner marks each lead on a line that this change adds.
+
+The server stages the cause and the previous result beside each script.
+The runner validates them, and the record of the work, before the script starts.
+An input that is not valid fails the script, never the review.
+
+### Models through the runner
 
 Option 4.
 
@@ -79,6 +130,12 @@ The runner writes each quote from the source, and a failure becomes a "Not rated
 
 ## Consequences
 
+- A workspace script in the positional form stops giving leads after the upgrade.
+  Its review shows the error line until an admin rewrites the script.
+  The bundled practices changed their scripts and criteria.
+  Thus, each workspace that adopted one gets an update offer.
+- A script can do different work for a moment, a recheck and a request.
+  It can look first at what changed since the previous result.
 - A script that a workspace admin wrote can use models and holds no credential.
 - A leaked practice script token reaches only model calls of one job attempt.
   The two attempt limits bound its spend, above them by its calls in flight.

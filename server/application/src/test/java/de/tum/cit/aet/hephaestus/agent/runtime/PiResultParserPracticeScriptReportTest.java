@@ -58,7 +58,7 @@ class PiResultParserPracticeScriptReportTest extends BaseUnitTest {
         return "{\"practices\":[" + String.join(",", entries) + "],\"truncated\":false}";
     }
 
-    private static String positional(String slug, String status, int leads) {
+    private static String withoutModels(String slug, String status, int leads) {
         return """
                 {"slug":"%s","status":"%s","leads":%d,"models":[]}""".formatted(slug, status, leads);
     }
@@ -109,7 +109,7 @@ class PiResultParserPracticeScriptReportTest extends BaseUnitTest {
                    {"slot":"decision","need":"required","bound":true,"notRated":{"too-large":2,"deadline":5,"budget":0}},
                    {"slot":"chat","need":"optional","bound":true,"notRated":{}}]}""";
 
-        List<PracticeScriptRunReport> runs = parse(report(decision, positional("error-handling", "ok", 7)));
+        List<PracticeScriptRunReport> runs = parse(report(decision, withoutModels("error-handling", "ok", 7)));
 
         assertThat(runs)
                 .containsExactly(
@@ -144,7 +144,7 @@ class PiResultParserPracticeScriptReportTest extends BaseUnitTest {
     @Test
     void shouldLeaveTheModelsUnknownWhenTheScriptEndedBeforeItDeclaredThem() {
         List<PracticeScriptRunReport> runs = parse(report("""
-                {"slug":"comment-quality","status":"timeout","leads":0}""", positional("error-handling", "error", 0)));
+                {"slug":"comment-quality","status":"timeout","leads":0}""", withoutModels("error-handling", "error", 0)));
 
         assertThat(runs)
                 .containsExactly(
@@ -313,7 +313,7 @@ class PiResultParserPracticeScriptReportTest extends BaseUnitTest {
 
     @Test
     void shouldRecordAStagedScriptAsNotFinishedWhenAWholeReportDoesNotNameIt() {
-        List<PracticeScriptRunReport> runs = parse(report(positional("comment-quality", "ok", 2)));
+        List<PracticeScriptRunReport> runs = parse(report(withoutModels("comment-quality", "ok", 2)));
 
         assertThat(runs)
                 .contains(new PracticeScriptRunReport(
@@ -325,7 +325,7 @@ class PiResultParserPracticeScriptReportTest extends BaseUnitTest {
     @Test
     void shouldRecordNoRunForAStagedScriptWhenATruncatedReportDoesNotNameIt() {
         List<PracticeScriptRunReport> runs =
-                parse("{\"practices\":[" + positional("comment-quality", "ok", 2) + "],\"truncated\":true}");
+                parse("{\"practices\":[" + withoutModels("comment-quality", "ok", 2) + "],\"truncated\":true}");
 
         assertThat(runs).extracting(PracticeScriptRunReport::practiceSlug).containsExactly("comment-quality");
         assertThat(failures()).isZero();
@@ -334,7 +334,7 @@ class PiResultParserPracticeScriptReportTest extends BaseUnitTest {
     @Test
     void shouldDropAnEntryWhenTheJobDidNotStageItsScript() {
         List<PracticeScriptRunReport> runs =
-                parse(report(positional("comment-quality", "ok", 2), positional("not-admitted", "ok", 9)));
+                parse(report(withoutModels("comment-quality", "ok", 2), withoutModels("not-admitted", "ok", 9)));
 
         assertThat(runs).extracting(PracticeScriptRunReport::practiceSlug).doesNotContain("not-admitted");
         assertThat(failures()).isEqualTo(1d);
@@ -365,7 +365,7 @@ class PiResultParserPracticeScriptReportTest extends BaseUnitTest {
                 "{\"slug\":\"comment-quality\",\"status\":\"not-finished\",\"leads\":0,\"models\":[]}"
             })
     void shouldDropAnEntryWithoutClaimingTheScriptDidNotFinishWhenItIsOutsideTheContract(String entry) {
-        List<PracticeScriptRunReport> runs = parse(report(entry, positional("error-handling", "ok", 1)));
+        List<PracticeScriptRunReport> runs = parse(report(entry, withoutModels("error-handling", "ok", 1)));
 
         assertThat(runs).extracting(PracticeScriptRunReport::practiceSlug).containsExactly("error-handling");
         assertThat(failures()).isEqualTo(1d);
@@ -374,9 +374,9 @@ class PiResultParserPracticeScriptReportTest extends BaseUnitTest {
     @Test
     void shouldDropEveryEntryOfASlugWhenTheReportNamesItTwice() {
         List<PracticeScriptRunReport> runs = parse(report(
-                positional("comment-quality", "ok", 1),
-                positional("comment-quality", "error", 0),
-                positional("error-handling", "ok", 1)));
+                withoutModels("comment-quality", "ok", 1),
+                withoutModels("comment-quality", "error", 0),
+                withoutModels("error-handling", "ok", 1)));
 
         assertThat(runs).extracting(PracticeScriptRunReport::practiceSlug).containsExactly("error-handling");
     }
@@ -406,7 +406,7 @@ class PiResultParserPracticeScriptReportTest extends BaseUnitTest {
 
     @Test
     void shouldRefuseTheReportWhenItIsLargerThanItsLimit() {
-        String entries = report(positional("comment-quality", "ok", 1));
+        String entries = report(withoutModels("comment-quality", "ok", 1));
         String atLimit = entries + " ".repeat(PiResultParser.PRACTICE_SCRIPT_REPORT_MAX_BYTES - entries.length());
 
         assertThat(parse(atLimit)).hasSize(STAGED.size());
@@ -422,10 +422,10 @@ class PiResultParserPracticeScriptReportTest extends BaseUnitTest {
         String atLimit = report(staged.stream()
                 .sorted()
                 .limit(PiResultParser.PRACTICE_SCRIPT_REPORT_MAX_ENTRIES)
-                .map(slug -> positional(slug, "ok", 0))
+                .map(slug -> withoutModels(slug, "ok", 0))
                 .toArray(String[]::new));
         String overLimit =
-                report(staged.stream().map(slug -> positional(slug, "ok", 0)).toArray(String[]::new));
+                report(staged.stream().map(slug -> withoutModels(slug, "ok", 0)).toArray(String[]::new));
 
         assertThat(parser.parsePracticeScriptReport(atLimit.getBytes(UTF_8), staged))
                 .hasSize(staged.size());

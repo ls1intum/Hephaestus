@@ -7,37 +7,28 @@ import { parseArgs } from "node:util";
 import { boundModelsSchema, isFailed, PRACTICE_SLUG, type BoundModels } from "./lib/contract.ts";
 import { globFilesSync } from "./lib/files.ts";
 
+import { eachBounded, MODEL_CONCURRENCY } from "./lib/concurrency.ts";
 import { parseDiff } from "./lib/diff-parser.ts";
-import { isJsonObject } from "./lib/json.ts";
+import type { ScriptResult } from "./lib/leads.ts";
 import { hostModels, ModelBudget } from "./lib/models-host.ts";
 import { InputReader } from "./lib/script-inputs.ts";
-import {
-	POSITIONAL_MS,
-	practiceFiles,
-	readableRoots,
-	runScript,
-	type ScriptOutcome,
-} from "./lib/script-run.ts";
-import type { ArtifactMetadata, DiffFile } from "./lib/types.ts";
+import { practiceFiles, readableRoots, runScript } from "./lib/script-run.ts";
+import type { DiffFile } from "./lib/types.ts";
 
 const DEFAULT_OUTPUT_DIR = ".practice-scripts";
 /** Scripts that run at once: each is its own Node process, and the sandbox has two CPUs. */
 const CONCURRENCY = 4;
-/** Model calls in flight across all scripts. */
-const MODEL_CONCURRENCY = 4;
 
 const { values } = parseArgs({
 	args: process.argv.slice(2),
 	options: {
 		repo: { type: "string" },
 		diff: { type: "string" },
-		metadata: { type: "string" },
 		context: { type: "string" },
 		"context-reference": { type: "string" },
 		change: { type: "string" },
 		practices: { type: "string" },
 		output: { type: "string", default: DEFAULT_OUTPUT_DIR },
-		timeout: { type: "string", default: String(POSITIONAL_MS) },
 		// The stage's own deadline: a script that starts late gets only what is left of it.
 		"stage-ms": { type: "string" },
 		// The models the server bound for this job (practice-script-models.json). Calls go to
@@ -50,7 +41,7 @@ const { values } = parseArgs({
 
 if (values.repo === undefined || values.repo === "") {
 	console.error(
-		"Usage: node runner.ts --repo <path> --diff <path> [--metadata <path>] [--context <dir>] [--change <dir>] [--practices <dir>] [--output <dir>]",
+		"Usage: node runner.ts --repo <path> --diff <path> [--context <dir>] [--change <dir>] [--practices <dir>] [--output <dir>]",
 	);
 	process.exit(1);
 }
@@ -58,15 +49,6 @@ if (values.repo === undefined || values.repo === "") {
 const globalStart = Date.now();
 const repoPath = values.repo;
 const outputDir = values.output;
-// A non-numeric or non-positive --timeout would make every race timer fire immediately and time out
-// every practice on the spot, so an unusable value falls back to the default instead of silently
-// disabling every practice script.
-const requestedTimeoutMs = Number.parseInt(values.timeout, 10);
-const timeoutIsUsable = Number.isFinite(requestedTimeoutMs) && requestedTimeoutMs > 0;
-if (!timeoutIsUsable) {
-	console.error(`Ignoring unusable --timeout ${values.timeout}; using ${POSITIONAL_MS}ms`);
-}
-const timeoutMs = timeoutIsUsable ? requestedTimeoutMs : POSITIONAL_MS;
 const contextDir = values.context ?? "";
 const contextReference = values["context-reference"] ?? "";
 if (contextDir !== "" && contextReference === "") {
@@ -94,20 +76,6 @@ if (values.diff !== undefined && values.diff !== "") {
 	}
 }
 
-let metadata: ArtifactMetadata = {};
-if (values.metadata !== undefined && values.metadata !== "") {
-	try {
-		const parsed: unknown = JSON.parse(await readFile(values.metadata, "utf8"));
-		if (isJsonObject(parsed)) {
-			metadata = parsed;
-		} else {
-			console.error(`Metadata ${values.metadata} is not a JSON object; scripts will see {}`);
-		}
-	} catch (error) {
-		console.error(`Could not load metadata: ${String(error)}`);
-	}
-}
-
 const practicesDir = values.practices ?? `${outputDir}/practices`;
 const practiceModules: [string, string][] = [];
 
@@ -128,7 +96,7 @@ if (practiceModules.length === 0) {
 	process.exit(0);
 }
 
-console.error(`Running ${practiceModules.length} practice analyzer(s)...`);
+console.error(`Running ${practiceModules.length} practice script(s)...`);
 
 // Each practice's files are written as soon as it finishes, so a stage that is stopped at its
 // deadline keeps every practice that finished before it.
@@ -173,11 +141,9 @@ const bound = callable ? await boundModels(values.models) : {};
 const environment = {
 	readable,
 	sources: { change: diffFiles, repo: repoPath, contextDir, contextReference },
-	metadata,
 	changeDir,
 	now: new Date(globalStart).toISOString(),
 	stageEnd,
-	positionalMs: timeoutMs,
 	models: (practice: string) => hostModels(bound, proxyUrl, proxyToken, practice),
 	budget: new ModelBudget(stageTokens, MODEL_CONCURRENCY),
 	log: (line: string) => console.error(line),
@@ -191,47 +157,31 @@ const inputs = new InputReader({
 	log: environment.log,
 });
 
-const queue = [...practiceModules];
-const outcomes: ScriptOutcome[] = [];
-await Promise.all(
-	Array.from({ length: Math.min(CONCURRENCY, queue.length) }, async () => {
-		for (let next = queue.shift(); next !== undefined; next = queue.shift()) {
-			const [slug, modulePath] = next;
-			// One practice's unreadable inputs fail only that practice's definition script.
-			const read = await inputs
-				.read(slug)
-				.catch((error: unknown) => ({ error: `the runner could not read them: ${String(error)}` }));
-			const start = Date.now();
-			const outcome = await runScript(slug, modulePath, environment, read);
-			const durationMs = Date.now() - start;
-			const { result } = outcome;
-			const files = practiceFiles(
-				outcome,
-				durationMs,
-				`${outputDir}/${slug}.json`,
-				contextReference,
-			);
-			await writeWhole(`${outputDir}/${slug}.json`, files.json);
-			await writeWhole(`${outputDir}/${slug}.md`, files.section);
-			console.error(
-				isFailed(result.status)
-					? `  FAIL ${slug}: ${result.directions[0] ?? ""} (${durationMs}ms)`
-					: `  ${result.status} ${slug} (${outcome.contract}): ${outcome.contract === "definition" ? outcome.result.leads.length : outcome.result.hints.length} leads (${durationMs}ms)`,
-			);
-			outcomes.push(outcome);
-		}
-	}),
-);
+const results: ScriptResult[] = [];
+await eachBounded(practiceModules, CONCURRENCY, async ([slug, modulePath]) => {
+	// One practice's unreadable inputs fail only that practice's script.
+	const read = await inputs
+		.read(slug)
+		.catch((error: unknown) => ({ error: `the runner could not read them: ${String(error)}` }));
+	const start = Date.now();
+	const result = await runScript(slug, modulePath, environment, read);
+	const durationMs = Date.now() - start;
+	const files = practiceFiles(result, durationMs, `${outputDir}/${slug}.json`, contextReference);
+	await writeWhole(`${outputDir}/${slug}.json`, files.json);
+	await writeWhole(`${outputDir}/${slug}.md`, files.section);
+	console.error(
+		isFailed(result.status)
+			? `  FAIL ${slug}: ${result.directions[0] ?? ""} (${durationMs}ms)`
+			: `  ${result.status} ${slug}: ${result.leads.length} leads (${durationMs}ms)`,
+	);
+	results.push(result);
+});
 
-const positionalResults = outcomes.flatMap((o) => (o.contract === "definition" ? [] : [o.result]));
-const definitionResults = outcomes.flatMap((o) => (o.contract === "definition" ? [o.result] : []));
 const summary = {
 	durationMs: Date.now() - globalStart,
-	practices: outcomes.length,
-	positionalHints: positionalResults.reduce((s, r) => s + r.hints.length, 0),
-	inDiffHints: positionalResults.reduce((s, r) => s + r.hints.filter((h) => h.inDiff).length, 0),
-	leads: definitionResults.reduce((s, r) => s + r.leads.length, 0),
-	errors: outcomes.filter((o) => isFailed(o.result.status)).length,
+	practices: results.length,
+	leads: results.reduce((s, r) => s + r.leads.length, 0),
+	errors: results.filter((r) => isFailed(r.status)).length,
 };
 await writeFile(`${outputDir}/.timing.json`, JSON.stringify(summary));
 await writeFile(`${outputDir}/.complete`, new Date().toISOString());

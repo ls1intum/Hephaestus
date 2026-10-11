@@ -1,15 +1,13 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import nodePath from "node:path";
 import test from "node:test";
 
 import type { DiffFile } from "../../../../../../docker/agents/practice-scripts/lib/types.ts";
-import { runBundled } from "../../../../../../docker/agents/practice-scripts/run-bundled.ts";
 import {
 	moment,
 	requested,
-} from "../../../../../../docker/agents/practice-scripts/run-definition.ts";
+	runBundled,
+	type RunInputs,
+} from "../../../../../../docker/agents/practice-scripts/run-bundled.ts";
 
 const metadata = {
 	pr_number: 16,
@@ -17,7 +15,6 @@ const metadata = {
 	repository_full_name: "team/project",
 	source_branch: "18-add-ingredient-view",
 	target_branch: "main",
-	commit_sha: "abc123",
 	title: "#18: Add ingredient creation view",
 	body: "Closes #18\n\nAdds the view.",
 	state: "MERGED",
@@ -44,78 +41,71 @@ interface CapturedCommit {
 	sha: string;
 	message: string;
 	authoredAt: string;
+	files?: { status: string; path: string }[];
 }
 
-/**
- * A context folder with the records and the commit record that `stage` writes, and a run of
- * plans-the-work-in-an-issue-first on a pull request with it.
- */
-function plansFirst(context: Record<string, unknown>, commits: CapturedCommit[] = []) {
-	const root = mkdtempSync(nodePath.join(tmpdir(), "lifecycle-practice-script-"));
-	const contextDir = nodePath.join(root, "context");
-	mkdirSync(contextDir);
-	for (const [name, value] of Object.entries(context)) {
-		writeFileSync(nodePath.join(contextDir, name), JSON.stringify(value));
-	}
-	writeFileSync(
-		nodePath.join(contextDir, "commits.json"),
-		JSON.stringify({
-			commits: commits.map((c) => ({
-				files: [],
-				...c,
-				author: "ada",
-				committer: "ada",
-				committedAt: c.authoredAt,
-				parents: [],
-			})),
-		}),
-	);
+/** The commit record, `commits.json`, with `commits` authored and committed by ada. */
+function commitsRecord(commits: CapturedCommit[]) {
 	return {
-		root,
-		contextDir,
-		script: async (work: Record<string, unknown>) =>
-			runBundled("plans-the-work-in-an-issue-first", {
-				work,
-				contextDir,
-				contextReference: "areas/changed-work",
-			}),
+		commits: commits.map((c) => ({
+			files: [],
+			...c,
+			author: "ada",
+			committer: "ada",
+			committedAt: c.authoredAt,
+			parents: [],
+		})),
 	};
 }
 
+/** A run of `slug` with the context folder at the reference that the server gives it. */
+async function review(slug: string, inputs: RunInputs) {
+	return runBundled(slug, { contextReference: "areas/changed-work", ...inputs });
+}
+
+/** A review at the merge, the only moment of the merge practices. */
+const atMerge = moment("scm.pull_request.merged");
+
+/** A review that a person requested, of an open pull request. */
+const requestedOpen = requested("scm.pull_request", { state: "OPEN" });
+
+/** A review that a person requested, of a merged pull request. */
+const requestedMerged = requested("scm.pull_request", { state: "MERGED" });
+
 void test("plans-first puts the issue's opening beside the earliest commit, never beside the pull request", async () => {
-	const { root, script } = plansFirst(
-		{
+	const result = await review("plans-the-work-in-an-issue-first", {
+		work: metadata,
+		context: {
 			"linked_work_items.json": {
 				workItems: [
 					{ number: 18, title: "Add ingredients", createdAt: "2026-04-13T09:35:24Z", body: "" },
 					{ number: 12, title: "Unrelated", createdAt: "2026-04-01T00:00:00Z", body: "" },
 				],
 			},
+			"commits.json": commitsRecord([
+				{
+					sha: "f46a897aaaa",
+					message: "Add AddIngredientView",
+					authoredAt: "2026-04-12T17:11:59Z",
+				},
+				{ sha: "dd6e2f5bbbb", message: "Wire it", authoredAt: "2026-04-12T17:38:00Z" },
+			]),
 		},
-		[
-			{ sha: "f46a897aaaa", message: "Add AddIngredientView", authoredAt: "2026-04-12T17:11:59Z" },
-			{ sha: "dd6e2f5bbbb", message: "Wire it", authoredAt: "2026-04-12T17:38:00Z" },
-		],
+	});
+	assert.equal(result.leads.length, 1);
+	const [lead] = result.leads;
+	assert.ok(lead);
+	assert.deepEqual(lead.at, { record: "linked_work_items/18.md", line: 0 });
+	assert.equal(lead.kind, "candidate-issue");
+	assert.equal(lead.facts?.number, 18);
+	assert.equal(lead.facts.firstCommit, "f46a897");
+	assert.equal(lead.facts.hoursFromIssueToFirstCommit, "-16.4");
+	assert.match(
+		String(lead.facts.relation),
+		/the issue was opened 16\.4 h after the earliest commit was authored/u,
 	);
-	try {
-		const result = await script(metadata);
-		assert.equal(result.leads.length, 1);
-		const [lead] = result.leads;
-		assert.ok(lead);
-		assert.deepEqual(lead.at, { record: "linked_work_items/18.md", line: 0 });
-		assert.equal(lead.kind, "candidate-issue");
-		assert.equal(lead.facts?.number, 18);
-		assert.equal(lead.facts.firstCommit, "f46a897");
-		assert.equal(lead.facts.hoursFromIssueToFirstCommit, "-16.4");
-		assert.match(
-			String(lead.facts.relation),
-			/the issue was opened 16\.4 h after the earliest commit was authored/u,
-		);
-		assert.equal(result.facts?.issueOpenedAfterFirstCommitMinutes, 983);
-		assert.match(result.directions?.[0] ?? "", /never against the pull request's creation/u);
-	} finally {
-		rmSync(root, { recursive: true, force: true });
-	}
+	assert.equal(result.facts?.issueOpenedAfterFirstCommitMinutes, 983);
+	assert.match(result.directions?.[0] ?? "", /never against the pull request's creation/u);
 });
 
 void test("plans-first preserves the exact recorded order before, at, and after the first commit", async () => {
@@ -124,20 +114,20 @@ void test("plans-first preserves the exact recorded order before, at, and after 
 		["2026-04-12T18:00:00Z", "0.0"],
 		["2026-04-12T18:30:00Z", "-0.5"],
 	]) {
-		const { root, script } = plansFirst(
-			{ "linked_work_items.json": { workItems: [{ number: 18, createdAt: openedAt }] } },
-			[{ sha: "f46a897aaaa", message: "Add ingredients", authoredAt: "2026-04-12T18:00:00Z" }],
-		);
-		try {
-			const result = await script(metadata);
-			const lead = result.leads[0];
-			assert.ok(lead);
-			assert.equal(lead.facts?.openedAt, openedAt);
-			assert.equal(lead.facts?.firstCommitAuthoredAt, "2026-04-12T18:00:00Z");
-			assert.equal(lead.facts.hoursFromIssueToFirstCommit, hours);
-		} finally {
-			rmSync(root, { recursive: true, force: true });
-		}
+		const result = await review("plans-the-work-in-an-issue-first", {
+			work: metadata,
+			context: {
+				"linked_work_items.json": { workItems: [{ number: 18, createdAt: openedAt }] },
+				"commits.json": commitsRecord([
+					{ sha: "f46a897aaaa", message: "Add ingredients", authoredAt: "2026-04-12T18:00:00Z" },
+				]),
+			},
+		});
+		const lead = result.leads[0];
+		assert.ok(lead);
+		assert.equal(lead.facts?.openedAt, openedAt);
+		assert.equal(lead.facts?.firstCommitAuthoredAt, "2026-04-12T18:00:00Z");
+		assert.equal(lead.facts.hoursFromIssueToFirstCommit, hours);
 	}
 });
 
@@ -150,55 +140,48 @@ void test("plans-first cannot replace unknown authored dates with a later handof
 			{ sha: "dd6e2f5bbbb", message: "Wire it", authoredAt: "2026-04-12T17:38:00Z" },
 		],
 	]) {
-		const { root, script } = plansFirst(
-			{
+		const result = await review("plans-the-work-in-an-issue-first", {
+			work: metadata,
+			context: {
 				"linked_work_items.json": {
 					workItems: [{ number: 18, title: "Add ingredients", createdAt: "2026-04-13T09:35:24Z" }],
 				},
+				"commits.json": commitsRecord(commits),
 			},
-			commits,
+		});
+		assert.equal(result.leads.length, 1);
+		const facts = result.leads[0]?.facts;
+		assert.match(
+			String(facts?.relation),
+			/do not establish the earliest authored time; the order is not known from the record/u,
 		);
-		try {
-			const result = await script(metadata);
-			assert.equal(result.leads.length, 1);
-			const facts = result.leads[0]?.facts;
-			assert.match(
-				String(facts?.relation),
-				/do not establish the earliest authored time; the order is UNDETERMINED/u,
-			);
-			assert.equal(facts?.firstCommit, undefined);
-			assert.equal(facts?.hoursFromIssueToFirstCommit, undefined);
-			assert.equal(facts?.hoursFromIssueToPullRequest, undefined);
-			const directions = (result.directions ?? []).join("\n");
-			assert.match(directions, /creation dates the handoff, not the start of work/u);
-			assert.match(directions, /Missing commit capture is a collection gap, not UNDETERMINED/u);
-		} finally {
-			rmSync(root, { recursive: true, force: true });
-		}
+		assert.equal(facts?.firstCommit, undefined);
+		assert.equal(facts?.hoursFromIssueToFirstCommit, undefined);
+		assert.equal(facts?.hoursFromIssueToPullRequest, undefined);
+		const directions = (result.directions ?? []).join("\n");
+		assert.match(directions, /creation dates the handoff, not the start of work/u);
+		assert.match(directions, /Missing commit capture is a collection gap, not an unsettled order/u);
 	}
 });
 
 void test("plans-first keeps missing commit capture separate from unknown authored dates", async () => {
-	const { root, script, contextDir } = plansFirst({
-		"linked_work_items.json": { workItems: [{ number: 18, createdAt: "2026-04-13T09:35:24Z" }] },
-	});
-	try {
-		rmSync(nodePath.join(contextDir, "commits.json"));
-		for (const malformed of [undefined, "{", '{"commits":[null]}']) {
-			if (malformed !== undefined) {
-				writeFileSync(nodePath.join(contextDir, "commits.json"), malformed);
-			}
-			const result = await script(metadata);
-			assert.match(
-				(result.directions ?? []).join("\n"),
-				/collection gap and record no observation, never UNDETERMINED/u,
-			);
-			const facts = result.leads[0]?.facts;
-			assert.match(String(facts?.relation), /commit record is missing or malformed/u);
-			assert.equal(facts?.firstCommit, undefined);
-		}
-	} finally {
-		rmSync(root, { recursive: true, force: true });
+	for (const malformed of [undefined, "{", '{"commits":[null]}']) {
+		const result = await review("plans-the-work-in-an-issue-first", {
+			work: metadata,
+			context: {
+				"linked_work_items.json": {
+					workItems: [{ number: 18, createdAt: "2026-04-13T09:35:24Z" }],
+				},
+				...(malformed === undefined ? {} : { "commits.json": malformed }),
+			},
+		});
+		assert.match(
+			(result.directions ?? []).join("\n"),
+			/report a collection gap and record no observation\./u,
+		);
+		const facts = result.leads[0]?.facts;
+		assert.match(String(facts?.relation), /commit record is missing or malformed/u);
+		assert.equal(facts?.firstCommit, undefined);
 	}
 });
 
@@ -210,21 +193,10 @@ const partial = {
 	created_at: "2026-09-27T02:19:18Z",
 };
 
-async function planFirst(
-	body: string,
-	workItems: unknown[] | null,
-	envelope: { unresolvedReferences?: number[]; truncated?: boolean } = {},
-) {
-	const { root, script } = plansFirst(
-		workItems === null ? {} : { "linked_work_items.json": { workItems, ...envelope } },
-		[{ sha: "b08d591eaaaa", message: "Save the draft", authoredAt: "2026-09-27T02:18:53Z" }],
-	);
-	try {
-		return await script({ ...partial, body });
-	} finally {
-		rmSync(root, { recursive: true, force: true });
-	}
-}
+/** The commit record of the partial workflow: one commit, authored before the pull request. */
+const partialCommits = commitsRecord([
+	{ sha: "b08d591eaaaa", message: "Save the draft", authoredAt: "2026-09-27T02:18:53Z" },
+]);
 
 function linkedIssue(number: number, createdAt: string, how: "closesOnMerge" | "mentions") {
 	return { number, title: `Issue ${String(number)}`, state: "OPEN", how, createdAt, body: "" };
@@ -235,9 +207,13 @@ void test("plans-first dates an issue named only by Related to as a mention, bef
 		["2026-09-27T02:01:31Z", /the earliest commit was authored 0\.3 h after the issue was opened/u],
 		["2026-09-27T05:18:53Z", /the issue was opened 3\.0 h after the earliest commit was authored/u],
 	] as const) {
-		const result = await planFirst("Related to #5\n\nFirst slice only; #5 stays open.", [
-			linkedIssue(5, openedAt, "mentions"),
-		]);
+		const result = await review("plans-the-work-in-an-issue-first", {
+			work: { ...partial, body: "Related to #5\n\nFirst slice only; #5 stays open." },
+			context: {
+				"linked_work_items.json": { workItems: [linkedIssue(5, openedAt, "mentions")] },
+				"commits.json": partialCommits,
+			},
+		});
 		const [lead] = result.leads;
 		assert.ok(lead);
 		assert.equal(result.leads.length, 1);
@@ -255,20 +231,39 @@ void test("plans-first names no candidate for a bare, quoted or fenced number, n
 		"```\nCloses #5\n```",
 		"> Fixes #5",
 	]) {
-		const result = await planFirst(body, [linkedIssue(5, "2026-09-27T02:01:31Z", "mentions")]);
+		const result = await review("plans-the-work-in-an-issue-first", {
+			work: { ...partial, body },
+			context: {
+				"linked_work_items.json": {
+					workItems: [linkedIssue(5, "2026-09-27T02:01:31Z", "mentions")],
+				},
+				"commits.json": partialCommits,
+			},
+		});
 		assert.deepEqual(result.leads, [], body);
 		assert.equal(result.facts?.namedIssues, 0, body);
 	}
-	const uncaptured = await planFirst("Related to #5", null);
+	const uncaptured = await review("plans-the-work-in-an-issue-first", {
+		work: { ...partial, body: "Related to #5" },
+		context: { "commits.json": partialCommits },
+	});
 	assert.deepEqual(uncaptured.leads, []);
 	assert.match(uncaptured.directions?.[0] ?? "", /was not captured: a collection gap/u);
 });
 
 void test("plans-first dates a provider closing link no text names, and lists it apart from a related issue", async () => {
-	const result = await planFirst("Related to #5", [
-		linkedIssue(4, "2026-09-27T05:00:00Z", "closesOnMerge"),
-		linkedIssue(5, "2026-09-27T02:01:31Z", "mentions"),
-	]);
+	const result = await review("plans-the-work-in-an-issue-first", {
+		work: { ...partial, body: "Related to #5" },
+		context: {
+			"linked_work_items.json": {
+				workItems: [
+					linkedIssue(4, "2026-09-27T05:00:00Z", "closesOnMerge"),
+					linkedIssue(5, "2026-09-27T02:01:31Z", "mentions"),
+				],
+			},
+			"commits.json": partialCommits,
+		},
+	});
 	assert.deepEqual(
 		result.leads.map((lead) => [lead.facts?.number, lead.facts?.namedBy, lead.facts?.providerLink]),
 		[
@@ -281,7 +276,13 @@ void test("plans-first dates a provider closing link no text names, and lists it
 
 void test("plans-first leaves an unresolved or undated named issue open to the description, and still dates the rest", async () => {
 	const closing = linkedIssue(4, "2026-09-27T01:00:00Z", "closesOnMerge");
-	const result = await planFirst("Related to #5", [closing], { unresolvedReferences: [5] });
+	const result = await review("plans-the-work-in-an-issue-first", {
+		work: { ...partial, body: "Related to #5" },
+		context: {
+			"linked_work_items.json": { workItems: [closing], unresolvedReferences: [5] },
+			"commits.json": partialCommits,
+		},
+	});
 	assert.equal(result.facts?.unresolvedNamedIssues, 1);
 	assert.deepEqual(
 		result.leads.map((lead) => lead.facts?.number),
@@ -289,25 +290,36 @@ void test("plans-first leaves an unresolved or undated named issue open to the d
 	);
 	assert.match(
 		(result.directions ?? []).join(" "),
-		/#5 are among the capture's unresolved references.*if it is, the order stays open \(UNDETERMINED.*if the description rules it out, it is no occasion/u,
+		/#5 are among the capture's unresolved references.*if it is, the record cannot settle the order, so name that issue.*if the description rules it out, it is no occasion/u,
 	);
 	const { createdAt: _openedAt, ...undated } = linkedIssue(5, "", "mentions");
-	const undatedResult = await planFirst("Related to #5", [undated]);
+	const undatedResult = await review("plans-the-work-in-an-issue-first", {
+		work: { ...partial, body: "Related to #5" },
+		context: {
+			"linked_work_items.json": { workItems: [undated] },
+			"commits.json": partialCommits,
+		},
+	});
 	const [lead] = undatedResult.leads;
 	assert.match(String(lead?.facts?.relation), /its opening time is not captured/u);
 	for (const envelope of [{ unresolvedReferences: [9] }, { truncated: true }]) {
-		const unaffected = await planFirst(
-			"Related to #5",
-			[closing, linkedIssue(5, "2026-09-27T02:01:31Z", "mentions")],
-			envelope,
-		);
+		const unaffected = await review("plans-the-work-in-an-issue-first", {
+			work: { ...partial, body: "Related to #5" },
+			context: {
+				"linked_work_items.json": {
+					workItems: [closing, linkedIssue(5, "2026-09-27T02:01:31Z", "mentions")],
+					...envelope,
+				},
+				"commits.json": partialCommits,
+			},
+		});
 		assert.equal(unaffected.facts?.unresolvedNamedIssues, 0);
 		assert.equal(unaffected.leads.length, 2);
 	}
 });
 
 void test("deferred asks are one lead each, with the record's facts and none of the judgement", async () => {
-	const { root, script } = withContext("defers-review-asks-into-tracked-work", {
+	const context = {
 		"comments.json": [
 			{
 				path: "App/AddIngredientView.swift",
@@ -354,47 +366,44 @@ void test("deferred asks are one lead each, with the record's facts and none of 
 				{ state: "APPROVED", author: "jennifer", submittedAt: "2026-04-13T14:52:00Z" },
 			],
 		},
+	};
+	const result = await review("defers-review-asks-into-tracked-work", {
+		work: { ...metadata, is_merged: true },
+		cause: atMerge,
+		change: new Map([diffFile("App/AddIngredientView.swift", [12, 13])]),
+		context,
 	});
-	try {
-		const result = await script(
-			{ ...metadata, is_merged: true },
-			atMerge,
-			new Map([diffFile("App/AddIngredientView.swift", [12, 13])]),
-		);
-		assert.equal(result.facts?.asks, 3);
-		assert.equal(result.facts.inlineAsks, 2);
-		assert.equal(result.facts.conversationAsks, 1);
-		const [stock, capitalisation, emptyState] = result.leads;
-		assert.ok(stock && capitalisation && emptyState);
-		// The stock ask: the file is in the change but nothing near line 55 changed, no reply,
-		// resolved — and the reviewer's own later word on the thread drops it.
-		assert.equal(stock.kind, "inline-ask");
-		assert.deepEqual(stock.at, { record: "comments.json", line: 0 });
-		assert.equal(stock.facts?.path, "App/AddIngredientView.swift");
-		assert.equal(stock.facts.line, 55);
-		assert.equal(stock.facts.fileInChange, true);
-		assert.equal(stock.facts.changeNearLine, false);
-		assert.equal(stock.facts.authorReplied, false);
-		assert.equal(stock.facts.threadResolved, true);
-		assert.equal(stock.facts.reviewerFollowedUp, true);
-		assert.equal(stock.facts.waiverWordsInFollowUp, true);
-		assert.equal(stock.facts.approvedAfterAsk, true);
-		// The capitalisation ask: changed beside it, and the author answered; nobody else did.
-		assert.equal(capitalisation.facts?.changeNearLine, true);
-		assert.equal(capitalisation.facts.authorReplied, true);
-		assert.equal(capitalisation.facts.reviewerFollowedUp, false);
-		assert.equal(capitalisation.facts.waiverWordsInFollowUp, false);
-		// The conversation ask: the reply names an issue and defers in words, and the approval
-		// followed it — a fact the review weighs, not a waiver by itself.
-		assert.equal(emptyState.kind, "conversation-ask");
-		assert.deepEqual(emptyState.at, { record: "general_comments.json", line: 0 });
-		assert.equal(emptyState.facts?.issueNamedInReply, true);
-		assert.equal(emptyState.facts.deferralWordsInReply, true);
-		assert.equal(emptyState.facts.approvedAfterAsk, true);
-		assert.match((result.directions ?? []).join(" "), /is a deferral to track, not a waiver/u);
-	} finally {
-		rmSync(root, { recursive: true, force: true });
-	}
+	assert.equal(result.facts?.asks, 3);
+	assert.equal(result.facts.inlineAsks, 2);
+	assert.equal(result.facts.conversationAsks, 1);
+	const [stock, capitalisation, emptyState] = result.leads;
+	assert.ok(stock && capitalisation && emptyState);
+	// The stock ask: the file is in the change but nothing near line 55 changed, no reply,
+	// resolved — and the reviewer's own later word on the thread drops it.
+	assert.equal(stock.kind, "inline-ask");
+	assert.deepEqual(stock.at, { record: "comments.json", line: 0 });
+	assert.equal(stock.facts?.path, "App/AddIngredientView.swift");
+	assert.equal(stock.facts.line, 55);
+	assert.equal(stock.facts.fileInChange, true);
+	assert.equal(stock.facts.changeNearLine, false);
+	assert.equal(stock.facts.authorReplied, false);
+	assert.equal(stock.facts.threadResolved, true);
+	assert.equal(stock.facts.reviewerFollowedUp, true);
+	assert.equal(stock.facts.waiverWordsInFollowUp, true);
+	assert.equal(stock.facts.approvedAfterAsk, true);
+	// The capitalisation ask: changed beside it, and the author answered; nobody else did.
+	assert.equal(capitalisation.facts?.changeNearLine, true);
+	assert.equal(capitalisation.facts.authorReplied, true);
+	assert.equal(capitalisation.facts.reviewerFollowedUp, false);
+	assert.equal(capitalisation.facts.waiverWordsInFollowUp, false);
+	// The conversation ask: the reply names an issue and defers in words, and the approval
+	// followed it — a fact the review weighs, not a waiver by itself.
+	assert.equal(emptyState.kind, "conversation-ask");
+	assert.deepEqual(emptyState.at, { record: "general_comments.json", line: 0 });
+	assert.equal(emptyState.facts?.issueNamedInReply, true);
+	assert.equal(emptyState.facts.deferralWordsInReply, true);
+	assert.equal(emptyState.facts.approvedAfterAsk, true);
+	assert.match((result.directions ?? []).join(" "), /is a deferral to track, not a waiver/u);
 });
 
 void test("an ask cites the line of its body in the record that the server writes", async () => {
@@ -403,100 +412,46 @@ void test("an ask cites the line of its body in the record that the server write
 		{ path: "App/A.swift", line: 3, body: "Done", author: "ada" },
 		{ path: "App/B.swift", line: 9, body: "Split this", author: "jennifer" },
 	];
-	const { root, script, contextDir } = withContext("defers-review-asks-into-tracked-work", {
-		"general_comments.json": { comments: [] },
+	const result = await review("defers-review-asks-into-tracked-work", {
+		work: { ...metadata, is_merged: true },
+		cause: atMerge,
+		context: {
+			"general_comments.json": { comments: [] },
+			// The server writes each key of a comment on its own line.
+			"comments.json": JSON.stringify(comments, null, 2),
+		},
 	});
-	try {
-		// The server writes each key of a comment on its own line.
-		writeFileSync(nodePath.join(contextDir, "comments.json"), JSON.stringify(comments, null, 2));
-		const result = await script({ ...metadata, is_merged: true }, atMerge);
-		assert.deepEqual(
-			result.leads.map((lead) => lead.at),
-			[
-				{ record: "comments.json", line: 5 },
-				{ record: "comments.json", line: 17 },
-			],
-		);
-	} finally {
-		rmSync(root, { recursive: true, force: true });
-	}
+	assert.deepEqual(
+		result.leads.map((lead) => lead.at),
+		[
+			{ record: "comments.json", line: 5 },
+			{ record: "comments.json", line: 17 },
+		],
+	);
 });
 
 void test("a requested review of unmerged work lists no ask, and says that the work is not merged", async () => {
-	const { root, script } = withContext("defers-review-asks-into-tracked-work", {
+	const context = {
 		"comments.json": [{ path: "App/A.swift", line: 3, body: "Rename this", author: "jennifer" }],
 		"general_comments.json": { comments: [] },
+	};
+	const open = await review("defers-review-asks-into-tracked-work", {
+		work: { ...unmerged, state: "OPEN" },
+		cause: requestedOpen,
+		context,
 	});
-	try {
-		const open = await script({ ...unmerged, state: "OPEN" }, requestedWhen("OPEN"));
-		assert.deepEqual(open.leads, []);
-		assert.match((open.directions ?? []).join(" "), /^The work is not merged\./u);
-		const merged = await script({ ...metadata, is_merged: true }, requestedWhen("MERGED"));
-		assert.equal(merged.leads.length, 1);
-	} finally {
-		rmSync(root, { recursive: true, force: true });
-	}
+	assert.deepEqual(open.leads, []);
+	assert.match((open.directions ?? []).join(" "), /^The work is not merged\./u);
+	const merged = await review("defers-review-asks-into-tracked-work", {
+		work: { ...metadata, is_merged: true },
+		cause: requestedMerged,
+		context,
+	});
+	assert.equal(merged.leads.length, 1);
 });
 
-/**
- * A context folder with the records, and with the commit record when `commits` is given, and a run of
- * one script on a pull request with it and the change. Without a cause, a person requested the review.
- */
-function withContext(
-	slug: string,
-	context: Record<string, unknown>,
-	commits?: (CapturedCommit & { files?: { status: string; path: string }[] })[],
-) {
-	const root = mkdtempSync(nodePath.join(tmpdir(), "lifecycle-practice-script-"));
-	const contextDir = nodePath.join(root, "context");
-	mkdirSync(contextDir);
-	for (const [name, value] of Object.entries(context)) {
-		writeFileSync(nodePath.join(contextDir, name), JSON.stringify(value));
-	}
-	if (commits !== undefined) {
-		writeFileSync(
-			nodePath.join(contextDir, "commits.json"),
-			JSON.stringify({
-				commits: commits.map((c) => ({
-					files: [],
-					...c,
-					author: "ada",
-					committer: "ada",
-					committedAt: c.authoredAt,
-					parents: [],
-				})),
-			}),
-		);
-	}
-	return {
-		root,
-		contextDir,
-		script: async (
-			work: Record<string, unknown>,
-			cause?: unknown,
-			change?: ReadonlyMap<string, DiffFile>,
-		) =>
-			runBundled(slug, {
-				work,
-				change,
-				contextDir,
-				contextReference: "areas/changed-work",
-				cause,
-			}),
-	};
-}
-
-/** A review at the merge, the only moment of the merge practices. */
-const atMerge = moment("scm.pull_request.merged");
-
-/** A review that a person requested, of a pull request in `state`. */
-function requestedWhen(state: "OPEN" | "MERGED") {
-	const cause = requested();
-	return { ...cause, cause: { ...cause.cause, state: { state } } };
-}
-
 void test("every captured linked issue is a row, and those with a checkable outcome are candidates the criteria decide", async () => {
-	const { root, script, contextDir } = withContext("merge-confirms-the-linked-issue-outcome", {
+	const context = {
 		"linked_work_items.json": {
 			workItems: [
 				{
@@ -568,81 +523,90 @@ void test("every captured linked issue is a row, and those with a checkable outc
 				},
 			],
 		},
+	};
+	const result = await review("merge-confirms-the-linked-issue-outcome", {
+		work: metadata,
+		cause: atMerge,
+		context,
 	});
-	try {
-		const result = await script(metadata, atMerge);
-		assert.equal(result.facts?.linkedItems, 10);
-		assert.equal(result.facts.checkableItems, 7);
-		assert.equal(result.facts.untickedItems, 1);
-		const [
-			story,
-			tasks,
-			subIssues,
-			totalOnly,
-			none,
-			provider,
-			someOpen,
-			allClosed,
-			emptyMirror,
+	assert.equal(result.facts?.linkedItems, 10);
+	assert.equal(result.facts.checkableItems, 7);
+	assert.equal(result.facts.untickedItems, 1);
+	const [
+		story,
+		tasks,
+		subIssues,
+		totalOnly,
+		none,
+		provider,
+		someOpen,
+		allClosed,
+		emptyMirror,
+		unrecognized,
+	] = result.leads;
+	assert.ok(
+		story &&
+			tasks &&
+			subIssues &&
+			totalOnly &&
+			none &&
+			provider &&
+			someOpen &&
+			allClosed &&
+			emptyMirror &&
 			unrecognized,
-		] = result.leads;
-		assert.ok(
-			story &&
-				tasks &&
-				subIssues &&
-				totalOnly &&
-				none &&
-				provider &&
-				someOpen &&
-				allClosed &&
-				emptyMirror &&
-				unrecognized,
-		);
-		assert.deepEqual(story.at, { record: "linked_work_items/18.md" });
-		// An unreported rollup is unknown: neither a checkable outcome nor proof there is none.
-		assert.equal(story.kind, "no-task-list-or-outcome-heading");
-		assert.equal(Object.hasOwn(story.facts ?? {}, "subIssuesTotal"), false);
-		assert.equal(story.facts?.how, "named with a closing keyword in the body");
-		assert.equal(tasks.kind, "checkable-outcome");
-		assert.equal(tasks.facts?.ticked, 1);
-		assert.equal(tasks.facts.unticked, 1);
-		assert.equal(tasks.facts.how, "linked through a commit or another item");
-		assert.equal(subIssues.facts?.subIssuesTotal, 3);
-		assert.equal(subIssues.facts.subIssuesCompleted, 1);
-		assert.equal(totalOnly.facts?.subIssuesTotal, 2);
-		assert.equal(Object.hasOwn(totalOnly.facts ?? {}, "subIssuesCompleted"), false);
-		assert.equal(none.kind, "no-checkable-outcome");
-		assert.equal(none.facts?.subIssuesTotal, 0);
-		// A capture that recorded no source, or one this reader does not recognize, claims neither.
-		for (const legacy of [story, subIssues, totalOnly, none, unrecognized]) {
-			assert.equal(Object.hasOwn(legacy.facts ?? {}, "subIssuesSource"), false);
-		}
-		assert.equal(unrecognized.facts?.subIssuesCompleted, 2);
-		assert.equal(provider.facts?.subIssuesSource, "provider");
-		// Stored children are the mirror at capture, which may omit others.
-		for (const stored of [someOpen, allClosed, emptyMirror]) {
-			assert.equal(stored.facts?.subIssuesSource, "children");
-		}
-		assert.equal(someOpen.kind, "checkable-outcome");
-		assert.equal(allClosed.facts?.subIssuesTotal, 2);
-		assert.equal(emptyMirror.kind, "no-task-list-or-outcome-heading");
-		assert.equal(emptyMirror.facts?.subIssuesTotal, 0);
-		const said = (result.directions ?? []).join("\n");
-		assert.match(result.directions?.[0] ?? "", /Each is a candidate: the criteria decide which/u);
-		assert.doesNotMatch(said, /every one is an occasion/u);
-		// All of them closed establishes only that mirror, not the whole hierarchy.
-		assert.match(
-			said,
-			/may omit other children, so all of them closed does not show that the whole hierarchy is complete/u,
-		);
-		// A review that a person requested of an open pull request has no merge to review.
-		const open = await script({ ...unmerged, state: "OPEN" }, requestedWhen("OPEN"));
-		assert.deepEqual(open.leads, []);
-		assert.match(open.directions?.[0] ?? "", /not merged/u);
-		for (const source of ["provider", "children"]) {
-			writeFileSync(
-				nodePath.join(contextDir, "linked_work_items.json"),
-				JSON.stringify({
+	);
+	assert.deepEqual(story.at, { record: "linked_work_items/18.md" });
+	// An unreported rollup is unknown: neither a checkable outcome nor proof there is none.
+	assert.equal(story.kind, "no-task-list-or-outcome-heading");
+	assert.equal(Object.hasOwn(story.facts ?? {}, "subIssuesTotal"), false);
+	assert.equal(story.facts?.how, "named with a closing keyword in the body");
+	assert.equal(tasks.kind, "checkable-outcome");
+	assert.equal(tasks.facts?.ticked, 1);
+	assert.equal(tasks.facts.unticked, 1);
+	assert.equal(tasks.facts.how, "linked through a commit or another item");
+	assert.equal(subIssues.facts?.subIssuesTotal, 3);
+	assert.equal(subIssues.facts.subIssuesCompleted, 1);
+	assert.equal(totalOnly.facts?.subIssuesTotal, 2);
+	assert.equal(Object.hasOwn(totalOnly.facts ?? {}, "subIssuesCompleted"), false);
+	assert.equal(none.kind, "no-checkable-outcome");
+	assert.equal(none.facts?.subIssuesTotal, 0);
+	// A capture that recorded no source, or one this reader does not recognize, claims neither.
+	for (const legacy of [story, subIssues, totalOnly, none, unrecognized]) {
+		assert.equal(Object.hasOwn(legacy.facts ?? {}, "subIssuesSource"), false);
+	}
+	assert.equal(unrecognized.facts?.subIssuesCompleted, 2);
+	assert.equal(provider.facts?.subIssuesSource, "provider");
+	// Stored children are the mirror at capture, which may omit others.
+	for (const stored of [someOpen, allClosed, emptyMirror]) {
+		assert.equal(stored.facts?.subIssuesSource, "children");
+	}
+	assert.equal(someOpen.kind, "checkable-outcome");
+	assert.equal(allClosed.facts?.subIssuesTotal, 2);
+	assert.equal(emptyMirror.kind, "no-task-list-or-outcome-heading");
+	assert.equal(emptyMirror.facts?.subIssuesTotal, 0);
+	const said = (result.directions ?? []).join("\n");
+	assert.match(result.directions?.[0] ?? "", /Each is a candidate: the criteria decide which/u);
+	assert.doesNotMatch(said, /every one is an occasion/u);
+	// All of them closed establishes only that mirror, not the whole hierarchy.
+	assert.match(
+		said,
+		/may omit other children, so all of them closed does not show that the whole hierarchy is complete/u,
+	);
+	// A review that a person requested of an open pull request has no merge to review.
+	const open = await review("merge-confirms-the-linked-issue-outcome", {
+		work: { ...unmerged, state: "OPEN" },
+		cause: requestedOpen,
+		context,
+	});
+	assert.deepEqual(open.leads, []);
+	assert.match(open.directions?.[0] ?? "", /not merged/u);
+	for (const source of ["provider", "children"]) {
+		const zero = await review("merge-confirms-the-linked-issue-outcome", {
+			work: metadata,
+			cause: atMerge,
+			context: {
+				"linked_work_items.json": {
 					workItems: [
 						{
 							number: 1,
@@ -653,15 +617,12 @@ void test("every captured linked issue is a row, and those with a checkable outc
 							subIssuesSource: source,
 						},
 					],
-				}),
-			);
-			const zero = await script(metadata, atMerge);
-			assert.equal(zero.facts?.checkableItems, 0);
-			assert.match(zero.directions?.[0] ?? "", /positive captured sub-issue count/u);
-			assert.doesNotMatch(zero.directions?.[0] ?? "", /reported sub-issue rollup/u);
-		}
-	} finally {
-		rmSync(root, { recursive: true, force: true });
+				},
+			},
+		});
+		assert.equal(zero.facts?.checkableItems, 0);
+		assert.match(zero.directions?.[0] ?? "", /positive captured sub-issue count/u);
+		assert.doesNotMatch(zero.directions?.[0] ?? "", /reported sub-issue rollup/u);
 	}
 });
 
@@ -689,78 +650,81 @@ const openMergeRequest = {
 };
 
 void test("an open issue that an open merge request may close stays open, its closing link a candidate", async () => {
-	const links = withContext("links-the-change-to-its-issue", closingLink);
-	const outcome = withContext("merge-confirms-the-linked-issue-outcome", closingLink);
-	try {
-		const result = await links.script(openMergeRequest);
-		const provider = result.leads[0];
-		assert.ok(provider);
-		assert.deepEqual(provider.at, { record: "linked_work_items.json" });
-		assert.equal(provider.kind, "closing-reference");
-		assert.equal(provider.facts?.number, 1);
-		assert.equal(provider.facts.state, "OPEN");
-		assert.equal(
-			provider.facts.where,
-			"areas/changed-work/linked_work_items.json (how: closesOnMerge)",
-		);
-		assert.equal(result.facts?.providerClosingLinks, 1);
-		assert.match(
-			result.directions?.[1] ?? "",
-			/1 captured, 1 of them provider closing candidates #1 \(state OPEN\)/u,
-		);
-		const evidence = [
-			...result.leads.map((lead) => JSON.stringify(lead)),
-			...(result.directions ?? []),
-		].join("\n");
-		assert.doesNotMatch(evidence, /\bclosed\b/u);
-		// The merge practice has no merge to review before the merge.
-		const unmergedOutcome = await outcome.script(openMergeRequest, requestedWhen("OPEN"));
-		assert.deepEqual(unmergedOutcome.leads, []);
-		assert.match(unmergedOutcome.directions?.[0] ?? "", /not merged/u);
-	} finally {
-		for (const staged of [links, outcome]) {
-			rmSync(staged.root, { recursive: true, force: true });
-		}
-	}
+	const result = await review("links-the-change-to-its-issue", {
+		work: openMergeRequest,
+		context: closingLink,
+	});
+	const provider = result.leads[0];
+	assert.ok(provider);
+	assert.deepEqual(provider.at, { record: "linked_work_items.json" });
+	assert.equal(provider.kind, "closing-reference");
+	assert.equal(provider.facts?.number, 1);
+	assert.equal(provider.facts.state, "OPEN");
+	assert.equal(
+		provider.facts.where,
+		"areas/changed-work/linked_work_items.json (how: closesOnMerge)",
+	);
+	assert.equal(result.facts?.providerClosingLinks, 1);
+	assert.match(
+		result.directions?.[1] ?? "",
+		/1 captured, 1 of them provider closing candidates #1 \(state OPEN\)/u,
+	);
+	const evidence = [
+		...result.leads.map((lead) => JSON.stringify(lead)),
+		...(result.directions ?? []),
+	].join("\n");
+	assert.doesNotMatch(evidence, /\bclosed\b/u);
+	// The merge practice has no merge to review before the merge.
+	const unmergedOutcome = await review("merge-confirms-the-linked-issue-outcome", {
+		work: openMergeRequest,
+		cause: requestedOpen,
+		context: closingLink,
+	});
+	assert.deepEqual(unmergedOutcome.leads, []);
+	assert.match(unmergedOutcome.directions?.[0] ?? "", /not merged/u);
 });
 
 void test("a merge request stored closed by its merge is merged, while its linked issue stays as last synced", async () => {
-	const { root, script } = withContext("merge-confirms-the-linked-issue-outcome", closingLink);
-	try {
-		const mergedRequest = { ...openMergeRequest, state: "CLOSED", is_merged: true };
-		const result = await script(mergedRequest, atMerge);
-		const [issue] = result.leads;
-		assert.ok(issue);
-		assert.equal(issue.kind, "checkable-outcome");
-		assert.equal(issue.facts?.how, "a provider closing candidate");
-		assert.equal(issue.facts.state, "OPEN");
-		assert.match(
-			result.directions?.[0] ?? "",
-			/1 captured linked issue\(s\) state a checkable outcome/u,
-		);
-		// A person who asks for a review of the merged work gets the same leads as the merge.
-		assert.deepEqual(await script(mergedRequest, requestedWhen("MERGED")), result);
-	} finally {
-		rmSync(root, { recursive: true, force: true });
-	}
+	const mergedRequest = { ...openMergeRequest, state: "CLOSED", is_merged: true };
+	const result = await review("merge-confirms-the-linked-issue-outcome", {
+		work: mergedRequest,
+		cause: atMerge,
+		context: closingLink,
+	});
+	const [issue] = result.leads;
+	assert.ok(issue);
+	assert.equal(issue.kind, "checkable-outcome");
+	assert.equal(issue.facts?.how, "a provider closing candidate");
+	assert.equal(issue.facts.state, "OPEN");
+	assert.match(
+		result.directions?.[0] ?? "",
+		/1 captured linked issue\(s\) state a checkable outcome/u,
+	);
+	// A person who asks for a review of the merged work gets the same leads as the merge.
+	assert.deepEqual(
+		await review("merge-confirms-the-linked-issue-outcome", {
+			work: mergedRequest,
+			cause: requestedMerged,
+			context: closingLink,
+		}),
+		result,
+	);
 });
 
 void test("an uncaptured linked-work file is a collection gap, apart from a capture that holds no issue", async () => {
 	const merged = { ...openMergeRequest, state: "CLOSED", is_merged: true };
-	const absent = withContext("merge-confirms-the-linked-issue-outcome", {});
-	const empty = withContext("merge-confirms-the-linked-issue-outcome", {
-		"linked_work_items.json": { workItems: [] },
+	const uncaptured = await review("merge-confirms-the-linked-issue-outcome", {
+		work: merged,
+		cause: atMerge,
+		context: {},
 	});
-	try {
-		const uncaptured = await absent.script(merged, atMerge);
-		const capturedEmpty = await empty.script(merged, atMerge);
-		assert.match(uncaptured.directions?.[0] ?? "", /was not captured: a collection gap/u);
-		assert.match(capturedEmpty.directions?.[0] ?? "", /^The capture holds no linked issue/u);
-	} finally {
-		for (const staged of [absent, empty]) {
-			rmSync(staged.root, { recursive: true, force: true });
-		}
-	}
+	const capturedEmpty = await review("merge-confirms-the-linked-issue-outcome", {
+		work: merged,
+		cause: atMerge,
+		context: { "linked_work_items.json": { workItems: [] } },
+	});
+	assert.match(uncaptured.directions?.[0] ?? "", /was not captured: a collection gap/u);
+	assert.match(capturedEmpty.directions?.[0] ?? "", /^The capture holds no linked issue/u);
 });
 
 void test("every authored commit is one lead, however many there are", async () => {
@@ -774,81 +738,80 @@ void test("every authored commit is one lead, however many there are", async () 
 		],
 	}));
 	for (const slug of ["commit-subjects-explain-each-change", "commits-are-atomic-and-cohesive"]) {
-		const { root, script } = withContext(slug, {}, commits);
-		try {
-			const result = await script(metadata);
-			assert.equal(result.leads.length, 12);
-			assert.equal(result.directions?.length, 2);
-			const [first] = result.leads;
-			const bare = result.leads[3];
-			assert.ok(first && bare);
-			// The server writes the commit record on one line, so a lead cites it whole and names its sha.
-			assert.deepEqual(first.at, { record: "commits.json" });
-			assert.equal(first.kind, "commit");
-			assert.deepEqual(
-				first.facts,
-				slug === "commit-subjects-explain-each-change"
-					? { sha: "0000000", bare: false, repeat: false, cutOff: false }
-					: {
-							sha: "0000000",
-							bare: false,
-							repeat: false,
-							joinedClauses: true,
-							cutOff: false,
-							bodyLines: 0,
-							files: 2,
-							moved: 0,
-							paths: "App/Step0.swift, README.md",
-						},
-			);
-			assert.equal(bare.facts?.bare, true);
-		} finally {
-			rmSync(root, { recursive: true, force: true });
-		}
+		const result = await review(slug, {
+			work: metadata,
+			context: { "commits.json": commitsRecord(commits) },
+		});
+		assert.equal(result.leads.length, 12);
+		assert.equal(result.directions?.length, 2);
+		const [first] = result.leads;
+		const bare = result.leads[3];
+		assert.ok(first && bare);
+		// The server writes the commit record on one line, so a lead cites it whole and names its sha.
+		assert.deepEqual(first.at, { record: "commits.json" });
+		assert.equal(first.kind, "commit");
+		assert.deepEqual(
+			first.facts,
+			slug === "commit-subjects-explain-each-change"
+				? { sha: "0000000", bare: false, repeat: false, cutOff: false }
+				: {
+						sha: "0000000",
+						bare: false,
+						repeat: false,
+						joinedClauses: true,
+						cutOff: false,
+						bodyLines: 0,
+						files: 2,
+						moved: 0,
+						paths: "App/Step0.swift, README.md",
+					},
+		);
+		assert.equal(bare.facts?.bare, true);
 	}
 });
 
 void test("an issue reference is resolved against the inventory and the linked items", async () => {
-	const { root, script } = withContext("links-the-change-to-its-issue", {
-		"linked_work_items.json": { workItems: [{ number: 18, title: "Add ingredients", body: "" }] },
-		"project_inventory.json": {
-			issues: [
-				{ number: 18, title: "Add ingredients", state: "OPEN" },
-				{ number: 21, title: "Confetti", state: "CLOSED" },
-			],
+	const result = await review("links-the-change-to-its-issue", {
+		work: { ...metadata, body: "Closes #18\n\nSee also #21 and #99." },
+		context: {
+			"linked_work_items.json": {
+				workItems: [{ number: 18, title: "Add ingredients", body: "" }],
+			},
+			"project_inventory.json": {
+				issues: [
+					{ number: 18, title: "Add ingredients", state: "OPEN" },
+					{ number: 21, title: "Confetti", state: "CLOSED" },
+				],
+			},
 		},
 	});
-	try {
-		const result = await script({ ...metadata, body: "Closes #18\n\nSee also #21 and #99." });
-		// The first lead for a number is the title's; the same number in the body and branch follows.
-		const byNumber = new Map(
-			result.leads.toReversed().map((lead) => [lead.facts?.number, lead.facts]),
-		);
-		assert.deepEqual(byNumber.get(18), {
-			number: 18,
-			where: "areas/changed-work/metadata.json (title)",
-			inInventory: true,
-			title: "Add ingredients",
-			state: "OPEN",
-			inLinkedItems: true,
-		});
-		assert.equal(byNumber.get(21)?.inInventory, true);
-		assert.equal(byNumber.get(21)?.inLinkedItems, false);
-		assert.equal(byNumber.get(99)?.inInventory, false);
-		assert.equal(byNumber.get(99)?.title, undefined);
-		// The provider's enum casing is the one the inventory holds.
-		assert.equal(result.facts?.inventoryOpenIssues, 1);
-		assert.equal(result.facts.referencesInInventory, 2);
-		assert.equal(result.facts.linkedWorkItems, 1);
-	} finally {
-		rmSync(root, { recursive: true, force: true });
-	}
+	// The first lead for a number is the title's; the same number in the body and branch follows.
+	const byNumber = new Map(
+		result.leads.toReversed().map((lead) => [lead.facts?.number, lead.facts]),
+	);
+	assert.deepEqual(byNumber.get(18), {
+		number: 18,
+		where: "areas/changed-work/metadata.json (title)",
+		inInventory: true,
+		title: "Add ingredients",
+		state: "OPEN",
+		inLinkedItems: true,
+	});
+	assert.equal(byNumber.get(21)?.inInventory, true);
+	assert.equal(byNumber.get(21)?.inLinkedItems, false);
+	assert.equal(byNumber.get(99)?.inInventory, false);
+	assert.equal(byNumber.get(99)?.title, undefined);
+	// The provider's enum casing is the one the inventory holds.
+	assert.equal(result.facts?.inventoryOpenIssues, 1);
+	assert.equal(result.facts.referencesInInventory, 2);
+	assert.equal(result.facts.linkedWorkItems, 1);
 });
 
 void test("every reviewer comment is one lead with the reply, the thread and the later commits beside it", async () => {
-	const { root, script } = withContext(
-		"engaging-with-inline-review-comments",
-		{
+	const result = await review("engaging-with-inline-review-comments", {
+		work: metadata,
+		change: new Map([diffFile("App/AddIngredientView.swift", [54, 56])]),
+		context: {
 			"comments.json": [
 				{
 					id: 1,
@@ -895,77 +858,69 @@ void test("every reviewer comment is one lead with the reply, the thread and the
 				],
 				reviewDecisions: [],
 			},
+			"commits.json": commitsRecord([
+				{
+					sha: "aaaaaaa1111",
+					message: "Add the view",
+					authoredAt: "2026-04-13T10:00:00Z",
+					files: [{ status: "A", path: "App/AddIngredientView.swift" }],
+				},
+				{
+					sha: "bbbbbbb2222",
+					message: "Turn the field red",
+					authoredAt: "2026-04-13T14:50:00Z",
+					files: [{ status: "M", path: "App/AddIngredientView.swift" }],
+				},
+				{
+					sha: "ccccccc3333",
+					message: "Tidy",
+					authoredAt: "2026-04-13T15:00:00Z",
+					files: [{ status: "M", path: "App/Other.swift" }],
+				},
+			]),
 		},
-		[
-			{
-				sha: "aaaaaaa1111",
-				message: "Add the view",
-				authoredAt: "2026-04-13T10:00:00Z",
-				files: [{ status: "A", path: "App/AddIngredientView.swift" }],
-			},
-			{
-				sha: "bbbbbbb2222",
-				message: "Turn the field red",
-				authoredAt: "2026-04-13T14:50:00Z",
-				files: [{ status: "M", path: "App/AddIngredientView.swift" }],
-			},
-			{
-				sha: "ccccccc3333",
-				message: "Tidy",
-				authoredAt: "2026-04-13T15:00:00Z",
-				files: [{ status: "M", path: "App/Other.swift" }],
-			},
-		],
+	});
+	assert.equal(result.leads.length, 2);
+	const [stock, rename] = result.leads;
+	assert.ok(stock && rename);
+	assert.equal(stock.kind, "reviewer-comment");
+	assert.deepEqual(stock.at, { record: "comments.json", line: 0 });
+	// An empty text is no fact: no later note by the reviewer, no approval after it.
+	assert.deepEqual(stock.facts, {
+		by: "jennifer",
+		bot: false,
+		at: "2026-04-13T14:18:20Z",
+		path: "App/AddIngredientView.swift",
+		side: "RIGHT",
+		outdated: false,
+		authorReplied: true,
+		replyExcerpt: "Good idea, done in the next commit — it now turns the field red.",
+		threadResolved: true,
+		resolvedBy: "ada",
+		afterHandOff: false,
+		fileInChange: true,
+		changeNearLine: true,
+		commitsAfter: 2,
+		commitsAfterTouchingFile: 1,
+		line: 55,
+	});
+	assert.equal(rename.facts?.bot, true);
+	assert.equal(rename.facts.outdated, true);
+	assert.equal(rename.facts.authorReplied, false);
+	assert.equal(rename.facts.threadResolved, false);
+	assert.equal(result.facts?.reviewerComments, 1);
+	assert.equal(result.facts.botComments, 1);
+	assert.match(
+		(result.directions ?? []).join(" "),
+		/^1 reviewer note\(s\) \(1 inline, 0 conversation\), 1 more by bots; 1 have a later author note\. 1 have a later authored commit touching the commented file; 0 were posted after the work merged or closed\./u,
 	);
-	try {
-		const result = await script(
-			metadata,
-			undefined,
-			new Map([diffFile("App/AddIngredientView.swift", [54, 56])]),
-		);
-		assert.equal(result.leads.length, 2);
-		const [stock, rename] = result.leads;
-		assert.ok(stock && rename);
-		assert.equal(stock.kind, "reviewer-comment");
-		assert.deepEqual(stock.at, { record: "comments.json", line: 0 });
-		// An empty text is no fact: no later note by the reviewer, no approval after it.
-		assert.deepEqual(stock.facts, {
-			by: "jennifer",
-			bot: false,
-			at: "2026-04-13T14:18:20Z",
-			path: "App/AddIngredientView.swift",
-			side: "RIGHT",
-			outdated: false,
-			authorReplied: true,
-			replyExcerpt: "Good idea, done in the next commit — it now turns the field red.",
-			threadResolved: true,
-			resolvedBy: "ada",
-			afterHandOff: false,
-			fileInChange: true,
-			changeNearLine: true,
-			commitsAfter: 2,
-			commitsAfterTouchingFile: 1,
-			line: 55,
-		});
-		assert.equal(rename.facts?.bot, true);
-		assert.equal(rename.facts.outdated, true);
-		assert.equal(rename.facts.authorReplied, false);
-		assert.equal(rename.facts.threadResolved, false);
-		assert.equal(result.facts?.reviewerComments, 1);
-		assert.equal(result.facts.botComments, 1);
-		assert.match(
-			(result.directions ?? []).join(" "),
-			/^1 reviewer note\(s\) \(1 inline, 0 conversation\), 1 more by bots; 1 have a later author note\. 1 have a later authored commit touching the commented file; 0 were posted after the work merged or closed\./u,
-		);
-	} finally {
-		rmSync(root, { recursive: true, force: true });
-	}
 });
 
 void test("a conversation note is a lead, with the reviewer's approval, their settling note and the hand-off beside it", async () => {
-	const { root, script } = withContext(
-		"engaging-with-inline-review-comments",
-		{
+	const result = await review("engaging-with-inline-review-comments", {
+		work: metadata,
+		change: new Map([diffFile("App/QuizView.swift", [3])]),
+		context: {
 			"comments.json": [
 				{
 					id: 1,
@@ -1004,126 +959,121 @@ void test("a conversation note is a lead, with the reviewer's approval, their se
 					{ state: "APPROVED", author: "tutor", submittedAt: "2026-04-13T13:00:00.250Z" },
 				],
 			},
+			"commits.json": commitsRecord([
+				{
+					sha: "aaaaaaa1111",
+					message: "update the quiz view",
+					authoredAt: "2026-04-13T12:30:00Z",
+					files: [{ status: "M", path: "App/QuizView.swift" }],
+				},
+			]),
 		},
-		[
-			{
-				sha: "aaaaaaa1111",
-				message: "update the quiz view",
-				authoredAt: "2026-04-13T12:30:00Z",
-				files: [{ status: "M", path: "App/QuizView.swift" }],
-			},
-		],
+	});
+	const [nitpick, advice, thanks, afterMerge] = result.leads;
+	assert.ok(nitpick && advice && thanks && afterMerge);
+	// The reviewer's own next note stands beside the resolution of the inline nitpick.
+	assert.match(String(nitpick.facts?.reviewerLaterNote), /^Approved, it works\./u);
+	assert.equal(
+		nitpick.facts?.reviewerApprovedAfter,
+		"3600s later; 1 commit(s) and 0 author note(s) between",
 	);
-	try {
-		const result = await script(
-			metadata,
-			undefined,
-			new Map([diffFile("App/QuizView.swift", [3])]),
-		);
-		const [nitpick, advice, thanks, afterMerge] = result.leads;
-		assert.ok(nitpick && advice && thanks && afterMerge);
-		// The reviewer's own next note stands beside the resolution of the inline nitpick.
-		assert.match(String(nitpick.facts?.reviewerLaterNote), /^Approved, it works\./u);
-		assert.equal(
-			nitpick.facts?.reviewerApprovedAfter,
-			"3600s later; 1 commit(s) and 0 author note(s) between",
-		);
-		// Advice posted with the reviewer's own approval, nothing between them.
-		assert.equal(advice.kind, "conversation-comment");
-		assert.deepEqual(advice.at, { record: "general_comments.json", line: 0 });
-		assert.equal(
-			advice.facts?.reviewerApprovedAfter,
-			"0s later; 0 commit(s) and 0 author note(s) between",
-		);
-		assert.equal(advice.facts.afterHandOff, false);
-		assert.equal(advice.facts.authorNotesAfter, 0);
-		// A note posted after the merge is marked as such.
-		assert.equal(afterMerge.facts?.by, "peer");
-		assert.equal(afterMerge.facts.afterHandOff, true);
-		assert.equal("reviewerApprovedAfter" in afterMerge.facts, false);
-		assert.equal(result.facts?.conversationComments, 3);
-		const directions = (result.directions ?? []).join(" ");
-		assert.match(directions, /1 were posted after the work merged or closed/u);
-		assert.doesNotMatch(directions, /who clicked it|occasion did not arise/u);
-	} finally {
-		rmSync(root, { recursive: true, force: true });
-	}
+	// Advice posted with the reviewer's own approval, nothing between them.
+	assert.equal(advice.kind, "conversation-comment");
+	assert.deepEqual(advice.at, { record: "general_comments.json", line: 0 });
+	assert.equal(
+		advice.facts?.reviewerApprovedAfter,
+		"0s later; 0 commit(s) and 0 author note(s) between",
+	);
+	assert.equal(advice.facts.afterHandOff, false);
+	assert.equal(advice.facts.authorNotesAfter, 0);
+	// A note posted after the merge is marked as such.
+	assert.equal(afterMerge.facts?.by, "peer");
+	assert.equal(afterMerge.facts.afterHandOff, true);
+	assert.equal("reviewerApprovedAfter" in afterMerge.facts, false);
+	assert.equal(result.facts?.conversationComments, 3);
+	const directions = (result.directions ?? []).join(" ");
+	assert.match(directions, /1 were posted after the work merged or closed/u);
+	assert.doesNotMatch(directions, /who clicked it|occasion did not arise/u);
 });
 
 void test("a comments file that was not captured is told apart from one with no comment by others", async () => {
-	const absent = withContext("defers-review-asks-into-tracked-work", {});
-	const empty = withContext("defers-review-asks-into-tracked-work", {
-		"comments.json": [],
-		"general_comments.json": {
-			comments: [{ author: "ada", body: "Ready", createdAt: "2026-04-13T14:00:00Z" }],
+	const noFile = await review("defers-review-asks-into-tracked-work", {
+		work: metadata,
+		cause: atMerge,
+		context: {},
+	});
+	assert.match(noFile.directions?.[0] ?? "", /collection gap and record no observation/u);
+	assert.equal(noFile.facts?.commentsFileAbsent, 1);
+	const noOthers = await review("defers-review-asks-into-tracked-work", {
+		work: metadata,
+		cause: atMerge,
+		context: {
+			"comments.json": [],
+			"general_comments.json": {
+				comments: [{ author: "ada", body: "Ready", createdAt: "2026-04-13T14:00:00Z" }],
+			},
 		},
 	});
-	const engagingAbsent = withContext("engaging-with-inline-review-comments", {});
-	const engagingEmpty = withContext("engaging-with-inline-review-comments", {
-		"comments.json": [],
+	assert.match(
+		noOthers.directions?.[0] ?? "",
+		/^No comment by anyone other than the author in the captured record \(0 inline comment\(s\), 1 conversation comment\(s\)\)/u,
+	);
+	assert.equal(noOthers.facts?.commentsFileAbsent, 0);
+	const inlineNoFile = await review("engaging-with-inline-review-comments", {
+		work: metadata,
+		cause: atMerge,
+		context: {},
 	});
-	try {
-		const run = async (staged: typeof absent) => staged.script(metadata, atMerge);
-		const noFile = await run(absent);
-		assert.match(noFile.directions?.[0] ?? "", /collection gap and record no observation/u);
-		assert.equal(noFile.facts?.commentsFileAbsent, 1);
-		const noOthers = await run(empty);
-		assert.match(
-			noOthers.directions?.[0] ?? "",
-			/^No comment by anyone other than the author in the captured record \(0 inline comment\(s\), 1 conversation comment\(s\)\)/u,
-		);
-		assert.equal(noOthers.facts?.commentsFileAbsent, 0);
-		const inlineNoFile = await run(engagingAbsent);
-		assert.match(inlineNoFile.directions?.[0] ?? "", /^No comments file was captured/u);
-		const inlineNoOthers = await run(engagingEmpty);
-		assert.match(
-			inlineNoOthers.directions?.[0] ?? "",
-			/^No note by anyone other than the author in the captured record \(0 inline comment\(s\), general_comments\.json not captured\)\.$/u,
-		);
-	} finally {
-		for (const staged of [absent, empty, engagingAbsent, engagingEmpty]) {
-			rmSync(staged.root, { recursive: true, force: true });
-		}
-	}
+	assert.match(inlineNoFile.directions?.[0] ?? "", /^No comments file was captured/u);
+	const inlineNoOthers = await review("engaging-with-inline-review-comments", {
+		work: metadata,
+		cause: atMerge,
+		context: { "comments.json": [] },
+	});
+	assert.match(
+		inlineNoOthers.directions?.[0] ?? "",
+		/^No note by anyone other than the author in the captured record \(0 inline comment\(s\), general_comments\.json not captured\)\.$/u,
+	);
 });
 
 void test("one missing comments surface cannot prove no deferred ask", async () => {
 	for (const context of [{ "comments.json": [] }, { "general_comments.json": { comments: [] } }]) {
-		const staged = withContext("defers-review-asks-into-tracked-work", context);
-		try {
-			const result = await staged.script(metadata, atMerge);
-			const said = (result.directions ?? []).join("\n");
-			assert.match(said, /collection gap and record no observation/u);
-			assert.doesNotMatch(said, /occasion did not arise/u);
-		} finally {
-			rmSync(staged.root, { recursive: true, force: true });
-		}
+		const result = await review("defers-review-asks-into-tracked-work", {
+			work: metadata,
+			cause: atMerge,
+			context,
+		});
+		const said = (result.directions ?? []).join("\n");
+		assert.match(said, /collection gap and record no observation/u);
+		assert.doesNotMatch(said, /occasion did not arise/u);
 	}
 });
 
 void test("current unresolved threads do not establish their state at an earlier merge", async () => {
-	const { root, script } = withContext("merged-past-unresolved-review-threads", {
-		"review_threads.json": {
-			threads: [
-				{ id: 1, state: "UNRESOLVED", createdAt: "2026-04-13T16:00:00Z" },
-				{ id: 2, state: "UNRESOLVED" },
-			],
-			reviewDecisions: [],
+	const result = await review("merged-past-unresolved-review-threads", {
+		work: metadata,
+		cause: atMerge,
+		context: {
+			"review_threads.json": {
+				threads: [
+					{ id: 1, state: "UNRESOLVED", createdAt: "2026-04-13T16:00:00Z" },
+					{ id: 2, state: "UNRESOLVED" },
+				],
+				reviewDecisions: [],
+			},
 		},
 	});
-	try {
-		const result = await script(metadata, atMerge);
-		assert.equal(result.leads[1]?.facts?.createdAt, "2026-04-13T16:00:00Z");
-		assert.equal(Object.hasOwn(result.leads[2]?.facts ?? {}, "createdAt"), false);
-		assert.match((result.directions ?? []).join("\n"), /not proven open at merge/u);
-		assert.match((result.directions ?? []).join("\n"), /unknown historical order as UNDETERMINED/u);
-	} finally {
-		rmSync(root, { recursive: true, force: true });
-	}
+	assert.equal(result.leads[1]?.facts?.createdAt, "2026-04-13T16:00:00Z");
+	assert.equal(Object.hasOwn(result.leads[2]?.facts ?? {}, "createdAt"), false);
+	assert.match((result.directions ?? []).join("\n"), /not proven open at merge/u);
+	assert.match(
+		(result.directions ?? []).join("\n"),
+		/where the record cannot settle that order, name the missing date and decide as the criteria say/u,
+	);
 });
 
 void test("a resolution the record does not date by the merge, or a merge it does not date, stays a historical question", async () => {
-	const { root, script } = withContext("merged-past-unresolved-review-threads", {
+	const context = {
 		"review_threads.json": {
 			threads: [
 				{
@@ -1145,50 +1095,62 @@ void test("a resolution the record does not date by the merge, or a merge it doe
 			],
 			reviewDecisions: [],
 		},
+	};
+	const result = await review("merged-past-unresolved-review-threads", {
+		work: metadata,
+		cause: atMerge,
+		context,
 	});
-	try {
-		const result = await script(metadata, atMerge);
+	assert.deepEqual(
+		result.leads
+			.filter((lead) => lead.kind !== "merge")
+			.map((lead) => [lead.facts?.id, lead.kind, lead.facts?.createdAt, lead.facts?.resolvedAt]),
+		[
+			[21, "thread-resolved-after-the-merge", "2026-04-13T14:00:00Z", "2026-04-13T15:30:00Z"],
+			[22, "resolved-thread-resolution-time-unknown", "2026-04-13T14:00:00Z", undefined],
+			[23, "resolved-thread-resolution-time-unknown", "2026-04-13T14:00:00Z", "yesterday"],
+		],
+	);
+	assert.equal(result.facts?.candidateThreads, 3);
+	assert.equal(result.facts.resolutionTimeUnknown, 2);
+	assert.equal(result.facts.resolvedBeforeMerge, 1);
+
+	// Merged without a merge time, or with one that does not parse; and a pull request still open.
+	const [missing, invalid, open] = await Promise.all([
+		review("merged-past-unresolved-review-threads", {
+			work: unmerged,
+			cause: atMerge,
+			context,
+		}),
+		review("merged-past-unresolved-review-threads", {
+			work: { ...metadata, merged_at: "not a time" },
+			cause: atMerge,
+			context,
+		}),
+		review("merged-past-unresolved-review-threads", {
+			work: { ...unmerged, state: "OPEN" },
+			cause: requestedOpen,
+			context,
+		}),
+	]);
+	for (const undated of [missing, invalid]) {
 		assert.deepEqual(
-			result.leads
+			undated.leads
 				.filter((lead) => lead.kind !== "merge")
-				.map((lead) => [lead.facts?.id, lead.kind, lead.facts?.createdAt, lead.facts?.resolvedAt]),
+				.map((lead) => [lead.facts?.id, lead.kind]),
 			[
-				[21, "thread-resolved-after-the-merge", "2026-04-13T14:00:00Z", "2026-04-13T15:30:00Z"],
-				[22, "resolved-thread-resolution-time-unknown", "2026-04-13T14:00:00Z", undefined],
-				[23, "resolved-thread-resolution-time-unknown", "2026-04-13T14:00:00Z", "yesterday"],
+				[20, "resolved-thread-merge-time-unknown"],
+				[21, "resolved-thread-merge-time-unknown"],
+				[22, "resolved-thread-both-times-unknown"],
+				[23, "resolved-thread-both-times-unknown"],
+				[24, "resolved-thread-both-times-unknown"],
 			],
 		);
-		assert.equal(result.facts?.candidateThreads, 3);
-		assert.equal(result.facts.resolutionTimeUnknown, 2);
-		assert.equal(result.facts.resolvedBeforeMerge, 1);
-
-		// Merged without a merge time, or with one that does not parse; and a pull request still open.
-		const [missing, invalid, open] = await Promise.all([
-			script(unmerged, atMerge),
-			script({ ...metadata, merged_at: "not a time" }, atMerge),
-			script({ ...unmerged, state: "OPEN" }, requestedWhen("OPEN")),
-		]);
-		for (const undated of [missing, invalid]) {
-			assert.deepEqual(
-				undated.leads
-					.filter((lead) => lead.kind !== "merge")
-					.map((lead) => [lead.facts?.id, lead.kind]),
-				[
-					[20, "resolved-thread-merge-time-unknown"],
-					[21, "resolved-thread-merge-time-unknown"],
-					[22, "resolved-thread-both-times-unknown"],
-					[23, "resolved-thread-both-times-unknown"],
-					[24, "resolved-thread-both-times-unknown"],
-				],
-			);
-			assert.equal(undated.facts?.resolutionTimeUnknown, 3);
-			assert.equal(undated.facts.resolvedBeforeMerge, undefined);
-		}
-		assert.deepEqual(open.leads, []);
-		assert.match(open.directions?.[0] ?? "", /not merged/u);
-	} finally {
-		rmSync(root, { recursive: true, force: true });
+		assert.equal(undated.facts?.resolutionTimeUnknown, 3);
+		assert.equal(undated.facts.resolvedBeforeMerge, undefined);
 	}
+	assert.deepEqual(open.leads, []);
+	assert.match(open.directions?.[0] ?? "", /not merged/u);
 });
 
 void test("the merge practices read the threads and decisions as rows against the merge", async () => {
@@ -1244,89 +1206,93 @@ void test("the merge practices read the threads and decisions as rows against th
 		},
 	};
 	const merged = { ...metadata, is_merged: true, merged_by: "ada", review_decision: "APPROVED" };
-	const threads = withContext("merged-past-unresolved-review-threads", record);
-	const approval = withContext("merges-only-after-approval", record);
-	const noRecord = withContext("merges-only-after-approval", {});
-	try {
-		const unresolved = await threads.script(merged, atMerge);
-		assert.equal(unresolved.facts?.candidateThreads, 2);
-		assert.equal(unresolved.facts.resolvedBeforeMerge, 1);
-		assert.equal(unresolved.facts.mergedByIsAuthor, 1);
-		assert.equal(unresolved.facts.threadsFileAbsent, 0);
-		const [merge, thread] = unresolved.leads;
-		assert.ok(merge && thread);
-		assert.equal(merge.kind, "merge");
-		assert.deepEqual(merge.at, { record: "metadata.json" });
-		assert.equal(merge.facts?.mergedBy, "ada");
-		assert.equal(merge.facts.mergedByIsAuthor, true);
-		assert.equal(merge.facts.reviewDecision, "APPROVED");
-		assert.equal(thread.kind, "unresolved-thread");
-		assert.deepEqual(thread.at, { record: "review_threads.json" });
-		assert.deepEqual(thread.facts, {
-			id: 11,
-			state: "UNRESOLVED",
-			createdAt: "2026-04-13T14:19:00Z",
-			path: "App/Model.swift",
-			line: 9,
-			outdated: true,
-		});
-		const late = unresolved.leads[2];
-		assert.ok(late);
-		assert.equal(late.kind, "thread-resolved-after-the-merge");
-		assert.equal(late.facts?.resolvedAt, "2026-04-13T16:00:00Z");
-		assert.match(
-			unresolved.directions?.[0] ?? "",
-			/^Merged by ada \(the author\); 3 thread\(s\) captured, 2 candidate thread\(s\)/u,
-		);
+	const unresolved = await review("merged-past-unresolved-review-threads", {
+		work: merged,
+		cause: atMerge,
+		context: record,
+	});
+	assert.equal(unresolved.facts?.candidateThreads, 2);
+	assert.equal(unresolved.facts.resolvedBeforeMerge, 1);
+	assert.equal(unresolved.facts.mergedByIsAuthor, 1);
+	assert.equal(unresolved.facts.threadsFileAbsent, 0);
+	const [merge, thread] = unresolved.leads;
+	assert.ok(merge && thread);
+	assert.equal(merge.kind, "merge");
+	assert.deepEqual(merge.at, { record: "metadata.json" });
+	assert.equal(merge.facts?.mergedBy, "ada");
+	assert.equal(merge.facts.mergedByIsAuthor, true);
+	assert.equal(merge.facts.reviewDecision, "APPROVED");
+	assert.equal(thread.kind, "unresolved-thread");
+	assert.deepEqual(thread.at, { record: "review_threads.json" });
+	assert.deepEqual(thread.facts, {
+		id: 11,
+		state: "UNRESOLVED",
+		createdAt: "2026-04-13T14:19:00Z",
+		path: "App/Model.swift",
+		line: 9,
+		outdated: true,
+	});
+	const late = unresolved.leads[2];
+	assert.ok(late);
+	assert.equal(late.kind, "thread-resolved-after-the-merge");
+	assert.equal(late.facts?.resolvedAt, "2026-04-13T16:00:00Z");
+	assert.match(
+		unresolved.directions?.[0] ?? "",
+		/^Merged by ada \(the author\); 3 thread\(s\) captured, 2 candidate thread\(s\)/u,
+	);
 
-		const decisions = await approval.script(merged, atMerge);
-		assert.equal(decisions.facts?.decisions, 5);
-		// Jennifer's approval at 15:00 is before the 15:06 merge and by someone else; Ada's is the author's, the bot's is
-		// no person's, Tom's is after.
-		assert.equal(decisions.facts.approvalsBeforeMergeByOthers, 1);
-		const rows = decisions.leads.filter((lead) => lead.kind === "review-decision");
-		assert.deepEqual(
-			rows.map((lead) => [
-				lead.facts?.author,
-				lead.facts?.state,
-				lead.facts?.beforeMerge,
-				lead.facts?.isAuthor,
-			]),
-			[
-				["jennifer", "CHANGES_REQUESTED", true, false],
-				["ada", "APPROVED", true, true],
-				["jennifer", "APPROVED", true, false],
-				["heph_introcourse_tutor_e2e", "APPROVED", true, false],
-				["tom", "APPROVED", false, false],
-			],
-		);
-		assert.equal(rows[3]?.facts?.bot, true);
-		assert.deepEqual(rows[0]?.at, { record: "review_threads.json" });
-		const last = decisions.leads.filter((lead) => lead.kind === "last-decision-by-reviewer");
-		assert.deepEqual(
-			last.map((lead) => [lead.facts?.author, lead.facts?.state]),
-			[
-				["jennifer", "APPROVED"],
-				["ada", "APPROVED"],
-				["heph_introcourse_tutor_e2e", "APPROVED"],
-				["tom", "APPROVED"],
-			],
-		);
+	const decisions = await review("merges-only-after-approval", {
+		work: merged,
+		cause: atMerge,
+		context: record,
+	});
+	assert.equal(decisions.facts?.decisions, 5);
+	// Jennifer's approval at 15:00 is before the 15:06 merge and by someone else; Ada's is the author's, the bot's is
+	// no person's, Tom's is after.
+	assert.equal(decisions.facts.approvalsBeforeMergeByOthers, 1);
+	const rows = decisions.leads.filter((lead) => lead.kind === "review-decision");
+	assert.deepEqual(
+		rows.map((lead) => [
+			lead.facts?.author,
+			lead.facts?.state,
+			lead.facts?.beforeMerge,
+			lead.facts?.isAuthor,
+		]),
+		[
+			["jennifer", "CHANGES_REQUESTED", true, false],
+			["ada", "APPROVED", true, true],
+			["jennifer", "APPROVED", true, false],
+			["heph_introcourse_tutor_e2e", "APPROVED", true, false],
+			["tom", "APPROVED", false, false],
+		],
+	);
+	assert.equal(rows[3]?.facts?.bot, true);
+	assert.deepEqual(rows[0]?.at, { record: "review_threads.json" });
+	const last = decisions.leads.filter((lead) => lead.kind === "last-decision-by-reviewer");
+	assert.deepEqual(
+		last.map((lead) => [lead.facts?.author, lead.facts?.state]),
+		[
+			["jennifer", "APPROVED"],
+			["ada", "APPROVED"],
+			["heph_introcourse_tutor_e2e", "APPROVED"],
+			["tom", "APPROVED"],
+		],
+	);
 
-		const absent = await noRecord.script(merged, atMerge);
-		assert.equal(absent.facts?.threadsFileAbsent, 1);
-		assert.match(absent.directions?.[0] ?? "", /^No review threads file was captured/u);
-		const open = await noRecord.script(
-			{ ...metadata, state: "OPEN", merged_at: undefined },
-			requestedWhen("OPEN"),
-		);
-		assert.deepEqual(open.leads, []);
-		assert.match(open.directions?.[0] ?? "", /not merged/u);
-	} finally {
-		for (const staged of [threads, approval, noRecord]) {
-			rmSync(staged.root, { recursive: true, force: true });
-		}
-	}
+	const absent = await review("merges-only-after-approval", {
+		work: merged,
+		cause: atMerge,
+		context: {},
+	});
+	assert.equal(absent.facts?.threadsFileAbsent, 1);
+	assert.match(absent.directions?.[0] ?? "", /^No review threads file was captured/u);
+	const open = await review("merges-only-after-approval", {
+		work: { ...metadata, state: "OPEN", merged_at: undefined },
+		cause: requestedOpen,
+		context: {},
+	});
+	assert.deepEqual(open.leads, []);
+	assert.match(open.directions?.[0] ?? "", /not merged/u);
 });
 
 void test("an approval by an account marked bot is kept as a row but counted as no person's approval", async () => {
@@ -1356,73 +1322,69 @@ void test("an approval by an account marked bot is kept as a row but counted as 
 		},
 	];
 	for (const { name, decisions, approvals } of cases) {
-		const { root, script } = withContext("merges-only-after-approval", {
-			"review_threads.json": { threads: [], reviewDecisions: decisions },
+		const result = await review("merges-only-after-approval", {
+			work: merged,
+			cause: atMerge,
+			context: { "review_threads.json": { threads: [], reviewDecisions: decisions } },
 		});
-		try {
-			const result = await script(merged, atMerge);
-			assert.equal(result.facts?.approvalsBeforeMergeByOthers, approvals, name);
-			assert.equal(result.facts.decisionsByBots, 1, name);
-			const botLeads = result.leads.filter((lead) => lead.facts?.bot === true);
-			assert.deepEqual(
-				botLeads.map((lead) => lead.kind),
-				["review-decision", "last-decision-by-reviewer"],
-				name,
-			);
-			assert.match(
-				result.directions?.[0] ?? "",
-				new RegExp(
-					`, ${approvals} of them an undismissed APPROVED before the merge by an account other than the author's that is not marked bot\\.`,
-					"u",
-				),
-				name,
-			);
-		} finally {
-			rmSync(root, { recursive: true, force: true });
-		}
+		assert.equal(result.facts?.approvalsBeforeMergeByOthers, approvals, name);
+		assert.equal(result.facts.decisionsByBots, 1, name);
+		const botLeads = result.leads.filter((lead) => lead.facts?.bot === true);
+		assert.deepEqual(
+			botLeads.map((lead) => lead.kind),
+			["review-decision", "last-decision-by-reviewer"],
+			name,
+		);
+		assert.match(
+			result.directions?.[0] ?? "",
+			new RegExp(
+				`, ${approvals} of them an undismissed APPROVED before the merge by an account other than the author's that is not marked bot\\.`,
+				"u",
+			),
+			name,
+		);
 	}
 });
 
 void test("unknown approval times establish neither before-merge absence nor a last historical decision", async () => {
-	const { root, script } = withContext("merges-only-after-approval", {
-		"review_threads.json": {
-			threads: [],
-			reviewDecisions: [
-				{ state: "CHANGES_REQUESTED", author: "jennifer", submittedAt: "2026-04-13T14:20:00Z" },
-				{ state: "APPROVED", author: "jennifer" },
-				{ state: "APPROVED", author: "tom", submittedAt: "2026-04-13T15:00:00Z" },
-			],
+	const result = await review("merges-only-after-approval", {
+		work: { ...metadata, is_merged: true },
+		cause: atMerge,
+		context: {
+			"review_threads.json": {
+				threads: [],
+				reviewDecisions: [
+					{ state: "CHANGES_REQUESTED", author: "jennifer", submittedAt: "2026-04-13T14:20:00Z" },
+					{ state: "APPROVED", author: "jennifer" },
+					{ state: "APPROVED", author: "tom", submittedAt: "2026-04-13T15:00:00Z" },
+				],
+			},
 		},
 	});
-	try {
-		const result = await script({ ...metadata, is_merged: true }, atMerge);
-		const unknown = result.leads.find(
-			(lead) =>
-				lead.kind === "review-decision" &&
-				lead.facts?.author === "jennifer" &&
-				lead.facts.state === "APPROVED",
-		);
-		assert.ok(unknown);
-		assert.equal(Object.hasOwn(unknown.facts ?? {}, "beforeMerge"), false);
-		assert.equal(result.facts?.unknownDecisionTimes, 1);
-		assert.equal(result.facts.approvalsBeforeMergeByOthers, 1);
-		assert.deepEqual(
-			result.leads
-				.filter((lead) => lead.kind === "last-decision-by-reviewer")
-				.map((lead) => lead.facts?.author),
-			["tom"],
-		);
-		assert.match(result.directions?.[2] ?? "", /lower bound.*no historical last decision/u);
-	} finally {
-		rmSync(root, { recursive: true, force: true });
-	}
+	const unknown = result.leads.find(
+		(lead) =>
+			lead.kind === "review-decision" &&
+			lead.facts?.author === "jennifer" &&
+			lead.facts.state === "APPROVED",
+	);
+	assert.ok(unknown);
+	assert.equal(Object.hasOwn(unknown.facts ?? {}, "beforeMerge"), false);
+	assert.equal(result.facts?.unknownDecisionTimes, 1);
+	assert.equal(result.facts.approvalsBeforeMergeByOthers, 1);
+	assert.deepEqual(
+		result.leads
+			.filter((lead) => lead.kind === "last-decision-by-reviewer")
+			.map((lead) => lead.facts?.author),
+		["tom"],
+	);
+	assert.match(result.directions?.[2] ?? "", /lower bound.*no historical last decision/u);
 });
 
 void test("review engagement distinguishes unavailable commit evidence from a captured empty range", async () => {
 	for (const captured of [false, true]) {
-		const staged = withContext(
-			"engaging-with-inline-review-comments",
-			{
+		const result = await review("engaging-with-inline-review-comments", {
+			work: metadata,
+			context: {
 				"comments.json": [
 					{
 						author: "reviewer",
@@ -1438,31 +1400,26 @@ void test("review engagement distinguishes unavailable commit evidence from a ca
 						{ state: "APPROVED", author: "reviewer", submittedAt: "2026-04-13T14:30:00Z" },
 					],
 				},
+				...(captured ? { "commits.json": commitsRecord([]) } : {}),
 			},
-			captured ? [] : undefined,
+		});
+		const note = result.leads[0];
+		assert.ok(note);
+		const said = (result.directions ?? []).join(" ");
+		assert.equal(result.facts?.commitsFileAbsent, captured ? 0 : 1);
+		assert.equal(note.facts?.commitsAfterTouchingFile, captured ? 0 : "unknown");
+		// The sum over notes is as unknown as each note's count; a captured empty range measures 0.
+		assert.equal(result.facts.withLaterCommitOnFile, captured ? 0 : undefined);
+		assert.match(
+			said,
+			captured
+				? /\. 0 have a later authored commit touching the commented file;/u
+				: /How many have a later authored commit touching the commented file is unknown/u,
 		);
-		try {
-			const result = await staged.script(metadata);
-			const note = result.leads[0];
-			assert.ok(note);
-			const said = (result.directions ?? []).join(" ");
-			assert.equal(result.facts?.commitsFileAbsent, captured ? 0 : 1);
-			assert.equal(note.facts?.commitsAfterTouchingFile, captured ? 0 : "unknown");
-			// The sum over notes is as unknown as each note's count; a captured empty range measures 0.
-			assert.equal(result.facts.withLaterCommitOnFile, captured ? 0 : undefined);
-			assert.match(
-				said,
-				captured
-					? /\. 0 have a later authored commit touching the commented file;/u
-					: /How many have a later authored commit touching the commented file is unknown/u,
-			);
-			assert.match(
-				String(note.facts.reviewerApprovedAfter),
-				captured ? /0 commit\(s\)/u : /unknown commit count/u,
-			);
-			assert.match(said, captured ? /0 captured commit\(s\)/u : /Commit capture: unavailable/u);
-		} finally {
-			rmSync(staged.root, { recursive: true, force: true });
-		}
+		assert.match(
+			String(note.facts.reviewerApprovedAfter),
+			captured ? /0 commit\(s\)/u : /unknown commit count/u,
+		);
+		assert.match(said, captured ? /0 captured commit\(s\)/u : /Commit capture: unavailable/u);
 	}
 });

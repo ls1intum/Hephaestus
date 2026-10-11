@@ -14,3 +14,14 @@ It applies automatically.
 Audit entries from before the upgrade name the script hash `precomputeScriptSha256`.
 Newer entries name it `practiceScriptSha256`.
 The bundled webapp needs no operator action.
+
+#### 🔴 Workspace practice scripts in the old form stop giving leads
+
+Every practice script now uses `definePracticeScript`.
+A workspace practice script whose default export is a plain function, the form of earlier releases, no longer runs.
+Its review shows the error *This script uses the retired positional form. Rewrite it with definePracticeScript.*
+The review continues on its other evidence, and the error never becomes a statement about the work.
+Ask the admins of each workspace to rewrite such a script, as [Rewrite a script in the retired form](https://docs.hephaestus.build/admin/practice-scripts#rewrite-a-script-in-the-retired-form) tells.
+
+The scripts and criteria of the bundled practices changed.
+Each workspace that adopted a bundled practice gets an update offer for it.

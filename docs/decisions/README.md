@@ -93,6 +93,6 @@ do, its home is the Admin Guide (`docs/admin/`) and the runbook links to it.
 | [0052](0052-activity-sorts-by-contributions-and-can-be-public.md) | Workspace activity sorts people by plain counts, and a workspace can publish it | Accepted. Supersedes parts of [0045](0045-activity-counts-work-and-never-ranks-people.md). |
 | [0053](0053-workspace-addresses-are-a-presentation-origin.md) | A workspace address is a presentation origin, and sign-in stays on the apex | Accepted. Builds on [0017](0017-replace-keycloak-with-spring-native-auth.md) and [0048](0048-installed-clients-sign-in-with-a-pkce-handoff.md). |
 | [0054](0054-practice-visuals-and-guides.md) | Practice visuals and guides are themeable inline SVG and Markdown | Accepted |
-| [0054](0054-practice-scripts-call-models-through-the-runner.md) | Practice scripts call models through the runner with a second credential | Accepted. Builds on [0026](0026-per-purpose-agent-bindings-and-llm-governance.md) and [0036](0036-agent-runtime-runs-on-node-24.md). |
+| [0054](0054-practice-scripts-call-models-through-the-runner.md) | Practice scripts give leads through one contract and call models through the runner | Accepted. Builds on [0026](0026-per-purpose-agent-bindings-and-llm-governance.md) and [0036](0036-agent-runtime-runs-on-node-24.md). |
 
 Template: [0000-template.md](0000-template.md).

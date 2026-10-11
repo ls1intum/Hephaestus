@@ -1,22 +1,10 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import path from "node:path";
 import test from "node:test";
 
 import type { DiffFile } from "../../../../../../docker/agents/practice-scripts/lib/types.ts";
 import { runBundled } from "../../../../../../docker/agents/practice-scripts/run-bundled.ts";
 
-/** An empty checkout at `repo`, and a run of the script on a pull request with the change. */
-function stage() {
-	const root = mkdtempSync(path.join(tmpdir(), "dependency-practice-script-"));
-	mkdirSync(path.join(root, "repo"), { recursive: true });
-	return {
-		root,
-		script: async (change: ReadonlyMap<string, DiffFile>) =>
-			runBundled("changes-dependencies-deliberately", { repo: path.join(root, "repo"), change }),
-	};
-}
+const SLUG = "changes-dependencies-deliberately";
 
 function diffFile(file: string, added: string[], removed: string[] = []): DiffFile {
 	return {
@@ -28,210 +16,172 @@ function diffFile(file: string, added: string[], removed: string[] = []): DiffFi
 }
 
 void test("an XcodeGen project.yml edit lists its changed package lines without calling the package new", async () => {
-	const { root, script } = stage();
-	try {
-		const result = await script(
-			new Map([
-				[
-					"project.yml",
-					diffFile(
-						"project.yml",
-						[
-							"  ConfettiSwiftUI:",
-							"    url: https://github.com/simibac/ConfettiSwiftUI",
-							"    from: 2.0.0",
-							"      - package: ConfettiSwiftUI",
-						],
-						["    from: 1.3.0"],
-					),
-				],
-			]),
-		);
-		// The url may be unchanged and merely re-added beside the new bound: nothing here says the package is new.
-		assert.deepEqual(
-			result.leads.map((lead) => [lead.kind, lead.at, lead.facts?.side]),
+	const result = await runBundled(SLUG, {
+		change: new Map([
 			[
-				["raw-manifest-line", { change: "project.yml", line: 10, side: "OLD" }, "removed"],
-				["raw-manifest-line", { change: "project.yml", line: 11, side: "NEW" }, "added"],
-				["raw-manifest-line", { change: "project.yml", line: 12, side: "NEW" }, "added"],
+				"project.yml",
+				diffFile(
+					"project.yml",
+					[
+						"  ConfettiSwiftUI:",
+						"    url: https://github.com/simibac/ConfettiSwiftUI",
+						"    from: 2.0.0",
+						"      - package: ConfettiSwiftUI",
+					],
+					["    from: 1.3.0"],
+				),
 			],
-		);
-		assert.equal(result.facts?.manifestsChanged, 1);
-		assert.equal(result.facts.onlyAdded, 0);
-		assert.equal(result.facts.unpairedManifestLines, 3);
-		assert.doesNotMatch(
-			(result.directions ?? []).join("\n"),
-			/No changed line in these manifests/u,
-		);
-	} finally {
-		rmSync(root, { recursive: true, force: true });
-	}
+		]),
+	});
+	// The url may be unchanged and merely re-added beside the new bound: nothing here says the package is new.
+	assert.deepEqual(
+		result.leads.map((lead) => [lead.kind, lead.at, lead.facts?.side]),
+		[
+			["raw-manifest-line", { change: "project.yml", line: 10, side: "OLD" }, "removed"],
+			["raw-manifest-line", { change: "project.yml", line: 11, side: "NEW" }, "added"],
+			["raw-manifest-line", { change: "project.yml", line: 12, side: "NEW" }, "added"],
+		],
+	);
+	assert.equal(result.facts?.manifestsChanged, 1);
+	assert.equal(result.facts.onlyAdded, 0);
+	assert.equal(result.facts.unpairedManifestLines, 3);
+	assert.doesNotMatch((result.directions ?? []).join("\n"), /No changed line in these manifests/u);
 });
 
 void test("internal XcodeGen test-target and scheme wiring offers no dependency line and says the name is no occasion", async () => {
-	const { root, script } = stage();
-	try {
-		const result = await script(
-			new Map([
-				[
-					"project.yml",
-					diffFile("project.yml", [
-						"      testTargets:",
-						"        - AppTests",
-						"  AppTests:",
-						"    type: bundle.unit-test",
-						"    dependencies:",
-						"      - target: App",
-					]),
-				],
-			]),
-		);
-		assert.deepEqual(result.leads, []);
-		assert.equal(result.facts?.manifestsChanged, 1);
-		assert.equal(result.facts.unpairedManifestLines, 0);
-		const said = (result.directions ?? []).join("\n");
-		assert.match(said, /The name alone is no occasion/u);
-		assert.match(
-			said,
-			/No changed line in these manifests has the dependency shape this script reads/u,
-		);
-	} finally {
-		rmSync(root, { recursive: true, force: true });
-	}
+	const result = await runBundled(SLUG, {
+		change: new Map([
+			[
+				"project.yml",
+				diffFile("project.yml", [
+					"      testTargets:",
+					"        - AppTests",
+					"  AppTests:",
+					"    type: bundle.unit-test",
+					"    dependencies:",
+					"      - target: App",
+				]),
+			],
+		]),
+	});
+	assert.deepEqual(result.leads, []);
+	assert.equal(result.facts?.manifestsChanged, 1);
+	assert.equal(result.facts.unpairedManifestLines, 0);
+	const said = (result.directions ?? []).join("\n");
+	assert.match(said, /The name alone is no occasion/u);
+	assert.match(
+		said,
+		/No changed line in these manifests has the dependency shape this script reads/u,
+	);
 });
 
 void test("a pom.xml version moved away from its artifactId is not a dropped pin; a requirement that loses its pin is", async () => {
-	const { root, script } = stage();
-	try {
-		const result = await script(
-			new Map([
-				[
-					"pom.xml",
-					diffFile(
-						"pom.xml",
-						[
-							"      <artifactId>guava</artifactId>",
-							"      <!-- the last release for Java 8 -->",
-							"      <type>jar</type>",
-							"      <version>33.0.0-jre</version>",
-						],
-						["      <artifactId>guava</artifactId>", "      <version>33.0.0-jre</version>"],
-					),
-				],
-				[
-					"requirements.txt",
-					diffFile("requirements.txt", ["requests"], ["requests==2.31.0", "urllib3==2.2.1"]),
-				],
-			]),
-		);
-		assert.equal(result.facts?.unpairedManifestLines, 4);
-		assert.equal(result.facts.pinsDropped, 1);
-		assert.deepEqual(
-			result.leads
-				.filter((lead) => "change" in lead.at && lead.at.change === "requirements.txt")
-				.map((lead) => [lead.kind, lead.at, lead.facts]),
+	const result = await runBundled(SLUG, {
+		change: new Map([
 			[
-				[
-					"pin-dropped",
-					{ change: "requirements.txt", line: 10, side: "NEW" },
-					{ ecosystem: "requirements.txt", name: "requests", oldConstraint: "==2.31.0" },
-				],
-				[
-					"only-removed",
-					{ change: "requirements.txt", line: 11, side: "OLD" },
-					{ ecosystem: "requirements.txt", name: "urllib3" },
-				],
+				"pom.xml",
+				diffFile(
+					"pom.xml",
+					[
+						"      <artifactId>guava</artifactId>",
+						"      <!-- the last release for Java 8 -->",
+						"      <type>jar</type>",
+						"      <version>33.0.0-jre</version>",
+					],
+					["      <artifactId>guava</artifactId>", "      <version>33.0.0-jre</version>"],
+				),
 			],
-		);
-	} finally {
-		rmSync(root, { recursive: true, force: true });
-	}
+			[
+				"requirements.txt",
+				diffFile("requirements.txt", ["requests"], ["requests==2.31.0", "urllib3==2.2.1"]),
+			],
+		]),
+	});
+	assert.equal(result.facts?.unpairedManifestLines, 4);
+	assert.equal(result.facts.pinsDropped, 1);
+	assert.deepEqual(
+		result.leads
+			.filter((lead) => "change" in lead.at && lead.at.change === "requirements.txt")
+			.map((lead) => [lead.kind, lead.at, lead.facts]),
+		[
+			[
+				"pin-dropped",
+				{ change: "requirements.txt", line: 10, side: "NEW" },
+				{ ecosystem: "requirements.txt", name: "requests", oldConstraint: "==2.31.0" },
+			],
+			[
+				"only-removed",
+				{ change: "requirements.txt", line: 11, side: "OLD" },
+				{ ecosystem: "requirements.txt", name: "urllib3" },
+			],
+		],
+	);
 });
 
 void test("raw manifest lines beyond the lead cap are counted but reported as not listed", async () => {
-	const { root, script } = stage();
-	try {
-		const artifacts = Array.from(
-			{ length: 45 },
-			(_, i) => `      <artifactId>lib-${i}</artifactId>`,
-		);
-		const result = await script(
-			new Map([
-				[
-					"package.json",
-					diffFile("package.json", [
-						'    "a": "^1.0.0",',
-						'    "b": "^2.0.0",',
-						'    "c": "^3.0.0",',
-					]),
-				],
-				["pom.xml", diffFile("pom.xml", artifacts)],
-			]),
-		);
-		const raw = result.leads.filter((lead) => lead.kind === "raw-manifest-line");
-		assert.equal(result.leads.length, 40);
-		assert.equal(result.facts?.onlyAdded, 3);
-		assert.equal(result.facts.unpairedManifestLines, 45);
-		assert.equal(result.facts.rawLinesListed, 37);
-		assert.equal(raw.length, 37);
-		// The 37th artifact line, lib-36, is the last one listed.
-		assert.deepEqual(raw.at(-1)?.at, { change: "pom.xml", line: 46, side: "NEW" });
-	} finally {
-		rmSync(root, { recursive: true, force: true });
-	}
+	const artifacts = Array.from({ length: 45 }, (_, i) => `      <artifactId>lib-${i}</artifactId>`);
+	const result = await runBundled(SLUG, {
+		change: new Map([
+			[
+				"package.json",
+				diffFile("package.json", [
+					'    "a": "^1.0.0",',
+					'    "b": "^2.0.0",',
+					'    "c": "^3.0.0",',
+				]),
+			],
+			["pom.xml", diffFile("pom.xml", artifacts)],
+		]),
+	});
+	const raw = result.leads.filter((lead) => lead.kind === "raw-manifest-line");
+	assert.equal(result.leads.length, 40);
+	assert.equal(result.facts?.onlyAdded, 3);
+	assert.equal(result.facts.unpairedManifestLines, 45);
+	assert.equal(result.facts.rawLinesListed, 37);
+	assert.equal(raw.length, 37);
+	// The 37th artifact line, lib-36, is the last one listed.
+	assert.deepEqual(raw.at(-1)?.at, { change: "pom.xml", line: 46, side: "NEW" });
 });
 
 void test("metadata lines shaped like dependencies stay candidates with their constraint delta", async () => {
-	const { root, script } = stage();
-	try {
-		const result = await script(
-			new Map([
-				["package.json", diffFile("package.json", ['    "node": ">=22"'], ['    "node": ">=20"'])],
-				[
-					"Cargo.toml",
-					diffFile("Cargo.toml", ['rust-version = "1.80"'], ['rust-version = "1.78"']),
-				],
-			]),
-		);
-		// An engines entry and a toolchain floor: the delta is real, the dependency identity is not established.
-		assert.deepEqual(
-			result.leads.map((lead) => [lead.at, lead.kind, lead.facts]),
+	const result = await runBundled(SLUG, {
+		change: new Map([
+			["package.json", diffFile("package.json", ['    "node": ">=22"'], ['    "node": ">=20"'])],
+			["Cargo.toml", diffFile("Cargo.toml", ['rust-version = "1.80"'], ['rust-version = "1.78"'])],
+		]),
+	});
+	// An engines entry and a toolchain floor: the delta is real, the dependency identity is not established.
+	assert.deepEqual(
+		result.leads.map((lead) => [lead.at, lead.kind, lead.facts]),
+		[
 			[
-				[
-					{ change: "package.json", line: 10, side: "NEW" },
-					"bumped",
-					{ ecosystem: "package.json", name: "node", oldConstraint: ">=20", newConstraint: ">=22" },
-				],
-				[
-					{ change: "Cargo.toml", line: 10, side: "NEW" },
-					"bumped",
-					{
-						ecosystem: "cargo.toml",
-						name: "rust-version",
-						oldConstraint: "1.78",
-						newConstraint: "1.80",
-					},
-				],
+				{ change: "package.json", line: 10, side: "NEW" },
+				"bumped",
+				{ ecosystem: "package.json", name: "node", oldConstraint: ">=20", newConstraint: ">=22" },
 			],
-		);
-	} finally {
-		rmSync(root, { recursive: true, force: true });
-	}
+			[
+				{ change: "Cargo.toml", line: 10, side: "NEW" },
+				"bumped",
+				{
+					ecosystem: "cargo.toml",
+					name: "rust-version",
+					oldConstraint: "1.78",
+					newConstraint: "1.80",
+				},
+			],
+		],
+	);
 });
 
 void test("a lockfile elsewhere in the checkout is reported by its path, not as the changed manifest's", async () => {
-	const { root, script } = stage();
-	try {
-		mkdirSync(path.join(root, "repo/tools/docs"), { recursive: true });
-		writeFileSync(path.join(root, "repo/tools/docs/package-lock.json"), "{}\n");
-		const result = await script(
-			new Map([["app/package.json", diffFile("app/package.json", ['    "left-pad": "^1.3.0",'])]]),
-		);
-		assert.match(
-			(result.directions ?? []).join("\n"),
-			/in the checkout: tools\/docs\/package-lock\.json; touched in this diff: none/u,
-		);
-	} finally {
-		rmSync(root, { recursive: true, force: true });
-	}
+	const result = await runBundled(SLUG, {
+		repo: { "tools/docs/package-lock.json": "{}\n" },
+		change: new Map([
+			["app/package.json", diffFile("app/package.json", ['    "left-pad": "^1.3.0",'])],
+		]),
+	});
+	assert.match(
+		(result.directions ?? []).join("\n"),
+		/in the checkout: tools\/docs\/package-lock\.json; touched in this diff: none/u,
+	);
 });

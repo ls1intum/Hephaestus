@@ -113,7 +113,7 @@ It is not a successful review.
 │   ├── notes/review.md              #   What the review has recorded, appended by the runner; read back after compaction.
 │   ├── practice-scripts/practices/  #   Practice scripts (<slug>.ts, run on Node), each beside its
 │   │                                #   <slug>.cause.json and <slug>.previous.json.
-│   ├── practice-scripts-out/        #   Practice script runtime output (logs, structured hints).
+│   ├── practice-scripts-out/        #   Practice script runtime output (logs, structured leads).
 │   ├── analysis/practices/          #   Per-practice analysis output (holds the .gitkeep marker).
 │   └── composition/                 #   observations.json — the admitted observations feedback is composed from.
 ├── out/                             # THE ONLY collected directory — result.json, review-state.json,
@@ -553,12 +553,11 @@ See [ADR 0036](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/dec
 
 Practice scripts are advisory.
 In production, the image runner validates every script's default export and its result.
-A positional script returns hints, directions and finite numeric metrics.
-A definition script returns leads, facts, unrated items and directions.
-An invalid result or a thrown exception becomes a recorded script error with no hints or leads.
+A script is a `definePracticeScript` definition, and it returns leads, facts, unrated items and directions.
+A default export of another form, an invalid result or a thrown exception becomes a recorded script error with no leads.
 It does not become an observation about the reviewed work.
 
-A failed practice script remains best-effort: the practice review continues without its hints or leads.
+A failed practice script remains best-effort: the practice review continues without its leads.
 
 The server-staged bootstrap bounds the **entire stage** to one tenth of the job timeout, at most 90 seconds.
 The stage includes script copies, module imports, script execution, and the model calls of the scripts.
@@ -570,11 +569,11 @@ The image runner runs only a staged file whose name, less `.ts`, is a practice s
 It starts one Node process for each script, at most four at a time.
 Each process has a heap of at most 256 MiB.
 A script's process ends at the script's deadline, or earlier when the stage has less time left.
-The deadline is 15 seconds for a positional script and 60 seconds for a definition script.
+The deadline is 60 seconds.
 
-A definition script's model calls and its `ctx.abortSignal` end 5 seconds before its deadline, so that the script can still return what it found.
+A script's model calls and its `ctx.abortSignal` end 5 seconds before its deadline, so that the script can still return what it found.
 The runner itself stops one second before the stage deadline.
-Thus, a script that never returns loses only its own practice's hints or leads.
+Thus, a script that never returns loses only its own practice's leads.
 
 The runner writes each practice's section and result when that practice finishes.
 If the stage is stopped, the sections of the finished practices stay, and every other file is removed.
@@ -640,7 +639,7 @@ It writes `practice-scripts.json` into `out/` with one entry for each staged scr
 | --- | --- |
 | `practices[].slug` | The slug of the staged script. |
 | `practices[].status` | `ok`, `skipped`, `error` or `timeout` from the script's `<slug>.json`. `not-finished` when the script has no result that the review runner can read. |
-| `practices[].leads` | The leads of a definition script, or the hints of a positional script. 0 for `skipped` and `not-finished`. |
+| `practices[].leads` | The leads of the script. 0 for `skipped`, `error`, `timeout` and `not-finished`. |
 | `practices[].models` | One entry for each slot that the script declares: `slot`, `need`, `bound` and `notRated`. `notRated` counts the model calls that the runner could not rate, by reason. Empty for a script that uses no model. Absent when the models are not known: the script ended before it declared them, or did not finish. |
 | `practices[].error` | For `error`, one line of the script's error: the text up to the first line break after leading blanks, cut to 500 code points. A control character becomes a space, and trailing blanks are removed. A line that UTF-8 cannot encode is left out. Absent for every other status. |
 | `practices[].durationMs` | How long the script ran, in milliseconds, from its `<slug>.json`. Absent when the script has no readable result. |

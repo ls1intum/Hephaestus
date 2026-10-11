@@ -63,8 +63,6 @@ const child = spawnSync(
 		paths.repositoryRoot,
 		"--diff",
 		path.resolve(root, CHANGE_ROOT, "diff.patch"),
-		"--metadata",
-		path.resolve(paths.contextRoot, "metadata.json"),
 		"--context",
 		paths.contextRoot,
 		"--context-reference",

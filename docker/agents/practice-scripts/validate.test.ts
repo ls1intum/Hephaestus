@@ -5,6 +5,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { test, type TestContext } from "node:test";
 
+import { RETIRED_FORM_ERROR } from "./lib/contract.ts";
+
 const validate = path.join(import.meta.dirname, "validate.ts");
 const fixtures = path.join(import.meta.dirname, "fixtures");
 const pullRequestRecord = path.join(import.meta.dirname, "fixtures", "pull-request-metadata.json");
@@ -88,34 +90,34 @@ void test("a definition script runs without models and prints its result and its
 	assert.equal(written.trimEnd(), section.trimEnd());
 });
 
-void test("a positional script runs as the runner runs it", async (t) => {
+void test("a script in the retired form exits with 1 and the line that tells how to rewrite it", async (t) => {
 	const root = await workspace(t);
 	const script = path.join(root, "counts-lines.ts");
 	await writeFile(
 		script,
-		`export default (_repo, diff) => ({
-	hints: [],
-	metrics: { files: diff.size },
-	directions: ["counted"],
-});
-`,
+		"export default (_repo, diff) => ({ hints: [], metrics: { files: diff.size }, directions: [] });\n",
 	);
-	const { status, stdout, stderr } = run([
+	const { status, stdout } = run([
 		"--script",
 		script,
 		"--repo",
 		path.join(root, "repo"),
 		"--diff",
 		path.join(root, "change.diff"),
+		"--metadata",
+		pullRequestRecord,
 	]);
-	assert.equal(status, 0, stderr);
+	assert.equal(status, 1);
 	const files = printed(stdout);
 	assert.partialDeepStrictEqual(JSON.parse(files.get("counts-lines.json") ?? ""), {
-		contract: "positional",
-		status: "ok",
-		metrics: { files: 1 },
+		contract: "unknown",
+		status: "error",
+		error: RETIRED_FORM_ERROR,
 	});
-	assert.equal(files.get("counts-lines.md"), "- counted\n");
+	assert.match(
+		files.get("counts-lines.md") ?? "",
+		new RegExp(`- Script failed: ${RETIRED_FORM_ERROR}\\n$`, "u"),
+	);
 });
 
 void test("a script that requires a model is skipped, and one that fails exits with an error", async (t) => {
@@ -152,7 +154,7 @@ void test("a script whose process is killed exits with an error that is not a ti
 	await mkdir(temporary);
 	const script = path.join(root, "killed.ts");
 	// A kill that the runner did not send, as the kernel sends when memory runs out.
-	await writeFile(script, 'export default () => process.kill(process.pid, "SIGKILL");\n');
+	await writeFile(script, 'process.kill(process.pid, "SIGKILL");\nexport default {};\n');
 	const { status, stdout, stderr } = run(["--script", script, "--repo", path.join(root, "repo")], {
 		...process.env,
 		TMPDIR: temporary,
