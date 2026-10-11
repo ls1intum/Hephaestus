@@ -281,7 +281,7 @@ export const PersonUpdating: Story = {
 	play: async () => {
 		const panel = await settledDrawerPanel();
 		await expect(
-			within(panel).getByText(/These figures are for .* while the new range loads\./u),
+			within(panel).getByText(/These figures are for .* while activity updates\./u),
 		).toBeVisible();
 		await expect(panel.querySelector('[aria-busy="true"]')).toBeVisible();
 	},
@@ -291,5 +291,22 @@ export const Reflow: Story = {
 	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
 	play: async () => {
 		await expectNoPageOverflow();
+	},
+};
+
+export const RefreshFailed: Story = {
+	args: { refreshError: { error: { status: 503 }, onRetry: fn(), pending: false } },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("We could not refresh activity")).toBeVisible();
+		await expect(canvas.getByRole("table", { name: "People" })).toBeVisible();
+		await expect(canvas.getByRole("button", { name: "Retry" })).toBeEnabled();
+	},
+};
+
+export const RefreshRetrying: Story = {
+	args: { refreshError: { error: { status: 503 }, onRetry: fn(), pending: true }, updating: true },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("table", { name: "People" })).toBeVisible();
+		await expect(canvas.getByRole("button", { name: "Retrying…" })).toBeDisabled();
 	},
 };

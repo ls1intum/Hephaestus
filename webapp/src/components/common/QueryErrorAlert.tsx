@@ -3,12 +3,14 @@ import type * as React from "react";
 
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { problemDetailOf, problemStatusOf } from "@/lib/problem-detail";
 
 export interface QueryErrorAlertProps {
 	error: unknown;
 	title: string;
 	onRetry?: () => void;
+	pending?: boolean;
 	className?: string;
 }
 
@@ -97,6 +99,11 @@ function classifyError(status: number | undefined): ErrorClass {
 	};
 }
 
+/** Whether the existing error guidance offers a repeat of the failed read. */
+export function queryErrorIsRetryable(error: unknown): boolean {
+	return classifyError(problemStatusOf(error)).retryable;
+}
+
 const LOAD_TITLE = /^We could not load (?<what>.+)$/u;
 
 function describe(lead: string, next: string): string {
@@ -110,7 +117,13 @@ function describe(lead: string, next: string): string {
 	return /[.!?]$/u.test(lead) ? `${lead} ${next}` : `${lead}. ${next}`;
 }
 
-export function QueryErrorAlert({ error, title, onRetry, className }: QueryErrorAlertProps) {
+export function QueryErrorAlert({
+	error,
+	title,
+	onRetry,
+	pending = false,
+	className,
+}: QueryErrorAlertProps) {
 	const status = problemStatusOf(error);
 	const { icon, cause, next, variant, retryable, retitle, ignoreDetail } = classifyError(status);
 	const detail = ignoreDetail === true ? "" : problemDetailOf(error, "").trim();
@@ -127,8 +140,9 @@ export function QueryErrorAlert({ error, title, onRetry, className }: QueryError
 			</AlertDescription>
 			{showRetry && (
 				<AlertAction>
-					<Button type="button" variant="outline" size="sm" onClick={onRetry}>
-						Retry
+					<Button type="button" variant="outline" size="sm" onClick={onRetry} disabled={pending}>
+						{pending && <Spinner />}
+						{pending ? "Retrying…" : "Retry"}
 					</Button>
 				</AlertAction>
 			)}

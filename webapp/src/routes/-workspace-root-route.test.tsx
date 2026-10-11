@@ -235,6 +235,13 @@ describe("the address of a workspace", () => {
 		const { router } = renderRouteAtWithRouter("/w/acme?detail=person%3Aada");
 		const panel = await screen.findByRole("dialog", { name: "Ada Lovelace" }, ROUTE_RENDER_WAIT);
 		within(panel).getByRole("link", { name: /ada on GitHub/u });
+		server.use(
+			http.get("*/public/workspaces/:slug/activity", () => HttpResponse.error(), { once: true }),
+		);
+		await act(async () => router.invalidate());
+		within(screen.getByRole("dialog", { name: "Ada Lovelace" })).getByRole("link", {
+			name: /ada on GitHub/u,
+		});
 		page = publicActivity({ people: [person("bob", "Bob Brenner")] });
 		await act(async () => router.invalidate());
 		await waitFor(() => {
@@ -284,6 +291,140 @@ describe("search engines", () => {
 		publish(publicActivity({ allowSearchEngines: true }));
 
 		await expect(robotsAt("/w/acme")).resolves.toStrictEqual([]);
+	});
+});
+
+describe("refreshing public activity", () => {
+	it("keeps the active range through a failed refresh and disables Retry while it reloads", async () => {
+		server.use(unauthenticatedUser);
+		publish();
+		const { router } = renderRouteAtWithRouter("/w/acme?sort=name");
+		await screen.findByRole("heading", { name: "Acme activity" }, ROUTE_RENDER_WAIT);
+		server.use(http.get("*/public/workspaces/:slug/activity", () => HttpResponse.error()));
+		await act(async () => {
+			await router.invalidate();
+		});
+		expect(names()).toStrictEqual(["Ada Lovelace", "Bob Brenner"]);
+		screen.getByText("We could not refresh activity");
+
+		const next = deferred<Wire<PublicActivity>>();
+		server.use(
+			http.get("*/public/workspaces/:slug/activity", async () =>
+				HttpResponse.json(await next.promise),
+			),
+		);
+		await userEvent.setup().click(screen.getByRole("button", { name: "Retry" }));
+		await waitFor(() =>
+			expect(screen.getByRole<HTMLButtonElement>("button", { name: "Retrying…" }).disabled).toBe(
+				true,
+			),
+		);
+		expect(names()).toStrictEqual(["Ada Lovelace", "Bob Brenner"]);
+		await act(async () => {
+			next.resolve(publicActivity({ people: [person("bob", "Bob Brenner")] }));
+		});
+		await waitFor(() => expect(screen.queryByText("We could not refresh activity")).toBeNull());
+		expect(names()).toStrictEqual(["Bob Brenner"]);
+	});
+
+	it.each([429, 503])("retains the active figures on a retryable %s refresh", async (status) => {
+		server.use(unauthenticatedUser);
+		publish();
+		const { router } = renderRouteAtWithRouter("/w/acme?sort=name");
+		await screen.findByRole("heading", { name: "Acme activity" }, ROUTE_RENDER_WAIT);
+		server.use(
+			http.get("*/public/workspaces/:slug/activity", () =>
+				HttpResponse.json({ status }, { status }),
+			),
+		);
+		await act(async () => {
+			await router.invalidate();
+		});
+		expect(names()).toStrictEqual(["Ada Lovelace", "Bob Brenner"]);
+		screen.getByText("We could not refresh activity");
+	});
+
+	it.each([401, 403])(
+		"does not restore pre-refusal figures after %s and a later network failure",
+		async (status) => {
+			server.use(unauthenticatedUser);
+			publish();
+			const { router } = renderRouteAtWithRouter("/w/acme");
+			await screen.findByRole("heading", { name: "Acme activity" }, ROUTE_RENDER_WAIT);
+			server.use(
+				http.get("*/public/workspaces/:slug/activity", () =>
+					HttpResponse.json({ status }, { status }),
+				),
+			);
+			await act(async () => {
+				await router.invalidate();
+			});
+			expect(screen.queryByRole("heading", { name: "Acme activity" })).toBeNull();
+			server.use(http.get("*/public/workspaces/:slug/activity", () => HttpResponse.error()));
+			await act(async () => {
+				await router.invalidate();
+			});
+			expect(screen.queryByRole("heading", { name: "Acme activity" })).toBeNull();
+			expect(screen.queryByText("Ada Lovelace")).toBeNull();
+		},
+	);
+
+	it("redirects on publication removal instead of retaining its earlier figures", async () => {
+		server.use(unauthenticatedUser);
+		publish();
+		const { router } = renderRouteAtWithRouter("/w/acme");
+		await screen.findByRole("heading", { name: "Acme activity" }, ROUTE_RENDER_WAIT);
+		server.use(
+			http.get("*/public/workspaces/:slug/activity", () =>
+				HttpResponse.json({ status: 404 }, { status: 404 }),
+			),
+		);
+		await act(async () => {
+			await router.invalidate();
+		});
+		await waitFor(() => expect(router.state.location.pathname).toBe("/login"));
+		expect(screen.queryByText("Ada Lovelace")).toBeNull();
+	});
+
+	it.each([{ range: "30d" as const }, { repo: ["acme/api"] }])(
+		"does not borrow a displayed range for another failed scope %j",
+		async (search) => {
+			server.use(unauthenticatedUser);
+			publish();
+			const { router } = renderRouteAtWithRouter("/w/acme");
+			await screen.findByRole("heading", { name: "Acme activity" }, ROUTE_RENDER_WAIT);
+			server.use(http.get("*/public/workspaces/:slug/activity", () => HttpResponse.error()));
+			await act(async () => {
+				await router.navigate({
+					to: "/w/$workspaceSlug",
+					params: { workspaceSlug: "acme" },
+					search,
+				});
+			});
+			expect(screen.queryByRole("heading", { name: "Acme activity" })).toBeNull();
+			expect(screen.queryByText("Ada Lovelace")).toBeNull();
+		},
+	);
+
+	it("does not reuse a cached workspace on a failed return from another workspace", async () => {
+		server.use(unauthenticatedUser);
+		publish();
+		const { router } = renderRouteAtWithRouter("/w/acme");
+		await screen.findByRole("heading", { name: "Acme activity" }, ROUTE_RENDER_WAIT);
+		publish(
+			publicActivity({ workspaceName: "Other", people: [person("other", "Other Developer")] }),
+		);
+		await act(async () => {
+			await router.navigate({ to: "/w/$workspaceSlug", params: { workspaceSlug: "other" } });
+		});
+		await screen.findByRole("heading", { name: "Other activity" });
+		server.use(http.get("*/public/workspaces/:slug/activity", () => HttpResponse.error()));
+		await act(async () => {
+			await router.navigate({ to: "/w/$workspaceSlug", params: { workspaceSlug: "acme" } });
+		});
+		expect(screen.queryByRole("heading", { name: "Acme activity" })).toBeNull();
+		expect(screen.queryByText("Ada Lovelace")).toBeNull();
+		expect(screen.queryByText("Other Developer")).toBeNull();
 	});
 });
 

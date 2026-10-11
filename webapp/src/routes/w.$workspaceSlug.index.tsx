@@ -1,3 +1,4 @@
+import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, redirect, useRouter, useRouterState } from "@tanstack/react-router";
 import { currentTenantSlug } from "@/runtime/workspace-address";
 
@@ -21,6 +22,7 @@ import {
 	PublicActivityPage,
 	PublicActivityPageSkeleton,
 } from "@/components/activity/PublicActivityPage";
+import { queryErrorIsRetryable } from "@/components/common/QueryErrorAlert";
 import { useDetailStack } from "@/components/layout/detail-drawer/use-detail-stack";
 import { PublicActivityOnboardingDialog } from "@/components/onboarding/PublicActivityOnboardingDialog";
 import { useLoginNavigation } from "@/hooks/use-login-navigation";
@@ -35,6 +37,16 @@ import { consentIsPending, resolveCurrentUser } from "@/runtime/auth/guard";
 type PublicActivityLoad =
 	| { status: "ready"; page: PublicActivity }
 	| { status: "error"; error: unknown };
+
+function publicActivityOptions(
+	slug: string,
+	search: Pick<PublicActivitySearch, "range" | "from" | "to" | "repo">,
+) {
+	return getPublicActivityOptions({
+		path: { slug },
+		query: { ...periodQuery(periodFromSearch(search)), repo: search.repo },
+	});
+}
 
 /**
  * The address of a workspace. Its members land on their home; everyone else sees the public activity
@@ -88,42 +100,46 @@ export const Route = createFileRoute("/w/$workspaceSlug/")({
 		return { signedIn: true };
 	},
 	loaderDeps: ({ search: { range, from, to, repo } }) => ({ range, from, to, repo }),
-	loader: async ({ context, params, deps, location }): Promise<PublicActivityLoad> => {
-		const read = async (repo: string[] | undefined) =>
-			context.queryClient.query(
-				getPublicActivityOptions({
-					path: { slug: params.workspaceSlug },
-					query: { ...periodQuery(periodFromSearch(deps)), repo },
-				}),
-			);
-		try {
-			return { status: "ready", page: await read(deps.repo) };
-		} catch (error) {
-			if (problemStatusOf(error) === 404) {
-				// A repository the workspace no longer lists is a 404 too. If the page reads without it,
-				// the link was stale, not the workspace private.
-				if (deps.repo !== undefined && (await read(undefined).catch(() => undefined))) {
-					throw redirect({
-						to: "/w/$workspaceSlug",
-						params,
-						search: { ...location.search, repo: undefined },
-						replace: true,
-					});
+	loader: {
+		// Cached entry must finish its current read before its observer can retain that scope.
+		staleReloadMode: "blocking",
+		handler: async ({ context, params, deps, location }): Promise<PublicActivityLoad> => {
+			const options = publicActivityOptions(params.workspaceSlug, deps);
+			const read = async (repo: string[] | undefined) =>
+				context.queryClient.query(publicActivityOptions(params.workspaceSlug, { ...deps, repo }));
+			try {
+				return { status: "ready", page: await read(deps.repo) };
+			} catch (error) {
+				if (!queryErrorIsRetryable(error)) {
+					// A later network failure cannot restore figures from before an access refusal.
+					await context.queryClient.resetQueries({ queryKey: options.queryKey, exact: true });
 				}
-				// A visitor signs in and comes back to this address, and a signed-in person reaches their own
-				// workspace. Either way a private workspace answers as one that does not exist.
-				if (context.signedIn) {
-					throw redirect({
-						to: "/w/$workspaceSlug/activity",
-						params,
-						search: location.search,
-						replace: true,
-					});
+				if (problemStatusOf(error) === 404) {
+					// A repository the workspace no longer lists is a 404 too. If the page reads without it,
+					// the link was stale, not the workspace private.
+					if (deps.repo !== undefined && (await read(undefined).catch(() => undefined))) {
+						throw redirect({
+							to: "/w/$workspaceSlug",
+							params,
+							search: { ...location.search, repo: undefined },
+							replace: true,
+						});
+					}
+					// A visitor signs in and comes back to this address, and a signed-in person reaches their own
+					// workspace. Either way a private workspace answers as one that does not exist.
+					if (context.signedIn) {
+						throw redirect({
+							to: "/w/$workspaceSlug/activity",
+							params,
+							search: location.search,
+							replace: true,
+						});
+					}
+					throw redirect({ to: "/login", search: { returnTo: location.href } });
 				}
-				throw redirect({ to: "/login", search: { returnTo: location.href } });
+				return { status: "error", error };
 			}
-			return { status: "error", error };
-		}
+		},
 	},
 	// Nothing is indexed until the workspace says so, so a page that did not load stays out too.
 	head: ({ loaderData }) => {
@@ -154,7 +170,16 @@ function PublicActivityRoute() {
 	const updating = useRouterState({ select: (state) => state.isLoading });
 	const { isAuthenticated, userView } = useAuth();
 
-	const page = load.status === "ready" ? load.page : undefined;
+	// The loader owns requests; this observer owns only the exact query's mounted lifecycle.
+	const query = useQuery({ ...publicActivityOptions(workspaceSlug, search), enabled: false });
+	const retained =
+		load.status === "error" &&
+		queryErrorIsRetryable(load.error) &&
+		(query.isRefetchError || query.isFetching) &&
+		query.isFetchedAfterMount
+			? query.data
+			: undefined;
+	const page = load.status === "ready" ? load.page : retained;
 	const providerType = toScmProviderType(page?.providerType);
 	const onboarding = usePublicActivityOnboarding({
 		workspaceSlug,
@@ -185,17 +210,28 @@ function PublicActivityRoute() {
 				repositories={page?.repositories ?? []}
 				coverage={page?.coverage}
 				updating={updating}
-				detail={{ stack: detailStack, onClose: stackControls.close }}
-				people={
-					load.status === "ready"
-						? { status: "ready", people: publicPeopleRows(load.page), stale: false }
-						: {
-								status: "error",
+				refreshError={
+					retained !== undefined && load.status === "error"
+						? {
 								error: load.error,
 								onRetry: () => {
 									void router.invalidate();
 								},
+								pending: updating,
 							}
+						: undefined
+				}
+				detail={{ stack: detailStack, onClose: stackControls.close }}
+				people={
+					page === undefined
+						? {
+								status: "error",
+								error: load.status === "error" ? load.error : undefined,
+								onRetry: () => {
+									void router.invalidate();
+								},
+							}
+						: { status: "ready", people: publicPeopleRows(page), stale: false }
 				}
 			/>
 			{page !== undefined && (
