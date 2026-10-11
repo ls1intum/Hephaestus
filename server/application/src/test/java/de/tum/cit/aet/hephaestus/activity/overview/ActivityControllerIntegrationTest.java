@@ -1030,7 +1030,7 @@ class ActivityControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
             var after = reads.measure(() -> peopleService.people(workspace.getId(), range, null, Set.of()));
             assertThat(after.value().people()).extracting(p -> p.person().id()).containsAll(added);
             assertThat(after.cost()).isEqualTo(before.cost());
-            assertThat(after.cost().statements()).isEqualTo(5);
+            assertThat(after.cost().statements()).isEqualTo(4);
             assertThat(after.cost().entities()).isZero();
         }
 
@@ -1190,7 +1190,7 @@ class ActivityControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
             assertThat(person.counts().peopleHelped()).isEqualTo(1);
             assertThat(person.counts().activeWeeks()).isEqualTo(2);
             assertThat(person.weeks()).hasSize(2);
-            assertThat(measured.cost().statements()).isEqualTo(5);
+            assertThat(measured.cost().statements()).isEqualTo(4);
             assertThat(measured.cost().entities()).isZero();
         }
 

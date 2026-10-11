@@ -40,7 +40,7 @@ public class ActivityService {
                 workspace, team, repositoryKeys, peopleQueries.teams(workspace), peopleQueries.repositories(workspace));
         return work(
                 new ActivityScope(workspace, Set.of(userId), selected.teamIds(), selected.repositoryIds()),
-                page.range(params, clock, peopleQueries.earliest(selected, clock.instant())),
+                page.range(params, clock, () -> peopleQueries.findEarliest(selected)),
                 page);
     }
 
@@ -75,7 +75,7 @@ public class ActivityService {
         }
         return work(
                 new ActivityScope(workspaceId, actors, selected.teamIds(), selected.repositoryIds()),
-                page.range(params, clock, peopleQueries.earliest(selected, clock.instant())),
+                page.range(params, clock, () -> peopleQueries.findEarliest(selected)),
                 page);
     }
 
