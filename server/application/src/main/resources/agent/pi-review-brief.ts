@@ -526,6 +526,14 @@ export type StatementOrigin = "AUTOMATED" | "UNKNOWN";
 
 /** One thing written on the work before its capture, as captured: attributed data, not an assessment of the work now. */
 export interface CapturedPublicStatement {
+	/** Captured mirror links and positions, not native parentage, resolution or current-code anchors. */
+	capturedId?: string | null;
+	threadId?: string | null;
+	/** A missing or unmatched parent does not establish a root comment. */
+	inReplyToId?: string | null;
+	path?: string | null;
+	line?: number | null;
+	side?: "LEFT" | "RIGHT" | null;
 	/** Unique within one history; a trace handle, not evidence. */
 	witnessId: string;
 	sourcePath: string;
@@ -653,6 +661,10 @@ function idOf(value: unknown): string | null {
 	return typeof value === "string" && /^[1-9]\d*$/u.test(value) ? value : null;
 }
 
+function lineOf(value: unknown): number | null {
+	return typeof value === "number" && Number.isSafeInteger(value) && value > 0 ? value : null;
+}
+
 function instantOf(value: unknown): string | null {
 	return typeof value === "string" && Number.isFinite(Date.parse(value)) ? value : null;
 }
@@ -714,6 +726,16 @@ function readDiscussion(
 				: `comment:${sourcePath}:ordinal:${ordinal + 1}`;
 		witnesses.add(witnessId);
 		statements.push({
+			...(file.kind === "scm.pull-request.comments"
+				? {
+						capturedId: idOf(entry.id),
+						threadId: idOf(entry.thread),
+						inReplyToId: idOf(entry.in_reply_to),
+						path: textOf(entry.path),
+						line: lineOf(entry.line),
+						side: entry.side === "LEFT" || entry.side === "RIGHT" ? entry.side : null,
+					}
+				: {}),
 			witnessId,
 			sourcePath,
 			sourceKind: file.kind,
@@ -739,6 +761,11 @@ function readDiscussion(
 		});
 	}
 	const qualifications: string[] = [];
+	if (file.kind === "scm.pull-request.comments") {
+		qualifications.push(
+			"comment, thread and reply handles are captured mirror data; parents and positions may be normalized or inherited, not proof of direct native parentage, resolution or current-code anchors; missing or unmatched parents are unknown",
+		);
+	}
 	if (cutoff === null) {
 		qualifications.push("the capture states no time: whether these words precede it is unknown");
 	}

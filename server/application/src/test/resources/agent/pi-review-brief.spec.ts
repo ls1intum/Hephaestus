@@ -1102,6 +1102,182 @@ void test("a future edit cannot be backdated by creation time and undated captur
 	);
 });
 
+void test("inline discussion preserves captured mirror links without turning author replies into prior advice", (t) => {
+	const file = "context/comments.json";
+	const root = workspace({
+		"context/metadata.json": discussionMetadata(),
+		[file]: JSON.stringify([
+			{
+				id: 101,
+				thread: 201,
+				native_id: 21,
+				author_id: 12,
+				body: "Explain this choice.",
+				created_at: BEFORE_CAPTURE,
+				path: "View.swift",
+				line: 28,
+				side: "RIGHT",
+			},
+			{
+				id: 102,
+				thread: 201,
+				in_reply_to: 101,
+				native_id: 22,
+				author_id: 11,
+				body: "I kept it because of this constraint.",
+				created_at: BEFORE_CAPTURE,
+				path: "View.swift",
+				line: 28,
+				side: "RIGHT",
+			},
+		]),
+	});
+	t.after(() => rmSync(root, { recursive: true, force: true }));
+	const history = buildPublicReviewHistory(
+		root,
+		"context",
+		discussionIndex("scm.pull-request.comments", file),
+		FRAMING,
+	);
+	assert.deepEqual(
+		history.statements.map(
+			({
+				capturedId,
+				threadId,
+				inReplyToId,
+				nativeId,
+				path,
+				line,
+				side,
+				eligibleForPriorAdvice,
+			}) => ({
+				capturedId,
+				threadId,
+				inReplyToId,
+				nativeId,
+				path,
+				line,
+				side,
+				eligibleForPriorAdvice,
+			}),
+		),
+		[
+			{
+				capturedId: "101",
+				threadId: "201",
+				inReplyToId: null,
+				nativeId: "21",
+				path: "View.swift",
+				line: 28,
+				side: "RIGHT",
+				eligibleForPriorAdvice: true,
+			},
+			{
+				capturedId: "102",
+				threadId: "201",
+				inReplyToId: "101",
+				nativeId: "22",
+				path: "View.swift",
+				line: 28,
+				side: "RIGHT",
+				eligibleForPriorAdvice: false,
+			},
+		],
+	);
+	assert.deepEqual(
+		history.statements.map(({ body }) => body),
+		["Explain this choice.", "I kept it because of this constraint."],
+	);
+	assert.equal(history.statements[1]?.witnessId, `comment:${file}:22`);
+	assert.match(JSON.stringify(history.sources), /captured mirror data/u);
+	assert.match(JSON.stringify(history.sources), /not proof of direct native parentage/u);
+});
+
+void test("unmatched and unreadable inline links remain unknown, including a parent edited after capture", (t) => {
+	const file = "context/comments.json";
+	const root = workspace({
+		"context/metadata.json": discussionMetadata(),
+		[file]: JSON.stringify([
+			{
+				id: 101,
+				native_id: 21,
+				author_id: 12,
+				body: "Future parent words.",
+				created_at: BEFORE_CAPTURE,
+				updated_at: "2026-10-01T11:00:00Z",
+			},
+			{
+				id: 102,
+				thread: 201,
+				in_reply_to: 101,
+				native_id: 22,
+				author_id: 11,
+				body: "Captured reply.",
+				created_at: BEFORE_CAPTURE,
+			},
+			{
+				id: -1,
+				thread: "invalid",
+				in_reply_to: 999,
+				native_id: 23,
+				author_id: 12,
+				body: "Unmatched parent.",
+				created_at: BEFORE_CAPTURE,
+				path: "",
+				line: 0,
+				side: "UNKNOWN",
+			},
+			{
+				native_id: 24,
+				author_id: 12,
+				body: "No captured parent.",
+				created_at: BEFORE_CAPTURE,
+				in_reply_to: "invalid",
+				line: 1.5,
+			},
+		]),
+	});
+	t.after(() => rmSync(root, { recursive: true, force: true }));
+	const history = buildPublicReviewHistory(
+		root,
+		"context",
+		discussionIndex("scm.pull-request.comments", file),
+		FRAMING,
+	);
+	assert.deepEqual(
+		history.statements.map(({ capturedId, threadId, inReplyToId, path, line, side }) => ({
+			capturedId,
+			threadId,
+			inReplyToId,
+			path,
+			line,
+			side,
+		})),
+		[
+			{
+				capturedId: "102",
+				threadId: "201",
+				inReplyToId: "101",
+				path: null,
+				line: null,
+				side: null,
+			},
+			{ capturedId: null, threadId: null, inReplyToId: "999", path: null, line: null, side: null },
+			{ capturedId: null, threadId: null, inReplyToId: null, path: null, line: null, side: null },
+		],
+	);
+	assert.deepEqual(
+		history.statements.map(({ nativeId }) => nativeId),
+		["22", "23", "24"],
+	);
+	assert.ok(
+		history.sources.some((source) =>
+			source.qualifications.some((reason) => reason.includes("edited after")),
+		),
+	);
+	assert.doesNotMatch(JSON.stringify(history), /Future parent words/u);
+});
+
 void test("native inline and review decision revisions are not replaced by the current head", (t) => {
 	for (const [kind, file, payload] of [
 		[
@@ -1124,6 +1300,12 @@ void test("native inline and review decision revisions are not replaced by the c
 				reviewDecisions: [
 					{
 						nativeId: 22,
+						id: 102,
+						thread: 201,
+						in_reply_to: 101,
+						path: "View.swift",
+						line: 28,
+						side: "RIGHT",
 						authorId: 12,
 						body: "Check the error path.",
 						submittedAt: BEFORE_CAPTURE,
@@ -1148,6 +1330,10 @@ void test("native inline and review decision revisions are not replaced by the c
 		assert.equal(statement.eligibleForPriorAdvice, true);
 		assert.match(statement.reviewedRevision ?? "", /^original-/u);
 		if (kind === "scm.review-threads") {
+			assert.ok(
+				!("capturedId" in statement) && !("threadId" in statement) && !("inReplyToId" in statement),
+			);
+			assert.ok(!("path" in statement) && !("line" in statement) && !("side" in statement));
 			assert.equal(statement.state, "CHANGES_REQUESTED");
 			assert.equal(statement.dismissed, true);
 			assert.ok(
