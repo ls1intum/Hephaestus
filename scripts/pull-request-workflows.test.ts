@@ -17,6 +17,21 @@ async function stepsIn(file: string, location: string[]): Promise<YAMLMap[]> {
 	});
 }
 
+const identityCommit = (login: string | null) => ({
+	commit: {
+		abbreviatedOid: "abcdef0",
+		authors: {
+			nodes: [
+				{
+					email: "maintainer@example.com",
+					name: "Maintainer",
+					user: login === null ? null : { login },
+				},
+			],
+		},
+	},
+});
+
 void test("title preflight loads without dependencies and validates the current title on reruns", async (t) => {
 	const steps = await stepsIn(".github/workflows/pull-request.yml", [
 		"jobs",
@@ -107,6 +122,156 @@ void test("PR metadata shares a lightweight runner without skipping policies aft
 	]);
 	for (const id of ["identity", "attribution"]) {
 		assert.equal(steps.find((step) => step.get("id") === id)?.get("if"), `\${{ !cancelled() }}`);
+	}
+});
+
+void test("commit identity accepts only the current author or a resolved listed maintainer", async (t) => {
+	const steps = await stepsIn(".github/workflows/pull-request.yml", [
+		"jobs",
+		"validate-pr",
+		"steps",
+	]);
+	const identity = steps.find((step) => step.get("id") === "identity");
+	assert.ok(identity);
+	assert.equal(identity.getIn(["env", "MAINTAINERS"]), `\${{ vars.REVIEW_POLICY_MAINTAINERS }}`);
+	const script = identity.getIn(["with", "script"]);
+	assert.equal(typeof script, "string");
+	const checkout = steps.find((step) => String(step.get("uses")).startsWith("actions/checkout@"));
+	assert.ok(checkout);
+	assert.equal(checkout.getIn(["with", "ref"]), `\${{ github.event.repository.default_branch }}`);
+	assert.equal(checkout.getIn(["with", "persist-credentials"]), false);
+	const workspace = await mkdtemp(path.join(tmpdir(), "commit-identity-"));
+	t.after(async () => rm(workspace, { recursive: true, force: true }));
+	for (const entry of String(checkout.getIn(["with", "sparse-checkout"]))
+		.trim()
+		.split("\n")) {
+		const file = entry.trim();
+		await mkdir(path.join(workspace, path.dirname(file)), { recursive: true });
+		await copyFile(file, path.join(workspace, file));
+	}
+	const coauthored = identityCommit("unlisted");
+	coauthored.commit.authors.nodes.push({
+		email: "listed@example.com",
+		name: "Listed",
+		user: { login: "maintainer" },
+	});
+	const cases = [
+		{
+			name: "current PR author",
+			author: "contributor",
+			type: "User",
+			maintainers: "",
+			pages: [[identityCommit("contributor")]],
+			valid: true,
+		},
+		{
+			name: "listed maintainer and case normalization",
+			author: "contributor",
+			type: "User",
+			maintainers: " MaIntAiner, ",
+			pages: [[identityCommit("MAINTAINER")]],
+			valid: true,
+		},
+		{
+			name: "mixed contributor and maintainer commits",
+			author: "contributor",
+			type: "User",
+			maintainers: "maintainer",
+			pages: [[identityCommit("contributor"), identityCommit("maintainer")]],
+			valid: true,
+		},
+		{
+			name: "unresolved name and email",
+			author: "contributor",
+			type: "User",
+			maintainers: "maintainer",
+			pages: [[identityCommit(null)]],
+			valid: false,
+		},
+		{
+			name: "unlisted collaborator",
+			author: "contributor",
+			type: "User",
+			maintainers: "maintainer",
+			pages: [[identityCommit("other")]],
+			valid: false,
+		},
+		{
+			name: "co-author cannot replace primary author",
+			author: "contributor",
+			type: "User",
+			maintainers: "maintainer",
+			pages: [[coauthored]],
+			valid: false,
+		},
+		{
+			name: "empty maintainer list",
+			author: "contributor",
+			type: "User",
+			maintainers: "",
+			pages: [[identityCommit("maintainer")]],
+			valid: false,
+		},
+		{
+			name: "bot's resolved account",
+			author: "renovate",
+			type: "Bot",
+			maintainers: "",
+			pages: [[identityCommit("Renovate[bot]")]],
+			valid: true,
+		},
+		{
+			name: "bot login without resolved suffix",
+			author: "renovate",
+			type: "Bot",
+			maintainers: "",
+			pages: [[identityCommit("renovate")]],
+			valid: false,
+		},
+		{
+			name: "offender after a full page",
+			author: "contributor",
+			type: "User",
+			maintainers: "maintainer",
+			pages: [
+				Array.from({ length: 100 }, () => identityCommit("maintainer")),
+				[identityCommit("other")],
+			],
+			valid: false,
+		},
+	];
+	for (const entry of cases) {
+		const result = spawnSync(
+			process.execPath,
+			[
+				"-e",
+				`
+			const assert = require("node:assert/strict");
+			const pages = ${JSON.stringify(entry.pages)};
+			let calls = 0;
+			const context = { repo: { owner: "owner", repo: "repo" }, payload: { pull_request: { number: 7, user: { login: "stale-payload" }, base: { ref: "main" } } } };
+			const github = { graphql: async (query, variables) => {
+				assert.ok(query.includes("authors(first:1)"));
+				assert.equal(variables.after, calls === 0 ? null : "page-" + calls);
+				const nodes = pages[calls++];
+				return { repository: { pullRequest: { author: { __typename: ${JSON.stringify(entry.type)}, login: ${JSON.stringify(entry.author)} }, commits: { nodes, pageInfo: { hasNextPage: calls < pages.length, endCursor: "page-" + calls } } } } };
+			} };
+			const core = { setFailed() { process.exitCode = 1; } };
+			(async () => { ${String(script)} })().then(() => assert.equal(calls, pages.length)).catch(error => { console.error(error); process.exitCode = 2; });
+		`,
+			],
+			{
+				encoding: "utf8",
+				env: {
+					...process.env,
+					GITHUB_WORKSPACE: workspace,
+					RUNNER_TEMP: workspace,
+					MAINTAINERS: entry.maintainers,
+				},
+			},
+		);
+		assert.equal(result.status, entry.valid ? 0 : 1, `${entry.name}: ${result.stderr}`);
+		assert.equal(result.stderr, "", entry.name);
 	}
 });
 
