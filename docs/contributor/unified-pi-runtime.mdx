@@ -85,7 +85,7 @@ Thus, the summary is billed to that turn and spends its budget.
 If compaction fails or leaves the conversation past the trigger, the turn ends with an error.
 It does not send the history.
 Pi never cuts inside a tool batch, so a tool result larger than the retention target stays whole.
-Context resources stay small for that reason. `observations_history.json` lists observations without their evidence. `observations_history/<id>.json` reads one listed observation's evidence on demand.
+Context resources stay small for that reason. `results_history.json` lists results without their evidence. `results_history/<id>.json` reads one listed result's evidence and observations on demand.
 
 Each resource has a size bound.
 The trigger also caps Pi's summary output at the model's own output limit.

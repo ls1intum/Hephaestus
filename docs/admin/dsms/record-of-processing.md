@@ -45,17 +45,17 @@ A workspace administrator connects one or more Git repositories from github.com 
 
 Hephaestus then syncs authored pull/merge requests, issues, code reviews, review comments, and commit metadata from those repositories. The platform processes activity authored in the connected repositories, whether or not the author has signed in to Hephaestus.
 
-Hephaestus analyzes the synced activity against practices that the workspace administrator configures. It produces observations about each contributor's activity. Some judgments require the analysis to read and understand natural-language text. Examples include the meaning of a code comment or the substance of a review reply. For those judgments, the analysis uses an eligible model configured for the workspace, selected by the reviewed developer's AI choice (see the recipient details below).
+Hephaestus analyzes the synced activity against practices that the workspace administrator configures. It produces practice results about each contributor's activity. A result is one practice's verdict on one piece of work. Hephaestus stores each result with its observations (problems at places in the work), an optional example and any open questions. Some judgments require the analysis to read and understand natural-language text. Examples include the meaning of a code comment or the substance of a review reply. For those judgments, the analysis uses an eligible model configured for the workspace, selected by the reviewed developer's AI choice (see the recipient details below).
 
 Automated practice review forwards the relevant pull/merge-request diff or issue content and the surrounding discussion to the provider. For a pull/merge request, it also forwards whatever the review reads from the captured repository and its history. It can post the resulting AI-generated feedback as comments on the reviewed artifact. Where explicitly connected and permitted, selected Outline documents may supply project context.
 
 The conversational mentor is an in-app chat where contributors can ask follow-up questions. Hephaestus forwards their messages and the approved bounded context to an eligible model configured for Heph, selected by the AI choice of the person who asks (see the recipient details below). This context can come from repository activity, prior feedback, selected Outline documents, or participant-permitted monitored Slack channels. Sources are purpose- and audience-bound. An enabled integration does not by itself authorize all of its content for every request.
 
-Contributors who sign in with their GitHub or LRZ-GitLab account get a personal dashboard that summarizes their observations and activity. They get access to the conversational mentor and their account preferences. Sign-in adds the federated user identifier, username, display name, email, and avatar URL to what Hephaestus holds about that contributor.
+Contributors who sign in with their GitHub or LRZ-GitLab account get a personal dashboard that summarizes their practice results and activity. They get access to the conversational mentor and their account preferences. Sign-in adds the federated user identifier, username, display name, email, and avatar URL to what Hephaestus holds about that contributor.
 
 Everyone with a role in the workspace also sees Activity. Activity shows counts and lists of pull/merge requests, reviews, issues and comments that members did in the workspace's repositories. It also shows each member's open work (review requests, assigned issues), with each reviewer's review state. Members see this for themselves and for the workspace. Workspace activity can sort people by each count. The default sort is Contributions: pull/merge requests opened, pull/merge requests reviewed (each once, never one's own) and issues opened, with no weights. A sorted table shows a position number (ADR 0052). Activity never shows a score, practices or standings.
 
-A workspace administrator can publish a public activity page when the instance allows it. Anyone can read it without sign-in. It shows the counts and links of the work in the workspace's public repositories, for members and outside contributors. It never shows practices, feedback, observations, Slack, Outline or AI review content. Each person can hide at once with Show me on public activity pages. A hidden person leaves every total. A person without an account can object through the privacy contact. The maintainer reassessed this audience on 2026-10-09. The TUM data-protection coordinator confirms it before the first TUM workspace goes public (`dpia-prescreen.md` § 6).
+A workspace administrator can publish a public activity page when the instance allows it. Anyone can read it without sign-in. It shows the counts and links of the work in the workspace's public repositories, for members and outside contributors. It never shows practices, feedback, practice results, Slack, Outline or AI review content. Each person can hide at once with Show me on public activity pages. A hidden person leaves every total. A person without an account can object through the privacy contact. The maintainer reassessed this audience on 2026-10-09. The TUM data-protection coordinator confirms it before the first TUM workspace goes public (`dpia-prescreen.md` § 6).
 
 Members also see Practices across the workspace (ADR 0051). It counts how many developers are at each practice standing in each practice group and practice. It also shows the middle half of the reviewed work, the practices going well, the practices needing attention and the open feedback of the developers counted. It names nobody and has no smallest count. Thus, a small count can tell the members of a workspace the standing of one developer. Hidden members are not counted. The maintainer reassessed this audience on 2026-10-07 with a low residual risk. The full DPIA confirms it (`dpia-prescreen.md` § 6).
 
@@ -69,9 +69,9 @@ The research uses the participant's work in connected repositories and tools, He
 
 The participant can refuse or withdraw at any time. Refusing or withdrawing has no disadvantage, and practice reviews continue. The consent is separate from the terms of use and is not a condition of service. The research is covered in more detail under *Legal basis* below.
 
-TUM is the controller. Workspace administrators make these workspace-level choices under TUM's operating responsibility; an administrator role does not establish separate or joint controllership. The choices are listed in "Legal basis" below. Hephaestus focuses on the contributor's own development. Observations serve the contributor and let the workspace administrator deliver targeted feedback during the project.
+TUM is the controller. Workspace administrators make these workspace-level choices under TUM's operating responsibility; an administrator role does not establish separate or joint controllership. The choices are listed in "Legal basis" below. Hephaestus focuses on the contributor's own development. Practice results serve the contributor and let the workspace administrator deliver targeted feedback during the project.
 
-Observations are advisory and contestable. The platform makes no automated decisions within the meaning of Art. 22 GDPR. It feeds no grading, assessment, HR, or access-control pipeline. Signed-in contributors can stop new practice-feedback comments and related Slack reminders through the in-app **Comments and Slack reminders** setting. They can respond to individual pieces of feedback by recording whether the feedback was helpful and how they handled it.
+Practice results are advisory and contestable. The platform makes no automated decisions within the meaning of Art. 22 GDPR. It feeds no grading, assessment, HR, or access-control pipeline. Signed-in contributors can stop new practice-feedback comments and related Slack reminders through the in-app **Comments and Slack reminders** setting. They can respond to individual pieces of feedback by recording whether the feedback was helpful and how they handled it.
 
 This delivery setting does not stop review processing.
 
@@ -100,7 +100,7 @@ These include metadata about comments recorded as posted for the reader on that 
 - Practice names, comment locations and links.
 - Recorded delivery times.
 
-When the report opens, it also handles the reader's own observations on that work:
+When the report opens, it also handles the reader's own practice results on that work:
 
 - Practice, outcome and severity.
 - A one-sentence summary.
@@ -128,7 +128,7 @@ In DSMS:
 
 ## Categories of personal data
 
-Do **not** select `Examination and academic performance`. Practice observations are advisory, not graded.
+Do **not** select `Examination and academic performance`. Practice results are advisory, not graded.
 
 In DSMS:
 
@@ -274,7 +274,7 @@ Profiles include login, name, email and avatar. Hephaestus retains these as inst
 
 Authored repository artifacts and derived records
 
-These include issues, pull/merge requests, comments and reviews synced from GitHub / gitlab.lrz.de. They also include their practice observations, delivery-policy traces, and pending delivery packages. The active PostgreSQL mirror remains while at least one workspace monitors the source repository. Removal occurs when the last workspace stops monitoring it, the last relevant connection disconnects, the workspace is purged, or verified erasure completes.
+These include issues, pull/merge requests, comments and reviews synced from GitHub / gitlab.lrz.de. They also include their practice results and observations, delivery-policy traces, and pending delivery packages. The active PostgreSQL mirror remains while at least one workspace monitors the source repository. Removal occurs when the last workspace stops monitoring it, the last relevant connection disconnects, the workspace is purged, or verified erasure completes.
 
 After projection of a package into the practice-feedback ledger, a terminal delivery keeps only its idempotency and provider-placement record. Failed packages remain available for an administrator to retry. Diagnostic, worker-input, and broker copies follow the bounded windows below. They do not all support immediate selective erasure.
 
@@ -326,9 +326,9 @@ The ledger holds no message content and no free text. Its opaque source identifi
 
 Practice-review job records (`agent_job`)
 
-These records include the queued job, the sandbox's captured stdout, and the observations it produced. They can quote the contributor's code and discussion. The retention service strips the diagnostic payload (`container_logs`, `output`) to NULL 14 days after the job reaches a terminal state (`AGENT_PAYLOAD_RETENTION`, default `P14D`). The unreferenced row becomes eligible for deletion after 90 days (`AGENT_ROW_RETENTION`, default `P90D`). Operators can change both windows.
+These records include the queued job, the sandbox's captured stdout, and the practice results it produced. They can quote the contributor's code and discussion. The retention service strips the diagnostic payload (`container_logs`, `output`) to NULL 14 days after the job reaches a terminal state (`AGENT_PAYLOAD_RETENTION`, default `P14D`). The unreferenced row becomes eligible for deletion after 90 days (`AGENT_ROW_RETENTION`, default `P90D`). Operators can change both windows.
 
-Pending delivery blocks both passes. Observations or feedback that reference the job block row deletion. The scheduled service runs only with the server role and AGENT_ENABLED=true. If that service is disabled, retained jobs do not expire.
+Pending delivery blocks both passes. Practice results or feedback that reference the job block row deletion. The scheduled service runs only with the server role and AGENT_ENABLED=true. If that service is disabled, retained jobs do not expire.
 
 1. Monitor the backlog.
 2. For individual requests, use verified person erasure.
@@ -387,7 +387,7 @@ For a wider verified Art. 15 request, an instance administrator uses Person data
 2. Preview the per-store scope.
 3. Download one machine-readable JSON file.
 
-The file includes conversations, observations (also invalidated), feedback and its delivery state (also never delivered), activity, memberships, profiles, preferences and collected Slack content. It excludes credentials and other people's profile data. The access and erasure contributors use the same frozen selections. A changed preview needs a replacement.
+The file includes conversations, practice results with their observations (also invalidated results), feedback and its delivery state (also never delivered), activity, memberships, profiles, preferences and collected Slack content. It excludes credentials and other people's profile data. The access and erasure contributors use the same frozen selections. A changed preview needs a replacement.
 
 Original source-platform content and copies outside active application storage remain subject to the platform or operator's separate procedure. No layer of the stack writes an HTTP access log, so there are no HTTP access-log entries to disclose. Hephaestus holds IP addresses on authentication events, which the self-service export already covers.
 
@@ -426,7 +426,7 @@ Instance administration → Person data covers exact source-only identities as w
 
 Erasure cancels affected attempts and waits for mounted evidence-store acknowledgement. It removes selected conversations and derived records. It anonymizes shared profiles and attribution. It clears affected hidden Heph runtime journals. An offline worker or failed step leaves a resumable request, not a completed erasure.
 
-Other developers' observations and feedback stay when the person appeared only in their evidence. Erasure removes the captured input copies. Permanent exact-native-identity suppression prevents new product processing. Sync may still mirror upstream records. Git history, broker payloads, backups, delivered email and provider-side copies follow the separate boundaries in the personal-data map. These controls do not authorize extended evaluation retention.
+Other developers' practice results and feedback stay when the person appeared only in their evidence. Erasure removes the captured input copies. Permanent exact-native-identity suppression prevents new product processing. Sync may still mirror upstream records. Git history, broker payloads, backups, delivered email and provider-side copies follow the separate boundaries in the personal-data map. These controls do not authorize extended evaluation retention.
 
 Research copies
 
@@ -438,8 +438,8 @@ Mirrored third-party content
 
 Disconnection of the corresponding integration and workspace purge erase the same rows by hard deletion, not by a deleted-flag. The erased content is:
 
-- GitHub / gitlab.lrz.de: the mirrored repository and everything that cascades from it. This includes issues, pull/merge requests, reviews, review threads and comments, discussions, labels, milestones, and collaborators. It also includes the workspace's repository monitors and any local git clone. The org-level mirror includes teams, team memberships and organization memberships. Removal also covers the activity-event log and SCM-derived practice observations and feedback, whose evidence quotes mirrored content verbatim. Repository rows are instance-global and shared. A repository that another workspace still monitors remains for that workspace. Only the disconnecting workspace's access path is removed. The org-level mirror is removed only when no other workspace is bound to the same organization.
-- Slack: messages, threads, monitored-channel records, participant-consent records, mentor threads, and conversation-derived observations and feedback.
+- GitHub / gitlab.lrz.de: the mirrored repository and everything that cascades from it. This includes issues, pull/merge requests, reviews, review threads and comments, discussions, labels, milestones, and collaborators. It also includes the workspace's repository monitors and any local git clone. The org-level mirror includes teams, team memberships and organization memberships. Removal also covers the activity-event log and SCM-derived practice results (with their observations) and feedback, whose evidence quotes mirrored content verbatim. Repository rows are instance-global and shared. A repository that another workspace still monitors remains for that workspace. Only the disconnecting workspace's access path is removed. The org-level mirror is removed only when no other workspace is bound to the same organization.
+- Slack: messages, threads, monitored-channel records, participant-consent records, mentor threads, and conversation-derived practice results and feedback.
 - Outline: documents, collections, and the document event log.
 
 Retention after disconnection / purge
@@ -538,7 +538,7 @@ Recovery (Art. 32(1)(c))
 
 An optional encrypted pgBackRest off-host backup overlay ships in docker/self-host/compose.backup.yaml. Its existence does not prove that the TUM deployment enables it. Before relying on recovery, record the actual destination, chain-count policy, effective age limit, access permissions, restore-test result and erased-data handling.
 
-The PostgreSQL container uses a named Docker volume on the host. GitHub and gitlab.lrz.de hold the authoritative copies of pull/merge-request content. Loss of the host-local PostgreSQL volume would lose Hephaestus-specific state: workspace state, observations and practice configurations. This file does not record acceptance of that risk.
+The PostgreSQL container uses a named Docker volume on the host. GitHub and gitlab.lrz.de hold the authoritative copies of pull/merge-request content. Loss of the host-local PostgreSQL volume would lose Hephaestus-specific state: workspace state, practice results and practice configurations. This file does not record acceptance of that risk.
 
 Testing and evaluation (Art. 32(1)(d))
 
@@ -692,7 +692,7 @@ person's commits, selected through exact native identity references, never names
 
 ## Current source scope and controls
 
-Automated practice review can read all permitted workspace areas and repositories in its job folder. This includes Slack threads and person-scoped observation and feedback history. There are no record-count or history-window caps. The source-use registry version 1.3.0 records maintainer engineering approval,
+Automated practice review can read all permitted workspace areas and repositories in its job folder. This includes Slack threads and person-scoped practice result and feedback history. There are no record-count or history-window caps. The source-use registry version 1.3.0 records maintainer engineering approval,
 not controller/DPO approval. The [source-governance record](./artifact-source-governance.md) owns the
 scope and approval boundary. These categories belong in the full DPIA and the pending notice review.
 
@@ -724,7 +724,7 @@ Other members see standings only in the counts of Practices across the workspace
 one developer when a count is small.
 
 Practice profiles and their feedback text are private to the developer. Workspace admins can read
-observations, delivery metadata, whether a developer answered a piece of feedback, and dispute
+results, delivery metadata, whether a developer answered a piece of feedback, and dispute
 explanations. Ordinary administration does not show them practice-page or conversation feedback text.
 Ratings, other resolutions and other private response notes stay private.
 
@@ -744,7 +744,7 @@ and inline provider comments are not recalled. This is correction and delivery c
 Slack channel retention defaults to 30 days, configurable per connection with a 180-day ceiling.
 Eligibility is measured from a thread's last message, so an active thread can contain much older
 messages. This is not a maximum age for each message and does not apply to mentor DMs. Daily cleanup
-and failures can delay removal. Contributor profiles, conversations, observations, feedback, consent records, and several operational stores have no independent time-based expiry.
+and failures can delay removal. Contributor profiles, conversations, practice results, feedback, consent records, and several operational stores have no independent time-based expiry.
 
 1. Choose a necessity review and deletion trigger.
 2. Document them.

@@ -93,7 +93,7 @@ Tone changes with the situation.
 | **Warning** | Calm. Give notice before a loss. Name the consequence and the way out. | `This repository has no webhook. New pull requests will not be reviewed until you add one.` |
 | **Error** | Plain. Say what happened, then what to do next. | `We could not reach GitHub. Check the connection, then try again.` |
 | **Empty** | Helpful. Say why it is empty and what will appear. Offer the way to get it. | `No feedback yet. It appears here after Heph reviews your next pull request.` |
-| **Destructive** | Serious. Name the object and the consequence. Say if it can be undone. | `Delete practice "Code review"? This removes the practice and its observations. You cannot undo this.` |
+| **Destructive** | Serious. Name the object and the consequence. Say if it can be undone. | `Delete practice "Code review"? This removes the practice and its results. You cannot undo this.` |
 | **Onboarding** | Encouraging, one step at a time. Lead to the first result. | `Connect a repository to get your first feedback.` |
 | **Progress** | Present participle with a single ellipsis character. | `Saving…` |
 

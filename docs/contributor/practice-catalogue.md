@@ -420,20 +420,26 @@ A changed visual or guide follows the [release behavior](#release-behavior) of e
 
 ### Practice scripts
 
-A practice script finds leads inside the review container.
-Every bundled script uses `definePracticeScript`, the one contract that the runner runs.
-It reads the work, the cause, the previous result, the parsed change and the captured context.
-It returns leads, facts, unrated items and directions, not observations.
-[Write a practice script](/admin/practice-scripts) owns the contract, its model slots and its lead design.
+A practice script is the review program of its practice, and it runs inside the review container.
+A practice without a script runs the built-in program, which asks for one review of the practice as it is.
+[Write a practice script](/admin/practice-scripts) owns the contract, its model slots and its review input.
+The [practice script runner](./practice-script-runner.mdx) owns how the host runs a program.
 The [workspace ABI](./agent/workspace-abi.mdx#practice-script-validation-and-limits) owns the process grants and the deadline.
 
-The runner keeps only a lead whose kind the script declares and whose citation the source holds.
-The section counts the leads that it does not show.
+Every bundled script uses `definePracticeScript` with `meta: {}`, because no bundled script calls a model directly.
+It reads the work, the cause, the previous result, the files and the captured records.
+It prepares a review input and returns `ctx.review({ leads, facts, directions, limitations })`.
+Thus, the review session decides the result, and the script never decides one itself.
+Each bundled script exports `LABELS`, the label of each kind of lead that it finds.
+The child reads only the default export, and the tests use `LABELS` to name leads.
+
+The host resolves each lead to the text that its source holds.
+A lead that its source does not hold is an error of the script, never dropped.
 
 - **Practice-specific predicates belong in the script.** Shared readers and scanning mechanics live
   in `docker/agents/practice-scripts/lib/`. Keep the predicates consistent with the practice criteria.
-- **A candidate is not a judgment.** A matched line or review thread directs inspection. The model
-  must check its context against the criteria. The purity test rejects observation vocabulary in
+- **A lead is not a judgment.** A matched line or review thread directs inspection. The review
+  session must check its context against the criteria. The purity test rejects observation vocabulary in
   scripts, but does not establish that their output is complete or correct.
 - **Missing and empty differ.** Context readers return `null` when a capture file is absent and `[]`
   when a captured list is empty. Scripts must preserve that distinction.
@@ -441,12 +447,36 @@ The section counts the leads that it does not show.
   Unsupported languages and unavailable files produce `unknown` placement. Directions must identify
   relevant limits, such as constructs that span several lines.
 
-The runner renders one bounded section per practice, `work/practice-scripts-out/<slug>.md`, and the review shows it under that practice's criteria in the turn that evaluates it.
+The host renders one bounded section for each review input, and the review session reads it under that practice's criteria.
 A section holds the practice's directions, leads, facts and `Not rated` lines.
-[What the review reads](/admin/practice-scripts#what-the-review-reads) gives its 3,000-character bound and what the bound keeps.
-Sections are bounded one by one, so a script with many leads never crowds another practice's leads out.
-
+It has at most 3,000 characters, and the `Not rated` lines keep their own share.
+[Review input](/admin/practice-scripts#review-input) gives what the bound keeps.
+The session can read the whole input in `work/review-input/<slug>.json`.
 A section is an entry point to the evidence, not proof that the model inspected every candidate.
+
+#### Bundled script upgrade
+
+A release that changes the contract of practice scripts also changes the bundled scripts.
+A workspace or instance copy of a bundled practice keeps its own script, so the server upgrades the copies once.
+`PracticeCatalogInstallationManager` runs this step on the server role after the workspaces are initialized.
+
+1. The step runs `adoptShippedPracticeScripts` for the instance copies first.
+2. For each workspace that is not yet upgraded, it runs `PracticeReleaseService.adoptOfferedPracticeScript` for each practice, in one transaction.
+3. The step then marks the workspace in `practice_catalog_installation.practice_scripts_upgraded_at`.
+
+A copy is unchanged when its script equals the script of its adopted base, and the release offers another script.
+An unchanged copy gets the offered script, and a new revision and a system audit entry record the change.
+Every other field of the copy and its pending offer stay as they were.
+
+A diverged copy keeps its script and its normal offer.
+If that script is in the positional form of earlier releases, its practice fails at run time.
+The status is `failed`, the stop reason is `invalid-program`, and the error is `RETIRED_FORM_ERROR`.
+A script in the leads form of a preview build fails in the same way with `LEGACY_CONTRACT_ERROR`.
+Each error tells an admin to rewrite the script, and the offer can replace it.
+
+If the instance step fails, no workspace is marked, and the next start tries again.
+A copy whose offered script fails validation is kept, and the server logs it.
+A new installation is marked at once.
 
 ### Review the effective definition
 
@@ -456,7 +486,7 @@ Check these seams explicitly:
 - A preamble cannot declare a source unavailable when the review captures it, or infer absence from
   an unavailable quotation. The actual capture manifest establishes availability. Practice criteria
   establish permitted use.
-- A candidate from a practice script is a lead, not a judgment. A count or path match alone cannot establish a
+- A lead from a practice script is not a judgment. A count or path match alone cannot establish a
   developer's intent, a runtime outcome or the adequacy of a rationale.
 - An applicability exclusion and an assessed outcome cannot both describe the same case. Read all
   exceptions together with the final decision instructions, not just the opening behavior statement.

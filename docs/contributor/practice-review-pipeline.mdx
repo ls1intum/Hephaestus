@@ -5,22 +5,22 @@ title: Practice review pipeline
 description: The four practice review stages and their refusal vocabulary. The seam between measurement and delivery, and where the work runs.
 ---
 
-A practice review passes through four stages, in this order: **Occasion**, **Capture**, **Observation**,
+A practice review passes through four stages, in this order: **Occasion**, **Capture**, **Result**,
 **Delivery**.
 Each stage can stop independently and records a different reason.
 
 ```mermaid
 flowchart TB
     accTitle: Practice review stages and their distinct exits
-    accDescr: Work passes through occasion, evidence capture, observation, and delivery. Each stage records a different result when processing stops.
+    accDescr: Work passes through occasion, evidence capture, result, and delivery. Each stage records a different result when processing stops.
     Work[Something happened to a piece of work] --> Occasion{Occasion: do we look?}
     Occasion -->|no| Refused[artifact_signal.state_reason]
     Occasion -->|yes| Capture{Capture: can we look?}
     Capture -->|no| Unready[agent_job.review_readiness]
-    Capture -->|yes| Observe{Observation: what do we see?}
-    Observe -->|no practice subject| NotApplicable[observation.outcome NOT_APPLICABLE]
-    Observe -->|cannot tell| Undetermined[observation.outcome UNDETERMINED]
-    Observe -->|behaviour claim| Deliver{Delivery: do we say it?}
+    Capture -->|yes| Judge{Result: what do we see?}
+    Judge -->|no practice subject| NotApplicable[practice_result.outcome NOT_APPLICABLE]
+    Judge -->|cannot tell| Undetermined[practice_result.outcome UNDETERMINED]
+    Judge -->|behaviour claim| Deliver{Delivery: do we say it?}
     Deliver -->|no| Quiet[feedback.suppression_reason]
     Deliver -->|yes| Said[Feedback recorded and routed to an eligible surface]
 ```
@@ -37,13 +37,13 @@ Start elsewhere when your change belongs to one contract:
 | ----------------------------------------------------------------- | ------------------------------------------------------------- |
 | A source, its capture states, retention, or permitted uses        | [Artifact-source contract](./artifact-source-contract.mdx)    |
 | A practice's criteria, occasion, or evidence requirements         | [Practice catalogue](./practice-catalogue.md)                 |
-| Observation or feedback persistence, identity, or API projections | [Practice review data model](./practice-feedback-schema.md)   |
+| Result or feedback persistence, identity, or API projections      | [Practice review data model](./practice-feedback-schema.md)   |
 | Product and model-facing terminology                              | [Practice feedback language](./practice-feedback-language.md) |
 | Run provenance and evaluation joins                               | [Evaluation provenance](./evaluation-provenance.md)           |
 | An exact enum meaning after you know the stage                    | [Practice review glossary](./practice-review-glossary.mdx)    |
 
 Use this page for changes across stages.
-Capture failures must not become observations, and delivery choices must not erase observations.
+Capture failures must not become results, and delivery choices must not erase results.
 
 ## Where a review can stop
 
@@ -53,11 +53,11 @@ Capture failures must not become observations, and delivery choices must not era
 | ----------- | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------- |
 | Occasion    | `SignalStateReason`                                                          | `artifact_signal.state_reason`                                             | We chose not to look, or not yet |
 | Capture     | `SourceAbsenceReason` per source, `SourceReadinessReason` per practice check | `agent_job.evidence_snapshot` (the manifest), `agent_job.review_readiness` | We could not look                |
-| Observation | `Outcome.UNDETERMINED`                                                       | `observation.outcome`                                                      | We looked and could not tell     |
+| Result      | `Outcome.UNDETERMINED`                                                       | `practice_result.outcome`                                                  | We looked and could not tell     |
 | Delivery    | `FeedbackSuppressionReason`                                                  | `feedback.suppression_reason`                                              | We know, and chose to stay quiet |
 
 A missing source is not a claim about behavior and must not become an `Outcome` value.
-A delivery refusal or pending approval does not erase the observation.
+A delivery refusal or pending approval does not erase the result.
 Add each reason to the stage that owns the decision. Use separate reasons when more than one stage stops.
 
 ## Occasion
@@ -67,31 +67,31 @@ It is recorded in `artifact_signal` before admission, so a review that does not 
 
 ### Issue snapshot supersession
 
-An issue observation is current only while both its practice review rule and its supporting issue snapshot are current.
+An issue result is current only while both its practice review rule and its supporting issue snapshot are current.
 A change to title, body, state, state reason, native type, milestone, labels, or assignees advances the issue's review snapshot.
-This occurs in the mirror transaction and marks earlier issue observations historical.
+This occurs in the mirror transaction and marks earlier issue results historical.
 An identical replay does neither.
 A return to earlier content is a **new** transition.
 
 The snapshot token changes even though its content digest matches an older one.
-The older observations do not become current again.
+The older results do not become current again.
 
 The snapshot-deduplicated automatic occasion may already be settled for that content.
-In that case there is no new current observation until a new review is requested.
+In that case there is no new current result until a new review is requested.
 A failed, refused, or undecided later review never implies that the earlier judgment was correct or incorrect.
 
 One mirrored issue can be reviewed in several workspaces.
-Its transition retires observations in every workspace that recorded that issue, without exposing one workspace's history to another.
+Its transition retires results in every workspace that recorded that issue, without exposing one workspace's history to another.
 Each monitoring workspace records and settles its own issue-update occasion.
 A later monitor change cannot redirect a queued review to a different workspace.
 
-At observation publication, the review must still name the issue's current snapshot token.
+At result publication, the review must still name the issue's current snapshot token.
 The publication transaction locks the issue row.
-A concurrent mirror update either completes first and rejects the old review, or completes afterwards and marks its observations historical.
-A historical observation keeps its evidence, job, feedback links and original developer.
+A concurrent mirror update either completes first and rejects the old review, or completes afterwards and marks its results historical.
+A historical result keeps its evidence, job, feedback links and original developer.
 
 It is not a human retraction ([#1507](https://github.com/hephaestus-build/Hephaestus/issues/1507)).
-Existing issue observations with no reliable snapshot token become historical at migration, rather than being presented as verified current claims.
+Existing issue results with no reliable snapshot token become historical at migration, rather than being presented as verified current claims.
 Operator review history reports `STALE`.
 Current developer standings and Heph context omit superseded claims.
 
@@ -189,11 +189,11 @@ Only practices bound to updates are selected.
 Changes to a closing issue's title, body, dates or state also record a separate repair occasion for merged pull or merge requests that close it.
 Changes to the merged work's title, body, head or closing-issue set record that occasion too.
 Sync records these discoveries without starting a review.
-The repair gate requires current eligible negative observations about changed cited linked material.
+The repair gate requires current eligible negative results about changed cited linked material.
 A head change alone does not prove that change, and the repair captures current work rather than reconstructing the original merge.
 
 A close review is admitted with the issue's snapshot token.
-If the token has moved by the time its evidence is captured, capture stops before writing evidence files and the review records no observation.
+If the token has moved by the time its evidence is captured, capture stops before writing evidence files and the review records no result.
 An issue edit, a change to its discussion, or a reopen can move the token.
 The update occasion reviews the current record.
 
@@ -257,7 +257,7 @@ Only that diff distinguishes a retitling from a due-date, weight, or time-tracki
 
 Synchronization updates the issue projection without starting a live review.
 When GitLab sync finds changed review evidence on an existing issue, it advances the snapshot and records the update occasion as sync-discovered.
-This retires stale observations without coaching on historical work.
+This retires stale results without coaching on historical work.
 GitLab synchronization includes native type, but its webhook contract does not provide a reliable type transition.
 
 The GitLab adapter therefore does not advertise live type-change reviews.
@@ -294,12 +294,12 @@ See [Signal state reasons](./practice-review-glossary.mdx#signal-state-reasons) 
 Issue-update jobs retain the admitted revision.
 Capture compares it against the issue's canonical digest.
 For a missing or mismatched revision, it reports the source unavailable (`SourceAbsenceReason.NOT_FOUND`).
-It does not make an observation about the developer.
-This check does not fence edits after capture or invalidate earlier observations and feedback.
+It records no result about the developer.
+This check does not fence edits after capture or invalidate earlier results and feedback.
 Closure jobs use the same source-unavailable reason when their admitted snapshot token is missing or no longer current.
 
 The recorded source and practice readiness checks explain why capture stopped.
-No observation is recorded.
+No result is recorded.
 The final publication check still rejects a token that moves after capture.
 
 #### Push and edit coalescing
@@ -368,13 +368,13 @@ The run then completes with the outcome `COALESCED` without starting a sandbox.
 The executor records the captured evidence and readiness.
 It writes the outcome and its `answeredPractices` through the fenced terminal write that an evidence refusal uses, then releases the prepared evidence.
 `COALESCED` is not `INSUFFICIENT_EVIDENCE` and not a cancellation.
-The evidence was sufficient, no model ran, and the run records no observations of its own.
+The evidence was sufficient, no model ran, and the run records no results of its own.
 
 The practice trace attributes each answered practice to the earlier review, as `REVIEWED` with that review's id.
-Across every review, this follows the standing observation.
+Across every review, this follows the standing result.
 On the named review, it follows the recorded answer.
-The named review's own observation and delivery counts stay zero.
-This is historical attribution, not a claim that the earlier observation is still eligible today.
+The named review's own result and delivery counts stay zero.
+This is historical attribution, not a claim that the earlier result is still eligible today.
 
 Either review also rechecks practices whose current claim about the author on that work is `NOT_MET`, whatever occasion they are bound to.
 It uses each claim's latest live or requested run that is neither superseded nor invalidated.
@@ -412,7 +412,7 @@ The newest review covers a queued one only when all of the following hold:
   Each uses its own occasion, review state and rechecked practices.
   When it has already captured, only the practices that its readiness report records as ready count.
   A report that cannot be read covers nothing.
-- The queued one has no admitted observations.
+- The queued one has no admitted results.
 
 A covered review completes with the outcome `SUPERSEDED` and `coveringJobId` instead of starting its waiting attempt.
 The replacement makes no additional assessment.
@@ -545,7 +545,7 @@ It does not change copies already posted or the reconciliation of an unconfirmed
 It does not recover a job that capture refused or a job that stopped.
 GitLab line notes are ordinary location comments, so the same check covers them.
 
-Practice scripts run on these inputs inside the sandbox.
+Practice programs run on these inputs inside the sandbox.
 The server also reads the change to evaluate declared practice subjects and verify citations.
 The [workspace ABI](./agent/workspace-abi.mdx) owns the file layout.
 
@@ -566,25 +566,34 @@ The immutable definition digest includes scheduling and assessment fields.
 The review-rule fingerprint excludes only `signals` and `reviewWhen`, because moving a review to a different moment does not change what the same evidence establishes.
 Artifact kind, criteria, evidence requirements, subject, precondition, practice script, assessment policy, name and group remain part of the assessment basis.
 
-## Observation
+## Result
 
-An observation is one practice's answer about one piece of work, written once and immutable.
-Its [outcome](./practice-feedback-language.md#observation-outcomes) remains unchanged from the sandbox tool through server admission, persistence and read projections.
-Severity is required exactly for `NOT_MET`.
+A result is one practice's answer about one piece of work, written once and immutable.
+Its [outcome](./practice-feedback-language.md#result-outcomes) remains unchanged from the candidate result through server admission, persistence and read projections.
+Severity is required exactly for `NOT_MET`, and a `NOT_MET` result has one or more observations.
 Contradictory fields are rejected, never silently removed.
 
-A final review records at most one observation per practice.
+### Practice programs
+
+Every admitted practice runs one [practice program](./practice-review-glossary.mdx#results-and-programs), which returns one candidate result.
+A practice without a practice script runs the built-in program, which calls `ctx.review()` once.
+A practice script can pass review input to `ctx.review()`, decide in its own code, or call models for practice scripts.
+Leads are only review input.
+A program never returns leads, and a lead never becomes a result or an observation.
+The [practice script runner](./practice-script-runner.mdx) owns the program host, its limits, and its execution report.
+
+A final review records at most one result per practice.
 Duplicate practice results are refused as a whole, before quote verification can remove one side of a contradiction.
-The runtime may revise its provisional result before submission.
-Persisted observations do not change.
+A review session may revise its provisional result before its program returns it.
+Persisted results and their observations do not change.
 
-Earlier behavior-level observations remain authorized history, but their fingerprint scheme does not establish conformance under the current whole-practice standard.
+Earlier behavior-level results remain authorized history, but their fingerprint scheme does not establish conformance under the current whole-practice standard.
 They are `UNVERIFIABLE`, not current evidence.
-A new review appends a current-standard practice revision without rewriting the revision cited by historical observations.
+A new review appends a current-standard practice revision without rewriting the revision cited by historical results.
 
-A claim is one workspace's observation about one developer, practice and piece of work.
+A claim is one workspace's result about one developer, practice and piece of work.
 Live and manually requested reviews share its current quote.
-Backfilled observations form a separate claim.
+Backfilled results form a separate claim.
 Trends choose only live reviews, so a manual request does not remove the last live measurement.
 
 New author reviews retain whether the pull request or merge request was open and unmerged when admitted.
@@ -598,18 +607,22 @@ Reviews without this retained proof, historical occasions and backfills keep com
 
 Mixed prior and new reviews compare those retained dates.
 Prior rows are never repaired or redated.
-The observation's recorded date remains its completion date in history and time windows.
+The result's recorded date remains its completion date in history and time windows.
 
 Current summaries first select each claim's latest valid run, then check its review basis.
 An outdated or unknown basis does not restore an older current claim.
 Standing snapshots apply the same order before visibility filtering at each time boundary.
 
-Admission validates the outcome and its evidence warrants against the practice's criteria. `MET` and `NOT_MET` are decided results. `NOT_APPLICABLE` requires an evidence-backed applicability reason. `UNDETERMINED` requires an unresolved question and what would settle it.
+Admission validates the outcome and its evidence warrants against the practice's criteria. `MET` and `NOT_MET` are decided results. `NOT_APPLICABLE` requires an evidence-backed applicability reason. `UNDETERMINED` requires at least one open question and what would settle it.
 A submitted absence claim includes a recorded search checked against captured sources.
 A `MET` absence claim also requires an exhaustive corpus declared by the practice.
 
+Every `MET` result requires complete result coverage.
+Every producer submits to the same admission endpoint.
+The [glossary](./practice-review-glossary.mdx#results-and-programs) owns what admission withholds for one practice and what refuses the whole submission.
+
 Warrants and citations are enforced both inside the sandbox and by the server.
-Capture failure remains a readiness decision and creates no observation.
+Capture failure remains a readiness decision and creates no result.
 Abstentions create no feedback and do not move the decided-result trend denominator.
 Their counts remain visible separately.
 
@@ -620,41 +633,45 @@ A repeat carrying a different payload is refused as a conflict, and an attempt t
 
 Persistence assigns identity, not the sandbox.
 An occurrence key dedupes within a run (`insertIfAbsent`, `ON CONFLICT DO NOTHING`).
-A recurrence key groups the evidence location across runs.
+The recurrence key of each observation groups its evidence location across runs.
 Different behaviors can share a location.
 This key does not establish that a concern persisted or resolved.
 
-**Observations describe the work.
-Feedback contains advice.** An observation carries a concise `summary` and an `evidenceRationale` that explains the assessment, for example: “The change adds a tax-exempt branch, and no changed test calls `total`.” It has no `guidance` field.
-Composition decides whether and how to give advice from admitted observations.
+**Results and observations describe the work.
+Feedback contains advice.** A result carries a concise `summary` and an `evidenceRationale` that explains the assessment, for example: “The change adds a tax-exempt branch, and no changed test calls `total`.”
+Each observation carries its own summary and explanation, and an optional next step that names only the change its criteria require.
+Neither has a `guidance` field.
+Composition decides whether and how to give advice from admitted results.
 
 ### Recorded-result coverage
 
 The runtime's per-practice execution ledger measures **recorded results**, not how thoroughly the sources were inspected.
-A practice with at least one recorded observation is counted as evaluated. a practice without one is counted as unevaluated and may be retried.
+A practice with at least one recorded result is counted as evaluated.
+A practice without one is counted as unevaluated and may be retried.
 This does not establish that all relevant behaviors were reviewed, or that a practice without a result was never inspected.
 
-The current runner cannot complete successfully with zero recorded observations.
-A supported `NOT_APPLICABLE` observation can record that no practice subject applies to the captured work.
+The current runner cannot complete successfully with zero recorded results.
+A supported `NOT_APPLICABLE` result can record that no practice subject applies to the captured work.
 Missing required sources remain readiness failures, and no verdict may be invented to satisfy execution coverage.
 Report this protocol limitation separately from source completeness, judgment quality and delivery.
 
 ## Measurement and intervention
 
-Measurement records one final observation per practice in a review.
-Before admission, the runtime can explicitly revise its local draft by naming the returned draft reference and supplying a complete replacement.
+Measurement records one final result per practice in a review.
+A session that `ctx.review()` opens records its draft result with `submit_result`.
+It can revise its local draft by submitting the complete result again.
 The replacement passes the same evidence checks.
 A refusal leaves the previous draft unchanged.
 
-A call with repeated practices changes no drafts.
-Server admission refuses a package with repeated practices before recording observations.
-After admission, recorded observations stay immutable. Correction uses the existing [invalidation flow](./practice-review-glossary.mdx#invalidated-observations).
+The runner binds each session to its practice, so a session cannot record a result for another practice.
+Server admission refuses a package with repeated practices before recording results.
+After admission, recorded results stay immutable. Correction uses the existing [invalidation flow](./practice-review-glossary.mdx#invalidated-results).
 
 Measurement and composition are separate phases.
 Measurement keeps the catalog group turns as scheduling and work-budget scopes.
 Each scope gets one work budget for its practice count, shared across its sessions.
-Each practice in a scope gets a fresh session in the same sandbox, one after another.
-That session receives the task, the brief and the complete criteria and leads of its practice only.
+Each practice in a scope runs its practice program in the same sandbox, one after another.
+Each `ctx.review()` call opens a fresh session with the task, the brief, the complete criteria of its practice, and the review input of that call.
 
 The native model catalogue identifies Responses models that support explicit prompt caching.
 Measurement requests for these models mark the end of the shared task, brief and example within the user message.
@@ -665,10 +682,9 @@ histories separate. The provider's implicit caching remains available for later 
 Other models and protocols keep their native requests unchanged. Cache reuse depends on the provider.
 It does not establish a latency or cost improvement.
 
-It can record and revise only its practice.
-An item for another practice is refused before any draft changes.
-
-Drafts and coverage stay on disk across sessions, and admission receives every recorded draft once.
+The draft of each session is private to its `ctx.review()` call, which returns it to the program as a candidate result.
+The runner measures result coverage from the reads of the session.
+Admission receives every candidate result once, in one request.
 A session can end on its own with no result for its practice.
 If the scope budget and the safety line permit, the runner then asks the same session one time to record the practice.
 The session still holds the evidence that it read.
@@ -683,19 +699,19 @@ The model proxy remains authoritative for request accounting, including calls su
 Public composition starts a fresh session.
 Private composition starts its own fresh session after measurement stops.
 It holds no measuring transcript.
-An authenticated callback admits observations before either composition session.
+An authenticated callback admits results before either composition session.
 Composition can reference only the persisted projection.
 
-An observation states a claim that can be checked against the captured work.
+A result states a claim that can be checked against the captured work.
 Feedback proposes an action for a recipient and considers the surface, history and conversation.
-Keeping these phases separate allows an observation to remain recorded even when advice would be repetitive, poorly timed or unnecessary.
+Keeping these phases separate allows a result to remain recorded even when advice would be repetitive, poorly timed or unnecessary.
 
 ```mermaid
 flowchart TB
     accTitle: Public and private composition have separate inputs
-    accDescr: Admitted observations feed a public review of current work and separate private feedback from authorized history. The server admits each complete body before delivery.
+    accDescr: Admitted results feed a public review of current work and separate private feedback from authorized history. The server admits each complete body before delivery.
     work["Captured work"] --> measure["Measure practices"]
-    measure --> obs["Admitted observations"]
+    measure --> obs["Admitted results"]
     obs --> public["Fresh public composition session"]
     sameWork["Prior public feedback on the same work"] --> public
     public --> review["Complete summary and complete line notes"]
@@ -715,14 +731,14 @@ The server admits.** Origin, effective autonomy, routing and placement checks st
 ### Composition inputs and outputs
 
 Only pull-request and issue handlers enable composition, and not for backfills.
-Document and conversation reviews record observations without composing feedback.
-An authenticated callback admits observations before composition starts.
+Document and conversation reviews record results without composing feedback.
+An authenticated callback admits results before composition starts.
 Composition can bind only to the persisted projection returned by that callback.
 
 Before the public session starts, its authenticated attempt reads current authorized public deliveries for the same work and author.
-This communication read has its own timestamp and does not replace captured work, assessment history or admitted observations.
+This communication read has its own timestamp and does not replace captured work, assessment history or admitted results.
 A later delivery can establish that a point has already been communicated, but prior-advice and response claims retain the original work capture cutoff.
-A failed read records a public composition failure while preserving admitted observations and independent private preparation.
+A failed read records a public composition failure while preserving admitted results and independent private preparation.
 The runner trace retains the read time, original cutoff and shown record eligibility without feedback bodies.
 
 Two public sessions can still read before either publishes.
@@ -746,23 +762,25 @@ A malformed basis part is left unstated, and no time is inferred for it.
 A record is shown whole, or named as not shown with the reason.
 Reasons are source state, an unrecorded file, empty, too large, unreadable, or naming other work.
 The record supplies captured intent, identity and state for orientation.
-Only admitted observations authorize assessments and concerns.
+Only admitted results and their observations authorize assessments and concerns.
 
-Primary code from admitted public citations precedes the observations as bounded whole files from the verified revisions.
+Primary code from admitted public citations precedes the results as bounded whole files from the verified revisions.
 Change citations add matching pinned diff sections or an explicit omission reason.
 
 The first turn shows the captured work and complete permitted public communication once.
-Each practice with an eligible `NOT_MET` observation then carries its whole staged criteria, complete observations and known limitations.
+Each practice with an eligible `NOT_MET` result then carries its whole staged criteria, its complete result with its observations, and known limitations.
 Candidate prior witness references use the delivered feedback's captured practice association, without deciding a match or novelty.
 
-Each reference pairs the current captured code head and practice revision with the matching delivery's recorded head and observation support.
+Each reference pairs the current captured code head and practice revision with the matching delivery's recorded head and result support.
 These coordinates identify assessments.
 They establish neither developer progress nor unchanged descriptions or discussion.
 Missing coordinates remain unknown.
 
-Eligible `MET` observations start as an identity and summary index, without rationale or citations.
+A `MET` result never enters this session.
+The review on the work rests only on eligible `NOT_MET` results, so a met result is never pushed to the work as praise.
+A run with no eligible `NOT_MET` result composes no review on the work.
 
-Delivered feedback retains its identity, reviewed revision and original observation support.
+Delivered feedback retains its identity, reviewed revision and original result support.
 Public history keeps a stale delivery's stored words as a record of what was delivered, not of a current claim or the provider's current text.
 Private history still shows only current words.
 
@@ -774,48 +792,40 @@ Prior Hephaestus feedback uses the same per-entry and total bounds.
 Omitted entries are counted by reason and cannot be prior-advice witnesses.
 
 It receives the names of unreached practices.
-Eligible `NOT_APPLICABLE` and `UNDETERMINED` observations retain their complete `inapplicability` or `undecidability` evidence branch.
+Eligible `NOT_APPLICABLE` and `UNDETERMINED` results retain their complete `inapplicability` or `undecidability` evidence branch.
 Their cited lines accompany these recorded limits.
 Their id, summary and rationale stay out, because that prose can assert more than the abstention decided.
 These limits and names support no claims.
 
-An observation that cites or consulted a private or unknown source stays out of this session entirely.
-Removing a private citation would not remove the information from the observation's prose.
-The public session has two tools: `read_practice` and `report_review`.
+A result that cites or consulted a private or unknown source stays out of this session entirely.
+Removing a private citation would not remove the information from the result's prose.
+The public session has one tool: `report_review`.
 It has no file, search or execution tools and loads no private context.
 The first turn ends with the writing guidance.
 
-`read_practice` shows a practice’s complete eligible `MET` observations beside its whole staged criteria.
-It also shows the known limitations and candidate prior witness references.
-A whole standard already shown beside a concern is referenced there rather than repeated.
-It names no path and serves no other practice.
-A criterion that is missing, unreadable, empty or blank is shown as such and makes nothing available.
-Reading a standard creates no obligation to acknowledge anything.
-
 `report_review` submits complete decisions first, then the summary and line notes in the same call.
-Each eligible `NOT_MET` observation has one decision: `RAISE` or a withholding reason.
-A raised observation supports text.
+Each eligible `NOT_MET` result has one decision: `RAISE` or a withholding reason.
+A raised result supports text about it or its observations.
 A withheld one does not.
-The runner validates it whole against the original admitted observations and stores it whole, or refuses it with every reason.
-There is no separate selection step: the observations each text rests on are the review's choice.
+The runner validates it whole against the original admitted results and stores it whole, or refuses it with every reason.
+There is no separate selection step: the results and observations each text rests on are the review's choice.
 
-Every eligible `NOT_MET` observation is spoken about or withheld, never both.
+Every eligible `NOT_MET` result is spoken about or withheld, never both.
 A review without text is a valid decision.
-When there is no eligible `NOT_MET` observation, its decision list is empty.
+When there is no eligible `NOT_MET` result, its decision list is empty.
 
 Repetition reasons name eligible prior statements in `witnessIds`.
 This check establishes a located, dated statement by another author or usable delivered feedback, not semantic equivalence.
 The model still judges whether the advice repeats, whether circumstances changed and whether it adds value.
 The witnesses are checked and then dropped.
-Each withholding decision becomes the existing stored observation support and reason.
+Each withholding decision becomes the existing stored result support and reason.
 
-A text that rests on a `MET` observation needs its complete reference in view when the model wrote it.
-An opening standard for a mixed-result practice does not supply its deferred `MET` grounds.
-The complete reference from `read_practice` is in view only from the next model turn.
-Thus, a review sent in the same response as the read is refused.
+A text rests only on eligible `NOT_MET` results and their observations.
+`report_review` refuses a text whose `basedOn` names a result with any other outcome.
+The server applies the same rule when it admits the review (`ComposedReviewAdmission`).
 
 The criteria explain the recorded standard and its accepted responses and establish no additional concern.
-The admitted observations stay unchanged, but their outcomes are candidate claims, not certified conclusions.
+The admitted results stay unchanged, but their outcomes are candidate claims, not certified conclusions.
 When the captured evidence does not support a concern under its standard, the session withholds it as `BELOW_BAR`.
 `review-composer.md` owns that rule.
 
@@ -824,7 +834,7 @@ Shared assessment grounding and the owning practice standard establish the type,
 Composition retains those qualifications when choosing what to communicate.
 
 A completed compaction takes every standard out of view.
-The next tool answer restores the complete original review turn and every standard read so far, whole.
+The next tool answer restores the complete original review turn, whole.
 A final proposal is refused until the next model turn can use that restored context.
 Another tool call in the same batch cannot finalize it.
 
@@ -832,13 +842,13 @@ Invalid proposals receive correction reasons within the existing turn budget.
 An accepted proposal ends the composition, including an intentionally quiet review.
 The stored review and independent server admission retain their existing contract.
 
-The private session receives the task, the brief, the admitted observations with their qualifications,
-bounded observation history, feedback history and unread prepared feedback.
-Its first turn carries the complete staged criteria of each practice with a `NOT_MET` observation before the admitted observations.
-It carries no measuring leads.
+The private session receives the task, the brief, the admitted results with their observations and qualifications,
+bounded result history, feedback history and unread prepared feedback.
+Its first turn carries the complete staged criteria of each practice with a `NOT_MET` result before the admitted results.
+It carries no leads or other review input.
 A criterion too large to show is named with its file.
 
-Current `MET` and `NOT_MET` observations retain their rationale, evidence qualifications and citation coordinates.
+Current `MET` and `NOT_MET` results retain their rationale, evidence qualifications and citation coordinates, and a `NOT_MET` result keeps its observations.
 Full quoted evidence remains in the admission file.
 
 Delivered and unread prepared feedback retain their staged metadata.
@@ -863,22 +873,22 @@ The same supported action may appear across channels when it serves each channel
 The shared writing guide and each channel's prompt define those purposes:
 
 - `IN_CONTEXT` is public feedback about the author’s work. `report_review` submits the whole final review:
-  complete observation-scoped decisions, an optional complete summary and complete line notes.
-  Each body names every admitted decided observation it speaks about in `basedOn`.
+  complete result-scoped decisions, an optional complete summary and complete line notes.
+  Each body names in `basedOn` every admitted decided result or observation it speaks about.
   The model writes the prose.
-  The server never joins fragments or publishes raw observation summaries.
+  The server never joins fragments or publishes raw result or observation summaries.
   Summary and line notes coordinate without repeating the full argument in both places.
   Independent actions use short blocks, bullets or headings when helpful, without a fixed comment template.
 - `IN_APP` is private process-level feedback about a pattern in the recipient's work.
 - `IN_CHAT` prepares `situation`, `capability`, `evidenceSummary` and `inConversationSignal` as private notes,
   not dialogue. A later conversational turn may adapt, defer or discard them.
 
-Public eligibility uses the author of the mirrored work and the subject of the observation's recorded practice revision.
-Author observations qualify, as do merger observations when the author merged the work.
-Reviewer observations stay private, including self-review.
+Public eligibility uses the author of the mirrored work and the subject of the result's recorded practice revision.
+Author results qualify, as do merger results when the author merged the work.
+Reviewer results stay private, including self-review.
 
-The initial public context excludes ineligible observations and ineligible prior public advice.
-If no decided observation qualifies, the public writer does not start.
+The initial public context excludes ineligible results and ineligible prior public advice.
+If no decided result qualifies, the public writer does not start.
 The server checks each composed part and checks the persisted package's exact cited support again before any new provider write.
 
 These exclusions can leave a review with no public composition.
@@ -919,15 +929,19 @@ It never appends that body to the summary.
 
 Recording-tool validation and server admission enforce the contract independently.
 Neither composition tool accepts outcome or severity changes.
-Each public body is indivisible: if any supporting observation fails admission, the whole body stays unsent.
+Each public body is indivisible: if any supporting result or observation fails admission, the whole body stays unsent.
 Unrelated valid bodies may still proceed.
 
 Every contributor must identify the same recipient, and all public bodies must address that person.
-An observation that decided nothing cannot support a positive or negative claim.
-A specific positive observation permits a bounded acknowledgement, not a general readiness or approval verdict.
+A result that decided nothing cannot support a positive or negative claim.
+On the work, a text rests only on `NOT_MET` results and their observations, so a `MET` result is never pushed there as praise.
+In a private channel, a specific positive result permits a bounded acknowledgement, not a general readiness or approval verdict.
+An open question is never pushed, and an example is never pushed alone.
 
 A line note names `{ observationId, citationIndex }` rather than authoring coordinates.
-That observation must be among its own `basedOn` contributors.
+Its `basedOn` must name that observation or the result that holds it.
+A result's own citations never anchor a note.
+
 The server resolves a verified location in the reviewed diff from the persisted citation.
 Several independent notes may refer to one practice.
 Two notes cannot occupy the same citation.
@@ -939,17 +953,17 @@ The server decides whether that target may be replaced.
 
 `report_feedback` refuses private `ALREADY_SAID` or `NO_MATERIAL_CHANGE` withholding unless the staged history establishes prior delivery on the unit's channel for each `NOT_MET` practice that the unit covers.
 The record must be current and not withdrawn, with a body on the same channel.
-It must rest on a `NOT_MET` observation of the same practice.
+It must rest on a `NOT_MET` result of the same practice.
 The glossary owns [thread keys and supersession](./practice-review-glossary.mdx#thread-key-and-supersession).
 
-A public withholding decision names exact `NOT_MET` observations, never a whole practice or a positive observation.
+A public withholding decision names exact `NOT_MET` results, never a whole practice or a positive result.
 `NO_MATERIAL_CHANGE`, `ALREADY_SAID` and `BELOW_BAR` are composition reasons.
 [The glossary](./practice-review-glossary.mdx#measurement-and-intervention) distinguishes them from delivery policy reasons.
-A body cannot both speak about and withhold the same observation.
+A body cannot both speak about and withhold the same result.
 
 ### Missing composition and recovery
 
-A composition failure does not invalidate admitted observations.
+A composition failure does not invalidate admitted results.
 The runner records at most one incomplete status per public or private composition phase in `feedback.json`.
 It records a finite stop reason after settlement and, where applicable, the existing correction attempt, when a required decision remains.
 A final accepted review, including a valid empty review, pays the public obligation.
@@ -957,7 +971,7 @@ A private decision is paid by the existing practice-level unit, folding or withh
 Disabled channels and inapplicable composition do not create obligations.
 
 Valid partial feedback remains eligible for normal preparation and delivery.
-The review can complete with admitted observations while its delivery status stays `FAILED` for incomplete composition.
+The review can complete with admitted results while its delivery status stays `FAILED` for incomplete composition.
 Malformed present status also fails delivery processing.
 Absent legacy metadata remains unknown.
 
@@ -965,7 +979,7 @@ For known incomplete or unreadable composition, a delivery retry requires an act
 Delivery recovery never repeats measurement or composition.
 Recovery preserves the incomplete status after posting or finding an existing partial package.
 
-An attempt can continue after its worker is lost, if observations were admitted and no output was saved.
+An attempt can continue after its worker is lost, if results were admitted and no output was saved.
 The new attempt only writes the public review on the work.
 It uses the original manifest, captured records, practice index, whole standards and composition request kept when public delivery was enabled.
 The recorded expiry gives a one-day eligibility window.
@@ -976,7 +990,7 @@ The existing retention sweep removes expired inputs and inputs of ended jobs.
 The continuing attempt restores the original commits from the server's local mirror.
 It fetches nothing and reads no current branch.
 A commit the mirror no longer holds refuses the attempt before any model call.
-It does not measure, run practice scripts or admit observations.
+It does not measure, run practice programs or admit results.
 Its citations are verified as the admitting attempt's.
 
 Before staging, the existing composition policy refuses ineligible public work.
@@ -992,13 +1006,13 @@ Admissions with no kept inputs, expired inputs or erased, purged or incomplete r
 Saved output, including prepared or uncertain delivery, is recovered through delivery.
 No second writer is started for saved output.
 
-Each eligible public `NOT_MET` observation must be named by a body or an explicit withholding decision.
-An empty review is intentional silence only when it leaves no such observation undecided.
+Each eligible public `NOT_MET` result must be named by a body or an explicit withholding decision.
+An empty review is intentional silence only when it leaves no such result undecided.
 A required review that is missing or breaks its contract is a delivery failure, never silence.
 A later gate refusal of one body holds only that body.
 
-Backfills, disabled public delivery and runs with no eligible decided observations need no public turn.
-There is no fallback from failed composition to raw observations.
+Backfills, disabled public delivery and runs with no eligible decided results need no public turn.
+There is no fallback from failed composition to raw results or observations.
 Private channels have no content fallback either.
 
 Previously sealed immutable dispatch and approval packages remain deliverable and recoverable, including pending
@@ -1046,12 +1060,14 @@ Job payload retention clears its prose, and person erasure and workspace removal
 
 Composition creates immutable feedback units before release authority is applied.
 A composer `WITHHOLD` means there was nothing useful to say and creates no feedback row.
-The observations it covers on the work are recorded `SUPPRESSED` with `COMPOSER_WITHHELD`.
+The results it covers on the work are recorded `SUPPRESSED` with `COMPOSER_WITHHELD`.
 Thus, a withheld practice is a recorded decision, never a bare headline rendered without a note.
-A complete body is admitted only when every observation it cites may support delivery.
+A complete body is admitted only when every result and observation it cites may support delivery.
 
-Feedback is bound only to the observations its text was written from, including every observation a unit cites.
-Only those observations decide whether it waits for approval.
+Feedback is bound only to the results and observations its text was written from.
+Each `feedback_evidence` row names one result and, when the text speaks about a located problem, one of its observations.
+Only those results decide whether it waits for approval.
+
 A not-applicable result beside it does not.
 Each line note carries its own.
 A line note that never lands is recorded `FAILED` rather than bound to the delivered comment.
@@ -1110,7 +1126,7 @@ An unknown comparison leaves them waiting for a bounded retry.
 The same comparison applies to configured historical public delivery.
 Issue delivery keeps its current snapshot check, and this public comparison does not withhold private channels.
 
-Observation publication takes the same work lock before the review job lock.
+Result publication takes the same work lock before the review job lock.
 The comparison and lease-guarded reservation commit together in a short transaction.
 Provider calls happen after commit.
 This orders reservations with mirror changes and publication, but it does not order provider arrival.
@@ -1151,15 +1167,15 @@ The glossary owns it in full.
 [The delivery policy check order](./practice-review-glossary.mdx#the-delivery-policy-check-order) owns the ordered gates that every delivery walks.
 Read those before changing anything here, and do not restate them.
 
-Each channel router applies `PracticeAutonomyPolicy`: the observation's `ObservationOrigin` must permit the channel, and effective autonomy must permit delivery there. `HUMAN_APPROVAL` requires approval for pushed comments on the work, but allows on-demand practice pages and chat. `OFF` blocks all channels.
+Each channel router applies `PracticeAutonomyPolicy`: the result's `ResultOrigin` must permit the channel, and effective autonomy must permit delivery there. `HUMAN_APPROVAL` requires approval for pushed comments on the work, but allows on-demand practice pages and chat. `OFF` blocks all channels.
 Backfill origin permits only the practice-page channel, regardless of autonomy.
-That permission is a ceiling: `InAppFeedbackRouter` holds a pattern supported only by backfilled observations.
+That permission is a ceiling: `InAppFeedbackRouter` holds a pattern supported only by backfilled results.
 Other delivery gates still apply.
 
 ## Runtime and extension points
 
 The server records an occasion and enqueues an `agent_job`.
-A worker claims it, captures evidence, runs the sandbox, admits observations, resumes composition, applies delivery gates, and calls the provider.
+A worker claims it, captures evidence, runs the sandbox, admits results, resumes composition, applies delivery gates, and calls the provider.
 Runtime roles, transaction boundaries, extension ownership, and change guidance are documented in [Practice review runtime](./practice-review-runtime.mdx).
 
 ## Reading a real review back
@@ -1169,7 +1185,7 @@ Runtime roles, transaction boundaries, extension ownership, and change guidance 
 Workspace admins see it under **Practice reviews → Work**.
 The developer sees it on a review under **Reviews of your work**.
 
-That view reads it only for a review that observed them.
+That view reads it only for a review about them.
 It is derived, never stored: `PracticeTraceDeriver` walks an ordered precedence list to a single `PracticeTraceOutcome`.
 
 The trace separates measurement from delivery:
@@ -1177,9 +1193,9 @@ The trace separates measurement from delivery:
 - **`outcome` is about the measurement**, and is one of these values: `REVIEWED`, `RUNNING`,
   `PENDING`, `SKIPPED`, `NOT_REACHED`, `NOT_ASSESSABLE`, `TURNED_OFF`, `NOT_OCCASIONED`, `DORMANT`,
   `LAPSED`, `FAILED`.
-- **`observationCount`, `deliveredCount` and `withheldReasons` are about the intervention.**
+- **`practiceResultCount`, `deliveredCount` and `withheldReasons` are about the intervention.**
 
-At `HUMAN_APPROVAL`, `REVIEWED` and a positive observation count describe the measurement.
+At `HUMAN_APPROVAL`, `REVIEWED` and a positive result count describe the measurement.
 The proposal's `AWAITING_APPROVAL`, `PREPARED`, `DISCARDED`, or eventual `DELIVERED` state describes the intervention.
 Do not represent a pending human decision as suppression: it is an actionable workflow state.
 

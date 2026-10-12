@@ -84,12 +84,16 @@ filesystem grants do not confine that program, so a script could read the contai
 the review's job token in it. Thus, the third control of § Context did not hold for a script that a
 workspace admin wrote.
 
-The practice script runner keeps the grant and starts one Node process for each script. That process
-has `--permission`, no child-process grant, no write grant, an empty environment, a bounded heap and
-its own deadline. The library's `grep` sends a search to the runner, which starts `grep` with a fixed
-argument list inside the same read grants. The runner holds the practice script credential of
-[ADR 0055](0055-practice-scripts-call-models-through-the-runner.md), and a script's process holds no
-credential. Node permissions stay defense in depth, and Docker isolation stays the outer boundary.
+The review runner hosts the practice programs, and it keeps the one job token. There is no second
+credential for practice scripts. A custom program runs in its own Node process with `--permission`.
+That process may read only the toolkit, its dependencies and the staged inputs. It has no write
+grant and no child-process grant, an empty environment, a bounded heap and its own deadline.
+
+The program reads the reviewed work, searches it with `grep`, and calls models only through the host.
+The host answers each request in its own process and holds the token. Thus, a program's process
+holds no credential. Node permissions stay defense in depth, and Docker isolation stays the outer
+boundary. [ADR 0055](0055-practice-scripts-call-models-through-the-runner.md) records how a program
+calls models and how its results are admitted.
 
 [Workspace ABI § Practice script validation and limits](../contributor/agent/workspace-abi.mdx#practice-script-validation-and-limits)
 owns the current grants and limits.

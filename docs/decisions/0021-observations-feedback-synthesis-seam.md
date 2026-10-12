@@ -1,6 +1,6 @@
 # ADR 0021: Separate observations from feedback
 
-**Status:** Accepted (amended 2026-07-31 #1423, 2026-08-18 #1444 — rewritten in place; refined by [ADR 0022](0022-observation-presence-assessment-and-schema-cleanup.md) and [ADR 0029](0029-measurement-intervention-seam-and-channel-levels.md))  
+**Status:** Accepted (amended 2026-07-31 #1423, 2026-08-18 #1444 — rewritten in place; refined by [ADR 0022](0022-observation-presence-assessment-and-schema-cleanup.md) and [ADR 0029](0029-measurement-intervention-seam-and-channel-levels.md); 2026-10-12 — the verdict is a result, and an observation is one problem, see [ADR 0055](0055-practice-scripts-call-models-through-the-runner.md))  
 **Date:** 2026-06-14  
 **Authors:** Felix T.J. Dietrich
 
@@ -107,3 +107,10 @@ This ADR owns the separation and its invariants, not field inventories. Current 
 - [Practice review pipeline](../contributor/practice-review-pipeline.mdx)
 - [ADR 0029](0029-measurement-intervention-seam-and-channel-levels.md)
 - the generated [database schema](../contributor/database-schema.mdx) and OpenAPI specification
+
+## Update — 2026-10-12 (#2656): results and observations
+
+Supersedes the meaning of *observation* in the sections above. The measurement of one practice on one
+piece of reviewed work is now a **result**. An **observation** is one problem under a `NOT_MET` result.
+The separation of measurement from feedback stands: feedback is written only from admitted results and
+their observations. [ADR 0055](0055-practice-scripts-call-models-through-the-runner.md) owns the decision.

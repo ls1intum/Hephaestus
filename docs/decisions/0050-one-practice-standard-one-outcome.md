@@ -1,6 +1,6 @@
 # ADR 0050: One practice standard, one outcome
 
-**Status:** Accepted
+**Status:** Accepted (amended 2026-10-12 — a result holds the outcome, see [ADR 0055](0055-practice-scripts-call-models-through-the-runner.md))
 **Date:** 2026-10-02
 **Supersedes:** The observation axes in [ADR 0022](0022-observation-presence-assessment-and-schema-cleanup.md).
 
@@ -88,3 +88,11 @@ contracts for signals within one practice. Do not add states only to encode feed
   lifecycle as separate facts. A signal is not a substitute for either recorded fact.
 - [Slack message events](https://docs.slack.dev/reference/events/message/) do not supply a shared
   pull-request lifecycle. A descriptor exposes only state its adapter records.
+
+## Update — 2026-10-12 (#2656): a result holds the outcome
+
+The one outcome of this ADR now belongs to a **result**. A `NOT_MET` result has one or more observations,
+and each observation is one problem with its own severity. The result's severity is at least that of its
+worst observation. `INFO` is a real gap with trivial impact. A result can also hold one example and, for
+`NOT_MET` and `UNDETERMINED`, located open questions. The single outcome and its rules stand.
+[ADR 0055](0055-practice-scripts-call-models-through-the-runner.md) owns the decision.

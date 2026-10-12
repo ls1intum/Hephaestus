@@ -26,20 +26,20 @@ The BayLfD's Bavarian Blacklist (dated 1 March 2019 under Art. 35(4) GDPR) enume
 | WP29 criterion                                                | Present?                                  | Current facts and safeguards                                                                                                                                                                                                                                       |
 | ------------------------------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Evaluation or scoring                                         | **Yes**                                   | Practice reviews create contributor-specific assessments of observed engineering work. Advisory and contestable output, no automated grading/HR/access decision, and separate delivery controls reduce consequence. They do not negate the criterion. The research purpose adds evaluation datasets and benchmark runs built from participants' work.           |
-| Automated decision with legal or similarly significant effect | **No**                                    | Observations do not determine grades, employment, recognition caps, feature access, merge rights, or another legal/significant outcome. Any such consumer is a material change requiring a full reassessment before use.                                               |
+| Automated decision with legal or similarly significant effect | **No**                                    | Practice results do not determine grades, employment, recognition caps, feature access, merge rights, or another legal/significant outcome. Any such consumer is a material change requiring a full reassessment before use.                                               |
 | Systematic monitoring                                         | **Yes**                                   | Enabled workspaces repeatedly observe activity in administrator-connected repositories and optional monitored Slack/Outline sources. The scope is selected rather than an open crawl, but the processing is organized and recurring.                               |
 | Sensitive or highly personal data                             | **Partly**                                | The system does not solicit or classify Art. 9/10 data, but free-text code, issues, messages, documents, and conversations can contain incidental sensitive or highly personal content. Private mentor and Slack conversations receive the stricter source class. Research datasets built from free text can carry the same incidental content.  |
 | Data processed on a large scale                               | **Not established by code** | Workspace scope is a tenancy boundary, not a scale measurement. Record the current deployment population, volume, duration and geographic reach. Reassess before expansion.                                                                                                   |
-| Matching or combining datasets                                | **Yes**                                   | Practice review and mentoring can combine GitHub/GitLab activity with Hephaestus observations and, where enabled, selected Slack messages and Outline documents. This is source combination even though Hephaestus does not enrich people from commercial external profiles. Research datasets combine these sources again for participants. |
+| Matching or combining datasets                                | **Yes**                                   | Practice review and mentoring can combine GitHub/GitLab activity with Hephaestus practice results and, where enabled, selected Slack messages and Outline documents. This is source combination even though Hephaestus does not enrich people from commercial external profiles. Research datasets combine these sources again for participants. |
 | Vulnerable data subjects                                      | **Yes**                                   | Students and employees can face a power imbalance and may be unable to oppose workspace-level processing as easily as an ordinary consumer. Advisory use and rights procedures reduce risk. The product does not enforce a ban on human grading or HR use. The controller must assess that use. The controller must govern it. Research consent from these groups is valid only with a real refusal path and no disadvantage. See Recital 43 and EDPB Guidelines 05/2020 paras 16-24 and 46-48. The research team must be separate from grading and line management. If doubt remains, the controller must not rely on consent (EDPB Guidelines 1/2026 para 36).                                        |
 | Innovative technology or organizational solution              | **Yes**                                   | An LLM interprets work artifacts and produces contributor-specific practice feedback. Recipient-specific provider terms and restricted egress reduce risk but do not remove this criterion.                                                                             |
-| Prevents exercise of a right or use of a service/contract     | **No**                                    | The product does not gate course, employment, repository, or Hephaestus access on observations.                                                                                                                                                                        |
+| Prevents exercise of a right or use of a service/contract     | **No**                                    | The product does not gate course, employment, repository, or Hephaestus access on practice results.                                                                                                                                                                        |
 
 WP248 rev.01 states that, in most cases, processing that meets two criteria warrants a DPIA. It states that more criteria make high risk more likely. Multiple criteria above are present. A full DPIA is indicated now.
 
 The research purpose adds evaluation, dataset building and benchmark running. It does not change the conclusion. A full DPIA stays indicated. The full assessment covers the research purpose and the processing of participants' data that it needs.
 
-The wider job folder can include permitted Slack threads and person-scoped observation and feedback history without record-count or history-window caps. This increases combination and longitudinal evaluation, including third-party context. Worker isolation and an advisory output reduce risks but do not remove the screening criteria.
+The wider job folder can include permitted Slack threads and person-scoped practice result and feedback history without record-count or history-window caps. This increases combination and longitudinal evaluation, including third-party context. Worker isolation and an advisory output reduce risks but do not remove the screening criteria.
 
 1. Before authorizing the current scope for the deployment, open its full assessment.
 2. Record necessity, proportionality, risks to people and measures under Art. 35(7).
@@ -136,7 +136,7 @@ As a deployment governance requirement, reassess the DPIA and amend it where the
 
 - An external model provider is added, changed to a consumer tier, or its recorded training terms change.
 - Practice-review sandbox gains outbound connectivity beyond the governed worker gateway.
-- Observations begin to drive any automated decision within Hephaestus (grading, recognition caps, feature access).
+- Practice results begin to drive any automated decision within Hephaestus (grading, recognition caps, feature access).
 - The bundled Sentry integration is activated against a SaaS tenant.
 - The processing population starts to include data subjects in a category covered by the BayLfD vulnerable-data-subjects criterion.
 - Repository ingestion expands beyond administrator-selected repositories into systematic or large-scale monitoring of public sources.
@@ -162,12 +162,12 @@ This reassessment also records the derivation decision of rule 6 in [`artifact-s
 The reasons:
 
 - The page shows only a coarse standing per practice group and practice, as counts.
-  It shows no feedback text, no observations, and no work content.
+  It shows no feedback text, no practice results, and no work content.
 - The audience is the closed workspace.
   Its members already see the pull requests that the standing comes from.
 - A standing is not a grade, and a person still assesses the work.
   Thus, the page makes no automated decision under Art. 22 GDPR.
-- Tutors, as workspace admins, already see individual observations.
+- Tutors, as workspace admins, already see individual practice results.
   Thus, the extra exposure is only towards peers.
   It applies mainly to a bar part of one or two developers.
   Classmates can guess who they are from visible pull requests.
@@ -193,7 +193,7 @@ For each person on the page, the public sees this data:
 - For the selected range: pull requests opened and merged, pull requests reviewed and their authors, issues opened, and active weeks.
 - The weekly trend, the **Contributions** total, the position, and links to the work.
 
-The page shows no practices, feedback, observations, Slack, Outline or AI review content.
+The page shows no practices, feedback, practice results, Slack, Outline or AI review content.
 
 **Lawful basis for TUM.**
 Hephaestus processes the activity under Art. 6(1)(e) and (3) GDPR i.V.m. Art. 2 BayHIG and Art. 4(1) BayDSG, as for Activity.

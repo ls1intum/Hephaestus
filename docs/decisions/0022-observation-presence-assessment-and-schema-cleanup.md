@@ -1,6 +1,6 @@
 # ADR 0022: Observation = presence × assessment (drop `Practice.kind`); reaction anchors on feedback; ruthless column cleanup
 
-**Status:** Accepted (observation semantics amended before 1.0; 2026-09-17 — channel value corrected)
+**Status:** Accepted (observation semantics amended before 1.0; 2026-09-17 — channel value corrected; 2026-10-12 — the verdict is a result, see [ADR 0055](0055-practice-scripts-call-models-through-the-runner.md))
 **Date:** 2026-06-24
 **Authors:** Felix T.J. Dietrich
 **Supersedes (in part):** [ADR 0021](0021-observations-feedback-synthesis-seam.md) F-6 (the sign-neutral `Observation` × `Practice.kind` split) and F-13/F-24 (the `FeedbackReaction` reshape with a nullable `finding_id` and an open `verb` event log)
@@ -148,3 +148,10 @@ observation incorrect or withdraw the feedback.
 ## Update — 2026-10-02
 
 [ADR 0050](0050-one-practice-standard-one-outcome.md) supersedes the observation-axis decision with a single conformance outcome. The original rationale remains as design history.
+
+## Update — 2026-10-12 (#2656): results and observations
+
+The row that this ADR calls an observation is now a **result**, stored in `practice_result` with the same
+IDs. An observation is now one problem under a `NOT_MET` result, stored in `practice_observation`.
+Reactions still anchor on feedback, and an admin marks a result incorrect.
+[ADR 0055](0055-practice-scripts-call-models-through-the-runner.md) owns the decision.

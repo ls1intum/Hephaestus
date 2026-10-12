@@ -8,7 +8,7 @@ description: The review operation, the evidence contract, and the exact API, Jav
 This glossary is the canonical language for AI-supported practice mentoring and the versioned evidence contract.
 Use product terms in human-facing copy and the corresponding machine terms in contracts.
 Do not invent synonyms.
-The broader [practice feedback language](./practice-feedback-language.md) remains canonical for observations and feedback.
+The broader [practice feedback language](./practice-feedback-language.md) remains canonical for results, observations, and feedback.
 
 For how the words fit together at runtime — the four stages, and the refusal vocabulary each one owns — see the [practice review pipeline](./practice-review-pipeline.mdx).
 
@@ -17,7 +17,7 @@ For how the words fit together at runtime — the four stages, and the refusal v
 | Term                                | Plain meaning                                                                                                                                                                                                                                                                                                                     | Do not use for this concept                                       |
 | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
 | **AI-supported practice mentoring** | The product experience in which Hephaestus uses connected work to offer practice-focused guidance while leaving room for self, peer, and human mentor context. It is support, not grading or a replacement for a person.                                                                                                          | autonomous mentoring, performance scoring                         |
-| **Practice review**                 | One evidence-bounded operation within AI-supported mentoring: Hephaestus checks one or more practices against a specific piece of work and may produce observations. The practices it checks are the ones selected when the review starts.                                                                                        | practice detection, scan, mentoring relationship, run, assessment |
+| **Practice review**                 | One evidence-bounded operation within AI-supported mentoring: Hephaestus checks one or more practices against a specific piece of work and may record results. The practices it checks are the ones selected when the review starts.                                                                                        | practice detection, scan, mentoring relationship, run, assessment |
 | **Automated review**                | The technical capability that lets Hephaestus perform a practice review. Prefer **AI-supported mentoring** in author-facing UI.                                                                                                                                                                                                   | detection, detector capability, judgment                          |
 | **AI-supported mentoring**          | Hephaestus may review connected work and offer guidance when every required source is ready.                                                                                                                                                                                                                                      | AI mentor, guaranteed feedback                                    |
 | **Human review needed**             | Connected evidence is not enough for responsible AI guidance. The practice remains useful for self, peer, or mentor review outside the current product, and Hephaestus skips it.                                                                                                                                                  | human context needed, unobservable, not applicable                |
@@ -27,11 +27,11 @@ For how the words fit together at runtime — the four stages, and the refusal v
 | **Automated-review policy**         | The frame a review runs in for one practice: the source-contract version, the review mode, the refusal behavior, and the known limits. Evidence requirements belong to the flat review configuration, not here.                                                                                                                   | evidence requirements                                             |
 | **Review occasion**                 | The one occasion a practice is reviewed on, and the evidence a review occasioned that way reads. A practice declares exactly one.                                                                                                                                                                                                 | trigger, review event, schedule, bare "binding"                   |
 | **Model assignment**                | Which AI model, with which execution limits, a workspace runs a given purpose on, for one tier. Lives in Administration &rarr; AI models, not in the practice catalogue. The verb is **assign**. The code name is *binding*.                                                                                                       | bind, bound, unbound, bare "binding", practice binding, agent config |
-| **Practice script**                 | Optional TypeScript in a practice that runs before each review of that practice. It points the review to locations to examine and never writes feedback. It can call the models for practice scripts that the workspace assigns on AI models. See [Write a practice script](/admin/practice-scripts). | precompute script, static analysis, analyzer, detector, linter, findings, scout, check script |
+| **Practice script**                 | Optional TypeScript in a practice that is its [practice program](#results-and-programs) in place of the built-in program. It returns the practice's one candidate result and never writes feedback. It can call the models for practice scripts that the workspace assigns on AI models. See [Write a practice script](/admin/practice-scripts). | precompute script, static analysis, analyzer, detector, linter, findings, scout, check script |
 | **Model slot**                      | One kind of model that a practice script can call: chat, decision, embedding or reranking. Chat is the practice review's own model. Each other slot comes from its own model assignment. It is not the purpose and tier row of an assignment. See [Model slots and needs](/admin/practice-scripts#model-slots-and-needs). | model type, capability, tool, tier |
 | **Model for practice scripts**      | A decision, embedding or reranking model that a workspace assigns under **Models for practice scripts** on AI models, for practice scripts to call. The review's own chat model is not a model for practice scripts. See [Models for practice scripts](/admin/ai-providers#models-for-practice-scripts). | precompute model, precompute agent, script model, helper model |
-| **Lead**                            | A location that a practice script points the reviewer to for one practice: a citation, a declared kind, and optional facts and rating. It reaches the measuring turn only. It is never an observation or a claim about the work. In UI text, a lead is a **place** to check. | finding, detection, flag, verdict |
-| **Not rated**                       | A call to a model for practice scripts that gave no answer that the script can use, with one of seven reasons. A script reports the items that it could not rate with the same reasons. It never means that the script found nothing. [Calls that were not rated](/admin/practice-review-operations#calls-that-were-not-rated) lists the reasons. | nothing found, skipped, unrated finding |
+| **Lead**                            | A place that a practice program passes to the review session in its [review input](#results-and-programs), with a one-line label and optional facts. It reaches that session only. It is never a result, an observation, or a claim about the work. In UI text, a lead is a **place** to check. | finding, detection, flag, verdict |
+| **Not rated**                       | A call to a model for practice scripts that gave no answer that the script can use, with one of seven reasons. A program passes the items that it could not rate to the review as limitations, with the same reasons. It never means that the script found nothing. [Calls that were not rated](/admin/practice-review-operations#calls-that-were-not-rated) lists the reasons. | nothing found, skipped, unrated finding |
 | **Signal**                          | The name of an ingested event a practice can be reviewed on, such as `scm.pull_request.merged`. Its prefix is the artifact kind, which is why a practice never states its artifact kind separately. On screen it is a **moment**, in the editor and in the filters alike.                                                         | trigger event, webhook, hook                                      |
 | **Evidence requirement**            | One source a practice review reads, and the stance the practice takes towards it.                                                                                                                                                                                                                                                 | required evidence, evidence declaration, detector configuration   |
 | **Evidence stance**                 | How a practice relates to one source: `REQUIRED`, `EXHAUSTIVE`, or `CONTEXTUAL`.                                                                                                                                                                                                                                                  | required/optional lists, source role                              |
@@ -67,7 +67,7 @@ Nothing validates a policy independently, so no surface may suggest something di
 
 “Mentoring” describes the product goal, not an anthropomorphic claim.
 Hephaestus does not know a developer's intent, private conversations, runtime conditions, or learning needs unless an authorized source explicitly provides that context.
-An observation is a bounded record of observed work, not a grade, diagnosis, or ground truth.
+A result is a bounded record of observed work, not a grade, diagnosis, or ground truth.
 
 ### A value with no words
 
@@ -81,6 +81,41 @@ Whichever side meets a value it has no words for shows these, never the identifi
 | A signal its artifact kind no longer declares | **A moment this version no longer offers**     |
 | A source kind the webapp has no name for      | **Another source**                             |
 | A provider the webapp has no name for         | **Another provider**                           |
+
+## Results and programs
+
+A review records one result per practice that it decides.
+The [product vocabulary](./practice-feedback-language.md#result-outcomes) owns what a result, an observation, an example, and an open question mean to a reader.
+This table owns the review terms that produce and check them.
+
+| Term | Plain meaning | Do not use for this concept |
+| --- | --- | --- |
+| **Result** | One practice's one verdict about one piece of reviewed work in one review. Defined in the [practice feedback language](./practice-feedback-language.md#result-outcomes). | observation (for the verdict), finding, verdict row |
+| **Observation** | One problem under a `NOT_MET` result, at a place in the work. Defined in the [practice feedback language](./practice-feedback-language.md#observations). | finding, detection, problem kind |
+| **Example** | The optional place of a `MET` or `NOT_MET` result that shows the practice done well. Defined in the [practice feedback language](./practice-feedback-language.md#examples). | good example, praise, strength |
+| **Open question** | A located doubt in the evidence of a result. Defined in the [practice feedback language](./practice-feedback-language.md#open-questions). | uncertainty finding, question to the developer |
+| **Claim basis** | Why an observation belongs to the reviewed work: the work introduced it, worsened it, or left undone a duty that the criteria state. Each basis names the observation's own citations by index. An observation migrated from before the contract has none. | justification, reason, cause |
+| **Result coverage** | How much of its scope a result read, and what it left out. Host coverage counts the runner's own read receipts. Claimed coverage counts what program code reports. `MET` needs complete coverage. | review coverage, confidence, completeness score |
+| **Practice program** | The code that reviews one admitted practice in one review attempt and returns one candidate result. It is the built-in program or the practice's own practice script. | precompute stage, lead stage, pre-step |
+| **Built-in program** | The practice program of a practice that has no practice script. It calls `ctx.review()` once, with no review input. | default script, fallback review |
+| **Review input** | What a practice program passes to `ctx.review()`: leads, facts, directions, context, and limitations. It guides one review session. It is never a result. | script output, precompute output, leads output |
+| **Candidate result** | The result that a practice program returns, before admission. Its shape depends on the outcome, so an invalid combination cannot be written. | draft observation, script result |
+| **Admission** | The server step that verifies every candidate result of one review attempt and records the results that pass. Every producer submits through one endpoint. | publication, ingestion, import |
+| **Withheld result** | A candidate result that admission did not record, with a reason code. The other practices of the attempt proceed. | refused result, dropped result |
+
+Every practice program returns its candidate through one route, `POST /internal/llm/admit-results`, with schema version 2.
+The built-in program, a practice script, and a session that `ctx.review()` opens all produce the same candidate shape.
+A practice script can also decide without a review session, from its own code or direct model calls.
+
+A candidate is atomic per practice.
+If admission refuses one observation or the example, it withholds that practice's whole result.
+The withholding reasons are `quote_unverified`, `duty_not_in_criteria`, `basis_state_unsupported`, and `practice_withdrawn`.
+A malformed candidate, a repeated or unadmitted practice, a wrong attribution, or an unauthorized source refuses the whole submission instead.
+A withheld `NOT_MET` result never becomes `MET`.
+
+Admission computes the provenance of each result on the server.
+It records the job, the attempt, the practice revision, the program kind and digest, and the captured revision.
+The [evaluation provenance contract](./evaluation-provenance.md) owns how to join it.
 
 ## Who may review
 
@@ -108,9 +143,9 @@ A statement that a person *could* observe something must never let Hephaestus at
 ## How a review was occasioned
 
 Three separate words describe the start of a review, and they are not synonyms.
-The **door** is what a person or a provider did. `DiscoveredVia` is how we came to know about the occurrence, recorded on every signal. `ObservationOrigin` is the population any resulting observation belongs to, derived from `DiscoveredVia` once and never re-decided.
+The **door** is what a person or a provider did. `DiscoveredVia` is how we came to know about the occurrence, recorded on every signal. `ResultOrigin` is the population that any resulting result belongs to, derived from `DiscoveredVia` once and never re-decided.
 
-| Door                                            | Recorded as (`DiscoveredVia`) | UI label                   | Observation origin | Starts a review                      |
+| Door                                            | Recorded as (`DiscoveredVia`) | UI label                   | Result origin      | Starts a review                      |
 | ----------------------------------------------- | ----------------------------- | -------------------------- | ------------------ | ------------------------------------ |
 | A provider event on connected work              | `EVENT`                       | Live event                 | `LIVE`             | yes                                  |
 | Reconciling with the provider                   | `SYNC`                        | Noticed during a sync      | `LIVE`             | **no** on its own, for pull requests and issues |
@@ -133,7 +168,7 @@ The **door** is what a person or a provider did. `DiscoveredVia` is how we came 
   `PracticeDefinitionValidator` refuses a practice that names a manual-request signal. Do not present it as
   a moment an author can tick.
 - **A recurring sweep is `LIVE`, not `BACKFILL`.** `SWEEP` records how the work was *found*, and the work
-  it finds is current work that never raised an event. Its observations therefore compose and deliver
+  it finds is current work that never raised an event. Its results therefore compose and deliver
   exactly like an event-triggered review. Only a confirmed past-work campaign carries `BACKFILL`, and only
   `BACKFILL` is measured-and-never-delivered. A sweep is a standing authorization to spend *and* to speak.
 
@@ -142,16 +177,16 @@ The **door** is what a person or a provider did. `DiscoveredVia` is how we came 
 A standing, a trend, and a resolution by the work count each piece of work at its newest `LIVE` review.
 A later `MANUAL` review of the same work does not hide that result.
 Only a practice that no `LIVE` review judged reads its `MANUAL` and `BACKFILL` reviews instead, by the same rule.
-Neither origin raises a Practice profile card on its own, and both stay visible as observations.
+Neither origin raises a Practice profile card on its own, and both stay visible as results.
 
 Feedback cites each piece of work at its newest `LIVE` review.
 A later `MANUAL` review drops that work from the citation only if it found no problem on the practice.
 A `BACKFILL` review never changes what feedback cites.
 
-A `BACKFILL` observation is also entitled only to `IN_APP`: the developer's own practice feedback.
+A `BACKFILL` result is also entitled only to `IN_APP`: the developer's own practice feedback.
 That entitlement is a ceiling, not an instruction.
 The in-app router refuses a cluster made entirely of backfilled measurements (`BACKFILL_QUIET`).
-Thus, a backfill observation is measured but never delivered, by construction rather than configuration.
+Thus, a backfill result is measured but never delivered, by construction rather than configuration.
 
 ## Signal state reasons
 
@@ -173,7 +208,7 @@ A provider read or an ordinary sync that records the merger clears it.
 
 `COALESCED` means an issue-update snapshot was displaced before admission.
 It is suppressed, not pending: the reaper does not retry it, but a later live transition back to that content can offer it again.
-It says nothing about whether earlier observations were resolved.
+It says nothing about whether earlier results were resolved.
 See [Issue lifecycle occasions](./practice-review-pipeline.mdx#issue-lifecycle-occasions) for revision identity.
 
 The review outcome `COALESCED` is a different fact, which is recorded on a completed review.
@@ -203,7 +238,7 @@ Feedback on a practice page or in a mentor turn is **pulled** by the developer a
 It remains subject to channel access controls, the origin rule and delivery rules such as attribution, corroboration and cooldown.
 The rule has one home, `PracticeAutonomy.delivers(channel)` over `FeedbackChannel.pushed()`.
 
-`HUMAN_APPROVAL` is an operational mode, not silent observation.
+`HUMAN_APPROVAL` is an operational mode, not silent measurement.
 An in-context unit enters `AWAITING_APPROVAL` with its immutable content and target — only `IN_CONTEXT` feedback is approvable at all.
 A workspace owner or administrator can approve that exact proposal or reject it, optionally recording a structured reason.
 Approval moves the unit to `PREPARED`.
@@ -374,10 +409,10 @@ The seam is [ADR 0029](https://github.com/hephaestus-build/Hephaestus/blob/main/
 
 | Term                       | Plain meaning                                                                                                                                                                                                                                                              | Do not use for this concept                                |
 | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| **Measurement**            | The first phase reads one piece of work against each practice and records one [observation](./practice-feedback-language.md) per practice. The observation is immutable while retained. It carries an `evidenceRationale`, never advice.                                   | detection pass, scan, phase one                            |
+| **Measurement**            | The first phase reads one piece of work against each practice and records one [result](#results-and-programs) per practice. The result and its observations are immutable while retained. They carry explanations, never advice.                                   | detection pass, scan, phase one                            |
 | **Intervention**           | The second phase: deciding what is worth saying now, to whom, and on which surface.                                                                                                                                                                                        | synthesis, rendering, formatting                           |
 | **Composition**            | The second LLM turn in the review's existing agent session. It starts only after Java has admitted the final measurements.                                                                                                                                                 | the composer's turn as part of the review, second pass     |
-| **Composed feedback unit** | One intervention the composition turn proposes for one channel and one practice, before any server gate has admitted it. Once admitted it is [feedback](./practice-feedback-language.md) in the ledger, with its channel, delivery state and the observations it rests on. | feedback row, draft feedback                               |
+| **Composed feedback unit** | One intervention the composition turn proposes for one channel and one practice, before any server gate has admitted it. Once admitted it is [feedback](./practice-feedback-language.md) in the ledger, with its channel, delivery state and the results it rests on. | feedback row, draft feedback                               |
 | **Withhold**               | The composer's own decision that a lane is not worth writing on, recorded with a reason.                                                                                                                                                                                   | suppress, skip, drop                                       |
 | **Suppress**               | The *server's* refusal to deliver feedback it was given, recorded as `FeedbackSuppressionReason`.                                                                                                                                                                          | withhold, silence                                          |
 | **Notes**                  | What is composed for the mentor conversation: `situation`, `capability`, `evidenceSummary`, and `inConversationSignal`. Notes *to* the mentor, never a sentence for it to say — it writes the turn from the live conversation and admitted evidence.                       | move, opener, conversation message, prepared reply, script |
@@ -434,33 +469,34 @@ Pull request reviews do not: every new review posts a new summary, while a retry
 
 ### Recorded review history
 
-The history context contains each recorded observation and the feedback already delivered or prepared.
-A location groups observations about the same piece of work.
+The history context contains each recorded result with its observations, and the feedback already delivered or prepared.
+A shared location groups results and observations about the same piece of work.
 It does not establish semantic equivalence between their behaviors.
-Comparing outcomes at a shared location or omitting a prior observation does not establish that a concern was resolved or regressed.
+Comparing outcomes at a shared location or omitting a prior result does not establish that a concern was resolved or regressed.
 
 Feedback previously published on the work stays in the history of prior advice after a newer review replaces it, with its original recipient and support.
 Its words remain usable only while that support is permitted and current and the feedback is not withdrawn.
 
-Responses apply to the specific observations bound to the feedback the developer received.
+Responses apply to the specific results bound to the feedback the developer received.
 
-### Invalidated observations
+### Invalidated results
 
-A workspace admin **invalidates** an observation that was wrong when it was recorded, with a reason.
+A workspace admin **invalidates** a result that was wrong when it was recorded, with a reason.
+Correction is result-level: it covers the result with all of its observations.
 The reverse is **restore**, with its own reason.
-Neither changes the observation: each correction is an `observation_invalidation` row keeping both actors, reasons and times, and at most one is in force per observation.
+Neither changes the result: each correction is a `practice_result_invalidation` row keeping both actors, reasons and times, and at most one is in force per result.
 While one is in force:
 
 - Every current read treats the claim as never made.
   This includes the standing, Practice profile, Heph's context, composition history, and new feedback. The latest-run rule skips it too.
   An earlier valid review of the same work speaks again.
-  The exception is when the same run left another valid observation of that practice there.
+  The exception is when the same run left another valid result of that practice there.
 - Review history keeps it, labeled with the reason. The developer sees the reason, not who gave it.
 - Feedback citing it that has not reached anyone is suppressed as a whole with `OBSERVATION_INVALIDATED`.
-  A Practice profile card citing it is hidden, however many other observations it cites.
-- A correction and a delivery citing the same observation never overlap. An automatic, approved, or retried delivery attempt is admitted only while its claim is live.
-  A short transaction must also share-lock its cited observations and find none invalidated. The correction takes its observation `FOR UPDATE` and is
-  refused with a conflict while a claim citing it is live. An automatic package cites the observations it was
+  A Practice profile card citing it is hidden, however many other results it cites.
+- A correction and a delivery citing the same result never overlap. An automatic, approved, or retried delivery attempt is admitted only while its claim is live.
+  A short transaction must also share-lock its cited results and find none invalidated. The correction takes its result `FOR UPDATE` and is
+  refused with a conflict while a claim citing it is live. An automatic package cites the results it was
   written from, or its whole run if it predates recording them. An approved one, those bound to it. No connection is
   held across provider calls. A claim whose lease expired mid-write is no longer counted, which is the one
   window this leaves.
@@ -482,13 +518,13 @@ While one is in force:
   Thus, a known summary is corrected at once while the rest stays unknown. `PENDING` lasts while a delivery citing it is unsettled or an edit must be retried. Each retry moves the correction behind every other due one.
   Its backoff is half its time pending, from a minute to six hours.
 
-Restoring makes the observation count again from then on and removes the notice it added.
+Restoring makes the result count again from then on and removes the notice it added.
 Feedback the invalidation stopped stays stopped.
 Say **invalidated** or **marked incorrect**, never *deleted*, *retracted* or *superseded*: superseded is the word for [feedback replaced on its thread](#thread-key-and-supersession).
 
 ### Withdrawn feedback
 
-A workspace admin **withdraws** an `IN_APP` card, `PREPARED` or `DELIVERED`, whose words were wrong while its observations are valid.
+A workspace admin **withdraws** an `IN_APP` card, `PREPARED` or `DELIVERED`, whose words were wrong while its results are valid.
 The reverse is **restore**, each with a reason.
 The feedback row is `@Immutable` and does not change.
 Each withdrawal is a `feedback_withdrawal` row that keeps both actors, reasons, and times.
@@ -508,12 +544,12 @@ While one is open:
   It still marks where the next card's evidence starts.
   The in-app cooldown still counts it.
 - It takes no new answer (`409`). The developer's earlier answer stays readable and can still be removed.
-- Observations, standings and review history are unchanged, and nothing else — notes on the work,
+- Results, standings and review history are unchanged, and nothing else — notes on the work,
   `IN_CHAT` feedback — is touched.
 
 A read already in flight when the withdrawal commits may still show and deliver the card.
-Restoring reopens the ordinary read, subject to observation visibility and consent, and never re-sends.
-Say **withdrawn**, never *deleted*, *retracted* or *invalidated*: invalidated is the word for an [observation that was wrong](#invalidated-observations).
+Restoring reopens the ordinary read, subject to result visibility and consent, and never re-sends.
+Say **withdrawn**, never *deleted*, *retracted* or *invalidated*: invalidated is the word for a [result that was wrong](#invalidated-results).
 
 ### How feedback resolves
 
@@ -521,7 +557,7 @@ A piece of [feedback](./practice-feedback-language.md) on the Practice profile r
 
 | Term                     | Plain meaning                                                                                                                                                                                                                                                                                                                  | Do not use for this concept                         |
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------- |
-| **Resolved by the work** | Three pieces of the developer's reviewed work in a row, reviewed after the feedback was prepared, came back clean on the practice. Computed from the observations when the feedback is read and never stored. A problem starts the count over. A piece of work reviewed several times counts once, at its newest [`LIVE` review](#how-a-review-was-occasioned). | auto-resolved, closed by the system, streak, passed |
+| **Resolved by the work** | Three pieces of the developer's reviewed work in a row, reviewed after the feedback was prepared, came back clean on the practice. Computed from the results when the feedback is read and never stored. A problem starts the count over. A piece of work reviewed several times counts once, at its newest [`LIVE` review](#how-a-review-was-occasioned). | auto-resolved, closed by the system, streak, passed |
 | **Marked as addressed**  | The developer answered the card with *Addressed* or *Not applicable*. The card closes as *Marked by you* on neutral ground, never in the success color of a resolution. It says that the next work confirms it. Its clean work count continues. Pressing the answer again takes it back and reopens the card. *Disagree* writes a dispute, which leaves the card open. Whichever way closed the feedback first is the one the card and the summary report. | dismissed, acknowledged, done                       |
 | **Fell back**            | Open feedback the developer's work had started to answer, with at least one clean piece of work toward the three. A piece of work reviewed in the overview's window raised the problem again. The count went back to none. Closed feedback never falls back.                                                        | reset, regressed, reopened                          |
 
@@ -562,7 +598,7 @@ Its rules, in one place:
   3. New feedback.
   4. A standing that slipped.
   5. A standing that moved up.
-  6. A first observation.
+  6. A first result.
   7. A trend that turned.
 
 ## Machine names
@@ -574,10 +610,22 @@ Its rules, in one place:
 | Review occasion                       | `signals`, `reviewWhen`, `evidenceRequirements`, `subject`, `precondition`                       | `PracticeDefinition`                                                     | flat columns on practice and revision                                                               |
 | Model assignment                      | `AgentBinding`                                                                                   | `WorkspaceAgentBinding`                                                  | `workspace_agent_binding`                                                                           |
 | Practice script                       | `practiceScript`                                                                                 | `Practice.practiceScript`                                                | `practice.practice_script`                                                                          |
-| What one practice script did in one review attempt | `practiceScript` on a practice trace entry (`PracticeScriptRun`), `practices[]` in `practice-scripts.json`, and `GET /agents/jobs/{jobId}/practice-scripts` (`ReviewPracticeScripts`) | `PracticeScriptRunDTO`, `AgentJobPracticeScriptRun`, `ReviewPracticeScriptsDTO` | `agent_job_practice_script_run` |
+| What one practice program did in one review attempt | `practiceScript` on a practice trace entry (`PracticeScriptRun`, with `programKind`, `path` and `stopReason`), `practices[]` in `practice-scripts.json`, and `GET /agents/jobs/{jobId}/practice-scripts` (`ReviewPracticeScripts`) | `PracticeScriptRunDTO`, `AgentJobPracticeScriptRun`, `ReviewPracticeScriptsDTO` | `agent_job_practice_script_run` |
+| Practice program kind | `program.kind` (`builtin`, `custom`) in `practice-scripts.json`, `programKind` on `PracticeScriptRun` | `PracticeProgramKind` | `agent_job_practice_script_run.program_kind` |
 | Model slot                            | `chat`, `decision`, `embedding`, `reranking` in `practice-script-models.json` and script `meta.models` | `ModelKind` | `agent_job_practice_script_usage.model_kind` |
-| Lead                                  | `leads[]` in the practice script result `<slug>.json`. `leads` on `PracticeScriptRun` is their count | `PracticeScriptRunDTO.leads`, the count of leads | `agent_job_practice_script_run.leads`, the count only |
-| Not rated                             | `unrated[]` in the practice script result `<slug>.json`. `notRated` on `PracticeScriptModelUse`, with a `reason` | `PracticeScriptNotRatedDTO`, `PracticeScriptNotRatedReason` | `agent_job_practice_script_run.models`, in each stored model |
+| Lead | `leads[]` in the review input of `ctx.review()` (`ReviewLead`) | not in Java | not stored |
+| Not rated | `limitations[]` in the review input of `ctx.review()`. `notRated` on `PracticeScriptModelUse`, with a `reason` | `PracticeScriptNotRatedDTO`, `PracticeScriptNotRatedReason` | `agent_job_practice_script_run.models`, in each stored model |
+| Candidate result | `Candidate` in `lib/contract.ts`, inside each `results[]` entry of the admission request | `Candidate` in `agent.handler.candidate` | never stored as such |
+| Admission | `POST /internal/llm/admit-results`, schema version 2 | `ResultAdmissionService`, `ResultAdmissionController` | `practice_result`, `practice_observation`, and the job metadata keys `observation_admission_*` |
+| Result | `practiceResultId`, `PracticeResultDetail`, `ReviewResult`, `ReviewResultDetail` | `PracticeResult` | `practice_result` |
+| Observation | `observationId`, `observations[]` on a result detail (`Observation`) | `Observation`, `ObservationDTO` | `practice_observation` |
+| Example | `example` (`PracticeResultExample`) | `PracticeResultExampleDTO` | `practice_result.example` |
+| Open question | `evidence.undecidability[]` (`OpenQuestion`) | `OpenQuestionDTO` | inside `practice_result.evidence` |
+| Claim basis | `basis` on an observation (`ClaimBasis`) | `ClaimBasisDTO` | `practice_observation.basis` |
+| Result coverage | `coverage` (`PracticeResultCoverage`) | `PracticeResultCoverageDTO` | `practice_result.coverage` |
+| Result provenance | `provenance` on an admin result detail (`PracticeResultProvenance`) | `PracticeResultProvenanceDTO` | `practice_result.provenance` |
+| Result correction | `PracticeResultInvalidation` | `PracticeResultInvalidation` | `practice_result_invalidation` |
+| Feedback evidence | `basedOn[]` of `EvidenceRef` in `out/feedback.json` | `FeedbackEvidence` | `feedback_evidence` |
 | Signal                                | `signals[]`                                                                                      | `SignalName`                                                             | `signals`                                                                                           |
 | Review conditions                     | `reviewWhen`                                                                                     | `PracticeDefinition.reviewWhen`                                          | `review_when`                                                                                       |
 | Evidence requirement                  | `evidenceRequirements[]`                                                                         | `PracticeEvidenceRequirement`                                            | `evidence_requirements`                                                                             |
@@ -600,7 +648,7 @@ Its rules, in one place:
 | Source readiness checks               | not on the HTTP API                                                                              | `SourceReadinessCheck`                                                   | inside `agent_job.review_readiness`                                                                 |
 | Source absence reason                 | inside `manifest.json`                                                                           | `SourceAbsenceReason`                                                    | inside `agent_job.evidence_snapshot`                                                                |
 | Discovery provenance                  | `discoveredVia`                                                                                  | `DiscoveredVia`                                                          | `artifact_signal.discovered_via`                                                                    |
-| Observation origin                    | `origin`                                                                                         | `ObservationOrigin`                                                      | `observation.origin`                                                                                |
+| Result origin | `origin` | `ResultOrigin` | `practice_result.origin` |
 | Occurrence state                      | —                                                                                                | `SignalState`                                                            | `artifact_signal.state`                                                                             |
 | Source-use purpose                    | `purpose`                                                                                        | `SourceUsePurpose`                                                       | source-use decisions                                                                                |
 | Source absence state                  | `supportedAbsenceStates`                                                                         | `SourceAbsenceState`                                                     | source catalog                                                                                      |
@@ -657,12 +705,12 @@ There is no such state, and the contract says why.
 
 ## Outcome states
 
-The [product vocabulary](./practice-feedback-language.md#observation-outcomes) owns observation outcome labels.
-The same outcome values are used by the generation tool, persisted observation and read DTOs.
+The [product vocabulary](./practice-feedback-language.md#result-outcomes) owns result outcome labels.
+The candidate result, the persisted result, and the read DTOs use the same outcome values.
 The [feedback schema](./practice-feedback-schema.md#evidence-warrants) owns their warrants.
 
-A readiness refusal belongs to the capture stage and creates no observation.
-It is not an observation outcome.
+A readiness refusal belongs to the capture stage and creates no result.
+It is not a result outcome.
 NOT_APPLICABLE and UNDETERMINED describe distinct facts established by reading available evidence, and neither contributes to the decided-result denominator.
 
 ## Lifecycle
@@ -677,7 +725,7 @@ NOT_APPLICABLE and UNDETERMINED describe distinct facts established by reading a
 7. Each review captures evidence and records explicit source states.
 8. Source readiness checks decide whether every required source meets its requirements.
 9. Hephaestus reviews the work or records that the practice was skipped.
-10. Observations retain the exact practice revision, source contract, and evidence provenance.
+10. Results retain the exact practice revision, source contract, program, and evidence provenance.
 11. Changes to the assessment standard or source contract move the review-rule fingerprint. Scheduling-only changes (`signals`, `reviewWhen`) do not. Earlier claims derive as stale from their recorded basis. Nothing marks a claim stale by hand.
 12. Automated review validation — always `AUTHOR_DECLARED` — is separate from source authorization, practice autonomy, and per-run readiness.
 

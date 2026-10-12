@@ -29,7 +29,7 @@ from those pages remain in scope.
 | Authentication | `/login`, workspace login, callback and error |
 | Workspace creation | provider selection, GitHub, GitLab, validation and errors |
 | Workspace home | dashboard, teams and user profiles |
-| Developer feedback | reviews, trace, observations, feedback delivery and targets |
+| Developer feedback | reviews, trace, results, feedback delivery and targets |
 | Mentor | thread list, greeting, transcript, composer and copilot |
 | Personal settings | settings, integrations and destructive actions |
 | Workspace administration | members, practices, review operations, models, usage and integrations |

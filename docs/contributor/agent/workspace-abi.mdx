@@ -106,16 +106,18 @@ It is not a successful review.
 ├── repos/<repo>/                    # Full-history, read-only working copies and sanitized Git metadata.
 ├── inputs/                          # Small runtime and composition metadata, also read-only.
 │   ├── history/                    # Uncapped subject observations, feedback and prepared-feedback projections.
-│   └── practices/                  # Eligible practice index and practice scripts.
-├── work/                            # AGENT + PRACTICE SCRIPT SCRATCH. Never collected back into SQL.
-│   ├── change/                      #   The change view pi-change.ts derives from the checkout with git:
+│   └── practices/                  # Eligible practice index and the criteria of each practice.
+├── work/                            # AGENT + PRACTICE PROGRAM SCRATCH. Never collected back into SQL.
+│   ├── change/                      #   The change view the runner derives with pi-change.ts and git:
 │   │                                #   diff.patch ([L<n>]-annotated), diff_stat.txt, files.json.
 │   ├── notes/review.md              #   What the review has recorded, appended by the runner; read back after compaction.
-│   ├── practice-scripts/practices/  #   Practice scripts (<slug>.ts, run on Node), each beside its
-│   │                                #   <slug>.cause.json and <slug>.previous.json.
-│   ├── practice-scripts-out/        #   Practice script runtime output (logs, structured leads).
+│   ├── practice-scripts/
+│   │   ├── lib -> /opt/practice-scripts/lib  # The toolkit link, made before Node starts.
+│   │   └── practices/               #   <slug>.cause.json and <slug>.previous.json for each admitted
+│   │                                #   practice, and <slug>.ts for a practice with a custom program.
+│   ├── review-input/<slug>.json     #   The whole input of each review; removed before admission.
 │   ├── analysis/practices/          #   Per-practice analysis output (holds the .gitkeep marker).
-│   └── composition/                 #   observations.json — the admitted observations feedback is composed from.
+│   └── composition/                 #   results.json — the admitted results and their observations.
 ├── out/                             # THE ONLY collected directory — result.json, review-state.json,
 │                                    #   usage.json, runner-debug.json, practice-coverage.json,
 │                                    #   feedback.json, watchdog-killed.json, practice-scripts.json;
@@ -128,17 +130,26 @@ It is not a successful review.
 ├── pi-provider.json                 # Provider/model routing for the runner.
 ├── practice-script-models.json      # The models that practice scripts may call, by slot. Absent with no slot.
 ├── pi-provider.ts                   # Provider/model helper imported by both runners.
+├── pi-agent-sandbox.ts              # Session resource options for an untrusted project.
+├── pi-assessment-cache.ts           # Review-local cache accounting.
+├── pi-task-paths.ts                 # Task path validation and resolution.
+├── pi-tool-arguments.ts             # Decodes JSON text in tool arguments.
+├── pi-change.ts                     # Derives work/change/ from the checkout, before any program runs.
+├── pi-practice-scripts-report.ts    # Writes out/practice-scripts.json, the execution report.
 ├── pi-error-text.ts                 # Shared error-message helper.
 ├── pi-model-failure.ts              # Reads the provider adapter's closed failure diagnostic.
-├── pi-task-paths.ts                 # Task path validation and resolution.
-├── pi-change.ts                     # Derives work/change/ from the checkout; runs first, and its failure is the review's.
-├── pi-practice-scripts.sh           # Bounded, best-effort practice script bootstrap.
-├── pi-practice-scripts.ts           # Practice script launcher using task-declared paths.
-├── pi-observation-normalize.ts      # Normalises sandbox observations before out/ is written.
-├── pi-runner-usage.ts               # Token-usage accounting sidecar.
-├── pi-review-brief.ts               # The first turn's brief: the captured records and the change view, line-numbered.
+├── pi-text.ts                       # Shared text helpers.
+├── pi-result-normalize.ts           # Checks and normalizes each submit_result submission.
+├── pi-practice-coverage.ts          # Writes out/practice-coverage.json.
+├── pi-review-brief.ts               # The review session's brief: the captured records and the change view, line-numbered.
+├── pi-folder-index.ts               # Reads INDEX.json for citations.
 ├── pi-review-turns.ts               # Practices as turns per catalog group; the budget's fair shares.
+├── pi-turn-context.ts               # The context a turn holds.
+├── pi-runner-output.ts              # The names of out/ archive members.
+├── pi-runner-usage.ts               # Token-usage accounting sidecar.
+├── pi-runner-retry.ts               # Which HTTP failures the runner retries.
 ├── pi-runner-composition.ts         # Feedback-composition contract and coherence rules.
+├── pi-session-lifecycle.ts          # Binds each session file to its review.
 ├── feedback-style.md                # Shared writing guidance; digested with both composition prompts.
 ├── feedback-composer.md             # Private-composition prompt; digested with the prompt scaffolding.
 ├── review-composer.md               # Public-review prompt; digested with the prompt scaffolding.
@@ -168,7 +179,7 @@ See [ADR 0036](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/dec
   projection is pretty-printed, one field per line, so a line citation into it is possible. A source with nothing to report still writes its file with an empty list.
   "The record was read and held nothing" is a fact a review can reason from.
   "The file is not there" is not.
-- **`inputs/history/`** — earlier observations and feedback, present on every review. These are uncapped authorized subject projections from the same snapshot. `COMPLETE` means complete
+- **`inputs/history/`** — earlier results and feedback, present on every review. These are uncapped authorized subject projections from the same snapshot. `COMPLETE` means complete
   for that permitted mirror scope, not a guarantee about upstream records.
 - **`INDEX.json`** — the source and artifact index, and the authoritative statement of what a run
   staged. **Every source permitted for the workspace and purpose is rendered on every review**.
@@ -184,22 +195,23 @@ See [ADR 0036](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/dec
   hydrated, and its presence makes the capture `PARTIAL` with `SUBMODULE_EXCLUDED` recorded in
   `INDEX.json`. Only the `repos/reviewed/.git/HEAD` and captured-refs witnesses carry manifest digests.
   the checkout itself is transferred by traversal.
-- **`work/change/`** — what `pi-change.ts` derives from `repos/reviewed/` with `git` before the practice scripts and the model run.
+- **`work/change/`** — what the runner derives from `repos/reviewed/` with `pi-change.ts` and `git` when it starts, before any program runs.
   It derives `git diff` from `base_sha` to `head_sha`, with renames detected.
   Every hunk line has the prefix `[L<n>]` and a space: the coordinate a change citation names.
   It also derives `git diff --stat` and the changed files with their status letters. The commits of the range are not derived here.
   They are staged as `context/commits.json`.
-  Thus, a commit-message quote cites an artifact that admission can verify. Absent when no change was captured (an issue review). A practice script
-  receives this directory as its fifth argument and reads it through `lib/change.ts`.
-- **`work/`** — agent + practice script scratch. The Pi agent may write here. The server never
+  Thus, a commit-message quote cites an artifact that admission can verify. Absent when no change was captured (an issue review).
+  A continuation derives no change view.
+  A practice program reads the change through `ctx.files.change`, which the host parses from `diff.patch`.
+- **`work/`** — agent and practice program scratch. The Pi agent may write here. The server never
   collects it.
 - **`out/`** — the *only* directory the sandbox collects after the run. `runner-debug.json` carries the per-turn trace.
-  This covers calls, tool calls by name, stored and refused observations with refusal reasons, compactions, and provider retries.
+  This covers calls, tool calls by name, stored and refused results with refusal reasons, compactions, and provider retries.
   The server keeps this trace in the job output.
   Thus, production friction is read from the job record, not a transcript.
-  `practice-scripts.json` reports each staged practice script, as [Practice script report](#practice-script-report) describes.
+  `practice-scripts.json` reports the program of each admitted practice, as [Practice script report](#practice-script-report) describes.
 - **`node_modules`** — a symlink to `/opt/pi-sdk/node_modules`, so the runner's bare-specifier
-  import of `@earendil-works/pi-coding-agent` resolves. The runner, practice scripts, and SDK native
+  import of `@earendil-works/pi-coding-agent` resolves. The runner, practice programs, and SDK native
   bindings execute on Node.
 - **`task.json`** — the [task envelope](#task-envelope).
 - **`.pi*`** / `inputs/practices/` / `work/practice-scripts*` / `work/analysis/` / `out/`
@@ -348,7 +360,7 @@ Prompt-size bounds never remove records from the folder.
 
 ## Task envelope
 
-`task.json` is one flat record with `schemaVersion: 4`, `jobId`, `workspaceId`, `prompt`, `pullRequestNumber`, `repositoryFullName` and the seven input-location fields below.
+`task.json` is one flat record with `schemaVersion: 5`, `jobId`, `workspaceId`, `prompt`, `pullRequestNumber`, `repositoryFullName` and the seven input-location fields below.
 There is no `kind` discriminator, nested `task` or nested `paths` object.
 The practice runner requires a non-empty `prompt`.
 Unreadable or invalid JSON, unsupported versions, blank prompts and invalid paths exit with `42`.
@@ -363,7 +375,7 @@ All seven input-location fields are required:
 | `practiceIndex`      | Practice index file. Practice documents share its directory                             |
 | `compositionRequest` | Feedback-composition request file                                                       |
 | `preparedFeedback`   | Previously prepared feedback file. Review history shares its directory                  |
-| `practiceScripts`    | Per-practice TypeScript script directory                                                |
+| `practiceScripts`    | Per-practice staged inputs and custom programs                                          |
 
 Values are relative to `/workspace`, use `/` separators, and cannot be empty or consist only of Unicode separators.
 Absolute paths, `.` or `..` components, empty components, backslashes, colons and control characters are rejected.
@@ -372,8 +384,8 @@ It does not establish filesystem ownership or prevent symlink traversal.
 
 A declared location does not guarantee content exists there.
 For example, a review without a repository has no repository tree, and feedback composition runs only when its request is present.
-The runner and the practice script runner resolve input locations from these fields, not from the layout shown above.
-The practice script runner receives the relative `contextRoot` for record citations and its absolute path for file reads.
+The runner resolves input locations from these fields, not from the layout shown above.
+Its program host cites a record by the relative `contextRoot`, and reads the record at its absolute path.
 Thus, a relocated job folder does not leave stale citation paths.
 
 Scratch and output locations remain fixed by this ABI.
@@ -516,7 +528,7 @@ These facts describe calls. They do not change retries, deadlines, budgets or ho
 | 3    | Watchdog hard-kill (budget + grace exceeded). Writes `out/watchdog-killed.json` first                        |
 | 42   | Task-envelope contract drift: malformed envelope, unsupported version, blank prompt, or invalid paths        |
 | 43   | Result archive upload did not complete before the upload deadline or was refused                             |
-| 75   | The review finished, but the call admitting its observations never reached the server                        |
+| 75   | The review finished, but the call admitting its results never reached the server                             |
 | 76   | No practice was reached, and every model call the run made went unanswered                                   |
 | 124  | The work deadline stopped the runner child. Result upload was still attempted                                |
 
@@ -533,7 +545,7 @@ A lost admission response therefore cannot repeat an admitted review.
 The retry cap still applies.
 
 Exit `76` uses the same retry policy when no practice was reached and every model call went unanswered.
-It records a provider failure, not an observation about the reviewed work.
+It records a provider failure, not a result about the reviewed work.
 
 ## Versioning policy
 
@@ -546,62 +558,49 @@ They evolve together.
 There is no cross-version envelope compatibility layer.
 
 The agent image's `hephaestus.agent.runtime-contract` label versions its runtime dependencies and launch contract separately.
-Its value is `3`, independent of the envelope schema version.
+Its value is `5`, independent of the envelope schema version.
 See [ADR 0036](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0036-agent-runtime-runs-on-node-24.md) for the image contract.
 
 ## Practice script validation and limits
 
-Practice scripts are advisory.
-In production, the image runner validates every script's default export and its result.
-A script is a `definePracticeScript` definition, and it returns leads, facts, unrated items and directions.
-A default export of another form, an invalid result or a thrown exception becomes a recorded script error with no leads.
-It does not become an observation about the reviewed work.
+Every admitted practice runs one program, as [Practice script runner](../practice-script-runner.mdx#one-program-for-each-practice) describes.
+A practice without a script runs the built-in program in the review runner, the host.
+A custom program, `work/practice-scripts/practices/<slug>.ts`, runs in its own Node process.
+The host validates the `meta` of each program, its requests and the value that it returns.
+A retired form, an invalid value or an exception fails only that practice, with a recorded stop reason.
+It never becomes a statement about the reviewed work, and the other practices continue.
 
-A failed practice script remains best-effort: the practice review continues without its leads.
+The host gets the job timeout less 60 seconds for shutdown, `TIMEOUT_BUFFER_SECONDS`.
+No program stage takes time before the host starts.
+The host runs one practice at a time, inside the measuring window.
+The deadline of each program is the end of the measuring window less 5 seconds, `RETURN_MS`.
+The program's model calls, its reads and its `ctx.abortSignal` end at that deadline.
+The host kills the program's process 5 seconds after the deadline, so that a program that unwinds can still return.
 
-The server-staged bootstrap bounds the **entire stage** to one tenth of the job timeout, at most 90 seconds.
-The stage includes script copies, module imports, script execution, and the model calls of the scripts.
-The review runner starts after the stage.
-Its budget is the job timeout less this stage and 60 seconds for shutdown.
-Ordinary child processes are killed when the stage ends, including after success.
+The process of a custom program has these grants and limits:
 
-The image runner runs only a staged file whose name, less `.ts`, is a practice slug: `^[a-z0-9][a-z0-9-]{0,63}$`.
-It starts one Node process for each script, at most four at a time.
-Each process has a heap of at most 256 MiB.
-A script's process ends at the script's deadline, or earlier when the stage has less time left.
-The deadline is 60 seconds.
+- It runs with `--permission`.
+- It may read only the toolkit install `/opt/practice-scripts` and its dependency folders.
+- It may also read the stage, `work/practice-scripts/`.
+- It has no write grant and no child-process grant.
+- Its environment is empty.
+- Its heap is at most 256 MiB.
+- It may have at most 32 requests in flight.
+- Each message to the host is at most 512 KiB as JSON.
+- The host logs at most 65,536 characters of its output.
 
-A script's model calls and its `ctx.abortSignal` end 5 seconds before its deadline, so that the script can still return what it found.
-The runner itself stops one second before the stage deadline.
-Thus, a script that never returns loses only its own practice's leads.
+The program reads the reviewed work only through the host.
+The host answers each read and each `grep` search inside its own process, from the pinned captures.
+The host starts Node without permission flags, because a subprocess would bypass them anyway.
+Its only runtime flag is a heap of 256 MiB (`PracticeRunnerProfile.runtimeFlags()`).
 
-The runner writes each practice's section and result when that practice finishes.
-If the stage is stopped, the sections of the finished practices stay, and every other file is removed.
-Each practice's result reaches the model as a section under that practice's criteria in its evaluation turn, not in the opening brief.
-The [practice catalogue](../practice-catalogue.md) owns what a section holds and its bound.
-The review runner removes `work/practice-scripts-out` after measurement, before composition starts.
-
-The bootstrap clears the inherited environment.
-It runs `pi-practice-scripts.ts` with the child-process grant and with filesystem permission grants.
-These grants cover the workspace, the practice script library, and the stage and output directories of `pi-practice-scripts.ts`.
-
-`pi-practice-scripts.ts` stages the scripts and starts the runner with fewer grants.
-The runner may read the workspace and the practice script library, and write only the output directory.
-The runner keeps the child-process grant, to start the script processes and `grep`.
-The bootstrap applies a **10 MiB per-file limit** in its subshell, including the diagnostic log.
-
-A script's own process has an empty environment.
-It may read only the practice script install and its dependencies, the staged scripts, the repository, the captured context and the change view.
-It has no write grant and no child-process grant.
-A search through the library's `grep` runs in the runner, inside the same read grants.
-
-On failure, at most 8 KiB of diagnostics is passed onward.
-The subsequent review does not inherit that file limit.
-A per-file limit is not a cumulative disk quota.
+The workspace root is read-only, so the toolkit link is made before Node starts.
+`PracticeRunnerProfile.setupCommands()` creates `/workspace/work/practice-scripts`.
+It then links `/workspace/work/practice-scripts/lib` to `/opt/practice-scripts/lib`.
+The host imports the toolkit through this link, and a staged program imports `../lib/…` through it.
 
 These safeguards protect against broken scripts, not hostile code.
-[What a script can reach](../practice-script-runner.mdx#what-a-script-can-reach) states what the Node permission model does not stop, and which process holds which token.
-Node child-process permission is not a security boundary.
+[What a script can reach](../practice-script-runner.mdx#what-a-script-can-reach) states what the Node permission model does not stop, and which process holds the token.
 A deliberately detached process can escape process-group cleanup.
 The container's network policy, its resource limits and teardown, and the credentials that a process does not hold remain the outer boundary.
 
@@ -614,72 +613,94 @@ An entry for a model with a reasoning effort also has `reasoningEffort`, as the 
 `docker/agents/practice-scripts/test/practice-script-models.json` pins the shape for the server and the runner tests.
 The file holds no credential.
 
-The container receives a second credential, `PRACTICE_SCRIPT_PROXY_TOKEN`.
-It reaches only the proxy paths `/internal/llm/practice-script/<slot>/…`.
+There is no second credential for practice scripts.
+The host makes each direct model call with the one job token, `LLM_PROXY_TOKEN`, on the proxy paths `/internal/llm/practice-script/<slot>/…`.
+`LlmProxySecurityConfig` authorizes these paths and `/internal/llm/admit-results` with the same scope, `LLM_PROXY_SCOPE`.
+The proxy refuses a mentor credential on the direct paths with HTTP 403, because they bill a review attempt.
 
 Each call on these paths names its practice in the header `x-hephaestus-practice: <slug>`.
-The runner sets the header from the script's file name, and the request allowlist drops a header that a script sets.
+The host sets the header from the program's practice, and the request allowlist drops a header that a program sets.
 The proxy refuses a call without the header, or with a value that is not a practice slug, with HTTP 400.
 It counts each refusal in `llm.proxy.practice_script.unattributed`.
 The proxy records the usage of each attempt by model kind and practice, so the usage report can split each usage row between practices.
 `PRACTICE_SCRIPT_PRACTICE_HEADER` in `lib/contract.ts` and in `JobTokenAuthenticationFilter` hold the name, and `PracticeScriptContractSyncTest` keeps them equal.
 
 [Write a practice script](/admin/practice-scripts) owns the script contract, the model slots, and the limits of model calls.
-[Practice script runner](../practice-script-runner.mdx#token-accounting) owns how the runner accounts for tokens.
+[Practice script runner](../practice-script-runner.mdx#direct-model-calls) owns how the host accounts for the tokens of direct calls.
 [ADR 0055](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0055-practice-scripts-call-models-through-the-runner.md) records the decision.
 
 ### Practice script report
 
-The review runner reads the practice script results when it starts, because composition removes `work/practice-scripts-out`.
-It writes `practice-scripts.json` into `out/` with one entry for each staged script, from the task's `practiceScripts` directory, sorted by slug.
-`server/application/src/test/resources/agent/practice-scripts-report.json` pins the shape.
+The host writes `practice-scripts.json` into `out/` when the run ends.
+It has one entry for each admitted practice, sorted by slug.
+The built-in programs and the practices that no program reached have entries too.
+A continuation runs no program, so it writes no report.
+
+`executionEntrySchema` in `lib/contract.ts` defines an entry.
+`server/application/src/test/resources/practice-results/execution-report.json` pins the shape for both sides.
 `pi-practice-scripts-report.spec.ts` checks that the runner writes it, and `PiResultParserPracticeScriptReportTest` checks that the server reads it.
+
+The top level has `schemaVersion: 2`, `truncated` and `practices`.
 
 | Field | Meaning |
 | --- | --- |
-| `practices[].slug` | The slug of the staged script. |
-| `practices[].status` | `ok`, `skipped`, `error` or `timeout` from the script's `<slug>.json`. `not-finished` when the script has no result that the review runner can read. |
-| `practices[].leads` | The leads of the script. 0 for `skipped`, `error`, `timeout` and `not-finished`. |
-| `practices[].models` | One entry for each slot that the script declares: `slot`, `need`, `bound` and `notRated`. `notRated` counts the model calls that the runner could not rate, by reason. Empty for a script that uses no model. Absent when the models are not known: the script ended before it declared them, or did not finish. |
-| `practices[].error` | For `error`, one line of the script's error: the text up to the first line break after leading blanks, cut to 500 code points. A control character becomes a space, and trailing blanks are removed. A line that UTF-8 cannot encode is left out. Absent for every other status. |
-| `practices[].durationMs` | How long the script ran, in milliseconds, from its `<slug>.json`. Absent when the script has no readable result. |
+| `practices[].practiceSlug` | The slug of the admitted practice. |
+| `practices[].program` | `kind` is `builtin` or `custom`. `digest` is the SHA-256 of the staged `<slug>.ts` bytes as hex for `custom`, and `null` for `builtin`. |
+| `practices[].models` | One entry for each slot that the program declares: `slot`, `need`, `bound` and `notRated`. `notRated` counts the direct calls that the host could not rate, by reason. Empty for the built-in program. |
+| `practices[].status` | `ok`, `skipped`, `failed` or `not-reached`. `ok` means that a candidate passed the host's checks. Admission is a separate step. |
+| `practices[].stopReason` | `null` exactly for `ok`. Otherwise `unavailable`, `budget`, `deadline`, `too-large`, `off-format`, `refused`, `error`, `cancelled`, `invalid-program` or `invalid-candidate`. |
+| `practices[].error` | For `failed`, one line of the error: the text up to the first line break after leading blanks, cut to 500 code points. A control character becomes a space, and trailing blanks are removed. A line that UTF-8 cannot encode is left out. Absent for every other status. |
+| `practices[].calls` | The calls of the program: `review` sessions, and direct `chat`, `decision`, `embedding` and `reranking` calls. |
+| `practices[].coverageReached` | The reads that the program and its review sessions reached: `reads`, `truncatedReads` and `failedReads`. |
+| `practices[].durationMs` | How long the program ran, in milliseconds. `null` exactly for `not-reached`. |
 | `truncated` | `true` when the runner left out entries to stay within the bounds. |
 
-The file holds no tokens and no calls, because the proxy counts those.
+The file holds no candidate and no tokens, because the proxy counts the tokens.
 It has at most 64 KiB and 256 entries.
 Past either bound, the runner leaves out the entries that sort last and sets `truncated`.
 
-An error only explains a failure, so the runs come first.
-The errors get the bytes that the runs leave, in slug order, and an entry whose error does not fit has no `error`.
+An error only explains a failure, so the entries come first.
+The errors get the bytes that the entries leave, in slug order, and an entry whose error does not fit has no `error`.
 `SandboxLayoutSyncTest` keeps the bounds and the 500 code points equal on both sides.
 `PiResultParser` applies the error-line rule again.
 `practice-script-error-lines.json` holds the cases on which both sides must agree.
 
-The server reads the file in the attempt's terminal transaction and writes one `agent_job_practice_script_run` row for each script that it names.
-The row keeps the `error` of the script and the tier of the model that the attempt froze for each declared slot.
-It keeps `durationMs` unless the script was skipped or did not finish.
+The server reads the file in the attempt's terminal transaction.
+It writes one `agent_job_practice_script_run` row for each admitted practice that the file names.
+The server knows the program kind of each admitted practice: `custom` when the admitted revision holds a script.
+An entry with another kind is not valid.
 
-When `truncated` is `false`, a staged script that the file does not name is `NOT_FINISHED`.
-When `truncated` is `true`, a staged script that the file does not name gets no row.
-The server drops an entry that is not valid, that repeats a slug, or that names a script that the job did not stage.
-A missing or unreadable file records no rows, because it says nothing about the scripts.
+A row keeps the status as `PracticeScriptRunStatus`, the program kind and digest, the stop reason, the calls and the reads reached.
+It keeps the `error` of the program, and the tier of the model that the attempt froze for each declared slot.
+A row of a practice not reached keeps no models and no `durationMs`.
+The server derives `PracticeProgramPath` from the calls: `CODE`, `MODELS`, `REVIEW` or `MIXED`.
+
+When `truncated` is `false`, an admitted practice that the file does not name is `NOT_FINISHED`.
+When `truncated` is `true`, an admitted practice that the file does not name gets no row.
+The server drops an entry that is not valid, or that names a practice that the job did not admit.
+A slug that repeats leaves its practice without a row.
+A missing or unreadable file records no rows, because it says nothing about the programs.
+The report only explains execution, so an invalid report never creates a result.
 
 ## Practice review tools
 
-Each measuring practice has its own session.
+Each review that a practice program asks for with `ctx.review()` gets a fresh session.
 The task and captured brief form its shared opening.
-The turn then carries the whole staged criterion before generic recording illustrations and the leads of the practice script.
+The turn then carries the whole staged criterion, the result illustrations, and the section of the program's review input.
 Its final recording task applies that criterion’s Occasion, Judge and Defer to the captured evidence.
 After compaction, the missing opening and illustrations return once, with the exact criterion.
 
 The runner fixes its tool set when it creates the session in `pi-runner.ts`.
-The set includes the native Pi tools `read`, `grep`, `find`, `ls`, `write`, `edit`, and `bash`, plus Pi's `codemode`.
-It includes `report_observation` for the measuring turns.
+The set includes the native Pi tools `read`, `grep`, `find`, `ls` and `bash`, plus Pi's `codemode`.
+A review session also gets `submit_result`.
 
-When private composition was requested, it also includes `report_feedback` for that turn.
-Public composition creates a fresh in-memory session with only `report_review`.
+When private composition was requested, the runner opens its own session with the same tools and `report_feedback`.
+
+Public composition creates a fresh session whose only tool is `report_review`.
+It runs only when at least one eligible `NOT_MET` result exists, and a `MET` result never reaches it.
 It loads no context files, skills or extensions and has no native file or execution tools.
-Its inline input contains the eligible current-work observations, immutable practice facts and prior public feedback on the same work.
+Its inline input contains the eligible `NOT_MET` results of the current work with their observations.
+It also contains the limits that abstentions recorded, immutable practice facts and prior public feedback on the same work.
 Private history is not part of that session.
 
 `codemode` runs one JavaScript script in a QuickJS sandbox that calls the native tools during measurement.
@@ -688,16 +709,24 @@ Only what the script prints returns to the model.
 The recording tools are declared `model-only`, so a script cannot call them: what a turn records is always a call the model made.
 A script's own tool calls appear in the per-turn trace as `codemode.<tool>` and do not count toward the repetition limits, which watch the model's calls.
 
-A measuring turn ends with the `report_observation` call that leaves each of its practices with a recorded result, rather than on a further model call.
-The feedback tools store nothing until the server has admitted the recorded observations.
-`report_review` records one complete review object, naming the exact observation contributors of each complete body.
-The public tool schema constrains those identifiers to the current eligible decided observations.
-Withholding can name only `NOT_MET` observations.
+A review session ends with the `submit_result` call that stores the result of its practice, rather than on a further model call.
+The feedback tools store nothing until the server has admitted the submitted results.
 
-`report_observation` takes one complete observation as the call's arguments.
-It is stored or refused with the reason.
-Its evidence and citations may arrive as JSON text.
-The observation itself must arrive as an object.
+`report_review` records one complete review object.
+It names what each complete body rests on as `EvidenceRef` values, `{ practiceResultId, observationId? }`.
+An observation must belong to the result that the same reference names.
+
+An inline note's anchor names one observation and the index of one of its citations.
+A result's own citations never anchor a note.
+The public tool schema constrains those identifiers to the current eligible decided results and their observations.
+Withholding can name only `NOT_MET` results.
+
+`submit_result` takes one complete result of the session's practice as the call's arguments.
+The host binds the practice slug and adds the coverage that it measured.
+The result is stored in the draft of that review, or refused with the reason.
+A later complete submission replaces the draft.
+Its citations, problems, example and evidence may arrive as JSON text.
+The result itself must arrive as an object.
 
 Private `report_feedback` takes a list of several units in one call.
 Each is stored or refused on its own with the reason.
@@ -722,8 +751,9 @@ A refused citation is answered with what the cited lines really hold.
 The mentor runner exposes no native tool.
 Its context arrives through `fetch_context`.
 
-It gives feedback about an observation with `link_observation`.
-The reply shows its `text` to the developer once the server admits that observation for them.
+It links its text to a result with `link_result`, and to one observation of a result with `link_observation`.
+The mentor protocol version is 2.
+The reply shows its `text` to the developer once the server accepts the link for them.
 
 A refused link fails the call and shows nothing.
 
@@ -737,12 +767,13 @@ Use streaming shell commands for lines too large for the read tool.
 
 The runner rewrites `out/` from its in-memory state and removes unexpected files before packaging.
 Output remains untrusted.
-Server-side admission verifies its observations and citations.
+Server-side admission verifies its results and citations.
 
 The root filesystem and captured inputs are mounted read-only.
 Scratch directories are separate writable mounts.
 The practice runner starts Node without permission flags, because a subprocess would bypass them anyway.
 The mount and container isolation are the boundary.
+Only the process of a custom practice program runs with `--permission`.
 
 The [sandbox threat model](/admin/threat-model#boundary-2-llm-agent-sandbox) owns the isolation requirements.
 Deployment connectivity is covered in [practice-review operations](/admin/practice-review-operations).

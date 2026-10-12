@@ -6,9 +6,16 @@ description: Enable practice review, set autonomy and coverage, control costs, a
 
 Practice review checks connected workspace work against its installed practices.
 This work includes pull requests, merge requests, issues, documents, and settled Slack threads.
-It first records grounded observations.
+It first records grounded results.
 It composes feedback only for pull or merge requests and issues.
 Document and settled-thread reviews record their results and stop there.
+
+A result is the verdict of one practice about one piece of work.
+Its outcome is **Met**, **Not met**, **Does not apply**, or **Could not determine**.
+A **Not met** result records one or more observations.
+Each observation is one problem at a place in the work, with its own severity.
+A **Could not determine** result names the open questions that the review could not settle.
+A failure to capture evidence or to run the review is never a result about the work.
 
 Feedback reaches the work, the developer's private practice pages, or a later mentor conversation.
 This page explains setup, cost controls, and diagnosis of quiet workspaces.
@@ -41,7 +48,7 @@ Use this path before changes to coverage, campaigns, or per-practice overrides.
 13. Open a small pull or merge request whose author is an eligible linked member.
 14. Find that work under **Practices → Practice reviews → Reviews**, or under the status **No review started** if no review started.
 
-The work distinguishes ingestion, admission, observation, composition, withholding, and delivery.
+The work distinguishes ingestion, admission, results, composition, withholding, and delivery.
 A provider comment is not the success test.
 After this path works, you can narrow coverage, add practice overrides, or configure past-work reviews.
 The rest of this page gives reference information and diagnosis for those decisions.
@@ -57,17 +64,18 @@ The review follows this sequence:
 2. Coverage admits the repository, base branch, and author before the review proceeds.
 3. The review gate selects practices whose occasions match the pull request.
 4. Capture satisfies each selected practice's evidence requirements before that practice runs.
-5. A practice about why a change is needed can observe the absence of an explanation in the searched description.
-   That bounded observation remains even if nobody receives feedback.
-6. Composition considers the observation with recent observations and feedback.
+5. A practice about why a change is needed can record a **Not met** result.
+   Its observation is that the searched description has no explanation.
+   That bounded result remains even if nobody receives feedback.
+6. Composition considers the result with recent results and feedback.
    It can propose a public summary, private process feedback, mentor context, or no feedback.
 7. Server-side policy admits or refuses each proposal.
    Feedback awaiting a decision appears first under **Needs you** on **Practices → Practice reviews**.
-8. A workspace admin reads the exact in-context feedback and its observations.
+8. A workspace admin reads the exact in-context feedback and its results.
 9. That person approves and sends the feedback, or rejects it.
 
 A provider comment exists only after approval and a successful release-time policy check.
-The smallest useful diagnostic sequence is occurrence → readiness → observation → composition → delivery.
+The smallest useful diagnostic sequence is occurrence → readiness → result → composition → delivery.
 
 1. Stop at the first missing stage instead of random changes to downstream settings.
 
@@ -77,7 +85,7 @@ The smallest useful diagnostic sequence is occurrence → readiness → observat
 | ----------------------------------------------------------------- | ----------------------------------------------------------- |
 | Did this piece of work enter the system, and why was it quiet?    | **Practices → Practice reviews → Reviews**, then the status **No review started** |
 | What needs me, and are the reviews working?                       | **Practices → Practice reviews** (the overview)             |
-| Did a job run, fail, or produce observations and feedback?        | **Practices → Practice reviews → Reviews**, then open a row |
+| Did a job run, fail, or produce results and feedback?             | **Practices → Practice reviews → Reviews**, then open a row |
 | Is in-context feedback waiting for approval?                      | **Practices → Practice reviews**, under **Needs you**       |
 | How does one practice behave: its outcomes and incorrect marks?   | **Practices → Practice reviews**, then select the practice  |
 | Which work may start reviews, and may feedback be sent?           | **Practices → Review settings → When and where**            |
@@ -122,7 +130,7 @@ The adjacent arrows move backward or forward through the queue.
 Approval or rejection moves to the next piece or returns to a piece you skipped.
 The panel closes when nothing else awaits a decision.
 
-Feedback opened from the **Feedback** list, a review, or an observation opens alone, without the queue.
+Feedback opened from the **Feedback** list, a review, or a result opens alone, without the queue.
 If no feedback awaits your approval, one line states this.
 
 Failures are counted where they happen, over the range, as rates:
@@ -293,16 +301,16 @@ A review shows the same stages under **How it ran**, with the time of each stage
 It also gives the time until a developer read its feedback, apart from the stages.
 If the work was merged before the review finished, the review gives the merge time and the interval.
 
-**Practices** lists practices with an observation, or feedback about one, in the range.
-**Number of observations** is the plain total of the observations of the practice.
-**Not met**, **Not applicable**, **Undetermined** and **Marked incorrect** each read as a part of that total, for example "19 of 89".
+**Practices** lists practices with a result, or feedback about one, in the range.
+**Number of results** is the plain total of the results of the practice.
+**Not met**, **Does not apply**, **Could not determine** and **Marked incorrect** each read as a part of that total, for example "19 of 89".
 **Feedback delivered** reads as a part of the feedback composed about the practice, for example "7 of 12".
 That total includes feedback that waits, was withheld or failed, so you can see how much of it reached the developer.
 A piece replaced by a newer one is not counted, because the newer piece stands for it.
 
 The last row, **All practices**, gives the totals of the range, the same figures as the tiles above.
 It includes the practices that the filters hide, and a line under the table says how many.
-The observations of the practices add up to the totals, because each observation is of one practice.
+The results of the practices add up to the totals, because each result is of one practice.
 **Feedback delivered** can add up to a different number.
 A piece of feedback about two practices counts in the row of each, and a piece about no practice counts in none.
 The totals row counts each piece once, and a line under the table gives both numbers.
@@ -316,27 +324,27 @@ Each row is one line: a long practice name is cut short, and the full name shows
 
 By default, **Needs a look first** puts the practices with a marker at the top:
 
-- **Never applies here**: 90 % or more of its observations were not applicable.
+- **Never applies here**: 90 % or more of its results did not apply.
   The practice costs reviews and tells nobody anything, so consider turning it off for this workspace.
-- **Often undecided**: 30 % or more of its observations were undetermined.
+- **Often undecided**: 30 % or more of its results could not be determined.
   The review may lack the evidence to decide.
 
-A practice needs 20 observations in the range before it can get a marker.
-Then come the practices with the most observations marked incorrect, then the most undetermined.
+A practice needs 20 results in the range before it can get a marker.
+Then come the practices with the most results marked incorrect, then the most that could not be determined.
 The other practices follow busiest first.
 **Sort** can order the whole table busiest first.
 The choice stays in the address, so a reload or a shared link keeps it.
 
 A practice that is turned off today does not show in the table.
 Turned off means that the autonomy of the practice is **Off** in **Practice setup** now, or that the practice is no longer in the workspace.
-The table reads this state when it loads, not the state when the observations were made.
+The table reads this state when it loads, not the state when the results were recorded.
 **Show turned-off practices** shows these practices again, and tells how many it hides.
 **Group** limits the table to the practices of the selected groups.
 
 Select a practice to open its sheet (see [Open a record](#open-a-record)).
 The table is an overview, not a stream, so its rows have no **Track** or **Trace**.
 
-The overview's lists are **Reviews**, **Observations**, and **Feedback**.
+The overview's lists are **Reviews**, **Results**, and **Feedback**.
 The tabs share one scope: a developer, practice groups, practices, a date range, and a selection.
 The scope stays when you change tabs.
 Each list tab shows how many records it holds under the scope, for example **Reviews 1,688**.
@@ -350,12 +358,12 @@ Each list applies the parts of the scope that its data supports:
 
 | List | Developer | Group and practice | Date range | Selection |
 | --- | --- | --- | --- | --- |
-| **Reviews** | Reviews that observed the developer | Reviews that observed the practice | When the review was created (**Created**) | The selected review, the reviews of the selected work, or the review of the selected observation |
-| **Observations** | The developer observed | Yes | When the observation was made | The observations of the selected work or review, or of the review of the selected observation |
-| **Feedback** | The developer the feedback is for | The practices covered by its observations | When the feedback was composed | The feedback of the selected work or review, or the feedback written from the selected observation |
+| **Reviews** | Reviews that recorded a result about the developer | Reviews that recorded a result about the practice | When the review was created (**Created**) | The selected review, the reviews of the selected work, or the review of the selected result |
+| **Results** | The developer the result is about | Yes | When the result was recorded | The results of the selected work or review, or of the review of the selected result |
+| **Feedback** | The developer the feedback is for | The practices covered by its results | When the feedback was composed | The feedback of the selected work or review, or the feedback written from the selected result |
 | **No review started** (on **Reviews**) | No | No | When a moment was recorded | The selected work |
 
-A review, a piece of work, or an observation can also be a filter instead of the selection.
+A review, a piece of work, or a result can also be a filter instead of the selection.
 An older link to a list sets it.
 The filter shows as a pill in the filter row, for example **Review: #1423 · 5 Oct, 2:02 pm**.
 It narrows the lists as the selection does, but it does not show above the tabs and has no **Show trace**.
@@ -385,7 +393,7 @@ It leaves out the reviews on hold for the AI budget and the reviews that wait be
 These are the reviews that the queue counts as **Waiting**.
 With another status, **On hold** or **Waiting** adds its reviews to that status.
 
-**Observations** filters by outcome, **Developer response**, severity, and **Origin**.
+**Results** filters by outcome, **Developer response**, severity, and **Origin**.
 **Feedback** filters by outcome, channel, and why it was withheld.
 It can list the oldest first.
 
@@ -444,9 +452,9 @@ Each fact appears once, and every time is a date and a time.
   Its actions are **Cancel review**, **Retry result processing** and **Request another review**.
   **Request another review** asks you to confirm first, because the review runs as an agent job.
   It is disabled while another review of the same work is queued or running.
-- **Observation**: the outcome and severity, the practice, why it was raised, and all the evidence.
+- **Result**: the outcome and severity, the practice, why it was raised, and all the evidence.
   It also shows each dispute in the developer's words, each correction and restore, and when it stopped being current.
-  Its action is **Mark as incorrect** or **Restore observation**.
+  Its action is **Mark as incorrect** or **Restore result**.
 - **Feedback**: the recipient and where it appears.
   Feedback on the work shows its first line as the title and its text as **Rendered** or **Source**.
   Feedback on a developer's Practice profile or in conversation shows delivery metadata, never its private text.
@@ -474,14 +482,14 @@ An older link that opened a review, a piece of work or a practice as a panel ope
 
 ### Track and trace a record
 
-Each row in **Reviews**, **Observations** and **Feedback** has two buttons in its **Actions** column.
+Each row in **Reviews**, **Results** and **Feedback** has two buttons in its **Actions** column.
 A row in **Reviews** has a third button, **Request review**.
 The (i) in the **Actions** header says what each button does.
 No button opens the row, and a click anywhere in the **Actions** column does not open it either.
 
 - **Track** (crosshair) makes the record the selection.
   Every list narrows to the records related to it.
-  These are the reviews, observations and feedback of the same review, work or practice.
+  These are the reviews, results and feedback of the same review, work or practice.
   The row of the tracked record is highlighted.
   Above the lists, the selection shows, for example "Tracking: Review of #1423 · 5 October, 2:02 pm".
   It shows on every tab, and the URL holds it, so you can share the link.
@@ -544,16 +552,16 @@ It tells the story of the record from top to bottom in the order that things hap
    If the work had more than one review, it shows which review this is.
    An example is **Review 3 of 7 on this work**.
    With **System info**, also its model.
-   The observations of the review show as a count by verdict and a numbered dot for each observation.
-   **Show all observations in the table** opens a table with one row for each observation.
+   The results of the review show as a count by verdict and a numbered dot for each result.
+   **Show all results in the table** opens a table with one row for each result.
    The columns are the number, the practice, the outcome, the severity, the feedback written from it, and the time.
    **Fold the table** closes it again.
    The table opens and closes on its own button, so you do not need **Siblings** for it.
 6. **Feedback**: a table with one row for each piece of feedback, in the order that they were written.
-   The columns are the letter, the channel, the state, the observations it was written from, and the time.
+   The columns are the letter, the channel, the state, the results it was written from, and the time.
    The channel is on the work, on their practice pages, or in conversation.
    The state tells where the piece went or why it was withheld, and whether the developer answered.
-   **From** shows the numbers of the observations, as the observation table shows them.
+   **From** shows the numbers of the results, as the result table shows them.
    A moment on the work between two pieces, such as the merge, starts a new table at its time.
    A card on their practice pages that no developer opened yet says **Not opened yet**.
 7. **Effect**: whether the developer answered or disputes it, and whether their work resolved it.
@@ -574,38 +582,38 @@ Each toggle applies to the whole trace:
   A wait of 30 minutes or more is coloured, and the line to that step is dashed.
 - **System info** shows the state and the model.
   It also shows each fact of a piece of feedback, and the facts under the record that you started from.
-- **Siblings** lists the other observations and feedback of the record that you started from.
-- **Connections** draws a line from each observation row to the feedback written from it.
+- **Siblings** lists the other results and feedback of the record that you started from.
+- **Connections** draws a line from each result row to the feedback written from it.
   The **From** and **Feedback** columns tell the same relation in words, so this toggle is off at first.
 
 **Times** is on at first, and the other toggles are off.
 Your browser keeps your choice for the next trace that you open.
-**Expand all** opens each folded part: the moments before the review, the observation table, the other records, and the facts.
+**Expand all** opens each folded part: the moments before the review, the result table, the other records, and the facts.
 The facts under a step tell only what its own line does not:
 
 - The work: a link to it, the number of moments, and when it was merged.
 - The review: when it was asked for, picked up and finished, its attempts, its model, and how far it got.
-- An observation: what became of it, the day it was observed, and when an admin marked it incorrect.
+- A result: what became of it, the day it was recorded, and when an admin marked it incorrect.
 - A piece of feedback: where exactly it went, what became of it, and each dated step.
   Each step shows the time since the step before.
   With only **System info**, it also shows the practices that the piece was written from.
 
-A moment, the count of observations and the end of the path have no facts of their own, so they open nothing.
+A moment, the count of results and the end of the path have no facts of their own, so they open nothing.
 **Collapse all** folds them again.
 
 **Legend** shows each mark of the trace with its name and one line of meaning.
 Each mark looks the same as in the trace.
 The legend puts the marks in groups.
 The first groups are the stages and their marks, the dots of the steps, and the ends of a path.
-The other groups are the observation chips and feedback letters, the connections, the rail, and the icons.
+The other groups are the result chips and feedback letters, the connections, the rail, and the icons.
 Under the groups, the legend explains some terms and tells what the trace cannot show.
 
 Select a step or a table row to open the sheet of its record over the trace.
 The sheet covers the trace to the same depth as a panel over another panel on the Practice profile.
 A strip of the trace stays in view at its left.
-The record is the observation, the piece of feedback, the review, or the work.
+The record is the result, the piece of feedback, the review, or the work.
 Each record opens from one step only.
-A moment, the count of observations, and the end of the path open no sheet.
+A moment, the count of results, and the end of the path open no sheet.
 
 On a narrow screen, each table row shows its cells on stacked lines.
 This sheet is the same sheet as from the row, so it has no links to other records.
@@ -616,23 +624,23 @@ A second Escape closes the trace.
 
 For work that no review started on, the trace shows the latest moment and why no review started.
 An older link to the page of a review opens **Reviews** with the trace of that review.
-If the link pointed to one observation or piece of feedback, it opens the trace of that record.
+If the link pointed to one result or piece of feedback, it opens the trace of that record.
 
 ### Do not grade with standings
 
 A standing comes from AI review of the work, and it can be wrong.
-Do not use standings, observations, feedback, or the counts on Practices across the workspace to grade or assess a person.
+Do not use standings, results, feedback, or the counts on Practices across the workspace to grade or assess a person.
 A person must assess the work.
-If an observation is wrong, correct it.
+If a result is wrong, correct it.
 
-### Correct an observation that was wrong
+### Correct a result that was wrong
 
-1. Open the observation under **Practices → Practice reviews → Observations**.
+1. Open the result under **Practices → Practice reviews → Results**.
 2. Select **Mark as incorrect** at the bottom of the panel.
 3. Supply a reason that the developer will read.
 
 The review record stays unchanged.
-The observation no longer contributes to the developer's standing, Practice profile, or Heph's context.
+The result no longer contributes to the developer's standing, Practice profile, or Heph's context.
 Feedback about it that has reached nobody is withheld.
 If Hephaestus is delivering feedback that cites it at that moment, it asks you to retry and changes nothing.
 
@@ -642,19 +650,19 @@ The table contains the exact UI text:
 
 | State                  | Sentence shown while the correction is in force                                                                                                                                                                                                                                                                      |
 | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Pending                | `Hephaestus is still correcting the comments it posted about this observation, or it is still checking whether a comment it tried to post arrived.`                                                                                                                                                                  |
+| Pending                | `Hephaestus is still correcting the comments it posted about this result, or it is still checking whether a comment it tried to post arrived.`                                                                                                                                                                       |
 | Nothing posted         | `No comment about it was found on the work.`                                                                                                                                                                                                                                                                         |
 | Updated                | `Every summary comment Hephaestus posted about it now opens with a correction notice, or has since been deleted.`                                                                                                                                                                                                    |
 | Inline comments remain | `Comments Hephaestus posted about specific lines, whether on the lines or linking to them, are still on the work unchanged, because they cannot be edited from here. Any summary comment now carries a correction notice. Remove or answer those comments on the pull request or merge request.`                     |
 | Unresolved             | `Hephaestus cannot correct every comment about it. A summary comment could not be edited, the provider did not say which comment it accepted, or a posted comment is unconfirmed. Check the pull request or merge request and correct it there. Hephaestus keeps checking and updates this if it finds the comment.` |
 
-**Restore observation** reverses the correction with a second reason.
+**Restore result** reverses the correction with a second reason.
 It removes any notice the correction added and resends nothing.
 Every correction stays listed on the page.
 
 ### Withdraw feedback whose words were wrong
 
-Observations can be correct while their feedback is incorrect.
+Results can be correct while their feedback is incorrect.
 Only a developer's Practice profile card that awaits display or has appeared can be withdrawn.
 You cannot recall feedback posted on the work or raised in a conversation here.
 
@@ -664,7 +672,7 @@ You cannot recall feedback posted on the work or raised in a conversation here.
 
 Withdrawal has these effects:
 
-- The feedback's text, delivery, and observations stay unchanged.
+- The feedback's text, delivery, and results stay unchanged.
 - A card that the developer had not seen never appears.
 - A previously seen card temporarily shows a withdrawal notice without your reason.
 - Later reviews and Heph receive the record that the card existed, without its text.
@@ -681,19 +689,19 @@ A new withdrawal after restoration adds a new entry.
 
 Developers dispute feedback from their own reviews, linked by every comment on the work.
 They can also select **Disagree** on a Practice profile card.
-The dispute appears on each observation that the feedback used, with the developer's explanation.
-It adds a **Disputed** mark in the **Observations** list and the **Developer response** filter.
-The explanation appears at the top of the observation and feedback panels.
+The dispute appears on each result that the feedback used, with the developer's explanation.
+It adds a **Disputed** mark in the **Results** list and the **Developer response** filter.
+The explanation appears at the top of the result and feedback panels.
 It is the developer's explanation addressed to you.
 
 Practice profile and conversation feedback text remain hidden from you.
 
 1. Decide what the dispute concerns.
-2. If the observation was incorrect, use **Mark as incorrect**.
-3. If the observations were correct but the Practice profile card was incorrect, use **Withdraw feedback**.
+2. If the result was incorrect, use **Mark as incorrect**.
+3. If the results were correct but the Practice profile card was incorrect, use **Withdraw feedback**.
 4. If neither applies, leave the dispute unchanged.
 
-The dispute stays on the observation until the developer withdraws it.
+The dispute stays on the result until the developer withdraws it.
 While it stands, later reviews of the same work do not raise the same point about the same place again.
 The withheld feedback lists that reason.
 A different point, or the same point on other work, is not withheld.
@@ -707,7 +715,7 @@ Inline comments and conversation replies stay unchanged.
 Feedback on the work awaits approval by default.
 
 1. Open it under **Needs you**.
-2. Check the exact proposed summary and inline comments against their observations.
+2. Check the exact proposed summary and inline comments against their results and observations.
 3. Select **Approve and close** to approve that package and close the panel.
 
 Approval still passes current delivery checks.
@@ -724,7 +732,7 @@ It does not approve a pull request for merge.
 1. Add the requested explanation.
 
 The decision records your identity and reason.
-Rejection does not mark observations incorrect.
+Rejection does not mark results incorrect.
 Use **Mark as incorrect** for that.
 
 ## What starts a review
@@ -974,7 +982,7 @@ Before confirmation, the screen states:
 > Every check can start reviews, so this authorizes the AI spend for all of them, not just the first.
 
 **A swept review is a normal review.**
-It records live observations, composes feedback, and delivers provider comments, practice-page cards, and mentor context.
+It records live results, composes feedback, and delivers provider comments, practice-page cards, and mentor context.
 It behaves as an event-triggered review would.
 The sweep finds current work that had no notification.
 A schedule is an ongoing decision about spend and feedback, not a one-time action.
@@ -993,7 +1001,7 @@ Previously reviewed work does not incur a second review charge.
 
 **A campaign, by contrast, is measured and never delivered.**
 Backfilled runs never enter composition.
-The in-app channel also refuses a pattern supported only by backfilled observations.
+The in-app channel also refuses a pattern supported only by backfilled results.
 Results appear in read models and under **Practices → Practice reviews**.
 They never become comments, practice-page cards, or mentor briefs.
 
@@ -1141,7 +1149,7 @@ It must not judge them as hand-written work or count them toward hand-written re
 The `excludes-generated-and-build-artifacts` practice does not treat intentionally committed output on those paths as unwanted artifacts.
 It can still assess artifacts outside them.
 
-If a practice requires hand-written changes and none remain, the result is **Not applicable**, not a strength or problem.
+If a practice requires hand-written changes and none remain, the result is **Does not apply**, not a strength or problem.
 Other evidence, including the title, body, commits, and review comments, remains available.
 A broad pattern can hide useful practice feedback.
 

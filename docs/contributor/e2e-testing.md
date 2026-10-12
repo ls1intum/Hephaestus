@@ -10,7 +10,7 @@ This setup runs the complete local path:
 - Workspace creation and SCM sync.
 - Job execution in Docker.
 - LLM calls through the application proxy.
-- Observation persistence.
+- Result persistence.
 - Feedback delivery to a PR or MR.
 
 The opt-in `e2e` profile enables these local-only capabilities:
@@ -116,7 +116,7 @@ A host-run server refuses them.
 Only the Heph binding may set `allowInternet=true`, which lets its
 sandbox reach a host-run proxy through `host.docker.internal`.
 Hephaestus posts feedback back to the MR.
-The workspace's **Practices → Practice reviews** view shows the observations behind it.
+The workspace's **Practices → Practice reviews** view shows the results behind it.
 
 Live runner JUnit tests call the upstream provider directly. They do not cover application proxying,
 budget admission, durable usage accounting, sandbox execution, or SCM delivery.

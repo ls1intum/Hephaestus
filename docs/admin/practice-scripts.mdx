@@ -1,14 +1,15 @@
 ---
 id: practice-scripts
 title: Write a practice script
-description: Write a practice script that points a practice review at places to check, with code first and models only where code cannot decide.
+description: Write the review program of a practice. Prepare the review input with code, or decide in code and models where they can, and return one result.
 ---
 
 # Write a practice script
 
-A practice can have a practice script.
-The script runs before each review of the practice and points the review at places to check.
-This page tells a workspace admin how to write one, try it, and read what it did.
+A practice script is the review program of its practice.
+Each review of a practice runs one program, and the program returns one result for the practice.
+A practice without a script runs the built-in program, which asks the review to decide.
+This page tells a workspace admin how to write a script, try it, and read what it did.
 
 You write the script in the practice editor, in the section **Script**.
 It is TypeScript.
@@ -20,39 +21,63 @@ Other pages own the adjacent facts:
 | --- | --- |
 | The review criteria that a script supports | [Writing effective practices](./writing-practices.mdx) |
 | How to assign the decision, embedding and reranking models, and what they cost | [Models for practice scripts](./ai-providers.mdx#models-for-practice-scripts) |
-| How to read what a script did in one review | [Practice review operations](./practice-review-operations.mdx#practice-scripts) |
-| How the runner runs a script, isolates it, and accounts for its calls | [Practice script runner](/contributor/practice-script-runner) |
+| How to read what a program did in one review | [Practice review operations](./practice-review-operations.mdx#practice-scripts) |
+| How the host runs a program, isolates it, and accounts for its calls | [Practice script runner](/contributor/practice-script-runner) |
+| What a result and an observation mean | [Product vocabulary](/contributor/practice-feedback-language) |
 
 ## What a script is for
 
-A review checks a practice against the reviewed work.
-A script finds the places in the work that the review must look at for that practice.
-Such a place is a **lead**: a citation, a kind, and optional facts.
-The review reads the leads after the practice's criterion, checks each lead against the criterion, and decides.
+A review checks a practice against the reviewed work and records one **result**.
+A result has an outcome: met, not met, does not apply, or could not determine.
+A not met result has one or more **observations**.
+Each observation is one problem at a place in the work.
 
-A lead is never a claim about the work.
-It does not become an observation, and it does not become feedback.
-Thus, a wrong lead costs the review one look.
-A missing lead costs nothing that the review cannot find alone.
+Without a script, the built-in program reviews the practice.
+It opens one review session, which reads the criteria and the evidence and returns the result.
+A script changes how the practice reaches its result.
+It can do one of these things, or a mix of them:
 
-A script can fail, run out of time, or lose its model.
-Then the review continues without the script's leads.
-The script's section tells the review what was not rated and why.
-A failure of a script or a model never becomes a statement about the developer's work.
+- **Prepare, then review.** Code finds the places, facts and limits that matter, and gives them to `ctx.review()`. The review session then decides.
+- **Decide in code.** Code, or a narrow model call, settles the criteria and returns the result itself.
+- **Decide part, review the rest.** Code returns a result where it is certain, and calls `ctx.review()` where it is not.
 
-Most of a script is code.
-A script can also call models: a decision model, an embedding model, a reranking model, and the review's own chat model.
-Use a model only at a point where code cannot decide.
+Use the smallest path that is correct.
+A comment that explains a decision needs judgment, so a review session decides it.
+A count of approvals needs no model.
+The bundled practices use the first path, with code only.
 
-Every script uses `definePracticeScript`, as this page shows.
-A script from an earlier release can have a plain function as its default export.
-Hephaestus does not run a script in that retired form.
-Its review shows the error *This script uses the retired positional form. Rewrite it with definePracticeScript.*, and continues without the script's leads.
-[Rewrite a script in the retired form](#rewrite-a-script-in-the-retired-form) tells how.
+These rules do not change with the path:
+
+- The server checks every result in the same way before it records it.
+  It checks the structure, the scope, and each quote against the captured sources.
+  This step is **admission**.
+- A result that admission refuses for one practice gives that practice no result.
+  The other practices of the review continue.
+- A program that fails, is skipped, or runs out of time gives its practice no result in this review.
+  The failure never becomes a statement about the developer's work.
+- A program that fails never falls back to the built-in program.
+
+## The built-in program
+
+The built-in program is this script:
+
+```ts
+import { definePracticeScript } from "../lib/practice-script.ts";
+
+export default definePracticeScript({
+  meta: {},
+  run: async (ctx) => ctx.review(),
+});
+```
+
+`ctx.review()` without options gives the review session the practice's criteria and the evidence, as a review without a script reads them.
+The session reads the work with its own tools and returns the result.
+A practice that needs nothing more needs no script.
 
 ## Write your first script
 
 This tutorial writes a script for a practice with this criterion: *Each TODO that the change adds names a tracking item, such as an issue.*
+The script prepares the review input, and the review decides.
 
 ### 1. List the places to look at
 
@@ -68,37 +93,48 @@ Thus, the first version of the script uses no model.
 ### 2. Find the places with code
 
 ```ts
-import { addedComments, definePracticeScript, expectKind, type Lead } from "../lib/practice-script.ts";
+import {
+  addedComments,
+  definePracticeScript,
+  expectKind,
+  requireChange,
+} from "../lib/practice-script.ts";
 
 const OPEN_WORK = /\b(TODO|FIXME|HACK|XXX)\b/u;
 const TRACKING = /#\d+|\b[A-Z][A-Z0-9]+-\d+\b|https?:\/\/\S+/u;
 
 export default definePracticeScript({
-  meta: {
-    version: 1,
-    kinds: { "untracked-todo": "A TODO that the change adds, with no tracking reference." },
-  },
+  meta: {},
   async run(ctx) {
     expectKind(ctx, "scm.pull_request");
-    const leads: Lead[] = addedComments(ctx.change)
+    const leads = addedComments(requireChange(ctx.files))
       .filter((comment) => OPEN_WORK.test(comment.text) && !TRACKING.test(comment.text))
-      .map((comment) => ({ at: comment.at, kind: "untracked-todo" }));
-    return { leads };
+      .map((comment) => ({
+        at: comment.at,
+        label: "A TODO that the change adds, with no tracking reference.",
+      }));
+    return ctx.review({ leads });
   },
 });
 ```
 
-`expectKind` tells TypeScript that the script reads a pull request, so `ctx.change` exists.
+`expectKind` tells TypeScript that the script reads a pull request.
 [Narrow the context to a kind](#narrow-the-context-to-a-kind) tells more.
-`addedComments` returns each comment that the change adds, with its citation.
-`meta.kinds` declares each kind of lead with the sentence that the review reads for it.
-The script returns one lead for each comment that marks open work and has no tracking reference.
+`requireChange` returns the captured change, or stops the program when the change was not captured.
+`addedComments` returns each comment that the change adds, with its location.
+Each **lead** is a location and a one-line label that the review reads.
+`ctx.review({ leads })` asks the review to decide, and returns its result.
+
+A lead is not a claim about the work.
+The review checks each lead against the criterion, and it can read beyond the leads.
+An empty list of leads still asks the review to decide.
+Thus, the review can still find a problem that code did not find.
 
 ### 3. Add an optional model
 
 Some temporary work has no marker, such as `// remove before the release`.
 Code cannot find it, but a decision model can rate each comment against a fixed set of kinds.
-Declare the decision model as `optional`, so that the script still gives its code leads without the model:
+Declare the decision model as `optional`, so that the script still works without the model:
 
 ```ts
 import {
@@ -107,7 +143,8 @@ import {
   commentKinds,
   definePracticeScript,
   expectKind,
-  type Lead,
+  requireChange,
+  type ReviewLead,
 } from "../lib/practice-script.ts";
 
 const OPEN_WORK = /\b(TODO|FIXME|HACK|XXX)\b/u;
@@ -115,24 +152,17 @@ const TRACKING = /#\d+|\b[A-Z][A-Z0-9]+-\d+\b|https?:\/\/\S+/u;
 const NEEDS_A_LOOK = new Set(["untracked-todo", "temporary-stub"]);
 
 export default definePracticeScript({
-  meta: {
-    version: 1,
-    models: { decision: "optional" },
-    kinds: {
-      "untracked-todo": "A TODO that the change adds, with no tracking reference.",
-      "open-work": "An added comment that a model rated as untracked or temporary work.",
-    },
-  },
+  meta: { models: { decision: "optional" } },
   async run(ctx) {
     expectKind(ctx, "scm.pull_request");
-    const comments = addedComments(ctx.change);
-    const leads: Lead[] = [];
+    const comments = addedComments(requireChange(ctx.files));
+    const leads: ReviewLead[] = [];
     const unmarked: typeof comments = [];
     for (const comment of comments) {
       if (!OPEN_WORK.test(comment.text)) {
         unmarked.push(comment);
       } else if (!TRACKING.test(comment.text)) {
-        leads.push({ at: comment.at, kind: "untracked-todo" });
+        leads.push({ at: comment.at, label: "A TODO that the change adds, with no tracking reference." });
       }
     }
 
@@ -144,30 +174,27 @@ export default definePracticeScript({
     });
     for (const [comment, rating] of ratings) {
       if (NEEDS_A_LOOK.has(rating.value)) {
-        leads.push({
-          at: comment.at,
-          kind: "open-work",
-          rating: { value: rating.value, score: rating.score },
-        });
+        leads.push({ at: comment.at, label: "An added comment that a model rated as unfinished work." });
       }
     }
 
-    return { leads, facts: { addedComments: comments.length }, unrated };
+    return ctx.review({ leads, facts: { addedComments: comments.length }, limitations: unrated });
   },
 });
 ```
 
 `classify` sends the comments that code did not flag to the decision model.
-Code then decides which kinds deserve a lead.
+Code then decides which ratings deserve a lead.
 Without a decision model, `classify` returns every comment as not rated, with the reason `unavailable`.
-The script returns that `unrated` entry, so the review knows what it must read itself.
+The script gives those entries to the review as `limitations`.
+Thus, the review knows which comments it must read itself.
 
 ### 4. Run it on a change
 
 Run the script on a change of your own before you save it.
-[Run a script on your own change](#run-a-script-on-your-own-change) gives the command.
-Read the section that the command prints.
-It shows each `untracked-todo` lead, and one `Not rated` line for the comments without a TODO marker.
+[Run a program on your own change](#run-a-program-on-your-own-change) gives the command.
+Read the section that the command prints for the review.
+It shows each lead with its quote, and one `Not rated` line for the comments without a TODO marker.
 
 ### 5. Save it and assign the model
 
@@ -182,19 +209,129 @@ It shows each `untracked-todo` lead, and one `Not rated` line for the comments w
 
 [Which practices use a model for practice scripts](./ai-providers.mdx#which-practices-use-a-model-for-practice-scripts) tells when the needs of a script appear.
 
-## Patterns
+## Return a result in code
 
-Each pattern below gives the case for it, its shape, and what the script gives without its model.
-All fragments run inside `run(ctx)` and import from `../lib/practice-script.ts`.
-They add to three values that `run` returns at its end:
+A program can return the result itself when code decides the criteria.
+This version of the TODO practice decides in code where it is certain.
+When the change adds no open-work comment, it asks the review, because code cannot tell if the practice applies.
 
 ```ts
-const leads: Lead[] = [];
-const facts: Facts = {};
-const unrated: Unrated[] = [];
+import {
+  addedComments,
+  definePracticeScript,
+  expectKind,
+  requireChange,
+  UnratedError,
+  type Citation,
+  type NonEmpty,
+  type Problem,
+} from "../lib/practice-script.ts";
+
+const OPEN_WORK = /\b(TODO|FIXME|HACK|XXX)\b/u;
+const TRACKING = /#\d+|\b[A-Z][A-Z0-9]+-\d+\b|https?:\/\/\S+/u;
+const MAX = 50;
+
+export default definePracticeScript({
+  meta: {},
+  async run(ctx) {
+    expectKind(ctx, "scm.pull_request");
+    const change = ctx.files?.change;
+    if (change == null) {
+      throw new UnratedError("unavailable", "the change of this work was not captured");
+    }
+    const open = addedComments(requireChange(ctx.files)).filter((c) => OPEN_WORK.test(c.text));
+    if (open.length === 0) {
+      return ctx.review();
+    }
+    const cite = (c: (typeof open)[number]) => change.cite(c.at.change, "NEW", c.at.line, c.at.endLine);
+    const coverage = {
+      source: "claimed",
+      selected: open.length,
+      checked: open.length,
+      total: open.length,
+      complete: true,
+    } as const;
+    const search = {
+      consulted: ["scm.pull-request.diff"],
+      lookedFor: "a TODO, FIXME, HACK or XXX comment that the change adds without a tracking reference",
+      boundary: "the comments that the change adds; existing comments are not part of this practice",
+    } satisfies { consulted: NonEmpty<string>; lookedFor: string; boundary: string };
+
+    const untracked = open.filter((c) => !TRACKING.test(c.text)).slice(0, MAX);
+    if (untracked.length > 0) {
+      const problems: Problem[] = [];
+      for (const comment of untracked) {
+        problems.push({
+          severity: "MINOR",
+          summary: "An added TODO names no tracking item",
+          explanation: "The change adds this TODO, and it names no issue, ticket or link.",
+          citations: [await cite(comment)],
+          basis: { type: "introduced", head: 0, explanation: "The change adds this comment." },
+          nextStep: "Open an issue for the work, and name it in the comment.",
+        });
+      }
+      const [first, ...rest] = problems;
+      if (first === undefined) {
+        throw new Error("unreachable");
+      }
+      return {
+        outcome: "NOT_MET",
+        summary: `${untracked.length} of ${open.length} added open-work comments name no tracking item`,
+        explanation: "Each comment below marks open work that no issue, ticket or link tracks.",
+        citations: [],
+        problems: [first, ...rest],
+        evidence: { search },
+        coverage,
+      };
+    }
+    const tracked: Citation[] = [];
+    for (const comment of open.slice(0, MAX)) {
+      tracked.push(await cite(comment));
+    }
+    const [first, ...rest] = tracked;
+    if (first === undefined) {
+      throw new Error("unreachable");
+    }
+    return {
+      outcome: "MET",
+      summary: "Every added TODO names a tracking item",
+      explanation: `The change adds ${open.length} open-work comments, and each one names an issue, a ticket or a link.`,
+      citations: [first, ...rest],
+      evidence: { search },
+      coverage,
+    };
+  },
+});
 ```
 
-`comments` is `addedComments(ctx.change)`, after `expectKind(ctx, "scm.pull_request")`.
+Each part of the result has a rule:
+
+- `change.cite` reads the quote of the cited lines from the change.
+  Use the `cite` functions of the context for every citation, because admission checks each quote again.
+- Each observation has its own severity, summary, explanation and citations.
+  Its `basis` tells why the problem belongs to this work: here, the change introduced the cited line.
+- A not met result can have no result citations of its own, because its observations cite the work.
+- A met result needs complete coverage.
+  This script claims coverage: it selected, checked and found the same number of comments.
+- The search warrant states what the program looked for, in which sources, and where it stopped.
+
+[The result](#the-result) gives every field and its rules.
+
+## Patterns
+
+Each pattern below gives the case for it, its shape, and what the program does without its model.
+All fragments run inside `run(ctx)` and import from `../lib/practice-script.ts`.
+They add to three values that `run` gives to `ctx.review()` at its end:
+
+```ts
+const leads: ReviewLead[] = [];
+const facts: Facts = {};
+const limitations: Omission[] = [];
+// …
+return ctx.review({ leads, facts, limitations });
+```
+
+`comments` is `addedComments(requireChange(ctx.files))`, after `expectKind(ctx, "scm.pull_request")`.
 
 ### Code only
 
@@ -202,7 +339,7 @@ const unrated: Unrated[] = [];
 **Degrades to:** nothing. It needs no model.
 
 The tutorial's first version is this pattern.
-Code gives the same leads for the same work, costs nothing, and needs no assignment.
+Code gives the same input for the same work, costs nothing, and needs no assignment.
 Start each script here.
 
 ### Code finds, a decision model filters
@@ -217,6 +354,7 @@ const { ratings, unrated } = await classify({
   items: comments,
   what: "added comments",
 });
+limitations.push(...unrated);
 ```
 
 The tutorial's second version is this pattern.
@@ -230,21 +368,26 @@ To rate other items, write your own question set, as [`classify` and question se
 
 ```ts
 const { embedding } = ctx.models;
+const what = "added comments compared for copies";
 if (embedding === undefined) {
-  unrated.push({ what: "added comments compared for copies", count: comments.length, reason: "unavailable" });
+  limitations.push({ what, count: comments.length, reason: "unavailable" });
 } else if (comments.length > 1) {
   const embedded = await step("embed", async () =>
     embedMany({ model: embedding, values: comments.map((c) => c.text) }),
   );
   if ("unrated" in embedded) {
-    unrated.push({ what: "added comments compared for copies", count: comments.length, reason: embedded.unrated });
+    limitations.push({ what, count: comments.length, reason: embedded.unrated });
   } else {
     const vectors = embedded.value.embeddings;
     for (const [i, a] of vectors.entries()) {
       for (const [j, b] of vectors.entries()) {
         const copy = comments[j];
         if (j > i && copy !== undefined && cosineSimilarity(a, b) > 0.9) {
-          leads.push({ at: copy.at, kind: "near-copy", facts: { copyOfLine: comments[i]?.at.line ?? 0 } });
+          leads.push({
+            at: copy.at,
+            label: "An added comment that is almost the same as another one.",
+            facts: { copyOfLine: comments[i]?.at.line ?? 0 },
+          });
         }
       }
     }
@@ -277,15 +420,17 @@ if (reranking !== undefined && candidates.length > TOP) {
     }),
   );
   if ("unrated" in ranked) {
-    unrated.push({ what: "ranking of the candidates", count: candidates.length, reason: ranked.unrated });
+    limitations.push({ what: "ranking of the candidates", count: candidates.length, reason: ranked.unrated });
   } else {
     chosen = ranked.value.ranking.flatMap((r) => candidates[r.originalIndex] ?? []);
   }
 }
+limitations.push({ what: "candidates that the program did not show", count: candidates.length - chosen.length, reason: "selection" });
 ```
 
 A reranking score orders the items.
 Do not use it as a rating of an item.
+Tell the review what the selection left out, with the reason `selection`.
 
 ### One structured answer
 
@@ -299,7 +444,7 @@ if (chat !== undefined) {
     const { output } = await generateText({
       model: chat,
       output: Output.choice({ options: ["code", "documentation", "configuration", "mixed"] }),
-      prompt: `Which kind of change adds these files: ${[...ctx.change.keys()].join(", ")}?`,
+      prompt: `Which kind of change adds these files: ${[...requireChange(ctx.files).keys()].join(", ")}?`,
     });
     return output;
   });
@@ -313,6 +458,8 @@ Read `output` inside the `step`.
 When the answer has no output, reading it throws, and `step` turns the error into `off-format`.
 Use `Output.object` with a `z` schema for an answer with more than one field.
 The [AI SDK documentation](https://ai-sdk.dev/docs/ai-sdk-core/generating-structured-data) describes both.
+Put a closed answer, such as one of the options, in `facts`.
+Never put free model text in `facts` or `directions`.
 
 ### Locate code with `agent`
 
@@ -325,7 +472,7 @@ if (chat !== undefined) {
   const found = await step("locate", async () =>
     agent({
       model: chat,
-      tools: ctx.tools,
+      tools: ctx.evidence.tools,
       instructions: "You locate code in a repository. Use the tools to look. Do not guess.",
       prompt: "Find where the function parseDiff is declared.",
       schema: z.object({ file: z.string(), line: z.int().positive() }),
@@ -334,29 +481,30 @@ if (chat !== undefined) {
     }),
   );
   if ("value" in found) {
-    leads.push({ at: { file: found.value.output.file, line: found.value.output.line }, kind: "declaration" });
+    const { file, line } = found.value.output;
+    leads.push({ at: { file, line }, label: "The declaration of parseDiff." });
   }
 }
 ```
 
 Of all primitives, `agent` costs the most.
 Give it a narrow question and a small `maxSteps`.
-Cite what it found as a `file` lead, so that the runner checks that the lines exist.
+Give what it found as a `file` lead, so that the host checks that the lines exist.
 
 ### Independent steps together
 
-**When:** a script has two or more steps that do not depend on each other.
+**When:** a program has two or more steps that do not depend on each other.
 **Degrades to:** each step degrades alone.
 
-Write each step as a function that returns its own leads, facts and `unrated` entries.
+Write each step as a function that returns its own leads, facts and limitations.
 Start the steps together.
 Then join what they return:
 
 ```ts
 interface Part {
-  leads?: Lead[];
+  leads?: ReviewLead[];
   facts?: Facts;
-  unrated?: Unrated[];
+  limitations?: Omission[];
 }
 
 const parts: Part[] = await Promise.all([
@@ -364,17 +512,81 @@ const parts: Part[] = await Promise.all([
   findCopies(ctx, comments),
   rankUnfinished(ctx, comments),
 ]);
-return {
+return ctx.review({
   leads: parts.flatMap((part) => part.leads ?? []),
   facts: Object.fromEntries(parts.flatMap((part) => Object.entries(part.facts ?? {}))),
-  unrated: parts.flatMap((part) => part.unrated ?? []),
-};
+  limitations: parts.flatMap((part) => part.limitations ?? []),
+});
 ```
 
-Then a slow model costs only its own step, and the other steps still finish before the deadline.
+Then a slow model costs only its own step.
 Steps that run together share one limit of requests in flight, as [Requests in flight](#requests-in-flight) tells.
 To type `ctx` in such a function, declare `meta` as a constant with `as const`.
-Then type `ctx` as `PracticeScriptContext<typeof meta.models, "scm.pull_request">`, with the kind that the script reads.
+Then type `ctx` as `PracticeScriptContext<typeof meta.models, "scm.pull_request">`, with the kind that the program reads.
+
+### Different work for each cause
+
+A program can do different work on a request, a recheck, a push and a merge:
+
+```ts
+import {
+  addedComments,
+  definePracticeScript,
+  expectKind,
+  requireChange,
+  type DiffFile,
+  type ReviewLead,
+} from "../lib/practice-script.ts";
+
+const OPEN_WORK = /\b(?:TODO|FIXME)\b/u;
+const TRACKING = /#\d+|\b[A-Z][A-Z0-9]+-\d+\b|https?:\/\/\S+/u;
+const LABEL = "A TODO that the change adds, with no tracking reference.";
+
+export default definePracticeScript({
+  meta: {},
+  async run(ctx) {
+    expectKind(ctx, "scm.pull_request");
+    const todos = addedComments(requireChange(ctx.files)).filter(
+      (comment) => OPEN_WORK.test(comment.text) && !TRACKING.test(comment.text),
+    );
+    // The leads in the files of `only`, or in the whole change.
+    const leads = (only?: ReadonlyMap<string, DiffFile>): ReviewLead[] =>
+      todos
+        .filter((comment) => only === undefined || only.has(comment.at.change))
+        .map((comment) => ({ at: comment.at, label: LABEL }));
+
+    const { cause } = ctx;
+    if (cause.type === "requested") {
+      return ctx.review({
+        leads: leads(),
+        directions: ["A person asked for this review. Judge the work as it is now."],
+      });
+    }
+    if (cause.type === "recheck") {
+      return ctx.review({
+        leads: leads(),
+        directions: ["The last review found untracked TODOs. Check if the new commits track them."],
+      });
+    }
+    if (cause.signal === "scm.pull_request.synchronized") {
+      // Lead with the files that the new commits changed, when that change is known.
+      return ctx.review({ leads: leads(ctx.previous?.changeSince) });
+    }
+    if (cause.signal === "scm.pull_request.merged") {
+      return ctx.review({
+        leads: leads(),
+        directions: ["The work is merged. Each untracked TODO is now on the target branch."],
+      });
+    }
+    return ctx.review({ leads: leads() });
+  },
+});
+```
+
+The program does not list its moments.
+If an admin removes `merged` from the practice, the `merged` branch does not run again.
+On `opened`, `ready` and `edited`, the last `return` runs.
+On `synchronized`, the review still judges the whole work: the leads only point at the new files first.
 
 ### When not to write a script
 
@@ -385,33 +597,68 @@ Do not write a script in these cases:
 - Only a model can find the places, and it must read the whole change to do so. The review reads the change already.
 - The criterion is about intent, a decision, or a conversation, and no pattern finds the candidates.
 
-## Run a script on your own change
+## What a program must never do
 
-Run the script on a real change before you save it.
+The host and the server stop most of these, but do not try them:
+
+- Name a workspace, practice, developer, recipient or piece of work.
+  The host attaches the identity of the practice, and the server takes the identity from the review's own credential.
+- Change files, write to a provider, call the database, or reach a provider credential.
+  A program reads the captured evidence only.
+- Read the network or start a program.
+  The process of a custom program has no such grant.
+- Turn a failed read, a missing capture, or a failed model call into an outcome.
+  Throw `UnratedError`, or let a call fail, so that the practice stops with its reason.
+- Return met for places that the program did not check.
+  Met needs complete coverage.
+- Record an optional improvement as an observation.
+  An observation is a shortfall against the criteria.
+- Write a duty into an observation that the criteria do not state.
+- Put reviewed text or model text in `directions` or `facts`.
+  Put such data in `context`, which the review reads as data and never as instructions.
+- Call `ctx.review()` twice at the same time, or from inside another `ctx.review()`.
+  The host refuses the second call.
+- Read the clock or a random value.
+  Use `ctx.now`, so that the same work gives the same result.
+
+## Run a program on your own change
+
+Run the program on a real change before you save it.
 The run uses no model, so each model slot is not available.
-An `optional` slot then gives `Not rated` lines, and a `required` slot stops the script with the status `skipped`.
+An `optional` slot is then absent, and a `required` slot skips the program.
+The run also opens no review session.
+Thus, `ctx.review()` returns a result that you write yourself in a file, or it fails.
 
 You need a checkout of Hephaestus at the version of your instance, and Node.js at the version that the checkout pins.
 
 1. In the checkout, go to `docker/agents/practice-scripts`.
 2. Install the dependencies with `pnpm install --frozen-lockfile`.
 3. Write the change as a unified diff, for example with `git -C <clone> diff main...HEAD > change.patch`.
-4. Run the script:
+4. If the program calls `ctx.review()`, write the result that the review returns in a JSON file.
+   It has the shape of [The result](#the-result), with host coverage, such as `{ "source": "host", "reads": 3, "truncatedReads": 0, "failedReads": 0, "complete": true }`.
+5. Run the program:
 
    ```bash
-   node validate.ts --script <script.ts> --repo <clone> --diff change.patch --metadata fixtures/pull-request-metadata.json
+   node validate.ts --script <script.ts> --repo <clone> --diff change.patch --metadata fixtures/pull-request-metadata.json --review result.json
    ```
 
    `fixtures/pull-request-metadata.json` is a sample record of a pull request.
-   If the script reads `ctx.work`, copy the sample and put the values of your pull request in it.
+   If the program reads `ctx.work`, copy the sample and put the values of your pull request in it.
 
-5. Read the output.
-   It prints the result `<slug>.json` and the section `<slug>.md` that the review reads.
-   The command exits with 1 when the script failed or ran out of time.
-   It exits with 2 when an option or an input is not valid.
-   An example is a `--repo` that is not a folder.
-6. Fix the script.
-7. Run the command again until the section shows the leads that you expect.
+6. Read the output.
+   It prints the report `<slug>.json`.
+   It also prints the section `<slug>.review-<n>.md` for each `ctx.review()` call with input.
+7. Fix the program.
+8. Run the command again until the leads, the limitations and the result are the ones that you expect.
+
+The report gives the status of the program, its stop reason, its error, its models, its calls, and its reads.
+It lists each review that the program asked for, with its input and the section that the review would read.
+It also gives the result that the program returned.
+
+The command exits with 0 when the program returned a valid result.
+It exits with 1 when the program failed, was skipped, or returned no valid result.
+It exits with 2 when an option or an input is not valid.
+An example is a `--repo` that is not a folder.
 
 The command accepts these options:
 
@@ -419,41 +666,67 @@ The command accepts these options:
 | --- | --- |
 | `--script` | The script file. Its name, less `.ts`, is the practice's identifier: lowercase letters, digits and hyphens. |
 | `--repo` | A checkout of the repository at the head of the change. |
-| `--diff` | The change as a unified diff. Without it, the change is empty. |
-| `--metadata` | The record of the reviewed work, which the script reads as `ctx.work`. Its shape also sets the kind of the work. [The record of each kind](#the-record-of-each-kind) gives the shapes. Without it, the script fails, because it has no record to read. |
-| `--context` | A folder with captured context records, for a script that reads `ctx.context`. |
-| `--signal` | A moment, such as `scm.pull_request.merged`. The script runs as a review at that moment. Without it, the script runs as a review that a person requested. |
-| `--recheck` | With `--signal`: the script runs as a recheck at that moment. |
-| `--cause` | A JSON file with the kind, the subject and the cause, in the shape that the server writes. Use it instead of `--signal` to set the review state or the subject. |
-| `--previous` | A JSON file with the previous result, in the shape of [`ctx.previous`](#the-previous-result). If it has a `head` that is an ancestor of the head of `--repo`, the script also gets `changeSince`. |
-| `--out` | A folder that keeps `<slug>.json` and `<slug>.md` after the run. |
+| `--diff` | The change as a unified diff. Without it, the work has no captured change. |
+| `--metadata` | The record of the reviewed work, which the program reads as `ctx.work`. Its shape also sets the kind of the work. [The record of each kind](#the-record-of-each-kind) gives the shapes. |
+| `--context` | A folder with captured context records, for a program that reads `ctx.evidence.record`. `citeRecord` fails in a local run, because it needs the server's folder index. |
+| `--signal` | A moment, such as `scm.pull_request.merged`. The program runs as a review at that moment. Without it, the program runs as a review that a person requested. |
+| `--recheck` | With `--signal`: the program runs as a recheck at that moment. |
+| `--cause` | A JSON file with the kind, the subject, the practice, the scope and the cause, in the shape that the server writes. Use it instead of `--signal` to set the review state or the subject. |
+| `--previous` | A JSON file with the previous result, in the shape of [`ctx.previous`](#the-previous-result). If it has a `head` that is an ancestor of the head of `--repo`, the program also gets `changeSince`. |
+| `--review` | A JSON file with the result that each `ctx.review()` call returns. Without it, `ctx.review()` fails with `unavailable`. The command never makes up a result. |
+| `--out` | A folder that keeps the report and the sections after the run. |
 
-## Rewrite a script in the retired form
+## Upgrade a script from an earlier release
 
-A script in the retired form is a plain function: `(repo, diffFiles, metadata, contextDir, changeDir, contextReference) => ({ hints, metrics, directions })`.
-To rewrite it:
+Earlier releases ran a practice's script in the positional form, as a plain function.
+This release does not run that form, and no grace period applies.
+A script in that form fails its practice until an admin upgrades it.
+The practice then has no result in its reviews.
 
-1. Wrap the function body in `run(ctx)` of `definePracticeScript`, as [`meta`](#meta) shows.
-   Set `meta.version` to `1`.
+The bundled practices need no action when nobody changed their script.
+At its first start, the server gives each unchanged copy of a bundled script its new version.
+It does this for the copies of each workspace and for the instance's own copies.
+A copy that an admin changed keeps its text, and its practice fails until an admin acts.
+The admin can accept the practice's update, which replaces the changed script, or upgrade the script by hand.
+
+### Upgrade a script in the positional form
+
+A script in the positional form is a plain function: `(repo, diffFiles, metadata, contextDir, changeDir, contextReference) => ({ hints, metrics, directions })`.
+Its practice fails with this error: *This script uses the retired positional form. Rewrite it with definePracticeScript.*
+To upgrade it:
+
+1. Wrap the function body in `run(ctx)` of `definePracticeScript`, with `meta: {}`.
 2. Replace each argument with its field of the context:
 
    | Argument | Field |
    | --- | --- |
-   | `repo` | `ctx.repo` |
-   | `diffFiles` | `ctx.change` |
+   | `repo` | `ctx.files.head`: `read`, `list`, `grep` and `cite` |
+   | `diffFiles` | `requireChange(ctx.files)` |
    | `metadata` | `ctx.work` |
-   | `contextDir` | `ctx.context.dir` |
-   | `changeDir` | `ctx.changeDir` |
-   | `contextReference` | `ctx.context.reference` |
+   | `contextDir`, `contextReference` | `ctx.evidence.record(name)` and `ctx.evidence.citeRecord(name, line)` |
+   | `changeDir` | `ctx.files.change` |
 
-   Call `expectKind(ctx, "scm.pull_request")` first when the script reads `ctx.repo`, `ctx.change` or `ctx.changeDir`.
+   Call `expectKind(ctx, "scm.pull_request")` first when the program reads the files of a pull request.
 3. Replace each hint with a lead.
-   A hint on a changed line becomes `{ at: { change: file, line }, kind }`.
-   A hint on a record becomes `{ at: { record: file }, kind }`.
-   Declare each kind in `meta.kinds` with one sentence.
+   A hint on a changed line becomes `{ at: { change: file, line }, label }`.
+   A hint on a record becomes `{ at: { record: file }, label }`.
+   The label is one line that tells the review what the place is.
    Put the flags of a hint in the `facts` of its lead.
-4. Return the metrics as `facts`, and keep the directions.
-5. Run the script on a change, as [Run a script on your own change](#run-a-script-on-your-own-change) tells, and save it.
+4. Give the metrics as `facts` and keep the directions: `return ctx.review({ leads, facts, directions })`.
+5. Run the program on a change, as [Run a program on your own change](#run-a-program-on-your-own-change) tells, and save it.
+
+### Scripts from a preview build
+
+A preview build of this release had a leads form: `meta.version: 1`, `meta.kinds`, `meta.tokens`, and a `run` that returned `{ leads, facts, unrated, directions }`.
+A script in that form fails with this error:
+
+```text
+This practice script uses the retired leads contract (meta.version). Accept the practice's catalog update, or rewrite run() to return a result, for example return ctx.review({ leads }).
+```
+
+To upgrade it, remove `version`, `kinds` and `tokens` from `meta`.
+Give each lead the `label` that `meta.kinds` held for its kind, and remove its `rating`.
+Then return `ctx.review({ leads, facts, limitations: unrated, directions })`.
 
 ## Use an AI assistant
 
@@ -462,15 +735,15 @@ Give the assistant this page and the brief below.
 Replace each «…» with your facts.
 
 ```text
-Follow the attached guide exactly. Criterion: «…». Places the review must look at: «…». Models this workspace assigns: «…». Return one TypeScript file whose default export is `definePracticeScript({ meta, run })`.
+Follow the attached guide exactly. Criterion: «…». Places the review must look at: «…». Models this workspace assigns: «…». Return one TypeScript file whose default export is `definePracticeScript({ meta, run })`. Prefer `return ctx.review({ … })` with prepared input. Return a result in code only where code decides the whole criterion.
 ```
 
 1. Copy the criterion from the practice's **What to look for**.
 2. List the places, as in [step 1 of the tutorial](#1-list-the-places-to-look-at).
 3. List the models for practice scripts that **AI models** assigns. If it assigns none, write `none`.
-4. Run the file that you get, as [Run a script on your own change](#run-a-script-on-your-own-change) tells.
-5. Give the output back to the assistant until the section is correct.
-6. Read the script yourself before you save it. Check it against [Anti-patterns](#anti-patterns).
+4. Run the file that you get, as [Run a program on your own change](#run-a-program-on-your-own-change) tells.
+5. Give the output back to the assistant until the review input and the result are correct.
+6. Read the script yourself before you save it. Check it against [What a program must never do](#what-a-program-must-never-do) and [Anti-patterns](#anti-patterns).
 
 ## Reference
 
@@ -482,35 +755,25 @@ A script has one default export:
 import { definePracticeScript } from "../lib/practice-script.ts";
 
 export default definePracticeScript({
-  meta: {
-    version: 1,
-    models: { decision: "optional" },
-    tokens: 20_000,
-    kinds: { "untracked-todo": "A TODO without a tracking reference." },
-  },
-  async run() {
-    return { leads: [] };
+  meta: { models: { decision: "optional" } },
+  async run(ctx) {
+    return ctx.review();
   },
 });
 ```
 
-The runner reads `meta` before `run` starts.
-A `meta` that is not valid stops the script with an error.
+The host reads `meta` before `run` starts.
+`meta` has one optional field, `models`: model slot → `"required"` or `"optional"`.
+It declares the models that the program calls directly.
+A slot that is not declared is never available.
+`meta: {}` declares no direct model, and `ctx.review()` still works.
 
-| Field | Type | Meaning |
-| --- | --- | --- |
-| `version` | `1` | Required. The version of the script contract. Version 1 is the leads contract: `run` returns leads, and the review decides what each lead means. A script without it stops with the error `version is missing`. |
-| `models` | slot → `"required"` or `"optional"` | The model slots that the script uses. A slot that is not declared is never available. |
-| `tokens` | positive integer, at most 500 000 | The token limit of this practice. The default is 20 000. The attempt token limit applies too. [Limits](#limits) gives both. |
-| `kinds` | lead kind → one sentence | Each lead kind that the script can return, with the sentence that the review reads for it. |
-
-A kind has 2 to 48 characters and matches `^[a-z][a-z0-9-]{1,47}$`.
-Name it by what the place is, such as `untracked-todo`.
-Its sentence is one line of at most 300 characters.
+A `meta` with another field is not valid, and the program fails with the stop reason `invalid-program`.
+A `meta` with `version`, `kinds` or `tokens` fails with the error of [Scripts from a preview build](#scripts-from-a-preview-build).
 
 ### Model slots and needs
 
-A **model slot** is one kind of model that a script can call.
+A **model slot** is one kind of model that a program can call directly.
 
 | Slot | AI SDK type | The model that the slot gets |
 | --- | --- | --- |
@@ -522,10 +785,10 @@ A **model slot** is one kind of model that a script can call.
 For each review, Hephaestus chooses each model through the reviewed developer's AI choice.
 [Privacy](./ai-providers.mdx#privacy) gives the rule.
 
-The runner decides which slots are available before `run` starts:
+The host decides which slots are available before `run` starts:
 
 1. A declared slot is available when the review has a model for it.
-2. If a `required` slot is not available, the script does not run. Its status is `skipped`.
+2. If a `required` slot is not available, the program does not run. Its status is `skipped`, and the practice has no result in this review.
 3. If an `optional` slot is not available, `ctx.models.<slot>` is `undefined`.
 
 The types follow `meta.models`.
@@ -534,8 +797,12 @@ An `optional` slot is a model or `undefined`.
 An undeclared slot does not exist on `ctx.models`.
 
 Prefer `optional`.
-A script with `optional` slots still gives the leads that its code finds when the workspace assigns no model.
-Use `required` only when the script has nothing useful to say without the model.
+A program with `optional` slots still works when the workspace assigns no model.
+Use `required` only when the program has nothing useful to do without the model.
+
+`ctx.review()` needs no declaration.
+The review session uses the review's own model.
+Its calls are not direct calls, and `meta.models` does not limit them.
 
 ### The context
 
@@ -550,22 +817,64 @@ Its shape depends on the kind of the reviewed work.
 | `cause` | Why this practice is in this review. [The cause](#the-cause) tells more. |
 | `previous` | The previous result of this practice on this work, or `null`. [The previous result](#the-previous-result) tells more. |
 | `subject.role` | The role that the practice is about: `AUTHOR`, `REVIEWER` or `MERGER`. |
-| `practice.slug` | The identifier of the practice. |
-| `context.dir`, `context.reference` | The folder of the captured context, and its reference, to cite records. |
-| `now` | The time of the review. Use it instead of the clock. |
+| `practice` | `slug`, the identifier of the practice, `revisionId`, its revision in this review, and `criteria`, its criteria text. |
+| `scope` | The authored scope that the result is about: `key`, `mode` and `description`. The key is opaque. `mode` is `change` in this release. |
+| `files` | The file trees of the work, or `null` for an issue, a conversation or a document. [Files](#files) tells more. |
+| `evidence` | The captured records and the read tools. [Evidence](#evidence) tells more. |
 | `models` | The available model slots, as AI SDK model objects. |
-| `tools` | `readFile`, `listFiles` and `grep` over the repository, as AI SDK tools. |
-| `remaining()` | The tokens and milliseconds that this practice has left. |
-| `abortSignal` | An `AbortSignal` that aborts shortly before the deadline of this practice. Give it to an AI SDK call as `abortSignal`. |
-| `log(text)` | One line to the runner's log. The runner keeps at most 2 000 characters of each line. |
+| `review(options)` | Asks a review session to decide the practice with the prepared input, and returns its result. [Review input](#review-input) tells more. |
+| `budget.remaining()` | `tokens`, the tokens that direct model calls of this attempt have left, and `ms`, the milliseconds that this program has left. |
+| `now` | The time of the review. Use it instead of the clock. |
+| `abortSignal` | An `AbortSignal` that aborts when the program must stop: at its deadline, at the end of the budget, or when the review is cancelled. Give it to an AI SDK call as `abortSignal`. |
+| `log(text)` | One line to the host's log. The host keeps at most 2 000 characters of each line. |
 
-A pull request review also has these fields:
+#### Files
+
+`ctx.files` has three fields:
 
 | Field | What it holds |
 | --- | --- |
-| `repo` | The absolute path of the repository checkout at the reviewed head. |
-| `change` | The parsed change: path → added and removed lines, keyed by line number. |
-| `changeDir` | The folder of the change view: `diff.patch`, `diff_stat.txt` and `files.json`. The local command gives an empty string. Prefer `change`. |
+| `head` | The repository at the reviewed head. `revision` is its full commit SHA. |
+| `base` | `null` in this release. |
+| `change` | The captured change, or `null` when no change was captured. It has `base`, `head`, `files` and `cite`. |
+
+`head` has four functions.
+Each read goes through the host, which counts it for the coverage of the practice.
+
+| Function | Returns |
+| --- | --- |
+| `read(path)` | `{ status: "FOUND", text, truncated }`, `{ status: "BINARY" }` or `{ status: "ABSENT" }`. A read returns at most 2 MiB, and `truncated` tells if it cut the file. |
+| `list(glob?)` | `{ paths, truncated }`, with at most 5 000 paths. |
+| `grep(pattern, options?)` | `{ matches, truncated }`, with at most 200 matches unless `options.maxResults` sets the bound. |
+| `cite(path, startLine, endLine?)` | A citation of lines of the file, with the quote read from the tree. At most 200 lines. |
+
+`change.files` is the parsed change: path → added and removed lines, keyed by line number.
+`change.cite(path, side, startLine, endLine?)` cites lines that the change adds (`NEW`) or removes (`OLD`).
+
+`ABSENT` proves that the path is not in the tree.
+A read that fails throws `UnratedError` with `unavailable`.
+Thus, a read that fails never reads as an empty or absent file.
+A path in the checkout's `.git` folder reads as absent, because it is not part of the work.
+
+#### Evidence
+
+`ctx.evidence` has three fields:
+
+| Field | What it holds |
+| --- | --- |
+| `tools` | `readFile`, `listFiles` and `grep` over `files.head`, as AI SDK tools for `agent`. Empty when the work has no files. |
+| `record(name)` | A captured record by its name in the context folder, such as `metadata.json`: `{ status: "FOUND", text }` or `{ status: "ABSENT" }`. |
+| `citeRecord(name, startLine, endLine?)` | A citation of lines of a captured record. |
+
+The tools have these limits:
+
+| Tool | Limit |
+| --- | --- |
+| `readFile` | 200 numbered lines for each call |
+| `listFiles` | 200 entries |
+| `grep` | 50 matches |
+
+`readRecordJson(ctx.evidence, name)` returns a record parsed as JSON, or `null` when the record is absent or is not JSON.
 
 #### Narrow the context to a kind
 
@@ -575,29 +884,29 @@ Call `expectKind` before you read a field of that kind:
 ```ts
 async run(ctx) {
   expectKind(ctx, "scm.pull_request");
-  const comments = addedComments(ctx.change);
+  const comments = addedComments(requireChange(ctx.files));
   // …
 }
 ```
 
-After `expectKind`, TypeScript knows the kind of `ctx`, so `ctx.change` and the fields of `ctx.work` exist.
+After `expectKind`, TypeScript knows the kind of `ctx`, so the fields of `ctx.work` exist.
 If the review is about another kind, `expectKind` throws.
-The script then fails with the status `error`.
+The program then fails with the stop reason `error`.
 It never reports that it found nothing.
-A script that reads more than one kind uses `switch (ctx.kind)` instead.
+A program that reads more than one kind uses `switch (ctx.kind)` instead.
 
 #### The record of each kind
 
-The runner reads the record of the work from the context folder and validates it before the script starts.
+The host reads the record of the work from the context folder and validates it before the program starts.
 `ctx.work` holds only the fields below.
-If the record does not have this shape, the script does not run, and its status is `error`.
+If the record does not have this shape, the program does not run, and its practice fails.
 
 | Kind | Record | `ctx.work` |
 | --- | --- | --- |
 | `scm.pull_request`: a GitHub pull request or a GitLab merge request | `metadata.json` | `pr_number`, `pr_url`, `repository_full_name`, `source_branch`, `target_branch`, `commit_sha` (the reviewed head), `subject_role`, `is_draft`, `is_merged`, `additions`, `deletions`, `changed_files`, `labels`, `assignees`, and `basis`, which tells when each field was read. When they are known: `repository_id` and `provider_id`, which identify the repository, `title`, `body`, `state`, `created_at`, `closed_at`, `merged_at`, `author`, `author_id`, `author_bot`, `merged_by`, `milestone`, `merge_state_status`, `review_decision` and `head_checks`. |
 | `scm.issue`: a GitHub or GitLab issue | `metadata.json` | `issue_number`, `title`, `body`, `state`, `state_reason`, `html_url`, `repository_full_name`, `author`, `author_id`, `issue_type`, `is_locked`, `sub_issues_total`, `sub_issues_completed`, `milestone`, `closed_at`, `labels` and `assignees`. `sub_issues_source` when the counts are known, and `repository_id` and `provider_id` when the repository is known. A field that the provider did not record is `null`. |
 | `chat.conversation_thread`: a Slack thread | `conversation_thread.json` | `channel`, `threadTs`, `messages`, `messageCount` and `truncated`. Each message has `ts`, `author` and `text`. When they are known, it also has `authorLogin`, `authorName`, `underReview` and `edited`. |
-| `docs.document`: an Outline document | `document.json` | `title`, `collection`, `collectionSlug`, `slug`, `createdBy`, `updatedBy`, `createdAt`, `updatedAt` and `archived`. The body is `document.md` in `context.dir`. |
+| `docs.document`: an Outline document | `document.json` | `title`, `collection`, `collectionSlug`, `slug`, `createdBy`, `updatedBy`, `createdAt`, `updatedAt` and `archived`. The body is the record `document.md`: read it with `ctx.evidence.record("document.md")`. |
 
 A descriptive field can get a value that this release does not know, such as a new pipeline state from a provider.
 Then `head_checks` and `sub_issues_source` are absent, which means that they are not known, and the `state` of an issue is `UNKNOWN`.
@@ -608,7 +917,7 @@ A value of another shape in any other field fails the record.
 #### The cause
 
 The moments and the review conditions of a practice are its review occasion.
-`ctx.cause` tells the script which of them brought the practice into this review, or that a recheck or a request by hand did.
+`ctx.cause` tells the program which of them brought the practice into this review, or that a recheck or a request by hand did.
 `ctx.cause.type` has one of three values:
 
 | `type` | Meaning | Fields |
@@ -639,119 +948,297 @@ It is `null` when there is none.
 
 | Field | What it holds |
 | --- | --- |
+| `practiceResultId` | The identifier of that result. |
 | `reviewedAt` | The time of that result. |
 | `cause`, `signal` | Why that review ran: `moment`, `recheck` or `requested`, as in [the cause](#the-cause). |
 | `outcome` | `MET`, `NOT_MET`, `NOT_APPLICABLE` or `UNDETERMINED`. |
 | `severity` | For `NOT_MET`: `CRITICAL`, `MAJOR`, `MINOR` or `INFO`. |
-| `citations` | The places that the result cites: `sourceKind`, `path`, `startLine`, `endLine`, and `side` for a line of the change. |
+| `citations` | The places that the result and each of its observations cite, in that order: `sourceKind`, `path`, `startLine`, `endLine`, and `side` for a line of the change. |
 | `head` | For a pull request: the head that the earlier review read. |
-| `changeSince` | For a pull request: the change from `head` to the reviewed head, in the shape of `change`. It is absent when `head` is not an ancestor of the reviewed head, for example after a force push. An empty map means that nothing changed. |
+| `changeSince` | For a pull request: the change from `head` to the reviewed head, in the shape of `change.files`. It is absent when `head` is not an ancestor of the reviewed head, for example after a force push. An empty map means that nothing changed. |
 
-`previous` has no summary and no rationale, because a model wrote them.
+`previous` has no summary and no explanation, because a model wrote them.
 It has no delivery state.
 A result that an admin marked incorrect is not a current result.
 A result whose evidence the workspace no longer permits is not a current result either.
+A previous result is context, not a verdict to copy.
 
-The runner marks each lead on a line that `changeSince` adds.
-[What the review reads](#what-the-review-reads) tells how.
+The host marks each lead on a line that `changeSince` adds.
+[Review input](#review-input) tells how.
 
 #### The practice decides when it runs
 
 The moments and the review conditions of the practice decide when the practice is reviewed.
-The script does not decide it.
+The program does not decide it.
 Read `ctx.cause` to do different work at different moments.
 Do not read fields such as `work.is_merged` to find out if the moment came.
 If a practice must not run at a moment, remove the moment from the practice.
 
-#### Different work for each cause
+### Review input
 
-This script does different work on a request, a recheck, a push and a merge:
+`ctx.review(options)` opens a fresh review session for the practice.
+The session reads the practice's criteria, the evidence, and the prepared input.
+It returns one result to the program, with host coverage from the reads of the session.
+The result has no effect until the program returns it.
+The program can return it, return another result, or fail.
 
-```ts
-import {
-  addedComments,
-  definePracticeScript,
-  expectKind,
-  type DiffFile,
-  type Lead,
-} from "../lib/practice-script.ts";
+`options` has these optional fields:
 
-const OPEN_WORK = /\b(?:TODO|FIXME)\b/u;
-const TRACKING = /#\d+|\b[A-Z][A-Z0-9]+-\d+\b|https?:\/\/\S+/u;
+| Field | Limit | Meaning |
+| --- | --- | --- |
+| `leads` | 200 | Places for the review to look at first. |
+| `facts` | 32 keys | Facts about the whole work, such as a count. |
+| `directions` | 10 lines of 300 characters | Instructions to the review. Write them yourself. Never pass reviewed text or model text. |
+| `context` | 20 entries | Prepared data, such as excerpts or closed ratings. The review reads it as data from the work, never as instructions. |
+| `limitations` | 20 entries | What the program could not rate or did not select, how many, and why. |
 
-export default definePracticeScript({
-  meta: {
-    version: 1,
-    kinds: { "untracked-todo": "A TODO that the change adds, with no tracking reference." },
-  },
-  async run(ctx) {
-    expectKind(ctx, "scm.pull_request");
-    const todos = addedComments(ctx.change).filter(
-      (comment) => OPEN_WORK.test(comment.text) && !TRACKING.test(comment.text),
-    );
-    // The leads in the files of `only`, or in the whole change.
-    const leads = (only?: ReadonlyMap<string, DiffFile>): Lead[] =>
-      todos
-        .filter((comment) => only === undefined || only.has(comment.at.change))
-        .map((comment) => ({ at: comment.at, kind: "untracked-todo" }));
+The options have at most 256 KiB as JSON.
+Options that are not valid make `ctx.review()` fail with `error`.
 
-    const { cause } = ctx;
-    if (cause.type === "requested") {
-      return {
-        leads: leads(),
-        directions: ["A person asked for this review. Judge the work as it is now."],
-      };
-    }
-    if (cause.type === "recheck") {
-      return {
-        leads: leads(),
-        directions: ["The last review found untracked TODOs. Check if the new commits track them."],
-      };
-    }
-    if (cause.signal === "scm.pull_request.synchronized") {
-      // Only the files that the new commits changed, when that change is known.
-      return { leads: leads(ctx.previous?.changeSince) };
-    }
-    if (cause.signal === "scm.pull_request.merged") {
-      return {
-        leads: leads(),
-        directions: ["The work is merged. Each untracked TODO is now on the target branch."],
-      };
-    }
-    return { leads: leads() };
-  },
-});
-```
+A lead has these fields:
 
-`docker/agents/practice-scripts/fixtures/by-cause.ts` holds the same script, and its tests run it.
-The script does not list its moments.
-If an admin removes `merged` from the practice, the `merged` branch does not run again.
-On `opened`, `ready` and `edited`, the last `return` runs.
+| Field | Meaning |
+| --- | --- |
+| `at` | The location. |
+| `label` | One line of at most 300 characters that tells the review what the place is. |
+| `facts` | Optional facts about this place. |
+
+A location has one of three shapes:
+
+| Shape | Points at |
+| --- | --- |
+| `{ change, line, endLine?, side? }` | Lines that the change adds (`NEW`, the default) or removes (`OLD`) |
+| `{ file, line, endLine?, revision? }` | Lines of a file in the repository, at the reviewed head or at the full commit SHA `revision` |
+| `{ record, line? }` | A captured record in the context folder. Line 0 or no line points at the whole record. |
+
+A fact is a one-line string of at most 200 characters, a finite number, or a boolean.
+Its key has at most 64 characters, starts with a letter, and has only letters and digits, such as `similarCommentPairs`.
+
+A `context` entry has a one-line `label` of at most 160 characters, a JSON `value`, and optional `citations`.
+A `limitations` entry is `{ what, count, reason, units? }`.
+`what` names the items for the review, such as `added comments`, in one line of at most 160 characters.
+`reason` is `selection`, `truncated`, `cancelled`, or one of the [reasons](#reasons).
+`units` names up to 50 of the items.
+
+#### How the host settles leads
+
+The host settles each lead before the review sees it:
+
+1. It reads the quote of each lead from the source.
+   A program never writes a quote.
+2. If the source does not hold the location, `ctx.review()` fails with `error`.
+   The error names the lead.
+   The host never drops a lead without notice.
+3. It marks each lead on a line that [`changeSince`](#the-previous-result) adds.
+
+#### What the review reads
+
+The host turns the options into one section, which the review reads after the practice's criterion.
+The section holds these lines:
+
+- The directions.
+- The leads, in the program's order. Each run of leads with one label shows the label once.
+- For each lead: its place, the first line of its quote, and its facts as `key=value`.
+- When [`changeSince`](#the-previous-result) is known, one line that counts the leads on lines added after the last review.
+  An example is `1 of 2 leads point at lines added since the last review of this practice, each marked (new).`
+  Each such lead has `(new)` after its place.
+- The facts about the whole work.
+- The prepared context, under a heading that says it is data from the reviewed work.
+  Each value shows at most 1 200 characters.
+- One `Not rated` line for each limitation, such as `Not rated: 3 added comments (unavailable). Read those yourself.`
+
+A section has at most 3 000 characters, so the input cannot push the criteria out of the review's turn.
+The `Not rated` lines come first in this bound and take at most 1 500 characters.
+When more lines exist, one line counts the entries that the section does not show.
+
+The directions, the leads, the facts and the context get the rest of the bound, in that order.
+When they do not fit, the section keeps the first lines.
+Then one line counts the lines that the section does not show, and how many of them are leads.
+Thus, give only the leads that the review needs.
+
+The review can read beyond the section.
+It decides the whole practice, not only the leads.
+
+#### When `ctx.review()` fails
+
+`ctx.review()` rejects with `UnratedError` when the session ends without a result.
+The reason tells why, such as `deadline`, `budget` or `error`.
+A second call while one is active rejects with `refused`.
+A program can catch the error, but it must not turn it into an outcome.
+A program that lets the error escape fails with that reason, and its practice has no result.
+
+### The result
+
+`run` returns one result.
+Its `outcome` decides which fields it has:
+
+| Field | `MET` | `NOT_MET` | `NOT_APPLICABLE` | `UNDETERMINED` |
+| --- | --- | --- | --- | --- |
+| `summary` | Required | Required | Required | Required |
+| `explanation` | Required | Required | Required | Required |
+| `citations` | At least one | Zero or more | At least one | At least one |
+| `problems` | None | At least one | None | None |
+| `severity` | None | Optional | None | None |
+| `example` | Optional | Optional | None | None |
+| `evidence.search` | Optional | Optional | None | Optional |
+| `evidence.undecidability` | None | Optional | None | Required |
+| `evidence.inapplicability` | None | None | Required | None |
+| `coverage` | Complete | Required | Required | Required |
+
+These rules decide the outcome:
+
+- Any problem gives `NOT_MET`.
+- With no problem, an open question gives `UNDETERMINED`.
+- `MET` needs complete coverage and no open question.
+- `NOT_APPLICABLE` needs a warrant that rules the practice out.
+- An optional improvement is never a problem.
+
+`summary` is one line of at most 160 characters.
+`explanation` has at most 10 000 characters.
+
+#### Problems
+
+Each entry of `problems` becomes one **observation** when the server admits the result.
+
+| Field | Meaning |
+| --- | --- |
+| `severity` | `CRITICAL`, `MAJOR`, `MINOR` or `INFO`. The weight of this problem alone. `INFO` is a real gap with trivial impact. The app labels it **Trivial**. |
+| `summary` | One line of at most 160 characters. |
+| `explanation` | Why this is a shortfall against the criteria, in at most 4 000 characters. |
+| `citations` | 1 to 20 citations of the problem's places. |
+| `basis` | Why the problem belongs to this work. See the next table. |
+| `nextStep` | Optional. What the developer can do, in at most 1 000 characters. Composition can use it as data. |
+| `key` | Optional. A stable name for the problem, in the shape of a practice identifier. Unique in the result. |
+
+`basis` has one of these shapes.
+Its numbers are positions in the problem's own `citations`:
+
+| `type` | Fields | Use when |
+| --- | --- | --- |
+| `introduced` | `head`, `explanation` | The work added the cited place. |
+| `worsened` | `base`, `head`, `explanation` | The work made an earlier place worse. |
+| `duty` | `criterionQuote`, `event`, `explanation` | The criteria state a duty, and the cited event did not do it. `criterionQuote` must occur in the criteria. |
+| `state` | `explanation` | Admission does not accept it in this release. |
+
+The result's `severity` is optional.
+Without it, admission uses the worst severity of the problems.
+A supplied severity can be more severe, but never less.
+Use a higher severity only when the criteria escalate a pattern, and name the pattern in the explanation.
+
+#### Example
+
+`example` is one place in the work that shows the practice done well: `{ citation, note }`.
+`note` has at most 280 characters and is about the work.
+The example cannot cite a place that a problem cites.
+An example teaches.
+It is never sent alone, and it is never praise.
+
+#### Warrants and open questions
+
+| Field | Shape | Meaning |
+| --- | --- | --- |
+| `evidence.search` | `{ consulted, lookedFor, boundary }` | What a search for something missing looked for, in which source kinds, and where it stopped. |
+| `evidence.inapplicability` | `{ consulted, subject, ruledOutBy }` | Why the practice does not apply to this work. |
+| `evidence.undecidability` | 1 to 20 open questions | Questions that the evidence leaves open. |
+
+`consulted` names 1 to 20 source kinds, such as `scm.pull-request.diff`.
+An open question is `{ openQuestion, wouldSettleIt, citation? }`, with at most 500 characters in each text.
+An open question is about the meaning of the work.
+A failed read, a timeout or a spent budget is never an open question.
+Open questions are never sent as feedback.
+
+#### Coverage
+
+`coverage` tells how much of the scope the result covers.
+It has one of two sources:
+
+| `source` | Fields | Where it comes from |
+| --- | --- | --- |
+| `host` | `reads`, `truncatedReads`, `failedReads` | The host counts the reads of a review session. Only a result from `ctx.review()` has it. A program can return it only unchanged. |
+| `claimed` | `selected`, `checked`, `total` | Program code states it. `total` can be `null` when the total is not known. It stays a claim. |
+
+Both have `complete`.
+When `complete` is `false`, `omitted` lists 1 to 20 [limitation entries](#review-input) that tell what the result left out.
+These rules apply:
+
+- Host coverage is complete only when no read was cut and no read failed.
+- Claimed coverage cannot check more than it selected, or select more than the total.
+- Complete claimed coverage checked everything that it selected, and selected the whole total.
+
+A not met result can have incomplete coverage when its problems are proved.
+A met result cannot.
+
+#### Citations
+
+A citation has these fields:
+
+| Field | Meaning |
+| --- | --- |
+| `sourceKind` | The kind of the captured source, such as `scm.pull-request.diff`, `scm.repository.tree` or `scm.pull-request.core`. |
+| `artifactPath` | The staged artifact, such as `context/change.json`. |
+| `path` | The repository path for code, or the record path. |
+| `side` | `OLD` or `NEW`, only on `scm.pull-request.diff`. |
+| `revision` | A full commit SHA, only on `scm.repository.tree` and `scm.pull-request.diff`. |
+| `startLine`, `endLine` | The lines, from 1. |
+| `quote` | The exact text at those lines, at most 4 000 characters. |
+
+Get each citation from `files.head.cite`, `files.change.cite` or `evidence.citeRecord`.
+They read the quote from the source.
+A result from `ctx.review()` already has verified citations.
+
+#### Bounds
+
+| Bound | Value |
+| --- | --- |
+| Result citations | 50 |
+| Problems | 50 |
+| Citations of one problem | 20 |
+| Open questions | 20 |
+| Omitted entries | 20, each with up to 50 units |
+| The whole result as JSON | 128 KiB |
+
+#### What admission checks
+
+The host checks the shape of the result when the program returns it.
+A result that is not valid fails the practice with the stop reason `invalid-candidate`.
+The server checks the result again when it admits it, with the same rules and these checks:
+
+- Each quote must be the text of the captured source at its place.
+- Each source must be one that this review captured and may read.
+- A `duty` basis must quote the criteria.
+- The practice must still be part of the review.
+
+If one check fails for a problem, an example or a citation, the server withholds the whole result of that practice.
+It never removes one problem and keeps the rest.
+A withheld not met result never becomes met.
+The other practices of the review continue.
 
 ### Primitives and tools
 
 `../lib/practice-script.ts` is the one library import of a script.
-It exports `definePracticeScript`, the primitives below, the reader `addedComments`, the question set `commentKinds`, and the types.
+It exports `definePracticeScript`, the primitives below, the helpers `expectKind`, `requireChange` and `readRecordJson`, the reader `addedComments`, the question set `commentKinds`, `UnratedError`, and the types.
 
 | You need to | Use | Slot | Calls |
 | --- | --- | --- | --- |
 | Find a pattern, count lines, or match a path | Plain TypeScript and the readers | none | none |
+| Ask the review to decide with prepared input | `ctx.review` | none | One review session |
 | Rate many items against a fixed set of answers | `classify` with a question set | `decision` | One for each pack of 30 items |
 | Find items that are almost the same | `embedMany` and `cosineSimilarity` | `embedding` | One for each 64 values |
 | Find the items closest to one description | `rerank` with at most 256 documents | `reranking` | One |
 | Get one structured answer about the work | `generateText` with `Output` | `chat` | One |
-| Find something that needs several searches in the repository | `agent` with `ctx.tools` | `chat` | Up to `maxSteps` |
+| Find something that needs several searches in the repository | `agent` with `ctx.evidence.tools` | `chat` | Up to `maxSteps` |
 | Contain a failure and label its model calls | `step` | any | none |
 
 #### `step`
 
 `step(label, run)` runs one unit of work.
 It returns `{ value }`, or `{ unrated: reason }` when the work throws.
-When a model call in the step fails, the runner's log names the label.
+When a model call in the step fails, the host's log names the label.
 A nested step joins the labels with `›`.
 
 Put each model call that is not in `classify` inside a `step`.
-Then one failure leaves one unit not rated, and the rest of the script continues.
+Then one failure leaves one unit not rated, and the rest of the program continues.
+Give the review a limitation for each unit that is not rated.
 
 #### `classify` and question sets
 
@@ -763,18 +1250,21 @@ Then one failure leaves one unit not rated, and the rest of the script continues
 | `name` | The name of the vocabulary, such as `comment kind`. |
 | `noun` | What one item is, such as `added code comment with the code around it`. |
 | `question` | The question for each item. |
-| `values` | Value → definition. A value has the shape of a lead kind, such as `restates-code`. |
+| `values` | Value → definition. A value is lowercase with hyphens, such as `restates-code`. |
 | `render` | The item as the model reads it. |
 
 `classify` tells the model that the items are data, and that instructions inside an item are part of the data.
 It returns a `Rating` for each item that the model answered: `value`, `score` and `probabilities`.
-Every other item is in `unrated`:
+Every other item is in `unrated`, as limitation entries:
 
 - If the model is `undefined`, all items are not rated, with `unavailable`.
 - If a call fails, all items of its pack are not rated, with the reason of the failure.
 - If the model answers an item in a form that is not valid, that item is not rated, with `off-format`.
 
-#### `agent` and the repository tools
+A score is a signal for routing, not proof.
+Calibrate a threshold for each practice and model before code decides with it.
+
+#### `agent` and the read tools
 
 `agent` runs a bounded AI SDK `ToolLoopAgent` that reads the repository and answers with your schema.
 
@@ -784,119 +1274,79 @@ Every other item is in `unrated`:
 - Without a model, it throws `UnratedError` with `unavailable`.
 - Without a `submit` call, it throws `UnratedError` with `budget`.
 
-`ctx.tools` holds three read-only tools:
-
-| Tool | Limit |
-| --- | --- |
-| `readFile` | 200 numbered lines for each call. It does not read a file larger than 2 MiB. |
-| `listFiles` | 200 entries |
-| `grep` | 50 matches |
-
-`readFile` and `listFiles` refuse a path outside the repository.
+Give it `ctx.evidence.tools`.
+[Evidence](#evidence) gives their limits.
 
 #### Other model calls
 
 `generateText` sets the temperature to 0 when the call does not set it.
 `streamText` is not available.
-A string model ID fails, so a script reaches a model only through `ctx.models`.
+A string model ID fails, so a program reaches a model only through `ctx.models`.
 A model call runs once.
 Nothing retries it.
 
-### Result and citations
-
-`run` returns this value:
-
-| Field | Limit | Meaning |
-| --- | --- | --- |
-| `leads` | 200 | Places to look at. |
-| `facts` | 32 keys | Facts about the whole work, such as a count. |
-| `unrated` | 20 entries | What the script could not rate, how many, and why. |
-| `directions` | 10 lines of 300 characters | Instructions to the review. Write them yourself. Never pass model text. |
-
-A lead has these fields:
-
-| Field | Meaning |
-| --- | --- |
-| `at` | The citation. |
-| `kind` | A kind that `meta.kinds` declares. |
-| `facts` | Optional facts about this place. |
-| `rating` | Optional `{ value, score }` from a model. `value` has the shape of a lead kind. `score` is from 0 to 1. |
-
-A fact is a one-line string of at most 200 characters, a finite number, or a boolean.
-Its key has at most 64 characters, starts with a letter, and has only letters and digits, such as `similarCommentPairs`.
-
-A citation has one of three shapes:
-
-| Shape | Points at |
-| --- | --- |
-| `{ change, line, endLine?, side? }` | Lines that the change adds (`NEW`, the default) or removes (`OLD`) |
-| `{ file, line, endLine? }` | Lines of a file in the repository |
-| `{ record, line? }` | A captured record in the context folder. Line 0 or no line cites the whole record. |
-
-An `unrated` entry is `{ what, count, reason }`.
-`what` names the items for the review, such as `added comments`, in at most 160 characters.
-
-### How leads are settled
-
-The runner settles each lead before the review sees it:
-
-1. It drops a lead whose kind `meta.kinds` does not declare.
-2. It drops a lead whose citation the source does not hold.
-   A quote spans at most 20 lines, and a quoted file has at most 2 MiB.
-3. It writes the quote of each lead that it keeps, from the source.
-   A script never writes a quote.
-4. It counts the dropped leads and shows them as one `Not rated` line with `off-format`.
-
 ### Reasons
 
-A reason tells why something was not rated.
+A reason tells why something was not rated, or why a program stopped.
 It never means "nothing found".
-A script uses one of seven reasons: `unavailable`, `budget`, `deadline`, `too-large`, `off-format`, `refused` and `error`.
+A program uses one of seven reasons: `unavailable`, `budget`, `deadline`, `too-large`, `off-format`, `refused` and `error`.
+The host adds `cancelled` when the review is cancelled.
 [Calls that were not rated](./practice-review-operations.mdx#calls-that-were-not-rated) gives the meaning of each reason and what to do.
-It also tells which reasons the review's pages show.
 
 `reasonOf(error)` maps an error to a reason.
 `step` and `classify` use it.
-`UnratedError` carries the reason of a call that the runner refused or could not finish.
+`UnratedError` carries the reason of a read, a call or a review that the host refused or could not finish.
+A program can throw it with a reason to stop its practice.
+
+The host also records these stop reasons for a program:
+
+| Stop reason | Meaning |
+| --- | --- |
+| `invalid-program` | The script is not a `definePracticeScript` definition, its `meta` is not valid, or it uses an older form. |
+| `invalid-candidate` | The program returned a value that is not a valid result. |
 
 ### Limits
 
 | Limit | Value |
 | --- | --- |
-| The token limit of the practice | `meta.tokens`, default 20 000 |
-| The attempt token limit: the tokens of one review attempt, all scripts together | Default 200 000. [Cost and limits](./ai-providers.mdx#cost-and-limits) tells who sets it. |
-| The attempt search unit limit: the search units that reranking calls of one review attempt billed, all scripts together | Default 1 000. Only the proxy counts search units, so a call that it refuses is not rated, with `budget`. |
-| Model calls in flight, all scripts together | 4 |
-| Requests in flight from one script: model calls and `ctx.tools.grep` searches | 32. One more stops the script with an error. |
-| Output tokens of one chat call | 4 096 |
+| Direct model tokens: the tokens of the direct model calls of one review attempt, all practices together | Default 200 000. [Cost and limits](./ai-providers.mdx#cost-and-limits) tells who sets it. |
+| Direct search units: the search units that the direct reranking calls of one review attempt billed | Default 1 000. Only the proxy counts search units, so a call that it refuses is not rated, with `budget`. |
+| Review sessions | The calls of `ctx.review()` share the allowance of the review turn: 12 model calls and 16 000 output tokens for each practice. A new call does not start a new allowance. |
+| Time | A program can run until the measuring part of the review attempt ends. `ctx.budget.remaining().ms` gives what is left. |
+| Direct model calls in flight, all programs together | 4 |
+| Requests in flight from one program: model calls, reads and reviews | 32. One more stops the program with an error. |
+| Output tokens of one direct chat call | 4 096 |
 | Entries in one call | 64 decision questions, 64 embedding inputs, 256 reranking documents |
-| Time | The deadline of each script and of the stage, in the [workspace ABI](/contributor/agent/agent-workspace-abi#practice-script-validation-and-limits) |
+| Memory of a custom program | 256 MiB of heap |
 
-Read `ctx.remaining()` before an expensive step.
+The practices of a review run one after the other, and they share the time of the attempt.
+Thus, a slow program leaves less time for the practices after it.
+Read `ctx.budget.remaining()` before an expensive step.
 Pass `ctx.abortSignal` to long work, such as `agent`.
+A program that does not stop at its deadline is stopped 5 seconds later.
 
 #### Requests in flight
 
-A script that sends more than 32 requests at the same time stops with an error.
-The runner sends only 4 model calls at a time, so the other requests wait in the runner.
+A program that sends more than 32 requests at the same time stops with an error.
+The host sends only 4 direct model calls at a time, so the other requests wait in the host.
 Some primitives send many calls at once:
 
-- `classify` sends at most 4 packs of 30 items at the same time, so it does not stop the script.
+- `classify` sends at most 4 packs of 30 items at the same time, so it does not stop the program.
 - `embedMany` sends all its calls of 64 values at the same time.
-  Thus, more than 2 048 values in one `embedMany` stop the script.
+  Thus, more than 2 048 values in one `embedMany` stop the program.
   Set `maxParallelCalls` on `embedMany` to send fewer calls at a time.
-- `Promise.all` over model calls or `grep` sends all of them at once.
+- `Promise.all` over model calls or reads sends all of them at once.
 
 Cut a large set of items into parts.
 Send the next part only after the previous part is complete.
 
 #### Token reservations
 
-The runner reserves tokens for each model call before the call starts.
+The host reserves tokens for each direct model call before the call starts.
 A call waits for its turn among the 4 calls in flight, and then makes its reservation.
-If the token limit of the practice or the attempt token limit cannot hold the reservation, the call is not rated, with `budget`.
-When the call ends, the runner keeps only the tokens that the provider reported, and frees the rest.
-A call can report more tokens than its reservation, so the stage can end above a token limit.
+If the direct model tokens cannot hold the reservation, the call is not rated, with `budget`.
+When the call ends, the host keeps only the tokens that the provider reported, and frees the rest.
+A call can report more tokens than its reservation, so an attempt can end above the limit.
 A call that fails, is cancelled, or reports no tokens keeps its whole reservation.
 
 A reservation is one token for each four characters of the request, plus an output allowance:
@@ -907,53 +1357,23 @@ A reservation is one token for each four characters of the request, plus an outp
 | Decision | 12 tokens for each question, plus 16 |
 | Embedding or reranking | 64 tokens |
 
-Thus, with the default 20 000 tokens, a practice can hold only a few chat calls in flight at the same time.
 Set `maxOutputTokens` on a chat call to the length that its answer needs.
-Raise `meta.tokens` for a script that makes many chat calls.
-
-### What the review reads
-
-The runner turns the result into one section, which the review reads after the practice's criterion.
-The section holds these lines:
-
-- The directions.
-- The sentence of each lead kind that the section shows, once.
-- For each lead: its kind, its place, the first line of its quote, and its facts as `key=value`.
-- `(model-rated)` after the kind of a rated lead. The review never sees the score or the rated value.
-- When [`changeSince`](#the-previous-result) is known, one line that counts the leads on lines added after the last review.
-  An example is `1 of 2 leads point at lines added since the last review of this practice, each marked (new).`
-  Each such lead has `(new)` after its kind.
-- The facts about the whole work.
-- One `Not rated` line for each `unrated` entry, such as `Not rated: 3 added comments (unavailable). Read those yourself.`
-
-A section has at most 3 000 characters, so one script cannot push the leads of another practice out.
-The notices come first in this bound: the notice of a failed script and the `Not rated` lines.
-They take at most 1 500 characters.
-When more `Not rated` lines exist, one line counts the entries that the section does not show.
-
-The directions, the leads and the facts get the rest of the bound, in that order.
-When they do not fit, the section keeps the first lines.
-Then one line counts the lines that the section does not show, and how many of them are leads.
-That line points to the full result.
-Thus, return only the leads that the review needs.
-
-If the script fails or runs out of time, the section says so, and the review assesses the practice from the sources.
-If the script does not run because a `required` slot is not available, the section names the slots.
 
 ## Anti-patterns
 
 | Do not | Do this instead | Reason |
 | --- | --- | --- |
 | Ask a model what code can compute | Compute it, and use the model only for the judgment. | Code is free, gives the same answer each time, and needs no assignment. |
-| Ask a model whether the practice is met | Return places. | The review judges against the criterion. A script that judges hides its evidence. |
-| Pass model text into `directions`, `facts`, or a kind | Map the answer to a declared kind or a fact. | Model text in the review's turn can carry instructions from the work. |
-| Return no leads when a model was not available | Return the `unrated` entries that `classify` or `step` gives. | An empty list alone tells the review that nothing was found. |
-| Use `required` when code alone finds useful leads | Use `optional`. | A workspace without the model still gets the code leads. |
-| Read `Date.now()` or `Math.random()` | Use `ctx.now`. Keep the output a function of the input. | The same work must give the same leads. |
-| Send the whole repository to `agent` | Give it a narrow question and a small `maxSteps`. | Of all primitives, `agent` costs the most, and the deadline is short. |
-| Cite a file when you mean one line | Cite the line or the smallest range. | The review reads the first line of the quote. |
-| Catch an error and return an empty result | Let `step` turn it into a reason. | The review must know what it must read itself. |
-| Name a lead kind by a verdict, such as `violation` | Name it by what the place is, such as `untracked-todo`. | A lead is a place, not a claim. |
+| Return met from code that did not check every place | Claim the coverage that the program reached, or call `ctx.review()`. | Met claims the whole standard. Admission refuses met without complete coverage. |
+| Pass model text into `directions`, `facts`, or a label | Map the answer to a fixed label or a fact, or put it in `context`. | Model text in the review's turn can carry instructions from the work. |
+| Give no limitations when a model was not available | Give the `unrated` entries that `classify` or `step` gives. | An empty list alone tells the review that nothing was missed. |
+| Catch a failed read or call and return a result as if it worked | Let the error stop the practice, or tell the review in `limitations`. | A failure must never become a statement about the work. |
+| Use `required` when code alone gives useful input | Use `optional`. | A workspace without the model still gets the code's input. |
+| Read `Date.now()` or `Math.random()` | Use `ctx.now`. Keep the output a function of the input. | The same work must give the same result. |
+| Send the whole repository to `agent` | Give it a narrow question and a small `maxSteps`. | Of all primitives, `agent` costs the most, and every practice after it shares the time. |
+| Cite a file when you mean one line | Cite the line or the smallest range. | The review reads the first line of the quote, and admission checks every quote. |
+| Write a quote yourself | Use the `cite` functions. | Admission refuses a quote that the source does not hold, and withholds the whole result. |
+| Label a lead with a verdict, such as `violation` | Label it by what the place is, such as `An added TODO with no tracking reference.` | A lead is a place, not a claim. |
 | Ask for a model by name | Use `ctx.models`. | The workspace owns the assignment and its data handling. |
-| Read `work.is_merged` or `work.state` to find out if the moment came | Read `ctx.cause`. Change the practice's moments and review conditions. | The practice decides when it is reviewed. A second rule in the script goes out of date. |
-| Return no leads for a kind of work that the script does not read | Call `expectKind`. | A wrong kind is an error of the script, not a review that found nothing. |
+| Read `work.is_merged` or `work.state` to find out if the moment came | Read `ctx.cause`. Change the practice's moments and review conditions. | The practice decides when it is reviewed. A second rule in the program goes out of date. |
+| Return a result for a kind of work that the program does not read | Call `expectKind`. | A wrong kind is an error of the program, not a review that found nothing. |

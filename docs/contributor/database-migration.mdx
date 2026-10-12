@@ -105,6 +105,16 @@ if history never changes underneath an instance that already ran part of it.
    Release *N+1* drops it. A single
    release must stay bootable against the schema left behind by the previous one.
 
+Before 1.0, a maintainer can approve one exception to rule 3 for one change: a single-release contraction.
+Then one release migrates the data, moves every reader and writer, and drops the old objects.
+Rules 1 and 2 still apply, so the contraction appends new changesets and edits no released changeset.
+The release cannot run against the schema of the previous release, and the previous release cannot run against the new schema.
+Thus, the operator stops every runtime role and active attempt, makes a verified backup, and upgrades all components together.
+Rollback after the contraction is a restore of that backup with the previous release, never an old binary on the new schema.
+
+The release ships a `.migration` fragment that gives these steps to the operator.
+[Practice result transition before 1.0](#practice-result-transition-before-10) is the approved instance.
+
 CI enforces 1 and 2 mechanically (see below). 3 is a review responsibility. The sole archival
 transition is the verified v0.77.4 baseline: archived files remain byte-identical and test-only.
 The baseline and subsequent migrations follow the same immutability policy. Existing installations
@@ -197,9 +207,9 @@ outcomes for archival integrity and refuses inconsistent historical rows rather 
 certainty or severity. It does not reassess old evidence against the complete practice standard.
 
 Historical revision fingerprints remain unchanged. Earlier fingerprint schemes and missing fingerprints are `UNVERIFIABLE` under the current standard.
-These observations remain available in authorized history, but do not count as current evidence. A review-run summary counts their met or
+These results remain available in authorized history, but do not count as current evidence. A review-run summary counts their met or
 not-met verdict as undecided. A new review receives a new immutable revision under the current
-fingerprint scheme. Old observations retain their original revision.
+fingerprint scheme. Old results retain their original revision.
 
 The migration keeps criteria as written before cutover, including instructions for the presence and assessment matrix.
 This applies to installed bundled workspace copies, instance overrides of bundled practices, and custom definitions.
@@ -214,3 +224,30 @@ and the flat practice definition. Restore the verified backup to undo the destru
 
 Preserve schema versions on exported evaluation data. Frozen historical reports must not be silently
 reinterpreted as assessments of the current standard.
+
+## Practice result transition before 1.0
+
+The maintainer approved this change as a single-release contraction under the pre-1.0 exception to rule 3.
+The branch changelog appends the change sets, and no released changeset changes.
+The [product vocabulary](./practice-feedback-language.md) owns the meaning of a result and an observation.
+
+The migration does these steps in one release:
+
+1. It renames `observation` to `practice_result`, `observation_invalidation` to `practice_result_invalidation`, and `feedback_observation` to `feedback_evidence`.
+   Every row keeps its ID, so an old observation ID is now a result ID.
+2. It adds `scope_key`, `example`, `coverage` and `provenance` to `practice_result`.
+   It fills `scope_key` from the recorded job attribution.
+   It leaves `example`, `coverage` and `provenance` empty on old rows, because nothing recorded them.
+3. It turns a legacy open-question object into a list of one open question.
+4. It creates `practice_observation` and writes one observation for each legacy `NOT_MET` result, with a new ID.
+   That observation copies the result's severity, summary, rationale, citations and recurrence key.
+   Its claim basis stays empty, because no proof was recorded.
+5. It gives `feedback_evidence` its own ID, the workspace and an optional observation.
+   Migrated rows name only their result.
+
+Deferred constraint triggers make a `NOT_MET` result have at least one observation, and every other outcome have none.
+They also keep a result at least as severe as its worst observation.
+A database test proves that root IDs stay, that observation IDs are new, and that delivered feedback is not sent again.
+
+The release also renames the result API routes and fields, so the webapp, the browser extension, and custom API clients must upgrade with it.
+The entry "Practice scripts are the review program" in [`MIGRATION.md`](https://github.com/hephaestus-build/Hephaestus/blob/main/MIGRATION.md) gives the operator steps.

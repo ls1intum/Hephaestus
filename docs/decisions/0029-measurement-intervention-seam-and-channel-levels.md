@@ -1,6 +1,6 @@
 # ADR 0029: Separate measurement from intervention and derive level from channel
 
-**Status:** Accepted (amended 2026-09-17 — `basedOn` names this run's observations only)
+**Status:** Accepted (amended 2026-09-17 — `basedOn` names this run's observations only; 2026-10-12 — one admission for every program, see [ADR 0055](0055-practice-scripts-call-models-through-the-runner.md))
 **Date:** 2026-08-16
 **Authors:** Felix T.J. Dietrich
 **Builds on:** [ADR 0021](0021-observations-feedback-synthesis-seam.md), [ADR 0022](0022-observation-presence-assessment-and-schema-cleanup.md), [ADR 0007](0007-sandbox-spi-shape.md)
@@ -176,3 +176,12 @@ The result read as a template, and the server wrote sentences that no model wrot
 
 Everything else in this ADR stands. The contract lives in `agent/review-composer.md`, `pi-runner-composition.ts`,
 `ComposedReview` and `ComposedReviewAdmission`.
+
+## Update — 2026-10-12 (#2656): one admission for every program
+
+Supersedes the measurement tool `report_observation` and the meaning of *observation* in the sections above.
+Each practice runs one program that returns one candidate result. A review session submits its candidate
+with `submit_result`. The host submits the final candidates of the attempt to one admission endpoint, and
+composition reads only the admitted results and their observations. `basedOn` names results and, where a
+claim is located, one of their observations. The seam between measurement and intervention stands.
+[ADR 0055](0055-practice-scripts-call-models-through-the-runner.md) owns the decision.

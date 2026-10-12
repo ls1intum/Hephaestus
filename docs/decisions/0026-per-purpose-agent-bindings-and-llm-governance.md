@@ -181,8 +181,9 @@ gate never kills a call already streaming; it acts only pre-forward.
   can together reach N times the cap before any of them stops. For jobs N is the workspace's
   sum of the per-location `maxConcurrentJobs` limits — operator-set numbers, not an open end; for mentor
   turns it is the number of developers chatting at once.
-- **Calls in flight together.** The term counts only calls that have returned. The practice script runner
-  sends up to 4 calls at a time, so a practice script stage can overshoot by those calls, not by one.
+- **Calls in flight together.** The term counts only calls that have returned. The practice program host
+  sends up to 4 direct model calls at a time, so the direct calls of an attempt can overshoot by those calls,
+  not by one.
 - **Calls the provider reports no usage for.** A streamed call whose provider rejects
   `stream_options.include_usage` (retried without it, counted as
   `llm.proxy.stream.usage.unsupported`), or any served response with no usage block (counted as

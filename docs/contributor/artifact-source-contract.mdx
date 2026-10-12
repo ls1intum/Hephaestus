@@ -12,7 +12,7 @@ Contract `1.3.0` defines the logical source catalog, its capture states, and how
 A folder index records what was supplied to one run.
 It does not prove that a practice is empirically observable.
 
-> If any required evidence clause is unsatisfied, refuse the review and create no observation.
+> If any required evidence clause is unsatisfied, refuse the review and create no result.
 > A source failure is never `NOT_APPLICABLE`, a strength, or evidence that desired behavior is absent.
 
 ## One frozen job folder
@@ -100,13 +100,13 @@ It does not authorize collection, disclosure, or model egress.
 
 | Class                | Scope                                                                            | Minimum treatment                                                  |
 | -------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| `INTERNAL`           | Non-public project or workspace content without person-level review observations | Workspace authorization and purpose-bound retention                |
+| `INTERNAL`           | Non-public project or workspace content without person-level review results      | Workspace authorization and purpose-bound retention                |
 | `PERSONAL`           | User-linked project content, authorship, reviews, comments, or activity          | Personal-data access, export, and erasure coverage                 |
-| `SENSITIVE_PERSONAL` | Private conversations or derived person-level review observations                | Restricted audience and stricter disclosure and retention controls |
+| `SENSITIVE_PERSONAL` | Private conversations or derived person-level review results                      | Restricted audience and stricter disclosure and retention controls |
 
 Each catalog source references separate source-use decisions whose purposes are machine-enforced.
 Capture requires `AUTOMATED_PRACTICE_REVIEW`.
-Observation persistence, delivery, and contributor evidence APIs require `PRACTICE_FEEDBACK_DELIVERY`.
+Result persistence, delivery, and contributor evidence APIs require `PRACTICE_FEEDBACK_DELIVERY`.
 Mentor reuse requires `CONVERSATIONAL_MENTORING`.
 
 And workspace-admin evidence review requires `OPERATOR_EVIDENCE_REVIEW`.
@@ -141,7 +141,7 @@ The constraints with direct authoring consequences are:
   Every other source may be validly empty.
 - Two cannot be partial: the pull-request diff and the document core record. An available diff is
   also pinned. Its `requiredQuality` is `COMPLETE`: a verified empty range is available evidence.
-  Each practice still needs its own occasion and supported observation. Capture readiness assigns neither
+  Each practice still needs its own occasion and supported result. Capture readiness assigns neither
   applicability nor an outcome. Missing, failed or incomplete required captures remain unready.
 
 `ENGINEERING_BASELINE` with `ENGINEERING_APPROVED` records maintainer approval of the shipped, minimized product scope.
@@ -353,7 +353,7 @@ The [glossary](./practice-review-glossary.mdx#machine-names) maps each pair to t
 A skipped practice is omitted from that review request.
 Source readiness checks contain only source-quality reasons — `SOURCE_NOT_AVAILABLE`, `SOURCE_INCOMPLETE`, `SOURCE_EMPTY` — so review-mode limitations are never misreported as defective sources.
 
-Missing evidence never becomes a fabricated `NOT_APPLICABLE` observation.
+Missing evidence never becomes a fabricated `NOT_APPLICABLE` result.
 
 Human review is outside this contract.
 A self-review, peer-review, or human-mentor channel carries its own review target, reviewer relationship, rubric, and evidence provenance.
@@ -395,7 +395,7 @@ Neither is an evidence concern — they decide whether evidence is collected at 
 
 `scope-one-reviewable-change` is bound to `scm.pull_request.opened` and `scm.pull_request.ready`, and requires `scm.pull-request.core` and `scm.pull-request.diff` and reads `scm.repository.tree` contextually.
 The diff's contract demands a complete capture, including a verified empty range.
-If the diff cannot be read, or the pinned commit is gone from the mirror, readiness refuses the practice and no observation is created.
+If the diff cannot be read, or the pinned commit is gone from the mirror, readiness refuses the practice and no result is created.
 The runtime makes no claim that the change is focused, sprawling, or `NOT_APPLICABLE`.
 
 No stance can demand a currentness the pull-request record cannot show.
@@ -428,7 +428,7 @@ The model can technically read that union.
 This runtime uses an attribution boundary rather than process isolation.
 The practice index lists each practice's admissible logical source kinds.
 
-Every model-authored observation must cite an exact quote and artifact path.
+Every citation of a model-authored result, observation, example, or open question must name an exact quote and artifact path.
 The sandbox and server independently verify these facts:
 
 - The source is declared and available.
@@ -447,14 +447,14 @@ It can also name a `revision`: a full commit id from the captured history.
 Omitted, it means the reviewed commit.
 A change citation names `scm.pull-request.diff`, the pinned `context/change.json` as its `artifactPath`, the `OLD` or `NEW` side, and the same path, quote and lines.
 
-Its revision is the side's commit of the pinned range, and a path the change does not touch withholds the observation.
+Its revision is the side's commit of the pinned range, and a path the change does not touch withholds the result of that practice.
 The server never stages a diff.
 The container derives `work/change/diff.patch` from the checkout with `git`.
 Its line annotations are the coordinates a change citation names.
 
 The server answers every code citation by opening the snapshot with JGit.
 It pins the snapshot by the `repos/reviewed/.git/HEAD` and captured-refs digests.
-An uncaptured object, a nonexistent path at that revision, or a quote mismatch withholds the observation.
+An uncaptured object, a nonexistent path at that revision, or a quote mismatch withholds the result of that practice.
 The server records `QUOTE_LOCATION_MISMATCH` against the citation.
 Shell output is not an artifact.
 A quote is verified against the Git object, never against what a command printed.
@@ -480,13 +480,13 @@ Currentness is derived:
 - changing a practice's review configuration or automated-review policy stales that practice's claims.
 - adding a source cannot silently alter existing requirements because each practice names its sources explicitly.
 - governance withdrawal disables its exact future use without rewriting historical semantics.
-  This includes collection, observation persistence and delivery, mentoring reuse, or evidence disclosure.
+  This includes collection, result persistence and delivery, mentoring reuse, or evidence disclosure.
 - erasure or expiry may make a claim unreplayable without making the historical result false.
 
 Semantic currentness, automated-review-validation status, governance eligibility, and replayability remain separate.
-Observation and review APIs expose `claimCurrentness` as `CURRENT`, `STALE`, or `UNVERIFIABLE`.
+Result and review APIs expose `claimCurrentness` as `CURRENT`, `STALE`, or `UNVERIFIABLE`.
 They compare the evaluated practice revision's review-rule fingerprint with the current revision's fingerprint.
-Once the observation carries a superseded marker, they expose `STALE`. `IssueObservationSuperseder` sets that marker on an issue's observations in the transaction that records a change to its reviewable content.
+Once the result carries a superseded marker, they expose `STALE`. `IssueResultSuperseder` sets that marker on an issue's results in the transaction that records a change to its reviewable content.
 This occurs before and independently of any new review.
 
 Presentation-only edits retain semantic currentness.

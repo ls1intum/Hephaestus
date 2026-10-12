@@ -70,7 +70,7 @@ It is an engineering gate and contains only releasable decision summaries. Each 
 
 ### Full job-folder scope
 
-On 2026-10-01, the maintainer explicitly approved the engineering scope in [#1732](https://github.com/hephaestus-build/Hephaestus/issues/1732). It covers every permitted workspace area and repository, including Slack threads and person-scoped observation and feedback history. It has no record-count or history-window caps.
+On 2026-10-01, the maintainer explicitly approved the engineering scope in [#1732](https://github.com/hephaestus-build/Hephaestus/issues/1732). It covers every permitted workspace area and repository, including Slack threads and person-scoped practice result and feedback history. It has no record-count or history-window caps.
 
 Version 1.3.0 records this approval for automated practice review. It does **not** record controller or DPO
 approval. The existing visibility, consent, withdrawal, tenancy, processor, retention and erasure checks still apply. The engineering implementation ships in [#2335](https://github.com/hephaestus-build/Hephaestus/pull/2335). The full DPIA is indicated for this combined scope. A versioned engineering decision is not authority to activate it for TUM.
@@ -183,7 +183,7 @@ Deletion must traverse every content-bearing copy and derived record. A deleted 
 - Job directory.
 - Repository snapshot.
 - Practice script output.
-- Observation.
+- Practice result and its observations.
 - Feedback record.
 - Export.
 - Backup.

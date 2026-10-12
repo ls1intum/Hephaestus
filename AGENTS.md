@@ -12,7 +12,7 @@ It delivers practice feedback on the work itself, on the developer's own practic
 
 ## What we will not compromise on
 
-1. **Feedback earns trust or it is not sent.** A review passes through occasion, evidence capture, observation, and delivery.
+1. **Feedback earns trust or it is not sent.** A review passes through occasion, evidence capture, result, and delivery.
    Each stage can stop with its own recorded reason.
    Never turn a capture failure into a claim about someone's work.
    Never report withheld feedback as missing evidence.
@@ -72,18 +72,23 @@ Use these words on every task:
 - **practice** — a defined way of working used to review work.
   A **practice group** collects related practices.
   Never use *rule*, *detector*, or *category* for these concepts.
-- **practice review** — one evidence-bounded operation: Hephaestus checks practices against one
-  piece of reviewed work and may record observations.
-- **observation** — one recorded result of reviewing one practice against one piece of reviewed
-  work. Never *finding*, *detection*.
-- **practice feedback**, shortened to **feedback** — guidance written from observations and addressed to a developer.
+- **practice review** — one evidence-bounded operation.
+  Hephaestus checks practices against one piece of reviewed work and may record a result for each.
+- **result** — the verdict of one practice about one piece of reviewed work.
+  Its outcome is met, not met, does not apply, or could not determine.
+- **observation** — one problem that a not met result records at a place in the work.
+  Never *finding*, *detection*.
+- **practice script** — the review program of one practice. It returns one result, which the server
+  admits or withholds. A practice without one runs the built-in program.
+- **practice feedback**, shortened to **feedback** — guidance written from results and their observations.
+  It is addressed to a developer.
   It is uncountable.
   Write *3 pieces of feedback*, never *messages*.
 - **channel** — where one piece of feedback is meant to appear.
 - **delivery** — whether it was prepared, delivered, withheld, failed, or replaced.
 - **reviewed work** — a pull request, merge request, issue, conversation or document under review.
   Say *pull request* or *merge request* when the provider is known.
-- **developer** — the person an observation is about.
+- **developer** — the person a result is about.
 - **Heph** — the conversational assistant.
   Its product area is **mentor**.
   Neither Heph, the application, nor a review is an *agent*.
@@ -152,7 +157,7 @@ The SPA talks to the server only through the generated client.
   It runs through the Vite+ version pinned in `devDependencies`.
   `tsconfig.agents.json` type-checks these sources as one project:
   - The agent runner (`server/application/src/main/resources/agent/`).
-  - The practice script runner and lib (`docker/agents/practice-scripts/`).
+  - The practice script toolkit: the program host library, the child and the author tools (`docker/agents/practice-scripts/`).
   - The bundled practice scripts (`server/application/src/main/resources/practices/scripts/`).
 
 Skills live in `.claude/skills/<name>/`.
@@ -255,7 +260,7 @@ Oxlint lints.
 Oxfmt formats, sorts imports, and sorts Tailwind classes.
 One rule set has multiple layers.
 The root `.oxlintrc.json` is the base for every TypeScript file and the config for the Node trees.
-These trees are the agent runner, the practice script runner, `scripts/**`, `load-tests/**`, and the task graph.
+These trees are the agent runner, the practice script toolkit, `scripts/**`, `load-tests/**`, and the task graph.
 `oxlint.react.jsonc` is the React layer.
 
 `oxlint.app.jsonc` adds the application compiler, Vitest, and Storybook policy for `webapp/.oxlintrc.json` and `extension/.oxlintrc.json`.
@@ -357,7 +362,7 @@ Every *Done when* bullet is a change that ships, never a measurement or a verdic
   Use `satisfies`.
 - Validate anything crossing a trust boundary: a webhook body, a hand-parsed stream, or a `JSON.parse`.
   Use a discriminated union, or a `zod` schema in a tree that has zod.
-  Only the SPA, the extension and the practice script runner (`docker/agents/practice-scripts/`) have zod.
+  Only the SPA, the extension and the practice script toolkit (`docker/agents/practice-scripts/`) have zod.
   Never log a token, a secret, or a raw request body.
 - A leading `_` marks what the language or a tool reads that way.
   Examples are an unused binding, a server field name, or a runtime global, never something private.

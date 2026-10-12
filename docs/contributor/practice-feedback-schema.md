@@ -1,6 +1,6 @@
 ---
 title: Practice feedback schema
-description: The persisted shape of an observation and the feedback composed from it.
+description: The persisted shape of a practice result, its observations, and the feedback composed from them.
 ---
 
 # Practice review data model
@@ -28,12 +28,14 @@ Use the executable sources for exact details:
 | --------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
 | `PracticeGroup`        | Workspace-defined grouping for practices                                   | Has many practices. A practice may be unassigned                                |
 | `Practice`            | Configurable criterion a review checks                                     | Belongs to a workspace and may belong to a group                                |
-| `PracticeRevision`    | Criteria snapshot used to interpret a past result                          | Belongs to one practice. An observation may pin one revision                    |
-| `Observation`         | Evidence produced by one review job                                        | Belongs to one practice and one job. May support many pieces of feedback        |
-| `Feedback`            | One recipient-specific piece of feedback and its delivery outcome          | Belongs to one job. May draw on many observations and have many placements      |
+| `PracticeRevision`    | Criteria snapshot used to interpret a past result                          | Belongs to one practice. A result may pin one revision                          |
+| `PracticeResult`      | One practice's verdict on one piece of work, produced by one review job    | Belongs to one practice and one job. May support many pieces of feedback        |
+| `Observation`         | One problem of a `NOT_MET` result at a place in the work                   | Belongs to one result. A `NOT_MET` result has one or more                       |
+| `PracticeResultInvalidation` | Correction that marks one result incorrect, or restores it          | Belongs to one result. At most one is in force per result                       |
+| `Feedback`            | One recipient-specific piece of feedback and its delivery outcome          | Belongs to one job. May draw on many results and have many placements           |
 | `FeedbackApproval`    | Immutable decision to approve or reject one exact feedback proposal        | Stores the feedback ID, workspace, actor, decision context, content digest, and time |
 | `FeedbackDispatch`    | Crash-safe provider delivery of one exact review package                   | Owns one job or approved feedback proposal. Records provider placements before ledger projection |
-| `FeedbackObservation` | Ordered evidence binding between one piece of feedback and one observation | Joins feedback to observations with a primary or supporting role                |
+| `FeedbackEvidence`    | Evidence binding between one piece of feedback and one result, and optionally one of its observations | Joins feedback to results with a primary or supporting role |
 | `FeedbackPlacement`   | Where a piece of feedback was placed                                       | Belongs to one `Feedback`. Records a summary, inline, or conversation placement |
 | `Reaction`            | Immutable feedback-response snapshot                                       | Belongs to one `Feedback`. Stores usefulness, resolution, or both               |
 
@@ -41,13 +43,13 @@ Use the executable sources for exact details:
 
 ### Evidence and feedback are separate
 
-An observation records what a review observed.
-Feedback records the guidance prepared from one or more observations and what happened to it.
+A result records what a review decided about one practice, and its observations record the problems it found.
+Feedback records the guidance prepared from one or more results and what happened to it.
 A placement records where that feedback appeared.
-This separation preserves observations even when no feedback is composed or delivery is withheld.
+This separation preserves results even when no feedback is composed or delivery is withheld.
 
-Observation rows are immutable.
-Practice criteria are mutable, so each observation can reference the criteria revision that applied to its review.
+Result and observation rows are immutable.
+Practice criteria are mutable, so each result can reference the criteria revision that applied to its review.
 Feedback content, provenance, and replacement link are immutable.
 A re-review creates a new provider comment and a new feedback unit linked to the last delivered unit.
 
@@ -56,9 +58,11 @@ Guarded lifecycle updates may change delivery state, delivery timestamp, or supp
 
 ### Occurrence and recurrence have different identities
 
-`occurrenceKey` prevents duplicate persistence of the same result within a job retry. `recurrenceKey` groups the same evidence location across review jobs, including observations about different behaviors.
-A new review creates a new observation.
-Location grouping proves neither recurrence nor resolution. Responses and exact-observation delivery decisions use the observations bound to the feedback.
+`occurrenceKey` prevents duplicate persistence of the same result within a job retry.
+The `recurrenceKey` of an observation groups the same evidence location across review jobs, including observations about different behaviors.
+A new review creates a new result.
+Location grouping proves neither recurrence nor resolution.
+Responses and exact delivery decisions use the results and observations bound to the feedback.
 
 ### Historical measurement is not current conformance
 
@@ -67,30 +71,40 @@ Historical revision fingerprints are preserved.
 A missing or incompatible fingerprint makes a claim `UNVERIFIABLE`.
 It cannot support current standings or new delivery.
 
-New reviews append a current-scheme snapshot without rewriting the revision of a past observation.
+New reviews append a current-scheme snapshot without rewriting the revision of a past result.
 
 ### One contract across boundaries
 
-An observation carries one required `outcome`: `MET`, `NOT_MET`, `NOT_APPLICABLE`, or `UNDETERMINED`.
-The [product vocabulary](./practice-feedback-language.md#observation-outcomes) owns their meaning.
+A result carries one required `outcome`: `MET`, `NOT_MET`, `NOT_APPLICABLE`, or `UNDETERMINED`.
+The [product vocabulary](./practice-feedback-language.md#result-outcomes) owns their meaning.
 The runtime, persistence, and HTTP projections use the same values.
-Severity is required exactly for `NOT_MET`.
+Severity is required exactly for `NOT_MET`, and it is absent otherwise.
 
-It is absent otherwise.
+Deferred constraint triggers on both tables hold two rules at commit.
+A `NOT_MET` result has at least one observation, and no other outcome has any.
+A result is never less severe than its worst observation.
+The `ck_practice_result_example` check allows an `example` only on `MET` and `NOT_MET`.
 Admission rejects contradictory submissions rather than deleting fields or manufacturing a judgment.
-Delivery policy remains independent of the observation outcome.
+Delivery policy remains independent of the result outcome.
+
+A result migrated from before the practice program contract kept its id.
+Each migrated `NOT_MET` result got one observation at position 0, with no claim basis.
+No migrated result got an example.
 
 ### Evidence warrants
 
 Every observation cites exact staged text.
+A `MET`, `NOT_APPLICABLE`, or `UNDETERMINED` result also cites it.
+A `NOT_MET` result can rely on the citations of its observations.
 Additional warrants express the basis for the claim:
 
 | Claim | Evidence branch | Meaning |
 | --- | --- | --- |
 | An absence-based decided claim | `evidence.search` | Sources searched, target, and bounded scope |
 | `NOT_APPLICABLE` | `evidence.inapplicability` | Sources read, prerequisite, and fact excluding it |
-| `UNDETERMINED` | `evidence.undecidability` | Open question and evidence that would settle it |
+| `UNDETERMINED`, and optionally `NOT_MET` | `evidence.undecidability` | One or more open questions, what would settle each, and an optional citation |
 | Directly evidenced conformance or shortfall | Citations | The actual work supporting the claim |
+| Why a problem belongs to this work | `basis` on an observation | Introduced, worsened, or a duty that the criteria state |
 
 A missing, errored, redacted, or inadequate required source is a readiness failure, not an outcome.
 Every source declared exhaustive must appear in `search.consulted`.
@@ -103,12 +117,12 @@ Empirical evaluation must test those properties separately.
 
 ### Ordering uses observable properties
 
-Observations have no model-reported confidence score. `ObservationOrder` sorts by severity where it applies, then by the number of distinct cited loci, then by stable identity.
+Results have no model-reported confidence score. `ResultOrder` sorts by severity where it applies, then by the number of distinct cited loci, then by stable identity.
 This makes ordering deterministic and derives every input from admitted evidence instead of model self-assessment.
 
 ### Recipient and subject remain distinct
 
-An observation's `aboutUserId` identifies the developer the evidence concerns.
+A result's `aboutUserId` identifies the developer the evidence concerns.
 Feedback separately stores the subject and the recipient.
 They may be equal, but they are not the same concept and must not be inferred from each other.
 
@@ -132,7 +146,7 @@ A crash between provider acknowledgement and ledger recording resumes projection
 
 ### One feedback response has two independent dimensions
 
-The recipient responds to the delivered `Feedback` unit, not to a private observation.
+The recipient responds to the delivered `Feedback` unit, not to a private result.
 One response may record perceived usefulness (`HELPFUL` or `UNHELPFUL`), a resolution (`ADDRESSED`, `DISPUTED`, or `NOT_APPLICABLE`), or both. `DISPUTED` requires a comment because it rejects the feedback's judgment. Usefulness alone does not change standing, trend, or re-nag suppression.
 
 PUT replaces the complete response.
@@ -148,11 +162,11 @@ Read projections expose only the current response, so a change of mind never cou
 The persistence model is not an authorization boundary.
 Controllers define who may see each projection:
 
-- developer observation list, detail, and summary endpoints, and practice standings are scoped to the authenticated
+- developer result list, detail, and summary endpoints, and practice standings are scoped to the authenticated
   developer.
-- the pull-request observation projection shows workspace members every relevant observation for that pull
+- the pull-request result projection shows workspace members every relevant result for that pull
   request.
-- the workspace-admin practice-review endpoints expose observations and feedback across that workspace.
+- the workspace-admin practice-review endpoints expose results, observations, and feedback across that workspace.
 - developer-facing practice projections omit practice criteria by construction.
 
 Workspace-admin response projections use the recipient's latest response snapshot.

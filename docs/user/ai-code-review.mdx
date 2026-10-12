@@ -9,7 +9,7 @@ Feedback can concern the scope of a change, its explanation, or your response to
 
 When practice reviews are on, Hephaestus uses AI to check eligible work against your workspace’s practices.
 Eligible work includes pull requests, merge requests, and issues.
-Hephaestus first records observations.
+Hephaestus first records a result for each practice it checks.
 Then it decides whether feedback would help and where it belongs.
 
 The feedback is guidance. It does not approve a change for merge, grade the developer, or replace human review.
@@ -24,45 +24,45 @@ Feedback about reviewing stays on the reviewer's own Practice profile or in thei
 - **In Heph:** private feedback prepared for a later conversation. Heph decides when it is relevant
   and shows it as a separate part of its reply. It counts as delivered only when Heph shows it.
 
-Not every observation becomes feedback.
+Not every result becomes feedback.
 Hephaestus can withhold a point that is repeated, unchanged, ungrounded, or already addressed.
 
-If an issue changes after a review, its earlier observations stay in the review history with a historical mark. They no longer count as current practice feedback or Heph context. A later review that cannot finish does not turn the earlier result into a new claim.
+If an issue changes after a review, its earlier results stay in the review history with a historical mark. They no longer count as current practice feedback or Heph context. A later review that cannot finish does not turn the earlier result into a new claim.
 Hephaestus does not silently remove a comment it already posted on the issue.
 
-A workspace admin can mark an observation as incorrect if it was wrong when Hephaestus made it.
-The observation stays in your review history with the admin’s reason.
+A workspace admin can mark a result as incorrect if it was wrong when Hephaestus made it.
+The result stays in your review history with the admin’s reason.
 It no longer counts toward your standing, your Practice profile, or what Heph knows about your work.
 Hephaestus does not send feedback about it that has not reached you yet.
 It tries to add a correction notice to its existing summary comment on your pull request or merge request.
 An inline comment stays as it is.
 
-If the admin restores the observation, it counts again and Hephaestus removes any notice.
+If the admin restores the result, it counts again and Hephaestus removes any notice.
 
 ## Answer or dispute feedback
 
 Reactions and replies on GitHub or GitLab do not record your response in Hephaestus. Every comment ends with **Answer or dispute it in Hephaestus**.
 The link opens your own reviews of that pull request, merge request, or issue.
-There you can mark each observation behind the comment as **Addressed**, **Not applicable**, or **Disputed**.
+There you can mark each result behind the comment as **Addressed**, **Not applicable**, or **Disputed**.
 Other people who follow the link see only their own reviews, and nothing about you.
 
 1. Select **Answer or dispute it in Hephaestus** on the comment.
-2. Open the observation you want to answer.
+2. Open the result you want to answer.
 3. Select **Addressed**, **Not applicable**, or **Disputed**.
 4. If you dispute it, explain what is wrong under **Why do you dispute this?**.
 
 For example, name the description section that contains the information the review said was missing.
-Workspace admins read your explanation on the observation.
+Workspace admins read your explanation on the result.
 
 While the dispute stands, later reviews withhold feedback about the same claim on the same work.
 **Not applicable** also withholds feedback about that claim.
 If you withdraw the dispute, a review can raise that point again.
-A dispute does not change the observation or your standing by itself.
+A dispute does not change the result or your standing by itself.
 
 Admins can then act on it:
 
-- **Mark the observation incorrect** when it was wrong. It stops counting, as described above.
-- **Withdraw the feedback** on your Practice profile when correct observations led to incorrect feedback. See [Practice profile](./practice-profile.mdx).
+- **Mark the result incorrect** when it was wrong. It stops counting, as described above.
+- **Withdraw the feedback** on your Practice profile when correct results led to incorrect feedback. See [Practice profile](./practice-profile.mdx).
 
 Neither action takes back words already sent.
 A summary comment gets a correction notice where the provider permits edits.
@@ -78,7 +78,7 @@ For brevity, **change request** means either kind of work here.
 An eligible event, such as new work or a manual request, can start a review.
 Each practice decides which events it reviews.
 Hephaestus reads the change, its description, commits, and relevant discussion.
-It checks the work against workspace practices and records observations when the evidence supports an assessment.
+It checks the work against workspace practices and records a result for each practice when the evidence supports an assessment.
 It then decides whether feedback would help.
 
 Useful feedback can become a summary or inline comment.
@@ -198,11 +198,16 @@ A practice’s review state and its feedback delivery are separate:
 | **Expired**                 | The occasion became too old before a review reached it.                    |
 | **Failed**                  | A review started but could not finish.                                     |
 
-An observation can be **Met**, **Not met**, **Not applicable**, or **Undetermined**.
+A result can be **Met**, **Not met**, **Does not apply**, or **Could not determine**.
 **Met** and **Not met** say whether the captured evidence shows that the work meets the practice or falls materially short of it.
-**Not applicable** needs evidence that the practice does not apply.
-**Undetermined** means the review read enough evidence but could not settle a question.
-Missing or failed required evidence stops the assessment before the review creates an observation.
+A **Not met** result lists the problems the review found, such as **Not met · 3 problems**.
+Each problem points to a place in your work and has its own urgency.
+A **Met** or **Not met** result can also point to one place in your work that shows the practice done well.
+
+**Does not apply** needs evidence that the practice does not apply.
+**Could not determine** means the review read enough evidence but could not settle a question.
+The result names that open question and what would settle it.
+Missing or failed required evidence stops the review of that practice before it records a result.
 This failure is never a claim about your work.
 
 Catch-up reviews of past work never produce comments.
@@ -252,7 +257,10 @@ The exact practices depend on your workspace. Common areas include:
 - maintainable code
 - security and reliability practices
 
-The app shows urgency as **Critical**, **Major**, **Minor**, or **Informational**.
+The app shows urgency as **Critical**, **Major**, **Minor**, or **Trivial**.
+Each one is a real gap in the work.
+**Trivial** is a small gap. Fix it when it’s cheap.
+
 Only comments on the work use urgency emoji.
 Urgency orders the feedback.
 It is not a grade or a merge decision.
@@ -277,8 +285,8 @@ The workspace needs a Slack connection, you must have connected your Slack accou
 The message contains a count, not the feedback text.
 
 This setting controls delivery only. Reviews can still run.
-Their observations stay stored and may be visible to workspace admins.
-This setting does not delete earlier comments or observations.
+Their results stay stored and may be visible to workspace admins.
+This setting does not delete earlier comments or results.
 
 1. To allow new comments and reminders again, turn on **Comments and Slack reminders**.
 

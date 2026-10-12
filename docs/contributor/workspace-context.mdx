@@ -176,14 +176,14 @@ on the dedicated public activity endpoint or instance-admin elevation.
 The effective role is the strongest role across the account's linked workspace members.
 `WorkspaceActorSelector` selects a representative from actors that currently hold membership.
 It prefers the actor on the provider type and server URL configured for the workspace's active SCM connection.
-Reviewed work, observations, and feedback name the account's actor on that instance.
+Reviewed work, results, and feedback name the account's actor on that instance.
 An actor on another provider or instance can still hold membership, such as the workspace's creator.
 
 Without an active SCM connection or a member actor on its instance, selection uses the first-linked member actor in identity-link id order.
 Until sync records actors against the configured instance ([#2181](https://github.com/hephaestus-build/Hephaestus/issues/2181)), a workspace connected to a non-default instance uses link order.
 GitHub Enterprise sync still records github.com.
 This selects one actor, not an aggregate.
-Reads show only that actor's observations.
+Reads show only that actor's results.
 HTTP requests and provider attribution use the same selection.
 
 Role changes and new links do not replace an eligible representative on the connected instance.

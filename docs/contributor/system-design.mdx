@@ -80,7 +80,7 @@ records native auth. [Instance administration](./instance-admin) owns recent-sig
 
 The webhook role verifies and durably buffers provider events. Server consumers sync the work and
 record occurrences. Eligible occasions become PostgreSQL-backed jobs.
-Workers claim these jobs and execute them in isolated sandboxes. The worker admits observations through the shared Java admission service
+Workers claim these jobs and execute them in isolated sandboxes. The worker admits the results of a review through the shared Java admission service
 before composition and feedback delivery.
 
 Feedback on the work awaits workspace-admin approval by default. Delivery rechecks policy and

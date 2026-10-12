@@ -61,7 +61,7 @@ Instance metadata endpoints under `/admin`, all gated by `hasAuthority('app_admi
 
 [Instance admin](/admin/instance-admin#silent-mode) owns operator behavior and recovery.
 `GET /admin/settings` returns an ETag. `PATCH /admin/settings/silent-mode` requires `If-Match`
-when releasing the brake. Provider gateways enforce it independently from observation persistence.
+when releasing the brake. Provider gateways enforce it independently from result persistence.
 
 ## Recent sign-in gate
 
@@ -161,7 +161,7 @@ This is a view of existing content, not a user login. It does not enter onboardi
 settings or create an account, so it cannot reproduce the member's first-login experience.
 
 A successful `USER_VIEW` row records authorization to attempt a read, not proof that the handler returned content.
-A missing observation or conversation can still produce a 404 after the row commits.
+A missing result or conversation can still produce a 404 after the row commits.
 The row carries these fields:
 
 - `acting_account_id` = the instance administrator.

@@ -74,7 +74,7 @@ Thus, the boundary protects data and actions, not the extension's presence:
   It reads the tab with `tabs.get` and rereads it after every await.
   Another list, filter, or page makes the result stale.
   A row reaches only the line and reader's own comments (`get-context`, `get-work-feedback`).
-  Observations, admin records, and review changes belong to the work page.
+  Results, admin records, and review changes belong to the work page.
 - **The page can still observe the extension.** It can see that the report exists and its frame's
   size. The page and the frame exchange only readiness, height and theme messages. Nothing here hides
   that the user runs the extension or when they open the report.
@@ -161,9 +161,9 @@ The flow is in `docs/auth-architecture.md`.
   The worker counts one comment per handle and keeps handles private.
   It links only permalinks anchored on the work's own pages.
   The report shows this first.
-- Other reads reuse existing endpoints for the reader's own reviewed-work runs and observations.
+- Other reads reuse existing endpoints for the reader's own reviewed-work runs and results.
   They request a trace by the latest own review id through `getOwnArtifactTrace`.
-  Observations use exact `artifactKind` and `artifactId` filters when the report opens.
+  Results use exact `artifactKind` and `artifactId` filters when the report opens.
   The worker checks that each returned record concerns the resolved work, and refuses a list that does not.
   Admins use the same own-reader projection.
   A missing own run or refused trace is unavailable, not evidence that nobody reviewed the work.
@@ -331,14 +331,15 @@ and [Primer's progressive disclosure](https://primer.style/product/ui-patterns/p
 one attributed summary line — "Only level 1 can be expanded and collapsed".
 It opens into flat second-level rows for the reader's comments.
 Each row links to that comment on the provider. Then the
-reader's observations, practice, outcome and one sentence each. Then the precise review time and the
+reader's results, practice, outcome and one sentence each, and under a not met result the one-line
+summary of each problem. Then the precise review time and the
 links into the web app. Nothing inside opens further, and nothing repeats what the line already says.
 
 A list row gets no report.
 It gets one unboxed line (`RowPreview`), filled immediately, with the same sentence and links to the first comments. Each action has one visible placement. The report omits successfully empty groups, but still shows loading and failure states.
 
 Keep Hephaestus visibly identified even when the report has a warning or error. Provider styling
-must not make a Hephaestus observation look like a provider's merge check.
+must not make a Hephaestus result look like a provider's merge check.
 
 The report participates in the page's normal scrolling. Do not contain overscroll.
 Do not forward wheel events through the frame bridge.
@@ -575,7 +576,7 @@ the dashboard's private test-instructions field, keeping credentials out of the 
 1. Connect, sign in, finish the app's account setup if needed, and allow each demonstration site.
 2. Open the supplied issue and pull/merge-request links, and their changes. The practice review sits
    after the description and above the changed files. Open it and compare its comments and
-   observations with the app. On a list, press a row's Hephaestus button and check the one line.
+   results with the app. On a list, press a row's Hephaestus button and check the one line.
 3. Choose **Request review** on a disposable work item: the confirmation window names the work and
    workspace. Cancel once, then confirm once and check the outcome shown. Nothing in the page itself
    sends a change.

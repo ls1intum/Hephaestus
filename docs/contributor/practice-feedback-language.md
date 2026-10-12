@@ -1,6 +1,6 @@
 ---
 title: Practice feedback language
-description: The normative product vocabulary for observations, feedback, practices and groups.
+description: The normative product vocabulary for results, observations, feedback, practices and groups.
 ---
 
 # Practice feedback language
@@ -12,7 +12,7 @@ The tables define names.
 The verb table defines actions.
 The prose checks read the first column, so keep each term in bold.
 
-This page owns the vocabulary for **observations and the feedback built from them**.
+This page owns the vocabulary for **practice results, their observations, and the feedback built from them**.
 The [practice review glossary](./practice-review-glossary.mdx) owns the vocabulary for **the review operation, the evidence contract, and the exact API, Java, and persistence names**.
 This includes *practice review*, *model assignment*, *signal*, *evidence stance*, and *practice autonomy*.
 A term is defined in one of the two and cited from the other.
@@ -31,18 +31,23 @@ In the practice editor, shorten **practice visual** to **Visual**, **practice gu
 | **Practice**                        | A defined way of working used to review work                                                                                                               | rule, detector                                                       |
 | **Practice group**                   | A named collection of related practices                                                                                                                               | category, goal, learning objective                                   |
 | **Unassigned**                      | Practices that are not in a practice group                                                                                                                  | ungrouped, unbound                                                   |
-| **Observation**                     | One recorded result of reviewing one practice against one piece of reviewed work                                                                           | finding, detection, verdict                                          |
-| **Marked incorrect**                | An observation a workspace admin [invalidated](./practice-review-glossary.mdx#invalidated-observations) because it was wrong when made. It stays in history  | deleted, retracted, superseded                                       |
-| **Withdrawn**                       | A Practice profile card a workspace admin [withdrew](./practice-review-glossary.mdx#withdrawn-feedback) because its words were wrong. Its observations are unchanged | deleted, retracted, invalidated                                      |
-| **Disputed**                        | Feedback the developer answered as wrong, with an explanation workspace admins read on its observations. A later review of the same work holds the same claim back while it stands ([ADR 0022](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0022-observation-presence-assessment-and-schema-cleanup.md)) | rejected, contested, flagged                                         |
-| **Requested**                       | A practice review that someone asked for with the *Request review* button or a comment command, not one that the work started. The tag on a review and the origin of its observations. Its observations stay apart from live ones ([how a review was occasioned](./practice-review-glossary.mdx#how-a-review-was-occasioned)) | manual, on demand, by hand |
-| **Practice feedback**               | Guidance written from observations and addressed to a developer — both the whole and the countable unit                                                    | message, AI feedback, feedback item, ledger unit                     |
+| **Result**                          | The one verdict of one practice about one piece of reviewed work in one review. Its outcome is Met, Not met, Does not apply, or Could not determine. The full term is **practice result**. [Result outcomes](#result-outcomes) gives its parts | observation (for the verdict), finding, detection, assessment |
+| **Observation**                     | One problem that a Not met result records at a place in the work, with its own severity. Every observation is a problem. The UI counts observations as **problems**: *Not met · 3 problems* | finding, detection, violation, issue |
+| **Example**                         | An optional place in the work that a Met or Not met result cites to show the practice done well, with a short note. It teaches. It is not praise | good example, strength, praise, highlight |
+| **Open question**                   | A doubt about the work that a result records in its evidence, at a place when one applies. It is never feedback | uncertainty, question to the developer, finding |
+| **Severity**                        | How much one real gap weighs: Critical, Major, Minor, or Trivial. Each observation has one, and a Not met result has one | priority, level, impact score |
+| **Trivial**                         | The label of the severity `INFO`: a real gap with trivial impact. Fix it when it is cheap | informational, info, nit, no action expected |
+| **Marked incorrect**                | A result a workspace admin [invalidated](./practice-review-glossary.mdx#invalidated-results) because it was wrong when made. It stays in history  | deleted, retracted, superseded                                       |
+| **Withdrawn**                       | A Practice profile card a workspace admin [withdrew](./practice-review-glossary.mdx#withdrawn-feedback) because its words were wrong. Its results are unchanged | deleted, retracted, invalidated                                      |
+| **Disputed**                        | Feedback the developer answered as wrong, with an explanation workspace admins read on its results. A later review of the same work holds the same claim back while it stands ([ADR 0022](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0022-observation-presence-assessment-and-schema-cleanup.md)) | rejected, contested, flagged                                         |
+| **Requested**                       | A practice review that someone asked for with the *Request review* button or a comment command, not one that the work started. The tag on a review and the origin of its results. Its results stay apart from live ones ([how a review was occasioned](./practice-review-glossary.mdx#how-a-review-was-occasioned)) | manual, on demand, by hand |
+| **Practice feedback**               | Guidance written from results and their observations and addressed to a developer — both the whole and the countable unit                                  | message, AI feedback, feedback item, ledger unit                     |
 | **Delivery**                        | Whether one piece of feedback was prepared, delivered, withheld, failed, or replaced                                                                       | placement, surface                                                   |
 | **Channel**                         | Where one piece of feedback is intended to appear — a fact about that piece, not a workspace setting. The destinations are the `FeedbackChannel` constants | destination, surface, reach                                          |
 | **Location**                        | Where one piece of feedback appears, by the provider that shows it. It splits a channel by provider: **On GitHub**, **On GitLab**, **With Heph in the app**, **With Heph in Slack**. **On the work**, **In conversation** and **On their practice pages** are the channel's own words. The values are the `FeedbackLocation` constants | destination, surface, provider channel                               |
 | **Practice feedback about a way of working** | Practice feedback prepared for one developer about what recurs across their work, readable by nobody else — the `IN_APP` channel                           | my feedback, private view, profile, reflection, reflection dashboard |
 | **Reviewed work**                   | A pull request, merge request, issue, conversation, or document being reviewed                                                                             | artifact, target                                                     |
-| **Developer**                       | The person an observation is about                                                                                                                         | learner                                                              |
+| **Developer**                       | The person a result and its observations are about                                                                                                         | learner                                                              |
 | **Contributor**                     | A repository role relevant to review eligibility                                                                                                           | user, when the role matters                                          |
 | **Heph**                            | The conversational assistant                                                                                                                               | agent, bot                                                           |
 | **Mentor**                          | The product area for conversations with Heph                                                                                                               |                                                                      |
@@ -53,7 +58,7 @@ In the practice editor, shorten **practice visual** to **Visual**, **practice gu
 | **Practices across the workspace**  | A page beside the Practice profile that counts how the workspace's developers with a standing split and range. It never names a developer, but it has no smallest count, so a small count can tell other members a developer's standing. It is not the developer's profile. **You** marks their own place. The page links to the Practice profile for the rest ([ADR 0051](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0051-practices-across-the-workspace-counts-developers.md)). *Across the workspace* is its short form in the sidebar, under Practice profile | course comparison, course figures, cohort view, benchmark, leaderboard |
 | **Split**                           | How many developers with a standing are at Needs attention, Mixed feedback, Going well, and none yet in one practice group or practice. Each developer counts with the current standing that their Practice profile shows. Practices across the workspace shows it | distribution, breakdown, ranking |
 | **None yet**                        | The part of a split for developers with a standing elsewhere on the page and none in this practice group or practice | no data, missing, unranked |
-| **Developer with a standing**       | A developer whose reviewed work met or did not meet a practice in at least one practice group on Practices across the workspace. Observations that did not apply or stayed undetermined give no standing. Every split and the three tiles with a window count this reference group. The open feedback tile counts every developer that the page counts, reviewed or not | observed developer |
+| **Developer with a standing**       | A developer whose reviewed work met or did not meet a practice in at least one practice group on Practices across the workspace. Results that did not apply or stayed undetermined give no standing. Every split and the three tiles with a window count this reference group. The open feedback tile counts every developer that the page counts, reviewed or not | observed developer |
 | **Typical range**                   | On a tile of Practices across the workspace, the middle half of the developers with a standing in the window, the reader included when counted. A quarter of them are below it, and a quarter are above it. On the open feedback tile, it is the middle half of every developer that the page counts, reviewed or not | percentile, quartile range, average, norm |
 | **Activity**                        | The developer's own page. It shows what needs them and what they did over a time range. It lists the pull or merge requests and issues they worked on. Counts work, never scores it | profile, stats                                                       |
 | **Workspace activity**              | The same counts and lists for everyone in a workspace or one team, one row for each person. It sorts by each count, by **Contributions** first ([ADR 0052](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0052-activity-sorts-by-contributions-and-can-be-public.md)) | leaderboard, ranking, standings                                      |
@@ -73,7 +78,7 @@ In the practice editor, shorten **practice visual** to **Visual**, **practice gu
 | **Instance catalog**                | The set of practices a workspace may adopt from                                                                                                                              | curated catalog                                                      |
 | **Workspace practices**             | Independent definitions used for reviews in one workspace                                                                                                  | workspace catalog                                                    |
 | **Review rules**                    | Inputs and criteria that determine review behavior                                                                                                         | detector configuration                                               |
-| **Practice script**                 | Optional code in a practice that points its review to locations to examine. The [glossary](./practice-review-glossary.mdx#product-terms) defines it | precompute script, pre-compute script, static analysis, analyzer, detector, linter, scout, check script |
+| **Practice script**                 | Optional code in a practice that runs in place of its built-in program and returns its one result. The [glossary](./practice-review-glossary.mdx#product-terms) defines it | precompute script, pre-compute script, static analysis, analyzer, detector, linter, scout, check script |
 | **Model for practice scripts**      | A decision, embedding or reranking model that practice scripts call. The [glossary](./practice-review-glossary.mdx#product-terms) defines it | precompute model, script model, helper model |
 | **Developer guidance**              | Explanatory text that does not change review behavior                                                                                                      | learner guidance                                                     |
 | **Practice visual**                 | The optional picture that introduces a practice on its panel, with a description of what it means. It is developer guidance. [Descriptions](./practice-visuals.md#descriptions) gives the rules for the description | illustration, hero image, diagram, explainer |
@@ -108,7 +113,7 @@ Do not invent a second word for the same thing.
 | No messages yet              | No feedback yet                                            |
 | This message                 | This feedback                                              |
 | Message details              | Feedback details                                           |
-| Findings behind this message | Observations behind this feedback                          |
+| Findings behind this message | Results behind this feedback                               |
 | Queued for conversation      | Prepared for conversation                                  |
 
 The glossary owns how feedback on the Practice profile stops being open: **resolved by the work** or **marked as addressed**.
@@ -116,9 +121,9 @@ See [How feedback resolves](./practice-review-glossary.mdx#how-feedback-resolves
 The card, the summary and the release notes use those two phrases and no other.
 
 A column that counts per row is headed **Feedback** and the cell holds the number alone.
-Where a sentence needs a singular subject, name what the feedback is *about* — "the feedback for this observation", not "the message for this observation".
+Where a sentence needs a singular subject, name what the feedback is *about* — "the feedback for this result", not "the message for this result".
 
-**Say what happens, not who does it.** On practice-review surfaces, use *practice review*, *review*, *feedback*, or *observation* as the subject.
+**Say what happens, not who does it.** On practice-review surfaces, use *practice review*, *review*, *feedback*, *result*, or *observation* as the subject.
 Use **Hephaestus** when the application itself is the subject, such as installation, account linking, or releases.
 Do not call the application or a review an *agent*.
 
@@ -143,7 +148,7 @@ On an operator surface, the channel reads **On their practice pages**.
 **Feedback waiting for a mentor conversation is *prepared*, never *queued*.** A queue implies somebody has to work it.
 Nothing works this queue.
 `FeedbackDeliveryState.PREPARED` advances to `DELIVERED` when a completed chat turn shows the developer feedback about it.
-The mentor's `link_observation` call carries the words.
+The mentor's `link_result` or `link_observation` call carries the words.
 The reply renders them in the app and in Slack.
 
 The label is **Prepared for conversation**.
@@ -170,16 +175,24 @@ But a row, its badge, and a list filter keep each delivery state's own word.
 A count opens its list filtered to exactly the states its family holds.
 Unconfirmed is a family of its own because counting it as prepared would promise a delivery that will not happen.
 
-**Observation, not finding**, for the measurement — in copy, URLs, API schema, field names, and Java.
+**Result and observation, never finding**, for the measurement — in copy, URLs, API schema, field names, and Java.
+A result is `PracticeResult` in Java, `practice_result` in the database, and `practiceResultId` on the wire.
+An observation is `Observation` in Java, `practice_observation` in the database, and `observationId` on the wire.
 Delivery uses `FeedbackAnchor` and `InlineFeedbackChannel`.
-The mentor uses `link_observation` and `data-observation`.
+The mentor uses `link_result` and `link_observation`, and its stream parts are `data-result` and `data-result-observation`.
 The schema, wire protocol and web routes have no aliases for the retired vocabulary, and no address redirects from a retired word.
 
-Everything else is an observation, including the read APIs and the reviews UI.
+The read APIs and the reviews UI use the same two words.
 The banned word does the most damage on the surfaces an operator actually reads.
-Those names are `ReviewObservation`, `ReviewObservationDetail`, `ReviewBoundObservation`, `observationId`, and the workspace-admin route `/workspaces/{workspaceSlug}/practices/reviews/observations`.
-Developer-scoped reads live under `/workspaces/{workspaceSlug}/practices/observations`.
+Those names are `ReviewResult`, `ReviewResultDetail`, `ReviewBoundResult`, `practiceResultId`, and the workspace-admin route `/workspaces/{workspaceSlug}/practices/reviews/results`.
+Developer-scoped reads live under `/workspaces/{workspaceSlug}/practices/results`.
 A *finding* in this subsystem is a bug.
+
+Before the practice program contract, *observation* named the verdict that is now a result.
+Each old observation id became the `practiceResultId` of its result, with the same value.
+A saved `data-observation` part in a mentor conversation still reads as a link to a result.
+Persisted values keep the old word, such as `OBSERVATION_INVALIDATED` and the `observation_admission_digest` job metadata key.
+An accepted ADR keeps the word that it used when it was accepted.
 
 **Practice autonomy** and **effective autonomy** are the glossary's ([Practice autonomy](./practice-review-glossary.mdx#practice-autonomy), [Autonomy inheritance](./practice-review-glossary.mdx#autonomy-inheritance)).
 The product labels for the three values are **Off**, **Review before sending** and **Send automatically**.
@@ -188,43 +201,104 @@ A value set at the level being discussed is an **override**, and one a parent su
 For whether an instance entry is copied into new workspaces, use **include / exclude** (see the table above).
 Do not use *shipped*, *offered*, *retired*, *ours*, *yours*, or *here* in catalog UI copy. Those terms expose implementation or depend on who is reading.
 
-## Observation outcomes
+## Result outcomes
 
-An observation records whether the reviewed work meets one practice's criteria within the recorded evidence boundary.
+A result records whether the reviewed work meets one practice's criteria within the recorded evidence boundary.
 It does not establish a developer's mastery or the correctness of the entire project.
 
-| Outcome | Meaning | Severity |
-| --- | --- | --- |
-| `MET` | The captured evidence establishes conformance to the practice standard. | None |
-| `NOT_MET` | The captured evidence establishes a material shortfall against that standard. | Required |
-| `NOT_APPLICABLE` | An evidenced fact rules out the occasion to apply the practice. | None |
-| `UNDETERMINED` | Adequate captured evidence was read, but a material question remains unresolved. | None |
+| Outcome | UI label | Meaning | Severity | Observations |
+| --- | --- | --- | --- | --- |
+| `MET` | Met | The captured evidence establishes conformance to the practice standard. | None | None |
+| `NOT_MET` | Not met | The captured evidence establishes a material shortfall against that standard. | Required | One or more |
+| `NOT_APPLICABLE` | Does not apply | An evidenced fact rules out the occasion to apply the practice. | None | None |
+| `UNDETERMINED` | Could not determine | Adequate captured evidence was read, but a material question remains unresolved. | None | None |
 
-`outcome` is the only result field.
+`outcome` is the only verdict field.
 There is no separate presence, desirability, or derived result axis.
-Criteria states the positive standard.
+The criteria state the positive standard.
 An undesirable action and a required action that is missing can both establish `NOT_MET`.
+`MET` requires conformance to the standard, not merely the presence of one desirable behavior.
 
-The summary explains the actual shortfall without a second taxonomy. `MET` requires conformance to the standard, not merely the presence of one desirable behavior.
-
-A review records at most one observation per practice.
+A review records at most one result per practice.
 Its outcome applies to the complete standard within the evidence boundary.
-The rationale can describe several independent shortfalls.
 Do not record both `MET` and `NOT_MET` for one practice.
 
-Provisional runtime submissions may be corrected before server admission.
-Admitted observations are immutable.
-A met observation does not require praise or delivery.
+### One verdict
+
+When the occasion applies, one priority decides the outcome:
+
+1. Any admitted problem gives `NOT_MET`.
+2. With no problem, any open question gives `UNDETERMINED`.
+3. `MET` needs complete coverage and no open question.
+
+[Admission](./practice-review-glossary.mdx#results-and-programs) can withhold a candidate result.
+A withheld `NOT_MET` result never becomes `MET`.
+
+### Observations
+
+An observation is one problem that a `NOT_MET` result records at a place in the work.
+It has these parts:
+
+- A severity of its own.
+- A one-line summary and an explanation.
+- One or more verified citations.
+- A claim basis: introduced, worsened, or duty. An observation migrated from before the contract has none.
+- An optional next step.
+- A recurrence key.
+
+Every observation is a problem, and there is no observation kind.
+The summary names the actual shortfall without a second taxonomy.
+Missing an optional improvement is not a shortfall, so Hephaestus never records one.
+
+### Severity
+
+| Severity | UI label | Description |
+| --- | --- | --- |
+| `CRITICAL` | Critical | Serious enough to hold up the work until it is addressed. |
+| `MAJOR` | Major | Worth fixing before this work is considered done. |
+| `MINOR` | Minor | Worth knowing about, but it does not block anything. |
+| `INFO` | Trivial | A small gap. Fix it when it is cheap. |
+
+Every severity is a real gap.
+`INFO` means a real gap with trivial impact.
+Do not call it *informational*, and do not say that it asks nothing of the developer.
+
+Each observation has its own severity.
+The severity of a result is at least the severity of its worst observation.
+Admission stores the worst observation's severity when the program gives none.
+A higher result severity names a pattern that the criteria rate higher, such as the same minor problem in several places.
+
+### Examples
+
+An example is one optional field on a `MET` or `NOT_MET` result.
+It has one citation and a note of no more than 280 characters.
+It shows a place in the work where the practice is done well.
+It must not cite a place that a problem of the same result cites.
+An example teaches and is not praise.
+It is never pushed alone, and it has no recurrence key, label, or dispute of its own.
+
+### Open questions
+
+An open question is a semantic doubt that a result records in `evidence.undecidability`.
+It names the question and what would settle it, and it can cite the place where the doubt arises.
+`UNDETERMINED` requires at least one open question.
+`NOT_MET` can have open questions beside its problems.
+`MET` and `NOT_APPLICABLE` have none.
+
+An open question is never feedback and is never pushed.
+An operational failure is never an open question.
+A capture failure, a timeout, a spent budget, and a program error are operational failures.
+
+### Warrants and boundaries
 
 A claim based on absence requires a complete bounded search, recorded in `evidence.search`.
 Conformance based on avoiding harm requires exhaustive coverage of the relevant corpus.
-Missing an optional improvement is not a shortfall.
-Citations and the rationale name the reviewed boundary.
+Citations and the explanation name the reviewed boundary.
 
-`NOT_APPLICABLE` requires an inapplicability warrant identifying the fact that excludes the occasion. `UNDETERMINED` requires an undecidability warrant naming the open question and what would settle it.
-Neither contributes to the decided-outcome denominator.
+`NOT_APPLICABLE` requires an inapplicability warrant identifying the fact that excludes the occasion.
+Neither `NOT_APPLICABLE` nor `UNDETERMINED` contributes to the decided-outcome denominator.
 Report both separately when measuring coverage: combining them hides the difference between no occasion and unresolved assessment.
-Missing, truncated, or failed required capture is a review readiness failure and creates no observation.
+Missing, truncated, or failed required capture is a review readiness failure and creates no result.
 
 For a change to saved settings, complete non-destructive restart instructions can establish `MET`.
 Missing a required restart check, or instructions that erase the state under test, establishes `NOT_MET`.
@@ -233,7 +307,11 @@ Conflicting captured requirements that prevent a judgment may establish `UNDETER
 
 A missing captured description establishes none of these outcomes: capture must succeed first.
 
-The sandbox, server, and database reject invalid outcomes and severity combinations.
+Provisional runtime submissions may be corrected before server admission.
+Admitted results and their observations are immutable.
+A met result does not require praise or delivery.
+
+The sandbox, server, and database reject invalid combinations of outcome, severity, observations, and example.
 Delivery remains an independent decision.
 See the [review pipeline](./practice-review-pipeline.mdx).
 

@@ -74,13 +74,13 @@ They are not mandatory headings or a word-count target.
 
 | Decision      | What the author must make clear                                                                              |
 | ------------- | ------------------------------------------------------------------------------------------------------------ |
-| Applicability | What fact makes this expectation relevant? What ordinary cases need no observation?                          |
+| Applicability | What fact makes this expectation relevant? Which ordinary cases are outside it?                              |
 | Standard      | What observable requirements must the reviewed work meet?                                                    |
 | Evidence      | Which captured sources can establish each claim? Who authored them, and when?                                |
 | Conformance   | What evidence establishes the complete standard or a material shortfall?                                     |
 | Absence       | What complete, bounded search justifies a claim of missing required behavior or absence of harmful behavior? |
 | Uncertainty   | What unresolved question prevents a judgment, even with the required evidence captured?                      |
-| Consequence   | Why does a not-met observation matter? What consequence justifies its severity?                              |
+| Consequence   | Why does each observation (a problem) matter? What consequence justifies its severity?                       |
 | Feedback      | What specific change could the developer make? When would no corrective feedback be useful?                  |
 
 1. Prefer “identify a material decision whose rationale the reviewer needs” to a keyword test for “because.”
@@ -99,15 +99,28 @@ Use one outcome for conformance within the recorded evidence boundary:
 | `NOT_APPLICABLE` | The work has no material behavior that requires this verification.                                                  |
 | `UNDETERMINED`   | Adequate captured evidence contains an unresolved conflict about the required behavior.                             |
 
+The UI shows these outcomes as **Met**, **Not met**, **Does not apply**, and **Could not determine**.
+A `NOT_MET` result records one or more observations.
+Each observation is one problem at a place in the work, with a summary, an explanation, and verified citations.
+An `UNDETERMINED` result records one or more open questions, each with what would settle it.
+A `NOT_MET` result can also record open questions.
+A `MET` or `NOT_MET` result can show one example from the work that shows the practice done well.
+
 One useful instruction alone does not establish conformance to the complete standard.
 Absence claims need a complete bounded search.
-A missing optional improvement is not a shortfall.
-If required capture fails, the review creates no observation.
+A missing optional improvement is not a shortfall, and the review never records it.
+If required capture fails, the review creates no result.
 This is not uncertainty about the developer's work.
 
 1. Do not count inadequate instructions and their missing part as separate shortfalls when both need the same correction.
 
 Severity applies only to `NOT_MET`.
+The severities are **Critical**, **Major**, **Minor**, and **Trivial** (`INFO`), from the most severe.
+Every severity is a real gap.
+Use **Trivial** for a real gap with a small cost, which the developer can fix when it is cheap.
+Each observation has its own severity.
+The result is at least as severe as its most severe observation.
+
 Delivery is a separate decision.
 
 ### Evidence is more than a matching quotation
@@ -121,11 +134,11 @@ A template issue number is not automatically an adopted requirement.
 Required evidence that is missing, failed, or truncated stops assessment.
 
 1. Relate instructions to the actual changed behavior.
-2. If required evidence is missing, failed, or truncated, record the collection gap, not an observation about the developer.
-3. With qualified evidence, use UNDETERMINED for a material question that remains unresolved.
+2. If required evidence is missing, failed, or truncated, record the collection gap, not a result about the developer.
+3. With qualified evidence, use UNDETERMINED for a material open question. State what would settle it.
 
 Failure to find a quotation does not itself prove absence.
-A previous observation records an earlier judgment.
+A previous result records an earlier judgment.
 It is not independent proof that the judgment was correct.
 
 1. Separate recorded facts from the events they approximate.
@@ -172,9 +185,15 @@ Each practice needs evidence and consequences that match its expectation and the
 
 ## Practice script
 
-A practice can have a practice script: TypeScript that runs before each review of the practice.
-The script points the review at places to check, and it never writes feedback.
+A practice can have a practice script: TypeScript that runs as the review program of the practice.
+The script prepares the review input, such as places to check, and passes it to the review.
+A script can also return the result itself.
 The criteria stay the only standard of the review.
+
+The server checks each result against the same contract before the result can lead to feedback.
+A script never writes feedback.
+If a script fails or runs out of time, the practice gets no result in that review.
+A script failure is never a claim about the work.
 
 The editor's **Script** section follows **When this practice is reviewed**.
 It is optional, and it opens when the practice has a script.
@@ -191,7 +210,7 @@ If you save with another option, Hephaestus removes the script from the practice
 The editor's **Feedback delivery** section separates delivery from what the practice measures.
 **Overlap group** groups practices whose feedback can cover the same concern.
 **Preferred practice identifier** identifies the practice to prefer in that overlap group.
-These settings do not change observation outcomes or authorize automatic sending.
+These settings do not change result outcomes or authorize automatic sending.
 
 1. If feedback must stay in the summary rather than on a changed line, select summary-only delivery.
 2. Use the identifier of an existing practice, not its display name.

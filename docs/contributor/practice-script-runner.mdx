@@ -1,53 +1,67 @@
 ---
 id: practice-script-runner
 title: Practice script runner
-description: How the practice script runner runs a script, what it records, what a script can reach, how the server learns a script's needs, and how to test it.
+description: How the review runner hosts the program of each practice, what a program can reach, how the attempt budgets and reports it, how the server learns its needs, and how to test it.
 ---
 
 # Practice script runner
 
-This page describes how the practice script runner runs a practice's script.
-The runner is `docker/agents/practice-scripts/runner.ts`, and its library is `docker/agents/practice-scripts/lib/`.
+This page describes how the review runner runs the program of each admitted practice.
+The host is `pi-runner.ts` in the review container.
+Its library is `docker/agents/practice-scripts/lib/`, and `lib/program-host.ts` runs one program.
+There is no separate practice script stage, and no second runner process.
 
 ## The contract
 
-[Write a practice script](/admin/practice-scripts) owns the script contract.
-It describes `definePracticeScript`, `meta`, the model slots, the context, the primitives, the result, the reasons and the limits.
-This page does not repeat those facts.
-[ADR 0055](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0055-practice-scripts-call-models-through-the-runner.md) records why a script calls models through the runner.
+[Write a practice script](/admin/practice-scripts) owns the author contract, and this page does not repeat it:
+
+- [The result](/admin/practice-scripts#the-result) gives the candidate result that a program returns.
+- [Review input](/admin/practice-scripts#review-input) gives what `ctx.review()` takes.
+- [The context](/admin/practice-scripts#the-context) gives the fields of `ctx`.
+- [Limits](/admin/practice-scripts#limits) gives the values of the limits.
+
+[ADR 0055](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0055-practice-scripts-call-models-through-the-runner.md) records why a practice script is the review program, with one admission.
 
 Other documents own the adjacent facts:
 
 | Fact | Home |
 | --- | --- |
-| Where bundled scripts live and how a bundled practice changes | [Practice catalogue](./practice-catalogue.md#practice-scripts) |
-| What a section holds and how it is bounded | [What the review reads](/admin/practice-scripts#what-the-review-reads) |
-| The stage time, the script deadlines, the process grants, and `practice-script-models.json` | [Workspace ABI](./agent/workspace-abi.mdx#practice-script-validation-and-limits) |
-| The practice header of each model call, and the practice script report (`practice-scripts.json`) | [Workspace ABI](./agent/workspace-abi.mdx#practice-script-report) |
-| The stages of a review and where leads stop | [Practice review pipeline](./practice-review-pipeline.mdx) |
+| Where bundled scripts live, and how a bundled practice and its script change | [Practice catalogue](./practice-catalogue.md#practice-scripts) |
+| The process grants, the deadlines, and `practice-script-models.json` | [Workspace ABI](./agent/workspace-abi.mdx#practice-script-validation-and-limits) |
+| The practice header of each direct model call | [Workspace ABI](./agent/workspace-abi.mdx#models-for-practice-scripts) |
+| The execution report (`practice-scripts.json`) | [Workspace ABI](./agent/workspace-abi.mdx#practice-script-report) |
+| The stages of a review, and where a review can stop | [Practice review pipeline](./practice-review-pipeline.mdx) |
 | How an admin assigns the models, sees which practices use them, and reads their cost by practice | [Models for practice scripts](/admin/ai-providers#models-for-practice-scripts) |
-| What each line about a script in a review means, and the metrics | [Practice review operations](/admin/practice-review-operations#practice-scripts) |
+| What each line about a program in a review means, and the metrics | [Practice review operations](/admin/practice-review-operations#practice-scripts) |
+| What an admin does with a script from an earlier release | [Upgrade a script from an earlier release](/admin/practice-scripts#upgrade-a-script-from-an-earlier-release) |
 | The live tests | [Testing](./testing.mdx#live-models-for-practice-scripts) |
 
-### One contract
+### One program for each practice
 
-The runner runs one contract: a default export of `definePracticeScript({ meta, run })`.
-Every bundled script uses it.
-The child process checks that the default export has `meta` and a `run` function.
-If it does not, the script fails with the status `error` and the error `RETIRED_FORM_ERROR` from `lib/contract.ts`.
-This one line tells the admin to rewrite the script with `definePracticeScript`.
+Every admitted practice runs exactly one program, and the program returns one candidate result.
+A practice whose revision holds a script runs that script as a custom program.
+A practice without a script runs the built-in program, `BUILTIN_PROGRAM` in `lib/program-host.ts`:
 
-A workspace script from an earlier release, whose default export is a plain function, gets this error.
-The review continues without the script's leads, and the error never becomes a statement about the work.
+```ts
+export const BUILTIN_PROGRAM = definePracticeScript({ meta: {}, run: async (ctx) => ctx.review() });
+```
 
-`meta.version` names the version of the contract.
-Version 1 is the leads contract: `run` returns leads, and the review decides what each lead means.
-The runner accepts only `version: 1`.
-A later contract that changes what `run` returns gets the next number.
-Thus, the runner never infers the contract from the shape of a result.
+The built-in program runs in the host process.
+A custom program runs in its own child process, through `child.ts`.
+Both get the same context from `lib/program-context.ts`.
+The host checks the value that each returns in the same way.
 
-A `meta` without `version` fails at step 3.
-Its error is `meta: version is missing. Add version: 1, the leads contract.`
+### Retired forms
+
+The child checks that the default export is a `definePracticeScript` definition.
+If it is not, the practice fails with the stop reason `invalid-program` and the error `RETIRED_FORM_ERROR` from `lib/contract.ts`.
+A script whose `meta` has `version`, `kinds` or `tokens` fails with `invalid-program`.
+Its error is `LEGACY_CONTRACT_ERROR`, and the error names the retired key.
+A `run` that returns leads fails with the stop reason `invalid-candidate` and the same error.
+
+Such a practice has no result in this review.
+Its error never becomes a statement about the work.
+The [practice catalogue](./practice-catalogue.md#practice-scripts) tells how the server upgrades a bundled script that nobody changed.
 
 `lib/practice-script.ts` is the only import that the admin page documents.
 It re-exports the readers that a workspace script needs.
@@ -59,55 +73,91 @@ A workspace that customized a bundled practice keeps a copy of its script, so su
 A bundled script is `server/application/src/main/resources/practices/scripts/<slug>.ts`.
 The [practice catalogue](./practice-catalogue.md#practice-scripts) tells how a bundled practice and its script change.
 
-1. Write a new bundled script with `definePracticeScript`, as [Write a practice script](/admin/practice-scripts) tells.
+1. Write the script with `definePracticeScript`, as [Write a practice script](/admin/practice-scripts) tells.
 2. Import from `docker/agents/practice-scripts/lib/practice-script.ts` where it exports what you need.
-3. Put shared readers and scanning mechanics in `docker/agents/practice-scripts/lib/`, and the predicates of one practice in its script.
-4. Add the tests that [Testing](#testing) describes.
+3. Put shared readers and scanning mechanics in `docker/agents/practice-scripts/lib/`.
+4. Put the predicates of one practice in its script.
+5. Add the tests that [Testing](#testing) describes.
 
-## How the runner runs a script
+## How the host runs the programs
 
-The runner starts one Node process for each script, through `child.ts`.
-The [workspace ABI](./agent/workspace-abi.mdx#practice-script-validation-and-limits) gives how many run at a time, their grants, and their deadlines.
+The host runs the programs in this order:
 
-A script runs in these steps:
+1. The host decides if the attempt continues an admitted review. A continuation runs no program, derives no change and admits nothing.
+2. Otherwise, the host derives the change view `work/change/` with `pi-change.ts`.
+3. The host runs one practice at a time, in the order of its turns. A turn holds the practices of one catalog group.
+4. For each practice, the host reads and validates the staged inputs. If they are not valid, the practice fails with the stop reason `unavailable`.
+5. The host runs the program of the practice until it returns, fails, or reaches its deadline.
+6. The host checks the returned value as one candidate.
+7. When the measuring window ends, the host admits all candidates in one call.
 
-1. Before the child starts, the runner reads and validates the script's inputs.
-   [What a script reads about its review](#what-a-script-reads-about-its-review) tells how.
-2. The child imports the script, checks its default export, and sends `meta` to the runner.
-3. The runner validates `meta` with the zod schema in `lib/contract.ts`.
-4. If the inputs of step 1 are not valid, the runner stops the child with the status `error`.
-5. The runner decides which declared slots are available.
-6. If a `required` slot is not available, the runner stops the child.
-7. Otherwise, the runner replies with the available slots and the token limit of the practice.
-8. The child builds the context from the inputs, calls `run`, and sends the result.
-9. The runner validates the result with zod and settles the leads.
-   It marks the new leads, and writes the section and the result.
+### A custom program
 
-[Write a practice script](/admin/practice-scripts#meta) gives the status of a script that step 2, 3, 4 or 6 stops.
+A custom program runs in these steps:
 
-A slot is available when `practice-script-models.json` has a model for it and that model's protocol serves the slot.
-`lib/contract.ts` holds the slots, the protocols, the reasons, the entry limits of one call, and the run statuses.
-`PracticeScriptContractSyncTest` keeps the slots, protocols, reasons and statuses equal to the Java side.
+1. The host starts `child.ts` with `--permission`, an empty environment and a heap of 256 MiB.
+2. The host sends the job: the slug, the inputs, the criteria, the pinned files, the time and the deadline.
+3. The child imports the program, checks its default export, and sends `meta` to the host.
+4. The host validates `meta` with `parseMeta` in `lib/contract.ts`.
+5. If a `required` slot has no model, the host stops the child with the status `skipped`.
+6. Otherwise, the host replies with the available slots and the tokens left in the attempt's direct-model account.
+7. The child builds the context, calls `run`, and sends one final message: the value or the failure.
+
+A slot is available when `practice-script-models.json` has a model for it and the protocol of that model serves the slot.
+`lib/contract.ts` holds the slots, the protocols, the reasons, the stop reasons and the entry limits of one call.
+`PracticeScriptContractSyncTest` keeps these names equal to the Java side.
 `PracticeScriptCapsSyncTest` keeps `MODEL_SLOT_CAPS` equal to the entry limits of `LlmProxyService`.
 
-### What a script reads about its review
+### The messages between the host and a child
 
-The context of a script has a `kind`, a `work`, a `cause` and a `previous`.
-[The context](/admin/practice-scripts#the-context) gives their fields.
-The server stages them, and the runner validates them once, before the script starts:
+`lib/ipc.ts` defines the messages.
+The host sends a `HostMessage`: `job`, `meta-accepted`, `model`, `model-failed`, `read-result`, `read-failed`, `review-result`, `review-failed` and `abort`.
+The child sends a `ChildMessage`: `meta`, `model`, `read`, `review`, `cancel`, `log`, `result` and `failed`.
+The host trusts its own messages.
+It parses each child message with `childMessageSchema`, because the child runs code that a workspace admin wrote.
 
-1. For each practice with a script, `PracticeCatalogInjector` writes `<slug>.ts` to `work/practice-scripts/practices/`.
-   Beside it, `PracticeScriptInputs` writes `<slug>.cause.json` and `<slug>.previous.json`.
-   Only the worker prepares a review, so only the worker writes them.
-   `PracticeScriptInputs` is no bean of its own.
-2. `pi-practice-scripts.ts` copies the three files of each practice to the stage.
-3. The runner reads the two files beside the script.
-   It reads the record of the work from the context folder.
-   The record is `metadata.json` for a pull request or an issue.
-   It is `conversation_thread.json` for a conversation, and `document.json` for a document.
-4. The runner validates the three with `practiceInputsSchema` in `lib/contract.ts`.
-   An error names the file that holds it.
-   An error fails the practice with the status `error`, as the other errors of a script do.
+These rules apply in `lib/script-run.ts`:
+
+- Each `model`, `read` and `review` request carries a call ID. The host answers each ID once.
+- A message that does not parse stops the program.
+- A message larger than `MAX_IPC_MESSAGE_BYTES`, 512 KiB as JSON, stops the program.
+- More than 32 requests in flight (`MAX_IN_FLIGHT`) stop the program.
+- A request that uses the ID of an open request stops the program.
+- A `model` or `review` request before `meta` fails the program with `invalid-program`.
+- A child sends exactly one final message, `result` or `failed`. A second final message fails the program.
+- After `abort`, the host answers no request and sends no late reply.
+- No message carries provenance. The server computes the provenance of a result at admission.
+
+### Reads through the host
+
+A program reads the reviewed work through `ctx.files` and `ctx.evidence`.
+The host answers each read with `EvidenceReader` in `lib/evidence-reader.ts`.
+It reads from the pinned checkout, the change view and the captured records.
+Each read leaves a receipt: read, cut short, or failed.
+A missing file is `ABSENT`, but a read that fails throws the reason `unavailable`.
+The `.git` folder of the repository reads as absent.
+
+A search through `grep` also runs in the host, because the child cannot start a program.
+The built-in program uses the same reader in the host process.
+
+### What a program reads about its review
+
+The server stages these inputs, and the host validates them once, before the program starts:
+
+1. For each admitted practice, `PracticeScriptInputs` writes `<slug>.cause.json` and `<slug>.previous.json` to `work/practice-scripts/practices/`.
+2. For a practice with a script, `PracticeCatalogInjector` writes `<slug>.ts` beside them.
+3. `PracticeRunnerProfile.setupCommands()` links `work/practice-scripts/lib` to `/opt/practice-scripts/lib` before Node starts.
+4. `InputReader` in `lib/script-inputs.ts` reads the two files and the record of the work.
+5. `InputReader` validates the three with `practiceInputsSchema` in `lib/contract.ts`.
+
+Only the worker prepares a review, so only the worker writes the inputs.
+`PracticeScriptInputs` is not a bean of its own.
+The link lets a staged program import `../lib/…`, and lets the host import `./work/practice-scripts/lib/…`.
+
+The record is `metadata.json` for a pull request or an issue.
+It is `conversation_thread.json` for a conversation, and `document.json` for a document.
+An error names the file that holds it.
+A missing or invalid input fails the practice with the stop reason `unavailable`, and no program starts.
 
 The record schemas follow what the content sources write.
 A field that is wrong for an identity, a role, a revision or a structure fails the record.
@@ -116,7 +166,10 @@ Such a field reads a value that the schema does not name, such as a new pipeline
 `notKnownWhenUnnamed` in `lib/contract.ts` marks these fields: `head_checks` and `sub_issues_source`.
 An issue's `state` reads such a value as `UNKNOWN`.
 
-The cause file holds `kind`, `subject.role` and `cause`.
+The cause file holds `kind`, `subject.role`, `practice.revisionId`, `scope` and `cause`.
+`scope.key` is `<kind>:<artifactId>:<ROLE>`, and a reviewer's pass over one submitted review adds `:review:<reviewId>`.
+A program treats the key as opaque, and admission stores it on the result.
+
 The practice's moments and review conditions are its review occasion.
 The cause tells which of them brought the practice into this review, or that a recheck or a request by hand did.
 The server derives `cause.type` from the job:
@@ -129,14 +182,14 @@ The server derives `cause.type` from the job:
 
 `origin` is the job's `observation_origin`, `state` its `review_state`, and `admittedAt` its creation time.
 
-The previous file holds `null`, or the current claim of the practice about the review's person on the same work.
-The server reads it as the review reads history:
-`LatestRun.perClaim` over `ObservationRepository.findStandingForWork`, then `ObservationVisibilityPolicy.permitsAll`, then the consent of a conversation's channel.
-Thus, the server does not stage a claim that an admin invalidated, a stale claim, or a claim whose evidence is no longer authorized.
-An older claim does not take their place.
+The previous file holds `null`, or the current result of the practice about the review's person on the same work.
+The server reads it as the review reads history.
+It applies `LatestRun.perClaim` over `PracticeResultRepository.findStandingForWork`, then `ResultVisibilityPolicy.permitsAll`, then the consent of a conversation's channel.
+Thus, the server does not stage a result that an admin invalidated, a stale result, or a result whose evidence is no longer authorized.
+An older result does not take their place.
 
-The file holds the outcome, the severity and the citations.
-It holds no summary, no rationale and no delivery state.
+The file holds `practiceResultId`, the outcome, the severity and the citations.
+It holds no summary, no explanation and no delivery state.
 For a pull request, it holds the `head` of the earlier run's `reviewedWork`.
 
 `KINDS`, `MOMENTS` and `REVIEW_STATES` in `lib/contract.ts` repeat the artifact descriptors, which stay their home.
@@ -144,139 +197,229 @@ For a pull request, it holds the `head` of the earlier run's `reviewedWork`.
 
 #### The change since the previous review
 
-When `previous.head` is set, the runner asks git if it is an ancestor of the reviewed head, `work.commit_sha`.
-If it is, the runner gives the script `previous.changeSince`: the parsed diff from `previous.head` to the reviewed head.
-If it is not, as after a force push, `changeSince` is absent, and the runner logs why.
+When `previous.head` is set, the host asks git if it is an ancestor of the reviewed head, `work.commit_sha`.
+If it is, the program gets `previous.changeSince`: the parsed diff from `previous.head` to the reviewed head.
+If it is not, as after a force push, `changeSince` is absent, and the host logs why.
 An empty `changeSince` means that the work did not change.
-The runner starts git, because a script's process has no child-process grant.
-It computes each change once and shares it between the practices with the same `head`.
+The host computes each change once and shares it between the practices with the same `head`.
 
-After the runner settles the leads, it marks each lead that cites a new-side line of the change that `changeSince` adds.
-The result counts them in `newSinceLastReview`.
-The section says how many leads are new, and marks each with `(new)`.
-The practice script report to the server does not carry the count.
+When the host resolves the leads of a review input, it marks each lead on a new-side line that `changeSince` adds.
+The section of that review marks each such lead with `(new)` and counts them.
+The execution report does not carry the count.
 
-### Model calls through IPC
+### A review of one practice
+
+`ctx.review(options)` asks the host for one review of the program's practice.
+The host runs at most one practice and at most one review at a time.
+A concurrent or nested call to `review()` rejects with the reason `refused`.
+The host checks the options with `parseReviewOptions`, and an invalid input fails the program before a review starts.
+
+The host prepares the review input in these steps:
+
+1. The host resolves each lead to the line that its source holds, with `lib/leads.ts`.
+2. A lead that its source does not hold is an error of the program, never dropped.
+3. The host renders a section of at most 3,000 characters from the leads, facts, directions, context and limitations.
+4. The host writes the whole input to `work/review-input/<slug>.json`, for the session to read past the section.
+
+The host then opens a fresh native session for this call.
+The session receives the task, the brief, the practice's criteria, the result illustrations and the section.
+Its tools are the evidence tools, `bash`, `codemode` and `submit_result`.
+
+`submit_result` fills a draft that is private to this call.
+The host first normalizes the submission with `pi-result-normalize.ts`.
+It checks the sources, the scope and the quotes, and then `parseCandidate` with host coverage.
+The host measures that coverage from the read receipts of the session.
+When the session ends, `review()` returns the draft.
+Without a draft, it rejects with the reason that the session gave no result.
+
+The host removes `work/review-input/` before admission.
+A native session that does not stop ends the run, and no later session starts.
+
+### The final candidate
+
+The program returns the final candidate.
+It can return the candidate of its review, change its words, or return a candidate of its own.
+`runPracticeProgram` checks the value with `parseCandidate` in `lib/contract.ts`.
+
+- A value that is not a candidate fails the practice with `invalid-candidate`.
+- A candidate with `coverage.source: "host"` must carry coverage that a review of that practice returned, unchanged.
+- Other host coverage fails the practice with `invalid-candidate`.
+- A program that throws an `UnratedError` fails with its reason.
+
+### Admission
+
+The host sends all final candidates in one `POST {LLM_PROXY_URL}/admit-results`:
+
+```json
+{ "schemaVersion": 2, "results": [ { "practiceSlug": "…", "candidate": { } } ] }
+```
+
+The results are sorted by slug, with one entry for each slug.
+The body names no job and no attempt, because the identity comes from the token only.
+The server answers with the admitted results, the withheld practices and the admission digest.
+Composition starts after that answer.
+`result.json` and `review-state.json` in `out/` hold the request body.
+The [practice review pipeline](./practice-review-pipeline.mdx) owns the admission rules.
+
+A continuation runs no program, derives no change and admits nothing.
+Its `result.json` in `out/` is `{ "schemaVersion": 2, "results": [] }`, and it writes no execution report.
+
+## Budget
+
+An attempt has one budget for time and one account for direct model calls.
+
+### Time
+
+The host gets the job timeout less `TIMEOUT_BUFFER_SECONDS`, 60 seconds, as `AGENT_BUDGET_MS`.
+No program stage takes time before the host starts.
+When composition was requested, the measuring window keeps 85% of that budget, and composition keeps the rest.
+Each program's deadline is the end of the measuring window less `RETURN_MS`, 5 seconds.
+Thus, a program that unwinds at its deadline can still return.
+
+### Direct model calls
+
+The direct model calls of all practices share one attempt account, `ModelBudget` in `lib/models-host.ts`.
+The host takes its size from `PI_DIRECT_MODEL_TOKENS`.
+The server sets that variable from `hephaestus.practice-review.direct-model-tokens-per-attempt`.
+The environment variable of that setting is `PRACTICE_REVIEW_DIRECT_MODEL_TOKENS_PER_ATTEMPT`, and its default is 200000.
+A later practice sees only what the earlier practices left.
+
+The host reserves tokens before each call, and the reservation is an estimate.
+When the call ends, the host settles the account with the tokens that the provider reported.
+A call that fails, is cancelled, or reports no tokens keeps its reservation, because the provider can have billed it.
+A call that the account cannot hold does not run, and its reason is `budget`.
+
+The LLM proxy enforces the same token cap again for the attempt.
+It also counts the search units of reranking calls against `direct-model-search-units-per-attempt`, whose default is 1000.
+Past either cap, the proxy refuses further direct calls.
+[Cost and limits](/admin/ai-providers#cost-and-limits) gives the purses that the proxy also enforces.
+
+`MODEL_CONCURRENCY` in `lib/concurrency.ts` limits the direct calls in flight for all practices together to 4.
+
+### Review sessions
+
+The calls of a review session do not spend the direct-model account.
+The runner bounds each turn by `practice-model-calls`, 12 by default, for each practice that the turn carries.
+It also bounds each turn by `practice-output-tokens`, 16000 by default, in the same way.
+A turn gets at least three practices' worth.
+
+### Cancellation
+
+The host stops a program for one of three reasons: `deadline`, `budget` or `cancelled`.
+When it stops a custom program, it sends `abort` to the child.
+Each open request fails at once with that reason, and the host cancels the call behind it.
+If the child has not ended `RETURN_MS` later, the host kills it.
+The host sends no reply that arrives after the abort.
+
+The end of the measuring window aborts every program that still runs.
+A practice that the host did not start has the status `not-reached`.
+Its stop reason is the reason that the run stopped.
+
+## Model calls through IPC
 
 `ctx.models` in the child are stub objects from `lib/models-ipc.ts`.
-Each call goes to the runner as a message.
-`lib/models-host.ts` in the runner makes the call against the LLM proxy with `PRACTICE_SCRIPT_PROXY_TOKEN`, which the child never holds.
-`ctx.tools.grep` also runs in the runner, because the child cannot start a program.
+Each call goes to the host as a message.
+`hostModels` in `lib/models-host.ts` makes the call against the LLM proxy with `LLM_PROXY_TOKEN`, the one job token.
+The child never holds a token.
 
 A decision model with the `openai-decisions` protocol calls the [OpenAI Decisions API](https://developers.openai.com/api/docs/guides/decisions).
-On an `openai-completions` model, the runner asks for one letter for each question and reads `top_logprobs` at each answer position.
+On an `openai-completions` model, the host asks for one letter for each question and reads `top_logprobs` at each answer position.
 This adapter works only with models that return log probabilities, such as vLLM deployments and OpenAI chat models without reasoning.
 
-The runner refuses a call that holds more entries than the entry limit of its slot, `MODEL_SLOT_CAPS` in `lib/contract.ts`, with the reason `too-large`.
-[Limits](/admin/practice-scripts#limits) gives the values.
+The host refuses a call that holds more entries than the entry limit of its slot, `MODEL_SLOT_CAPS` in `lib/contract.ts`.
+Its reason is `too-large`.
 The embedding stub sets `maxEmbeddingsPerCall` to its limit, so the AI SDK splits a larger `embedMany` into calls within the limit.
 `classify` packs its questions with `PACK_SIZE` in `lib/practice-script.ts`, which stays below the decision limit.
-It keeps at most `MODEL_CONCURRENCY` packs in flight, through `eachBounded` in `lib/concurrency.ts`, so a large `classify` does not reach `MAX_IN_FLIGHT`.
-The runner starts the script processes through the same `eachBounded`.
+It keeps at most `MODEL_CONCURRENCY` packs in flight, through `eachBounded` in `lib/concurrency.ts`.
 
 On the Decisions, Embeddings and Rerank APIs, the proxy enforces the same limits with HTTP 413.
-A decision call to a Chat Completions model has only the runner's check.
+A decision call to a Chat Completions model has only the host's check.
 
-### Token accounting
+## What the host records
 
-The runner reserves tokens before each call, against the token limit of the practice and the attempt token limit.
-[Limits](/admin/practice-scripts#limits) gives the size of a reservation.
-When the call ends, the runner settles the account with the tokens that the provider reported.
-A call that fails, is cancelled, or reports no tokens keeps its reservation, because the provider can have billed it.
-The LLM proxy enforces the attempt token limit and the purses again, as [Cost and limits](/admin/ai-providers#cost-and-limits) tells.
-
-`MODEL_CONCURRENCY` in `lib/concurrency.ts` limits the model calls in flight for all scripts together.
-`MAX_IN_FLIGHT` in `lib/script-run.ts` stops a script that has too many requests in flight.
-[Limits](/admin/practice-scripts#limits) gives both values.
-
-## What the runner records
-
-When a practice ends, the runner writes `<slug>.md`, the section, and `<slug>.json`, the result.
-A script's result has these fields:
-
-| Field | Meaning |
-| --- | --- |
-| `contract` | `definition` when the runner accepted the script's `meta`. `unknown` when the script failed before that, or never started. |
-| `status` | `ok`, `skipped`, `error`, or `timeout`. `timeout` means that the runner stopped the script at its deadline, or that the stage ended before the script started. |
-| `durationMs` | The time from the start of the script to its result. |
-| `leads`, `facts`, `unrated`, `directions`, `kinds` | What the script returned, after the runner settled the leads. Each lead carries the quote that the runner wrote and its rating score. A lead on a line added since the previous review has `newSinceLastReview: true`. |
-| `newSinceLastReview` | How many leads cite a line added since the previous review. Absent when the change since that review is not known. |
-| `dropped` | The leads that the runner did not show. |
-| `models` | Slot → `{ need, bound, notRated }`. `bound` tells if the job has a model for the slot. `notRated` counts the calls that the runner could not rate, by reason. |
-| `error` | For `error` and `timeout`, why the script failed or was stopped. The report `practice-scripts.json` keeps its first line for `error` only, as the [workspace ABI](./agent/workspace-abi.mdx#practice-script-report) tells. |
-
-A script with the contract `unknown` has the status `error` or `timeout`, no leads, and empty `models` and `kinds`.
-Its needs are not known, so the server records no models for it.
-
-The result holds no tokens and no calls.
-The proxy counts those for each practice, and the usage report shows them.
-`.timing.json` holds the totals of the stage: `durationMs`, `practices`, `leads` and `errors`.
-`errors` counts the results with the status `error` or `timeout`.
-
-The review runner turns the results into the report `practice-scripts.json` in `out/`, which the server stores.
+The host writes the execution report `practice-scripts.json` into `out/` when the run ends.
+It has one entry for each admitted practice, the built-in programs and the practices not reached included.
 The [workspace ABI](./agent/workspace-abi.mdx#practice-script-report) gives its shape.
+
+An entry gives the program kind and digest, the status, the stop reason and the calls.
+It also gives the reads that the program and its reviews reached, and the run time.
+The digest is the SHA-256 of the staged bytes of a custom program, and `null` for the built-in program.
+The status `ok` means that a candidate passed the host's checks.
+Admission is a separate step, and admission can still withhold that candidate.
+The report holds no candidate and no tokens, because the proxy counts the tokens.
+
+The server stores the status as `PracticeScriptRunStatus`: `OK`, `SKIPPED`, `FAILED`, `NOT_REACHED` or `NOT_FINISHED`.
+`NOT_FINISHED` is the status of an admitted practice that a complete report does not name.
+The server derives `PracticeProgramPath` from the calls: `CODE`, `MODELS`, `REVIEW` or `MIXED`.
+At admission, the server computes the provenance of each result from its own pinned data, the program digest included.
 
 ## What a script can reach
 
 A practice script is code that a workspace admin writes.
 Hephaestus trusts it like the practice definition that it belongs to.
 The script still never holds a credential.
-The [workspace ABI](./agent/workspace-abi.mdx#practice-script-validation-and-limits) gives the grants of the script's process.
+The [workspace ABI](./agent/workspace-abi.mdx#practice-script-validation-and-limits) gives the grants of the program's process.
 
 The [Node permission model](https://nodejs.org/docs/latest-v24.x/api/permissions.html) is a seat belt, not a sandbox.
 It follows symbolic links, and it does not restrict the network.
 Thus, a token must not be in a process that runs script code:
 
-| Process | Tokens in its environment |
+| Process | Token in its environment |
 | --- | --- |
-| The container's PID 1 and `pi-practice-scripts.sh` | `LLM_PROXY_TOKEN` and `PRACTICE_SCRIPT_PROXY_TOKEN` |
-| `pi-practice-scripts.ts` and `runner.ts`, started with `env -i` | `PRACTICE_SCRIPT_PROXY_TOKEN` only, with `LLM_PROXY_URL` |
-| A script's process | None. Its environment is empty. |
-| The review runner | `LLM_PROXY_TOKEN` only. The stage unsets `PRACTICE_SCRIPT_PROXY_TOKEN` before the review starts. |
+| The container's PID 1 and the review host, `pi-runner.ts` | `LLM_PROXY_TOKEN`, the one job token of the attempt |
+| The process of a custom program | None. Its environment is empty. |
 
-A script's process can read the `/proc/<pid>/environ` of another process only through a symbolic link in a folder that it may read.
+There is no second token for practice scripts.
+The direct-model route `/internal/llm/practice-script/{slot}/**` takes the same job token as the review session.
+The proxy refuses a mentor credential on that route with HTTP 403, because the route bills a review attempt.
+
+A program's process may read only the toolkit install, its dependency folders and the stage, `work/practice-scripts/`.
+It can read the `/proc/<pid>/environ` of another process only through a symbolic link in such a folder.
 No untrusted party can put such a link there:
 
-- The checkout writes each link of the repository as a plain file.
-- The server stages context inputs only as regular files.
-- The script's process has no write grant.
+- The server stages the inputs only as regular files.
+- The program's process has no write grant.
 - The only link in the stage is the fixed `lib` link.
 
-The model calls of a script have these controls:
+The model calls and reads of a program have these controls:
 
 | Control | Effect |
 | --- | --- |
-| Model calls through IPC | Each call goes to the runner as a message, and the runner makes it with a credential that the script never holds. |
-| Request allowlist | The runner keeps only the fields that a call from a practice script can set. It drops provider options and headers. Chat keeps only function tools. |
-| Practice header | The runner names the script's practice on each call. A script cannot name another practice, because the allowlist drops its headers. The [workspace ABI](./agent/workspace-abi.mdx#models-for-practice-scripts) gives the header. |
-| No default provider | `lib/models-ipc.ts` sets the AI SDK [global provider](https://ai-sdk.dev/docs/ai-sdk-core/provider-management#global-provider-configuration) to an empty provider, so a script cannot reach another provider through it. |
-| Parsed messages | The runner parses every message and result with zod. A message that does not parse stops the script. |
+| Model calls through IPC | Each call goes to the host as a message, and the host makes it with a credential that the program never holds. |
+| Reads through the host | The program reads the work only through the host, which reads only the pinned captures and keeps a receipt of each read. |
+| Request allowlist | The host keeps only the fields that a direct model call can set. It drops provider options and headers. Chat keeps only function tools. |
+| Practice header | The host names the program's practice on each call. A program cannot name another practice, because the allowlist drops its headers. |
+| No default provider | `lib/models-ipc.ts` sets the AI SDK [global provider](https://ai-sdk.dev/docs/ai-sdk-core/provider-management#global-provider-configuration) to an empty provider, so a program cannot reach another provider through it. |
+| Parsed messages | The host parses every message with zod. A message that does not parse stops the program. |
+
+The [workspace ABI](./agent/workspace-abi.mdx#models-for-practice-scripts) gives the practice header.
 
 ## How the server learns needs
 
 A script declares `meta.models` in code, and the server does not parse scripts.
 Thus, the server knows what a script needs only after a review runs it.
 
-The server stores the report of each review attempt as `agent_job_practice_script_run` rows.
+The server stores the execution report of each review attempt as `agent_job_practice_script_run` rows, one for each admitted practice.
+A row holds the status, the program kind and digest, the stop reason, the calls and the reads reached.
+It also holds the declared models, the run time, and the error line of a failed program.
+A program that the host did not reach has no models in its row.
 The [workspace ABI](./agent/workspace-abi.mdx#practice-script-report) describes the report.
-A row holds the status, the number of leads, the declared models, the run time, and the error line of a failed script.
-A script whose models are not known has no models in its row.
 
 The job's snapshot holds only the models of its latest attempt.
 Thus, a row of an earlier attempt cannot read its tiers from the snapshot.
 The row itself stores the tier of the model that the attempt froze for each declared model.
 A retry cannot change the tiers of an earlier attempt.
 The proxy records the calls and tokens of each slot in an `agent_job_practice_script_usage` row, with the tier of the model that served them.
-Thus, a script that did not finish, whose run has no models, still shows the tier of each model that it called.
+Thus, a program that did not finish still shows the tier of each model that it called.
 
-`GET /workspaces/{workspaceSlug}/agents/jobs/{jobId}/practice-scripts` returns the rows of the current attempt of one review, joined with the usage rows of that attempt.
+`GET /workspaces/{workspaceSlug}/agents/jobs/{jobId}/practice-scripts` returns the rows of the current attempt of one review.
+It joins them with the usage rows of that attempt.
 Only the attempt's terminal write records its rows.
 Thus, the list is empty while a retry runs, and a retry never shows the rows of an earlier attempt.
 
-`GET /workspaces/{workspaceSlug}/practices/scripts` serves the needs to workspace admins.
+`GET /workspaces/{workspaceSlug}/practices/practice-script-needs` serves the needs to workspace admins.
 It gives one entry for each practice with a script.
-The entry has the needs from the newest run that declared the script's models.
-A run whose models are not known says nothing about them, so the server passes over it.
+The entry has the needs from the newest run that reported the script's models.
 For each need, it names the tiers that no ready assignment serves now.
 When that run ran an earlier version of the script, the entry gives `scriptChanged: true` and no needs.
 
@@ -292,50 +435,70 @@ Before each call, it checks only that the model fits the developer's own AI choi
 
 ## Testing
 
+The TypeScript tests are under `docker/agents/practice-scripts/` and `server/application/src/test/resources/agent/`.
+
 | Test | What it proves |
 | --- | --- |
-| `docker/agents/practice-scripts/definition.test.ts` | The runner runs the fixtures against the proxy stand-in, holds the token limits, settles leads, and renders sections. |
-| `docker/agents/practice-scripts/runner.test.ts` | Process grants, deadlines, sections, a stopped stage, and the error of a script in the retired form. |
-| `docker/agents/practice-scripts/lib/leads.test.ts` | The section bound: the notices of a failed script and the `Not rated` lines stay, and a line counts what the bound leaves out. |
-| `docker/agents/practice-scripts/scripts.test.ts` and `server/application/src/test/resources/agent/*-practice-script.spec.ts` | The bundled scripts. Each runs through `run-bundled.ts`, which validates the inputs and the result as the runner does. |
-| `docker/agents/practice-scripts/live.test.ts` | The runner and `fixtures/every-slot.ts` against real models. |
-| `server/application/src/test/resources/agent/pi-practice-scripts-report.spec.ts` | `practice-scripts.json` for each status, its bounds, and a script without a result. |
-| `PiResultParserPracticeScriptReportTest` | The server reads the report within its bounds and drops entries outside the contract. |
-| `PracticeScriptIntegrationTest` | The stored runs and the first line of a failed script's error, also when it holds a NUL. The runs of one review, with the calls that the proxy counted and the tiers of the attempt shown. The needs endpoint. Both endpoints with their access rules. The check that the proxy asks for each call allows a model for practice scripts only within the developer's own AI choice. |
-| `ReviewMemberAiPolicyTest` | The review's models for practice scripts come from the routing adapter for the reviewed developer. A Cloud member whose review runs on an In-house model gets no Cloud decision model. |
+| `lib/program-host.test.ts` | The built-in program and custom programs through the host. The child's grants, one review at a time, and the IPC bounds. A second final message, cancellation, the deadline, the shared direct budget, and the retired forms. |
+| `lib/contract.test.ts` | `parseCandidate` on the shared fixtures, each refusal code and its order, the candidate bounds, `meta`, and the review input. |
+| `lib/evidence-reader.test.ts` | The governed reads: found, binary and absent files, cut and failed reads, paths outside the tree, the `.git` folder, searches, records and citations. |
+| `definition.test.ts` | The fixtures through the host against the proxy stand-in: each slot, the shared budget, reservations, cancellation, the request allowlist and the practice header. |
+| `cause.test.ts` | The context of a pull request and of an issue. Inputs that do not parse, a wrong `expectKind`, new leads, a force push, and the example of the admin page. |
+| `validate.test.ts` | `validate.ts` with and without `--review`, the retired forms, a skipped program, a killed process, and the exit codes. |
+| `scripts.test.ts` and `*-practice-script.spec.ts` | The bundled scripts. Each runs through `run-bundled.ts`, with a fake `review()` that records the review input. |
+| `lib/leads.test.ts` | Lead resolution, new leads, a lead that its source does not hold, and the bound of the section. |
+| `lib/models-host.test.ts` | The models file, settlement, the shared account, a failed call, and the calls in flight. |
+| `lib/script-inputs.test.ts` | The schema of the inputs of each kind, the descriptive fields, `expectKind`, and `changeSince`. |
+| `lib/practice-script.test.ts` | The primitives, and that `classify` keeps at most `MODEL_CONCURRENCY` packs in flight. |
+| `live.test.ts` | The host and `fixtures/every-slot.ts` against real models. |
+| `pi-program-host.spec.ts` | The runner as the host: admission, the built-in session, the retired forms, missing inputs, the execution report, a practice not reached, and a continuation. |
+| `pi-direct-budget.spec.ts` | The shared direct account across practices, review sessions outside it, and the one job token on each direct call. |
+| `pi-practice-scripts-report.spec.ts` | `practice-scripts.json` against the shared fixture, each status and stop reason, the digest, the error line, and the bounds. |
+| `pi-result-normalize.spec.ts` | The normalization of a submitted result for each outcome. |
+| `pi-review-golden.spec.ts` | The prompts of a review session against frozen copies, the tools of the session, and one session for the built-in program. |
+
+The Java tests are under `server/application/src/test/java/de/tum/cit/aet/hephaestus/`.
+
+| Test | What it proves |
+| --- | --- |
+| `CandidateFixturesTest` | The server parses and refuses the shared fixtures as `lib/contract.test.ts` does. |
+| `CandidateContractSyncTest` | The candidate bounds and the refusal order are the same in `lib/contract.ts` and in `CandidateParser`. |
+| `PracticeScriptContractSyncTest` | The slots, protocols, reasons, statuses, stop reasons, program kinds, practice header and slug pattern are the same on both sides. So are the kinds, moments, review states, origins, outcomes, severities, subject roles and suffixes. |
+| `PiResultParserPracticeScriptReportTest` | The server reads the shared execution report within its bounds and drops entries outside the contract. |
+| `PracticeScriptIntegrationTest` | One stored run for each admitted practice, the error line, the runs of one review, the needs endpoint and the access rules. |
+| `ResultAdmissionServiceTest`, `ResultAdmissionControllerTest` and `ResultAdmissionConcurrencyIntegrationTest` | The admission of the results, the version 2 body, the identity from the token, and the job lock. |
+| `PracticeScriptInputsTest` | The cause type, the scope, the review of a reviewer moment, and the current result without model text. It stages no invalidated, unauthorized or unconsented result. |
+| `PracticeScriptUpgradeIntegrationTest` | An unchanged copy of a bundled script takes the offered script, and a diverged copy keeps its own and its offer. |
+| `PracticeResultCutoverMigrationTest` | The migration of results, problems, delivered evidence and earlier runs from the released schema. |
+| `PracticeScriptCapsSyncTest` | `MODEL_SLOT_CAPS` equals the entry limits of one direct call in `LlmProxyService`. |
+| `ReviewMemberAiPolicyTest` | The review's models for practice scripts come from the routing adapter for the reviewed developer. |
 | `LlmUsageByPracticeIntegrationTest` | The cost split by practice adds up to the usage rows. |
-| `docker/agents/practice-scripts/validate.test.ts` | `validate.ts` runs a script, and a script in the retired form exits with 1 and its error line. It runs a script as a request by hand, or at the moment and with the previous result of its options. It skips a script without its required model and exits with 1 for a failed script. It stops with exit code 2 on a bad file name, a missing argument, or an input that it cannot use. |
-| `PracticeScriptContractSyncTest` | The slots, protocols, reasons, run statuses, practice header and slug pattern are the same in `lib/contract.ts` and in Java. So are the kinds, moments and review states of the artifact descriptors. So are the origins, outcomes, severities, subject roles, and the suffixes of the staged inputs. |
-| `PracticeScriptInputsTest` | The server stages the cause type for a bound moment, a recheck and a request by hand. It stages the review of a reviewer moment, and the current claim without model text. It stages no claim that is invalidated, not authorized, or from a conversation without consent. |
-| `docker/agents/practice-scripts/cause.test.ts` | The runner gives the context of a pull request and of an issue. It fails a script on inputs that do not parse and on a wrong `expectKind`. It marks new leads, marks none after a force push, and runs the example of the admin page. |
-| `docker/agents/practice-scripts/lib/script-inputs.test.ts` | The schema of the inputs of each kind, with records in the shapes that the content sources stage. The descriptive fields that read an unnamed value as not known. The error that names its file, `expectKind`, and `changeSince` for an ancestor, a force push and a missing commit. |
-| `docker/agents/practice-scripts/lib/practice-script.test.ts` | The primitives, and that `classify` keeps at most `MODEL_CONCURRENCY` packs in flight. |
-| `PracticeScriptCapsSyncTest` | `MODEL_SLOT_CAPS` in `lib/contract.ts` equals the entry limits of one call from a practice script in `LlmProxyService`. |
 | `MemberAiRoutingAdapterTest` | The data-class rule of [Privacy](/admin/ai-providers#privacy) for the job's slots and the needs endpoint. |
+
+`server/application/src/test/resources/practice-results/` holds the shared fixtures.
+They are candidates, an admission request and reply, an execution report, and invalid candidates with their refusal codes.
+Both languages read them.
+Do not change a fixture for one side only.
 
 Run one TypeScript file with `node --test <file>`.
 `vp run test:agents` runs all of them.
 The Java tests run in the server's test tiers (`server/AGENTS.md` § Test tiers).
 
-`test/proxy-stand-in.ts` serves the practice script proxy routes, `POST /practice-script/<slot>/<operation>`.
-It checks the practice script token and records each request.
+`test/proxy-stand-in.ts` serves the direct model routes, `POST /practice-script/<slot>/<operation>`.
+It checks the bearer token and records each request.
 A test gives it a handler that answers by item.
 A handler must throw for an item that it does not know, so that a changed prompt fails the test.
-A test asserts what the runner guarantees, never the wording of a real model.
+A test asserts what the host guarantees, never the wording of a real model.
 
 To test a new script:
 
 1. Put a fixture next to the others in `docker/agents/practice-scripts/fixtures/`.
 2. Add a case to `definition.test.ts` that runs the fixture with no models.
-   `stagePracticeScripts` stages a requested pull request review beside the fixture, and the test stages `fixtures/pull-request-metadata.json` as its record.
-3. Assert the leads that code finds and the `unrated` lines.
+3. Assert the review input that the program asks for, or the candidate that it returns.
 4. Add a case for each slot with a stand-in handler that answers by item.
-5. Assert the leads, the quotes, and the `models` report in `<slug>.json`.
+5. Assert the `models` and `calls` of the outcome.
 
-`validate.ts` runs one script on a repository without models, through the same staging as the tests.
-[Run a script on your own change](/admin/practice-scripts#run-a-script-on-your-own-change) gives its options.
-
-To run a script with models, set `LLM_PROXY_URL` to a server that serves the practice script routes, and `PRACTICE_SCRIPT_PROXY_TOKEN` to its token.
-Then pass a models file to `runner.ts` with `--models`.
-`live.test.ts` shows this setup with the stand-in.
+`validate.ts` runs one program on a repository without models and without a review session.
+[Run a program on your own change](/admin/practice-scripts#run-a-program-on-your-own-change) gives its options.
+`live.test.ts` shows how to run a program with models behind the stand-in.
 `fixtures/every-slot.ts` uses every primitive and every slot.

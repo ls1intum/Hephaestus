@@ -11,7 +11,7 @@ should start with [Practice Review](./practice-review.mdx).
 
 Public feedback addresses the author’s work.
 `PUBLIC_SUBJECT_INELIGIBLE` means the recorded subject or its support does not qualify for that public placement.
-Reviewer observations remain recorded for the reviewer.
+Reviewer results remain recorded for the reviewer.
 Private feedback must pass its own evidence, recipient and delivery checks.
 
 ## Deployment configuration
@@ -36,10 +36,11 @@ Work, not time, bounds the set.
 Each value is multiplied by the number of practices in the set, with a minimum of three.
 A set of five practices can make 60 model calls and write 80,000 output tokens.
 
-The model calls of practice scripts have their own attempt token limit and attempt search unit limit.
-`PRACTICE_REVIEW_PRACTICE_SCRIPT_MAX_TOKENS_PER_ATTEMPT` (default 200000) and `PRACTICE_REVIEW_PRACTICE_SCRIPT_MAX_SEARCH_UNITS_PER_ATTEMPT` (default 1000) set them.
+A practice script that calls `ctx.review()` opens review sessions, and their calls count against these same set budgets.
+The direct model calls of practice scripts have their own limits for each review attempt: a token limit and a search unit limit.
+`PRACTICE_REVIEW_DIRECT_MODEL_TOKENS_PER_ATTEMPT` (default 200000) and `PRACTICE_REVIEW_DIRECT_MODEL_SEARCH_UNITS_PER_ATTEMPT` (default 1000) set them.
 See [Cost and limits](./ai-providers.mdx#cost-and-limits).
-[Practice scripts](#practice-scripts) tells you how to read what each script did.
+[Practice scripts](#practice-scripts) tells you how to read what each practice program did.
 
 The defaults cap excessive work at several times a set's normal use.
 A review spends what its practices need, and no more.
@@ -58,8 +59,8 @@ Independent set budgets do not reserve time for every set.
 If a set has no streamed token or tool progress for five minutes, it stops.
 Two consecutive stalls end measurement with its recorded results.
 
-A timeout below 151 seconds runs at 151 seconds.
-The practice scripts run first, inside the same timeout, as the [workspace ABI](/contributor/agent/agent-workspace-abi#practice-script-validation-and-limits) describes.
+A timeout below 61 seconds runs at 61 seconds.
+Each practice program runs inside the same timeout, with no time reserved before the review, as the [workspace ABI](/contributor/agent/agent-workspace-abi#practice-script-validation-and-limits) describes.
 
 `PRACTICE_REVIEW_SAMPLING_TEMPERATURE` sets the sampling temperature for practice-review model calls, not mentor calls.
 If unset, the provider default applies.
@@ -95,7 +96,7 @@ A diagnostic type does not grant a retry.
 Eligibility and retry limits are unchanged.
 Earlier failures without a retained cause cannot be classified retrospectively.
 
-PostgreSQL retains admitted observations and their citation verification results.
+PostgreSQL retains admitted results and their citation verification results.
 Delivery does not require the worker's source files.
 [ADR 0041](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0041-compose-1x-kubernetes-2.md#evidence-admission-and-deletion) defines the storage and cleanup contract.
 
@@ -129,8 +130,8 @@ Use them for alerts instead of application logs.
 - **`llm.proxy.budget.blocked`** — model calls of a running job that the LLM proxy refused at a cap, tagged by `apiProtocol` and `cap`.
   `instance` names the shared-model budget, and `byo` names the provider cap.
   An admin raises it.
-  `practice_script_attempt` names the [attempt token limit or the attempt search unit limit](./ai-providers.mdx#cost-and-limits).
-  An operator raises them with `PRACTICE_REVIEW_PRACTICE_SCRIPT_MAX_TOKENS_PER_ATTEMPT` and `PRACTICE_REVIEW_PRACTICE_SCRIPT_MAX_SEARCH_UNITS_PER_ATTEMPT`.
+  `practice_script_attempt` names the [direct model token limit or search unit limit of the attempt](./ai-providers.mdx#cost-and-limits).
+  An operator raises them with `PRACTICE_REVIEW_DIRECT_MODEL_TOKENS_PER_ATTEMPT` and `PRACTICE_REVIEW_DIRECT_MODEL_SEARCH_UNITS_PER_ATTEMPT`.
 - **`practice.review.occasions`** — live issue-update recording attempts, tagged by `signal` and `outcome` (`deferred` or `duplicate`).
   These exclude issue opening and closing.
 - **`practice.review.refused`** — refused reviews, tagged by `phase` (`submission` or `execution`) and `reason`.
@@ -157,104 +158,100 @@ Metric names in the instrumented code are authoritative for dashboards and alert
 
 ### Practice scripts
 
-A practice's practice script runs before the review and points it at places to check.
-For each review, Hephaestus records what each script did.
+Each practice of a review runs one program: its practice script, or the built-in program when it has none.
+For each review, Hephaestus records how each program ran.
 Workspace admins see it in two places:
 
 - **The trace line.** Open the work under **Practice reviews → Work**, then **Every practice**.
-  The column **What it saw** has one line for each practice with a script.
+  The column **What it saw** has one line for each practice of the review.
 - **The section Practice scripts of the review.** Open the review under **Practice reviews → Reviews**, or select **Details** in the trace line.
 
 [Write a practice script](./practice-scripts.mdx) tells how to write and try a script.
 
 #### The trace line
 
-The line starts with how the script ended.
-If some model calls of the script were not rated, the line adds their count.
+The line starts with how the program ended.
+It names the program: **Practice script** or **Built-in review**.
+If some model calls of the program were not rated, the line adds their count.
 An example is `5 calls were not rated.`
 Then it has at most one link that fixes the cause, and **Details**.
 **Details** opens the review's section **Practice scripts**.
 
+A program that returned a result has not yet passed admission.
+The server can still withhold that result, as [What admission checks](./practice-scripts.mdx#what-admission-checks) tells.
+
 | The line starts with | What it means | What to do |
 | --- | --- | --- |
-| **Practice script found** | The script ran to its end. It gave the review the places that the line counts. | Nothing. If the line links **Check the decision model**, or the model that it names, a model caused calls that were not rated. Open its row and check it. |
-| **Practice script handed the review no places** | The script ran to its end and gave no places, but some of its model calls were not rated. It does not mean that the work has nothing to check. | Select **Details** and read the reasons. If the line links **Check the decision model**, or the model that it names, open its row and check it. |
-| **Practice script did not run** | The review had no model that the script requires. Either no model is assigned for the reviewed developer's AI choice, or the assigned model does not meet the rule in [Privacy](./ai-providers.mdx#privacy). The line names the model, such as `no decision model was set for this review`. The review checked the practice without the script. | Select **Assign a decision model**, or the link for the model that the line names. Assign a model for that tier. If the review ran on an In-house model, assign an In-house model. |
-| **Practice script failed** | The script stopped with an error, returned a result that is not valid, or its process ended without a result. | Select **Edit the script**. The review's section shows the first line of the error. To reproduce it, [run the script on the same change](./practice-scripts.mdx#run-a-script-on-your-own-change). |
-| **Practice script ran out of time** | The script passed its deadline, or the practice script stage ended before the script started. | If many scripts in one review run out of time, raise the timeout of the **Practice reviews** assignment on **AI models**. Otherwise, make the script faster. |
-| **Practice script did not finish** | The script was staged, but the stage stopped before the script reported a result. | Same as for a script that ran out of time. If it continues, read the container logs that the job record keeps. When the stage fails, they hold the end of the practice script runner's log. |
+| **… returned a result** | The program ran to its end and returned a valid result. The line can say how: from its code alone, with its models, through the review, or with its models and the review. | Nothing. If the line links **Check the decision model**, or the model that it names, a model caused calls that were not rated. Open its row and check it. |
+| **… did not run** | The review had no model that the script requires. Either no model is assigned for the reviewed developer's AI choice, or the assigned model does not meet the rule in [Privacy](./ai-providers.mdx#privacy). The line names the model, such as `no decision model was set for this review`. The practice has no result in this review. | Select **Assign a decision model**, or the link for the model that the line names. Assign a model for that tier. If the review ran on an In-house model, assign an In-house model. |
+| **… stopped without a result** | The program stopped. The line gives the reason, such as `it raised an error`, `it ran out of time`, `what it returned is not a result`, or `it is not a program the review can run`. The practice has no result in this review. | For a script error, select **Edit the script**. The review's section shows the first line of the error. To reproduce it, [run the program on the same change](./practice-scripts.mdx#run-a-program-on-your-own-change). For time or budget, see below. |
+| **The review ended before … started** | The attempt ran out of time or budget, or was cancelled, before it reached this practice. | Same as for a program that ran out of time. |
+| **… did not finish** | The review's report does not name the program, for example because the container stopped. | Same as for a program that ran out of time. If it continues, read the container logs that the job record keeps. |
 
-A script that failed, ran out of time, or did not finish can still have given the review places.
-Then the line adds them.
-An example is `Practice script ran out of time but found 3 places to check.`
+A program that ran out of time or budget, or did not finish, links **Why scripts stop early**.
+It opens this section.
+The practices of a review run one after the other in the time of the **Practice reviews** assignment.
+If many practices in one review run out of time, raise the timeout of that assignment on **AI models**.
+Otherwise, make the slow script faster.
+[Limits](./practice-scripts.mdx#limits) gives the time and token limits of a program.
 
-Some causes have no single fix in the workspace.
-For them, the link opens a section of this page:
+A script from an earlier release stops with the error *This script uses the retired positional form. Rewrite it with definePracticeScript.*
+[Upgrade a script from an earlier release](./practice-scripts.mdx#upgrade-a-script-from-an-earlier-release) tells what to do.
 
-- A script that ran out of time or did not finish links **Why scripts stop early**.
-  It opens [The trace line](#the-trace-line), and the table above tells what to do.
-- A script that ran to its end can have calls that were not rated only for such causes.
-  These causes are a spent token limit, budget or cap, a slow model, and a call with too many entries.
-  Then the script links **Why calls go unrated**.
-  It opens [Calls that were not rated](#calls-that-were-not-rated), which tells who fixes each cause, and where.
-
-The stage takes its time from the timeout of the **Practice reviews** assignment.
-The [workspace ABI](/contributor/agent/agent-workspace-abi#practice-script-validation-and-limits) gives the time limits of the stage and of each script.
+A program that ran to its end can have calls that were not rated only for causes outside the workspace.
+These causes are a spent token limit, budget or cap, a slow model, and a call with too many entries.
+Then the line links **Why calls go unrated**.
+It opens [Calls that were not rated](#calls-that-were-not-rated), which tells who fixes each cause, and where.
 
 #### The review's practice scripts
 
-A review that ran at least one script has the section **Practice scripts**.
-It is between the review's output and **How this review ran**.
-It has one row for each script:
+The section **Practice scripts** is between the review's output and **How this review ran**.
+It has one row for each practice of the review:
 
 | Column | What it shows |
 | --- | --- |
 | **Practice** | The practice. It links to the practice. A practice that the workspace no longer has shows its identifier and **Not a current practice**. |
-| **Result** | **Found 3 places**, **Found no places**, **Handed the review no places**, **Did not run**, **Failed**, **Ran out of time**, or **Did not finish**. A script that ended early but gave places adds them, such as **Failed, found 2 places**. Below the result is the same fix link as in the trace line. A practice that the workspace no longer has shows no **Edit the script**. For a script that failed, the first line of the error comes last. |
+| **Result** | How the program ended. Examples are **Result from code**, **Result from the review**, **Did not run**, **Failed: ran out of time**, **Not reached** and **Did not finish**. Below it is the same fix link as in the trace line. A practice that the workspace no longer has, or that runs the built-in program, shows no **Edit the script**. For a program that failed, the first line of the error comes last. |
 | **Models** | Each decision, embedding or reranking model that the script declared or called. An icon shows the tier of the model that the review had for it. A declared model that the review did not have and that made no calls shows **No model**. The review's own chat model never shows here. |
 | **Not rated** | The model calls that were not rated, with one line below for each reason, such as `5 too slow` and `1 wrong format`. [Calls that were not rated](#calls-that-were-not-rated) gives what to do for each reason. |
-| **Calls** | The decision, embedding and reranking calls that the proxy recorded for the script. A script that did not run, or that uses no such model, shows a dash. |
-| **Time** | How long the script ran, such as `4.2 s` or `2 min 5 s`. A run shorter than 0.1 seconds shows `< 0.1 s`. A script that did not run or did not finish shows a dash. |
-
-A script that gave no places while some of its calls were not rated shows **Handed the review no places**.
-It does not mean that the work has nothing to check.
+| **Calls** | The decision, embedding and reranking calls that the proxy recorded for the program. A program that did not run, or that uses no such model, shows a dash. |
+| **Time** | How long the program ran, such as `4.2 s` or `2 min 5 s`. A run shorter than 0.1 seconds shows `< 0.1 s`. A program that did not run, was not reached, or did not finish shows a dash. |
 
 The section shows no cost.
 Its note says `Spend is on AI usage.`
 **AI usage** shows the cost of models for practice scripts, by practice.
 The card **How this review ran** shows the review's **Model** with an icon for its tier.
-Its **Review model calls** and token counts include the chat calls of the scripts, because those calls use the review's model.
+Its **Review model calls** and token counts include the review sessions that programs open with `ctx.review()`, and the direct chat calls of the scripts.
 They do not include the decision, embedding and reranking calls.
 
 #### Calls that were not rated
 
 A model call that was not rated has a reason.
 The count is model calls, not places.
-A reason never means that the script found nothing.
+A reason never means that the program found nothing.
 This table is the one list of reasons.
-The column **In a script** gives the name that a script and the section that the review reads use.
+The column **In a script** gives the name that a script and the review input use.
 
 | Reason | In a script | What it means | What to do |
 | --- | --- | --- | --- |
-| model missing | `unavailable` | No model of that slot was available to the script. | Assign the model. **Check the decision model**, or the link for the model that the row names, opens its row. |
+| model missing | `unavailable` | No model of that slot was available to the program. | Assign the model. **Check the decision model**, or the link for the model that the row names, opens its row. |
 | limit reached | `budget` | A token limit cannot hold the call, or the shared-model budget or the provider cap is spent. For `agent`, no `submit` call came within `maxSteps`. | Raise the limit that was spent. The list below tells who raises each limit, and where. |
-| too slow | `deadline` | The script's deadline passed before the model answered, for example because the model was slow or had to load first. A call that the script aborted also has this reason. | Ask the operator of the model's host to keep the model loaded, or assign a faster model. |
-| too large | `too-large` | The call held more entries than one call can send, or the script found an item too large to send. The runner refuses a call with too many entries before it reaches the model. | Ask the script's author to send fewer entries in one call. [Limits](./practice-scripts.mdx#limits) gives the limits. |
-| wrong format | `off-format` | The model's answer did not have the expected shape. In the section that the review reads, a lead that did not resolve also has this reason. | The model is not suitable for this purpose. Choose another model. |
-| declined | `refused` | The model declined to answer. The script sets this reason. | Choose another model. |
+| too slow | `deadline` | The program's deadline passed before the model answered, for example because the model was slow or had to load first. A call that the program aborted also has this reason. | Ask the operator of the model's host to keep the model loaded, or assign a faster model. |
+| too large | `too-large` | The call held more entries than one call can send, or the program found an item too large to send. The host refuses a call with too many entries before it reaches the model. | Ask the script's author to send fewer entries in one call. [Limits](./practice-scripts.mdx#limits) gives the limits. |
+| wrong format | `off-format` | The model's answer did not have the expected shape. | The model is not suitable for this purpose. Choose another model. |
+| declined | `refused` | The model declined to answer. The program sets this reason. | Choose another model. |
 | failed | `error` | Any other failure, such as an error from the provider or a rate limit. | Check the provider and the connection. |
 
-The column **Not rated** counts only the model calls that the runner could not finish.
+The column **Not rated** counts only the model calls that the host could not finish.
 Thus, it never shows `refused`.
-The `unrated` entries that a script returns reach only the section that the review reads, as [What the review reads](./practice-scripts.mdx#what-the-review-reads) tells.
+The limitations that a program gives to `ctx.review()` reach only the review session, as [What the review reads](./practice-scripts.mdx#what-the-review-reads) tells.
 
 A token limit, a budget or a cap stops calls in one of these places:
 
-- **The token limit of the practice**, `meta.tokens`, or the `maxSteps` of `agent`.
+- **The `maxSteps` of `agent`.**
   The script's author raises it in the script, or makes the script send less.
-  [Limits](./practice-scripts.mdx#limits) gives the limits.
-- **The attempt token limit or the attempt search unit limit.**
-  An operator raises them with `PRACTICE_REVIEW_PRACTICE_SCRIPT_MAX_TOKENS_PER_ATTEMPT` and `PRACTICE_REVIEW_PRACTICE_SCRIPT_MAX_SEARCH_UNITS_PER_ATTEMPT`.
+- **The direct model token limit or the direct model search unit limit of the attempt.**
+  An operator raises them with `PRACTICE_REVIEW_DIRECT_MODEL_TOKENS_PER_ATTEMPT` and `PRACTICE_REVIEW_DIRECT_MODEL_SEARCH_UNITS_PER_ATTEMPT`.
   See [Cost and limits](./ai-providers.mdx#cost-and-limits).
 - **The shared-model budget.**
   Only an instance admin raises it on **Instance admin → AI usage** with **Change budget**.
@@ -265,27 +262,28 @@ On **AI usage**, the tile of a purse whose budget or cap is spent shows **Paused
 A purse with a budget or cap also pauses when some of its usage has no price.
 Its tile then shows **No price set**, and an alert gives the number of runs that have usage without a price.
 
-A failed or stopped script never becomes a claim about the developer's work.
-The review checks the practice from the sources.
+A program that failed, was skipped, or was not reached gives its practice no result in that review.
+It never becomes a claim about the developer's work.
 
 #### Practice script metrics
 
-Two metrics count practice script events on the worker:
+Two metrics count practice program events on the worker:
 
-- **`agent.review.practice_scripts`** — one count for each script run that the report of a review attempt records, tagged by `status`: `ok`, `skipped`, `failed`, `timed_out` or `not_finished`.
-  A staged script that a complete report does not name counts as `not_finished`.
+- **`agent.review.practice_scripts`** — one count for each practice that the report of a review attempt records, tagged by `status`: `ok`, `skipped`, `failed`, `not_reached` or `not_finished`.
+  It counts built-in programs and practice scripts.
+  An admitted practice that a complete report does not name counts as `not_finished`.
   A missing report adds no count.
-  A truncated report adds no count for the scripts that it does not name.
+  A truncated report adds no count for the practices that it does not name.
   An entry that is not valid adds no count.
   It counts when the attempt's results are stored.
-  A growing share of `failed`, `timed_out` or `not_finished` needs attention.
+  A growing share of `failed`, `not_reached` or `not_finished` needs attention.
   `skipped` usually means a missing assignment.
-- **`llm.proxy.practice_script.unattributed`** — calls from practice scripts that the proxy refused with HTTP 400, because they named no valid practice.
+- **`llm.proxy.practice_script.unattributed`** — direct model calls that the proxy refused with HTTP 400, because they named no valid practice.
   It is 0 when the server and the agent image come from the same release.
   A value above 0 means that the agent image does not send the practice of each call.
   Run the agent image of the server's release.
 
-[Queue health](#queue-health) lists `llm.proxy.budget.blocked`, which also counts the calls from practice scripts that a budget, a cap or the attempt token limit refused.
+[Queue health](#queue-health) lists `llm.proxy.budget.blocked`, which also counts the direct model calls that a budget, a cap or the direct model limit of the attempt refused.
 
 ### Issue-update queue
 
@@ -371,7 +369,7 @@ The reservation also does not order when the provider receives the request.
 Copies an earlier attempt may have posted are still looked up first, against the reviewed commit.
 An unconfirmed write is never settled unseen.
 The [review pipeline](/contributor/practice-review-pipeline#copies-on-the-reviewed-work-are-immutable) describes the reservation boundary.
-Its [observation section](/contributor/practice-review-pipeline#observation) describes how new reviews retain their occasion and prior reviews keep their ordering.
+Its [result section](/contributor/practice-review-pipeline#result) describes how new reviews retain their occasion and prior reviews keep their ordering.
 
 **Where inline comments land.** GitHub inline comments are review comments on the lines.
 GitLab inline comments are ordinary merge request comments.
@@ -463,7 +461,7 @@ These behaviors matter independently of configured capacity:
   Neither substitutes for the other in diagnosis of missing context.
 - **Work that has been deleted at the provider yields a review with no evidence, not an empty one.**
   After reconciliation finds work missing upstream, evidence capture reports its sources as unavailable.
-  The review stops without an observation about that work.
+  The review stops without a result about that work.
   If the work reappears, the next ordinary sync clears the mark.
   A later review reads the work again.
 - **No screen edits what the model is told.**

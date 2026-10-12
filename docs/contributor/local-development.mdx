@@ -178,7 +178,7 @@ If work is missing, the seed stops before it writes.
 
 - The organization sync removes the synthetic members when the server starts and every night. Run the seed again after a restart.
 - Removal deletes only rows that the seed wrote, and the answers that you gave to the demo feedback. It refuses to run while a review is queued or running.
-- The seed writes reviews and observations directly with the `POSTGRES_*` values in `server/.env`. It refuses a `POSTGRES_HOST` that is not a loopback address.
+- The seed writes reviews and results directly with the `POSTGRES_*` values in `server/.env`. It refuses a `POSTGRES_HOST` that is not a loopback address.
 - Before it writes, the seed signs in to the server through dev sign-in and finds that account in the database. Thus, it never writes to a database that no dev server reads.
 - The server pins the practice revisions and writes the reader's feedback through two dev endpoints. Removal rewinds only the revisions that the server appended for the seed.
 - All reviews are complete, and the only feedback is in-app feedback. Thus, no worker picks up the demo, and nothing goes to a provider.

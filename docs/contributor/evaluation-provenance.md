@@ -1,6 +1,6 @@
 ---
 title: Evaluation provenance
-description: Trace a persisted practice observation to its review inputs, configuration, and delivery evidence.
+description: Trace a persisted practice result to its review inputs, configuration, and delivery evidence.
 ---
 
 # Evaluation provenance
@@ -21,7 +21,8 @@ stable:
 | Prompt scaffolding | `agent_job.prompt_digest` | preparation |
 | Injected files | `agent_job.inputs_digest` | preparation |
 | Repository revision, where applicable | job metadata and the evidence manifest | submission and preparation |
-| Admitted practice criteria | evidence snapshot and `observation.practice_revision_id` | preparation and persistence |
+| Admitted practice criteria | evidence snapshot and `practice_result.practice_revision_id` | preparation and persistence |
+| Practice program, attempt, and captured revision | `practice_result.provenance` | admission |
 | Model identity, usage, and cost | `agent_job` and `llm_usage_event` | completion |
 
 Use the complete versioned configuration snapshot as the behaviour-configuration identity. A selected
@@ -33,8 +34,14 @@ path-order-independent and elides occurrences of the job UUID. Equal digests the
 byte-identical sandbox workspaces or semantically equivalent evidence.
 
 The evidence snapshot records the exact admitted practice revision. Persistence carries that identity
-into `observation.practice_revision_id`.
+into `practice_result.practice_revision_id`.
 The system does not reconstruct it from a timestamp.
+
+Admission also computes `practice_result.provenance` from data that the server pinned.
+It records the job, the attempt, the practice revision, and the captured head revision.
+It records the program kind, `builtin` or `custom`, and the SHA-256 digest of the practice script.
+The digest comes from the script that the practice revision holds, not from the runner's report.
+A result recorded before the practice program contract has no provenance, and its coverage is unknown.
 
 Comparisons must be stratified by the complete behaviour configuration, prompt digest, input or case
 cohort, and practice revision. Equality in one dimension does not make runs comparable in the others.
@@ -54,14 +61,16 @@ types define delivery outcomes and suppression reasons.
 
 ## Evaluation joins
 
-- **Observation to review:** join `observation.agent_job_id` to `agent_job` for configuration, digests,
-  repository metadata, and usage. Join `observation.practice_revision_id` to the admitted criteria.
-- **Observation to feedback:** join through `feedback_observation`. Absence of a link means no feedback
-  was composed from that observation.
+- **Result to review:** join `practice_result.agent_job_id` to `agent_job` for configuration, digests,
+  repository metadata, and usage. Join `practice_result.practice_revision_id` to the admitted criteria.
+- **Result to observations:** join `practice_observation.practice_result_id`. Only a `NOT_MET` result has
+  observations.
+- **Result to feedback:** join through `feedback_evidence`. Absence of a link means no feedback
+  was composed from that result.
   It says nothing about why.
 - **Feedback to placement:** join `feedback_placement` and inspect its channel reference. Feedback state
   alone is insufficient evidence of placement.
-- **Response to observation:** join `reaction.feedback_id` through `feedback_observation`. The latest
+- **Response to result:** join `reaction.feedback_id` through `feedback_evidence`. The latest
   append-only reaction records the supplied response fields.
   Missing telemetry is unknown, not a negative response.
 
@@ -69,15 +78,15 @@ types define delivery outcomes and suppression reasons.
 
 - Digests identify materialized bytes under their stated coverage.
   They do not establish semantic equivalence or cover every sandbox-visible input.
-- Persisted observations exclude candidates rejected before persistence. Invalid-output and failure-rate
-  analysis requires a durable attempt and transition record rather than logs or observation rows alone.
+- Persisted results exclude candidate results that admission withheld or refused. Invalid-output and failure-rate
+  analysis requires a durable attempt and transition record rather than logs or result rows alone.
 - Delivery and placement evidence does not establish that feedback was read or changed behaviour.
 
 ## Approval and shown conversation feedback
 
 `feedback_approval` records the actor and decision on the exact proposed feedback package. Rejection
 records a reason.
-It does not invalidate observations. `observation_invalidation` records correction
+It does not invalidate results. `practice_result_invalidation` records correction
 and restoration separately. Neither an approval nor a valid citation proves the underlying judgment
 is correct.
 

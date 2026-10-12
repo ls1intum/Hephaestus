@@ -133,7 +133,7 @@ No repository cascade reaches it.
 Erasure occurs only when no other non-purged workspace binds to the same `Organization`. The `Organization` row itself is global: unlinked, never deleted.
 
 Derived rows go first, while the artifacts they reference still exist: the eraser publishes a
-synchronous in-transaction `ScmMirrorErasedEvent`, and `practices` (SCM-artifact observations and
+synchronous in-transaction `ScmMirrorErasedEvent`, and `practices` (SCM-artifact results and
 feedback) and `activity` (`activity_event`) listen.
 
 Disconnect and purge call the same eraser, so they reach the same end state by construction.
